@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGOSTAT" "1" "Jun 21, 2018" "4.0" "mongodb-manual"
+.TH "MONGOSTAT" "1" "Jul 25, 2019" "4.2" "mongodb-manual"
 .SH NAME
 mongostat \- MongoDB Use Statistics
 .
@@ -37,17 +37,21 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .IP \(bu 2
 \fI\%Required Access\fP
 .IP \(bu 2
+\fI\%Behavior\fP
+.IP \(bu 2
 \fI\%Options\fP
 .IP \(bu 2
 \fI\%Fields\fP
 .IP \(bu 2
-\fI\%Use\fP
+\fI\%Examples\fP
+.IP \(bu 2
+\fI\%Additional Information\fP
 .UNINDENT
 .INDENT 0.0
 .INDENT 3.5
-.IP "Mac OSX Sierra and Go 1.6 Incompatibility"
+.IP "macOS Sierra and Go 1.6 Incompatibility"
 .sp
-Users running on Mac OSX Sierra require the 3.2.10 or newer version
+Users running on macOS Sierra require the 3.2.10 or newer version
 of  mongostat\&.
 .UNINDENT
 .UNINDENT
@@ -61,29 +65,6 @@ UNIX/Linux file system utility \fBvmstat\fP, but provides data regarding
 \fBmongod\fP and \fBmongos\fP instances.
 .sp
 Run \fI\%mongostat\fP from the system command line, not the \fBmongo\fP shell.
-.sp
-\fBSEE ALSO:\fP
-.INDENT 0.0
-.INDENT 3.5
-For more information about monitoring MongoDB, see
-/administration/monitoring\&.
-.sp
-For more background on other MongoDB status outputs see:
-.INDENT 0.0
-.IP \(bu 2
-/reference/command/serverStatus
-.IP \(bu 2
-/reference/command/replSetGetStatus
-.IP \(bu 2
-/reference/command/dbStats
-.IP \(bu 2
-/reference/command/collStats
-.UNINDENT
-.sp
-For an additional utility that provides MongoDB metrics see
-mongotop\&.
-.UNINDENT
-.UNINDENT
 .SH REQUIRED ACCESS
 .sp
 In order to connect to a \fBmongod\fP that enforces authorization
@@ -94,6 +75,15 @@ with the \fB\-\-auth\fP option, specify the
 The built\-in role \fBclusterMonitor\fP provides this privilege as
 well as other privileges. To create a role with just the privilege to
 run \fI\%mongostat\fP, see create\-role\-for\-mongostat\&.
+.SH BEHAVIOR
+.SS FIPS
+.sp
+Starting in version 4.2, MongoDB removes the \fB\-\-sslFIPSMode\fP
+option for mongostat\&. mongostat
+will use FIPS compliant connections to
+\fBmongod\fP/\fBmongos\fP if the
+\fBmongod\fP/\fBmongos\fP instances are
+configured to use FIPS mode\&.
 .SH OPTIONS
 .INDENT 0.0
 .TP
@@ -123,50 +113,53 @@ New in version 3.4.6.
 
 .sp
 Specify a resolvable URI
-connection string for the \fBmongod\fP to which to
-connect.
-.sp
-The following is the standard
-URI connection scheme:
+connection string (enclose in quotes) to connect to the MongoDB deployment.
 .INDENT 7.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]
+\-\-uri "mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]"
 .ft P
 .fi
 .UNINDENT
 .UNINDENT
 .sp
-For detailed explanations of the components of this string, refer to
-the
-Connection String URI Format
-documentation.
+For information on the components of the connection string, see
+the Connection String URI Format documentation.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+For TLS/SSL options, use the command\-line options instead of the
+URI options for TLS/SSL (Available starting in
+4.2)\&.
+.UNINDENT
+.UNINDENT
 .sp
 \fBIMPORTANT:\fP
 .INDENT 7.0
 .INDENT 3.5
-The following \fI\%mongostat\fP options are incompatible with the
-\fB\-\-uri\fP option. Instead, specify these options as part of your
-\fB\-\-uri\fP connection string when applicable:
+The following command\-line options cannot be used in conjunction
+with \fI\%\-\-uri\fP option:
 .INDENT 0.0
 .IP \(bu 2
-\fB\-\-host\fP
+\fI\%\-\-host\fP
 .IP \(bu 2
-\fB\-\-port\fP
+\fI\%\-\-port\fP
 .IP \(bu 2
-\fB\-\-db\fP
+\fI\%\-\-username\fP
 .IP \(bu 2
-\fB\-\-username\fP
+\fI\%\-\-password\fP (if the
+URI connection string also includes the password)
 .IP \(bu 2
-\fB\-\-password\fP (when specifying the password as part of the
-URI connection string)
+\fI\%\-\-authenticationDatabase\fP
 .IP \(bu 2
-\fB\-\-authenticationDatabase\fP
-.IP \(bu 2
-\fB\-\-authenticationMechanism\fP
+\fI\%\-\-authenticationMechanism\fP
 .UNINDENT
+.sp
+Instead, specify these options as part of your \fI\%\-\-uri\fP
+connection string.
 .UNINDENT
 .UNINDENT
 .UNINDENT
@@ -197,6 +190,13 @@ Changed in version 3.0.0: If you use IPv6 and use the \fB<address>:<port>\fP for
 enclose the portion of an address and port combination in
 brackets (e.g. \fB[<address>]\fP).
 
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+You cannot specify both \fI\%\-\-host\fP and \fI\%\-\-uri\fP\&.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -205,6 +205,13 @@ brackets (e.g. \fB[<address>]\fP).
 .sp
 Specifies the TCP port on which the MongoDB instance listens for
 client connections.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+You cannot specify both \fI\%\-\-port\fP and \fI\%\-\-uri\fP\&.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -239,13 +246,17 @@ Specifies the \fB\&.pem\fP file that contains the root certificate chain
 from the Certificate Authority. Specify the file name of the
 \fB\&.pem\fP file using relative or absolute paths.
 .sp
-Starting in version 3.4, if \fB\-\-sslCAFile\fP or \fBssl.CAFile\fP is not
-specified and you are not using x.509 authentication, the
-system\-wide CA certificate store will be used when connecting to an
-TLS/SSL\-enabled server.
+Starting in version 3.4, if \fB\-\-tlsCAFile\fP/\fBnet.tls.CAFile\fP (or
+their aliases \fB\-\-sslCAFile\fP/\fBnet.ssl.CAFile\fP) is not specified
+and you are not using x.509 authentication, the system\-wide CA
+certificate store will be used when connecting to an TLS/SSL\-enabled
+server.
 .sp
-If using x.509 authentication, \fB\-\-sslCAFile\fP or \fBssl.CAFile\fP
-must be specified.
+To use x.509 authentication, \fB\-\-tlsCAFile\fP or \fBnet.tls.CAFile\fP
+must be specified unless using \fB\-\-tlsCertificateSelector\fP or
+\fB\-\-net.tls.certificateSelector\fP\&. Or if using the \fBssl\fP aliases,
+\fB\-\-sslCAFile\fP or \fBnet.ssl.CAFile\fP must be specified unless using
+\fB\-\-sslCertificateSelector\fP or \fBnet.ssl.certificateSelector\fP\&.
 .sp
 \fBWARNING:\fP
 .INDENT 7.0
@@ -330,19 +341,23 @@ the use of invalid certificates. When using the
 warning the use of the invalid certificate.
 .sp
 Starting in MongoDB 4.0, if you specify
-\fB\-\-sslAllowInvalidCertificates\fP or \fBssl.allowInvalidCertificates:
-true\fP when using x.509 authentication, an invalid certificate is
-only sufficient to establish a TLS/SSL connection but is
-\fIinsufficient\fP for authentication.
+\fB\-\-sslAllowInvalidCertificates\fP or
+\fBnet.ssl.allowInvalidCertificates: true\fP (or in MongoDB 4.2, the
+alias \fB\-\-tlsAllowInvalidateCertificates\fP or
+\fBnet.tls.allowInvalidCertificates: true\fP) when using x.509
+authentication, an invalid certificate is only sufficient to
+establish a TLS/SSL connection but is \fIinsufficient\fP for
+authentication.
+.sp
+# We created a separate blurb for tls in the ssl\-clients page.
 .sp
 \fBWARNING:\fP
 .INDENT 7.0
 .INDENT 3.5
-For TLS/SSL connections to \fBmongod\fP and
-\fBmongos\fP, avoid using
-\fB\-\-sslAllowInvalidCertificates\fP if possible and only use
-\fB\-\-sslAllowInvalidCertificates\fP on systems where intrusion is
-not possible.
+Although available, avoid using the
+\fB\-\-sslAllowInvalidCertificates\fP option if possible. If the use of
+\fB\-\-sslAllowInvalidCertificates\fP is necessary, only use the option
+on systems where intrusion is not possible.
 .sp
 If the \fBmongo\fP shell (and other
 mongodb\-tools\-support\-ssl) runs with the
@@ -352,7 +367,9 @@ mongodb\-tools\-support\-ssl) will not attempt to validate
 the server certificates. This creates a vulnerability to expired
 \fBmongod\fP and \fBmongos\fP certificates as
 well as to foreign processes posing as valid
-\fBmongod\fP or \fBmongos\fP instances.
+\fBmongod\fP or \fBmongos\fP instances. If you
+only need to disable the validation of the hostname in the
+TLS/SSL certificates, see \fB\-\-sslAllowInvalidHostnames\fP\&.
 .UNINDENT
 .UNINDENT
 .sp
@@ -376,52 +393,50 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sslFIPSMode
-New in version 2.6.
-
-.sp
-Directs the \fBmongostat\fP to use the FIPS mode of the installed OpenSSL
-library. Your system must have a FIPS compliant OpenSSL library to use
-the \fI\%\-\-sslFIPSMode\fP option.
+.B \-\-username <username>, \-u <username>
+Specifies a username with which to authenticate to a MongoDB database
+that uses authentication. Use in conjunction with the \fI\%\-\-password\fP and
+\fI\%\-\-authenticationDatabase\fP options.
 .sp
 \fBNOTE:\fP
 .INDENT 7.0
 .INDENT 3.5
-FIPS\-compatible TLS/SSL is
-available only in \fI\%MongoDB Enterprise\fP\&. See
-/tutorial/configure\-fips for more information.
+You cannot specify both \fI\%\-\-username\fP and \fI\%\-\-uri\fP\&.
 .UNINDENT
 .UNINDENT
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-username <username>, \-u <username>
-Specifies a username with which to authenticate to a MongoDB database
-that uses authentication. Use in conjunction with the \fB\-\-password\fP and
-\fB\-\-authenticationDatabase\fP options.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-password <password>, \-p <password>
 Specifies a password with which to authenticate to a MongoDB database
-that uses authentication. Use in conjunction with the \fB\-\-username\fP and
-\fB\-\-authenticationDatabase\fP options.
+that uses authentication. Use in conjunction with the \fI\%\-\-username\fP and
+\fI\%\-\-authenticationDatabase\fP options.
 .sp
-Changed in version 3.0.0: If you do not specify an argument for \fI\%\-\-password\fP, \fBmongostat\fP returns
-an error.
-
-.sp
-Changed in version 3.0.2: If you wish \fBmongostat\fP to prompt the user
+Changed in version 3.0.2: To prompt the user
 for the password, pass the \fI\%\-\-username\fP option without
 \fI\%\-\-password\fP or specify an empty string as the \fI\%\-\-password\fP value,
 as in \fB\-\-password ""\fP .
 
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+You cannot specify both \fI\%\-\-password\fP and \fI\%\-\-uri\fP\&.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-authenticationDatabase <dbname>
-Specifies the database in which the user is created.
+Specifies the authentication database where the specified \fI\%\-\-username\fP has been created.
 See user\-authentication\-database\&.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+You cannot specify both \fI\%\-\-authenticationDatabase\fP and \fI\%\-\-uri\fP\&.
+.UNINDENT
+.UNINDENT
 .sp
 \fI\%\-\-authenticationDatabase\fP is required for \fBmongod\fP
 and \fBmongos\fP instances that use authentication\&.
@@ -493,6 +508,13 @@ passwords in plain text. This mechanism is available only in
 T}
 _
 .TE
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+You cannot specify both \fI\%\-\-authenticationMechanism\fP and \fI\%\-\-uri\fP\&.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -782,9 +804,6 @@ Changed in version 3.0.
 .sp
 For the storage\-wiredtiger, \fBflushes\fP refers to the number
 of WiredTiger checkpoints triggered between each polling interval.
-.sp
-For the storage\-mmapv1, \fBflushes\fP represents the number of
-fsync operations per second.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -810,33 +829,9 @@ cache that is in use, calculated by
 .UNINDENT
 .INDENT 0.0
 .TP
-.B mapped
-Changed in version 3.0.
-
-.sp
-Only for storage\-mmapv1\&. The total amount of data mapped in
-megabytes. This is the total data size at the time of the last
-\fI\%mongostat\fP call.
-.UNINDENT
-.INDENT 0.0
-.TP
 .B vsize
 The amount of virtual memory in megabytes used by the process at
 the time of the last \fI\%mongostat\fP call.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B non\-mapped
-Changed in version 3.0.
-
-.sp
-Only for storage\-mmapv1\&.
-.sp
-\fIOptional\fP\&. The total amount of virtual memory excluding all mapped memory at
-the time of the last \fI\%mongostat\fP call.
-.sp
-\fI\%mongostat\fP only returns this value when started with the
-\fI\%\-\-all\fP option.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -846,76 +841,12 @@ the time of the last \fI\%mongostat\fP call.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B faults
-Changed in version 3.0.
-
-.sp
-Only for storage\-mmapv1\&. The number of page faults per second.
-.sp
-Changed in version 2.1: Before version 2.1, this value was only provided for MongoDB
-instances running on Linux hosts.
-
-.UNINDENT
-.INDENT 0.0
-.TP
-.B lr
-New in version 3.2.
-
-.sp
-Only for storage\-mmapv1\&. The percentage of read lock
-acquisitions that had to wait. \fI\%mongostat\fP displays \fBlr|lw\fP
-if a lock acquisition waited.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B lw
-New in version 3.2.
-
-.sp
-Only for storage\-mmapv1\&. The percentage of write lock
-acquisitions that had to wait. \fI\%mongostat\fP displays \fBlr|lw\fP
-if a lock acquisition waited.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B lrt
-New in version 3.2.
-
-.sp
-Only for storage\-mmapv1\&. The average acquire time, in
-microseconds, of read lock acquisitions that waited.
-\fI\%mongostat\fP displays \fBlrt|lwt\fP if a lock acquisition
-waited.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B lwt
-New in version 3.2.
-
-.sp
-Only for storage\-mmapv1\&. The average acquire time, in
-microseconds, of write lock acquisitions that waited.
-\fI\%mongostat\fP displays \fBlrt|lwt\fP if a lock acquisition
-waited.
-.UNINDENT
-.INDENT 0.0
-.TP
 .B locked
 Changed in version 3.0: Only appears when \fI\%mongostat\fP runs against pre\-3.0
 versions of MongoDB instances.
 
 .sp
 The percent of time in a global write lock.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B idx miss
-Changed in version 3.0.
-
-.sp
-Only for storage\-mmapv1\&. The percent of index access attempts
-that required a page fault to load a btree node. This is a sampled
-value.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -1004,7 +935,7 @@ _
 T{
 RTR
 T}	T{
-mongos process (“router”)
+mongos process ("router")
 T}
 _
 T{
@@ -1015,7 +946,7 @@ T}
 _
 .TE
 .UNINDENT
-.SH USE
+.SH EXAMPLES
 .SS Specify \fBmongostat\fP Collection Period and Frequency
 .sp
 In the first example, \fI\%mongostat\fP will return data every
@@ -1080,7 +1011,7 @@ New in version 3.4.
 \fBserverStatus\fP output to add to the default
 \fI\%mongostat\fP output. The following example adds the \fBhost\fP
 and \fBversion\fP fields as well as the \fBnetwork.numRequests\fP field,
-which will display as “network requests”, to the default
+which will display as "network requests", to the default
 \fI\%mongostat\fP output:
 .INDENT 0.0
 .INDENT 3.5
@@ -1155,9 +1086,9 @@ help you view the performance of your \fBmongod\fP instance.
 .sp
 The following example reports on the rate of change of the
 \fBmetrics.document.inserted\fP \fBserverStatus\fP field. The
-invocation uses \fI\%\-o\fP’s ability to specify the name of an column
-to label \fBmetrics.document.inserted.rate()\fP as “inserted rate” and
-\fBmetrics.document.inserted\fP as “inserted”:
+invocation uses \fI\%\-o\fP\(aqs ability to specify the name of an column
+to label \fBmetrics.document.inserted.rate()\fP as "inserted rate" and
+\fBmetrics.document.inserted\fP as "inserted":
 .INDENT 0.0
 .INDENT 3.5
 .sp
@@ -1285,9 +1216,28 @@ Press \(aq?\(aq to toggle help
 .fi
 .UNINDENT
 .UNINDENT
+.SH ADDITIONAL INFORMATION
+.sp
+For more information about monitoring MongoDB, see
+/administration/monitoring\&.
+.sp
+For more background on other MongoDB status outputs see:
+.INDENT 0.0
+.IP \(bu 2
+/reference/command/serverStatus
+.IP \(bu 2
+/reference/command/replSetGetStatus
+.IP \(bu 2
+/reference/command/dbStats
+.IP \(bu 2
+/reference/command/collStats
+.UNINDENT
+.sp
+For an additional utility that provides MongoDB metrics see
+mongotop\&.
 .SH AUTHOR
 MongoDB Documentation Project
 .SH COPYRIGHT
-2008-2018
+2008-2019
 .\" Generated by docutils manpage writer.
 .

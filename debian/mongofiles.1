@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGOFILES" "1" "Jun 21, 2018" "4.0" "mongodb-manual"
+.TH "MONGOFILES" "1" "Jul 25, 2019" "4.2" "mongodb-manual"
 .SH NAME
 mongofiles \- MongoDB GridFS Utility
 .
@@ -37,6 +37,8 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .IP \(bu 2
 \fI\%Required Access\fP
 .IP \(bu 2
+\fI\%Behavior\fP
+.IP \(bu 2
 \fI\%Options\fP
 .IP \(bu 2
 \fI\%Commands\fP
@@ -45,9 +47,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .UNINDENT
 .INDENT 0.0
 .INDENT 3.5
-.IP "Mac OSX Sierra and Go 1.6 Incompatibility"
+.IP "macOS Sierra and Go 1.6 Incompatibility"
 .sp
-Users running on Mac OSX Sierra require the 3.2.10 or newer version
+Users running on macOS Sierra require the 3.2.10 or newer version
 of  mongofiles\&.
 .UNINDENT
 .UNINDENT
@@ -79,7 +81,7 @@ these options to control the behavior of \fI\%mongofiles\fP\&.
 \fI\%Commands\fP\&. Use one of these commands to
 determine the action of \fI\%mongofiles\fP\&.
 .IP 3. 3
-A filename which is either: the name of a file on your local’s file
+A filename which is either: the name of a file on your local\(aqs file
 system, or a GridFS object.
 .UNINDENT
 .sp
@@ -89,7 +91,7 @@ Run \fI\%mongofiles\fP from the system command line, not the \fBmongo\fP shell.
 .INDENT 0.0
 .INDENT 3.5
 For replica sets,
-\fI\%mongofiles\fP can only read from the set’s
+\fI\%mongofiles\fP can only read from the set\(aqs
 primary\&.
 .UNINDENT
 .UNINDENT
@@ -107,6 +109,38 @@ the \fBread\fP role for the accessed database when using the
 the \fBreadWrite\fP role for the accessed database when using
 the \fBput\fP or \fBdelete\fP commands.
 .UNINDENT
+.SH BEHAVIOR
+.SS FIPS
+.sp
+Starting in version 4.2, MongoDB removes the \fB\-\-sslFIPSMode\fP
+option for mongofiles\&. mongofiles
+will use FIPS compliant connections to
+\fBmongod\fP/\fBmongos\fP if the
+\fBmongod\fP/\fBmongos\fP instances are
+configured to use FIPS mode\&.
+.SS Read Preference
+.sp
+By default, \fI\%mongofiles\fP uses read preference
+\fBprimary\fP\&. To override the default, you can specify the
+read preference in the
+\fI\%\-\-readPreference\fP command line
+option or in the \fI\%\-\-uri connection string\fP\&.
+.sp
+Starting in version 4.2, if you specify read preference in the URI
+string and the \fI\%\-\-readPreference\fP, the \fI\%\-\-readPreference\fP value overrides the read preference specified in the
+URI string.
+.sp
+In earlier versions, the two options are incompatible.
+.SS Write Concern
+.sp
+Starting in version 4.2, you can specify both the
+\fI\%\-\-writeConcern\fP and the
+\fI\%\-\-uri connection string\fP option. If write
+concern is specified using both options, the
+\fI\%\-\-writeConcern\fP value overrides
+the write concern specified in the URI string.
+.sp
+In earlier versions, the two options are incompatible.
 .SH OPTIONS
 .sp
 Changed in version 3.0.0: \fI\%mongofiles\fP removed the \fB\-\-dbpath\fP as well as related
@@ -156,50 +190,55 @@ New in version 3.4.6.
 
 .sp
 Specify a resolvable URI
-connection string for the \fBmongod\fP to which to
-connect.
-.sp
-The following is the standard
-URI connection scheme:
+connection string (enclose in quotes) to connect to the MongoDB deployment.
 .INDENT 7.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]
+\-\-uri "mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]"
 .ft P
 .fi
 .UNINDENT
 .UNINDENT
 .sp
-For detailed explanations of the components of this string, refer to
-the
-Connection String URI Format
-documentation.
+For information on the components of the connection string, see
+the Connection String URI Format documentation.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+For TLS/SSL options, use the command\-line options instead of the
+URI options for TLS/SSL (Available starting in
+4.2)\&.
+.UNINDENT
+.UNINDENT
 .sp
 \fBIMPORTANT:\fP
 .INDENT 7.0
 .INDENT 3.5
-The following \fI\%mongofiles\fP options are incompatible with the
-\fB\-\-uri\fP option. Instead, specify these options as part of your
-\fB\-\-uri\fP connection string when applicable:
+The following command\-line options cannot be used in conjunction
+with \fI\%\-\-uri\fP option:
 .INDENT 0.0
 .IP \(bu 2
-\fB\-\-host\fP
+\fI\%\-\-host\fP
 .IP \(bu 2
-\fB\-\-port\fP
+\fI\%\-\-port\fP
 .IP \(bu 2
-\fB\-\-db\fP
+\fI\%\-\-db\fP
 .IP \(bu 2
-\fB\-\-username\fP
+\fI\%\-\-username\fP
 .IP \(bu 2
-\fB\-\-password\fP (when specifying the password as part of the
-URI connection string)
+\fI\%\-\-password\fP  (if the
+URI connection string also includes the password)
 .IP \(bu 2
-\fB\-\-authenticationDatabase\fP
+\fI\%\-\-authenticationDatabase\fP
 .IP \(bu 2
-\fB\-\-authenticationMechanism\fP
+\fI\%\-\-authenticationMechanism\fP
 .UNINDENT
+.sp
+Instead, specify these options as part of your \fI\%\-\-uri\fP
+connection string.
 .UNINDENT
 .UNINDENT
 .UNINDENT
@@ -212,6 +251,13 @@ to a MongoDB process running on the localhost port number \fB27017\fP\&.
 .sp
 Optionally, specify a port number to connect a MongoDB instance running
 on a port other than 27017.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+You cannot specify both \fI\%\-\-host\fP and \fI\%\-\-uri\fP\&.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -220,6 +266,13 @@ on a port other than 27017.
 .sp
 Specifies the TCP port on which the MongoDB instance listens for
 client connections.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+You cannot specify both \fI\%\-\-port\fP and \fI\%\-\-uri\fP\&.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -254,13 +307,17 @@ Specifies the \fB\&.pem\fP file that contains the root certificate chain
 from the Certificate Authority. Specify the file name of the
 \fB\&.pem\fP file using relative or absolute paths.
 .sp
-Starting in version 3.4, if \fB\-\-sslCAFile\fP or \fBssl.CAFile\fP is not
-specified and you are not using x.509 authentication, the
-system\-wide CA certificate store will be used when connecting to an
-TLS/SSL\-enabled server.
+Starting in version 3.4, if \fB\-\-tlsCAFile\fP/\fBnet.tls.CAFile\fP (or
+their aliases \fB\-\-sslCAFile\fP/\fBnet.ssl.CAFile\fP) is not specified
+and you are not using x.509 authentication, the system\-wide CA
+certificate store will be used when connecting to an TLS/SSL\-enabled
+server.
 .sp
-If using x.509 authentication, \fB\-\-sslCAFile\fP or \fBssl.CAFile\fP
-must be specified.
+To use x.509 authentication, \fB\-\-tlsCAFile\fP or \fBnet.tls.CAFile\fP
+must be specified unless using \fB\-\-tlsCertificateSelector\fP or
+\fB\-\-net.tls.certificateSelector\fP\&. Or if using the \fBssl\fP aliases,
+\fB\-\-sslCAFile\fP or \fBnet.ssl.CAFile\fP must be specified unless using
+\fB\-\-sslCertificateSelector\fP or \fBnet.ssl.certificateSelector\fP\&.
 .sp
 \fBWARNING:\fP
 .INDENT 7.0
@@ -345,19 +402,23 @@ the use of invalid certificates. When using the
 warning the use of the invalid certificate.
 .sp
 Starting in MongoDB 4.0, if you specify
-\fB\-\-sslAllowInvalidCertificates\fP or \fBssl.allowInvalidCertificates:
-true\fP when using x.509 authentication, an invalid certificate is
-only sufficient to establish a TLS/SSL connection but is
-\fIinsufficient\fP for authentication.
+\fB\-\-sslAllowInvalidCertificates\fP or
+\fBnet.ssl.allowInvalidCertificates: true\fP (or in MongoDB 4.2, the
+alias \fB\-\-tlsAllowInvalidateCertificates\fP or
+\fBnet.tls.allowInvalidCertificates: true\fP) when using x.509
+authentication, an invalid certificate is only sufficient to
+establish a TLS/SSL connection but is \fIinsufficient\fP for
+authentication.
+.sp
+# We created a separate blurb for tls in the ssl\-clients page.
 .sp
 \fBWARNING:\fP
 .INDENT 7.0
 .INDENT 3.5
-For TLS/SSL connections to \fBmongod\fP and
-\fBmongos\fP, avoid using
-\fB\-\-sslAllowInvalidCertificates\fP if possible and only use
-\fB\-\-sslAllowInvalidCertificates\fP on systems where intrusion is
-not possible.
+Although available, avoid using the
+\fB\-\-sslAllowInvalidCertificates\fP option if possible. If the use of
+\fB\-\-sslAllowInvalidCertificates\fP is necessary, only use the option
+on systems where intrusion is not possible.
 .sp
 If the \fBmongo\fP shell (and other
 mongodb\-tools\-support\-ssl) runs with the
@@ -367,7 +428,9 @@ mongodb\-tools\-support\-ssl) will not attempt to validate
 the server certificates. This creates a vulnerability to expired
 \fBmongod\fP and \fBmongos\fP certificates as
 well as to foreign processes posing as valid
-\fBmongod\fP or \fBmongos\fP instances.
+\fBmongod\fP or \fBmongos\fP instances. If you
+only need to disable the validation of the hostname in the
+TLS/SSL certificates, see \fB\-\-sslAllowInvalidHostnames\fP\&.
 .UNINDENT
 .UNINDENT
 .sp
@@ -391,52 +454,50 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sslFIPSMode
-New in version 2.6.
-
-.sp
-Directs the \fBmongofiles\fP to use the FIPS mode of the installed OpenSSL
-library. Your system must have a FIPS compliant OpenSSL library to use
-the \fI\%\-\-sslFIPSMode\fP option.
+.B \-\-username <username>, \-u <username>
+Specifies a username with which to authenticate to a MongoDB database
+that uses authentication. Use in conjunction with the \fI\%\-\-password\fP and
+\fI\%\-\-authenticationDatabase\fP options.
 .sp
 \fBNOTE:\fP
 .INDENT 7.0
 .INDENT 3.5
-FIPS\-compatible TLS/SSL is
-available only in \fI\%MongoDB Enterprise\fP\&. See
-/tutorial/configure\-fips for more information.
+You cannot specify both \fI\%\-\-username\fP and \fI\%\-\-uri\fP\&.
 .UNINDENT
 .UNINDENT
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-username <username>, \-u <username>
-Specifies a username with which to authenticate to a MongoDB database
-that uses authentication. Use in conjunction with the \fB\-\-password\fP and
-\fB\-\-authenticationDatabase\fP options.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-password <password>, \-p <password>
 Specifies a password with which to authenticate to a MongoDB database
-that uses authentication. Use in conjunction with the \fB\-\-username\fP and
-\fB\-\-authenticationDatabase\fP options.
+that uses authentication. Use in conjunction with the \fI\%\-\-username\fP and
+\fI\%\-\-authenticationDatabase\fP options.
 .sp
-Changed in version 3.0.0: If you do not specify an argument for \fI\%\-\-password\fP, \fBmongofiles\fP returns
-an error.
-
-.sp
-Changed in version 3.0.2: If you wish \fBmongofiles\fP to prompt the user
+Changed in version 3.0.2: To prompt the user
 for the password, pass the \fI\%\-\-username\fP option without
 \fI\%\-\-password\fP or specify an empty string as the \fI\%\-\-password\fP value,
 as in \fB\-\-password ""\fP .
 
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+You cannot specify both \fI\%\-\-password\fP and \fI\%\-\-uri\fP\&.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-authenticationDatabase <dbname>
-Specifies the database in which the user is created.
+Specifies the authentication database where the specified \fI\%\-\-username\fP has been created.
 See user\-authentication\-database\&.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+You cannot specify both \fI\%\-\-authenticationDatabase\fP and \fI\%\-\-uri\fP\&.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -505,6 +566,13 @@ passwords in plain text. This mechanism is available only in
 T}
 _
 .TE
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+You cannot specify both \fI\%\-\-authenticationMechanism\fP and \fI\%\-\-uri\fP\&.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -532,12 +600,13 @@ This option is available only in MongoDB Enterprise.
 .TP
 .B \-\-db <database>, \-d <database>
 Specifies the name of the database on which to run the \fBmongofiles\fP\&.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+You cannot specify both \fI\%\-\-db\fP and \fI\%\-\-uri\fP\&.
 .UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-collection <collection>, \-c <collection>
-This option has no use in this context and a future release may
-remove it. See \fI\%SERVER\-4931\fP for more information.
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -548,7 +617,7 @@ operations.
 In the \fBmongofiles put\fP and \fBmongofiles get\fP commands,
 the required \fB<filename>\fP modifier refers to the name the object will
 have in GridFS. \fI\%mongofiles\fP assumes that this reflects the
-file’s name on the local file system. This setting overrides this
+file\(aqs name on the local file system. This setting overrides this
 default.
 .UNINDENT
 .INDENT 0.0
@@ -583,9 +652,81 @@ GridFS prefix to use.
 \fIDefault\fP: majority
 .sp
 Specifies the write concern for each write operation that \fBmongofiles\fP
-writes to the target database.
+performs.
 .sp
-Specify the write concern as a document with w options\&.
+Specify the write concern as a document with w options:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+\-\-writeConcern "{w:\(aqmajority\(aq}"
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+If the write concern is also included in the \fI\%\-\-uri
+connection string\fP, the command\-line
+\fI\%\-\-writeConcern\fP overrides the write concern specified in
+the URI string.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-readPreference <string|document>
+\fIDefault\fP: \fBprimary\fP
+.sp
+Specifies the read preference for
+\fBmongofiles\fP\&. The \fI\%\-\-readPreference\fP option can take:
+.INDENT 7.0
+.IP \(bu 2
+A string if specifying only the read preference mode:
+.INDENT 2.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+\-\-readPreference secondary
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.IP \(bu 2
+A quote\-enclosed document to specify the mode, the optional
+read preference tag sets, and the
+optional maxStalenessSeconds:
+.INDENT 2.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+\-\-readPreference \(aq{mode: "secondary", tagSets: [ { "region": "east" } ], maxStalenessSeconds: 120}\(aq
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+If specifying the maxStalenessSeconds, the value must be greater than or equal to 90.
+.sp
+New in version 4.2.
+
+.UNINDENT
+.sp
+\fBmongofiles\fP defaults to \fBprimary\fP
+read preference\&.
+.sp
+Starting in version 4.2, if the read
+preference is also included in the \fI\%\-\-uri connection string\fP, the command\-line \fI\%\-\-readPreference\fP overrides the read preference
+specified in the URI string.
+.sp
+\fBWARNING:\fP
+.INDENT 7.0
+.INDENT 3.5
+Using a read preference other than
+\fBprimary\fP with a connection to a \fBmongos\fP may produce
+inconsistencies, duplicates, or result in missed documents.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .SH COMMANDS
 .INDENT 0.0
@@ -620,7 +761,7 @@ system.
 .sp
 Here, \fB<filename>\fP refers to the name the object will have in
 GridFS. \fI\%mongofiles\fP writes the file to the local
-file system using the file’s \fBfilename\fP in GridFS. To choose a
+file system using the file\(aqs \fBfilename\fP in GridFS. To choose a
 different location for the file on the local file system, use the
 \fI\%\-\-local\fP option.
 .UNINDENT
@@ -634,7 +775,7 @@ Copy the specified file from GridFS storage to the local file system.
 .sp
 Here \fB<ObjectId>\fP refers to the extended JSON \fB_id\fP of the
 object in GridFS. \fI\%mongofiles\fP writes the file to the local
-file system using the file’s \fBfilename\fP in GridFS. To choose a
+file system using the file\(aqs \fBfilename\fP in GridFS. To choose a
 different location for the file on the local file system, use the
 \fI\%\-\-local\fP option.
 .UNINDENT
@@ -684,7 +825,7 @@ mongofiles \-\-host db1.example.net \-\-port 37017 \-d records list
 .UNINDENT
 .UNINDENT
 .sp
-Modify any of the following commands as needed if you’re connecting
+Modify any of the following commands as needed if you\(aqre connecting
 the \fBmongod\fP instances on different ports or hosts.
 .sp
 To upload a file named \fB32\-corinth.lp\fP to the GridFS collection in
@@ -771,6 +912,6 @@ You must include quotation marks around the \fB_id\fP\&.
 .SH AUTHOR
 MongoDB Documentation Project
 .SH COPYRIGHT
-2008-2018
+2008-2019
 .\" Generated by docutils manpage writer.
 .
