@@ -40,17 +40,18 @@ constexpr StringData ExplainOptions::kVerbosityName;
 constexpr StringData ExplainOptions::kQueryPlannerVerbosityStr;
 constexpr StringData ExplainOptions::kExecStatsVerbosityStr;
 constexpr StringData ExplainOptions::kAllPlansExecutionVerbosityStr;
+const StringData kExplain = "explain";
 
 StringData ExplainOptions::verbosityString(ExplainOptions::Verbosity verbosity) {
     switch (verbosity) {
-        case Verbosity::kQueryPlanner:
-            return kQueryPlannerVerbosityStr;
-        case Verbosity::kExecStats:
-            return kExecStatsVerbosityStr;
-        case Verbosity::kExecAllPlans:
-            return kAllPlansExecutionVerbosityStr;
-        default:
-            MONGO_UNREACHABLE;
+    case Verbosity::kQueryPlanner:
+        return kQueryPlannerVerbosityStr;
+    case Verbosity::kExecStats:
+        return kExecStatsVerbosityStr;
+    case Verbosity::kExecAllPlans:
+        return kAllPlansExecutionVerbosityStr;
+    default:
+        MONGO_UNREACHABLE;
     }
 }
 
@@ -60,25 +61,36 @@ StatusWith<ExplainOptions::Verbosity> ExplainOptions::parseCmdBSON(const BSONObj
     }
 
     auto verbosity = Verbosity::kExecAllPlans;
-    if (auto verbosityElt = cmdObj[kVerbosityName]) {
-        if (verbosityElt.type() != BSONType::String) {
-            return Status(ErrorCodes::FailedToParse, "explain verbosity must be a string");
-        }
+    for (auto && elem : cmdObj) {
+        auto fieldName = elem.fieldNameStringData();
+        auto verbStr = elem.valueStringData();
 
-        auto verbStr = verbosityElt.valueStringData();
-        if (verbStr == kQueryPlannerVerbosityStr) {
-            verbosity = Verbosity::kQueryPlanner;
-        } else if (verbStr == kExecStatsVerbosityStr) {
-            verbosity = Verbosity::kExecStats;
-        } else if (verbStr != kAllPlansExecutionVerbosityStr) {
-            return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "verbosity string must be one of {'"
-                                        << kQueryPlannerVerbosityStr
-                                        << "', '"
-                                        << kExecStatsVerbosityStr
-                                        << "', '"
-                                        << kAllPlansExecutionVerbosityStr
-                                        << "'}");
+        // Assures the first the command is 'explain'.
+        if (fieldName == kExplain) {
+            continue;
+        } else if (fieldName[0] == '$') {
+            continue;
+        }// Ignore top-level fields prefixed with $. They are for the command
+        // processor, not us.
+        else if (elem.type() != BSONType::String) {
+            return Status(ErrorCodes::FailedToParse, "Field name must be a string");
+        } else if (fieldName == kVerbosityName) {
+            if (verbStr == kQueryPlannerVerbosityStr) {
+                verbosity = Verbosity::kQueryPlanner;
+            } else if (verbStr == kExecStatsVerbosityStr) {
+                verbosity = Verbosity::kExecStats;
+            } else if (verbStr != kAllPlansExecutionVerbosityStr) {
+                return Status(ErrorCodes::FailedToParse,
+                              str::stream() << "verbosity string must be one of {'"
+                              << kQueryPlannerVerbosityStr
+                              << "', '"
+                              << kExecStatsVerbosityStr
+                              << "', '"
+                              << kAllPlansExecutionVerbosityStr
+                              << "'}");
+            }
+        } else {
+            return Status(ErrorCodes::FailedToParse, "Invalid commands");
         }
     }
 
