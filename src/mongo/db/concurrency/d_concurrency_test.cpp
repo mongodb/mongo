@@ -120,6 +120,12 @@ public:
 
         return result;
     }
+
+    void waitForLockerToHaveWaitingResource(Locker* locker) {
+        while (!locker->getWaitingResource().isValid()) {
+            sleepmillis(0);
+        }
+    }
 };
 
 
@@ -2241,6 +2247,101 @@ TEST_F(DConcurrencyTestFixture, RSTLLockGuardResilientToExceptionThrownBeforeWai
     firstRSTL.reacquire();
     ASSERT_TRUE(firstRSTL.isLocked());
     ASSERT_TRUE(firstOpCtx->lockState()->isRSTLExclusive());
+}
+
+TEST_F(DConcurrencyTestFixture, FailPointInLockDoesNotFailUninterruptibleGlobalNonIntentLocks) {
+    FailPointEnableBlock failWaitingNonPartitionedLocks("failNonIntentLocksIfWaitNeeded");
+
+    LockerImpl locker1;
+    LockerImpl locker2;
+    LockerImpl locker3;
+
+    {
+        locker1.lockGlobal(MODE_IX);
+
+        // MODE_S attempt.
+        stdx::thread t2([&]() {
+            UninterruptibleLockGuard noInterrupt(&locker2);
+            locker2.lockGlobal(MODE_S);
+        });
+
+        // Wait for the thread to attempt to acquire the global lock in MODE_S.
+        waitForLockerToHaveWaitingResource(&locker2);
+
+        locker1.unlockGlobal();
+        t2.join();
+        locker2.unlockGlobal();
+    }
+
+    {
+        locker1.lockGlobal(MODE_IX);
+
+        // MODE_X attempt.
+        stdx::thread t3([&]() {
+            UninterruptibleLockGuard noInterrupt(&locker3);
+            locker3.lockGlobal(MODE_X);
+        });
+
+        // Wait for the thread to attempt to acquire the global lock in MODE_X.
+        waitForLockerToHaveWaitingResource(&locker3);
+
+        locker1.unlockGlobal();
+        t3.join();
+        locker3.unlockGlobal();
+    }
+}
+
+TEST_F(DConcurrencyTestFixture, FailPointInLockDoesNotFailUninterruptibleNonIntentLocks) {
+    FailPointEnableBlock failWaitingNonPartitionedLocks("failNonIntentLocksIfWaitNeeded");
+
+    LockerImpl locker1;
+    LockerImpl locker2;
+    LockerImpl locker3;
+
+    // Granted MODE_X lock, fail incoming MODE_S and MODE_X.
+    const ResourceId resId(RESOURCE_COLLECTION, "TestDB.collection"_sd);
+
+    locker1.lockGlobal(MODE_IX);
+
+    {
+        locker1.lock(resId, MODE_X);
+
+        // MODE_S attempt.
+        stdx::thread t2([&]() {
+            UninterruptibleLockGuard noInterrupt(&locker2);
+            locker2.lockGlobal(MODE_IS);
+            locker2.lock(resId, MODE_S);
+        });
+
+        // Wait for the thread to attempt to acquire the collection lock in MODE_S.
+        waitForLockerToHaveWaitingResource(&locker2);
+
+        locker1.unlock(resId);
+        t2.join();
+        locker2.unlock(resId);
+        locker2.unlockGlobal();
+    }
+
+    {
+        locker1.lock(resId, MODE_X);
+
+        // MODE_X attempt.
+        stdx::thread t3([&]() {
+            UninterruptibleLockGuard noInterrupt(&locker3);
+            locker3.lockGlobal(MODE_IX);
+            locker3.lock(resId, MODE_X);
+        });
+
+        // Wait for the thread to attempt to acquire the collection lock in MODE_X.
+        waitForLockerToHaveWaitingResource(&locker3);
+
+        locker1.unlock(resId);
+        t3.join();
+        locker3.unlock(resId);
+        locker3.unlockGlobal();
+    }
+
+    locker1.unlockGlobal();
 }
 
 }  // namespace

@@ -904,7 +904,7 @@ void LockerImpl::lockComplete(OperationContext* opCtx,
 
     // This failpoint is used to time out non-intent locks if they cannot be granted immediately.
     // Testing-only.
-    if (MONGO_FAIL_POINT(failNonIntentLocksIfWaitNeeded)) {
+    if (!_uninterruptibleLocksRequested && MONGO_FAIL_POINT(failNonIntentLocksIfWaitNeeded)) {
         uassert(ErrorCodes::LockTimeout,
                 str::stream() << "Cannot immediately acquire lock '" << resId.toString()
                               << "'. Timing out due to failpoint.",
