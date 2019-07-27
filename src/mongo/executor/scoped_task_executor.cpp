@@ -247,10 +247,9 @@ private:
                 // modify the status field.
                 auto args = cargs;
 
-                IF_CONSTEXPR(std::is_same_v<ArgsT, CallbackArgs>) {
+                if constexpr (std::is_same_v<ArgsT, CallbackArgs>) {
                     args.status = kShutdownStatus;
-                }
-                else {
+                } else {
                     static_assert(std::is_same_v<ArgsT, RemoteCommandOnAnyCallbackArgs>,
                                   "_wrapCallback only supports CallbackArgs and "
                                   "RemoteCommandOnAnyCallbackArgs");

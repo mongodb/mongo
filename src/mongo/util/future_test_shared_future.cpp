@@ -194,21 +194,20 @@ TEST(SharedFuture, NoStackOverflow_Destruction) {
 }
 
 TEST(SharedFuture, ThenChaining_Sync) {
-    FUTURE_SUCCESS_TEST([] {},
-                        [](/*Future<void>*/ auto&& fut) {
-                            const auto exec = InlineCountingExecutor::make();
+    FUTURE_SUCCESS_TEST(
+        [] {},
+        [](/*Future<void>*/ auto&& fut) {
+            const auto exec = InlineCountingExecutor::make();
 
-                            auto res = std::move(fut).then([] { return SharedSemiFuture(1); });
+            auto res = std::move(fut).then([] { return SharedSemiFuture(1); });
 
-                            IF_CONSTEXPR(
-                                std::is_same_v<std::decay_t<decltype(fut)>, ExecutorFuture<void>>) {
-                                static_assert(std::is_same_v<decltype(res), ExecutorFuture<int>>);
-                            }
-                            else {
-                                static_assert(std::is_same_v<decltype(res), SemiFuture<int>>);
-                            }
-                            ASSERT_EQ(res.get(), 1);
-                        });
+            if constexpr (std::is_same_v<std::decay_t<decltype(fut)>, ExecutorFuture<void>>) {
+                static_assert(std::is_same_v<decltype(res), ExecutorFuture<int>>);
+            } else {
+                static_assert(std::is_same_v<decltype(res), SemiFuture<int>>);
+            }
+            ASSERT_EQ(res.get(), 1);
+        });
 }
 
 TEST(SharedFuture, ThenChaining_Async) {
@@ -219,10 +218,9 @@ TEST(SharedFuture, ThenChaining_Async) {
 
             auto res = std::move(fut).then([] { return async([] { return 1; }).share(); });
 
-            IF_CONSTEXPR(std::is_same_v<std::decay_t<decltype(fut)>, ExecutorFuture<void>>) {
+            if constexpr (std::is_same_v<std::decay_t<decltype(fut)>, ExecutorFuture<void>>) {
                 static_assert(std::is_same_v<decltype(res), ExecutorFuture<int>>);
-            }
-            else {
+            } else {
                 static_assert(std::is_same_v<decltype(res), SemiFuture<int>>);
             }
             ASSERT_EQ(res.get(), 1);

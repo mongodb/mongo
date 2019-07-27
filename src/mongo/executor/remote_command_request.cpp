@@ -35,7 +35,6 @@
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/util/if_constexpr.h"
 #include "mongo/util/str.h"
 
 using namespace fmt::literals;
@@ -82,7 +81,7 @@ RemoteCommandRequestImpl<T>::RemoteCommandRequestImpl(RequestId requestId,
                                                       Milliseconds timeoutMillis)
     : RemoteCommandRequestBase(requestId, theDbName, theCmdObj, metadataObj, opCtx, timeoutMillis),
       target(theTarget) {
-    IF_CONSTEXPR(std::is_same_v<T, std::vector<HostAndPort>>) {
+    if constexpr (std::is_same_v<T, std::vector<HostAndPort>>) {
         invariant(!theTarget.empty());
     }
 }
@@ -106,10 +105,9 @@ template <typename T>
 std::string RemoteCommandRequestImpl<T>::toString() const {
     str::stream out;
     out << "RemoteCommand " << id << " -- target:";
-    IF_CONSTEXPR(std::is_same_v<HostAndPort, T>) {
+    if constexpr (std::is_same_v<HostAndPort, T>) {
         out << target.toString();
-    }
-    else {
+    } else {
         out << "[{}]"_format(fmt::join(target, ", "));
     }
     out << " db:" << dbname;

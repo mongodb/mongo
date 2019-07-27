@@ -38,7 +38,6 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/fail_point_service.h"
-#include "mongo/util/if_constexpr.h"
 
 namespace mongo {
 

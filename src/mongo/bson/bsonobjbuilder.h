@@ -50,7 +50,6 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/decimal_counter.h"
-#include "mongo/util/if_constexpr.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -262,13 +261,11 @@ public:
         constexpr BSONType type = BSONObjAppendFormat<T>::value;
         _b.appendNum(static_cast<char>(type));
         _b.appendStr(fieldName);
-        IF_CONSTEXPR(type == Bool) {
+        if constexpr (type == Bool) {
             _b.appendNum(static_cast<char>(n));
-        }
-        else IF_CONSTEXPR(type == NumberInt) {
+        } else if constexpr (type == NumberInt) {
             _b.appendNum(static_cast<int>(n));
-        }
-        else {
+        } else {
             _b.appendNum(n);
         }
         return *this;

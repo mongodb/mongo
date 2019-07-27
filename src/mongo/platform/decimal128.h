@@ -40,7 +40,6 @@
 #include "mongo/config.h"
 
 #include "mongo/util/assert_util.h"
-#include "mongo/util/if_constexpr.h"
 
 namespace mongo {
 
@@ -580,7 +579,7 @@ private:
     // The absolute value of constexpr `i` as a uint64_t, avoiding warnings.
     template <typename T>
     constexpr std::uint64_t _makeCoefficientLow(T i) {
-        IF_CONSTEXPR(std::is_signed_v<T>) {
+        if constexpr (std::is_signed_v<T>) {
             if (i < 0) {
                 std::make_unsigned_t<T> ui = i;
                 ui = ~ui + 1;  // Negation, without MSVC C4146.
@@ -588,8 +587,7 @@ private:
             } else {
                 return static_cast<std::uint64_t>(i);
             }
-        }
-        else {
+        } else {
             return static_cast<std::uint64_t>(i);
         }
     }

@@ -38,7 +38,6 @@
 
 #include "mongo/base/static_assert.h"
 #include "mongo/stdx/type_traits.h"
-#include "mongo/util/if_constexpr.h"
 
 namespace mongo {
 
@@ -194,27 +193,22 @@ bool inRange(Input i) {
  */
 template <typename Output, typename Input>
 boost::optional<Output> representAs(Input number) try {
-    IF_CONSTEXPR(std::is_same_v<Input, Output>) {
+    if constexpr (std::is_same_v<Input, Output>) {
         return number;
-    }
-    else IF_CONSTEXPR(std::is_same_v<Decimal128, Output>) {
+    } else if constexpr (std::is_same_v<Decimal128, Output>) {
         // Use Decimal128's ctor taking (u)int64_t or double, if it's safe to cast to one of those.
-        IF_CONSTEXPR(std::is_integral_v<Input>) {
-            IF_CONSTEXPR(std::is_signed_v<Input>) {
+        if constexpr (std::is_integral_v<Input>) {
+            if constexpr (std::is_signed_v<Input>) {
                 return Decimal128{boost::numeric_cast<int64_t>(number)};
-            }
-            else {
+            } else {
                 return Decimal128{boost::numeric_cast<uint64_t>(number)};
             }
-        }
-        else IF_CONSTEXPR(std::is_floating_point_v<Input>) {
+        } else if constexpr (std::is_floating_point_v<Input>) {
             return Decimal128{boost::numeric_cast<double>(number)};
-        }
-        else {
+        } else {
             return {};
         }
-    }
-    else {
+    } else {
         // If number is NaN and Output can also represent NaN, return NaN
         // Note: We need to specifically handle NaN here because of the way
         // detail::compare is implemented.
@@ -226,7 +220,7 @@ boost::optional<Output> representAs(Input number) try {
 
         // If Output is integral and number is a non-integral floating point value,
         // return a disengaged optional.
-        IF_CONSTEXPR(std::is_floating_point_v<Input> && std::is_integral_v<Output>) {
+        if constexpr (std::is_floating_point_v<Input> && std::is_integral_v<Output>) {
             if (!(std::trunc(number) == number)) {
                 return {};
             }
@@ -240,7 +234,7 @@ boost::optional<Output> representAs(Input number) try {
 
         // Some integers cannot be exactly represented as floating point numbers.
         // To check, we cast back to the input type if we can, and compare.
-        IF_CONSTEXPR(std::is_integral_v<Input> && std::is_floating_point_v<Output>) {
+        if constexpr (std::is_integral_v<Input> && std::is_floating_point_v<Output>) {
             if (!detail::inRange<Input>(numberOut) || static_cast<Input>(numberOut) != number) {
                 return {};
             }
@@ -258,21 +252,17 @@ boost::optional<Output> representAs(const Decimal128& number) try {
     std::uint32_t flags = 0;
     Output numberOut;
 
-    IF_CONSTEXPR(std::is_same_v<Output, Decimal128>) {
+    if constexpr (std::is_same_v<Output, Decimal128>) {
         return number;
-    }
-    else IF_CONSTEXPR(std::is_floating_point_v<Output>) {
+    } else if constexpr (std::is_floating_point_v<Output>) {
         numberOut = boost::numeric_cast<Output>(number.toDouble(&flags));
-    }
-    else IF_CONSTEXPR(std::is_integral_v<Output>) {
-        IF_CONSTEXPR(std::is_signed_v<Output>) {
+    } else if constexpr (std::is_integral_v<Output>) {
+        if constexpr (std::is_signed_v<Output>) {
             numberOut = boost::numeric_cast<Output>(number.toLongExact(&flags));
-        }
-        else {
+        } else {
             numberOut = boost::numeric_cast<Output>(number.toULongExact(&flags));
         }
-    }
-    else {
+    } else {
         // Unsupported type.
         return {};
     }

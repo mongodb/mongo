@@ -292,10 +292,9 @@ void decimal128ToInteger() {
     ASSERT(!representAs<Integer>(Decimal128::kSmallestPositive));
     ASSERT(!representAs<Integer>(Decimal128::kSmallestNegative));
 
-    IF_CONSTEXPR(std::is_signed<Integer>()) {
+    if constexpr (std::is_signed<Integer>()) {
         ASSERT_EQ(*representAs<Integer>(Decimal128("-5")), -5);
-    }
-    else {
+    } else {
         ASSERT(!representAs<Integer>(Decimal128("-5")));
     }
 }
@@ -353,7 +352,7 @@ void integerToDecimal128() {
     std::vector<Integer> v{
         Integer{5}, std::numeric_limits<Integer>::lowest(), std::numeric_limits<Integer>::max()};
 
-    IF_CONSTEXPR(std::is_signed_v<Integer>) {
+    if constexpr (std::is_signed_v<Integer>) {
         v.emplace_back(-5);
     }
 

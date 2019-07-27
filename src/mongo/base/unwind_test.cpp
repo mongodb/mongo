@@ -42,7 +42,6 @@
 
 #include "mongo/base/backtrace_visibility_test.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/if_constexpr.h"
 #include "mongo/util/stacktrace.h"
 
 namespace mongo {
@@ -98,10 +97,9 @@ struct Context {
 // Disable clang-format for the "if constexpr"
 template <int N>
 void callNext(Context& ctx) {
-    IF_CONSTEXPR(N == 0) {
+    if constexpr (N == 0) {
         ctx.s = trace();
-    }
-    else {
+    } else {
         ctx.plan[N - 1](ctx);
     }
 

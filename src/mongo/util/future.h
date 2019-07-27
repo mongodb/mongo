@@ -40,7 +40,6 @@
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
-#include "mongo/util/if_constexpr.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/out_of_line_executor.h"
@@ -1146,10 +1145,9 @@ NOINLINE_DECL auto ExecutorFuture<T>::wrapCBHelper(unique_function<Sig>&& func) 
                         // Using a lambda taking a nullary lambda here to work around an MSVC2017
                         // bug that caused it to not ignore the other side of the constexpr-if.
                         // TODO Make this less silly once we upgrade to 2019.
-                        IF_CONSTEXPR(!isFutureLike<decltype(nullary())>) {
+                        if constexpr (!isFutureLike<decltype(nullary())>) {
                             return nullary();
-                        }
-                        else {
+                        } else {
                             // Cheat and convert to an inline Future since we know we will schedule
                             // further user callbacks onto an executor.
                             return nullary().unsafeToInlineFuture();

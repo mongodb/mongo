@@ -39,7 +39,6 @@
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/if_constexpr.h"
 #include "mongo/util/str.h"  // for str::stream()!
 
 #define ASSERT_PARSES_WITH_PARSER(type, input_string, parser, expected_value) \
