@@ -32,10 +32,13 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/map_reduce_agg.h"
 #include "mongo/db/commands/map_reduce_command_base.h"
 #include "mongo/db/commands/mr.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find_common.h"
+#include "mongo/db/query/query_knobs_gen.h"
 
 
 namespace mongo {
@@ -66,6 +69,9 @@ private:
                   const BSONObj& cmd,
                   std::string& errmsg,
                   BSONObjBuilder& result) final {
+        if (getTestCommandsEnabled() && internalQueryUseAggMapReduce.load()) {
+            return runAggregationMapReduce(opCtx, dbname, cmd, errmsg, result);
+        }
         return mr::runMapReduce(opCtx, dbname, cmd, errmsg, result);
     }
 } mapReduceCommand;

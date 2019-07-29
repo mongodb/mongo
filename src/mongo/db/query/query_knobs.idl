@@ -304,3 +304,10 @@ server_parameters:
     cpp_varname: "internalQueryAllowShardedLookup"
     cpp_vartype: AtomicWord<bool>
     default: false
+
+  internalQueryUseAggMapReduce:
+    description: "If true runs mapReduce in a pipeline instead of the mapReduce command."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryUseAggMapReduce"
+    cpp_vartype: AtomicWord<bool>
+    default: false
