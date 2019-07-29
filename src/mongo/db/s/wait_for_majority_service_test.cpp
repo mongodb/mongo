@@ -46,11 +46,11 @@ public:
 
         auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service);
 
-        replCoord->setAwaitReplicationReturnValueFunction([this](OperationContext* opCtx,
-                                                                 const repl::OpTime& opTime) {
-            waitForWriteConcernStub(opCtx, opTime);
-            return repl::ReplicationCoordinator::StatusAndDuration(Status::OK(), Milliseconds(0));
-        });
+        replCoord->setAwaitReplicationReturnValueFunction(
+            [this](OperationContext* opCtx, const repl::OpTime& opTime) {
+                auto status = waitForWriteConcernStub(opCtx, opTime);
+                return repl::ReplicationCoordinator::StatusAndDuration(status, Milliseconds(0));
+            });
 
         repl::ReplicationCoordinator::set(service, std::move(replCoord));
     }
@@ -73,18 +73,24 @@ public:
         }
     }
 
-    void waitForWriteConcernStub(OperationContext* opCtx, const repl::OpTime& opTime) {
+    Status waitForWriteConcernStub(OperationContext* opCtx, const repl::OpTime& opTime) {
         stdx::unique_lock<stdx::mutex> lk(_mutex);
 
         while (!_isTestReady) {
-            if (!opCtx->waitForConditionOrInterruptNoAssert(_isTestReadyCV, lk).isOK()) {
-                return;
+            auto status = opCtx->waitForConditionOrInterruptNoAssert(_isTestReadyCV, lk);
+            if (!status.isOK()) {
+                _isTestReady = false;
+                _finishWaitingOneOpTimeCV.notify_one();
+
+                return status;
             }
         }
 
         _lastOpTimeWaited = opTime;
         _isTestReady = false;
         _finishWaitingOneOpTimeCV.notify_one();
+
+        return Status::OK();
     }
 
     const repl::OpTime& getLastOpTimeWaited() {
