@@ -31,6 +31,10 @@ if (typeof db === 'undefined') {
 TestData = TestData || {};
 TestData.traceExceptions = false;
 
+// Disable implicit sessions so FSM workloads that kill random sessions won't interrupt the
+// operations in this test that aren't resilient to interruptions.
+TestData.disableImplicitSessions = true;
+
 const conn = db.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(conn);
 
@@ -78,21 +82,23 @@ function checkReplDbhashBackgroundThread(hosts) {
     // We enable the "WTPreserveSnapshotHistoryIndefinitely" failpoint to ensure that the same
     // snapshot will be available to read at on the primary and secondaries.
     for (let session of sessions) {
-        const db = session.getDatabase('admin');
+        // Use the session's client directly so FSM workloads that kill random sessions won't
+        // interrupt these operations.
+        const dbNoSession = session.getClient().getDB('admin');
 
-        let preserveRes = assert.commandWorked(db.runCommand({
+        let preserveRes = assert.commandWorked(dbNoSession.runCommand({
             configureFailPoint: 'WTPreserveSnapshotHistoryIndefinitely',
             mode: 'alwaysOn',
         }),
                                                debugInfo);
         debugInfo.push({
-            "node": db.getMongo(),
+            "node": dbNoSession.getMongo(),
             "session": session,
             "preserveFailPointOpTime": preserveRes['operationTime']
         });
 
         resetFns.push(() => {
-            assert.commandWorked(db.runCommand({
+            assert.commandWorked(dbNoSession.runCommand({
                 configureFailPoint: 'WTPreserveSnapshotHistoryIndefinitely',
                 mode: 'off',
             }));
@@ -100,13 +106,16 @@ function checkReplDbhashBackgroundThread(hosts) {
     }
 
     for (let session of sessions) {
-        const db = session.getDatabase('admin');
-        const res = assert.commandWorked(db.runCommand({listDatabases: 1, nameOnly: true}));
+        // Use the session's client directly so FSM workloads that kill random sessions won't
+        // interrupt these operations.
+        const dbNoSession = session.getClient().getDB('admin');
+        const res =
+            assert.commandWorked(dbNoSession.runCommand({listDatabases: 1, nameOnly: true}));
         for (let dbInfo of res.databases) {
             dbNames.add(dbInfo.name);
         }
         debugInfo.push({
-            "node": db.getMongo(),
+            "node": dbNoSession.getMongo(),
             "session": session,
             "listDatabaseOpTime": res['operationTime']
         });
@@ -252,6 +261,13 @@ function checkReplDbhashBackgroundThread(hosts) {
         return result;
     };
 
+    // Outside of checkCollectionHashesForDB(), operations in this function are not resilient to
+    // their session being killed by a concurrent FSM workload, so the driver sessions started above
+    // have not been used and will have contain null logical time values. The process for selecting
+    // a read timestamp below assumes each session has valid logical times, so run a dummy command
+    // through each session to populate its logical times.
+    sessions.forEach(session => session.getDatabase('admin').runCommand({ping: 1}));
+
     for (let dbName of dbNames) {
         let result;
         let clusterTime;
@@ -310,32 +326,34 @@ function checkReplDbhashBackgroundThread(hosts) {
                     signedClusterTime = sess.getClusterTime();
                 }
             }
-            waitForSecondaries(clusterTime, signedClusterTime);
-
-            for (let session of sessions) {
-                debugInfo.push({
-                    "node": session.getClient(),
-                    "session": session,
-                    "readAtClusterTime": clusterTime
-                });
-            }
 
             hasTransientError = false;
             performNoopWrite = false;
 
             try {
+                waitForSecondaries(clusterTime, signedClusterTime);
+
+                for (let session of sessions) {
+                    debugInfo.push({
+                        "node": session.getClient(),
+                        "session": session,
+                        "readAtClusterTime": clusterTime
+                    });
+                }
+
                 result = checkCollectionHashesForDB(dbName, clusterTime);
             } catch (e) {
                 if (isTransientError(e)) {
                     if (performNoopWrite) {
-                        const primarySession = sessions[0];
+                        // Use the session's client directly so FSM workloads that kill random
+                        // sessions won't interrupt appendOplogNote.
+                        const primaryConn = sessions[0].getClient();
 
                         // If the no-op write fails due to the global lock not being able to be
                         // acquired within 1 millisecond, retry the operation again at a later
                         // time.
                         assert.commandWorkedOrFailedWithCode(
-                            primarySession.getDatabase(dbName).adminCommand(
-                                {appendOplogNote: 1, data: {}}),
+                            primaryConn.adminCommand({appendOplogNote: 1, data: {}}),
                             ErrorCodes.LockFailed);
                     }
 
