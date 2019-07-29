@@ -13,7 +13,14 @@ var rst = new ReplSetTest({
 rst.startSet();
 rst.initiate();
 
-var conn = rst.getPrimary();               // Waits for PRIMARY state.
+var conn = rst.getPrimary();  // Waits for PRIMARY state.
+
+// Wait for the commit point to reach the top of the oplog so that the stableTS can advance.
+assert.soon(function() {
+    const optimes = assert.commandWorked(conn.adminCommand({replSetGetStatus: 1})).optimes;
+    return (0 == rs.compareOpTimes(optimes.lastCommittedOpTime, optimes.appliedOpTime));
+});
+
 conn = rst.restart(0, {noReplSet: true});  // Restart as a standalone node.
 assert.neq(null, conn, "failed to restart");
 
