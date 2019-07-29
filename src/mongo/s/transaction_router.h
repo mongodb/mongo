@@ -171,6 +171,11 @@ public:
         LogicalTime getTime() const;
 
         /**
+         * Returns true if the _atClusterTime has been changed from the default uninitialized value.
+         */
+        bool timeHasBeenSet() const;
+
+        /**
          * Sets the timestamp and remembers the statement id of the command that set it.
          */
         void setTime(LogicalTime atClusterTime, StmtId currentStmtId);
@@ -401,6 +406,11 @@ public:
          * shard.
          */
         BSONObj _handOffCommitToCoordinator(OperationContext* opCtx);
+
+        /**
+         * Returns true if the atClusterTime has been changed from the default uninitialized value.
+         */
+        bool _atClusterTimeHasBeenSet() const;
 
         /**
          * Sets the given logical time as the atClusterTime for the transaction to be the greater of

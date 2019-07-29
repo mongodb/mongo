@@ -402,6 +402,10 @@ LogicalTime TransactionRouter::AtClusterTime::getTime() const {
     return _atClusterTime;
 }
 
+bool TransactionRouter::AtClusterTime::timeHasBeenSet() const {
+    return _atClusterTime != LogicalTime::kUninitialized;
+}
+
 void TransactionRouter::AtClusterTime::setTime(LogicalTime atClusterTime, StmtId currentStmtId) {
     invariant(atClusterTime != LogicalTime::kUninitialized);
     _atClusterTime = atClusterTime;
@@ -680,6 +684,10 @@ void TransactionRouter::Router::setDefaultAtClusterTime(OperationContext* opCtx)
     auto defaultTime = LogicalClock::get(opCtx)->getClusterTime();
     _setAtClusterTime(
         opCtx, repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime(), defaultTime);
+}
+
+bool TransactionRouter::Router::_atClusterTimeHasBeenSet() const {
+    return o().atClusterTime.is_initialized() && o().atClusterTime->timeHasBeenSet();
 }
 
 void TransactionRouter::Router::_setAtClusterTime(
@@ -1140,7 +1148,7 @@ std::string TransactionRouter::Router::_transactionInfoForLog(
 
     sb << "parameters:" << parametersBuilder.obj().toString() << ",";
 
-    if (o().atClusterTime) {
+    if (_atClusterTimeHasBeenSet()) {
         sb << " globalReadTimestamp:" << o().atClusterTime->getTime().toString() << ",";
     }
 
