@@ -31,7 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/catalog/record_store_validate_adaptor.h"
+#include "mongo/db/catalog/validate_adaptor.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -59,9 +59,11 @@ KeyString::Builder makeWildCardMultikeyMetadataKeyString(const BSONObj& indexKey
 }
 }  // namespace
 
-Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
-                                            const RecordData& record,
-                                            size_t* dataSize) {
+Status ValidateAdaptor::validateRecord(
+    const RecordId& recordId,
+    const RecordData& record,
+    const std::unique_ptr<SeekableRecordCursor>& seekRecordStoreCursor,
+    size_t* dataSize) {
     BSONObj recordBson;
     try {
         recordBson = record.toBson();
@@ -136,7 +138,8 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
                                                  indexInfo.ord,
                                                  keyString.getTypeBits());
                 indexInfo.ks->resetToKey(key, indexInfo.ord, recordId);
-                _indexConsistency->addDocKey(*indexInfo.ks, &indexInfo, recordId, key);
+                _indexConsistency->addDocKey(
+                    *indexInfo.ks, &indexInfo, recordId, seekRecordStoreCursor, key);
             } catch (...) {
                 return exceptionToStatus();
             }
@@ -145,10 +148,10 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
     return status;
 }
 
-void RecordStoreValidateAdaptor::traverseIndex(const IndexAccessMethod* iam,
-                                               const IndexDescriptor* descriptor,
-                                               ValidateResults* results,
-                                               int64_t* numTraversedKeys) {
+void ValidateAdaptor::traverseIndex(int64_t* numTraversedKeys,
+                                    const std::unique_ptr<SortedDataInterface::Cursor>& indexCursor,
+                                    const IndexDescriptor* descriptor,
+                                    ValidateResults* results) {
     auto indexName = descriptor->indexName();
     IndexInfo* indexInfo = &_indexConsistency->getIndexInfo(indexName);
     int64_t numKeys = 0;
@@ -157,7 +160,6 @@ void RecordStoreValidateAdaptor::traverseIndex(const IndexAccessMethod* iam,
     const Ordering ord = Ordering::make(key);
     bool isFirstEntry = true;
 
-    std::unique_ptr<SortedDataInterface::Cursor> cursor = iam->newCursor(_opCtx, true);
     // We want to use the latest version of KeyString here.
     const KeyString::Version version = KeyString::Version::kLatestVersion;
     std::unique_ptr<KeyString::Builder> indexKeyStringBuilder =
@@ -166,7 +168,8 @@ void RecordStoreValidateAdaptor::traverseIndex(const IndexAccessMethod* iam,
         std::make_unique<KeyString::Builder>(version);
 
     // Seeking to BSONObj() is equivalent to seeking to the first entry of an index.
-    for (auto indexEntry = cursor->seek(BSONObj(), true); indexEntry; indexEntry = cursor->next()) {
+    for (auto indexEntry = indexCursor->seek(BSONObj(), true); indexEntry;
+         indexEntry = indexCursor->next()) {
         indexKeyStringBuilder->resetToKey(indexEntry->key, ord, indexEntry->loc);
 
         // Ensure that the index entries are in increasing or decreasing order.
@@ -211,19 +214,22 @@ void RecordStoreValidateAdaptor::traverseIndex(const IndexAccessMethod* iam,
     }
 }
 
-void RecordStoreValidateAdaptor::traverseRecordStore(RecordStore* recordStore,
-                                                     ValidateResults* results,
-                                                     BSONObjBuilder* output) {
+void ValidateAdaptor::traverseRecordStore(
+    RecordStore* recordStore,
+    const RecordId& firstRecordId,
+    const std::unique_ptr<SeekableRecordCursor>& traverseRecordStoreCursor,
+    const std::unique_ptr<SeekableRecordCursor>& seekRecordStoreCursor,
+    ValidateResults* results,
+    BSONObjBuilder* output) {
     long long nrecords = 0;
     long long dataSizeTotal = 0;
     long long nInvalid = 0;
 
     results->valid = true;
-    std::unique_ptr<SeekableRecordCursor> cursor = recordStore->getCursor(_opCtx, true);
     int interruptInterval = 4096;
     RecordId prevRecordId;
-
-    while (auto record = cursor->next()) {
+    for (auto record = traverseRecordStoreCursor->seekExact(firstRecordId); record;
+         record = traverseRecordStoreCursor->next()) {
         ++nrecords;
 
         if (!(nrecords % interruptInterval)) {
@@ -233,7 +239,8 @@ void RecordStoreValidateAdaptor::traverseRecordStore(RecordStore* recordStore,
         auto dataSize = record->data.size();
         dataSizeTotal += dataSize;
         size_t validatedSize;
-        Status status = validate(record->id, record->data, &validatedSize);
+        Status status =
+            validateRecord(record->id, record->data, seekRecordStoreCursor, &validatedSize);
 
         // Checks to ensure isInRecordIdOrder() is being used properly.
         if (prevRecordId.isValid()) {
@@ -263,9 +270,9 @@ void RecordStoreValidateAdaptor::traverseRecordStore(RecordStore* recordStore,
     output->appendNumber("nrecords", nrecords);
 }
 
-void RecordStoreValidateAdaptor::validateIndexKeyCount(const IndexDescriptor* idx,
-                                                       int64_t numRecs,
-                                                       ValidateResults& results) {
+void ValidateAdaptor::validateIndexKeyCount(const IndexDescriptor* idx,
+                                            int64_t numRecs,
+                                            ValidateResults& results) {
     const std::string indexName = idx->indexName();
     IndexInfo* indexInfo = &_indexConsistency->getIndexInfo(indexName);
     auto numTotalKeys = indexInfo->numKeys;

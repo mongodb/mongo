@@ -67,12 +67,10 @@ IndexInfo::IndexInfo(const IndexDescriptor* descriptor)
 IndexConsistency::IndexConsistency(OperationContext* opCtx,
                                    Collection* collection,
                                    NamespaceString nss,
-                                   RecordStore* recordStore,
                                    bool background)
     : _opCtx(opCtx),
       _collection(collection),
       _nss(nss),
-      _recordStore(recordStore),
       _tracker(opCtx->getServiceContext()->getFastClockSource(),
                internalQueryExecYieldIterations.load(),
                Milliseconds(internalQueryExecYieldPeriodMS.load())),
@@ -211,6 +209,7 @@ void IndexConsistency::addIndexEntryErrors(ValidateResultsMap* indexNsResultsMap
 void IndexConsistency::addDocKey(const KeyString::Builder& ks,
                                  IndexInfo* indexInfo,
                                  RecordId recordId,
+                                 const std::unique_ptr<SeekableRecordCursor>& seekRecordStoreCursor,
                                  const BSONObj& indexKey) {
     const uint32_t hash = _hashKeyString(ks, indexInfo->indexNameHash);
 
@@ -223,8 +222,7 @@ void IndexConsistency::addDocKey(const KeyString::Builder& ks,
         // Found a document key for a hash bucket that had mismatches.
 
         // Get the documents _id index key.
-        auto cursor = _recordStore->getCursor(_opCtx);
-        auto record = cursor->seekExact(recordId);
+        auto record = seekRecordStoreCursor->seekExact(recordId);
         invariant(record);
 
         BSONObj data = record->data.toBson();

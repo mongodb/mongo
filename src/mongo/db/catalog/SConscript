@@ -342,7 +342,7 @@ env.Library(
     target='collection_validation',
     source=[
 	"collection_validation.cpp",
-	"record_store_validate_adaptor.cpp",
+	"validate_adaptor.cpp",
     ],
     LIBDEPS=[
 	'catalog_impl',

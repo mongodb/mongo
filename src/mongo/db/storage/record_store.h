@@ -250,7 +250,7 @@ public:
     virtual long long dataSize(OperationContext* opCtx) const = 0;
 
     /**
-     * Total number of record in the RecordStore. You may need to cache it, so this call
+     * Total number of records in the RecordStore. You may need to cache it, so this call
      * takes constant time, as it is called often.
      */
     virtual long long numRecords(OperationContext* opCtx) const = 0;
@@ -587,19 +587,5 @@ struct ValidateResults {
     std::vector<std::string> warnings;
     std::vector<BSONObj> extraIndexEntries;
     std::vector<BSONObj> missingIndexEntries;
-};
-
-/**
- * This is so when a RecordStore is validating all records
- * it can call back to someone to check if a record is valid.
- * The actual data contained in a Record is totally opaque to the implementation.
- */
-class ValidateAdaptor {
-public:
-    virtual ~ValidateAdaptor() {}
-
-    virtual Status validate(const RecordId& recordId,
-                            const RecordData& recordData,
-                            size_t* dataSize) = 0;
 };
 }  // namespace mongo

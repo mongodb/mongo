@@ -52,13 +52,13 @@ using ValidateResultsMap = std::map<std::string, ValidateResults>;
  * The record store validate adaptor is used to keep track of the index consistency during
  * a validation that's running.
  */
-class RecordStoreValidateAdaptor : public ValidateAdaptor {
+class ValidateAdaptor {
 public:
-    RecordStoreValidateAdaptor(OperationContext* opCtx,
-                               IndexConsistency* indexConsistency,
-                               ValidateCmdLevel level,
-                               IndexCatalog* ic,
-                               ValidateResultsMap* irm)
+    ValidateAdaptor(OperationContext* opCtx,
+                    IndexConsistency* indexConsistency,
+                    ValidateCmdLevel level,
+                    IndexCatalog* ic,
+                    ValidateResultsMap* irm)
 
         : _opCtx(opCtx),
           _indexConsistency(indexConsistency),
@@ -67,25 +67,32 @@ public:
           _indexNsResultsMap(irm) {}
 
     /**
-     * Validates the BSON object and traverses through its key set to keep track of the
+     * Validates the record data and traverses through its key set to keep track of the
      * index consistency.
      */
-    virtual Status validate(const RecordId& recordId, const RecordData& record, size_t* dataSize);
+    virtual Status validateRecord(
+        const RecordId& recordId,
+        const RecordData& record,
+        const std::unique_ptr<SeekableRecordCursor>& seekRecordStoreCursor,
+        size_t* dataSize);
 
     /**
      * Traverses the index getting index entriess to validate them and keep track of the index keys
      * for index consistency.
      */
-    void traverseIndex(const IndexAccessMethod* iam,
+    void traverseIndex(int64_t* numTraversedKeys,
+                       const std::unique_ptr<SortedDataInterface::Cursor>& indexCursor,
                        const IndexDescriptor* descriptor,
-                       ValidateResults* results,
-                       int64_t* numTraversedKeys);
+                       ValidateResults* results);
 
     /**
      * Traverses the record store to retrieve every record and go through its document key
      * set to keep track of the index consistency during a validation.
      */
     void traverseRecordStore(RecordStore* recordStore,
+                             const RecordId& firstRecordId,
+                             const std::unique_ptr<SeekableRecordCursor>& traverseRecordStoreCursor,
+                             const std::unique_ptr<SeekableRecordCursor>& seekRecordStoreCursor,
                              ValidateResults* results,
                              BSONObjBuilder* output);
 

@@ -283,7 +283,6 @@ Lock::CollectionLock::CollectionLock(OperationContext* opCtx,
                                      LockMode mode,
                                      Date_t deadline)
     : _opCtx(opCtx) {
-
     LockMode actualLockMode = mode;
     if (!supportsDocLocking()) {
         actualLockMode = isSharedLockMode(mode) ? MODE_S : MODE_X;

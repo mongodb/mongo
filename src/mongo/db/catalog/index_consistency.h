@@ -74,7 +74,6 @@ public:
     IndexConsistency(OperationContext* opCtx,
                      Collection* collection,
                      NamespaceString nss,
-                     RecordStore* recordStore,
                      bool background);
 
     /**
@@ -86,6 +85,7 @@ public:
     void addDocKey(const KeyString::Builder& ks,
                    IndexInfo* indexInfo,
                    RecordId recordId,
+                   const std::unique_ptr<SeekableRecordCursor>& cursor,
                    const BSONObj& indexKey);
 
     /**
@@ -143,7 +143,6 @@ private:
     OperationContext* _opCtx;
     Collection* _collection;
     const NamespaceString _nss;
-    const RecordStore* _recordStore;
     ElapsedTracker _tracker;
 
     // We map the hashed KeyString values to a bucket that contains the count of how many
