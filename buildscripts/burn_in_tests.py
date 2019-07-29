@@ -33,7 +33,7 @@ from buildscripts.patch_builds.change_data import find_changed_files
 from buildscripts.resmokelib.suitesconfig import create_test_membership_map, get_suites
 from buildscripts.resmokelib.utils import default_if_none, globstar
 from buildscripts.ciconfig.evergreen import parse_evergreen_file, ResmokeArgs, \
-    EvergreenProjectConfig
+    EvergreenProjectConfig, VariantTask
 from buildscripts.util import teststats
 from buildscripts.util.taskname import name_generated_task
 from buildscripts.patch_builds.task_generation import resmoke_commands, TimeoutInfo, TaskList
@@ -297,8 +297,55 @@ def _set_resmoke_args(task):
     return ResmokeArgs.get_updated_arg(resmoke_args, "suites", suite_name)
 
 
-def create_task_list(evergreen_conf: EvergreenProjectConfig, build_variant: str, suites: Dict,
-                     exclude_tasks: [str]):
+def _distro_to_run_task_on(task: VariantTask, evg_proj_config: EvergreenProjectConfig,
+                           build_variant: str) -> str:
+    """
+    Determine what distro an task should be run on.
+
+    For normal tasks, the distro will be the default for the build variant unless the task spec
+    specifies a particular distro to run on.
+
+    For generated tasks, the distro will be the default for the build variant unless (1) the
+    "use_large_distro" flag is set as a "var" in the "generate resmoke tasks" command of the
+    task definition and (2) the build variant defines the "large_distro_name" in its expansions.
+
+    :param task: Task being run.
+    :param evg_proj_config: Evergreen project configuration.
+    :param build_variant: Build Variant task is being run on.
+    :return: Distro task should be run on.
+    """
+    task_def = evg_proj_config.get_task(task.name)
+    if task_def.is_generate_resmoke_task:
+        resmoke_vars = task_def.generate_resmoke_tasks_command["vars"]
+        if "use_large_distro" in resmoke_vars:
+            bv = evg_proj_config.get_variant(build_variant)
+            if "large_distro_name" in bv.raw["expansions"]:
+                return bv.raw["expansions"]["large_distro_name"]
+
+    return task.run_on[0]
+
+
+def _gather_task_info(task: VariantTask, tests_by_suite: Dict,
+                      evg_proj_config: EvergreenProjectConfig, build_variant: str) -> Dict:
+    """
+    Gather the information needed to run the given task.
+
+    :param task: Task to be run.
+    :param tests_by_suite: Dict of suites.
+    :param evg_proj_config: Evergreen project configuration.
+    :param build_variant: Build variant task will be run on.
+    :return: Dictionary of information needed to run task.
+    """
+    return {
+        "resmoke_args": _set_resmoke_args(task),
+        "tests": tests_by_suite[task.resmoke_suite],
+        "use_multiversion": task.multiversion_path,
+        "distro": _distro_to_run_task_on(task, evg_proj_config, build_variant)
+    }  # yapf: disable
+
+
+def create_task_list(evergreen_conf: EvergreenProjectConfig, build_variant: str,
+                     tests_by_suite: Dict[str, List[str]], exclude_tasks: [str]):
     """
     Find associated tasks for the specified build_variant and suites.
 
@@ -311,13 +358,13 @@ def create_task_list(evergreen_conf: EvergreenProjectConfig, build_variant: str,
 
     :param evergreen_conf: Evergreen configuration for project.
     :param build_variant: Build variant to select tasks from.
-    :param suites: Suites to be run.
+    :param tests_by_suite: Suites to be run.
     :param exclude_tasks: Tasks to exclude.
     :return: Dict of tasks to run with run configuration.
     """
     log = LOGGER.bind(build_variant=build_variant)
 
-    log.debug("creating task list for suites", suites=suites, exclude_tasks=exclude_tasks)
+    log.debug("creating task list for suites", suites=tests_by_suite, exclude_tasks=exclude_tasks)
     evg_build_variant = evergreen_conf.get_variant(build_variant)
     if not evg_build_variant:
         log.warning("Buildvariant not found in evergreen config")
@@ -333,11 +380,8 @@ def create_task_list(evergreen_conf: EvergreenProjectConfig, build_variant: str,
 
     # Return the list of tasks to run for the specified suite.
     task_list = {
-        task_name: {
-            "resmoke_args": _set_resmoke_args(task), "tests": suites[task.resmoke_suite],
-            "use_multiversion": task.multiversion_path
-        }
-        for task_name, task in all_variant_tasks.items() if task.resmoke_suite in suites
+        task_name: _gather_task_info(task, tests_by_suite, evergreen_conf, build_variant)
+        for task_name, task in all_variant_tasks.items() if task.resmoke_suite in tests_by_suite
     }
 
     log.debug("Found task list", task_list=task_list)
@@ -482,6 +526,7 @@ def create_generate_tasks_config(evg_config: Configuration, tests_by_task: Dict,
                                                        generate_config.build_variant)
         resmoke_args = tests_by_task[task]["resmoke_args"]
         test_list = tests_by_task[task]["tests"]
+        distro = tests_by_task[task].get("distro", generate_config.distro)
         for index, test in enumerate(test_list):
             sub_task_name = name_generated_task(f"{task_prefix}:{task}", index, len(test_list),
                                                 generate_config.run_build_variant)
@@ -493,7 +538,7 @@ def create_generate_tasks_config(evg_config: Configuration, tests_by_task: Dict,
             timeout = _generate_timeouts(repeat_config.repeat_tests_secs, test, task_runtime_stats)
             commands = resmoke_commands("run tests", run_tests_vars, timeout, multiversion_path)
 
-            task_list.add_task(sub_task_name, commands, ["compile"], generate_config.distro)
+            task_list.add_task(sub_task_name, commands, ["compile"], distro)
 
     existing_tasks = [BURN_IN_TESTS_GEN_TASK] if include_gen_task else None
     task_list.add_to_variant(generate_config.run_build_variant, BURN_IN_TESTS_TASK, existing_tasks)
@@ -715,6 +760,7 @@ def main(build_variant, run_build_variant, distro, project, generate_tasks_file,
     resmoke_cmd = _set_resmoke_cmd(repeat_config, list(resmoke_args))
 
     tests_by_task = create_tests_by_task(build_variant, repo, evg_conf)
+    LOGGER.debug("tests and tasks found", tests_by_task=tests_by_task)
 
     if generate_tasks_file:
         json_config = create_generate_tasks_file(tests_by_task, generate_config, repeat_config,
