@@ -1162,11 +1162,8 @@ public:
         assertCommitSentAndRespondWithSuccess();
         assertCommitSentAndRespondWithSuccess();
 
+        coordinator.onCompletion().get();
         stopCapturingLogMessages();
-
-        // Properly wait for the coordinator to finish all asynchronous tasks.
-        auto future = coordinator.onCompletion();
-        future.getNoThrow().ignore();
     }
 };
 
@@ -1605,8 +1602,9 @@ TEST_F(TransactionCoordinatorMetricsTest, SimpleTwoPhaseCommitRealCoordinator) {
     checkStats(stats, expectedStats);
     checkMetrics(expectedMetrics);
 
-    // Slow log line is logged since the coordination completed successfully.
     stopCapturingLogMessages();
+
+    // Slow log line is logged since the coordination completed successfully.
     ASSERT_EQUALS(1, countLogLinesContaining("two-phase commit parameters:"));
 }
 
@@ -1648,8 +1646,9 @@ TEST_F(TransactionCoordinatorMetricsTest, CoordinatorIsCanceledWhileInactive) {
     checkStats(stats, expectedStats);
     checkMetrics(expectedMetrics);
 
-    // Slow log line is not logged since the coordination did not complete successfully.
     stopCapturingLogMessages();
+
+    // Slow log line is not logged since the coordination did not complete successfully.
     ASSERT_EQUALS(0, countLogLinesContaining("two-phase commit parameters:"));
 }
 
@@ -1689,8 +1688,9 @@ TEST_F(TransactionCoordinatorMetricsTest, CoordinatorsAWSIsShutDownWhileCoordina
     checkStats(stats, expectedStats);
     checkMetrics(expectedMetrics);
 
-    // Slow log line is not logged since the coordination did not complete successfully.
     stopCapturingLogMessages();
+
+    // Slow log line is not logged since the coordination did not complete successfully.
     ASSERT_EQUALS(0, countLogLinesContaining("two-phase commit parameters:"));
 }
 
@@ -1748,8 +1748,9 @@ TEST_F(TransactionCoordinatorMetricsTest,
     checkStats(stats, expectedStats);
     checkMetrics(expectedMetrics);
 
-    // Slow log line is not logged since the coordination did not complete successfully.
     stopCapturingLogMessages();
+
+    // Slow log line is not logged since the coordination did not complete successfully.
     ASSERT_EQUALS(0, countLogLinesContaining("two-phase commit parameters:"));
 }
 
@@ -1810,8 +1811,9 @@ TEST_F(TransactionCoordinatorMetricsTest,
     checkStats(stats, expectedStats);
     checkMetrics(expectedMetrics);
 
-    // Slow log line is not logged since the coordination did not complete successfully.
     stopCapturingLogMessages();
+
+    // Slow log line is not logged since the coordination did not complete successfully.
     ASSERT_EQUALS(0, countLogLinesContaining("two-phase commit parameters:"));
 }
 
@@ -1874,8 +1876,9 @@ TEST_F(TransactionCoordinatorMetricsTest,
     checkStats(stats, expectedStats);
     checkMetrics(expectedMetrics);
 
-    // Slow log line is not logged since the coordination did not complete successfully.
     stopCapturingLogMessages();
+
+    // Slow log line is not logged since the coordination did not complete successfully.
     ASSERT_EQUALS(0, countLogLinesContaining("two-phase commit parameters:"));
 }
 
@@ -1944,8 +1947,9 @@ TEST_F(TransactionCoordinatorMetricsTest,
     checkStats(stats, expectedStats);
     checkMetrics(expectedMetrics);
 
-    // Slow log line is not logged since the coordination did not complete successfully.
     stopCapturingLogMessages();
+
+    // Slow log line is not logged since the coordination did not complete successfully.
     ASSERT_EQUALS(0, countLogLinesContaining("two-phase commit parameters:"));
 }
 
@@ -2020,8 +2024,9 @@ TEST_F(TransactionCoordinatorMetricsTest, CoordinatorsAWSIsShutDownWhileCoordina
     checkStats(stats, expectedStats);
     checkMetrics(expectedMetrics);
 
-    // Slow log line is not logged since the coordination did not complete successfully.
     stopCapturingLogMessages();
+
+    // Slow log line is not logged since the coordination did not complete successfully.
     ASSERT_EQUALS(0, countLogLinesContaining("two-phase commit parameters:"));
 }
 
@@ -2063,7 +2068,9 @@ TEST_F(TransactionCoordinatorMetricsTest, DoesNotLogTransactionsUnderSlowMSThres
     assertCommitSentAndRespondWithSuccess();
     assertCommitSentAndRespondWithSuccess();
 
+    coordinator.onCompletion().get();
     stopCapturingLogMessages();
+
     ASSERT_EQUALS(0, countLogLinesContaining("two-phase commit parameters:"));
 }
 
@@ -2093,7 +2100,9 @@ TEST_F(
     assertCommitSentAndRespondWithSuccess();
     assertCommitSentAndRespondWithSuccess();
 
+    coordinator.onCompletion().get();
     stopCapturingLogMessages();
+
     ASSERT_EQUALS(0, countLogLinesContaining("two-phase commit parameters:"));
 }
 
@@ -2121,6 +2130,7 @@ TEST_F(TransactionCoordinatorMetricsTest, LogsTransactionsOverSlowMSThreshold) {
     assertCommitSentAndRespondWithSuccess();
     assertCommitSentAndRespondWithSuccess();
 
+    coordinator.onCompletion().get();
     stopCapturingLogMessages();
 
     ASSERT_EQUALS(1, countLogLinesContaining("two-phase commit parameters:"));
@@ -2160,6 +2170,7 @@ TEST_F(TransactionCoordinatorMetricsTest, SlowLogLineIncludesTerminationCauseFor
     assertAbortSentAndRespondWithSuccess();
     assertAbortSentAndRespondWithSuccess();
 
+    coordinator.onCompletion().get();
     stopCapturingLogMessages();
 
     ASSERT_EQUALS(1, countLogLinesContaining("terminationCause:aborted"));
