@@ -27,10 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/base/init.h"
-#include "mongo/db/client.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
-#include "mongo/platform/mutex.h"
 
 #include "mongo/util/diagnostic_info.h"
 
@@ -40,7 +39,16 @@
 #include <link.h>
 #endif
 
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+
+#include "mongo/base/init.h"
+#include "mongo/db/client.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/log.h"
+
+using namespace fmt::literals;
 
 namespace mongo {
 // Maximum number of stack frames to appear in a backtrace.
@@ -85,63 +93,86 @@ void DiagnosticInfo::Diagnostic::set(Client* const client,
 }
 
 #if defined(__linux__)
-struct DynamicObject {
-    StringData objectPath;
-    ptrdiff_t sectionOffset;
-    unsigned long sectionSize;
+namespace {
+
+class DynamicObjectMap {
+public:
+    struct Section {
+        StringData objectPath;
+        uintptr_t sectionOffset = 0;
+        size_t sectionSize = 0;
+    };
+
+    // uses dl_iterate_phdr to retrieve information on the shared objects that have been loaded in
+    // the form of a map from segment address to object
+    void init() {
+        ::dl_iterate_phdr(addToMap, &_map);
+    }
+
+    // return a StackFrame object located at the header address in the map that is immediately
+    // preceding or equal to the instruction pointer address
+    DiagnosticInfo::StackFrame getFrame(void* instructionPtr) const;
+
+    // callback function in dl_iterate_phdr that iterates through the shared objects and creates a
+    // map from the section address to object
+    static int addToMap(dl_phdr_info* info, size_t size, void* data);
+
+private:
+    std::map<uintptr_t, Section> _map;
+} gDynamicObjectMap;
+
+MONGO_INITIALIZER(InitializeDynamicObjectMap)(InitializerContext* context) {
+    gDynamicObjectMap.init();
+    return Status::OK();
 };
 
-// callback function in dl_iterate_phdr that iterates through the shared objects
-// and creates a map from the section address to object
-static int createStackTraceMap(dl_phdr_info* info, size_t size, void* data) {
-    auto& addr_map = *reinterpret_cast<std::map<void*, DynamicObject>*>(data);
+}  // anonymous namespace
+
+int DynamicObjectMap::addToMap(dl_phdr_info* info, size_t size, void* data) {
+    auto& addr_map = *reinterpret_cast<decltype(DynamicObjectMap::_map)*>(data);
     for (int j = 0; j < info->dlpi_phnum; j++) {
-        auto addr = (void*)(info->dlpi_addr + info->dlpi_phdr[j].p_vaddr);
-        DynamicObject frame = {
-            info->dlpi_name,                        // name
-            (ptrdiff_t)info->dlpi_phdr[j].p_vaddr,  // section offset
-            info->dlpi_phdr[j].p_memsz,             // section size
+        auto& header = info->dlpi_phdr[j];
+        auto addr = info->dlpi_addr + header.p_vaddr;
+        switch (header.p_type) {
+            case PT_LOAD:
+            case PT_DYNAMIC:
+                break;
+            default:
+                continue;
+        }
+        auto frame = Section{
+            info->dlpi_name,                          // object name
+            static_cast<uintptr_t>(header.p_offset),  // section offset in file
+            header.p_memsz,                           // section size in memory
         };
         addr_map.emplace(addr, frame);
     }
     return 0;
 }
 
-class DynamicObjectMap {
-public:
-    DynamicObjectMap() {
-        // uses dl_iterate_phdr to retrieve information on the shared objects that have been loaded
-        // in the form of a map from segment address to object
-        dl_iterate_phdr(createStackTraceMap, (void*)&_map);
-    }
+DiagnosticInfo::StackFrame DynamicObjectMap::getFrame(void* instructionPtr) const {
+    auto address = reinterpret_cast<uintptr_t>(instructionPtr);
 
-    // return a StackFrameObject located at the header address in the map
-    // that is immediately preceding or equal to the instruction pointer
-    // address
-    DiagnosticInfo::StackFrame getFrame(void* instructionPtr) const {
-        auto it = --_map.upper_bound(instructionPtr);
+    // instructionPtr < it->first
+    auto it = _map.upper_bound(address);
+    // instuctionPtr >= it->first
+    --it;
 
-        auto& [objectPtr, frame] = *it;
-        ptrdiff_t instructionOffset =
-            static_cast<char*>(instructionPtr) - static_cast<char*>(objectPtr);
-        return DiagnosticInfo::StackFrame{
-            frame.objectPath, frame.sectionOffset, frame.sectionSize, instructionOffset};
-    }
+    auto& [headerAddress, frame] = *it;
+    dassert(address < (headerAddress + frame.sectionSize));
 
-    friend int createStackTraceMap(dl_phdr_info* info, size_t size, void* data);
-
-private:
-    std::map<void*, DynamicObject> _map;
-} gDynamicObjectMap;
+    auto fileOffset = address - headerAddress + frame.sectionOffset;
+    return DiagnosticInfo::StackFrame{frame.objectPath, fileOffset};
+}
 
 // iterates through the backtrace instruction pointers to
 // find the instruction pointer that refers to a segment in the addr_map
-DiagnosticInfo::StackTrace DiagnosticInfo::makeStackTrace() {
-    DiagnosticInfo::StackTrace stacktrace;
+DiagnosticInfo::StackTrace DiagnosticInfo::makeStackTrace() const {
+    DiagnosticInfo::StackTrace trace;
     for (auto addr : _backtraceAddresses) {
-        stacktrace.emplace_back(gDynamicObjectMap.getFrame(addr));
+        trace.frames.emplace_back(gDynamicObjectMap.getFrame(addr));
     }
-    return stacktrace;
+    return trace;
 }
 
 static std::vector<void*> getBacktraceAddresses() {
@@ -152,7 +183,7 @@ static std::vector<void*> getBacktraceAddresses() {
     return backtraceAddresses;
 }
 #else
-DiagnosticInfo::StackTrace DiagnosticInfo::makeStackTrace() {
+DiagnosticInfo::StackTrace DiagnosticInfo::makeStackTrace() const {
     return DiagnosticInfo::StackTrace();
 }
 
@@ -160,6 +191,46 @@ static std::vector<void*> getBacktraceAddresses() {
     return std::vector<void*>();
 }
 #endif
+
+bool operator==(const DiagnosticInfo::StackFrame& frame1,
+                const DiagnosticInfo::StackFrame& frame2) {
+    return frame1.objectPath == frame2.objectPath &&
+        frame1.instructionOffset == frame2.instructionOffset;
+}
+
+bool operator==(const DiagnosticInfo::StackTrace& trace1,
+                const DiagnosticInfo::StackTrace& trace2) {
+    return trace1.frames == trace2.frames;
+}
+
+bool operator==(const DiagnosticInfo& info1, const DiagnosticInfo& info2) {
+    return info1._captureName == info2._captureName && info1._timestamp == info2._timestamp &&
+        info1._backtraceAddresses == info2._backtraceAddresses;
+}
+
+std::string DiagnosticInfo::StackFrame::toString() const {
+    return "{{ \"path\": \"{}\", \"addr\": \"0x{:x}\" }}"_format(objectPath, instructionOffset);
+}
+
+std::string DiagnosticInfo::StackTrace::toString() const {
+    str::stream stream;
+    stream << "{ \"backtrace\": [ ";
+    bool isFirst = true;
+    for (auto& frame : frames) {
+        if (!std::exchange(isFirst, false)) {
+            // Sadly, JSON doesn't allow trailing commas
+            stream << ", ";
+        }
+        stream << frame.toString();
+    }
+    stream << "] }";
+    return stream;
+}
+
+std::string DiagnosticInfo::toString() const {
+    return "{{ \"name\": \"{}\", \"time\": \"{}\", \"backtraceSize\": {} }}"_format(
+        _captureName.toString(), _timestamp.toString(), _backtraceAddresses.size());
+}
 
 DiagnosticInfo takeDiagnosticInfo(const StringData& captureName) {
     // uses backtrace to retrieve an array of instruction pointers for currently active

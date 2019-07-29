@@ -56,28 +56,47 @@ public:
     DiagnosticInfo& operator=(DiagnosticInfo&&) = default;
 
     struct StackFrame {
-        StringData objectPath = "";
-        ptrdiff_t sectionOffset = 0;
-        unsigned long sectionSize = 0;
-        ptrdiff_t instructionOffset = 0;
-    };
-    using StackTrace = std::vector<StackFrame>;
+        std::string toString() const;
+        friend bool operator==(const StackFrame& frame1, const StackFrame& frame2);
+        friend bool operator!=(const StackFrame& frame1, const StackFrame& frame2) {
+            return !(frame1 == frame2);
+        }
 
-    Date_t getTimestamp() {
+        StringData objectPath;
+        uintptr_t instructionOffset = 0;
+    };
+    struct StackTrace {
+        std::string toString() const;
+        friend bool operator==(const StackTrace& trace1, const StackTrace& trace2);
+        friend bool operator!=(const StackTrace& trace1, const StackTrace& trace2) {
+            return !(trace1 == trace2);
+        }
+
+        std::vector<StackFrame> frames;
+    };
+
+    Date_t getTimestamp() const {
         return _timestamp;
     }
 
-    StringData getCaptureName() {
+    StringData getCaptureName() const {
         return _captureName;
     }
 
-    StackTrace makeStackTrace();
+    StackTrace makeStackTrace() const;
 
     static std::vector<void*> getBacktraceAddresses();
 
+    std::string toString() const;
     friend DiagnosticInfo takeDiagnosticInfo(const StringData& captureName);
 
 private:
+    friend bool operator==(const DiagnosticInfo& info1, const DiagnosticInfo& info2);
+    friend bool operator!=(const DiagnosticInfo& info1, const DiagnosticInfo& info2) {
+        return !(info1 == info2);
+    }
+    friend std::ostream& operator<<(std::ostream& s, const DiagnosticInfo& info);
+
     Date_t _timestamp;
     StringData _captureName;
     std::vector<void*> _backtraceAddresses;
@@ -89,6 +108,15 @@ private:
           _captureName(captureName),
           _backtraceAddresses(backtraceAddresses) {}
 };
+
+
+inline std::ostream& operator<<(std::ostream& s, const DiagnosticInfo::StackFrame& frame) {
+    return s << frame.toString();
+}
+
+inline std::ostream& operator<<(std::ostream& s, const DiagnosticInfo& info) {
+    return s << info.toString();
+}
 
 /**
  * Captures the diagnostic information based on the caller's context.

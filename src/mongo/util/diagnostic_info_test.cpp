@@ -27,11 +27,16 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
+#include "mongo/util/diagnostic_info.h"
+
 #include <string>
 
+#include "mongo/bson/inline_decls.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
-#include "mongo/util/diagnostic_info.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 TEST(DiagnosticInfo, BasicSingleThread) {
@@ -53,10 +58,95 @@ TEST(DiagnosticInfo, BasicSingleThread) {
     // take a second diagnostic capture and compare its fields to the first
     DiagnosticInfo capture2 = takeDiagnosticInfo("capture2"_sd);
     ASSERT_LT(capture1.getTimestamp(), capture2.getTimestamp());
-    ASSERT_EQ(capture1.getCaptureName(), "capture1");
     ASSERT_EQ(capture2.getCaptureName(), "capture2");
+    ASSERT_NE(capture2, capture1);
 
     clockSourcePointer->advance(Seconds(1));
     ASSERT_LT(capture2.getTimestamp(), clockSourcePointer->now());
+}
+
+using MaybeDiagnosticInfo = boost::optional<DiagnosticInfo>;
+void recurseAndCaptureInfo(MaybeDiagnosticInfo& info, size_t i);
+
+TEST(DiagnosticInfo, StackTraceTest) {
+    // set up serviceContext and clock source
+    auto serviceContext = ServiceContext::make();
+    auto clockSource = std::make_unique<ClockSourceMock>();
+    serviceContext->setFastClockSource(std::move(clockSource));
+    setGlobalServiceContext(std::move(serviceContext));
+
+    MaybeDiagnosticInfo infoRecurse0;
+    recurseAndCaptureInfo(infoRecurse0, 0);
+    ASSERT(infoRecurse0);
+    log() << *infoRecurse0;
+    auto trace0 = infoRecurse0->makeStackTrace();
+    log() << trace0;
+
+#ifdef __linux__
+    auto testRecursion = [&](size_t i, const MaybeDiagnosticInfo& infoRecurse) {
+        ASSERT(infoRecurse);
+        log() << *infoRecurse;
+
+        auto trace = infoRecurse->makeStackTrace();
+        log() << trace;
+        ASSERT_EQ(trace0.frames.size() + i, trace.frames.size());
+
+        auto it = trace.frames.begin();
+        auto it0 = trace0.frames.begin();
+
+        for (; *it == *it0; ++it, ++it0) {
+            // The begining of the trace should be the same
+        }
+
+        size_t j = 0;
+        auto recursiveFrame = *it;
+        for (; *it == recursiveFrame; ++it, ++j) {
+            // Advance the recursive trace through the recursion
+            ASSERT_NE(*it, *it0);
+
+            // The recursive frame should always be on the main executable
+            ASSERT_EQ(it->objectPath, "");
+        }
+        ASSERT_EQ(j, i);
+
+        // The frame right above the recursion will be a different return
+        ASSERT_NE(*it, *it0);
+        ++it, ++it0;
+
+        for (; it0 != trace0.frames.end() && *it == *it0; ++it, ++it0) {
+            // The end of the trace should be the same
+        }
+
+        ASSERT(it == trace.frames.end());
+    };
+
+    {
+        volatile size_t i = 3;
+        MaybeDiagnosticInfo infoRecurse;
+        recurseAndCaptureInfo(infoRecurse, i);
+        testRecursion(i, infoRecurse);
+    }
+
+    {
+        volatile size_t i = 10;
+        MaybeDiagnosticInfo infoRecurse;
+        recurseAndCaptureInfo(infoRecurse, i);
+        testRecursion(i, infoRecurse);
+    }
+#else
+    ASSERT_TRUE(trace0.frames.empty());
+#endif
+}
+
+void NOINLINE_DECL recurseAndCaptureInfo(MaybeDiagnosticInfo& info, size_t i) {
+    // Prevent tail-call optimization.
+    asm volatile("");  // NOLINT
+
+    if (i == 0) {
+        info = takeDiagnosticInfo("Recursion!"_sd);
+        return;
+    }
+
+    recurseAndCaptureInfo(info, --i);
 }
 }  // namespace mongo

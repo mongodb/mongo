@@ -24,15 +24,7 @@ import subprocess
 import sys
 
 
-def symbolize_frames(  # pylint: disable=too-many-locals
-        trace_doc, dbg_path_resolver, symbolizer_path=None, dsym_hint=None):
-    """Return a list of symbolized stack frames from a trace_doc in MongoDB stack dump format."""
-
-    if symbolizer_path is None:
-        symbolizer_path = os.environ.get("MONGOSYMB_SYMBOLIZER_PATH", "llvm-symbolizer")
-    if dsym_hint is None:
-        dsym_hint = []
-
+def parse_input(trace_doc):
     def make_base_addr_map(somap_list):
         """Return map from binary load address to description of library from the somap_list.
 
@@ -62,7 +54,28 @@ def symbolize_frames(  # pylint: disable=too-many-locals
         frames.append(
             dict(
                 path=dbg_path_resolver.get_dbg_file(soinfo), buildId=soinfo.get("buildId", None),
-                offset=frame["o"], addr=addr, symbol=frame.get("s", None)))
+                offset=frame["o"], addr="0x{:x}".format(addr), symbol=frame.get("s", None)))
+    return frames
+
+
+def symbolize_frames(  # pylint: disable=too-many-locals
+        trace_doc, dbg_path_resolver, symbolizer_path=None, dsym_hint=None, input_format="classic",
+        **kwargs):
+    """Return a list of symbolized stack frames from a trace_doc in MongoDB stack dump format."""
+
+    if symbolizer_path is None:
+        symbolizer_path = os.environ.get("MONGOSYMB_SYMBOLIZER_PATH", "llvm-symbolizer")
+    if dsym_hint is None:
+        dsym_hint = []
+
+    if input_format == "classic":
+        frames = parse_input(trace_doc)
+    elif input_format == "thin":
+        frames = trace_doc["backtrace"]
+        for frame in frames:
+            frame["path"] = dbg_path_resolver.get_dbg_file(frame)
+    else:
+        raise ValueError('Unknown input format "{}"'.format(input_format))
 
     symbolizer_args = [symbolizer_path]
     for dh in dsym_hint:
@@ -102,7 +115,8 @@ def symbolize_frames(  # pylint: disable=too-many-locals
     for frame in frames:
         if frame["path"] is None:
             continue
-        symbolizer_process.stdin.write("CODE {path:s} 0x{addr:X}\n".format(**frame).encode())
+        symbol_line = "CODE {path:} {addr:}\n".format(**frame)
+        symbolizer_process.stdin.write(symbol_line.encode())
         symbolizer_process.stdin.flush()
         frame["symbinfo"] = extract_symbols(symbolizer_process.stdout)
     symbolizer_process.stdin.close()
@@ -115,11 +129,12 @@ class PathDbgFileResolver(object):
 
     def __init__(self, bin_path_guess):
         """Initialize PathDbgFileResolver."""
-        self._bin_path_guess = bin_path_guess
+        self._bin_path_guess = os.path.realpath(bin_path_guess)
 
     def get_dbg_file(self, soinfo):
         """Return dbg file name."""
-        return soinfo.get("path", self._bin_path_guess)
+        path = soinfo.get("path", "")
+        return path if path else self._bin_path_guess
 
 
 class S3BuildidDbgFileResolver(object):
@@ -174,6 +189,7 @@ def main(argv):
     parser.add_option("--dsym-hint", action="append", dest="dsym_hint")
     parser.add_option("--symbolizer-path", dest="symbolizer_path", default=None)
     parser.add_option("--debug-file-resolver", dest="debug_file_resolver", default="path")
+    parser.add_option("--input-format", dest="input_format", default="classic")
     parser.add_option("--output-format", dest="output_format", default="classic")
     (options, args) = parser.parse_args(argv)
     resolver_constructor = dict(path=PathDbgFileResolver, s3=S3BuildidDbgFileResolver).get(
@@ -187,6 +203,8 @@ def main(argv):
         sys.stderr.write("Invalid output-format argument: %s\n" % options.output_format)
         sys.exit(1)
 
+    unnamed_args = args[1:]
+
     # Skip over everything before the first '{' since it is likely to be log line prefixes.
     # Additionally, using raw_decode() to ignore extra data after the closing '}' to allow maximal
     # sloppiness in copy-pasting input.
@@ -194,9 +212,8 @@ def main(argv):
     trace_doc = trace_doc[trace_doc.find('{'):]
     trace_doc = json.JSONDecoder().raw_decode(trace_doc)[0]
 
-    resolver = resolver_constructor(*args[1:])
-    frames = symbolize_frames(trace_doc, resolver, symbolizer_path=options.symbolizer_path,
-                              dsym_hint=options.dsym_hint)
+    resolver = resolver_constructor(*unnamed_args)
+    frames = symbolize_frames(trace_doc, resolver, **vars(options))
     output_fn(frames, sys.stdout, indent=2)
 
 
