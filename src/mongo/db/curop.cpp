@@ -323,13 +323,18 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
 
     std::shared_ptr<DiagnosticInfo> diagnostic = DiagnosticInfo::Diagnostic::get(client);
     if (diagnostic && backtraceMode) {
-        // TODO: SERVER-42447 Add backtrace as bsonobj to waitingForLatch
-        BSONObjBuilder waitingForLatchBuilder;
+        BSONObjBuilder waitingForLatchBuilder(infoBuilder->subobjStart("waitingForLatch"));
         waitingForLatchBuilder.append("timestamp", diagnostic->getTimestamp());
         waitingForLatchBuilder.append("captureName", diagnostic->getCaptureName());
-        infoBuilder->append("waitingForLatch", waitingForLatchBuilder.obj());
+        {
+            BSONArrayBuilder backtraceBuilder(waitingForLatchBuilder.subarrayStart("backtrace"));
+            for (const auto& frame : diagnostic->makeStackTrace().frames) {
+                BSONObjBuilder backtraceObj(backtraceBuilder.subobjStart());
+                backtraceObj.append("addr", integerToHex(frame.instructionOffset));
+                backtraceObj.append("path", frame.objectPath);
+            }
+        }
     }
-
 
     if (MONGO_FAIL_POINT(keepDiagnosticCaptureOnFailedLock)) {
         gHangLock.lock.unlock();

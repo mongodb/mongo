@@ -28,6 +28,13 @@ var result = getCurrentOp();
 assert(result.hasOwnProperty("waitingForLatch"));
 assert(result["waitingForLatch"].hasOwnProperty("timestamp"));
 assert(result["waitingForLatch"].hasOwnProperty("captureName"));
+assert(result["waitingForLatch"].hasOwnProperty("backtrace"));
+result["waitingForLatch"]["backtrace"].forEach(function(obj) {
+    assert(obj.hasOwnProperty("addr"));
+    assert(typeof obj["addr"] === "string");
+    assert(obj.hasOwnProperty("path"));
+    assert(typeof obj["path"] === "string");
+});
 
 assert.commandWorked(
     db.adminCommand({"configureFailPoint": 'keepDiagnosticCaptureOnFailedLock', "mode": 'off'}));
