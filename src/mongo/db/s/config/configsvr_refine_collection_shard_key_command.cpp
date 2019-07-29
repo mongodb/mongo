@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -140,6 +141,10 @@ public:
                                                                  boost::none,
                                                                  collType.getUnique(),
                                                                  false);  // createIndexIfPossible
+
+            LOG(0) << "CMD: refineCollectionShardKey: " << request().toBSON({});
+
+            audit::logRefineCollectionShardKey(opCtx->getClient(), nss.ns(), proposedKey);
 
             ShardingCatalogManager::get(opCtx)->refineCollectionShardKey(
                 opCtx, nss, newShardKeyPattern);

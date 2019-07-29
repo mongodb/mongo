@@ -172,4 +172,8 @@ void mongo::audit::logShardCollection(Client* client,
                                       const BSONObj& keyPattern,
                                       bool unique) {}
 
+void mongo::audit::logRefineCollectionShardKey(Client* client,
+                                               StringData ns,
+                                               const BSONObj& keyPattern) {}
+
 #endif

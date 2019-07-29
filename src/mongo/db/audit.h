@@ -315,5 +315,10 @@ void logRemoveShard(Client* client, StringData shardname);
  */
 void logShardCollection(Client* client, StringData ns, const BSONObj& keyPattern, bool unique);
 
+/**
+ * Logs the result of a refineCollectionShardKey event.
+ */
+void logRefineCollectionShardKey(Client* client, StringData ns, const BSONObj& keyPattern);
+
 }  // namespace audit
 }  // namespace mongo
