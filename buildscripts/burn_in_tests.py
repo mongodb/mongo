@@ -10,7 +10,7 @@ import os.path
 import subprocess
 import shlex
 import sys
-import urllib.parse
+from typing import Dict, List
 
 from git import Repo
 import structlog
@@ -31,6 +31,7 @@ if __name__ == "__main__" and __package__ is None:
 from buildscripts.patch_builds.change_data import find_changed_files
 from buildscripts import resmokelib
 from buildscripts.ciconfig import evergreen
+from buildscripts.ciconfig.evergreen import EvergreenProjectConfig, VariantTask
 # pylint: enable=wrong-import-position
 
 structlog.configure(logger_factory=LoggerFactory())
@@ -294,9 +295,57 @@ def _set_resmoke_args(task):
     return evergreen.ResmokeArgs.get_updated_arg(resmoke_args, "suites", suite_name)
 
 
-def create_task_list(  #pylint: disable=too-many-locals
-        evergreen_conf, buildvariant, suites, exclude_tasks):
-    """Find associated tasks for the specified buildvariant and suites.
+def _distro_to_run_task_on(task: VariantTask, evg_proj_config: EvergreenProjectConfig,
+                           build_variant: str) -> str:
+    """
+    Determine what distro an task should be run on.
+
+    For normal tasks, the distro will be the default for the build variant unless the task spec
+    specifies a particular distro to run on.
+
+    For generated tasks, the distro will be the default for the build variant unless (1) the
+    "use_large_distro" flag is set as a "var" in the "generate resmoke tasks" command of the
+    task definition and (2) the build variant defines the "large_distro_name" in its expansions.
+
+    :param task: Task being run.
+    :param evg_proj_config: Evergreen project configuration.
+    :param build_variant: Build Variant task is being run on.
+    :return: Distro task should be run on.
+    """
+    task_def = evg_proj_config.get_task(task.name)
+    if task_def.is_generate_resmoke_task:
+        resmoke_vars = task_def.generate_resmoke_tasks_command["vars"]
+        if "use_large_distro" in resmoke_vars:
+            bv = evg_proj_config.get_variant(build_variant)
+            if "large_distro_name" in bv.raw["expansions"]:
+                return bv.raw["expansions"]["large_distro_name"]
+
+    return task.run_on[0]
+
+
+def _gather_task_info(task: VariantTask, tests_by_suite: Dict,
+                      evg_proj_config: EvergreenProjectConfig, build_variant: str) -> Dict:
+    """
+    Gather the information needed to run the given task.
+
+    :param task: Task to be run.
+    :param tests_by_suite: Dict of suites.
+    :param evg_proj_config: Evergreen project configuration.
+    :param build_variant: Build variant task will be run on.
+    :return: Dictionary of information needed to run task.
+    """
+    return {
+        "resmoke_args": _set_resmoke_args(task),
+        "tests": tests_by_suite[task.resmoke_suite],
+        "use_multiversion": task.multiversion_path,
+        "distro": _distro_to_run_task_on(task, evg_proj_config, build_variant)
+    }  # yapf: disable
+
+
+def create_task_list(evergreen_conf: EvergreenProjectConfig, build_variant: str,
+                     tests_by_suite: Dict[str, List[str]], exclude_tasks: [str]):
+    """
+    Find associated tasks for the specified build_variant and suites.
 
     Returns a dict keyed by task_name, with executor, resmoke_args & tests, i.e.,
     {'jsCore_small_oplog':
@@ -304,28 +353,31 @@ def create_task_list(  #pylint: disable=too-many-locals
          'tests': ['jstests/core/all2.js', 'jstests/core/all3.js'],
          'use_multiversion': '/data/multiversion'}
     }
+
+    :param evergreen_conf: Evergreen configuration for project.
+    :param build_variant: Build variant to select tasks from.
+    :param tests_by_suite: Suites to be run.
+    :param exclude_tasks: Tasks to exclude.
+    :return: Dict of tasks to run with run configuration.
     """
 
-    evg_buildvariant = evergreen_conf.get_variant(buildvariant)
-    if not evg_buildvariant:
-        print("Buildvariant '{}' not found in {}".format(buildvariant, evergreen_conf.path))
-        sys.exit(1)
+    evg_build_variant = evergreen_conf.get_variant(build_variant)
+    if not evg_build_variant:
+        print("Buildvariant '{}' not found in {}".format(build_variant, evergreen_conf.path))
+        raise ValueError(f"Buildvariant ({build_variant} not found in evergreen configuration")
 
     # Find all the buildvariant tasks.
     exclude_tasks_set = set(exclude_tasks)
-    variant_task = {
+    all_variant_tasks = {
         _get_task_name(task): task
-        for task in evg_buildvariant.tasks
+        for task in evg_build_variant.tasks
         if task.name not in exclude_tasks_set and task.combined_resmoke_args
     }
 
     # Return the list of tasks to run for the specified suite.
     return {
-        task_name: {
-            "resmoke_args": _set_resmoke_args(task), "tests": suites[task.resmoke_suite],
-            "use_multiversion": task.multiversion_path
-        }
-        for task_name, task in variant_task.items() if task.resmoke_suite in suites
+        task_name: _gather_task_info(task, tests_by_suite, evergreen_conf, build_variant)
+        for task_name, task in all_variant_tasks.items() if task.resmoke_suite in tests_by_suite
     }
 
 
