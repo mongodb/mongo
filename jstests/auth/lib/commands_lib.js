@@ -4766,7 +4766,7 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: adminDbName,
-                roles: roles_clusterManager,
+                roles: Object.extend({enableSharding: 1}, roles_clusterManager),
                 privileges: [{
                     resource: {db: "test", collection: "x"},
                     actions: ["refineCollectionShardKey"]
