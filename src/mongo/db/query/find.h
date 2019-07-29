@@ -76,7 +76,7 @@ void beginQueryOp(OperationContext* opCtx,
 
 /**
  * 1) Fills out CurOp for "opCtx" with information regarding this query's execution.
- * 2) Reports index usage to the CollectionInfoCache.
+ * 2) Reports index usage to the CollectionQueryInfo.
  *
  * Uses explain functionality to extract stats from 'exec'.
  */

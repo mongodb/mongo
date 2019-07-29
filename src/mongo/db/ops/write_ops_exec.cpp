@@ -59,6 +59,7 @@
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/ops/write_ops_retryability.h"
+#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -649,7 +650,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
     PlanSummaryStats summary;
     Explain::getSummaryStats(*exec, &summary);
     if (collection->getCollection()) {
-        collection->getCollection()->infoCache()->notifyOfQuery(opCtx, summary);
+        CollectionQueryInfo::get(collection->getCollection()).notifyOfQuery(opCtx, summary);
     }
 
     if (curOp.shouldDBProfile()) {
@@ -890,7 +891,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     PlanSummaryStats summary;
     Explain::getSummaryStats(*exec, &summary);
     if (collection.getCollection()) {
-        collection.getCollection()->infoCache()->notifyOfQuery(opCtx, summary);
+        CollectionQueryInfo::get(collection.getCollection()).notifyOfQuery(opCtx, summary);
     }
     curOp.debug().setPlanSummaryMetrics(summary);
 

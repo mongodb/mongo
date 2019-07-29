@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include "mongo/db/query/collection_query_info.h"
+
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/collection_index_usage_tracker.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -36,37 +39,34 @@
 #include "mongo/db/update_index_data.h"
 
 namespace mongo {
-class Collection;
+
 class IndexDescriptor;
 class OperationContext;
 
 /**
  * this is for storing things that you want to cache about a single collection
- * life cycle is managed for you from inside Collection.
+ * life cycle is managed for you from inside Collection
  */
-class CollectionInfoCache {
+class CollectionQueryInfo {
 public:
-    virtual ~CollectionInfoCache() = default;
+    CollectionQueryInfo();
 
-    /**
-     * Builds internal cache state based on the current state of the Collection's IndexCatalog.
-     */
-    virtual void init(OperationContext* const opCtx) = 0;
+    inline static const auto get = Collection::declareDecoration<CollectionQueryInfo>();
 
     /**
      * Get the PlanCache for this collection.
      */
-    virtual PlanCache* getPlanCache() const = 0;
+    PlanCache* getPlanCache() const;
 
     /**
      * Get the QuerySettings for this collection.
      */
-    virtual QuerySettings* getQuerySettings() const = 0;
+    QuerySettings* getQuerySettings() const;
 
     /* get set of index keys for this namespace.  handy to quickly check if a given
        field is indexed (Note it might be a secondary component of a compound index.)
     */
-    virtual const UpdateIndexData& getIndexKeys(OperationContext* const opCtx) const = 0;
+    const UpdateIndexData& getIndexKeys(OperationContext* opCtx) const;
 
     /**
      * Returns cached index usage statistics for this collection.  The map returned will contain
@@ -75,13 +75,14 @@ public:
      *
      * Note for performance that this method returns a copy of a StringMap.
      */
-    virtual CollectionIndexUsageMap getIndexUsageStats() const = 0;
+    CollectionIndexUsageMap getIndexUsageStats() const;
+
+    CollectionIndexUsageTracker::CollectionScanStats getCollectionScanStats() const;
 
     /**
-     * Returns a struct containing information on the number of collection scans that have been
-     * performed.
+     * Builds internal cache state based on the current state of the Collection's IndexCatalog.
      */
-    virtual CollectionIndexUsageTracker::CollectionScanStats getCollectionScanStats() const = 0;
+    void init(OperationContext* opCtx);
 
     /**
      * Register a newly-created index with the cache.  Must be called whenever an index is
@@ -89,7 +90,7 @@ public:
      *
      * Must be called under exclusive collection lock.
      */
-    virtual void addedIndex(OperationContext* const opCtx, const IndexDescriptor* const desc) = 0;
+    void addedIndex(OperationContext* opCtx, const IndexDescriptor* desc);
 
     /**
      * Deregister a newly-dropped index with the cache.  Must be called whenever an index is
@@ -97,22 +98,38 @@ public:
      *
      * Must be called under exclusive collection lock.
      */
-    virtual void droppedIndex(OperationContext* const opCtx, const StringData indexName) = 0;
+    void droppedIndex(OperationContext* opCtx, StringData indexName);
 
     /**
      * Removes all cached query plans.
      */
-    virtual void clearQueryCache() = 0;
+    void clearQueryCache();
+
+    void notifyOfQuery(OperationContext* opCtx, const PlanSummaryStats& summaryStats);
+
+private:
+    void computeIndexKeys(OperationContext* opCtx);
+    void updatePlanCacheIndexEntries(OperationContext* opCtx);
 
     /**
-     * Signal to the cache that a query operation has completed.  'indexesUsed' should list the
-     * set of indexes used by the winning plan, if any. 'summaryStats.collectionScans' and
-     * 'summaryStats.collectionScansNonTailable' should be the number of collections scans and
-     * non-tailable collection scans that occured while executing the winning plan.
+     * Rebuilds cached information that is dependent on index composition. Must be called
+     * when index composition changes.
      */
-    virtual void notifyOfQuery(OperationContext* const opCtx,
-                               const PlanSummaryStats& summaryStats) = 0;
+    void rebuildIndexData(OperationContext* opCtx);
 
-    virtual void setNs(NamespaceString ns) = 0;
+    // ---  index keys cache
+    bool _keysComputed;
+    UpdateIndexData _indexedPaths;
+
+    // A cache for query plans.
+    std::unique_ptr<PlanCache> _planCache;
+
+    // Query settings.
+    // Includes index filters.
+    std::unique_ptr<QuerySettings> _querySettings;
+
+    // Tracks index usage statistics for this collection.
+    CollectionIndexUsageTracker _indexUsageTracker;
 };
+
 }  // namespace mongo

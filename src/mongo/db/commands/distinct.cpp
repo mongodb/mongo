@@ -46,6 +46,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find_common.h"
@@ -285,7 +286,7 @@ public:
         PlanSummaryStats stats;
         Explain::getSummaryStats(*executor.getValue(), &stats);
         if (collection) {
-            collection->infoCache()->notifyOfQuery(opCtx, stats);
+            CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, stats);
         }
         curOp->debug().setPlanSummaryMetrics(stats);
 

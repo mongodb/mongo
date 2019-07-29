@@ -1026,6 +1026,7 @@ env.Library(
         'background',
         'bson/dotted_path_support',
         'catalog/collection',
+        'catalog/collection_query_info',
         'catalog/document_validation',
         'catalog/index_catalog_entry',
         'catalog/index_catalog',

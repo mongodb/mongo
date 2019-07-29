@@ -45,6 +45,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -857,7 +858,7 @@ void UpdateStage::doRestoreStateRequiresCollection() {
 
     // The set of indices may have changed during yield. Make sure that the update driver has up to
     // date index information.
-    const auto& updateIndexData = collection()->infoCache()->getIndexKeys(getOpCtx());
+    const auto& updateIndexData = CollectionQueryInfo::get(collection()).getIndexKeys(getOpCtx());
     _params.driver->refreshIndexKeys(&updateIndexData);
 }
 

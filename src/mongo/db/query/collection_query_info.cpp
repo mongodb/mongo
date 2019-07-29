@@ -31,7 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/catalog/collection_info_cache_impl.h"
+#include "mongo/db/query/collection_query_info.h"
 
 #include <memory>
 
@@ -52,26 +52,48 @@
 
 namespace mongo {
 
-CollectionInfoCacheImpl::CollectionInfoCacheImpl(Collection* collection, const NamespaceString& ns)
-    : _collection(collection),
-      _ns(ns),
-      _keysComputed(false),
-      _planCache(std::make_unique<PlanCache>(ns.ns())),
+namespace {
+CoreIndexInfo indexInfoFromIndexCatalogEntry(const IndexCatalogEntry& ice) {
+    auto desc = ice.descriptor();
+    invariant(desc);
+
+    auto accessMethod = ice.accessMethod();
+    invariant(accessMethod);
+
+    const ProjectionExecAgg* projExec = nullptr;
+    if (desc->getIndexType() == IndexType::INDEX_WILDCARD)
+        projExec = static_cast<const WildcardAccessMethod*>(accessMethod)->getProjectionExec();
+
+    return {desc->keyPattern(),
+            desc->getIndexType(),
+            desc->isSparse(),
+            IndexEntry::Identifier{desc->indexName()},
+            ice.getFilterExpression(),
+            ice.getCollator(),
+            projExec};
+}
+}  // namespace
+
+CollectionQueryInfo::CollectionQueryInfo()
+    : _keysComputed(false),
+      _planCache(std::make_unique<PlanCache>()),
       _querySettings(std::make_unique<QuerySettings>()),
       _indexUsageTracker(getGlobalServiceContext()->getPreciseClockSource()) {}
 
-const UpdateIndexData& CollectionInfoCacheImpl::getIndexKeys(OperationContext* opCtx) const {
+const UpdateIndexData& CollectionQueryInfo::getIndexKeys(OperationContext* opCtx) const {
+    const Collection* coll = get.owner(this);
     // This requires "some" lock, and MODE_IS is an expression for that, for now.
-    dassert(opCtx->lockState()->isCollectionLockedForMode(_collection->ns(), MODE_IS));
+    dassert(opCtx->lockState()->isCollectionLockedForMode(coll->ns(), MODE_IS));
     invariant(_keysComputed);
     return _indexedPaths;
 }
 
-void CollectionInfoCacheImpl::computeIndexKeys(OperationContext* opCtx) {
+void CollectionQueryInfo::computeIndexKeys(OperationContext* opCtx) {
     _indexedPaths.clear();
 
+    const Collection* coll = get.owner(this);
     std::unique_ptr<IndexCatalog::IndexIterator> it =
-        _collection->getIndexCatalog()->getIndexIterator(opCtx, true);
+        coll->getIndexCatalog()->getIndexIterator(opCtx, true);
     while (it->more()) {
         const IndexCatalogEntry* entry = it->next();
         const IndexDescriptor* descriptor = entry->descriptor();
@@ -136,45 +158,48 @@ void CollectionInfoCacheImpl::computeIndexKeys(OperationContext* opCtx) {
     _keysComputed = true;
 }
 
-void CollectionInfoCacheImpl::notifyOfQuery(OperationContext* opCtx,
-                                            const PlanSummaryStats& summaryStats) {
+void CollectionQueryInfo::notifyOfQuery(OperationContext* opCtx,
+                                        const PlanSummaryStats& summaryStats) {
     _indexUsageTracker.recordCollectionScans(summaryStats.collectionScans);
     _indexUsageTracker.recordCollectionScansNonTailable(summaryStats.collectionScansNonTailable);
 
     const auto& indexesUsed = summaryStats.indexesUsed;
+    const Collection* coll = get.owner(this);
     // Record indexes used to fulfill query.
     for (auto it = indexesUsed.begin(); it != indexesUsed.end(); ++it) {
         // This index should still exist, since the PlanExecutor would have been killed if the
         // index was dropped (and we would not get here).
-        dassert(nullptr != _collection->getIndexCatalog()->findIndexByName(opCtx, *it));
+        dassert(nullptr != coll->getIndexCatalog()->findIndexByName(opCtx, *it));
 
         _indexUsageTracker.recordIndexAccess(*it);
     }
 }
 
-void CollectionInfoCacheImpl::clearQueryCache() {
-    LOG(1) << _collection->ns() << ": clearing plan cache - collection info cache reset";
+void CollectionQueryInfo::clearQueryCache() {
+    const Collection* coll = get.owner(this);
+    LOG(1) << coll->ns() << ": clearing plan cache - collection info cache reset";
     if (nullptr != _planCache.get()) {
         _planCache->clear();
     }
 }
 
-PlanCache* CollectionInfoCacheImpl::getPlanCache() const {
+PlanCache* CollectionQueryInfo::getPlanCache() const {
     return _planCache.get();
 }
 
-QuerySettings* CollectionInfoCacheImpl::getQuerySettings() const {
+QuerySettings* CollectionQueryInfo::getQuerySettings() const {
     return _querySettings.get();
 }
 
-void CollectionInfoCacheImpl::updatePlanCacheIndexEntries(OperationContext* opCtx) {
+void CollectionQueryInfo::updatePlanCacheIndexEntries(OperationContext* opCtx) {
     std::vector<CoreIndexInfo> indexCores;
 
     // TODO We shouldn't need to include unfinished indexes, but we must here because the index
     // catalog may be in an inconsistent state.  SERVER-18346.
     const bool includeUnfinishedIndexes = true;
+    const Collection* coll = get.owner(this);
     std::unique_ptr<IndexCatalog::IndexIterator> ii =
-        _collection->getIndexCatalog()->getIndexIterator(opCtx, includeUnfinishedIndexes);
+        coll->getIndexCatalog()->getIndexIterator(opCtx, includeUnfinishedIndexes);
     while (ii->more()) {
         const IndexCatalogEntry* ice = ii->next();
         indexCores.emplace_back(indexInfoFromIndexCatalogEntry(*ice));
@@ -183,13 +208,14 @@ void CollectionInfoCacheImpl::updatePlanCacheIndexEntries(OperationContext* opCt
     _planCache->notifyOfIndexUpdates(indexCores);
 }
 
-void CollectionInfoCacheImpl::init(OperationContext* opCtx) {
+void CollectionQueryInfo::init(OperationContext* opCtx) {
+    const Collection* coll = get.owner(this);
     // Requires exclusive collection lock.
-    invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns(), MODE_X));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(coll->ns(), MODE_X));
 
     const bool includeUnfinishedIndexes = false;
     std::unique_ptr<IndexCatalog::IndexIterator> ii =
-        _collection->getIndexCatalog()->getIndexIterator(opCtx, includeUnfinishedIndexes);
+        coll->getIndexCatalog()->getIndexIterator(opCtx, includeUnfinishedIndexes);
     while (ii->more()) {
         const IndexDescriptor* desc = ii->next()->descriptor();
         _indexUsageTracker.registerIndex(desc->indexName(), desc->keyPattern());
@@ -198,9 +224,10 @@ void CollectionInfoCacheImpl::init(OperationContext* opCtx) {
     rebuildIndexData(opCtx);
 }
 
-void CollectionInfoCacheImpl::addedIndex(OperationContext* opCtx, const IndexDescriptor* desc) {
+void CollectionQueryInfo::addedIndex(OperationContext* opCtx, const IndexDescriptor* desc) {
+    const Collection* coll = get.owner(this);
     // Requires exclusive collection lock.
-    invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns(), MODE_X));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(coll->ns(), MODE_X));
     invariant(desc);
 
     rebuildIndexData(opCtx);
@@ -208,15 +235,16 @@ void CollectionInfoCacheImpl::addedIndex(OperationContext* opCtx, const IndexDes
     _indexUsageTracker.registerIndex(desc->indexName(), desc->keyPattern());
 }
 
-void CollectionInfoCacheImpl::droppedIndex(OperationContext* opCtx, StringData indexName) {
+void CollectionQueryInfo::droppedIndex(OperationContext* opCtx, StringData indexName) {
+    const Collection* coll = get.owner(this);
     // Requires exclusive collection lock.
-    invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns(), MODE_X));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(coll->ns(), MODE_X));
 
     rebuildIndexData(opCtx);
     _indexUsageTracker.unregisterIndex(indexName);
 }
 
-void CollectionInfoCacheImpl::rebuildIndexData(OperationContext* opCtx) {
+void CollectionQueryInfo::rebuildIndexData(OperationContext* opCtx) {
     clearQueryCache();
 
     _keysComputed = false;
@@ -224,18 +252,11 @@ void CollectionInfoCacheImpl::rebuildIndexData(OperationContext* opCtx) {
     updatePlanCacheIndexEntries(opCtx);
 }
 
-CollectionIndexUsageMap CollectionInfoCacheImpl::getIndexUsageStats() const {
+CollectionIndexUsageMap CollectionQueryInfo::getIndexUsageStats() const {
     return _indexUsageTracker.getUsageStats();
 }
 
-void CollectionInfoCacheImpl::setNs(NamespaceString ns) {
-    auto oldNs = _ns;
-    _ns = std::move(ns);
-
-    _planCache->setNs(_ns);
-}
-
-CollectionIndexUsageTracker::CollectionScanStats CollectionInfoCacheImpl::getCollectionScanStats()
+CollectionIndexUsageTracker::CollectionScanStats CollectionQueryInfo::getCollectionScanStats()
     const {
     return _indexUsageTracker.getCollectionScanStats();
 }

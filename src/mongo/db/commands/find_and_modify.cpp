@@ -57,6 +57,7 @@
 #include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/write_ops_retryability.h"
+#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find_and_modify_request.h"
 #include "mongo/db/query/get_executor.h"
@@ -409,7 +410,7 @@ public:
                 PlanSummaryStats summaryStats;
                 Explain::getSummaryStats(*exec, &summaryStats);
                 if (collection) {
-                    collection->infoCache()->notifyOfQuery(opCtx, summaryStats);
+                    CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, summaryStats);
                 }
                 opDebug->setPlanSummaryMetrics(summaryStats);
 
@@ -509,7 +510,7 @@ public:
                 PlanSummaryStats summaryStats;
                 Explain::getSummaryStats(*exec, &summaryStats);
                 if (collection) {
-                    collection->infoCache()->notifyOfQuery(opCtx, summaryStats);
+                    CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, summaryStats);
                 }
                 UpdateStage::recordUpdateStatsInOpDebug(UpdateStage::getUpdateStats(exec.get()),
                                                         opDebug);

@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/pipeline/document.h"
+#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/storage/storage_options.h"
@@ -324,7 +325,7 @@ DocumentSourceCursor::DocumentSourceCursor(
     }
 
     if (collection) {
-        collection->infoCache()->notifyOfQuery(pExpCtx->opCtx, _planSummaryStats);
+        CollectionQueryInfo::get(collection).notifyOfQuery(pExpCtx->opCtx, _planSummaryStats);
     }
 }
 

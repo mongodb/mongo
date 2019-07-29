@@ -60,12 +60,6 @@ public:
         std::abort();
     }
 
-    CollectionInfoCache* infoCache() {
-        std::abort();
-    }
-    const CollectionInfoCache* infoCache() const {
-        std::abort();
-    }
     const IndexCatalog* getIndexCatalog() const {
         return _indexCatalog.get();
     }

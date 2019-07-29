@@ -44,6 +44,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_yield_policy.h"
@@ -189,7 +190,7 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanFailure) {
     const std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
     // We shouldn't have anything in the plan cache for this shape yet.
-    PlanCache* cache = collection->infoCache()->getPlanCache();
+    PlanCache* cache = CollectionQueryInfo::get(collection).getPlanCache();
     ASSERT(cache);
     ASSERT_EQ(cache->get(*cq).state, PlanCache::CacheEntryState::kNotPresent);
 
@@ -235,7 +236,7 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanHitMaxWorks) {
     const std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
     // We shouldn't have anything in the plan cache for this shape yet.
-    PlanCache* cache = collection->infoCache()->getPlanCache();
+    PlanCache* cache = CollectionQueryInfo::get(collection).getPlanCache();
     ASSERT(cache);
     ASSERT_EQ(cache->get(*cq).state, PlanCache::CacheEntryState::kNotPresent);
 
@@ -286,7 +287,7 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanAddsActiveCacheEntries) {
         canonicalQueryFromFilterObj(opCtx(), nss, fromjson("{a: {$gte: 11}, b: {$gte: 11}}"));
 
     // We shouldn't have anything in the plan cache for this shape yet.
-    PlanCache* cache = collection->infoCache()->getPlanCache();
+    PlanCache* cache = CollectionQueryInfo::get(collection).getPlanCache();
     ASSERT(cache);
     ASSERT_EQ(cache->get(*shapeCq).state, PlanCache::CacheEntryState::kNotPresent);
 
@@ -345,7 +346,7 @@ TEST_F(QueryStageCachedPlan, DeactivatesEntriesOnReplan) {
         canonicalQueryFromFilterObj(opCtx(), nss, fromjson("{a: {$gte: 11}, b: {$gte: 11}}"));
 
     // We shouldn't have anything in the plan cache for this shape yet.
-    PlanCache* cache = collection->infoCache()->getPlanCache();
+    PlanCache* cache = CollectionQueryInfo::get(collection).getPlanCache();
     ASSERT(cache);
     ASSERT_EQ(cache->get(*shapeCq).state, PlanCache::CacheEntryState::kNotPresent);
 
@@ -404,7 +405,7 @@ TEST_F(QueryStageCachedPlan, EntriesAreNotDeactivatedWhenInactiveEntriesDisabled
         canonicalQueryFromFilterObj(opCtx(), nss, fromjson("{a: {$gte: 11}, b: {$gte: 11}}"));
 
     // We shouldn't have anything in the plan cache for this shape yet.
-    PlanCache* cache = collection->infoCache()->getPlanCache();
+    PlanCache* cache = CollectionQueryInfo::get(collection).getPlanCache();
     ASSERT(cache);
     ASSERT_EQ(cache->get(*shapeCq).state, PlanCache::CacheEntryState::kNotPresent);
 
@@ -444,7 +445,7 @@ TEST_F(QueryStageCachedPlan, ThrowsOnYieldRecoveryWhenIndexIsDroppedBeforePlanSe
     const std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
     // We shouldn't have anything in the plan cache for this shape yet.
-    PlanCache* cache = collection->infoCache()->getPlanCache();
+    PlanCache* cache = CollectionQueryInfo::get(collection).getPlanCache();
     ASSERT(cache);
 
     // Get planner params.
@@ -486,7 +487,7 @@ TEST_F(QueryStageCachedPlan, DoesNotThrowOnYieldRecoveryWhenIndexIsDroppedAferPl
     const std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
     // We shouldn't have anything in the plan cache for this shape yet.
-    PlanCache* cache = collection->infoCache()->getPlanCache();
+    PlanCache* cache = CollectionQueryInfo::get(collection).getPlanCache();
     ASSERT(cache);
 
     // Get planner params.

@@ -280,6 +280,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/catalog/collection_catalog_helper',
+        '$BUILD_DIR/mongo/db/catalog/collection_query_info',
         '$BUILD_DIR/mongo/db/catalog/collection_validation',
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/catalog/index_key_validate',

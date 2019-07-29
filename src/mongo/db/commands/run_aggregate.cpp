@@ -57,6 +57,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
@@ -788,7 +789,7 @@ Status runAggregate(OperationContext* opCtx,
         // For an optimized away pipeline, signal the cache that a query operation has completed.
         // For normal pipelines this is done in DocumentSourceCursor.
         if (ctx && ctx->getCollection()) {
-            ctx->getCollection()->infoCache()->notifyOfQuery(opCtx, stats);
+            CollectionQueryInfo::get(ctx->getCollection()).notifyOfQuery(opCtx, stats);
         }
     }
 

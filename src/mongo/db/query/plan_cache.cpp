@@ -362,8 +362,6 @@ PlanCache::PlanCache() : PlanCache(internalQueryCacheSize.load()) {}
 
 PlanCache::PlanCache(size_t size) : _cache(size) {}
 
-PlanCache::PlanCache(const std::string& ns) : _cache(internalQueryCacheSize.load()), _ns(ns) {}
-
 PlanCache::~PlanCache() {}
 
 std::unique_ptr<CachedSolution> PlanCache::getCacheEntryIfActive(const PlanCacheKey& key) const {
@@ -545,7 +543,7 @@ Status PlanCache::set(const CanonicalQuery& query,
     std::unique_ptr<PlanCacheEntry> evictedEntry = _cache.add(key, newEntry.release());
 
     if (nullptr != evictedEntry.get()) {
-        LOG(1) << _ns << ": plan cache maximum size exceeded - "
+        LOG(1) << query.nss() << ": plan cache maximum size exceeded - "
                << "removed least recently used entry " << redact(evictedEntry->toString());
     }
 

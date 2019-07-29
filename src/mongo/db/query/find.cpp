@@ -49,6 +49,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
@@ -150,7 +151,7 @@ void endQueryOp(OperationContext* opCtx,
     curOp->debug().setPlanSummaryMetrics(summaryStats);
 
     if (collection) {
-        collection->infoCache()->notifyOfQuery(opCtx, summaryStats);
+        CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, summaryStats);
     }
 
     if (curOp->shouldDBProfile()) {

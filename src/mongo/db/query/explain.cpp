@@ -46,6 +46,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/canonical_query_encoder.h"
+#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -657,10 +658,11 @@ void Explain::generatePlannerInfo(PlanExecutor* exec,
     boost::optional<uint32_t> queryHash;
     boost::optional<uint32_t> planCacheKeyHash;
     if (collection && exec->getCanonicalQuery()) {
-        const CollectionInfoCache* infoCache = collection->infoCache();
-        const QuerySettings* querySettings = infoCache->getQuerySettings();
-        PlanCacheKey planCacheKey =
-            infoCache->getPlanCache()->computeKey(*exec->getCanonicalQuery());
+        const QuerySettings* querySettings =
+            CollectionQueryInfo::get(collection).getQuerySettings();
+        PlanCacheKey planCacheKey = CollectionQueryInfo::get(collection)
+                                        .getPlanCache()
+                                        ->computeKey(*exec->getCanonicalQuery());
         planCacheKeyHash = canonical_query_encoder::computeHash(planCacheKey.toString());
         queryHash = canonical_query_encoder::computeHash(planCacheKey.getStableKeyStringData());
 

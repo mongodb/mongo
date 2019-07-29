@@ -47,6 +47,7 @@
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/storage/storage_options.h"
@@ -82,7 +83,7 @@ void MultiIndexBlock::cleanUpAfterBuild(OperationContext* opCtx, Collection* col
     }
 
     if (!_needToCleanup && !_indexes.empty()) {
-        collection->infoCache()->clearQueryCache();
+        CollectionQueryInfo::get(collection).clearQueryCache();
     }
 
     // Make lock acquisition uninterruptible.

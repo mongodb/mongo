@@ -46,6 +46,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
@@ -243,7 +244,7 @@ public:
         Collection* collection = ctx.getCollection();
 
         StatusWith<std::unique_ptr<PlanCacheEntry>> planCacheEntryWithStatus =
-            collection->infoCache()->getPlanCache()->getEntry(*(cq.get()));
+            CollectionQueryInfo::get(collection).getPlanCache()->getEntry(*(cq.get()));
         ASSERT_OK(planCacheEntryWithStatus.getStatus());
 
         // We assert that there was only one plan scored, implying that there was only one

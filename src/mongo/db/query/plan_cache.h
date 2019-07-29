@@ -401,8 +401,6 @@ public:
 
     PlanCache(size_t size);
 
-    PlanCache(const std::string& ns);
-
     ~PlanCache();
 
     /**
@@ -529,10 +527,6 @@ public:
         const std::function<BSONObj(const PlanCacheEntry&)>& serializationFunc,
         const std::function<bool(const BSONObj&)>& filterFunc) const;
 
-    void setNs(NamespaceString ns) {
-        _ns = ns.toString();
-    }
-
 private:
     struct NewEntryState {
         bool shouldBeCreated = false;
@@ -550,9 +544,6 @@ private:
 
     // Protects _cache.
     mutable stdx::mutex _cacheMutex;
-
-    // Full namespace of collection.
-    std::string _ns;
 
     // Holds computed information about the collection's indexes.  Used for generating plan
     // cache keys.

@@ -44,6 +44,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_ranker.h"
@@ -125,7 +126,10 @@ PlanStage::StageState MultiPlanStage::doWork(WorkingSetID* out) {
         // if the best solution fails. Alternatively we could try to
         // defer cache insertion to be after the first produced result.
 
-        collection()->infoCache()->getPlanCache()->remove(*_query).transitional_ignore();
+        CollectionQueryInfo::get(collection())
+            .getPlanCache()
+            ->remove(*_query)
+            .transitional_ignore();
 
         _bestPlanIdx = _backupPlanIdx;
         _backupPlanIdx = kNoSuchPlan;
@@ -328,9 +332,8 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         }
 
         if (validSolutions) {
-            collection()
-                ->infoCache()
-                ->getPlanCache()
+            CollectionQueryInfo::get(collection())
+                .getPlanCache()
                 ->set(*_query,
                       solutions,
                       std::move(ranking),

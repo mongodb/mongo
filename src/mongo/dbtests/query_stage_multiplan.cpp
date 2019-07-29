@@ -46,6 +46,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/mock_yield_policies.h"
 #include "mongo/db/query/plan_executor.h"
@@ -294,7 +295,7 @@ TEST_F(QueryStageMultiPlanTest, MPSDoesNotCreateActiveCacheEntryImmediately) {
     auto mps = runMultiPlanner(_opCtx.get(), nss, coll, 7);
 
     // Be sure that an inactive cache entry was added.
-    PlanCache* cache = coll->infoCache()->getPlanCache();
+    PlanCache* cache = CollectionQueryInfo::get(coll).getPlanCache();
     ASSERT_EQ(cache->size(), 1U);
     auto entry = assertGet(cache->getEntry(*cq));
     ASSERT_FALSE(entry->isActive);
@@ -349,7 +350,7 @@ TEST_F(QueryStageMultiPlanTest, MPSDoesCreatesActiveEntryWhenInactiveEntriesDisa
     auto mps = runMultiPlanner(_opCtx.get(), nss, coll, 7);
 
     // Be sure that an _active_ cache entry was added.
-    PlanCache* cache = coll->infoCache()->getPlanCache();
+    PlanCache* cache = CollectionQueryInfo::get(coll).getPlanCache();
     ASSERT_EQ(cache->get(*cq).state, PlanCache::CacheEntryState::kPresentActive);
 
     // Run the multi-planner again. The entry should still be active.

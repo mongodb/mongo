@@ -64,14 +64,6 @@ public:
         return _magic == kMagicNumber;
     }
 
-    CollectionInfoCache* infoCache() final {
-        return _infoCache.get();
-    }
-
-    const CollectionInfoCache* infoCache() const final {
-        return _infoCache.get();
-    }
-
     const NamespaceString& ns() const final {
         return _ns;
     }
@@ -387,7 +379,6 @@ private:
     // The RecordStore may be null during a repair operation.
     std::unique_ptr<RecordStore> _recordStore;  // owned
     const bool _needCappedLock;
-    std::unique_ptr<CollectionInfoCache> _infoCache;
     std::unique_ptr<IndexCatalog> _indexCatalog;
 
 

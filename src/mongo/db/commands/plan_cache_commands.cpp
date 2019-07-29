@@ -45,6 +45,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/util/hex.h"
@@ -70,10 +71,7 @@ static Status getPlanCache(OperationContext* opCtx,
         return Status(ErrorCodes::BadValue, "no such collection");
     }
 
-    CollectionInfoCache* infoCache = collection->infoCache();
-    invariant(infoCache);
-
-    PlanCache* planCache = infoCache->getPlanCache();
+    PlanCache* planCache = CollectionQueryInfo::get(collection).getPlanCache();
     invariant(planCache);
 
     *planCacheOut = planCache;

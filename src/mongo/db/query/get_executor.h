@@ -91,13 +91,6 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
                                            const CanonicalQuery* canonicalQuery = nullptr);
 
 /**
- * Converts the catalog metadata for an index into a CoreIndexInfo, which is a format that is meant
- * to be used to update the plan cache. This function has no side effects and is safe to call in
- * all contexts.
- */
-CoreIndexInfo indexInfoFromIndexCatalogEntry(const IndexCatalogEntry& ice);
-
-/**
  * Determines whether or not to wait for oplog visibility for a query. This is only used for
  * collection scans on the oplog.
  */

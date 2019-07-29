@@ -38,7 +38,6 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_info_cache_impl.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/index/index_access_method.h"
@@ -49,6 +48,7 @@
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/transaction_participant.h"
@@ -61,9 +61,9 @@ using std::string;
 
 IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
                                              std::unique_ptr<IndexDescriptor> descriptor,
-                                             CollectionInfoCache* const infoCache)
+                                             CollectionQueryInfo* const queryInfo)
     : _descriptor(std::move(descriptor)),
-      _infoCache(infoCache),
+      _queryInfo(queryInfo),
       _ordering(Ordering::make(_descriptor->keyPattern())),
       _isReady(false),
       _prefix(DurableCatalog::get(opCtx)->getIndexPrefix(
@@ -282,10 +282,10 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
             }
         }
 
-        if (indexMetadataHasChanged && _infoCache) {
+        if (indexMetadataHasChanged && _queryInfo) {
             LOG(1) << ns() << ": clearing plan cache - index " << _descriptor->keyPattern()
                    << " set to multi key.";
-            _infoCache->clearQueryCache();
+            _queryInfo->clearQueryCache();
         }
     };
 

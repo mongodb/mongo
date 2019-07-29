@@ -61,6 +61,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/internal_plans.h"
@@ -204,26 +205,6 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
             projExec};
 }
 
-CoreIndexInfo indexInfoFromIndexCatalogEntry(const IndexCatalogEntry& ice) {
-    auto desc = ice.descriptor();
-    invariant(desc);
-
-    auto accessMethod = ice.accessMethod();
-    invariant(accessMethod);
-
-    const ProjectionExecAgg* projExec = nullptr;
-    if (desc->getIndexType() == IndexType::INDEX_WILDCARD)
-        projExec = static_cast<const WildcardAccessMethod*>(accessMethod)->getProjectionExec();
-
-    return {desc->keyPattern(),
-            desc->getIndexType(),
-            desc->isSparse(),
-            IndexEntry::Identifier{desc->indexName()},
-            ice.getFilterExpression(),
-            ice.getCollator(),
-            projExec};
-}
-
 /**
  * If query supports index filters, filter params.indices according to any index filters that have
  * been configured. In addition, sets that there were indeed index filters applied.
@@ -232,7 +213,7 @@ void applyIndexFilters(Collection* collection,
                        const CanonicalQuery& canonicalQuery,
                        QueryPlannerParams* plannerParams) {
     if (!IDHackStage::supportsQuery(collection, canonicalQuery)) {
-        QuerySettings* querySettings = collection->infoCache()->getQuerySettings();
+        QuerySettings* querySettings = CollectionQueryInfo::get(collection).getQuerySettings();
         const auto key = canonicalQuery.encodeKey();
 
         // Filter index catalog if index filters are specified for query.
@@ -452,18 +433,19 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
     }
 
     // Check that the query should be cached.
-    if (collection->infoCache()->getPlanCache()->shouldCacheQuery(*canonicalQuery)) {
+    if (CollectionQueryInfo::get(collection).getPlanCache()->shouldCacheQuery(*canonicalQuery)) {
         // Fill in opDebug information.
         const auto planCacheKey =
-            collection->infoCache()->getPlanCache()->computeKey(*canonicalQuery);
+            CollectionQueryInfo::get(collection).getPlanCache()->computeKey(*canonicalQuery);
         CurOp::get(opCtx)->debug().queryHash =
             canonical_query_encoder::computeHash(planCacheKey.getStableKeyStringData());
         CurOp::get(opCtx)->debug().planCacheKey =
             canonical_query_encoder::computeHash(planCacheKey.toString());
 
         // Try to look up a cached solution for the query.
-        if (auto cs =
-                collection->infoCache()->getPlanCache()->getCacheEntryIfActive(planCacheKey)) {
+        if (auto cs = CollectionQueryInfo::get(collection)
+                          .getPlanCache()
+                          ->getCacheEntryIfActive(planCacheKey)) {
             // We have a CachedSolution.  Have the planner turn it into a QuerySolution.
             auto statusWithQs = QueryPlanner::planFromCache(*canonicalQuery, plannerParams, *cs);
 
@@ -890,7 +872,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
 
     // Pass index information to the update driver, so that it can determine for us whether the
     // update affects indices.
-    const auto& updateIndexData = collection->infoCache()->getIndexKeys(opCtx);
+    const auto& updateIndexData = CollectionQueryInfo::get(collection).getIndexKeys(opCtx);
     driver->refreshIndexKeys(&updateIndexData);
 
     if (!parsedUpdate->hasParsedQuery()) {

@@ -174,6 +174,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/collection_query_info',
         '$BUILD_DIR/mongo/db/index/index_descriptor',
         '$BUILD_DIR/mongo/db/index_names',
         '$BUILD_DIR/mongo/db/ttl_collection_cache',
@@ -281,7 +282,6 @@ env.Library(
     target='catalog_impl',
     source=[
         "collection_impl.cpp",
-        "collection_info_cache_impl.cpp",
         "database_holder_impl.cpp",
         "database_impl.cpp",
         "index_catalog_entry_impl.cpp",
@@ -368,6 +368,22 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'database_holder',
+    ],
+)
+
+env.Library(
+    target="collection_query_info",
+    source=[
+        "$BUILD_DIR/mongo/db/query/collection_query_info.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/collection_index_usage_tracker',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/curop',
+        '$BUILD_DIR/mongo/db/query/query_planner',
+        '$BUILD_DIR/mongo/db/update_index_data',
+        '$BUILD_DIR/mongo/db/service_context',
     ],
 )
 

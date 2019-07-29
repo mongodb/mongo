@@ -47,6 +47,7 @@
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
+#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
@@ -259,7 +260,7 @@ CollectionIndexUsageMap MongoInterfaceStandalone::getIndexStats(OperationContext
         return CollectionIndexUsageMap();
     }
 
-    return collection->infoCache()->getIndexUsageStats();
+    return CollectionQueryInfo::get(collection).getIndexUsageStats();
 }
 
 void MongoInterfaceStandalone::appendLatencyStats(OperationContext* opCtx,
@@ -299,7 +300,7 @@ Status MongoInterfaceStandalone::appendQueryExecStats(OperationContext* opCtx,
                 str::stream() << "Collection [" << nss.toString() << "] not found."};
     }
 
-    auto collectionScanStats = collection->infoCache()->getCollectionScanStats();
+    auto collectionScanStats = CollectionQueryInfo::get(collection).getCollectionScanStats();
 
     dassert(collectionScanStats.collectionScans <=
             static_cast<unsigned long long>(std::numeric_limits<long long>::max()));
@@ -531,9 +532,7 @@ std::vector<BSONObj> MongoInterfaceStandalone::getMatchingPlanCacheEntryStats(
     uassert(
         50933, str::stream() << "collection '" << nss.toString() << "' does not exist", collection);
 
-    const auto infoCache = collection->infoCache();
-    invariant(infoCache);
-    const auto planCache = infoCache->getPlanCache();
+    const auto planCache = CollectionQueryInfo::get(collection).getPlanCache();
     invariant(planCache);
 
     return planCache->getMatchingStats(serializer, predicate);

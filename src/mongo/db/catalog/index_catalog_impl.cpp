@@ -61,6 +61,7 @@
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
@@ -126,6 +127,8 @@ Status IndexCatalogImpl::init(OperationContext* opCtx) {
 
         fassert(17340, entry->isReady(opCtx));
     }
+
+    CollectionQueryInfo::get(_collection).init(opCtx);
 
     _magic = INDEX_CATALOG_INIT;
     return Status::OK();
@@ -372,7 +375,7 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
 
     auto* const descriptorPtr = descriptor.get();
     auto entry = std::make_shared<IndexCatalogEntryImpl>(
-        opCtx, std::move(descriptor), _collection->infoCache());
+        opCtx, std::move(descriptor), &CollectionQueryInfo::get(_collection));
 
     IndexDescriptor* desc = entry->descriptor();
 
@@ -404,7 +407,7 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
             } else {
                 _buildingIndexes.remove(descriptor);
             }
-            _collection->infoCache()->droppedIndex(opCtx, indexName);
+            CollectionQueryInfo::get(_collection).droppedIndex(opCtx, indexName);
         });
     }
 
@@ -917,10 +920,10 @@ public:
         auto indexDescriptor = _entry->descriptor();
         _entries->add(std::move(_entry));
 
-        // Refresh the CollectionInfoCache's knowledge of what indices are present. This must be
+        // Refresh the CollectionQueryInfo's knowledge of what indices are present. This must be
         // done after re-adding our IndexCatalogEntry to the '_entries' list, since 'addedIndex()'
         // refreshes its knowledge by iterating the list of indices currently in the catalog.
-        _collection->infoCache()->addedIndex(_opCtx, indexDescriptor);
+        CollectionQueryInfo::get(_collection).addedIndex(_opCtx, indexDescriptor);
     }
 
 private:
@@ -954,7 +957,7 @@ Status IndexCatalogImpl::dropIndexEntry(OperationContext* opCtx, IndexCatalogEnt
             new IndexRemoveChange(opCtx, _collection, &_buildingIndexes, std::move(released)));
     }
 
-    _collection->infoCache()->droppedIndex(opCtx, indexName);
+    CollectionQueryInfo::get(_collection).droppedIndex(opCtx, indexName);
     entry = nullptr;
     deleteIndexFromDisk(opCtx, indexName);
 
@@ -1195,19 +1198,19 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
 
     // Delete the IndexCatalogEntry that owns this descriptor.  After deletion, 'oldDesc' is
     // invalid and should not be dereferenced. Also, invalidate the index from the
-    // CollectionInfoCache.
+    // CollectionQueryInfo.
     auto oldEntry = _readyIndexes.release(oldDesc);
     invariant(oldEntry);
     opCtx->recoveryUnit()->registerChange(
         new IndexRemoveChange(opCtx, _collection, &_readyIndexes, std::move(oldEntry)));
-    _collection->infoCache()->droppedIndex(opCtx, indexName);
+    CollectionQueryInfo::get(_collection).droppedIndex(opCtx, indexName);
 
     // Ask the CollectionCatalogEntry for the new index spec.
     BSONObj spec = durableCatalog->getIndexSpec(opCtx, _collection->ns(), indexName).getOwned();
     BSONObj keyPattern = spec.getObjectField("key");
 
     // Re-register this index in the index catalog with the new spec. Also, add the new index
-    // to the CollectionInfoCache.
+    // to the CollectionQueryInfo.
     auto newDesc =
         std::make_unique<IndexDescriptor>(_collection, _getAccessMethodName(keyPattern), spec);
     const bool initFromDisk = false;
@@ -1215,7 +1218,7 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
     const IndexCatalogEntry* newEntry =
         createIndexEntry(opCtx, std::move(newDesc), initFromDisk, isReadyIndex);
     invariant(newEntry->isReady(opCtx));
-    _collection->infoCache()->addedIndex(opCtx, newEntry->descriptor());
+    CollectionQueryInfo::get(_collection).addedIndex(opCtx, newEntry->descriptor());
 
     // Return the new descriptor.
     return newEntry->descriptor();

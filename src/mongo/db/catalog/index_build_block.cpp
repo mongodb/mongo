@@ -41,6 +41,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/util/assert_util.h"
@@ -135,10 +136,10 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection) {
             });
     }
 
-    // Register this index with the CollectionInfoCache to regenerate the cache. This way, updates
+    // Register this index with the CollectionQueryInfo to regenerate the cache. This way, updates
     // occurring while an index is being build in the background will be aware of whether or not
     // they need to modify any indexes.
-    collection->infoCache()->addedIndex(opCtx, _indexCatalogEntry->descriptor());
+    CollectionQueryInfo::get(collection).addedIndex(opCtx, _indexCatalogEntry->descriptor());
 
     return Status::OK();
 }

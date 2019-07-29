@@ -40,6 +40,7 @@
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_ranker.h"
@@ -192,7 +193,7 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
 
     if (shouldCache) {
         // Deactivate the current cache entry.
-        PlanCache* cache = collection()->infoCache()->getPlanCache();
+        PlanCache* cache = CollectionQueryInfo::get(collection()).getPlanCache();
         cache->deactivate(*_canonicalQuery);
     }
 
@@ -302,7 +303,7 @@ const SpecificStats* CachedPlanStage::getSpecificStats() const {
 void CachedPlanStage::updatePlanCache() {
     const double score = PlanRanker::scoreTree(getStats()->children[0].get());
 
-    PlanCache* cache = collection()->infoCache()->getPlanCache();
+    PlanCache* cache = CollectionQueryInfo::get(collection()).getPlanCache();
     Status fbs = cache->feedback(*_canonicalQuery, score);
     if (!fbs.isOK()) {
         LOG(5) << _canonicalQuery->ns() << ": Failed to update cache with feedback: " << redact(fbs)

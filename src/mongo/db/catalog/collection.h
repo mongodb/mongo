@@ -40,7 +40,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/catalog/collection_info_cache.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/logical_session_id.h"
@@ -54,6 +53,7 @@
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 class CappedCallback;
@@ -148,7 +148,7 @@ private:
     bool _dead = false;
 };
 
-class Collection {
+class Collection : public Decorable<Collection> {
 public:
     enum class StoreDeletedDoc { Off, On };
 
@@ -191,9 +191,6 @@ public:
     virtual ~Collection() = default;
 
     virtual bool ok() const = 0;
-
-    virtual CollectionInfoCache* infoCache() = 0;
-    virtual const CollectionInfoCache* infoCache() const = 0;
 
     virtual const NamespaceString& ns() const = 0;
 
