@@ -151,13 +151,14 @@ public:
 
     RemoteCommandRequest makeTestCommand(boost::optional<Milliseconds> timeout = boost::none,
                                          BSONObj cmd = BSON("echo" << 1 << "foo"
-                                                                   << "bar")) {
+                                                                   << "bar"),
+                                         OperationContext* opCtx = nullptr) {
         auto cs = fixture();
         return RemoteCommandRequest(cs.getServers().front(),
                                     "admin",
                                     std::move(cmd),
                                     BSONObj(),
-                                    nullptr,
+                                    opCtx,
                                     timeout ? *timeout : RemoteCommandRequest::kNoTimeout);
     }
 
@@ -287,6 +288,81 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeout) {
         ASSERT(result.elapsedMillis);
         assertNumOps(0u, 1u, 0u, 0u);
     }
+}
+
+TEST_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineSooner) {
+    // Kick off operation
+    auto cb = makeCallbackHandle();
+    auto cmdObj = BSON("sleep" << 1 << "lock"
+                               << "none"
+                               << "secs" << 1000000000);
+
+    constexpr auto opCtxDeadline = Milliseconds{600};
+    constexpr auto requestTimeout = Milliseconds{1000};
+
+    auto serviceContext = ServiceContext::make();
+    auto client = serviceContext->makeClient("NetworkClient");
+    auto opCtx = client->makeOperationContext();
+    opCtx->setDeadlineAfterNowBy(opCtxDeadline, ErrorCodes::ExceededTimeLimit);
+
+    auto request = makeTestCommand(requestTimeout, cmdObj, opCtx.get());
+
+    auto deferred = runCommand(cb, request);
+
+    waitForIsMaster();
+
+    auto result = deferred.get();
+
+    // mongos doesn't implement the ping command, so ignore the response there, otherwise
+    // check that we've timed out.
+    if (pingCommandMissing(result)) {
+        return;
+    }
+
+    ASSERT_EQ(ErrorCodes::NetworkInterfaceExceededTimeLimit, result.status);
+    ASSERT(result.elapsedMillis);
+    // check that the request timeout uses the smaller of the operation context deadline and
+    // the timeout specified in the request constructor.
+    ASSERT_GTE(result.elapsedMillis.value(), opCtxDeadline);
+    ASSERT_LT(result.elapsedMillis.value(), requestTimeout);
+    assertNumOps(0u, 1u, 0u, 0u);
+}
+
+TEST_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineLater) {
+    // Kick off operation
+    auto cb = makeCallbackHandle();
+    auto cmdObj = BSON("sleep" << 1 << "lock"
+                               << "none"
+                               << "secs" << 1000000000);
+
+    constexpr auto opCtxDeadline = Milliseconds{1000};
+    constexpr auto requestTimeout = Milliseconds{600};
+
+    auto serviceContext = ServiceContext::make();
+    auto client = serviceContext->makeClient("NetworkClient");
+    auto opCtx = client->makeOperationContext();
+    opCtx->setDeadlineAfterNowBy(opCtxDeadline, ErrorCodes::ExceededTimeLimit);
+    auto request = makeTestCommand(requestTimeout, cmdObj, opCtx.get());
+
+    auto deferred = runCommand(cb, request);
+
+    waitForIsMaster();
+
+    auto result = deferred.get();
+
+    // mongos doesn't implement the ping command, so ignore the response there, otherwise
+    // check that we've timed out.
+    if (pingCommandMissing(result)) {
+        return;
+    }
+
+    ASSERT_EQ(ErrorCodes::NetworkInterfaceExceededTimeLimit, result.status);
+    ASSERT(result.elapsedMillis);
+    // check that the request timeout uses the smaller of the operation context deadline and
+    // the timeout specified in the request constructor.
+    ASSERT_GTE(result.elapsedMillis.value(), requestTimeout);
+    ASSERT_LT(result.elapsedMillis.value(), opCtxDeadline);
+    assertNumOps(0u, 1u, 0u, 0u);
 }
 
 TEST_F(NetworkInterfaceTest, StartCommand) {

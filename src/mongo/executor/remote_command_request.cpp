@@ -59,12 +59,10 @@ RemoteCommandRequestBase::RemoteCommandRequestBase(RequestId requestId,
                                                    const BSONObj& metadataObj,
                                                    OperationContext* opCtx,
                                                    Milliseconds timeoutMillis)
-    : id(requestId),
-      dbname(theDbName),
-      metadata(metadataObj),
-      cmdObj(theCmdObj),
-      opCtx(opCtx),
-      timeout(timeoutMillis) {}
+    : id(requestId), dbname(theDbName), metadata(metadataObj), cmdObj(theCmdObj), opCtx(opCtx) {
+    timeout = opCtx ? std::min<Milliseconds>(opCtx->getRemainingMaxTimeMillis(), timeoutMillis)
+                    : timeoutMillis;
+}
 
 RemoteCommandRequestBase::RemoteCommandRequestBase() : id(requestIdCounter.addAndFetch(1)) {}
 
