@@ -21,6 +21,7 @@ const kNsName = kDbName + '.' + kCollName;
 const kConfigCollections = 'config.collections';
 const kConfigChunks = 'config.chunks';
 const kConfigTags = 'config.tags';
+const kConfigChangelog = 'config.changelog';
 const kUnrelatedName = kDbName + '.bar';
 let oldEpoch = null;
 
@@ -51,6 +52,17 @@ function validateConfigCollections(keyDoc, oldEpoch) {
     assert.eq(1, collArr.length);
     assert.eq(keyDoc, collArr[0].key);
     assert.neq(oldEpoch, collArr[0].lastmodEpoch);
+}
+
+function validateConfigChangelog(count) {
+    assert.eq(count,
+              mongos.getCollection(kConfigChangelog)
+                  .find({what: 'refineCollectionShardKey.start', ns: kNsName})
+                  .itcount());
+    assert.eq(count,
+              mongos.getCollection(kConfigChangelog)
+                  .find({what: 'refineCollectionShardKey.end', ns: kNsName})
+                  .itcount());
 }
 
 function validateConfigCollectionsUnique(unique) {
@@ -389,6 +401,7 @@ oldEpoch = mongos.getCollection(kConfigCollections).findOne({_id: kNsName}).last
 assert.commandWorked(
     mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}}));
 validateConfigCollections({_id: 1, aKey: 1}, oldEpoch);
+validateConfigChangelog(1);
 
 // Should fail because only an index with missing or incomplete shard key entries exists for new
 // shard key {_id: 1, aKey: 1}.
@@ -444,6 +457,7 @@ oldEpoch = mongos.getCollection(kConfigCollections).findOne({_id: kNsName}).last
 assert.commandWorked(
     mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}}));
 validateConfigCollections({_id: 1, aKey: 1}, oldEpoch);
+validateConfigChangelog(2);
 
 // Should work because a 'useful' index exists for new shard key {a: 1, b.c: 1}. NOTE: We are
 // explicitly verifying that refineCollectionShardKey works with a dotted field.
@@ -454,6 +468,7 @@ oldEpoch = mongos.getCollection(kConfigCollections).findOne({_id: kNsName}).last
 assert.commandWorked(
     mongos.adminCommand({refineCollectionShardKey: kNsName, key: {a: 1, 'b.c': 1}}));
 validateConfigCollections({a: 1, 'b.c': 1}, oldEpoch);
+validateConfigChangelog(3);
 
 assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
 
