@@ -470,8 +470,6 @@ public:
                                             const IndexDescriptor* desc,
                                             InsertDeleteOptions* options) const = 0;
 
-    virtual void setNs(NamespaceString ns) = 0;
-
     virtual void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) = 0;
 };
 }  // namespace mongo

@@ -142,8 +142,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnIndexCreation) {
     createIndex(collection,
                 BSON("name"
                      << "a_1_b_1"
-                     << "ns" << _nss.ns() << "key" << keyPattern << "v"
-                     << static_cast<int>(kIndexVersion)))
+                     << "key" << keyPattern << "v" << static_cast<int>(kIndexVersion)))
         .transitional_ignore();
 
     assertMultikeyPaths(collection, keyPattern, {std::set<size_t>{}, {0U}});
@@ -172,8 +171,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnIndexCreationWithMultipleDocuments) {
     createIndex(collection,
                 BSON("name"
                      << "a_1_b_1"
-                     << "ns" << _nss.ns() << "key" << keyPattern << "v"
-                     << static_cast<int>(kIndexVersion)))
+                     << "key" << keyPattern << "v" << static_cast<int>(kIndexVersion)))
         .transitional_ignore();
 
     assertMultikeyPaths(collection, keyPattern, {{0U}, {0U}});
@@ -188,8 +186,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentInsert) {
     createIndex(collection,
                 BSON("name"
                      << "a_1_b_1"
-                     << "ns" << _nss.ns() << "key" << keyPattern << "v"
-                     << static_cast<int>(kIndexVersion)))
+                     << "key" << keyPattern << "v" << static_cast<int>(kIndexVersion)))
         .transitional_ignore();
 
     {
@@ -226,8 +223,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdate) {
     createIndex(collection,
                 BSON("name"
                      << "a_1_b_1"
-                     << "ns" << _nss.ns() << "key" << keyPattern << "v"
-                     << static_cast<int>(kIndexVersion)))
+                     << "key" << keyPattern << "v" << static_cast<int>(kIndexVersion)))
         .transitional_ignore();
 
     {
@@ -275,8 +271,7 @@ TEST_F(MultikeyPathsTest, PathsNotUpdatedOnDocumentDelete) {
     createIndex(collection,
                 BSON("name"
                      << "a_1_b_1"
-                     << "ns" << _nss.ns() << "key" << keyPattern << "v"
-                     << static_cast<int>(kIndexVersion)))
+                     << "key" << keyPattern << "v" << static_cast<int>(kIndexVersion)))
         .transitional_ignore();
 
     {
@@ -316,16 +311,14 @@ TEST_F(MultikeyPathsTest, PathsUpdatedForMultipleIndexesOnDocumentInsert) {
     createIndex(collection,
                 BSON("name"
                      << "a_1_b_1"
-                     << "ns" << _nss.ns() << "key" << keyPatternAB << "v"
-                     << static_cast<int>(kIndexVersion)))
+                     << "key" << keyPatternAB << "v" << static_cast<int>(kIndexVersion)))
         .transitional_ignore();
 
     BSONObj keyPatternAC = BSON("a" << 1 << "c" << 1);
     createIndex(collection,
                 BSON("name"
                      << "a_1_c_1"
-                     << "ns" << _nss.ns() << "key" << keyPatternAC << "v"
-                     << static_cast<int>(kIndexVersion)))
+                     << "key" << keyPatternAC << "v" << static_cast<int>(kIndexVersion)))
         .transitional_ignore();
     {
         WriteUnitOfWork wuow(_opCtx.get());

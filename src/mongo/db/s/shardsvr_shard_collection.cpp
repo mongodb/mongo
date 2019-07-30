@@ -258,7 +258,7 @@ void createCollectionOrValidateExisting(OperationContext* opCtx,
     // 3. If proposed key is required to be unique, additionally check for exact match.
 
     if (hasUsefulIndexForKey && request.getUnique()) {
-        BSONObj eqQuery = BSON("ns" << nss.ns() << "key" << proposedKey);
+        BSONObj eqQuery = BSON("key" << proposedKey);
         BSONObj eqQueryResult;
 
         for (const auto& idx : indexes) {

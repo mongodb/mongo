@@ -41,7 +41,6 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/disable_index_spec_namespace_generation_gen.h"
 #include "mongo/db/catalog/index_build_block.h"
 #include "mongo/db/catalog/index_catalog_entry_impl.h"
 #include "mongo/db/catalog/index_key_validate.h"
@@ -373,7 +372,7 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
 
     auto* const descriptorPtr = descriptor.get();
     auto entry = std::make_shared<IndexCatalogEntryImpl>(
-        opCtx, _collection->ns(), std::move(descriptor), _collection->infoCache());
+        opCtx, std::move(descriptor), _collection->infoCache());
 
     IndexDescriptor* desc = entry->descriptor();
 
@@ -530,21 +529,6 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
 
     if (nss.isOplog())
         return Status(ErrorCodes::CannotCreateIndex, "cannot have an index on the oplog");
-
-    // If we stop generating the 'ns' field for index specs during testing, then we shouldn't
-    // validate that the 'ns' field is missing.
-    if (!disableIndexSpecNamespaceGeneration.load()) {
-        const BSONElement specNamespace = spec["ns"];
-        if (specNamespace.type() != String)
-            return Status(ErrorCodes::CannotCreateIndex,
-                          "the index spec is missing a \"ns\" string field");
-
-        if (nss.ns() != specNamespace.valueStringData())
-            return Status(ErrorCodes::CannotCreateIndex,
-                          str::stream() << "the \"ns\" field of the index spec '"
-                                        << specNamespace.valueStringData()
-                                        << "' does not match the collection name '" << nss << "'");
-    }
 
     // logical name of the index
     const BSONElement nameElem = spec["name"];
@@ -811,7 +795,6 @@ BSONObj IndexCatalogImpl::getDefaultIdIndexSpec() const {
     BSONObjBuilder b;
     b.append("v", static_cast<int>(indexVersion));
     b.append("name", "_id_");
-    b.append("ns", _collection->ns().ns());
     b.append("key", _idObj);
     if (_collection->getDefaultCollator() && indexVersion >= IndexVersion::kV2) {
         // Creating an index with the "collation" option requires a v=2 index.
@@ -1660,6 +1643,14 @@ StatusWith<BSONObj> IndexCatalogImpl::_fixIndexSpec(OperationContext* opCtx,
     }
     b.append("name", name);
 
+    // During repair, if the 'ns' field exists in the index spec, do not remove it as repair can be
+    // running on old data files from other mongod versions. Removing the 'ns' field during repair
+    // would prevent the data files from starting up on the original mongod version as the 'ns'
+    // field is required to be present in 3.6 and 4.0.
+    if (storageGlobalParams.repair && o.hasField("ns")) {
+        b.append("ns", o.getField("ns").String());
+    }
+
     {
         BSONObjIterator i(o);
         while (i.more()) {
@@ -1668,8 +1659,9 @@ StatusWith<BSONObj> IndexCatalogImpl::_fixIndexSpec(OperationContext* opCtx,
 
             if (s == "_id") {
                 // skip
-            } else if (s == "dropDups") {
+            } else if (s == "dropDups" || s == "ns") {
                 // dropDups is silently ignored and removed from the spec as of SERVER-14710.
+                // ns is removed from the spec as of 4.4.
             } else if (s == "v" || s == "unique" || s == "key" || s == "name") {
                 // covered above
             } else {
@@ -1681,13 +1673,4 @@ StatusWith<BSONObj> IndexCatalogImpl::_fixIndexSpec(OperationContext* opCtx,
     return b.obj();
 }
 
-void IndexCatalogImpl::setNs(NamespaceString ns) {
-    for (auto&& ice : _readyIndexes) {
-        ice->setNs(ns);
-    }
-
-    for (auto&& ice : _buildingIndexes) {
-        ice->setNs(ns);
-    }
-}
 }  // namespace mongo

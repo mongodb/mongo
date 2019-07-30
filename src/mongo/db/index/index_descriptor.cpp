@@ -52,7 +52,7 @@ void populateOptionsMap(std::map<StringData, BSONElement>& theMap, const BSONObj
 
         StringData fieldName = e.fieldNameStringData();
         if (fieldName == IndexDescriptor::kKeyPatternFieldName ||
-            fieldName == IndexDescriptor::kNamespaceFieldName ||
+            fieldName == IndexDescriptor::kNamespaceFieldName ||  // removed in 4.4
             fieldName == IndexDescriptor::kIndexNameFieldName ||
             fieldName ==
                 IndexDescriptor::kIndexVersionFieldName ||  // not considered for equivalence
@@ -107,7 +107,6 @@ IndexDescriptor::IndexDescriptor(Collection* collection,
       _keyPattern(infoObj.getObjectField(IndexDescriptor::kKeyPatternFieldName).getOwned()),
       _projection(infoObj.getObjectField(IndexDescriptor::kPathProjectionFieldName).getOwned()),
       _indexName(infoObj.getStringField(IndexDescriptor::kIndexNameFieldName)),
-      _parentNS(collection->ns()),
       _isIdIndex(isIdIndexPattern(_keyPattern)),
       _sparse(infoObj[IndexDescriptor::kSparseFieldName].trueValue()),
       _unique(_isIdIndex || infoObj[kUniqueFieldName].trueValue()),
@@ -171,6 +170,10 @@ const IndexCatalog* IndexDescriptor::getIndexCatalog() const {
     return _collection->getIndexCatalog();
 }
 
+const NamespaceString& IndexDescriptor::parentNS() const {
+    return _collection->ns();
+}
+
 bool IndexDescriptor::areIndexOptionsEquivalent(const IndexDescriptor* other) const {
     if (isSparse() != other->isSparse()) {
         return false;
@@ -199,25 +202,6 @@ bool IndexDescriptor::areIndexOptionsEquivalent(const IndexDescriptor* other) co
                            SimpleBSONElementComparator::kInstance.evaluate(lhs.second ==
                                                                            rhs.second);
                    });
-}
-
-void IndexDescriptor::setNs(NamespaceString ns) {
-    _parentNS = ns;
-
-    // Construct a new infoObj with the namespace field replaced.
-    _infoObj = renameNsInIndexSpec(_infoObj, ns);
-}
-
-BSONObj IndexDescriptor::renameNsInIndexSpec(BSONObj spec, const NamespaceString& newNs) {
-    BSONObjBuilder builder;
-    for (auto&& elt : spec) {
-        if (elt.fieldNameStringData() == kNamespaceFieldName) {
-            builder.append(kNamespaceFieldName, newNs.ns());
-        } else {
-            builder.append(elt);
-        }
-    }
-    return builder.obj();
 }
 
 }  // namespace mongo

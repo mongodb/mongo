@@ -170,9 +170,7 @@ StatusWith<std::vector<BSONObj>> parseBSONSpecsIntoVector(const BSONElement& bso
                                   << "' array must be objects, but found "
                                   << typeName(bsonElem.type())};
         }
-        BSONObjBuilder builder(bsonElem.Obj());
-        builder.append("ns", nss.toString());
-        vec.emplace_back(builder.obj());
+        vec.emplace_back(bsonElem.Obj().getOwned());
     }
     return vec;
 }
@@ -232,11 +230,8 @@ void createIndexForApplyOps(OperationContext* opCtx,
                             const NamespaceString& indexNss,
                             IncrementOpsAppliedStatsFn incrementOpsAppliedStats,
                             OplogApplication::Mode mode) {
-    // Lock the database if it's not locked.
-    boost::optional<Lock::DBLock> dbLock;
-    if (!opCtx->lockState()->isLocked()) {
-        dbLock.emplace(opCtx, indexNss.db(), MODE_X);
-    }
+    invariant(opCtx->lockState()->isCollectionLockedForMode(indexNss, MODE_X));
+
     // Check if collection exists.
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto db = databaseHolder->getDb(opCtx, indexNss.ns());
@@ -263,7 +258,7 @@ void createIndexForApplyOps(OperationContext* opCtx,
 
     if (shouldBuildInForeground(opCtx, indexSpec, indexNss, mode)) {
         IndexBuilder builder(indexSpec, constraints, replicatedWrites);
-        Status status = builder.buildInForeground(opCtx, db);
+        Status status = builder.buildInForeground(opCtx, db, indexCollection);
         uassertStatusOK(status);
     } else {
         Lock::TempRelease release(opCtx->lockState());
@@ -734,7 +729,6 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           idIndexSpecBuilder.append(IndexDescriptor::kIndexVersionFieldName,
                                     static_cast<int>(IndexVersion::kV1));
           idIndexSpecBuilder.append(IndexDescriptor::kIndexNameFieldName, "_id_");
-          idIndexSpecBuilder.append(IndexDescriptor::kNamespaceFieldName, nss.ns());
           idIndexSpecBuilder.append(IndexDescriptor::kKeyPatternFieldName, BSON("_id" << 1));
           return createCollectionForApplyOps(
               opCtx, nss.db().toString(), ui, cmd, idIndexSpecBuilder.done());
@@ -754,10 +748,8 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                   "createIndexes value must be a string",
                   first.type() == mongo::String);
           BSONObj indexSpec = cmd.removeField("createIndexes");
-          // The UUID determines the collection to build the index on, so create new 'ns' field.
-          BSONObj nsObj = BSON("ns" << nss.ns());
-          indexSpec = indexSpec.addField(nsObj.firstElement());
-
+          Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
+          Lock::CollectionLock collLock(opCtx, nss, MODE_X);
           createIndexForApplyOps(opCtx, indexSpec, nss, {}, mode);
           return Status::OK();
       },

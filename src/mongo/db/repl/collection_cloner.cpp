@@ -396,22 +396,15 @@ void CollectionCloner::_listIndexesCallback(const Fetcher::QueryResponseStatus& 
     }
 
     UniqueLock lk(_mutex);
-    // When listing indexes by UUID, the sync source may use a different name for the collection
-    // as result of renaming or two-phase drop. As the index spec also includes a 'ns' field, this
-    // must be rewritten.
-    BSONObjBuilder nsFieldReplacementBuilder;
-    nsFieldReplacementBuilder.append("ns", _sourceNss.ns());
-    BSONElement nsFieldReplacementElem = nsFieldReplacementBuilder.done().firstElement();
 
     // We may be called with multiple batches leading to a need to grow _indexSpecs.
     _indexSpecs.reserve(_indexSpecs.size() + documents.size());
     for (auto&& doc : documents) {
-        // The addField replaces the 'ns' field with the correct name, see above.
         if (StringData("_id_") == doc["name"].str()) {
-            _idIndexSpec = doc.addField(nsFieldReplacementElem);
+            _idIndexSpec = doc;
             continue;
         }
-        _indexSpecs.push_back(doc.addField(nsFieldReplacementElem));
+        _indexSpecs.push_back(doc);
     }
     lk.unlock();
 

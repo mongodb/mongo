@@ -301,8 +301,7 @@ void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationCont
         ASSERT_EQUALS(indexCatalog->numIndexesInProgress(opCtx), 0);
         auto indexInfoObj = BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key"
                                      << BSON("a" << 1) << "name"
-                                     << "a_1"
-                                     << "ns" << nss.ns());
+                                     << "a_1");
 
         auto indexBuildBlock = std::make_unique<IndexBuildBlock>(
             indexCatalog, collection->ns(), indexInfoObj, IndexBuildMethod::kHybrid);

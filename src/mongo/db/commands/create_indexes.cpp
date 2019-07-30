@@ -130,7 +130,7 @@ StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
                 }
 
                 auto indexSpecStatus = index_key_validate::validateIndexSpec(
-                    opCtx, parsedIndexSpec, ns, featureCompatibility);
+                    opCtx, parsedIndexSpec, featureCompatibility);
                 if (!indexSpecStatus.isOK()) {
                     return indexSpecStatus.getStatus().withContext(
                         str::stream() << "Error in specification " << parsedIndexSpec.toString());

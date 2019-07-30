@@ -145,13 +145,9 @@ void DocumentSourceOut::initialize() {
     }
 
     // Copy the indexes of the output collection to the temp collection.
-    std::vector<BSONObj> tempNsIndexes;
-    for (const auto& indexSpec : _originalIndexes) {
-        // Replace the spec's 'ns' field value, which is the original collection, with the temp
-        // collection.
-        tempNsIndexes.push_back(indexSpec.addField(BSON("ns" << _tempNs.ns()).firstElement()));
-    }
     try {
+        std::vector<BSONObj> tempNsIndexes = {std::begin(_originalIndexes),
+                                              std::end(_originalIndexes)};
         conn->createIndexes(_tempNs.ns(), tempNsIndexes);
     } catch (DBException& ex) {
         ex.addContext("Copying indexes for $out failed");

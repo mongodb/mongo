@@ -59,17 +59,12 @@ class IndexCatalogEntryImpl : public IndexCatalogEntry {
 public:
     explicit IndexCatalogEntryImpl(
         OperationContext* opCtx,
-        const NamespaceString& nss,
         std::unique_ptr<IndexDescriptor> descriptor,  // ownership passes to me
         CollectionInfoCache* infoCache);              // not owned, optional
 
     ~IndexCatalogEntryImpl() final;
 
-    const NamespaceString& ns() const final {
-        return _ns;
-    }
-
-    void setNs(NamespaceString ns) final;
+    const NamespaceString& ns() const final;
 
     void init(std::unique_ptr<IndexAccessMethod> accessMethod) final;
 
@@ -191,8 +186,6 @@ private:
     KVPrefix _catalogGetPrefix(OperationContext* opCtx) const;
 
     // -----
-
-    NamespaceString _ns;
 
     std::unique_ptr<IndexDescriptor> _descriptor;  // owned here
 

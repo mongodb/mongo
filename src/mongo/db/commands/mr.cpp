@@ -532,11 +532,10 @@ void State::prepTempCollection() {
             auto incColl = db->createCollection(
                 _opCtx, _config.incLong, options, false /* force no _id index */);
 
-            auto rawIndexSpec =
-                BSON("key" << BSON("0" << 1) << "ns" << _config.incLong.ns() << "name"
-                           << "_temp_0");
+            auto rawIndexSpec = BSON("key" << BSON("0" << 1) << "name"
+                                           << "_temp_0");
             auto indexSpec = uassertStatusOK(index_key_validate::validateIndexSpec(
-                _opCtx, rawIndexSpec, _config.incLong, serverGlobalParams.featureCompatibility));
+                _opCtx, rawIndexSpec, serverGlobalParams.featureCompatibility));
 
             uassertStatusOKWithContext(
                 incColl->getIndexCatalog()->createIndexOnEmptyCollection(_opCtx, indexSpec),
@@ -566,13 +565,12 @@ void State::prepTempCollection() {
             while (ii->more()) {
                 const IndexDescriptor* currIndex = ii->next()->descriptor();
                 BSONObjBuilder b;
-                b.append("ns", _config.tempNamespace.ns());
 
                 // Copy over contents of the index descriptor's infoObj.
                 BSONObjIterator j(currIndex->infoObj());
                 while (j.more()) {
                     BSONElement e = j.next();
-                    if (e.fieldNameStringData() == "_id" || e.fieldNameStringData() == "ns")
+                    if (e.fieldNameStringData() == "_id")
                         continue;
                     b.append(e);
                 }

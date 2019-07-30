@@ -271,66 +271,38 @@ TEST_F(ConfigInitializationTest, BuildsNecessaryIndexes) {
 
     auto expectedChunksIndexes = std::vector<BSONObj>{
         BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
-                 << "_id_"
-                 << "ns"
-                 << "config.chunks"),
+                 << "_id_"),
         BSON("v" << 2 << "unique" << true << "key" << BSON("ns" << 1 << "min" << 1) << "name"
-                 << "ns_1_min_1"
-                 << "ns"
-                 << "config.chunks"),
+                 << "ns_1_min_1"),
         BSON("v" << 2 << "unique" << true << "key" << BSON("ns" << 1 << "shard" << 1 << "min" << 1)
                  << "name"
-                 << "ns_1_shard_1_min_1"
-                 << "ns"
-                 << "config.chunks"),
+                 << "ns_1_shard_1_min_1"),
         BSON("v" << 2 << "unique" << true << "key" << BSON("ns" << 1 << "lastmod" << 1) << "name"
-                 << "ns_1_lastmod_1"
-                 << "ns"
-                 << "config.chunks")};
+                 << "ns_1_lastmod_1")};
     auto expectedLockpingsIndexes =
         std::vector<BSONObj>{BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
-                                      << "_id_"
-                                      << "ns"
-                                      << "config.lockpings"),
+                                      << "_id_"),
                              BSON("v" << 2 << "key" << BSON("ping" << 1) << "name"
-                                      << "ping_1"
-                                      << "ns"
-                                      << "config.lockpings")};
+                                      << "ping_1")};
     auto expectedLocksIndexes = std::vector<BSONObj>{
         BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
-                 << "_id_"
-                 << "ns"
-                 << "config.locks"),
+                 << "_id_"),
         BSON("v" << 2 << "key" << BSON("ts" << 1) << "name"
-                 << "ts_1"
-                 << "ns"
-                 << "config.locks"),
+                 << "ts_1"),
         BSON("v" << 2 << "key" << BSON("state" << 1 << "process" << 1) << "name"
-                 << "state_1_process_1"
-                 << "ns"
-                 << "config.locks")};
+                 << "state_1_process_1")};
     auto expectedShardsIndexes = std::vector<BSONObj>{
         BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
-                 << "_id_"
-                 << "ns"
-                 << "config.shards"),
+                 << "_id_"),
         BSON("v" << 2 << "unique" << true << "key" << BSON("host" << 1) << "name"
-                 << "host_1"
-                 << "ns"
-                 << "config.shards")};
+                 << "host_1")};
     auto expectedTagsIndexes = std::vector<BSONObj>{
         BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
-                 << "_id_"
-                 << "ns"
-                 << "config.tags"),
+                 << "_id_"),
         BSON("v" << 2 << "unique" << true << "key" << BSON("ns" << 1 << "min" << 1) << "name"
-                 << "ns_1_min_1"
-                 << "ns"
-                 << "config.tags"),
+                 << "ns_1_min_1"),
         BSON("v" << 2 << "key" << BSON("ns" << 1 << "tag" << 1) << "name"
-                 << "ns_1_tag_1"
-                 << "ns"
-                 << "config.tags")};
+                 << "ns_1_tag_1")};
 
     auto foundChunksIndexes = assertGet(getIndexes(operationContext(), ChunkType::ConfigNS));
     assertBSONObjsSame(expectedChunksIndexes, foundChunksIndexes);
@@ -358,13 +330,9 @@ TEST_F(ConfigInitializationTest, CompatibleIndexAlreadyExists) {
 
     auto expectedShardsIndexes = std::vector<BSONObj>{
         BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
-                 << "_id_"
-                 << "ns"
-                 << "config.shards"),
+                 << "_id_"),
         BSON("v" << 2 << "unique" << true << "key" << BSON("host" << 1) << "name"
-                 << "host_1"
-                 << "ns"
-                 << "config.shards")};
+                 << "host_1")};
 
 
     auto foundShardsIndexes = assertGet(getIndexes(operationContext(), ShardType::ConfigNS));

@@ -111,7 +111,7 @@ SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats> generateSystemIndexForE
 
     try {
         auto indexSpecStatus = index_key_validate::validateIndexSpec(
-            opCtx, spec.toBSON(), ns, serverGlobalParams.featureCompatibility);
+            opCtx, spec.toBSON(), serverGlobalParams.featureCompatibility);
         BSONObj indexSpec = fassert(40452, indexSpecStatus);
 
         log() << "No authorization index detected on " << ns
@@ -232,20 +232,16 @@ void createSystemIndexes(OperationContext* opCtx, Collection* collection) {
     const NamespaceString& ns = collection->ns();
     BSONObj indexSpec;
     if (ns == AuthorizationManager::usersCollectionNamespace) {
-        indexSpec =
-            fassert(40455,
-                    index_key_validate::validateIndexSpec(opCtx,
-                                                          v3SystemUsersIndexSpec.toBSON(),
-                                                          ns,
-                                                          serverGlobalParams.featureCompatibility));
+        indexSpec = fassert(
+            40455,
+            index_key_validate::validateIndexSpec(
+                opCtx, v3SystemUsersIndexSpec.toBSON(), serverGlobalParams.featureCompatibility));
 
     } else if (ns == AuthorizationManager::rolesCollectionNamespace) {
-        indexSpec =
-            fassert(40457,
-                    index_key_validate::validateIndexSpec(opCtx,
-                                                          v3SystemRolesIndexSpec.toBSON(),
-                                                          ns,
-                                                          serverGlobalParams.featureCompatibility));
+        indexSpec = fassert(
+            40457,
+            index_key_validate::validateIndexSpec(
+                opCtx, v3SystemRolesIndexSpec.toBSON(), serverGlobalParams.featureCompatibility));
     }
     if (!indexSpec.isEmpty()) {
         opCtx->getServiceContext()->getOpObserver()->onCreateIndex(

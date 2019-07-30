@@ -79,20 +79,11 @@ std::string IndexBuilder::name() const {
     return _name;
 }
 
-Status IndexBuilder::buildInForeground(OperationContext* opCtx, Database* db) const {
-    return _buildAndHandleErrors(opCtx, db, false /*buildInBackground */, nullptr);
-}
+Status IndexBuilder::buildInForeground(OperationContext* opCtx,
+                                       Database* db,
+                                       Collection* coll) const {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(coll->ns(), MODE_X));
 
-Status IndexBuilder::_buildAndHandleErrors(OperationContext* opCtx,
-                                           Database* db,
-                                           bool buildInBackground,
-                                           Lock::DBLock* dbLock) const {
-    invariant(!buildInBackground);
-    invariant(!dbLock);
-
-    const NamespaceString ns(_index["ns"].String());
-
-    Collection* coll = db->getCollection(opCtx, ns);
     // Collections should not be implicitly created by the index builder.
     fassert(40409, coll);
 
@@ -101,17 +92,12 @@ Status IndexBuilder::_buildAndHandleErrors(OperationContext* opCtx,
     // The 'indexer' can throw, so ensure build cleanup occurs.
     ON_BLOCK_EXIT([&] { indexer.cleanUpAfterBuild(opCtx, coll); });
 
-    return _build(opCtx, buildInBackground, coll, indexer, dbLock);
+    return _build(opCtx, coll, indexer);
 }
 
 Status IndexBuilder::_build(OperationContext* opCtx,
-                            bool buildInBackground,
                             Collection* coll,
-                            MultiIndexBlock& indexer,
-                            Lock::DBLock* dbLock) const try {
-    invariant(!buildInBackground);
-    invariant(!dbLock);
-
+                            MultiIndexBlock& indexer) const try {
     auto ns = coll->ns();
 
     {
@@ -163,7 +149,6 @@ Status IndexBuilder::_build(OperationContext* opCtx,
     }
 
     {
-        Lock::CollectionLock collLock(opCtx, ns, MODE_IX);
         // WriteConflict exceptions and statuses are not expected to escape this method.
         status = indexer.insertAllDocumentsInCollection(opCtx, coll);
         if (!status.isOK()) {

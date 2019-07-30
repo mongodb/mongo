@@ -541,8 +541,8 @@ public:
         IndexCatalog* catalog = coll->getIndexCatalog();
 
         string idxName = "a";
-        BSONObj spec = BSON("ns" << ns << "key" << BSON("a" << 1) << "name" << idxName << "v"
-                                 << static_cast<int>(kIndexVersion));
+        BSONObj spec = BSON("key" << BSON("a" << 1) << "name" << idxName << "v"
+                                  << static_cast<int>(kIndexVersion));
 
         // END SETUP / START TEST
 
@@ -582,8 +582,8 @@ public:
         IndexCatalog* catalog = coll->getIndexCatalog();
 
         string idxName = "a";
-        BSONObj spec = BSON("ns" << ns << "key" << BSON("a" << 1) << "name" << idxName << "v"
-                                 << static_cast<int>(kIndexVersion));
+        BSONObj spec = BSON("key" << BSON("a" << 1) << "name" << idxName << "v"
+                                  << static_cast<int>(kIndexVersion));
 
         {
             WriteUnitOfWork uow(&opCtx);
@@ -635,8 +635,8 @@ public:
         IndexCatalog* catalog = coll->getIndexCatalog();
 
         string idxName = "a";
-        BSONObj spec = BSON("ns" << ns << "key" << BSON("a" << 1) << "name" << idxName << "v"
-                                 << static_cast<int>(kIndexVersion));
+        BSONObj spec = BSON("key" << BSON("a" << 1) << "name" << idxName << "v"
+                                  << static_cast<int>(kIndexVersion));
 
         // END SETUP / START TEST
 
@@ -678,12 +678,12 @@ public:
         string idxNameA = "indexA";
         string idxNameB = "indexB";
         string idxNameC = "indexC";
-        BSONObj specA = BSON("ns" << ns << "key" << BSON("a" << 1) << "name" << idxNameA << "v"
-                                  << static_cast<int>(kIndexVersion));
-        BSONObj specB = BSON("ns" << ns << "key" << BSON("b" << 1) << "name" << idxNameB << "v"
-                                  << static_cast<int>(kIndexVersion));
-        BSONObj specC = BSON("ns" << ns << "key" << BSON("c" << 1) << "name" << idxNameC << "v"
-                                  << static_cast<int>(kIndexVersion));
+        BSONObj specA = BSON("key" << BSON("a" << 1) << "name" << idxNameA << "v"
+                                   << static_cast<int>(kIndexVersion));
+        BSONObj specB = BSON("key" << BSON("b" << 1) << "name" << idxNameB << "v"
+                                   << static_cast<int>(kIndexVersion));
+        BSONObj specC = BSON("key" << BSON("c" << 1) << "name" << idxNameC << "v"
+                                   << static_cast<int>(kIndexVersion));
 
         // END SETUP / START TEST
 

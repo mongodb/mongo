@@ -415,7 +415,7 @@ void _createIndexOnEmptyCollection(OperationContext* opCtx,
                                 << " because collection " << nss << " does not exist.";
 
         auto indexInfoObj = BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key"
-                                     << BSON("a" << 1) << "name" << indexName << "ns" << nss.ns());
+                                     << BSON("a" << 1) << "name" << indexName);
 
         auto indexCatalog = collection->getIndexCatalog();
         WriteUnitOfWork wuow(opCtx);

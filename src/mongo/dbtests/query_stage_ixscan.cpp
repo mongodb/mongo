@@ -61,9 +61,8 @@ public:
 
         ASSERT_OK(_coll->getIndexCatalog()->createIndexOnEmptyCollection(
             &_opCtx,
-            BSON("ns" << ns() << "key" << BSON("x" << 1) << "name"
-                      << DBClientBase::genIndexName(BSON("x" << 1)) << "v"
-                      << static_cast<int>(kIndexVersion))));
+            BSON("key" << BSON("x" << 1) << "name" << DBClientBase::genIndexName(BSON("x" << 1))
+                       << "v" << static_cast<int>(kIndexVersion))));
 
         wunit.commit();
     }

@@ -92,21 +92,12 @@ public:
     /**
      * Instead of building the index in a background thread, build on the current thread.
      */
-    Status buildInForeground(OperationContext* opCtx, Database* db) const;
+    Status buildInForeground(OperationContext* opCtx, Database* db, Collection* coll) const;
 
     static bool canBuildInBackground();
 
 private:
-    Status _buildAndHandleErrors(OperationContext* opCtx,
-                                 Database* db,
-                                 bool buildInBackground,
-                                 Lock::DBLock* dbLock) const;
-
-    Status _build(OperationContext* opCtx,
-                  bool buildInBackground,
-                  Collection* coll,
-                  MultiIndexBlock& indexer,
-                  Lock::DBLock* dbLock) const;
+    Status _build(OperationContext* opCtx, Collection* coll, MultiIndexBlock& indexer) const;
     const BSONObj _index;
     const IndexConstraints _indexConstraints;
     const ReplicatedWrites _replicatedWrites;

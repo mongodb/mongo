@@ -128,7 +128,7 @@ public:
             BSONObjBuilder keyObj;
             builder.append("key", keyObj.append(key, 1).done());
         }
-        BSONObj spec = builder.append("name", key).append("ns", collNs.ns()).append("v", 2).done();
+        BSONObj spec = builder.append("name", key).append("v", 2).done();
 
         auto collection = std::make_unique<CollectionMock>(collNs);
         auto descriptor = std::make_unique<IndexDescriptor>(

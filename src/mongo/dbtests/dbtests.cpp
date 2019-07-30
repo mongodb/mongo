@@ -86,7 +86,6 @@ void initWireSpec() {
 Status createIndex(OperationContext* opCtx, StringData ns, const BSONObj& keys, bool unique) {
     BSONObjBuilder specBuilder;
     specBuilder.append("name", DBClientBase::genIndexName(keys));
-    specBuilder.append("ns", ns);
     specBuilder.append("key", keys);
     specBuilder.append("v", static_cast<int>(kIndexVersion));
     if (unique) {

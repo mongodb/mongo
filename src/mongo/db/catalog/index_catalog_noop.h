@@ -236,8 +236,6 @@ public:
                                     const IndexDescriptor* desc,
                                     InsertDeleteOptions* options) const override {}
 
-    void setNs(NamespaceString ns) override {}
-
     void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) override {}
 };
 

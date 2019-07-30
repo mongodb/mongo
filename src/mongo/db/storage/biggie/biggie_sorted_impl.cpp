@@ -37,6 +37,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/storage/biggie/biggie_recovery_unit.h"
@@ -293,7 +294,7 @@ SortedDataInterface::SortedDataInterface(OperationContext* opCtx,
       _prefix(ident.toString().append(1, '\1')),
       // Therefore, the string ident + \2 will be greater than all elements in this ident.
       _identEnd(ident.toString().append(1, '\2')),
-      _collectionNamespace(desc->parentNS()),
+      _collectionNamespace(desc->getCollection()->ns()),
       _indexName(desc->indexName()),
       _keyPattern(desc->keyPattern()),
       _isUnique(desc->unique()),

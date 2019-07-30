@@ -2180,7 +2180,7 @@ TEST_F(IdempotencyTest, CreateCollectionWithIdIndex) {
 
     auto options1 = BSON("idIndex" << BSON("key" << fromjson("{_id: 1}") << "name"
                                                  << "_id_"
-                                                 << "v" << 2 << "ns" << nss.ns())
+                                                 << "v" << 2)
                                    << "uuid" << uuid);
     auto createColl1 = makeCreateCollectionOplogEntry(nextOpTime(), nss, options1);
     ASSERT_OK(runOpInitialSync(createColl1));

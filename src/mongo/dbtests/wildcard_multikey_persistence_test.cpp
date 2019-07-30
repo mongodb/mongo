@@ -181,8 +181,7 @@ protected:
                                   BSONObj key,
                                   BSONObj pathProjection,
                                   bool background) {
-        BSONObjBuilder bob =
-            std::move(BSONObjBuilder() << "ns" << nss.ns() << "name" << name << "key" << key);
+        BSONObjBuilder bob = std::move(BSONObjBuilder() << "name" << name << "key" << key);
 
         if (!pathProjection.isEmpty())
             bob << IndexDescriptor::kPathProjectionFieldName << pathProjection;

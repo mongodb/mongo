@@ -738,11 +738,12 @@ void rollbackCreateIndexes(OperationContext* opCtx, UUID uuid, std::set<std::str
 void rollbackDropIndexes(OperationContext* opCtx,
                          UUID uuid,
                          std::map<std::string, BSONObj> indexNames) {
-
     boost::optional<NamespaceString> nss = CollectionCatalog::get(opCtx).lookupNSSByUUID(uuid);
     invariant(nss);
-    Lock::DBLock dbLock(opCtx, nss->db(), MODE_X);
-    Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(uuid);
+    Lock::DBLock dbLock(opCtx, nss->db(), MODE_IX);
+    Lock::CollectionLock collLock(opCtx, *nss, MODE_X);
+    Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(*nss);
+
     // If we cannot find the collection, we skip over dropping the index.
     if (!collection) {
         LOG(2) << "Cannot find the collection with uuid: " << uuid.toString()
@@ -751,17 +752,8 @@ void rollbackDropIndexes(OperationContext* opCtx,
     }
 
     for (auto itIndex = indexNames.begin(); itIndex != indexNames.end(); itIndex++) {
-
         const string indexName = itIndex->first;
         BSONObj indexSpec = itIndex->second;
-        // We replace the namespace field because it is possible that a
-        // renameCollection command has occurred, changing the namespace of the
-        // collection from what it initially was during the creation of this index.
-        BSONObjBuilder updatedNss;
-        updatedNss.append("ns", nss->ns());
-
-        BSONObj updatedNssObj = updatedNss.obj();
-        indexSpec = indexSpec.addField(updatedNssObj.firstElement());
 
         log() << "Creating index in rollback for collection: " << *nss << ", UUID: " << uuid
               << ", index: " << indexName;

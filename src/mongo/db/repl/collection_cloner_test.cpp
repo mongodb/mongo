@@ -281,11 +281,9 @@ void CollectionClonerTest::setUp() {
 // Return index specs to use for secondary indexes.
 std::vector<BSONObj> CollectionClonerTest::makeSecondaryIndexSpecs(const NamespaceString& nss) {
     return {BSON("v" << 1 << "key" << BSON("a" << 1) << "name"
-                     << "a_1"
-                     << "ns" << nss.ns()),
+                     << "a_1"),
             BSON("v" << 1 << "key" << BSON("b" << 1) << "name"
-                     << "b_1"
-                     << "ns" << nss.ns())};
+                     << "b_1")};
 }
 
 void CollectionClonerTest::tearDown() {
@@ -1399,8 +1397,7 @@ TEST_F(CollectionClonerRenamedBeforeStartTest, BeginCollectionWithUUID) {
     ASSERT_BSONOBJ_EQ(options.toBSON(), collOptions.toBSON());
 
     BSONObj expectedIdIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
-                                           << "_id_"
-                                           << "ns" << alternateNss.ns());
+                                           << "_id_");
     ASSERT_BSONOBJ_EQ(collIdIndexSpec, expectedIdIndexSpec);
 
     auto expectedNonIdIndexSpecs = makeSecondaryIndexSpecs(alternateNss);

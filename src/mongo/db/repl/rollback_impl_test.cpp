@@ -1638,7 +1638,7 @@ TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespaceOfDropColl
 TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespaceOfCreateIndexOplogEntry) {
     auto nss = NamespaceString("test", "coll");
     auto indexObj =
-        BSON("createIndexes" << nss.coll() << "ns" << nss.toString() << "v"
+        BSON("createIndexes" << nss.coll() << "v"
                              << static_cast<int>(IndexDescriptor::IndexVersion::kV2) << "key"
                              << "x"
                              << "name"

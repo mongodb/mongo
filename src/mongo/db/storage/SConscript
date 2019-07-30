@@ -79,9 +79,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/storage/kv/kv_prefix',
         ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/disable_index_spec_namespace_generation',
-        ],
     )
 
 env.Library(
@@ -425,9 +422,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/kv/kv_drop_pending_ident_reaper',
         '$BUILD_DIR/mongo/db/storage/kv/kv_prefix',
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/disable_index_spec_namespace_generation',
     ]
 )
 

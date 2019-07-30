@@ -75,7 +75,7 @@ public:
     static constexpr StringData kIndexVersionFieldName = "v"_sd;
     static constexpr StringData kKeyPatternFieldName = "key"_sd;
     static constexpr StringData kLanguageOverrideFieldName = "language_override"_sd;
-    static constexpr StringData kNamespaceFieldName = "ns"_sd;
+    static constexpr StringData kNamespaceFieldName = "ns"_sd;  // Removed in 4.4
     static constexpr StringData kPartialFilterExprFieldName = "partialFilterExpression"_sd;
     static constexpr StringData kPathProjectionFieldName = "wildcardProjection"_sd;
     static constexpr StringData kSparseFieldName = "sparse"_sd;
@@ -83,12 +83,6 @@ public:
     static constexpr StringData kTextVersionFieldName = "textIndexVersion"_sd;
     static constexpr StringData kUniqueFieldName = "unique"_sd;
     static constexpr StringData kWeightsFieldName = "weights"_sd;
-
-    /**
-     * Given a BSONObj representing an index spec, returns a new owned BSONObj which is identical to
-     * 'spec' after replacing the 'ns' field with the value of 'newNs'.
-     */
-    static BSONObj renameNsInIndexSpec(BSONObj spec, const NamespaceString& newNs);
 
     /**
      * infoObj is a copy of the index-describing BSONObj contained in the catalog.
@@ -162,9 +156,7 @@ public:
     }
 
     // Return the name of the indexed collection.
-    const NamespaceString& parentNS() const {
-        return _parentNS;
-    }
+    const NamespaceString& parentNS() const;
 
     // Return the name of the access method we must use to access this index's data.
     const std::string& getAccessMethodName() const {
@@ -227,8 +219,6 @@ public:
 
     bool areIndexOptionsEquivalent(const IndexDescriptor* other) const;
 
-    void setNs(NamespaceString ns);
-
     const BSONObj& collation() const {
         return _collation;
     }
@@ -266,7 +256,6 @@ private:
     BSONObj _keyPattern;
     BSONObj _projection;
     std::string _indexName;
-    NamespaceString _parentNS;
     bool _isIdIndex;
     bool _sparse;
     bool _unique;

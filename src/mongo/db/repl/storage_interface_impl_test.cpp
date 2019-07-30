@@ -66,10 +66,10 @@ using namespace mongo::repl;
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 
 BSONObj makeIdIndexSpec(const NamespaceString& nss) {
-    return BSON("ns" << nss.toString() << "name"
-                     << "_id_"
-                     << "key" << BSON("_id" << 1) << "unique" << true << "v"
-                     << static_cast<int>(kIndexVersion));
+    return BSON("name"
+                << "_id_"
+                << "key" << BSON("_id" << 1) << "unique" << true << "v"
+                << static_cast<int>(kIndexVersion));
 }
 
 /**
@@ -616,8 +616,7 @@ TEST_F(StorageInterfaceImplTest, DestroyingUncommittedCollectionBulkLoaderDropsI
     auto opCtx = getOperationContext();
     auto nss = makeNamespace(_agent);
     std::vector<BSONObj> indexes = {BSON("v" << 1 << "key" << BSON("x" << 1) << "name"
-                                             << "x_1"
-                                             << "ns" << nss.ns())};
+                                             << "x_1")};
     auto destroyLoaderFn = [](std::unique_ptr<CollectionBulkLoader> loader) {
         // Destroy 'loader' by letting it go out of scope.
     };
@@ -640,8 +639,7 @@ TEST_F(StorageInterfaceImplTest,
     auto opCtx = getOperationContext();
     auto nss = makeNamespace(_agent);
     std::vector<BSONObj> indexes = {BSON("v" << 1 << "key" << BSON("x" << 1) << "name"
-                                             << "x_1"
-                                             << "ns" << nss.ns())};
+                                             << "x_1")};
     auto destroyLoaderFn = [](std::unique_ptr<CollectionBulkLoader> loader) {
         // Destroy 'loader' in a new thread that does not have a Client.
         stdx::thread([&loader]() { loader.reset(); }).join();
@@ -904,8 +902,7 @@ TEST_F(StorageInterfaceImplTest, FindDocumentsReturnsIndexOptionsConflictIfIndex
     auto nss = makeNamespace(_agent);
     std::vector<BSONObj> indexes = {BSON("v" << 1 << "key" << BSON("x" << 1) << "name"
                                              << "x_1"
-                                             << "ns" << nss.ns() << "partialFilterExpression"
-                                             << BSON("y" << 1))};
+                                             << "partialFilterExpression" << BSON("y" << 1))};
     auto loader = unittest::assertGet(storage.createCollectionForBulkLoading(
         nss, generateOptionsWithUuid(), makeIdIndexSpec(nss), indexes));
     std::vector<BSONObj> docs = {BSON("_id" << 1), BSON("_id" << 1), BSON("_id" << 2)};
@@ -2643,8 +2640,8 @@ TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeySucceeds) {
     ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
 
     auto indexName = "a_b_1";
-    auto indexSpec = BSON("name" << indexName << "ns" << nss.ns() << "key" << BSON("a.b" << 1)
-                                 << "v" << static_cast<int>(kIndexVersion));
+    auto indexSpec = BSON("name" << indexName << "key" << BSON("a.b" << 1) << "v"
+                                 << static_cast<int>(kIndexVersion));
     ASSERT_EQUALS(_createIndexOnEmptyCollection(opCtx, nss, indexSpec), 2);
 
     MultikeyPaths paths = {{1}};

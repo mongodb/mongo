@@ -46,8 +46,7 @@ using namespace unittest;
 const HostAndPort BaseClonerTest::target("localhost", -1);
 const NamespaceString BaseClonerTest::nss("db.coll");
 const BSONObj BaseClonerTest::idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
-                                                     << "_id_"
-                                                     << "ns" << nss.ns());
+                                                     << "_id_");
 
 // static
 BSONObj BaseClonerTest::createCountResponse(int documentCount) {

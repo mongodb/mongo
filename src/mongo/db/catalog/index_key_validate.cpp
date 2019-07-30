@@ -40,7 +40,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/db/catalog/disable_index_spec_namespace_generation_gen.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/wildcard_key_generator.h"
@@ -255,7 +254,6 @@ BSONObj removeUnknownFields(const BSONObj& indexSpec) {
 StatusWith<BSONObj> validateIndexSpec(
     OperationContext* opCtx,
     const BSONObj& indexSpec,
-    const NamespaceString& expectedNamespace,
     const ServerGlobalParams::FeatureCompatibility& featureCompatibility) {
     bool hasKeyPatternField = false;
     bool hasIndexNameField = false;
@@ -327,28 +325,6 @@ StatusWith<BSONObj> validateIndexSpec(
 
             hasIndexNameField = true;
         } else if (IndexDescriptor::kNamespaceFieldName == indexSpecElemFieldName) {
-            if (indexSpecElem.type() != BSONType::String) {
-                return {ErrorCodes::TypeMismatch,
-                        str::stream()
-                            << "The field '" << IndexDescriptor::kNamespaceFieldName
-                            << "' must be a string, but got " << typeName(indexSpecElem.type())};
-            }
-
-            StringData ns = indexSpecElem.valueStringData();
-            if (ns.empty()) {
-                return {ErrorCodes::BadValue,
-                        str::stream() << "The field '" << IndexDescriptor::kNamespaceFieldName
-                                      << "' cannot be an empty string"};
-            }
-
-            if (ns != expectedNamespace.ns()) {
-                return {ErrorCodes::BadValue,
-                        str::stream()
-                            << "The value of the field '" << IndexDescriptor::kNamespaceFieldName
-                            << "' (" << ns << ") doesn't match the namespace '" << expectedNamespace
-                            << "'"};
-            }
-
             hasNamespaceField = true;
         } else if (IndexDescriptor::kIndexVersionFieldName == indexSpecElemFieldName) {
             if (!indexSpecElem.isNumber()) {
@@ -485,29 +461,24 @@ StatusWith<BSONObj> validateIndexSpec(
                               << static_cast<int>(*resolvedIndexVersion)};
     }
 
-    if (!hasNamespaceField || !hasVersionField) {
-        BSONObjBuilder bob;
+    BSONObj modifiedSpec = indexSpec;
 
-        // Only generate the 'ns' field for the index spec if it's missing it and if the server test
-        // parameter to disable the generation isn't enabled.
-        if (!hasNamespaceField && !disableIndexSpecNamespaceGeneration.load()) {
-            // We create a new index specification with the 'ns' field set as 'expectedNamespace' if
-            // the field was omitted.
-            bob.append(IndexDescriptor::kNamespaceFieldName, expectedNamespace.ns());
-        }
-
-        if (!hasVersionField) {
-            // We create a new index specification with the 'v' field set as 'defaultIndexVersion'
-            // if the field was omitted.
-            bob.append(IndexDescriptor::kIndexVersionFieldName,
-                       static_cast<int>(*resolvedIndexVersion));
-        }
-
-        bob.appendElements(indexSpec);
-        return bob.obj();
+    // Ignore any 'ns' field in the index spec because this field is dropped post-4.0. Don't remove
+    // the field during repair, as repair may run on old data files (version 3.6 and 4.0) that
+    // require the field to be present.
+    if (hasNamespaceField && !storageGlobalParams.repair) {
+        modifiedSpec = modifiedSpec.removeField(IndexDescriptor::kNamespaceFieldName);
     }
 
-    return indexSpec;
+    if (!hasVersionField) {
+        // We create a new index specification with the 'v' field set as 'defaultIndexVersion' if
+        // the field was omitted.
+        BSONObj versionObj = BSON(IndexDescriptor::kIndexVersionFieldName
+                                  << static_cast<int>(*resolvedIndexVersion));
+        modifiedSpec = modifiedSpec.addField(versionObj.firstElement());
+    }
+
+    return modifiedSpec;
 }
 
 Status validateIdIndexSpec(const BSONObj& indexSpec) {

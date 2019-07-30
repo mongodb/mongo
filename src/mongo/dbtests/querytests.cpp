@@ -100,7 +100,6 @@ protected:
     void addIndex(const IndexSpec& spec) {
         BSONObjBuilder builder(spec.toBSON());
         builder.append("v", int(IndexDescriptor::kLatestIndexVersion));
-        builder.append("ns", ns());
         auto specObj = builder.obj();
 
         MultiIndexBlock indexer;

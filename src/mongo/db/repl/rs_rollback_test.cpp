@@ -81,8 +81,8 @@ OplogInterfaceMock::Operation makeDropIndexOplogEntry(Collection* collection,
                                                       BSONObj key,
                                                       std::string indexName,
                                                       int time) {
-    auto indexSpec = BSON("ns" << collection->ns().ns() << "key" << key << "name" << indexName
-                               << "v" << static_cast<int>(kIndexVersion));
+    auto indexSpec =
+        BSON("key" << key << "name" << indexName << "v" << static_cast<int>(kIndexVersion));
 
     return std::make_pair(
         BSON("ts" << Timestamp(Seconds(time), 0) << "op"
@@ -98,9 +98,9 @@ OplogInterfaceMock::Operation makeCreateIndexOplogEntry(Collection* collection,
                                                         BSONObj key,
                                                         std::string indexName,
                                                         int time) {
-    auto indexSpec = BSON(
-        "createIndexes" << collection->ns().coll() << "ns" << collection->ns().ns() << "v"
-                        << static_cast<int>(kIndexVersion) << "key" << key << "name" << indexName);
+    auto indexSpec =
+        BSON("createIndexes" << collection->ns().coll() << "v" << static_cast<int>(kIndexVersion)
+                             << "key" << key << "name" << indexName);
 
     return std::make_pair(BSON("ts" << Timestamp(Seconds(time), 0) << "op"
                                     << "c"
@@ -439,9 +439,9 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommand) {
     options.uuid = UUID::gen();
     NamespaceString nss("test", "coll");
     auto collection = _createCollection(_opCtx.get(), nss.toString(), options);
-    auto indexSpec = BSON("ns" << nss.toString() << "v" << static_cast<int>(kIndexVersion) << "key"
-                               << BSON("a" << 1) << "name"
-                               << "a_1");
+    auto indexSpec =
+        BSON("v" << static_cast<int>(kIndexVersion) << "key" << BSON("a" << 1) << "name"
+                 << "a_1");
 
     int numIndexes = _createIndexOnEmptyCollection(_opCtx.get(), collection, nss, indexSpec);
     ASSERT_EQUALS(2, numIndexes);
@@ -482,10 +482,8 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandIndexNotInCatalog) {
     CollectionOptions options;
     options.uuid = UUID::gen();
     auto collection = _createCollection(_opCtx.get(), "test.t", options);
-    auto indexSpec = BSON("ns"
-                          << "test.t"
-                          << "key" << BSON("a" << 1) << "name"
-                          << "a_1");
+    auto indexSpec = BSON("key" << BSON("a" << 1) << "name"
+                                << "a_1");
     // Skip index creation to trigger warning during rollback.
     {
         Lock::DBLock dbLock(_opCtx.get(), "test", MODE_S);
@@ -632,8 +630,8 @@ TEST_F(RSRollbackTest, RollingBackCreateIndexAndRenameWithLongName) {
     auto collection = _createCollection(_opCtx.get(), nss.toString(), options);
 
     auto longName = std::string(115, 'a');
-    auto indexSpec = BSON("ns" << nss.toString() << "v" << static_cast<int>(kIndexVersion) << "key"
-                               << BSON("b" << 1) << "name" << longName);
+    auto indexSpec = BSON("v" << static_cast<int>(kIndexVersion) << "key" << BSON("b" << 1)
+                              << "name" << longName);
 
     int numIndexes = _createIndexOnEmptyCollection(_opCtx.get(), collection, nss, indexSpec);
     ASSERT_EQUALS(2, numIndexes);
@@ -680,9 +678,9 @@ TEST_F(RSRollbackTest, RollingBackDropAndCreateOfSameIndexNameWithDifferentSpecs
     NamespaceString nss("test", "coll");
     auto collection = _createCollection(_opCtx.get(), nss.toString(), options);
 
-    auto indexSpec = BSON("ns" << nss.toString() << "v" << static_cast<int>(kIndexVersion) << "key"
-                               << BSON("b" << 1) << "name"
-                               << "a_1");
+    auto indexSpec =
+        BSON("v" << static_cast<int>(kIndexVersion) << "key" << BSON("b" << 1) << "name"
+                 << "a_1");
 
     int numIndexes = _createIndexOnEmptyCollection(_opCtx.get(), collection, nss, indexSpec);
     ASSERT_EQUALS(2, numIndexes);
@@ -779,8 +777,8 @@ std::string idxName(std::string id) {
 
 // Create an index spec object given the namespace and the index 'id'.
 BSONObj idxSpec(NamespaceString nss, std::string id) {
-    return BSON("ns" << nss.toString() << "v" << static_cast<int>(kIndexVersion) << "key"
-                     << BSON(idxKey(id) << 1) << "name" << idxName(id));
+    return BSON("v" << static_cast<int>(kIndexVersion) << "key" << BSON(idxKey(id) << 1) << "name"
+                    << idxName(id));
 }
 
 // Returns the number of indexes that exist on the given collection.
@@ -902,8 +900,8 @@ TEST_F(RSRollbackTest, RollbackCreateDropRecreateIndexOnCollection) {
 
     // Create the necessary indexes. Index 0 is created, dropped, and created again in the
     // sequence of ops, so we create that index.
-    auto indexSpec = BSON("ns" << nss.toString() << "v" << static_cast<int>(kIndexVersion) << "key"
-                               << BSON(idxKey("0") << 1) << "name" << idxName("0"));
+    auto indexSpec = BSON("v" << static_cast<int>(kIndexVersion) << "key" << BSON(idxKey("0") << 1)
+                              << "name" << idxName("0"));
 
     int numIndexes = _createIndexOnEmptyCollection(_opCtx.get(), coll, nss, indexSpec);
     ASSERT_EQUALS(2, numIndexes);

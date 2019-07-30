@@ -36,7 +36,6 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/catalog/disable_index_spec_namespace_generation_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
@@ -1205,12 +1204,6 @@ BSONObj DurableCatalogImpl::getIndexSpec(OperationContext* opCtx,
     invariant(offset >= 0);
 
     BSONObj spec = md.indexes[offset].spec.getOwned();
-    if (spec.hasField("ns") || disableIndexSpecNamespaceGeneration.load()) {
-        return spec;
-    }
-
-    BSONObj nsObj = BSON("ns" << ns.ns());
-    spec = spec.addField(nsObj.firstElement());
     return spec;
 }
 

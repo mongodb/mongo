@@ -41,14 +41,10 @@ function testOplogEntryContainsIndexInfoObj(coll, keyPattern, indexOptions) {
 
     // Because of differences between the new and old oplog entries for createIndexes,
     // treat the namespace part separately and compare entries without ns field.
-    const indexSpecNs = indexSpec.ns;
-    delete indexSpec.ns;
     const found = allOplogEntries.filter((entry) => {
-        const entryNs = entry.o.ns || testDB.getName() + "." + entry.o.createIndexes;
         const entrySpec = entry.o;
-        delete entrySpec.ns;
         delete entrySpec.createIndexes;
-        return indexSpecNs === entryNs && bsonWoCompare(indexSpec, entrySpec) === 0;
+        return bsonWoCompare(indexSpec, entrySpec) === 0;
     });
     assert.eq(1,
               found.length,

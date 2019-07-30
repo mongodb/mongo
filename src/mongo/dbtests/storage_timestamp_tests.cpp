@@ -261,8 +261,7 @@ public:
             auto swIndexInfoObj =
                 indexer.init(_opCtx,
                              coll,
-                             {BSON("v" << 2 << "name" << indexName << "ns" << coll->ns().ns()
-                                       << "key" << indexKey)},
+                             {BSON("v" << 2 << "name" << indexName << "key" << indexKey)},
                              MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, coll));
             ASSERT_OK(swIndexInfoObj.getStatus());
             indexInfoObj = std::move(swIndexInfoObj.getValue()[0]);
@@ -1260,8 +1259,8 @@ public:
             uuid = autoColl.getCollection()->uuid();
         }
         auto indexName = "a_1";
-        auto indexSpec = BSON("name" << indexName << "ns" << nss.ns() << "key" << BSON("a" << 1)
-                                     << "v" << static_cast<int>(kIndexVersion));
+        auto indexSpec = BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
+                                     << static_cast<int>(kIndexVersion));
         ASSERT_OK(dbtests::createIndexFromSpec(_opCtx, nss.ns(), indexSpec));
 
         _coordinatorMock->alwaysAllowWrites(false);
@@ -1329,8 +1328,8 @@ public:
             uuid = autoColl.getCollection()->uuid();
         }
         auto indexName = "a_1";
-        auto indexSpec = BSON("name" << indexName << "ns" << nss.ns() << "key" << BSON("a" << 1)
-                                     << "v" << static_cast<int>(kIndexVersion));
+        auto indexSpec = BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
+                                     << static_cast<int>(kIndexVersion));
         ASSERT_OK(dbtests::createIndexFromSpec(_opCtx, nss.ns(), indexSpec));
 
         _coordinatorMock->alwaysAllowWrites(false);
@@ -1357,10 +1356,10 @@ public:
                                               << "op"
                                               << "i"
                                               << "ns" << nss.ns() << "ui" << uuid << "o" << doc2));
-        auto indexSpec2 = BSON("createIndexes" << nss.coll() << "ns" << nss.ns() << "v"
-                                               << static_cast<int>(kIndexVersion) << "key"
-                                               << BSON("b" << 1) << "name"
-                                               << "b_1");
+        auto indexSpec2 =
+            BSON("createIndexes" << nss.coll() << "v" << static_cast<int>(kIndexVersion) << "key"
+                                 << BSON("b" << 1) << "name"
+                                 << "b_1");
         auto createIndexOp = repl::OplogEntry(
             BSON("ts" << indexBuildTime.asTimestamp() << "t" << 1LL << "v" << 2 << "op"
                       << "c"
@@ -1425,8 +1424,8 @@ public:
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
         auto indexName = "a_1";
-        auto indexSpec = BSON("name" << indexName << "ns" << nss.ns() << "key" << BSON("a" << 1)
-                                     << "v" << static_cast<int>(kIndexVersion));
+        auto indexSpec = BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
+                                     << static_cast<int>(kIndexVersion));
         ASSERT_OK(dbtests::createIndexFromSpec(_opCtx, nss.ns(), indexSpec));
 
         const LogicalTime pastTime = _clock->reserveTicks(1);
@@ -1454,8 +1453,8 @@ public:
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
         auto indexName = "a_1";
-        auto indexSpec = BSON("name" << indexName << "ns" << nss.ns() << "key" << BSON("a" << 1)
-                                     << "v" << static_cast<int>(kIndexVersion));
+        auto indexSpec = BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
+                                     << static_cast<int>(kIndexVersion));
         ASSERT_OK(dbtests::createIndexFromSpec(_opCtx, nss.ns(), indexSpec));
 
         const LogicalTime pastTime = _clock->reserveTicks(1);
@@ -1877,7 +1876,7 @@ public:
                 autoColl.getCollection(),
                 {BSON("v" << 2 << "unique" << true << "name"
                           << "a_1"
-                          << "ns" << nss.ns() << "key" << BSON("a" << 1))},
+                          << "key" << BSON("a" << 1))},
                 MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, autoColl.getCollection()));
             ASSERT_OK(swIndexInfoObj.getStatus());
             indexInfoObj = std::move(swIndexInfoObj.getValue()[0]);
@@ -2515,10 +2514,10 @@ public:
                 origIdents = durableCatalog->getAllIdents(_opCtx);
             }
 
-            auto indexSpec = BSON("createIndexes" << nss.coll() << "ns" << nss.ns() << "v"
-                                                  << static_cast<int>(kIndexVersion) << "key"
-                                                  << BSON("field" << 1) << "name"
-                                                  << "field_1");
+            auto indexSpec =
+                BSON("createIndexes" << nss.coll() << "v" << static_cast<int>(kIndexVersion)
+                                     << "key" << BSON("field" << 1) << "name"
+                                     << "field_1");
 
             auto createIndexOp = BSON("ts" << startBuildTs << "t" << 1LL << "v" << 2 << "op"
                                            << "c"

@@ -75,7 +75,7 @@ public:
             ->createIndexOnEmptyCollection(&_opCtx,
                                            BSON("key" << BSON("x" << 1) << "name"
                                                       << "x_1"
-                                                      << "ns" << ns() << "v" << 1))
+                                                      << "v" << 1))
             .status_with_transitional_ignore();
 
         for (int i = 0; i < kDocuments; i++) {

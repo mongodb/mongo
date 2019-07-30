@@ -1051,7 +1051,6 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CollectionImpl::makePlanExe
 
 void CollectionImpl::setNs(NamespaceString nss) {
     _ns = std::move(nss);
-    _indexCatalog->setNs(_ns);
     _infoCache->setNs(_ns);
     _recordStore.get()->setNs(_ns);
 }

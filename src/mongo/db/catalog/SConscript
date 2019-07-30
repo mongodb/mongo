@@ -114,16 +114,6 @@ env.Library(
 )
 
 env.Library(
-        target='disable_index_spec_namespace_generation',
-        source=[
-            env.Idlc('disable_index_spec_namespace_generation.idl')[0],
-        ],
-        LIBDEPS_PRIVATE=[
-            '$BUILD_DIR/mongo/idl/server_parameter',
-        ],
-)
-
-env.Library(
     target='index_key_validate',
     source=[
         "index_key_validate.cpp",
@@ -137,9 +127,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/matcher/expressions',
         '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
         '$BUILD_DIR/mongo/util/fail_point',
-    ],
-    LIBDEPS_PRIVATE=[
-        'disable_index_spec_namespace_generation',
     ],
 )
 
@@ -331,7 +318,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'index_build_block',
-        'disable_index_spec_namespace_generation',
         '$BUILD_DIR/mongo/db/catalog/collection_catalog_helper',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/index/index_build_interceptor',

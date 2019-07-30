@@ -32,7 +32,6 @@
 #include <algorithm>
 #include <numeric>
 
-#include "mongo/db/catalog/disable_index_spec_namespace_generation_gen.h"
 #include "mongo/db/field_ref.h"
 
 namespace mongo {
@@ -141,19 +140,6 @@ bool BSONCollectionCatalogEntry::MetaData::eraseIndex(StringData name) {
 
 void BSONCollectionCatalogEntry::MetaData::rename(StringData toNS) {
     ns = toNS.toString();
-    for (size_t i = 0; i < indexes.size(); i++) {
-        BSONObj spec = indexes[i].spec;
-        BSONObjBuilder b;
-        // Add the fields in the same order they were in the original specification.
-        for (auto&& elem : spec) {
-            if (elem.fieldNameStringData() == "ns") {
-                b.append("ns", toNS);
-            } else {
-                b.append(elem);
-            }
-        }
-        indexes[i].spec = b.obj();
-    }
 }
 
 KVPrefix BSONCollectionCatalogEntry::MetaData::getMaxPrefix() const {
