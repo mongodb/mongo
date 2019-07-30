@@ -55,5 +55,29 @@ void applyPositionalProjection(const Document& input,
                                const MatchExpression& matchExpr,
                                const FieldPath& path,
                                MutableDocument* output);
+/**
+ * Applies an $elemMatch projection on the array at the given 'path' on the 'input' document. The
+ * applied projection is stored in the output document. If the output document contains a field
+ * under which the projection is saved, it will be overwritten with the projection value. The
+ * 'matchExpr' specifies a condition to locate the first matching element in the array and must
+ * contain the $elemMatch operator. This function doesn't enforce this requirement and the caller
+ * must ensure that the valid match expression is passed. For example, given:
+ *
+ *   - the 'input' document {foo: [{bar: 1}, {bar: 2}, {bar: 3}]}
+ *   - the 'matchExpr' condition {foo: {$elemMatch: {bar: {$gt: 1}}}}
+ *   - and the 'path' of 'foo'
+ *
+ * The resulting document will contain the following element: {foo: [{bar: 2}]}
+ *
+ * If the 'matchExpr' does not match the input document, the function returns without modifying
+ * the output document.
+ *
+ * Since the $elemMatch projection cannot be used with a nested field, the 'path' value must not
+ * be a dotted path, otherwise an invariant will be triggered.
+ */
+void applyElemMatchProjection(const Document& input,
+                              const MatchExpression& matchExpr,
+                              const FieldPath& path,
+                              MutableDocument* output);
 }  // namespace projection_executor
 }  // namespace mongo

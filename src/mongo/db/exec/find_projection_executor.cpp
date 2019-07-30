@@ -102,5 +102,34 @@ void applyPositionalProjection(const Document& input,
         }
     }
 }
+
+void applyElemMatchProjection(const Document& input,
+                              const MatchExpression& matchExpr,
+                              const FieldPath& path,
+                              MutableDocument* output) {
+    invariant(output);
+    invariant(path.getPathLength() == 1);
+
+    // Try to find the first matching array element from the 'input' document based on the condition
+    // specified as 'matchExpr'. If such an element is found, its position within an array will be
+    // recorded in the 'details' object.
+    MatchDetails details;
+    details.requestElemMatchKey();
+    if (!matchExpr.matchesBSON(input.toBson(), &details)) {
+        // If there is no match, remove the 'path' from the output document (if it exists, otherwise
+        // the call below is a no op).
+        output->remove(path.fullPath());
+        return;
+    }
+
+    auto val = input[path.fullPath()];
+    invariant(val.getType() == BSONType::Array);
+    auto elemMatchKey = details.elemMatchKey();
+    invariant(details.hasElemMatchKey());
+    auto matchingElem = extractArrayElement(val, elemMatchKey);
+    invariant(!matchingElem.missing());
+
+    output->setField(path.fullPath(), Value{std::vector<Value>{matchingElem}});
+}
 }  // namespace projection_executor
 }  // namespace mongo

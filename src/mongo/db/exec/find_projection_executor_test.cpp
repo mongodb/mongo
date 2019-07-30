@@ -121,5 +121,91 @@ TEST(PositionalProjection, CanMergeWithExistingFieldsInOutputDocument) {
     ASSERT_DOCUMENT_EQ(doc, applyPositional(fromjson("{foo: 3}"), "foo", doc, doc));
 }
 }  // namespace positional_projection_tests
+
+namespace elem_match_projection_tests {
+Document applyElemMatch(const BSONObj& match,
+                        const std::string& path,
+                        const Document& input,
+                        const Document& output = {}) {
+    MutableDocument doc(output);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matchObj = BSON(path << BSON("$elemMatch" << match));
+    auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(matchObj, expCtx));
+    projection_executor::applyElemMatchProjection(input, *matchExpr, path, &doc);
+    return doc.freeze();
+}
+
+TEST(ElemMatchProjection, CorrectlyProjectsNonObjectElement) {
+    ASSERT_DOCUMENT_EQ(
+        Document{fromjson("{foo: [4]}")},
+        applyElemMatch(fromjson("{$in: [4]}"), "foo", Document{fromjson("{foo: [1,2,3,4]}")}));
+    ASSERT_DOCUMENT_EQ(
+        Document{fromjson("{foo: [4]}")},
+        applyElemMatch(fromjson("{$nin: [1,2,3]}"), "foo", Document{fromjson("{foo: [1,2,3,4]}")}));
+}
+
+TEST(ElemMatchProjection, CorrectlyProjectsObjectElement) {
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{foo: [{bar: 6, z: 6}]}")},
+                       applyElemMatch(fromjson("{bar: {$gte: 5}}"),
+                                      "foo",
+                                      Document{fromjson("{foo: [{bar: 1, z: 1}, {bar: 2, z: 2}, "
+                                                        "{bar: 6, z: 6}, {bar: 10, z: 10}]}")}));
+}
+
+TEST(ElemMatchProjection, CorrectlyProjectsArrayElement) {
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{foo: [[3,4]]}")},
+                       applyElemMatch(fromjson("{$gt: [1,2]}"),
+                                      "foo",
+                                      Document{fromjson("{foo: [[1,2], [3,4]]}")}));
+}
+
+TEST(ElemMatchProjection, ProjectsAsEmptyDocumentIfInputIsEmpty) {
+    ASSERT_DOCUMENT_EQ({}, applyElemMatch(fromjson("{bar: {$gte: 5}}"), "foo", {}));
+}
+
+TEST(ElemMatchProjection, RemovesFieldFromOutputDocumentIfUnableToMatchArrayElement) {
+    ASSERT_DOCUMENT_EQ({},
+                       applyElemMatch(fromjson("{bar: {$gte: 5}}"),
+                                      "foo",
+                                      Document{fromjson("{foo: [{bar: 1, z: 1}, "
+                                                        "{bar: 2, z: 2}]}")}));
+    auto doc =
+        Document{fromjson("{bar: 1, foo: [{bar: 1, z: 1}, {bar: 2, z: 2}, "
+                          "{bar: 6, z: 6}, {bar: 10, z: 10}]}")};
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{bar:1}")},
+                       applyElemMatch(fromjson("{bar: {$gte: 20}}"), "foo", doc, doc));
+}
+
+TEST(ElemMatchProjection, CorrectlyProjectsWithMultipleCriteriaInMatchExpression) {
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{foo: [{bar: 2, z: 2}]}")},
+                       applyElemMatch(fromjson("{bar: {$gt: 1, $lt: 6}}"),
+                                      "foo",
+                                      Document{fromjson("{foo: [{bar: 1, z: 1}, {bar: 2, z: 2}, "
+                                                        "{bar: 6, z: 6}, {bar: 10, z: 10}]}")}));
+}
+
+TEST(ElemMatchProjection, CanMergeWithExistingFieldsInOutputDocument) {
+    auto doc =
+        Document{fromjson("{foo: [{bar: 1, z: 1}, {bar: 2, z: 2}, "
+                          "{bar: 6, z: 6}, {bar: 10, z: 10}]}")};
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{foo: [{bar: 6, z: 6}]}")},
+                       applyElemMatch(fromjson("{bar: {$gte: 5}}"), "foo", doc, doc));
+
+    doc =
+        Document{fromjson("{bar: 1, foo: [{bar: 1, z: 1}, {bar: 2, z: 2}, "
+                          "{bar: 6, z: 6}, {bar: 10, z: 10}]}")};
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{bar:1, foo: [{bar: 6, z: 6}]}")},
+                       applyElemMatch(fromjson("{bar: {$gte: 5}}"), "foo", doc, doc));
+}
+
+TEST(ElemMatchProjection, RemovesFieldFromOutputDocumentIfItContainsNumericSubfield) {
+    auto doc = Document{BSON("foo" << BSON(0 << 3))};
+    ASSERT_DOCUMENT_EQ({}, applyElemMatch(fromjson("{$gt: 2}"), "foo", doc));
+
+    doc = Document{BSON("bar" << 1 << "foo" << BSON(0 << 3))};
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{bar: 1}")},
+                       applyElemMatch(fromjson("{$gt: 2}"), "foo", doc, doc));
+}
+}  // namespace elem_match_projection_tests
 }  // namespace projection_executor
 }  // namespace mongo
