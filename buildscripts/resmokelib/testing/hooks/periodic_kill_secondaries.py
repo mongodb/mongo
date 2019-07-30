@@ -431,12 +431,14 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
                 bson.SON([
                     ("replSetTest", 1),
                     ("waitForMemberState", 2),  # 2 = SECONDARY
-                    ("timeoutMillis", fixture.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000)
+                    ("timeoutMillis",
+                     fixture.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60 * 1000)
                 ]))
         except pymongo.errors.OperationFailure as err:
             self.logger.exception(
                 "mongod on port %d failed to reach state SECONDARY after %d seconds",
-                secondary.port, fixture.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60)
+                secondary.port, fixture.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60)
             raise errors.ServerFailure(
                 "mongod on port {} failed to reach state SECONDARY after {} seconds: {}".format(
-                    secondary.port, fixture.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60, err.args[0]))
+                    secondary.port, fixture.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60,
+                    err.args[0]))
