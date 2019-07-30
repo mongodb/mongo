@@ -35,6 +35,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/s/balancer/migration_manager.h"
 #include "mongo/db/s/balancer/type_migration.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -161,6 +162,8 @@ private:
 
 void MigrationManagerTest::setUp() {
     ConfigServerTestFixture::setUp();
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                  ->initializeConfigDatabaseIfNeeded(operationContext()));
     _migrationManager = std::make_unique<MigrationManager>(getServiceContext());
     _migrationManager->startRecoveryAndAcquireDistLocks(operationContext());
     _migrationManager->finishRecovery(operationContext(), 0, kDefaultSecondaryThrottle);
@@ -440,9 +443,9 @@ TEST_F(MigrationManagerTest, SourceShardNotFound) {
         MigrationStatuses migrationStatuses = _migrationManager->executeMigrationsForAutoBalance(
             opCtx.get(), migrationRequests, 0, kDefaultSecondaryThrottle, false);
 
-        ASSERT_OK(migrationStatuses.at(MigrationType::genID(chunk1.getNS(), chunk1.getMin())));
+        ASSERT_OK(migrationStatuses.at(migrationRequests.front().getName()));
         ASSERT_EQ(ErrorCodes::ReplicaSetNotFound,
-                  migrationStatuses.at(MigrationType::genID(chunk2.getNS(), chunk2.getMin())));
+                  migrationStatuses.at(migrationRequests.back().getName()));
     });
 
     // Expect only one moveChunk command to be called.
@@ -485,7 +488,7 @@ TEST_F(MigrationManagerTest, JumboChunkResponseBackwardsCompatibility) {
             opCtx.get(), migrationRequests, 0, kDefaultSecondaryThrottle, false);
 
         ASSERT_EQ(ErrorCodes::ChunkTooBig,
-                  migrationStatuses.at(MigrationType::genID(chunk1.getNS(), chunk1.getMin())));
+                  migrationStatuses.at(migrationRequests.front().getName()));
     });
 
     // Expect only one moveChunk command to be called.
@@ -560,7 +563,7 @@ TEST_F(MigrationManagerTest, InterruptMigration) {
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             repl::ReadConcernLevel::kMajorityReadConcern,
             MigrationType::ConfigNS,
-            BSON(MigrationType::name(MigrationType::genID(collName, chunk.getMin()))),
+            BSON(MigrationType::ns(collName.ns()) << MigrationType::min(chunk.getMin())),
             BSONObj(),
             boost::none);
     Shard::QueryResponse migrationsQueryResponse =
@@ -570,7 +573,7 @@ TEST_F(MigrationManagerTest, InterruptMigration) {
     ASSERT_OK(catalogClient()->removeConfigDocuments(
         operationContext(),
         MigrationType::ConfigNS,
-        BSON(MigrationType::name(MigrationType::genID(collName, chunk.getMin()))),
+        BSON(MigrationType::ns(collName.ns()) << MigrationType::min(chunk.getMin())),
         kMajorityWriteConcern));
 
     // Restore the migration manager back to the started state, which is expected by tearDown
@@ -756,6 +759,9 @@ TEST_F(MigrationManagerTest, RemoteCallErrorConversionToOperationFailed) {
     ChunkType chunk2 =
         setUpChunk(collName, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version);
 
+    // Going to request that these two chunks get migrated.
+    const std::vector<MigrateInfo> migrationRequests{{kShardId1, chunk1}, {kShardId3, chunk2}};
+
     auto future = launchAsync([&] {
         ThreadClient tc("Test", getGlobalServiceContext());
         auto opCtx = cc().makeOperationContext();
@@ -766,16 +772,12 @@ TEST_F(MigrationManagerTest, RemoteCallErrorConversionToOperationFailed) {
         shardTargeterMock(opCtx.get(), kShardId2)->setFindHostReturnValue(kShardHost2);
 
         MigrationStatuses migrationStatuses = _migrationManager->executeMigrationsForAutoBalance(
-            opCtx.get(),
-            {{kShardId1, chunk1}, {kShardId3, chunk2}},
-            0,
-            kDefaultSecondaryThrottle,
-            false);
+            opCtx.get(), migrationRequests, 0, kDefaultSecondaryThrottle, false);
 
         ASSERT_EQ(ErrorCodes::OperationFailed,
-                  migrationStatuses.at(MigrationType::genID(collName, chunk1.getMin())));
+                  migrationStatuses.at(migrationRequests.front().getName()));
         ASSERT_EQ(ErrorCodes::OperationFailed,
-                  migrationStatuses.at(MigrationType::genID(collName, chunk2.getMin())));
+                  migrationStatuses.at(migrationRequests.back().getName()));
     });
 
     // Expect a moveChunk command that will fail with a retriable error.

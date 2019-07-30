@@ -44,7 +44,6 @@ const StringData kChunkVersion = "chunkVersion"_sd;
 
 const NamespaceString MigrationType::ConfigNS("config.migrations");
 
-const BSONField<std::string> MigrationType::name("_id");
 const BSONField<std::string> MigrationType::ns("ns");
 const BSONField<BSONObj> MigrationType::min("min");
 const BSONField<BSONObj> MigrationType::max("max");
@@ -122,7 +121,6 @@ StatusWith<MigrationType> MigrationType::fromBSON(const BSONObj& source) {
 BSONObj MigrationType::toBSON() const {
     BSONObjBuilder builder;
 
-    builder.append(name.name(), getName());
     builder.append(ns.name(), _nss.ns());
 
     builder.append(min.name(), _min);
@@ -146,23 +144,6 @@ MigrateInfo MigrationType::toMigrateInfo() const {
     chunk.setVersion(_chunkVersion);
 
     return MigrateInfo(_toShard, chunk);
-}
-
-std::string MigrationType::getName() const {
-    return genID(_nss, _min);
-}
-
-std::string MigrationType::genID(const NamespaceString& nss, const BSONObj& o) {
-    StringBuilder buf;
-    buf << nss.ns() << "-";
-
-    BSONObjIterator i(o);
-    while (i.more()) {
-        BSONElement e = i.next();
-        buf << e.fieldName() << "_" << e.toString(false, true);
-    }
-
-    return buf.str();
 }
 
 }  // namespace mongo

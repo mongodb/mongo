@@ -537,7 +537,24 @@ MigrateInfo::MigrateInfo(const ShardId& a_to, const ChunkType& a_chunk) {
 }
 
 std::string MigrateInfo::getName() const {
-    return MigrationType::genID(nss, minKey);
+    // Generates a unique name for a MigrateInfo based on the namespace and the lower bound of the
+    // chunk being moved.
+    StringBuilder buf;
+    buf << nss.ns() << "-";
+
+    BSONObjIterator i(minKey);
+    while (i.more()) {
+        BSONElement e = i.next();
+        buf << e.fieldName() << "_" << e.toString(false, true);
+    }
+
+    return buf.str();
+}
+
+BSONObj MigrateInfo::getMigrationTypeQuery() const {
+    // Generates a query object for a single MigrationType based on the namespace and the lower
+    // bound of the chunk being moved.
+    return BSON(MigrationType::ns(nss.ns()) << MigrationType::min(minKey));
 }
 
 string MigrateInfo::toString() const {

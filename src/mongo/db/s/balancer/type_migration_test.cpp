@@ -40,7 +40,6 @@ namespace {
 
 using unittest::assertGet;
 
-const std::string kName = "TestDB.TestColl-a_10";
 const std::string kNs = "TestDB.TestColl";
 const BSONObj kMin = BSON("a" << 10);
 const BSONObj kMax = BSON("a" << 20);
@@ -66,7 +65,6 @@ TEST(MigrationTypeTest, ConvertFromMigrationInfo) {
     MigrationType migrationType(migrateInfo, kWaitForDelete);
 
     BSONObjBuilder builder;
-    builder.append(MigrationType::name(), kName);
     builder.append(MigrationType::ns(), kNs);
     builder.append(MigrationType::min(), kMin);
     builder.append(MigrationType::max(), kMax);
@@ -84,7 +82,6 @@ TEST(MigrationTypeTest, FromAndToBSON) {
     const ChunkVersion version(1, 2, OID::gen());
 
     BSONObjBuilder builder;
-    builder.append(MigrationType::name(), kName);
     builder.append(MigrationType::ns(), kNs);
     builder.append(MigrationType::min(), kMin);
     builder.append(MigrationType::max(), kMax);
@@ -186,7 +183,6 @@ TEST(MigrationTypeTest, MissingRequiredToShardField) {
 
 TEST(MigrationTypeTest, MissingRequiredVersionField) {
     BSONObjBuilder builder;
-    builder.append(MigrationType::name(), kName);
     builder.append(MigrationType::ns(), kNs);
     builder.append(MigrationType::min(), kMin);
     builder.append(MigrationType::max(), kMax);

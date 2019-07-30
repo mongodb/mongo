@@ -48,7 +48,6 @@ public:
     static const NamespaceString ConfigNS;
 
     // Field names and types in the migrations collection type.
-    static const BSONField<std::string> name;
     static const BSONField<std::string> ns;
     static const BSONField<BSONObj> min;
     static const BSONField<BSONObj> max;
@@ -77,16 +76,6 @@ public:
      * Helper function for the Balancer that uses MigrateInfo objects to schedule migrations.
      */
     MigrateInfo toMigrateInfo() const;
-
-    /**
-     * Uniquely identifies a chunk by collection and min key.
-     */
-    std::string getName() const;
-
-    /**
-     * Generates id based on the namespace and the lower bound of the chunk being moved.
-     */
-    static std::string genID(const NamespaceString& nss, const BSONObj& o);
 
     const NamespaceString& getNss() const {
         return _nss;

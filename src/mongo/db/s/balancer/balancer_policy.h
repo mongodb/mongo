@@ -56,6 +56,8 @@ struct MigrateInfo {
 
     std::string getName() const;
 
+    BSONObj getMigrationTypeQuery() const;
+
     std::string toString() const;
 
     NamespaceString nss;

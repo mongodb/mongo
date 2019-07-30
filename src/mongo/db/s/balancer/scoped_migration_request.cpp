@@ -112,7 +112,7 @@ StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
                     ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                     repl::ReadConcernLevel::kLocalReadConcern,
                     MigrationType::ConfigNS,
-                    BSON(MigrationType::name(migrateInfo.getName())),
+                    migrateInfo.getMigrationTypeQuery(),
                     BSONObj(),
                     boost::none);
             if (!statusWithMigrationQueryResult.isOK()) {
