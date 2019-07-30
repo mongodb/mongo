@@ -121,14 +121,14 @@ TEST(DiagnosticInfo, StackTraceTest) {
     };
 
     {
-        volatile size_t i = 3;
+        volatile size_t i = 3;  // NOLINT
         MaybeDiagnosticInfo infoRecurse;
         recurseAndCaptureInfo(infoRecurse, i);
         testRecursion(i, infoRecurse);
     }
 
     {
-        volatile size_t i = 10;
+        volatile size_t i = 10;  // NOLINT
         MaybeDiagnosticInfo infoRecurse;
         recurseAndCaptureInfo(infoRecurse, i);
         testRecursion(i, infoRecurse);
