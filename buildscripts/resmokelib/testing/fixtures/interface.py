@@ -138,6 +138,7 @@ class ReplFixture(Fixture):
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED  # type: ignore
 
     AWAIT_REPL_TIMEOUT_MINS = 5
+    AWAIT_REPL_TIMEOUT_FOREVER_MINS = 24 * 60
 
     def get_primary(self):
         """Return the primary of a replica set."""
