@@ -579,12 +579,6 @@ axes:
   - id: python-linux
     display_name: "Python"
     values:
-      - id: "2.6"
-        display_name: "Python 2.6"
-        variables:
-           PYTHON_BINARY: "/opt/python/2.6/bin/python"
-           DRIVER_WORKING_DIRECTORY: "mongo-python-driver"
-           DRIVER_TEST_UPLOAD_DIRECTORY: "src/mongo-python-driver/xunit-results/TEST-*.xml"
       - id: "2.7"
         display_name: "Python 2.7"
         variables:
@@ -688,7 +682,7 @@ buildvariants:
 
 ### Python Matrix Linux
 - matrix_name: "python-driver-linux"
-  matrix_spec: {auth: "*", ssl: "*", os: "rhel62", python-linux: "2.6" }
+  matrix_spec: {auth: "*", ssl: "*", os: "rhel62", python-linux: "2.7" }
   display_name: "Python Driver ${os} ${python-linux} ${auth} ${ssl}"
   modules: [ "mongo-python-driver", "drivers-evergreen-tools" ]
   tasks:
