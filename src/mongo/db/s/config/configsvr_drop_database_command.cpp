@@ -149,7 +149,7 @@ public:
                  opCtx, dbname, repl::ReadConcernArgs::get(opCtx).getLevel())) {
             auto collDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
                 opCtx, nss.ns(), "dropCollection", DistLockManager::kDefaultLockTimeout));
-            uassertStatusOK(catalogManager->dropCollection(opCtx, nss));
+            catalogManager->dropCollection(opCtx, nss);
         }
 
         // Drop the database from the primary shard first.

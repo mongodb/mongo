@@ -53,33 +53,6 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(setDropCollDistLockWait);
 
-template <typename F>
-auto staleExceptionRetry(OperationContext* opCtx, StringData opStr, F&& f) {
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "Command " << opStr << " does not support database versioning",
-            !OperationShardingState::get(opCtx).hasDbVersion());
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "Command " << opStr << " does not support collection versioning",
-            !OperationShardingState::get(opCtx).hasShardVersion());
-
-    for (int tries = 0;; ++tries) {
-        // Try kMaxStaleExceptionTries times and on the last try, rethrow the exception
-        const bool canRetry = tries < kMaxNumStaleVersionRetries - 1;
-        try {
-            return f();
-        } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
-            log() << "Attempt " << tries << " of " << opStr << " received StaleShardVersion error"
-                  << causedBy(ex);
-
-            if (canRetry) {
-                continue;
-            }
-            throw;
-        }
-        MONGO_UNREACHABLE;
-    }
-}
-
 /**
  * Internal sharding command run on config servers to drop a collection from a database.
  */
@@ -158,8 +131,7 @@ public:
         ON_BLOCK_EXIT(
             [opCtx, nss] { Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(nss); });
 
-        staleExceptionRetry(
-            opCtx, "_configsvrDropCollection", [&] { _dropCollection(opCtx, nss); });
+        _dropCollection(opCtx, nss);
 
         return true;
     }
@@ -172,71 +144,13 @@ private:
             catalogClient->getCollection(opCtx, nss, repl::ReadConcernArgs::get(opCtx).getLevel());
         if (collStatus == ErrorCodes::NamespaceNotFound) {
             // We checked the sharding catalog and found that this collection doesn't exist. This
-            // may be because it never existed, or because a drop command was sent previously. This
-            // data might not be majority committed though, so we will set the client's last optime
-            // to the system's last optime to ensure the client waits for the writeConcern to be
-            // satisfied.
-            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
-
-            // If the DB isn't in the sharding catalog either, consider the drop a success.
-            auto dbStatus = catalogClient->getDatabase(
-                opCtx, nss.db().toString(), repl::ReadConcernArgs::get(opCtx).getLevel());
-            if (dbStatus == ErrorCodes::NamespaceNotFound) {
-                return;
-            }
-            uassertStatusOK(dbStatus);
-
-            // If we found the DB but not the collection, the collection might exist and not be
-            // sharded, so send the command to the primary shard.
-            _dropUnshardedCollectionFromShard(opCtx, dbStatus.getValue().value.getPrimary(), nss);
+            // may be because it never existed, or because a drop command was sent previously.
+            ShardingCatalogManager::get(opCtx)->ensureDropCollectionCompleted(opCtx, nss);
         } else {
             uassertStatusOK(collStatus);
-            uassertStatusOK(ShardingCatalogManager::get(opCtx)->dropCollection(opCtx, nss));
+            ShardingCatalogManager::get(opCtx)->dropCollection(opCtx, nss);
         }
     }
-
-    static void _dropUnshardedCollectionFromShard(OperationContext* opCtx,
-                                                  const ShardId& shardId,
-                                                  const NamespaceString& nss) {
-
-        const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-
-        const auto dropCommandBSON = [shardRegistry, opCtx, &shardId, &nss] {
-            BSONObjBuilder builder;
-            builder.append("drop", nss.coll());
-
-            // Append the chunk version for the specified namespace indicating that we believe it is
-            // not sharded. Collections residing on the config server are never sharded so do not
-            // send the shard version.
-            if (shardId != shardRegistry->getConfigShard()->getId()) {
-                ChunkVersion::UNSHARDED().appendToCommand(&builder);
-            }
-
-            if (!opCtx->getWriteConcern().usedDefault) {
-                builder.append(WriteConcernOptions::kWriteConcernField,
-                               opCtx->getWriteConcern().toBSON());
-            }
-
-            return builder.obj();
-        }();
-
-        const auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
-
-        auto cmdDropResult = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            nss.db().toString(),
-            dropCommandBSON,
-            Shard::RetryPolicy::kIdempotent));
-
-        // If the collection doesn't exist, consider the drop a success.
-        if (cmdDropResult.commandStatus == ErrorCodes::NamespaceNotFound) {
-            return;
-        }
-
-        uassertStatusOK(cmdDropResult.commandStatus);
-        uassertStatusOK(cmdDropResult.writeConcernStatus);
-    };
 
 } configsvrDropCollectionCmd;
 

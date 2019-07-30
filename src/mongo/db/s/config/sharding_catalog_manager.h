@@ -254,12 +254,24 @@ public:
     /**
      * Drops the specified collection from the collection metadata store.
      *
-     * Returns Status::OK if successful or any error code indicating the failure. These are
-     * some of the known failures:
-     *  - NamespaceNotFound - collection does not exist
+     * Throws a DBException for any failures. These are some of the known failures:
+     *  - NamespaceNotFound - Collection does not exist
      */
-    Status dropCollection(OperationContext* opCtx, const NamespaceString& nss);
+    void dropCollection(OperationContext* opCtx, const NamespaceString& nss);
 
+    /**
+     * Ensures that a namespace that has received a dropCollection, but no longer has an entry in
+     * config.collections, has cleared all relevant metadata entries for the corresponding
+     * collection. As part of this, sends dropCollection, setShardVersion, and unsetSharding to all
+     * shards -- in case shards didn't receive these commands as part of the original
+     * dropCollection.
+     *
+     * This function does not guarantee that all shards will eventually receive setShardVersion,
+     * unless the client infinitely retries until hearing back success. This function does, however,
+     * increase the likelihood of shards having received setShardVersion.
+     */
+
+    void ensureDropCollectionCompleted(OperationContext* opCtx, const NamespaceString& nss);
 
     /**
      * Shards collection with namespace 'nss' and implicitly assumes that the database is enabled
