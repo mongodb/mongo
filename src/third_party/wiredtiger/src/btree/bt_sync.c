@@ -321,10 +321,19 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 			 * cache clean but with history that cannot be
 			 * discarded), that is not wasted effort because
 			 * checkpoint doesn't need to write the page again.
+			 *
+			 * XXX Only attempt this eviction when there are no
+			 * readers older than the checkpoint.  Otherwise, a bug
+			 * in eviction can mark the page clean and discard
+			 * history, causing those reads to incorrectly see
+			 * newer versions of data than they should.
 			 */
 			if (!WT_PAGE_IS_INTERNAL(page) &&
 			    page->read_gen == WT_READGEN_WONT_NEED &&
-			    !tried_eviction) {
+			    !tried_eviction &&
+			    (!F_ISSET(txn, WT_TXN_HAS_TS_READ) ||
+			    txn->read_timestamp ==
+			    conn->txn_global.pinned_timestamp)) {
 				WT_ERR_BUSY_OK(
 				    __wt_page_release_evict(session, walk, 0));
 				walk = prev;
