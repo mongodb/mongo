@@ -27,7 +27,7 @@ assertFails({
     assertStarts({
         'setParameter': {
             enableTestCommands: v,
-            enableIndexBuildsCoordinatorForCreateIndexesCommand: 'false',
+            takeUnstableCheckpointOnShutdown: 'false',
         },
     });
 });
