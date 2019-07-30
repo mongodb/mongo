@@ -28,25 +28,35 @@
 #     it in the license file.
 
 # Generate a table for itoa.cpp
+import argparse
+import io
 import math
 import sys
 
 def main():
-    fout = sys.stdout
-    digits = int(sys.argv[1])
+    """Execute Main Entry point."""
+    parser = argparse.ArgumentParser(description='MongoDB Itoa Table Generator.')
 
-    def pr(s, *args, end='', file=fout, **kwargs):
-        print(s, *args, end=end, file=file, **kwargs)
+    parser.add_argument('--digit_count', type=int, required=True, help="Number of Digits to Generate")
 
-    pr(f'#define ITOA_TABLE_EXPAND_{digits}(makeEntry_, comma_) \\\n')
-    sep = ''
-    for i in range(pow(10, digits)):
-        n = len(f'{i}')
-        s = f'{i:0{digits}d}'
-        cs = ','.join([f"'{c}'" for c in s])
-        pr(f'{sep}    makeEntry_({n}, ({cs:s}))')
-        sep= " comma_ \\\n"
-    pr('\n')
+    parser.add_argument('--output', type=str, required=True, help="Output file")
+
+    args = parser.parse_args()
+
+    digits = args.digit_count
+
+    with io.open(args.output, mode='w') as file_handle:
+
+        file_handle.write(f'#define ITOA_TABLE_EXPAND_{digits}(makeEntry_, comma_) \\\n')
+        sep = ''
+        for i in range(pow(10, digits)):
+            n = len(f'{i}')
+            s = f'{i:0{digits}d}'
+            cs = ','.join([f"'{c}'" for c in s])
+            file_handle.write(f'{sep}    makeEntry_({n}, ({cs:s}))')
+            sep = " comma_ \\\n"
+
+        file_handle.write('\n')
 
 if __name__ == "__main__":
     main()

@@ -621,7 +621,7 @@ generateItoATable = env.Command(
         'generate_itoa_table.py',
     ],
     action=[
-        '$PYTHON ${SOURCES[0]} 4 >${TARGETS[0]}'
+        '$PYTHON ${SOURCES[0]} --digit_count=4 --output=${TARGETS[0]}'
     ],
 )
 env.Alias('generated-sources', generateItoATable)
