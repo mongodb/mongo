@@ -47,6 +47,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
+#include "mongo/util/exit.h"
+#include "mongo/util/exit_code.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
@@ -157,8 +159,9 @@ void WatchdogPeriodicThread::doLoop() {
                 if (!s.isOK()) {
                     // The only bad status is when we are in shutdown
                     if (!opCtx->getServiceContext()->getKillAllOperations()) {
-                        error() << "Watchdog was interrupted, shuting down:, reason: "
-                                << s.getStatus();
+                        severe() << "Watchdog was interrupted, shutting down, reason: "
+                                 << s.getStatus();
+                        exitCleanly(ExitCode::EXIT_ABRUPT);
                     }
 
                     return;
