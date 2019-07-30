@@ -294,7 +294,7 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
         }
 
         uassert(15974,
-                "$sort key ordering must be specified using a number or {$meta: 'textScore'}",
+                str::stream() << "Illegal key in $sort specification: " << keyField,
                 keyField.isNumber());
 
         int sortOrder = keyField.numberInt();

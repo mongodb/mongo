@@ -52,9 +52,14 @@ SortKeyGenerator::SortKeyGenerator(const BSONObj& sortSpec, const CollatorInterf
             invariant(metaElem.fieldNameStringData() == "$meta"_sd);
             if (metaElem.valueStringData() == "textScore"_sd) {
                 _patternPartTypes.push_back(SortPatternPartType::kMetaTextScore);
-            } else {
-                invariant(metaElem.valueStringData() == "randVal"_sd);
+            } else if (metaElem.valueStringData() == "randVal"_sd) {
                 _patternPartTypes.push_back(SortPatternPartType::kMetaRandVal);
+            } else if (metaElem.valueStringData() == "searchScore"_sd) {
+                uasserted(31218, "$meta sort by 'searchScore' metadata is not supported");
+            } else if (metaElem.valueStringData() == "searchHighlights"_sd) {
+                uasserted(31219, "$meta sort by 'searchHighlights' metadata is not supported");
+            } else {
+                uasserted(31138, "Illegal $meta sort: " + metaElem.valueStringData());
             }
             _sortHasMeta = true;
         }
