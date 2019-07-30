@@ -34,7 +34,7 @@ from buildscripts.resmokelib.suitesconfig import create_test_membership_map, get
 from buildscripts.resmokelib.utils import default_if_none, globstar
 from buildscripts.ciconfig.evergreen import parse_evergreen_file, ResmokeArgs, \
     EvergreenProjectConfig, VariantTask
-from buildscripts.util import teststats
+from buildscripts.util.teststats import TestStats
 from buildscripts.util.taskname import name_generated_task
 from buildscripts.patch_builds.task_generation import resmoke_commands, TimeoutInfo, TaskList
 # pylint: enable=wrong-import-position
@@ -54,7 +54,7 @@ DEFAULT_PROJECT = "mongodb-mongo-master"
 REPEAT_SUITES = 2
 EVERGREEN_FILE = "etc/evergreen.yml"
 MAX_TASKS_TO_CREATE = 1000
-MIN_AVG_TEST_OVERFLOW_SEC = 60
+MIN_AVG_TEST_OVERFLOW_SEC = float(60)
 MIN_AVG_TEST_TIME_SEC = 5 * 60
 # The executor_file and suite_files defaults are required to make the suite resolver work
 # correctly.
@@ -124,6 +124,13 @@ class RepeatConfig(object):
 
         repeat_suites = self.repeat_tests_num if self.repeat_tests_num else REPEAT_SUITES
         return f" --repeatSuites={repeat_suites} "
+
+    def __repr__(self):
+        """Build string representation of object for debugging."""
+        return "".join([
+            f"RepeatConfig[num={self.repeat_tests_num}, secs={self.repeat_tests_secs}, ",
+            f"min={self.repeat_tests_min}, max={self.repeat_tests_max}]",
+        ])
 
 
 class GenerateConfig(object):
@@ -406,7 +413,7 @@ def _set_resmoke_cmd(repeat_config: RepeatConfig, resmoke_args: [str]) -> [str]:
     return new_args
 
 
-def _parse_avg_test_runtime(test, task_avg_test_runtime_stats):
+def _parse_avg_test_runtime(test: str, task_avg_test_runtime_stats: TestStats) -> Optional[float]:
     """
     Parse list of teststats to find runtime for particular test.
 
@@ -420,7 +427,7 @@ def _parse_avg_test_runtime(test, task_avg_test_runtime_stats):
     return None
 
 
-def _calculate_timeout(avg_test_runtime):
+def _calculate_timeout(avg_test_runtime: float) -> int:
     """
     Calculate timeout_secs for the Evergreen task.
 
@@ -431,24 +438,35 @@ def _calculate_timeout(avg_test_runtime):
     return max(MIN_AVG_TEST_TIME_SEC, ceil(avg_test_runtime * AVG_TEST_TIME_MULTIPLIER))
 
 
-def _calculate_exec_timeout(repeat_tests_secs, avg_test_runtime):
+def _calculate_exec_timeout(repeat_config: RepeatConfig, avg_test_runtime: float) -> int:
     """
     Calculate exec_timeout_secs for the Evergreen task.
 
+    :param repeat_config: Information about how the test will repeat.
     :param avg_test_runtime: How long a test has historically taken to run.
     :return: repeat_tests_secs + an amount of padding time so that the test has time to finish on
         its final run.
     """
+    LOGGER.debug("Calculating exec timeout", repeat_config=repeat_config,
+                 avg_test_runtime=avg_test_runtime)
+    repeat_tests_secs = repeat_config.repeat_tests_secs
+    if avg_test_runtime > repeat_tests_secs and repeat_config.repeat_tests_min:
+        # If a single execution of the test takes longer than the repeat time, then we don't
+        # have to worry about the repeat time at all and can just use the average test runtime
+        # and minimum number of executions to calculate the exec timeout value.
+        return ceil(avg_test_runtime * AVG_TEST_TIME_MULTIPLIER * repeat_config.repeat_tests_min)
+
     test_execution_time_over_limit = avg_test_runtime - (repeat_tests_secs % avg_test_runtime)
     test_execution_time_over_limit = max(MIN_AVG_TEST_OVERFLOW_SEC, test_execution_time_over_limit)
     return ceil(repeat_tests_secs + (test_execution_time_over_limit * AVG_TEST_TIME_MULTIPLIER))
 
 
-def _generate_timeouts(repeat_tests_secs, test, task_avg_test_runtime_stats) -> TimeoutInfo:
+def _generate_timeouts(repeat_config: RepeatConfig, test: str,
+                       task_avg_test_runtime_stats: TestStats) -> TimeoutInfo:
     """
     Add timeout.update command to list of commands for a burn in execution task.
 
-    :param repeat_tests_secs: How long test will repeat for.
+    :param repeat_config: Information on how the test will repeat.
     :param test: Test name.
     :param task_avg_test_runtime_stats: Teststat data.
     :return: TimeoutInfo to use.
@@ -459,7 +477,8 @@ def _generate_timeouts(repeat_tests_secs, test, task_avg_test_runtime_stats) -> 
             LOGGER.debug("Avg test runtime", test=test, runtime=avg_test_runtime)
 
             timeout = _calculate_timeout(avg_test_runtime)
-            exec_timeout = _calculate_exec_timeout(repeat_tests_secs, avg_test_runtime)
+            exec_timeout = _calculate_exec_timeout(repeat_config, avg_test_runtime)
+            LOGGER.debug("Using timeout overrides", exec_timeout=exec_timeout, timeout=timeout)
             timeout_info = TimeoutInfo.overridden(exec_timeout, timeout)
 
             LOGGER.debug("Override runtime for test", test=test, timeout=timeout_info)
@@ -489,8 +508,7 @@ def _get_task_runtime_history(evg_api: Optional[EvergreenApi], project: str, tas
                                              before_date=end_date.strftime("%Y-%m-%d"),
                                              tasks=[task], variants=[variant], group_by="test",
                                              group_num_days=AVG_TEST_RUNTIME_ANALYSIS_DAYS)
-        test_runtimes = teststats.TestStats(data).get_tests_runtimes()
-        LOGGER.debug("Test_runtime data parsed from Evergreen history", runtimes=test_runtimes)
+        test_runtimes = TestStats(data).get_tests_runtimes()
         return test_runtimes
     except requests.HTTPError as err:
         if err.response.status_code == requests.codes.SERVICE_UNAVAILABLE:
@@ -535,7 +553,7 @@ def create_generate_tasks_config(evg_config: Configuration, tests_by_task: Dict,
             run_tests_vars = {"resmoke_args": f"{resmoke_args} {resmoke_options} {test}"}
             if multiversion_path:
                 run_tests_vars["task_path_suffix"] = multiversion_path
-            timeout = _generate_timeouts(repeat_config.repeat_tests_secs, test, task_runtime_stats)
+            timeout = _generate_timeouts(repeat_config, test, task_runtime_stats)
             commands = resmoke_commands("run tests", run_tests_vars, timeout, multiversion_path)
 
             task_list.add_task(sub_task_name, commands, ["compile"], distro)

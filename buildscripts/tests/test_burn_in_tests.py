@@ -285,42 +285,53 @@ class TestCalculateTimeout(unittest.TestCase):
 
 class TestCalculateExecTimeout(unittest.TestCase):
     def test__calculate_exec_timeout(self):
+        repeat_config = under_test.RepeatConfig(repeat_tests_secs=600)
         avg_test_runtime = 455.1
-        repeat_tests_secs = 600
 
-        exec_timeout = under_test._calculate_exec_timeout(repeat_tests_secs, avg_test_runtime)
+        exec_timeout = under_test._calculate_exec_timeout(repeat_config, avg_test_runtime)
 
         self.assertEqual(1531, exec_timeout)
+
+    def test_average_timeout_greater_than_execution_time(self):
+        repeat_config = under_test.RepeatConfig(repeat_tests_secs=600, repeat_tests_min=2)
+        avg_test_runtime = 750
+
+        exec_timeout = under_test._calculate_exec_timeout(repeat_config, avg_test_runtime)
+
+        # The timeout needs to be greater than the number of the test * the minimum number of runs.
+        minimum_expected_timeout = avg_test_runtime * repeat_config.repeat_tests_min
+
+        self.assertGreater(exec_timeout, minimum_expected_timeout)
 
 
 class TestGenerateTimeouts(unittest.TestCase):
     def test__generate_timeouts(self):
-        repeat_tests_secs = 600
+        repeat_config = under_test.RepeatConfig(repeat_tests_secs=600)
         runtime_stats = [teststats_utils.TestRuntime(test_name="dir/test2.js", runtime=455.1)]
         test_name = "dir/test2.js"
 
-        timeout_info = under_test._generate_timeouts(repeat_tests_secs, test_name, runtime_stats)
+        timeout_info = under_test._generate_timeouts(repeat_config, test_name, runtime_stats)
 
         self.assertEqual(timeout_info.exec_timeout, 1531)
         self.assertEqual(timeout_info.timeout, 1366)
 
     def test__generate_timeouts_no_results(self):
-        repeat_tests_secs = 600
+        repeat_config = under_test.RepeatConfig(repeat_tests_secs=600)
         runtime_stats = []
         test_name = "dir/new_test.js"
 
-        timeout_info = under_test._generate_timeouts(repeat_tests_secs, test_name, runtime_stats)
+        timeout_info = under_test._generate_timeouts(repeat_config, test_name, runtime_stats)
 
         self.assertIsNone(timeout_info.cmd)
 
     def test__generate_timeouts_avg_runtime_is_zero(self):
-        repeat_tests_secs = 600
+        repeat_config = under_test.RepeatConfig(repeat_tests_secs=600)
         runtime_stats = [
             teststats_utils.TestRuntime(test_name="dir/test_with_zero_runtime.js", runtime=0)
         ]
         test_name = "dir/test_with_zero_runtime.js"
 
-        timeout_info = under_test._generate_timeouts(repeat_tests_secs, test_name, runtime_stats)
+        timeout_info = under_test._generate_timeouts(repeat_config, test_name, runtime_stats)
 
         self.assertIsNone(timeout_info.cmd)
 
