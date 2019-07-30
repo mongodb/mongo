@@ -216,7 +216,7 @@ const failureModes = {
         beforeCommit: () => {
             // Participant primary steps down.
             assert.commandWorked(
-                st.shard0.adminCommand({replSetStepDown: 60 /* stepDownSecs */, force: true}));
+                st.shard0.adminCommand({replSetStepDown: 1 /* stepDownSecs */, force: true}));
         },
         getCommitCommand: (lsid, txnNumber) => {
             return addTxnFields(defaultCommitCommand, lsid, txnNumber);
