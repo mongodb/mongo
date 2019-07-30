@@ -165,7 +165,7 @@ DEATH_TEST(SortKeyGeneratorTest,
 
 DEATH_TEST(SortKeyGeneratorTest,
            SortPatternComponentWithUnknownMetaKeywordIsFatal,
-           "Invariant failure metaElem.valueStringData() == \"randVal\"_sd") {
+           "Illegal $meta sort: unknown") {
     MONGO_COMPILER_VARIABLE_UNUSED auto ignored =
         std::make_unique<SortKeyGenerator>(BSON("a" << BSON("$meta"
                                                             << "unknown")),
