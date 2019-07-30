@@ -30,30 +30,25 @@
 #pragma once
 
 #include <memory>
+#include <type_traits>
 
-#include "mongo/client/connection_string.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/sessions_collection.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 
-class DBDirectClient;
 class OperationContext;
-class RemoteCommandTargeter;
 
 /**
  * Accesses the sessions collection for replica set members.
  */
-class SessionsCollectionRS : public SessionsCollection {
+class SessionsCollectionRS final : public SessionsCollection {
 public:
-    /**
-     * Constructs a new SessionsCollectionRS.
-     */
-    SessionsCollectionRS() = default;
-
     /**
      * Ensures that the sessions collection exists and has the proper indexes.
      */
@@ -89,6 +84,32 @@ public:
      */
     StatusWith<LogicalSessionIdSet> findRemovedSessions(
         OperationContext* opCtx, const LogicalSessionIdSet& sessions) override;
+
+private:
+    auto _makePrimaryConnection(OperationContext* opCtx);
+
+    bool _isStandaloneOrPrimary(const NamespaceString& ns, OperationContext* opCtx);
+
+    template <typename LocalCallback, typename RemoteCallback>
+    struct CommonResult {
+        using LocalReturnType = std::invoke_result_t<LocalCallback>;
+        using RemoteReturnType = std::invoke_result_t<RemoteCallback, DBClientBase*>;
+        static_assert(std::is_same_v<LocalReturnType, RemoteReturnType>,
+                      "LocalCallback and RemoteCallback must have the same return type");
+
+        using Type = RemoteReturnType;
+    };
+    template <typename LocalCallback, typename RemoteCallback>
+    using CommonResultT = typename CommonResult<LocalCallback, RemoteCallback>::Type;
+
+    template <typename LocalCallback, typename RemoteCallback>
+    CommonResultT<LocalCallback, RemoteCallback> _dispatch(const NamespaceString& ns,
+                                                           OperationContext* opCtx,
+                                                           LocalCallback&& localCallback,
+                                                           RemoteCallback&& remoteCallback);
+
+    stdx::mutex _mutex;
+    std::unique_ptr<RemoteCommandTargeter> _targeter;
 };
 
 }  // namespace mongo
