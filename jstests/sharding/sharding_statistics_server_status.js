@@ -121,8 +121,8 @@ checkServerStatusMigrationLockTimeoutCount(donorConn, 0);
 
 // Pause a migration before entering the critical section.
 pauseMoveChunkAtStep(donorConn, moveChunkStepNames.reachedSteadyState);
-let moveChunkThread = new ScopedThread(
-    runConcurrentMoveChunk, st.s.host, dbName + "." + collName, st.shard1.shardName);
+let moveChunkThread =
+    new Thread(runConcurrentMoveChunk, st.s.host, dbName + "." + collName, st.shard1.shardName);
 moveChunkThread.start();
 waitForMoveChunkStep(donorConn, moveChunkStepNames.reachedSteadyState);
 
@@ -147,15 +147,15 @@ assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: 5}));
 
 // Pause a migration after entering the critical section, but before entering the commit phase.
 pauseMoveChunkAtStep(donorConn, moveChunkStepNames.chunkDataCommitted);
-moveChunkThread = new ScopedThread(
-    runConcurrentMoveChunk, st.s.host, dbName + "." + collName, st.shard1.shardName);
+moveChunkThread =
+    new Thread(runConcurrentMoveChunk, st.s.host, dbName + "." + collName, st.shard1.shardName);
 moveChunkThread.start();
 waitForMoveChunkStep(donorConn, moveChunkStepNames.chunkDataCommitted);
 
 // Pause a read while it's holding locks so the migration can't commit.
 assert.commandWorked(
     donorConn.adminCommand({configureFailPoint: "waitInFindBeforeMakingBatch", mode: "alwaysOn"}));
-const concurrentRead = new ScopedThread(runConcurrentRead, st.s.host, dbName, collName);
+const concurrentRead = new Thread(runConcurrentRead, st.s.host, dbName, collName);
 concurrentRead.start();
 assert.soon(function() {
     const curOpResults = assert.commandWorked(donorConn.adminCommand({currentOp: 1}));

@@ -1,6 +1,6 @@
 'use strict';
 
-load('jstests/libs/parallelTester.js');                 // for ScopedThread and CountDownLatch
+load('jstests/libs/parallelTester.js');                 // for Thread and CountDownLatch
 load('jstests/concurrency/fsm_libs/worker_thread.js');  // for workerThread
 
 /**
@@ -28,11 +28,10 @@ var ThreadManager = function(clusterOptions, executionMode = {composed: false}) 
         };
 
         if (executionMode.composed) {
-            return new ScopedThread(
-                guardedThreadFn, workerThread.composed, workloads, args, options);
+            return new Thread(guardedThreadFn, workerThread.composed, workloads, args, options);
         }
 
-        return new ScopedThread(guardedThreadFn, workerThread.fsm, workloads, args, options);
+        return new Thread(guardedThreadFn, workerThread.fsm, workloads, args, options);
     }
 
     var latch;

@@ -7,7 +7,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/parallelTester.js");  // for ScopedThread
+load("jstests/libs/parallelTester.js");  // for Thread
 
 // We set the number of write tickets to be a small value in order to avoid needing to spawn a
 // large number of threads to exhaust all of the available ones.
@@ -42,7 +42,7 @@ assert.commandWorked(sessionDb.mycoll.insert({}));
 const threads = [];
 
 for (let i = 0; i < kNumWriteTickets; ++i) {
-    const thread = new ScopedThread(function(host) {
+    const thread = new Thread(function(host) {
         try {
             const conn = new Mongo(host);
             const db = conn.getDB("test");

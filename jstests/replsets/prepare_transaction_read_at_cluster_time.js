@@ -102,10 +102,8 @@ let clusterTime = testDB.getSession().getOperationTime();
 // These should block until the prepared transaction commits or aborts if we specify
 // $_internalReadAtClusterTime to be the timestamp of the second write we did, outside of the
 // transaction.
-const dbHashPrimaryThread =
-    new ScopedThread(runDBHashFn, primary.host, dbName, tojson(clusterTime));
-const dbHashSecondaryThread =
-    new ScopedThread(runDBHashFn, secondary.host, dbName, tojson(clusterTime));
+const dbHashPrimaryThread = new Thread(runDBHashFn, primary.host, dbName, tojson(clusterTime));
+const dbHashSecondaryThread = new Thread(runDBHashFn, secondary.host, dbName, tojson(clusterTime));
 
 dbHashPrimaryThread.start();
 dbHashSecondaryThread.start();
@@ -115,9 +113,9 @@ assertOpHasPrepareConflict(testDBSecondary, "dbHash");
 
 // Run 'find' with '$_internalReadAtClusterTime' specified.
 const findPrimaryThread =
-    new ScopedThread(runFindFn, primary.host, dbName, collName, tojson(clusterTime));
+    new Thread(runFindFn, primary.host, dbName, collName, tojson(clusterTime));
 const findSecondaryThread =
-    new ScopedThread(runFindFn, secondary.host, dbName, collName, tojson(clusterTime));
+    new Thread(runFindFn, secondary.host, dbName, collName, tojson(clusterTime));
 
 findPrimaryThread.start();
 findSecondaryThread.start();

@@ -75,7 +75,7 @@ var insertAndRemove = function(host) {
 
     jsTestLog("finished bg writes on " + host);
 };
-var worker = new ScopedThread(insertAndRemove, primary.host);
+var worker = new Thread(insertAndRemove, primary.host);
 worker.start();
 
 jsTestLog("add a new secondary");

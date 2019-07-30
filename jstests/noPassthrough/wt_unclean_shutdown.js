@@ -7,7 +7,7 @@
  * @tags: [requires_wiredtiger, requires_journaling]
  */
 
-load('jstests/libs/parallelTester.js');  // For ScopedThread
+load('jstests/libs/parallelTester.js');  // For Thread
 
 (function() {
 'use strict';
@@ -70,7 +70,7 @@ var max_per_thread = 1000000;
 var num_threads = 8;
 var threads = [];
 for (var i = 0; i < num_threads; i++) {
-    var t = new ScopedThread(
+    var t = new Thread(
         insertWorkload, conn.host, i * max_per_thread, max_per_thread + (i * max_per_thread));
     threads.push(t);
     t.start();

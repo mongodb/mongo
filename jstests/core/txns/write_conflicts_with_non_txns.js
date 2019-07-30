@@ -21,7 +21,7 @@
 
 "use strict";
 
-load('jstests/libs/parallelTester.js');  // for ScopedThread.
+load('jstests/libs/parallelTester.js');  // for Thread.
 
 const dbName = "test";
 const collName = "write_conflicts_with_non_txns";
@@ -81,7 +81,7 @@ assert.commandFailedWithCode(
     ErrorCodes.MaxTimeMSExpired);
 
 jsTestLog("Doing conflicting single document write in separate thread.");
-let thread = new ScopedThread(singleDocWrite, dbName, collName, nonTxnDoc);
+let thread = new Thread(singleDocWrite, dbName, collName, nonTxnDoc);
 thread.start();
 
 // Wait for the single doc write to start.
@@ -112,7 +112,7 @@ session.startTransaction();
 assert.commandWorked(sessionColl.insert(txnDoc));
 
 jsTestLog("Doing conflicting single document write in separate thread.");
-thread = new ScopedThread(singleDocWrite, dbName, collName, nonTxnDoc);
+thread = new Thread(singleDocWrite, dbName, collName, nonTxnDoc);
 thread.start();
 
 // Wait for the single doc write to start.

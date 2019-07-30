@@ -7,7 +7,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/parallelTester.js");  // for ScopedThread
+load("jstests/libs/parallelTester.js");  // for Thread
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -33,7 +33,7 @@ assert.eq(
 assert.eq(ops[0].locks,
           {ReplicationStateTransition: "w", Global: "w", Database: "w", Collection: "w"});
 
-const threadCaptruncCmd = new ScopedThread(function(host) {
+const threadCaptruncCmd = new Thread(function(host) {
     try {
         const conn = new Mongo(host);
         const db = conn.getDB("test");
@@ -57,7 +57,7 @@ assert.soon(() => {
     return ops.length === 1;
 }, () => "Failed to find create collection in currentOp() output: " + tojson(db.currentOp()));
 
-const threadDBHash = new ScopedThread(function(host, clusterTime) {
+const threadDBHash = new Thread(function(host, clusterTime) {
     try {
         const conn = new Mongo(host);
         const db = conn.getDB("test");

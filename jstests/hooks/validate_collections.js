@@ -150,7 +150,7 @@ function CollectionValidator() {
         try {
             hostList.forEach(host => {
                 const thread =
-                    new ScopedThread(validateCollectionsThread, this.validateCollections, host);
+                    new Thread(validateCollectionsThread, this.validateCollections, host);
                 threads.push(thread);
                 thread.start();
             });

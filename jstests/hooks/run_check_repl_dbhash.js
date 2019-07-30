@@ -4,7 +4,7 @@
 
 (function() {
 load('jstests/libs/discover_topology.js');  // For Topology and DiscoverTopology.
-load('jstests/libs/parallelTester.js');     // For ScopedThread.
+load('jstests/libs/parallelTester.js');     // For Thread.
 
 function checkReplicatedDataHashesThread(hosts) {
     load('jstests/libs/override_methods/implicitly_retry_on_background_op_in_progress.js');
@@ -57,8 +57,7 @@ try {
     const threads = [];
     try {
         if (topology.configsvr.nodes.length > 1) {
-            const thread =
-                new ScopedThread(checkReplicatedDataHashesThread, topology.configsvr.nodes);
+            const thread = new Thread(checkReplicatedDataHashesThread, topology.configsvr.nodes);
             threads.push(thread);
             thread.start();
         } else {
@@ -79,7 +78,7 @@ try {
             }
 
             if (shard.nodes.length > 1) {
-                const thread = new ScopedThread(checkReplicatedDataHashesThread, shard.nodes);
+                const thread = new Thread(checkReplicatedDataHashesThread, shard.nodes);
                 threads.push(thread);
                 thread.start();
             } else {

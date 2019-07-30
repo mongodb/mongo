@@ -9,7 +9,7 @@
 
 "use strict";
 
-load('jstests/libs/parallelTester.js');  // for ScopedThread.
+load('jstests/libs/parallelTester.js');  // for Thread.
 load('jstests/sharding/libs/sharded_transactions_helpers.js');
 
 let st = new ShardingTest({mongos: 1, shards: 2});
@@ -90,7 +90,7 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
         const mongosConn = new Mongo(host);
         return mongosConn.getDB(kDbName).foo.update(query, update);
     }
-    let thread = new ScopedThread(
+    let thread = new Thread(
         conflictingUpdate, st.s.host, kDbName, {"x": originalShardKeyValue}, {$inc: {"a": 1}});
     thread.start();
     assert.soon(() => opStarted("update"));

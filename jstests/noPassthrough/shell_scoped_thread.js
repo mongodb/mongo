@@ -1,8 +1,8 @@
 /**
- * Tests ScopedThread from jstests/libs/parallelTester.js.
+ * Tests Thread from jstests/libs/parallelTester.js.
  */
 
-load('jstests/libs/parallelTester.js');  // for ScopedThread
+load('jstests/libs/parallelTester.js');  // for Thread
 
 (() => {
     "use strict";
@@ -11,7 +11,7 @@ load('jstests/libs/parallelTester.js');  // for ScopedThread
 
     tests.push(function checkTestData() {
         let testData = TestData;
-        let worker = new ScopedThread((testData) => {
+        let worker = new Thread((testData) => {
             assert.eq(TestData, testData);
         }, testData);
         worker.start();
@@ -23,7 +23,7 @@ load('jstests/libs/parallelTester.js');  // for ScopedThread
         let testData = TestData;
         let arg1 = 1;
         let arg2 = {a: 1};
-        let worker = new ScopedThread((testData, arg1, arg2) => {
+        let worker = new Thread((testData, arg1, arg2) => {
             assert.eq(TestData, testData);
             assert.eq(arg1, 1);
             assert.eq(arg2, {a: 1});
@@ -43,7 +43,7 @@ load('jstests/libs/parallelTester.js');  // for ScopedThread
         };
         let testData = TestData;
         try {
-            let worker = new ScopedThread((testData) => {
+            let worker = new Thread((testData) => {
                 // We cannot directly compare testData & TestData because the func object
                 // has extra whitespace and line control.
                 assert.eq(Object.keys(TestData), Object.keys(testData));
@@ -67,7 +67,7 @@ load('jstests/libs/parallelTester.js');  // for ScopedThread
         let oldTestData = TestData;
         TestData = null;
         try {
-            let worker = new ScopedThread(() => {
+            let worker = new Thread(() => {
                 assert.eq(TestData, null);
             });
             worker.start();
@@ -82,7 +82,7 @@ load('jstests/libs/parallelTester.js');  // for ScopedThread
         let oldTestData = TestData;
         TestData = undefined;
         try {
-            let worker = new ScopedThread(() => {
+            let worker = new Thread(() => {
                 assert.eq(TestData, undefined);
             });
             worker.start();
@@ -94,22 +94,20 @@ load('jstests/libs/parallelTester.js');  // for ScopedThread
     });
 
     function testUncaughtException(joinFn) {
-        const thread = new ScopedThread(function myFunction() {
-            throw new Error("Intentionally thrown inside ScopedThread");
+        const thread = new Thread(function myFunction() {
+            throw new Error("Intentionally thrown inside Thread");
         });
         thread.start();
 
         let error = assert.throws(joinFn, [thread]);
-        assert(
-            /Intentionally thrown inside ScopedThread/.test(error.message),
-            () =>
-                "Exception didn't include the message from the exception thrown in ScopedThread: " +
-                tojson(error.message));
+        assert(/Intentionally thrown inside Thread/.test(error.message),
+               () => "Exception didn't include the message from the exception thrown in Thread: " +
+                   tojson(error.message));
         assert(/myFunction@/.test(error.stack),
-               () => "Exception doesn't contain stack frames from within the ScopedThread: " +
+               () => "Exception doesn't contain stack frames from within the Thread: " +
                    tojson(error.stack));
         assert(/testUncaughtException@/.test(error.stack),
-               () => "Exception doesn't contain stack frames from caller of the ScopedThread: " +
+               () => "Exception doesn't contain stack frames from caller of the Thread: " +
                    tojson(error.stack));
 
         error = assert.throws(() => thread.join());
@@ -133,37 +131,35 @@ load('jstests/libs/parallelTester.js');  // for ScopedThread
     });
 
     // The returnData() method internally calls the join() method and should also throw an exception
-    // if the ScopedThread had an uncaught exception.
+    // if the Thread had an uncaught exception.
     tests.push(function testUncaughtExceptionAndWaitUsingReturnData() {
         testUncaughtException(thread => thread.returnData());
     });
 
     tests.push(function testUncaughtExceptionInNativeCode() {
-        const thread = new ScopedThread(function myFunction() {
+        const thread = new Thread(function myFunction() {
             new Timestamp(-1);
         });
         thread.start();
 
         const error = assert.throws(() => thread.join());
-        assert(
-            /Timestamp/.test(error.message),
-            () =>
-                "Exception didn't include the message from the exception thrown in ScopedThread: " +
-                tojson(error.message));
+        assert(/Timestamp/.test(error.message),
+               () => "Exception didn't include the message from the exception thrown in Thread: " +
+                   tojson(error.message));
         assert(/myFunction@/.test(error.stack),
-               () => "Exception doesn't contain stack frames from within the ScopedThread: " +
+               () => "Exception doesn't contain stack frames from within the Thread: " +
                    tojson(error.stack));
     });
 
-    tests.push(function testUncaughtExceptionFromNestedScopedThreads() {
-        const thread = new ScopedThread(function myFunction1() {
+    tests.push(function testUncaughtExceptionFromNestedThreads() {
+        const thread = new Thread(function myFunction1() {
             load("jstests/libs/parallelTester.js");
 
-            const thread = new ScopedThread(function myFunction2() {
+            const thread = new Thread(function myFunction2() {
                 load("jstests/libs/parallelTester.js");
 
-                const thread = new ScopedThread(function myFunction3() {
-                    throw new Error("Intentionally thrown inside ScopedThread");
+                const thread = new Thread(function myFunction3() {
+                    throw new Error("Intentionally thrown inside Thread");
                 });
 
                 thread.start();
@@ -176,24 +172,18 @@ load('jstests/libs/parallelTester.js');  // for ScopedThread
         thread.start();
 
         const error = assert.throws(() => thread.join());
-        assert(
-            /Intentionally thrown inside ScopedThread/.test(error.message),
-            () =>
-                "Exception didn't include the message from the exception thrown in ScopedThread: " +
-                tojson(error.message));
-        assert(
-            /myFunction3@/.test(error.stack),
-            () =>
-                "Exception doesn't contain stack frames from within the innermost ScopedThread: " +
-                tojson(error.stack));
-        assert(/myFunction2@/.test(error.stack),
-               () => "Exception doesn't contain stack frames from within an inner ScopedThread: " +
+        assert(/Intentionally thrown inside Thread/.test(error.message),
+               () => "Exception didn't include the message from the exception thrown in Thread: " +
+                   tojson(error.message));
+        assert(/myFunction3@/.test(error.stack),
+               () => "Exception doesn't contain stack frames from within the innermost Thread: " +
                    tojson(error.stack));
-        assert(
-            /myFunction1@/.test(error.stack),
-            () =>
-                "Exception doesn't contain stack frames from within the outermost ScopedThread: " +
-                tojson(error.stack));
+        assert(/myFunction2@/.test(error.stack),
+               () => "Exception doesn't contain stack frames from within an inner Thread: " +
+                   tojson(error.stack));
+        assert(/myFunction1@/.test(error.stack),
+               () => "Exception doesn't contain stack frames from within the outermost Thread: " +
+                   tojson(error.stack));
     });
 
     /* main */

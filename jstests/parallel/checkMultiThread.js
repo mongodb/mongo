@@ -6,8 +6,8 @@ var func = function() {
     db.runCommand({sleep: 1, seconds: 10000});
     return new Date();
 };
-a = new ScopedThread(func);
-b = new ScopedThread(func);
+a = new Thread(func);
+b = new Thread(func);
 a.start();
 b.start();
 a.join();

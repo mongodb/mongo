@@ -28,4 +28,4 @@ for (var i = 4; i < 8; ++i) {
     t.add(EventGenerator.dispatch, g.getEvents());
 }
 
-t.run("one or more tests failed", true);
+t.run("one or more tests failed");

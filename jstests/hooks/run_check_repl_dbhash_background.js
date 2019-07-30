@@ -19,7 +19,7 @@
 
 (function() {
 load('jstests/libs/discover_topology.js');  // For Topology and DiscoverTopology.
-load('jstests/libs/parallelTester.js');     // For ScopedThread.
+load('jstests/libs/parallelTester.js');     // For Thread.
 
 if (typeof db === 'undefined') {
     throw new Error(
@@ -449,8 +449,7 @@ if (topology.type === Topology.kReplicaSet) {
     const threads = [];
     try {
         if (topology.configsvr.nodes.length > 1) {
-            const thread =
-                new ScopedThread(checkReplDbhashBackgroundThread, topology.configsvr.nodes);
+            const thread = new Thread(checkReplDbhashBackgroundThread, topology.configsvr.nodes);
             threads.push(thread);
             thread.start();
         } else {
@@ -472,7 +471,7 @@ if (topology.type === Topology.kReplicaSet) {
             }
 
             if (shard.nodes.length > 1) {
-                const thread = new ScopedThread(checkReplDbhashBackgroundThread, shard.nodes);
+                const thread = new Thread(checkReplDbhashBackgroundThread, shard.nodes);
                 threads.push(thread);
                 thread.start();
             } else {

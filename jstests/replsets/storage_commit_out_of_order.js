@@ -53,7 +53,7 @@ assert.commandWorked(primary.adminCommand({
 const t = [];
 const counter = new CountDownLatch(numThreads + 1);
 for (let i = 0; i < numThreads; ++i) {
-    t[i] = new ScopedThread(majorityInsert, i, coll.getMongo().host, dbName, collName, counter);
+    t[i] = new Thread(majorityInsert, i, coll.getMongo().host, dbName, collName, counter);
     t[i].start();
 }
 

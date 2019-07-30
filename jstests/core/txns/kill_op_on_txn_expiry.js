@@ -53,7 +53,7 @@ try {
     assert.commandWorked(testDB.adminCommand({clearLog: 'global'}));
 
     jsTestLog("Starting insert operation in parallel thread");
-    let workerThread = new ScopedThread((sessionId, txnNumber, dbName, collName) => {
+    let workerThread = new Thread((sessionId, txnNumber, dbName, collName) => {
         // Deserialize the session ID from its string representation.
         sessionId = eval("(" + sessionId + ")");
 

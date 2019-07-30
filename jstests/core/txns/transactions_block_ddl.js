@@ -3,7 +3,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/parallelTester.js");  // for ScopedThread.
+load("jstests/libs/parallelTester.js");  // for Thread.
 
 const dbName = "transactions_block_ddl";
 const collName = "transactions_block_ddl";
@@ -43,7 +43,7 @@ function testSuccessOnTxnCommit(cmdDBName, ddlCmd, currentOpFilter) {
     session.startTransaction();
     assert.commandWorked(sessionColl.insert({a: 5, b: 6}));
     jsTestLog("Transaction started, running ddl operation " + ddlCmd);
-    let thread = new ScopedThread(function(cmdDBName, ddlCmd) {
+    let thread = new Thread(function(cmdDBName, ddlCmd) {
         return db.getSiblingDB(cmdDBName).runCommand(ddlCmd);
     }, cmdDBName, ddlCmd);
     thread.start();

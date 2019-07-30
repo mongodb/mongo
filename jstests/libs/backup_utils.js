@@ -1,4 +1,4 @@
-load("jstests/libs/parallelTester.js");  // for ScopedThread.
+load("jstests/libs/parallelTester.js");  // for Thread.
 
 function backupData(mongo, destinationDirectory) {
     let backupCursor = openBackupCursor(mongo);
@@ -43,7 +43,7 @@ function startHeartbeatThread(host, backupCursor, session, stopCounter) {
         }
     };
 
-    heartbeater = new ScopedThread(heartbeatBackupCursor, host, cursorId, lsid, stopCounter);
+    heartbeater = new Thread(heartbeatBackupCursor, host, cursorId, lsid, stopCounter);
     heartbeater.start();
     return heartbeater;
 }
@@ -57,7 +57,7 @@ function getBackupCursorMetadata(backupCursor) {
 
 /**
  * Exhaust the backup cursor and copy all the listed files to the destination directory. If `async`
- * is true, this function will spawn a ScopedThread doing the copy work and return the thread along
+ * is true, this function will spawn a Thread doing the copy work and return the thread along
  * with the backup cursor metadata. The caller should `join` the thread when appropriate.
  */
 function copyBackupCursorFiles(backupCursor, dbpath, destinationDirectory, async) {
@@ -72,8 +72,7 @@ function copyBackupCursorExtendFiles(cursor, dbpath, destinationDirectory, async
     let files = _cursorToFiles(cursor);
     let copyThread;
     if (async) {
-        copyThread =
-            new ScopedThread(_copyFiles, files, dbpath, destinationDirectory, _copyFileHelper);
+        copyThread = new Thread(_copyFiles, files, dbpath, destinationDirectory, _copyFileHelper);
         copyThread.start();
     } else {
         _copyFiles(files, dbpath, destinationDirectory, _copyFileHelper);

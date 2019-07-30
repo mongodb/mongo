@@ -8,7 +8,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/parallelTester.js");  // for ScopedThread.
+load("jstests/libs/parallelTester.js");  // for Thread.
 
 const replTest = new ReplSetTest({
     name: "oplog_visibility",
@@ -29,7 +29,7 @@ let stopLatch = new CountDownLatch(1);
 let writers = [];
 for (let idx = 0; idx < 2; ++idx) {
     let coll = "coll_" + idx;
-    let writer = new ScopedThread(function(host, coll, stopLatch) {
+    let writer = new Thread(function(host, coll, stopLatch) {
         const conn = new Mongo(host);
         let id = 0;
 

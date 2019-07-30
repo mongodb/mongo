@@ -1,5 +1,5 @@
 /**
- * This test makes makes sure Thread and ScopedThread work with --enableJavaScriptProtection
+ * This test makes makes sure Thread works with --enableJavaScriptProtection
  */
 (function() {
 'use strict';
@@ -40,7 +40,6 @@ function testThread(threadType) {
     assert(thread.returnData());
 }
 
-// Test both Thread and ScopedThread
+// Test the Thread class
 testThread(Thread);
-testThread(ScopedThread);
 }());

@@ -59,9 +59,9 @@ var workerThread = (function() {
                 let initialOperationTime;
 
                 // JavaScript objects backed by C++ objects (e.g. BSON values from a command
-                // response) do not serialize correctly when passed through the ScopedThread
+                // response) do not serialize correctly when passed through the Thread
                 // constructor. To work around this behavior, we instead pass a stringified form
-                // of the JavaScript object through the ScopedThread constructor and use eval()
+                // of the JavaScript object through the Thread constructor and use eval()
                 // to rehydrate it.
                 if (typeof args.sessionOptions.initialClusterTime === 'string') {
                     initialClusterTime = eval('(' + args.sessionOptions.initialClusterTime + ')');

@@ -10,7 +10,7 @@
 
 load('jstests/libs/change_stream_util.js');  // For ChangeStreamTest.
 load("jstests/libs/check_log.js");           // For checkLog.
-load("jstests/libs/parallelTester.js");      // for ScopedThread.
+load("jstests/libs/parallelTester.js");      // for Thread.
 
 const name = "change_stream_speculative_majority_lastApplied_lag";
 const replTest = new ReplSetTest({
@@ -52,8 +52,7 @@ function doUpdate(host, dbName, collName, query, update) {
 // Do a document update on primary, but don't wait for it to majority commit. The write should
 // hang due to the enabled failpoint.
 jsTestLog("Starting update on primary.");
-var primaryWrite =
-    new ScopedThread(doUpdate, primary.host, dbName, collName, {_id: 1}, {$set: {v: 2}});
+var primaryWrite = new Thread(doUpdate, primary.host, dbName, collName, {_id: 1}, {$set: {v: 2}});
 primaryWrite.start();
 
 // Wait for the fail point to be hit. By the time the primary hits this fail point, the update

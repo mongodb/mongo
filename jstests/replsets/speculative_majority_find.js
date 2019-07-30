@@ -13,7 +13,7 @@
 "use strict";
 
 load("jstests/libs/write_concern_util.js");  // for [stop|restart]ServerReplication.
-load("jstests/libs/parallelTester.js");      // for ScopedThread.
+load("jstests/libs/parallelTester.js");      // for Thread.
 
 let name = "speculative_majority_find";
 let replTest = new ReplSetTest({
@@ -77,7 +77,7 @@ stopServerReplication(secondary);
 assert.commandWorked(primaryColl.insert({_id: 2}));
 
 jsTestLog("Do a speculative majority that should block until write commits.");
-let speculativeRead = new ScopedThread(function(host, dbName, collName) {
+let speculativeRead = new Thread(function(host, dbName, collName) {
     const nodeDB = new Mongo(host).getDB(dbName);
     return nodeDB.runCommand({
         find: collName,

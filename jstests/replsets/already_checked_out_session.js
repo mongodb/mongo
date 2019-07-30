@@ -40,11 +40,11 @@ let thread2;
 assert.commandWorked(db.fsyncLock());
 try {
     // JavaScript objects backed by C++ objects (e.g. BSON values) do not serialize correctly
-    // when passed through the ScopedThread constructor. To work around this behavior, we
-    // instead pass a stringified form of the JavaScript object through the ScopedThread
+    // when passed through the Thread constructor. To work around this behavior, we
+    // instead pass a stringified form of the JavaScript object through the Thread
     // constructor and use eval() to rehydrate it.
     const lsid = UUID();
-    thread1 = new ScopedThread(doInsertWithSession, primary.host, tojson(lsid), 1);
+    thread1 = new Thread(doInsertWithSession, primary.host, tojson(lsid), 1);
     thread1.start();
 
     assert.soon(
@@ -57,7 +57,7 @@ try {
             return "insert operation with txnNumber 1 was not found: " + tojson(db.currentOp());
         });
 
-    thread2 = new ScopedThread(doInsertWithSession, primary.host, tojson(lsid), 2);
+    thread2 = new Thread(doInsertWithSession, primary.host, tojson(lsid), 2);
     thread2.start();
 
     // Run currentOp() again to ensure that thread2 has started its insert command.

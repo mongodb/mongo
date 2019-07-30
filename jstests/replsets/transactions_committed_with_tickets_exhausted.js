@@ -7,7 +7,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/parallelTester.js");  // for ScopedThread
+load("jstests/libs/parallelTester.js");  // for Thread
 load("jstests/core/txns/libs/prepare_helpers.js");
 
 // We set the number of write tickets to be a small value in order to avoid needing to spawn a
@@ -48,7 +48,7 @@ let prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 const threads = [];
 
 for (let i = 0; i < kNumWriteTickets; ++i) {
-    const thread = new ScopedThread(function(host) {
+    const thread = new Thread(function(host) {
         try {
             const conn = new Mongo(host);
             const db = conn.getDB("test");

@@ -4,7 +4,7 @@
 "use strict";
 
 load("jstests/libs/write_concern_util.js");
-load("jstests/libs/parallelTester.js");  // For ScopedThread.
+load("jstests/libs/parallelTester.js");  // For Thread.
 
 const dbName = "test";
 const collName = "no_error_labels_outside_txn";
@@ -171,7 +171,7 @@ function dropCmdFunc(primaryHost, dbName, collName) {
     const primary = new Mongo(primaryHost);
     return primary.getDB(dbName).runCommand({drop: collName, writeConcern: {w: "majority"}});
 }
-const thread = new ScopedThread(dropCmdFunc, primary.host, dbName, collName);
+const thread = new Thread(dropCmdFunc, primary.host, dbName, collName);
 thread.start();
 // Wait for the drop to have a pending MODE_X lock on the database.
 assert.soon(

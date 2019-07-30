@@ -30,11 +30,11 @@ let ContinuousStepdown;
 (function() {
 "use strict";
 
-load("jstests/libs/parallelTester.js");  // ScopedThread and CountDownLatch
+load("jstests/libs/parallelTester.js");  // Thread and CountDownLatch
 load("jstests/replsets/rslib.js");       // reconfig
 
 /**
- * Helper class to manage the ScopedThread instance that will continuously step down the primary
+ * Helper class to manage the Thread instance that will continuously step down the primary
  * node.
  */
 const StepdownThread = function() {
@@ -111,7 +111,7 @@ const StepdownThread = function() {
     };
 
     /**
-     * Spawns a ScopedThread using the given seedNode to discover the replica set.
+     * Spawns a Thread using the given seedNode to discover the replica set.
      */
     this.start = function(seedNode, options) {
         if (_thread) {
@@ -119,7 +119,7 @@ const StepdownThread = function() {
         }
 
         _counter = new CountDownLatch(1);
-        _thread = new ScopedThread(_continuousPrimaryStepdownFn, _counter, seedNode, options);
+        _thread = new Thread(_continuousPrimaryStepdownFn, _counter, seedNode, options);
         _thread.start();
     };
 

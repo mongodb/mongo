@@ -22,7 +22,7 @@
  *  - compact collection
  */
 
-load("jstests/libs/parallelTester.js");  // For ScopedThread.
+load("jstests/libs/parallelTester.js");  // For Thread.
 load("jstests/replsets/rslib.js");       // For startSetIfSupportsReadMajority.
 
 (function() {
@@ -201,7 +201,7 @@ const testCases = {
 };
 
 // Assertion helpers. These must get all state as arguments rather than through closure since
-// they may be passed in to a ScopedThread.
+// they may be passed in to a Thread.
 function assertReadsBlock(coll) {
     var res = coll.runCommand('find', {"readConcern": {"level": "majority"}, "maxTimeMS": 5000});
     assert.commandFailedWithCode(
@@ -296,18 +296,18 @@ for (var testName in testCases) {
 
     // Use background threads to test that reads that start blocked can complete if the
     // operation they are waiting on becomes committed while the read is still blocked.
-    // We don't do this when testing auth because ScopedThread's don't propagate auth
+    // We don't do this when testing auth because Thread's don't propagate auth
     // credentials.
     var threads = jsTest.options().auth ? [] : test.blockedCollections.map((name) => {
         // This function must get all inputs as arguments and can't use closure because it
-        // is used in a ScopedThread.
+        // is used in a Thread.
         function bgThread(host, collection, assertReadsSucceed) {
             // Use a longer timeout since we expect to block for a little while (at least 2
             // seconds).
             assertReadsSucceed(new Mongo(host).getCollection(collection), 30 * 1000);
         }
-        var thread = new ScopedThread(
-            bgThread, primary.host, mainDB[name].getFullName(), assertReadsSucceed);
+        var thread =
+            new Thread(bgThread, primary.host, mainDB[name].getFullName(), assertReadsSucceed);
         thread.start();
         return thread;
     });

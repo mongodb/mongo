@@ -59,7 +59,7 @@ assert.commandWorked(coll.insert({_id: 2}));
 assert.commandWorked(coll.insert({_id: 3}));
 assert.commandWorked(coll.insert({_id: 4}));
 
-let getChangeEvent = new ScopedThread(function(host, cursorId, dbName, collName) {
+let getChangeEvent = new Thread(function(host, cursorId, dbName, collName) {
     jsTestLog("Trying to receive change event from divergent primary.");
     const nodeDB = new Mongo(host).getDB(dbName);
     try {

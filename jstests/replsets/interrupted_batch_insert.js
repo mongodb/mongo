@@ -48,7 +48,7 @@ assert.commandWorked(primary.getDB("db").adminCommand(
 
 // In a background thread, issue an insert command to the primary that will insert 10 batches of
 // documents.
-var worker = new ScopedThread((host, collName, numToInsert) => {
+var worker = new Thread((host, collName, numToInsert) => {
     // Insert elements [{idx: 0}, {idx: 1}, ..., {idx: numToInsert - 1}].
     const docsToInsert = Array.from({length: numToInsert}, (_, i) => {
         return {idx: i};

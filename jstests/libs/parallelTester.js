@@ -42,16 +42,6 @@ if (typeof _threadInject != "undefined") {
     };
     _threadInject(Thread.prototype);
 
-    ScopedThread = function() {
-        var args = Array.prototype.slice.call(arguments);
-        // Always pass TestData as the first argument.
-        args.unshift(TestData);
-        args.unshift(_threadStartWrapper);
-        this.init.apply(this, args);
-    };
-    ScopedThread.prototype = new Thread(function() {});
-    _scopedThreadInject(ScopedThread.prototype);
-
     fork = function() {
         var t = new Thread(function() {});
         Thread.apply(t, arguments);
@@ -135,9 +125,8 @@ if (typeof _threadInject != "undefined") {
         this.params.push(args);
     };
 
-    ParallelTester.prototype.run = function(msg, newScopes) {
-        newScopes = newScopes || false;
-        assert.parallelTests(this.params, msg, newScopes);
+    ParallelTester.prototype.run = function(msg) {
+        assert.parallelTests(this.params, msg);
     };
 
     // creates lists of tests from jstests dir in a format suitable for use by
@@ -354,9 +343,7 @@ if (typeof _threadInject != "undefined") {
     // by zero or more arguments to that function.  Each function and its arguments will
     // be called in a separate thread.
     // msg: failure message
-    // newScopes: if true, each thread starts in a fresh scope
-    assert.parallelTests = function(params, msg, newScopes) {
-        newScopes = newScopes || false;
+    assert.parallelTests = function(params, msg) {
         function wrapper(fun, argv, globals) {
             if (globals.hasOwnProperty("TestData")) {
                 TestData = globals.TestData;
@@ -378,11 +365,7 @@ if (typeof _threadInject != "undefined") {
         for (var i in params) {
             var param = params[i];
             var test = param.shift();
-            var t;
-            if (newScopes)
-                t = new ScopedThread(wrapper, test, param, {TestData: TestData});
-            else
-                t = new Thread(wrapper, test, param, {TestData: TestData});
+            var t = new Thread(wrapper, test, param, {TestData: TestData});
             runners.push(t);
         }
 
