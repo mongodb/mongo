@@ -286,6 +286,28 @@ boost::optional<CollectionUUID> CollectionCatalog::lookupUUIDByNSS(
     return boost::none;
 }
 
+NamespaceString CollectionCatalog::resolveNamespaceStringOrUUID(NamespaceStringOrUUID nsOrUUID) {
+    if (auto& nss = nsOrUUID.nss()) {
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Namespace " << *nss << " is not a valid collection name",
+                nss->isValid());
+        return std::move(*nss);
+    }
+
+    auto resolvedNss = lookupNSSByUUID(*nsOrUUID.uuid());
+
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "Unable to resolve " << nsOrUUID.toString(),
+            resolvedNss && resolvedNss->isValid());
+
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "UUID " << nsOrUUID.toString() << " specified in " << nsOrUUID.dbname()
+                          << " resolved to a collection in a different database: " << *resolvedNss,
+            resolvedNss->db() == nsOrUUID.dbname());
+
+    return std::move(*resolvedNss);
+}
+
 bool CollectionCatalog::checkIfCollectionSatisfiable(CollectionUUID uuid,
                                                      CollectionInfoFn predicate) const {
     invariant(predicate);

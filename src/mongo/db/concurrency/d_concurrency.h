@@ -38,7 +38,7 @@
 namespace mongo {
 
 class StringData;
-class NamespaceString;
+class NamespaceStringOrUUID;
 
 class Lock {
 public:
@@ -361,14 +361,15 @@ public:
 
     public:
         CollectionLock(OperationContext* opCtx,
-                       const NamespaceString& nss,
+                       const NamespaceStringOrUUID& nssOrUUID,
                        LockMode mode,
                        Date_t deadline = Date_t::max());
+
         CollectionLock(CollectionLock&&);
         ~CollectionLock();
 
     private:
-        const ResourceId _id;
+        ResourceId _id;
         OperationContext* _opCtx;
     };
 

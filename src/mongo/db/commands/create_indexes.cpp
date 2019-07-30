@@ -400,28 +400,6 @@ Collection* getOrCreateCollection(OperationContext* opCtx,
     });
 }
 
-/**
- * Locks a collection in the database 'dbName' with UUID 'uuid' in the mode 'collectionLockMode',
- * instantiating the lock in the 'collLock' reference.
- */
-void lockCollectionByUUID(OperationContext* opCtx,
-                          const std::string& dbName,
-                          const UUID& uuid,
-                          LockMode collectionLockMode,
-                          boost::optional<Lock::CollectionLock>& collLock) {
-    NamespaceString prevResolvedNss;
-    NamespaceString resolvedNss;
-    NamespaceStringOrUUID nssOrUUID(dbName, uuid);
-    do {
-        prevResolvedNss = AutoGetCollection::resolveNamespaceStringOrUUID(opCtx, nssOrUUID);
-        collLock.emplace(opCtx, prevResolvedNss, collectionLockMode);
-
-        // We looked up UUID without a collection lock so it's possible that the
-        // collection name changed now. Look it up again.
-        resolvedNss = AutoGetCollection::resolveNamespaceStringOrUUID(opCtx, nssOrUUID);
-    } while (resolvedNss != prevResolvedNss);
-}
-
 bool runCreateIndexes(OperationContext* opCtx,
                       const std::string& dbname,
                       const BSONObj& cmdObj,
@@ -544,8 +522,7 @@ bool runCreateIndexes(OperationContext* opCtx,
     // Collection scan and insert into index, followed by a drain of writes received in the
     // background.
     {
-        boost::optional<Lock::CollectionLock> colLock;
-        lockCollectionByUUID(opCtx, dbName, collectionUUID, MODE_IS, colLock);
+        Lock::CollectionLock colLock(opCtx, {dbName, collectionUUID}, MODE_IS);
 
         // Reaquire the collection pointer because we momentarily released the collection lock.
         collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(collectionUUID);
@@ -566,8 +543,7 @@ bool runCreateIndexes(OperationContext* opCtx,
     // Perform the first drain while holding an intent lock.
     {
         opCtx->recoveryUnit()->abandonSnapshot();
-        boost::optional<Lock::CollectionLock> colLock;
-        lockCollectionByUUID(opCtx, dbName, collectionUUID, MODE_IS, colLock);
+        Lock::CollectionLock colLock(opCtx, {dbName, collectionUUID}, MODE_IS);
 
         // Reaquire the collection pointer because we momentarily released the collection lock.
         collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(collectionUUID);
@@ -588,8 +564,7 @@ bool runCreateIndexes(OperationContext* opCtx,
     // Perform the second drain while stopping writes on the collection.
     {
         opCtx->recoveryUnit()->abandonSnapshot();
-        boost::optional<Lock::CollectionLock> colLock;
-        lockCollectionByUUID(opCtx, dbName, collectionUUID, MODE_S, colLock);
+        Lock::CollectionLock colLock(opCtx, {dbName, collectionUUID}, MODE_S);
 
         // Reaquire the collection pointer because we momentarily released the collection lock.
         collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(collectionUUID);
@@ -610,7 +585,8 @@ bool runCreateIndexes(OperationContext* opCtx,
     // Need to get exclusive collection lock back to complete the index build.
     if (indexer.isBackgroundBuilding()) {
         opCtx->recoveryUnit()->abandonSnapshot();
-        lockCollectionByUUID(opCtx, dbName, collectionUUID, MODE_X, exclusiveCollectionLock);
+        exclusiveCollectionLock.emplace(
+            opCtx, NamespaceStringOrUUID(dbName, collectionUUID), MODE_X);
 
         // Reaquire the collection pointer because we momentarily released the collection lock.
         collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(collectionUUID);

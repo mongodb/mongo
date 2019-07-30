@@ -37,6 +37,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/concurrency/flow_control_ticketholder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
@@ -277,20 +278,58 @@ void Lock::DBLock::relockWithMode(LockMode newMode) {
     _result = LOCK_OK;
 }
 
-
 Lock::CollectionLock::CollectionLock(OperationContext* opCtx,
-                                     const NamespaceString& nss,
+                                     const NamespaceStringOrUUID& nssOrUUID,
                                      LockMode mode,
                                      Date_t deadline)
-    : _id(RESOURCE_COLLECTION, nss.ns()), _opCtx(opCtx) {
-    invariant(nss.coll().size(), str::stream() << "expected non-empty collection name:" << nss);
-    dassert(opCtx->lockState()->isDbLockedForMode(nss.db(),
-                                                  isSharedLockMode(mode) ? MODE_IS : MODE_IX));
+    : _opCtx(opCtx) {
+
     LockMode actualLockMode = mode;
     if (!supportsDocLocking()) {
         actualLockMode = isSharedLockMode(mode) ? MODE_S : MODE_X;
     }
-    _opCtx->lockState()->lock(_opCtx, _id, actualLockMode, deadline);
+
+    if (nssOrUUID.nss()) {
+        auto& nss = *nssOrUUID.nss();
+        _id = {RESOURCE_COLLECTION, nss.ns()};
+
+        invariant(nss.coll().size(), str::stream() << "expected non-empty collection name:" << nss);
+        dassert(_opCtx->lockState()->isDbLockedForMode(nss.db(),
+                                                       isSharedLockMode(mode) ? MODE_IS : MODE_IX));
+
+        _opCtx->lockState()->lock(_opCtx, _id, actualLockMode, deadline);
+        return;
+    }
+
+    // 'nsOrUUID' must be a UUID and dbName.
+
+    auto& collectionCatalog = CollectionCatalog::get(opCtx);
+
+    NamespaceString prevResolvedNss;
+    auto nss = collectionCatalog.resolveNamespaceStringOrUUID(nssOrUUID);
+
+    // The UUID cannot move between databases so this one dassert is sufficient.
+    dassert(_opCtx->lockState()->isDbLockedForMode(nss.db(),
+                                                   isSharedLockMode(mode) ? MODE_IS : MODE_IX));
+
+    // We cannot be sure that the namespace we lock matches the UUID given because we resolve the
+    // namespace from the UUID without the safety of a lock. Therefore, we will continue to re-lock
+    // until the namespace we resolve from the UUID before and after taking the lock is the same.
+    bool locked = false;
+    do {
+        if (locked) {
+            _opCtx->lockState()->unlock(_id);
+        }
+
+        _id = ResourceId(RESOURCE_COLLECTION, nss.ns());
+        _opCtx->lockState()->lock(_opCtx, _id, actualLockMode, deadline);
+        locked = true;
+
+        // We looked up UUID without a collection lock so it's possible that the
+        // collection name changed now. Look it up again.
+        prevResolvedNss = nss;
+        nss = collectionCatalog.resolveNamespaceStringOrUUID(nssOrUUID);
+    } while (nss != prevResolvedNss);
 }
 
 Lock::CollectionLock::CollectionLock(CollectionLock&& otherLock)

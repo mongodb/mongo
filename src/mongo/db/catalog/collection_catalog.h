@@ -166,6 +166,13 @@ public:
     boost::optional<CollectionUUID> lookupUUIDByNSS(const NamespaceString& nss) const;
 
     /**
+     * Without acquiring any locks resolves the given NamespaceStringOrUUID to an actual namespace.
+     * Throws NamespaceNotFound if the collection UUID cannot be resolved to a name, or if the UUID
+     * can be resolved, but the resulting collection is in the wrong database.
+     */
+    NamespaceString resolveNamespaceStringOrUUID(NamespaceStringOrUUID nsOrUUID);
+
+    /**
      * Returns whether the collection with 'uuid' satisfies the provided 'predicate'. If the
      * collection with 'uuid' is not found, false is returned.
      */

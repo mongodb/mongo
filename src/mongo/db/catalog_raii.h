@@ -102,14 +102,6 @@ public:
                       Date_t deadline = Date_t::max());
 
     /**
-     * Without acquiring any locks resolves the given NamespaceStringOrUUID to an actual namespace.
-     * Throws NamespaceNotFound if the collection UUID cannot be resolved to a name, or if the UUID
-     * can be resolved, but the resulting collection is in the wrong database.
-     */
-    static NamespaceString resolveNamespaceStringOrUUID(OperationContext* opCtx,
-                                                        NamespaceStringOrUUID nsOrUUID);
-
-    /**
      * Returns nullptr if the database didn't exist.
      */
     Database* getDb() const {
