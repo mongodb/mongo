@@ -63,11 +63,9 @@ assert.commandWorked(coll.ensureIndex({a: 1}, {unique: true}));
 specs = cursorGetIndexSpecs(getListIndexesCursor(coll));
 assert.eq(2, specs.length);
 assert.eq("_id_", specs[0].name);
-assert.eq(coll.getFullName(), specs[0].ns);
 assert.eq({_id: 1}, specs[0].key);
 assert(!specs[0].hasOwnProperty("unique"));
 assert.eq("a_1", specs[1].name);
-assert.eq(coll.getFullName(), specs[1].ns);
 assert.eq({a: 1}, specs[1].key);
 assert.eq(true, specs[1].unique);
 

@@ -3068,8 +3068,7 @@ var authCommandsLib = {
         },
         {
           testname: "createIndexes",
-          command:
-              {createIndexes: "x", indexes: [{ns: firstDbName + ".x", key: {a: 1}, name: "a_1"}]},
+          command: {createIndexes: "x", indexes: [{key: {a: 1}, name: "a_1"}]},
           teardown: function(db) {
               db.x.drop();
           },

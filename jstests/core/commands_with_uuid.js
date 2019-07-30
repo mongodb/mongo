@@ -75,9 +75,9 @@ cmd = {
 res = db.runCommand(cmd);
 assert.commandWorked(res, 'could not run ' + tojson(cmd));
 cursor = new DBCommandCursor(db, res);
-cursor.forEach(function(doc) {
-    assert.eq(doc.ns, 'test.' + mainCollName);
-});
+assert.eq(1, cursor.toArray().length);
+assert.eq("_id_", cursor.toArray()[0].name);
+assert.eq(bsonWoCompare({"_id": 1}, cursor.toArray()[0].key), 0);
 
 // Ensure passing a UUID to count retrieves results from the correct collection.
 cmd = {

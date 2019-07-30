@@ -105,7 +105,6 @@ master.getCollection('local.oplog.rs').find().forEach(function(entry) {
         assert(entry.o2.name);
         assert(entry.o2.key);
         assert.eq(entry.o2.v, 2);
-        assert.eq(entry.o2.ns, dbName + "." + collName);
         assert.eq(entry.ns, dbName + ".$cmd");
     }
 });

@@ -61,10 +61,15 @@ createdCollections.forEach(function(createdCollectionName) {
         return;
     }
 
+    const periodIndex = createdCollectionName.indexOf(".");
+    const dbName = createdCollectionName.substring(0, periodIndex);
+    const collName = createdCollectionName.substring(periodIndex + 1);
+
     // Search for a log entry for the creation of this collection.
-    const oplogEntries = primaryDB.getSiblingDB("local")["oplog.rs"]
-                             .find({op: "c", "o.idIndex.ns": createdCollectionName})
-                             .toArray();
+    const oplogEntries =
+        primaryDB.getSiblingDB("local")["oplog.rs"]
+            .find({op: "c", ns: dbName + ".$cmd", "o.create": collName, "o.idIndex.name": "_id_"})
+            .toArray();
     if (createdCollectionName.startsWith("local.")) {
         // We do not want to see any replication of "local" collections.
         assert.eq(oplogEntries.length,

@@ -18,7 +18,6 @@ function validateSessionsCollection(conn, collectionExists, indexExists, timeout
         if (entry["name"] == "lsidTTLIndex") {
             found = true;
 
-            assert.eq(entry["ns"], "config.system.sessions");
             assert.eq(entry["key"], {"lastUse": 1});
             assert(entry.hasOwnProperty("expireAfterSeconds"));
             if (timeout) {

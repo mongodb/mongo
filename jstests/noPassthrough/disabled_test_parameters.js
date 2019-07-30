@@ -27,7 +27,7 @@ assertFails({
     assertStarts({
         'setParameter': {
             enableTestCommands: v,
-            disableIndexSpecNamespaceGeneration: 'false',
+            enableIndexBuildsCoordinatorForCreateIndexesCommand: 'false',
         },
     });
 });

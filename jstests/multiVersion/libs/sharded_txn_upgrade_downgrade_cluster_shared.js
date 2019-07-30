@@ -116,22 +116,26 @@ function downgradeUniqueIndexesScript(db) {
         let mdb = db.getSiblingDB(d.name);
         mdb.getCollectionInfos().forEach(function(c) {
             let currentCollection = mdb.getCollection(c.name);
-            currentCollection.getIndexes().forEach(function(i) {
-                if (i.unique) {
-                    if (i.v === 1) {
-                        unique_idx_v1.push(i);
-                    } else {
-                        unique_idx_v2.push(i);
-                    }
+            currentCollection.getIndexes().forEach(function(spec) {
+                if (!spec.unique) {
                     return;
+                }
+
+                const ns = d.name + "." + c.name;
+                if (spec.v === 1) {
+                    unique_idx_v1.push({ns: ns, spec: spec});
+                } else {
+                    unique_idx_v2.push({ns: ns, spec: spec});
                 }
             });
         });
     });
 
     // Drop and recreate all v:1 indexes
-    for (let idx of unique_idx_v1) {
-        let [dbName, collName] = idx.ns.split(".");
+    for (let pair of unique_idx_v1) {
+        const ns = pair.ns;
+        const idx = pair.spec;
+        let [dbName, collName] = ns.split(".");
         let res = db.getSiblingDB(dbName).runCommand({dropIndexes: collName, index: idx.name});
         assert.commandWorked(res);
         res = db.getSiblingDB(dbName).runCommand({
@@ -142,8 +146,10 @@ function downgradeUniqueIndexesScript(db) {
     }
 
     // Drop and recreate all v:2 indexes
-    for (let idx of unique_idx_v2) {
-        let [dbName, collName] = idx.ns.split(".");
+    for (let pair of unique_idx_v2) {
+        const ns = pair.ns;
+        const idx = pair.spec;
+        let [dbName, collName] = ns.split(".");
         let res = db.getSiblingDB(dbName).runCommand({dropIndexes: collName, index: idx.name});
         assert.commandWorked(res);
         res = db.getSiblingDB(dbName).runCommand({

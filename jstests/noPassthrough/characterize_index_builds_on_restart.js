@@ -1,9 +1,6 @@
 /**
  * Characterizes the actions (rebuilds or drops the index) taken upon unfinished indexes when
  * restarting mongod from (standalone -> standalone) and (replica set member -> standalone).
- * Additionally, the primary will use the 'disableIndexSpecNamespaceGeneration' server test
- * parameter to prevent index specs from having the 'ns' field to test the absence of the 'ns' field
- * on a replica set with unfinished indexes during restart.
  *
  * @tags: [requires_replication, requires_persistence, requires_majority_read_concern]
  */
@@ -79,11 +76,6 @@ function startIndexBuildOnSecondaryAndLeaveUnfinished(primaryDB, writeConcern, s
     assert.commandWorked(secondaryDB.adminCommand(
         {configureFailPoint: "leaveIndexBuildUnfinishedForShutdown", mode: "alwaysOn"}));
 
-    // Do not generate the 'ns' field for index specs on the primary to test the absence of the
-    // field on restart.
-    assert.commandWorked(
-        primaryDB.adminCommand({setParameter: 1, disableIndexSpecNamespaceGeneration: 1}));
-
     try {
         let res = assert.commandWorked(primaryDB.runCommand(
             {createIndexes: collName, indexes: indexesToBuild, writeConcern: {w: writeConcern}}));
@@ -143,7 +135,6 @@ function checkForIndexRebuild(mongod, indexName, shouldExist) {
 
     let foundIndexEntry = false;
     for (let index = 0; index < collIndexes.length; index++) {
-        assert.eq(true, collIndexes[index].hasOwnProperty('ns'));
         if (collIndexes[index].name == indexName) {
             foundIndexEntry = true;
             break;
@@ -224,9 +215,6 @@ function secondaryToStandaloneTest() {
     mongod = restartStandalone(primary);
     let specs = mongod.getDB(dbName).getCollection(collName).getIndexes();
     assert.eq(specs.length, 5);
-    for (let index = 0; index < specs.length; index++) {
-        assert.eq(true, specs[index].hasOwnProperty('ns'));
-    }
 
     shutdownStandalone(mongod);
 }
