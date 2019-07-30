@@ -59,7 +59,6 @@ StatusWith<ExplainOptions::Verbosity> ExplainOptions::parseCmdBSON(const BSONObj
         return Status(ErrorCodes::FailedToParse, "explain command requires a nested object");
     }
 
-    bool verbositySpecified = false;
     auto verbosity = Verbosity::kExecAllPlans;
     if (auto verbosityElt = cmdObj[kVerbosityName]) {
         if (verbosityElt.type() != BSONType::String) {
@@ -78,24 +77,32 @@ StatusWith<ExplainOptions::Verbosity> ExplainOptions::parseCmdBSON(const BSONObj
                               << "', '" << kExecStatsVerbosityStr << "', '"
                               << kAllPlansExecutionVerbosityStr << "'}");
         }
-        verbositySpecified = true;
     }
 
-    int numFields = 0;
+    auto invalidFields = str::stream();
     BSONObjIterator i(cmdObj);
+    // Skip first argument as it is the command itself.
+    if (i.moreWithEOO()) {
+        i.next();
+    }
     while (i.moreWithEOO()) {
         BSONElement e = i.next();
         if (e.eoo())
             break;
-        if (e.fieldNameStringData() == "$db")
+        auto name = e.fieldNameStringData();
+        if (name == kVerbosityName || name == "$db" || name == "lsid")
             continue;
-        numFields++;
+
+        if (invalidFields.ss.len() > 0) {
+            invalidFields << ", ";
+        }
+        invalidFields << "'" << name << "'";
     }
-    if (numFields != (verbositySpecified ? 2 : 1)) {
-        return Status(ErrorCodes::InvalidOptions,
-                      str::stream() << "explain command supports an optional verbosity argument.");
-    }
-    return verbosity;
+
+    return invalidFields.ss.len() > 0
+        ? Status(ErrorCodes::InvalidOptions,
+                 str::stream() << "explain does not support " << invalidFields << " argument(s).")
+        : StatusWith(verbosity);
 }
 
 BSONObj ExplainOptions::toBSON(ExplainOptions::Verbosity verbosity) {
