@@ -350,10 +350,4 @@ void printWindowsStackTrace(CONTEXT& context, std::ostream& os) {
     }
 }
 
-// Print error message from C runtime, then fassert
-int crtDebugCallback(int, char* originalMessage, int*) {
-    StringData message(originalMessage);
-    log() << "*** C runtime error: " << message.substr(0, message.find('\n')) << ", terminating";
-    fassertFailed(17006);
-}
 }  // namespace mongo

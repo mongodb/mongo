@@ -45,13 +45,48 @@
 #ifdef _WIN32
 
 namespace mongo {
+namespace {
+
+StringData firstLine(const char* s) {
+    const char* eol = s;
+    while (*eol && *eol != '\n')
+        ++eol;
+    return StringData(s, eol - s);
+}
+
+StringData severity(int t) {
+    switch (t) {
+        case _CRT_WARN:
+            return "WARN"_sd;
+        case _CRT_ERROR:
+            return "ERROR"_sd;
+        case _CRT_ASSERT:
+            return "ASSERT"_sd;
+    }
+    return ""_sd;
+}
+
+extern "C" {
+// Print C runtime message, then fassert if it's more severe than a warning.
+int __cdecl crtDebugCallback(int nRptType, char* originalMessage, int* returnValue) noexcept {
+    *returnValue = 0;  // Returned by _CrtDbgReport. (1: starts the debugger).
+    bool die = (nRptType != _CRT_WARN);
+    log() << "*** C runtime " << severity(nRptType) << ": " << firstLine(originalMessage)
+          << (die ? ", terminating"_sd : ""_sd);
+    if (die) {
+        fassertFailed(17006);
+    }
+    return TRUE;
+}
+}  // extern "C"
+}  // namespace
 
 MONGO_INITIALIZER(Behaviors_Win32)(InitializerContext*) {
     // do not display dialog on abort()
     _set_abort_behavior(0, _CALL_REPORTFAULT | _WRITE_ABORT_MSG);
 
     // hook the C runtime's error display
-    _CrtSetReportHook(crtDebugCallback);
+    _CrtSetReportHook(&crtDebugCallback);
 
     if (_setmaxstdio(2048) == -1) {
         warning() << "Failed to increase max open files limit from default of 512 to 2048";

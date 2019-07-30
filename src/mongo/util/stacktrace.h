@@ -54,9 +54,6 @@ void printStackTraceFromSignal(std::ostream& os);
 // Print stack trace (using a specified stack context) to "os", default to the log stream.
 void printWindowsStackTrace(CONTEXT& context, std::ostream& os);
 void printWindowsStackTrace(CONTEXT& context);
-
-// Print error message from C runtime followed by stack trace
-int crtDebugCallback(int, char* originalMessage, int*);
 #endif
 
 }  // namespace mongo
