@@ -61,6 +61,8 @@ TEST(ExplainOptionsTest, ExplainOptionsSerializeToBSONCorrectly) {
 }
 
 TEST(ExplainOptionsTest, InvalidOptionsIfAgumentNotRecognized) {
+    ASSERT(
+        ExplainOptions::parseCmdBSON(fromjson("{explain: { find: \"bar\" }}")).getStatus().isOK());
     ASSERT_EQ(ExplainOptions::parseCmdBSON(fromjson("{explain: {}, foo: 1}")).getStatus(),
               ErrorCodes::InvalidOptions);
     ASSERT_EQ(
