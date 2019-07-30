@@ -133,7 +133,9 @@ private:
 
         TTLCollectionCache& ttlCollectionCache = TTLCollectionCache::get(getGlobalServiceContext());
         std::vector<std::pair<UUID, std::string>> ttlInfos = ttlCollectionCache.getTTLInfos();
-        std::vector<BSONObj> ttlIndexes;
+
+        // Pair of collection namespace and index spec.
+        std::vector<std::pair<NamespaceString, BSONObj>> ttlIndexes;
 
         ttlPasses.increment();
 
@@ -170,18 +172,18 @@ private:
             if (!DurableCatalog::get(opCtxPtr.get())->isIndexReady(&opCtx, *nss, indexName))
                 continue;
 
-            ttlIndexes.push_back(spec.getOwned());
+            ttlIndexes.push_back(std::make_pair(*nss, spec.getOwned()));
         }
 
-        for (const BSONObj& idx : ttlIndexes) {
+        for (const auto& it : ttlIndexes) {
             try {
-                doTTLForIndex(&opCtx, idx);
+                doTTLForIndex(&opCtx, it.first, it.second);
             } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
                 warning() << "TTLMonitor was interrupted, waiting " << ttlMonitorSleepSecs.load()
                           << " seconds before doing another pass";
                 return;
             } catch (const DBException& dbex) {
-                error() << "Error processing ttl index: " << idx << " -- " << dbex.toString();
+                error() << "Error processing ttl index: " << it.second << " -- " << dbex.toString();
                 // Continue on to the next index.
                 continue;
             }
@@ -192,8 +194,7 @@ private:
      * Remove documents from the collection using the specified TTL index after a sufficient amount
      * of time has passed according to its expiry specification.
      */
-    void doTTLForIndex(OperationContext* opCtx, BSONObj idx) {
-        const NamespaceString collectionNSS(idx["ns"].String());
+    void doTTLForIndex(OperationContext* opCtx, NamespaceString collectionNSS, BSONObj idx) {
         if (collectionNSS.isDropPendingNamespace()) {
             return;
         }
