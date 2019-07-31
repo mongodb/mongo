@@ -272,12 +272,6 @@ boost::optional<OplogEntry> SessionUpdateTracker::_createTransactionTableUpdateF
         newTxnRecord.setLastWriteOpTime(entry.getOpTime());
         newTxnRecord.setLastWriteDate(*entry.getWallClockTime());
 
-        // "state" is a new field in 4.2.
-        if (serverGlobalParams.featureCompatibility.getVersion() <
-            ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo42) {
-            return newTxnRecord.toBSON();
-        }
-
         if (entry.isPartialTransaction()) {
             invariant(entry.getPrevWriteOpTimeInTransaction()->isNull());
             newTxnRecord.setState(DurableTxnStateEnum::kInProgress);

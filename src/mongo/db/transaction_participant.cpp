@@ -134,12 +134,7 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
         return result;
     }
 
-    // State is a new field in FCV 4.2 that indicates if a transaction committed, so check it in FCV
-    // 4.2 and upgrading to 4.2. Check when downgrading as well so sessions refreshed at the start
-    // of downgrade enter the correct state.
-    if ((serverGlobalParams.featureCompatibility.getVersion() >=
-             ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo40 &&
-         result.lastTxnRecord->getState())) {
+    if (result.lastTxnRecord->getState()) {
         // When state is given, it must be a transaction, so we don't need to traverse the history.
         return result;
     }
@@ -161,15 +156,8 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
                 continue;
             }
 
-
-            // State is a new field in FCV 4.2, so look for an applyOps oplog entry without a
-            // prepare flag to mark a committed transaction in FCV 4.0 or downgrading to 4.0. Check
-            // when upgrading as well so sessions refreshed at the beginning of upgrade enter the
-            // correct state.
-            if ((serverGlobalParams.featureCompatibility.getVersion() <=
-                 ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo42) &&
-                (entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps &&
-                 !entry.shouldPrepare() && !entry.isPartialTransaction())) {
+            if (entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps &&
+                !entry.shouldPrepare() && !entry.isPartialTransaction()) {
                 result.lastTxnRecord->setState(DurableTxnStateEnum::kCommitted);
                 return result;
             }

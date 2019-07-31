@@ -35,7 +35,6 @@
 #include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_command_parser.h"
@@ -43,15 +42,9 @@
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/transaction_participant.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/database_version_helpers.h"
@@ -67,154 +60,6 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(featureCompatibilityDowngrade);
 MONGO_FAIL_POINT_DEFINE(featureCompatibilityUpgrade);
-MONGO_FAIL_POINT_DEFINE(pauseBeforeUpgradingSessions);
-MONGO_FAIL_POINT_DEFINE(pauseBeforeDowngradingSessions);
-
-/**
- * Returns a set of the logical session ids of each entry in config.transactions that matches the
- * given query.
- */
-LogicalSessionIdSet getMatchingSessionIdsFromTransactionTable(OperationContext* opCtx,
-                                                              Query query) {
-    LogicalSessionIdSet sessionIds = {};
-
-    DBDirectClient client(opCtx);
-    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace, query);
-    while (cursor->more()) {
-        auto txnRecord = SessionTxnRecord::parse(
-            IDLParserErrorContext("setFCV-find-matching-sessions"), cursor->next());
-        sessionIds.insert(txnRecord.getSessionId());
-    }
-    return sessionIds;
-}
-
-/**
- * Checks out each given session with a new operation context, verifies the session's transaction
- * participant passes the validation function, runs the modification function with a direct
- * client from another new operation context while the session is checked out, then invalidates the
- * session.
- */
-void forEachSessionWithCheckout(
-    OperationContext* opCtx,
-    LogicalSessionIdSet sessionIds,
-    std::function<bool(OperationContext* opCtx)> verifyTransactionParticipantFn,
-    std::function<void(DBDirectClient* client, LogicalSessionId sessionId)> performModificationFn) {
-    // Construct a new operation context to check out the session with.
-    auto clientForCheckout =
-        opCtx->getServiceContext()->makeClient("setFCV-transaction-table-checkout");
-    AlternativeClientRegion acrForCheckout(clientForCheckout);
-    for (const auto& sessionId : sessionIds) {
-        // Check for interrupt on the parent opCtx because killing it won't be propagated to the
-        // opCtx checking out the session and performing the modification.
-        opCtx->checkForInterrupt();
-
-        const auto opCtxForCheckout = cc().makeOperationContext();
-        opCtxForCheckout->setLogicalSessionId(sessionId);
-        MongoDOperationContextSession ocs(opCtxForCheckout.get());
-
-        // Now that the session is checked out, verify it still needs to be modified using its
-        // transaction participant.
-        if (!verifyTransactionParticipantFn(opCtxForCheckout.get())) {
-            continue;
-        }
-
-        {
-            // Perform the modification on another operation context to bypass retryable writes and
-            // transactions machinery.
-            auto clientForModification =
-                opCtx->getServiceContext()->makeClient("setFCV-transaction-table-modification");
-            AlternativeClientRegion acrForModification(clientForModification);
-
-            const auto opCtxForModification = cc().makeOperationContext();
-            DBDirectClient directClient(opCtxForModification.get());
-            performModificationFn(&directClient, sessionId);
-        }
-
-        // Note that invalidating the session here is unnecessary if the modification function
-        // writes directly to config.transactions, which already invalidates the affected session.
-        auto txnParticipant = TransactionParticipant::get(opCtxForCheckout.get());
-        txnParticipant.invalidate(opCtxForCheckout.get());
-    }
-}
-
-/**
- * Removes all documents from config.transactions with a "state" field because they may point to
- * oplog entries in a format a 4.0 mongod cannot process.
- */
-void downgradeTransactionTable(OperationContext* opCtx) {
-    // In FCV 4.0, all transaction table entries associated with a transaction have a "state" field.
-    Query query(BSON("state" << BSON("$exists" << true)));
-    LogicalSessionIdSet sessionIdsWithState =
-        getMatchingSessionIdsFromTransactionTable(opCtx, query);
-
-    if (MONGO_FAIL_POINT(pauseBeforeDowngradingSessions)) {
-        LOG(0) << "Hit pauseBeforeDowngradingSessions failpoint";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(pauseBeforeDowngradingSessions);
-    }
-
-    // Remove all transaction table entries associated with a committed / aborted transaction. Note
-    // that transactions that abort before prepare have no entry.
-    forEachSessionWithCheckout(
-        opCtx,
-        sessionIdsWithState,
-        [](OperationContext* opCtx) {
-            auto txnParticipant = TransactionParticipant::get(opCtx);
-            return txnParticipant.transactionIsCommitted() || txnParticipant.transactionIsAborted();
-        },
-        [](DBDirectClient* directClient, LogicalSessionId sessionId) {
-            const auto commandResponse = directClient->runCommand([&] {
-                write_ops::Delete deleteOp(NamespaceString::kSessionTransactionsTableNamespace);
-                deleteOp.setDeletes({[&] {
-                    write_ops::DeleteOpEntry entry;
-                    entry.setQ(BSON("_id" << sessionId.toBSON()));
-                    entry.setMulti(false);
-                    return entry;
-                }()});
-                return deleteOp.serialize({});
-            }());
-            uassertStatusOK(getStatusFromWriteCommandReply(commandResponse->getCommandReply()));
-        });
-}
-
-/**
- * Adds a "state" field to all documents in config.transactions that represent committed
- * transactions so they are in the 4.2 format.
- */
-void upgradeTransactionTable(OperationContext* opCtx) {
-    // Retryable writes and committed transactions have the same format in FCV 4.0, so use an empty
-    // query to return all session ids in the transaction table.
-    LogicalSessionIdSet allSessionIds = getMatchingSessionIdsFromTransactionTable(opCtx, Query());
-
-    if (MONGO_FAIL_POINT(pauseBeforeUpgradingSessions)) {
-        LOG(0) << "Hit pauseBeforeUpgradingSessions failpoint";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(pauseBeforeUpgradingSessions);
-    }
-
-    // Add state=committed to the transaction table entry for each session that most recently
-    // committed a transaction.
-    forEachSessionWithCheckout(
-        opCtx,
-        allSessionIds,
-        [](OperationContext* opCtx) {
-            auto txnParticipant = TransactionParticipant::get(opCtx);
-            return txnParticipant.transactionIsCommitted();
-        },
-        [](DBDirectClient* directClient, LogicalSessionId sessionId) {
-            const auto commandResponse = directClient->runCommand([&] {
-                write_ops::Update updateOp(NamespaceString::kSessionTransactionsTableNamespace);
-                updateOp.setUpdates({[&] {
-                    write_ops::UpdateOpEntry entry;
-                    entry.setQ(BSON("_id" << sessionId.toBSON()));
-                    entry.setU(BSON("$set" << BSON("state"
-                                                   << "committed")));
-                    entry.setMulti(false);
-                    return entry;
-                }()});
-                return updateOp.serialize({});
-            }());
-            uassertStatusOK(getStatusFromWriteCommandReply(commandResponse->getCommandReply()));
-        });
-}
 
 /**
  * Sets the minimum allowed version for the cluster. If it is 4.0, then the node should not use 4.2
@@ -328,8 +173,6 @@ public:
                 Lock::GlobalLock lk(opCtx, MODE_S);
             }
 
-            upgradeTransactionTable(opCtx);
-
             // Upgrade shards before config finishes its upgrade.
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
                 uassertStatusOK(
@@ -371,8 +214,6 @@ public:
                 //     this.
                 Lock::GlobalLock lk(opCtx, MODE_S);
             }
-
-            downgradeTransactionTable(opCtx);
 
             // Downgrade shards before config finishes its downgrade.
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
