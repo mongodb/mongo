@@ -18,7 +18,7 @@ var $config = (function() {
         }
 
         function insertDocuments(db, collName) {
-            const nDocumentsToInsert = 1000;
+            const nDocumentsToInsert = 100;
             var bulk = db[collName].initializeUnorderedBulkOp();
             for (var i = 0; i < nDocumentsToInsert; ++i) {
                 bulk.insert({x: i});
@@ -70,7 +70,7 @@ var $config = (function() {
     };
 
     return {
-        threadCount: 30,
+        threadCount: 10,
         iterations: 10,
         states: states,
         transitions: transitions,
