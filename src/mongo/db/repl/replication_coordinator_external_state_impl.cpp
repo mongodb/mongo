@@ -320,6 +320,9 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& s
     if (_startedThreads) {
         return;
     }
+    if (_inShutdown) {
+        log() << "Not starting replication storage threads because replication is shutting down.";
+    }
 
     log() << "Starting replication storage threads";
     _service->getStorageEngine()->setJournalListener(this);
@@ -337,11 +340,11 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& s
 
 void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) {
     stdx::unique_lock<stdx::mutex> lk(_threadMutex);
+    _inShutdown = true;
     if (!_startedThreads) {
         return;
     }
 
-    _inShutdown = true;
     _stopDataReplication_inlock(opCtx, lk);
 
     if (_noopWriter) {
