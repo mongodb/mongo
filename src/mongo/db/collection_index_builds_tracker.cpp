@@ -27,11 +27,14 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndex
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/collection_index_builds_tracker.h"
 
 #include "mongo/db/catalog/index_builds_manager.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -103,7 +106,18 @@ int CollectionIndexBuildsTracker::getNumberOfIndexBuilds(WithLock) const {
 
 void CollectionIndexBuildsTracker::waitUntilNoIndexBuildsRemain(
     stdx::unique_lock<stdx::mutex>& lk) {
-    _noIndexBuildsRemainCondVar.wait(lk, [&] { return _buildStateByBuildUUID.empty(); });
+    _noIndexBuildsRemainCondVar.wait(lk, [&] {
+        if (_buildStateByBuildUUID.empty()) {
+            return true;
+        }
+
+        log() << "Waiting until the following index builds are finished:";
+        for (const auto& indexBuild : _buildStateByBuildUUID) {
+            log() << "    Index build with UUID: " << indexBuild.first;
+        }
+
+        return false;
+    });
 }
 
 }  // namespace mongo
