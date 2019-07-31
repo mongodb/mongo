@@ -45,6 +45,9 @@ void Mutex::lock() {
     }
     hasLock = _mutex.try_lock_for(_lockTimeout.toSystemDuration() -
                                   kContendedLockTimeout.toSystemDuration());
+    if (gLockActions && !hasLock) {
+        gLockActions->onFailedLock();
+    }
     uassert(
         ErrorCodes::InternalError, "Unable to take latch, wait time exceeds set timeout", hasLock);
 }

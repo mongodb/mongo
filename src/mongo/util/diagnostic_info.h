@@ -31,11 +31,12 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-
+MONGO_FAIL_POINT_DECLARE(keepDiagnosticCaptureOnFailedLock);
 /**
  * DiagnosticInfo keeps track of diagnostic information such as a developer provided
  * name, the time when a lock was first acquired, and a partial caller call stack.
@@ -43,9 +44,10 @@ namespace mongo {
 class DiagnosticInfo {
 public:
     struct Diagnostic {
-        static DiagnosticInfo& get(Client*);
+        static std::shared_ptr<DiagnosticInfo> get(Client*);
         static void set(Client*, std::shared_ptr<DiagnosticInfo>);
-        Mutex m;
+        static void clearDiagnostic();
+        stdx::mutex m;
         std::shared_ptr<DiagnosticInfo> diagnostic;
     };
 

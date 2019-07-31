@@ -53,11 +53,13 @@ using namespace fmt::literals;
 namespace mongo {
 // Maximum number of stack frames to appear in a backtrace.
 const unsigned int kMaxBackTraceFrames = 100;
+MONGO_FAIL_POINT_DEFINE(keepDiagnosticCaptureOnFailedLock);
 
 namespace {
 const auto gDiagnosticHandle = Client::declareDecoration<DiagnosticInfo::Diagnostic>();
 
 MONGO_INITIALIZER(LockActions)(InitializerContext* context) {
+
     class LockActionsSubclass : public LockActions {
         void onContendedLock(const StringData& name) override {
             if (haveClient()) {
@@ -67,8 +69,11 @@ MONGO_INITIALIZER(LockActions)(InitializerContext* context) {
             }
         }
         void onUnlock() override {
-            if (haveClient()) {
-                DiagnosticInfo::Diagnostic::set(Client::getCurrent(), nullptr);
+            DiagnosticInfo::Diagnostic::clearDiagnostic();
+        }
+        void onFailedLock() override {
+            if (!MONGO_FAIL_POINT(keepDiagnosticCaptureOnFailedLock)) {
+                DiagnosticInfo::Diagnostic::clearDiagnostic();
             }
         }
     };
@@ -79,10 +84,10 @@ MONGO_INITIALIZER(LockActions)(InitializerContext* context) {
 }
 }  // namespace
 
-auto DiagnosticInfo::Diagnostic::get(Client* const client) -> DiagnosticInfo& {
+auto DiagnosticInfo::Diagnostic::get(Client* const client) -> std::shared_ptr<DiagnosticInfo> {
     auto& handle = gDiagnosticHandle(client);
     stdx::lock_guard lk(handle.m);
-    return *handle.diagnostic;
+    return handle.diagnostic;
 }
 
 void DiagnosticInfo::Diagnostic::set(Client* const client,
@@ -90,6 +95,12 @@ void DiagnosticInfo::Diagnostic::set(Client* const client,
     auto& handle = gDiagnosticHandle(client);
     stdx::lock_guard lk(handle.m);
     handle.diagnostic = newDiagnostic;
+}
+
+void DiagnosticInfo::Diagnostic::clearDiagnostic() {
+    if (haveClient()) {
+        DiagnosticInfo::Diagnostic::set(Client::getCurrent(), nullptr);
+    }
 }
 
 #if defined(__linux__)

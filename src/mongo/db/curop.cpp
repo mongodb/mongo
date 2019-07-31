@@ -47,6 +47,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
@@ -232,12 +233,29 @@ CurOp* CurOp::get(const OperationContext& opCtx) {
     return _curopStack(opCtx).top();
 }
 
+namespace {
+
+struct {
+    Mutex mutex = Mutex("TestMutex"_sd, Seconds(1));
+    stdx::unique_lock<Mutex> lock = stdx::unique_lock<Mutex>(mutex, stdx::defer_lock);
+} gHangLock;
+
+}  // namespace
 void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
                                      Client* client,
                                      bool truncateOps,
                                      bool backtraceMode,
                                      BSONObjBuilder* infoBuilder) {
     invariant(client);
+    if (MONGO_FAIL_POINT(keepDiagnosticCaptureOnFailedLock)) {
+        gHangLock.lock.lock();
+        try {
+            stdx::lock_guard testLock(gHangLock.mutex);
+        } catch (const DBException& e) {
+            log() << "Successfully caught " << e;
+        }
+    }
+
     OperationContext* clientOpCtx = client->getOperationContext();
 
     infoBuilder->append("type", "op");
@@ -302,12 +320,19 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
 
         CurOp::get(clientOpCtx)->reportState(infoBuilder, truncateOps);
     }
-    if (backtraceMode) {
-        DiagnosticInfo& diagnostic = DiagnosticInfo::Diagnostic::get(client);
+
+    std::shared_ptr<DiagnosticInfo> diagnostic = DiagnosticInfo::Diagnostic::get(client);
+    if (diagnostic && backtraceMode) {
+        // TODO: SERVER-42447 Add backtrace as bsonobj to waitingForLatch
         BSONObjBuilder waitingForLatchBuilder;
-        waitingForLatchBuilder.append("timestamp", diagnostic.getTimestamp());
-        waitingForLatchBuilder.append("captureName", diagnostic.getCaptureName());
+        waitingForLatchBuilder.append("timestamp", diagnostic->getTimestamp());
+        waitingForLatchBuilder.append("captureName", diagnostic->getCaptureName());
         infoBuilder->append("waitingForLatch", waitingForLatchBuilder.obj());
+    }
+
+
+    if (MONGO_FAIL_POINT(keepDiagnosticCaptureOnFailedLock)) {
+        gHangLock.lock.unlock();
     }
 }
 
