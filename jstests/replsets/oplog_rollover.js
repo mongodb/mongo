@@ -10,7 +10,7 @@ function doTest(storageEngine) {
 
     const replSet = new ReplSetTest({
         // Set the syncdelay to 1s to speed up checkpointing.
-        nodeOptions: {syncdelay: 1},
+        nodeOptions: {syncdelay: 1, setParameter: {logComponentVerbosity: tojson({storage: 1})}},
         nodes: [{}, {rsConfig: {priority: 0, votes: 0}}]
     });
     // Set max oplog size to 1MB.
@@ -27,11 +27,19 @@ function doTest(storageEngine) {
     const longString = new Array(400 * 1024).join("a");
 
     function numInsertOplogEntry(oplog) {
+        print(`Oplog times for ${oplog.getMongo().host}: ${
+            tojsononeline(oplog.find().projection({ts: 1, t: 1, op: 1, ns: 1}).toArray())}`);
         return oplog.find({op: "i", "ns": "test.foo"}).itcount();
     }
 
     // Insert the first document.
-    assert.commandWorked(coll.insert({_id: 0, longString: longString}, {writeConcern: {w: 2}}));
+    const firstInsertTimestamp =
+        assert
+            .commandWorked(coll.runCommand(
+                "insert", {documents: [{_id: 0, longString: longString}], writeConcern: {w: 2}}))
+            .operationTime;
+    jsTestLog("First insert timestamp: " + firstInsertTimestamp);
+
     // Test that oplog entry of the first insert exists on both primary and secondary.
     assert.eq(1, numInsertOplogEntry(primaryOplog));
     assert.eq(1, numInsertOplogEntry(secondaryOplog));
@@ -42,6 +50,8 @@ function doTest(storageEngine) {
             .commandWorked(coll.runCommand(
                 "insert", {documents: [{_id: 1, longString: longString}], writeConcern: {w: 2}}))
             .operationTime;
+    jsTestLog("Second insert timestamp: " + secondInsertTimestamp);
+
     // Test that oplog entries of both inserts exist on both primary and secondary.
     assert.eq(2, numInsertOplogEntry(primaryOplog));
     assert.eq(2, numInsertOplogEntry(secondaryOplog));
@@ -64,15 +74,11 @@ function doTest(storageEngine) {
                 const secondaryTimestamp =
                     assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}))
                         .lastStableRecoveryTimestamp;
-                if (primaryTimestamp >= secondInsertTimestamp &&
-                    secondaryTimestamp >= secondInsertTimestamp) {
-                    return true;
-                } else {
-                    jsTestLog("Awaiting last stable recovery timestamp " +
-                              `(primary: ${primaryTimestamp}, secondary: ${secondaryTimestamp}) ` +
-                              `target: ${secondInsertTimestamp}`);
-                    return false;
-                }
+                jsTestLog("Awaiting last stable recovery timestamp " +
+                          `(primary: ${primaryTimestamp}, secondary: ${secondaryTimestamp}) ` +
+                          `target: ${secondInsertTimestamp}`);
+                return ((timestampCmp(primaryTimestamp, secondInsertTimestamp) >= 0) &&
+                        (timestampCmp(secondaryTimestamp, secondInsertTimestamp) >= 0));
             },
             "Timeout waiting for checkpointing to catch up with the second insert",
             ReplSetTest.kDefaultTimeoutMS,
@@ -82,7 +88,13 @@ function doTest(storageEngine) {
         // oplog cap maintainer thread will then be unblocked on the creation of the new oplog
         // stone and will start truncating oplog entries. The oplog entry for the first
         // insert will be truncated after the oplog cap maintainer thread finishes.
-        assert.commandWorked(coll.insert({_id: 2, longString: longString}, {writeConcern: {w: 2}}));
+        const thirdInsertTimestamp =
+            assert
+                .commandWorked(coll.runCommand(
+                    "insert",
+                    {documents: [{_id: 2, longString: longString}], writeConcern: {w: 2}}))
+                .operationTime;
+        jsTestLog("Third insert timestamp: " + thirdInsertTimestamp);
 
         // Test that oplog entry of the initial insert rolls over on both primary and secondary.
         // Use assert.soon to wait for oplog cap maintainer thread to run.
