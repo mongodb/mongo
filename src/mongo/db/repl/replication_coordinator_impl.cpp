@@ -756,6 +756,10 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
         {
             // Must take the lock to set _initialSyncer, but not call it.
             stdx::lock_guard<stdx::mutex> lock(_mutex);
+            if (_inShutdown) {
+                log() << "Initial Sync not starting because replication is shutting down.";
+                return;
+            }
             initialSyncerCopy = std::make_shared<InitialSyncer>(
                 createInitialSyncerOptions(this, _externalState.get()),
                 stdx::make_unique<DataReplicatorExternalStateInitialSync>(this,
