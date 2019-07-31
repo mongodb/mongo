@@ -381,7 +381,7 @@ TEST_F(QueryPlannerWildcardTest, RangeIndexScanMinKeyMaxKey) {
         "{fetch: {filter: null, node: "
         "{ixscan: {filter: null, pattern: {'$_path': 1, a: 1},"
         "bounds: {'$_path': [['a','a',true,true], ['a.', 'a/', true, false]], 'a': [['MinKey', "
-        "'MaxKey', true, true]]}}}}}");
+        "'MaxKey', false, false]]}}}}}");
 }
 
 TEST_F(QueryPlannerWildcardTest, RangeIndexScanNestedField) {

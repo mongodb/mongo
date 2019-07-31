@@ -18,7 +18,7 @@ const proj = {
 };
 assertCoveredQueryAndCount({collection: coll, query: {a: {$gt: MaxKey}}, project: proj, count: 0});
 assertCoveredQueryAndCount({collection: coll, query: {a: {$gte: MaxKey}}, project: proj, count: 1});
-assertCoveredQueryAndCount({collection: coll, query: {a: {$lt: MaxKey}}, project: proj, count: 1});
+assertCoveredQueryAndCount({collection: coll, query: {a: {$lt: MaxKey}}, project: proj, count: 0});
 assertCoveredQueryAndCount({collection: coll, query: {a: {$lte: MaxKey}}, project: proj, count: 1});
 
 // Test that all documents are considered less than MaxKey, regardless of the presence of
