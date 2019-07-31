@@ -146,7 +146,7 @@ functions:
   - *setup_credentials
 
 
-  ### FOR MONGODB TESTS ### 
+  ### FOR MONGODB TESTS ###
   "set up virtualenv" :
     command: shell.exec
     type: test
@@ -468,7 +468,7 @@ tasks:
 - name: "test-nightly-standalone"
   depends_on:
    - variant: ".compile-variant"
-     name: "jsCore_WT" 
+     name: "jsCore_WT"
   tags: ["nightly", "standalone"]
   commands:
     - *git_get_project
@@ -523,7 +523,7 @@ tasks:
 #                AXES                 #
 #######################################
 axes:
-  ### GENERAL FOR ALL DRIVERS TESTS ### 
+  ### GENERAL FOR ALL DRIVERS TESTS ###
   - id: os
     display_name: OS
     values:
@@ -579,13 +579,6 @@ axes:
   - id: python-linux
     display_name: "Python"
     values:
-      - id: "2.6"
-        display_name: "Python 2.6"
-        variables:
-           ### There is no python toolchain on RHEL 6.2, using system python
-           PYTHON_BINARY: "/usr/bin/python"
-           DRIVER_WORKING_DIRECTORY: "mongo-python-driver"
-           DRIVER_TEST_UPLOAD_DIRECTORY: "src/mongo-python-driver/xunit-results/TEST-*.xml"
       - id: "2.7"
         display_name: "Python 2.7"
         variables:
@@ -612,12 +605,12 @@ modules:
 - name: enterprise
   repo: git@github.com:10gen/mongo-enterprise-modules.git
   prefix: src/mongo/db/modules
-  branch: v3.4 
+  branch: v3.4
 
 # Shared by all drivers projects
 - name: drivers-evergreen-tools
   repo: git@github.com:mongodb-labs/drivers-evergreen-tools.git
-  branch: master 
+  branch: master
 
 ### DRIVER REPOS ###
 ### DRIVERS ADD YOUR GIT REPO HERE ###
@@ -688,7 +681,7 @@ buildvariants:
 
 ### Python Matrix Linux
 - matrix_name: "python-driver-linux"
-  matrix_spec: {auth: "*", ssl: "*", os: "rhel62", python-linux: "2.6" }
+  matrix_spec: {auth: "*", ssl: "*", os: "rhel62", python-linux: "2.7" }
   display_name: "Python Driver ${os} ${python-linux} ${auth} ${ssl}"
   modules: [ "mongo-python-driver", "drivers-evergreen-tools" ]
   tasks:
