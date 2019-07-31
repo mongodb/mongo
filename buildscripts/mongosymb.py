@@ -24,7 +24,9 @@ import subprocess
 import sys
 
 
-def parse_input(trace_doc):
+def parse_input(trace_doc, dbg_path_resolver):
+    """Return a list of frame dicts from an object of {backtrace: list(), processInfo: dict()}."""
+
     def make_base_addr_map(somap_list):
         """Return map from binary load address to description of library from the somap_list.
 
@@ -58,18 +60,15 @@ def parse_input(trace_doc):
     return frames
 
 
-def symbolize_frames(  # pylint: disable=too-many-locals
-        trace_doc, dbg_path_resolver, symbolizer_path=None, dsym_hint=None, input_format="classic",
-        **kwargs):
+def symbolize_frames(trace_doc, dbg_path_resolver, symbolizer_path, dsym_hint, input_format,
+                     **_kwargs):
     """Return a list of symbolized stack frames from a trace_doc in MongoDB stack dump format."""
 
-    if symbolizer_path is None:
+    if not symbolizer_path:
         symbolizer_path = os.environ.get("MONGOSYMB_SYMBOLIZER_PATH", "llvm-symbolizer")
-    if dsym_hint is None:
-        dsym_hint = []
 
     if input_format == "classic":
-        frames = parse_input(trace_doc)
+        frames = parse_input(trace_doc, dbg_path_resolver)
     elif input_format == "thin":
         frames = trace_doc["backtrace"]
         for frame in frames:
@@ -186,8 +185,8 @@ def classic_output(frames, outfile, **kwargs):  # pylint: disable=unused-argumen
 def main(argv):
     """Execute Main program."""
     parser = optparse.OptionParser()
-    parser.add_option("--dsym-hint", action="append", dest="dsym_hint")
-    parser.add_option("--symbolizer-path", dest="symbolizer_path", default=None)
+    parser.add_option("--dsym-hint", action="append", dest="dsym_hint", default=list())
+    parser.add_option("--symbolizer-path", dest="symbolizer_path", default=str())
     parser.add_option("--debug-file-resolver", dest="debug_file_resolver", default="path")
     parser.add_option("--input-format", dest="input_format", default="classic")
     parser.add_option("--output-format", dest="output_format", default="classic")
