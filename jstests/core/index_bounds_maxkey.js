@@ -18,7 +18,7 @@
     assertCoveredQueryAndCount(
         {collection: coll, query: {a: {$gte: MaxKey}}, project: proj, count: 1});
     assertCoveredQueryAndCount(
-        {collection: coll, query: {a: {$lt: MaxKey}}, project: proj, count: 1});
+        {collection: coll, query: {a: {$lt: MaxKey}}, project: proj, count: 0});
     assertCoveredQueryAndCount(
         {collection: coll, query: {a: {$lte: MaxKey}}, project: proj, count: 1});
 

@@ -439,9 +439,9 @@ TEST(IndexBoundsBuilderTest, TranslateLtMaxKey) {
     IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
-    ASSERT_EQUALS(oil.intervals[0].toString(), "[MinKey, MaxKey]");
+    ASSERT_EQUALS(oil.intervals[0].toString(), "[MinKey, MaxKey)");
     ASSERT_TRUE(oil.intervals[0].startInclusive);
-    ASSERT_TRUE(oil.intervals[0].endInclusive);
+    ASSERT_FALSE(oil.intervals[0].endInclusive);
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
 }
 
@@ -583,8 +583,8 @@ TEST(IndexBoundsBuilderTest, TranslateGtMinKey) {
     IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
-    ASSERT_EQUALS(oil.intervals[0].toString(), "[MinKey, MaxKey]");
-    ASSERT_TRUE(oil.intervals[0].startInclusive);
+    ASSERT_EQUALS(oil.intervals[0].toString(), "(MinKey, MaxKey]");
+    ASSERT_FALSE(oil.intervals[0].startInclusive);
     ASSERT_TRUE(oil.intervals[0].endInclusive);
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
 }
@@ -2485,7 +2485,8 @@ TEST(IndexBoundsBuilderTest, LTMaxKeyWithCollator) {
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
     ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
-                  oil.intervals[0].compare(IndexBoundsBuilder::allValues()));
+                  oil.intervals[0].compare(IndexBoundsBuilder::allValuesRespectingInclusion(
+                      BoundInclusion::kIncludeStartKeyOnly)));
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
 }
 
@@ -2525,7 +2526,8 @@ TEST(IndexBoundsBuilderTest, GTMinKeyWithCollator) {
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
     ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
-                  oil.intervals[0].compare(IndexBoundsBuilder::allValues()));
+                  oil.intervals[0].compare(IndexBoundsBuilder::allValuesRespectingInclusion(
+                      BoundInclusion::kIncludeEndKeyOnly)));
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
 }
 
