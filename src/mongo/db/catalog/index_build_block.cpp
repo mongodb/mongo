@@ -151,7 +151,6 @@ IndexBuildBlock::~IndexBuildBlock() {
 void IndexBuildBlock::fail(OperationContext* opCtx, const Collection* collection) {
     // Being in a WUOW means all timestamping responsibility can be pushed up to the caller.
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
-    fassert(17204, collection->ok());  // defensive
 
     invariant(opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_X));
 
@@ -169,7 +168,6 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
     // Being in a WUOW means all timestamping responsibility can be pushed up to the caller.
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
-    fassert(17207, collection->ok());
     invariant(opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_X));
 
     if (_indexBuildInterceptor) {

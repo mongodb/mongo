@@ -43,10 +43,6 @@ public:
         return Status::OK();
     }
 
-    bool ok() const override {
-        return true;
-    }
-
     bool haveAnyIndexes() const override {
         return false;
     }

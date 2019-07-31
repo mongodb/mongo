@@ -190,8 +190,6 @@ public:
     Collection() = default;
     virtual ~Collection() = default;
 
-    virtual bool ok() const = 0;
-
     virtual const NamespaceString& ns() const = 0;
 
     /**

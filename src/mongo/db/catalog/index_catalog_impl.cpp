@@ -84,23 +84,11 @@ using std::vector;
 
 using IndexVersion = IndexDescriptor::IndexVersion;
 
-static const int INDEX_CATALOG_INIT = 283711;
-static const int INDEX_CATALOG_UNINIT = 654321;
-
 const BSONObj IndexCatalogImpl::_idObj = BSON("_id" << 1);
 
 // -------------
 
-IndexCatalogImpl::IndexCatalogImpl(Collection* collection)
-    : _magic(INDEX_CATALOG_UNINIT), _collection(collection) {}
-
-IndexCatalogImpl::~IndexCatalogImpl() {
-    if (_magic != INDEX_CATALOG_UNINIT) {
-        // only do this check if we haven't been initialized
-        _checkMagic();
-    }
-    _magic = 123456;
-}
+IndexCatalogImpl::IndexCatalogImpl(Collection* collection) : _collection(collection) {}
 
 Status IndexCatalogImpl::init(OperationContext* opCtx) {
     vector<string> indexNames;
@@ -130,20 +118,7 @@ Status IndexCatalogImpl::init(OperationContext* opCtx) {
 
     CollectionQueryInfo::get(_collection).init(opCtx);
 
-    _magic = INDEX_CATALOG_INIT;
     return Status::OK();
-}
-
-bool IndexCatalogImpl::ok() const {
-    return (_magic == INDEX_CATALOG_INIT);
-}
-
-void IndexCatalogImpl::_checkMagic() const {
-    if (ok()) {
-        return;
-    }
-    log() << "IndexCatalog::_magic wrong, is : " << _magic;
-    fassertFailed(17198);
 }
 
 std::unique_ptr<IndexCatalog::IndexIterator> IndexCatalogImpl::getIndexIterator(
@@ -421,8 +396,6 @@ StatusWith<BSONObj> IndexCatalogImpl::createIndexOnEmptyCollection(OperationCont
               str::stream() << "Collection must be empty. Collection: " << _collection->ns()
                             << " UUID: " << _collection->uuid()
                             << " Count: " << _collection->numRecords(opCtx));
-
-    _checkMagic();
 
     StatusWith<BSONObj> statusWithSpec = prepareSpecForCreate(opCtx, spec);
     Status status = statusWithSpec.getStatus();
@@ -938,8 +911,6 @@ Status IndexCatalogImpl::dropIndexEntry(OperationContext* opCtx, IndexCatalogEnt
     invariant(entry);
     invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns(), MODE_X));
 
-    _checkMagic();
-
     // Pulling indexName out as it is needed post descriptor release.
     string indexName = entry->descriptor()->indexName();
 
@@ -960,8 +931,6 @@ Status IndexCatalogImpl::dropIndexEntry(OperationContext* opCtx, IndexCatalogEnt
     CollectionQueryInfo::get(_collection).droppedIndex(opCtx, indexName);
     entry = nullptr;
     deleteIndexFromDisk(opCtx, indexName);
-
-    _checkMagic();
 
     return Status::OK();
 }

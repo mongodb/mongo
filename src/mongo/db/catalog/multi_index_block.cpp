@@ -240,10 +240,6 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
 
     const auto& ns = collection->ns().ns();
 
-    const auto idxCat = collection->getIndexCatalog();
-    invariant(idxCat);
-    invariant(idxCat->ok());
-
     const bool enableHybrid = areHybridIndexBuildsEnabled();
 
     // Parse the specs if this builder is not building hybrid indexes, otherwise log a message.

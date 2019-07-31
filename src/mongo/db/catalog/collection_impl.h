@@ -38,9 +38,6 @@ namespace mongo {
 class IndexConsistency;
 class CollectionCatalog;
 class CollectionImpl final : public Collection, public CappedCallback {
-private:
-    static const int kMagicNumber = 1357924;
-
 public:
     enum ValidationAction { WARN, ERROR_V };
     enum ValidationLevel { OFF, MODERATE, STRICT_V };
@@ -59,10 +56,6 @@ public:
                                          CollectionUUID uuid,
                                          std::unique_ptr<RecordStore> rs) const final;
     };
-
-    bool ok() const final {
-        return _magic == kMagicNumber;
-    }
 
     const NamespaceString& ns() const final {
         return _ns;
@@ -370,8 +363,6 @@ private:
                             std::vector<InsertStatement>::const_iterator begin,
                             std::vector<InsertStatement>::const_iterator end,
                             OpDebug* opDebug);
-
-    int _magic;
 
     NamespaceString _ns;
     UUID _uuid;

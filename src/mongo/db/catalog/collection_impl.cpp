@@ -194,8 +194,7 @@ CollectionImpl::CollectionImpl(OperationContext* opCtx,
                                const NamespaceString& nss,
                                UUID uuid,
                                std::unique_ptr<RecordStore> recordStore)
-    : _magic(kMagicNumber),
-      _ns(nss),
+    : _ns(nss),
       _uuid(uuid),
       _recordStore(std::move(recordStore)),
       _needCappedLock(supportsDocLocking() && _recordStore && _recordStore->isCapped() &&
@@ -209,7 +208,6 @@ CollectionImpl::CollectionImpl(OperationContext* opCtx,
 }
 
 CollectionImpl::~CollectionImpl() {
-    invariant(ok());
     if (isCapped()) {
         _recordStore->setCappedCallback(nullptr);
         _cappedNotifier->kill();
@@ -218,8 +216,6 @@ CollectionImpl::~CollectionImpl() {
     if (ns().isOplog()) {
         repl::clearLocalOplogPtr();
     }
-
-    _magic = 0;
 }
 
 std::unique_ptr<Collection> CollectionImpl::FactoryImpl::make(
@@ -266,7 +262,6 @@ bool CollectionImpl::requiresIdIndex() const {
 std::unique_ptr<SeekableRecordCursor> CollectionImpl::getCursor(OperationContext* opCtx,
                                                                 bool forward) const {
     dassert(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_IS));
-    invariant(ok());
 
     return _recordStore->getCursor(opCtx, forward);
 }

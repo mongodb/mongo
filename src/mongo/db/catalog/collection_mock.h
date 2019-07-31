@@ -56,10 +56,6 @@ public:
         _ns = std::move(nss);
     }
 
-    bool ok() const {
-        std::abort();
-    }
-
     const IndexCatalog* getIndexCatalog() const {
         return _indexCatalog.get();
     }
