@@ -34,6 +34,7 @@
 #include "mongo/db/catalog/collection_validation.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/max_validate_mb_per_sec_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/record_store.h"

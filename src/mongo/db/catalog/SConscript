@@ -74,6 +74,16 @@ env.Library(
 )
 
 env.Library(
+    target='max_validate_mb_per_sec_idl',
+    source=[
+        env.Idlc('max_validate_mb_per_sec.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/idl/server_parameter',
+    ],
+)
+
+env.Library(
     target='index_build_entry_idl',
     source=[
         env.Idlc('index_build_entry.idl')[0],
@@ -336,6 +346,7 @@ env.Library(
     ],
     LIBDEPS=[
 	'catalog_impl',
+	'max_validate_mb_per_sec_idl',
     ]
 )
 
