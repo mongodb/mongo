@@ -165,6 +165,11 @@ public:
      */
     static Interval allValues();
 
+    /**
+     * Returns an Interval from minKey to maxKey, preserving the specified inclusion.
+     */
+    static Interval allValuesRespectingInclusion(BoundInclusion bi);
+
     static void translateRegex(const RegexMatchExpression* rme,
                                const IndexEntry& index,
                                OrderedIntervalList* oil,

@@ -277,6 +277,13 @@ void IndexBoundsBuilder::allValuesForField(const BSONElement& elt, OrderedInterv
         makeRangeInterval(bob.obj(), BoundInclusion::kIncludeBothStartAndEndKeys));
 }
 
+Interval IndexBoundsBuilder::allValuesRespectingInclusion(BoundInclusion bi) {
+    BSONObjBuilder bob;
+    bob.appendMinKey("");
+    bob.appendMaxKey("");
+    return makeRangeInterval(bob.obj(), bi);
+}
+
 Interval IndexBoundsBuilder::allValues() {
     BSONObjBuilder bob;
     bob.appendMinKey("");
@@ -526,9 +533,10 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         const LTMatchExpression* node = static_cast<const LTMatchExpression*>(expr);
         BSONElement dataElt = node->getData();
 
-        // Everything is <= MaxKey.
+        // Everything is < MaxKey, except for MaxKey.
         if (MaxKey == dataElt.type()) {
-            oilOut->intervals.push_back(allValues());
+            oilOut->intervals.push_back(allValuesRespectingInclusion(
+                IndexBounds::makeBoundInclusionFromBoundBools(true, false)));
             *tightnessOut =
                 index.collator ? IndexBoundsBuilder::INEXACT_FETCH : IndexBoundsBuilder::EXACT;
             return;
@@ -564,9 +572,10 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         const GTMatchExpression* node = static_cast<const GTMatchExpression*>(expr);
         BSONElement dataElt = node->getData();
 
-        // Everything is > MinKey.
+        // Everything is > MinKey, except MinKey.
         if (MinKey == dataElt.type()) {
-            oilOut->intervals.push_back(allValues());
+            oilOut->intervals.push_back(allValuesRespectingInclusion(
+                IndexBounds::makeBoundInclusionFromBoundBools(false, true)));
             *tightnessOut =
                 index.collator ? IndexBoundsBuilder::INEXACT_FETCH : IndexBoundsBuilder::EXACT;
             return;
