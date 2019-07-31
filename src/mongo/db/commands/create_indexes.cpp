@@ -839,7 +839,9 @@ public:
         bool shouldLogMessageOnAlreadyBuildingError = true;
         while (true) {
             try {
-                if (enableIndexBuildsCoordinatorForCreateIndexesCommand) {
+                // TODO: SERVER-42513 Re-enable on mobile.
+                if (enableIndexBuildsCoordinatorForCreateIndexesCommand &&
+                    storageGlobalParams.engine != "mobile") {
                     return runCreateIndexesWithCoordinator(
                         opCtx, dbname, cmdObj, errmsg, result, false /*two phase build*/);
                 }
