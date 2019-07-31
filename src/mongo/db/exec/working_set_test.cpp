@@ -27,21 +27,17 @@
  *    it in the license file.
  */
 
-/**
- * This file contains tests for mongo/db/exec/working_set.cpp
- */
-
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/pipeline/document.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
-using namespace mongo;
-
-namespace {
+namespace mongo {
 
 using std::string;
 
@@ -156,4 +152,42 @@ TEST_F(WorkingSetFixture, getDottedFieldFromIndex) {
     ASSERT_FALSE(member->getFieldDotted("y", &elt));
 }
 
-}  // namespace
+TEST_F(WorkingSetFixture, MetadataCanBeCorrectlyTransferredBackAndForthFromDocument) {
+    // Add some metadata to the WSM.
+    member->metadata().setTextScore(1.2);
+    member->metadata().setSearchScore(3.4);
+
+    // Test that the metadata can be extracted from the WSM.
+    auto releasedMetadata = member->releaseMetadata();
+    ASSERT_FALSE(member->metadata());
+    ASSERT_FALSE(member->metadata().hasTextScore());
+    ASSERT_FALSE(member->metadata().hasSearchScore());
+    ASSERT_TRUE(releasedMetadata);
+    ASSERT_TRUE(releasedMetadata.hasTextScore());
+    ASSERT_TRUE(releasedMetadata.hasSearchScore());
+
+    // Test that the extracted metadata can be added to a Document.
+    Document document;
+    MutableDocument md{std::move(document)};
+    md.setMetadata(std::move(releasedMetadata));
+    document = md.freeze();
+    ASSERT_FALSE(releasedMetadata);
+    ASSERT_FALSE(releasedMetadata.hasTextScore());
+    ASSERT_FALSE(releasedMetadata.hasSearchScore());
+    ASSERT_TRUE(document.metadata());
+    ASSERT_TRUE(document.metadata().hasTextScore());
+    ASSERT_TRUE(document.metadata().hasSearchScore());
+
+    // Test that metadata can be transferred back to the WSM.
+    MutableDocument md2{std::move(document)};
+    member->setMetadata(md2.releaseMetadata());
+    document = md2.freeze();
+    ASSERT_FALSE(document.metadata());
+    ASSERT_FALSE(document.metadata().hasTextScore());
+    ASSERT_FALSE(document.metadata().hasSearchScore());
+    ASSERT_TRUE(member->metadata());
+    ASSERT_TRUE(member->metadata().hasTextScore());
+    ASSERT_TRUE(member->metadata().hasSearchScore());
+}
+
+}  // namespace mongo

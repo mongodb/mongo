@@ -407,6 +407,14 @@ public:
         return _metadataFields;
     }
 
+    DocumentMetadataFields releaseMetadata() {
+        return std::move(_metadataFields);
+    }
+
+    void setMetadata(DocumentMetadataFields&& metadata) {
+        _metadataFields = std::move(metadata);
+    }
+
     static unsigned hashKey(StringData name) {
         // TODO consider FNV-1a once we have a better benchmark corpus
         unsigned out;

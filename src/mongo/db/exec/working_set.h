@@ -285,6 +285,23 @@ public:
         return _metadata;
     }
 
+    /**
+     * Clears all metadata fields inside this WorkingSetMember, and returns a structure containing
+     * that extracted metadata to the caller. The metadata can then be attached to a new
+     * WorkingSetMember or to another data structure that houses metadata.
+     */
+    DocumentMetadataFields releaseMetadata() {
+        return std::move(_metadata);
+    }
+
+    /**
+     * Transfers metadata fields to this working set member. By pairs of calls to releaseMetadata()
+     * and setMetadata(), callers can cheaply transfer metadata between WorkingSetMembers.
+     */
+    void setMetadata(DocumentMetadataFields&& metadata) {
+        _metadata = std::move(metadata);
+    }
+
 private:
     friend class WorkingSet;
 

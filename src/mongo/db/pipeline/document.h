@@ -524,6 +524,23 @@ public:
         return storage().metadata();
     }
 
+    /**
+     * Clears all metadata fields inside this Document, and returns a structure containing that
+     * extracted metadata to the caller. The metadata can then be attached to a new Document or to
+     * another data structure that houses metadata.
+     */
+    DocumentMetadataFields releaseMetadata() {
+        return storage().releaseMetadata();
+    }
+
+    /**
+     * Transfers metadata fields to this Document. By pairs of calls to releaseMetadata() and
+     * setMetadata(), callers can cheaply transfer metadata between Documents.
+     */
+    void setMetadata(DocumentMetadataFields&& metadata) {
+        storage().setMetadata(std::move(metadata));
+    }
+
     /** Convert to a read-only document and release reference.
      *
      *  Call this to indicate that you are done with this Document and will
