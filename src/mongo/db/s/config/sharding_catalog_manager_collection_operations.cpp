@@ -68,6 +68,7 @@
 #include "mongo/s/shard_util.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
@@ -79,11 +80,21 @@ using std::set;
 using std::string;
 using std::vector;
 
+MONGO_FAIL_POINT_DEFINE(writeUnshardedCollectionsToShardingCatalog);
+
+MONGO_FAIL_POINT_DEFINE(hangCreateCollectionAfterAcquiringDistlocks);
+MONGO_FAIL_POINT_DEFINE(hangCreateCollectionAfterSendingCreateToPrimaryShard);
+MONGO_FAIL_POINT_DEFINE(hangCreateCollectionAfterGettingUUIDFromPrimaryShard);
+MONGO_FAIL_POINT_DEFINE(hangCreateCollectionAfterWritingEntryToConfigChunks);
+MONGO_FAIL_POINT_DEFINE(hangCreateCollectionAfterWritingEntryToConfigCollections);
+
 namespace {
 
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
 const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
 const char kWriteConcernField[] = "writeConcern";
+
+const KeyPattern kUnshardedCollectionShardKey(BSON("_id" << 1));
 
 boost::optional<UUID> checkCollectionOptions(OperationContext* opCtx,
                                              Shard* shard,
@@ -127,8 +138,8 @@ boost::optional<UUID> checkCollectionOptions(OperationContext* opCtx,
     return uassertStatusOK(UUID::parse(collectionInfo["uuid"]));
 }
 
-void writeFirstChunksForShardCollection(
-    OperationContext* opCtx, const InitialSplitPolicy::ShardCollectionConfig& initialChunks) {
+void writeFirstChunksForCollection(OperationContext* opCtx,
+                                   const InitialSplitPolicy::ShardCollectionConfig& initialChunks) {
     for (const auto& chunk : initialChunks.chunks) {
         uassertStatusOK(Grid::get(opCtx)->catalogClient()->insertConfigDocument(
             opCtx,
@@ -437,7 +448,7 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
             opCtx, nss, fieldsAndOrder, dbPrimaryShardId);
     }
 
-    writeFirstChunksForShardCollection(opCtx, initialChunks);
+    writeFirstChunksForCollection(opCtx, initialChunks);
 
     {
         CollectionType coll;
@@ -536,8 +547,17 @@ void ShardingCatalogManager::generateUUIDsForExistingShardedCollections(Operatio
 void ShardingCatalogManager::createCollection(OperationContext* opCtx,
                                               const NamespaceString& ns,
                                               const CollectionOptions& collOptions) {
+    if (MONGO_FAIL_POINT(hangCreateCollectionAfterAcquiringDistlocks)) {
+        log() << "Hit hangCreateCollectionAfterAcquiringDistlocks";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
+            opCtx, hangCreateCollectionAfterAcquiringDistlocks);
+    }
+
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+
+    // Forward the create to the primary shard to either create the collection or verify that the
+    // collection already exists with the same options.
 
     auto dbEntry =
         uassertStatusOK(catalogClient->getDatabase(
@@ -557,20 +577,111 @@ void ShardingCatalogManager::createCollection(OperationContext* opCtx,
         createCmdBuilder.obj(),
         Shard::RetryPolicy::kIdempotent);
 
+    if (MONGO_FAIL_POINT(hangCreateCollectionAfterSendingCreateToPrimaryShard)) {
+        log() << "Hit hangCreateCollectionAfterSendingCreateToPrimaryShard";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
+            opCtx, hangCreateCollectionAfterSendingCreateToPrimaryShard);
+    }
+
     auto createStatus = Shard::CommandResponse::getEffectiveStatus(swResponse);
     if (!createStatus.isOK() && createStatus != ErrorCodes::NamespaceExists) {
         uassertStatusOK(createStatus);
     }
 
-    checkCollectionOptions(opCtx, primaryShard.get(), ns, collOptions);
+    const auto uuid = checkCollectionOptions(opCtx, primaryShard.get(), ns, collOptions);
 
-    // TODO: SERVER-33094 use UUID returned to write config.collections entries.
+    if (MONGO_FAIL_POINT(hangCreateCollectionAfterGettingUUIDFromPrimaryShard)) {
+        log() << "Hit hangCreateCollectionAfterGettingUUIDFromPrimaryShard";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
+            opCtx, hangCreateCollectionAfterGettingUUIDFromPrimaryShard);
+    }
 
-    // Make sure to advance the opTime if writes didn't occur during the execution of this
-    // command. This is to ensure that this request will wait for the opTime that at least
-    // reflects the current state (that this command observed) while waiting for replication
-    // to satisfy the write concern.
-    repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+    if (collOptions.isView()) {
+        // Views are not written to the sharding catalog.
+        return;
+    }
+
+    uassert(51248,
+            str::stream() << "Expected to get back UUID from primary shard for new collection "
+                          << ns.ns(),
+            uuid);
+
+    // Insert the collection into the sharding catalog if it does not already exist.
+
+    const auto swExistingCollType =
+        catalogClient->getCollection(opCtx, ns, repl::ReadConcernLevel::kLocalReadConcern);
+    if (swExistingCollType != ErrorCodes::NamespaceNotFound) {
+        const auto existingCollType = uassertStatusOK(swExistingCollType).value;
+        LOG(0) << "Collection " << ns.ns() << " already exists in sharding catalog as "
+               << existingCollType.toBSON() << ", createCollection not writing new entry";
+        return;
+    }
+
+    InitialSplitPolicy::ShardCollectionConfig initialChunks;
+    ChunkVersion version(1, 0, OID::gen());
+    initialChunks.chunks.emplace_back(ns,
+                                      ChunkRange(kUnshardedCollectionShardKey.globalMin(),
+                                                 kUnshardedCollectionShardKey.globalMax()),
+                                      version,
+                                      primaryShardId);
+
+    auto& chunk = initialChunks.chunks.back();
+    const Timestamp validAfter = LogicalClock::get(opCtx)->getClusterTime().asTimestamp();
+    chunk.setHistory({ChunkHistory(std::move(validAfter), primaryShardId)});
+
+    // Construct the collection default collator.
+    std::unique_ptr<CollatorInterface> defaultCollator;
+    if (!collOptions.collation.isEmpty()) {
+        defaultCollator = uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                              ->makeFromBSON(collOptions.collation));
+    }
+
+    CollectionType targetCollType;
+    targetCollType.setNs(ns);
+    targetCollType.setDefaultCollation(defaultCollator ? defaultCollator->getSpec().toBSON()
+                                                       : BSONObj());
+    targetCollType.setUUID(*uuid);
+    targetCollType.setEpoch(initialChunks.collVersion().epoch());
+    targetCollType.setUpdatedAt(Date_t::fromMillisSinceEpoch(initialChunks.collVersion().toLong()));
+    targetCollType.setKeyPattern(kUnshardedCollectionShardKey.toBSON());
+    targetCollType.setUnique(false);
+    targetCollType.setDistributionMode(CollectionType::DistributionMode::kUnsharded);
+    uassertStatusOK(targetCollType.validate());
+
+    try {
+        checkForExistingChunks(opCtx, ns);
+    } catch (const ExceptionFor<ErrorCodes::ManualInterventionRequired>&) {
+        LOG(0) << "Found orphaned chunk metadata for " << ns.ns()
+               << ", going to remove it before writing new chunk metadata for createCollection";
+        uassertStatusOK(
+            catalogClient->removeConfigDocuments(opCtx,
+                                                 ChunkType::ConfigNS,
+                                                 BSON(ChunkType::ns(ns.ns())),
+                                                 ShardingCatalogClient::kLocalWriteConcern));
+    }
+
+    if (MONGO_FAIL_POINT(writeUnshardedCollectionsToShardingCatalog)) {
+        LOG(0) << "Going to write initial chunk for new unsharded collection " << ns.ns() << ": "
+               << chunk.toString();
+        writeFirstChunksForCollection(opCtx, initialChunks);
+
+        if (MONGO_FAIL_POINT(hangCreateCollectionAfterWritingEntryToConfigChunks)) {
+            log() << "Hit hangCreateCollectionAfterWritingEntryToConfigChunks";
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
+                opCtx, hangCreateCollectionAfterWritingEntryToConfigChunks);
+        }
+
+        LOG(0) << "Going to write collection entry for new unsharded collection " << ns.ns() << ": "
+               << targetCollType.toBSON();
+        uassertStatusOK(ShardingCatalogClientImpl::updateShardingCatalogEntryForCollection(
+            opCtx, ns, targetCollType, true /*upsert*/));
+
+        if (MONGO_FAIL_POINT(hangCreateCollectionAfterWritingEntryToConfigCollections)) {
+            log() << "Hit hangCreateCollectionAfterWritingEntryToConfigCollections";
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
+                opCtx, hangCreateCollectionAfterWritingEntryToConfigCollections);
+        }
+    }
 }
 
 void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
