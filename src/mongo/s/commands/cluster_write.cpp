@@ -328,7 +328,8 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
         : desiredChunkSize;
 
     // Check if there are enough estimated bytes written to warrant a split
-    if (chunkBytesWritten < splitThreshold / splitTestFactor) {
+    if (chunkBytesWritten < splitThreshold / splitTestFactor ||
+        !balancerConfig->getShouldAutoSplit()) {
         return;
     }
 
