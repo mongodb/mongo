@@ -86,7 +86,8 @@ function setupCRUDBeforeRefine() {
 }
 
 function validateCRUDAfterRefine() {
-    // Force a refresh on each shard to simulate the asynchronous 'setShardVersion' completing.
+    // Force a refresh on the mongos and each shard because refineCollectionShardKey only triggers
+    // best-effort shard refreshes.
     flushRoutersAndRefreshShardMetadata(st, {ns: kNsName});
 
     const session = mongos.startSession({retryWrites: true});
@@ -591,6 +592,31 @@ assert.eq(3, oldTagsArr.length);
 
 assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: kNsName, key: newKeyDoc}));
 validateUnrelatedCollAfterRefine(oldCollArr, oldChunkArr, oldTagsArr);
+
+// Verify that all shards containing chunks in the namespace 'db.foo' eventually refresh (i.e. the
+// secondary shard will not refresh because it does not contain any chunks in 'db.foo'). NOTE: This
+// will only succeed in a linear jstest without failovers.
+dropAndReshardColl(oldKeyDoc);
+assert.commandWorked(mongos.getCollection(kNsName).createIndex(newKeyDoc));
+
+assert.commandWorked(
+    mongos.adminCommand({moveChunk: kNsName, find: {a: 0, b: 0}, to: secondaryShard}));
+assert.commandWorked(
+    mongos.adminCommand({moveChunk: kNsName, find: {a: 0, b: 0}, to: primaryShard}));
+
+const oldPrimaryEpoch = st.shard0.adminCommand({getShardVersion: kNsName, fullMetadata: true})
+                            .metadata.shardVersionEpoch.toString();
+const oldSecondaryEpoch = st.shard1.adminCommand({getShardVersion: kNsName, fullMetadata: true})
+                              .metadata.shardVersionEpoch.toString();
+
+assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: kNsName, key: newKeyDoc}));
+
+assert.soon(() => oldPrimaryEpoch !==
+                st.shard0.adminCommand({getShardVersion: kNsName, fullMetadata: true})
+                    .metadata.shardVersionEpoch.toString());
+assert.soon(() => oldSecondaryEpoch ===
+                st.shard1.adminCommand({getShardVersion: kNsName, fullMetadata: true})
+                    .metadata.shardVersionEpoch.toString());
 
 st.stop();
 })();
