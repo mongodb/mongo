@@ -232,6 +232,17 @@ public:
      */
     void checkInvariants() const;
 
+    /**
+     * Wrap the callback and schedule it to run at some time
+     *
+     * The callback wrapper does the following:
+     * * Return before running cb if isRemovedFromManager is true
+     * * Return before running cb if the handle was canceled
+     * * Lock before running cb and unlock after
+     */
+    template <typename Callback>
+    auto scheduleWorkAt(Date_t when, Callback&& cb) const;
+
     const MongoURI setUri;  // URI passed to ctor -- THIS IS NOT UPDATED BY SCANS
     const std::string name;
 
@@ -240,7 +251,7 @@ public:
 
     AtomicWord<bool> isRemovedFromManager{false};
 
-    stdx::mutex mutex;  // You must hold this to access any member below.
+    mutable stdx::mutex mutex;  // You must hold this to access any member below.
 
     executor::TaskExecutor::CallbackHandle refresherHandle;
 

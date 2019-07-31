@@ -218,6 +218,22 @@ ReplicaSetMonitor::~ReplicaSetMonitor() {
     drop();
 }
 
+template <typename Callback>
+auto ReplicaSetMonitor::SetState::scheduleWorkAt(Date_t when, Callback&& cb) const {
+    auto wrappedCallback = [cb = std::forward<Callback>(cb),
+                            anchor = shared_from_this()](const CallbackArgs& cbArgs) mutable {
+        if (anchor->isRemovedFromManager.load() || ErrorCodes::isCancelationError(cbArgs.status)) {
+            // Do no more work if we're removed or canceled
+            return;
+        }
+        invariant(cbArgs.status);
+
+        stdx::lock_guard lk(anchor->mutex);
+        cb(cbArgs);
+    };
+    return executor->scheduleWorkAt(std::move(when), std::move(wrappedCallback));
+}
+
 void ReplicaSetMonitor::SetState::rescheduleRefresh(SchedulingStrategy strategy) {
     // Reschedule the refresh
 
@@ -253,20 +269,15 @@ void ReplicaSetMonitor::SetState::rescheduleRefresh(SchedulingStrategy strategy)
 
     nextScanTime = possibleNextScanTime;
     LOG(1) << "Next replica set scan scheduled for " << nextScanTime;
-    auto swHandle = executor->scheduleWorkAt(
-        nextScanTime, [this, anchor = shared_from_this()](const CallbackArgs& cbArgs) {
-            if (!cbArgs.status.isOK())
-                return;
+    auto swHandle = scheduleWorkAt(nextScanTime, [this](const CallbackArgs& cbArgs) {
+        if (cbArgs.myHandle != refresherHandle)
+            return;  // We've been replaced!
 
-            stdx::lock_guard lk(mutex);
-            if (cbArgs.myHandle != refresherHandle)
-                return;  // We've been replaced!
+        _ensureScanInProgress(shared_from_this());
 
-            _ensureScanInProgress(anchor);
-
-            // And now we set up the next one
-            rescheduleRefresh(SchedulingStrategy::kKeepEarlyScan);
-        });
+        // And now we set up the next one
+        rescheduleRefresh(SchedulingStrategy::kKeepEarlyScan);
+    });
 
     if (ErrorCodes::isShutdownError(swHandle.getStatus().code())) {
         LOG(1) << "Cant schedule refresh for " << name << ". Executor shutdown in progress";
@@ -527,15 +538,11 @@ void Refresher::scheduleNetworkRequests() {
         }
 
         // ensure that the call to isMaster is scheduled at most every 500ms
-        auto swHandle = _set->executor->scheduleWorkAt(
-            node->nextPossibleIsMasterCall,
-            [*this, host = ns.host](const CallbackArgs& cbArgs) mutable {
-                if (!cbArgs.status.isOK()) {
-                    return;
-                }
-                stdx::lock_guard lk(_set->mutex);
-                scheduleIsMaster(host);
-            });
+        auto swHandle =
+            _set->scheduleWorkAt(node->nextPossibleIsMasterCall,
+                                 [*this, host = ns.host](const CallbackArgs& cbArgs) mutable {
+                                     scheduleIsMaster(host);
+                                 });
 
         if (ErrorCodes::isShutdownError(swHandle.getStatus().code())) {
             break;
