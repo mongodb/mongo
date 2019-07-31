@@ -154,6 +154,11 @@ void ReplicaSetMonitorManager::removeMonitor(StringData setName) {
 }
 
 void ReplicaSetMonitorManager::shutdown() {
+    // Sadly, this function can run very late in the post-main shutdown because there is still
+    // a globalRSMonitorManager. We have to be very carefully how we log because this can actually
+    // shutdown later than the logging subsystem. This will be less of an issue once SERVER-42437 is
+    // done.
+
     decltype(_monitors) monitors;
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -164,7 +169,9 @@ void ReplicaSetMonitorManager::shutdown() {
         monitors = std::exchange(_monitors, {});
     }
 
-    log() << "Dropping all ongoing scans against replica sets";
+    if (monitors.size()) {
+        log() << "Dropping all ongoing scans against replica sets";
+    }
     for (auto& [name, monitor] : monitors) {
         auto anchor = monitor.lock();
         if (!anchor) {
