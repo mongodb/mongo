@@ -782,10 +782,10 @@ TEST_F(RenameCollectionTest,
     _opObserver->renameOpTime = {};
 
     _createCollection(_opCtx.get(), _sourceNss);
-    _createCollection(_opCtx.get(), _targetNss);
+    auto dropTargetUUID = _createCollectionWithUUID(_opCtx.get(), _targetNss);
     auto dbName = _sourceNss.db().toString();
     auto cmd = BSON("renameCollection" << _sourceNss.ns() << "to" << _targetNss.ns() << "dropTarget"
-                                       << true);
+                                       << dropTargetUUID);
 
     repl::OpTime renameOpTime = {Timestamp(Seconds(200), 1U), 1LL};
     ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, {}, cmd, renameOpTime));
@@ -804,10 +804,10 @@ DEATH_TEST_F(RenameCollectionTest,
     ASSERT_FALSE(_opCtx->writesAreReplicated());
 
     _createCollection(_opCtx.get(), _sourceNss);
-    _createCollection(_opCtx.get(), _targetNss);
+    auto dropTargetUUID = _createCollectionWithUUID(_opCtx.get(), _targetNss);
     auto dbName = _sourceNss.db().toString();
     auto cmd = BSON("renameCollection" << _sourceNss.ns() << "to" << _targetNss.ns() << "dropTarget"
-                                       << true);
+                                       << dropTargetUUID);
 
     repl::OpTime renameOpTime = {Timestamp(Seconds(200), 1U), 1LL};
     ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, {}, cmd, renameOpTime));
