@@ -115,11 +115,6 @@ MONGO_FAIL_POINT_DEFINE(sleepBetweenInsertOpTimeGenerationAndLogOp);
 // are visible, but before we have advanced 'lastApplied' for the write.
 MONGO_FAIL_POINT_DEFINE(hangBeforeLogOpAdvancesLastApplied);
 
-// so we can fail the same way
-void checkOplogInsert(Status result) {
-    massert(17322, str::stream() << "write to oplog failed: " << result.toString(), result.isOK());
-}
-
 bool shouldBuildInForeground(OperationContext* opCtx,
                              const BSONObj& index,
                              const NamespaceString& indexNss,
@@ -327,7 +322,11 @@ void _logOpsInner(OperationContext* opCtx,
                   str::stream() << "logOp() but can't accept write to collection " << nss.ns());
     }
 
-    checkOplogInsert(oplogCollection->insertDocumentsForOplog(opCtx, records, timestamps));
+    Status result = oplogCollection->insertDocumentsForOplog(opCtx, records, timestamps);
+    if (!result.isOK()) {
+        severe() << "write to oplog failed: " << result.toString();
+        fassertFailed(17322);
+    }
 
     // Set replCoord last optime only after we're sure the WUOW didn't abort and roll back.
     opCtx->recoveryUnit()->onCommit(
