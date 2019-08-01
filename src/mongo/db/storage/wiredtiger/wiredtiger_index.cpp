@@ -385,11 +385,19 @@ Status WiredTigerIndex::dupKeyCheck(OperationContext* opCtx, const BSONObj& key)
     invariant(!key.hasFieldNames());
     invariant(unique());
 
+    KeyString::Builder keyString(getKeyStringVersion(), key, _ordering);
+    return dupKeyCheck(opCtx, keyString.getValueCopy());
+}
+
+Status WiredTigerIndex::dupKeyCheck(OperationContext* opCtx, const KeyString::Value& key) {
+    invariant(unique());
+
     WiredTigerCursor curwrap(_uri, _tableId, false, opCtx);
     WT_CURSOR* c = curwrap.get();
 
     if (isDup(opCtx, c, key))
-        return buildDupKeyErrorStatus(key, _collectionNamespace, _indexName, _keyPattern);
+        return buildDupKeyErrorStatus(
+            key, _collectionNamespace, _indexName, _keyPattern, _ordering);
     return Status::OK();
 }
 
@@ -462,13 +470,12 @@ long long WiredTigerIndex::getSpaceUsedBytes(OperationContext* opCtx) const {
     return static_cast<long long>(WiredTigerUtil::getIdentSize(session->getSession(), _uri));
 }
 
-bool WiredTigerIndex::isDup(OperationContext* opCtx, WT_CURSOR* c, const BSONObj& key) {
+bool WiredTigerIndex::isDup(OperationContext* opCtx, WT_CURSOR* c, const KeyString::Value& key) {
     dassert(opCtx->lockState()->isReadLocked());
     invariant(unique());
 
     // First check whether the key exists.
-    KeyString::Builder data(getKeyStringVersion(), key, _ordering);
-    WiredTigerItem item(data.getBuffer(), data.getSize());
+    WiredTigerItem item(key.getBuffer(), key.getSize());
     setKey(c, item.Get());
 
     int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
@@ -1401,14 +1408,15 @@ bool WiredTigerIndexUnique::_keyExists(OperationContext* opCtx,
     return std::memcmp(buffer, item.data, std::min(size, item.size)) == 0;
 }
 
-bool WiredTigerIndexUnique::isDup(OperationContext* opCtx, WT_CURSOR* c, const BSONObj& key) {
+bool WiredTigerIndexUnique::isDup(OperationContext* opCtx,
+                                  WT_CURSOR* c,
+                                  const KeyString::Value& prefixKey) {
     if (!isTimestampSafeUniqueIdx()) {
         // The parent class provides a functionality that works fine, just use that.
-        return WiredTigerIndex::isDup(opCtx, c, key);
+        return WiredTigerIndex::isDup(opCtx, c, prefixKey);
     }
 
     // This procedure to determine duplicates is exclusive for timestamp safe unique indexes.
-    KeyString::Builder prefixKey(getKeyStringVersion(), key, _ordering);
     // Check if a prefix key already exists in the index. When keyExists() returns true, the cursor
     // will be positioned on the first occurence of the 'prefixKey'.
     if (!_keyExists(opCtx, c, prefixKey.getBuffer(), prefixKey.getSize())) {

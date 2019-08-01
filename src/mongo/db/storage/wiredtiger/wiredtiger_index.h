@@ -119,6 +119,8 @@ public:
                                    double scale) const;
     virtual Status dupKeyCheck(OperationContext* opCtx, const BSONObj& key);
 
+    virtual Status dupKeyCheck(OperationContext* opCtx, const KeyString::Value& keyString);
+
     virtual bool isEmpty(OperationContext* opCtx);
 
     virtual Status touch(OperationContext* opCtx) const;
@@ -135,7 +137,7 @@ public:
 
     // WiredTigerIndex additions
 
-    virtual bool isDup(OperationContext* opCtx, WT_CURSOR* c, const BSONObj& key);
+    virtual bool isDup(OperationContext* opCtx, WT_CURSOR* c, const KeyString::Value& keyString);
 
     uint64_t tableId() const {
         return _tableId;
@@ -222,7 +224,7 @@ public:
 
     bool isTimestampSafeUniqueIdx() const override;
 
-    bool isDup(OperationContext* opCtx, WT_CURSOR* c, const BSONObj& key) override;
+    bool isDup(OperationContext* opCtx, WT_CURSOR* c, const KeyString::Value& keyString) override;
 
     Status _insert(OperationContext* opCtx,
                    WT_CURSOR* c,

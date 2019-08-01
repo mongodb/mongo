@@ -217,6 +217,10 @@ public:
         return Status::OK();
     }
 
+    virtual Status dupKeyCheck(OperationContext* opCtx, const KeyString::Value& keyString) {
+        return Status::OK();
+    }
+
     virtual void fullValidate(OperationContext* opCtx,
                               long long* numKeysOut,
                               ValidateResults* fullResults) const {}

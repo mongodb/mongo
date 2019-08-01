@@ -489,11 +489,16 @@ Status SortedDataInterface::truncate(OperationContext* opCtx) {
 }
 
 Status SortedDataInterface::dupKeyCheck(OperationContext* opCtx, const BSONObj& key) {
+    KeyString::Builder ks(KeyString::Version::V1, key, _ordering);
+
+    return dupKeyCheck(opCtx, ks.getValueCopy());
+}
+
+Status SortedDataInterface::dupKeyCheck(OperationContext* opCtx, const KeyString::Value& key) {
     invariant(_isUnique);
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
-
-    std::string minKey = createKeyString(key, RecordId::min(), _prefix, _ordering, _isUnique);
-    std::string maxKey = createKeyString(key, RecordId::max(), _prefix, _ordering, _isUnique);
+    std::string minKey = createKeyString(key, key.getSize(), RecordId::min(), _prefix, _isUnique);
+    std::string maxKey = createKeyString(key, key.getSize(), RecordId::max(), _prefix, _isUnique);
 
     // We effectively do the same check as in insert. However, we also check to make sure that
     // the iterator returned to us by lower_bound also happens to be inside out ident.
@@ -513,9 +518,15 @@ Status SortedDataInterface::dupKeyCheck(OperationContext* opCtx, const BSONObj& 
     }
 
     auto next =
-        keyStringToIndexKeyEntry(lowerBoundIterator->first, lowerBoundIterator->second, _ordering);
-    if (key.woCompare(next.key, _ordering, false) == 0) {
-        return buildDupKeyErrorStatus(key, _collectionNamespace, _indexName, _keyPattern);
+        keyStringToKeyStringEntry(lowerBoundIterator->first, lowerBoundIterator->second, _ordering);
+
+    if (KeyString::compare(next->keyString.getBuffer(),
+                           key.getBuffer(),
+                           KeyString::sizeWithoutRecordIdAtEnd(next->keyString.getBuffer(),
+                                                               next->keyString.getSize()),
+                           key.getSize()) == 0) {
+        return buildDupKeyErrorStatus(
+            key, _collectionNamespace, _indexName, _keyPattern, _ordering);
     }
 
     return Status::OK();

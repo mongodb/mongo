@@ -235,18 +235,25 @@ Status MobileIndex::dupKeyCheck(OperationContext* opCtx, const BSONObj& key) {
     invariant(!key.hasFieldNames());
     invariant(_isUnique);
 
+    KeyString::Builder keyString(_keyStringVersion, key, _ordering);
+    return dupKeyCheck(opCtx, keyString.getValueCopy());
+}
+
+Status MobileIndex::dupKeyCheck(OperationContext* opCtx, const KeyString::Value& key) {
+    invariant(_isUnique);
+
     if (_isDup(opCtx, key))
-        return buildDupKeyErrorStatus(key, _collectionNamespace, _indexName, _keyPattern);
+        return buildDupKeyErrorStatus(
+            key, _collectionNamespace, _indexName, _keyPattern, _ordering);
     return Status::OK();
 }
 
-bool MobileIndex::_isDup(OperationContext* opCtx, const BSONObj& key) {
+bool MobileIndex::_isDup(OperationContext* opCtx, const KeyString::Value& key) {
     MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx);
 
     SqliteStatement dupCheckStmt(*session, "SELECT COUNT(*) FROM \"", _ident, "\" WHERE key = ?;");
 
-    KeyString::Builder keyStr(_keyStringVersion, key, _ordering);
-    dupCheckStmt.bindBlob(0, keyStr.getBuffer(), keyStr.getSize());
+    dupCheckStmt.bindBlob(0, key.getBuffer(), key.getSize());
 
     dupCheckStmt.step(SQLITE_ROW);
     long long records = dupCheckStmt.getColInt(0);

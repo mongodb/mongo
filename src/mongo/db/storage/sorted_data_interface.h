@@ -145,6 +145,15 @@ public:
     virtual Status dupKeyCheck(OperationContext* opCtx, const BSONObj& key) = 0;
 
     /**
+     * Return ErrorCodes::DuplicateKey if there is more than one occurence of 'KeyString' in this
+     * index, and Status::OK() otherwise. This call is only allowed on a unique index, and will
+     * invariant otherwise.
+     *
+     * @param opCtx the transaction under which this operation takes place
+     */
+    virtual Status dupKeyCheck(OperationContext* opCtx, const KeyString::Value& keyString) = 0;
+
+    /**
      * Attempt to reduce the storage space used by this index via compaction. Only called if the
      * indexed record store supports compaction-in-place.
      */

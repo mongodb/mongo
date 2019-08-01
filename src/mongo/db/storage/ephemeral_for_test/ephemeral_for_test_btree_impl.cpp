@@ -242,6 +242,12 @@ public:
         return Status::OK();
     }
 
+    virtual Status dupKeyCheck(OperationContext* opCtx, const KeyString::Value& keyString) {
+        const BSONObj key = KeyString::toBson(
+            keyString.getBuffer(), keyString.getSize(), _ordering, keyString.getTypeBits());
+        return dupKeyCheck(opCtx, key);
+    }
+
     virtual bool isEmpty(OperationContext* opCtx) {
         return _data->empty();
     }

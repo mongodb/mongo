@@ -74,6 +74,43 @@ TEST(SortedDataInterface, DupKeyCheckAfterInsert) {
     }
 }
 
+// Insert a KeyString and verify that dupKeyCheck() returns a non-OK status for
+// the same KeyString. When dupKeyCheck() is called with the exact KeyString
+// pair that was inserted, it should still return an OK status.
+TEST(SortedDataInterface, DupKeyCheckAfterInsertKeyString) {
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/true, /*partial=*/false));
+
+    KeyString::Builder keyString1(sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc1);
+    KeyString::Builder keyString1WithoutRecordId(
+        sorted->getKeyStringVersion(), key1, sorted->getOrdering());
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), keyString1.getValueCopy(), loc1, false));
+            uow.commit();
+        }
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT_OK(sorted->dupKeyCheck(opCtx.get(), keyString1WithoutRecordId.getValueCopy()));
+    }
+}
+
 // Verify that dupKeyCheck() returns an OK status for a key that does
 // not exist in the index.
 TEST(SortedDataInterface, DupKeyCheckEmpty) {
@@ -88,11 +125,28 @@ TEST(SortedDataInterface, DupKeyCheckEmpty) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->dupKeyCheck(opCtx.get(), key1));
-            uow.commit();
-        }
+        ASSERT_OK(sorted->dupKeyCheck(opCtx.get(), key1));
+    }
+}
+
+// Verify that dupKeyCheck() returns an OK status for a KeyString that does
+// not exist in the index.
+TEST(SortedDataInterface, DupKeyCheckEmptyKeyString) {
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/true, /*partial=*/false));
+
+    KeyString::Builder keyString1WithoutRecordId(
+        sorted->getKeyStringVersion(), key1, sorted->getOrdering());
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT_OK(sorted->dupKeyCheck(opCtx.get(), keyString1WithoutRecordId.getValueCopy()));
     }
 }
 
@@ -187,6 +241,33 @@ TEST(SortedDataInterface, DupKeyCheckWithDuplicates) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
         ASSERT_NOT_OK(sorted->dupKeyCheck(opCtx.get(), key1));
+    }
+}
+
+TEST(SortedDataInterface, DupKeyCheckWithDuplicateKeyStrings) {
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/true, /*partial=*/false));
+
+    KeyString::Builder keyString1(sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc1);
+    KeyString::Builder keyString2(sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc2);
+    KeyString::Builder keyString1WithoutRecordId(
+        sorted->getKeyStringVersion(), key1, sorted->getOrdering());
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+
+        WriteUnitOfWork uow(opCtx.get());
+        ASSERT_OK(sorted->insert(opCtx.get(), keyString1.getValueCopy(), loc1, true));
+        ASSERT_OK(sorted->insert(opCtx.get(), keyString2.getValueCopy(), loc2, true));
+        uow.commit();
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
+        ASSERT_NOT_OK(sorted->dupKeyCheck(opCtx.get(), keyString1WithoutRecordId.getValueCopy()));
     }
 }
 

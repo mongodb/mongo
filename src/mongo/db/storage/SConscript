@@ -35,6 +35,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/namespace_string',
         'duplicate_key_error_info',
+        'key_string',
         ],
     )
 

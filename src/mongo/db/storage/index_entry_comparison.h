@@ -246,4 +246,13 @@ Status buildDupKeyErrorStatus(const BSONObj& key,
                               const std::string& indexName,
                               const BSONObj& keyPattern);
 
+/**
+ * Returns the formatted error status about the duplicate KeyString.
+ */
+Status buildDupKeyErrorStatus(const KeyString::Value& keyString,
+                              const NamespaceString& collectionNamespace,
+                              const std::string& indexName,
+                              const BSONObj& keyPattern,
+                              const Ordering& ordering);
+
 }  // namespace mongo

@@ -90,6 +90,8 @@ public:
 
     Status dupKeyCheck(OperationContext* opCtx, const BSONObj& key) override;
 
+    Status dupKeyCheck(OperationContext* opCtx, const KeyString::Value& key) override;
+
     // Beginning of MobileIndex-specific methods
 
     /**
@@ -117,7 +119,7 @@ public:
     }
 
 protected:
-    bool _isDup(OperationContext* opCtx, const BSONObj& key);
+    bool _isDup(OperationContext* opCtx, const KeyString::Value& key);
 
     /**
      * Performs the deletion from the table matching the given key.
