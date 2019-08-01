@@ -765,10 +765,10 @@ TEST_F(RenameCollectionTest,
     _opObserver->renameOpTime = {};
 
     _createCollection(_opCtx.get(), _sourceNss);
-    auto dropTargetUUID = _createCollectionWithUUID(_opCtx.get(), _targetNss);
+    _createCollection(_opCtx.get(), _targetNss);
     auto dbName = _sourceNss.db().toString();
     auto cmd = BSON("renameCollection" << _sourceNss.ns() << "to" << _targetNss.ns() << "dropTarget"
-                                       << dropTargetUUID);
+                                       << true);
 
     repl::OpTime renameOpTime = {Timestamp(Seconds(200), 1U), 1LL};
     ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, boost::none, cmd, renameOpTime));
@@ -787,10 +787,10 @@ DEATH_TEST_F(RenameCollectionTest,
     ASSERT_FALSE(_opCtx->writesAreReplicated());
 
     _createCollection(_opCtx.get(), _sourceNss);
-    auto dropTargetUUID = _createCollectionWithUUID(_opCtx.get(), _targetNss);
+    _createCollection(_opCtx.get(), _targetNss);
     auto dbName = _sourceNss.db().toString();
     auto cmd = BSON("renameCollection" << _sourceNss.ns() << "to" << _targetNss.ns() << "dropTarget"
-                                       << dropTargetUUID);
+                                       << true);
 
     repl::OpTime renameOpTime = {Timestamp(Seconds(200), 1U), 1LL};
     ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, boost::none, cmd, renameOpTime));
@@ -824,20 +824,11 @@ TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsDropTargetByUUIDEvenIfSo
     auto dropTargetNss = NamespaceString("test.bar3");
     _createCollectionWithUUID(_opCtx.get(), _targetNss);
     auto dropTargetUUID = _createCollectionWithUUID(_opCtx.get(), dropTargetNss);
-    //<<<<<<< HEAD
     auto uuid = UUID::gen();
     auto cmd = BSON("renameCollection" << missingSourceNss.ns() << "to" << _targetNss.ns()
                                        << "dropTarget" << dropTargetUUID);
     ASSERT_OK(
         renameCollectionForApplyOps(_opCtx.get(), missingSourceNss.db().toString(), uuid, cmd, {}));
-    //=======
-    //    auto uuidDoc = BSON("ui" << UUID::gen());
-    //    auto cmd = BSON("renameCollection" << missingSourceNss.ns() << "to" << _targetNss.ns()
-    //                                       << "dropTarget" << dropTargetUUID);
-    //    ASSERT_OK(renameCollectionForApplyOps(
-    //        _opCtx.get(), missingSourceNss.db().toString(), uuidDoc["ui"], cmd, {}));
-    //>>>>>>> SERVER-42441 renameCollectionForApplyOps should always rename the target out of the
-    // way if it exists
     ASSERT_TRUE(_collectionExists(_opCtx.get(), _targetNss));
     ASSERT_FALSE(_collectionExists(_opCtx.get(), dropTargetNss));
 }
@@ -872,12 +863,7 @@ TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsDropTargetByUUIDEvenIfSo
     _createCollectionWithUUID(_opCtx.get(), _targetNss);
 
     auto dropTargetUUID = _createCollectionWithUUID(_opCtx.get(), dropTargetNss);
-    //<<<<<<< HEAD
     auto uuid = _createCollectionWithUUID(_opCtx.get(), dropPendingNss);
-    //=======
-    //    auto uuidDoc = BSON("ui" << _createCollectionWithUUID(_opCtx.get(), dropPendingNss));
-    //>>>>>>> SERVER-42441 renameCollectionForApplyOps should always rename the target out of the
-    // way if it exists
     auto cmd = BSON("renameCollection" << dropPendingNss.ns() << "to" << _targetNss.ns()
                                        << "dropTarget" << dropTargetUUID);
 
@@ -1012,14 +998,8 @@ void _testRenameCollectionAcrossDatabaseOplogEntries(
     if (forApplyOps) {
         auto cmd = BSON("renameCollection" << sourceNss.ns() << "to" << targetNss.ns()
                                            << "dropTarget" << true);
-        //<<<<<<< HEAD
         ASSERT_OK(
             renameCollectionForApplyOps(opCtx, sourceNss.db().toString(), boost::none, cmd, {}));
-        //=======
-        //        ASSERT_OK(renameCollectionForApplyOps(opCtx, sourceNss.db().toString(), {}, cmd,
-        //        {}));
-        //>>>>>>> SERVER-42441 renameCollectionForApplyOps should always rename the target out of
-        // the way if it exists
     } else {
         RenameCollectionOptions options;
         options.dropTarget = true;

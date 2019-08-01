@@ -89,8 +89,7 @@ bool isReplicatedChanged(OperationContext* opCtx,
 Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
                                       const NamespaceString& source,
                                       const NamespaceString& target,
-                                      RenameCollectionOptions options,
-                                      bool targetExistsAllowed) {
+                                      RenameCollectionOptions options) {
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (opCtx->writesAreReplicated() && !replCoord->canAcceptWritesFor(opCtx, source))
@@ -130,7 +129,7 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
         if (isCollectionSharded(opCtx, target))
             return {ErrorCodes::IllegalOperation, "cannot rename to a sharded collection"};
 
-        if (!targetExistsAllowed && !options.dropTarget)
+        if (!options.dropTarget)
             return Status(ErrorCodes::NamespaceExists, "target namespace exists");
     }
 
@@ -296,8 +295,7 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
         sourceLock.emplace(opCtx, source, MODE_X);
     }
 
-    auto status = checkSourceAndTargetNamespaces(
-        opCtx, source, target, options, /* targetExistsAllowed */ false);
+    auto status = checkSourceAndTargetNamespaces(opCtx, source, target, options);
     if (!status.isOK())
         return status;
 
@@ -336,8 +334,7 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
         dss->checkDbVersion(opCtx, dssLock);
     }
 
-    auto status = checkSourceAndTargetNamespaces(
-        opCtx, source, target, options, /* targetExistsAllowed */ true);
+    auto status = checkSourceAndTargetNamespaces(opCtx, source, target, options);
     if (!status.isOK())
         return status;
 
@@ -374,7 +371,7 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
                 return Status::OK();
             });
         }
-        if (!uuidToDrop || (uuidToDrop && uuidToDrop != targetColl->uuid())) {
+        if (uuidToDrop && uuidToDrop != targetColl->uuid()) {
             // We need to rename the targetColl to a temporary name.
             auto status = renameTargetCollectionToTmp(
                 opCtx, source, sourceColl->uuid(), db, target, targetColl->uuid());
