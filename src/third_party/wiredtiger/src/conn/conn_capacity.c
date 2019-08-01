@@ -270,8 +270,7 @@ __capacity_reserve(uint64_t *reservation, uint64_t bytes, uint64_t capacity,
 			 * If the reservation clock is out of date, bring it
 			 * to within a second of a current time.
 			 */
-			(void)__wt_atomic_store64(reservation,
-			    (now_ns - WT_BILLION) + res_len);
+			*reservation = (now_ns - WT_BILLION) + res_len;
 	} else
 		res_value = now_ns;
 

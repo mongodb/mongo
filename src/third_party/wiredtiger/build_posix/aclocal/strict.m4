@@ -134,6 +134,10 @@ AC_DEFUN([AM_CLANG_WARNINGS], [
 		w="$w -Wno-unused-command-line-argument";;
 	esac
 
+	# We occasionally use an extra semicolon to indicate an empty loop or
+	# conditional body.
+	w="$w -Wno-extra-semi-stmt"
+
 	# Ignore unrecognized options.
 	w="$w -Wno-unknown-warning-option"
 

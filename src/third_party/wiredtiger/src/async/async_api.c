@@ -160,8 +160,7 @@ retry:
 	WT_RET(__async_get_format(conn, uri, config, op));
 	op->unique_id = __wt_atomic_add64(&async->op_id, 1);
 	op->optype = WT_AOP_NONE;
-	(void)__wt_atomic_store32(
-	    &async->ops_index, (i + 1) % conn->async_size);
+	async->ops_index = (i + 1) % conn->async_size;
 	*opp = op;
 	return (0);
 }

@@ -133,6 +133,13 @@ class test_compat02(wttest.WiredTigerTestCase, suite_subprocess):
         # version. That configuration needs an existing database for it to be
         # useful. Test for success or failure based on the relative versions
         # configured.
+
+        # Turn on checkpoint verbose to debug a rare occurence of a test
+        # hanging, most likely during the checkpoint of conn.close.
+        self.pr("Closing connection")
+        self.conn.reconfigure('verbose=(checkpoint)')
+        with self.expectedStdoutPattern('.'):
+            self.conn.close()
         compat_str = ''
         if (self.max_req != 'none'):
             compat_str += 'compatibility=(require_max="%s"),' % self.max_req
@@ -140,7 +147,6 @@ class test_compat02(wttest.WiredTigerTestCase, suite_subprocess):
             compat_str += 'compatibility=(require_min="%s"),' % self.min_req
         if (self.rel != 'none'):
             compat_str += 'compatibility=(release="%s"),' % self.rel
-        self.conn.close()
         log_str = 'log=(enabled,file_max=%s,archive=false),' % self.logmax
         restart_config = log_str + compat_str
         self.pr("Restart conn " + restart_config)

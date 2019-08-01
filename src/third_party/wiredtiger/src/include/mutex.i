@@ -68,7 +68,7 @@ __wt_spin_trylock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
 	WT_UNUSED(session);
 
-	return (__sync_lock_test_and_set(&t->lock, 1) == 0 ? 0 : EBUSY);
+	return (__atomic_test_and_set(&t->lock, __ATOMIC_ACQUIRE) ? 0 : EBUSY);
 }
 
 /*
@@ -82,7 +82,7 @@ __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 
 	WT_UNUSED(session);
 
-	while (__sync_lock_test_and_set(&t->lock, 1)) {
+	while (__atomic_test_and_set(&t->lock, __ATOMIC_ACQUIRE)) {
 		for (i = 0; t->lock && i < WT_SPIN_COUNT; i++)
 			WT_PAUSE();
 		if (t->lock)
@@ -99,7 +99,7 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
 	WT_UNUSED(session);
 
-	__sync_lock_release(&t->lock);
+	__atomic_clear(&t->lock, __ATOMIC_RELEASE);
 }
 
 #elif SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX ||			\

@@ -89,38 +89,40 @@
  * swap) operations.
  */
 
-#ifdef __clang__
 /*
- * We avoid __sync_bool_compare_and_swap with due to problems with optimization
- * with some versions of clang. See http://llvm.org/bugs/show_bug.cgi?id=21499
- * for details.
+ * We've hit optimization bugs with Clang 3.5 in the past when using the atomic
+ * builtins. See http://llvm.org/bugs/show_bug.cgi?id=21499 for details.
  */
-#define	WT_ATOMIC_CAS(ptr, old, new)					\
-	(__sync_val_compare_and_swap(ptr, old, new) == (old))
-#else
-#define	WT_ATOMIC_CAS(ptr, old, new)					\
-	__sync_bool_compare_and_swap(ptr, old, new)
+#if defined(__clang__) && \
+	defined(__clang_major__) && defined(__clang_minor__) && \
+	(((__clang_major__ == 3) && (__clang_minor__ <= 5)) || \
+	 (__clang_major__ < 3))
+#error "Clang versions 3.5 and earlier are unsupported by WiredTiger"
 #endif
+
+#define	WT_ATOMIC_CAS(ptr, oldp, new)					\
+	__atomic_compare_exchange_n(					\
+	    ptr, oldp, new, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
 #define	WT_ATOMIC_CAS_FUNC(name, vp_arg, old_arg, new_arg)		\
 static inline bool							\
 __wt_atomic_cas##name(vp_arg, old_arg, new_arg)				\
 {									\
-	return (WT_ATOMIC_CAS(vp, old, new));				\
+	return (WT_ATOMIC_CAS(vp, &old, new));				\
 }
 WT_ATOMIC_CAS_FUNC(8, uint8_t *vp, uint8_t old, uint8_t new)
 WT_ATOMIC_CAS_FUNC(16, uint16_t *vp, uint16_t old, uint16_t new)
 WT_ATOMIC_CAS_FUNC(32, uint32_t *vp, uint32_t old, uint32_t new)
 WT_ATOMIC_CAS_FUNC(v32,							\
-    volatile uint32_t *vp, volatile uint32_t old, volatile uint32_t new)
+    volatile uint32_t *vp, uint32_t old, volatile uint32_t new)
 WT_ATOMIC_CAS_FUNC(i32, int32_t *vp, int32_t old, int32_t new)
 WT_ATOMIC_CAS_FUNC(iv32,						\
-    volatile int32_t *vp, volatile int32_t old, volatile int32_t new)
+    volatile int32_t *vp, int32_t old, volatile int32_t new)
 WT_ATOMIC_CAS_FUNC(64, uint64_t *vp, uint64_t old, uint64_t new)
 WT_ATOMIC_CAS_FUNC(v64,							\
-    volatile uint64_t *vp, volatile uint64_t old, volatile uint64_t new)
+    volatile uint64_t *vp, uint64_t old, volatile uint64_t new)
 WT_ATOMIC_CAS_FUNC(i64, int64_t *vp, int64_t old, int64_t new)
 WT_ATOMIC_CAS_FUNC(iv64,						\
-    volatile int64_t *vp, volatile int64_t old, volatile int64_t new)
+    volatile int64_t *vp, int64_t old, volatile int64_t new)
 WT_ATOMIC_CAS_FUNC(size, size_t *vp, size_t old, size_t new)
 
 /*
@@ -130,29 +132,24 @@ WT_ATOMIC_CAS_FUNC(size, size_t *vp, size_t old, size_t new)
 static inline bool
 __wt_atomic_cas_ptr(void *vp, void *old, void *new)
 {
-	return (WT_ATOMIC_CAS((void **)vp, old, new));
+	return (WT_ATOMIC_CAS((void **)vp, &old, new));
 }
 
 #define	WT_ATOMIC_FUNC(name, ret, vp_arg, v_arg)			\
 static inline ret							\
 __wt_atomic_add##name(vp_arg, v_arg)					\
 {									\
-	return (__sync_add_and_fetch(vp, v));				\
+	return (__atomic_add_fetch(vp, v, __ATOMIC_SEQ_CST));		\
 }									\
 static inline ret							\
 __wt_atomic_fetch_add##name(vp_arg, v_arg)				\
 {									\
-	return (__sync_fetch_and_add(vp, v));				\
-}									\
-static inline ret							\
-__wt_atomic_store##name(vp_arg, v_arg)					\
-{									\
-	return (__sync_lock_test_and_set(vp, v));			\
+	return (__atomic_fetch_add(vp, v, __ATOMIC_SEQ_CST));		\
 }									\
 static inline ret							\
 __wt_atomic_sub##name(vp_arg, v_arg)					\
 {									\
-	return (__sync_sub_and_fetch(vp, v));				\
+	return (__atomic_sub_fetch(vp, v, __ATOMIC_SEQ_CST));		\
 }
 WT_ATOMIC_FUNC(8, uint8_t, uint8_t *vp, uint8_t v)
 WT_ATOMIC_FUNC(16, uint16_t, uint16_t *vp, uint16_t v)
