@@ -1,5 +1,9 @@
-// Test that open unprepared transactions are aborted on FCV downgrade.
-// @tags: [uses_transactions]
+/**
+ * Test that open unprepared transactions are aborted on FCV downgrade. This test covers the
+ * behavior between FCV downgrade and unprepared transactions as of v4.2. It is safe to change this
+ * test's behavior or remove this test entirely if the behavior changes post v4.2.
+ * @tags: [uses_transactions]
+ */
 (function() {
 "use strict";
 load("jstests/libs/feature_compatibility_version.js");

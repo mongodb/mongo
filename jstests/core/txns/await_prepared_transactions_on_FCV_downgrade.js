@@ -1,5 +1,7 @@
 /**
- * Test that we wait for prepared transactions to finish during downgrade to FCV 4.0.
+ * Test that we wait for prepared transactions to finish during FCV downgrade. This test covers the
+ * locking behavior as of v4.2. It is safe to change this test's behavior or remove this test
+ * entirely if the locking behavior changes post v4.2.
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
 (function() {
@@ -50,13 +52,6 @@ try {
     assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
     checkFCV(adminDB, lastStableFCV);
 
-    jsTestLog("Verify that we are not allowed to prepare a transaction after downgrading.");
-    session.startTransaction();
-    assert.commandWorked(sessionDB[collName].insert({"b": 2}));
-    assert.commandFailedWithCode(sessionDB.adminCommand({prepareTransaction: 1}),
-                                 ErrorCodes.CommandNotSupported);
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
 } finally {
     assert.commandWorked(
         testDB.adminCommand({configureFailPoint: "failNonIntentLocksIfWaitNeeded", mode: "off"}));
