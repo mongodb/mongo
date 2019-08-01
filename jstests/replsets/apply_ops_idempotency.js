@@ -144,6 +144,29 @@ var tests = {
             mydb.adminCommand({renameCollection: z.getFullName(), to: y.getFullName()}));
         return [mydb, otherdb];
     },
+    renameCollectionAcrossDatabasesWithDropAndConvertToCapped: (db1) => {
+        let db2 = db1.getSiblingDB(db1 + '_');
+        assert.commandWorked(db1.createCollection("a"));
+        assert.commandWorked(db1.createCollection("b"));
+        assert.commandWorked(db2.createCollection("c"));
+        assert.commandWorked(db2.createCollection("d"));
+        let [a, b] = getCollections(db1, ['a', 'b']);
+        let [c, d] = getCollections(db2, ['c', 'd']);
+
+        assert.commandWorked(db1.adminCommand(
+            {renameCollection: a.getFullName(), to: c.getFullName(), dropTarget: true}));
+
+        assert(d.drop());
+
+        assert.commandWorked(db1.adminCommand(
+            {renameCollection: c.getFullName(), to: d.getFullName(), dropTarget: false}));
+
+        assert.commandWorked(db1.adminCommand(
+            {renameCollection: b.getFullName(), to: c.getFullName(), dropTarget: false}));
+        assert.commandWorked(db2.runCommand({convertToCapped: "d", size: 1000}));
+
+        return [db1, db2];
+    },
     createIndex: (mydb) => {
         let [x, y] = getCollections(mydb, ['x', 'y']);
         assert.commandWorked(x.createIndex({x: 1}));
