@@ -20,7 +20,12 @@ function runTest(st, session, sessionDB, writeCmdName, writeCmd, isSharded) {
     assert.commandWorked(st.rs0.getPrimary().adminCommand({
         configureFailPoint: "failCommand",
         mode: {times: 1},
-        data: {errorCode: retryableError, failCommands: [writeCmdName], failInternalCommands: true}
+        data: {
+            namespace: ns,
+            errorCode: retryableError,
+            failCommands: [writeCmdName],
+            failInternalCommands: true
+        }
     }));
 
     session.startTransaction();
@@ -36,7 +41,12 @@ function runTest(st, session, sessionDB, writeCmdName, writeCmd, isSharded) {
     assert.commandWorked(st.rs0.getPrimary().adminCommand({
         configureFailPoint: "failCommand",
         mode: {times: 1},
-        data: {closeConnection: true, failCommands: [writeCmdName], failInternalCommands: true}
+        data: {
+            namespace: ns,
+            closeConnection: true,
+            failCommands: [writeCmdName],
+            failInternalCommands: true
+        }
     }));
 
     session.startTransaction();
