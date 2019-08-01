@@ -1413,7 +1413,8 @@ bool runMapReduce(OperationContext* opCtx,
 
     const auto metadata = [&] {
         AutoGetCollectionForReadCommand autoColl(opCtx, config.nss);
-        return CollectionShardingState::get(opCtx, config.nss)->getOrphansFilter(opCtx);
+        return CollectionShardingState::get(opCtx, config.nss)
+            ->getOrphansFilter(opCtx, autoColl.getCollection());
     }();
 
     bool shouldHaveData = false;

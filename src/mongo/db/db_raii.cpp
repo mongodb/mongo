@@ -316,13 +316,13 @@ AutoGetCollectionForReadCommand::AutoGetCollectionForReadCommand(
                     _autoCollForRead.getDb() ? _autoCollForRead.getDb()->getProfilingLevel()
                                              : kDoNotChangeProfilingLevel,
                     deadline) {
-    if (!_autoCollForRead.getView()) {
-        // Perform the check early so the query planner would be able to extract the correct
-        // shard key. Also make sure that version is compatible if query planner decides to
-        // use an empty plan.
-        auto css = CollectionShardingState::get(opCtx, _autoCollForRead.getNss());
-        css->checkShardVersionOrThrow(opCtx);
-    }
+
+    // Perform the check early so the query planner would be able to extract the correct
+    // shard key. Also make sure that version is compatible if query planner decides to
+    // use an empty plan.
+    invariant(!_autoCollForRead.getView() || !_autoCollForRead.getCollection());
+    auto css = CollectionShardingState::get(opCtx, _autoCollForRead.getNss());
+    css->checkShardVersionOrThrow(opCtx, _autoCollForRead.getCollection());
 }
 
 OldClientContext::OldClientContext(OperationContext* opCtx, const std::string& ns, bool doVersion)
@@ -344,7 +344,8 @@ OldClientContext::OldClientContext(OperationContext* opCtx, const std::string& n
                 break;
             default:
                 CollectionShardingState::get(_opCtx, NamespaceString(ns))
-                    ->checkShardVersionOrThrow(_opCtx);
+                    ->checkShardVersionOrThrow(_opCtx,
+                                               _db->getCollection(opCtx, NamespaceString(ns)));
                 break;
         }
     }

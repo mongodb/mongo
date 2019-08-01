@@ -175,7 +175,7 @@ void appendCommandResponse(const PlanExecutor* exec,
     }
 }
 
-void assertCanWrite(OperationContext* opCtx, const NamespaceString& nsString) {
+void assertCanWrite(OperationContext* opCtx, const NamespaceString& nsString, bool isCollection) {
     uassert(ErrorCodes::NotMaster,
             str::stream() << "Not primary while running findAndModify command on collection "
                           << nsString.ns(),
@@ -183,7 +183,7 @@ void assertCanWrite(OperationContext* opCtx, const NamespaceString& nsString) {
 
     // Check for shard version match
     auto css = CollectionShardingState::get(opCtx, nsString);
-    css->checkShardVersionOrThrow(opCtx);
+    css->checkShardVersionOrThrow(opCtx, isCollection);
 }
 
 void recordStatsForTopCommand(OperationContext* opCtx) {
@@ -276,7 +276,7 @@ public:
                     autoColl.getDb());
 
             auto css = CollectionShardingState::get(opCtx, nsString);
-            css->checkShardVersionOrThrow(opCtx);
+            css->checkShardVersionOrThrow(opCtx, autoColl.getCollection());
 
             Collection* const collection = autoColl.getCollection();
             const auto exec =
@@ -301,7 +301,7 @@ public:
                     autoColl.getDb());
 
             auto css = CollectionShardingState::get(opCtx, nsString);
-            css->checkShardVersionOrThrow(opCtx);
+            css->checkShardVersionOrThrow(opCtx, autoColl.getCollection());
 
             Collection* const collection = autoColl.getCollection();
             const auto exec =
@@ -389,7 +389,7 @@ public:
                     CurOp::get(opCtx)->enter_inlock(nsString.ns().c_str(), dbProfilingLevel);
                 }
 
-                assertCanWrite(opCtx, nsString);
+                assertCanWrite(opCtx, nsString, autoColl.getCollection());
 
                 Collection* const collection = autoColl.getCollection();
                 checkIfTransactionOnCappedColl(collection, inTransaction);
@@ -455,7 +455,7 @@ public:
                     CurOp::get(opCtx)->enter_inlock(nsString.ns().c_str(), dbProfilingLevel);
                 }
 
-                assertCanWrite(opCtx, nsString);
+                assertCanWrite(opCtx, nsString, autoColl->getCollection());
 
                 Collection* collection = autoColl->getCollection();
 
@@ -472,7 +472,8 @@ public:
                     autoColl.reset();
                     autoDb.emplace(opCtx, dbName, MODE_X);
 
-                    assertCanWrite(opCtx, nsString);
+                    assertCanWrite(
+                        opCtx, nsString, autoDb->getDb()->getCollection(opCtx, nsString));
 
                     collection = autoDb->getDb()->getCollection(opCtx, nsString);
 

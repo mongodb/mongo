@@ -149,6 +149,7 @@ selector:
   - jstests/sharding/database_and_shard_versioning_all_commands.js
   - jstests/sharding/shard1.js
   - jstests/sharding/track_unsharded_collections_create_collection.js
+  - jstests/sharding/track_unsharded_collections_check_shard_version.js
   - jstests/sharding/banned_txn_databases_sharded.js
   # Enable if SERVER-41813 is backported or 4.4 becomes last-stable
   - jstests/sharding/invalid_system_views_sharded_collection.js

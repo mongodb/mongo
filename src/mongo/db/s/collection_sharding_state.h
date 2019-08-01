@@ -97,7 +97,7 @@ public:
      *
      * The returned object is safe to access even after the collection lock has been dropped.
      */
-    ScopedCollectionMetadata getOrphansFilter(OperationContext* opCtx);
+    ScopedCollectionMetadata getOrphansFilter(OperationContext* opCtx, bool isCollection);
 
     /**
      * See the comments for 'getOrphansFilter' above for more information on this method.
@@ -120,7 +120,7 @@ public:
      * version of the collection and if not, throws StaleConfigException populated with the received
      * and wanted versions.
      */
-    void checkShardVersionOrThrow(OperationContext* opCtx);
+    void checkShardVersionOrThrow(OperationContext* opCtx, bool isCollection);
 
     /**
      * Methods to control the collection's critical section. Methods listed below must be called
@@ -161,7 +161,9 @@ private:
      * atClusterTime if specified.
      */
     boost::optional<ScopedCollectionMetadata> _getMetadataWithVersionCheckAt(
-        OperationContext* opCtx, const boost::optional<mongo::LogicalTime>& atClusterTime);
+        OperationContext* opCtx,
+        const boost::optional<mongo::LogicalTime>& atClusterTime,
+        bool isCollection);
 
     // Object-wide ResourceMutex to protect changes to the CollectionShardingRuntime or objects
     // held within. Use only the CollectionShardingRuntimeLock to lock this mutex.

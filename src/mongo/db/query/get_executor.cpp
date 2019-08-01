@@ -382,7 +382,8 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
         if (plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
             root = std::make_unique<ShardFilterStage>(
                 opCtx,
-                CollectionShardingState::get(opCtx, canonicalQuery->nss())->getOrphansFilter(opCtx),
+                CollectionShardingState::get(opCtx, canonicalQuery->nss())
+                    ->getOrphansFilter(opCtx, collection),
                 ws,
                 root.release());
         }

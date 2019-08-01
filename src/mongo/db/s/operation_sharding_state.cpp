@@ -110,7 +110,8 @@ bool OperationShardingState::hasShardVersion() const {
     return _globalUnshardedShardVersion || !_shardVersions.empty();
 }
 
-ChunkVersion OperationShardingState::getShardVersion(const NamespaceString& nss) const {
+boost::optional<ChunkVersion> OperationShardingState::getShardVersion(
+    const NamespaceString& nss) const {
     if (_globalUnshardedShardVersion) {
         return ChunkVersion::UNSHARDED();
     }
@@ -119,9 +120,8 @@ ChunkVersion OperationShardingState::getShardVersion(const NamespaceString& nss)
     if (it != _shardVersions.end()) {
         return it->second;
     }
-    // If the client did not send a shardVersion for the requested namespace, assume the client
-    // expected the namespace to be unsharded.
-    return ChunkVersion::UNSHARDED();
+
+    return boost::none;
 }
 
 bool OperationShardingState::hasDbVersion() const {

@@ -292,7 +292,6 @@ let viewsCommandTests = {
     getShardVersion: {
         command: {getShardVersion: "test.view"},
         isAdminCommand: true,
-        expectFailure: true,
         skipSharded: true,  // mongos is tested in views/views_sharded.js
     },
     getnonce: {skip: isUnrelated},

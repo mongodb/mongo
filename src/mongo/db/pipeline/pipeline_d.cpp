@@ -127,7 +127,8 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorEx
 
     // If the incoming operation is sharded, use the CSS to infer the filtering metadata for the
     // collection, otherwise treat it as unsharded
-    auto shardMetadata = CollectionShardingState::get(opCtx, coll->ns())->getOrphansFilter(opCtx);
+    auto shardMetadata =
+        CollectionShardingState::get(opCtx, coll->ns())->getOrphansFilter(opCtx, coll);
 
     // Because 'numRecords' includes orphan documents, our initial decision to optimize the $sample
     // cursor may have been mistaken. For sharded collections, build a TRIAL plan that will switch

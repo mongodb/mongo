@@ -37,10 +37,14 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(useFCV44CheckShardVersionProtocol);
+
 namespace {
 
 class CollectionShardingStateMap {
@@ -159,9 +163,10 @@ void CollectionShardingState::report(OperationContext* opCtx, BSONObjBuilder* bu
     collectionsMap->report(opCtx, builder);
 }
 
-ScopedCollectionMetadata CollectionShardingState::getOrphansFilter(OperationContext* opCtx) {
+ScopedCollectionMetadata CollectionShardingState::getOrphansFilter(OperationContext* opCtx,
+                                                                   bool isCollection) {
     const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
-    auto optMetadata = _getMetadataWithVersionCheckAt(opCtx, atClusterTime);
+    auto optMetadata = _getMetadataWithVersionCheckAt(opCtx, atClusterTime, isCollection);
 
     if (!optMetadata)
         return {kUnshardedCollection};
@@ -194,12 +199,14 @@ boost::optional<ChunkVersion> CollectionShardingState::getCurrentShardVersionIfK
     return metadata->getCollVersion();
 }
 
-void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx) {
-    (void)_getMetadataWithVersionCheckAt(opCtx, boost::none);
+void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx, bool isCollection) {
+    (void)_getMetadataWithVersionCheckAt(opCtx, boost::none, isCollection);
 }
 
 boost::optional<ScopedCollectionMetadata> CollectionShardingState::_getMetadataWithVersionCheckAt(
-    OperationContext* opCtx, const boost::optional<mongo::LogicalTime>& atClusterTime) {
+    OperationContext* opCtx,
+    const boost::optional<mongo::LogicalTime>& atClusterTime,
+    bool isCollection) {
     const auto optReceivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
 
     if (!optReceivedShardVersion)
@@ -218,8 +225,22 @@ boost::optional<ScopedCollectionMetadata> CollectionShardingState::_getMetadataW
 
     auto metadata = _getMetadata(atClusterTime);
     auto wantedShardVersion = ChunkVersion::UNSHARDED();
-    if (metadata && (*metadata)->isSharded()) {
-        wantedShardVersion = (*metadata)->getShardVersion();
+
+    if (MONGO_FAIL_POINT(useFCV44CheckShardVersionProtocol)) {
+        LOG(0) << "Received shardVersion: " << receivedShardVersion << " for " << _nss.ns();
+        if (isCollection) {
+            LOG(0) << "Namespace " << _nss.ns() << " is collection, "
+                   << (metadata ? "have shardVersion cached" : "don't know shardVersion");
+            uassert(StaleConfigInfo(_nss, receivedShardVersion, wantedShardVersion),
+                    "don't know shardVersion",
+                    metadata);
+            wantedShardVersion = (*metadata)->getShardVersion();
+        }
+        LOG(0) << "Wanted shardVersion: " << wantedShardVersion << " for " << _nss.ns();
+    } else {
+        if (metadata && (*metadata)->isSharded()) {
+            wantedShardVersion = (*metadata)->getShardVersion();
+        }
     }
 
     auto criticalSectionSignal = [&] {

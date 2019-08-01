@@ -108,10 +108,9 @@ public:
      * operation. Documents in chunks which did not belong on this shard at this shard version
      * will be filtered out.
      *
-     * Returns ChunkVersion::UNSHARDED() if this operation has no shard version information
-     * for the requested namespace.
+     * Returns ChunkVersion::UNSHARDED() if setGlobalUnshardedShardVersion has been called.
      */
-    ChunkVersion getShardVersion(const NamespaceString& nss) const;
+    boost::optional<ChunkVersion> getShardVersion(const NamespaceString& nss) const;
 
     /**
      * Returns true if the client sent a databaseVersion for any namespace.

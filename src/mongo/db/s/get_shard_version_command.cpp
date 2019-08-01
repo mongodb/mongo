@@ -106,7 +106,8 @@ public:
             result.appendTimestamp("mine", 0);
         }
 
-        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
+        AutoGetCollection autoColl(
+            opCtx, nss, MODE_IS, AutoGetCollection::ViewMode::kViewsPermitted);
         auto* const css = CollectionShardingRuntime::get(opCtx, nss);
 
         const auto optMetadata = css->getCurrentMetadataIfKnown();
