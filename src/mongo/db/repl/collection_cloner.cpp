@@ -537,18 +537,13 @@ void CollectionCloner::_runQuery(const executor::TaskExecutor::CallbackArgs& cal
         return;
     }
 
-    // readOnce is available on 4.2 sync sources only.  Initially we don't know FCV, so
-    // we won't use the readOnce feature, but once the admin database is cloned we will use it.
-    // The admin database is always cloned first, so all user data should use readOnce.
-    const bool readOnceAvailable = serverGlobalParams.featureCompatibility.getVersionUnsafe() ==
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42;
     try {
         _clientConnection->query(
             [this, onCompletionGuard](DBClientCursorBatchIterator& iter) {
                 _handleNextBatch(onCompletionGuard, iter);
             },
             NamespaceStringOrUUID(_sourceNss.db().toString(), *_options.uuid),
-            readOnceAvailable ? QUERY("query" << BSONObj() << "$readOnce" << true) : Query(),
+            QUERY("query" << BSONObj() << "$readOnce" << true),
             nullptr /* fieldsToReturn */,
             QueryOption_NoCursorTimeout | QueryOption_SlaveOk |
                 (collectionClonerUsesExhaust ? QueryOption_Exhaust : 0),
