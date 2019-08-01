@@ -42,16 +42,29 @@ function getCoordinatorFailpoints() {
     return coordinatorFailpointDataArr.map(failpoint => Object.assign({}, failpoint));
 }
 
-function setFailCommandOnShards(st, mode, commands, code, numShards) {
+function setFailCommandOnShards(st, mode, commands, code, numShards, ns) {
     for (let i = 0; i < numShards; i++) {
         const shardConn = st["rs" + i].getPrimary();
         // Sharding tests require failInternalCommands: true, since the mongos appears to mongod to
         // be an internal client.
-        assert.commandWorked(shardConn.adminCommand({
-            configureFailPoint: "failCommand",
-            mode: mode,
-            data: {errorCode: code, failCommands: commands, failInternalCommands: true}
-        }));
+        if (ns) {
+            assert.commandWorked(shardConn.adminCommand({
+                configureFailPoint: "failCommand",
+                mode: mode,
+                data: {
+                    namespace: ns,
+                    errorCode: code,
+                    failCommands: commands,
+                    failInternalCommands: true
+                }
+            }));
+        } else {
+            assert.commandWorked(shardConn.adminCommand({
+                configureFailPoint: "failCommand",
+                mode: mode,
+                data: {errorCode: code, failCommands: commands, failInternalCommands: true}
+            }));
+        }
     }
 }
 
