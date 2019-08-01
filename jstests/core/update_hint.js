@@ -12,15 +12,6 @@
 
 load("jstests/libs/analyze_plan.js");
 
-const coll = db.jstests_update_hint;
-coll.drop();
-
-assert.commandWorked(coll.insert({x: 1, y: 1}));
-assert.commandWorked(coll.insert({x: 1, y: 1}));
-
-assert.commandWorked(coll.createIndex({x: 1}));
-assert.commandWorked(coll.createIndex({y: -1}));
-
 function assertCommandUsesIndex(command, expectedHintKeyPattern) {
     const out = assert.commandWorked(coll.runCommand({explain: command}));
     const planStage = getPlanStage(out, "IXSCAN");
@@ -28,68 +19,135 @@ function assertCommandUsesIndex(command, expectedHintKeyPattern) {
     assert.eq(planStage.keyPattern, expectedHintKeyPattern, tojson(planStage));
 }
 
-const updateCmd = {
-    update: 'jstests_update_hint',
-};
+const coll = db.jstests_update_hint;
+let updateCmd = {update: coll.getName(), updates: [{q: {x: 1}, u: {$set: {y: 1}}, hint: {x: 1}}]};
 
-const updates = [{q: {x: 1}, u: {$set: {y: 1}}, hint: {x: 1}}];
+function normalIndexTest() {
+    // Hint using a key pattern.
+    coll.drop();
+    assert.commandWorked(coll.insert({x: 1, y: 1}));
+    assert.commandWorked(coll.createIndex({x: 1}));
+    assert.commandWorked(coll.createIndex({y: -1}));
 
-updateCmd.updates = updates;
-// Hint using a key pattern.
-assertCommandUsesIndex(updateCmd, {x: 1});
+    // Hint using index key pattern.
+    assertCommandUsesIndex(updateCmd, {x: 1});
 
-// Hint using an index name.
-updates[0].hint = 'y_-1';
-assertCommandUsesIndex(updateCmd, {y: -1});
+    // Hint using an index name.
+    updateCmd = {update: coll.getName(), updates: [{q: {x: 1}, u: {$set: {y: 1}}, hint: 'y_-1'}]};
+    assertCommandUsesIndex(updateCmd, {y: -1});
 
-// Passing a hint should not use the idhack fast-path.
-updates[0].q = {
-    _id: 1
-};
-assertCommandUsesIndex(updateCmd, {y: -1});
+    // Passing a hint should not use the idhack fast-path.
+    updateCmd = {update: coll.getName(), updates: [{q: {_id: 1}, u: {$set: {y: 1}}, hint: 'y_-1'}]};
+    assertCommandUsesIndex(updateCmd, {y: -1});
+}
 
-// Create a sparse index.
-assert.commandWorked(coll.createIndex({s: 1}, {sparse: true}));
+function sparseIndexTest() {
+    // Create a sparse index with 2 documents.
+    coll.drop();
+    assert.commandWorked(coll.insert({x: 1}));
+    assert.commandWorked(coll.insert({x: 1}));
+    assert.commandWorked(coll.insert({x: 1, s: 0}));
+    assert.commandWorked(coll.insert({x: 1, s: 0}));
+    assert.commandWorked(coll.createIndex({x: 1}));
+    assert.commandWorked(coll.createIndex({s: 1}, {sparse: true}));
 
-// Hint should be respected, even on incomplete indexes.
-updates[0].hint = {
-    s: 1
-};
-assertCommandUsesIndex(updateCmd, {s: 1});
+    // Hint should be respected, even on incomplete indexes.
+    updateCmd = {update: coll.getName(), updates: [{q: {_id: 1}, u: {$set: {y: 1}}, hint: {s: 1}}]};
+    assertCommandUsesIndex(updateCmd, {s: 1});
 
-// Command should fail with incorrectly formatted hints.
-updates[0].hint = 1;
-assert.commandFailedWithCode(coll.runCommand(updateCmd), ErrorCodes.FailedToParse);
-updates[0].hint = true;
-assert.commandFailedWithCode(coll.runCommand(updateCmd), ErrorCodes.FailedToParse);
+    // Update hinting a sparse index updates only the document in the sparse index.
+    updateCmd = {
+        update: coll.getName(),
+        updates: [{q: {}, u: {$set: {s: 1}}, hint: {s: 1}, multi: true}]
+    };
+    assert.commandWorked(coll.runCommand(updateCmd));
+    assert.eq(2, coll.count({s: 1}));
 
-// Command should fail with hints to non-existent indexes.
-updates[0].hint = {
-    badHint: 1
-};
-assert.commandFailedWithCode(coll.runCommand(updateCmd), ErrorCodes.BadValue);
+    // Update hinting a sparse index with upsert option can result in an insert even if the
+    // correct behaviour would be to update an existing document.
+    assert.commandWorked(coll.insert({x: 2}));
+    updateCmd = {
+        update: coll.getName(),
+        updates: [{q: {x: 2}, u: {$set: {x: 1}}, hint: {s: 1}, upsert: true}]
+    };
+    let res = assert.commandWorked(coll.runCommand(updateCmd));
+    assert.eq(res.upserted.length, 1);
+}
 
-// Insert document that will be in the sparse index.
-assert.commandWorked(coll.insert({x: 1, s: 0}));
+function shellHelpersTest() {
+    coll.drop();
+    assert.commandWorked(coll.insert({x: 1}));
+    assert.commandWorked(coll.insert({x: 1, s: 0}));
+    assert.commandWorked(coll.insert({x: 1, s: 0}));
+    assert.commandWorked(coll.createIndex({x: 1}));
+    assert.commandWorked(coll.createIndex({s: 1}, {sparse: true}));
 
-// Update hinting a sparse index updates only the document in the sparse index.
-updates[0] = {
-    q: {},
-    u: {$set: {s: 1}},
-    hint: {s: 1}
-};
-assert.commandWorked(coll.runCommand(updateCmd));
-assert.eq(1, coll.count({s: 1}));
+    // Test shell helpers using a hinted sparse index should only update documents that exist in
+    // the sparse index.
+    let res = coll.update({x: 1}, {$set: {y: 2}}, {hint: {s: 1}, multi: true});
+    assert.eq(res.nMatched, 2);
 
-// Update hinting a sparse index with upsert option can result in an insert even if the correct
-// behaviour would be to update an existing document.
-assert.commandWorked(coll.insert({x: 2}));
-updates[0] = {
-    q: {x: 2},
-    u: {$set: {s: 1}},
-    hint: {s: 1},
-    upsert: true
-};
-assert.commandWorked(coll.runCommand(updateCmd));
-assert.eq(2, coll.count({x: 2}));
+    // Insert document that will not be in the sparse index. Update hinting sparse index should
+    // result in upsert.
+    assert.commandWorked(coll.insert({x: 2}));
+    res = coll.updateOne({x: 2}, {$set: {y: 2}}, {hint: {s: 1}, upsert: true});
+    assert(res.upsertedId);
+    res = coll.updateMany({x: 1}, {$set: {y: 2}}, {hint: {s: 1}});
+    assert.eq(res.matchedCount, 2);
+
+    // Test bulk writes.
+    let bulk = coll.initializeUnorderedBulkOp();
+    bulk.find({x: 1}).hint({s: 1}).update({$set: {y: 1}});
+    res = bulk.execute();
+    assert.eq(res.nMatched, 2);
+    bulk = coll.initializeUnorderedBulkOp();
+    bulk.find({x: 2}).hint({s: 1}).upsert().updateOne({$set: {y: 1}});
+    res = bulk.execute();
+    assert.eq(res.nUpserted, 1);
+
+    res = coll.bulkWrite([{
+        updateOne: {
+            filter: {x: 2},
+            update: {$set: {y: 2}},
+            hint: {s: 1},
+            upsert: true,
+        }
+    }]);
+    assert.eq(res.upsertedCount, 1);
+
+    res = coll.bulkWrite([{
+        updateMany: {
+            filter: {x: 1},
+            update: {$set: {y: 2}},
+            hint: {s: 1},
+        }
+    }]);
+    assert.eq(res.matchedCount, 2);
+}
+
+function failedHintTest() {
+    coll.drop();
+    assert.commandWorked(coll.insert({x: 1}));
+    assert.commandWorked(coll.createIndex({x: 1}));
+
+    // Command should fail with incorrectly formatted hints.
+    updateCmd = {update: coll.getName(), updates: [{q: {_id: 1}, u: {$set: {y: 1}}, hint: 1}]};
+    assert.commandFailedWithCode(coll.runCommand(updateCmd), ErrorCodes.FailedToParse);
+    updateCmd = {update: coll.getName(), updates: [{q: {_id: 1}, u: {$set: {y: 1}}, hint: true}]};
+    assert.commandFailedWithCode(coll.runCommand(updateCmd), ErrorCodes.FailedToParse);
+
+    // Command should fail with hints to non-existent indexes.
+    updateCmd = {
+        update: coll.getName(),
+        updates: [{q: {_id: 1}, u: {$set: {y: 1}}, hint: {badHint: 1}}]
+    };
+    assert.commandFailedWithCode(coll.runCommand(updateCmd), ErrorCodes.BadValue);
+}
+
+normalIndexTest();
+sparseIndexTest();
+if (coll.getMongo().writeMode() === "commands") {
+    shellHelpersTest();
+}
+failedHintTest();
 })();
