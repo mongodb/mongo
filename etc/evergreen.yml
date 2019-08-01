@@ -1227,11 +1227,11 @@ functions:
           # Evergreen executable is in $HOME, so add that to the path.
           PATH=$PATH:$HOME $python buildscripts/bypass_compile_and_fetch_binaries.py            \
             --project ${project}                                               \
-            --buildVariant ${build_variant}                                    \
+            --build-variant ${build_variant}                                   \
             --revision ${revision}                                             \
-            --patchFile patch_files.txt                                        \
-            --outFile bypass_compile_expansions.yml                            \
-            --jsonArtifact artifacts.json
+            --patch-file patch_files.txt                                       \
+            --out-file bypass_compile_expansions.yml                           \
+            --json-artifact artifacts.json
         fi
 
   ### Set expansion macros used in each task ###

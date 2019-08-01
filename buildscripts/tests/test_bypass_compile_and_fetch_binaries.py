@@ -2,7 +2,6 @@
 
 import unittest
 
-from collections import namedtuple
 from mock import mock_open, patch, MagicMock
 
 import buildscripts.bypass_compile_and_fetch_binaries as under_test
@@ -66,9 +65,11 @@ class TestFileInGroup(unittest.TestCase):
 class TestShouldBypassCompile(unittest.TestCase):
     @patch("builtins.open", mock_open(read_data=""))
     def test_nothing_in_patch_file(self):
-        self.assertTrue(under_test.should_bypass_compile(MagicMock()))
+        build_variant = "build_variant"
+        self.assertTrue(under_test.should_bypass_compile("", build_variant))
 
     def test_change_to_blacklist_file(self):
+        build_variant = "build_variant"
         git_changes = """
 buildscripts/burn_in_tests.py
 buildscripts/scons.py
@@ -77,9 +78,10 @@ buildscripts/yaml_key_value.py
 
         with patch("builtins.open") as open_mock:
             open_mock.return_value.__enter__.return_value = git_changes.splitlines()
-            self.assertFalse(under_test.should_bypass_compile(MagicMock()))
+            self.assertFalse(under_test.should_bypass_compile(git_changes, build_variant))
 
     def test_change_to_blacklist_directory(self):
+        build_variant = "build_variant"
         git_changes = """
 buildscripts/burn_in_tests.py
 buildscripts/idl/file.py
@@ -88,9 +90,10 @@ buildscripts/yaml_key_value.py
 
         with patch("builtins.open") as open_mock:
             open_mock.return_value.__enter__.return_value = git_changes.splitlines()
-            self.assertFalse(under_test.should_bypass_compile(MagicMock()))
+            self.assertFalse(under_test.should_bypass_compile(git_changes, build_variant))
 
     def test_change_to_only_whitelist(self):
+        build_variant = "build_variant"
         git_changes = """
 buildscripts/burn_in_tests.py
 buildscripts/yaml_key_value.py
@@ -100,7 +103,7 @@ pytests/test2.py
 
         with patch("builtins.open") as open_mock:
             open_mock.return_value.__enter__.return_value = git_changes.splitlines()
-            self.assertTrue(under_test.should_bypass_compile(MagicMock()))
+            self.assertTrue(under_test.should_bypass_compile(git_changes, build_variant))
 
     @staticmethod
     def variant_mock(evg_mock):
@@ -109,6 +112,7 @@ pytests/test2.py
     @patch(ns('parse_evergreen_file'))
     @patch(ns('_get_original_etc_evergreen'))
     def test_change_to_etc_evergreen_that_bypasses(self, get_original_mock, parse_evg_mock):
+        build_variant = "build_variant"
         git_changes = """
 buildscripts/burn_in_tests.py
 etc/evergreen.yml
@@ -121,11 +125,12 @@ pytests/test2.py
             self.variant_mock(parse_evg_mock).expansion.return_value = "expansion 1"
 
             open_mock.return_value.__enter__.return_value = git_changes.splitlines()
-            self.assertTrue(under_test.should_bypass_compile(MagicMock()))
+            self.assertTrue(under_test.should_bypass_compile(git_changes, build_variant))
 
     @patch(ns('parse_evergreen_file'))
     @patch(ns('_get_original_etc_evergreen'))
     def test_change_to_etc_evergreen_that_compiles(self, get_original_mock, parse_evg_mock):
+        build_variant = "build_variant"
         git_changes = """
 buildscripts/burn_in_tests.py
 etc/evergreen.yml
@@ -138,29 +143,32 @@ pytests/test2.py
             self.variant_mock(parse_evg_mock).expansion.return_value = "expansion 2"
 
             open_mock.return_value.__enter__.return_value = git_changes.splitlines()
-            self.assertFalse(under_test.should_bypass_compile(MagicMock()))
+            self.assertFalse(under_test.should_bypass_compile(git_changes, build_variant))
 
 
-def generate_args():
-    project = "project-master"
-    build_variant = "rhel-62-64-bit"
-    revision = "fakesha"
-    Args = namedtuple("Args", ["project", "buildVariant", "revision"])
-    return Args(project=project, buildVariant=build_variant, revision=revision)
+class TestFindBuildForPreviousCompileTask(unittest.TestCase):
+    def test_find_build(self):
+        revision = "a22"
+        project = "project"
+        build_variant = "variant"
+        expected_build_id = "project_variant_patch_a22_date"
+        evergreen_api = MagicMock()
+        version_response = MagicMock()
+        evergreen_api.version_by_id.return_value = version_response
+        version_response.build_by_variant.return_value = MagicMock(id=expected_build_id)
 
-
-class TestFindSuitableBuildID(unittest.TestCase):
-    def test_builds(self):
-        expected_build_id = "project_master_rhel_62_64_bit_fakesha_19_07_10_15_48_53"
-        builds = ["build1", "build2", expected_build_id]
-        args = generate_args()
-        build_id = under_test.find_suitable_build_id(builds, args)
-
+        build_id = under_test.find_build_for_previous_compile_task(evergreen_api, revision, project,
+                                                                   build_variant)
         self.assertEqual(build_id, expected_build_id)
 
-    def test_no_builds(self):
-        builds = []
-        args = generate_args()
-        build_id = under_test.find_suitable_build_id(builds, args)
 
-        self.assertEqual(build_id, None)
+class TestFindPreviousCompileTask(unittest.TestCase):
+    def test_find_task(self):
+        revision = "a22"
+        build_id = "project_variant_patch_a22_date"
+        evergreen_api = MagicMock()
+        task_response = MagicMock(status="success")
+        evergreen_api.task_by_id.return_value = task_response
+
+        task = under_test.find_previous_compile_task(evergreen_api, build_id, revision)
+        self.assertEqual(task, task_response)
