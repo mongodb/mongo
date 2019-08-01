@@ -46,10 +46,11 @@ void validateWriteConcernForTransaction(const WriteConcernOptions& wcResult, Str
 bool shouldCommandSkipSessionCheckout(StringData cmdName);
 
 /**
- * Throws if the given session options are invalid for the given command and target database.
+ * Throws if the given session options are invalid for the given command and target namespace.
  */
 void validateSessionOptions(const OperationSessionInfoFromClient& sessionOptions,
                             StringData cmdName,
-                            StringData dbname);
+                            const NamespaceString& nss,
+                            bool allowTransactionsOnConfigDatabase);
 
 }  // namespace mongo

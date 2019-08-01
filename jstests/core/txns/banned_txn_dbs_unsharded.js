@@ -1,6 +1,6 @@
 // Tests that reads and writes to the config, admin, and local databases are forbidden within
-// transactions.
-// @tags: [uses_transactions]
+// transactions on non-sharded clusters. Behavior on sharded clusters is tested separately.
+// @tags: [assumes_against_mongod_not_mongos, assumes_unsharded_collection, uses_transactions]
 (function() {
 "use strict";
 

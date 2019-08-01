@@ -211,9 +211,12 @@ struct CommandHelpers {
                                           const OpMsgRequest& request);
 
     /**
-     * Returns OK if command is allowed to run under a transaction in the given database.
+     * Verifies that command is allowed to run under a transaction in the given database or
+     * namespace, and throws if that verification doesn't pass.
      */
-    static Status canUseTransactions(StringData dbName, StringData cmdName);
+    static void canUseTransactions(const NamespaceString& nss,
+                                   StringData cmdName,
+                                   bool allowTransactionsOnConfigDatabase);
 
     static constexpr StringData kHelpFieldName = "help"_sd;
 

@@ -664,7 +664,15 @@ void execCommandDatabase(OperationContext* opCtx,
             str::stream() << "Invalid database name: '" << dbname << "'",
             NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));
 
-        validateSessionOptions(sessionOptions, command->getName(), dbname);
+
+        const auto allowTransactionsOnConfigDatabase =
+            (serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
+             serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+
+        validateSessionOptions(sessionOptions,
+                               command->getName(),
+                               invocation->ns(),
+                               allowTransactionsOnConfigDatabase);
 
         std::unique_ptr<MaintenanceModeSetter> mmSetter;
 

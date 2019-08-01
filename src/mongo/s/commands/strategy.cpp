@@ -382,7 +382,11 @@ void runCommand(OperationContext* opCtx,
                                               command->attachLogicalSessionsToOpCtx(),
                                               true,
                                               true);
-    validateSessionOptions(osi, command->getName(), nss.db());
+
+    // TODO SERVER-28756: Change allowTransactionsOnConfigDatabase to true once we fix the bug
+    // where the mongos custom write path incorrectly drops the client's txnNumber.
+    auto allowTransactionsOnConfigDatabase = false;
+    validateSessionOptions(osi, command->getName(), nss, allowTransactionsOnConfigDatabase);
 
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     auto readConcernParseStatus = [&]() {

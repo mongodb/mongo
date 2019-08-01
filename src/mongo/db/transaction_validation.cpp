@@ -70,9 +70,10 @@ bool shouldCommandSkipSessionCheckout(StringData cmdName) {
 
 void validateSessionOptions(const OperationSessionInfoFromClient& sessionOptions,
                             StringData cmdName,
-                            StringData dbname) {
+                            const NamespaceString& nss,
+                            bool allowTransactionsOnConfigDatabase) {
     if (sessionOptions.getAutocommit()) {
-        uassertStatusOK(CommandHelpers::canUseTransactions(dbname, cmdName));
+        CommandHelpers::canUseTransactions(nss, cmdName, allowTransactionsOnConfigDatabase);
     }
 
     if (!sessionOptions.getAutocommit() && sessionOptions.getTxnNumber()) {

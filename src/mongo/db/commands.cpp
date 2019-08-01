@@ -431,26 +431,38 @@ bool CommandHelpers::uassertShouldAttemptParse(OperationContext* opCtx,
 }
 
 
-Status CommandHelpers::canUseTransactions(StringData dbName, StringData cmdName) {
-    if (cmdName == "count"_sd) {
-        return {ErrorCodes::OperationNotSupportedInTransaction,
-                "Cannot run 'count' in a multi-document transaction. Please see "
-                "http://dochub.mongodb.org/core/transaction-count for a recommended alternative."};
-    }
+void CommandHelpers::canUseTransactions(const NamespaceString& nss,
+                                        StringData cmdName,
+                                        bool allowTransactionsOnConfigDatabase) {
 
-    if (txnCmdWhitelist.find(cmdName) == txnCmdWhitelist.cend()) {
-        return {ErrorCodes::OperationNotSupportedInTransaction,
-                str::stream() << "Cannot run '" << cmdName << "' in a multi-document transaction."};
-    }
+    uassert(ErrorCodes::OperationNotSupportedInTransaction,
+            "Cannot run 'count' in a multi-document transaction. Please see "
+            "http://dochub.mongodb.org/core/transaction-count for a recommended alternative.",
+            cmdName != "count"_sd);
 
-    if (dbName == "config"_sd || dbName == "local"_sd ||
-        (dbName == "admin"_sd && txnAdminCommands.find(cmdName) == txnAdminCommands.cend())) {
-        return {ErrorCodes::OperationNotSupportedInTransaction,
-                str::stream() << "Cannot run command against the '" << dbName
-                              << "' database in a transaction"};
-    }
+    uassert(ErrorCodes::OperationNotSupportedInTransaction,
+            str::stream() << "Cannot run '" << cmdName << "' in a multi-document transaction.",
+            txnCmdWhitelist.find(cmdName) != txnCmdWhitelist.cend());
 
-    return Status::OK();
+    const auto dbName = nss.db();
+
+    uassert(ErrorCodes::OperationNotSupportedInTransaction,
+            str::stream() << "Cannot run command against the '" << dbName
+                          << "' database in a transaction.",
+            dbName != NamespaceString::kLocalDb &&
+                (dbName != NamespaceString::kAdminDb ||
+                 txnAdminCommands.find(cmdName) != txnAdminCommands.cend()));
+
+    if (allowTransactionsOnConfigDatabase) {
+        uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                "Cannot run command against the config.transactions namespace in a transaction"
+                "on a sharded cluster.",
+                nss != NamespaceString::kSessionTransactionsTableNamespace);
+    } else {
+        uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                "Cannot run command against the config database in a transaction.",
+                dbName != "config"_sd);
+    }
 }
 
 constexpr StringData CommandHelpers::kHelpFieldName;
