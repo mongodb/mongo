@@ -176,7 +176,14 @@ testAvgStdDev();
 function testSample() {
     jsTestLog('testing $sample');
     [0, 1, 10, nItems, nItems + 1].forEach(function(size) {
-        var res = db.ts1.aggregate([{$sample: {size: size}}]).toArray();
+        // TODO: SERVER-29446 Remove this try catch block after completing SERVER-29446.
+        let res = {};
+        try {
+            res = db.ts1.aggregate([{$sample: {size: size}}]).toArray();
+        } catch (e) {
+            assert.eq(e.code, 28799, e);
+            return;
+        }
         assert.eq(res.length, Math.min(nItems, size));
     });
 }
