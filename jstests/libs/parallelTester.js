@@ -208,6 +208,9 @@ if (typeof _threadInject != "undefined") {
 
             // Destroys and recreates the catalog, which will interfere with other tests.
             "restart_catalog.js",
+
+            // Concurrently using keepDiagnosticCaptureOnFailedLock fails, will be fixed soon.
+            "currentop_waiting_for_latch.js",
         ]);
 
         // The following tests cannot run when shell readMode is legacy.
