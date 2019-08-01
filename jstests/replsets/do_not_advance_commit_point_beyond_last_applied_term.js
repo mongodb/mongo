@@ -95,6 +95,7 @@ assert.eq(0, nodeE.getDB(dbName)[collName].find({term: 3}).itcount());
 jsTest.log("Node E switches its sync source to B and replicates the stale branch of term 2.");
 nodeE.disconnect([nodeA, nodeC, nodeD]);
 nodeB.reconnect(nodeE);
+rst.awaitSyncSource(nodeE, nodeB);
 assert.commandWorked(
     nodeE.adminCommand({configureFailPoint: "stopReplProducerOnDocument", mode: "off"}));
 assert.soon(() => {
