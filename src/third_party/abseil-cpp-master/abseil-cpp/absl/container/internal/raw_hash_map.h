@@ -19,6 +19,7 @@
 #include <type_traits>
 #include <utility>
 
+#include "absl/base/internal/throw_delegate.h"
 #include "absl/container/internal/container_memory.h"
 #include "absl/container/internal/raw_hash_set.h"  // IWYU pragma: export
 
@@ -136,14 +137,20 @@ class raw_hash_map : public raw_hash_set<Policy, Hash, Eq, Alloc> {
   template <class K = key_type, class P = Policy>
   MappedReference<P> at(const key_arg<K>& key) {
     auto it = this->find(key);
-    if (it == this->end()) std::abort();
+    if (it == this->end()) {
+      base_internal::ThrowStdOutOfRange(
+          "absl::container_internal::raw_hash_map<>::at");
+    }
     return Policy::value(&*it);
   }
 
   template <class K = key_type, class P = Policy>
   MappedConstReference<P> at(const key_arg<K>& key) const {
     auto it = this->find(key);
-    if (it == this->end()) std::abort();
+    if (it == this->end()) {
+      base_internal::ThrowStdOutOfRange(
+          "absl::container_internal::raw_hash_map<>::at");
+    }
     return Policy::value(&*it);
   }
 

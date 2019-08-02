@@ -460,6 +460,7 @@ cc_library(
     deps = [
         ":container_memory",
         ":raw_hash_set",
+        "//absl/base:throw_delegate",
     ],
 )
 

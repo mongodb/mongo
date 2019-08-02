@@ -19,5 +19,15 @@ env.Library(
     ],
     LIBDEPS=[
         "absl_hash",
+        "absl_throw_delegate",
+    ]
+)
+
+env.Library(
+    target="absl_throw_delegate",
+    source=[
+        "abseil-cpp/absl/base/internal/throw_delegate.cc",
+    ],
+    LIBDEPS=[
     ]
 )
