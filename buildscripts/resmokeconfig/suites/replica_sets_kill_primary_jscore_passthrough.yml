@@ -79,9 +79,6 @@ selector:
   # Inserts enough data that recovery takes more than 8 seconds, so we never get a working primary.
   - jstests/core/geo_s2ordering.js
 
-  # Inserts enough data that the secondaries get too far behind to catch up.
-  - jstests/core/txns/large_transactions_require_fcv42.js
-
   exclude_with_any_tags:
   ##
   # The next four tags correspond to the special errors thrown by the auto_retry_on_network_error.js

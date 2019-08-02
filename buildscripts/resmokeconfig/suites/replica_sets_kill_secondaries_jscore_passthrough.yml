@@ -14,8 +14,6 @@ selector:
   # true. This causes the test to hang because the secondary is running with the "rsSyncStopApply"
   # failpoint enabled.
   - jstests/core/geo_update_btree.js
-  # Inserts enough data that the secondaries get too far behind to catch up.
-  - jstests/core/txns/large_transactions_require_fcv42.js
   # The following tests create large oplog entries, which can cause the secondary to fall off the
   # primary's oplog when run as a part of burn_in_tests.
   - jstests/core/max_doc_size.js

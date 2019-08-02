@@ -13,8 +13,6 @@ selector:
 
   # No featureCompatibilityVersion parameter on mongos.
   - jstests/core/txns/abort_unprepared_transactions_on_FCV_downgrade.js
-  - jstests/core/txns/downgrade_fcv_while_large_partial_txn_in_progress.js
-  - jstests/core/txns/large_transactions_require_fcv42.js
 
   # Mongos doesn't upconvert from local or majority level readConcern to snapshot.
   - jstests/core/txns/upconvert_read_concern.js
