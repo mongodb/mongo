@@ -39,7 +39,7 @@ function makeTS(i) {
 }
 
 for (let i = 1; i <= 100; i++) {
-    assert.writeOK(t.insert({_id: i, ts: makeTS(i)}));
+    assert.commandWorked(t.insert({_id: i, ts: makeTS(i)}));
 }
 
 // A $gt query on just the 'ts' field should return the next document after the timestamp.
@@ -235,22 +235,24 @@ collScanStage = getPlanStage(res.executionStats.executionStages, "COLLSCAN");
 assert.neq(null, collScanStage, "no collection scan found in explain output: " + tojson(res));
 
 // We expect correct results when no collation specified and collection has a default collation.
-const t_collation = db.getSiblingDB("local").oplog.jstests_query_oplogreplay_collation;
-dropOplogAndCreateNew(t_collation,
+const testCollation = db.getSiblingDB("local").oplog.jstests_query_oplogreplay_collation;
+dropOplogAndCreateNew(testCollation,
                       {collation: {locale: "en_US", strength: 2}, capped: true, size: 16 * 1024});
 
-assert.writeOK(t_collation.insert({str: "FOO", ts: Timestamp(1000, 0)}));
-assert.writeOK(t_collation.insert({str: "FOO", ts: Timestamp(1000, 1)}));
-assert.writeOK(t_collation.insert({str: "FOO", ts: Timestamp(1000, 2)}));
-assert.eq(2, t_collation.find({str: "foo", ts: {$gte: Timestamp(1000, 1)}}).itcount());
+assert.commandWorked(testCollation.insert({str: "FOO", ts: Timestamp(1000, 0)}));
+assert.commandWorked(testCollation.insert({str: "FOO", ts: Timestamp(1000, 1)}));
+assert.commandWorked(testCollation.insert({str: "FOO", ts: Timestamp(1000, 2)}));
+assert.eq(2, testCollation.find({str: "foo", ts: {$gte: Timestamp(1000, 1)}}).itcount());
 
 // We expect correct results when "simple" collation specified and collection has a default
 // collation.
-assert.writeOK(t_collation.insert({str: "FOO", ts: Timestamp(1000, 0)}));
-assert.writeOK(t_collation.insert({str: "FOO", ts: Timestamp(1000, 1)}));
-assert.writeOK(t_collation.insert({str: "FOO", ts: Timestamp(1000, 2)}));
+dropOplogAndCreateNew(testCollation,
+                      {collation: {locale: "en_US", strength: 2}, capped: true, size: 16 * 1024});
+assert.commandWorked(testCollation.insert({str: "FOO", ts: Timestamp(1000, 0)}));
+assert.commandWorked(testCollation.insert({str: "FOO", ts: Timestamp(1000, 1)}));
+assert.commandWorked(testCollation.insert({str: "FOO", ts: Timestamp(1000, 2)}));
 assert.eq(0,
-          t_collation.find({str: "foo", ts: {$gte: Timestamp(1000, 1)}})
+          testCollation.find({str: "foo", ts: {$gte: Timestamp(1000, 1)}})
               .collation({locale: "simple"})
               .itcount());
 }());
