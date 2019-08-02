@@ -1317,6 +1317,30 @@ def remote_handler(options, operations):  # pylint: disable=too-many-branches,to
                                    err)
                     ret = err.code
 
+        elif operation == "check_disk":
+            if _IS_WINDOWS:
+                partitions = psutil.disk_partitions()
+                for part in partitions:
+                    if part.fstype != "NTFS" or part.mountpoint == "C:\\":
+                        # Powercycle testing in Evergreen only writes to the D: and E: drives on the
+                        # remote machine. We skip running the chkdsk command on the C: drive because
+                        # it sometimes fails with a "Snapshot was deleted" error. We assume the
+                        # system drive is functioning properly because the remote machine rebooted
+                        # fine anyway.
+                        continue
+
+                    # The chkdsk command won't accept the drive if it has a trailing backslash.
+                    # We use os.path.splitdrive()[0] to transform 'C:\\' into 'C:'.
+                    drive_letter = os.path.splitdrive(part.mountpoint)[0]
+                    LOGGER.info("Running chkdsk command for %s drive", drive_letter)
+                    cmds = f"chkdsk '{drive_letter}'"
+                    ret, output = execute_cmd(cmds, use_file=True)
+                    LOGGER.warning("chkdsk command for %s drive exited with code %d:\n%s",
+                                   drive_letter, ret, output)
+
+                    if ret != 0:
+                        return ret
+
         else:
             LOGGER.error("Unsupported remote option specified '%s'", operation)
             ret = 1
@@ -2568,6 +2592,11 @@ Examples:
         LOGGER.info("****Completed test loop %d test time %d seconds****", loop_num, test_time)
         if loop_num == options.num_loops or test_time >= options.test_time:
             break
+
+        ret, output = call_remote_operation(local_ops, options.remote_python, script_name,
+                                            client_args, "--remoteOperation check_disk")
+        if ret != 0:
+            LOGGER.error("****check_disk: %d %s****", ret, output)
 
     REPORT_JSON_SUCCESS = True
     local_exit(0)
