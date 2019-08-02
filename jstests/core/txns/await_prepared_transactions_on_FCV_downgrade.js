@@ -42,9 +42,6 @@ try {
     assert.commandWorked(
         testDB.adminCommand({configureFailPoint: "failNonIntentLocksIfWaitNeeded", mode: "off"}));
 
-    jsTestLog("Verify that the setFCV command set the target version to 'lastStable'.");
-    checkFCV(adminDB, lastStableFCV, lastStableFCV);
-
     jsTestLog("Commit the prepared transaction.");
     assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
 
