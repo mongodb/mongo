@@ -81,30 +81,22 @@ StatusWith<ExplainOptions::Verbosity> ExplainOptions::parseCmdBSON(const BSONObj
         }
     }
 
-    auto invalidFields = str::stream();
-    BSONObjIterator i(cmdObj);
-    // Skip first argument as it is the command itself.
-    if (i.moreWithEOO()) {
-        i.next();
-    }
-    while (i.moreWithEOO()) {
-        BSONElement e = i.next();
-        if (e.eoo())
-            break;
-        auto name = e.fieldNameStringData();
+    bool first = true;
+    for (auto&& elem : cmdObj) {
+        // Skip first argument as it is the command itself.
+        if (first) {
+            first = false;
+            continue;
+        }
+        auto name = elem.fieldNameStringData();
         if (name == kVerbosityName || name == kDatabaseName || name == kLogicalSessionIdName)
             continue;
 
-        if (invalidFields.ss.len() > 0) {
-            invalidFields << ", ";
-        }
-        invalidFields << "'" << name << "'";
+        return Status(ErrorCodes::InvalidOptions,
+                      str::stream() << "explain does not support '" << name << "' argument.");
     }
 
-    return invalidFields.ss.len() > 0
-        ? Status(ErrorCodes::InvalidOptions,
-                 str::stream() << "explain does not support " << invalidFields << " argument(s).")
-        : StatusWith(verbosity);
+    return StatusWith(verbosity);
 }
 
 BSONObj ExplainOptions::toBSON(ExplainOptions::Verbosity verbosity) {

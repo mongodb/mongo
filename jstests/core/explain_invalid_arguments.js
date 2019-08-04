@@ -16,7 +16,7 @@ explain = db.runCommand({
   verosity: "executionStats"
 });
 assert.commandFailedWithCode(explain, ErrorCodes.InvalidOptions);
-assert.eq("explain does not support 'verosity' argument(s).", explain.errmsg);
+assert.eq("explain does not support 'verosity' argument.", explain.errmsg);
 
 explain = db.runCommand({
   explain: { find: collName },
@@ -24,7 +24,15 @@ explain = db.runCommand({
   foo: 1
 });
 assert.commandFailedWithCode(explain, ErrorCodes.InvalidOptions);
-assert.eq("explain does not support 'foo' argument(s).", explain.errmsg);
+assert.eq("explain does not support 'foo' argument.", explain.errmsg);
+
+explain = db.runCommand({
+  explain: { find: collName },
+  foo: 1,
+  bar: 1
+});
+assert.commandFailedWithCode(explain, ErrorCodes.InvalidOptions);
+assert.eq("explain does not support 'foo' argument.", explain.errmsg);
 
 explain = db.runCommand({
   explain: { find: collName },
@@ -33,7 +41,7 @@ explain = db.runCommand({
   bar: 1
 });
 assert.commandFailedWithCode(explain, ErrorCodes.InvalidOptions);
-assert.eq("explain does not support 'foo', 'bar' argument(s).", explain.errmsg);
+assert.eq("explain does not support 'foo' argument.", explain.errmsg);
 
 explain = db.runCommand({
   explain: { find: collName },
@@ -41,4 +49,4 @@ explain = db.runCommand({
   bar: 1
 });
 assert.commandFailedWithCode(explain, ErrorCodes.InvalidOptions);
-assert.eq("explain does not support 'bar' argument(s).", explain.errmsg);
+assert.eq("explain does not support 'bar' argument.", explain.errmsg);
