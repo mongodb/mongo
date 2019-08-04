@@ -37,6 +37,8 @@
 namespace mongo {
 
 constexpr StringData ExplainOptions::kVerbosityName;
+constexpr StringData ExplainOptions::kDatabaseName;
+constexpr StringData ExplainOptions::kLogicalSessionIdName;
 constexpr StringData ExplainOptions::kQueryPlannerVerbosityStr;
 constexpr StringData ExplainOptions::kExecStatsVerbosityStr;
 constexpr StringData ExplainOptions::kAllPlansExecutionVerbosityStr;
@@ -90,7 +92,7 @@ StatusWith<ExplainOptions::Verbosity> ExplainOptions::parseCmdBSON(const BSONObj
         if (e.eoo())
             break;
         auto name = e.fieldNameStringData();
-        if (name == kVerbosityName || name == "$db" || name == "lsid")
+        if (name == kVerbosityName || name == kDatabaseName || name == kLogicalSessionIdName)
             continue;
 
         if (invalidFields.ss.len() > 0) {

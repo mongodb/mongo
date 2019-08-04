@@ -61,6 +61,8 @@ public:
     };
 
     static constexpr StringData kVerbosityName = "verbosity"_sd;
+    static constexpr StringData kDatabaseName = "$db"_sd;
+    static constexpr StringData kLogicalSessionIdName = "lsid"_sd;
 
     // String representations for verbosity levels.
     static constexpr StringData kQueryPlannerVerbosityStr = "queryPlanner"_sd;
