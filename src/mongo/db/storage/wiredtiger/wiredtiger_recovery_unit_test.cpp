@@ -54,7 +54,8 @@ public:
                   _dbpath.path(),         // .path
                   &_cs,                   // .cs
                   "",                     // .extraOpenOptions
-                  1,                      // .cacheSizeGB
+                  1,                      // .cacheSizeMB
+                  0,                      // .maxCacheOverflowFileSizeMB
                   false,                  // .durable
                   false,                  // .ephemeral
                   false,                  // .repair
