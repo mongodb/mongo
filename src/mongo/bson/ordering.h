@@ -57,6 +57,9 @@ public:
         get(1) == -1
     */
     int get(int i) const {
+        uassert(ErrorCodes::Overflow,
+                str::stream() << "Ordering offset is out of bounds: " << i,
+                i >= 0 && static_cast<size_t>(i) < kMaxCompoundIndexKeys);
         return ((1 << i) & bits) ? -1 : 1;
     }
 

@@ -212,6 +212,20 @@ TEST(TypeBitsTest, AppendLotsOfZeroTypeBits) {
     ASSERT(!typeBits.isLongEncoding());
 }
 
+TEST_F(KeyStringBuilderTest, TooManyElementsInCompoundKey) {
+    // Construct an illegal KeyString with more than the limit of 32 elements in a compound index
+    // key. Encode 33 kBoolTrue ('o') values.
+    const char* data = "ooooooooooooooooooooooooooooooooo";
+    const size_t size = 33;
+
+    KeyString::Builder ks(KeyString::Version::V1);
+    ks.resetFromBuffer(data, size);
+
+    ASSERT_THROWS_CODE(KeyString::toBsonSafe(data, size, ALL_ASCENDING, ks.getTypeBits()),
+                       AssertionException,
+                       ErrorCodes::Overflow);
+}
+
 TEST_F(KeyStringBuilderTest, Simple1) {
     BSONObj a = BSON("" << 5);
     BSONObj b = BSON("" << 6);
