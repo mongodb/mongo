@@ -120,7 +120,7 @@ Status CollectionBulkLoaderImpl::_insertDocumentsForUncappedCollection(
     while (iter != end) {
         std::vector<RecordId> locs;
         Status status = writeConflictRetry(
-            _opCtx.get(), "CollectionBulkLoaderImpl/insertDocomuntsUncapped", _nss.ns(), [&] {
+            _opCtx.get(), "CollectionBulkLoaderImpl/insertDocumentsUncapped", _nss.ns(), [&] {
                 WriteUnitOfWork wunit(_opCtx.get());
                 auto insertIter = iter;
                 int bytesInBlock = 0;
