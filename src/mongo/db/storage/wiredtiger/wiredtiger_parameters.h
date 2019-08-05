@@ -59,4 +59,17 @@ private:
     // starts out as the empty string.
     std::string _currentValue;
 };
+
+class WiredTigerMaxCacheOverflowSizeGBParameter : public ServerParameter {
+    MONGO_DISALLOW_COPYING(WiredTigerMaxCacheOverflowSizeGBParameter);
+
+public:
+    WiredTigerMaxCacheOverflowSizeGBParameter(WiredTigerKVEngine* engine, double value);
+
+    virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name);
+    virtual Status set(const BSONElement& newValueElement);
+    virtual Status setFromString(const std::string& str);
+
+    std::pair<double, WiredTigerKVEngine*> _data;
+};
 }

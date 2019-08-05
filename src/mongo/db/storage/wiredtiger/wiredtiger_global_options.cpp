@@ -79,6 +79,13 @@ Status WiredTigerGlobalOptions::add(moe::OptionSection* options) {
                            "WiredTiger storage engine custom "
                            "configuration settings")
         .hidden();
+    wiredTigerOptions
+        .addOptionChaining("storage.wiredTiger.engineConfig.maxCacheOverflowFileSizeGB",
+                           "wiredTigerMaxCacheOverflowFileSizeGB",
+                           moe::Double,
+                           "Maximum amount of disk space to use for cache overflow; "
+                           "Defaults to 0 (unbounded)")
+        .setDefault(moe::Value(0.0));
 
     // WiredTiger collection options
     wiredTigerOptions
@@ -142,6 +149,18 @@ Status WiredTigerGlobalOptions::store(const moe::Environment& params,
             params["storage.wiredTiger.engineConfig.configString"].as<std::string>();
         log() << "Engine custom option: " << wiredTigerGlobalOptions.engineConfig;
     }
+    if (params.count("storage.wiredTiger.engineConfig.maxCacheOverflowFileSizeGB")) {
+        const auto val =
+            params["storage.wiredTiger.engineConfig.maxCacheOverflowFileSizeGB"].as<double>();
+        const auto result = validateMaxCacheOverflowFileSizeGB(val);
+        if (result.isOK()) {
+            wiredTigerGlobalOptions.maxCacheOverflowFileSizeGB = val;
+            log() << "Max cache overflow file size custom option: "
+                  << wiredTigerGlobalOptions.maxCacheOverflowFileSizeGB;
+        } else {
+            return result;
+        }
+    }
 
     // WiredTiger collection options
     if (params.count("storage.wiredTiger.collectionConfig.blockCompressor")) {
@@ -163,6 +182,15 @@ Status WiredTigerGlobalOptions::store(const moe::Environment& params,
         wiredTigerGlobalOptions.indexConfig =
             params["storage.wiredTiger.indexConfig.configString"].as<std::string>();
         log() << "Index custom option: " << wiredTigerGlobalOptions.indexConfig;
+    }
+
+    return Status::OK();
+}
+
+Status WiredTigerGlobalOptions::validateMaxCacheOverflowFileSizeGB(double value) {
+    if (value != 0.0 && value < 0.1) {
+        return {ErrorCodes::BadValue,
+                "MaxCacheOverflowFileSizeGB must be either 0 (unbounded) or greater than 0.1."};
     }
 
     return Status::OK();

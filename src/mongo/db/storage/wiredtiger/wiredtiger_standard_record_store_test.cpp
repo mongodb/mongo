@@ -70,7 +70,8 @@ class WiredTigerHarnessHelper final : public RecordStoreHarnessHelper {
 public:
     WiredTigerHarnessHelper()
         : _dbpath("wt_test"),
-          _engine(kWiredTigerEngineName, _dbpath.path(), &_cs, "", 1, false, false, false, false) {}
+          _engine(
+              kWiredTigerEngineName, _dbpath.path(), &_cs, "", 1, 0, false, false, false, false) {}
 
     WiredTigerHarnessHelper(StringData extraStrings)
         : _dbpath("wt_test"),
@@ -79,6 +80,7 @@ public:
                   &_cs,
                   extraStrings.toString(),
                   1,
+                  0,
                   false,
                   false,
                   false,
