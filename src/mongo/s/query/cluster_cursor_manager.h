@@ -159,25 +159,13 @@ public:
         PinnedCursor& operator=(PinnedCursor&& other);
 
         /**
-         * Calls next() on the underlying cursor.  Cannot be called after returnCursor() is called.
-         * A cursor must be owned.
-         *
-         * Can block.
+         * Returns a pointer to the ClusterClientCursor that this PinnedCursor owns. A cursor must
+         * be owned.
          */
-        StatusWith<ClusterQueryResult> next(RouterExecStage::ExecContext);
-
-        /**
-         * Returns whether or not the underlying cursor is tailing a capped collection.  Cannot be
-         * called after returnCursor() is called.  A cursor must be owned.
-         */
-        bool isTailable() const;
-
-        /**
-         * Returns whether or not the underlying cursor is tailing a capped collection and was
-         * created with the 'awaitData' flag set.  Cannot be called after returnCursor() is called.
-         * A cursor must be owned.
-         */
-        bool isTailableAndAwaitData() const;
+        ClusterClientCursor* operator->() const {
+            invariant(_cursor);
+            return _cursor.get();
+        }
 
         /**
          * Transfers ownership of the underlying cursor back to the manager, and detaches it from
@@ -190,112 +178,14 @@ public:
         void returnCursor(CursorState cursorState);
 
         /**
-         * Returns the command object which originally created this cursor.
-         */
-        BSONObj getOriginatingCommand() const;
-
-        /**
-         * Returns the privleges for the original command object which created this cursor.
-         */
-
-        const PrivilegeVector& getOriginatingPrivileges() const&;
-        void getOriginatingPrivileges() && = delete;
-
-        /**
-         * Returns a reference to the vector of remote hosts involved in this operation.
-         */
-        std::size_t getNumRemotes() const;
-
-        /**
-         * If applicable, returns the current most-recent resume token for this cursor.
-         */
-        BSONObj getPostBatchResumeToken() const;
-
-        /**
          * Returns the cursor id for the underlying cursor, or zero if no cursor is owned.
          */
         CursorId getCursorId() const;
 
         /**
-         * Returns the read preference setting for this cursor.
-         */
-        boost::optional<ReadPreferenceSetting> getReadPreference() const;
-
-        /**
-         * Returns the number of result documents returned so far by this cursor via the next()
-         * method.
-         */
-        long long getNumReturnedSoFar() const;
-
-        /**
-         * Returns the creation date of the cursor.
-         */
-        Date_t getCreatedDate() const;
-
-        /**
-         * Returns the time the cursor was last used.
-         */
-        Date_t getLastUseDate() const;
-
-        /**
-         * Set the cursor's lastUseDate to the given time.
-         */
-        void setLastUseDate(Date_t now);
-
-        /**
-         * Increment the number of batches returned by this cursor.
-         */
-        void incNBatches();
-
-        /**
-         * Get the number of batches returned by this cursor.
-         */
-        long long getNBatches() const;
-
-        /**
          * Returns a GenericCursor version of the pinned cursor.
          */
         GenericCursor toGenericCursor() const;
-
-        /**
-         * Stashes 'obj' to be returned later by this cursor. A cursor must be owned.
-         */
-        void queueResult(const ClusterQueryResult& result);
-
-        /**
-         * Returns whether or not all the remote cursors underlying this cursor have been
-         * exhausted. Cannot be called after returnCursor() is called. A cursor must be owned.
-         */
-        bool remotesExhausted();
-
-        /**
-         * Sets the maxTimeMS value that the cursor should forward with any internally issued
-         * getMore requests. A cursor must be owned.
-         *
-         * Returns a non-OK status if this cursor type does not support maxTimeMS on getMore (i.e.
-         * if the cursor is not tailable + awaitData).
-         */
-        Status setAwaitDataTimeout(Milliseconds awaitDataTimeout);
-
-        /**
-         * Returns the logical session id of the command that created the underlying cursor.
-         */
-        boost::optional<LogicalSessionId> getLsid() const;
-
-        /**
-         * Returns the transaction number of the command that created the underlying cursor.
-         */
-        boost::optional<TxnNumber> getTxnNumber() const;
-
-        Microseconds getLeftoverMaxTimeMicros() const {
-            invariant(_cursor);
-            return _cursor->getLeftoverMaxTimeMicros();
-        }
-
-        void setLeftoverMaxTimeMicros(Microseconds leftoverMaxTimeMicros) {
-            invariant(_cursor);
-            _cursor->setLeftoverMaxTimeMicros(leftoverMaxTimeMicros);
-        }
 
     private:
         // ClusterCursorManager is a friend so that its methods can call the PinnedCursor

@@ -366,7 +366,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
  */
 Status setUpOperationContextStateForGetMore(OperationContext* opCtx,
                                             const GetMoreRequest& request,
-                                            ClusterCursorManager::PinnedCursor* cursor) {
+                                            const ClusterCursorManager::PinnedCursor& cursor) {
     if (auto readPref = cursor->getReadPreference()) {
         ReadPreferenceSetting::get(opCtx) = *readPref;
     }
@@ -496,7 +496,7 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
  */
 void validateLSID(OperationContext* opCtx,
                   const GetMoreRequest& request,
-                  ClusterCursorManager::PinnedCursor* cursor) {
+                  const ClusterCursorManager::PinnedCursor& cursor) {
     if (opCtx->getLogicalSessionId() && !cursor->getLsid()) {
         uasserted(50799,
                   str::stream() << "Cannot run getMore on cursor " << request.cursorid
@@ -526,7 +526,7 @@ void validateLSID(OperationContext* opCtx,
  */
 void validateTxnNumber(OperationContext* opCtx,
                        const GetMoreRequest& request,
-                       ClusterCursorManager::PinnedCursor* cursor) {
+                       const ClusterCursorManager::PinnedCursor& cursor) {
     if (opCtx->getTxnNumber() && !cursor->getTxnNumber()) {
         uasserted(50802,
                   str::stream() << "Cannot run getMore on cursor " << request.cursorid
@@ -559,8 +559,8 @@ void validateOperationSessionInfo(OperationContext* opCtx,
                                   ClusterCursorManager::PinnedCursor* cursor) {
     auto returnCursorGuard = makeGuard(
         [cursor] { cursor->returnCursor(ClusterCursorManager::CursorState::NotExhausted); });
-    validateLSID(opCtx, request, cursor);
-    validateTxnNumber(opCtx, request, cursor);
+    validateLSID(opCtx, request, *cursor);
+    validateTxnNumber(opCtx, request, *cursor);
     returnCursorGuard.dismiss();
 }
 
@@ -586,7 +586,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
 
     // Ensure that the client still has the privileges to run the originating command.
     if (!authzSession->isAuthorizedForPrivileges(
-            pinnedCursor.getValue().getOriginatingPrivileges())) {
+            pinnedCursor.getValue()->getOriginatingPrivileges())) {
         uasserted(ErrorCodes::Unauthorized,
                   str::stream() << "not authorized for getMore with cursor id "
                                 << request.cursorid);
@@ -594,11 +594,11 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
 
     // Set the originatingCommand object and the cursorID in CurOp.
     {
-        CurOp::get(opCtx)->debug().nShards = pinnedCursor.getValue().getNumRemotes();
+        CurOp::get(opCtx)->debug().nShards = pinnedCursor.getValue()->getNumRemotes();
         CurOp::get(opCtx)->debug().cursorid = request.cursorid;
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setOriginatingCommand_inlock(
-            pinnedCursor.getValue().getOriginatingCommand());
+            pinnedCursor.getValue()->getOriginatingCommand());
         CurOp::get(opCtx)->setGenericCursor_inlock(pinnedCursor.getValue().toGenericCursor());
     }
 
@@ -612,7 +612,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     }
 
     auto opCtxSetupStatus =
-        setUpOperationContextStateForGetMore(opCtx, request, &pinnedCursor.getValue());
+        setUpOperationContextStateForGetMore(opCtx, request, pinnedCursor.getValue());
     if (!opCtxSetupStatus.isOK()) {
         return opCtxSetupStatus;
     }
@@ -620,7 +620,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     std::vector<BSONObj> batch;
     int bytesBuffered = 0;
     long long batchSize = request.batchSize.value_or(0);
-    long long startingFrom = pinnedCursor.getValue().getNumReturnedSoFar();
+    long long startingFrom = pinnedCursor.getValue()->getNumReturnedSoFar();
     auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
     BSONObj postBatchResumeToken;
     bool stashedResult = false;
@@ -641,7 +641,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
         StatusWith<ClusterQueryResult> next =
             Status{ErrorCodes::InternalError, "uninitialized cluster query result"};
         try {
-            next = pinnedCursor.getValue().next(context);
+            next = pinnedCursor.getValue()->next(context);
         } catch (const ExceptionFor<ErrorCodes::CloseChangeStream>&) {
             // This exception is thrown when a $changeStream stage encounters an event
             // that invalidates the cursor. We should close the cursor and return without
@@ -659,8 +659,8 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
             // exhausted. If it is tailable, usually we keep it open (i.e. "NotExhausted") even when
             // we reach end-of-stream. However, if all the remote cursors are exhausted, there is no
             // hope of returning data and thus we need to close the mongos cursor as well.
-            if (!pinnedCursor.getValue().isTailable() ||
-                pinnedCursor.getValue().remotesExhausted()) {
+            if (!pinnedCursor.getValue()->isTailable() ||
+                pinnedCursor.getValue()->remotesExhausted()) {
                 cursorState = ClusterCursorManager::CursorState::Exhausted;
             }
             break;
@@ -668,7 +668,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
 
         if (!FindCommon::haveSpaceForNext(
                 *next.getValue().getResult(), batch.size(), bytesBuffered)) {
-            pinnedCursor.getValue().queueResult(*next.getValue().getResult());
+            pinnedCursor.getValue()->queueResult(*next.getValue().getResult());
             stashedResult = true;
             break;
         }
@@ -680,7 +680,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
         batch.push_back(std::move(*next.getValue().getResult()));
 
         // Update the postBatchResumeToken. For non-$changeStream aggregations, this will be empty.
-        postBatchResumeToken = pinnedCursor.getValue().getPostBatchResumeToken();
+        postBatchResumeToken = pinnedCursor.getValue()->getPostBatchResumeToken();
     }
 
     // If the cursor has been exhausted, we will communicate this by returning a CursorId of zero.
@@ -691,11 +691,11 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     // For empty batches, or in the case where the final result was added to the batch rather than
     // being stashed, we update the PBRT here to ensure that it is the most recent available.
     if (idToReturn && !stashedResult) {
-        postBatchResumeToken = pinnedCursor.getValue().getPostBatchResumeToken();
+        postBatchResumeToken = pinnedCursor.getValue()->getPostBatchResumeToken();
     }
 
-    pinnedCursor.getValue().setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
-    pinnedCursor.getValue().incNBatches();
+    pinnedCursor.getValue()->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
+    pinnedCursor.getValue()->incNBatches();
     // Upon successful completion, transfer ownership of the cursor back to the cursor manager. If
     // the cursor has been exhausted, the cursor manager will clean it up for us.
     pinnedCursor.getValue().returnCursor(cursorState);

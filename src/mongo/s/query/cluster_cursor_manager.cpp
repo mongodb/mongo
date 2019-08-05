@@ -112,28 +112,6 @@ ClusterCursorManager::PinnedCursor& ClusterCursorManager::PinnedCursor::operator
     return *this;
 }
 
-StatusWith<ClusterQueryResult> ClusterCursorManager::PinnedCursor::next(
-    RouterExecStage::ExecContext execContext) {
-    invariant(_cursor);
-    return _cursor->next(execContext);
-}
-
-bool ClusterCursorManager::PinnedCursor::isTailable() const {
-    invariant(_cursor);
-    return _cursor->isTailable();
-}
-
-bool ClusterCursorManager::PinnedCursor::isTailableAndAwaitData() const {
-    invariant(_cursor);
-    return _cursor->isTailableAndAwaitData();
-}
-
-boost::optional<ReadPreferenceSetting> ClusterCursorManager::PinnedCursor::getReadPreference()
-    const {
-    invariant(_cursor);
-    return _cursor->getReadPreference();
-}
-
 void ClusterCursorManager::PinnedCursor::returnCursor(CursorState cursorState) {
     invariant(_cursor);
     // Note that unpinning a cursor transfers ownership of the underlying ClusterClientCursor object
@@ -142,86 +120,24 @@ void ClusterCursorManager::PinnedCursor::returnCursor(CursorState cursorState) {
     *this = PinnedCursor();
 }
 
-BSONObj ClusterCursorManager::PinnedCursor::getOriginatingCommand() const {
-    invariant(_cursor);
-    return _cursor->getOriginatingCommand();
-}
-
-const PrivilegeVector& ClusterCursorManager::PinnedCursor::getOriginatingPrivileges() const& {
-    invariant(_cursor);
-    return _cursor->getOriginatingPrivileges();
-}
-
-std::size_t ClusterCursorManager::PinnedCursor::getNumRemotes() const {
-    invariant(_cursor);
-    return _cursor->getNumRemotes();
-}
-
-BSONObj ClusterCursorManager::PinnedCursor::getPostBatchResumeToken() const {
-    invariant(_cursor);
-    return _cursor->getPostBatchResumeToken();
-}
-
 CursorId ClusterCursorManager::PinnedCursor::getCursorId() const {
     return _cursorId;
 }
 
-long long ClusterCursorManager::PinnedCursor::getNumReturnedSoFar() const {
-    invariant(_cursor);
-    return _cursor->getNumReturnedSoFar();
-}
-
-Date_t ClusterCursorManager::PinnedCursor::getLastUseDate() const {
-    invariant(_cursor);
-    return _cursor->getLastUseDate();
-}
-
-void ClusterCursorManager::PinnedCursor::setLastUseDate(Date_t now) {
-    invariant(_cursor);
-    _cursor->setLastUseDate(now);
-}
-Date_t ClusterCursorManager::PinnedCursor::getCreatedDate() const {
-    invariant(_cursor);
-    return _cursor->getCreatedDate();
-}
-void ClusterCursorManager::PinnedCursor::incNBatches() {
-    invariant(_cursor);
-    return _cursor->incNBatches();
-}
-
-long long ClusterCursorManager::PinnedCursor::getNBatches() const {
-    invariant(_cursor);
-    return _cursor->getNBatches();
-}
-
-void ClusterCursorManager::PinnedCursor::queueResult(const ClusterQueryResult& result) {
-    invariant(_cursor);
-    _cursor->queueResult(result);
-}
-
-bool ClusterCursorManager::PinnedCursor::remotesExhausted() {
-    invariant(_cursor);
-    return _cursor->remotesExhausted();
-}
-
 GenericCursor ClusterCursorManager::PinnedCursor::toGenericCursor() const {
+    invariant(_cursor);
     GenericCursor gc;
     gc.setCursorId(getCursorId());
     gc.setNs(_nss);
-    gc.setLsid(getLsid());
-    gc.setNDocsReturned(getNumReturnedSoFar());
-    gc.setTailable(isTailable());
-    gc.setAwaitData(isTailableAndAwaitData());
-    gc.setOriginatingCommand(getOriginatingCommand());
-    gc.setLastAccessDate(getLastUseDate());
-    gc.setCreatedDate(getCreatedDate());
-    gc.setNBatchesReturned(getNBatches());
+    gc.setLsid(_cursor->getLsid());
+    gc.setNDocsReturned(_cursor->getNumReturnedSoFar());
+    gc.setTailable(_cursor->isTailable());
+    gc.setAwaitData(_cursor->isTailableAndAwaitData());
+    gc.setOriginatingCommand(_cursor->getOriginatingCommand());
+    gc.setLastAccessDate(_cursor->getLastUseDate());
+    gc.setCreatedDate(_cursor->getCreatedDate());
+    gc.setNBatchesReturned(_cursor->getNBatches());
     return gc;
-}
-
-Status ClusterCursorManager::PinnedCursor::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
-    invariant(_cursor);
-    return _cursor->setAwaitDataTimeout(awaitDataTimeout);
 }
 
 void ClusterCursorManager::PinnedCursor::returnAndKillCursor() {
@@ -229,16 +145,6 @@ void ClusterCursorManager::PinnedCursor::returnAndKillCursor() {
 
     // Return the cursor as exhausted so that it's deleted immediately.
     returnCursor(CursorState::Exhausted);
-}
-
-boost::optional<LogicalSessionId> ClusterCursorManager::PinnedCursor::getLsid() const {
-    invariant(_cursor);
-    return _cursor->getLsid();
-}
-
-boost::optional<TxnNumber> ClusterCursorManager::PinnedCursor::getTxnNumber() const {
-    invariant(_cursor);
-    return _cursor->getTxnNumber();
 }
 
 ClusterCursorManager::ClusterCursorManager(ClockSource* clockSource)
