@@ -619,6 +619,23 @@ TEST_F(KeyStringBuilderTest, DoubleInvalidIntegerPartV0) {
         31209);
 }
 
+TEST_F(KeyStringBuilderTest, InvalidInfinityDecimalV0) {
+    // Encode a Decimal positive infinity in a V1 keystring.
+    mongo::KeyString::Builder ks(
+        mongo::KeyString::Version::V1, BSON("" << Decimal128::kPositiveInfinity), ALL_ASCENDING);
+
+    // Construct V0 type bits that indicate a NumberDecimal has been encoded.
+    mongo::KeyString::TypeBits tb(mongo::KeyString::Version::V0);
+    tb.appendNumberDecimal();
+
+    // The conversion to BSON will fail because Decimal positive infinity cannot be encoded with V0
+    // type bits.
+    ASSERT_THROWS_CODE(
+        mongo::KeyString::toBsonSafe(ks.getBuffer(), ks.getSize(), ALL_ASCENDING, tb),
+        AssertionException,
+        31231);
+}
+
 TEST_F(KeyStringBuilderTest, LotsOfNumbers1) {
     for (int i = 0; i < 64; i++) {
         int64_t x = 1LL << i;

@@ -1412,7 +1412,9 @@ void toBsonValue(uint8_t ctype,
         // fallthrough (format is the same as positive, but inverted)
         case CType::kNumericPositiveLargeMagnitude: {
             const uint8_t originalType = typeBits->readNumeric();
-            invariant(version > Version::V0 || originalType != TypeBits::kDecimal);
+            uassert(31231,
+                    "Unexpected decimal encoding for V0 KeyString.",
+                    version > Version::V0 || originalType != TypeBits::kDecimal);
             uint64_t encoded = readType<uint64_t>(reader, inverted);
             encoded = endian::bigToNative(encoded);
             bool hasDecimalContinuation = false;
