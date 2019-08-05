@@ -564,6 +564,37 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalConfigDocument(Operati
     }
 }
 
+Status ReplicationCoordinatorExternalStateImpl::createLocalLastVoteCollection(
+    OperationContext* opCtx) {
+    auto status = _storageInterface->createCollection(
+        opCtx, NamespaceString(lastVoteCollectionName), CollectionOptions());
+    if (!status.isOK() && status.code() != ErrorCodes::NamespaceExists) {
+        return {ErrorCodes::CannotCreateCollection,
+                str::stream() << "Failed to create local last vote collection. Ns: "
+                              << lastVoteCollectionName
+                              << " Error: "
+                              << status.toString()};
+    }
+
+    // Make sure there's always a last vote document.
+    try {
+        writeConflictRetry(
+            opCtx, "create initial replica set lastVote", lastVoteCollectionName, [opCtx] {
+                AutoGetCollection coll(opCtx, NamespaceString(lastVoteCollectionName), MODE_X);
+                BSONObj result;
+                bool exists = Helpers::getSingleton(opCtx, lastVoteCollectionName, result);
+                if (!exists) {
+                    LastVote lastVote{OpTime::kInitialTerm, -1};
+                    Helpers::putSingleton(opCtx, lastVoteCollectionName, lastVote.toBSON());
+                }
+            });
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
+
+    return Status::OK();
+}
+
 StatusWith<LastVote> ReplicationCoordinatorExternalStateImpl::loadLocalLastVoteDocument(
     OperationContext* opCtx) {
     try {
@@ -589,26 +620,24 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
     try {
         Status status =
             writeConflictRetry(opCtx, "save replica set lastVote", lastVoteCollectionName, [&] {
-                Lock::DBLock dbWriteLock(opCtx, lastVoteDatabaseName, MODE_X);
+                AutoGetCollection coll(opCtx, NamespaceString(lastVoteCollectionName), MODE_IX);
+                WriteUnitOfWork wunit(opCtx);
 
-                // If there is no last vote document, we want to store one. Otherwise, we only want
-                // to replace it if the new last vote document would have a higher term. We both
-                // check the term of the current last vote document and insert the new document
-                // under the DBLock to synchronize the two operations.
+                // We only want to replace the last vote document if the new last vote document
+                // would have a higher term. We check the term of the current last vote document and
+                // insert the new document in a WriteUnitOfWork to synchronize the two operations.
+                // We have already ensured at startup time that there is an old document.
                 BSONObj result;
                 bool exists = Helpers::getSingleton(opCtx, lastVoteCollectionName, result);
-                if (!exists) {
-                    Helpers::putSingleton(opCtx, lastVoteCollectionName, lastVoteObj);
-                } else {
-                    StatusWith<LastVote> oldLastVoteDoc = LastVote::readFromLastVote(result);
-                    if (!oldLastVoteDoc.isOK()) {
-                        return oldLastVoteDoc.getStatus();
-                    }
-                    if (lastVote.getTerm() > oldLastVoteDoc.getValue().getTerm()) {
-                        Helpers::putSingleton(opCtx, lastVoteCollectionName, lastVoteObj);
-                    }
+                fassert(51241, exists);
+                StatusWith<LastVote> oldLastVoteDoc = LastVote::readFromLastVote(result);
+                if (!oldLastVoteDoc.isOK()) {
+                    return oldLastVoteDoc.getStatus();
                 }
-
+                if (lastVote.getTerm() > oldLastVoteDoc.getValue().getTerm()) {
+                    Helpers::putSingleton(opCtx, lastVoteCollectionName, lastVoteObj);
+                }
+                wunit.commit();
                 return Status::OK();
             });
 

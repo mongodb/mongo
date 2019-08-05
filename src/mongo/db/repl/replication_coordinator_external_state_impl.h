@@ -88,6 +88,7 @@ public:
     virtual void forwardSlaveProgress();
     virtual OID ensureMe(OperationContext* opCtx);
     virtual bool isSelf(const HostAndPort& host, ServiceContext* service);
+    Status createLocalLastVoteCollection(OperationContext* opCtx) final;
     virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* opCtx);
     virtual Status storeLocalConfigDocument(OperationContext* opCtx, const BSONObj& config);
     virtual StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* opCtx);

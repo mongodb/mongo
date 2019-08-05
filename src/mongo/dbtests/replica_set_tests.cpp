@@ -38,7 +38,7 @@
 #include "mongo/db/repl/replication_coordinator_external_state_impl.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/replication_recovery.h"
-#include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/unittest/unittest.h"
 
@@ -53,7 +53,7 @@ class ReplicaSetTest : public mongo::unittest::Test {
 protected:
     void setUp() {
         auto opCtx = makeOpCtx();
-        _storageInterface = stdx::make_unique<repl::StorageInterfaceMock>();
+        _storageInterface = std::make_unique<repl::StorageInterfaceImpl>();
         _dropPendingCollectionReaper =
             stdx::make_unique<repl::DropPendingCollectionReaper>(_storageInterface.get());
         auto consistencyMarkers =
@@ -67,6 +67,7 @@ protected:
             _dropPendingCollectionReaper.get(),
             _storageInterface.get(),
             _replicationProcess.get());
+        ASSERT_OK(_replCoordExternalState->createLocalLastVoteCollection(opCtx.get()));
     }
 
     void tearDown() {
