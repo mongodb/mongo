@@ -73,8 +73,7 @@ ReplSetMetadata::ReplSetMetadata(long long term,
       _currentPrimaryIndex(currentPrimaryIndex),
       _currentSyncSourceIndex(currentSyncSourceIndex) {}
 
-StatusWith<ReplSetMetadata> ReplSetMetadata::readFromMetadata(const BSONObj& metadataObj,
-                                                              bool requireWallTime) {
+StatusWith<ReplSetMetadata> ReplSetMetadata::readFromMetadata(const BSONObj& metadataObj) {
     BSONElement replMetadataElement;
 
     Status status = bsonExtractTypedField(
@@ -127,16 +126,11 @@ StatusWith<ReplSetMetadata> ReplSetMetadata::readFromMetadata(const BSONObj& met
     status = bsonExtractTypedField(
         replMetadataObj, kLastCommittedWallFieldName, BSONType::Date, &wallClockTimeElement);
 
-    // Last committed OpTime is optional, so if last committed OpTime is missing, do not check for
-    // last committed wall clock time. Last committed wall clock time is also only required if
-    // FCV is 4.2.
-    if (!status.isOK() && lastCommittedStatus != ErrorCodes::NoSuchKey &&
-        (status != ErrorCodes::NoSuchKey || requireWallTime))
+    if (!status.isOK()) {
         return status;
-    if (status.isOK()) {
-        lastOpCommitted.wallTime = wallClockTimeElement.Date();
     }
 
+    lastOpCommitted.wallTime = wallClockTimeElement.Date();
     return ReplSetMetadata(
         term, lastOpCommitted, lastOpVisible, configVersion, id, primaryIndex, syncSourceIndex);
 }

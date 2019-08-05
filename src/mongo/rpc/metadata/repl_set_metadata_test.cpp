@@ -71,7 +71,7 @@ TEST(ReplResponseMetadataTest, Roundtrip) {
     BSONObj serializedObj = builder.obj();
     ASSERT_BSONOBJ_EQ(expectedObj, serializedObj);
 
-    auto cloneStatus = ReplSetMetadata::readFromMetadata(serializedObj, /*requireWallTime*/ true);
+    auto cloneStatus = ReplSetMetadata::readFromMetadata(serializedObj);
     ASSERT_OK(cloneStatus.getStatus());
 
     const auto& clonedMetadata = cloneStatus.getValue();
@@ -90,10 +90,12 @@ TEST(ReplResponseMetadataTest, Roundtrip) {
 
 TEST(ReplResponseMetadataTest, MetadataCanBeConstructedWhenMissingOplogQueryMetadataFields) {
     auto id = OID::gen();
+    Date_t committedWallTime = Date_t();
     BSONObj obj(BSON(kReplSetMetadataFieldName
-                     << BSON("term" << 3 << "configVersion" << 6 << "replicaSetId" << id)));
+                     << BSON("term" << 3 << "configVersion" << 6 << "replicaSetId" << id
+                                    << "lastCommittedWall" << committedWallTime)));
 
-    auto status = ReplSetMetadata::readFromMetadata(obj, /*requireWallTime*/ true);
+    auto status = ReplSetMetadata::readFromMetadata(obj);
     ASSERT_OK(status.getStatus());
 
     const auto& metadata = status.getValue();

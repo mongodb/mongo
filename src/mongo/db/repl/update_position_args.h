@@ -75,7 +75,7 @@ public:
     /**
      * Initializes this UpdatePositionArgs from the contents of "argsObj".
      */
-    Status initialize(const BSONObj& argsObj, bool requireWallTime);
+    Status initialize(const BSONObj& argsObj);
 
     /**
      * Gets a begin iterator over the UpdateInfos stored in this UpdatePositionArgs.

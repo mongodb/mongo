@@ -62,7 +62,7 @@ UpdatePositionArgs::UpdateInfo::UpdateInfo(const OpTime& applied,
       cfgver(aCfgver),
       memberId(aMemberId) {}
 
-Status UpdatePositionArgs::initialize(const BSONObj& argsObj, bool requireWallTime) {
+Status UpdatePositionArgs::initialize(const BSONObj& argsObj) {
     // grab the array of changes
     BSONElement updateArray;
     Status status = bsonExtractTypedField(argsObj, kUpdateArrayFieldName, Array, &updateArray);
@@ -76,26 +76,26 @@ Status UpdatePositionArgs::initialize(const BSONObj& argsObj, bool requireWallTi
 
         OpTime appliedOpTime;
         status = bsonExtractOpTimeField(entry, kAppliedOpTimeFieldName, &appliedOpTime);
-        if (!status.isOK())
+        if (!status.isOK()) {
             return status;
-
+        }
         Date_t appliedWallTime = Date_t();
         BSONElement appliedWallTimeElement;
         status = bsonExtractTypedField(
             entry, kAppliedWallTimeFieldName, BSONType::Date, &appliedWallTimeElement);
-        if (!status.isOK() && (status != ErrorCodes::NoSuchKey || requireWallTime))
+        if (!status.isOK()) {
             return status;
-        if (status.isOK())
-            appliedWallTime = appliedWallTimeElement.Date();
+        }
+        appliedWallTime = appliedWallTimeElement.Date();
 
         Date_t durableWallTime = Date_t();
         BSONElement durableWallTimeElement;
         status = bsonExtractTypedField(
             entry, kDurableWallTimeFieldName, BSONType::Date, &durableWallTimeElement);
-        if (!status.isOK() && (status != ErrorCodes::NoSuchKey || requireWallTime))
+        if (!status.isOK()) {
             return status;
-        if (status.isOK())
-            durableWallTime = durableWallTimeElement.Date();
+        }
+        durableWallTime = durableWallTimeElement.Date();
 
         OpTime durableOpTime;
         status = bsonExtractOpTimeField(entry, kDurableOpTimeFieldName, &durableOpTime);

@@ -69,11 +69,8 @@ public:
      *     primaryIndex: 0,
      *     syncSourceIndex: 0
      * }
-     * requireWallTime is only false if FCV is less than 4.2 or the wall clock time is not read from
-     * this particular OplogQueryMetadata instance.
      */
-    static StatusWith<OplogQueryMetadata> readFromMetadata(const BSONObj& doc,
-                                                           bool requireWallTime);
+    static StatusWith<OplogQueryMetadata> readFromMetadata(const BSONObj& doc);
     Status writeToMetadata(BSONObjBuilder* builder) const;
 
     /**

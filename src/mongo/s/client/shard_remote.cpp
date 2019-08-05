@@ -272,8 +272,8 @@ StatusWith<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCommand(
 
         if (data.otherFields.metadata.hasField(rpc::kReplSetMetadataFieldName)) {
             // Sharding users of ReplSetMetadata do not require the wall clock time field to be set
-            auto replParseStatus = rpc::ReplSetMetadata::readFromMetadata(
-                data.otherFields.metadata, /*requireWallTime*/ false);
+            auto replParseStatus =
+                rpc::ReplSetMetadata::readFromMetadata(data.otherFields.metadata);
             if (!replParseStatus.isOK()) {
                 status = replParseStatus.getStatus();
                 response.docs.clear();

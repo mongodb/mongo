@@ -92,8 +92,7 @@ Status ShardingEgressMetadataHook::_advanceConfigOpTimeFromShard(OperationContex
             // Config servers return the config opTime as part of their own metadata.
             if (metadataObj.hasField(rpc::kReplSetMetadataFieldName)) {
                 // Sharding users of ReplSetMetadata do not use the wall clock time field.
-                auto parseStatus =
-                    rpc::ReplSetMetadata::readFromMetadata(metadataObj, /*requireWallTime*/ false);
+                auto parseStatus = rpc::ReplSetMetadata::readFromMetadata(metadataObj);
                 if (!parseStatus.isOK()) {
                     return parseStatus.getStatus();
                 }

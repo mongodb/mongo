@@ -611,8 +611,7 @@ public:
         if (cmdObj.hasField("handshake"))
             return true;
 
-        auto metadataResult =
-            rpc::ReplSetMetadata::readFromMetadata(cmdObj, true /* requireWallTime */);
+        auto metadataResult = rpc::ReplSetMetadata::readFromMetadata(cmdObj);
         if (metadataResult.isOK()) {
             // New style update position command has metadata, which may inform the
             // upstream of a higher term.
@@ -626,7 +625,7 @@ public:
 
         UpdatePositionArgs args;
 
-        status = args.initialize(cmdObj, true /* requireWallTime */);
+        status = args.initialize(cmdObj);
         if (status.isOK()) {
             status = replCoord->processReplSetUpdatePosition(args, &configVersion);
 

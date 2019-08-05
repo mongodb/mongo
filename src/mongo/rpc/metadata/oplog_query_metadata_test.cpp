@@ -62,8 +62,7 @@ TEST(ReplResponseMetadataTest, OplogQueryMetadataRoundtrip) {
     BSONObj serializedObj = builder.obj();
     ASSERT_BSONOBJ_EQ(expectedObj, serializedObj);
 
-    auto cloneStatus =
-        OplogQueryMetadata::readFromMetadata(serializedObj, /*requireWallTime*/ true);
+    auto cloneStatus = OplogQueryMetadata::readFromMetadata(serializedObj);
     ASSERT_OK(cloneStatus.getStatus());
 
     const auto& clonedMetadata = cloneStatus.getValue();

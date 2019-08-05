@@ -4754,7 +4754,7 @@ TEST_F(ReplCoordTest, PrepareOplogQueryMetadata) {
     BSONObj metadata = metadataBob.done();
     log() << metadata;
 
-    auto oqMetadata = rpc::OplogQueryMetadata::readFromMetadata(metadata, /*requireWallTime*/ true);
+    auto oqMetadata = rpc::OplogQueryMetadata::readFromMetadata(metadata);
     ASSERT_OK(oqMetadata.getStatus());
     ASSERT_EQ(oqMetadata.getValue().getLastOpCommitted().opTime, optime1);
     ASSERT_EQ(oqMetadata.getValue().getLastOpCommitted().wallTime, wallTime1);
@@ -5432,8 +5432,7 @@ TEST_F(ReplCoordTest, UpdatePositionCmdHasMetadata) {
     ASSERT_EQUALS(metadata.getTerm(), getReplCoord()->getTerm());
     ASSERT_EQUALS(metadata.getLastOpVisible(), optime);
 
-    auto oqMetadataStatus =
-        rpc::OplogQueryMetadata::readFromMetadata(cmd, /*requireWallTime*/ true);
+    auto oqMetadataStatus = rpc::OplogQueryMetadata::readFromMetadata(cmd);
     ASSERT_EQUALS(oqMetadataStatus.getStatus(), ErrorCodes::NoSuchKey);
 }
 
@@ -5533,8 +5532,7 @@ TEST_F(ReplCoordTest, StepDownWhenHandleLivenessTimeoutMarksAMajorityOfVotingNod
                            << Date_t() + Seconds(startingOpTime.getSecs())
                            << UpdatePositionArgs::kDurableOpTimeFieldName << startingOpTime.toBSON()
                            << UpdatePositionArgs::kDurableWallTimeFieldName
-                           << Date_t() + Seconds(startingOpTime.getSecs())))),
-        /*requireWallTime*/ true));
+                           << Date_t() + Seconds(startingOpTime.getSecs()))))));
     const Date_t startDate = getNet()->now();
     getNet()->enterNetwork();
     getNet()->runUntil(startDate + Milliseconds(100));

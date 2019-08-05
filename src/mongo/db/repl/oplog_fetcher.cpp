@@ -227,8 +227,7 @@ StatusWith<boost::optional<rpc::OplogQueryMetadata>> parseOplogQueryMetadata(
         queryResponse.otherFields.metadata.hasElement(rpc::kOplogQueryMetadataFieldName);
     if (receivedOplogQueryMetadata) {
         const auto& metadataObj = queryResponse.otherFields.metadata;
-        auto metadataResult =
-            rpc::OplogQueryMetadata::readFromMetadata(metadataObj, true /* requireWallTime */);
+        auto metadataResult = rpc::OplogQueryMetadata::readFromMetadata(metadataObj);
         if (!metadataResult.isOK()) {
             return metadataResult.getStatus();
         }
@@ -473,8 +472,7 @@ StatusWith<BSONObj> OplogFetcher::_onSuccessfulBatch(const Fetcher::QueryRespons
         queryResponse.otherFields.metadata.hasElement(rpc::kReplSetMetadataFieldName);
     if (receivedReplMetadata) {
         const auto& metadataObj = queryResponse.otherFields.metadata;
-        auto metadataResult =
-            rpc::ReplSetMetadata::readFromMetadata(metadataObj, true /* requireWallTime */);
+        auto metadataResult = rpc::ReplSetMetadata::readFromMetadata(metadataObj);
         if (!metadataResult.isOK()) {
             error() << "invalid replication metadata from sync source " << _getSource() << ": "
                     << metadataResult.getStatus() << ": " << metadataObj;

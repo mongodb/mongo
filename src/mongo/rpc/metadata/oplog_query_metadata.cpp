@@ -67,8 +67,7 @@ OplogQueryMetadata::OplogQueryMetadata(OpTimeAndWallTime lastOpCommitted,
       _currentPrimaryIndex(currentPrimaryIndex),
       _currentSyncSourceIndex(currentSyncSourceIndex) {}
 
-StatusWith<OplogQueryMetadata> OplogQueryMetadata::readFromMetadata(const BSONObj& metadataObj,
-                                                                    bool requireWallTime) {
+StatusWith<OplogQueryMetadata> OplogQueryMetadata::readFromMetadata(const BSONObj& metadataObj) {
     BSONElement oqMetadataElement;
 
     Status status = bsonExtractTypedField(
@@ -101,10 +100,10 @@ StatusWith<OplogQueryMetadata> OplogQueryMetadata::readFromMetadata(const BSONOb
     BSONElement wallClockTimeElement;
     status = bsonExtractTypedField(
         oqMetadataObj, kLastCommittedWallFieldName, BSONType::Date, &wallClockTimeElement);
-    if (!status.isOK() && (status != ErrorCodes::NoSuchKey || requireWallTime))
+    if (!status.isOK()) {
         return status;
-    if (status.isOK())
-        lastOpCommitted.wallTime = wallClockTimeElement.Date();
+    }
+    lastOpCommitted.wallTime = wallClockTimeElement.Date();
 
     repl::OpTime lastOpApplied;
     status = bsonExtractOpTimeField(oqMetadataObj, kLastOpAppliedFieldName, &lastOpApplied);

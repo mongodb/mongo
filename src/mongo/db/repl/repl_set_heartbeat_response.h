@@ -51,10 +51,8 @@ class ReplSetHeartbeatResponse {
 public:
     /**
      * Initializes this ReplSetHeartbeatResponse from the contents of "doc".
-     * "term" is only used to complete a V0 OpTime (which is really a Timestamp).
-     * Only processes wall clock time elements if FCV is 4.2 (i.e., requireWallTime is true).
      */
-    Status initialize(const BSONObj& doc, long long term, bool requireWallTime);
+    Status initialize(const BSONObj& doc, long long term);
 
     /**
      * Appends all non-default values to "builder".

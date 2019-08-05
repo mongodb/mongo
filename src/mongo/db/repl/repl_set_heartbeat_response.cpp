@@ -109,9 +109,7 @@ BSONObj ReplSetHeartbeatResponse::toBSON() const {
     return builder.obj();
 }
 
-Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc,
-                                            long long term,
-                                            bool requireWallTime) {
+Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) {
     auto status = getStatusFromCommandResult(doc);
     if (!status.isOK()) {
         return status;
@@ -161,9 +159,7 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc,
     if (!status.isOK()) {
         return status;
     }
-    if (status.isOK()) {
-        _durableWallTime = durableWallTimeElement.Date();
-    }
+    _durableWallTime = durableWallTimeElement.Date();
     _durableOpTimeSet = true;
 
 
@@ -180,9 +176,7 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc,
     if (!status.isOK()) {
         return status;
     }
-    if (status.isOK()) {
-        _appliedWallTime = appliedWallTimeElement.Date();
-    }
+    _appliedWallTime = appliedWallTimeElement.Date();
     _appliedOpTimeSet = true;
 
     const BSONElement memberStateElement = doc[kMemberStateFieldName];

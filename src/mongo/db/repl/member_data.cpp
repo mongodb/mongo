@@ -128,6 +128,7 @@ void MemberData::setAuthIssue(Date_t now) {
 }
 
 void MemberData::setLastAppliedOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_t now) {
+    invariant(opTime.opTime.isNull() || opTime.wallTime > Date_t());
     _lastUpdate = now;
     _lastUpdateStale = false;
     _lastAppliedOpTime = opTime.opTime;
@@ -135,6 +136,7 @@ void MemberData::setLastAppliedOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_
 }
 
 void MemberData::setLastDurableOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_t now) {
+    invariant(opTime.opTime.isNull() || opTime.wallTime > Date_t());
     _lastUpdate = now;
     _lastUpdateStale = false;
     if (_lastAppliedOpTime < opTime.opTime) {
@@ -153,6 +155,7 @@ void MemberData::setLastDurableOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_
 }
 
 bool MemberData::advanceLastAppliedOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_t now) {
+    invariant(opTime.opTime.isNull() || opTime.wallTime > Date_t());
     _lastUpdate = now;
     _lastUpdateStale = false;
     if (_lastAppliedOpTime < opTime.opTime) {
@@ -163,6 +166,7 @@ bool MemberData::advanceLastAppliedOpTimeAndWallTime(OpTimeAndWallTime opTime, D
 }
 
 bool MemberData::advanceLastDurableOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_t now) {
+    invariant(opTime.opTime.isNull() || opTime.wallTime > Date_t());
     _lastUpdate = now;
     _lastUpdateStale = false;
     if (_lastDurableOpTime < opTime.opTime) {

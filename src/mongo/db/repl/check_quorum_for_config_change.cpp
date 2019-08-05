@@ -195,7 +195,7 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
 
     BSONObj resBSON = response.data;
     ReplSetHeartbeatResponse hbResp;
-    Status hbStatus = hbResp.initialize(resBSON, 0, /*requireWallTime*/ false);
+    Status hbStatus = hbResp.initialize(resBSON, 0);
 
     if (hbStatus.code() == ErrorCodes::InconsistentReplicaSetNames) {
         std::string message = str::stream()
@@ -226,7 +226,7 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
 
     if (_rsConfig->hasReplicaSetId()) {
         StatusWith<rpc::ReplSetMetadata> replMetadata =
-            rpc::ReplSetMetadata::readFromMetadata(response.data, /*requireWallTime*/ false);
+            rpc::ReplSetMetadata::readFromMetadata(response.data);
         if (replMetadata.isOK() && replMetadata.getValue().getReplicaSetId().isSet() &&
             _rsConfig->getReplicaSetId() != replMetadata.getValue().getReplicaSetId()) {
             std::string message = str::stream()

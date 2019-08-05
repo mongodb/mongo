@@ -72,10 +72,8 @@ public:
      *     primaryIndex: 0,
      *     syncSourceIndex: 0
      * }
-     * requireWallTime is only false if the wall clock time is not read from this particular
-     * ReplSetMetadata instance.
      */
-    static StatusWith<ReplSetMetadata> readFromMetadata(const BSONObj& doc, bool requireWallTime);
+    static StatusWith<ReplSetMetadata> readFromMetadata(const BSONObj& doc);
     Status writeToMetadata(BSONObjBuilder* builder) const;
 
     /**

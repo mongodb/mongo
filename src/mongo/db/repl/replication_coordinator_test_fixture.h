@@ -106,15 +106,12 @@ protected:
         return _repl.get();
     }
 
-    Status updatePositionArgsInitialize(UpdatePositionArgs& args,
-                                        const BSONObj& argsObj,
-                                        bool requireWallTime = true) {
-        return args.initialize(argsObj, requireWallTime);
+    Status updatePositionArgsInitialize(UpdatePositionArgs& args, const BSONObj& argsObj) {
+        return args.initialize(argsObj);
     }
 
-    StatusWith<rpc::ReplSetMetadata> replReadFromMetadata(const BSONObj& doc,
-                                                          bool requireWallTime = true) {
-        return rpc::ReplSetMetadata::readFromMetadata(doc, requireWallTime);
+    StatusWith<rpc::ReplSetMetadata> replReadFromMetadata(const BSONObj& doc) {
+        return rpc::ReplSetMetadata::readFromMetadata(doc);
     }
 
     void replCoordSetMyLastAppliedOpTime(const OpTime& opTime, Date_t wallTime = Date_t()) {

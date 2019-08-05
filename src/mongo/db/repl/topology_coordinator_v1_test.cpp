@@ -3443,9 +3443,7 @@ TEST_F(HeartbeatResponseTestV1, ReconfigNodeRemovedBetweenHeartbeatRequestAndRep
                  0);
 
     ReplSetHeartbeatResponse hb;
-    hb.initialize(BSON("ok" << 1 << "v" << 1 << "state" << MemberState::RS_PRIMARY),
-                  0,
-                  /*requireWallTime*/ true)
+    hb.initialize(BSON("ok" << 1 << "v" << 1 << "state" << MemberState::RS_PRIMARY), 0)
         .transitional_ignore();
     hb.setDurableOpTimeAndWallTime(
         {lastOpTimeApplied, Date_t() + Seconds(lastOpTimeApplied.getSecs())});
@@ -3495,8 +3493,7 @@ TEST_F(HeartbeatResponseTestV1, ReconfigBetweenHeartbeatRequestAndRepsonse) {
                             << OpTime(Timestamp(100, 0), 0).toBSON() << "wallTime"
                             << Date_t() + Seconds(100) << "v" << 1 << "state"
                             << MemberState::RS_PRIMARY),
-                  0,
-                  /*requireWallTime*/ true)
+                  0)
         .transitional_ignore();
     hb.setDurableOpTimeAndWallTime(
         {lastOpTimeApplied, Date_t() + Seconds(lastOpTimeApplied.getSecs())});

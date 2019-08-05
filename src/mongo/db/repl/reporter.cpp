@@ -54,7 +54,7 @@ const char kConfigVersionFieldName[] = "configVersion";
 template <typename UpdatePositionArgsType>
 long long _parseCommandRequestConfigVersion(const BSONObj& commandRequest) {
     UpdatePositionArgsType args;
-    if (!args.initialize(commandRequest, /*requireWallTime*/ false).isOK()) {
+    if (!args.initialize(commandRequest).isOK()) {
         return -1;
     }
     if (args.updatesBegin() == args.updatesEnd()) {
