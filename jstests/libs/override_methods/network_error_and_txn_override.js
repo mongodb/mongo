@@ -822,12 +822,6 @@ function shouldRetryWithNetworkErrorOverride(
             return kContinue;
         }
 
-        // Thrown when an index build is interrupted during its collection scan.
-        if (cmdName === "createIndexes" && res.codeName === "InterruptedDueToReplStateChange") {
-            logError("Retrying because of interrupted collection scan");
-            return kContinue;
-        }
-
         // Some sharding commands return raw responses from all contacted shards and there won't
         // be a top level code if shards returned more than one error code, in which case retry
         // if any error is retryable.
