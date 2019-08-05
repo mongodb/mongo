@@ -72,8 +72,8 @@ public:
      *     primaryIndex: 0,
      *     syncSourceIndex: 0
      * }
-     * requireWallTime is only false if FCV is less than 4.2 or the wall clock time is not read from
-     * this particular ReplSetMetadata instance.
+     * requireWallTime is only false if the wall clock time is not read from this particular
+     * ReplSetMetadata instance.
      */
     static StatusWith<ReplSetMetadata> readFromMetadata(const BSONObj& doc, bool requireWallTime);
     Status writeToMetadata(BSONObjBuilder* builder) const;

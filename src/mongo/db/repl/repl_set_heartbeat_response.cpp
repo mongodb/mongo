@@ -158,9 +158,7 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc,
     _durableWallTime = Date_t();
     status = bsonExtractTypedField(
         doc, kDurableWallTimeFieldName, BSONType::Date, &durableWallTimeElement);
-    if (!status.isOK() && (status != ErrorCodes::NoSuchKey || requireWallTime)) {
-        // We ignore NoSuchKey errors if the FeatureCompatibilityVersion is less than 4.2, since
-        // older version nodes may not report wall clock times.
+    if (!status.isOK()) {
         return status;
     }
     if (status.isOK()) {
@@ -179,9 +177,7 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc,
     _appliedWallTime = Date_t();
     status = bsonExtractTypedField(
         doc, kAppliedWallTimeFieldName, BSONType::Date, &appliedWallTimeElement);
-    if (!status.isOK() && (status != ErrorCodes::NoSuchKey || requireWallTime)) {
-        // We ignore NoSuchKey errors if the FeatureCompatibilityVersion is less than 4.2, since
-        // older version nodes may not report wall clock times.
+    if (!status.isOK()) {
         return status;
     }
     if (status.isOK()) {

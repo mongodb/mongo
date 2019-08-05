@@ -150,17 +150,10 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
     BSONObj resp;
     if (responseStatus.isOK()) {
         resp = cbData.response.data;
-        // Wall clock times are required in ReplSetHeartbeatResponse when FCV is 4.2. Arbiters
-        // trivially have FCV equal to 4.2, so they are excluded from this check.
-        bool isArbiter = _topCoord->getMemberState() == MemberState::RS_ARBITER;
-        bool requireWallTime =
-            (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-             serverGlobalParams.featureCompatibility.getVersion() ==
-                 ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42 &&
-             !isArbiter);
-        responseStatus = hbResponse.initialize(resp, _topCoord->getTerm(), requireWallTime);
-        StatusWith<rpc::ReplSetMetadata> replMetadata =
-            rpc::ReplSetMetadata::readFromMetadata(cbData.response.data, requireWallTime);
+        responseStatus =
+            hbResponse.initialize(resp, _topCoord->getTerm(), true /* requireWallTime */);
+        StatusWith<rpc::ReplSetMetadata> replMetadata = rpc::ReplSetMetadata::readFromMetadata(
+            cbData.response.data, true /* requireWallTime */);
 
         LOG_FOR_HEARTBEATS(2) << "Received response to heartbeat (requestId: " << cbData.request.id
                               << ") from " << target << ", " << resp;
