@@ -15,21 +15,8 @@ function numKeys(o) {
 }
 
 db.foo.drop();
-//	SERVER-29678 changed collStats so versions > 4.0 now return 0s on NS not found
-if (MongoRunner.getBinVersionFor(jsTest.options().mongosBinVersion) === '4.0') {
-    // TODO: This should be fixed in 4.4
-    let res = db.foo.stats();
-    if (res.ok === 1) {
-        // Possible to hit a shard that is actually version >= 4.2 => result should be zeros
-        assert(res.size === 0 && res.count === 0 && res.storageSize === 0 && res.nindexes === 0);
-    } else {
-        assert.commandFailed(db.foo.stats(),
-                             'db.collection.stats() should fail non-existent in versions <= 4.0');
-    }
-} else {
-    assert.commandWorked(db.foo.stats(),
-                         'db.collection.stats() should return 0s on non-existent collection');
-}
+assert.commandWorked(db.foo.stats(),
+                     'db.collection.stats() should return 0s on non-existent collection');
 
 // ---------- load some data -----
 

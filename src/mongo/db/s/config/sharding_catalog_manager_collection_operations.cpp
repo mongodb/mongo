@@ -370,6 +370,7 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
     // Fail if there are partially written chunks from a previous failed shardCollection.
     checkForExistingChunks(opCtx, nss);
 
+    // TODO: SERVER-42593
     // Prior to 4.0.5, zones cannot be taken into account at collection sharding time, so ignore
     // them and let the balancer apply them later
     const std::vector<TagsType> treatAsNoZonesDefined;

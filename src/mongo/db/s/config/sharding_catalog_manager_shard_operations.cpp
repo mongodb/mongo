@@ -337,6 +337,7 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
                                                 << "field when attempting to add "
                                                 << connectionString.toString() << " as a shard");
     }
+    // TODO: SERVER-42592
     if (serverGlobalParams.featureCompatibility.getVersion() >
         ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40) {
         // If the cluster's FCV is 4.2, or upgrading to / downgrading from, the node being added
@@ -646,6 +647,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
     AddShard addShardCmd = add_shard_util::createAddShardCmd(opCtx, shardType.getName());
 
+    // TODO: SERVER-42592
     auto addShardCmdBSON = [&]() {
         // In 4.2, use the _addShard command to add the shard, which in turn inserts a
         // shardIdentity document into the shard and triggers sharding state initialization.
@@ -680,6 +682,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         invariant(!opCtx->lockState()->isLocked());
         Lock::SharedLock lk(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
 
+        // TODO: SERVER-42592
         BSONObj setFCVCmd;
         switch (serverGlobalParams.featureCompatibility.getVersion()) {
             case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42:

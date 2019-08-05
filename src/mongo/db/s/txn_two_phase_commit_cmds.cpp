@@ -221,12 +221,6 @@ public:
                 uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
             }
 
-            uassert(ErrorCodes::CommandNotSupported,
-                    "'coordinateCommitTransaction' is only supported in feature compatibility "
-                    "version 4.2",
-                    (serverGlobalParams.featureCompatibility.getVersion() ==
-                     ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42));
-
             const auto& cmd = request();
             const auto tcs = TransactionCoordinatorService::get(opCtx);
 

@@ -545,6 +545,7 @@ public:
                 return true;
             }
 
+            // TODO: SERVER-42594
             // This check for empty collection is racy, because it is not guaranteed that documents
             // will not show up in the collection right after the count below has executed. It is
             // left here for backwards compatiblity with pre-4.0.4 clusters, which do not support
