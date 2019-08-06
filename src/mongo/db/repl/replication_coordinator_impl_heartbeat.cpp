@@ -175,20 +175,11 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
             replMetadata = responseStatus;
         }
         if (replMetadata.isOK()) {
-
-            // The majority commit point can be propagated through heartbeats as long as there are
-            // no 4.0 nodes in the replica set. If there are 4.0 nodes, propagating the majority
-            // commit point through heartbeats can cause a sync source cycle due to SERVER-33248.
-            // Note that FCV may not be initialized, since for a new replica set, the first primary
-            // initializes the FCV after it is elected.
-            // TODO SERVER-40211: Always propagate the majority commit point through heartbeats,
-            // regardless of FCV.
-            const auto isFCV42 = serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-                serverGlobalParams.featureCompatibility.getVersion() ==
-                    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42;
+            // It is safe to update our commit point via heartbeat propagation as long as the
+            // the new commit point we learned of is on the same branch of history as our own
+            // oplog.
             if (_getMemberState_inlock().arbiter() ||
-                (isFCV42 && !_getMemberState_inlock().startup() &&
-                 !_getMemberState_inlock().startup2())) {
+                (!_getMemberState_inlock().startup() && !_getMemberState_inlock().startup2())) {
                 // The node that sent the heartbeat is not guaranteed to be our sync source.
                 const bool fromSyncSource = false;
                 _advanceCommitPoint(

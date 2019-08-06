@@ -1273,11 +1273,6 @@ var ReplSetTest = function(opts) {
                     "data": {"awaitLastStableRecoveryTimestamp": 1},
                     "writeConcern": {"w": "majority", "wtimeout": ReplSetTest.kDefaultTimeoutMS}
                 }));
-
-                // Perform a second write, in case some node had lost its sync source.
-                // TODO SERVER-40211: Remove the second write.
-                assert.commandWorked(db.adminCommand(
-                    {"appendOplogNote": 1, "data": {"awaitLastStableRecoveryTimestamp": 2}}));
             };
 
             // TODO(SERVER-14017): Remove this extra sub-shell in favor of a cleaner authentication
