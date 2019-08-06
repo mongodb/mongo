@@ -7,7 +7,6 @@ from . import queue_element
 from . import testcases
 from .. import config
 from .. import errors
-from ..testing.fixtures import interface as _fixtures
 from ..testing.hooks import stepdown
 from ..testing.testcases import fixture as _fixture
 from ..utils import queue as _queue
@@ -42,14 +41,13 @@ class Job(object):  # pylint: disable=too-many-instance-attributes
 
         Return True if the setup was successful, False otherwise.
         """
-        if isinstance(self.fixture, _fixtures.NoOpFixture):
-            return True
         test_case = _fixture.FixtureSetupTestCase(self.test_queue_logger, self.fixture,
                                                   "job{}".format(self.job_num))
         test_case(self.report)
         if self.report.find_test_info(test_case).status != "pass":
             self.logger.error("The setup of %s failed.", self.fixture)
             return False
+
         return True
 
     def teardown_fixture(self):
@@ -57,14 +55,13 @@ class Job(object):  # pylint: disable=too-many-instance-attributes
 
         Return True if the teardown was successful, False otherwise.
         """
-        if isinstance(self.fixture, _fixtures.NoOpFixture):
-            return True
         test_case = _fixture.FixtureTeardownTestCase(self.test_queue_logger, self.fixture,
                                                      "job{}".format(self.job_num))
         test_case(self.report)
         if self.report.find_test_info(test_case).status != "pass":
             self.logger.error("The teardown of %s failed.", self.fixture)
             return False
+
         return True
 
     @staticmethod
