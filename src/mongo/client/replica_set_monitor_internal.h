@@ -236,7 +236,7 @@ public:
      * Wrap the callback and schedule it to run at some time
      *
      * The callback wrapper does the following:
-     * * Return before running cb if isRemovedFromManager is true
+     * * Return before running cb if isDropped is true
      * * Return before running cb if the handle was canceled
      * * Lock before running cb and unlock after
      */
@@ -249,7 +249,7 @@ public:
     ReplicaSetChangeNotifier* const notifier;
     executor::TaskExecutor* const executor;
 
-    AtomicWord<bool> isRemovedFromManager{false};
+    bool isDropped = false;
 
     mutable stdx::mutex mutex;  // You must hold this to access any member below.
 

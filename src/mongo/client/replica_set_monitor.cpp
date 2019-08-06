@@ -45,6 +45,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/db/server_options.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/background.h"
@@ -222,13 +223,17 @@ template <typename Callback>
 auto ReplicaSetMonitor::SetState::scheduleWorkAt(Date_t when, Callback&& cb) const {
     auto wrappedCallback = [cb = std::forward<Callback>(cb),
                             anchor = shared_from_this()](const CallbackArgs& cbArgs) mutable {
-        if (anchor->isRemovedFromManager.load() || ErrorCodes::isCancelationError(cbArgs.status)) {
+        if (ErrorCodes::isCancelationError(cbArgs.status)) {
             // Do no more work if we're removed or canceled
             return;
         }
         invariant(cbArgs.status);
 
         stdx::lock_guard lk(anchor->mutex);
+        if (anchor->isDropped) {
+            return;
+        }
+
         cb(cbArgs);
     };
     return executor->scheduleWorkAt(std::move(when), std::move(wrappedCallback));
@@ -242,7 +247,7 @@ void ReplicaSetMonitor::SetState::rescheduleRefresh(SchedulingStrategy strategy)
         return;
     }
 
-    if (isRemovedFromManager.load()) {  // already removed so no need to refresh
+    if (isDropped) {  // already removed so no need to refresh
         LOG(1) << "Stopping refresh for replica set " << name << " because it's removed";
         return;
     }
@@ -311,13 +316,12 @@ SemiFuture<std::vector<HostAndPort>> ReplicaSetMonitor::getHostsOrRefresh(
 Future<std::vector<HostAndPort>> ReplicaSetMonitor::_getHostsOrRefresh(
     const ReadPreferenceSetting& criteria, Milliseconds maxWait) {
 
-    if (_state->isRemovedFromManager.load()) {
+    stdx::lock_guard<stdx::mutex> lk(_state->mutex);
+    if (_state->isDropped) {
         return Status(ErrorCodes::ReplicaSetMonitorRemoved,
                       str::stream() << "ReplicaSetMonitor for set " << getName() << " is removed");
     }
 
-    // Fast path, for the failure-free case
-    stdx::lock_guard<stdx::mutex> lk(_state->mutex);
     auto out = _state->getMatchingHosts(criteria);
     if (!out.empty())
         return {std::move(out)};
@@ -494,10 +498,6 @@ bool ReplicaSetMonitor::isKnownToHaveGoodPrimary() const {
     }
 
     return false;
-}
-
-void ReplicaSetMonitor::markAsRemoved() {
-    _state->isRemovedFromManager.store(true);
 }
 
 void ReplicaSetMonitor::runScanForMockReplicaSet() {
@@ -1291,9 +1291,9 @@ void SetState::notify(bool finishedScan) {
     const auto cachedNow = now();
 
     for (auto it = waiters.begin(); it != waiters.end();) {
-        if (globalRSMonitorManager.isShutdown()) {
-            it->promise.setError(
-                {ErrorCodes::ShutdownInProgress, str::stream() << "Server is shutting down"});
+        if (isDropped) {
+            it->promise.setError({ErrorCodes::ShutdownInProgress,
+                                  str::stream() << "ReplicaSetMonitor is shutting down"});
             waiters.erase(it++);
             continue;
         }
@@ -1333,6 +1333,8 @@ void SetState::init() {
 }
 
 void SetState::drop() {
+    isDropped = true;
+
     currentScan.reset();
     notify(/*finishedScan*/ true);
 

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <atomic>
 #include <functional>
 #include <memory>
 #include <set>
@@ -39,7 +38,6 @@
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/replica_set_change_notifier.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
@@ -172,11 +170,6 @@ public:
      * Returns true if the monitor knows a usable primary from it's interal view.
      */
     bool isKnownToHaveGoodPrimary() const;
-
-    /**
-     * Marks the instance as removed to exit refresh sooner.
-     */
-    void markAsRemoved();
 
     /**
      * Creates a new ReplicaSetMonitor, if it doesn't already exist.
