@@ -38,24 +38,5 @@ assert.eq(1, slave1col.count(), "missing inserted doc");
 sleep(70 * 1000);  // wait for 70seconds
 assert.eq(1, slave1col.count(), "ttl deleted my doc!");
 
-// looking for these errors : "Assertion: 13312:replSet error : logOp() but not primary",
-// "replSet error : logOp() but can't accept write to collection <ns>/n" + "Fatal Assertion 17405"
-// indicating that the secondary tried to delete the doc, but shouldn't be writing
-var errorStrings = ["Assertion: 13312", "Assertion 17405"];
-var foundError = false;
-var foundLine = "";
-var globalLogLines = assert.commandWorked(slave1col.getDB().adminCommand({getLog: "global"})).log;
-for (i in globalLogLines) {
-    var line = globalLogLines[i];
-    errorStrings.forEach(function(errorString) {
-        if (line.match(errorString)) {
-            foundError = true;
-            foundLine = line;  // replace error string with what we found.
-        }
-    });
-}
-
-assert.eq(false, foundError, "found error in this line: " + foundLine);
-
 // finish up
 rt.stopSet();
