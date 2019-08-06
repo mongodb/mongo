@@ -241,5 +241,10 @@ public:
         }
         return {fieldPaths, targetCollectionVersion};
     }
+
+    std::pair<JsExecution*, bool> getJsExec() {
+        MONGO_UNREACHABLE;
+    }
+    void releaseJsExec() {}
 };
 }  // namespace mongo

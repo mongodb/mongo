@@ -239,6 +239,13 @@ public:
                                            boost::optional<ChunkVersion> targetCollectionVersion,
                                            const NamespaceString& outputNs) const override;
 
+    std::pair<JsExecution*, bool> getJsExec() override {
+        // Javascript engine is not support on mongos.
+        MONGO_UNREACHABLE;
+    }
+
+    void releaseJsExec() override {}
+
 protected:
     BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
                                       Client* client,

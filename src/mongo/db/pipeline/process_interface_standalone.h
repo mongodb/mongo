@@ -33,6 +33,7 @@
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/pipeline/javascript_execution.h"
 #include "mongo/db/pipeline/mongo_process_common.h"
 #include "mongo/db/pipeline/pipeline.h"
 
@@ -153,6 +154,22 @@ public:
                                            boost::optional<ChunkVersion> targetCollectionVersion,
                                            const NamespaceString& outputNs) const override;
 
+    /**
+     * If we are creating a new JsExecution (and therefore a new thread-local scope), make sure
+     * we pass that information back to the caller.
+     */
+    std::pair<JsExecution*, bool> getJsExec() override {
+        if (!_jsExec) {
+            _jsExec = std::make_unique<JsExecution>();
+            return {_jsExec.get(), true};
+        }
+        return {_jsExec.get(), false};
+    }
+
+    void releaseJsExec() override {
+        _jsExec.reset();
+    }
+
 protected:
     BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
                                       Client* client,
@@ -193,6 +210,11 @@ private:
 
     DBDirectClient _client;
     std::map<UUID, std::unique_ptr<const CollatorInterface>> _collatorCache;
+
+    // Object which contains a JavaScript Scope, used for executing JS in pipeline stages and
+    // expressions. Owned by the process interface so that there is one common scope for the
+    // lifetime of a pipeline.
+    std::unique_ptr<JsExecution> _jsExec;
 };
 
 }  // namespace mongo

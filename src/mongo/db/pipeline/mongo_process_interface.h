@@ -58,6 +58,7 @@ namespace mongo {
 
 class ShardFilterer;
 class ExpressionContext;
+class JsExecution;
 class Pipeline;
 class PipelineDeleter;
 class TransactionHistoryIteratorBase;
@@ -405,6 +406,16 @@ public:
                                            boost::optional<std::vector<std::string>> fields,
                                            boost::optional<ChunkVersion> targetCollectionVersion,
                                            const NamespaceString& outputNs) const = 0;
+
+    /**
+     * Create or get a pointer to a JsExecution instance, capable of invoking Javascript functions
+     * and reading the return value.
+     *
+     * Returns a pointer to a JsExecution and a boolean to indicate whether the JS Scope was newly
+     * created.
+     */
+    virtual std::pair<JsExecution*, bool> getJsExec() = 0;
+    virtual void releaseJsExec() = 0;
 };
 
 }  // namespace mongo
