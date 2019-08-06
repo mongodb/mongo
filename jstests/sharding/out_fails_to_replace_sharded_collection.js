@@ -33,14 +33,7 @@ const cursorResponse = assert.commandWorked(mongosDB.runCommand({
 }));
 st.shardColl(targetColl, {_id: 1}, false);
 error = assert.throws(() => new DBCommandCursor(mongosDB, cursorResponse).itcount());
-// On master, we check whether the output collection is sharded at parse time so this error code
-// is simply 'CommandFailed' because it is a failed rename going through the DBDirectClient. The
-// message should indicate that the rename failed. In a mixed-version environment we can end up
-// with the code 17017 because a v4.0 shard will assert the collection is unsharded before
-// performing any writes but after parse time, instead of relying on the rename to fail. Because
-// this test is run in a mixed-version passthrough we have to allow both. Once 4.2 becomes the
-// last stable version, this assertion can be tightened up to only expect CommandFailed.
-assert.contains(error.code, [ErrorCodes.CommandFailed, 17017]);
+assert.eq(error.code, ErrorCodes.CommandFailed);
 
 st.stop();
 }());
