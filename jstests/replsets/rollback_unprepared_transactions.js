@@ -8,6 +8,7 @@
 load('jstests/libs/check_log.js');
 load('jstests/replsets/libs/rollback_test.js');
 load('jstests/replsets/libs/rollback_files.js');
+load("jstests/libs/uuid_util.js");
 
 // Operations that will be present on both nodes, before the common point.
 const dbName = 'test';
@@ -15,7 +16,6 @@ const collName = 'test.t';
 const collNameShort = 't';
 let CommonOps = (node) => {
     const coll = node.getCollection(collName);
-    const mydb = coll.getDB();
     assert.commandWorked(coll.insert({_id: 0}));
 };
 
@@ -54,7 +54,9 @@ assert.eq(1, coll.count());
 // Confirm that the rollback wrote deleted documents to a file.
 const replTest = rollbackTest.getTestFixture();
 const expectedDocs = [{_id: "a"}, {_id: "b"}, {_id: "c"}];
-checkRollbackFiles(replTest.getDbPath(rollbackNode), collName, expectedDocs);
+
+const uuid = getUUIDFromListCollections(rollbackTest.getPrimary().getDB(dbName), collNameShort);
+checkRollbackFiles(replTest.getDbPath(rollbackNode), collName, uuid, expectedDocs);
 
 rollbackTest.stop();
 })();

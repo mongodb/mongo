@@ -1084,16 +1084,16 @@ void RollbackImpl::_writeRollbackFileForNamespace(OperationContext* opCtx,
                                                   UUID uuid,
                                                   NamespaceString nss,
                                                   const SimpleBSONObjUnorderedSet& idSet) {
-    RemoveSaver removeSaver(kRollbackRemoveSaverType, nss.ns(), kRollbackRemoveSaverWhy);
+    RemoveSaver removeSaver(kRollbackRemoveSaverType, uuid.toString(), kRollbackRemoveSaverWhy);
     log() << "Preparing to write deleted documents to a rollback file for collection " << nss.ns()
           << " with uuid " << uuid.toString() << " to " << removeSaver.file().generic_string();
 
     // The RemoveSaver will save the data files in a directory structure similar to the following:
     //
     //     rollback
-    //     ├── db.collection
+    //     ├── uuid
     //     │   └── removed.2018-03-20T20-23-01.21.bson
-    //     ├── otherdb.othercollection
+    //     ├── otheruuid
     //     │   ├── removed.2018-03-20T20-23-01.18.bson
     //     │   └── removed.2018-03-20T20-23-01.19.bson
     //

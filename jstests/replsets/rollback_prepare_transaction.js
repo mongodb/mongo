@@ -9,6 +9,7 @@
 load("jstests/core/txns/libs/prepare_helpers.js");
 load("jstests/replsets/libs/rollback_test.js");
 load("jstests/replsets/libs/rollback_files.js");
+load("jstests/libs/uuid_util.js");
 
 const rollbackTest = new RollbackTest();
 const rollbackNode = rollbackTest.getPrimary();
@@ -72,7 +73,9 @@ assert.sameMembers([{_id: "a"}], testColl.find().toArray());
 // Confirm that the rollback wrote deleted documents to a file.
 const replTest = rollbackTest.getTestFixture();
 const expectedDocs = [{_id: "b"}, {_id: "t2_a"}, {_id: "t2_b"}, {_id: "t2_c"}];
-checkRollbackFiles(replTest.getDbPath(rollbackNode), testColl.getFullName(), expectedDocs);
+
+const uuid = getUUIDFromListCollections(testDB, collName);
+checkRollbackFiles(replTest.getDbPath(rollbackNode), testColl.getFullName(), uuid, expectedDocs);
 
 let adminDB = rollbackTest.getPrimary().getDB("admin");
 

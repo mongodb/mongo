@@ -23,3 +23,13 @@ function getUUIDFromListCollections(db, collName) {
     assert.neq(undefined, listCollsRes.cursor.firstBatch[0].info);
     return listCollsRes.cursor.firstBatch[0].info.uuid;
 }
+
+/**
+ * Takes a UUID object in the form of UUID("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx") and returns a
+ * string of the form xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.
+ *
+ */
+function extractUUIDFromObject(uuid) {
+    const uuidString = uuid.toString();
+    return uuidString.substring(6, uuidString.length - 2);
+}

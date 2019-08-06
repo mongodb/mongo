@@ -773,7 +773,7 @@ void dropCollection(OperationContext* opCtx,
                     Collection* collection,
                     Database* db) {
     if (RollbackImpl::shouldCreateDataFiles()) {
-        RemoveSaver removeSaver("rollback", "", nss.ns());
+        RemoveSaver removeSaver("rollback", "", collection->uuid().toString());
         log() << "Rolling back createCollection on " << nss
               << ": Preparing to write documents to a rollback file for a collection " << nss
               << " with uuid " << collection->uuid() << " to "
@@ -1320,7 +1320,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         }
 
         if (RollbackImpl::shouldCreateDataFiles()) {
-            removeSaver = std::make_unique<RemoveSaver>("rollback", "", nss->ns());
+            removeSaver = std::make_unique<RemoveSaver>("rollback", "", uuid.toString());
             log() << "Preparing to write deleted documents to a rollback file for collection "
                   << *nss << " with uuid " << uuid.toString() << " to "
                   << removeSaver->file().generic_string();

@@ -4,7 +4,9 @@
  * chooses one of those files arbitrarily to read data from. Note that a rollback file is simply a
  * sequence of concatenated BSON objects, which is a format that can be read by the bsondump tool.
  */
-function checkRollbackFiles(dbPath, nss, expectedDocs) {
+function checkRollbackFiles(dbPath, nss, uuid, expectedDocs) {
+    load("jstests/libs/uuid_util.js");
+
     // Check the path of the rollback directory.
     const rollbackDir = dbPath + '/rollback';
     assert(pathExists(rollbackDir), 'directory for rollback files does not exist: ' + rollbackDir);
@@ -28,8 +30,10 @@ function checkRollbackFiles(dbPath, nss, expectedDocs) {
     }
 
     function getRTTRollbackFile() {
-        let rollbackFiles = listFiles(rollbackDir + "/" + nss);
-        assert.gte(rollbackFiles.length, 1, "No RTT rollback files found for namespace: " + nss);
+        let rollbackFiles = listFiles(rollbackDir + "/" + extractUUIDFromObject(uuid));
+        assert.gte(rollbackFiles.length,
+                   1,
+                   "No RTT rollback files found for namespace: " + nss + " with UUID: " + uuid);
         return rollbackFiles[0].name;
     }
 
