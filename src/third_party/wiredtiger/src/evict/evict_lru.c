@@ -559,6 +559,7 @@ __evict_update_work(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	double dirty_target, dirty_trigger, target, trigger;
 	uint64_t bytes_inuse, bytes_max, dirty_inuse;
+	uint32_t flags;
 
 	conn = S2C(session);
 	cache = conn->cache;
@@ -568,14 +569,16 @@ __evict_update_work(WT_SESSION_IMPL *session)
 	target = cache->eviction_target;
 	trigger = cache->eviction_trigger;
 
-	/* Clear previous state. */
-	cache->flags = 0;
+	/* Build up the new state. */
+	flags = 0;
 
-	if (!F_ISSET(conn, WT_CONN_EVICTION_RUN))
+	if (!F_ISSET(conn, WT_CONN_EVICTION_RUN)) {
+		cache->flags = 0;
 		return (false);
+	}
 
 	if (!__evict_queue_empty(cache->evict_urgent_queue, false))
-		F_SET(cache, WT_CACHE_EVICT_URGENT);
+		LF_SET(WT_CACHE_EVICT_URGENT);
 
 	if (F_ISSET(conn, WT_CONN_LOOKASIDE_OPEN)) {
 		WT_ASSERT(session,
@@ -594,32 +597,38 @@ __evict_update_work(WT_SESSION_IMPL *session)
 	bytes_max = conn->cache_size + 1;
 	bytes_inuse = __wt_cache_bytes_inuse(cache);
 	if (__wt_eviction_clean_needed(session, NULL))
-		F_SET(cache, WT_CACHE_EVICT_CLEAN | WT_CACHE_EVICT_CLEAN_HARD);
+		LF_SET(WT_CACHE_EVICT_CLEAN | WT_CACHE_EVICT_CLEAN_HARD);
 	else if (bytes_inuse > (target * bytes_max) / 100)
-		F_SET(cache, WT_CACHE_EVICT_CLEAN);
+		LF_SET(WT_CACHE_EVICT_CLEAN);
 
 	dirty_inuse = __wt_cache_dirty_leaf_inuse(cache);
 	if (__wt_eviction_dirty_needed(session, NULL))
-		F_SET(cache, WT_CACHE_EVICT_DIRTY | WT_CACHE_EVICT_DIRTY_HARD);
+		LF_SET(WT_CACHE_EVICT_DIRTY | WT_CACHE_EVICT_DIRTY_HARD);
 	else if (dirty_inuse > (uint64_t)(dirty_target * bytes_max) / 100)
-		F_SET(cache, WT_CACHE_EVICT_DIRTY);
+		LF_SET(WT_CACHE_EVICT_DIRTY);
 
 	/*
 	 * If application threads are blocked by the total volume of data in
 	 * cache, try dirty pages as well.
 	 */
 	if (__wt_cache_aggressive(session) &&
-	    F_ISSET(cache, WT_CACHE_EVICT_CLEAN_HARD))
-		F_SET(cache, WT_CACHE_EVICT_DIRTY);
+	    LF_ISSET(WT_CACHE_EVICT_CLEAN_HARD))
+		LF_SET(WT_CACHE_EVICT_DIRTY);
+
+	/* When we stop looking for dirty pages, reduce the lookaside score. */
+	if (!LF_ISSET(WT_CACHE_EVICT_DIRTY))
+		__wt_cache_update_lookaside_score(session, 1, 0);
 
 	/*
 	 * Scrub dirty pages and keep them in cache if we are less than half
 	 * way to the clean or dirty trigger.
 	 */
-	if (bytes_inuse < (uint64_t)((target + trigger) * bytes_max) / 200 &&
-	    dirty_inuse <
-	    (uint64_t)((dirty_target + dirty_trigger) * bytes_max) / 200)
-		F_SET(cache, WT_CACHE_EVICT_SCRUB);
+	if (bytes_inuse < (uint64_t)((target + trigger) * bytes_max) / 200) {
+		if (dirty_inuse < (uint64_t)
+		    ((dirty_target + dirty_trigger) * bytes_max) / 200)
+			LF_SET(WT_CACHE_EVICT_SCRUB);
+	} else
+		LF_SET(WT_CACHE_EVICT_NOKEEP);
 
 	/*
 	 * Try lookaside evict when:
@@ -632,19 +641,22 @@ __evict_update_work(WT_SESSION_IMPL *session)
 	    (__wt_cache_lookaside_score(cache) > 80 &&
 	    dirty_inuse >
 	    (uint64_t)((dirty_target + dirty_trigger) * bytes_max) / 200))
-		F_SET(cache, WT_CACHE_EVICT_LOOKASIDE);
+		LF_SET(WT_CACHE_EVICT_LOOKASIDE);
 
 	/*
 	 * With an in-memory cache, we only do dirty eviction in order to scrub
 	 * pages.
 	 */
 	if (F_ISSET(conn, WT_CONN_IN_MEMORY)) {
-		if (F_ISSET(cache, WT_CACHE_EVICT_CLEAN))
-			F_SET(cache, WT_CACHE_EVICT_DIRTY);
-		if (F_ISSET(cache, WT_CACHE_EVICT_CLEAN_HARD))
-			F_SET(cache, WT_CACHE_EVICT_DIRTY_HARD);
-		F_CLR(cache, WT_CACHE_EVICT_CLEAN | WT_CACHE_EVICT_CLEAN_HARD);
+		if (LF_ISSET(WT_CACHE_EVICT_CLEAN))
+			LF_SET(WT_CACHE_EVICT_DIRTY);
+		if (LF_ISSET(WT_CACHE_EVICT_CLEAN_HARD))
+			LF_SET(WT_CACHE_EVICT_DIRTY_HARD);
+		LF_CLR(WT_CACHE_EVICT_CLEAN | WT_CACHE_EVICT_CLEAN_HARD);
 	}
+
+	/* Update the global eviction state. */
+	cache->flags = flags;
 
 	return (F_ISSET(cache, WT_CACHE_EVICT_ALL | WT_CACHE_EVICT_URGENT));
 }
