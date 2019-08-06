@@ -81,6 +81,7 @@ class Job(object):  # pylint: disable=too-many-instance-attributes
         will be run before this method returns. If an error occurs
         while destroying the fixture, then the 'teardown_flag' will be set.
         """
+        setup_succeeded = True
         if setup_flag is not None:
             try:
                 setup_succeeded = self.setup_fixture()
@@ -98,19 +99,20 @@ class Job(object):  # pylint: disable=too-many-instance-attributes
                 setup_succeeded = False
 
             if not setup_succeeded:
+                setup_flag.set()
                 self._interrupt_all_jobs(queue, interrupt_flag)
-                return
 
-        try:
-            self._run(queue, interrupt_flag)
-        except errors.StopExecution as err:
-            # Stop running tests immediately.
-            self.logger.error("Received a StopExecution exception: %s.", err)
-            self._interrupt_all_jobs(queue, interrupt_flag)
-        except:  # pylint: disable=bare-except
-            # Unknown error, stop execution.
-            self.logger.exception("Encountered an error during test execution.")
-            self._interrupt_all_jobs(queue, interrupt_flag)
+        if setup_succeeded:
+            try:
+                self._run(queue, interrupt_flag)
+            except errors.StopExecution as err:
+                # Stop running tests immediately.
+                self.logger.error("Received a StopExecution exception: %s.", err)
+                self._interrupt_all_jobs(queue, interrupt_flag)
+            except:  # pylint: disable=bare-except
+                # Unknown error, stop execution.
+                self.logger.exception("Encountered an error during test execution.")
+                self._interrupt_all_jobs(queue, interrupt_flag)
 
         if teardown_flag is not None:
             try:

@@ -233,7 +233,12 @@ class TestFixtureSetupAndTeardown(unittest.TestCase):
         self.__job_object(queue, interrupt_flag, setup_flag, teardown_flag)
 
         self.assertEqual(setup_succeeded, not interrupt_flag.is_set())
+        self.assertEqual(setup_succeeded, not setup_flag.is_set())
         self.assertEqual(teardown_succeeded, not teardown_flag.is_set())
+
+        # teardown_fixture() should be called even if setup_fixture() raises an exception.
+        self.__job_object.setup_fixture.assert_called()
+        self.__job_object.teardown_fixture.assert_called()
 
     def test_setup_and_teardown_both_succeed(self):
         self.__assert_when_run_tests()
