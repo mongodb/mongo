@@ -21,9 +21,7 @@ assert.neq(null, conn, 'mongod was unable to start up');
 mock_web.waitMetrics(6);
 
 // It gets marked as disabled on halt
-const reg = FreeMonGetRegistration(conn);
-print(tojson(reg));
-assert.eq(reg.state, "disabled");
+WaitForUnRegistration(conn);
 
 MongoRunner.stopMongod(conn);
 

@@ -72,8 +72,8 @@ assert.commandWorked(rst.getPrimary().adminCommand({setFreeMonitoring: 1, action
 WaitForUnRegistration(rst.getPrimary());
 WaitForUnRegistration(rst.getSecondary());
 
-assert.eq(FreeMonGetServerStatus(rst.getPrimary()).state, 'disabled');
-assert.eq(FreeMonGetServerStatus(rst.getSecondary()).state, 'disabled');
+WaitForFreeMonServerStatusState(rst.getPrimary(), 'disabled');
+WaitForFreeMonServerStatusState(rst.getSecondary(), 'disabled');
 
 // Restart the secondary with it disabled
 var s1 = rst._slaves[0];
@@ -85,8 +85,8 @@ rst.waitForState(s1, ReplSetTest.State.DOWN);
 rst.restart(s1Id);
 
 // Make sure it is disabled
-assert.eq(FreeMonGetServerStatus(rst.getPrimary()).state, 'disabled');
-assert.eq(FreeMonGetServerStatus(rst.getSecondary()).state, 'disabled');
+WaitForFreeMonServerStatusState(rst.getPrimary(), 'disabled');
+WaitForFreeMonServerStatusState(rst.getSecondary(), 'disabled');
 
 rst.stopSet();
 

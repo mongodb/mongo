@@ -23,8 +23,8 @@ WaitForRegistration(rst.getPrimary());
 
 mock_web.waitRegisters(2);
 
-assert.eq(FreeMonGetServerStatus(rst.getPrimary()).state, 'enabled');
-assert.eq(FreeMonGetServerStatus(rst.getSecondary()).state, 'enabled');
+WaitForFreeMonServerStatusState(rst.getPrimary(), 'enabled');
+WaitForFreeMonServerStatusState(rst.getSecondary(), 'enabled');
 
 mock_web.enableFaults();
 mock_web.waitFaults(1);
@@ -40,8 +40,8 @@ assert.gte(qs1.metrics + 1, qs2.metrics);
 assert.eq(qs1.registers, qs2.registers);
 
 // Halt causes us to disable free monitoring, not return it to initial state.
-assert.eq(FreeMonGetServerStatus(rst.getPrimary()).state, 'disabled');
-assert.eq(FreeMonGetServerStatus(rst.getSecondary()).state, 'disabled');
+WaitForFreeMonServerStatusState(rst.getPrimary(), 'disabled');
+WaitForFreeMonServerStatusState(rst.getSecondary(), 'disabled');
 
 // Disable the fault so we can re-enable again
 mock_web.disableFaults();
@@ -53,8 +53,8 @@ WaitForRegistration(rst.getSecondary());
 
 sleep(20 * 1000);
 
-assert.eq(FreeMonGetServerStatus(rst.getPrimary()).state, 'enabled');
-assert.eq(FreeMonGetServerStatus(rst.getSecondary()).state, 'enabled');
+WaitForFreeMonServerStatusState(rst.getPrimary(), 'enabled');
+WaitForFreeMonServerStatusState(rst.getSecondary(), 'enabled');
 
 rst.stopSet();
 
