@@ -1,4 +1,6 @@
 '''Pseudo-builders for building and registering unit tests.'''
+import os
+
 from SCons.Script import Action
 
 
@@ -39,9 +41,23 @@ def build_cpp_unit_test(env, target, source, **kwargs):
 
     result = env.Program(target, source, **kwargs)
     env.RegisterUnitTest(result[0])
+
     hygienic = env.GetOption('install-mode') == 'hygienic'
     if not hygienic:
-        env.Install('#/build/unittests/', result[0])
+        installed_test = env.Install('#/build/unittests/', result[0])
+        env.Command(
+            target="#+{}".format(os.path.basename(installed_test[0].path)),
+            source=installed_test,
+            action="${SOURCES[0]}"
+        )
+    else:
+        test_bin_name = os.path.basename(result[0].path)
+        env.Command(
+            target="#+{}".format(test_bin_name),
+            source=["$PREFIX_BINDIR/{}".format(test_bin_name)],
+            action="${SOURCES[0]}"
+        )
+
     return result
 
 
