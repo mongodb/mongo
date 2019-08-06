@@ -340,8 +340,8 @@ let testCases = {
     whatsmyuri: {skip: "does not return user data"}
 };
 
-commandsRemovedFromMongosIn42.forEach(function(cmd) {
-    testCases[cmd] = {skip: "must define test coverage for 4.0 backwards compatibility"};
+commandsRemovedFromMongosIn44.forEach(function(cmd) {
+    testCases[cmd] = {skip: "must define test coverage for 4.2 backwards compatibility"};
 });
 
 // Set the secondaries to priority 0 and votes 0 to prevent the primaries from stepping down.
