@@ -138,6 +138,7 @@ protected:
         });
     }
 
+    // TODO: SERVER-42654
     void expectSetFeatureCompatibilityVersion(const HostAndPort& target,
                                               StatusWith<BSONObj> response,
                                               BSONObj writeConcern) {

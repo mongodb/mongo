@@ -148,8 +148,6 @@ Status modifyRecoveryDocument(OperationContext* opCtx,
         autoGetOrCreateDb.emplace(
             opCtx, NamespaceString::kServerConfigurationNamespace.db(), MODE_X);
 
-        // The config server connection string and shard name are no longer parsed in 4.0, but 3.6
-        // nodes still expect to find them, so we must include them until after 4.0 ships.
         auto const grid = Grid::get(opCtx);
         BSONObj updateObj = RecoveryDocument::createChangeObj(grid->configOpTime(), change);
 
