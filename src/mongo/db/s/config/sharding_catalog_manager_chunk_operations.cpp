@@ -390,12 +390,6 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
                                   << ChunkRange(startKey, endKey).toString() << "is not allowed"};
         }
 
-        // verify that splits don't create too-big shard keys
-        Status shardKeySizeStatus = ShardKeyPattern::checkShardKeySize(endKey);
-        if (!shardKeySizeStatus.isOK()) {
-            return shardKeySizeStatus;
-        }
-
         // verify that splits don't use disallowed BSON object format
         Status shardKeyStorageStatus =
             ShardKeyPattern::checkShardKeyIsValidForMetadataStorage(endKey);

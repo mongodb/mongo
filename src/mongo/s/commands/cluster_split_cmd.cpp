@@ -232,10 +232,6 @@ public:
             }
 
             middle = cm->getShardKeyPattern().normalizeShardKey(middle);
-
-            // Check shard key size when manually provided
-            uassertStatusOK(ShardKeyPattern::checkShardKeySize(middle));
-
             chunk.emplace(cm->findIntersectingChunkWithSimpleCollation(middle));
 
             if (chunk->getMin().woCompare(middle) == 0 || chunk->getMax().woCompare(middle) == 0) {

@@ -154,18 +154,6 @@ BSONElement findEqualityElement(const EqualityMatches& equalities, const FieldRe
 
 }  // namespace
 
-constexpr int ShardKeyPattern::kMaxShardKeySizeBytes;
-
-Status ShardKeyPattern::checkShardKeySize(const BSONObj& shardKey) {
-    if (shardKey.objsize() <= kMaxShardKeySizeBytes)
-        return Status::OK();
-
-    return {ErrorCodes::ShardKeyTooBig,
-            str::stream() << "shard keys must be less than " << kMaxShardKeySizeBytes
-                          << " bytes, but key " << shardKey << " is " << shardKey.objsize()
-                          << " bytes"};
-}
-
 Status ShardKeyPattern::checkShardKeyIsValidForMetadataStorage(const BSONObj& shardKey) {
     for (const auto& elem : shardKey) {
         if (!isValidShardKeyElementForStorage(elem)) {

@@ -156,12 +156,6 @@ StatusWith<BSONObj> getUpdateExpr(OperationContext* opCtx,
     } else if (auto idElt = idFromQuery.getValue()[kIdFieldName]) {
         updateExpr = updateExpr.addField(idElt);
     }
-    // Confirm that the finalized replacement shard key is valid.
-    auto skStatus =
-        ShardKeyPattern::checkShardKeySize(shardKeyPattern.extractShardKeyFromDoc(updateExpr));
-    if (!skStatus.isOK()) {
-        return skStatus;
-    }
 
     return updateExpr;
 }
@@ -395,11 +389,6 @@ StatusWith<ShardEndpoint> ChunkManagerTargeter::targetInsert(OperationContext* o
                                   << " does not contain shard key for pattern "
                                   << _routingInfo->cm()->getShardKeyPattern().toString()};
         }
-
-        // Check shard key size on insert
-        Status status = ShardKeyPattern::checkShardKeySize(shardKey);
-        if (!status.isOK())
-            return status;
     }
 
     // Target the shard key or database primary
