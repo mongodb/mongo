@@ -393,10 +393,10 @@ private:
     Status _findRecordStoreCounts(OperationContext* opCtx);
 
     /**
-     * Executes the critical section in rollback, defined as the window between aborting and
-     * reconstructing prepared transactions.
+     * Executes the phase of rollback between aborting and reconstructing prepared transactions. We
+     * cannot safely recover if we fail during this phase.
      */
-    Status _runRollbackCriticalSection(
+    void _runPhaseFromAbortToReconstructPreparedTxns(
         OperationContext* opCtx, RollBackLocalOperations::RollbackCommonPoint commonPoint) noexcept;
 
     /**

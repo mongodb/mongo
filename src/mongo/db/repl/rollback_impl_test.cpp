@@ -766,7 +766,7 @@ TEST_F(RollbackImplTest,
 
 DEATH_TEST_F(RollbackImplTest,
              RollbackUassertsAreFatalBetweenAbortingAndReconstructingPreparedTransactions,
-             "Caught exception during critical section in rollback") {
+             "UnknownError: error for test") {
     auto op = makeOpAndRecordId(1);
     _remoteOplog->setOperations({op});
     ASSERT_OK(_insertOplogEntry(op.first));
@@ -779,7 +779,6 @@ DEATH_TEST_F(RollbackImplTest,
     // Called before aborting prepared transactions.
     _onRollbackIDIncrementedFn = [this]() { _incrementedRollbackID = true; };
 
-    // Called during the critical section.
     _onRecoverToStableTimestampFn = [this](Timestamp stableTimestamp) {
         _recoveredToStableTimestamp = true;
         uasserted(ErrorCodes::UnknownError, "error for test");

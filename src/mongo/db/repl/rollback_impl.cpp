@@ -233,13 +233,8 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     _rollbackStats.rollbackId = _replicationProcess->getRollbackID();
     _listener->onRollbackIDIncremented();
 
-    // Execute the critical section in rollback. It is illegal to exit rollback cleanly between
-    // aborting prepared transactions and reconstructing them. During this window, no interruptions
-    // are allowed and all errors should be made fatal.
-    status = _runRollbackCriticalSection(opCtx, commonPoint);
-    if (!status.isOK()) {
-        fassertFailedWithStatus(31049, status.withContext("Error in rollback critical section"));
-    }
+    // This function cannot fail without terminating the process.
+    _runPhaseFromAbortToReconstructPreparedTxns(opCtx, commonPoint);
     _listener->onPreparedTransactionsReconstructed();
 
     // We can now accept interruptions again.
@@ -451,9 +446,8 @@ StatusWith<std::set<NamespaceString>> RollbackImpl::_namespacesForOp(const Oplog
     return namespaces;
 }
 
-Status RollbackImpl::_runRollbackCriticalSection(
-    OperationContext* opCtx,
-    RollBackLocalOperations::RollbackCommonPoint commonPoint) noexcept try {
+void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
+    OperationContext* opCtx, RollBackLocalOperations::RollbackCommonPoint commonPoint) noexcept {
     // Before computing record store counts, abort all active transactions. This ensures that
     // the count adjustments are based on correct values where no prepared transactions are
     // active and all in-memory counts have been rolled-back.
@@ -468,9 +462,7 @@ Status RollbackImpl::_runRollbackCriticalSection(
     // rollback. Note: these numbers are relative to the common point, not the stable timestamp,
     // and thus must be set after recovering from the oplog.
     auto status = _findRecordStoreCounts(opCtx);
-    if (!status.isOK()) {
-        return status.withContext("Error while finding record store counts");
-    }
+    fassert(31227, status);
 
     if (shouldCreateDataFiles()) {
         // Write a rollback file for each namespace that has documents that would be deleted by
@@ -478,9 +470,7 @@ Status RollbackImpl::_runRollbackCriticalSection(
         // unecessary prepare conflicts when trying to read documents that were modified by
         // those prepared transactions, which we know we will abort anyway.
         status = _writeRollbackFiles(opCtx);
-        if (!status.isOK()) {
-            return status.withContext("Error while writing out rollback files");
-        }
+        fassert(31228, status);
     } else {
         log() << "Not writing rollback files. 'createRollbackDataFiles' set to false.";
     }
@@ -494,10 +484,8 @@ Status RollbackImpl::_runRollbackCriticalSection(
 
     // Recover to the stable timestamp.
     auto stableTimestampSW = _recoverToStableTimestamp(opCtx);
-    if (!stableTimestampSW.isOK()) {
-        auto status = stableTimestampSW.getStatus();
-        return status.withContext("Error while recovering to stable timestamp");
-    }
+    fassert(31049, stableTimestampSW);
+
     _rollbackStats.stableTimestamp = stableTimestampSW.getValue();
     _listener->onRecoverToStableTimestamp(stableTimestampSW.getValue());
 
@@ -547,12 +535,6 @@ Status RollbackImpl::_runRollbackCriticalSection(
     // collection counts, reconstruct the prepared transactions now, adding on any additional counts
     // to the now corrected record store.
     reconstructPreparedTransactions(opCtx, OplogApplication::Mode::kRecovering);
-
-    return Status::OK();
-} catch (...) {
-    // Any exceptions here should be made fatal.
-    severe() << "Caught exception during critical section in rollback: " << exceptionToStatus();
-    std::terminate();
 }
 
 void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
