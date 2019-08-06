@@ -34,7 +34,8 @@ assert.eq(enabled.metricsErrors, 0);
 
 // Explicitly disabled.
 admin.disableFreeMonitoring();
-sleep(2);  // Give the async command time to run.
+
+WaitForFreeMonServerStatusState(mongod, "disabled");
 
 const disabled = freeMonStats();
 assert.eq(disabled.state, 'disabled');

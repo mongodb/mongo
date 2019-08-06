@@ -39,8 +39,8 @@ WaitForRegistration(rst.getPrimary());
 mock_web.waitRegisters(1);
 mock_web_sec.waitRegisters(1);
 
-assert.eq(FreeMonGetServerStatus(rst.getPrimary()).state, 'enabled');
-assert.eq(FreeMonGetServerStatus(rst.getSecondary()).state, 'enabled');
+WaitForFreeMonServerStatusState(rst.getPrimary(), 'enabled');
+WaitForFreeMonServerStatusState(rst.getSecondary(), 'enabled');
 
 mock_web.waitRegisters(2);
 mock_web_sec.waitRegisters(2);
