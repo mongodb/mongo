@@ -646,11 +646,11 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
                 Helpers::putSingleton(txn, lastVoteCollectionName, lastVoteObj);
             }
             wunit.commit();
-            return Status::OK();
         }
         MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
             txn, "save replica set lastVote", lastVoteCollectionName);
         txn->recoveryUnit()->waitUntilDurable();
+        return Status::OK();
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
