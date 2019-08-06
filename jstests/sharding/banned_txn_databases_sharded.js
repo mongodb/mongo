@@ -8,7 +8,7 @@
  *    transactions on sharded clusters, BUT read and writes to other namespaces in the config
  *    database are allowed.
  *
- * @tags: [requires_find_command]
+ * @tags: [requires_find_command, uses_transactions]
  */
 
 (function() {
