@@ -127,6 +127,13 @@ assert(!res.electionCandidateMetrics.targetCatchupOpTime,
        () => "Response should not have an 'electionCandidateMetrics.targetCatchupOpTime' field: " +
            tojson(res.electionCandidateMetrics));
 
+// Check that the 'electionCandidateMetrics' section of the replSetGetStatus response has a
+// 'numCatchUpOps' field once the primary is caught up, and that it has the correct value.
+assert(res.electionCandidateMetrics.numCatchUpOps,
+       () => "Response should have an 'electionCandidateMetrics.numCatchUpOps' field: " +
+           tojson(res.electionCandidateMetrics));
+assert.eq(res.electionCandidateMetrics.numCatchUpOps, 0);
+
 jsTest.log("Case 2: The primary needs to catch up, succeeds in time.");
 initialNewPrimaryStatus =
     assert.commandWorked(rst.getSecondaries()[0].adminCommand({serverStatus: 1}));
@@ -172,15 +179,21 @@ verifyCatchUpConclusionReason(initialNewPrimaryStatus.electionMetrics,
                               newNewPrimaryStatus.electionMetrics,
                               'numCatchUpsSucceeded');
 
-// Check that the 'electionCandidateMetrics' section of the replSetGetStatus response has a
-// 'targetCatchupOpTime' field once heartbeats have updated the target opTime for catchup, and that
-// it has the correct value.
+// Check that the 'electionCandidateMetrics' section of the replSetGetStatus response has
+// 'targetCatchupOpTime' and 'numCatchUpOps' fields once the primary is caught up, and that they
+// have the correct values.
 assert(res.electionCandidateMetrics.targetCatchupOpTime,
        () => "Response should have an 'electionCandidateMetrics.targetCatchupOpTime' field: " +
            tojson(res.electionCandidateMetrics));
 assert.eq(res.electionCandidateMetrics.targetCatchupOpTime.ts,
           stepUpResults.latestOpOnOldPrimary.ts);
 assert.eq(res.electionCandidateMetrics.targetCatchupOpTime.t, stepUpResults.latestOpOnOldPrimary.t);
+assert(res.electionCandidateMetrics.numCatchUpOps,
+       () => "Response should have an 'electionCandidateMetrics.numCatchUpOps' field: " +
+           tojson(res.electionCandidateMetrics));
+// numCatchUpOps should be 4 because the 'foo' collection is implicitly created during the 3
+// inserts, and that's where the additional oplog entry comes from.
+assert.eq(res.electionCandidateMetrics.numCatchUpOps, 4);
 
 // Wait for all secondaries to catch up
 rst.awaitReplication();

@@ -273,6 +273,11 @@ void ReplicationMetrics::setTargetCatchupOpTime(OpTime opTime) {
     _electionCandidateMetrics.setTargetCatchupOpTime(opTime);
 }
 
+void ReplicationMetrics::setNumCatchUpOps(int numCatchUpOps) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _electionCandidateMetrics.setNumCatchUpOps(numCatchUpOps);
+}
+
 void ReplicationMetrics::setNewTermStartDate(Date_t newTermStartDate) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _electionCandidateMetrics.setNewTermStartDate(newTermStartDate);
@@ -299,6 +304,7 @@ BSONObj ReplicationMetrics::getElectionCandidateMetricsBSON() {
 void ReplicationMetrics::clearElectionCandidateMetrics() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _electionCandidateMetrics.setTargetCatchupOpTime(boost::none);
+    _electionCandidateMetrics.setNumCatchUpOps(boost::none);
     _electionCandidateMetrics.setNewTermStartDate(boost::none);
     _nodeIsCandidateOrPrimary = false;
 }

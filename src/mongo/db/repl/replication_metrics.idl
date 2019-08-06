@@ -130,6 +130,11 @@ structs:
                 description: "The node's target opTime for catchup"
                 type: optime
                 optional: true
+            numCatchUpOps:
+                description: "Number of ops applied during catchup when the primary successfully
+                              catches up"
+                type: long
+                optional: true
             newTermStartDate:
                 description: "Time the new term oplog entry was written"
                 type: date

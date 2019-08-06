@@ -1380,6 +1380,10 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
         }
     }
 
+    // Increment the counter for the number of ops applied during catchup if the node is in catchup
+    // mode.
+    replCoord->incrementNumCatchUpOpsIfCatchingUp(ops.size());
+
     // We have now written all database writes and updated the oplog to match.
     return ops.back().getOpTime();
 }

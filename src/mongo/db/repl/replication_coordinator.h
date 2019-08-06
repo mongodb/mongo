@@ -879,6 +879,12 @@ public:
     virtual Status abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) = 0;
 
     /**
+     * Increment the counter for the number of ops applied during catchup if the node is in catchup
+     * mode.
+     */
+    virtual void incrementNumCatchUpOpsIfCatchingUp(int numOps) = 0;
+
+    /**
      * Signals that drop pending collections have been removed from storage.
      */
     virtual void signalDropPendingCollectionsRemovedFromStorage() = 0;

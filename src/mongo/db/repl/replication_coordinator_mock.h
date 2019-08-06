@@ -305,6 +305,8 @@ public:
 
     virtual Status abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) override;
 
+    virtual void incrementNumCatchUpOpsIfCatchingUp(int numOps) override;
+
     void signalDropPendingCollectionsRemovedFromStorage() final;
 
     virtual boost::optional<Timestamp> getRecoveryTimestamp() override;

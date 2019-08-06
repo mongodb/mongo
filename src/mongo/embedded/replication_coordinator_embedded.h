@@ -251,6 +251,8 @@ public:
 
     Status abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) override;
 
+    void incrementNumCatchUpOpsIfCatchingUp(int numOps) override;
+
     void signalDropPendingCollectionsRemovedFromStorage() final;
 
     boost::optional<Timestamp> getRecoveryTimestamp() override;

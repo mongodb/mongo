@@ -533,6 +533,10 @@ Status ReplicationCoordinatorMock::abortCatchupIfNeeded(PrimaryCatchUpConclusion
     return Status::OK();
 }
 
+void ReplicationCoordinatorMock::incrementNumCatchUpOpsIfCatchingUp(int numOps) {
+    return;
+}
+
 void ReplicationCoordinatorMock::signalDropPendingCollectionsRemovedFromStorage() {}
 
 boost::optional<Timestamp> ReplicationCoordinatorMock::getRecoveryTimestamp() {

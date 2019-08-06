@@ -359,6 +359,10 @@ Status ReplicationCoordinatorEmbedded::abortCatchupIfNeeded(PrimaryCatchUpConclu
     UASSERT_NOT_IMPLEMENTED;
 }
 
+void ReplicationCoordinatorEmbedded::incrementNumCatchUpOpsIfCatchingUp(int numOps) {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 Status ReplicationCoordinatorEmbedded::processReplSetUpdatePosition(const UpdatePositionArgs&,
                                                                     long long*) {
     UASSERT_NOT_IMPLEMENTED;
