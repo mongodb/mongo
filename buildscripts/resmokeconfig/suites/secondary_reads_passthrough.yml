@@ -55,9 +55,6 @@ selector:
   - jstests/core/tailable_cursor_invalidation.js
   - jstests/core/tailable_skip_limit.js
   - jstests/core/collation.js
-  # This test runs very slow operations which take a long time to replicate in a 5 node linear
-  # chain. This can lead to awaitReplication timeouts when doing consistency checks.
-  - jstests/core/text_index_limits.js
 
   exclude_with_any_tags:
   ##

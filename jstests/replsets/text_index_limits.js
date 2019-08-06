@@ -8,10 +8,16 @@
 (function() {
 "use strict";
 
+const replTest = new ReplSetTest({nodes: 3});
+replTest.startSet();
+replTest.initiate();
+
+const db = replTest.getPrimary().getDB("test");
 var t = db.text_index_limits;
 t.drop();
 
 assert.commandWorked(t.createIndex({comments: "text"}));
+replTest.waitForAllIndexBuildsToFinish(t.getDB(), t.getName());
 
 // 1. Test number of unique terms exceeds 400,000
 let commentsWithALotOfUniqueWords = "";
@@ -42,6 +48,9 @@ for (let ch1 = 97; ch1 < 123; ch1++) {
         }
     }
 }
+
 assert.commandWorked(db.runCommand(
     {insert: t.getName(), documents: [{_id: 2, comments: commentsWithWordsOfLargeSize}]}));
-}());
+
+replTest.stopSet();
+})();
