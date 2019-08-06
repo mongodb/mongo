@@ -92,9 +92,12 @@ function runTestWithoutSubset(client) {
 
     MongoRunner.stopMongod(conn);
 }
-
-runTestWithoutSubset("TLS1_0");
-runTestWithoutSubset("TLS1_1");
+if (sslProviderSupportsTLS1_0()) {
+    runTestWithoutSubset("TLS1_0");
+}
+if (sslProviderSupportsTLS1_1()) {
+    runTestWithoutSubset("TLS1_1");
+}
 runTestWithoutSubset("TLS1_2");
 runTestWithoutSubset("TLS1_3");
 })();
