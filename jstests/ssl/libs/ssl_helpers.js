@@ -257,3 +257,34 @@ function detectDefaultTLSProtocol() {
         return "TLS1_3";
     }
 }
+
+function isRHEL8() {
+    if (_isWindows()) {
+        return false;
+    }
+
+    // RHEL 8 disables TLS 1.0 and TLS 1.1 as part their default crypto policy
+    // We skip tests on RHEL 8 that require these versions as a result.
+    const grep_result = runProgram('grep', 'Ootpa', '/etc/redhat-release');
+    if (grep_result == 0) {
+        return true;
+    }
+
+    return false;
+}
+
+function sslProviderSupportsTLS1_0() {
+    if (isRHEL8()) {
+        return false;
+    }
+
+    return true;
+}
+
+function sslProviderSupportsTLS1_1() {
+    if (isRHEL8()) {
+        return false;
+    }
+
+    return true;
+}
