@@ -366,6 +366,7 @@ def main(  # pylint: disable=too-many-arguments,too-many-locals,too-many-stateme
                     executable_name("mongobridge"),
                     executable_name("mongoebench"),
                     executable_name("mongoed"),
+                    executable_name("mongotmock"),
                     executable_name("wt"),
                 ]
                 with tarfile.open(filename, "r:gz") as tar:
