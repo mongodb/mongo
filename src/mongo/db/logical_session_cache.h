@@ -32,9 +32,11 @@
 #include <boost/optional.hpp>
 
 #include "mongo/base/status.h"
+#include "mongo/db/client.h"
 #include "mongo/db/logical_session_cache_gen.h"
 #include "mongo/db/logical_session_cache_stats_gen.h"
-#include "mongo/db/logical_session_id.h"
+#include "mongo/db/logical_session_id_helpers.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 
@@ -117,6 +119,36 @@ public:
      * Returns stats about the logical session cache and its recent operations.
      */
     virtual LogicalSessionCacheStats getStats() = 0;
+};
+
+/**
+ * WARNING: This class should only be used for rare operations because it generates a new logical
+ * session ID that isn't reaped until the next refresh, which could overwhelm memory if called in a
+ * loop.
+ */
+class AlternativeSessionRegion {
+public:
+    AlternativeSessionRegion(OperationContext* opCtx)
+        : _alternateClient(opCtx->getServiceContext()->makeClient("alternative-session-region")),
+          _acr(_alternateClient),
+          _newOpCtx(cc().makeOperationContext()),
+          _lsid(makeLogicalSessionId(opCtx)) {
+        _newOpCtx->setLogicalSessionId(_lsid);
+    }
+
+    ~AlternativeSessionRegion() {
+        LogicalSessionCache::get(opCtx())->endSessions({_lsid});
+    }
+
+    OperationContext* opCtx() {
+        return &*_newOpCtx;
+    }
+
+private:
+    ServiceContext::UniqueClient _alternateClient;
+    AlternativeClientRegion _acr;
+    ServiceContext::UniqueOperationContext _newOpCtx;
+    LogicalSessionId _lsid;
 };
 
 }  // namespace mongo

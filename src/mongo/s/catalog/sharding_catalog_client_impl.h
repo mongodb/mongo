@@ -155,13 +155,6 @@ public:
                                           bool upsert,
                                           const WriteConcernOptions& writeConcern) override;
 
-    StatusWith<bool> updateConfigDocuments(OperationContext* opCtx,
-                                           const NamespaceString& nss,
-                                           const BSONObj& query,
-                                           const BSONObj& update,
-                                           bool upsert,
-                                           const WriteConcernOptions& writeConcern) override;
-
     Status removeConfigDocuments(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  const BSONObj& query,
@@ -194,8 +187,7 @@ private:
                                                   const BSONObj& query,
                                                   const BSONObj& update,
                                                   bool upsert,
-                                                  const WriteConcernOptions& writeConcern,
-                                                  bool useMultiUpdate);
+                                                  const WriteConcernOptions& writeConcern);
 
     StatusWith<repl::OpTimeWith<std::vector<BSONObj>>> _exhaustiveFindOnConfig(
         OperationContext* opCtx,

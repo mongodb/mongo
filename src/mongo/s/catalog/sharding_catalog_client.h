@@ -356,19 +356,6 @@ public:
                                                   const WriteConcernOptions& writeConcern) = 0;
 
     /**
-     * Updates multiple documents in the specified namespace on the config server. Must only be used
-     * for updates to the 'config' database.
-     *
-     * Read the comment for 'updateConfigDocument' for additional information.
-     */
-    virtual StatusWith<bool> updateConfigDocuments(OperationContext* opCtx,
-                                                   const NamespaceString& nss,
-                                                   const BSONObj& query,
-                                                   const BSONObj& update,
-                                                   bool upsert,
-                                                   const WriteConcernOptions& writeConcern) = 0;
-
-    /**
      * Removes documents matching a particular query predicate from the specified namespace on the
      * config server. Must only be used for deletions from the 'config' database.
      *

@@ -40,10 +40,8 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
-#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/logical_session_cache.h"
-#include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
@@ -89,31 +87,6 @@ using std::vector;
 using str::stream;
 
 namespace {
-
-class AlternativeSessionRegion {
-public:
-    AlternativeSessionRegion(OperationContext* opCtx)
-        : _alternateClient(opCtx->getServiceContext()->makeClient("alternative-session-region")),
-          _acr(_alternateClient),
-          _newOpCtx(cc().makeOperationContext()),
-          _lsid(makeLogicalSessionId(opCtx)) {
-        _newOpCtx->setLogicalSessionId(_lsid);
-    }
-
-    ~AlternativeSessionRegion() {
-        LogicalSessionCache::get(opCtx())->endSessions({_lsid});
-    }
-
-    OperationContext* opCtx() {
-        return &*_newOpCtx;
-    }
-
-private:
-    ServiceContext::UniqueClient _alternateClient;
-    AlternativeClientRegion _acr;
-    ServiceContext::UniqueOperationContext _newOpCtx;
-    LogicalSessionId _lsid;
-};
 
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
 const ReadPreferenceSetting kConfigPrimaryPreferredSelector(ReadPreference::PrimaryPreferred,
@@ -203,8 +176,7 @@ Status ShardingCatalogClientImpl::updateShardingCatalogEntryForCollection(
                                         BSON(CollectionType::fullNs(nss.ns())),
                                         coll.toBSON(),
                                         upsert,
-                                        ShardingCatalogClient::kMajorityWriteConcern,
-                                        false /* multi */);
+                                        ShardingCatalogClient::kMajorityWriteConcern);
     return status.getStatus().withContext(str::stream() << "Collection metadata write failed");
 }
 
@@ -924,19 +896,7 @@ StatusWith<bool> ShardingCatalogClientImpl::updateConfigDocument(
     const BSONObj& update,
     bool upsert,
     const WriteConcernOptions& writeConcern) {
-    return _updateConfigDocument(
-        opCtx, nss, query, update, upsert, writeConcern, false /* useMultiUpdate */);
-}
-
-StatusWith<bool> ShardingCatalogClientImpl::updateConfigDocuments(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const BSONObj& query,
-    const BSONObj& update,
-    bool upsert,
-    const WriteConcernOptions& writeConcern) {
-    return _updateConfigDocument(
-        opCtx, nss, query, update, upsert, writeConcern, true /* useMultiUpdate */);
+    return _updateConfigDocument(opCtx, nss, query, update, upsert, writeConcern);
 }
 
 StatusWith<bool> ShardingCatalogClientImpl::_updateConfigDocument(
@@ -945,8 +905,7 @@ StatusWith<bool> ShardingCatalogClientImpl::_updateConfigDocument(
     const BSONObj& query,
     const BSONObj& update,
     bool upsert,
-    const WriteConcernOptions& writeConcern,
-    bool useMultiUpdate) {
+    const WriteConcernOptions& writeConcern) {
     invariant(nss.db() == NamespaceString::kConfigDb);
 
     BatchedCommandRequest request([&] {
@@ -956,7 +915,7 @@ StatusWith<bool> ShardingCatalogClientImpl::_updateConfigDocument(
             entry.setQ(query);
             entry.setU(update);
             entry.setUpsert(upsert);
-            entry.setMulti(useMultiUpdate);
+            entry.setMulti(false);
             return entry;
         }()});
         return updateOp;
@@ -973,14 +932,8 @@ StatusWith<bool> ShardingCatalogClientImpl::_updateConfigDocument(
     }
 
     const auto nSelected = response.getN();
-
-    if (useMultiUpdate) {
-        invariant(nSelected >= 0);
-        return (nSelected > 0);
-    } else {
-        invariant(nSelected == 0 || nSelected == 1);
-        return (nSelected == 1);
-    }
+    invariant(nSelected == 0 || nSelected == 1);
+    return (nSelected == 1);
 }
 
 Status ShardingCatalogClientImpl::removeConfigDocuments(OperationContext* opCtx,

@@ -202,11 +202,8 @@ selector:
   - jstests/sharding/sharding_statistics_server_status.js
   # setShardVersion is not robust during config server stepdown.
   - jstests/sharding/mongos_no_detect_sharding.js
-  # TODO (SERVER-42143): The tests below need transactional support for refineCollectionShardKey.
-  - jstests/sharding/refine_collection_shard_key_basic.js
-  - jstests/sharding/refine_collection_shard_key_jumbo.js
-  - jstests/sharding/refine_collection_shard_key_drops_chunks.js
-
+  # Aggregation with $merge will fail until SERVER-41949 is finished.
+  - jstests/sharding/merge_with_move_primary.js
 
 executor:
   config:

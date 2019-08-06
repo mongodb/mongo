@@ -180,16 +180,6 @@ StatusWith<bool> ShardingCatalogClientMock::updateConfigDocument(
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-StatusWith<bool> ShardingCatalogClientMock::updateConfigDocuments(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const BSONObj& query,
-    const BSONObj& update,
-    bool upsert,
-    const WriteConcernOptions& writeConcern) {
-    return {ErrorCodes::InternalError, "Method not implemented"};
-}
-
 Status ShardingCatalogClientMock::removeConfigDocuments(OperationContext* opCtx,
                                                         const NamespaceString& nss,
                                                         const BSONObj& query,
