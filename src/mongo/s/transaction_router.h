@@ -134,23 +134,59 @@ public:
          */
         Microseconds getCommitDuration(TickSource* tickSource, TickSource::Tick curTicks) const;
 
+        /**
+         * Returns the total active time of the transaction, given the current time value. A
+         * transaction is active when there is a running operation that is part of the transaction.
+         */
+        Microseconds getTimeActiveMicros(TickSource* tickSource, TickSource::Tick curTicks) const;
+
+        /**
+         * Returns the total inactive time of the transaction, given the current time value. A
+         * transaction is inactive when it is idly waiting for a new operation to occur.
+         */
+        Microseconds getTimeInactiveMicros(TickSource* tickSource, TickSource::Tick curTicks) const;
+
+        /**
+         * Marks the transaction as active and sets the start of the transaction's active time and
+         * overall start time the first time it is called.
+         *
+         * This method is a no-op if the transaction is currently active or has already ended.
+         */
+        void trySetActive(OperationContext* opCtx, TickSource::Tick curTicks);
+
+        /**
+         * Marks the transaction as inactive and sets the total active time of the transaction. The
+         * total active time will only be set if the transaction was active prior to this call.
+         *
+         * This method is a no-op if the transaction is not currently active or has already ended.
+         */
+        void trySetInactive(TickSource* tickSource, TickSource::Tick curTicks);
+
         // The start time of the transaction in millisecond resolution. Used only for diagnostics
         // reporting.
         Date_t startWallClockTime;
 
         // The start time of the transaction. Note that tick values should only ever be used to
-        // measure distance from other tick values, not for reporting absolute wall clock time.
+        // measure distance from other tick values, not for reporting absolute wall clock time. A
+        // value of zero means the transaction hasn't started yet.
         TickSource::Tick startTime{0};
 
         // The start time of the transaction commit in millisecond resolution. Used only for
         // diagnostics reporting.
         Date_t commitStartWallClockTime;
 
-        // When commit was started.
+        // When commit was started. A value of zero means the commit hasn't started yet.
         TickSource::Tick commitStartTime{0};
 
-        // The end time of the transaction.
+        // The end time of the transaction. A value of zero means the transaction hasn't ended yet.
         TickSource::Tick endTime{0};
+
+        // The total amount of active time spent by the transaction.
+        Microseconds timeActiveMicros = Microseconds{0};
+
+        // The time at which the transaction was last marked as active. The transaction is
+        // considered active if this value is not equal to 0.
+        TickSource::Tick lastTimeActiveStart{0};
     };
 
     enum class TransactionActions { kStart, kContinue, kCommit };
@@ -258,6 +294,11 @@ public:
         void beginOrContinueTxn(OperationContext* opCtx,
                                 TxnNumber txnNumber,
                                 TransactionActions action);
+
+        /**
+         * Updates transaction diagnostics when the transaction's session is checked in.
+         */
+        void stash(OperationContext* opCtx);
 
         /**
          * Attaches the required transaction related fields for a request to be sent to the given
@@ -515,6 +556,11 @@ public:
          * error per the retryable writes specification.
          */
         void _onNonRetryableCommitError(OperationContext* opCtx, Status commitStatus);
+
+        /**
+         * Updates relevent metrics when a transaction is continued.
+         */
+        void _onContinue(OperationContext* opCtx);
 
         /**
          * The first time this method is called it marks the transaction as over in the router's

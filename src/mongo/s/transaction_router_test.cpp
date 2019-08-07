@@ -2794,6 +2794,9 @@ protected:
     const TxnNumber kTxnNumber = 10;
     const TxnRecoveryToken kDummyRecoveryToken;
 
+    static constexpr auto kDefaultTimeActive = Microseconds(50);
+    static constexpr auto kDefaultTimeInactive = Microseconds(100);
+
     void setUp() override {
         TransactionRouterTestWithDefaultSession::setUp();
         repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
@@ -2854,6 +2857,16 @@ protected:
     bool networkHasReadyRequests() {
         executor::NetworkInterfaceMock::InNetworkGuard guard(network());
         return guard->hasReadyRequests();
+    }
+
+    void assertTimeActiveIs(Microseconds micros) {
+        auto stats = txnRouter().getTimingStats();
+        ASSERT_EQ(stats.getTimeActiveMicros(tickSource(), tickSource()->getTicks()), micros);
+    }
+
+    void assertTimeInactiveIs(Microseconds micros) {
+        auto stats = txnRouter().getTimingStats();
+        ASSERT_EQ(stats.getTimeInactiveMicros(tickSource(), tickSource()->getTicks()), micros);
     }
 
     //
@@ -3051,6 +3064,31 @@ protected:
     auto routerTxnMetrics() {
         return RouterTransactionsMetrics::get(operationContext());
     }
+
+    void assertTimeActiveAndInactiveCannotAdvance(Microseconds timeActive,
+                                                  Microseconds timeInactive) {
+        tickSource()->advance(Microseconds(150));
+        assertTimeActiveIs(Microseconds(timeActive));
+        assertTimeInactiveIs(Microseconds(timeInactive));
+
+        txnRouter().stash(operationContext());
+
+        tickSource()->advance(Microseconds(150));
+        assertTimeActiveIs(Microseconds(timeActive));
+        assertTimeInactiveIs(Microseconds(timeInactive));
+    }
+
+    void setUpDefaultTimeActiveAndInactive() {
+        tickSource()->advance(kDefaultTimeActive);
+        assertTimeActiveIs(kDefaultTimeActive);
+        assertTimeInactiveIs(Microseconds(0));
+
+        txnRouter().stash(operationContext());
+
+        tickSource()->advance(kDefaultTimeInactive);
+        assertTimeActiveIs(kDefaultTimeActive);
+        assertTimeInactiveIs(kDefaultTimeInactive);
+    }
 };
 
 //
@@ -3130,6 +3168,23 @@ TEST_F(TransactionRouterMetricsTest, SlowLoggingPrintsDurationAtEnd) {
     assertDurationIs(Milliseconds(111));
     runCommit(kDummyOkRes);
     ASSERT_EQUALS(1, countLogLinesContaining(" 111ms\n") + countLogLinesContaining(" 111ms\r\n"));
+}
+
+TEST_F(TransactionRouterMetricsTest, SlowLoggingPrintsTimeActiveAndInactive) {
+    beginTxnWithDefaultTxnNumber();
+    tickSource()->advance(Microseconds(111));
+    assertTimeActiveIs(Microseconds(111));
+
+    txnRouter().stash(operationContext());
+    tickSource()->advance(Microseconds(222));
+    assertTimeInactiveIs(Microseconds(222));
+
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kCommit);
+    runCommit(kDummyOkRes);
+
+    ASSERT_EQUALS(1, countLogLinesContaining("timeActiveMicros:111,"));
+    ASSERT_EQUALS(1, countLogLinesContaining("timeInactiveMicros:222,"));
 }
 
 //
@@ -3511,6 +3566,14 @@ TEST_F(TransactionRouterMetricsTest, DurationDoesNotAdvanceAfterImplicitAbort) {
     assertDurationIs(Microseconds(100));
 }
 
+TEST_F(TransactionRouterMetricsTest, DurationIsZeroForAbortedUnstartedTxn) {
+    // It's possible a transaction that has not been started can be implicitly aborted at server
+    // shutdown. The duration for such a transaction should be 0.
+    txnRouter().implicitlyAbortTransaction(operationContext(), kDummyStatus);
+
+    assertDurationIs(Microseconds(0));
+}
+
 TEST_F(TransactionRouterMetricsTest, CommitDurationAdvancesDuringCommit) {
     beginTxnWithDefaultTxnNumber();
 
@@ -3613,6 +3676,249 @@ TEST_F(TransactionRouterMetricsTest, DurationsAdvanceAfterUnknownCommitResult) {
     tickSource()->advance(Microseconds(500));
     assertDurationIs(Microseconds(250));
     assertCommitDurationIs(Microseconds(200));
+}
+
+TEST_F(TransactionRouterMetricsTest, TimeActiveAndInactiveAdvanceSeparatelyAndSumToDuration) {
+    beginTxnWithDefaultTxnNumber();
+
+    // Both timeActive and timeInactive start at 0.
+    assertTimeActiveIs(Microseconds(0));
+    assertTimeInactiveIs(Microseconds(0));
+    assertDurationIs(Microseconds(0));
+
+    // Only timeActive will advance while a txn is active.
+    tickSource()->advance(Microseconds(50));
+    assertTimeActiveIs(Microseconds(50));
+    assertTimeInactiveIs(Microseconds(0));
+    assertDurationIs(Microseconds(50));
+
+    // Only timeInactive will advance while a txn is stashed.
+    txnRouter().stash(operationContext());
+    tickSource()->advance(Microseconds(100));
+    assertTimeActiveIs(Microseconds(50));
+    assertTimeInactiveIs(Microseconds(100));
+    assertDurationIs(Microseconds(150));
+
+    // Will not advance after commit.
+    // Neither can advance after a successful commit.
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kCommit);
+    runCommit(kDummyOkRes);
+
+    tickSource()->advance(Microseconds(150));
+    assertTimeActiveIs(Microseconds(50));
+    assertTimeInactiveIs(Microseconds(100));
+    assertDurationIs(Microseconds(150));
+}
+
+TEST_F(TransactionRouterMetricsTest, StashIsIdempotent) {
+    // An error after checking out a session and before continuing a transaction can lead to
+    // back-to-back calls to TransactionRouter::stash(), so a repeated call to stash() shouldn't
+    // toggle the transaction back to the active state.
+
+    beginTxnWithDefaultTxnNumber();
+
+    setUpDefaultTimeActiveAndInactive();
+
+    assertTimeActiveIs(kDefaultTimeActive);
+    assertTimeInactiveIs(kDefaultTimeInactive);
+
+    txnRouter().stash(operationContext());
+
+    // Only timeInactive can advance.
+    tickSource()->advance(Microseconds(100));
+    assertTimeActiveIs(kDefaultTimeActive);
+    assertTimeInactiveIs(kDefaultTimeInactive + Microseconds(100));
+
+    txnRouter().stash(operationContext());
+
+    // Still only timeInactive can advance.
+    tickSource()->advance(Microseconds(100));
+    assertTimeActiveIs(kDefaultTimeActive);
+    assertTimeInactiveIs(kDefaultTimeInactive + Microseconds(200));
+}
+
+TEST_F(TransactionRouterMetricsTest, TimeActiveAndInactiveAreZeroForAbortedUnstartedTxn) {
+    // It's possible a transaction that has not been started can be implicitly aborted at server
+    // shutdown. The time active and inactive for such a transaction should be 0.
+    txnRouter().implicitlyAbortTransaction(operationContext(), kDummyStatus);
+
+    assertTimeActiveIs(Microseconds(0));
+    assertTimeInactiveIs(Microseconds(0));
+}
+
+TEST_F(TransactionRouterMetricsTest, DurationsForImplicitlyAbortedStashedTxn) {
+    beginTxnWithDefaultTxnNumber();
+
+    setUpDefaultTimeActiveAndInactive();
+
+    assertTimeActiveIs(kDefaultTimeActive);
+    assertTimeInactiveIs(kDefaultTimeInactive);
+    assertDurationIs(kDefaultTimeActive + kDefaultTimeInactive);
+
+    txnRouter().stash(operationContext());
+
+    // At shutdown transactions are implicitly aborted without being continued so a transaction may
+    // be stashed when aborting, which should still lead to durations in a consistent state.
+    txnRouter().implicitlyAbortTransaction(operationContext(), kDummyStatus);
+
+    assertTimeActiveIs(kDefaultTimeActive);
+    assertTimeInactiveIs(kDefaultTimeInactive);
+    assertDurationIs(kDefaultTimeActive + kDefaultTimeInactive);
+}
+
+TEST_F(TransactionRouterMetricsTest, DurationsForImplicitlyAbortedActiveTxn) {
+    beginTxnWithDefaultTxnNumber();
+
+    setUpDefaultTimeActiveAndInactive();
+
+    assertTimeActiveIs(kDefaultTimeActive);
+    assertTimeInactiveIs(kDefaultTimeInactive);
+    assertDurationIs(kDefaultTimeActive + kDefaultTimeInactive);
+
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kContinue);
+    tickSource()->advance(Microseconds(100));
+
+    assertTimeActiveIs(kDefaultTimeActive + Microseconds(100));
+    assertTimeInactiveIs(kDefaultTimeInactive);
+    assertDurationIs(kDefaultTimeActive + kDefaultTimeInactive + Microseconds(100));
+
+    txnRouter().implicitlyAbortTransaction(operationContext(), kDummyStatus);
+
+    assertTimeActiveIs(kDefaultTimeActive + Microseconds(100));
+    assertTimeInactiveIs(kDefaultTimeInactive);
+    assertDurationIs(kDefaultTimeActive + kDefaultTimeInactive + Microseconds(100));
+}
+
+TEST_F(TransactionRouterMetricsTest, DurationsForImplicitlyAbortedEndedTxn) {
+    beginTxnWithDefaultTxnNumber();
+
+    setUpDefaultTimeActiveAndInactive();
+
+    assertTimeActiveIs(kDefaultTimeActive);
+    assertTimeInactiveIs(kDefaultTimeInactive);
+    assertDurationIs(kDefaultTimeActive + kDefaultTimeInactive);
+
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kCommit);
+    runCommit(kDummyOkRes);
+    txnRouter().stash(operationContext());
+
+    // At shutdown transactions are implicitly aborted without being continued, so an "ended"
+    // transaction (i.e. committed or aborted) may be implicitly aborted again. This shouldn't
+    // affect any transaction durations.
+    auto future = launchAsync(
+        [&] { return txnRouter().implicitlyAbortTransaction(operationContext(), kDummyStatus); });
+    expectAbortTransactions({hostAndPort1}, getSessionId(), kTxnNumber);
+    future.default_timed_get();
+
+    assertTimeActiveIs(kDefaultTimeActive);
+    assertTimeInactiveIs(kDefaultTimeInactive);
+    assertDurationIs(kDefaultTimeActive + kDefaultTimeInactive);
+}
+
+TEST_F(TransactionRouterMetricsTest, NeitherTimeActiveNorInactiveAdvanceAfterSuccessfulCommit) {
+    beginTxnWithDefaultTxnNumber();
+
+    setUpDefaultTimeActiveAndInactive();
+
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kCommit);
+    runCommit(kDummyOkRes);
+
+    // Neither can advance.
+    assertTimeActiveAndInactiveCannotAdvance(kDefaultTimeActive /*timeActive*/,
+                                             kDefaultTimeInactive /*timeInactive*/);
+}
+
+TEST_F(TransactionRouterMetricsTest, NeitherTimeActiveNorInactiveAdvanceAfterFailedCommit) {
+    beginTxnWithDefaultTxnNumber();
+
+    setUpDefaultTimeActiveAndInactive();
+
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kContinue);
+    runCommit(kDummyErrorRes);
+
+    // Neither can advance.
+    assertTimeActiveAndInactiveCannotAdvance(kDefaultTimeActive /*timeActive*/,
+                                             kDefaultTimeInactive /*timeInactive*/);
+}
+
+TEST_F(TransactionRouterMetricsTest, TimeActiveAndInactiveAdvanceAfterUnknownCommitResult) {
+    beginTxnWithDefaultTxnNumber();
+
+    setUpDefaultTimeActiveAndInactive();
+
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kCommit);
+    runCommit(Status(ErrorCodes::HostUnreachable, "dummy"), true /* expectRetries */);
+
+    // timeActive can advance.
+    tickSource()->advance(Microseconds(100));
+    assertTimeActiveIs(kDefaultTimeActive + Microseconds(100));
+    assertTimeInactiveIs(kDefaultTimeInactive);
+
+    // timeInactive can advance.
+    txnRouter().stash(operationContext());
+    tickSource()->advance(Microseconds(100));
+    assertTimeActiveIs(kDefaultTimeActive + Microseconds(100));
+    assertTimeInactiveIs(kDefaultTimeInactive + Microseconds(100));
+
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kCommit);
+    runCommit(kDummyRetryableErrorRes, true /* expectRetries */);
+
+    // timeActive can advance.
+    tickSource()->advance(Microseconds(100));
+    assertTimeActiveIs(kDefaultTimeActive + Microseconds(200));
+    assertTimeInactiveIs(kDefaultTimeInactive + Microseconds(100));
+
+    // timeInactive can advance.
+    txnRouter().stash(operationContext());
+    tickSource()->advance(Microseconds(100));
+    assertTimeActiveIs(kDefaultTimeActive + Microseconds(200));
+    assertTimeInactiveIs(kDefaultTimeInactive + Microseconds(200));
+
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kCommit);
+    runCommit(kDummyOkRes);
+
+    // The result is known, so neither can advance.
+    assertTimeActiveAndInactiveCannotAdvance(kDefaultTimeActive + Microseconds(200) /*timeActive*/,
+                                             kDefaultTimeInactive +
+                                                 Microseconds(200) /*timeInactive*/);
+}
+
+TEST_F(TransactionRouterMetricsTest, NeitherTimeActiveNorInactiveAdvanceAfterAbort) {
+    beginTxnWithDefaultTxnNumber();
+
+    setUpDefaultTimeActiveAndInactive();
+
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kContinue);
+    ASSERT_THROWS_CODE(txnRouter().abortTransaction(operationContext()),
+                       AssertionException,
+                       ErrorCodes::NoSuchTransaction);
+
+    // Neither can advance.
+    assertTimeActiveAndInactiveCannotAdvance(kDefaultTimeActive /*timeActive*/,
+                                             kDefaultTimeInactive /*timeInactive*/);
+}
+
+TEST_F(TransactionRouterMetricsTest, NeitherTimeActiveNorInactiveAdvanceAfterImplicitAbort) {
+    beginTxnWithDefaultTxnNumber();
+
+    setUpDefaultTimeActiveAndInactive();
+
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kContinue);
+    txnRouter().implicitlyAbortTransaction(operationContext(), kDummyStatus);
+
+    // Neither can advance.
+    assertTimeActiveAndInactiveCannotAdvance(kDefaultTimeActive /*timeActive*/,
+                                             kDefaultTimeInactive /*timeInactive*/);
 }
 
 TEST_F(TransactionRouterMetricsTest, RouterMetricsTotalStarted_DefaultsTo0) {

@@ -62,6 +62,7 @@ public:
     ~RouterOperationContextSession();
 
 private:
+    OperationContext* _opCtx;
     OperationContextSession _operationContextSession;
 };
 

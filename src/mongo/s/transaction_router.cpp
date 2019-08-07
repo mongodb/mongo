@@ -851,10 +851,12 @@ void TransactionRouter::Router::beginOrContinueTxn(OperationContext* opCtx,
                 repl::ReadConcernArgs::get(opCtx) = o().readConcernArgs;
 
                 ++p().latestStmtId;
+                _onContinue(opCtx);
                 break;
             }
             case TransactionActions::kCommit:
                 ++p().latestStmtId;
+                _onContinue(opCtx);
                 break;
         }
     } else if (txnNumber > o().txnNumber) {
@@ -906,6 +908,12 @@ void TransactionRouter::Router::beginOrContinueTxn(OperationContext* opCtx,
     }
 
     _updateLastClientInfo(opCtx->getClient());
+}
+
+void TransactionRouter::Router::stash(OperationContext* opCtx) {
+    auto tickSource = opCtx->getServiceContext()->getTickSource();
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    o(lk).timingStats.trySetInactive(tickSource, tickSource->getTicks());
 }
 
 BSONObj TransactionRouter::Router::_handOffCommitToCoordinator(OperationContext* opCtx) {
@@ -1080,7 +1088,9 @@ BSONObj TransactionRouter::Router::_commitTransaction(
 }
 
 BSONObj TransactionRouter::Router::abortTransaction(OperationContext* opCtx) {
-    _onExplicitAbort(opCtx);
+    // Update stats on scope exit so the transaction is considered "active" while waiting on abort
+    // responses.
+    auto updateStatsGuard = makeGuard([&] { _onExplicitAbort(opCtx); });
 
     // The router has yet to send any commands to a remote shard for this transaction.
     // Return the same error that would have been returned by a shard.
@@ -1140,7 +1150,9 @@ void TransactionRouter::Router::implicitlyAbortTransaction(OperationContext* opC
         return;
     }
 
-    _onImplicitAbort(opCtx, errorStatus);
+    // Update stats on scope exit so the transaction is considered "active" while waiting on abort
+    // responses.
+    auto updateStatsGuard = makeGuard([&] { _onImplicitAbort(opCtx, errorStatus); });
 
     if (o().participants.empty()) {
         return;
@@ -1208,9 +1220,8 @@ void TransactionRouter::Router::_resetRouterState(OperationContext* opCtx,
     p().terminationInitiated = false;
 
     auto tickSource = opCtx->getServiceContext()->getTickSource();
-    o(lk).timingStats.startTime = tickSource->getTicks();
-    o(lk).timingStats.startWallClockTime =
-        opCtx->getServiceContext()->getPreciseClockSource()->now();
+    auto curTicks = tickSource->getTicks();
+    o(lk).timingStats.trySetActive(opCtx, curTicks);
 
     // TODO SERVER-37115: Parse statement ids from the client and remember the statement id
     // of the command that started the transaction, if one was included.
@@ -1300,8 +1311,6 @@ std::string TransactionRouter::Router::_transactionInfoForLog(
 
         invariant(!o().abortCause.empty());
         sb << " abortCause:" << o().abortCause << ",";
-
-        // TODO SERVER-40985: Log abortSource
     }
 
     if (o().commitType != CommitType::kNotInitiated) {
@@ -1312,9 +1321,13 @@ std::string TransactionRouter::Router::_transactionInfoForLog(
            << ",";
     }
 
-    // TODO SERVER-41376: Log timeActiveMicros
+    sb << " timeActiveMicros:"
+       << durationCount<Microseconds>(o().timingStats.getTimeActiveMicros(tickSource, curTicks))
+       << ",";
 
-    // TODO SERVER-41376: Log timeInactiveMicros
+    sb << " timeInactiveMicros:"
+       << durationCount<Microseconds>(o().timingStats.getTimeInactiveMicros(tickSource, curTicks))
+       << ",";
 
     // Total duration of the transaction. Logged at the end of the line for consistency with slow
     // command logging.
@@ -1398,6 +1411,13 @@ void TransactionRouter::Router::_onNonRetryableCommitError(OperationContext* opC
     _endTransactionTrackingIfNecessary(opCtx, TerminationCause::kAborted);
 }
 
+void TransactionRouter::Router::_onContinue(OperationContext* opCtx) {
+    auto tickSource = opCtx->getServiceContext()->getTickSource();
+
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    o(lk).timingStats.trySetActive(opCtx, tickSource->getTicks());
+}
+
 void TransactionRouter::Router::_onSuccessfulCommit(OperationContext* opCtx) {
     _endTransactionTrackingIfNecessary(opCtx, TerminationCause::kCommitted);
 }
@@ -1414,13 +1434,14 @@ void TransactionRouter::Router::_endTransactionTrackingIfNecessary(
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        o(lk).timingStats.endTime = curTicks;
 
-        // If startTime hasn't been set yet, that probably means it run into an error and is
-        // getting aborted.
-        if (o().timingStats.startTime == 0) {
-            o(lk).timingStats.startTime = curTicks;
-        }
+        // In some error contexts, the transaction may not have been started yet, so try setting the
+        // transaction's timing stats to active before ending it below. This is a no-op for already
+        // active transactions.
+        o(lk).timingStats.trySetActive(opCtx, curTicks);
+
+        o(lk).timingStats.trySetInactive(tickSource, curTicks);
+        o(lk).timingStats.endTime = curTicks;
     }
 
     if (shouldLog(logger::LogComponent::kTransaction, logger::LogSeverity::Debug(1)) ||
@@ -1465,6 +1486,57 @@ Microseconds TransactionRouter::TimingStats::getCommitDuration(TickSource* tickS
         return tickSource->ticksTo<Microseconds>(curTicks - commitStartTime);
     }
     return tickSource->ticksTo<Microseconds>(endTime - commitStartTime);
+}
+
+Microseconds TransactionRouter::TimingStats::getTimeActiveMicros(TickSource* tickSource,
+                                                                 TickSource::Tick curTicks) const {
+    invariant(startTime > 0);
+
+    if (lastTimeActiveStart != 0) {
+        // The transaction is currently active, so return the active time so far plus the time since
+        // the transaction became active.
+        return timeActiveMicros + tickSource->ticksTo<Microseconds>(curTicks - lastTimeActiveStart);
+    }
+    return timeActiveMicros;
+}
+
+Microseconds TransactionRouter::TimingStats::getTimeInactiveMicros(
+    TickSource* tickSource, TickSource::Tick curTicks) const {
+    invariant(startTime > 0);
+
+    auto micros = getDuration(tickSource, curTicks) - getTimeActiveMicros(tickSource, curTicks);
+    dassert(micros >= Microseconds(0),
+            str::stream() << "timeInactiveMicros should never be negative, was: " << micros);
+    return micros;
+}
+
+void TransactionRouter::TimingStats::trySetActive(OperationContext* opCtx,
+                                                  TickSource::Tick curTicks) {
+    if (endTime != 0 || lastTimeActiveStart != 0) {
+        // A transaction can't become active if it has already ended or is already active.
+        return;
+    }
+
+    if (startTime == 0) {
+        // If the transaction is becoming active for the first time, also set the transaction's
+        // start time.
+        startTime = curTicks;
+        startWallClockTime = opCtx->getServiceContext()->getPreciseClockSource()->now();
+    }
+    lastTimeActiveStart = curTicks;
+}
+
+void TransactionRouter::TimingStats::trySetInactive(TickSource* tickSource,
+                                                    TickSource::Tick curTicks) {
+    if (endTime != 0 || lastTimeActiveStart == 0) {
+        // If the transaction is already over or the router has already been stashed, the relevant
+        // stats should have been updated earlier. In certain error scenarios, it's possible for a
+        // transaction to be stashed twice in a row.
+        return;
+    }
+
+    timeActiveMicros += tickSource->ticksTo<Microseconds>(curTicks - lastTimeActiveStart);
+    lastTimeActiveStart = 0;
 }
 
 }  // namespace mongo
