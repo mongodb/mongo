@@ -826,7 +826,7 @@ struct DataType::Handler<BSONObj> {
                        const char* ptr,
                        size_t length,
                        size_t* advanced,
-                       std::ptrdiff_t debug_offset) {
+                       std::ptrdiff_t debug_offset) noexcept try {
         auto temp = BSONObj(ptr);
         auto len = temp.objsize();
         if (bson) {
@@ -836,13 +836,15 @@ struct DataType::Handler<BSONObj> {
             *advanced = len;
         }
         return Status::OK();
+    } catch (const DBException& e) {
+        return e.toStatus();
     }
 
     static Status store(const BSONObj& bson,
                         char* ptr,
                         size_t length,
                         size_t* advanced,
-                        std::ptrdiff_t debug_offset);
+                        std::ptrdiff_t debug_offset) noexcept;
 
     static BSONObj defaultConstruct() {
         return BSONObj();
