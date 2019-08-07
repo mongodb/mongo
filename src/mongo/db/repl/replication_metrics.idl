@@ -130,6 +130,10 @@ structs:
                 description: "The node's target opTime for catchup"
                 type: optime
                 optional: true
+            newTermStartDate:
+                description: "Time the new term oplog entry was written"
+                type: date
+                optional: true
 
     ElectionParticipantMetrics:
         description: "Stores metrics that are specific to the last election in which the node voted"

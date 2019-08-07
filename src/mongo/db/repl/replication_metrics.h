@@ -83,6 +83,7 @@ public:
     // consistent state.
     void setElectionCandidateMetrics(Date_t lastElectionDate);
     void setTargetCatchupOpTime(OpTime opTime);
+    void setNewTermStartDate(Date_t newTermStartDate);
 
     boost::optional<OpTime> getTargetCatchupOpTime_forTesting();
 
