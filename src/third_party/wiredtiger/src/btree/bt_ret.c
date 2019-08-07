@@ -250,7 +250,7 @@ __wt_value_return_upd(WT_SESSION_IMPL *session,
 	 * updates.
 	 */
 	while (i > 0)
-		WT_ERR(__wt_modify_apply(session, cursor, listp[--i]->data));
+		WT_ERR(__wt_modify_apply(cursor, listp[--i]->data));
 
 err:	if (allocated_bytes != 0)
 		__wt_free(session, listp);

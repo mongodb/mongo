@@ -61,6 +61,7 @@ snap_track(TINFO *tinfo, thread_op op)
 	snap->ts = WT_TS_NONE;
 	snap->repeatable = false;
 	snap->last = op == TRUNCATE ? tinfo->last : 0;
+	snap->ksize = snap->vsize = 0;
 
 	if (op == INSERT && g.type == ROW) {
 		ip = tinfo->key;

@@ -844,6 +844,7 @@ __wt_txn_upd_visible_type(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 
 	return (WT_VISIBLE_TRUE);
 }
+
 /*
  * __wt_txn_upd_durable --
  *	Can the current transaction make the given update durable.

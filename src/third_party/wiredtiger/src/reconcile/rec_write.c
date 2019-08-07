@@ -456,14 +456,20 @@ __rec_write_page_status(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 		}
 
 		/*
-		 * The page only might be clean; if the write generation is
-		 * unchanged since reconciliation started, it's clean.
+		 * We set the page state to mark it as having been dirtied for
+		 * the first time prior to reconciliation. A failed atomic cas
+		 * indicates that an update has taken place during
+		 * reconciliation.
 		 *
-		 * If the write generation changed, the page has been written
-		 * since reconciliation started and remains dirty (that can't
-		 * happen when evicting, the page is exclusively locked).
+		 * The page only might be clean; if the page state is unchanged
+		 * since reconciliation started, it's clean.
+		 *
+		 * If the page state changed, the page has been written since
+		 * reconciliation started and remains dirty (that can't happen
+		 * when evicting, the page is exclusively locked).
 		 */
-		if (__wt_atomic_cas32(&mod->write_gen, r->orig_write_gen, 0))
+		if (__wt_atomic_cas32(
+		    &mod->page_state, WT_PAGE_DIRTY_FIRST, WT_PAGE_CLEAN))
 			__wt_cache_dirty_decr(session, page);
 		else
 			WT_ASSERT(session, !F_ISSET(r, WT_REC_EVICT));
@@ -602,13 +608,22 @@ __rec_init(WT_SESSION_IMPL *session,
 	r->page = page;
 
 	/*
-	 * Save the page's write generation before reading the page.
 	 * Save the transaction generations before reading the page.
 	 * These are all ordered reads, but we only need one.
 	 */
 	r->orig_btree_checkpoint_gen = btree->checkpoint_gen;
 	r->orig_txn_checkpoint_gen = __wt_gen(session, WT_GEN_CHECKPOINT);
-	WT_ORDERED_READ(r->orig_write_gen, page->modify->write_gen);
+
+	/*
+	 * Update the page state to indicate that all currently installed
+	 * updates will be included in this reconciliation if it would mark the
+	 * page clean.
+	 *
+	 * Add a write barrier to make it more likely that a thread adding an
+	 * update will see this state change.
+	 */
+	page->modify->page_state = WT_PAGE_DIRTY_FIRST;
+	WT_FULL_BARRIER();
 
 	/*
 	 * Cache the oldest running transaction ID.  This is used to check
