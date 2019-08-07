@@ -34,7 +34,6 @@
 namespace mongo {
 namespace parsed_aggregation_projection {
 
-using ProjectionPolicies = ParsedAggregationProjection::ProjectionPolicies;
 using ArrayRecursionPolicy = ProjectionPolicies::ArrayRecursionPolicy;
 using ComputedFieldsPolicy = ProjectionPolicies::ComputedFieldsPolicy;
 using DefaultIdPolicy = ProjectionPolicies::DefaultIdPolicy;

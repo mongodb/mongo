@@ -50,31 +50,32 @@ namespace mongo {
 namespace parsed_aggregation_projection {
 namespace {
 
-using ProjectionPolicies = ParsedAggregationProjection::ProjectionPolicies;
-
 using std::vector;
 
 // Helper to simplify the creation of a ParsedExclusionProjection with default policies.
 ParsedExclusionProjection makeExclusionProjectionWithDefaultPolicies() {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedAggregationProjection::ProjectionPolicies defaultPolicies;
+    ProjectionPolicies defaultPolicies;
     return {expCtx, defaultPolicies};
 }
 
 // Helper to simplify the creation of a ParsedExclusionProjection which excludes _id by default.
 ParsedExclusionProjection makeExclusionProjectionWithDefaultIdExclusion() {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedAggregationProjection::ProjectionPolicies defaultExcludeId;
-    defaultExcludeId.idPolicy = ProjectionPolicies::DefaultIdPolicy::kExcludeId;
+    ProjectionPolicies defaultExcludeId{ProjectionPolicies::DefaultIdPolicy::kExcludeId,
+                                        ProjectionPolicies::kArrayRecursionPolicyDefault,
+                                        ProjectionPolicies::kComputedFieldsPolicyDefault};
     return {expCtx, defaultExcludeId};
 }
 
 // Helper to simplify the creation of a ParsedExclusionProjection which does not recurse arrays.
 ParsedExclusionProjection makeExclusionProjectionWithNoArrayRecursion() {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedAggregationProjection::ProjectionPolicies noArrayRecursion;
-    noArrayRecursion.arrayRecursionPolicy =
-        ProjectionPolicies::ArrayRecursionPolicy::kDoNotRecurseNestedArrays;
+    ProjectionPolicies noArrayRecursion{
+        ProjectionPolicies::kDefaultIdPolicyDefault,
+        ProjectionPolicies::ArrayRecursionPolicy::kDoNotRecurseNestedArrays,
+        ProjectionPolicies::kComputedFieldsPolicyDefault};
+
     return {expCtx, noArrayRecursion};
 }
 

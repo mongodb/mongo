@@ -48,8 +48,6 @@ namespace mongo {
 namespace parsed_aggregation_projection {
 namespace {
 
-using ProjectionPolicies = ParsedAggregationProjection::ProjectionPolicies;
-
 using std::vector;
 
 template <typename T>
@@ -60,24 +58,26 @@ BSONObj wrapInLiteral(const T& arg) {
 // Helper to simplify the creation of a ParsedInclusionProjection with default policies.
 ParsedInclusionProjection makeInclusionProjectionWithDefaultPolicies() {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedAggregationProjection::ProjectionPolicies defaultPolicies;
+    ProjectionPolicies defaultPolicies;
     return {expCtx, defaultPolicies};
 }
 
 // Helper to simplify the creation of a ParsedInclusionProjection which excludes _id by default.
 ParsedInclusionProjection makeInclusionProjectionWithDefaultIdExclusion() {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedAggregationProjection::ProjectionPolicies defaultExcludeId;
-    defaultExcludeId.idPolicy = ProjectionPolicies::DefaultIdPolicy::kExcludeId;
+    ProjectionPolicies defaultExcludeId{ProjectionPolicies::DefaultIdPolicy::kExcludeId,
+                                        ProjectionPolicies::kArrayRecursionPolicyDefault,
+                                        ProjectionPolicies::kComputedFieldsPolicyDefault};
     return {expCtx, defaultExcludeId};
 }
 
 // Helper to simplify the creation of a ParsedInclusionProjection which does not recurse arrays.
 ParsedInclusionProjection makeInclusionProjectionWithNoArrayRecursion() {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedAggregationProjection::ProjectionPolicies noArrayRecursion;
-    noArrayRecursion.arrayRecursionPolicy =
-        ProjectionPolicies::ArrayRecursionPolicy::kDoNotRecurseNestedArrays;
+    ProjectionPolicies noArrayRecursion{
+        ProjectionPolicies::kDefaultIdPolicyDefault,
+        ProjectionPolicies::ArrayRecursionPolicy::kDoNotRecurseNestedArrays,
+        ProjectionPolicies::kComputedFieldsPolicyDefault};
     return {expCtx, noArrayRecursion};
 }
 

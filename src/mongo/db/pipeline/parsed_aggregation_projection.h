@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/transformer_interface.h"
+#include "mongo/db/query/projection_policies.h"
 
 namespace mongo {
 
@@ -142,40 +143,6 @@ private:
  */
 class ParsedAggregationProjection : public TransformerInterface {
 public:
-    struct ProjectionPolicies {
-        // Allows the caller to indicate whether the projection should default to including or
-        // excluding the _id field in the event that the projection spec does not specify the
-        // desired behavior. For instance, given a projection {a: 1}, specifying 'kExcludeId' is
-        // equivalent to projecting {a: 1, _id: 0} while 'kIncludeId' is equivalent to the
-        // projection {a: 1, _id: 1}. If the user explicitly specifies a projection on _id, then
-        // this will override the default policy; for instance, {a: 1, _id: 0} will exclude _id for
-        // both 'kExcludeId' and 'kIncludeId'.
-        enum class DefaultIdPolicy { kIncludeId, kExcludeId };
-
-        // Allows the caller to specify how the projection should handle nested arrays; that is, an
-        // array whose immediate parent is itself an array. For example, in the case of sample
-        // document {a: [1, 2, [3, 4], {b: [5, 6]}]} the array [3, 4] is a nested array. The array
-        // [5, 6] is not, because there is an intervening object between it and its closest array
-        // ancestor.
-        enum class ArrayRecursionPolicy { kRecurseNestedArrays, kDoNotRecurseNestedArrays };
-
-        // Allows the caller to specify whether computed fields should be allowed within inclusion
-        // projections. Computed fields are implicitly prohibited by exclusion projections.
-        enum class ComputedFieldsPolicy { kBanComputedFields, kAllowComputedFields };
-
-        ProjectionPolicies(
-            DefaultIdPolicy idPolicy = DefaultIdPolicy::kIncludeId,
-            ArrayRecursionPolicy arrayRecursionPolicy = ArrayRecursionPolicy::kRecurseNestedArrays,
-            ComputedFieldsPolicy computedFieldsPolicy = ComputedFieldsPolicy::kAllowComputedFields)
-            : idPolicy(idPolicy),
-              arrayRecursionPolicy(arrayRecursionPolicy),
-              computedFieldsPolicy(computedFieldsPolicy) {}
-
-        DefaultIdPolicy idPolicy;
-        ArrayRecursionPolicy arrayRecursionPolicy;
-        ComputedFieldsPolicy computedFieldsPolicy;
-    };
-
     /**
      * Main entry point for a ParsedAggregationProjection.
      *

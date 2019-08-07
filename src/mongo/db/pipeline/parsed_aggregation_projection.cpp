@@ -138,7 +138,6 @@ void ProjectionSpecValidator::parseNestedObject(const BSONObj& thisLevelSpec,
 
 namespace {
 
-using ProjectionPolicies = ParsedAggregationProjection::ProjectionPolicies;
 using ComputedFieldsPolicy = ProjectionPolicies::ComputedFieldsPolicy;
 
 std::string makeBannedComputedFieldsErrorMessage(BSONObj projSpec) {

@@ -46,8 +46,6 @@ namespace mongo {
 namespace parsed_aggregation_projection {
 namespace {
 
-using ProjectionPolicies = ParsedAggregationProjection::ProjectionPolicies;
-
 template <typename T>
 BSONObj wrapInLiteral(const T& arg) {
     return BSON("$literal" << arg);
@@ -56,16 +54,17 @@ BSONObj wrapInLiteral(const T& arg) {
 // Helper to simplify the creation of a ParsedAggregationProjection with default policies.
 std::unique_ptr<ParsedAggregationProjection> makeProjectionWithDefaultPolicies(BSONObj spec) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedAggregationProjection::ProjectionPolicies defaultPolicies;
+    ProjectionPolicies defaultPolicies;
     return ParsedAggregationProjection::create(expCtx, spec, defaultPolicies);
 }
 
 // Helper to simplify the creation of a ParsedAggregationProjection which bans computed fields.
 std::unique_ptr<ParsedAggregationProjection> makeProjectionWithBannedComputedFields(BSONObj spec) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedAggregationProjection::ProjectionPolicies banComputedFields;
-    banComputedFields.computedFieldsPolicy =
-        ProjectionPolicies::ComputedFieldsPolicy::kBanComputedFields;
+    ProjectionPolicies banComputedFields{
+        ProjectionPolicies::kDefaultIdPolicyDefault,
+        ProjectionPolicies::kArrayRecursionPolicyDefault,
+        ProjectionPolicies::ComputedFieldsPolicy::kBanComputedFields};
     return ParsedAggregationProjection::create(expCtx, spec, banComputedFields);
 }
 
@@ -566,7 +565,7 @@ TEST(ParsedAggregationProjectionType, GetExpressionForPathGetsTopLevelExpression
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto projectObj = BSON("$add" << BSON_ARRAY(BSON("$const" << 1) << BSON("$const" << 3)));
     auto expr = Expression::parseObject(expCtx, projectObj, expCtx->variablesParseState);
-    ParsedAggregationProjection::ProjectionPolicies defaultPolicies;
+    ProjectionPolicies defaultPolicies;
     auto node = InclusionNode(defaultPolicies);
     node.addExpressionForPath(FieldPath("key"), expr);
     BSONObjBuilder bob;
@@ -579,7 +578,7 @@ TEST(ParsedAggregationProjectionType, GetExpressionForPathGetsCorrectTopLevelExp
     auto incorrectObj = BSON("$add" << BSON_ARRAY(BSON("$const" << 2) << BSON("$const" << 4)));
     auto correctExpr = Expression::parseObject(expCtx, correctObj, expCtx->variablesParseState);
     auto incorrectExpr = Expression::parseObject(expCtx, incorrectObj, expCtx->variablesParseState);
-    ParsedAggregationProjection::ProjectionPolicies defaultPolicies;
+    ProjectionPolicies defaultPolicies;
     auto node = InclusionNode(defaultPolicies);
     node.addExpressionForPath(FieldPath("key"), correctExpr);
     node.addExpressionForPath(FieldPath("other"), incorrectExpr);
@@ -591,7 +590,7 @@ TEST(ParsedAggregationProjectionType, GetExpressionForPathGetsNonTopLevelExpress
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto projectObj = BSON("$add" << BSON_ARRAY(BSON("$const" << 1) << BSON("$const" << 3)));
     auto expr = Expression::parseObject(expCtx, projectObj, expCtx->variablesParseState);
-    ParsedAggregationProjection::ProjectionPolicies defaultPolicies;
+    ProjectionPolicies defaultPolicies;
     auto node = InclusionNode(defaultPolicies);
     node.addExpressionForPath(FieldPath("key.second"), expr);
     BSONObjBuilder bob;

@@ -41,7 +41,6 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 using ParsedAggregationProjection = parsed_aggregation_projection::ParsedAggregationProjection;
-using ProjectionPolicies = ParsedAggregationProjection::ProjectionPolicies;
 
 REGISTER_DOCUMENT_SOURCE(project,
                          LiteParsedDocumentSourceDefault::parse,

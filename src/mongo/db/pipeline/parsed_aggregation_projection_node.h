@@ -31,6 +31,8 @@
 
 #include "mongo/db/pipeline/parsed_aggregation_projection.h"
 
+#include "mongo/db/query/projection_policies.h"
+
 namespace mongo {
 namespace parsed_aggregation_projection {
 
@@ -47,8 +49,6 @@ namespace parsed_aggregation_projection {
  */
 class ProjectionNode {
 public:
-    using ProjectionPolicies = ParsedAggregationProjection::ProjectionPolicies;
-
     ProjectionNode(ProjectionPolicies policies, std::string pathToNode = "");
 
     virtual ~ProjectionNode() = default;
