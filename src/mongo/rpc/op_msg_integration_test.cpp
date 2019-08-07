@@ -468,4 +468,33 @@ TEST(OpMsg, ServerRepliesWithoutChecksumToRequestWithoutChecksum) {
 TEST(OpMsg, ServerRepliesWithChecksumToRequestWithChecksum) {
     checksumTest(true);
 }
+
+TEST(OpMsg, ServerHandlesReallyLargeMessagesGracefully) {
+    std::string errMsg;
+    auto conn = unittest::getFixtureConnectionString().connect("integration_test", errMsg);
+    uassert(ErrorCodes::SocketException, errMsg, conn);
+
+    auto buildInfo = conn->runCommand(OpMsgRequest::fromDBAndBody("admin", BSON("buildInfo" << 1)))
+                         ->getCommandReply();
+    ASSERT_OK(getStatusFromCommandResult(buildInfo));
+    const auto maxBSONObjSizeFromServer =
+        static_cast<size_t>(buildInfo["maxBsonObjectSize"].Number());
+    const std::string bigData(maxBSONObjSizeFromServer * 2, ' ');
+
+    BSONObjBuilder bob;
+    bob << "ismaster" << 1 << "ignoredField" << bigData << "$db"
+        << "admin";
+    OpMsgRequest request;
+    request.body = bob.obj<BSONObj::LargeSizeTrait>();
+    ASSERT_GT(request.body.objsize(), BSONObjMaxInternalSize);
+    auto requestMsg = request.serialize();
+
+    Message replyMsg;
+    ASSERT(conn->call(requestMsg, replyMsg));
+
+    auto reply = OpMsg::parse(replyMsg);
+    auto replyStatus = getStatusFromCommandResult(reply.body);
+    ASSERT_NOT_OK(replyStatus);
+    ASSERT_EQ(replyStatus, ErrorCodes::BSONObjectTooLarge);
+}
 }  // namespace mongo
