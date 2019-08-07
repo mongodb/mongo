@@ -83,6 +83,14 @@ function runWildcardIndexTest(keyPattern, pathProjection, expectedPaths) {
 function assertWildcardQuery(query, expectedPath, explainStats = {}) {
     // Explain the query, and determine whether an indexed solution is available.
     const explainOutput = coll.find(query).explain("executionStats");
+
+    // Verify that the explain output reflects the given 'explainStats'.
+    for (let stat in explainStats) {
+        assert.eq(explainStats[stat],
+                  stat.split('.').reduce((obj, i) => obj[i], explainOutput),
+                  explainOutput);
+    }
+
     // If we expect the current path to have been excluded based on the $** keyPattern
     // or projection, confirm that no indexed solution was found.
     if (!expectedPath) {
@@ -95,12 +103,6 @@ function assertWildcardQuery(query, expectedPath, explainStats = {}) {
     assert.docEq(ixScans[0].keyPattern, {"$_path": 1, [expectedPath]: 1});
     // Verify that the results obtained from the $** index are identical to a COLLSCAN.
     assertArrayEq(coll.find(query).toArray(), coll.find(query).hint({$natural: 1}).toArray());
-    // Verify that the explain output reflects the given 'explainStats'.
-    for (let stat in explainStats) {
-        assert.eq(explainStats[stat],
-                  stat.split('.').reduce((obj, i) => obj[i], explainOutput),
-                  explainOutput);
-    }
 }
 
 // Test a $** index that indexes the entire document.
@@ -186,11 +188,6 @@ assertWildcardQuery({'a.0.b.1.c': 1},
                     'a.0.b.1.c',
                     {'executionStats.nReturned': 3, 'executionStats.totalDocsExamined': 4});
 
-// Test that we can query a specific field of an array whose fieldname is itself numeric.
-assertWildcardQuery({'a.0.1.d': 1},
-                    'a.0.1.d',
-                    {'executionStats.nReturned': 1, 'executionStats.totalDocsExamined': 1});
-
 // Test that we can query a primitive value at a specific array index.
 assertWildcardQuery({'a.0.b.1.c.2.d.3': 3},
                     'a.0.b.1.c.2.d.3',
@@ -202,6 +199,10 @@ assert.commandWorked(
 // We can query up to a depth of 8 arrays via specific indices, but not through 9 or more.
 assertWildcardQuery({'a.0.b.0.c.0.d.0.e.0.f.0.g.0.h.0.i': 1}, 'a.0.b.0.c.0.d.0.e.0.f.0.g.0.h.0.i');
 assertWildcardQuery({'a.0.b.0.c.0.d.0.e.0.f.0.g.0.h.0.i.0': 1}, null);
+
+// Test that a query with multiple positional path components following a multikey component cannot
+// use a wildcard index.
+assertWildcardQuery({'a.0.1.d': 1}, null);
 
 // Test that fieldname-or-array-index queries do not inappropriately trim predicates; that is,
 // all predicates on the field are added to a FETCH filter above the IXSCAN.
@@ -236,16 +237,12 @@ const trimTestIxScans = getPlanStages(trimTestExplain.queryPlanner.winningPlan, 
 for (let ixScan of trimTestIxScans) {
     assert.eq(ixScan.keyPattern["$_path"], 1);
 }
-// Finally, confirm that a collection scan produces the same results.
+// Confirm that a collection scan produces the same results.
 assertArrayEq(coll.find(trimTestQuery).toArray(),
               coll.find(trimTestQuery).hint({$natural: 1}).toArray());
 
-// Verify that no overlapping bounds are generated and all the expected documents are returned
-// for fieldname-or-array-index queries.
-const existenceQuery = {
-    "a.0.1": {$exists: true}
-};
-assert.commandWorked(coll.insert({a: [{1: "exists"}, 1]}));
+assert(coll.drop());
+assert.commandWorked(coll.createIndex({"$**": 1}));
 assert.commandWorked(coll.insert({a: {0: {1: "exists"}}}));
 assert.commandWorked(coll.insert({a: {0: [2, "exists"]}}));
 assert.commandWorked(coll.insert({a: {0: [2, {"object_exists": 1}]}}));
@@ -253,16 +250,44 @@ assert.commandWorked(coll.insert({a: {0: [2, ["array_exists"]]}}));
 assert.commandWorked(coll.insert({a: {0: [{1: "exists"}]}}));
 assert.commandWorked(coll.insert({a: {0: [{1: []}]}}));
 assert.commandWorked(coll.insert({a: {0: [{1: {}}]}}));
+assert.commandWorked(coll.insert({a: {0: ["not_exist"]}}));
+assert.commandWorked(coll.insert({a: {"01": ["not_exists"]}}));
+
+// Verify that when "a" is not multikey, a query with multiple successive positional path components
+// following "a" can use the wildcard index.
+let existenceQuery = {"a.0.1": {$exists: true}};
+assertWildcardQuery(existenceQuery, "a.0.1", {"executionStats.nReturned": 7});
+assertArrayEq(coll.find(existenceQuery).toArray(),
+              coll.find(existenceQuery).hint({$natural: 1}).toArray());
+
+assert.commandWorked(coll.insert({a: [{1: "exists"}, 1]}));
 assert.commandWorked(coll.insert({a: [{0: [{1: ["exists"]}]}]}));
 assert.commandWorked(coll.insert({a: [{}, {0: [{1: ["exists"]}]}]}));
 assert.commandWorked(coll.insert({a: [{}, {0: [[], {}, {1: ["exists"]}]}]}));
+assert.commandWorked(coll.insert({a: [{11: "exist"}]}));
+assert.commandWorked(coll.insert({a: [{11: {b: "exist"}}]}));
 
-assert.commandWorked(coll.insert({a: {0: ["not_exist"]}}));
-assert.commandWorked(coll.insert({a: {"01": ["not_exist"]}}));
-assert.commandWorked(coll.insert({a: [{11: "not_exist"}]}));
-
-assertWildcardQuery(existenceQuery, 'a.0.1', {'executionStats.nReturned': 11});
-// Finally, confirm that a collection scan produces the same results.
+// Verify that an existence query with a positional path component can use the wildcard index.
+existenceQuery = {
+    "a.0": {$exists: true}
+};
+assertWildcardQuery(existenceQuery, "a.0", {"executionStats.nReturned": 14});
 assertArrayEq(coll.find(existenceQuery).toArray(),
               coll.find(existenceQuery).hint({$natural: 1}).toArray());
-})();
+
+// Verify that an existence query with two successive numeric path components, but where one is not
+// spelled like a BSON array index, can use a wildcard index.
+existenceQuery = {
+    "a.01.0": {$exists: true}
+};
+assertWildcardQuery(existenceQuery, "a.01.0", {"executionStats.nReturned": 1});
+assertArrayEq(coll.find(existenceQuery).toArray(),
+              coll.find(existenceQuery).hint({$natural: 1}).toArray());
+
+// Verify that multiple successive positional path components preclude use of the wildcard index
+// when "a" is multikey.
+assertWildcardQuery({"a.0.11": {$exists: true}}, null, {"executionStats.nReturned": 2});
+assertWildcardQuery({"a.0.11.b": {$exists: true}}, null, {"executionStats.nReturned": 1});
+assertWildcardQuery({"a.3.4": {$exists: true}}, null, {"executionStats.nReturned": 0});
+assertWildcardQuery({"a.3.4.b": {$exists: true}}, null, {"executionStats.nReturned": 0});
+}());

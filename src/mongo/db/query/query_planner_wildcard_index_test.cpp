@@ -1456,7 +1456,7 @@ TEST_F(QueryPlannerWildcardTest, ShouldOnlyBuildSpecialBoundsForMultikeyPaths) {
 }
 
 TEST_F(QueryPlannerWildcardTest, ShouldGenerateSpecialBoundsForNumericMultikeyPaths) {
-    addWildcardIndex(BSON("a.$**" << 1), {"a.b", "a.b.0"});
+    addWildcardIndex(BSON("a.$**" << 1), {"a.b", "a.b.0", "a.b.0.c"});
 
     // 'a.b.0' is itself a multikey path, but since 'a.b' is multikey 'b.0' may refer to an array
     // element of 'b'. We generate special bounds for 'b.0'.
@@ -1467,22 +1467,22 @@ TEST_F(QueryPlannerWildcardTest, ShouldGenerateSpecialBoundsForNumericMultikeyPa
         "'a.b.0': 1}, bounds: {'$_path': [['a.b','a.b',true,true], ['a.b.0','a.b.0',true,true]], "
         "'a.b.0': [[10,10,true,true]]}}}}}");
 
-    // 'a.b' and 'a.b.0' are both multikey paths; we generate special bounds for 'b.0' and '0.1'.
-    runQuery(fromjson("{'a.b.0.1.c': 10}"));
+    // 'a.b' and 'a.b.0.c' are both multikey paths; we generate special bounds for 'b.0' and 'c.1'.
+    runQuery(fromjson("{'a.b.0.c.1.d': 10}"));
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{fetch: {filter: {'a.b.0.1.c': 10}, node: {ixscan: {filter: null, pattern: {'$_path': 1, "
-        "'a.b.0.1.c': 1}, bounds: {'$_path': [['a.b.0.1.c','a.b.0.1.c',true,true], "
-        "['a.b.0.c','a.b.0.c',true,true], ['a.b.1.c','a.b.1.c',true,true], "
-        "['a.b.c','a.b.c',true,true]], 'a.b.0.1.c': [[10,10,true,true]]}}}}}");
+        "{fetch: {filter: {'a.b.0.c.1.d': 10}, node: {ixscan: {filter: null, pattern: {'$_path': "
+        "1, 'a.b.0.c.1.d': 1}, bounds: {'$_path': [['a.b.0.c.1.d','a.b.0.c.1.d',true,true], "
+        "['a.b.0.c.d','a.b.0.c.d',true,true], ['a.b.c.1.d','a.b.c.1.d',true,true], "
+        "['a.b.c.d','a.b.c.d',true,true]], 'a.b.0.c.1.d': [[10,10,true,true]]}}}}}");
 
-    // 'a.b' is multikey but 'a.b.1' is not, so we only generate special bounds for 'b.1'.
-    runQuery(fromjson("{'a.b.1.1.c': 10}"));
+    // 'a.b' is multikey but 'a.b.c' is not, so we only generate special bounds for 'a.b.1'.
+    runQuery(fromjson("{'a.b.1.c.1': 10}"));
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{fetch: {filter: {'a.b.1.1.c': 10}, node: {ixscan: {filter: null, pattern: {'$_path': 1, "
-        "'a.b.1.1.c': 1}, bounds: {'$_path': [['a.b.1.1.c','a.b.1.1.c',true,true], "
-        "['a.b.1.c','a.b.1.c',true,true]], 'a.b.1.1.c': [[10,10,true,true]]}}}}}");
+        "{fetch: {filter: {'a.b.1.c.1': 10}, node: {ixscan: {filter: null, pattern: {'$_path': 1, "
+        "'a.b.1.c.1': 1}, bounds: {'$_path': [['a.b.1.c.1','a.b.1.c.1',true,true], "
+        "['a.b.c.1','a.b.c.1',true,true]], 'a.b.1.c.1': [[10,10,true,true]]}}}}}");
 }
 
 TEST_F(QueryPlannerWildcardTest, ShouldNotGenerateSpecialBoundsForFieldNamesWithLeadingZeroes) {
@@ -1539,55 +1539,97 @@ TEST_F(QueryPlannerWildcardTest, ShouldGenerateSpecialBoundsForNullAndExistenceQ
         "['a.b.1.c','a.b.1.c',true,true], ['a.b.1.c.','a.b.1.c/',true,false], "
         "['a.b.c','a.b.c',true,true], ['a.b.c.','a.b.c/',true,false]], 'a.0.b.1.c': [[{$minKey: "
         "1},{$maxKey: 1},true,true]]}}}}}");
+}
 
+TEST_F(QueryPlannerWildcardTest,
+       CanAnswerMultipleNumericPathComponentsWhenPrefixPathIsNotMultikey) {
+    addWildcardIndex(BSON("$**" << 1));
+    runQuery(fromjson("{'a.0.1': 'foo'}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node:"
+        "{ixscan: {filter: null, pattern: {$_path: 1, 'a.0.1': 1}, bounds:"
+        "{$_path: [['a.0.1','a.0.1',true,true]], 'a.0.1': [['foo','foo',true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerWildcardTest,
+       CannotAnswerMultipleNumericPathComponentsWhenPrefixPathIsMultikey) {
+    addWildcardIndex(BSON("$**" << 1), {"a"});
+    runQuery(fromjson("{'a.0.1': 'foo'}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
+TEST_F(QueryPlannerWildcardTest,
+       CannotAnswerMultipleNumericPathComponentsWhenPrefixMultikeyPathIsNumeric) {
+    addWildcardIndex(BSON("$**" << 1), {"a.0"});
+    runQuery(fromjson("{'a.0.1.2': 'foo'}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, CannotAnswerExistencePredicateOnMultipleNumericPathComponents) {
+    addWildcardIndex(BSON("a.$**" << 1), {"a"});
+
+    // This query cannot be serviced by the wildcard index, because there are multiple successive
+    // positional path components.
+    runQuery(fromjson("{'a.0.0.0': {$exists: true}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, CannotAnswerNullEqualityPredicateOnMultipleNumericPathComponents) {
+    addWildcardIndex(BSON("a.$**" << 1),
+                     {"a", "a.b", "a.b.2", "a.b.2.3", "a.b.2.3.4", "a.c.b", "a.c.b.1"});
+
+    runQuery(fromjson("{'a.0.b.2.3.4': {$exists: true, $eq: null}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
+TEST_F(QueryPlannerWildcardTest,
+       CannotAnswerEqualityPredicateWithMultipleNumericPathComponentsInMiddleOfPath) {
+    addWildcardIndex(BSON("a.$**" << 1), {"a"});
+
+    runQuery(fromjson("{'a.10.11.b.2': {$eq: 'foo'}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, DoNotProduceOverlappingBoundsWithMultipleNumericPathComponents) {
+    addWildcardIndex(BSON("a.$**" << 1), {"a.0"});
     // When an array index field exists in the query pattern and one of the resulting
     // fieldname-or-array-index paths is a prefix of another, then the subpath bounds generated by
     // the prefix path will contain all the bounds generated by its subpaths. Test that we avoid
     // overlap by removing the redundant paths.
     //
-    // In the below example, 'a' is multikey and the query is on 'a.0.0.0'. We generate paths
-    // 'a.0.0' and 'a.0.0.0' because the first '0' is an array index. But the subpaths bound
-    // generated by 'a.0.0' -> ['a.0.0.','a.0.0/'] would contain all the bounds generated by
-    // 'a.0.0.0'. Therefore we must remove path 'a.0.0.0' before generating the subpath bounds.
-    runQuery(fromjson("{'a.0.0.0': {$exists: true}}"));
+    // In the below example, 'a.0' is multikey and the query is on 'a.0.0'. We generate paths
+    // 'a.0' and 'a.0.0' because the first '0' is an array index. But the subpaths bound
+    // generated by 'a.0' -> ['a.0.','a.0/'] would contain all the bounds generated by
+    // 'a.0.0'. Therefore we must remove path 'a.0.0' before generating the subpath bounds.
+    runQuery(fromjson("{'a.0.0': {$exists: true}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{fetch: {filter: {'a.0.0.0': {$exists: true}}, node: {ixscan: {filter:null, "
-        "pattern:{'$_path': 1, 'a.0.0.0': 1}, bounds: {'$_path': [['a.0.0','a.0.0',true,true], "
-        "['a.0.0.','a.0.0/',true,false]], 'a.0.0.0': [[{$minKey: 1},{$maxKey: 1},true,true]]}}}}}");
+        "{fetch: {filter: {'a.0.0': {$exists: true}}, node: {ixscan: {filter:null, "
+        "pattern:{'$_path': 1, 'a.0.0': 1}, bounds: {'$_path': [['a.0','a.0',true,true], "
+        "['a.0.','a.0/',true,false]], 'a.0.0': [[{$minKey: 1},{$maxKey: 1},true,true]]}}}}}");
+}
 
-    // When there are multiple subpaths that are prefixes of a particular subpath, all the other
-    // subpaths need to be removed. In the below example, 'a.c.b', 'a.c.b.1', 'a.c.b.2' are possible
-    // subpaths, but since 'a.c.b' is a prefix of the rest, we need to ensure that 'a.c.b' is the
-    // only path that we consider.
-    runQuery(fromjson("{'a.c.b.1.2': {$exists: true}}"));
+TEST_F(QueryPlannerWildcardTest,
+       DoNotProduceOverlappingBoundsWithMultipleNumericPathComponentsInMiddleOfPath) {
+    addWildcardIndex(BSON("a.$**" << 1), {"a.0", "a.0.b"});
+    runQuery(fromjson("{'a.0.0.b.1': {$exists: true}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{fetch: {filter: {'a.c.b.1.2': {$exists: true}}, node: {ixscan: {filter:null, "
-        "pattern:{'$_path': 1, 'a.c.b.1.2': 1}, bounds: {'$_path': [['a.c.b','a.c.b',true,true], "
-        "['a.c.b.','a.c.b/',true,false]], "
-        "'a.c.b.1.2': [[{$minKey: 1},{$maxKey: 1},true,true]]}}}}}");
-
-    // Similar to the previous case except one of the subpath is a 'string prefix' (when compared as
-    // strings) and not a prefix from the FieldRef point of view. In this case bounds for both the
-    // subpaths should be generated since they don't overlap.
-    runQuery(fromjson("{'a.c.b.11.1': {$exists: true}}"));
-    assertNumSolutions(1U);
-    assertSolutionExists(
-        "{fetch: {filter: {'a.c.b.11.1': {$exists: true}}, node: {ixscan: {filter:null, "
-        "pattern:{'$_path': 1, 'a.c.b.11.1': 1}, bounds: {'$_path': "
-        "[['a.c.b.1','a.c.b.1',true,true], ['a.c.b.1.','a.c.b.1/',true,false], "
-        "['a.c.b.11.1','a.c.b.11.1',true,true], ['a.c.b.11.1.','a.c.b.11.1/',true,false]], "
-        "'a.c.b.11.1': [[{$minKey: 1},{$maxKey: 1},true,true]]}}}}}");
-
-
-    runQuery(fromjson("{'a.0.b.2.3.4': {$exists: true, $eq: null}}"));
-    assertNumSolutions(1U);
-    assertSolutionExists(
-        "{fetch: {filter: {'a.0.b.2.3.4': {$exists: true, $eq: null}}, node: {ixscan: {filter:null,"
-        "pattern:{'$_path': 1, 'a.0.b.2.3.4': 1}, bounds: {'$_path': [['a.0.b','a.0.b',true,true], "
-        "['a.0.b.','a.0.b/',true,false], ['a.b','a.b',true,true], ['a.b.','a.b/',true,false]], "
-        "'a.0.b.2.3.4': [[{$minKey: 1},{$maxKey: 1},true,true]]}}}}}");
+        "{fetch: {filter: {'a.0.0.b.1': {$exists: true}}, node: {ixscan: {filter:null, "
+        "pattern:{'$_path': 1, 'a.0.0.b.1': 1}, bounds: {'$_path': "
+        "[['a.0.0.b','a.0.0.b',true,true], "
+        "['a.0.0.b.','a.0.0.b/',true,false], ['a.0.b','a.0.b',true,true], "
+        "['a.0.b.','a.0.b/',true,false]],"
+        "'a.0.0.b.1': [[{$minKey: 1},{$maxKey: 1},true,true]]}}}}}");
 }
 
 TEST_F(QueryPlannerWildcardTest, ShouldDeclineToAnswerQueriesThatTraverseTooManyArrays) {

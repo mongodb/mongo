@@ -208,11 +208,13 @@ std::set<FieldRef> generateFieldNameOrArrayIndexPathSet(const std::set<std::size
 
 /**
  * Returns false if 'queryPath' includes any numerical path components which render it unanswerable
- * by the $** index, true otherwise. Specifically, the $** index cannot answer the query if either
+ * by the $** index, true otherwise. Specifically, the $** index cannot answer the query if any
  * of the following scenarios occur:
  *
  * - The query path traverses through more than 'kWildcardMaxArrayIndexTraversalDepth' nested arrays
  * via explicit array indices.
+ * - The query path has multiple successive positional components that come immediately after a
+ *   multikey path component.
  * - The query path lies along a $** projection through an array index.
  *
  * For an example of the latter case, say that our query path is 'a.0.b', our projection includes
@@ -247,6 +249,31 @@ bool validateNumericPathComponents(const MultikeyPaths& multikeyPaths,
                << kWildcardMaxArrayIndexTraversalDepth << " nested array indices.";
         return false;
     }
+
+    // Prevent the query from attempting to use a wildcard index if there are multiple successive
+    // positional path components that follow a multikey path component. For example, the path
+    // "a.0.1" cannot use a wildcard index if "a" is multikey.
+    //
+    // This restriction stems from the fact that wildcard indices do not recursively index nested
+    // arrays. The document {a: [[3, 4]]}, for instance, will have a single index key containing
+    // the array [3, 4] rather than individual index keys for 3 and 4. If "a" is known to be
+    // multikey, then a user could issue a query like {"a.0.1": {$eq: 4}} to attempt to match by
+    // position within a nested array. The access planner is not able to generate useful bounds for
+    // such positional queries over nested arrays.
+    //
+    // We have already found all positional path components that are immediately preceded by a
+    // multikey path component. All that remains is to bail out if any of these positional path
+    // components are followed by another positional component.
+    for (auto&& positionalComponentIndex : arrayIndices) {
+        auto adjacentIndex = positionalComponentIndex + 1;
+        if (adjacentIndex < queryPath.numParts() &&
+            queryPath.isNumericPathComponentStrict(adjacentIndex)) {
+            // There are two adjacent positional components, so this query might need to match by
+            // position in a nested array. The query cannot be answered using a wildcard index.
+            return false;
+        }
+    }
+
     // If 'includedPaths' is empty, then either the $** projection is an exclusion, or no explicit
     // projection was provided. In either case, it is not possible for the query path to lie along
     // an array index projection, and so we are safe to proceed with planning.
