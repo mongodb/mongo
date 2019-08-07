@@ -87,7 +87,6 @@ public:
     }
 
     void onBatchEnd(const StatusWith<OpTime>&, const OplogApplier::Operations&) final {}
-    void onMissingDocumentsFetchedAndInserted(const std::vector<FetchInfo>&) final {}
 
     void complete(const OpTime& applyThroughOpTime) const {
         log() << "Applied " << _numOpsApplied << " operations in " << _numBatches

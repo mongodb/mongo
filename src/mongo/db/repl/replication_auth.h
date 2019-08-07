@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -30,37 +30,19 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/databases_cloner.h"
-#include "mongo/db/repl/optime.h"
+#include "mongo/client/dbclient_connection.h"
+#include "mongo/client/dbclient_cursor.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 namespace repl {
 
 /**
- * Holder of state for initial sync (InitialSyncer).
+ * Authenticates conn using the server's cluster-membership credentials.
+ *
+ * Returns true on successful authentication.
  */
-struct InitialSyncState {
-    InitialSyncState(std::unique_ptr<DatabasesCloner> cloner) : dbsCloner(std::move(cloner)){};
-
-    std::unique_ptr<DatabasesCloner>
-        dbsCloner;                     // Cloner for all databases included in initial sync.
-    Timestamp beginApplyingTimestamp;  // Timestamp from the latest entry in oplog when started. It
-                                       // is also the timestamp after which we will start applying
-                                       // operations during initial sync.
-    Timestamp beginFetchingTimestamp;  // Timestamp from the earliest active transaction that had an
-                                       // oplog entry.
-    Timestamp stopTimestamp;  // Referred to as minvalid, or the place we can transition states.
-    Timer timer;              // Timer for timing how long each initial sync attempt takes.
-    size_t appliedOps = 0;
-};
+bool replAuthenticate(DBClientBase* conn);
 
 }  // namespace repl
 }  // namespace mongo

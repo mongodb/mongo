@@ -44,6 +44,8 @@
 namespace mongo {
 namespace repl {
 
+NoopOplogApplierObserver noopOplogApplierObserver;
+
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 
 // static

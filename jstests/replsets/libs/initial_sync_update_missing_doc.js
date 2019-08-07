@@ -10,9 +10,8 @@
  */
 
 // reInitiate the replica set with a secondary node, which will go through initial sync. This
-// function will hand the secondary in initial sync. turnOffHangBeforeCopyingDatabasesFailPoint
-// must be called after reInitiateSetWithSecondary, followed by
-// turnOffHangBeforeGettingMissingDocFailPoint.
+// function will hang the secondary in initial sync. turnOffHangBeforeCopyingDatabasesFailPoint
+// must be called after reInitiateSetWithSecondary.
 var reInitiateSetWithSecondary = function(replSet, secondaryConfig) {
     const secondary = replSet.add(secondaryConfig);
     secondary.setSlaveOk();
@@ -21,8 +20,6 @@ var reInitiateSetWithSecondary = function(replSet, secondaryConfig) {
     // copying databases.
     assert.commandWorked(secondary.getDB('admin').runCommand(
         {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'alwaysOn'}));
-    assert.commandWorked(secondary.getDB('admin').runCommand(
-        {configureFailPoint: 'initialSyncHangBeforeGettingMissingDocument', mode: 'alwaysOn'}));
 
     // Skip clearing initial sync progress after a successful initial sync attempt so that we
     // can check initialSyncStatus fields after initial sync is complete.
@@ -44,43 +41,9 @@ var reInitiateSetWithSecondary = function(replSet, secondaryConfig) {
 var turnOffHangBeforeCopyingDatabasesFailPoint = function(secondary) {
     assert.commandWorked(secondary.getDB('admin').runCommand(
         {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'off'}));
-
-    // The following checks assume that we have updated and deleted a document on the sync source
-    // that the secondary will try to update in phase 3.
-    checkLog.contains(secondary, 'update of non-mod failed');
-    checkLog.contains(secondary, 'Fetching missing document');
-    checkLog.contains(
-        secondary, 'initial sync - initialSyncHangBeforeGettingMissingDocument fail point enabled');
 };
 
-// Must be called after turnOffHangBeforeCopyingDatabasesFailPoint. Turns off the
-// initialSyncHangBeforeGettingMissingDocument fail point so that the secondary can check if the
-// sync source has the missing document.
-var turnOffHangBeforeGettingMissingDocFailPoint = function(primary, secondary, name, numFetched) {
-    if (numFetched === 0) {
-        // If we did not re-insert the missing document, insert an arbitrary document to move
-        // forward minValid even though the document was not found.
-        assert.commandWorked(
-            primary.getDB('test').getCollection(name + 'b').insert({_id: 1, y: 1}));
-    }
-
-    assert.commandWorked(secondary.getDB('admin').runCommand(
-        {configureFailPoint: 'initialSyncHangBeforeGettingMissingDocument', mode: 'off'}));
-
-    // If we've re-inserted the missing document between secondaryHangsBeforeGettingMissingDoc and
-    // this function, the secondary will insert the missing document after it fails the update.
-    // Otherwise, it will fail to fetch anything from the sync source because the document was
-    // deleted.
-    if (numFetched > 0) {
-        checkLog.contains(secondary, 'Inserted missing document');
-    } else {
-        checkLog.contains(
-            secondary, 'Missing document not found on source; presumably deleted later in oplog.');
-    }
-    checkLog.contains(secondary, 'initial sync done');
-};
-
-var finishAndValidate = function(replSet, name, firstOplogEnd, numFetched, numDocuments) {
+var finishAndValidate = function(replSet, name, numDocuments) {
     replSet.awaitReplication();
     replSet.awaitSecondaryNodes();
     const dbName = 'test';
@@ -93,24 +56,6 @@ var finishAndValidate = function(replSet, name, firstOplogEnd, numFetched, numDo
         jsTestLog(`Mismatch, primary collection: ${tojson(primaryCollection.find().toArray())}
 secondary collection: ${tojson(secondaryCollection.find().toArray())}`);
         throw new Error('Did not sync collection');
-    }
-
-    const res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
-
-    // If we haven't re-inserted any documents after deleting them, the fetch count is 0 because we
-    // are unable to get the document from the sync source.
-    assert.eq(res.initialSyncStatus.fetchedMissingDocs, numFetched);
-
-    const finalOplogEnd = res.initialSyncStatus.initialSyncOplogEnd;
-
-    if (numFetched > 0) {
-        assert.neq(firstOplogEnd,
-                   finalOplogEnd,
-                   "minValid was not moved forward when missing document was fetched");
-    } else {
-        assert.eq(firstOplogEnd,
-                  finalOplogEnd,
-                  "minValid was moved forward when missing document was not fetched");
     }
 
     assert.eq(0,

@@ -65,9 +65,9 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/initial_syncer.h"
 #include "mongo/db/repl/multiapplier.h"
-#include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/repl/replication_auth.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/session.h"
@@ -837,154 +837,6 @@ bool SyncTail::inShutdown() const {
     return _inShutdown;
 }
 
-BSONObj SyncTail::getMissingDoc(OperationContext* opCtx, const OplogEntry& oplogEntry) {
-    OplogReader missingObjReader;  // why are we using OplogReader to run a non-oplog query?
-
-    if (MONGO_FAIL_POINT(initialSyncHangBeforeGettingMissingDocument)) {
-        log() << "initial sync - initialSyncHangBeforeGettingMissingDocument fail point enabled. "
-                 "Blocking until fail point is disabled.";
-        while (MONGO_FAIL_POINT(initialSyncHangBeforeGettingMissingDocument)) {
-            mongo::sleepsecs(1);
-        }
-    }
-
-    auto source = _options.missingDocumentSourceForInitialSync;
-    invariant(source);
-
-    const int retryMax = 3;
-    for (int retryCount = 1; retryCount <= retryMax; ++retryCount) {
-        if (retryCount != 1) {
-            // if we are retrying, sleep a bit to let the network possibly recover
-            sleepsecs(retryCount * retryCount);
-        }
-        try {
-            bool ok = missingObjReader.connect(*source);
-            if (!ok) {
-                warning() << "network problem detected while connecting to the "
-                          << "sync source, attempt " << retryCount << " of " << retryMax;
-                continue;  // try again
-            }
-        } catch (const NetworkException&) {
-            warning() << "network problem detected while connecting to the "
-                      << "sync source, attempt " << retryCount << " of " << retryMax;
-            continue;  // try again
-        }
-
-        // get _id from oplog entry to create query to fetch document.
-        const auto idElem = oplogEntry.getIdElement();
-
-        if (idElem.eoo()) {
-            severe() << "cannot fetch missing document without _id field: "
-                     << redact(oplogEntry.toBSON());
-            fassertFailedNoTrace(28742);
-        }
-
-        BSONObj query = BSONObjBuilder().append(idElem).obj();
-        BSONObj missingObj;
-        auto nss = oplogEntry.getNss();
-        try {
-            auto uuid = oplogEntry.getUuid();
-            if (!uuid) {
-                missingObj = missingObjReader.findOne(nss.ns().c_str(), query);
-            } else {
-                auto dbname = nss.db();
-                // If a UUID exists for the command object, find the document by UUID.
-                missingObj = missingObjReader.findOneByUUID(dbname.toString(), *uuid, query);
-            }
-        } catch (const NetworkException&) {
-            warning() << "network problem detected while fetching a missing document from the "
-                      << "sync source, attempt " << retryCount << " of " << retryMax;
-            continue;  // try again
-        } catch (DBException& e) {
-            error() << "assertion fetching missing object: " << redact(e);
-            throw;
-        }
-
-        // success!
-        return missingObj;
-    }
-    // retry count exceeded
-    msgasserted(15916,
-                str::stream() << "Can no longer connect to initial sync source: "
-                              << source->toString());
-}
-
-void SyncTail::fetchAndInsertMissingDocument(OperationContext* opCtx,
-                                             const OplogEntry& oplogEntry) {
-    // Note that using the local UUID/NamespaceString mapping is sufficient for checking
-    // whether the collection is capped on the remote because convertToCapped creates a
-    // new collection with a different UUID.
-    const NamespaceString nss(parseUUIDOrNs(opCtx, oplogEntry));
-
-    {
-        // If the document is in a capped collection then it's okay for it to be missing.
-        AutoGetCollectionForRead autoColl(opCtx, nss);
-        Collection* const collection = autoColl.getCollection();
-        if (collection && collection->isCapped()) {
-            log() << "Not fetching missing document in capped collection (" << nss << ")";
-            return;
-        }
-    }
-
-    log() << "Fetching missing document: " << redact(oplogEntry.toBSON());
-    BSONObj missingObj = getMissingDoc(opCtx, oplogEntry);
-
-    if (missingObj.isEmpty()) {
-        BSONObj object2;
-        if (auto optionalObject2 = oplogEntry.getObject2()) {
-            object2 = *optionalObject2;
-        }
-        log() << "Missing document not found on source; presumably deleted later in oplog. o first "
-                 "field: "
-              << redact(oplogEntry.getObject()) << ", o2: " << redact(object2);
-
-        return;
-    }
-
-    return writeConflictRetry(opCtx, "fetchAndInsertMissingDocument", nss.ns(), [&] {
-        // Take an X lock on the database in order to preclude other modifications.
-        AutoGetDb autoDb(opCtx, nss.db(), MODE_X);
-        Database* const db = autoDb.getDb();
-
-        WriteUnitOfWork wunit(opCtx);
-
-        Collection* coll = nullptr;
-        auto uuid = oplogEntry.getUuid();
-        if (!uuid) {
-            if (!db) {
-                return;
-            }
-            coll = db->getOrCreateCollection(opCtx, nss);
-        } else {
-            // If the oplog entry has a UUID, use it to find the collection in which to insert the
-            // missing document.
-            auto& catalog = CollectionCatalog::get(opCtx);
-            coll = catalog.lookupCollectionByUUID(*uuid);
-            if (!coll) {
-                // TODO(SERVER-30819) insert this UUID into the missing UUIDs set.
-                return;
-            }
-        }
-
-        invariant(coll);
-
-        OpDebug* const nullOpDebug = nullptr;
-        Status status = coll->insertDocument(opCtx, InsertStatement(missingObj), nullOpDebug, true);
-        uassert(15917,
-                str::stream() << "Failed to insert missing document: " << status.toString(),
-                status.isOK());
-
-        LOG(1) << "Inserted missing document: " << redact(missingObj);
-
-        wunit.commit();
-
-        if (_observer) {
-            const OplogApplier::Observer::FetchInfo fetchInfo(oplogEntry, missingObj);
-            _observer->onMissingDocumentsFetchedAndInserted({fetchInfo});
-        }
-    });
-}
-
 // This free function is used by the writer threads to apply each op
 Status multiSyncApply(OperationContext* opCtx,
                       MultiApplier::OperationPtrs* ops,
@@ -1038,14 +890,10 @@ Status multiSyncApply(OperationContext* opCtx,
                     opCtx, &entry, oplogApplicationMode, stableTimestampForRecovery);
 
                 if (!status.isOK()) {
-                    // In initial sync, update operations can cause documents to be missed during
-                    // collection cloning. As a result, it is possible that a document that we
-                    // need to update is not present locally. In that case we fetch the document
-                    // from the sync source.
+                    // Tried to apply an update operation but the document is missing, there must be
+                    // a delete operation for the document later in the oplog.
                     if (status == ErrorCodes::UpdateOperationFailed &&
-                        st->getOptions().missingDocumentSourceForInitialSync) {
-                        // We might need to fetch the missing docs from the sync source.
-                        st->fetchAndInsertMissingDocument(opCtx, entry);
+                        oplogApplicationMode == OplogApplication::Mode::kInitialSync) {
                         continue;
                     }
 

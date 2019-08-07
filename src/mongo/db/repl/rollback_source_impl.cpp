@@ -31,10 +31,11 @@
 
 #include "mongo/db/repl/rollback_source_impl.h"
 
+#include "mongo/client/dbclient_connection.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/oplogreader.h"
+#include "mongo/db/repl/replication_auth.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,27 +27,20 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
-
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/oplogreader.h"
+#include "mongo/db/repl/replication_auth.h"
 
 #include <string>
 
 #include "mongo/client/authenticate.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/executor/network_interface.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {
 namespace {
 
 // Gets the singleton AuthorizationManager object for this server process
-//
-// TODO (SERVER-37563): Pass the service context instead of calling getGlobalServiceContext.
 AuthorizationManager* getGlobalAuthorizationManager() {
     AuthorizationManager* globalAuthManager = AuthorizationManager::get(getGlobalServiceContext());
     fassert(16842, globalAuthManager != nullptr);
@@ -62,48 +55,6 @@ bool replAuthenticate(DBClientBase* conn) {
     if (getGlobalAuthorizationManager()->isAuthEnabled())
         return false;
     return true;
-}
-
-const Seconds OplogReader::kSocketTimeout(30);
-
-OplogReader::OplogReader() {
-    _tailingQueryOptions = QueryOption_SlaveOk;
-    _tailingQueryOptions |= QueryOption_CursorTailable | QueryOption_OplogReplay;
-
-    /* TODO: slaveOk maybe shouldn't use? */
-    _tailingQueryOptions |= QueryOption_AwaitData;
-}
-
-bool OplogReader::connect(const HostAndPort& host) {
-    if (conn() == nullptr || _host != host) {
-        resetConnection();
-        _conn = std::shared_ptr<DBClientConnection>(
-            new DBClientConnection(false, durationCount<Seconds>(kSocketTimeout)));
-
-        std::string errmsg;
-        if (!_conn->connect(host, StringData(), errmsg) || !replAuthenticate(_conn.get())) {
-            resetConnection();
-            error() << errmsg;
-            return false;
-        }
-        _conn->setTags(transport::Session::kKeepOpen);
-        _host = host;
-    }
-    return true;
-}
-
-void OplogReader::tailCheck() {
-    if (cursor.get() && cursor->isDead()) {
-        log() << "old cursor isDead, will initiate a new one" << std::endl;
-        resetCursor();
-    }
-}
-
-void OplogReader::tailingQuery(const char* ns, const BSONObj& query) {
-    verify(!haveCursor());
-    LOG(2) << ns << ".find(" << redact(query) << ')';
-    cursor.reset(
-        _conn->query(NamespaceString(ns), query, 0, 0, nullptr, _tailingQueryOptions).release());
 }
 
 }  // namespace repl

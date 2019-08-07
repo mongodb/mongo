@@ -94,7 +94,6 @@ void SyncTailOpObserver::onCreateCollection(OperationContext* opCtx,
 OplogApplier::Options SyncTailTest::makeInitialSyncOptions() {
     OplogApplier::Options options(OplogApplication::Mode::kInitialSync);
     options.allowNamespaceNotFoundErrorsOnCrudOps = true;
-    options.missingDocumentSourceForInitialSync = HostAndPort("localhost", 123);
     return options;
 }
 

@@ -61,15 +61,13 @@ env.Library(
 )
 
 env.Library(
-    target='oplogreader',
+    target='replication_auth',
     source=[
-        'oplogreader.cpp',
+        'replication_auth.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/client/clientdriver_network',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
-        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/mongo/client/authentication',
     ],
 )
 
@@ -92,7 +90,6 @@ env.Library(
     LIBDEPS=[
         'oplog',
         'oplog_interface_remote',
-        'oplogreader',
         'repl_coordinator_interface',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/background',
@@ -104,6 +101,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/util/fail_point',
     ],
+    LIBDEPS_PRIVATE=[
+        'replication_auth',
+    ]
 )
 
 env.Library(
@@ -528,13 +528,13 @@ env.Library(
         'oplog',
         'oplog_application_interface',
         'oplog_entry',
-        'oplogreader',
         'repl_coordinator_interface',
         'repl_settings',
         'storage_interface',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/mongod_fsync',
+        'replication_auth',
     ],
 )
 
@@ -927,7 +927,6 @@ env.Library(
     ],
     LIBDEPS=[
         'task_runner',
-        'oplogreader',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/fetcher',
         '$BUILD_DIR/mongo/client/remote_command_retry_scheduler',
@@ -940,6 +939,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'repl_server_parameters',
+        'replication_auth',
     ],
 )
 
@@ -1118,7 +1118,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/query_exec',
         "$BUILD_DIR/mongo/util/fail_point",
         'oplog',
-        'oplogreader',
         'repl_coordinator_interface',
         'repl_settings',
         'replica_set_messages',
@@ -1127,6 +1126,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/server_status',
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/transport/message_compressor',
+        'replication_auth',
         'split_horizon',
     ],
 )

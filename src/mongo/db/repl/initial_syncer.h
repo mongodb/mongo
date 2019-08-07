@@ -68,10 +68,6 @@ MONGO_FAIL_POINT_DECLARE(failInitSyncWithBufferedEntriesLeft);
 // Failpoint which causes the initial sync function to hang before copying databases.
 MONGO_FAIL_POINT_DECLARE(initialSyncHangBeforeCopyingDatabases);
 
-// Failpoint which causes the initial sync function to hang before calling shouldRetry on a failed
-// operation.
-MONGO_FAIL_POINT_DECLARE(initialSyncHangBeforeGettingMissingDocument);
-
 // Failpoint which stops the applier.
 MONGO_FAIL_POINT_DECLARE(rsSyncApplyStop);
 
@@ -94,11 +90,9 @@ struct InitialSyncerOptions {
     /** Function to sets this node into a specific follower mode. */
     using SetFollowerModeFn = std::function<bool(const MemberState&)>;
 
-    // Error and retry values
+    // Retry values
     Milliseconds syncSourceRetryWait{1000};
     Milliseconds initialSyncRetryWait{1000};
-    Seconds blacklistSyncSourcePenaltyForNetworkConnectionError{10};
-    Minutes blacklistSyncSourcePenaltyForOplogStartMissing{10};
 
     // InitialSyncer waits this long before retrying getApplierBatchCallback() if there are
     // currently no operations available to apply or if the 'rsSyncApplyStop' failpoint is active.
@@ -326,28 +320,19 @@ private:
      *         |            (no ops to apply) |       | (have ops to apply)
      *         |                              |       |
      *         |                              |       V
-     *         |                              |   _getNextApplierBatchCallback()<-----+
-     *         |                              |       |                       ^       |
-     *         |                              |       |                       |       |
-     *         |                              |       |      (no docs fetched |       |
-     *         |                              |       |       and end ts not  |       |
-     *         |                              |       |       reached)        |       |
-     *         |                              |       |                       |       |
-     *         |                              |       V                       |       |
-     *         |                              |   _multiApplierCallback()-----+       |
-     *         |                              |       |       |                       |
-     *         |                              |       |       |                       |
-     *         |                              |       |       | (docs fetched)        | (end ts not
-     *         |                              |       |       |                       |  reached)
-     *         |                              |       |       V                       |
-     *         |                              |       |   _lastOplogEntryFetcherCallbackAfter-
-     *         |                              |       |       FetchingMissingDocuments()
-     *         |                              |       |       |
-     *         |                              |       |       |
-     *         |                           (reached end timestamp)
-     *         |                              |       |       |
-     *         |                              V       V       V
-     *         |                          _rollbackCheckerCheckForRollbackCallback()
+     *         |                              |   _getNextApplierBatchCallback()
+     *         |                              |       |                       ^
+     *         |                              |       |                       |
+     *         |                              |       |             (end ts not reached)
+     *         |                              |       |                       |
+     *         |                              |       V                       |
+     *         |                              |   _multiApplierCallback()-----+
+     *         |                              |       |
+     *         |                              |       |
+     *         |                        (reached end timestamp)
+     *         |                              |       |
+     *         |                              V       V
+     *         |                _rollbackCheckerCheckForRollbackCallback()
      *         |                              |
      *         |                              |
      *         +------------------------------+
@@ -472,16 +457,6 @@ private:
                                OpTimeAndWallTime lastApplied,
                                std::uint32_t numApplied,
                                std::shared_ptr<OnCompletionGuard> onCompletionGuard);
-
-    /**
-     * Callback for third '_lastOplogEntryFetcher' callback. This is scheduled after MultiApplier
-     * completed successfully and missing documents were fetched from the sync source while
-     * DataReplicatorExternalState::_multiApply() was processing operations.
-     * This callback will update InitialSyncState::stopTimestamp on success.
-     */
-    void _lastOplogEntryFetcherCallbackAfterFetchingMissingDocuments(
-        const StatusWith<Fetcher::QueryResponse>& result,
-        std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
     /**
      * Callback for rollback checker's last replSetGetRBID command after cloning data and applying
@@ -650,7 +625,6 @@ private:
     OpTime _lastFetched;                                   // (MX)
     OpTimeAndWallTime _lastApplied;                        // (MX)
     std::unique_ptr<OplogBuffer> _oplogBuffer;             // (M)
-    std::unique_ptr<OplogApplier::Observer> _observer;     // (S)
     std::unique_ptr<OplogApplier> _oplogApplier;           // (M)
 
     // Used to signal changes in _state.

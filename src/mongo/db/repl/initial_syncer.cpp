@@ -88,10 +88,6 @@ MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeCopyingDatabases);
 // Failpoint which causes the initial sync function to hang before finishing.
 MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeFinish);
 
-// Failpoint which causes the initial sync function to hang before calling shouldRetry on a failed
-// operation.
-MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeGettingMissingDocument);
-
 // Failpoint which causes the initial sync function to hang before creating the oplog.
 MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeCreatingOplog);
 
@@ -175,24 +171,6 @@ StatusWith<OpTimeAndWallTime> parseOpTimeAndWallTime(const QueryResponseStatus& 
     return result;
 }
 
-/**
- * OplogApplier observer that updates 'fetchCount' when applying operations for each writer thread.
- */
-class InitialSyncApplyObserver : public OplogApplier::Observer {
-public:
-    explicit InitialSyncApplyObserver(AtomicWord<unsigned>* fetchCount) : _fetchCount(fetchCount) {}
-
-    // OplogApplier::Observer functions
-    void onBatchBegin(const OplogApplier::Operations&) final {}
-    void onBatchEnd(const StatusWith<OpTime>&, const OplogApplier::Operations&) final {}
-    void onMissingDocumentsFetchedAndInserted(const std::vector<FetchInfo>& docs) final {
-        _fetchCount->fetchAndAdd(docs.size());
-    }
-
-private:
-    AtomicWord<unsigned>* const _fetchCount;
-};
-
 }  // namespace
 
 InitialSyncer::InitialSyncer(
@@ -209,8 +187,7 @@ InitialSyncer::InitialSyncer(
       _writerPool(writerPool),
       _storage(storage),
       _replicationProcess(replicationProcess),
-      _onCompletion(onCompletion),
-      _observer(std::make_unique<InitialSyncApplyObserver>(&_fetchCount)) {
+      _onCompletion(onCompletion) {
     uassert(ErrorCodes::BadValue, "task executor cannot be null", _exec);
     uassert(ErrorCodes::BadValue, "invalid storage interface", _storage);
     uassert(ErrorCodes::BadValue, "invalid replication process", _replicationProcess);
@@ -370,7 +347,6 @@ void InitialSyncer::_appendInitialSyncProgressMinimal_inlock(BSONObjBuilder* bob
     if (!_initialSyncState) {
         return;
     }
-    bob->appendNumber("fetchedMissingDocs", _initialSyncState->fetchedMissingDocs);
     bob->appendNumber("appliedOps", _initialSyncState->appliedOps);
     if (!_initialSyncState->beginApplyingTimestamp.isNull()) {
         bob->append("initialSyncOplogStart", _initialSyncState->beginApplyingTimestamp);
@@ -908,10 +884,13 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
     auto consistencyMarkers = _replicationProcess->getConsistencyMarkers();
     OplogApplier::Options options(OplogApplication::Mode::kInitialSync);
     options.allowNamespaceNotFoundErrorsOnCrudOps = true;
-    options.missingDocumentSourceForInitialSync = _syncSource;
     options.beginApplyingOpTime = lastOpTime;
-    _oplogApplier = _dataReplicatorExternalState->makeOplogApplier(
-        _oplogBuffer.get(), _observer.get(), consistencyMarkers, _storage, options, _writerPool);
+    _oplogApplier = _dataReplicatorExternalState->makeOplogApplier(_oplogBuffer.get(),
+                                                                   &noopOplogApplierObserver,
+                                                                   consistencyMarkers,
+                                                                   _storage,
+                                                                   options,
+                                                                   _writerPool);
 
     const auto beginApplyingTimestamp = lastOpTime.getTimestamp();
     _initialSyncState->beginApplyingTimestamp = beginApplyingTimestamp;
@@ -1289,56 +1268,6 @@ void InitialSyncer::_multiApplierCallback(const Status& multiApplierStatus,
     auto opCtx = makeOpCtx();
     const bool orderedCommit = true;
     _storage->oplogDiskLocRegister(opCtx.get(), lastAppliedOpTime.getTimestamp(), orderedCommit);
-
-    auto fetchCount = _fetchCount.load();
-    if (fetchCount > 0) {
-        _initialSyncState->fetchedMissingDocs += fetchCount;
-        _fetchCount.store(0);
-        status = _scheduleLastOplogEntryFetcher_inlock(
-            [=](const StatusWith<mongo::Fetcher::QueryResponse>& response,
-                mongo::Fetcher::NextAction*,
-                mongo::BSONObjBuilder*) {
-                return _lastOplogEntryFetcherCallbackAfterFetchingMissingDocuments(
-                    response, onCompletionGuard);
-            });
-        if (!status.isOK()) {
-            onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
-            return;
-        }
-        return;
-    }
-
-    _checkApplierProgressAndScheduleGetNextApplierBatch_inlock(lock, onCompletionGuard);
-}
-
-void InitialSyncer::_lastOplogEntryFetcherCallbackAfterFetchingMissingDocuments(
-    const StatusWith<Fetcher::QueryResponse>& result,
-    std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    auto status = _checkForShutdownAndConvertStatus_inlock(
-        result.getStatus(), "error getting last oplog entry after fetching missing documents");
-    if (!status.isOK()) {
-        error() << "Failed to get new minValid from source " << _syncSource << " due to '"
-                << redact(status) << "'";
-        onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
-        return;
-    }
-
-    auto&& optimeStatus = parseOpTimeAndWallTime(result);
-    if (!optimeStatus.isOK()) {
-        error() << "Failed to parse new minValid from source " << _syncSource << " due to '"
-                << redact(optimeStatus.getStatus()) << "'";
-        onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, optimeStatus.getStatus());
-        return;
-    }
-    auto&& optime = optimeStatus.getValue().opTime;
-
-    const auto newOplogEnd = optime.getTimestamp();
-    LOG(2) << "Pushing back minValid from " << _initialSyncState->stopTimestamp << " to "
-           << newOplogEnd;
-    _initialSyncState->stopTimestamp = newOplogEnd;
-
-    // Get another batch to apply.
     _checkApplierProgressAndScheduleGetNextApplierBatch_inlock(lock, onCompletionGuard);
 }
 

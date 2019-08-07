@@ -145,7 +145,6 @@ class DoNothingOplogApplierObserver : public repl::OplogApplier::Observer {
 public:
     void onBatchBegin(const repl::OplogApplier::Operations&) final {}
     void onBatchEnd(const StatusWith<repl::OpTime>&, const repl::OplogApplier::Operations&) final {}
-    void onMissingDocumentsFetchedAndInserted(const std::vector<FetchInfo>&) final {}
 };
 
 class StorageTimestampTest {
@@ -1374,7 +1373,6 @@ public:
         auto writerPool = repl::OplogApplier::makeWriterPool();
         repl::OplogApplier::Options options(repl::OplogApplication::Mode::kInitialSync);
         options.allowNamespaceNotFoundErrorsOnCrudOps = true;
-        options.missingDocumentSourceForInitialSync = HostAndPort("localhost", 123);
 
         repl::OplogApplierImpl oplogApplier(
             nullptr,  // task executor. not required for multiApply().

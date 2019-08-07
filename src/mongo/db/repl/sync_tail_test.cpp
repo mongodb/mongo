@@ -101,65 +101,20 @@ OplogEntry makeOplogEntry(OpTypeEnum opType, NamespaceString nss, OptionalCollec
 }
 
 /**
- * Testing-only SyncTail that returns user-provided "document" for getMissingDoc().
+ * Testing-only SyncTail.
  */
-class SyncTailWithLocalDocumentFetcher : public SyncTail, OplogApplier::Observer {
+class SyncTailForTest : public SyncTail {
 public:
-    SyncTailWithLocalDocumentFetcher(const BSONObj& document);
-    BSONObj getMissingDoc(OperationContext* opCtx, const OplogEntry& oplogEntry) override;
-
-    // OplogApplier::Observer functions
-    void onBatchBegin(const OplogApplier::Operations&) final {}
-    void onBatchEnd(const StatusWith<OpTime>&, const OplogApplier::Operations&) final {}
-    void onMissingDocumentsFetchedAndInserted(const std::vector<FetchInfo>& docs) final {
-        numFetched += docs.size();
-    }
-
-    std::size_t numFetched = 0U;
-
-private:
-    BSONObj _document;
+    SyncTailForTest();
 };
 
-/**
- * Testing-only SyncTail that checks the operation context in fetchAndInsertMissingDocument().
- */
-class SyncTailWithOperationContextChecker : public SyncTail {
-public:
-    SyncTailWithOperationContextChecker();
-    void fetchAndInsertMissingDocument(OperationContext* opCtx,
-                                       const OplogEntry& oplogEntry) override;
-    bool called = false;
-};
-
-SyncTailWithLocalDocumentFetcher::SyncTailWithLocalDocumentFetcher(const BSONObj& document)
-    : SyncTail(this,     // observer
-               nullptr,  // consistency markers
-               nullptr,  // storage interface
-               SyncTail::MultiSyncApplyFunc(),
-               nullptr,  // writer pool
-               SyncTailTest::makeInitialSyncOptions()),
-      _document(document) {}
-
-BSONObj SyncTailWithLocalDocumentFetcher::getMissingDoc(OperationContext*, const OplogEntry&) {
-    return _document;
-}
-
-SyncTailWithOperationContextChecker::SyncTailWithOperationContextChecker()
+SyncTailForTest::SyncTailForTest()
     : SyncTail(nullptr,  // observer
                nullptr,  // consistency markers
                nullptr,  // storage interface
                SyncTail::MultiSyncApplyFunc(),
                nullptr,  // writer pool
                SyncTailTest::makeInitialSyncOptions()) {}
-
-void SyncTailWithOperationContextChecker::fetchAndInsertMissingDocument(OperationContext* opCtx,
-                                                                        const OplogEntry&) {
-    ASSERT_FALSE(opCtx->writesAreReplicated());
-    ASSERT_FALSE(opCtx->lockState()->shouldConflictWithSecondaryBatchApplication());
-    ASSERT_TRUE(documentValidationDisabled(opCtx));
-    called = true;
-}
 
 /**
  * Creates collection options suitable for oplog.
@@ -1769,8 +1724,7 @@ TEST_F(SyncTailTest, MultiSyncApplyFallsBackOnApplyingInsertsIndividuallyWhenGro
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyIgnoresUpdateOperationIfDocumentIsMissingFromSyncSource) {
-    BSONObj emptyDoc;
-    SyncTailWithLocalDocumentFetcher syncTail(emptyDoc);
+    SyncTailForTest syncTail;
     NamespaceString nss("test.t");
     {
         Lock::GlobalWrite globalLock(_opCtx.get());
@@ -1786,17 +1740,14 @@ TEST_F(SyncTailTest, MultiSyncApplyIgnoresUpdateOperationIfDocumentIsMissingFrom
     WorkerMultikeyPathInfo pathInfo;
     ASSERT_OK(multiSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
 
-    // Since the missing document is not found on the sync source, the collection referenced by
-    // the failed operation should not be automatically created.
+    // Since the document was missing when we cloned data from the sync source, the collection
+    // referenced by the failed operation should not be automatically created.
     ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx.get(), nss).getCollection());
-
-    // Fetch count should remain zero if we failed to copy the missing document.
-    ASSERT_EQUALS(syncTail.numFetched, 0U);
 }
 
 TEST_F(SyncTailTest, MultiSyncApplySkipsDocumentOnNamespaceNotFoundDuringInitialSync) {
     BSONObj emptyDoc;
-    SyncTailWithLocalDocumentFetcher syncTail(emptyDoc);
+    SyncTailForTest syncTail;
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
     NamespaceString badNss("local." + _agent.getSuiteName() + "_" + _agent.getTestName() + "bad");
     auto doc1 = BSON("_id" << 1);
@@ -1809,7 +1760,6 @@ TEST_F(SyncTailTest, MultiSyncApplySkipsDocumentOnNamespaceNotFoundDuringInitial
     MultiApplier::OperationPtrs ops = {&op0, &op1, &op2, &op3};
     WorkerMultikeyPathInfo pathInfo;
     ASSERT_OK(multiSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
-    ASSERT_EQUALS(syncTail.numFetched, 0U);
 
     CollectionReader collectionReader(_opCtx.get(), nss);
     ASSERT_BSONOBJ_EQ(doc1, unittest::assertGet(collectionReader.next()));
@@ -1819,7 +1769,7 @@ TEST_F(SyncTailTest, MultiSyncApplySkipsDocumentOnNamespaceNotFoundDuringInitial
 
 TEST_F(SyncTailTest, MultiSyncApplySkipsIndexCreationOnNamespaceNotFoundDuringInitialSync) {
     BSONObj emptyDoc;
-    SyncTailWithLocalDocumentFetcher syncTail(emptyDoc);
+    SyncTailForTest syncTail;
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
     NamespaceString badNss("local." + _agent.getSuiteName() + "_" + _agent.getTestName() + "bad");
     auto doc1 = BSON("_id" << 1);
@@ -1834,7 +1784,6 @@ TEST_F(SyncTailTest, MultiSyncApplySkipsIndexCreationOnNamespaceNotFoundDuringIn
     MultiApplier::OperationPtrs ops = {&op0, &op1, &op2, &op3};
     WorkerMultikeyPathInfo pathInfo;
     ASSERT_OK(multiSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
-    ASSERT_EQUALS(syncTail.numFetched, 0U);
 
     CollectionReader collectionReader(_opCtx.get(), nss);
     ASSERT_BSONOBJ_EQ(doc1, unittest::assertGet(collectionReader.next()));
@@ -1843,26 +1792,6 @@ TEST_F(SyncTailTest, MultiSyncApplySkipsIndexCreationOnNamespaceNotFoundDuringIn
 
     // 'badNss' collection should not be implicitly created while attempting to create an index.
     ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx.get(), badNss).getCollection());
-}
-
-TEST_F(SyncTailTest, MultiSyncApplyFetchesMissingDocumentIfDocumentIsAvailableFromSyncSource) {
-    SyncTailWithLocalDocumentFetcher syncTail(BSON("_id" << 0 << "x" << 1));
-    NamespaceString nss("test.t");
-    createCollection(_opCtx.get(), nss, {});
-    auto updatedDocument = BSON("_id" << 0 << "x" << 1);
-    auto op = makeUpdateDocumentOplogEntry(
-        {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), updatedDocument);
-    MultiApplier::OperationPtrs ops = {&op};
-    WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
-    ASSERT_EQUALS(syncTail.numFetched, 1U);
-
-    // The collection referenced by "ns" in the failed operation is automatically created to hold
-    // the missing document fetched from the sync source. We verify the contents of the collection
-    // with the CollectionReader class.
-    CollectionReader collectionReader(_opCtx.get(), nss);
-    ASSERT_BSONOBJ_EQ(updatedDocument, unittest::assertGet(collectionReader.next()));
-    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, collectionReader.next().getStatus());
 }
 
 namespace {

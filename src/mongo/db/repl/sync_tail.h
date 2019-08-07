@@ -192,23 +192,6 @@ public:
     using BatchLimits = OplogApplier::BatchLimits;
 
     /**
-     * Fetch a single document referenced in the operation from the sync source.
-     *
-     * The sync source is specified at construction in
-     * OplogApplier::Options::missingDocumentSourceForInitialSync.
-     */
-    virtual BSONObj getMissingDoc(OperationContext* opCtx, const OplogEntry& oplogEntry);
-
-    /**
-     * If an update fails, fetches the missing document and inserts it into the local collection.
-     *
-     * Calls OplogApplier::Observer::onMissingDocumentsFetchedAndInserted() if the document was
-     * fetched and inserted successfully.
-     */
-    virtual void fetchAndInsertMissingDocument(OperationContext* opCtx,
-                                               const OplogEntry& oplogEntry);
-
-    /**
      * Applies a batch of oplog entries by writing the oplog entries to the local oplog and then
      * using a set of threads to apply the operations. It will only apply (but will
      * still write to the oplog) oplog entries with a timestamp greater than or equal to the

@@ -4,29 +4,24 @@
  * 2) copies all non-local databases from the source; and
  * 3) fetches and applies operations from the source after op_start1.
  *
- * This test updates and deletes a document on the source between phases 1 and 2. The
- * secondary will initially fail to apply the update operation in phase 3 and subsequently have
- * to attempt to check the source for a new copy of the document. The absence of the document on
- * the source indicates that the source is free to ignore the failed update operation.
- *
+ * This test updates and deletes a document on the source between phases 1 and 2. The secondary will
+ * fail to apply the update operation in phase 3 but initial sync completes nevertheless. The
+ * absence of the document on the source indicates that the source is free to ignore the failed
+ * update operation.
  */
 
 (function() {
 load("jstests/replsets/libs/initial_sync_update_missing_doc.js");
 load("jstests/libs/check_log.js");
 
-const name = 'initial_sync_update_missing_doc1';
-const replSet = new ReplSetTest({
-    name: name,
-    nodes: 1,
-});
+const replSet = new ReplSetTest({nodes: 1});
 
 replSet.startSet();
 replSet.initiate();
 const primary = replSet.getPrimary();
 const dbName = 'test';
-
-var coll = primary.getDB(dbName).getCollection(name);
+const collectionName = jsTestName();
+const coll = primary.getDB(dbName).getCollection(collectionName);
 assert.commandWorked(coll.insert({_id: 0, x: 1}));
 
 // Add a secondary node with priority: 0 and votes: 0 so that we prevent elections while
@@ -38,16 +33,8 @@ const secondary = reInitiateSetWithSecondary(replSet, secondaryConfig);
 
 // Update and remove document on primary.
 updateRemove(coll, {_id: 0});
-
 turnOffHangBeforeCopyingDatabasesFailPoint(secondary);
-
-var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
-assert.eq(res.initialSyncStatus.fetchedMissingDocs, 0);
-var firstOplogEnd = res.initialSyncStatus.initialSyncOplogEnd;
-
-turnOffHangBeforeGettingMissingDocFailPoint(primary, secondary, name, 0 /* numFetched */);
-
-finishAndValidate(replSet, name, firstOplogEnd, 0 /* numFetched */, 0 /* numDocuments */);
+finishAndValidate(replSet, collectionName, 0 /* numDocuments */);
 
 replSet.stopSet();
 })();

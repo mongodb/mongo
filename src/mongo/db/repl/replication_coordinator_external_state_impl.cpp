@@ -133,13 +133,6 @@ ServerStatusMetricField<Counter64> displayBufferSize("repl.buffer.sizeBytes", &b
 ServerStatusMetricField<Counter64> displayBufferMaxSize("repl.buffer.maxSizeBytes",
                                                         &bufferGauge.maxSize);
 
-class NoopOplogApplierObserver : public repl::OplogApplier::Observer {
-public:
-    void onBatchBegin(const repl::OplogApplier::Operations&) final {}
-    void onBatchEnd(const StatusWith<repl::OpTime>&, const repl::OplogApplier::Operations&) final {}
-    void onMissingDocumentsFetchedAndInserted(const std::vector<FetchInfo>&) final {}
-} noopOplogApplierObserver;
-
 /**
  * Returns new thread pool for thread pool task executor.
  */
@@ -222,8 +215,7 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
 
     // Using noop observer now that BackgroundSync no longer implements the OplogApplier::Observer
     // interface. During steady state replication, there is no need to log details on every batch
-    // we apply (recovery); or track missing documents that are fetched from the sync source
-    // (initial sync).
+    // we apply.
     _oplogApplier = std::make_unique<OplogApplierImpl>(
         _oplogApplierTaskExecutor.get(),
         _oplogBuffer.get(),
