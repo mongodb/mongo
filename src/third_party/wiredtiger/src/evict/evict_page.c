@@ -470,46 +470,11 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
 	WT_REF *child;
 	bool active;
 
-	/*
-	 * There may be cursors in the tree walking the list of child pages.
-	 * The parent is locked, so all we care about is cursors already in the
-	 * child pages, no thread can enter them. Any cursor moving through the
-	 * child pages must be hazard pointer coupling between pages, where the
-	 * page on which it currently has a hazard pointer must be in a state
-	 * other than on-disk. Walk the child list forward, then backward, to
-	 * ensure we don't race with a cursor walking in the opposite direction
-	 * from our check.
-	 */
-	WT_INTL_FOREACH_BEGIN(session, parent->page, child) {
-		switch (child->state) {
-		case WT_REF_DISK:		/* On-disk */
-		case WT_REF_DELETED:		/* On-disk, deleted */
-		case WT_REF_LOOKASIDE:		/* On-disk, lookaside */
-			break;
-		default:
-			return (__wt_set_return(session, EBUSY));
-		}
-	} WT_INTL_FOREACH_END;
-	WT_INTL_FOREACH_REVERSE_BEGIN(session, parent->page, child) {
-		switch (child->state) {
-		case WT_REF_DISK:		/* On-disk */
-		case WT_REF_DELETED:		/* On-disk, deleted */
-		case WT_REF_LOOKASIDE:		/* On-disk, lookaside */
-			break;
-		default:
-			return (__wt_set_return(session, EBUSY));
-		}
-	} WT_INTL_FOREACH_END;
-
-	/*
-	 * The fast check is done and there are no cursors in the child pages.
-	 * Make sure the child WT_REF structures pages can be discarded.
-	 */
 	WT_INTL_FOREACH_BEGIN(session, parent->page, child) {
 		switch (child->state) {
 		case WT_REF_DISK:		/* On-disk */
 			break;
-		case WT_REF_DELETED:		/* On-disk, deleted */
+		case WT_REF_DELETED:		/* Deleted */
 			/*
 			 * If the child page was part of a truncate,
 			 * transaction rollback might switch this page into its
@@ -533,7 +498,7 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
 			if (active)
 				return (__wt_set_return(session, EBUSY));
 			break;
-		case WT_REF_LOOKASIDE:		/* On-disk, lookaside */
+		case WT_REF_LOOKASIDE:
 			/*
 			 * If the lookaside history is obsolete, the reference
 			 * can be ignored.
@@ -555,8 +520,9 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
  *	for conditions that would block its eviction.
  */
 static int
-__evict_review(WT_SESSION_IMPL *session,
-    WT_REF *ref, uint32_t evict_flags, bool *inmem_splitp)
+__evict_review(
+    WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags,
+	bool *inmem_splitp)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;

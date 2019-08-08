@@ -21,13 +21,13 @@ typedef enum {
  */
 static inline bool
 __wt_ref_cas_state_int(WT_SESSION_IMPL *session, WT_REF *ref,
-    uint32_t old_state, uint32_t new_state, const char *func, int line)
+    uint32_t old_state, uint32_t new_state, const char *file, int line)
 {
 	bool cas_result;
 
 	/* Parameters that are used in a macro for diagnostic builds */
 	WT_UNUSED(session);
-	WT_UNUSED(func);
+	WT_UNUSED(file);
 	WT_UNUSED(line);
 
 	cas_result = __wt_atomic_casv32(&ref->state, old_state, new_state);
@@ -39,7 +39,7 @@ __wt_ref_cas_state_int(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * updated.
 	 */
 	 if (cas_result)
-		WT_REF_SAVE_STATE(ref, new_state, func, line);
+		WT_REF_SAVE_STATE(ref, new_state, file, line);
 #endif
 	return (cas_result);
 }
