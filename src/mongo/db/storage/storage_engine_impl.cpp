@@ -907,33 +907,34 @@ void StorageEngineImpl::TimestampMonitor::startup() {
                 checkpoint = _engine->getCheckpointTimestamp();
                 oldest = _engine->getOldestTimestamp();
                 stable = _engine->getStableTimestamp();
-            } catch (const ExceptionFor<ErrorCodes::InterruptedAtShutdown>&) {
+
+                Timestamp minOfCheckpointAndOldest =
+                    (checkpoint.isNull() || (checkpoint > oldest)) ? oldest : checkpoint;
+
+                // Notify listeners if the timestamps changed.
+                if (_currentTimestamps.checkpoint != checkpoint) {
+                    _currentTimestamps.checkpoint = checkpoint;
+                    notifyAll(TimestampType::kCheckpoint, checkpoint);
+                }
+
+                if (_currentTimestamps.oldest != oldest) {
+                    _currentTimestamps.oldest = oldest;
+                    notifyAll(TimestampType::kOldest, oldest);
+                }
+
+                if (_currentTimestamps.stable != stable) {
+                    _currentTimestamps.stable = stable;
+                    notifyAll(TimestampType::kStable, stable);
+                }
+
+                if (_currentTimestamps.minOfCheckpointAndOldest != minOfCheckpointAndOldest) {
+                    _currentTimestamps.minOfCheckpointAndOldest = minOfCheckpointAndOldest;
+                    notifyAll(TimestampType::kMinOfCheckpointAndOldest, minOfCheckpointAndOldest);
+                }
+            } catch (const ExceptionFor<ErrorCodes::InterruptedAtShutdown>& ex) {
                 // If we're interrupted at shutdown, it's fine to give up on future notifications
+                log() << "Timestamp monitor is stopping due to: " + ex.reason();
                 return;
-            }
-
-            Timestamp minOfCheckpointAndOldest =
-                (checkpoint.isNull() || (checkpoint > oldest)) ? oldest : checkpoint;
-
-            // Notify listeners if the timestamps changed.
-            if (_currentTimestamps.checkpoint != checkpoint) {
-                _currentTimestamps.checkpoint = checkpoint;
-                notifyAll(TimestampType::kCheckpoint, checkpoint);
-            }
-
-            if (_currentTimestamps.oldest != oldest) {
-                _currentTimestamps.oldest = oldest;
-                notifyAll(TimestampType::kOldest, oldest);
-            }
-
-            if (_currentTimestamps.stable != stable) {
-                _currentTimestamps.stable = stable;
-                notifyAll(TimestampType::kStable, stable);
-            }
-
-            if (_currentTimestamps.minOfCheckpointAndOldest != minOfCheckpointAndOldest) {
-                _currentTimestamps.minOfCheckpointAndOldest = minOfCheckpointAndOldest;
-                notifyAll(TimestampType::kMinOfCheckpointAndOldest, minOfCheckpointAndOldest);
             }
         },
         Seconds(1));
