@@ -36,6 +36,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <random>
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/client/connpool.h"
@@ -1016,7 +1017,7 @@ SetState::SetState(StringData name, const std::set<HostAndPort>& seedNodes)
       consecutiveFailedScans(0),
       seedNodes(seedNodes),
       latencyThresholdMicros(serverGlobalParams.defaultLocalThresholdMillis * 1000),
-      rand(int64_t(time(0))),
+      rand(std::random_device()()),
       roundRobin(0) {
     uassert(13642, "Replica set seed list can't be empty", !seedNodes.empty());
 
