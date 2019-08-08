@@ -66,8 +66,8 @@ public:
      * more multikey metadata keys have been generated; that is, if the 'multikeyMetadataKeys'
      * vector is non-empty.
      */
-    bool shouldMarkIndexAsMultikey(const std::vector<BSONObj>& keys,
-                                   const std::vector<BSONObj>& multikeyMetadataKeys,
+    bool shouldMarkIndexAsMultikey(const std::vector<KeyString::Value>& keys,
+                                   const std::vector<KeyString::Value>& multikeyMetadataKeys,
                                    const MultikeyPaths& multikeyPaths) const final;
 
     /**
@@ -94,9 +94,10 @@ public:
 
 private:
     void doGetKeys(const BSONObj& obj,
-                   BSONObjSet* keys,
-                   BSONObjSet* multikeyMetadataKeys,
-                   MultikeyPaths* multikeyPaths) const final;
+                   KeyStringSet* keys,
+                   KeyStringSet* multikeyMetadataKeys,
+                   MultikeyPaths* multikeyPaths,
+                   boost::optional<RecordId> id) const final;
 
     std::set<FieldRef> _getMultikeyPathSet(OperationContext* opCtx,
                                            const IndexBounds& indexBounds,

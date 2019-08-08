@@ -250,7 +250,13 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
     const RecordId opRecordId = RecordId(operation["recordId"].Long());
     const Op opType =
         (strcmp(operation.getStringField("op"), "i") == 0) ? Op::kInsert : Op::kDelete;
-    const BSONObjSet keySet = SimpleBSONObjComparator::kInstance.makeBSONObjSet({key});
+
+    KeyString::HeapBuilder keyString(
+        _indexCatalogEntry->accessMethod()->getSortedDataInterface()->getKeyStringVersion(),
+        key,
+        _indexCatalogEntry->ordering(),
+        opRecordId);
+    const KeyStringSet keySet{std::move(keyString.release())};
 
     auto accessMethod = _indexCatalogEntry->accessMethod();
     if (opType == Op::kInsert) {
@@ -360,8 +366,8 @@ boost::optional<MultikeyPaths> IndexBuildInterceptor::getMultikeyPaths() const {
 }
 
 Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
-                                        const std::vector<BSONObj>& keys,
-                                        const BSONObjSet& multikeyMetadataKeys,
+                                        const std::vector<KeyString::Value>& keys,
+                                        const KeyStringSet& multikeyMetadataKeys,
                                         const MultikeyPaths& multikeyPaths,
                                         RecordId loc,
                                         Op op,
@@ -391,12 +397,13 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
     }
 
     std::vector<BSONObj> toInsert;
-    for (const auto& key : keys) {
+    for (const auto& keyString : keys) {
         // Documents inserted into this table must be consumed in insert-order.
         // Additionally, these writes should be timestamped with the same timestamps that the
         // other writes making up this operation are given. When index builds can cope with
         // replication rollbacks, side table writes associated with a CUD operation should
         // remain/rollback along with the corresponding oplog entry.
+        auto key = KeyString::toBson(keyString, _indexCatalogEntry->ordering());
         toInsert.emplace_back(BSON("op" << (op == Op::kInsert ? "i" : "d") << "key" << key
                                         << "recordId" << loc.repr()));
     }
@@ -405,7 +412,8 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
         // Wildcard indexes write multikey path information, typically part of the catalog
         // document, to the index itself. Multikey information is never deleted, so we only need
         // to add this data on the insert path.
-        for (const auto& key : multikeyMetadataKeys) {
+        for (const auto& keyString : multikeyMetadataKeys) {
+            auto key = KeyString::toBson(keyString, _indexCatalogEntry->ordering());
             toInsert.emplace_back(BSON("op"
                                        << "i"
                                        << "key" << key << "recordId"

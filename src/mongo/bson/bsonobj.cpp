@@ -378,6 +378,25 @@ BSONObj BSONObj::replaceFieldNames(const BSONObj& names) const {
     return b.obj();
 }
 
+BSONObj BSONObj::stripFieldNames(const BSONObj& obj) {
+    if (!obj.hasFieldNames())
+        return obj;
+
+    BSONObjBuilder bb;
+    for (auto e : obj) {
+        bb.appendAs(e, StringData());
+    }
+    return bb.obj();
+}
+
+bool BSONObj::hasFieldNames() const {
+    for (auto e : *this) {
+        if (e.fieldName()[0])
+            return true;
+    }
+    return false;
+}
+
 Status BSONObj::storageValidEmbedded() const {
     BSONObjIterator i(*this);
 

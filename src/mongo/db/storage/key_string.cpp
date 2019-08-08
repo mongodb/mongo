@@ -2099,72 +2099,36 @@ std::string BuilderBase<BufferT>::toString() const {
     return toHex(getBuffer(), getSize());
 }
 
-template <class BufferT>
-int BuilderBase<BufferT>::compare(const BuilderBase<BufferT>& other) const {
-    int a = getSize();
-    int b = other.getSize();
-
-    int min = std::min(a, b);
-
-    int cmp = memcmp(getBuffer(), other.getBuffer(), min);
-
-    if (cmp) {
-        if (cmp < 0)
-            return -1;
-        return 1;
-    }
-
-    // keys match
-
-    if (a == b)
-        return 0;
-
-    return a < b ? -1 : 1;
+std::string Value::toString() const {
+    return toHex(getBuffer(), getSize());
 }
 
-template <class BufferT>
-int BuilderBase<BufferT>::compareWithoutRecordId(const BuilderBase<BufferT>& other) const {
-    int a = !isEmpty() ? sizeWithoutRecordIdAtEnd(getBuffer(), getSize()) : 0;
-    int b = !other.isEmpty() ? sizeWithoutRecordIdAtEnd(other.getBuffer(), other.getSize()) : 0;
-
-    int min = std::min(a, b);
-
-    int cmp = memcmp(getBuffer(), other.getBuffer(), min);
-
-    if (cmp) {
-        if (cmp < 0)
-            return -1;
-        return 1;
+TypeBits& TypeBits::operator=(const TypeBits& tb) {
+    if (&tb == this) {
+        return *this;
     }
 
-    // keys match
+    version = tb.version;
+    _curBit = tb._curBit;
+    _isAllZeros = tb._isAllZeros;
 
-    if (a == b)
-        return 0;
+    _buf.reset();
+    _buf.appendBuf(tb._buf.buf(), tb._buf.len());
 
-    return a < b ? -1 : 1;
+    return *this;
 }
 
-int Value::compare(const Value& other) const {
-    int a = getSize();
-    int b = other.getSize();
-
-    int min = std::min(a, b);
-
-    int cmp = memcmp(getBuffer(), other.getBuffer(), min);
-
-    if (cmp) {
-        if (cmp < 0)
-            return -1;
-        return 1;
+Value& Value::operator=(const Value& other) {
+    if (&other == this) {
+        return *this;
     }
 
-    // keys match
+    _version = other._version;
+    _typeBits = other._typeBits;
+    _size = other._size;
+    _buffer = other._buffer;
 
-    if (a == b)
-        return 0;
-
-    return a < b ? -1 : 1;
+    return *this;
 }
 
 uint32_t TypeBits::readSizeFromBuffer(BufReader* reader) {
@@ -2415,6 +2379,25 @@ RecordId decodeRecordId(BufReader* reader) {
     invariant((lastByte & 0x7) == numExtraBytes);
     repr = (repr << 5) | (lastByte >> 3);  // fold in high 5 bits of last byte
     return RecordId(repr);
+}
+
+int compare(const char* leftBuf, const char* rightBuf, size_t leftSize, size_t rightSize) {
+    int min = std::min(leftSize, rightSize);
+
+    int cmp = memcmp(leftBuf, rightBuf, min);
+
+    if (cmp) {
+        if (cmp < 0)
+            return -1;
+        return 1;
+    }
+
+    // keys match
+
+    if (leftSize == rightSize)
+        return 0;
+
+    return leftSize < rightSize ? -1 : 1;
 }
 
 template class BuilderBase<BufBuilder>;

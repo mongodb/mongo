@@ -79,26 +79,6 @@ using std::string;
 using std::vector;
 
 static const WiredTigerItem emptyItem(nullptr, 0);
-
-
-bool hasFieldNames(const BSONObj& obj) {
-    BSONForEach(e, obj) {
-        if (e.fieldName()[0])
-            return true;
-    }
-    return false;
-}
-
-BSONObj stripFieldNames(const BSONObj& query) {
-    if (!hasFieldNames(query))
-        return query;
-
-    BSONObjBuilder bb;
-    BSONForEach(e, query) {
-        bb.appendAs(e, StringData());
-    }
-    return bb.obj();
-}
 }  // namespace
 
 
@@ -270,17 +250,17 @@ Status WiredTigerIndex::insert(OperationContext* opCtx,
                                bool dupsAllowed) {
     dassert(opCtx->lockState()->isWriteLocked());
     invariant(id.isValid());
-    dassert(!hasFieldNames(key));
+    dassert(!key.hasFieldNames());
 
     TRACE_INDEX << " key: " << key << " id: " << id;
 
-    KeyString::Builder keyString(getKeyStringVersion(), key, _ordering, id);
+    KeyString::HeapBuilder keyString(getKeyStringVersion(), key, _ordering, id);
 
-    return insert(opCtx, keyString, id, dupsAllowed);
+    return insert(opCtx, std::move(keyString.release()), id, dupsAllowed);
 }
 
 Status WiredTigerIndex::insert(OperationContext* opCtx,
-                               const KeyString::Builder& keyString,
+                               const KeyString::Value& keyString,
                                const RecordId& id,
                                bool dupsAllowed) {
     dassert(opCtx->lockState()->isWriteLocked());
@@ -300,14 +280,14 @@ void WiredTigerIndex::unindex(OperationContext* opCtx,
                               const RecordId& id,
                               bool dupsAllowed) {
     invariant(id.isValid());
-    dassert(!hasFieldNames(key));
-    KeyString::Builder keyString(getKeyStringVersion(), key, _ordering, id);
+    dassert(!key.hasFieldNames());
+    KeyString::HeapBuilder keyString(getKeyStringVersion(), key, _ordering, id);
 
-    unindex(opCtx, keyString, id, dupsAllowed);
+    unindex(opCtx, std::move(keyString.release()), id, dupsAllowed);
 }
 
 void WiredTigerIndex::unindex(OperationContext* opCtx,
-                              const KeyString::Builder& keyString,
+                              const KeyString::Value& keyString,
                               const RecordId& id,
                               bool dupsAllowed) {
     dassert(opCtx->lockState()->isWriteLocked());
@@ -402,7 +382,7 @@ bool WiredTigerIndex::appendCustomStats(OperationContext* opCtx,
 }
 
 Status WiredTigerIndex::dupKeyCheck(OperationContext* opCtx, const BSONObj& key) {
-    invariant(!hasFieldNames(key));
+    invariant(!key.hasFieldNames());
     invariant(unique());
 
     WiredTigerCursor curwrap(_uri, _tableId, false, opCtx);
@@ -648,12 +628,12 @@ public:
         : BulkBuilder(idx, opCtx, prefix), _idx(idx) {}
 
     Status addKey(const BSONObj& key, const RecordId& id) override {
-        KeyString::Builder keyString(_idx->getKeyStringVersion(), key, _idx->_ordering, id);
+        KeyString::HeapBuilder keyString(_idx->getKeyStringVersion(), key, _idx->_ordering, id);
 
-        return addKey(keyString, id);
+        return addKey(std::move(keyString.release()), id);
     }
 
-    Status addKey(const KeyString::Builder& keyString, const RecordId& id) override {
+    Status addKey(const KeyString::Value& keyString, const RecordId& id) override {
         dassert(id == KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
 
         // Can't use WiredTigerCursor since we aren't using the cache.
@@ -703,12 +683,12 @@ public:
           _previousKeyString(idx->getKeyStringVersion()) {}
 
     Status addKey(const BSONObj& newKey, const RecordId& id) override {
-        KeyString::Builder newKeyString(
+        KeyString::HeapBuilder newKeyString(
             _idx->getKeyStringVersion(), newKey, _idx->getOrdering(), id);
-        return addKey(newKeyString, id);
+        return addKey(std::move(newKeyString.release()), id);
     }
 
-    Status addKey(const KeyString::Builder& newKeyString, const RecordId& id) override {
+    Status addKey(const KeyString::Value& newKeyString, const RecordId& id) override {
         dassert(id ==
                 KeyString::decodeRecordIdAtEnd(newKeyString.getBuffer(), newKeyString.getSize()));
 
@@ -728,16 +708,13 @@ public:
     }
 
 private:
-    Status addKeyTimestampSafe(const KeyString::Builder& newKeyString) {
+    Status addKeyTimestampSafe(const KeyString::Value& newKeyString) {
         // Do a duplicate check, but only if dups aren't allowed.
         if (!_dupsAllowed) {
             const int cmp = newKeyString.compareWithoutRecordId(_previousKeyString);
             if (cmp == 0) {
                 // Duplicate found!
-                auto newKey = KeyString::toBson(newKeyString.getBuffer(),
-                                                newKeyString.getSize(),
-                                                _idx->_ordering,
-                                                newKeyString.getTypeBits());
+                auto newKey = KeyString::toBson(newKeyString, _idx->_ordering);
                 return buildDupKeyErrorStatus(
                     newKey, _idx->collectionNamespace(), _idx->indexName(), _idx->keyPattern());
             } else {
@@ -769,12 +746,12 @@ private:
         return Status::OK();
     }
 
-    Status addKeyTimestampUnsafe(const KeyString::Builder& newKeyString, const RecordId& id) {
+    Status addKeyTimestampUnsafe(const KeyString::Value& newKeyString, const RecordId& id) {
         const int cmp = newKeyString.compareWithoutRecordId(_previousKeyString);
         if (cmp != 0) {
             if (!_previousKeyString.isEmpty()) {
                 // _previousKeyString.isEmpty() is only true on the first call to addKey().
-                invariant(cmp > 0);  // newKey must be > the last key
+                invariant(cmp > 0);  // newKey must be > the last key.
                 // We are done with dups of the last key so we can insert it now.
                 doInsert();
             }
@@ -782,10 +759,7 @@ private:
         } else {
             // Dup found!
             if (!_dupsAllowed) {
-                auto newKey = KeyString::toBson(newKeyString.getBuffer(),
-                                                newKeyString.getSize(),
-                                                _idx->_ordering,
-                                                newKeyString.getTypeBits());
+                auto newKey = KeyString::toBson(newKeyString, _idx->_ordering);
                 return buildDupKeyErrorStatus(
                     newKey, _idx->collectionNamespace(), _idx->indexName(), _idx->keyPattern());
             }
@@ -879,14 +853,14 @@ public:
             ? KeyString::Discriminator::kExclusiveAfter
             : KeyString::Discriminator::kExclusiveBefore;
         _endPosition = std::make_unique<KeyString::Builder>(_idx.getKeyStringVersion());
-        _endPosition->resetToKey(stripFieldNames(key), _idx.getOrdering(), discriminator);
+        _endPosition->resetToKey(BSONObj::stripFieldNames(key), _idx.getOrdering(), discriminator);
     }
 
     boost::optional<IndexKeyEntry> seek(const BSONObj& key,
                                         bool inclusive,
                                         RequestedInfo parts) override {
         dassert(_opCtx->lockState()->isReadLocked());
-        const BSONObj finalKey = stripFieldNames(key);
+        const BSONObj finalKey = BSONObj::stripFieldNames(key);
         const auto discriminator = _forward == inclusive
             ? KeyString::Discriminator::kExclusiveBefore
             : KeyString::Discriminator::kExclusiveAfter;
@@ -1394,7 +1368,7 @@ bool WiredTigerIndexUnique::isDup(OperationContext* opCtx, WT_CURSOR* c, const B
 
 Status WiredTigerIndexUnique::_insert(OperationContext* opCtx,
                                       WT_CURSOR* c,
-                                      const KeyString::Builder& keyString,
+                                      const KeyString::Value& keyString,
                                       const RecordId& id,
                                       bool dupsAllowed) {
     if (isTimestampSafeUniqueIdx()) {
@@ -1405,7 +1379,7 @@ Status WiredTigerIndexUnique::_insert(OperationContext* opCtx,
 
 Status WiredTigerIndexUnique::_insertTimestampUnsafe(OperationContext* opCtx,
                                                      WT_CURSOR* c,
-                                                     const KeyString::Builder& keyString,
+                                                     const KeyString::Value& keyString,
                                                      const RecordId& id,
                                                      bool dupsAllowed) {
     invariant(id.isValid());
@@ -1462,8 +1436,7 @@ Status WiredTigerIndexUnique::_insertTimestampUnsafe(OperationContext* opCtx,
     }
 
     if (!dupsAllowed) {
-        auto key = KeyString::toBson(
-            keyString.getBuffer(), keyString.getSize(), _ordering, keyString.getTypeBits());
+        auto key = KeyString::toBson(keyString, _ordering);
         return buildDupKeyErrorStatus(key, _collectionNamespace, _indexName, _keyPattern);
     }
 
@@ -1485,7 +1458,7 @@ Status WiredTigerIndexUnique::_insertTimestampUnsafe(OperationContext* opCtx,
 
 Status WiredTigerIndexUnique::_insertTimestampSafe(OperationContext* opCtx,
                                                    WT_CURSOR* c,
-                                                   const KeyString::Builder& keyString,
+                                                   const KeyString::Value& keyString,
                                                    bool dupsAllowed) {
     TRACE_INDEX << "Timestamp safe unique idx KeyString: " << keyString;
 
@@ -1547,7 +1520,7 @@ Status WiredTigerIndexUnique::_insertTimestampSafe(OperationContext* opCtx,
 
 void WiredTigerIndexUnique::_unindex(OperationContext* opCtx,
                                      WT_CURSOR* c,
-                                     const KeyString::Builder& keyString,
+                                     const KeyString::Value& keyString,
                                      const RecordId& id,
                                      bool dupsAllowed) {
     if (isTimestampSafeUniqueIdx()) {
@@ -1558,7 +1531,7 @@ void WiredTigerIndexUnique::_unindex(OperationContext* opCtx,
 
 void WiredTigerIndexUnique::_unindexTimestampUnsafe(OperationContext* opCtx,
                                                     WT_CURSOR* c,
-                                                    const KeyString::Builder& keyString,
+                                                    const KeyString::Value& keyString,
                                                     const RecordId& id,
                                                     bool dupsAllowed) {
     invariant(id.isValid());
@@ -1645,8 +1618,7 @@ void WiredTigerIndexUnique::_unindexTimestampUnsafe(OperationContext* opCtx,
     }
 
     if (!foundId) {
-        auto key = KeyString::toBson(
-            keyString.getBuffer(), keyString.getSize(), _ordering, keyString.getTypeBits());
+        auto key = KeyString::toBson(keyString, _ordering);
         warning().stream() << id << " not found in the index for key " << redact(key);
         return;  // nothing to do
     }
@@ -1670,7 +1642,7 @@ void WiredTigerIndexUnique::_unindexTimestampUnsafe(OperationContext* opCtx,
 
 void WiredTigerIndexUnique::_unindexTimestampSafe(OperationContext* opCtx,
                                                   WT_CURSOR* c,
-                                                  const KeyString::Builder& keyString,
+                                                  const KeyString::Value& keyString,
                                                   bool dupsAllowed) {
     WiredTigerItem item(keyString.getBuffer(), keyString.getSize());
     setKey(c, item.Get());
@@ -1726,7 +1698,7 @@ SortedDataBuilderInterface* WiredTigerIndexStandard::getBulkBuilder(OperationCon
 
 Status WiredTigerIndexStandard::_insert(OperationContext* opCtx,
                                         WT_CURSOR* c,
-                                        const KeyString::Builder& keyString,
+                                        const KeyString::Value& keyString,
                                         const RecordId& id,
                                         bool dupsAllowed) {
     invariant(dupsAllowed);
@@ -1752,7 +1724,7 @@ Status WiredTigerIndexStandard::_insert(OperationContext* opCtx,
 
 void WiredTigerIndexStandard::_unindex(OperationContext* opCtx,
                                        WT_CURSOR* c,
-                                       const KeyString::Builder& keyString,
+                                       const KeyString::Value& keyString,
                                        const RecordId&,
                                        bool dupsAllowed) {
     invariant(dupsAllowed);

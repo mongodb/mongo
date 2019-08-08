@@ -51,10 +51,16 @@ TwoDAccessMethod::TwoDAccessMethod(IndexCatalogEntry* btreeState,
 
 /** Finds the key objects to put in an index */
 void TwoDAccessMethod::doGetKeys(const BSONObj& obj,
-                                 BSONObjSet* keys,
-                                 BSONObjSet* multikeyMetadataKeys,
-                                 MultikeyPaths* multikeyPaths) const {
-    ExpressionKeysPrivate::get2DKeys(obj, _params, keys);
+                                 KeyStringSet* keys,
+                                 KeyStringSet* multikeyMetadataKeys,
+                                 MultikeyPaths* multikeyPaths,
+                                 boost::optional<RecordId> id) const {
+    ExpressionKeysPrivate::get2DKeys(obj,
+                                     _params,
+                                     keys,
+                                     getSortedDataInterface()->getKeyStringVersion(),
+                                     getSortedDataInterface()->getOrdering(),
+                                     id);
 }
 
 }  // namespace mongo

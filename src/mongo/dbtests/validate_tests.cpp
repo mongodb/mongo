@@ -825,12 +825,13 @@ public:
             options.dupsAllowed = true;
             options.logIfError = true;
 
-            BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+            KeyStringSet keys;
             iam->getKeys(actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                          &keys,
                          nullptr,
-                         nullptr);
+                         nullptr,
+                         id1);
             auto removeStatus =
                 iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, id1, options, &numDeleted);
             auto insertStatus = iam->insert(&_opCtx, badKey, id1, options, &insertResult);
@@ -1255,12 +1256,13 @@ public:
             options.logIfError = true;
             options.dupsAllowed = true;
 
-            BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+            KeyStringSet keys;
             iam->getKeys(actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                          &keys,
                          nullptr,
-                         nullptr);
+                         nullptr,
+                         rid);
             auto removeStatus =
                 iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, rid, options, &numDeleted);
 

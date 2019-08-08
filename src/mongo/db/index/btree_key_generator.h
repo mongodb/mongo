@@ -37,6 +37,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/storage/key_string.h"
 
 namespace mongo {
 
@@ -55,7 +56,9 @@ public:
     BtreeKeyGenerator(std::vector<const char*> fieldNames,
                       std::vector<BSONElement> fixed,
                       bool isSparse,
-                      const CollatorInterface* collator);
+                      const CollatorInterface* collator,
+                      KeyString::Version keyStringVersion,
+                      Ordering ordering);
 
     /**
      * Generates the index keys for the document 'obj', and stores them in the set 'keys'.
@@ -66,15 +69,20 @@ public:
      * element with the prefixes of the indexed field that would cause this index to be multikey as
      * a result of inserting 'keys'.
      */
-    void getKeys(const BSONObj& obj, BSONObjSet* keys, MultikeyPaths* multikeyPaths) const;
+    void getKeys(const BSONObj& obj,
+                 KeyStringSet* keys,
+                 MultikeyPaths* multikeyPaths,
+                 boost::optional<RecordId> id = boost::none) const;
 
 private:
+    const KeyString::Version _keyStringVersion;
+    const Ordering _ordering;
     // These are used by getKeys below.
-    std::vector<const char*> _fieldNames;
-    bool _isIdIndex;
-    bool _isSparse;
-    BSONObj _nullKey;  // A full key with all fields null.
-    BSONSizeTracker _sizeTracker;
+    const std::vector<const char*> _fieldNames;
+    const bool _isIdIndex;
+    const bool _isSparse;
+    const KeyString::Value _nullKeyString;  // A full key with all fields null.
+    const BSONSizeTracker _sizeTracker;
 
     std::vector<BSONElement> _fixed;
     /**
@@ -136,10 +144,11 @@ private:
     void _getKeysWithArray(std::vector<const char*> fieldNames,
                            std::vector<BSONElement> fixed,
                            const BSONObj& obj,
-                           BSONObjSet* keys,
+                           KeyStringSet* keys,
                            unsigned numNotFound,
                            const std::vector<PositionalPathInfo>& positionalInfo,
-                           MultikeyPaths* multikeyPaths) const;
+                           MultikeyPaths* multikeyPaths,
+                           boost::optional<RecordId> id) const;
 
     /**
      * A call to _getKeysWithArray() begins by calling this for each field in the key pattern. It
@@ -187,13 +196,16 @@ private:
     void _getKeysArrEltFixed(std::vector<const char*>* fieldNames,
                              std::vector<BSONElement>* fixed,
                              const BSONElement& arrEntry,
-                             BSONObjSet* keys,
+                             KeyStringSet* keys,
                              unsigned numNotFound,
                              const BSONElement& arrObjElt,
                              const std::set<size_t>& arrIdxs,
                              bool mayExpandArrayUnembedded,
                              const std::vector<PositionalPathInfo>& positionalInfo,
-                             MultikeyPaths* multikeyPaths) const;
+                             MultikeyPaths* multikeyPaths,
+                             boost::optional<RecordId> id) const;
+
+    KeyString::Value _buildNullKeyString() const;
 
     const std::vector<PositionalPathInfo> _emptyPositionalInfo;
 

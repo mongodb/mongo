@@ -46,28 +46,6 @@ namespace {
 using std::shared_ptr;
 using std::string;
 using std::vector;
-
-// BTree stuff
-
-bool hasFieldNames(const BSONObj& obj) {
-    BSONForEach(e, obj) {
-        if (e.fieldName()[0])
-            return true;
-    }
-    return false;
-}
-
-BSONObj stripFieldNames(const BSONObj& query) {
-    if (!hasFieldNames(query))
-        return query;
-
-    BSONObjBuilder bb;
-    BSONForEach(e, query) {
-        bb.appendAs(e, StringData());
-    }
-    return bb.obj();
-}
-
 }  // namespace
 
 MobileIndex::MobileIndex(OperationContext* opCtx,
@@ -86,15 +64,15 @@ Status MobileIndex::insert(OperationContext* opCtx,
                            const RecordId& recId,
                            bool dupsAllowed) {
     invariant(recId.isValid());
-    invariant(!hasFieldNames(key));
+    invariant(!key.hasFieldNames());
 
-    KeyString::Builder keyString(_keyStringVersion, key, _ordering, recId);
+    KeyString::HeapBuilder keyString(_keyStringVersion, key, _ordering, recId);
 
-    return insert(opCtx, keyString, recId, dupsAllowed);
+    return insert(opCtx, std::move(keyString.release()), recId, dupsAllowed);
 }
 
 Status MobileIndex::insert(OperationContext* opCtx,
-                           const KeyString::Builder& keyString,
+                           const KeyString::Value& keyString,
                            const RecordId& recId,
                            bool dupsAllowed) {
     return _insert(opCtx, keyString, recId, dupsAllowed);
@@ -144,18 +122,18 @@ void MobileIndex::unindex(OperationContext* opCtx,
                           const RecordId& recId,
                           bool dupsAllowed) {
     invariant(recId.isValid());
-    invariant(!hasFieldNames(key));
+    invariant(!key.hasFieldNames());
 
-    KeyString::Builder keyString(_keyStringVersion, key, _ordering, recId);
+    KeyString::HeapBuilder keyString(_keyStringVersion, key, _ordering, recId);
 
-    return unindex(opCtx, keyString, recId, dupsAllowed);
+    unindex(opCtx, std::move(keyString.release()), recId, dupsAllowed);
 }
 
 void MobileIndex::unindex(OperationContext* opCtx,
-                          const KeyString::Builder& keyString,
+                          const KeyString::Value& keyString,
                           const RecordId& recId,
                           bool dupsAllowed) {
-    return _unindex(opCtx, keyString, recId, dupsAllowed);
+    _unindex(opCtx, keyString, recId, dupsAllowed);
 }
 
 void MobileIndex::_doDelete(OperationContext* opCtx,
@@ -254,7 +232,7 @@ Status MobileIndex::create(OperationContext* opCtx, const std::string& ident) {
 }
 
 Status MobileIndex::dupKeyCheck(OperationContext* opCtx, const BSONObj& key) {
-    invariant(!hasFieldNames(key));
+    invariant(!key.hasFieldNames());
     invariant(_isUnique);
 
     if (_isDup(opCtx, key))
@@ -295,14 +273,14 @@ public:
 
     Status addKey(const BSONObj& key, const RecordId& recId) override {
         invariant(recId.isValid());
-        invariant(!hasFieldNames(key));
+        invariant(!key.hasFieldNames());
 
-        KeyString::Builder keyString(
+        KeyString::HeapBuilder keyString(
             _index->getKeyStringVersion(), key, _index->getOrdering(), recId);
-        return addKey(keyString, recId);
+        return addKey(std::move(keyString.release()), recId);
     }
 
-    Status addKey(const KeyString::Builder& keyString, const RecordId& recId) override {
+    Status addKey(const KeyString::Value& keyString, const RecordId& recId) override {
         Status status = _checkNextKey(keyString);
         if (!status.isOK()) {
             return status;
@@ -320,21 +298,18 @@ protected:
      * Checks whether the new key to be inserted is > or >= the previous one depending
      * on _dupsAllowed.
      */
-    Status _checkNextKey(const KeyString::Builder& keyString) {
-        const int cmp = keyString.compare(_lastKeyString);
+    Status _checkNextKey(const KeyString::Value& keyString) {
+        const int cmp = _lastKeyString.compare(keyString);
         if (!_dupsAllowed && cmp == 0) {
-            auto key = KeyString::toBson(keyString.getBuffer(),
-                                         keyString.getSize(),
-                                         _index->getOrdering(),
-                                         keyString.getTypeBits());
+            auto key = KeyString::toBson(keyString, _index->getOrdering());
             return buildDupKeyErrorStatus(key, _collectionNamespace, _indexName, _keyPattern);
-        } else if (cmp < 0) {
+        } else if (cmp > 0) {
             return Status(ErrorCodes::InternalError, "expected higher RecordId in bulk builder");
         }
         return Status::OK();
     }
 
-    virtual Status _addKey(const KeyString::Builder& keyString, const RecordId& recId) = 0;
+    virtual Status _addKey(const KeyString::Value& keyString, const RecordId& recId) = 0;
 
     MobileIndex* _index;
     OperationContext* const _opCtx;
@@ -359,7 +334,7 @@ public:
         : BulkBuilderBase(index, opCtx, dupsAllowed, collectionNamespace, indexName, keyPattern) {}
 
 protected:
-    Status _addKey(const KeyString::Builder& keyString, const RecordId&) override {
+    Status _addKey(const KeyString::Value& keyString, const RecordId&) override {
         KeyString::TypeBits typeBits = keyString.getTypeBits();
         return _index->doInsert(
             _opCtx, keyString.getBuffer(), keyString.getSize(), typeBits, typeBits, false);
@@ -383,7 +358,7 @@ public:
     }
 
 protected:
-    Status _addKey(const KeyString::Builder& keyString, const RecordId& recId) override {
+    Status _addKey(const KeyString::Value& keyString, const RecordId& recId) override {
         dassert(recId ==
                 KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
 
@@ -457,13 +432,14 @@ public:
             ? KeyString::Discriminator::kExclusiveAfter
             : KeyString::Discriminator::kExclusiveBefore;
         _endPosition = std::make_unique<KeyString::Builder>(_index.getKeyStringVersion());
-        _endPosition->resetToKey(stripFieldNames(key), _index.getOrdering(), discriminator);
+        _endPosition->resetToKey(
+            BSONObj::stripFieldNames(key), _index.getOrdering(), discriminator);
     }
 
     boost::optional<IndexKeyEntry> seek(const BSONObj& key,
                                         bool inclusive,
                                         RequestedInfo parts) override {
-        const BSONObj startKey = stripFieldNames(key);
+        const BSONObj startKey = BSONObj::stripFieldNames(key);
         // By using a discriminator other than kInclusive, there is no need to distinguish
         // unique vs non-unique key formats since both start with the key.
         const auto discriminator = _isForward == inclusive
@@ -701,7 +677,7 @@ std::unique_ptr<SortedDataInterface::Cursor> MobileIndexStandard::newCursor(Oper
 }
 
 Status MobileIndexStandard::_insert(OperationContext* opCtx,
-                                    const KeyString::Builder& keyString,
+                                    const KeyString::Value& keyString,
                                     const RecordId& recId,
                                     bool dupsAllowed) {
     invariant(dupsAllowed);
@@ -712,7 +688,7 @@ Status MobileIndexStandard::_insert(OperationContext* opCtx,
 }
 
 void MobileIndexStandard::_unindex(OperationContext* opCtx,
-                                   const KeyString::Builder& keyString,
+                                   const KeyString::Value& keyString,
                                    const RecordId&,
                                    bool dupsAllowed) {
     invariant(dupsAllowed);
@@ -739,7 +715,7 @@ std::unique_ptr<SortedDataInterface::Cursor> MobileIndexUnique::newCursor(Operat
 }
 
 Status MobileIndexUnique::_insert(OperationContext* opCtx,
-                                  const KeyString::Builder& keyString,
+                                  const KeyString::Value& keyString,
                                   const RecordId& recId,
                                   bool dupsAllowed) {
     // Replication is not supported so dups are not allowed.
@@ -761,7 +737,7 @@ Status MobileIndexUnique::_insert(OperationContext* opCtx,
 }
 
 void MobileIndexUnique::_unindex(OperationContext* opCtx,
-                                 const KeyString::Builder& keyString,
+                                 const KeyString::Value& keyString,
                                  const RecordId& recId,
                                  bool dupsAllowed) {
     // Replication is not supported so dups are not allowed.

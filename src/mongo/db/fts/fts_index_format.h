@@ -34,6 +34,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/db/fts/fts_util.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/sorted_data_interface.h"
 
 namespace mongo {
 
@@ -43,7 +45,12 @@ class FTSSpec;
 
 class FTSIndexFormat {
 public:
-    static void getKeys(const FTSSpec& spec, const BSONObj& document, BSONObjSet* keys);
+    static void getKeys(const FTSSpec& spec,
+                        const BSONObj& document,
+                        KeyStringSet* keys,
+                        KeyString::Version keyStringVersion,
+                        Ordering ordering,
+                        boost::optional<RecordId> id = boost::none);
 
     /**
      * Helper method to get return entry from the FTSIndex as a BSONObj

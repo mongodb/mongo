@@ -313,8 +313,8 @@ private:
 
     Status _indexKeys(OperationContext* opCtx,
                       IndexCatalogEntry* index,
-                      const std::vector<BSONObj>& keys,
-                      const BSONObjSet& multikeyMetadataKeys,
+                      const std::vector<KeyString::Value>& keys,
+                      const KeyStringSet& multikeyMetadataKeys,
                       const MultikeyPaths& multikeyPaths,
                       const BSONObj& obj,
                       RecordId loc,
@@ -341,7 +341,7 @@ private:
 
     void _unindexKeys(OperationContext* opCtx,
                       IndexCatalogEntry* index,
-                      const std::vector<BSONObj>& keys,
+                      const std::vector<KeyString::Value>& keys,
                       const BSONObj& obj,
                       RecordId loc,
                       bool logIfError,

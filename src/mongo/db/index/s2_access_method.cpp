@@ -125,10 +125,18 @@ StatusWith<BSONObj> S2AccessMethod::fixSpec(const BSONObj& specObj) {
 }
 
 void S2AccessMethod::doGetKeys(const BSONObj& obj,
-                               BSONObjSet* keys,
-                               BSONObjSet* multikeyMetadataKeys,
-                               MultikeyPaths* multikeyPaths) const {
-    ExpressionKeysPrivate::getS2Keys(obj, _descriptor->keyPattern(), _params, keys, multikeyPaths);
+                               KeyStringSet* keys,
+                               KeyStringSet* multikeyMetadataKeys,
+                               MultikeyPaths* multikeyPaths,
+                               boost::optional<RecordId> id) const {
+    ExpressionKeysPrivate::getS2Keys(obj,
+                                     _descriptor->keyPattern(),
+                                     _params,
+                                     keys,
+                                     multikeyPaths,
+                                     getSortedDataInterface()->getKeyStringVersion(),
+                                     getSortedDataInterface()->getOrdering(),
+                                     id);
 }
 
 }  // namespace mongo

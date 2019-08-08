@@ -47,28 +47,26 @@ using namespace mongo;
 
 namespace {
 
-std::string dumpKeyset(const BSONObjSet& objs) {
+std::string dumpKeyset(const KeyStringSet& keyStrings) {
     std::stringstream ss;
     ss << "[ ";
-    for (BSONObjSet::iterator i = objs.begin(); i != objs.end(); ++i) {
-        ss << i->toString() << " ";
+    for (auto& keyString : keyStrings) {
+        auto key = KeyString::toBson(keyString, Ordering::make(BSONObj()));
+        ss << key.toString() << " ";
     }
     ss << "]";
 
     return ss.str();
 }
 
-bool assertKeysetsEqual(const BSONObjSet& expectedKeys, const BSONObjSet& actualKeys) {
+bool assertKeysetsEqual(const KeyStringSet& expectedKeys, const KeyStringSet& actualKeys) {
     if (expectedKeys.size() != actualKeys.size()) {
         log() << "Expected: " << dumpKeyset(expectedKeys) << ", "
               << "Actual: " << dumpKeyset(actualKeys);
         return false;
     }
 
-    if (!std::equal(expectedKeys.begin(),
-                    expectedKeys.end(),
-                    actualKeys.begin(),
-                    SimpleBSONObjComparator::kInstance.makeEqualTo())) {
+    if (!std::equal(expectedKeys.begin(), expectedKeys.end(), actualKeys.begin())) {
         log() << "Expected: " << dumpKeyset(expectedKeys) << ", "
               << "Actual: " << dumpKeyset(actualKeys);
         return false;
@@ -77,12 +75,17 @@ bool assertKeysetsEqual(const BSONObjSet& expectedKeys, const BSONObjSet& actual
     return true;
 }
 
-BSONObj make2DKey(const TwoDIndexingParams& params, int x, int y, BSONElement trailingFields) {
+KeyString::Value make2DKey(const TwoDIndexingParams& params,
+                           int x,
+                           int y,
+                           BSONElement trailingFields) {
     BSONObjBuilder bob;
     BSONObj locObj = BSON_ARRAY(x << y);
     params.geoHashConverter->hash(locObj, nullptr).appendHashMin(&bob, "");
     bob.append(trailingFields);
-    return bob.obj();
+    KeyString::HeapBuilder keyString(
+        KeyString::Version::kLatestVersion, bob.obj(), Ordering::make(BSONObj()));
+    return keyString.release();
 }
 
 TEST(2dKeyGeneratorTest, TrailingField) {
@@ -90,10 +93,11 @@ TEST(2dKeyGeneratorTest, TrailingField) {
     BSONObj infoObj = fromjson("{key: {a: '2d', b: 1}}");
     TwoDIndexingParams params;
     ExpressionParams::parseTwoDParams(infoObj, &params);
-    BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
-    ExpressionKeysPrivate::get2DKeys(obj, params, &actualKeys);
+    KeyStringSet actualKeys;
+    ExpressionKeysPrivate::get2DKeys(
+        obj, params, &actualKeys, KeyString::Version::kLatestVersion, Ordering::make(BSONObj()));
 
-    BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+    KeyStringSet expectedKeys;
     BSONObj trailingFields = BSON("" << 5);
     expectedKeys.insert(make2DKey(params, 0, 0, trailingFields.firstElement()));
 
@@ -105,10 +109,11 @@ TEST(2dKeyGeneratorTest, ArrayTrailingField) {
     BSONObj infoObj = fromjson("{key: {a: '2d', b: 1}}");
     TwoDIndexingParams params;
     ExpressionParams::parseTwoDParams(infoObj, &params);
-    BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
-    ExpressionKeysPrivate::get2DKeys(obj, params, &actualKeys);
+    KeyStringSet actualKeys;
+    ExpressionKeysPrivate::get2DKeys(
+        obj, params, &actualKeys, KeyString::Version::kLatestVersion, Ordering::make(BSONObj()));
 
-    BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+    KeyStringSet expectedKeys;
     BSONObj trailingFields = BSON("" << BSON_ARRAY(5 << 6));
     expectedKeys.insert(make2DKey(params, 0, 0, trailingFields.firstElement()));
 
@@ -120,10 +125,11 @@ TEST(2dKeyGeneratorTest, ArrayOfObjectsTrailingField) {
     BSONObj infoObj = fromjson("{key: {a: '2d', 'b.c': 1}}");
     TwoDIndexingParams params;
     ExpressionParams::parseTwoDParams(infoObj, &params);
-    BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
-    ExpressionKeysPrivate::get2DKeys(obj, params, &actualKeys);
+    KeyStringSet actualKeys;
+    ExpressionKeysPrivate::get2DKeys(
+        obj, params, &actualKeys, KeyString::Version::kLatestVersion, Ordering::make(BSONObj()));
 
-    BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+    KeyStringSet expectedKeys;
     BSONObj trailingFields = BSON("" << BSON_ARRAY(5 << 6));
     expectedKeys.insert(make2DKey(params, 0, 0, trailingFields.firstElement()));
 

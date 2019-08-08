@@ -40,32 +40,39 @@
 namespace mongo {
 namespace {
 
-BSONObjSet makeKeySet(std::initializer_list<BSONObj> init = {}) {
-    return SimpleBSONObjComparator::kInstance.makeBSONObjSet(std::move(init));
+KeyStringSet makeKeySet(std::initializer_list<BSONObj> init = {}, RecordId id = RecordId()) {
+    KeyStringSet keys;
+    Ordering ordering = Ordering::make(BSONObj());
+    for (const auto& key : init) {
+        KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion, key, ordering);
+        if (!id.isNull()) {
+            keyString.appendRecordId(id);
+        }
+        keys.insert(keyString.release());
+    }
+    return keys;
 }
 
-std::string dumpKeyset(const BSONObjSet& objs) {
+std::string dumpKeyset(const KeyStringSet& keyStrings) {
     std::stringstream ss;
     ss << "[ ";
-    for (BSONObjSet::iterator i = objs.begin(); i != objs.end(); ++i) {
-        ss << i->toString() << " ";
+    for (auto& keyString : keyStrings) {
+        auto key = KeyString::toBson(keyString, Ordering::make(BSONObj()));
+        ss << key.toString() << " ";
     }
     ss << "]";
 
     return ss.str();
 }
 
-bool assertKeysetsEqual(const BSONObjSet& expectedKeys, const BSONObjSet& actualKeys) {
+bool assertKeysetsEqual(const KeyStringSet& expectedKeys, const KeyStringSet& actualKeys) {
     if (expectedKeys.size() != actualKeys.size()) {
         log() << "Expected: " << dumpKeyset(expectedKeys) << ", "
               << "Actual: " << dumpKeyset(actualKeys);
         return false;
     }
 
-    if (!std::equal(expectedKeys.begin(),
-                    expectedKeys.end(),
-                    actualKeys.begin(),
-                    SimpleBSONObjComparator::kInstance.makeEqualTo())) {
+    if (!std::equal(expectedKeys.begin(), expectedKeys.end(), actualKeys.begin())) {
         log() << "Expected: " << dumpKeyset(expectedKeys) << ", "
               << "Actual: " << dumpKeyset(actualKeys);
         return false;
@@ -77,7 +84,11 @@ bool assertKeysetsEqual(const BSONObjSet& expectedKeys, const BSONObjSet& actual
 // Full-document tests with no projection.
 
 TEST(WildcardKeyGeneratorFullDocumentTest, ExtractTopLevelKey) {
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                {},
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
     auto inputDoc = fromjson("{a: 1}");
 
     auto expectedKeys = makeKeySet({fromjson("{'': 'a', '': 1}")});
@@ -92,7 +103,11 @@ TEST(WildcardKeyGeneratorFullDocumentTest, ExtractTopLevelKey) {
 }
 
 TEST(WildcardKeyGeneratorFullDocumentTest, ExtractKeysFromNestedObject) {
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                {},
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
     auto inputDoc = fromjson("{a: {b: 'one', c: 2}}");
 
     auto expectedKeys =
@@ -100,8 +115,8 @@ TEST(WildcardKeyGeneratorFullDocumentTest, ExtractKeysFromNestedObject) {
 
     auto expectedMultikeyPaths = makeKeySet();
 
-    auto outputKeys = makeKeySet();
-    auto multikeyMetadataKeys = makeKeySet();
+    KeyStringSet outputKeys;
+    KeyStringSet multikeyMetadataKeys;
     keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
@@ -109,7 +124,11 @@ TEST(WildcardKeyGeneratorFullDocumentTest, ExtractKeysFromNestedObject) {
 }
 
 TEST(WildcardKeyGeneratorFullDocumentTest, ShouldIndexEmptyObject) {
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                {},
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
     auto inputDoc = fromjson("{a: 1, b: {}}");
 
     auto expectedKeys = makeKeySet({fromjson("{'': 'a', '': 1}"), fromjson("{'': 'b', '': {}}")});
@@ -124,17 +143,23 @@ TEST(WildcardKeyGeneratorFullDocumentTest, ShouldIndexEmptyObject) {
 }
 
 TEST(WildcardKeyGeneratorFullDocumentTest, ShouldIndexNonNestedEmptyArrayAsUndefined) {
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                {},
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
     auto inputDoc = fromjson("{ a: [], b: {c: []}, d: [[], {e: []}]}");
 
     auto expectedKeys = makeKeySet({fromjson("{'': 'a', '': undefined}"),
                                     fromjson("{'': 'b.c', '': undefined}"),
                                     fromjson("{'': 'd', '': []}"),
                                     fromjson("{'': 'd.e', '': undefined}")});
-    auto expectedMultikeyPaths = makeKeySet({fromjson("{'': 1, '': 'a'}"),
-                                             fromjson("{'': 1, '': 'b.c'}"),
-                                             fromjson("{'': 1, '': 'd'}"),
-                                             fromjson("{'': 1, '': 'd.e'}")});
+    auto expectedMultikeyPaths =
+        makeKeySet({fromjson("{'': 1, '': 'a'}"),
+                    fromjson("{'': 1, '': 'b.c'}"),
+                    fromjson("{'': 1, '': 'd'}"),
+                    fromjson("{'': 1, '': 'd.e'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -145,7 +170,11 @@ TEST(WildcardKeyGeneratorFullDocumentTest, ShouldIndexNonNestedEmptyArrayAsUndef
 }
 
 TEST(WildcardKeyGeneratorFullDocumentTest, ExtractMultikeyPath) {
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                {},
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
     auto inputDoc = fromjson("{a: [1, 2, {b: 'one', c: 2}, {d: 3}]}");
 
     auto expectedKeys = makeKeySet({fromjson("{'': 'a', '': 1}"),
@@ -154,7 +183,9 @@ TEST(WildcardKeyGeneratorFullDocumentTest, ExtractMultikeyPath) {
                                     fromjson("{'': 'a.c', '': 2}"),
                                     fromjson("{'': 'a.d', '': 3}")});
 
-    auto expectedMultikeyPaths = makeKeySet({fromjson("{'': 1, '': 'a'}")});
+    auto expectedMultikeyPaths =
+        makeKeySet({fromjson("{'': 1, '': 'a'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -165,7 +196,11 @@ TEST(WildcardKeyGeneratorFullDocumentTest, ExtractMultikeyPath) {
 }
 
 TEST(WildcardKeyGeneratorFullDocumentTest, ExtractMultikeyPathAndDedupKeys) {
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                {},
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
     auto inputDoc = fromjson("{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {d: 3}]}");
 
     auto expectedKeys = makeKeySet({fromjson("{'': 'a', '': 1}"),
@@ -174,7 +209,9 @@ TEST(WildcardKeyGeneratorFullDocumentTest, ExtractMultikeyPathAndDedupKeys) {
                                     fromjson("{'': 'a.c', '': 2}"),
                                     fromjson("{'': 'a.d', '': 3}")});
 
-    auto expectedMultikeyPaths = makeKeySet({fromjson("{'': 1, '': 'a'}")});
+    auto expectedMultikeyPaths =
+        makeKeySet({fromjson("{'': 1, '': 'a'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -185,7 +222,11 @@ TEST(WildcardKeyGeneratorFullDocumentTest, ExtractMultikeyPathAndDedupKeys) {
 }
 
 TEST(WildcardKeyGeneratorFullDocumentTest, ExtractZeroElementMultikeyPath) {
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                {},
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
     auto inputDoc = fromjson("{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {d: 3}], e: []}");
 
     auto expectedKeys = makeKeySet({fromjson("{'': 'a', '': 1}"),
@@ -196,7 +237,8 @@ TEST(WildcardKeyGeneratorFullDocumentTest, ExtractZeroElementMultikeyPath) {
                                     fromjson("{'': 'e', '': undefined}")});
 
     auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'e'}")});
+        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'e'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -207,7 +249,11 @@ TEST(WildcardKeyGeneratorFullDocumentTest, ExtractZeroElementMultikeyPath) {
 }
 
 TEST(WildcardKeyGeneratorFullDocumentTest, ExtractNestedMultikeyPaths) {
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                {},
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     // Note: the 'e' array is nested within a subdocument in the enclosing 'a' array; it will
     // generate a separate multikey entry 'a.e' and index keys for each of its elements. The raw
@@ -227,7 +273,8 @@ TEST(WildcardKeyGeneratorFullDocumentTest, ExtractNestedMultikeyPaths) {
                                     fromjson("{'': 'a.e', '': 5}")});
 
     auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")});
+        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -238,7 +285,11 @@ TEST(WildcardKeyGeneratorFullDocumentTest, ExtractNestedMultikeyPaths) {
 }
 
 TEST(WildcardKeyGeneratorFullDocumentTest, ExtractMixedPathTypesAndAllSubpaths) {
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                {},
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     // Tests a mix of multikey paths, various duplicate-key scenarios, and deeply-nested paths.
     auto inputDoc = fromjson(
@@ -261,10 +312,12 @@ TEST(WildcardKeyGeneratorFullDocumentTest, ExtractMixedPathTypesAndAllSubpaths) 
                                     fromjson("{'': 'g.h.k', '': 12.0}"),
                                     fromjson("{'': 'l', '': 'string'}")});
 
-    auto expectedMultikeyPaths = makeKeySet({fromjson("{'': 1, '': 'a'}"),
-                                             fromjson("{'': 1, '': 'a.e'}"),
-                                             fromjson("{'': 1, '': 'g.h.j'}"),
-                                             fromjson("{'': 1, '': 'g.h.j.k'}")});
+    auto expectedMultikeyPaths =
+        makeKeySet({fromjson("{'': 1, '': 'a'}"),
+                    fromjson("{'': 1, '': 'a.e'}"),
+                    fromjson("{'': 1, '': 'g.h.j'}"),
+                    fromjson("{'': 1, '': 'g.h.j.k'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -277,7 +330,11 @@ TEST(WildcardKeyGeneratorFullDocumentTest, ExtractMixedPathTypesAndAllSubpaths) 
 // Single-subtree implicit projection.
 
 TEST(WildcardKeyGeneratorSingleSubtreeTest, ExtractSubtreeWithSinglePathComponent) {
-    WildcardKeyGenerator keyGen{fromjson("{'g.$**': 1}"), {}, nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'g.$**': 1}"),
+                                {},
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     auto inputDoc = fromjson(
         "{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: 3, e: [4, 5]}, [6, 7, {f: 8}]], "
@@ -290,7 +347,8 @@ TEST(WildcardKeyGeneratorSingleSubtreeTest, ExtractSubtreeWithSinglePathComponen
                                     fromjson("{'': 'g.h.k', '': 12.0}")});
 
     auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")});
+        makeKeySet({fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -301,7 +359,11 @@ TEST(WildcardKeyGeneratorSingleSubtreeTest, ExtractSubtreeWithSinglePathComponen
 }
 
 TEST(WildcardKeyGeneratorSingleSubtreeTest, ExtractSubtreeWithMultiplePathComponents) {
-    WildcardKeyGenerator keyGen{fromjson("{'g.h.$**': 1}"), {}, nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'g.h.$**': 1}"),
+                                {},
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     auto inputDoc = fromjson(
         "{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: 3, e: [4, 5]}, [6, 7, {f: 8}]], "
@@ -314,7 +376,8 @@ TEST(WildcardKeyGeneratorSingleSubtreeTest, ExtractSubtreeWithMultiplePathCompon
                                     fromjson("{'': 'g.h.k', '': 12.0}")});
 
     auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")});
+        makeKeySet({fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -325,7 +388,11 @@ TEST(WildcardKeyGeneratorSingleSubtreeTest, ExtractSubtreeWithMultiplePathCompon
 }
 
 TEST(WildcardKeyGeneratorSingleSubtreeTest, ExtractMultikeySubtree) {
-    WildcardKeyGenerator keyGen{fromjson("{'g.h.j.$**': 1}"), {}, nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'g.h.j.$**': 1}"),
+                                {},
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     auto inputDoc = fromjson(
         "{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: 3, e: [4, 5]}, [6, 7, {f: 8}]], "
@@ -336,7 +403,8 @@ TEST(WildcardKeyGeneratorSingleSubtreeTest, ExtractMultikeySubtree) {
                                     fromjson("{'': 'g.h.j.k', '': 11.5}")});
 
     auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")});
+        makeKeySet({fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -347,7 +415,11 @@ TEST(WildcardKeyGeneratorSingleSubtreeTest, ExtractMultikeySubtree) {
 }
 
 TEST(WildcardKeyGeneratorSingleSubtreeTest, ExtractNestedMultikeySubtree) {
-    WildcardKeyGenerator keyGen{fromjson("{'a.e.$**': 1}"), {}, nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'a.e.$**': 1}"),
+                                {},
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     auto inputDoc = fromjson(
         "{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: 3, e: [4, 5]}, [6, 7, {f: 8}]], "
@@ -360,7 +432,8 @@ TEST(WildcardKeyGeneratorSingleSubtreeTest, ExtractNestedMultikeySubtree) {
                                     fromjson("{'': 'a.e', '': 5}")});
 
     auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")});
+        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -373,7 +446,11 @@ TEST(WildcardKeyGeneratorSingleSubtreeTest, ExtractNestedMultikeySubtree) {
 // Explicit inclusion tests.
 
 TEST(WildcardKeyGeneratorInclusionTest, InclusionProjectionSingleSubtree) {
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{g: 1}"), nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                fromjson("{g: 1}"),
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     auto inputDoc = fromjson(
         "{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: 3, e: [4, 5]}, [6, 7, {f: 8}]], "
@@ -386,7 +463,8 @@ TEST(WildcardKeyGeneratorInclusionTest, InclusionProjectionSingleSubtree) {
                                     fromjson("{'': 'g.h.k', '': 12.0}")});
 
     auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")});
+        makeKeySet({fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -397,7 +475,11 @@ TEST(WildcardKeyGeneratorInclusionTest, InclusionProjectionSingleSubtree) {
 }
 
 TEST(WildcardKeyGeneratorInclusionTest, InclusionProjectionNestedSubtree) {
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{'g.h': 1}"), nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                fromjson("{'g.h': 1}"),
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     auto inputDoc = fromjson(
         "{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: 3, e: [4, 5]}, [6, 7, {f: 8}]], "
@@ -410,7 +492,8 @@ TEST(WildcardKeyGeneratorInclusionTest, InclusionProjectionNestedSubtree) {
                                     fromjson("{'': 'g.h.k', '': 12.0}")});
 
     auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")});
+        makeKeySet({fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -421,7 +504,11 @@ TEST(WildcardKeyGeneratorInclusionTest, InclusionProjectionNestedSubtree) {
 }
 
 TEST(WildcardKeyGeneratorInclusionTest, InclusionProjectionMultikeySubtree) {
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{'g.h.j': 1}"), nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                fromjson("{'g.h.j': 1}"),
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     auto inputDoc = fromjson(
         "{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: 3, e: [4, 5]}, [6, 7, {f: 8}]], "
@@ -432,7 +519,8 @@ TEST(WildcardKeyGeneratorInclusionTest, InclusionProjectionMultikeySubtree) {
                                     fromjson("{'': 'g.h.j.k', '': 11.5}")});
 
     auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")});
+        makeKeySet({fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -443,7 +531,11 @@ TEST(WildcardKeyGeneratorInclusionTest, InclusionProjectionMultikeySubtree) {
 }
 
 TEST(WildcardKeyGeneratorInclusionTest, InclusionProjectionNestedMultikeySubtree) {
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{'a.e': 1}"), nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                fromjson("{'a.e': 1}"),
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     auto inputDoc = fromjson(
         "{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: 3, e: [4, 5]}, [6, 7, {f: 8}]], "
@@ -454,7 +546,8 @@ TEST(WildcardKeyGeneratorInclusionTest, InclusionProjectionNestedMultikeySubtree
                                     fromjson("{'': 'a.e', '': 5}")});
 
     auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")});
+        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -465,8 +558,11 @@ TEST(WildcardKeyGeneratorInclusionTest, InclusionProjectionNestedMultikeySubtree
 }
 
 TEST(WildcardKeyGeneratorInclusionTest, InclusionProjectionMultipleSubtrees) {
-    WildcardKeyGenerator keyGen{
-        fromjson("{'$**': 1}"), fromjson("{'a.b': 1, 'a.c': 1, 'a.e': 1, 'g.h.i': 1}"), nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                fromjson("{'a.b': 1, 'a.c': 1, 'a.e': 1, 'g.h.i': 1}"),
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     auto inputDoc = fromjson(
         "{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: 3, e: [4, 5]}, [6, 7, {f: 8}]], "
@@ -480,7 +576,8 @@ TEST(WildcardKeyGeneratorInclusionTest, InclusionProjectionMultipleSubtrees) {
                                     fromjson("{'': 'g.h.i', '': 9}")});
 
     auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")});
+        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -493,7 +590,11 @@ TEST(WildcardKeyGeneratorInclusionTest, InclusionProjectionMultipleSubtrees) {
 // Explicit exclusion tests.
 
 TEST(WildcardKeyGeneratorExclusionTest, ExclusionProjectionSingleSubtree) {
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{g: 0}"), nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                fromjson("{g: 0}"),
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     auto inputDoc = fromjson(
         "{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: 3, e: [4, 5]}, [6, 7, {f: 8}]], "
@@ -511,7 +612,8 @@ TEST(WildcardKeyGeneratorExclusionTest, ExclusionProjectionSingleSubtree) {
                                     fromjson("{'': 'l', '': 'string'}")});
 
     auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")});
+        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -522,7 +624,11 @@ TEST(WildcardKeyGeneratorExclusionTest, ExclusionProjectionSingleSubtree) {
 }
 
 TEST(WildcardKeyGeneratorExclusionTest, ExclusionProjectionNestedSubtree) {
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{'g.h': 0}"), nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                fromjson("{'g.h': 0}"),
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     auto inputDoc = fromjson(
         "{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: 3, e: [4, 5]}, [6, 7, {f: 8}]], "
@@ -541,7 +647,8 @@ TEST(WildcardKeyGeneratorExclusionTest, ExclusionProjectionNestedSubtree) {
                                     fromjson("{'': 'l', '': 'string'}")});
 
     auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")});
+        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -552,7 +659,11 @@ TEST(WildcardKeyGeneratorExclusionTest, ExclusionProjectionNestedSubtree) {
 }
 
 TEST(WildcardKeyGeneratorExclusionTest, ExclusionProjectionMultikeySubtree) {
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{'g.h.j': 0}"), nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                fromjson("{'g.h.j': 0}"),
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     auto inputDoc = fromjson(
         "{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: 3, e: [4, 5]}, [6, 7, {f: 8}]], "
@@ -572,7 +683,8 @@ TEST(WildcardKeyGeneratorExclusionTest, ExclusionProjectionMultikeySubtree) {
                                     fromjson("{'': 'l', '': 'string'}")});
 
     auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")});
+        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -583,7 +695,11 @@ TEST(WildcardKeyGeneratorExclusionTest, ExclusionProjectionMultikeySubtree) {
 }
 
 TEST(WildcardKeyGeneratorExclusionTest, ExclusionProjectionNestedMultikeySubtree) {
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{'a.e': 0}"), nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                fromjson("{'a.e': 0}"),
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     auto inputDoc = fromjson(
         "{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: 3, e: [4, 5]}, [6, 7, {f: 8}]], "
@@ -603,9 +719,11 @@ TEST(WildcardKeyGeneratorExclusionTest, ExclusionProjectionNestedMultikeySubtree
                                     fromjson("{'': 'g.h.k', '': 12}"),
                                     fromjson("{'': 'l', '': 'string'}")});
 
-    auto expectedMultikeyPaths = makeKeySet({fromjson("{'': 1, '': 'a'}"),
-                                             fromjson("{'': 1, '': 'g.h.j'}"),
-                                             fromjson("{'': 1, '': 'g.h.j.k'}")});
+    auto expectedMultikeyPaths =
+        makeKeySet({fromjson("{'': 1, '': 'a'}"),
+                    fromjson("{'': 1, '': 'g.h.j'}"),
+                    fromjson("{'': 1, '': 'g.h.j.k'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -616,8 +734,11 @@ TEST(WildcardKeyGeneratorExclusionTest, ExclusionProjectionNestedMultikeySubtree
 }
 
 TEST(WildcardKeyGeneratorExclusionTest, ExclusionProjectionMultipleSubtrees) {
-    WildcardKeyGenerator keyGen{
-        fromjson("{'$**': 1}"), fromjson("{'a.b': 0, 'a.c': 0, 'a.e': 0, 'g.h.i': 0}"), nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                fromjson("{'a.b': 0, 'a.c': 0, 'a.e': 0, 'g.h.i': 0}"),
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     auto inputDoc = fromjson(
         "{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: 3, e: [4, 5]}, [6, 7, {f: 8}]], "
@@ -634,9 +755,11 @@ TEST(WildcardKeyGeneratorExclusionTest, ExclusionProjectionMultipleSubtrees) {
                                     fromjson("{'': 'g.h.k', '': 12.0}"),
                                     fromjson("{'': 'l', '': 'string'}")});
 
-    auto expectedMultikeyPaths = makeKeySet({fromjson("{'': 1, '': 'a'}"),
-                                             fromjson("{'': 1, '': 'g.h.j'}"),
-                                             fromjson("{'': 1, '': 'g.h.j.k'}")});
+    auto expectedMultikeyPaths =
+        makeKeySet({fromjson("{'': 1, '': 'a'}"),
+                    fromjson("{'': 1, '': 'g.h.j'}"),
+                    fromjson("{'': 1, '': 'g.h.j.k'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -649,7 +772,11 @@ TEST(WildcardKeyGeneratorExclusionTest, ExclusionProjectionMultipleSubtrees) {
 // Test _id inclusion and exclusion behaviour.
 
 TEST(WildcardKeyGeneratorIdTest, ExcludeIdFieldIfProjectionIsEmpty) {
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                {},
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     auto inputDoc = fromjson(
         "{_id: {id1: 1, id2: 2}, a: [1, {b: 1, e: [4]}, [6, 7, {f: 8}]], g: {h: {i: 9, k: 12.0}}}");
@@ -662,7 +789,8 @@ TEST(WildcardKeyGeneratorIdTest, ExcludeIdFieldIfProjectionIsEmpty) {
                                     fromjson("{'': 'g.h.k', '': 12.0}")});
 
     auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")});
+        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -673,7 +801,11 @@ TEST(WildcardKeyGeneratorIdTest, ExcludeIdFieldIfProjectionIsEmpty) {
 }
 
 TEST(WildcardKeyGeneratorIdTest, ExcludeIdFieldForSingleSubtreeKeyPattern) {
-    WildcardKeyGenerator keyGen{fromjson("{'a.$**': 1}"), {}, nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'a.$**': 1}"),
+                                {},
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     auto inputDoc = fromjson(
         "{_id: {id1: 1, id2: 2}, a: [1, {b: 1, e: [4]}, [6, 7, {f: 8}]], g: {h: {i: 9, k: 12.0}}}");
@@ -684,7 +816,8 @@ TEST(WildcardKeyGeneratorIdTest, ExcludeIdFieldForSingleSubtreeKeyPattern) {
                                     fromjson("{'': 'a.e', '': 4}")});
 
     auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")});
+        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -695,7 +828,11 @@ TEST(WildcardKeyGeneratorIdTest, ExcludeIdFieldForSingleSubtreeKeyPattern) {
 }
 
 TEST(WildcardKeyGeneratorIdTest, PermitIdFieldAsSingleSubtreeKeyPattern) {
-    WildcardKeyGenerator keyGen{fromjson("{'_id.$**': 1}"), {}, nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'_id.$**': 1}"),
+                                {},
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     auto inputDoc = fromjson(
         "{_id: {id1: 1, id2: 2}, a: [1, {b: 1, e: [4]}, [6, 7, {f: 8}]], g: {h: {i: 9, k: 12.0}}}");
@@ -714,7 +851,11 @@ TEST(WildcardKeyGeneratorIdTest, PermitIdFieldAsSingleSubtreeKeyPattern) {
 }
 
 TEST(WildcardKeyGeneratorIdTest, PermitIdSubfieldAsSingleSubtreeKeyPattern) {
-    WildcardKeyGenerator keyGen{fromjson("{'_id.id1.$**': 1}"), {}, nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'_id.id1.$**': 1}"),
+                                {},
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     auto inputDoc = fromjson(
         "{_id: {id1: 1, id2: 2}, a: [1, {b: 1, e: [4]}, [6, 7, {f: 8}]], g: {h: {i: 9, k: 12.0}}}");
@@ -732,7 +873,11 @@ TEST(WildcardKeyGeneratorIdTest, PermitIdSubfieldAsSingleSubtreeKeyPattern) {
 }
 
 TEST(WildcardKeyGeneratorIdTest, ExcludeIdFieldByDefaultForInclusionProjection) {
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{a: 1}"), nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                fromjson("{a: 1}"),
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     auto inputDoc = fromjson(
         "{_id: {id1: 1, id2: 2}, a: [1, {b: 1, e: [4]}, [6, 7, {f: 8}]], g: {h: {i: 9, k: 12.0}}}");
@@ -743,7 +888,8 @@ TEST(WildcardKeyGeneratorIdTest, ExcludeIdFieldByDefaultForInclusionProjection) 
                                     fromjson("{'': 'a.e', '': 4}")});
 
     auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")});
+        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -754,7 +900,11 @@ TEST(WildcardKeyGeneratorIdTest, ExcludeIdFieldByDefaultForInclusionProjection) 
 }
 
 TEST(WildcardKeyGeneratorIdTest, PermitIdSubfieldInclusionInExplicitProjection) {
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{'_id.id1': 1}"), nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                fromjson("{'_id.id1': 1}"),
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     auto inputDoc = fromjson(
         "{_id: {id1: 1, id2: 2}, a: [1, {b: 1, e: [4]}, [6, 7, {f: 8}]], g: {h: {i: 9, k: 12.0}}}");
@@ -772,7 +922,11 @@ TEST(WildcardKeyGeneratorIdTest, PermitIdSubfieldInclusionInExplicitProjection) 
 }
 
 TEST(WildcardKeyGeneratorIdTest, ExcludeIdFieldByDefaultForExclusionProjection) {
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{a: 0}"), nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                fromjson("{a: 0}"),
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     auto inputDoc = fromjson(
         "{_id: {id1: 1, id2: 2}, a: [1, {b: 1, e: [4]}, [6, 7, {f: 8}]], g: {h: {i: 9, k: 12.0}}}");
@@ -791,7 +945,11 @@ TEST(WildcardKeyGeneratorIdTest, ExcludeIdFieldByDefaultForExclusionProjection) 
 }
 
 TEST(WildcardKeyGeneratorIdTest, PermitIdSubfieldExclusionInExplicitProjection) {
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{'_id.id1': 0}"), nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                fromjson("{'_id.id1': 0}"),
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     auto inputDoc = fromjson(
         "{_id: {id1: 1, id2: 2}, a: [1, {b: 1, e: [4]}, [6, 7, {f: 8}]], g: {h: {i: 9, k: 12.0}}}");
@@ -805,7 +963,8 @@ TEST(WildcardKeyGeneratorIdTest, PermitIdSubfieldExclusionInExplicitProjection) 
                                     fromjson("{'': 'g.h.k', '': 12.0}")});
 
     auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")});
+        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -816,7 +975,11 @@ TEST(WildcardKeyGeneratorIdTest, PermitIdSubfieldExclusionInExplicitProjection) 
 }
 
 TEST(WildcardKeyGeneratorIdTest, IncludeIdFieldIfExplicitlySpecifiedInProjection) {
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{_id: 1, a: 1}"), nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                fromjson("{_id: 1, a: 1}"),
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     auto inputDoc = fromjson(
         "{_id: {id1: 1, id2: 2}, a: [1, {b: 1, e: [4]}, [6, 7, {f: 8}]], g: {h: {i: 9, k: 12.0}}}");
@@ -829,7 +992,8 @@ TEST(WildcardKeyGeneratorIdTest, IncludeIdFieldIfExplicitlySpecifiedInProjection
                                     fromjson("{'': 'a.e', '': 4}")});
 
     auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")});
+        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -840,7 +1004,11 @@ TEST(WildcardKeyGeneratorIdTest, IncludeIdFieldIfExplicitlySpecifiedInProjection
 }
 
 TEST(WildcardKeyGeneratorIdTest, ExcludeIdFieldIfExplicitlySpecifiedInProjection) {
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{_id: 0, a: 1}"), nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                fromjson("{_id: 0, a: 1}"),
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     auto inputDoc = fromjson(
         "{_id: {id1: 1, id2: 2}, a: [1, {b: 1, e: [4]}, [6, 7, {f: 8}]], g: {h: {i: 9, k: 12.0}}}");
@@ -851,7 +1019,8 @@ TEST(WildcardKeyGeneratorIdTest, ExcludeIdFieldIfExplicitlySpecifiedInProjection
                                     fromjson("{'': 'a.e', '': 4}")});
 
     auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")});
+        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -862,7 +1031,11 @@ TEST(WildcardKeyGeneratorIdTest, ExcludeIdFieldIfExplicitlySpecifiedInProjection
 }
 
 TEST(WildcardKeyGeneratorIdTest, IncludeIdFieldIfExplicitlySpecifiedInExclusionProjection) {
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{_id: 1, a: 0}"), nullptr};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                fromjson("{_id: 1, a: 0}"),
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     auto inputDoc = fromjson(
         "{_id: {id1: 1, id2: 2}, a: [1, {b: 1, e: [4]}, [6, 7, {f: 8}]], g: {h: {i: 9, k: 12.0}}}");
@@ -886,7 +1059,11 @@ TEST(WildcardKeyGeneratorIdTest, IncludeIdFieldIfExplicitlySpecifiedInExclusionP
 
 TEST(WildcardKeyGeneratorCollationTest, CollationMixedPathAndKeyTypes) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, &collator};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                {},
+                                &collator,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     // Verify that the collation is only applied to String values, but all types are indexed.
     auto dateVal = "{'$date': 1529453450288}"_sd;
@@ -916,10 +1093,12 @@ TEST(WildcardKeyGeneratorCollationTest, CollationMixedPathAndKeyTypes) {
                                     fromjson("{'': 'g.h.k', '': 12.0}"),
                                     fromjson("{'': 'l', '': 'gnirts'}")});
 
-    auto expectedMultikeyPaths = makeKeySet({fromjson("{'': 1, '': 'a'}"),
-                                             fromjson("{'': 1, '': 'a.e'}"),
-                                             fromjson("{'': 1, '': 'g.h.j'}"),
-                                             fromjson("{'': 1, '': 'g.h.j.k'}")});
+    auto expectedMultikeyPaths =
+        makeKeySet({fromjson("{'': 1, '': 'a'}"),
+                    fromjson("{'': 1, '': 'a.e'}"),
+                    fromjson("{'': 1, '': 'g.h.j'}"),
+                    fromjson("{'': 1, '': 'g.h.j.k'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -930,7 +1109,11 @@ TEST(WildcardKeyGeneratorCollationTest, CollationMixedPathAndKeyTypes) {
 }
 
 TEST(WildcardKeyGeneratorDottedFieldsTest, DoNotIndexDottedFields) {
-    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, {}};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"),
+                                {},
+                                {},
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     auto inputDoc = fromjson(
         "{'a.b': 0, '.b': 1, 'b.': 2, a: {'.b': 3, 'b.': 4, 'b.c': 5, 'q': 6}, b: [{'d.e': 7}, {r: "
@@ -941,7 +1124,9 @@ TEST(WildcardKeyGeneratorDottedFieldsTest, DoNotIndexDottedFields) {
                                     fromjson("{'': 'b', '': [{'a.b': 9}]}"),
                                     fromjson("{'': 'c', '': 10}")});
 
-    auto expectedMultikeyPaths = makeKeySet({fromjson("{'': 1, '': 'b'}")});
+    auto expectedMultikeyPaths =
+        makeKeySet({fromjson("{'': 1, '': 'b'}")},
+                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -952,7 +1137,11 @@ TEST(WildcardKeyGeneratorDottedFieldsTest, DoNotIndexDottedFields) {
 }
 
 TEST(WildcardKeyGeneratorDottedFieldsTest, DoNotIndexDottedFieldsWithSimilarSubpathInKey) {
-    WildcardKeyGenerator keyGen{fromjson("{'a.b.$**': 1}"), {}, {}};
+    WildcardKeyGenerator keyGen{fromjson("{'a.b.$**': 1}"),
+                                {},
+                                {},
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
 
     auto inputDoc = fromjson("{'a.b': 0}");
 

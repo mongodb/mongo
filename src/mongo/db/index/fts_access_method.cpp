@@ -40,10 +40,16 @@ FTSAccessMethod::FTSAccessMethod(IndexCatalogEntry* btreeState,
       _ftsSpec(btreeState->descriptor()->infoObj()) {}
 
 void FTSAccessMethod::doGetKeys(const BSONObj& obj,
-                                BSONObjSet* keys,
-                                BSONObjSet* multikeyMetadataKeys,
-                                MultikeyPaths* multikeyPaths) const {
-    ExpressionKeysPrivate::getFTSKeys(obj, _ftsSpec, keys);
+                                KeyStringSet* keys,
+                                KeyStringSet* multikeyMetadataKeys,
+                                MultikeyPaths* multikeyPaths,
+                                boost::optional<RecordId> id) const {
+    ExpressionKeysPrivate::getFTSKeys(obj,
+                                      _ftsSpec,
+                                      keys,
+                                      getSortedDataInterface()->getKeyStringVersion(),
+                                      getSortedDataInterface()->getOrdering(),
+                                      id);
 }
 
 }  // namespace mongo

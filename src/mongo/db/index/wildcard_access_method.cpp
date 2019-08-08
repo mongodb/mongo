@@ -40,21 +40,25 @@ namespace mongo {
 WildcardAccessMethod::WildcardAccessMethod(IndexCatalogEntry* wildcardState,
                                            std::unique_ptr<SortedDataInterface> btree)
     : AbstractIndexAccessMethod(wildcardState, std::move(btree)),
-      _keyGen(
-          _descriptor->keyPattern(), _descriptor->pathProjection(), _btreeState->getCollator()) {}
+      _keyGen(_descriptor->keyPattern(),
+              _descriptor->pathProjection(),
+              _btreeState->getCollator(),
+              getSortedDataInterface()->getKeyStringVersion(),
+              getSortedDataInterface()->getOrdering()) {}
 
 bool WildcardAccessMethod::shouldMarkIndexAsMultikey(
-    const std::vector<BSONObj>& keys,
-    const std::vector<BSONObj>& multikeyMetadataKeys,
+    const std::vector<KeyString::Value>& keys,
+    const std::vector<KeyString::Value>& multikeyMetadataKeys,
     const MultikeyPaths& multikeyPaths) const {
     return !multikeyMetadataKeys.empty();
 }
 
 void WildcardAccessMethod::doGetKeys(const BSONObj& obj,
-                                     BSONObjSet* keys,
-                                     BSONObjSet* multikeyMetadataKeys,
-                                     MultikeyPaths* multikeyPaths) const {
-    _keyGen.generateKeys(obj, keys, multikeyMetadataKeys);
+                                     KeyStringSet* keys,
+                                     KeyStringSet* multikeyMetadataKeys,
+                                     MultikeyPaths* multikeyPaths,
+                                     boost::optional<RecordId> id) const {
+    _keyGen.generateKeys(obj, keys, multikeyMetadataKeys, id);
 }
 
 FieldRef WildcardAccessMethod::extractMultikeyPathFromIndexKey(const IndexKeyEntry& entry) {

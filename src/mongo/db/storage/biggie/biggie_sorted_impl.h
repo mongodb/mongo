@@ -49,7 +49,7 @@ public:
                                const BSONObj& keyPattern);
     void commit(bool mayInterrupt) override;
     virtual Status addKey(const BSONObj& key, const RecordId& loc);
-    virtual Status addKey(const KeyString::Builder& keyString, const RecordId& loc);
+    virtual Status addKey(const KeyString::Value& keyString, const RecordId& loc);
 
 private:
     OperationContext* _opCtx;
@@ -86,7 +86,7 @@ public:
                           const RecordId& loc,
                           bool dupsAllowed) override;
     virtual Status insert(OperationContext* opCtx,
-                          const KeyString::Builder& keyString,
+                          const KeyString::Value& keyString,
                           const RecordId& loc,
                           bool dupsAllowed) override;
     virtual void unindex(OperationContext* opCtx,
@@ -94,7 +94,7 @@ public:
                          const RecordId& loc,
                          bool dupsAllowed) override;
     virtual void unindex(OperationContext* opCtx,
-                         const KeyString::Builder& keyString,
+                         const KeyString::Value& keyString,
                          const RecordId& loc,
                          bool dupsAllowed) override;
     virtual Status dupKeyCheck(OperationContext* opCtx, const BSONObj& key) override;

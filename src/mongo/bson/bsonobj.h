@@ -532,6 +532,10 @@ public:
         passed object. */
     BSONObj replaceFieldNames(const BSONObj& obj) const;
 
+    static BSONObj stripFieldNames(const BSONObj& obj);
+
+    bool hasFieldNames() const;
+
     /**
      * Returns true if this object is valid according to the specified BSON version, and returns
      * false otherwise.

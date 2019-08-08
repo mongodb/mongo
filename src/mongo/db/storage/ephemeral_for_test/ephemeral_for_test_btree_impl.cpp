@@ -48,26 +48,6 @@ using std::vector;
 
 namespace {
 
-
-bool hasFieldNames(const BSONObj& obj) {
-    BSONForEach(e, obj) {
-        if (e.fieldName()[0])
-            return true;
-    }
-    return false;
-}
-
-BSONObj stripFieldNames(const BSONObj& query) {
-    if (!hasFieldNames(query))
-        return query;
-
-    BSONObjBuilder bb;
-    BSONForEach(e, query) {
-        bb.appendAs(e, StringData());
-    }
-    return bb.obj();
-}
-
 typedef std::set<IndexKeyEntry, IndexEntryComparison> IndexSet;
 
 bool keyExists(const IndexSet& data, const BSONObj& key) {
@@ -111,7 +91,7 @@ public:
         // inserts should be in ascending (key, RecordId) order.
 
         invariant(loc.isValid());
-        invariant(!hasFieldNames(key));
+        invariant(!key.hasFieldNames());
 
         if (!_data->empty()) {
             // Compare specified key with last inserted key, ignoring its RecordId
@@ -131,11 +111,10 @@ public:
         return Status::OK();
     }
 
-    Status addKey(const KeyString::Builder& keyString, const RecordId& loc) {
+    Status addKey(const KeyString::Value& keyString, const RecordId& loc) {
         dassert(loc == KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
 
-        auto key = KeyString::toBson(
-            keyString.getBuffer(), keyString.getSize(), _ordering, keyString.getTypeBits());
+        auto key = KeyString::toBson(keyString, _ordering);
 
         return addKey(key, loc);
     }
@@ -186,7 +165,7 @@ public:
                           const RecordId& loc,
                           bool dupsAllowed) {
         invariant(loc.isValid());
-        invariant(!hasFieldNames(key));
+        invariant(!key.hasFieldNames());
 
 
         // TODO optimization: save the iterator from the dup-check to speed up insert
@@ -202,13 +181,12 @@ public:
     }
 
     virtual Status insert(OperationContext* opCtx,
-                          const KeyString::Builder& keyString,
+                          const KeyString::Value& keyString,
                           const RecordId& loc,
                           bool dupsAllowed) {
         dassert(loc == KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
 
-        auto key = KeyString::toBson(
-            keyString.getBuffer(), keyString.getSize(), _ordering, keyString.getTypeBits());
+        auto key = KeyString::toBson(keyString, _ordering);
 
         return insert(opCtx, key, loc, dupsAllowed);
     }
@@ -218,7 +196,7 @@ public:
                          const RecordId& loc,
                          bool dupsAllowed) {
         invariant(loc.isValid());
-        invariant(!hasFieldNames(key));
+        invariant(!key.hasFieldNames());
 
         IndexKeyEntry entry(key.getOwned(), loc);
         const size_t numDeleted = _data->erase(entry);
@@ -230,13 +208,12 @@ public:
     }
 
     virtual void unindex(OperationContext* opCtx,
-                         const KeyString::Builder& keyString,
+                         const KeyString::Value& keyString,
                          const RecordId& loc,
                          bool dupsAllowed) {
         dassert(loc == KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
 
-        auto key = KeyString::toBson(
-            keyString.getBuffer(), keyString.getSize(), _ordering, keyString.getTypeBits());
+        auto key = KeyString::toBson(keyString, _ordering);
 
         return unindex(opCtx, key, loc, dupsAllowed);
     }
@@ -259,7 +236,7 @@ public:
     }
 
     virtual Status dupKeyCheck(OperationContext* opCtx, const BSONObj& key) {
-        invariant(!hasFieldNames(key));
+        invariant(!key.hasFieldNames());
         if (isDup(*_data, key))
             return buildDupKeyErrorStatus(key, _collectionNamespace, _indexName, _keyPattern);
         return Status::OK();
@@ -307,7 +284,7 @@ public:
 
             // NOTE: this uses the opposite min/max rules as a normal seek because a forward
             // scan should land after the key if inclusive and before if exclusive.
-            _endState = EndState(stripFieldNames(key),
+            _endState = EndState(BSONObj::stripFieldNames(key),
                                  _forward == inclusive ? RecordId::max() : RecordId::min());
             seekEndCursor();
         }
@@ -322,7 +299,7 @@ public:
                     return {};
                 }
             } else {
-                const BSONObj query = stripFieldNames(key);
+                const BSONObj query = BSONObj::stripFieldNames(key);
                 locate(query, _forward == inclusive ? RecordId::min() : RecordId::max());
                 _lastMoveWasRestore = false;
                 if (_isEOF)

@@ -173,7 +173,7 @@ public:
         return Status::OK();
     }
 
-    virtual Status addKey(const KeyString::Builder& keyString, const RecordId& loc) {
+    virtual Status addKey(const KeyString::Value& keyString, const RecordId& loc) {
         return Status::OK();
     }
 };
@@ -197,7 +197,7 @@ public:
     }
 
     virtual Status insert(OperationContext* opCtx,
-                          const KeyString::Builder& keyString,
+                          const KeyString::Value& keyString,
                           const RecordId& loc,
                           bool dupsAllowed) {
         return Status::OK();
@@ -209,7 +209,7 @@ public:
                          bool dupsAllowed) {}
 
     virtual void unindex(OperationContext* opCtx,
-                         const KeyString::Builder& keyString,
+                         const KeyString::Value& keyString,
                          const RecordId& loc,
                          bool dupsAllowed) {}
 

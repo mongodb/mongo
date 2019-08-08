@@ -67,7 +67,12 @@ namespace dps = ::mongo::dotted_path_support;
  * Insert the BSONObj into keys.
  * Used by getHaystackKeys.
  */
-void addKey(const string& root, const BSONElement& e, BSONObjSet* keys) {
+void addKey(const string& root,
+            const BSONElement& e,
+            KeyStringSet* keys,
+            KeyString::Version keyStringVersion,
+            Ordering ordering,
+            boost::optional<RecordId> id) {
     BSONObjBuilder buf;
     buf.append("", root);
 
@@ -76,7 +81,11 @@ void addKey(const string& root, const BSONElement& e, BSONObjSet* keys) {
     else
         buf.appendAs(e, "");
 
-    keys->insert(buf.obj());
+    KeyString::HeapBuilder keyString(keyStringVersion, buf.obj(), ordering);
+    if (id) {
+        keyString.appendRecordId(*id);
+    }
+    keys->insert(keyString.release());
 }
 
 //
@@ -236,7 +245,10 @@ using std::vector;
 // static
 void ExpressionKeysPrivate::get2DKeys(const BSONObj& obj,
                                       const TwoDIndexingParams& params,
-                                      BSONObjSet* keys) {
+                                      KeyStringSet* keys,
+                                      KeyString::Version keyStringVersion,
+                                      Ordering ordering,
+                                      boost::optional<RecordId> id) {
     BSONElementMultiSet bSet;
 
     // Get all the nested location fields, but don't return individual elements from
@@ -323,7 +335,11 @@ void ExpressionKeysPrivate::get2DKeys(const BSONObj& obj,
                     b.append("", aBuilder.arr());
                 }
             }
-            keys->insert(b.obj());
+            KeyString::Builder keyString(keyStringVersion, b.obj(), ordering);
+            if (id) {
+                keyString.appendRecordId(*id);
+            }
+            keys->insert(keyString.getValueCopy());
             if (singleElement)
                 break;
         }
@@ -333,8 +349,11 @@ void ExpressionKeysPrivate::get2DKeys(const BSONObj& obj,
 // static
 void ExpressionKeysPrivate::getFTSKeys(const BSONObj& obj,
                                        const fts::FTSSpec& ftsSpec,
-                                       BSONObjSet* keys) {
-    fts::FTSIndexFormat::getKeys(ftsSpec, obj, keys);
+                                       KeyStringSet* keys,
+                                       KeyString::Version keyStringVersion,
+                                       Ordering ordering,
+                                       boost::optional<RecordId> id) {
+    fts::FTSIndexFormat::getKeys(ftsSpec, obj, keys, keyStringVersion, ordering, id);
 }
 
 // static
@@ -344,7 +363,10 @@ void ExpressionKeysPrivate::getHashKeys(const BSONObj& obj,
                                         int hashVersion,
                                         bool isSparse,
                                         const CollatorInterface* collator,
-                                        BSONObjSet* keys) {
+                                        KeyStringSet* keys,
+                                        KeyString::Version keyStringVersion,
+                                        Ordering ordering,
+                                        boost::optional<RecordId> id) {
     const char* cstr = hashedField.c_str();
     BSONElement fieldVal = dps::extractElementAtPath(obj, cstr);
 
@@ -363,10 +385,19 @@ void ExpressionKeysPrivate::getHashKeys(const BSONObj& obj,
 
     if (!fieldVal.eoo()) {
         BSONObj key = BSON("" << makeSingleHashKey(fieldVal, seed, hashVersion));
-        keys->insert(key);
+        KeyString::HeapBuilder keyString(keyStringVersion, key, ordering);
+        if (id) {
+            keyString.appendRecordId(*id);
+        }
+        keys->insert(keyString.release());
     } else if (!isSparse) {
         BSONObj nullObj = BSON("" << BSONNULL);
-        keys->insert(BSON("" << makeSingleHashKey(nullObj.firstElement(), seed, hashVersion)));
+        BSONObj key = BSON("" << makeSingleHashKey(nullObj.firstElement(), seed, hashVersion));
+        KeyString::HeapBuilder keyString(keyStringVersion, key, ordering);
+        if (id) {
+            keyString.appendRecordId(*id);
+        }
+        keys->insert(keyString.release());
     }
 }
 
@@ -381,7 +412,10 @@ void ExpressionKeysPrivate::getHaystackKeys(const BSONObj& obj,
                                             const std::string& geoField,
                                             const std::vector<std::string>& otherFields,
                                             double bucketSize,
-                                            BSONObjSet* keys) {
+                                            KeyStringSet* keys,
+                                            KeyString::Version keyStringVersion,
+                                            Ordering ordering,
+                                            boost::optional<RecordId> id) {
     BSONElement loc = dps::extractElementAtPath(obj, geoField);
 
     if (loc.eoo()) {
@@ -414,14 +448,14 @@ void ExpressionKeysPrivate::getHaystackKeys(const BSONObj& obj,
         // We're indexing a document that doesn't have the secondary non-geo field present.
         // XXX: do we want to add this even if all.size() > 0?  result:empty search terms
         // match everything instead of only things w/empty search terms)
-        addKey(root, BSONElement(), keys);
+        addKey(root, BSONElement(), keys, keyStringVersion, ordering, id);
     } else {
         // Ex:If our secondary field is type: "foo" or type: {a:"foo", b:"bar"},
         // all.size()==1.  We can query on the complete field.
         // Ex: If our secondary field is type: ["A", "B"] all.size()==2 and all has values
         // "A" and "B".  The query looks for any of the fields in the array.
         for (BSONElementSet::iterator i = all.begin(); i != all.end(); ++i) {
-            addKey(root, *i, keys);
+            addKey(root, *i, keys, keyStringVersion, ordering, id);
         }
     }
 }
@@ -445,8 +479,11 @@ std::string ExpressionKeysPrivate::makeHaystackString(int hashedX, int hashedY) 
 void ExpressionKeysPrivate::getS2Keys(const BSONObj& obj,
                                       const BSONObj& keyPattern,
                                       const S2IndexingParams& params,
-                                      BSONObjSet* keys,
-                                      MultikeyPaths* multikeyPaths) {
+                                      KeyStringSet* keys,
+                                      MultikeyPaths* multikeyPaths,
+                                      KeyString::Version keyStringVersion,
+                                      Ordering ordering,
+                                      boost::optional<RecordId> id) {
     BSONObjSet keysToAdd = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
 
     // Does one of our documents have a geo field?
@@ -560,7 +597,14 @@ void ExpressionKeysPrivate::getS2Keys(const BSONObj& obj,
                   << " num keys: " << keysToAdd.size() << " obj inserted: " << redact(obj);
     }
 
-    *keys = std::move(keysToAdd);
+    invariant(keys->empty());
+    for (const auto& key : keysToAdd) {
+        KeyString::HeapBuilder keyString(keyStringVersion, key, ordering);
+        if (id) {
+            keyString.appendRecordId(*id);
+        }
+        keys->insert(keyString.release());
+    }
 }
 
 }  // namespace mongo

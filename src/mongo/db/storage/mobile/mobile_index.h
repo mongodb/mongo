@@ -58,7 +58,7 @@ public:
                   bool dupsAllowed) override;
 
     Status insert(OperationContext* opCtx,
-                  const KeyString::Builder& keyString,
+                  const KeyString::Value& keyString,
                   const RecordId& recId,
                   bool dupsAllowed) override;
 
@@ -68,7 +68,7 @@ public:
                  bool dupsAllowed) override;
 
     void unindex(OperationContext* opCtx,
-                 const KeyString::Builder& keyString,
+                 const KeyString::Value& keyString,
                  const RecordId& recId,
                  bool dupsAllowed) override;
 
@@ -128,12 +128,12 @@ protected:
                    KeyString::Builder* value = nullptr);
 
     virtual Status _insert(OperationContext* opCtx,
-                           const KeyString::Builder& keyString,
+                           const KeyString::Value& keyString,
                            const RecordId& recId,
                            bool dupsAllowed) = 0;
 
     virtual void _unindex(OperationContext* opCtx,
-                          const KeyString::Builder& keyString,
+                          const KeyString::Value& keyString,
                           const RecordId& recId,
                           bool dupsAllowed) = 0;
 
@@ -162,12 +162,12 @@ public:
 
 protected:
     Status _insert(OperationContext* opCtx,
-                   const KeyString::Builder& keyString,
+                   const KeyString::Value& keyString,
                    const RecordId& recId,
                    bool dupsAllowed) override;
 
     void _unindex(OperationContext* opCtx,
-                  const KeyString::Builder& keyString,
+                  const KeyString::Value& keyString,
                   const RecordId& recId,
                   bool dupsAllowed) override;
 };
@@ -185,12 +185,12 @@ public:
 
 protected:
     Status _insert(OperationContext* opCtx,
-                   const KeyString::Builder& keyString,
+                   const KeyString::Value& keyString,
                    const RecordId& recId,
                    bool dupsAllowed) override;
 
     void _unindex(OperationContext* opCtx,
-                  const KeyString::Builder& keyString,
+                  const KeyString::Value& keyString,
                   const RecordId& recId,
                   bool dupsAllowed) override;
 

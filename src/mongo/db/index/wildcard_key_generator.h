@@ -32,6 +32,8 @@
 #include "mongo/db/exec/projection_exec_agg.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/sorted_data_interface.h"
 
 namespace mongo {
 
@@ -54,7 +56,9 @@ public:
 
     WildcardKeyGenerator(BSONObj keyPattern,
                          BSONObj pathProjection,
-                         const CollatorInterface* collator);
+                         const CollatorInterface* collator,
+                         KeyString::Version keyStringVersion,
+                         Ordering ordering);
 
     /**
      * Returns a pointer to the key generator's underlying ProjectionExecAgg.
@@ -65,35 +69,48 @@ public:
 
     /**
      * Applies the appropriate Wildcard projection to the input doc, and then adds one key-value
-     * pair to the BSONObjSet 'keys' for each leaf node in the post-projection document:
+     * pair to the set 'keys' for each leaf node in the post-projection document:
      *      { '': 'path.to.field', '': <collation-aware-field-value> }
      * Also adds one entry to 'multikeyPaths' for each array encountered in the post-projection
      * document, in the following format:
      *      { '': 1, '': 'path.to.array' }
      */
-    void generateKeys(BSONObj inputDoc, BSONObjSet* keys, BSONObjSet* multikeyPaths) const;
+    void generateKeys(BSONObj inputDoc,
+                      KeyStringSet* keys,
+                      KeyStringSet* multikeyPaths,
+                      boost::optional<RecordId> id = boost::none) const;
 
 private:
     // Traverses every path of the post-projection document, adding keys to the set as it goes.
     void _traverseWildcard(BSONObj obj,
                            bool objIsArray,
                            FieldRef* path,
-                           BSONObjSet* keys,
-                           BSONObjSet* multikeyPaths) const;
+                           KeyStringSet* keys,
+                           KeyStringSet* multikeyPaths,
+                           boost::optional<RecordId> id) const;
 
     // Helper functions to format the entry appropriately before adding it to the key/path tracker.
-    void _addMultiKey(const FieldRef& fullPath, BSONObjSet* multikeyPaths) const;
-    void _addKey(BSONElement elem, const FieldRef& fullPath, BSONObjSet* keys) const;
+    void _addMultiKey(const FieldRef& fullPath, KeyStringSet* multikeyPaths) const;
+    void _addKey(BSONElement elem,
+                 const FieldRef& fullPath,
+                 KeyStringSet* keys,
+                 boost::optional<RecordId> id) const;
 
     // Helper to check whether the element is a nested array, and conditionally add it to 'keys'.
     bool _addKeyForNestedArray(BSONElement elem,
                                const FieldRef& fullPath,
                                bool enclosingObjIsArray,
-                               BSONObjSet* keys) const;
-    bool _addKeyForEmptyLeaf(BSONElement elem, const FieldRef& fullPath, BSONObjSet* keys) const;
+                               KeyStringSet* keys,
+                               boost::optional<RecordId> id) const;
+    bool _addKeyForEmptyLeaf(BSONElement elem,
+                             const FieldRef& fullPath,
+                             KeyStringSet* keys,
+                             boost::optional<RecordId> id) const;
 
     std::unique_ptr<ProjectionExecAgg> _projExec;
     const CollatorInterface* _collator;
     const BSONObj _keyPattern;
+    const KeyString::Version _keyStringVersion;
+    const Ordering _ordering;
 };
 }  // namespace mongo

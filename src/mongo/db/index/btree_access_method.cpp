@@ -56,15 +56,21 @@ BtreeAccessMethod::BtreeAccessMethod(IndexCatalogEntry* btreeState,
         fixed.push_back(BSONElement());
     }
 
-    _keyGenerator = std::make_unique<BtreeKeyGenerator>(
-        fieldNames, fixed, _descriptor->isSparse(), btreeState->getCollator());
+    _keyGenerator =
+        std::make_unique<BtreeKeyGenerator>(fieldNames,
+                                            fixed,
+                                            _descriptor->isSparse(),
+                                            btreeState->getCollator(),
+                                            getSortedDataInterface()->getKeyStringVersion(),
+                                            getSortedDataInterface()->getOrdering());
 }
 
 void BtreeAccessMethod::doGetKeys(const BSONObj& obj,
-                                  BSONObjSet* keys,
-                                  BSONObjSet* multikeyMetadataKeys,
-                                  MultikeyPaths* multikeyPaths) const {
-    _keyGenerator->getKeys(obj, keys, multikeyPaths);
+                                  KeyStringSet* keys,
+                                  KeyStringSet* multikeyMetadataKeys,
+                                  MultikeyPaths* multikeyPaths,
+                                  boost::optional<RecordId> id) const {
+    _keyGenerator->getKeys(obj, keys, multikeyPaths, id);
 }
 
 }  // namespace mongo

@@ -68,7 +68,12 @@ SortKeyGenerator::SortKeyGenerator(SortPattern sortPattern, const CollatorInterf
     }
 
     constexpr bool isSparse = false;
-    _indexKeyGen = std::make_unique<BtreeKeyGenerator>(fieldNames, fixed, isSparse, _collator);
+    _indexKeyGen = std::make_unique<BtreeKeyGenerator>(fieldNames,
+                                                       fixed,
+                                                       isSparse,
+                                                       _collator,
+                                                       KeyString::Version::kLatestVersion,
+                                                       Ordering::make(_sortSpecWithoutMeta));
 }
 
 StatusWith<BSONObj> SortKeyGenerator::getSortKey(const WorkingSetMember& wsm) const {
@@ -162,10 +167,7 @@ StatusWith<BSONObj> SortKeyGenerator::getSortKeyFromDocumentWithoutMetadata(
     // The keys themselves will incorporate the collation, with strings translated to their
     // corresponding collation keys. Therefore, we use the simple string comparator when comparing
     // the keys themselves.
-    const StringData::ComparatorInterface* stringComparator = nullptr;
-    BSONObjComparator patternCmp(
-        _sortSpecWithoutMeta, BSONObjComparator::FieldNamesMode::kConsider, stringComparator);
-    BSONObjSet keys = patternCmp.makeBSONObjSet();
+    KeyStringSet keys;
 
     try {
         // There's no need to compute the prefixes of the indexed fields that cause the index to be
@@ -187,7 +189,7 @@ StatusWith<BSONObj> SortKeyGenerator::getSortKeyFromDocumentWithoutMetadata(
     invariant(!keys.empty());
 
     // The sort key is the first index key, ordered according to the pattern '_sortSpecWithoutMeta'.
-    return *keys.begin();
+    return KeyString::toBson(*keys.begin(), Ordering::make(_sortSpecWithoutMeta));
 }
 
 }  // namespace mongo

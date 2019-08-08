@@ -70,19 +70,6 @@ using std::string;
 using std::unique_ptr;
 using std::vector;
 
-namespace {
-
-BSONObj stripFieldNames(const BSONObj& obj) {
-    BSONObjIterator it(obj);
-    BSONObjBuilder bob;
-    while (it.more()) {
-        bob.appendAs(it.next(), "");
-    }
-    return bob.obj();
-}
-
-}  // namespace
-
 /**
  * A command for manually constructing a query tree and running it.
  *
@@ -300,8 +287,8 @@ public:
 
             IndexScanParams params(opCtx, desc);
             params.bounds.isSimpleRange = true;
-            params.bounds.startKey = stripFieldNames(nodeArgs["startKey"].Obj());
-            params.bounds.endKey = stripFieldNames(nodeArgs["endKey"].Obj());
+            params.bounds.startKey = BSONObj::stripFieldNames(nodeArgs["startKey"].Obj());
+            params.bounds.endKey = BSONObj::stripFieldNames(nodeArgs["endKey"].Obj());
             params.bounds.boundInclusion = IndexBounds::makeBoundInclusionFromBoundBools(
                 nodeArgs["startKeyInclusive"].Bool(), nodeArgs["endKeyInclusive"].Bool());
             params.direction = nodeArgs["direction"].numberInt();

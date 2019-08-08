@@ -107,7 +107,7 @@ public:
      *         at a RecordId other than 'loc' and duplicates were not allowed
      */
     virtual Status insert(OperationContext* opCtx,
-                          const KeyString::Builder& keyString,
+                          const KeyString::Value& keyString,
                           const RecordId& loc,
                           bool dupsAllowed) = 0;
 
@@ -131,7 +131,7 @@ public:
      *        otherwise
      */
     virtual void unindex(OperationContext* opCtx,
-                         const KeyString::Builder& keyString,
+                         const KeyString::Value& keyString,
                          const RecordId& loc,
                          bool dupsAllowed) = 0;
 
@@ -421,7 +421,7 @@ public:
      * this is violated an error Status (ErrorCodes::InternalError) will be returned.
      */
     virtual Status addKey(const BSONObj& key, const RecordId& loc) = 0;
-    virtual Status addKey(const KeyString::Builder& keyString, const RecordId& loc) = 0;
+    virtual Status addKey(const KeyString::Value& keyString, const RecordId& loc) = 0;
 
     /**
      * Do any necessary work to finish building the tree.

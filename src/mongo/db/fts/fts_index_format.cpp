@@ -135,7 +135,12 @@ MONGO_INITIALIZER(FTSIndexFormat)(InitializerContext* context) {
     return Status::OK();
 }
 
-void FTSIndexFormat::getKeys(const FTSSpec& spec, const BSONObj& obj, BSONObjSet* keys) {
+void FTSIndexFormat::getKeys(const FTSSpec& spec,
+                             const BSONObj& obj,
+                             KeyStringSet* keys,
+                             KeyString::Version keyStringVersion,
+                             Ordering ordering,
+                             boost::optional<RecordId> id) {
     int extraSize = 0;
     vector<BSONElement> extrasBefore;
     vector<BSONElement> extrasAfter;
@@ -182,7 +187,11 @@ void FTSIndexFormat::getKeys(const FTSSpec& spec, const BSONObj& obj, BSONObjSet
 
         verify(guess >= res.objsize());
 
-        keys->insert(res);
+        KeyString::HeapBuilder keyString(keyStringVersion, res, ordering);
+        if (id) {
+            keyString.appendRecordId(*id);
+        }
+        keys->insert(keyString.release());
         keyBSONSize += res.objsize();
     }
 }

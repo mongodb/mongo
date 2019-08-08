@@ -93,14 +93,15 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
             }
         }
 
-        BSONObjSet documentKeySet = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
-        BSONObjSet multikeyMetadataKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+        KeyStringSet documentKeySet;
+        KeyStringSet multikeyMetadataKeys;
         MultikeyPaths multikeyPaths;
         iam->getKeys(recordBson,
                      IndexAccessMethod::GetKeysMode::kEnforceConstraints,
                      &documentKeySet,
                      &multikeyMetadataKeys,
-                     &multikeyPaths);
+                     &multikeyPaths,
+                     recordId);
 
         if (!descriptor->isMultikey(_opCtx) &&
             iam->shouldMarkIndexAsMultikey(
@@ -115,14 +116,30 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
             curRecordResults.valid = false;
         }
 
-        for (const auto& key : multikeyMetadataKeys) {
-            _indexConsistency->addMultikeyMetadataPath(makeWildCardMultikeyMetadataKeyString(key),
-                                                       &indexInfo);
+        for (const auto& keyString : multikeyMetadataKeys) {
+            try {
+                auto key = KeyString::toBsonSafe(keyString.getBuffer(),
+                                                 keyString.getSize(),
+                                                 indexInfo.ord,
+                                                 keyString.getTypeBits());
+                _indexConsistency->addMultikeyMetadataPath(
+                    makeWildCardMultikeyMetadataKeyString(key), &indexInfo);
+            } catch (...) {
+                return exceptionToStatus();
+            }
         }
 
-        for (const auto& key : documentKeySet) {
-            indexInfo.ks->resetToKey(key, indexInfo.ord, recordId);
-            _indexConsistency->addDocKey(*indexInfo.ks, &indexInfo, recordId, key);
+        for (const auto& keyString : documentKeySet) {
+            try {
+                auto key = KeyString::toBsonSafe(keyString.getBuffer(),
+                                                 keyString.getSize(),
+                                                 indexInfo.ord,
+                                                 keyString.getTypeBits());
+                indexInfo.ks->resetToKey(key, indexInfo.ord, recordId);
+                _indexConsistency->addDocKey(*indexInfo.ks, &indexInfo, recordId, key);
+            } catch (...) {
+                return exceptionToStatus();
+            }
         }
     }
     return status;

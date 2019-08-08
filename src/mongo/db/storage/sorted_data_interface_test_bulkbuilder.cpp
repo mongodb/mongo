@@ -83,7 +83,7 @@ TEST(SortedDataInterface, BuilderAddKeyString) {
         const std::unique_ptr<SortedDataBuilderInterface> builder(
             sorted->getBulkBuilder(opCtx.get(), true));
 
-        ASSERT_OK(builder->addKey(keyString1, loc1));
+        ASSERT_OK(builder->addKey(keyString1.getValueCopy(), loc1));
         builder->commit(false);
     }
 
@@ -200,8 +200,9 @@ TEST(SortedDataInterface, BuilderAddSameKeyString) {
         const std::unique_ptr<SortedDataBuilderInterface> builder(
             sorted->getBulkBuilder(opCtx.get(), false));
 
-        ASSERT_OK(builder->addKey(keyStringLoc1, loc1));
-        ASSERT_EQUALS(ErrorCodes::DuplicateKey, builder->addKey(keyStringLoc2, loc2));
+        ASSERT_OK(builder->addKey(keyStringLoc1.getValueCopy(), loc1));
+        ASSERT_EQUALS(ErrorCodes::DuplicateKey,
+                      builder->addKey(keyStringLoc2.getValueCopy(), loc2));
         builder->commit(false);
     }
 
@@ -263,8 +264,8 @@ TEST(SortedDataInterface, BuilderAddSameKeyStringWithDupsAllowed) {
         const std::unique_ptr<SortedDataBuilderInterface> builder(
             sorted->getBulkBuilder(opCtx.get(), true /* allow duplicates */));
 
-        ASSERT_OK(builder->addKey(keyStringLoc1, loc1));
-        ASSERT_OK(builder->addKey(keyStringLoc2, loc2));
+        ASSERT_OK(builder->addKey(keyStringLoc1.getValueCopy(), loc1));
+        ASSERT_OK(builder->addKey(keyStringLoc2.getValueCopy(), loc2));
         builder->commit(false);
     }
 
@@ -324,9 +325,9 @@ TEST(SortedDataInterface, BuilderAddMultipleKeyStrings) {
         const std::unique_ptr<SortedDataBuilderInterface> builder(
             sorted->getBulkBuilder(opCtx.get(), true));
 
-        ASSERT_OK(builder->addKey(keyString1, loc1));
-        ASSERT_OK(builder->addKey(keyString2, loc2));
-        ASSERT_OK(builder->addKey(keyString3, loc3));
+        ASSERT_OK(builder->addKey(keyString1.getValueCopy(), loc1));
+        ASSERT_OK(builder->addKey(keyString2.getValueCopy(), loc2));
+        ASSERT_OK(builder->addKey(keyString3.getValueCopy(), loc3));
         builder->commit(false);
     }
 

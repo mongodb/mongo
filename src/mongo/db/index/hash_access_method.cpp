@@ -56,11 +56,20 @@ HashAccessMethod::HashAccessMethod(IndexCatalogEntry* btreeState,
 }
 
 void HashAccessMethod::doGetKeys(const BSONObj& obj,
-                                 BSONObjSet* keys,
-                                 BSONObjSet* multikeyMetadataKeys,
-                                 MultikeyPaths* multikeyPaths) const {
-    ExpressionKeysPrivate::getHashKeys(
-        obj, _hashedField, _seed, _hashVersion, _descriptor->isSparse(), _collator, keys);
+                                 KeyStringSet* keys,
+                                 KeyStringSet* multikeyMetadataKeys,
+                                 MultikeyPaths* multikeyPaths,
+                                 boost::optional<RecordId> id) const {
+    ExpressionKeysPrivate::getHashKeys(obj,
+                                       _hashedField,
+                                       _seed,
+                                       _hashVersion,
+                                       _descriptor->isSparse(),
+                                       _collator,
+                                       keys,
+                                       getSortedDataInterface()->getKeyStringVersion(),
+                                       getSortedDataInterface()->getOrdering(),
+                                       id);
 }
 
 }  // namespace mongo

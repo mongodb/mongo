@@ -80,17 +80,23 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
         // unneeded due to the structure of the plan.
         invariant(!member->keyData.empty());
         for (size_t i = 0; i < member->keyData.size(); i++) {
-            BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+            KeyStringSet keys;
             // There's no need to compute the prefixes of the indexed fields that cause the index to
             // be multikey when ensuring the keyData is still valid.
-            BSONObjSet* multikeyMetadataKeys = nullptr;
+            KeyStringSet* multikeyMetadataKeys = nullptr;
             MultikeyPaths* multikeyPaths = nullptr;
-            member->keyData[i].index->getKeys(member->obj.value(),
-                                              IndexAccessMethod::GetKeysMode::kEnforceConstraints,
-                                              &keys,
-                                              multikeyMetadataKeys,
-                                              multikeyPaths);
-            if (!keys.count(member->keyData[i].keyData)) {
+            auto* iam = member->keyData[i].index;
+            iam->getKeys(member->obj.value(),
+                         IndexAccessMethod::GetKeysMode::kEnforceConstraints,
+                         &keys,
+                         multikeyMetadataKeys,
+                         multikeyPaths,
+                         member->recordId);
+            KeyString::HeapBuilder keyString(iam->getSortedDataInterface()->getKeyStringVersion(),
+                                             member->keyData[i].keyData,
+                                             iam->getSortedDataInterface()->getOrdering(),
+                                             member->recordId);
+            if (!keys.count(keyString.release())) {
                 // document would no longer be at this position in the index.
                 return false;
             }

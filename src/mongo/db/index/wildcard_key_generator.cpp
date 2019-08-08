@@ -93,23 +93,31 @@ std::unique_ptr<ProjectionExecAgg> WildcardKeyGenerator::createProjectionExec(
 
 WildcardKeyGenerator::WildcardKeyGenerator(BSONObj keyPattern,
                                            BSONObj pathProjection,
-                                           const CollatorInterface* collator)
-    : _collator(collator), _keyPattern(keyPattern) {
+                                           const CollatorInterface* collator,
+                                           KeyString::Version keyStringVersion,
+                                           Ordering ordering)
+    : _collator(collator),
+      _keyPattern(keyPattern),
+      _keyStringVersion(keyStringVersion),
+      _ordering(ordering) {
     _projExec = createProjectionExec(keyPattern, pathProjection);
 }
 
 void WildcardKeyGenerator::generateKeys(BSONObj inputDoc,
-                                        BSONObjSet* keys,
-                                        BSONObjSet* multikeyPaths) const {
+                                        KeyStringSet* keys,
+                                        KeyStringSet* multikeyPaths,
+                                        boost::optional<RecordId> id) const {
     FieldRef rootPath;
-    _traverseWildcard(_projExec->applyProjection(inputDoc), false, &rootPath, keys, multikeyPaths);
+    _traverseWildcard(
+        _projExec->applyProjection(inputDoc), false, &rootPath, keys, multikeyPaths, id);
 }
 
 void WildcardKeyGenerator::_traverseWildcard(BSONObj obj,
                                              bool objIsArray,
                                              FieldRef* path,
-                                             BSONObjSet* keys,
-                                             BSONObjSet* multikeyPaths) const {
+                                             KeyStringSet* keys,
+                                             KeyStringSet* multikeyPaths,
+                                             boost::optional<RecordId> id) const {
     for (const auto elem : obj) {
         // If the element's fieldName contains a ".", fast-path skip it because it's not queryable.
         if (elem.fieldNameStringData().find('.', 0) != std::string::npos)
@@ -121,22 +129,22 @@ void WildcardKeyGenerator::_traverseWildcard(BSONObj obj,
         switch (elem.type()) {
             case BSONType::Array:
                 // If this is a nested array, we don't descend it but instead index it as a value.
-                if (_addKeyForNestedArray(elem, *path, objIsArray, keys))
+                if (_addKeyForNestedArray(elem, *path, objIsArray, keys, id))
                     break;
 
                 // Add an entry for the multi-key path, and then fall through to BSONType::Object.
                 _addMultiKey(*path, multikeyPaths);
 
             case BSONType::Object:
-                if (_addKeyForEmptyLeaf(elem, *path, keys))
+                if (_addKeyForEmptyLeaf(elem, *path, keys, id))
                     break;
 
                 _traverseWildcard(
-                    elem.Obj(), elem.type() == BSONType::Array, path, keys, multikeyPaths);
+                    elem.Obj(), elem.type() == BSONType::Array, path, keys, multikeyPaths, id);
                 break;
 
             default:
-                _addKey(elem, *path, keys);
+                _addKey(elem, *path, keys, id);
         }
 
         // Remove the element's fieldname from the path, if it was pushed onto it earlier.
@@ -147,10 +155,11 @@ void WildcardKeyGenerator::_traverseWildcard(BSONObj obj,
 bool WildcardKeyGenerator::_addKeyForNestedArray(BSONElement elem,
                                                  const FieldRef& fullPath,
                                                  bool enclosingObjIsArray,
-                                                 BSONObjSet* keys) const {
+                                                 KeyStringSet* keys,
+                                                 boost::optional<RecordId> id) const {
     // If this element is an array whose parent is also an array, index it as a value.
     if (enclosingObjIsArray && elem.type() == BSONType::Array) {
-        _addKey(elem, fullPath, keys);
+        _addKey(elem, fullPath, keys, id);
         return true;
     }
     return false;
@@ -158,12 +167,13 @@ bool WildcardKeyGenerator::_addKeyForNestedArray(BSONElement elem,
 
 bool WildcardKeyGenerator::_addKeyForEmptyLeaf(BSONElement elem,
                                                const FieldRef& fullPath,
-                                               BSONObjSet* keys) const {
+                                               KeyStringSet* keys,
+                                               boost::optional<RecordId> id) const {
     invariant(elem.isABSONObj());
     if (elem.embeddedObject().isEmpty()) {
         // In keeping with the behaviour of regular indexes, an empty object is indexed as-is while
         // empty arrays are indexed as 'undefined'.
-        _addKey(elem.type() == BSONType::Array ? BSONElement{} : elem, fullPath, keys);
+        _addKey(elem.type() == BSONType::Array ? BSONElement{} : elem, fullPath, keys, id);
         return true;
     }
     return false;
@@ -171,7 +181,8 @@ bool WildcardKeyGenerator::_addKeyForEmptyLeaf(BSONElement elem,
 
 void WildcardKeyGenerator::_addKey(BSONElement elem,
                                    const FieldRef& fullPath,
-                                   BSONObjSet* keys) const {
+                                   KeyStringSet* keys,
+                                   boost::optional<RecordId> id) const {
     // Wildcard keys are of the form { "": "path.to.field", "": <collation-aware value> }.
     BSONObjBuilder bob;
     bob.append("", fullPath.dottedField());
@@ -180,15 +191,26 @@ void WildcardKeyGenerator::_addKey(BSONElement elem,
     } else {
         bob.appendUndefined("");
     }
-    keys->insert(bob.obj());
+    KeyString::HeapBuilder keyString(_keyStringVersion, bob.obj(), _ordering);
+    if (id) {
+        keyString.appendRecordId(*id);
+    }
+    keys->insert(keyString.release());
 }
 
-void WildcardKeyGenerator::_addMultiKey(const FieldRef& fullPath, BSONObjSet* multikeyPaths) const {
+void WildcardKeyGenerator::_addMultiKey(const FieldRef& fullPath,
+                                        KeyStringSet* multikeyPaths) const {
     // Multikey paths are denoted by a key of the form { "": 1, "": "path.to.array" }. The argument
     // 'multikeyPaths' may be nullptr if the access method is being used in an operation which does
     // not require multikey path generation.
     if (multikeyPaths) {
-        multikeyPaths->insert(BSON("" << 1 << "" << fullPath.dottedField()));
+        auto key = BSON("" << 1 << "" << fullPath.dottedField());
+        KeyString::HeapBuilder keyString(
+            _keyStringVersion,
+            key,
+            _ordering,
+            RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+        multikeyPaths->insert(keyString.release());
     }
 }
 

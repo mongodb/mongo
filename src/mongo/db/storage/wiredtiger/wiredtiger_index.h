@@ -97,7 +97,7 @@ public:
                           bool dupsAllowed);
 
     virtual Status insert(OperationContext* opCtx,
-                          const KeyString::Builder& keyString,
+                          const KeyString::Value& keyString,
                           const RecordId& id,
                           bool dupsAllowed);
 
@@ -107,7 +107,7 @@ public:
                          bool dupsAllowed);
 
     virtual void unindex(OperationContext* opCtx,
-                         const KeyString::Builder& keyString,
+                         const KeyString::Value& keyString,
                          const RecordId& id,
                          bool dupsAllowed);
 
@@ -163,13 +163,13 @@ public:
 protected:
     virtual Status _insert(OperationContext* opCtx,
                            WT_CURSOR* c,
-                           const KeyString::Builder& keyString,
+                           const KeyString::Value& keyString,
                            const RecordId& id,
                            bool dupsAllowed) = 0;
 
     virtual void _unindex(OperationContext* opCtx,
                           WT_CURSOR* c,
-                          const KeyString::Builder& keyString,
+                          const KeyString::Value& keyString,
                           const RecordId& id,
                           bool dupsAllowed) = 0;
 
@@ -226,36 +226,36 @@ public:
 
     Status _insert(OperationContext* opCtx,
                    WT_CURSOR* c,
-                   const KeyString::Builder& keyString,
+                   const KeyString::Value& keyString,
                    const RecordId& id,
                    bool dupsAllowed) override;
 
     Status _insertTimestampUnsafe(OperationContext* opCtx,
                                   WT_CURSOR* c,
-                                  const KeyString::Builder& keyString,
+                                  const KeyString::Value& keyString,
                                   const RecordId& id,
                                   bool dupsAllowed);
 
     Status _insertTimestampSafe(OperationContext* opCtx,
                                 WT_CURSOR* c,
-                                const KeyString::Builder& keyString,
+                                const KeyString::Value& keyString,
                                 bool dupsAllowed);
 
     void _unindex(OperationContext* opCtx,
                   WT_CURSOR* c,
-                  const KeyString::Builder& keyString,
+                  const KeyString::Value& keyString,
                   const RecordId& id,
                   bool dupsAllowed) override;
 
     void _unindexTimestampUnsafe(OperationContext* opCtx,
                                  WT_CURSOR* c,
-                                 const KeyString::Builder& keyString,
+                                 const KeyString::Value& keyString,
                                  const RecordId& id,
                                  bool dupsAllowed);
 
     void _unindexTimestampSafe(OperationContext* opCtx,
                                WT_CURSOR* c,
-                               const KeyString::Builder& keyString,
+                               const KeyString::Value& keyString,
                                bool dupsAllowed);
 
 private:
@@ -290,13 +290,13 @@ public:
 
     Status _insert(OperationContext* opCtx,
                    WT_CURSOR* c,
-                   const KeyString::Builder& keyString,
+                   const KeyString::Value& keyString,
                    const RecordId& id,
                    bool dupsAllowed) override;
 
     void _unindex(OperationContext* opCtx,
                   WT_CURSOR* c,
-                  const KeyString::Builder& keyString,
+                  const KeyString::Value& keyString,
                   const RecordId& id,
                   bool dupsAllowed) override;
 };

@@ -84,7 +84,7 @@ TEST(SortedDataInterface, InsertKeyString) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(opCtx.get(), keyString1, loc1, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), keyString1.getValueCopy(), loc1, true));
             uow.commit();
         }
     }
@@ -281,8 +281,8 @@ TEST(SortedDataInterface, InsertSameKeyString) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(opCtx.get(), keyStringLoc1, loc1, false));
-            ASSERT_NOT_OK(sorted->insert(opCtx.get(), keyStringLoc2, loc2, false));
+            ASSERT_OK(sorted->insert(opCtx.get(), keyStringLoc1.getValueCopy(), loc1, false));
+            ASSERT_NOT_OK(sorted->insert(opCtx.get(), keyStringLoc2.getValueCopy(), loc2, false));
             uow.commit();
         }
     }
@@ -299,7 +299,7 @@ TEST(SortedDataInterface, InsertSameKeyString) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_NOT_OK(sorted->insert(opCtx.get(), keyStringLoc2, loc2, false));
+            ASSERT_NOT_OK(sorted->insert(opCtx.get(), keyStringLoc2.getValueCopy(), loc2, false));
             uow.commit();
         }
     }
@@ -454,8 +454,8 @@ TEST(SortedDataInterface, InsertMultipleKeyStrings) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(opCtx.get(), keyString1, loc1, false));
-            ASSERT_OK(sorted->insert(opCtx.get(), keyString2, loc2, false));
+            ASSERT_OK(sorted->insert(opCtx.get(), keyString1.getValueCopy(), loc1, false));
+            ASSERT_OK(sorted->insert(opCtx.get(), keyString2.getValueCopy(), loc2, false));
             uow.commit();
         }
     }
@@ -473,7 +473,7 @@ TEST(SortedDataInterface, InsertMultipleKeyStrings) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(opCtx.get(), keyString3, loc3, false));
+            ASSERT_OK(sorted->insert(opCtx.get(), keyString3.getValueCopy(), loc3, false));
             uow.commit();
         }
     }
