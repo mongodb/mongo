@@ -1631,7 +1631,7 @@ def make_polyfill_regex():
     'packaged_task',
     'promise',
     'recursive_mutex',
-    'shared_lock,',
+    'shared_lock',
     'shared_mutex',
     'shared_timed_mutex',
     'this_thread(?!::at_thread_exit)',
