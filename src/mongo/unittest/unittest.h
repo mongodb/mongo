@@ -137,26 +137,26 @@
  * of a subtype of "EXCEPTION_TYPE", the test is considered a failure and further evaluation
  * halts.
  */
-#define ASSERT_THROWS(STATEMENT, EXCEPTION_TYPE) \
-    ASSERT_THROWS_WITH_CHECK(STATEMENT, EXCEPTION_TYPE, ([](const EXCEPTION_TYPE&) {}))
+#define ASSERT_THROWS(EXPRESSION, EXCEPTION_TYPE) \
+    ASSERT_THROWS_WITH_CHECK(EXPRESSION, EXCEPTION_TYPE, ([](const EXCEPTION_TYPE&) {}))
 
 /**
  * Behaves like ASSERT_THROWS, above, but also fails if calling what() on the thrown exception
  * does not return a string equal to EXPECTED_WHAT.
  */
-#define ASSERT_THROWS_WHAT(STATEMENT, EXCEPTION_TYPE, EXPECTED_WHAT)                     \
-    ASSERT_THROWS_WITH_CHECK(STATEMENT, EXCEPTION_TYPE, ([&](const EXCEPTION_TYPE& ex) { \
-                                 ASSERT_EQ(::mongo::StringData(ex.what()),               \
-                                           ::mongo::StringData(EXPECTED_WHAT));          \
+#define ASSERT_THROWS_WHAT(EXPRESSION, EXCEPTION_TYPE, EXPECTED_WHAT)                     \
+    ASSERT_THROWS_WITH_CHECK(EXPRESSION, EXCEPTION_TYPE, ([&](const EXCEPTION_TYPE& ex) { \
+                                 ASSERT_EQ(::mongo::StringData(ex.what()),                \
+                                           ::mongo::StringData(EXPECTED_WHAT));           \
                              }))
 
 /**
  * Behaves like ASSERT_THROWS, above, but also fails if calling getCode() on the thrown exception
  * does not return an error code equal to EXPECTED_CODE.
  */
-#define ASSERT_THROWS_CODE(STATEMENT, EXCEPTION_TYPE, EXPECTED_CODE)                     \
-    ASSERT_THROWS_WITH_CHECK(STATEMENT, EXCEPTION_TYPE, ([&](const EXCEPTION_TYPE& ex) { \
-                                 ASSERT_EQ(ex.toStatus().code(), EXPECTED_CODE);         \
+#define ASSERT_THROWS_CODE(EXPRESSION, EXCEPTION_TYPE, EXPECTED_CODE)                     \
+    ASSERT_THROWS_WITH_CHECK(EXPRESSION, EXCEPTION_TYPE, ([&](const EXCEPTION_TYPE& ex) { \
+                                 ASSERT_EQ(ex.toStatus().code(), EXPECTED_CODE);          \
                              }))
 
 /**
@@ -164,11 +164,11 @@
  * does not return an error code equal to EXPECTED_CODE or if calling what() on the thrown exception
  * does not return a string equal to EXPECTED_WHAT.
  */
-#define ASSERT_THROWS_CODE_AND_WHAT(STATEMENT, EXCEPTION_TYPE, EXPECTED_CODE, EXPECTED_WHAT) \
-    ASSERT_THROWS_WITH_CHECK(STATEMENT, EXCEPTION_TYPE, ([&](const EXCEPTION_TYPE& ex) {     \
-                                 ASSERT_EQ(ex.toStatus().code(), EXPECTED_CODE);             \
-                                 ASSERT_EQ(::mongo::StringData(ex.what()),                   \
-                                           ::mongo::StringData(EXPECTED_WHAT));              \
+#define ASSERT_THROWS_CODE_AND_WHAT(EXPRESSION, EXCEPTION_TYPE, EXPECTED_CODE, EXPECTED_WHAT) \
+    ASSERT_THROWS_WITH_CHECK(EXPRESSION, EXCEPTION_TYPE, ([&](const EXCEPTION_TYPE& ex) {     \
+                                 ASSERT_EQ(ex.toStatus().code(), EXPECTED_CODE);              \
+                                 ASSERT_EQ(::mongo::StringData(ex.what()),                    \
+                                           ::mongo::StringData(EXPECTED_WHAT));               \
                              }))
 
 
@@ -220,15 +220,20 @@
  * Behaves like ASSERT_THROWS, above, but also calls CHECK(caughtException) which may contain
  * additional assertions.
  */
-#define ASSERT_THROWS_WITH_CHECK(STATEMENT, EXCEPTION_TYPE, CHECK)             \
-    do {                                                                       \
-        try {                                                                  \
-            UNIT_TEST_INTERNALS_IGNORE_UNUSED_RESULT_WARNINGS(STATEMENT);      \
-            FAIL("Expected statement " #STATEMENT " to throw " #EXCEPTION_TYPE \
-                 " but it threw nothing.");                                    \
-        } catch (const EXCEPTION_TYPE& ex) {                                   \
-            CHECK(ex);                                                         \
-        }                                                                      \
+#define ASSERT_THROWS_WITH_CHECK(EXPRESSION, EXCEPTION_TYPE, CHECK)                              \
+    do {                                                                                         \
+        try {                                                                                    \
+            UNIT_TEST_INTERNALS_IGNORE_UNUSED_RESULT_WARNINGS(EXPRESSION);                       \
+        } catch (const EXCEPTION_TYPE& ex) {                                                     \
+            CHECK(ex);                                                                           \
+            break;                                                                               \
+        }                                                                                        \
+        /*                                                                                       \
+         * Fail outside of the try/catch, this way the code in the `FAIL` macro doesn't have the \
+         * potential to throw an exception which we might also be checking for.                  \
+         */                                                                                      \
+        FAIL("Expected expression " #EXPRESSION " to throw " #EXCEPTION_TYPE                     \
+             " but it threw nothing.");                                                          \
     } while (false)
 
 #define ASSERT_STRING_CONTAINS(BIG_STRING, CONTAINS)                                            \
