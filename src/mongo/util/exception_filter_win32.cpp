@@ -68,7 +68,7 @@ void doMinidumpWithException(struct _EXCEPTION_POINTERS* exceptionInfo) {
         // Fallback name
         wcscpy_s(moduleFileName, L"mongo");
     } else {
-        WCHAR* dotStr = wcschr(&moduleFileName[0], L'.');
+        WCHAR* dotStr = wcsrchr(&moduleFileName[0], L'.');
         if (dotStr != nullptr) {
             *dotStr = L'\0';
         }
