@@ -8297,6 +8297,14 @@ tasks:
   - func: "set up win mount script"
   - func: "shared scons cache pruning"
 
+- name: commit_queue_placeholder
+  commands:
+  - command: shell.exec
+    params:
+      script: |
+        echo "Commit Queue Placeholder"
+        exit 0
+
 #######################################
 #             Task Groups             #
 #######################################
@@ -12619,3 +12627,12 @@ buildvariants:
   stepback: false
   tasks:
   - name: win_shared_scons_cache_pruning
+
+- name: commit-queue
+  display_name: "~ Commit Queue"
+  run_on:
+    - rhel62-small
+  batchtime: 10080 # 7 days
+  stepback: false
+  tasks:
+    - name: commit_queue_placeholder
