@@ -186,163 +186,6 @@ void validateAndDeduceFullRequestOptions(OperationContext* opCtx,
 }
 
 /**
- * Migrates the initial "big chunks" from the primary shard to spread them evenly across the shards.
- *
- * If 'finalSplitPoints' is not empty, additionally splits each "big chunk" into smaller chunks
- * using the points in 'finalSplitPoints.'
- */
-void migrateAndFurtherSplitInitialChunks(OperationContext* opCtx,
-                                         const NamespaceString& nss,
-                                         const std::vector<ShardId>& shardIds,
-                                         const std::vector<BSONObj>& finalSplitPoints) {
-    const auto catalogCache = Grid::get(opCtx)->catalogCache();
-
-    auto routingInfo = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
-    uassert(ErrorCodes::ConflictingOperationInProgress,
-            "Collection was successfully written as sharded but got dropped before it "
-            "could be evenly distributed",
-            routingInfo.cm());
-
-    auto chunkManager = routingInfo.cm();
-
-    // Move and commit each "big chunk" to a different shard.
-    auto nextShardId = [&, indx = 0]() mutable { return shardIds[indx++ % shardIds.size()]; };
-
-    for (auto chunk : chunkManager->chunks()) {
-        const auto shardId = nextShardId();
-
-        const auto toStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
-        if (!toStatus.isOK()) {
-            continue;
-        }
-
-        const auto to = toStatus.getValue();
-
-        // Can't move chunk to shard it's already on
-        if (to->getId() == chunk.getShardId()) {
-            continue;
-        }
-
-        ChunkType chunkType;
-        chunkType.setNS(nss);
-        chunkType.setMin(chunk.getMin());
-        chunkType.setMax(chunk.getMax());
-        chunkType.setShard(chunk.getShardId());
-        chunkType.setVersion(chunkManager->getVersion());
-
-        Status moveStatus = configsvr_client::moveChunk(
-            opCtx,
-            chunkType,
-            to->getId(),
-            Grid::get(opCtx)->getBalancerConfiguration()->getMaxChunkSizeBytes(),
-            MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
-            true);
-        if (!moveStatus.isOK()) {
-            warning() << "couldn't move chunk " << redact(chunk.toString()) << " to shard " << *to
-                      << " while sharding collection " << nss.ns() << causedBy(redact(moveStatus));
-        }
-    }
-
-    if (finalSplitPoints.empty()) {
-        return;
-    }
-
-    // Reload the config info, after all the migrations
-    routingInfo = uassertStatusOK(catalogCache->getCollectionRoutingInfoWithRefresh(opCtx, nss));
-    uassert(ErrorCodes::ConflictingOperationInProgress,
-            "Collection was successfully written as sharded but got dropped before it "
-            "could be evenly distributed",
-            routingInfo.cm());
-    chunkManager = routingInfo.cm();
-
-    // Subdivide the big chunks by splitting at each of the points in "finalSplitPoints"
-    // that we haven't already split by.
-    boost::optional<Chunk> currentChunk(
-        chunkManager->findIntersectingChunkWithSimpleCollation(finalSplitPoints[0]));
-
-    std::vector<BSONObj> subSplits;
-    for (unsigned i = 0; i <= finalSplitPoints.size(); i++) {
-        if (i == finalSplitPoints.size() || !currentChunk->containsKey(finalSplitPoints[i])) {
-            if (!subSplits.empty()) {
-                auto splitStatus = shardutil::splitChunkAtMultiplePoints(
-                    opCtx,
-                    currentChunk->getShardId(),
-                    nss,
-                    chunkManager->getShardKeyPattern(),
-                    chunkManager->getVersion(),
-                    ChunkRange(currentChunk->getMin(), currentChunk->getMax()),
-                    subSplits);
-                if (!splitStatus.isOK()) {
-                    warning() << "couldn't split chunk " << redact(currentChunk->toString())
-                              << " while sharding collection " << nss.ns()
-                              << causedBy(redact(splitStatus.getStatus()));
-                }
-
-                subSplits.clear();
-            }
-
-            if (i < finalSplitPoints.size()) {
-                currentChunk.emplace(
-                    chunkManager->findIntersectingChunkWithSimpleCollation(finalSplitPoints[i]));
-            }
-        } else {
-            BSONObj splitPoint(finalSplitPoints[i]);
-
-            // Do not split on the boundaries
-            if (currentChunk->getMin().woCompare(splitPoint) == 0) {
-                continue;
-            }
-
-            subSplits.push_back(splitPoint);
-        }
-    }
-}
-boost::optional<UUID> getUUIDFromPrimaryShard(OperationContext* opCtx,
-                                              const NamespaceString& nss,
-                                              const std::shared_ptr<Shard>& primaryShard) {
-    // Obtain the collection's UUID from the primary shard's listCollections response.
-    BSONObj res;
-    {
-        auto listCollectionsCmd =
-            BSON("listCollections" << 1 << "filter" << BSON("name" << nss.coll()));
-        auto allRes = uassertStatusOK(primaryShard->runExhaustiveCursorCommand(
-            opCtx,
-            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            nss.db().toString(),
-            listCollectionsCmd,
-            Milliseconds(-1)));
-        const auto& all = allRes.docs;
-        if (!all.empty()) {
-            res = all.front().getOwned();
-        }
-    }
-
-    uassert(ErrorCodes::InternalError,
-            str::stream() << "expected the primary shard host " << primaryShard->getConnString()
-                          << " for database " << nss.db() << " to return an entry for " << nss.ns()
-                          << " in its listCollections response, but it did not",
-            !res.isEmpty());
-
-    BSONObj collectionInfo;
-    if (res["info"].type() == BSONType::Object) {
-        collectionInfo = res["info"].Obj();
-    }
-
-    uassert(ErrorCodes::InternalError,
-            str::stream() << "expected primary shard to return 'info' field as part of "
-                             "listCollections for "
-                          << nss.ns() << ", but got " << res,
-            !collectionInfo.isEmpty());
-
-    uassert(ErrorCodes::InternalError,
-            str::stream() << "expected primary shard to return a UUID for collection " << nss.ns()
-                          << " as part of 'info' field but got " << res,
-            collectionInfo.hasField("uuid"));
-
-    return uassertStatusOK(UUID::parse(collectionInfo["uuid"]));
-}
-
-/**
  * Internal sharding command run on config servers to shard a collection.
  */
 class ConfigSvrShardCollectionCommand : public BasicCommand {
@@ -508,137 +351,25 @@ public:
                 cmdObj, shardsvrShardCollectionRequest.toBSON())),
             Shard::RetryPolicy::kIdempotent));
 
-        if (cmdResponse.commandStatus != ErrorCodes::CommandNotFound) {
-            uassertStatusOK(cmdResponse.commandStatus);
+        uassertStatusOK(cmdResponse.commandStatus);
 
-            auto shardCollResponse = ShardsvrShardCollectionResponse::parse(
-                IDLParserErrorContext("ShardsvrShardCollectionResponse"), cmdResponse.response);
-            auto uuid = std::move(shardCollResponse.getCollectionUUID());
+        auto shardCollResponse = ShardsvrShardCollectionResponse::parse(
+            IDLParserErrorContext("ShardsvrShardCollectionResponse"), cmdResponse.response);
+        uuid = std::move(shardCollResponse.getCollectionUUID());
 
-            result << "collectionsharded" << nss.ns();
-            if (uuid) {
-                result << "collectionUUID" << *uuid;
-            }
-
-            auto routingInfo =
-                uassertStatusOK(catalogCache->getCollectionRoutingInfoWithRefresh(opCtx, nss));
-            uassert(ErrorCodes::ConflictingOperationInProgress,
-                    "Collection was successfully written as sharded but got dropped before it "
-                    "could be evenly distributed",
-                    routingInfo.cm());
-
-            return true;
-        } else {
-            // Step 2.
-            if (auto existingColl =
-                    InitialSplitPolicy::checkIfCollectionAlreadyShardedWithSameOptions(
-                        opCtx,
-                        nss,
-                        shardsvrShardCollectionRequest,
-                        repl::ReadConcernLevel::kLocalReadConcern)) {
-                result << "collectionsharded" << nss.ns();
-                if (existingColl->getUUID()) {
-                    result << "collectionUUID" << *existingColl->getUUID();
-                }
-                repl::ReplClientInfo::forClient(opCtx->getClient())
-                    .setLastOpToSystemLastOpTime(opCtx);
-                return true;
-            }
-
-            // TODO: SERVER-42594
-            // This check for empty collection is racy, because it is not guaranteed that documents
-            // will not show up in the collection right after the count below has executed. It is
-            // left here for backwards compatiblity with pre-4.0.4 clusters, which do not support
-            // sharding being performed by the primary shard.
-            auto countCmd = BSON("count" << nss.coll());
-            auto countRes = uassertStatusOK(
-                primaryShard->runCommand(opCtx,
-                                         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                         nss.db().toString(),
-                                         countCmd,
-                                         Shard::RetryPolicy::kIdempotent));
-
-            const bool isEmpty = (countRes.response["n"].Int() == 0);
-
-            // Map/reduce with output to an empty collection assumes it has full control of the
-            // output collection and it would be an unsupported operation if the collection is being
-            // concurrently written
-            const bool fromMapReduce = bool(request.getInitialSplitPoints());
-            if (fromMapReduce) {
-                uassert(ErrorCodes::ConflictingOperationInProgress,
-                        str::stream() << "Map reduce with sharded output to a new collection found "
-                                      << nss.ns() << " to be non-empty which is not supported.",
-                        isEmpty);
-            }
-
-            // Step 3.
-            shardkeyutil::validateShardKeyAgainstExistingIndexes(opCtx,
-                                                                 nss,
-                                                                 proposedKey,
-                                                                 shardKeyPattern,
-                                                                 primaryShard,
-                                                                 request.getCollation(),
-                                                                 request.getUnique(),
-                                                                 true);  // createIndexIfPossible
-
-            // Step 4.
-            if (request.getGetUUIDfromPrimaryShard()) {
-                uuid = getUUIDFromPrimaryShard(opCtx, nss, primaryShard);
-            } else {
-                uuid = UUID::gen();
-            }
-
-            // Step 5.
-            std::vector<BSONObj> initialSplitPoints;  // there will be at most numShards-1 of these
-            std::vector<BSONObj> finalSplitPoints;    // all of the desired split points
-            if (request.getInitialSplitPoints()) {
-                initialSplitPoints = *request.getInitialSplitPoints();
-            } else {
-                InitialSplitPolicy::calculateHashedSplitPointsForEmptyCollection(
-                    shardKeyPattern,
-                    isEmpty,
-                    shardIds.size(),
-                    request.getNumInitialChunks(),
-                    &initialSplitPoints,
-                    &finalSplitPoints);
-            }
-
-            LOG(0) << "CMD: shardcollection: " << cmdObj;
-
-            audit::logShardCollection(
-                opCtx->getClient(), nss.ns(), proposedKey, request.getUnique());
-
-            // Step 6. Actually shard the collection.
-            catalogManager->shardCollection(opCtx,
-                                            nss,
-                                            uuid,
-                                            shardKeyPattern,
-                                            *request.getCollation(),
-                                            request.getUnique(),
-                                            initialSplitPoints,
-                                            fromMapReduce,
-                                            primaryShardId);
-            result << "collectionsharded" << nss.ns();
-            if (uuid) {
-                result << "collectionUUID" << *uuid;
-            }
-
-            // Make sure the cached metadata for the collection knows that we are now sharded
-            catalogCache->invalidateShardedCollection(nss);
-
-            // Free the distlocks to allow the splits and migrations below to proceed.
-            collDistLock.reset();
-            dbDistLock.reset();
-
-            // Step 7. If the collection is empty and using hashed sharding, migrate initial chunks
-            // to spread them evenly across shards from the beginning. Otherwise rely on the
-            // balancer to do it.
-            if (isEmpty && shardKeyPattern.isHashedPattern()) {
-                migrateAndFurtherSplitInitialChunks(opCtx, nss, shardIds, finalSplitPoints);
-            }
-
-            return true;
+        result << "collectionsharded" << nss.ns();
+        if (uuid) {
+            result << "collectionUUID" << *uuid;
         }
+
+        auto routingInfo =
+            uassertStatusOK(catalogCache->getCollectionRoutingInfoWithRefresh(opCtx, nss));
+        uassert(ErrorCodes::ConflictingOperationInProgress,
+                "Collection was successfully written as sharded but got dropped before it "
+                "could be evenly distributed",
+                routingInfo.cm());
+
+        return true;
     }
 
 } configsvrShardCollectionCmd;
