@@ -6782,6 +6782,16 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *task_template
+  name: concurrency_replication_wiredtiger_cursor_sweeps
+  tags: ["concurrency", "repl"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=concurrency_replication_wiredtiger_cursor_sweeps --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
+
+- <<: *task_template
   name: concurrency_sharded_replication
   tags: ["concurrency", "common", "read_concern_maj"]
   commands:
@@ -6929,6 +6939,16 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=concurrency_simultaneous_replication --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
+
+- <<: *task_template
+  name: concurrency_simultaneous_replication_wiredtiger_cursor_sweeps
+  tags: ["concurrency", "repl"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=concurrency_simultaneous_replication_wiredtiger_cursor_sweeps --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
 - <<: *task_template
