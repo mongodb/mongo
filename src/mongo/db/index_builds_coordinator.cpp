@@ -175,7 +175,6 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::startIndexRe
     auto& collectionCatalog = CollectionCatalog::get(getGlobalServiceContext());
     Collection* collection = collectionCatalog.lookupCollectionByNamespace(nss);
     auto indexCatalog = collection->getIndexCatalog();
-    std::unique_ptr<MultiIndexBlock> indexer;
     {
         // These steps are combined into a single WUOW to ensure there are no commits without
         // the indexes.

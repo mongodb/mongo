@@ -301,6 +301,9 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
         if (!status.isOK())
             return status;
 
+        auto indexCleanupGuard =
+            makeGuard([opCtx, &index] { index.block->deleteTemporaryTables(opCtx); });
+
         index.real = index.block->getEntry()->accessMethod();
         status = index.real->initializeAsEmpty(opCtx);
         if (!status.isOK())
@@ -340,6 +343,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
         // TODO SERVER-14888 Suppress this in cases we don't want to audit.
         audit::logCreateIndex(opCtx->getClient(), &info, descriptor->indexName(), ns);
 
+        indexCleanupGuard.dismiss();
         _indexes.push_back(std::move(index));
     }
 
