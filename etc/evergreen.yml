@@ -273,7 +273,6 @@ variables:
   - func: "set up win mount script"
   - func: "generate compile expansions"
   teardown_group:
-  - func: "scons cache pruning"
   - func: "umount shared scons directory"
   - func: "print OOM messages"
   - func: "cleanup environment"
@@ -357,7 +356,6 @@ variables:
     - func: "set up win mount script"
     - func: "generate compile expansions"
   teardown_group:
-    - func: "scons cache pruning"
     - func: "umount shared scons directory"
 
 # List of all variants that make mongocryptd
@@ -1039,21 +1037,6 @@ functions:
 
         else
           echo "Not on master, shared SCons cache pruning skipped"
-        fi
-
-  "scons cache pruning":
-    command: shell.exec
-    params:
-      working_dir: src
-      script: |
-        set -o errexit
-        set -o verbose
-        # removes files from the local scons cache.
-
-        ${activate_virtualenv}
-        echo "Legacy local shared cache prune"
-        if [ -d "${scons_cache_path}" ]; then
-          $python buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
         fi
 
   "umount shared scons directory":
@@ -8354,7 +8337,6 @@ task_groups:
     - func: "set up win mount script"
     - func: "generate compile expansions"
   teardown_group:
-    - func: "scons cache pruning"
     - func: "umount shared scons directory"
   setup_task:
     - func: "set task expansion macros"
