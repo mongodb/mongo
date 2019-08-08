@@ -36,6 +36,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <random>
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/client/connpool.h"
@@ -1015,7 +1016,7 @@ SetState::SetState(StringData name, const std::set<HostAndPort>& seedNodes, Mong
       consecutiveFailedScans(0),
       seedNodes(seedNodes),
       latencyThresholdMicros(serverGlobalParams.defaultLocalThresholdMillis * 1000),
-      rand(int64_t(time(0))),
+      rand(std::random_device()()),
       roundRobin(0),
       setUri(std::move(uri)),
       refreshPeriod(getDefaultRefreshPeriod()) {
