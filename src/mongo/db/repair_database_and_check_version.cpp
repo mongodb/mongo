@@ -77,11 +77,6 @@ MONGO_FAIL_POINT_DEFINE(exitBeforeRepairInvalidatesConfig);
 
 namespace {
 
-const std::string mustDowngradeErrorMsg = str::stream()
-    << "UPGRADE PROBLEM: The data files need to be fully upgraded to version 3.6 before attempting "
-       "an upgrade to 4.0; see "
-    << feature_compatibility_version_documentation::kUpgradeLink << " for more details.";
-
 Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx,
                                                          const std::vector<std::string>& dbNames) {
     NamespaceString fcvNss(NamespaceString::kServerConfigurationNamespace);
@@ -194,7 +189,17 @@ Status ensureAllCollectionsHaveUUIDs(OperationContext* opCtx,
                 // We expect all collections to have UUIDs starting in FCV 3.6, so if we are missing
                 // a UUID then the user never upgraded to FCV 3.6 and this startup attempt is
                 // illegal.
-                return {ErrorCodes::MustDowngrade, mustDowngradeErrorMsg};
+                return {
+                    ErrorCodes::MustDowngrade,
+                    str::stream()
+                        << "Collection " << coll->ns().ns()
+                        << " is missing an UUID. We expect all collections to have UUIDs starting "
+                           "in FCV 3.6. Please make sure the FCV is version 3.6 before attempting "
+                           "an upgrade to 4.0; see "
+                        << feature_compatibility_version_documentation::kUpgradeLink
+                        << " for more details. "
+                        << "If the FCV is already 3.6, please try --repair with a 3.6 binary or "
+                           "initial sync to fix the data files."};
             }
         }
     }
