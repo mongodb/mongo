@@ -587,7 +587,8 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         // If we're readOnly skip all WAL-related settings.
         ss << "log=(enabled=true,archive=true,path=journal,compressor=";
         ss << wiredTigerGlobalOptions.journalCompressor << "),";
-        ss << "file_manager=(close_idle_time=100000),";  //~28 hours, will put better fix in 3.1.x
+        ss << "file_manager=(close_idle_time=" << gWiredTigerFileHandleCloseIdleTime
+           << ",close_handle_minimum=" << gWiredTigerFileHandleCloseMinimum << "),";
         ss << "statistics_log=(wait=" << wiredTigerGlobalOptions.statisticsLogDelaySecs << "),";
 
         if (shouldLog(::mongo::logger::LogComponent::kStorageRecovery,
