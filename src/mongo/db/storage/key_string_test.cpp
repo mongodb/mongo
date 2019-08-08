@@ -42,6 +42,8 @@
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/base/simple_string_data_comparator.h"
+#include "mongo/bson/bson_depth.h"
+#include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonobj_comparator.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/config.h"
@@ -224,6 +226,36 @@ TEST_F(KeyStringBuilderTest, TooManyElementsInCompoundKey) {
     ASSERT_THROWS_CODE(KeyString::toBsonSafe(data, size, ALL_ASCENDING, ks.getTypeBits()),
                        AssertionException,
                        ErrorCodes::Overflow);
+}
+
+TEST_F(KeyStringBuilderTest, ExceededBSONDepth) {
+    KeyString::Builder ks(KeyString::Version::V1);
+
+    // Construct an illegal KeyString encoding with excessively nested BSON arrays '80' (P).
+    const auto nestedArr = std::string(BSONDepth::getMaxAllowableDepth() + 1, 'P');
+    ks.resetFromBuffer(nestedArr.c_str(), nestedArr.size());
+    ASSERT_THROWS_CODE(
+        KeyString::toBsonSafe(ks.getBuffer(), ks.getSize(), ALL_ASCENDING, ks.getTypeBits()),
+        AssertionException,
+        ErrorCodes::Overflow);
+
+    // Construct an illegal BSON object with excessive nesting.
+    BSONObj nestedObj;
+    for (unsigned i = 0; i < BSONDepth::getMaxAllowableDepth() + 1; i++) {
+        nestedObj = BSON("" << nestedObj);
+    }
+    // This BSON object should not be valid.
+    auto validateStatus =
+        validateBSON(nestedObj.objdata(), nestedObj.objsize(), BSONVersion::kV1_1);
+    ASSERT_EQ(ErrorCodes::Overflow, validateStatus.code());
+
+    // Construct a KeyString from the invalid BSON, and confirm that it fails to convert back to
+    // BSON.
+    ks.resetToKey(nestedObj, ALL_ASCENDING, RecordId());
+    ASSERT_THROWS_CODE(
+        KeyString::toBsonSafe(ks.getBuffer(), ks.getSize(), ALL_ASCENDING, ks.getTypeBits()),
+        AssertionException,
+        ErrorCodes::Overflow);
 }
 
 TEST_F(KeyStringBuilderTest, Simple1) {

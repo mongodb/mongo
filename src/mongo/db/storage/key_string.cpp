@@ -38,6 +38,7 @@
 
 #include "mongo/base/data_cursor.h"
 #include "mongo/base/data_view.h"
+#include "mongo/bson/bson_depth.h"
 #include "mongo/platform/bits.h"
 #include "mongo/platform/strnlen.h"
 #include "mongo/util/decimal_counter.h"
@@ -1145,24 +1146,36 @@ void toBsonValue(uint8_t ctype,
                  TypeBits::Reader* typeBits,
                  bool inverted,
                  Version version,
-                 BSONObjBuilderValueStream* stream);
+                 BSONObjBuilderValueStream* stream,
+                 uint32_t depth);
 
 void toBson(BufReader* reader,
             TypeBits::Reader* typeBits,
             bool inverted,
             Version version,
-            BSONObjBuilder* builder) {
+            BSONObjBuilder* builder,
+            uint32_t depth) {
     while (readType<uint8_t>(reader, inverted) != 0) {
         if (inverted) {
             std::string name = readInvertedCString(reader);
             BSONObjBuilderValueStream& stream = *builder << name;
-            toBsonValue(
-                readType<uint8_t>(reader, inverted), reader, typeBits, inverted, version, &stream);
+            toBsonValue(readType<uint8_t>(reader, inverted),
+                        reader,
+                        typeBits,
+                        inverted,
+                        version,
+                        &stream,
+                        depth);
         } else {
             StringData name = readCString(reader);
             BSONObjBuilderValueStream& stream = *builder << name;
-            toBsonValue(
-                readType<uint8_t>(reader, inverted), reader, typeBits, inverted, version, &stream);
+            toBsonValue(readType<uint8_t>(reader, inverted),
+                        reader,
+                        typeBits,
+                        inverted,
+                        version,
+                        &stream,
+                        depth);
         }
     }
 }
@@ -1196,7 +1209,12 @@ void toBsonValue(uint8_t ctype,
                  TypeBits::Reader* typeBits,
                  bool inverted,
                  Version version,
-                 BSONObjBuilderValueStream* stream) {
+                 BSONObjBuilderValueStream* stream,
+                 uint32_t depth) {
+    uassert(ErrorCodes::Overflow,
+            "KeyString encoding exceeded maximum allowable BSON nesting depth",
+            depth <= BSONDepth::getMaxAllowableDepth());
+
     // This is only used by the kNumeric.*ByteInt types, but needs to be declared up here
     // since it is used across a fallthrough.
     bool isNegative = false;
@@ -1288,7 +1306,7 @@ void toBsonValue(uint8_t ctype,
             }
             // Not going to optimize CodeWScope.
             BSONObjBuilder scope;
-            toBson(reader, typeBits, inverted, version, &scope);
+            toBson(reader, typeBits, inverted, version, &scope, depth + 1);
             *stream << BSONCodeWScope(code, scope.done());
             break;
         }
@@ -1343,7 +1361,7 @@ void toBsonValue(uint8_t ctype,
 
         case CType::kObject: {
             BSONObjBuilder subObj(stream->subobjStart());
-            toBson(reader, typeBits, inverted, version, &subObj);
+            toBson(reader, typeBits, inverted, version, &subObj, depth + 1);
             break;
         }
 
@@ -1352,8 +1370,13 @@ void toBsonValue(uint8_t ctype,
             DecimalCounter<unsigned> index;
             uint8_t elemType;
             while ((elemType = readType<uint8_t>(reader, inverted)) != 0) {
-                toBsonValue(
-                    elemType, reader, typeBits, inverted, version, &(subArr << StringData{index}));
+                toBsonValue(elemType,
+                            reader,
+                            typeBits,
+                            inverted,
+                            version,
+                            &(subArr << StringData{index}),
+                            depth + 1);
                 ++index;
             }
             break;
@@ -2347,7 +2370,7 @@ BSONObj toBsonSafe(const char* buffer, size_t len, Ordering ord, const TypeBits&
 
         if (ctype == kEnd)
             break;
-        toBsonValue(ctype, &reader, &typeBitsReader, invert, typeBits.version, &(builder << ""));
+        toBsonValue(ctype, &reader, &typeBitsReader, invert, typeBits.version, &(builder << ""), 1);
     }
     return builder.obj();
 }
