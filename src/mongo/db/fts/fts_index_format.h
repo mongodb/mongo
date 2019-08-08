@@ -66,13 +66,25 @@ public:
 
 private:
     /**
-     * Helper method to get return entry from the FTSIndex as a BSONObj
-     * @param b, reference to the BSONOBjBuilder
-     * @param weight, the weight of the term in the entry
-     * @param term, the std::string term in the entry
-     * @param textIndexVersion, index version. affects key format.
+     * Helper method to get return entry from the FTSIndex as a BSONObj.
+     * 'b' is a reference to the BSONOBjBuilder.
+     * 'weight' is the weight of the term in the entry.
+     * 'term' is the std::string term in the entry.
+     * 'textIndexVersion' is index version, affects key format.
      */
     static void _appendIndexKey(BSONObjBuilder& b,
+                                double weight,
+                                const std::string& term,
+                                TextIndexVersion textIndexVersion);
+
+    /**
+     * Helper method to get return entry from the FTSIndex as a BSONObj.
+     * 'keyString' is a reference to the KeyString builder.
+     * 'weight' is the weight of the term in the entry.
+     * 'term' is the std::string term in the entry.
+     * 'textIndexVersion' is index version, affects key format.
+     */
+    static void _appendIndexKey(KeyString::Builder& keyString,
                                 double weight,
                                 const std::string& term,
                                 TextIndexVersion textIndexVersion);

@@ -343,15 +343,23 @@ void BuilderBase<BufferT>::resetToKey(const BSONObj& obj,
 
 template <class BufferT>
 void BuilderBase<BufferT>::appendBSONElement(const BSONElement& elem, const StringTransformFn& f) {
-    invariant(_state == BuildState::kEmpty || _state == BuildState::kAppendingBSONElements);
+    _verifyAppendingState();
+    _appendBsonValue(elem, _shouldInvertOnAppend(), nullptr, f);
+    _elemCount++;
+}
 
-    const int elemIdx = _elemCount++;
-    const bool invert = (_ordering.get(elemIdx) == -1);
+template <class BufferT>
+void BuilderBase<BufferT>::appendString(StringData val) {
+    _verifyAppendingState();
+    _appendString(val, _shouldInvertOnAppend(), nullptr);
+    _elemCount++;
+}
 
-    if (_state == BuildState::kEmpty) {
-        _transition(BuildState::kAppendingBSONElements);
-    }
-    _appendBsonValue(elem, invert, nullptr, f);
+template <class BufferT>
+void BuilderBase<BufferT>::appendNumberDouble(double num) {
+    _verifyAppendingState();
+    _appendNumberDouble(num, _shouldInvertOnAppend());
+    _elemCount++;
 }
 
 template <class BufferT>

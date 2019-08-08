@@ -78,31 +78,6 @@ const size_t termKeySuffixLengthV3 = 32U;
 const size_t termKeyLengthV3 = termKeyPrefixLengthV3 + termKeySuffixLengthV3;
 
 /**
- * Returns size of buffer required to store term in index key.
- * In version 1, terms are stored verbatim in key.
- * In version 2 and above, terms longer than 32 characters are hashed and combined
- * with a prefix.
- */
-int guessTermSize(const std::string& term, TextIndexVersion textIndexVersion) {
-    if (TEXT_INDEX_VERSION_1 == textIndexVersion) {
-        return term.size();
-    } else if (TEXT_INDEX_VERSION_2 == textIndexVersion) {
-        if (term.size() <= termKeyPrefixLengthV2) {
-            return term.size();
-        }
-
-        return termKeyLengthV2;
-    } else {
-        invariant(TEXT_INDEX_VERSION_3 == textIndexVersion);
-        if (term.size() <= termKeyPrefixLengthV3) {
-            return term.size();
-        }
-
-        return termKeyLengthV3;
-    }
-}
-
-/**
  * Given an object being indexed, 'obj', and a path through 'obj', returns the corresponding BSON
  * element, according to the indexing rules for the non-text fields of an FTS index key pattern.
  *
@@ -162,37 +137,27 @@ void FTSIndexFormat::getKeys(const FTSSpec& spec,
     TermFrequencyMap term_freqs;
     spec.scoreDocument(obj, &term_freqs);
 
-    // create index keys from raw scores
-    // only 1 per string
-    long long keyBSONSize = 0;
-
     for (TermFrequencyMap::const_iterator i = term_freqs.begin(); i != term_freqs.end(); ++i) {
         const string& term = i->first;
         double weight = i->second;
 
-        // guess the total size of the btree entry based on the size of the weight, term tuple
-        int guess = 5 /* bson overhead */ + 10 /* weight */ + 8 /* term overhead */ +
-            /* term size (could be truncated/hashed) */
-            guessTermSize(term, spec.getTextIndexVersion()) + extraSize;
-
-        BSONObjBuilder b(guess);  // builds a BSON object with guess length.
-        for (unsigned k = 0; k < extrasBefore.size(); k++) {
-            b.appendAs(extrasBefore[k], "");
+        KeyString::Builder keyString(keyStringVersion, ordering);
+        for (const auto& elem : extrasBefore) {
+            keyString.appendBSONElement(elem);
         }
-        _appendIndexKey(b, weight, term, spec.getTextIndexVersion());
-        for (unsigned k = 0; k < extrasAfter.size(); k++) {
-            b.appendAs(extrasAfter[k], "");
+        _appendIndexKey(keyString, weight, term, spec.getTextIndexVersion());
+        for (const auto& elem : extrasAfter) {
+            keyString.appendBSONElement(elem);
         }
-        BSONObj res = b.obj();
 
-        verify(guess >= res.objsize());
-
-        KeyString::HeapBuilder keyString(keyStringVersion, res, ordering);
         if (id) {
             keyString.appendRecordId(*id);
         }
-        keys->insert(keyString.release());
-        keyBSONSize += res.objsize();
+
+        /*
+         * Insert a copy to only allocate as much buffer space as necessary.
+         */
+        keys->insert(keyString.getValueCopy());
     }
 }
 
@@ -207,25 +172,27 @@ BSONObj FTSIndexFormat::getIndexKey(double weight,
         b.appendAs(i.next(), "");
     }
 
-    _appendIndexKey(b, weight, term, textIndexVersion);
-    return b.obj();
+    KeyString::Builder keyString(KeyString::Version::kLatestVersion, KeyString::ALL_ASCENDING);
+    _appendIndexKey(keyString, weight, term, textIndexVersion);
+    auto key = KeyString::toBson(keyString, KeyString::ALL_ASCENDING);
+
+    return b.appendElements(key).obj();
 }
 
-void FTSIndexFormat::_appendIndexKey(BSONObjBuilder& b,
+void FTSIndexFormat::_appendIndexKey(KeyString::Builder& keyString,
                                      double weight,
                                      const string& term,
                                      TextIndexVersion textIndexVersion) {
-    verify(weight >= 0 && weight <= MAX_WEIGHT);  // FTSmaxweight =  defined in fts_header
+    invariant(weight >= 0 && weight <= MAX_WEIGHT);  // FTSmaxweight =  defined in fts_header
     // Terms are added to index key verbatim.
     if (TEXT_INDEX_VERSION_1 == textIndexVersion) {
-        b.append("", term);
-        b.append("", weight);
+        keyString.appendString(term);
     }
     // See comments at the top of file for termKeyPrefixLengthV2.
     // Apply hash for text index version 2 to long terms (longer than 32 characters).
     else if (TEXT_INDEX_VERSION_2 == textIndexVersion) {
         if (term.size() <= termKeyPrefixLengthV2) {
-            b.append("", term);
+            keyString.appendString(term);
         } else {
             union {
                 uint64_t hash[2];
@@ -235,20 +202,19 @@ void FTSIndexFormat::_appendIndexKey(BSONObjBuilder& b,
             MurmurHash3_x64_128(term.data(), term.size(), seed, t.hash);
             string keySuffix = mongo::toHexLower(t.data, sizeof(t.data));
             invariant(termKeySuffixLengthV2 == keySuffix.size());
-            b.append("", term.substr(0, termKeyPrefixLengthV2) + keySuffix);
+            keyString.appendString(term.substr(0, termKeyPrefixLengthV2) + keySuffix);
         }
-        b.append("", weight);
     } else {
         invariant(TEXT_INDEX_VERSION_3 == textIndexVersion);
         if (term.size() <= termKeyPrefixLengthV3) {
-            b.append("", term);
+            keyString.appendString(term);
         } else {
             string keySuffix = md5simpledigest(term);
             invariant(termKeySuffixLengthV3 == keySuffix.size());
-            b.append("", term.substr(0, termKeyPrefixLengthV3) + keySuffix);
+            keyString.appendString(term.substr(0, termKeyPrefixLengthV3) + keySuffix);
         }
-        b.append("", weight);
     }
+    keyString.appendNumberDouble(weight);
 }
 }  // namespace fts
 }  // namespace mongo

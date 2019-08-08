@@ -450,6 +450,9 @@ public:
      */
     void appendBSONElement(const BSONElement& elem, const StringTransformFn& f = nullptr);
 
+    void appendString(StringData val);
+    void appendNumberDouble(double num);
+
     /**
      * Resets to an empty state.
      * Equivalent to but faster than *this = Builder(ord, discriminator)
@@ -573,6 +576,14 @@ private:
         }
     }
 
+    void _verifyAppendingState() {
+        invariant(_state == BuildState::kEmpty || _state == BuildState::kAppendingBSONElements);
+
+        if (_state == BuildState::kEmpty) {
+            _transition(BuildState::kAppendingBSONElements);
+        }
+    }
+
     void _transition(BuildState to) {
         // We can empty at any point since it just means that we are clearing the buffer.
         if (to == BuildState::kEmpty) {
@@ -611,6 +622,10 @@ private:
                 MONGO_UNREACHABLE;
         }
         _state = to;
+    }
+
+    bool _shouldInvertOnAppend() const {
+        return _ordering.get(_elemCount) == -1;
     }
 
 
