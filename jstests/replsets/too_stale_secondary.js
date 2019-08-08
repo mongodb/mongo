@@ -66,6 +66,13 @@ function tooStale(conn) {
     return assert.commandWorked(conn.adminCommand("replSetGetStatus")).tooStale;
 }
 
+/**
+ * Returns a node's current replica state.
+ */
+function myState(conn) {
+    return assert.commandWorked(conn.adminCommand("replSetGetStatus")).myState;
+}
+
 var testName = "too_stale_secondary";
 
 var smallOplogSizeMB = 1;
@@ -126,8 +133,12 @@ replTest.stop(1);
 replTest.restart(2);
 
 jsTestLog("6: Wait for Node 2 to transition to RECOVERING (it should be too stale).");
+assert.soonNoExcept(() => tooStale(replTest.nodes[2]), "Waiting for Node 2 to become too stale");
+// This checks the state as reported by the node itself.
+assert.soon(() => myState(replTest.nodes[2]) === ReplSetTest.State.RECOVERING,
+            "Waiting for Node 2 to transition to RECOVERING");
+// This waits for the state as indicated by the primary node.
 replTest.waitForState(replTest.nodes[2], ReplSetTest.State.RECOVERING);
-assert(tooStale(replTest.nodes[2]));
 
 jsTestLog("7: Stop and restart Node 2.");
 replTest.stop(2);
@@ -135,14 +146,23 @@ replTest.restart(2);
 
 jsTestLog(
     "8: Wait for Node 2 to transition to RECOVERING (its oplog should remain stale after restart)");
+assert.soonNoExcept(() => tooStale(replTest.nodes[2]), "Waiting for Node 2 to become too stale");
+// This checks the state as reported by the node itself.
+assert.soon(() => myState(replTest.nodes[2]) === ReplSetTest.State.RECOVERING,
+            "Waiting for Node 2 to transition to RECOVERING");
+// This waits for the state as indicated by the primary node.
 replTest.waitForState(replTest.nodes[2], ReplSetTest.State.RECOVERING);
 
 jsTestLog("9: Restart Node 1, which should have the full oplog history.");
 replTest.restart(1);
 
 jsTestLog("10: Wait for Node 2 to leave RECOVERING and transition to SECONDARY.");
+assert.soonNoExcept(() => !tooStale(replTest.nodes[2]), "Waiting for Node 2 to exit too stale");
+// This checks the state as reported by the node itself.
+assert.soon(() => myState(replTest.nodes[2]) === ReplSetTest.State.SECONDARY,
+            "Waiting for Node 2 to transition to SECONDARY");
+// This waits for the state as indicated by the primary node.
 replTest.waitForState(replTest.nodes[2], ReplSetTest.State.SECONDARY);
-assert(!tooStale(replTest.nodes[2]));
 
 replTest.stopSet();
 }());
