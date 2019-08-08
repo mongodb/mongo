@@ -6293,7 +6293,7 @@ tasks:
 
 - <<: *task_template
   name: jsCore_txns_large_txns_format
-  tags: ["jscore", "txns"]
+  tags: ["jscore", "txns", "multi_oplog"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -10472,58 +10472,27 @@ buildvariants:
   - name: concurrency_sharded_multi_stmt_txn_with_stepdowns
   - name: concurrency_sharded_with_stepdowns
   - name: concurrency_sharded_with_stepdowns_and_balancer
+  - name: initial_sync_fuzzer_gen
   - name: jsCore
   - name: jsCore_txns
-  - name: logical_session_cache_replication_100ms_refresh_jscore_passthrough_gen
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
-  - name: logical_session_cache_replication_10sec_refresh_jscore_passthrough_gen
-  - name: logical_session_cache_replication_default_refresh_jscore_passthrough_gen
-  - name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough_gen
-  - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
-  - name: multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
-  - name: multi_shard_multi_stmt_txn_stepdown_primary_jscore_passthrough_gen
+  - name: .logical_session_cache .repl
+  - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_auth
   - name: multiversion
   - name: noPassthrough_gen
-  - name: replica_sets
+  - name: .replica_sets !.multi_oplog !.large
+  - name: .replica_sets !.multi_oplog .large
     distros:
     - rhel62-large
-  - name: replica_sets_auth_gen
-  - name: replica_sets_ese_gen
-  - name: replica_sets_ese_gcm_gen
-  - name: replica_sets_jscore_passthrough
-  - name: replica_sets_initsync_jscore_passthrough
-    distros:
-    - rhel62-large
-  - name: replica_sets_initsync_static_jscore_passthrough
-    distros:
-    - rhel62-large
-  - name: replica_sets_kill_secondaries_jscore_passthrough
-    distros:
-    - rhel62-large
-  - name: replica_sets_multi_stmt_txn_jscore_passthrough
-    distros:
-    - rhel62-large
-  - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
-    distros:
-    - rhel62-large
-  - name: replica_sets_multi_stmt_txn_kill_primary_jscore_passthrough
-    distros:
-    - rhel62-large
-  - name: replica_sets_multi_stmt_txn_terminate_primary_jscore_passthrough
-    distros:
-    - rhel62-large
+  - name: .rollbackfuzzer
+  - name: .sharding .txns
   - name: sharding_gen
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
-  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
-  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharding_ese_gen
   - name: sharding_ese_gcm_gen
   - name: sharding_csrs_continuous_config_stepdown_gen
-  - name: sharded_jscore_txns
-  - name: sharded_jscore_txns_sharded_collections
   - name: sharded_multi_stmt_txn_jscore_passthrough
     distros:
     - rhel62-large
