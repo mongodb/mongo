@@ -140,7 +140,9 @@ TEST(DiagnosticInfo, StackTraceTest) {
 
 void NOINLINE_DECL recurseAndCaptureInfo(MaybeDiagnosticInfo& info, size_t i) {
     // Prevent tail-call optimization.
+#ifndef _WIN32
     asm volatile("");  // NOLINT
+#endif
 
     if (i == 0) {
         info = takeDiagnosticInfo("Recursion!"_sd);
