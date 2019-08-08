@@ -577,14 +577,6 @@ struct __wt_page {
 	for (__refp = __pindex->index,					\
 	    __entries = __pindex->entries; __entries > 0; --__entries) {\
 		(ref) = *__refp++;
-#define	WT_INTL_FOREACH_REVERSE_BEGIN(session, page, ref) do {		\
-	WT_PAGE_INDEX *__pindex;					\
-	WT_REF **__refp;						\
-	uint32_t __entries;						\
-	WT_INTL_INDEX_GET(session, page, __pindex);			\
-	for (__refp = __pindex->index + __pindex->entries,		\
-	    __entries = __pindex->entries; __entries > 0; --__entries) {\
-		(ref) = *--__refp;
 #define	WT_INTL_FOREACH_END						\
 	}								\
 } while (0)

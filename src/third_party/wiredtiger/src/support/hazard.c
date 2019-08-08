@@ -329,10 +329,6 @@ __wt_hazard_check(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_SESSION_IMPL *s;
 	uint32_t i, j, hazard_inuse, max, session_cnt, walk_cnt;
 
-	/* If a file can never be evicted, hazard pointers aren't required. */
-	if (F_ISSET(S2BT(session), WT_BTREE_IN_MEMORY))
-		return (NULL);
-
 	conn = S2C(session);
 
 	WT_STAT_CONN_INCR(session, cache_hazard_checks);
