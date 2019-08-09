@@ -27,6 +27,9 @@ assert.eq(testColl.find({}).itcount(), 0);
 
 //  This variable is used to get differential output
 var lastTop = getTop(testColl);
+if (lastTop === undefined) {
+    return;
+}
 
 var numRecords = 100;
 
@@ -77,6 +80,10 @@ var res;
 
 // "count" command
 lastTop = getTop(testColl);  // ignore any commands before this
+if (lastTop === undefined) {
+    return;
+}
+
 for (i = 0; i < numRecords; i++) {
     res = assert.commandWorked(testDB.runCommand({count: testColl.getName()}));
     assert.eq(res.n, numRecords, tojson(res));
@@ -85,6 +92,10 @@ lastTop = assertTopDiffEq(testColl, lastTop, "commands", numRecords);
 
 // "findAndModify" command
 lastTop = getTop(testColl);
+if (lastTop === undefined) {
+    return;
+}
+
 for (i = 0; i < numRecords; i++) {
     res = assert.commandWorked(testDB.runCommand({
         findAndModify: testColl.getName(),
@@ -96,6 +107,10 @@ for (i = 0; i < numRecords; i++) {
 lastTop = assertTopDiffEq(testColl, lastTop, "commands", numRecords);
 
 lastTop = getTop(testColl);
+if (lastTop === undefined) {
+    return;
+}
+
 for (i = 0; i < numRecords; i++) {
     res = assert.commandWorked(testDB.runCommand({
         findAndModify: testColl.getName(),

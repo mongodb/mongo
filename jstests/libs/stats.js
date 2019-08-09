@@ -38,7 +38,11 @@ function assertHistogramDiffEq(coll, lastHistogram, readDiff, writeDiff, command
 function getTop(coll) {
     let collName = coll.getFullName();
     let res = coll.getDB().adminCommand("top");
-    assert.commandWorked(res);
+    if (!res.ok) {
+        assert.commandFailedWithCode(res, [ErrorCodes.BSONObjectTooLarge, 13548]);
+        return undefined;
+    }
+
     assert.eq(true, res.totals.hasOwnProperty(collName), collName + " not found in top");
     return res.totals[collName];
 }

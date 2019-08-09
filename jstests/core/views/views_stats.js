@@ -46,6 +46,10 @@ if (isMongos) {
 
 // Check the top counters.
 let lastTop = getTop(view);
+if (lastTop === undefined) {
+    return;
+}
+
 view.aggregate([{$match: {}}]);
 lastTop = assertTopDiffEq(view, lastTop, "commands", 1);
 
@@ -60,6 +64,10 @@ lastTop = assertTopDiffEq(view, lastTop, "update", 1);
 
 // Check that operations on the backing collection do not modify the view stats.
 lastTop = getTop(view);
+if (lastTop === undefined) {
+    return;
+}
+
 lastHistogram = getHistogramStats(view);
 assert.writeOK(coll.insert({}));
 assert.writeOK(coll.update({}, {$set: {x: 1}}));

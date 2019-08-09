@@ -21,7 +21,13 @@ function getCollectionLatencyStats() {
 }
 
 function getTop() {
-    return db.adminCommand({top: 1}).totals[coll.getFullName()];
+    const res = db.adminCommand({top: 1});
+    if (!res.ok) {
+        assert.commandFailedWithCode(res, [ErrorCodes.BSONObjectTooLarge, 13548]);
+        return undefined;
+    }
+
+    return res.totals[coll.getFullName()];
 }
 
 // Global latency histogram from serverStatus should record two read ops, one for find and one
@@ -41,8 +47,17 @@ assert.eq(3, newCollLatency.ops - oldCollLatency.ops);
 // Top separates counters for getMore and find. We should see a delta of one getMore op and one
 // find op.
 let oldTop = getTop();
+if (oldTop === undefined) {
+    return;
+}
+
 assert.eq(3, coll.find().tailable(true).itcount());
+
 let newTop = getTop();
+if (newTop === undefined) {
+    return;
+}
+
 assert.eq(1, newTop.getmore.count - oldTop.getmore.count);
 assert.eq(1, newTop.queries.count - oldTop.queries.count);
 }());

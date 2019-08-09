@@ -11,7 +11,10 @@ assert.commandWorked(topDB.dropDatabase());
 // Asserts that the output of top contains exactly these collection entries for topDB.
 function checkTopEntries(expectedEntries) {
     let res = topDB.adminCommand("top");
-    assert.commandWorked(res, "Failed to run the top command");
+    if (!res.ok) {
+        assert.commandFailedWithCode(res, [ErrorCodes.BSONObjectTooLarge, 13548]);
+        return;
+    }
 
     let entriesInTop = Object.keys(res.totals).filter(function(ns) {
         // This filter only includes non-system collections in our test database.
@@ -72,7 +75,6 @@ topDB.foo.find().itcount();
 topDB.baz.update({}, {$set: {a: 1}});
 topDB.bar.remove({});
 
-let res = topDB.adminCommand("top");
 checkTopEntries([]);
 
 assert.commandWorked(topDB.dropDatabase());
