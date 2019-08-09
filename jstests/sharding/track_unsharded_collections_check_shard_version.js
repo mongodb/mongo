@@ -32,7 +32,8 @@ function validateTestCase(testCase) {
                 "whenNamespaceIsViewFailsWith",
                 "doesNotCheckShardVersion",
                 "doesNotSendShardVersionIfTracked",
-                "command"
+                "command",
+                "conditional"
             ].includes(key),
             "Found unexpected field " + key + " in test case " + tojson(testCase));
     }
