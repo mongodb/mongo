@@ -46,9 +46,10 @@ namespace mozjs {
 
 const char* const BSONInfo::className = "BSON";
 
-const JSFunctionSpec BSONInfo::freeFunctions[3] = {
+const JSFunctionSpec BSONInfo::freeFunctions[4] = {
     MONGO_ATTACH_JS_FUNCTION(bsonWoCompare),
     MONGO_ATTACH_JS_FUNCTION(bsonBinaryEqual),
+    MONGO_ATTACH_JS_FUNCTION(bsonObjToArray),
     JS_FS_END,
 };
 
@@ -267,6 +268,13 @@ std::tuple<BSONObj*, bool> BSONInfo::originalBSON(JSContext* cx, JS::HandleObjec
     return out;
 }
 
+void BSONInfo::Functions::bsonObjToArray::call(JSContext* cx, JS::CallArgs args) {
+    uassert(ErrorCodes::BadValue, "bsonObjToArray needs 1 argument", args.length() == 1);
+    uassert(ErrorCodes::BadValue, "argument must be an object", args.get(0).isObject());
+
+    auto obj = ValueWriter(cx, args.get(0)).toBSON();
+    ValueReader(cx, args.rval()).fromBSONArray(obj, nullptr, false);
+}
 
 void BSONInfo::Functions::bsonWoCompare::call(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 2)
