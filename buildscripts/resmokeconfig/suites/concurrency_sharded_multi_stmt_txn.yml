@@ -132,9 +132,6 @@ selector:
   # Performs direct writes to system.views
   - jstests/concurrency/fsm_workloads/view_catalog_direct_system_writes.js
 
-  # Expects DocumentValidationFailure which causes transaction to abort and retry indefinitely.
-  - jstests/concurrency/fsm_workloads/schema_validator_with_expr_variables.js
-
   ##
   # Blacklists specific to this suite.
   ##
@@ -164,6 +161,9 @@ selector:
   # These start a transaction in one state function and use it in other state functions. This suite
   # would instead execute each state function as its own transaction.
   - state_functions_share_transaction
+  # Tests which expect commands to fail and catch the error can cause transactions to abort and
+  # retry indefinitely.
+  - catches_command_failures
 
 executor:
   archive:

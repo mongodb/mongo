@@ -6,7 +6,7 @@
  * the test generates a large oplog and 'inMemory' instances have limited resources to accommodate
  * all nodes in the replica set (which all run in the same instance), so it may fail with the OOM
  * error.
- * @tags: [requires_non_retryable_writes, requires_persistence]
+ * @tags: [requires_non_retryable_writes, requires_persistence, catches_command_failures]
  */
 
 "use strict";

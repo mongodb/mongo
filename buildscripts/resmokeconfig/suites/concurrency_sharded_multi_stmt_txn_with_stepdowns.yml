@@ -147,9 +147,6 @@ selector:
   - jstests/concurrency/fsm_workloads/update_rename.js
   - jstests/concurrency/fsm_workloads/update_rename_noindex.js
 
-  # Expects DocumentValidationFailure which causes transaction to abort and retry indefinitely.
-  - jstests/concurrency/fsm_workloads/schema_validator_with_expr_variables.js
-
   ##
   # Blacklists from concurrency_sharded_with_stepdowns
   ##
@@ -233,6 +230,9 @@ selector:
   - state_functions_share_transaction
   # Note that "requires_non_retryable_writes" does not need to be blacklisted because some writes
   # that are not individually retryable can be retried if they are part of a transaction.
+  # Tests which expect commands to fail and catch the error can cause transactions to abort and
+  # retry indefinitely.
+  - catches_command_failures
 
 executor:
   archive:
