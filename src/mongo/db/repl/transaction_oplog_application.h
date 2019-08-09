@@ -63,8 +63,7 @@ const repl::OplogEntry getPreviousOplogEntry(OperationContext* opCtx,
 repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
     OperationContext* opCtx,
     const repl::OplogEntry& entry,
-    const std::vector<repl::OplogEntry*>& cachedOps,
-    boost::optional<Timestamp> commitOplogEntryTS);
+    const std::vector<repl::OplogEntry*>& cachedOps) noexcept;
 
 /**
  * Apply `prepareTransaction` oplog entry.

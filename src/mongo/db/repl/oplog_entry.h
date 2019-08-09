@@ -268,6 +268,23 @@ public:
     }
 
     /**
+     * Returns if this is a prepared 'commitTransaction' oplog entry.
+     */
+    bool isPreparedCommit() const {
+        return getCommandType() == OplogEntry::CommandType::kCommitTransaction;
+    }
+
+    /**
+     * Returns whether the oplog entry represents an applyOps which is a self-contained atomic
+     * operation, or the last applyOps of an unprepared transaction, as opposed to part of a
+     * prepared transaction or a non-final applyOps in a transaction.
+     */
+    bool isTerminalApplyOps() const {
+        return getCommandType() == OplogEntry::CommandType::kApplyOps && !shouldPrepare() &&
+            !isPartialTransaction() && !getObject().getBoolField("prepare");
+    }
+
+    /**
      * Returns if the oplog entry is for a CRUD operation.
      */
     static bool isCrudOpType(OpTypeEnum opType);

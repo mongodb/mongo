@@ -93,15 +93,7 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
                                        Timestamp durableTimestamp) {
     invariant(mode == repl::OplogApplication::Mode::kRecovering);
 
-    repl::MultiApplier::Operations ops;
-    {
-        // Traverse the oplog chain with its own snapshot and read timestamp.
-        ReadSourceScope readSourceScope(opCtx);
-
-        // Get the corresponding prepare applyOps oplog entry.
-        const auto prepareOplogEntry = getPreviousOplogEntry(opCtx, entry);
-        ops = readTransactionOperationsFromOplogChain(opCtx, prepareOplogEntry, {}, boost::none);
-    }
+    auto ops = readTransactionOperationsFromOplogChain(opCtx, entry, {});
 
     const auto dbName = entry.getNss().db().toString();
     Status status = Status::OK();
@@ -236,30 +228,41 @@ Status applyAbortTransaction(OperationContext* opCtx,
 
 repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
     OperationContext* opCtx,
-    const OplogEntry& commitOrPrepare,
-    const std::vector<OplogEntry*>& cachedOps,
-    boost::optional<Timestamp> commitOplogEntryTS) {
-    repl::MultiApplier::Operations ops;
+    const OplogEntry& lastEntryInTxn,
+    const std::vector<OplogEntry*>& cachedOps) noexcept {
+    // Traverse the oplog chain with its own snapshot and read timestamp.
+    ReadSourceScope readSourceScope(opCtx);
 
-    // Get the previous oplog entry.
-    auto currentOpTime = commitOrPrepare.getOpTime();
+    repl::MultiApplier::Operations ops;
 
     // The cachedOps are the ops for this transaction that are from the same oplog application batch
     // as the commit or prepare, those which have not necessarily been written to the oplog.  These
     // ops are in order of increasing timestamp.
+    const auto oldestEntryInBatch = cachedOps.empty() ? lastEntryInTxn : *cachedOps.front();
 
-    // The lastEntryOpTime is the OpTime of the last (latest OpTime) entry for this transaction
+    // The lastEntryWrittenToOplogOpTime is the OpTime of the latest entry for this transaction
     // which is expected to be present in the oplog.  It is the entry before the first cachedOp,
     // unless there are no cachedOps in which case it is the entry before the commit or prepare.
-    const auto lastEntryOpTime = (cachedOps.empty() ? commitOrPrepare : *cachedOps.front())
-                                     .getPrevWriteOpTimeInTransaction();
-    invariant(lastEntryOpTime < currentOpTime);
+    const auto lastEntryWrittenToOplogOpTime = oldestEntryInBatch.getPrevWriteOpTimeInTransaction();
+    invariant(lastEntryWrittenToOplogOpTime < lastEntryInTxn.getOpTime());
 
-    TransactionHistoryIterator iter(lastEntryOpTime.get());
-    // Empty commits are not allowed, but empty prepares are.
-    invariant(commitOrPrepare.getCommandType() != OplogEntry::CommandType::kCommitTransaction ||
-              !cachedOps.empty() || iter.hasNext());
-    auto commitOrPrepareObj = commitOrPrepare.toBSON();
+    TransactionHistoryIterator iter(lastEntryWrittenToOplogOpTime.get());
+
+    // If we started with a prepared commit, we want to forget about that operation and move onto
+    // the prepare.
+    auto prepareOrUnpreparedCommit = lastEntryInTxn;
+    if (lastEntryInTxn.isPreparedCommit()) {
+        // A prepared-commit must be in its own batch and thus have no cached ops.
+        invariant(cachedOps.empty());
+        invariant(iter.hasNext());
+        prepareOrUnpreparedCommit = iter.nextFatalOnErrors(opCtx);
+    }
+    invariant(prepareOrUnpreparedCommit.getCommandType() == OplogEntry::CommandType::kApplyOps);
+
+    // The non-DurableReplOperation fields of the extracted transaction operations will match those
+    // of the lastEntryInTxn. For a prepared commit, this will include the commit oplog entry's
+    // 'ts' field, which is what we want.
+    auto lastEntryInTxnObj = lastEntryInTxn.toBSON();
 
     // First retrieve and transform the ops from the oplog, which will be retrieved in reverse
     // order.
@@ -267,8 +270,8 @@ repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
         const auto& operationEntry = iter.nextFatalOnErrors(opCtx);
         invariant(operationEntry.isPartialTransaction());
         auto prevOpsEnd = ops.size();
-        repl::ApplyOps::extractOperationsTo(
-            operationEntry, commitOrPrepareObj, &ops, commitOplogEntryTS);
+        repl::ApplyOps::extractOperationsTo(operationEntry, lastEntryInTxnObj, &ops);
+
         // Because BSONArrays do not have fast way of determining size without iterating through
         // them, and we also have no way of knowing how many oplog entries are in a transaction
         // without iterating, reversing each applyOps and then reversing the whole array is
@@ -283,15 +286,11 @@ repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
     for (auto* cachedOp : cachedOps) {
         const auto& operationEntry = *cachedOp;
         invariant(operationEntry.isPartialTransaction());
-        repl::ApplyOps::extractOperationsTo(
-            operationEntry, commitOrPrepareObj, &ops, commitOplogEntryTS);
+        repl::ApplyOps::extractOperationsTo(operationEntry, lastEntryInTxnObj, &ops);
     }
 
-    // Reconstruct the operations from the commit or prepare oplog entry.
-    if (commitOrPrepare.getCommandType() == OplogEntry::CommandType::kApplyOps) {
-        repl::ApplyOps::extractOperationsTo(
-            commitOrPrepare, commitOrPrepareObj, &ops, commitOplogEntryTS);
-    }
+    // Reconstruct the operations from the prepare or unprepared commit oplog entry.
+    repl::ApplyOps::extractOperationsTo(prepareOrUnpreparedCommit, lastEntryInTxnObj, &ops);
     return ops;
 }
 
@@ -307,10 +306,7 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
     // The operations here are reconstructed at their prepare time.  However, that time will
     // be ignored because there is an outer write unit of work during their application.
     // The prepare time of the transaction is set explicitly below.
-    auto ops = [&] {
-        ReadSourceScope readSourceScope(opCtx);
-        return readTransactionOperationsFromOplogChain(opCtx, entry, {}, boost::none);
-    }();
+    auto ops = readTransactionOperationsFromOplogChain(opCtx, entry, {});
 
     if (mode == repl::OplogApplication::Mode::kRecovering ||
         mode == repl::OplogApplication::Mode::kInitialSync) {
@@ -399,10 +395,10 @@ void _reconstructPreparedTransaction(OperationContext* opCtx,
 }  // namespace
 
 /**
- * Make sure that if we are in replication recovery or initial sync, we don't apply the prepare
- * transaction oplog entry until we either see a commit transaction oplog entry or are at the very
- * end of recovery/initial sync. Otherwise, only apply the prepare transaction oplog entry if we are
- * a secondary.
+ * Make sure that if we are in replication recovery, we don't apply the prepare transaction oplog
+ * entry until we either see a commit transaction oplog entry or are at the very end of recovery.
+ * Otherwise, only apply the prepare transaction oplog entry if we are a secondary. We shouldn't get
+ * here for initial sync and applyOps should error.
  */
 Status applyPrepareTransaction(OperationContext* opCtx,
                                const OplogEntry& entry,
@@ -422,10 +418,9 @@ Status applyPrepareTransaction(OperationContext* opCtx,
             return Status::OK();
         }
         case repl::OplogApplication::Mode::kInitialSync: {
-            // Don't apply the operations from the prepared transaction until either we see a commit
-            // transaction oplog entry during the oplog application phase of initial sync or are at
-            // the end of initial sync.
-            return Status::OK();
+            // Initial sync should never apply 'prepareTransaction' since it unpacks committed
+            // transactions onto various applier threads at commit time.
+            MONGO_UNREACHABLE;
         }
         case repl::OplogApplication::Mode::kApplyOpsCmd: {
             // Return error if run via applyOps command.
