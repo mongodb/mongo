@@ -48,6 +48,12 @@ public:
         _scope.reset(getGlobalScriptEngine()->newScopeForCurrentThread());
     }
 
+    /**
+     * Registers and invokes the javascript function given by 'func' with the arguments 'params' and
+     * input object 'thisObj'.
+     *
+     * This method assumes that the desired function to execute does return a value.
+     */
     void callFunctionWithoutReturn(ScriptingFunction func,
                                    const BSONObj& params,
                                    const BSONObj& thisObj) {
@@ -55,6 +61,22 @@ public:
         const auto guard = makeGuard([&] { _scope->unregisterOperation(); });
 
         _scope->invoke(func, &params, &thisObj, 0, true);
+    }
+
+    /**
+     * Registers and invokes the javascript function given by 'func' with the arguments 'params' and
+     * input object 'thisObj'.
+     *
+     * Returns the value returned by the function.
+     */
+    Value callFunction(ScriptingFunction func, const BSONObj& params, const BSONObj& thisObj) {
+        _scope->registerOperation(Client::getCurrent()->getOperationContext());
+        const auto guard = makeGuard([&] { _scope->unregisterOperation(); });
+
+        _scope->invoke(func, &params, &thisObj, 0, false);
+        BSONObjBuilder returnValue;
+        _scope->append(returnValue, "", "__returnValue");
+        return Value(returnValue.done().firstElement());
     }
 
     Scope* getScope() {

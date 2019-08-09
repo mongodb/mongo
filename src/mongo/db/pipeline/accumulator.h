@@ -351,4 +351,30 @@ public:
 private:
     MutableDocument _output;
 };
+
+class AccumulatorInternalJsReduce final : public Accumulator {
+public:
+    static constexpr auto kAccumulatorName = "$_internalJsReduce"_sd;
+
+    static boost::intrusive_ptr<Accumulator> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    explicit AccumulatorInternalJsReduce(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : Accumulator(expCtx) {
+        _memUsageBytes = sizeof(*this);
+    }
+
+    const char* getOpName() const final {
+        return kAccumulatorName.rawData();
+    }
+    void processInternal(const Value& input, bool merging) final;
+    Value getValue(bool toBeMerged) final;
+    void reset() final;
+
+private:
+    std::vector<Value> _values;
+
+    std::string _funcSource;
+    Value _key;
+};
 }  // namespace mongo

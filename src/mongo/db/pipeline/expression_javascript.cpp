@@ -84,14 +84,15 @@ boost::intrusive_ptr<Expression> ExpressionInternalJsEmit::parse(
     BSONElement evalField = expr["eval"];
 
     uassert(31222, str::stream() << "The map function must be specified.", evalField);
+    uassert(ErrorCodes::BadValue,
+            str::stream() << kExpressionName << " with CodeWScope 'eval' argument is not supported",
+            evalField.type() != BSONType::CodeWScope);
     uassert(31224,
             "The map function must be of type string, code, or code w/ scope",
-            evalField.type() == BSONType::String || evalField.type() == BSONType::Code ||
-                evalField.type() == BSONType::CodeWScope);
+            evalField.type() == BSONType::String || evalField.type() == BSONType::Code);
 
     std::string funcSourceString = evalField._asCode();
     boost::intrusive_ptr<Expression> thisRef = parseOperand(expCtx, expr["this"], vps);
-
 
     uassert(31223, str::stream() << kExpressionName << " requires 'this' to be specified", thisRef);
 
@@ -105,23 +106,23 @@ Value ExpressionInternalJsEmit::serialize(bool explain) const {
 }
 
 Value ExpressionInternalJsEmit::evaluate(const Document& root, Variables* variables) const {
-    auto expCtx = getExpressionContext();
-    uassert(31234,
-            str::stream() << kExpressionName << " is not allowed to run on mongos",
-            !expCtx->inMongos);
+    uassert(31246,
+            "Cannot run server-side javascript without the javascript engine enabled",
+            getGlobalScriptEngine());
 
     Value thisVal = _thisRef->evaluate(root, variables);
     uassert(31225, "'this' must be an object.", thisVal.getType() == BSONType::Object);
 
     // If the scope does not exist and is created by the call to ExpressionContext::getJsExec(),
     // then make sure to re-bind emit() and the given function to the new scope.
+    auto expCtx = getExpressionContext();
     auto [jsExec, newlyCreated] = expCtx->mongoProcessInterface->getJsExec();
     if (newlyCreated) {
         jsExec->getScope()->loadStored(expCtx->opCtx, true);
 
         const_cast<ExpressionInternalJsEmit*>(this)->_func =
             jsExec->getScope()->createFunction(_funcSource.c_str());
-        uassert(31226, "The map function did not evaluate", _func);
+        uassert(31226, "The map function failed to parse in the javascript engine", _func);
         jsExec->getScope()->injectNative(
             "emit", emitFromJS, &const_cast<ExpressionInternalJsEmit*>(this)->_emittedObjects);
     }
