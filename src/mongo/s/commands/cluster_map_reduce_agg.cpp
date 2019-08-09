@@ -33,8 +33,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/map_reduce_gen.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_request.h"
-#include "mongo/db/query/mr_response_formatter.h"
 #include "mongo/s/commands/cluster_map_reduce_agg.h"
 
 namespace mongo {
@@ -81,14 +81,9 @@ bool runAggregationMapReduce(OperationContext* opCtx,
 
     auto cursorResponse = CursorResponse::parseFromBSONThrowing(aggResult);
     auto completeBatch = getAllAggregationResults(opCtx, dbname, cursorResponse);
-    CursorResponse completeCursor(
+    [[maybe_unused]] CursorResponse completeCursor(
         cursorResponse.getNSS(), cursorResponse.getCursorId(), std::move(completeBatch));
 
-    MapReduceResponseFormatter(
-        std::move(completeCursor),
-        boost::make_optional(!inMemory, NamespaceString(std::move(outDb), std::move(outColl))),
-        boost::get_optional_value_or(mrRequest.getVerbose(), false))
-        .appendAsClusterMapReduceResponse(&result);
     return true;
 }
 

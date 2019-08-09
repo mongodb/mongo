@@ -35,11 +35,12 @@
 #include "mongo/db/commands/map_reduce_agg.h"
 #include "mongo/db/commands/map_reduce_gen.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
-#include "mongo/db/query/mr_response_formatter.h"
+#include "mongo/db/query/map_reduce_output_format.h"
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
@@ -95,8 +96,31 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                              const BSONObj& cmd,
                              std::string& errmsg,
                              BSONObjBuilder& result) {
+    auto exhaustPipelineIntoBSONArray = [](auto&& pipeline) {
+        BSONArrayBuilder bab;
+        while (auto&& doc = pipeline->getNext())
+            bab.append(doc->toBson());
+        return bab.arr();
+    };
+
     auto parsedMr = MapReduce::parse(IDLParserErrorContext("MapReduce"), cmd);
-    [[maybe_unused]] auto pipe = translateFromMR(parsedMr, makeExpressionContext(opCtx, parsedMr));
+    bool inMemory = parsedMr.getOutOptions().getOutputType() == OutputType::InMemory;
+
+    auto pipe = translateFromMR(parsedMr, makeExpressionContext(opCtx, parsedMr));
+
+    if (inMemory)
+        map_reduce_output_format::appendInlineResponse(exhaustPipelineIntoBSONArray(pipe),
+                                                       parsedMr.getVerbose().get_value_or(false),
+                                                       false,
+                                                       &result);
+    else
+        map_reduce_output_format::appendOutResponse(
+            NamespaceString(parsedMr.getOutOptions().getDatabaseName(),
+                            parsedMr.getOutOptions().getCollectionName()),
+            boost::get_optional_value_or(parsedMr.getVerbose(), false),
+            false,
+            &result);
+
     return true;
 }
 

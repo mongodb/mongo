@@ -33,25 +33,18 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/mr_response_formatter.h"
+#include "mongo/db/query/map_reduce_output_format.h"
 #include "mongo/unittest/unittest.h"
-
-
-// TODO: SERVER-42644 Update for processing stats from aggregation.
 
 namespace mongo {
 namespace {
 
-const NamespaceString testNss("", "mr_response_formatter");
-const NamespaceString testNssWithDb("db.mr_response_formatter");
-const CursorId testCursor(0);
-
-TEST(MapReduceResponseFormatter, FormatInlineMapReduceResponse) {
-    CursorResponse cr(testNss, testCursor, {BSON("a" << 1), BSON("b" << 1)});
-    MapReduceResponseFormatter formatter(std::move(cr), boost::none, false);
+TEST(MapReduceOutputFormat, FormatInlineMapReduceResponse) {
+    BSONArrayBuilder documents;
+    documents.append(BSON("a" << 1));
+    documents.append(BSON("b" << 1));
     BSONObjBuilder builder;
-    formatter.appendAsMapReduceResponse(&builder);
+    map_reduce_output_format::appendInlineResponse(documents.arr(), false, false, &builder);
     ASSERT_BSONOBJ_EQ(fromjson("{results: [{a: 1}, {b: 1}],"
                                "timeMillis: 0,"
                                "counts: {input: 0, emit: 0, reduce: 0, output: 0},"
@@ -59,11 +52,10 @@ TEST(MapReduceResponseFormatter, FormatInlineMapReduceResponse) {
                       builder.obj());
 }
 
-TEST(MapReduceResponseFormatter, FormatEmptyInlineMapReduceResponse) {
-    CursorResponse cr(testNss, testCursor, {});
-    MapReduceResponseFormatter formatter(std::move(cr), boost::none, false);
+TEST(MapReduceOutputFormat, FormatEmptyInlineMapReduceResponse) {
+    BSONArrayBuilder documents;
     BSONObjBuilder builder;
-    formatter.appendAsMapReduceResponse(&builder);
+    map_reduce_output_format::appendInlineResponse(documents.arr(), false, false, &builder);
     ASSERT_BSONOBJ_EQ(fromjson("{results: [],"
                                "timeMillis: 0,"
                                "counts: {input: 0, emit: 0, reduce: 0, output: 0},"
@@ -71,36 +63,30 @@ TEST(MapReduceResponseFormatter, FormatEmptyInlineMapReduceResponse) {
                       builder.obj());
 }
 
-TEST(MapReduceResponseFormatter, FormatNonInlineMapReduceResponseWithoutDb) {
-    CursorResponse cr(testNss, testCursor, {});
-    MapReduceResponseFormatter formatter(std::move(cr), testNss, false);
+TEST(MapReduceOutputFormat, FormatNonInlineMapReduceResponseWithoutDb) {
     BSONObjBuilder builder;
-    formatter.appendAsMapReduceResponse(&builder);
-    ASSERT_BSONOBJ_EQ(fromjson("{result: \"mr_response_formatter\","
+    map_reduce_output_format::appendOutResponse(NamespaceString("", "c"), false, false, &builder);
+    ASSERT_BSONOBJ_EQ(fromjson("{result: \"c\","
                                "timeMillis: 0,"
                                "counts: {input: 0, emit: 0, reduce: 0, output: 0},"
                                "ok: 1}"),
                       builder.obj());
 }
 
-TEST(MapReduceResponseFormatter, FormatNonInlineMapReduceResponseWithDb) {
-    CursorResponse cr(testNss, testCursor, {});
-    MapReduceResponseFormatter formatter(std::move(cr), testNssWithDb, false);
+TEST(MapReduceOutputFormat, FormatNonInlineMapReduceResponseWithDb) {
     BSONObjBuilder builder;
-    formatter.appendAsMapReduceResponse(&builder);
-    ASSERT_BSONOBJ_EQ(fromjson("{result: {db: \"db\", collection: \"mr_response_formatter\"},"
+    map_reduce_output_format::appendOutResponse(NamespaceString("db", "c"), false, false, &builder);
+    ASSERT_BSONOBJ_EQ(fromjson("{result: {db: \"db\", collection: \"c\"},"
                                "timeMillis: 0,"
                                "counts: {input: 0, emit: 0, reduce: 0, output: 0},"
                                "ok: 1}"),
                       builder.obj());
 }
 
-TEST(MapReduceResponseFormatter, FormatVerboseMapReduceResponse) {
-    CursorResponse cr(testNss, testCursor, {});
-    MapReduceResponseFormatter formatter(std::move(cr), testNss, true);
+TEST(MapReduceOutputFormat, FormatVerboseMapReduceResponse) {
     BSONObjBuilder builder;
-    formatter.appendAsMapReduceResponse(&builder);
-    ASSERT_BSONOBJ_EQ(fromjson("{result: \"mr_response_formatter\","
+    map_reduce_output_format::appendOutResponse(NamespaceString("", "c"), true, false, &builder);
+    ASSERT_BSONOBJ_EQ(fromjson("{result: \"c\","
                                "timeMillis: 0,"
                                "timing: {mapTime: 0, emitLoop: 0, reduceTime: 0, total: 0},"
                                "counts: {input: 0, emit: 0, reduce: 0, output: 0},"
@@ -108,11 +94,12 @@ TEST(MapReduceResponseFormatter, FormatVerboseMapReduceResponse) {
                       builder.obj());
 }
 
-TEST(MapReduceResponseFormatter, FormatInlineClusterMapReduceResponse) {
-    CursorResponse cr(testNss, testCursor, {BSON("a" << 1), BSON("b" << 1)});
-    MapReduceResponseFormatter formatter(std::move(cr), boost::none, false);
+TEST(MapReduceOutputFormat, FormatInlineClusterMapReduceResponse) {
+    BSONArrayBuilder documents;
+    documents.append(BSON("a" << 1));
+    documents.append(BSON("b" << 1));
     BSONObjBuilder builder;
-    formatter.appendAsClusterMapReduceResponse(&builder);
+    map_reduce_output_format::appendInlineResponse(documents.arr(), false, true, &builder);
     ASSERT_BSONOBJ_EQ(fromjson("{results: [{a: 1}, {b: 1}], "
                                "counts: {input: 0, emit: 0, reduce: 0, output: 0}, "
                                "timeMillis: 0, "
@@ -124,11 +111,10 @@ TEST(MapReduceResponseFormatter, FormatInlineClusterMapReduceResponse) {
                       builder.obj());
 }
 
-TEST(MapReduceResponseFormatter, FormatEmptyInlineClusterMapReduceResponseWithoutDb) {
-    CursorResponse cr(testNss, testCursor, {});
-    MapReduceResponseFormatter formatter(std::move(cr), boost::none, false);
+TEST(MapReduceOutputFormat, FormatEmptyInlineClusterMapReduceResponse) {
+    BSONArrayBuilder documents;
     BSONObjBuilder builder;
-    formatter.appendAsClusterMapReduceResponse(&builder);
+    map_reduce_output_format::appendInlineResponse(documents.arr(), false, true, &builder);
     ASSERT_BSONOBJ_EQ(fromjson("{results: [],"
                                "counts: {input: 0, emit: 0, reduce: 0, output: 0},"
                                "timeMillis: 0,"
@@ -140,12 +126,10 @@ TEST(MapReduceResponseFormatter, FormatEmptyInlineClusterMapReduceResponseWithou
                       builder.obj());
 }
 
-TEST(MapReduceResponseFormatter, FormatNonInlineClusterMapReduceResponseWithDb) {
-    CursorResponse cr(testNss, testCursor, {});
-    MapReduceResponseFormatter formatter(std::move(cr), testNssWithDb, false);
+TEST(MapReduceOutputFormat, FormatNonInlineClusterMapReduceResponseWithoutDb) {
     BSONObjBuilder builder;
-    formatter.appendAsClusterMapReduceResponse(&builder);
-    ASSERT_BSONOBJ_EQ(fromjson("{result: {db: \"db\", collection: \"mr_response_formatter\"},"
+    map_reduce_output_format::appendOutResponse(NamespaceString("", "c"), false, true, &builder);
+    ASSERT_BSONOBJ_EQ(fromjson("{result: \"c\","
                                "counts: {input: 0, emit: 0, reduce: 0, output: 0},"
                                "timeMillis: 0,"
                                "shardCounts: {"
@@ -156,12 +140,10 @@ TEST(MapReduceResponseFormatter, FormatNonInlineClusterMapReduceResponseWithDb) 
                       builder.obj());
 }
 
-TEST(MapReduceResponseFormatter, FormatNonInlineClusterMapReduceResponse) {
-    CursorResponse cr(testNss, testCursor, {});
-    MapReduceResponseFormatter formatter(std::move(cr), testNss, false);
+TEST(MapReduceOutputFormat, FormatNonInlineClusterMapReduceResponseWithDb) {
     BSONObjBuilder builder;
-    formatter.appendAsClusterMapReduceResponse(&builder);
-    ASSERT_BSONOBJ_EQ(fromjson("{result: \"mr_response_formatter\","
+    map_reduce_output_format::appendOutResponse(NamespaceString("db", "c"), false, true, &builder);
+    ASSERT_BSONOBJ_EQ(fromjson("{result: {db: \"db\", collection: \"c\"},"
                                "counts: {input: 0, emit: 0, reduce: 0, output: 0},"
                                "timeMillis: 0,"
                                "shardCounts: {"
@@ -172,12 +154,10 @@ TEST(MapReduceResponseFormatter, FormatNonInlineClusterMapReduceResponse) {
                       builder.obj());
 }
 
-TEST(MapReduceResponseFormatter, FormatVerboseClusterMapReduceResponse) {
-    CursorResponse cr(testNss, testCursor, {});
-    MapReduceResponseFormatter formatter(std::move(cr), testNss, true);
+TEST(MapReduceOutputFormat, FormatVerboseClusterMapReduceResponse) {
     BSONObjBuilder builder;
-    formatter.appendAsClusterMapReduceResponse(&builder);
-    ASSERT_BSONOBJ_EQ(fromjson("{result: \"mr_response_formatter\","
+    map_reduce_output_format::appendOutResponse(NamespaceString("", "c"), true, true, &builder);
+    ASSERT_BSONOBJ_EQ(fromjson("{result: \"c\","
                                "counts: {input: 0, emit: 0, reduce: 0, output: 0},"
                                "timeMillis: 0,"
                                "timing: {shardProcessing: 0, postProcessing: 0},"

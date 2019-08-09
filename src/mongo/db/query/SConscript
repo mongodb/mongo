@@ -104,9 +104,9 @@ env.Library(
 )
 
 env.Library(
-    target='mr_response_formatter',
+    target='map_reduce_output_format',
     source=[
-        'mr_response_formatter.cpp'
+        'map_reduce_output_format.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -250,7 +250,7 @@ env.CppUnitTest(
         "killcursors_request_test.cpp",
         "killcursors_response_test.cpp",
         "lru_key_value_test.cpp",
-        "mr_response_formatter_test.cpp",
+        'map_reduce_output_format_test.cpp',
         "parsed_distinct_test.cpp",
         "parsed_projection_test.cpp",
         "plan_cache_indexability_test.cpp",
@@ -284,7 +284,7 @@ env.CppUnitTest(
         "command_request_response",
         "explain_options",
         "hint_parser",
-        "mr_response_formatter",
+        "map_reduce_output_format",
         "query_common",
         "query_planner",
         "query_planner_test_fixture",
