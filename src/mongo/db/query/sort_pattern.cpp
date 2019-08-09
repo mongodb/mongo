@@ -53,17 +53,16 @@ SortPattern::SortPattern(const BSONObj& obj,
             VariablesParseState vps = pExpCtx->variablesParseState;
             BSONElement metaElem = metaDoc.firstElement();
 
-            if (metaElem.valueStringData() == "textScore"_sd) {
+            if (metaElem.valueStringDataSafe() == "textScore"_sd) {
                 // Valid meta sort. Just fall through.
-            } else if (metaElem.valueStringData() == "randVal"_sd) {
+            } else if (metaElem.valueStringDataSafe() == "randVal"_sd) {
                 // Valid meta sort. Just fall through.
-            } else if (metaElem.valueStringData() == "searchScore"_sd) {
+            } else if (metaElem.valueStringDataSafe() == "searchScore"_sd) {
                 uasserted(31218, "$meta sort by 'searchScore' metadata is not supported");
-            } else if (metaElem.valueStringData() == "searchHighlights"_sd) {
+            } else if (metaElem.valueStringDataSafe() == "searchHighlights"_sd) {
                 uasserted(31219, "$meta sort by 'searchHighlights' metadata is not supported");
             } else {
-                uasserted(31138,
-                          str::stream() << "Illegal $meta sort: " << metaElem.valueStringData());
+                uasserted(31138, str::stream() << "Illegal $meta sort: " << metaElem);
             }
             patternPart.expression =
                 static_cast<ExpressionMeta*>(ExpressionMeta::parse(pExpCtx, metaElem, vps).get());

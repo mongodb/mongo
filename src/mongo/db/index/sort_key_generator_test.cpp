@@ -146,37 +146,66 @@ TEST(SortKeyGeneratorTest, SortKeyGenerationForArraysRespectsCompoundOrdering) {
     ASSERT_BSONOBJ_EQ(sortKey.getValue(), BSON("" << 0 << "" << 3));
 }
 
-DEATH_TEST(SortKeyGeneratorTest,
-           SortPatternComponentWithStringIsFatal,
-           "Illegal key in $sort specification: a: \"foo\"") {
-    MONGO_COMPILER_VARIABLE_UNUSED auto ignored = makeSortKeyGen(BSON("a"
-                                                                      << "foo"),
-                                                                 nullptr);
+TEST(SortKeyGeneratorTest, SortPatternComponentWithStringUasserts) {
+    ASSERT_THROWS_CODE_AND_WHAT(makeSortKeyGen(BSON("a"
+                                                    << "foo"),
+                                               nullptr),
+                                AssertionException,
+                                15974,
+                                "Illegal key in $sort specification: a: \"foo\"");
 }
 
-DEATH_TEST(SortKeyGeneratorTest,
-           SortPatternComponentWhoseObjectHasMultipleKeysIsFatal,
-           "Cannot have additional keys in a $meta sort specification") {
-    MONGO_COMPILER_VARIABLE_UNUSED auto ignored = makeSortKeyGen(BSON("a" << BSON("$meta"
-                                                                                  << "textScore"
-                                                                                  << "extra" << 1)),
-                                                                 nullptr);
+TEST(SortKeyGeneratorTest, SortPatternComponentWhoseObjectHasMultipleKeysUasserts) {
+    ASSERT_THROWS_CODE_AND_WHAT(makeSortKeyGen(BSON("a" << BSON("$meta"
+                                                                << "textScore"
+                                                                << "extra" << 1)),
+                                               nullptr),
+                                AssertionException,
+                                ErrorCodes::FailedToParse,
+                                "Cannot have additional keys in a $meta sort specification");
 }
 
-DEATH_TEST(SortKeyGeneratorTest,
-           SortPatternComponentWithNonMetaObjectSortIsFatal,
-           "$meta is the only expression supported by $sort right now") {
-    MONGO_COMPILER_VARIABLE_UNUSED auto ignored = makeSortKeyGen(BSON("a" << BSON("$unknown"
-                                                                                  << "textScore")),
-                                                                 nullptr);
+TEST(SortKeyGeneratorTest, SortPatternComponentWithNonMetaObjectSortUasserts) {
+    ASSERT_THROWS_CODE_AND_WHAT(makeSortKeyGen(BSON("a" << BSON("$unknown"
+                                                                << "textScore")),
+                                               nullptr),
+                                AssertionException,
+                                17312,
+                                "$meta is the only expression supported by $sort right now");
 }
 
-DEATH_TEST(SortKeyGeneratorTest,
-           SortPatternComponentWithUnknownMetaKeywordIsFatal,
-           "Illegal $meta sort: unknown") {
-    MONGO_COMPILER_VARIABLE_UNUSED auto ignored = makeSortKeyGen(BSON("a" << BSON("$meta"
-                                                                                  << "unknown")),
-                                                                 nullptr);
+TEST(SortKeyGeneratorTest, SortPatternComponentWithUnknownMetaKeywordUasserts) {
+    ASSERT_THROWS_CODE_AND_WHAT(makeSortKeyGen(BSON("a" << BSON("$meta"
+                                                                << "unknown")),
+                                               nullptr),
+                                AssertionException,
+                                31138,
+                                "Illegal $meta sort: $meta: \"unknown\"");
+}
+
+TEST(SortKeyGeneratorTest, SortPatternComponentWithNonStringMetaKeywordUasserts) {
+    ASSERT_THROWS_CODE_AND_WHAT(makeSortKeyGen(BSON("a" << BSON("$meta" << 0.1)), nullptr),
+                                AssertionException,
+                                31138,
+                                "Illegal $meta sort: $meta: 0.1");
+}
+
+TEST(SortKeyGeneratorTest, SortPatternComponentWithSearchScoreMetaKeywordUasserts) {
+    ASSERT_THROWS_CODE_AND_WHAT(makeSortKeyGen(BSON("a" << BSON("$meta"
+                                                                << "searchScore")),
+                                               nullptr),
+                                AssertionException,
+                                31218,
+                                "$meta sort by 'searchScore' metadata is not supported");
+}
+
+TEST(SortKeyGeneratorTest, SortPatternComponentWithSearchHighlightsMetaKeywordUasserts) {
+    ASSERT_THROWS_CODE_AND_WHAT(makeSortKeyGen(BSON("a" << BSON("$meta"
+                                                                << "searchHighlights")),
+                                               nullptr),
+                                AssertionException,
+                                31219,
+                                "$meta sort by 'searchHighlights' metadata is not supported");
 }
 
 DEATH_TEST(SortKeyGeneratorTest,
