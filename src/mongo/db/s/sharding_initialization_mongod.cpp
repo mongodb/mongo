@@ -105,27 +105,33 @@ public:
                     LOG(2) << "Unable to schedule confirmed set update due to " << status;
                     return;
                 }
-                uassertStatusOK(status);
+                invariant(status);
 
-                LOG(0) << "Updating config server with confirmed set " << connStr;
-                Grid::get(serviceContext)->shardRegistry()->updateReplSetHosts(connStr);
+                try {
+                    LOG(0) << "Updating config server with confirmed set " << connStr;
+                    Grid::get(serviceContext)->shardRegistry()->updateReplSetHosts(connStr);
 
-                if (MONGO_FAIL_POINT(failUpdateShardIdentityConfigString)) {
-                    return;
+                    if (MONGO_FAIL_POINT(failUpdateShardIdentityConfigString)) {
+                        return;
+                    }
+
+                    auto configsvrConnStr = Grid::get(serviceContext)
+                                                ->shardRegistry()
+                                                ->getConfigServerConnectionString();
+
+                    // Only proceed if the notification is for the configsvr
+                    if (configsvrConnStr.getSetName() != connStr.getSetName()) {
+                        return;
+                    }
+
+                    ThreadClient tc("updateShardIdentityConfigString", serviceContext);
+                    auto opCtx = tc->makeOperationContext();
+
+                    ShardingInitializationMongoD::updateShardIdentityConfigString(opCtx.get(),
+                                                                                  connStr);
+                } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
+                    LOG(0) << "Unable to update config server due to " << e;
                 }
-
-                auto configsvrConnStr =
-                    Grid::get(serviceContext)->shardRegistry()->getConfigServerConnectionString();
-
-                // Only proceed if the notification is for the configsvr
-                if (configsvrConnStr.getSetName() != connStr.getSetName()) {
-                    return;
-                }
-
-                ThreadClient tc("updateShardIdentityConfigString", serviceContext);
-                auto opCtx = tc->makeOperationContext();
-
-                ShardingInitializationMongoD::updateShardIdentityConfigString(opCtx.get(), connStr);
             });
     }
     void onPossibleSet(const State& state) final {

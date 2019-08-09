@@ -432,16 +432,20 @@ public:
             if (ErrorCodes::isCancelationError(args.status.code())) {
                 return;
             }
-            uassertStatusOK(args.status);
+            invariant(args.status);
 
-            LOG(0) << "Updating sharding state with confirmed set " << connStr;
+            try {
+                LOG(0) << "Updating sharding state with confirmed set " << connStr;
 
-            Grid::get(serviceContext)->shardRegistry()->updateReplSetHosts(connStr);
+                Grid::get(serviceContext)->shardRegistry()->updateReplSetHosts(connStr);
 
-            if (MONGO_FAIL_POINT(failReplicaSetChangeConfigServerUpdateHook)) {
-                return;
+                if (MONGO_FAIL_POINT(failReplicaSetChangeConfigServerUpdateHook)) {
+                    return;
+                }
+                ShardRegistry::updateReplicaSetOnConfigServer(serviceContext, connStr);
+            } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
+                LOG(0) << "Unable to update sharding state due to " << e;
             }
-            ShardRegistry::updateReplicaSetOnConfigServer(serviceContext, connStr);
         };
 
         auto executor = Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor();
