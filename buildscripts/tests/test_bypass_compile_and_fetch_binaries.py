@@ -162,6 +162,56 @@ class TestFindBuildForPreviousCompileTask(unittest.TestCase):
         self.assertEqual(build_id, expected_build_id)
 
 
+class TestFetchArtifactsForPreviousCompileTask(unittest.TestCase):
+    def test_fetch_artifacts_with_task_with_artifact(self):
+        revision = "a22"
+        build_id = "project_variant_patch_a22_date"
+
+        artifact_mock = MagicMock()
+        artifact_mock.name = "Binaries"
+        artifact_mock.url = "http://s3.amazon.com/mciuploads/mongodb/build_var//binaries/mongo-test.tgz"
+        artifacts_mock = [artifact_mock]
+
+        task_response = MagicMock(status="success")
+        task_response.artifacts = artifacts_mock
+        evergreen_api = MagicMock()
+        evergreen_api.task_by_id.return_value = task_response
+
+        artifact_files = under_test.fetch_artifacts(evergreen_api, build_id, revision)
+        expected_file = {
+            "name": artifact_mock.name,
+            "link": artifact_mock.url,
+            "visibility": "private",
+        }
+        self.assertIn(expected_file, artifact_files)
+
+    def test_fetch_artifacts_with_task_with_no_artifacts(self):
+        revision = "a22"
+        build_id = "project_variant_patch_a22_date"
+
+        artifacts_mock = []
+
+        task_response = MagicMock(status="success")
+        task_response.artifacts = artifacts_mock
+        evergreen_api = MagicMock()
+        evergreen_api.task_by_id.return_value = task_response
+
+        artifact_files = under_test.fetch_artifacts(evergreen_api, build_id, revision)
+        self.assertEqual(len(artifact_files), 0)
+
+    def test_fetch_artifacts_with_task_with_null_artifacts(self):
+        revision = "a22"
+        build_id = "project_variant_patch_a22_date"
+
+        task_response = MagicMock(status="failure")
+        task_response.is_success.return_value = False
+        evergreen_api = MagicMock()
+        evergreen_api.task_by_id.return_value = task_response
+
+        with self.assertRaises(ValueError):
+            under_test.fetch_artifacts(evergreen_api, build_id, revision)
+
+
 class TestFindPreviousCompileTask(unittest.TestCase):
     def test_find_task(self):
         revision = "a22"

@@ -1201,7 +1201,8 @@ functions:
             --build-variant ${burn_in_bypass}                                  \
             --revision ${revision}                                             \
             --out-file bypass_compile_expansions.yml                           \
-            --version-id ${version_id}
+            --version-id ${version_id}                                         \
+            --json-artifact artifacts.json
         fi
 
         # For patch builds determine if we can bypass compile.

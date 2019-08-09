@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """Bypass compile and fetch binaries for burn_in_tags."""
+
 import logging
 import sys
 
 import click
-from evergreen.api import RetryingEvergreenApi
 import structlog
 from structlog.stdlib import LoggerFactory
 
-from buildscripts.bypass_compile_and_fetch_binaries import generate_bypass_expansions, \
-    write_out_bypass_compile_expansions
+from evergreen.api import RetryingEvergreenApi
+from buildscripts.bypass_compile_and_fetch_binaries import fetch_artifacts, \
+    generate_bypass_expansions, write_out_bypass_compile_expansions, write_out_artifacts
 
 structlog.configure(logger_factory=LoggerFactory())
 LOGGER = structlog.get_logger(__name__)
@@ -56,7 +57,10 @@ def _retrieve_used_build_id(build):
 @click.option("--revision", required=True, help="Base revision of the build.")
 @click.option("--out-file", required=True, help="File to write macros expansions to.")
 @click.option("--version-id", required=True, help="Evergreen version id of the current build.")
-def main(project, build_variant, revision, out_file, version_id):
+@click.option("--json-artifact", required=True,
+              help="The JSON file to write out the metadata of files to attach to task.")
+def main(  # pylint: disable=too-many-arguments,too-many-locals
+        project, build_variant, revision, out_file, version_id, json_artifact):
     """
     Create a file with expansions that can be used to bypass compile.
 
@@ -80,6 +84,9 @@ def main(project, build_variant, revision, out_file, version_id):
 
     version = evg_api.version_by_id(version_id)
     build_id = _retrieve_used_build_id(version.build_by_variant(build_variant))
+    artifacts = fetch_artifacts(evg_api, build_id, revision)
+
+    write_out_artifacts(json_artifact, artifacts)
 
     LOGGER.info("Creating expansions files", project=project, build_variant=build_variant,
                 revision=revision, build_id=build_id)
