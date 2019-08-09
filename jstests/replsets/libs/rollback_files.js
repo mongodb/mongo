@@ -22,10 +22,12 @@ function checkRollbackFiles(dbPath, nss, uuid, expectedDocs) {
 
     function getRollbackViaRefetchRollbackFile() {
         let files = listFiles(rollbackDir);
-        let rollbackFiles = files.filter(f => !f.isDirectory && f.baseName.startsWith(nss));
+        let rollbackFiles =
+            files.filter(f => !f.isDirectory && f.baseName.startsWith(extractUUIDFromObject(uuid)));
         assert.gte(rollbackFiles.length,
                    1,
-                   "No rollbackViaRefetch rollback files found for namespace: " + nss);
+                   "No rollbackViaRefetch rollback files found for namespace: " + nss +
+                       " with UUID: " + uuid);
         return rollbackFiles[0].name;
     }
 
