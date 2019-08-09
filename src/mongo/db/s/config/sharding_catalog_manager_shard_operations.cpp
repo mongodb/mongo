@@ -758,66 +758,48 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     return shardType.getName();
 }
 
-StatusWith<ShardDrainingStatus> ShardingCatalogManager::removeShard(OperationContext* opCtx,
-                                                                    const ShardId& shardId) {
-    // Check preconditions for removing the shard
-    std::string name = shardId.toString();
-    auto countStatus = _runCountCommandOnConfig(
+ShardDrainingStatus ShardingCatalogManager::removeShard(OperationContext* opCtx,
+                                                        const ShardId& shardId) {
+    const auto name = shardId.toString();
+
+    // Find how many *other* shards exist, which are *not* currently draining
+    const auto countOtherNotDrainingShards = uassertStatusOK(_runCountCommandOnConfig(
         opCtx,
         ShardType::ConfigNS,
-        BSON(ShardType::name() << NE << name << ShardType::draining(true)));
-    if (!countStatus.isOK()) {
-        return countStatus.getStatus();
-    }
-    if (countStatus.getValue() > 0) {
-        return Status(ErrorCodes::ConflictingOperationInProgress,
-                      "Can't have more than one draining shard at a time");
-    }
-
-    countStatus =
-        _runCountCommandOnConfig(opCtx, ShardType::ConfigNS, BSON(ShardType::name() << NE << name));
-    if (!countStatus.isOK()) {
-        return countStatus.getStatus();
-    }
-    if (countStatus.getValue() == 0) {
-        return Status(ErrorCodes::IllegalOperation, "Can't remove last shard");
-    }
+        BSON(ShardType::name() << NE << name << ShardType::draining.ne(true))));
+    uassert(ErrorCodes::IllegalOperation,
+            "Operation not allowed because it would remove the last shard",
+            countOtherNotDrainingShards > 0);
 
     // Figure out if shard is already draining
-    countStatus = _runCountCommandOnConfig(
-        opCtx, ShardType::ConfigNS, BSON(ShardType::name() << name << ShardType::draining(true)));
-    if (!countStatus.isOK()) {
-        return countStatus.getStatus();
-    }
+    const bool isShardCurrentlyDraining =
+        uassertStatusOK(_runCountCommandOnConfig(
+            opCtx,
+            ShardType::ConfigNS,
+            BSON(ShardType::name() << name << ShardType::draining(true)))) > 0;
 
     auto* const shardRegistry = Grid::get(opCtx)->shardRegistry();
+    auto* const catalogClient = Grid::get(opCtx)->catalogClient();
 
-    if (countStatus.getValue() == 0) {
+    if (!isShardCurrentlyDraining) {
         log() << "going to start draining shard: " << name;
 
         // Record start in changelog
-        const Status logStatus = ShardingLogging::get(opCtx)->logChangeChecked(
+        uassertStatusOK(ShardingLogging::get(opCtx)->logChangeChecked(
             opCtx,
             "removeShard.start",
             "",
             BSON("shard" << name),
-            ShardingCatalogClient::kLocalWriteConcern);
-        if (!logStatus.isOK()) {
-            return logStatus;
-        }
+            ShardingCatalogClient::kLocalWriteConcern));
 
-        auto updateStatus = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
-            opCtx,
-            ShardType::ConfigNS,
-            BSON(ShardType::name() << name),
-            BSON("$set" << BSON(ShardType::draining(true))),
-            false,
-            ShardingCatalogClient::kLocalWriteConcern);
-        if (!updateStatus.isOK()) {
-            log() << "error starting removeShard: " << name
-                  << causedBy(redact(updateStatus.getStatus()));
-            return updateStatus.getStatus();
-        }
+        uassertStatusOKWithContext(
+            catalogClient->updateConfigDocument(opCtx,
+                                                ShardType::ConfigNS,
+                                                BSON(ShardType::name() << name),
+                                                BSON("$set" << BSON(ShardType::draining(true))),
+                                                false,
+                                                ShardingCatalogClient::kLocalWriteConcern),
+            "error starting removeShard");
 
         shardRegistry->reload(opCtx);
 
@@ -826,24 +808,17 @@ StatusWith<ShardDrainingStatus> ShardingCatalogManager::removeShard(OperationCon
 
     // Draining has already started, now figure out how many chunks and databases are still on the
     // shard.
-    countStatus =
-        _runCountCommandOnConfig(opCtx, ChunkType::ConfigNS, BSON(ChunkType::shard(name)));
-    if (!countStatus.isOK()) {
-        return countStatus.getStatus();
-    }
-    const long long chunkCount = countStatus.getValue();
+    const auto chunkCount = uassertStatusOK(
+        _runCountCommandOnConfig(opCtx, ChunkType::ConfigNS, BSON(ChunkType::shard(name))));
 
-    countStatus =
-        _runCountCommandOnConfig(opCtx, DatabaseType::ConfigNS, BSON(DatabaseType::primary(name)));
-    if (!countStatus.isOK()) {
-        return countStatus.getStatus();
-    }
-    const long long databaseCount = countStatus.getValue();
+    const auto databaseCount = uassertStatusOK(
+        _runCountCommandOnConfig(opCtx, DatabaseType::ConfigNS, BSON(DatabaseType::primary(name))));
 
     if (chunkCount > 0 || databaseCount > 0) {
         // Still more draining to do
         LOG(0) << "chunkCount: " << chunkCount;
         LOG(0) << "databaseCount: " << databaseCount;
+
         return ShardDrainingStatus::ONGOING;
     }
 
@@ -851,16 +826,12 @@ StatusWith<ShardDrainingStatus> ShardingCatalogManager::removeShard(OperationCon
     log() << "going to remove shard: " << name;
     audit::logRemoveShard(opCtx->getClient(), name);
 
-    Status status = Grid::get(opCtx)->catalogClient()->removeConfigDocuments(
-        opCtx,
-        ShardType::ConfigNS,
-        BSON(ShardType::name() << name),
-        ShardingCatalogClient::kLocalWriteConcern);
-    if (!status.isOK()) {
-        log() << "Error concluding removeShard operation on: " << name
-              << "; err: " << status.reason();
-        return status;
-    }
+    uassertStatusOKWithContext(
+        catalogClient->removeConfigDocuments(opCtx,
+                                             ShardType::ConfigNS,
+                                             BSON(ShardType::name() << name),
+                                             ShardingCatalogClient::kLocalWriteConcern),
+        str::stream() << "error completing removeShard operation on: " << name);
 
     shardConnectionPool.removeHost(name);
     ReplicaSetMonitor::remove(name);

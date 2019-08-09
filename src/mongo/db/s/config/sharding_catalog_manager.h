@@ -355,7 +355,7 @@ public:
      * Because of the asynchronous nature of the draining mechanism, this method returns
      * the current draining status. See ShardDrainingStatus enum definition for more details.
      */
-    StatusWith<ShardDrainingStatus> removeShard(OperationContext* opCtx, const ShardId& shardId);
+    ShardDrainingStatus removeShard(OperationContext* opCtx, const ShardId& shardId);
 
     //
     // Cluster Upgrade Operations
