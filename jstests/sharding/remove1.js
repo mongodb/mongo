@@ -14,12 +14,12 @@ assert.commandFailedWithCode(s.s0.adminCommand({removeshard: "shardz"}), ErrorCo
 // actually removes
 assert.commandWorked(s.s0.adminCommand({removeshard: s.shard0.shardName}));
 
-// Can't have more than one draining shard at a time
+// Can't make all shards in the cluster draining
 assert.commandFailedWithCode(s.s0.adminCommand({removeshard: s.shard1.shardName}),
-                             ErrorCodes.ConflictingOperationInProgress);
-assert.eq(s.s0.adminCommand({removeshard: s.shard0.shardName}).dbsToMove,
-          ['needToMove'],
-          "didn't show db to move");
+                             ErrorCodes.IllegalOperation);
+
+var removeResult = assert.commandWorked(s.s0.adminCommand({removeshard: s.shard0.shardName}));
+assert.eq(removeResult.dbsToMove, ['needToMove'], "didn't show db to move");
 
 s.s0.getDB('needToMove').dropDatabase();
 
@@ -27,7 +27,7 @@ s.s0.getDB('needToMove').dropDatabase();
 // removed
 s.awaitBalancerRound();
 
-var removeResult = assert.commandWorked(s.s0.adminCommand({removeshard: s.shard0.shardName}));
+removeResult = assert.commandWorked(s.s0.adminCommand({removeshard: s.shard0.shardName}));
 assert.eq('completed', removeResult.state, 'Shard was not removed: ' + tojson(removeResult));
 
 var existingShards = config.shards.find({}).toArray();

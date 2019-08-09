@@ -109,20 +109,19 @@ public:
                               << cmdObj,
                 opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
-        const auto shardStatus =
-            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, ShardId(target));
-        if (!shardStatus.isOK()) {
-            std::string msg(str::stream()
-                            << "Could not drop shard '" << target << "' because it does not exist");
-            log() << msg;
-            uasserted(ErrorCodes::ShardNotFound, msg);
-        }
-        const auto& shard = shardStatus.getValue();
+        const auto shard =
+            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, ShardId(target)));
 
         const auto shardingCatalogManager = ShardingCatalogManager::get(opCtx);
 
-        const auto shardDrainingStatus =
-            uassertStatusOK(shardingCatalogManager->removeShard(opCtx, shard->getId()));
+        const auto shardDrainingStatus = [&] {
+            try {
+                return shardingCatalogManager->removeShard(opCtx, shard->getId());
+            } catch (const DBException& ex) {
+                LOG(0) << "Failed to remove shard due to " << redact(ex);
+                throw;
+            }
+        }();
 
         std::vector<std::string> databases =
             uassertStatusOK(shardingCatalogManager->getDatabasesForShard(opCtx, shard->getId()));
