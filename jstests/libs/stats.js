@@ -37,20 +37,8 @@ function assertHistogramDiffEq(coll, lastHistogram, readDiff, writeDiff, command
  */
 function getTop(coll) {
     let collName = coll.getFullName();
-    let res;
-
-    assert.soon(() => {
-        res = coll.getDB().adminCommand("top");
-
-        // The command response from 'top' can be above the BSON document limit while running in
-        // parallel with tests that are creating very long collection names.
-        if (!res.ok && res.codeName == "BSONObjectTooLarge") {
-            return false;
-        }
-
-        return true;
-    });
-
+    let res = coll.getDB().adminCommand("top");
+    assert.commandWorked(res);
     assert.eq(true, res.totals.hasOwnProperty(collName), collName + " not found in top");
     return res.totals[collName];
 }
