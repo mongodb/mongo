@@ -1411,29 +1411,23 @@ TEST_F(ReplCoordTest, UpdatePositionArgsAdvancesWallTimes) {
     Date_t memberTwoAppliedWallTime = Date_t() + Seconds(5);
     Date_t memberTwoDurableWallTime = Date_t() + Seconds(6);
 
-    ASSERT_OK(updatePositionArgsInitialize(
-        updatePositionArgs,
-        BSON(
-            UpdatePositionArgs::kCommandFieldName
-            << 1 << UpdatePositionArgs::kUpdateArrayFieldName
-            << BSON_ARRAY(
-                   BSON(
-                       UpdatePositionArgs::kConfigVersionFieldName
-                       << configVersion << UpdatePositionArgs::kMemberIdFieldName << 1
+    ASSERT_OK(updatePositionArgs.initialize(BSON(
+        UpdatePositionArgs::kCommandFieldName
+        << 1 << UpdatePositionArgs::kUpdateArrayFieldName
+        << BSON_ARRAY(
+               BSON(UpdatePositionArgs::kConfigVersionFieldName
+                    << configVersion << UpdatePositionArgs::kMemberIdFieldName << 1
+                    << UpdatePositionArgs::kAppliedOpTimeFieldName << opTime2.asOpTime().toBSON()
+                    << UpdatePositionArgs::kAppliedWallTimeFieldName << memberOneAppliedWallTime
+                    << UpdatePositionArgs::kDurableOpTimeFieldName << opTime2.asOpTime().toBSON()
+                    << UpdatePositionArgs::kDurableWallTimeFieldName << memberOneDurableWallTime)
+               << BSON(UpdatePositionArgs::kConfigVersionFieldName
+                       << configVersion << UpdatePositionArgs::kMemberIdFieldName << 2
                        << UpdatePositionArgs::kAppliedOpTimeFieldName << opTime2.asOpTime().toBSON()
-                       << UpdatePositionArgs::kAppliedWallTimeFieldName << memberOneAppliedWallTime
+                       << UpdatePositionArgs::kAppliedWallTimeFieldName << memberTwoAppliedWallTime
                        << UpdatePositionArgs::kDurableOpTimeFieldName << opTime2.asOpTime().toBSON()
-                       << UpdatePositionArgs::kDurableWallTimeFieldName << memberOneDurableWallTime)
-                   << BSON(UpdatePositionArgs::kConfigVersionFieldName
-                           << configVersion << UpdatePositionArgs::kMemberIdFieldName << 2
-                           << UpdatePositionArgs::kAppliedOpTimeFieldName
-                           << opTime2.asOpTime().toBSON()
-                           << UpdatePositionArgs::kAppliedWallTimeFieldName
-                           << memberTwoAppliedWallTime
-                           << UpdatePositionArgs::kDurableOpTimeFieldName
-                           << opTime2.asOpTime().toBSON()
-                           << UpdatePositionArgs::kDurableWallTimeFieldName
-                           << memberTwoDurableWallTime)))));
+                       << UpdatePositionArgs::kDurableWallTimeFieldName
+                       << memberTwoDurableWallTime)))));
 
     ASSERT_OK(repl->processReplSetUpdatePosition(updatePositionArgs, &configVersion));
 
@@ -1697,30 +1691,26 @@ TEST_F(StepDownTest, StepDownCanCompleteBasedOnReplSetUpdatePositionAlone) {
     long long configVersion = repl->getConfig().getConfigVersion();
     UpdatePositionArgs updatePositionArgs;
 
-    ASSERT_OK(updatePositionArgsInitialize(
-        updatePositionArgs,
-        BSON(UpdatePositionArgs::kCommandFieldName
-             << 1 << UpdatePositionArgs::kUpdateArrayFieldName
-             << BSON_ARRAY(BSON(UpdatePositionArgs::kConfigVersionFieldName
-                                << configVersion << UpdatePositionArgs::kMemberIdFieldName << 1
-                                << UpdatePositionArgs::kAppliedOpTimeFieldName
-                                << opTime2.asOpTime().toBSON()
-                                << UpdatePositionArgs::kAppliedWallTimeFieldName
-                                << Date_t() + Seconds(opTime2.asOpTime().getSecs())
-                                << UpdatePositionArgs::kDurableOpTimeFieldName
-                                << opTime2.asOpTime().toBSON()
-                                << UpdatePositionArgs::kDurableWallTimeFieldName
-                                << Date_t() + Seconds(opTime2.asOpTime().getSecs()))
-                           << BSON(UpdatePositionArgs::kConfigVersionFieldName
-                                   << configVersion << UpdatePositionArgs::kMemberIdFieldName << 2
-                                   << UpdatePositionArgs::kAppliedOpTimeFieldName
-                                   << opTime1.asOpTime().toBSON()
-                                   << UpdatePositionArgs::kAppliedWallTimeFieldName
-                                   << Date_t() + Seconds(opTime1.asOpTime().getSecs())
-                                   << UpdatePositionArgs::kDurableOpTimeFieldName
-                                   << opTime1.asOpTime().toBSON()
-                                   << UpdatePositionArgs::kDurableWallTimeFieldName
-                                   << Date_t() + Seconds(opTime1.asOpTime().getSecs()))))));
+    ASSERT_OK(updatePositionArgs.initialize(BSON(
+        UpdatePositionArgs::kCommandFieldName
+        << 1 << UpdatePositionArgs::kUpdateArrayFieldName
+        << BSON_ARRAY(
+               BSON(UpdatePositionArgs::kConfigVersionFieldName
+                    << configVersion << UpdatePositionArgs::kMemberIdFieldName << 1
+                    << UpdatePositionArgs::kAppliedOpTimeFieldName << opTime2.asOpTime().toBSON()
+                    << UpdatePositionArgs::kAppliedWallTimeFieldName
+                    << Date_t() + Seconds(opTime2.asOpTime().getSecs())
+                    << UpdatePositionArgs::kDurableOpTimeFieldName << opTime2.asOpTime().toBSON()
+                    << UpdatePositionArgs::kDurableWallTimeFieldName
+                    << Date_t() + Seconds(opTime2.asOpTime().getSecs()))
+               << BSON(UpdatePositionArgs::kConfigVersionFieldName
+                       << configVersion << UpdatePositionArgs::kMemberIdFieldName << 2
+                       << UpdatePositionArgs::kAppliedOpTimeFieldName << opTime1.asOpTime().toBSON()
+                       << UpdatePositionArgs::kAppliedWallTimeFieldName
+                       << Date_t() + Seconds(opTime1.asOpTime().getSecs())
+                       << UpdatePositionArgs::kDurableOpTimeFieldName << opTime1.asOpTime().toBSON()
+                       << UpdatePositionArgs::kDurableWallTimeFieldName
+                       << Date_t() + Seconds(opTime1.asOpTime().getSecs()))))));
 
     ASSERT_OK(repl->processReplSetUpdatePosition(updatePositionArgs, &configVersion));
 
@@ -1839,30 +1829,26 @@ TEST_F(StepDownTestWithUnelectableNode,
     long long configVersion = repl->getConfig().getConfigVersion();
     UpdatePositionArgs catchupFirstSecondary;
 
-    ASSERT_OK(updatePositionArgsInitialize(
-        catchupFirstSecondary,
-        BSON(UpdatePositionArgs::kCommandFieldName
-             << 1 << UpdatePositionArgs::kUpdateArrayFieldName
-             << BSON_ARRAY(BSON(UpdatePositionArgs::kConfigVersionFieldName
-                                << configVersion << UpdatePositionArgs::kMemberIdFieldName << 1
-                                << UpdatePositionArgs::kAppliedOpTimeFieldName
-                                << opTime2.asOpTime().toBSON()
-                                << UpdatePositionArgs::kAppliedWallTimeFieldName
-                                << Date_t() + Seconds(opTime2.asOpTime().getSecs())
-                                << UpdatePositionArgs::kDurableOpTimeFieldName
-                                << opTime2.asOpTime().toBSON()
-                                << UpdatePositionArgs::kDurableWallTimeFieldName
-                                << Date_t() + Seconds(opTime2.asOpTime().getSecs()))
-                           << BSON(UpdatePositionArgs::kConfigVersionFieldName
-                                   << configVersion << UpdatePositionArgs::kMemberIdFieldName << 2
-                                   << UpdatePositionArgs::kAppliedOpTimeFieldName
-                                   << opTime1.asOpTime().toBSON()
-                                   << UpdatePositionArgs::kAppliedWallTimeFieldName
-                                   << Date_t() + Seconds(opTime1.asOpTime().getSecs())
-                                   << UpdatePositionArgs::kDurableOpTimeFieldName
-                                   << opTime1.asOpTime().toBSON()
-                                   << UpdatePositionArgs::kDurableWallTimeFieldName
-                                   << Date_t() + Seconds(opTime1.asOpTime().getSecs()))))));
+    ASSERT_OK(catchupFirstSecondary.initialize(BSON(
+        UpdatePositionArgs::kCommandFieldName
+        << 1 << UpdatePositionArgs::kUpdateArrayFieldName
+        << BSON_ARRAY(
+               BSON(UpdatePositionArgs::kConfigVersionFieldName
+                    << configVersion << UpdatePositionArgs::kMemberIdFieldName << 1
+                    << UpdatePositionArgs::kAppliedOpTimeFieldName << opTime2.asOpTime().toBSON()
+                    << UpdatePositionArgs::kAppliedWallTimeFieldName
+                    << Date_t() + Seconds(opTime2.asOpTime().getSecs())
+                    << UpdatePositionArgs::kDurableOpTimeFieldName << opTime2.asOpTime().toBSON()
+                    << UpdatePositionArgs::kDurableWallTimeFieldName
+                    << Date_t() + Seconds(opTime2.asOpTime().getSecs()))
+               << BSON(UpdatePositionArgs::kConfigVersionFieldName
+                       << configVersion << UpdatePositionArgs::kMemberIdFieldName << 2
+                       << UpdatePositionArgs::kAppliedOpTimeFieldName << opTime1.asOpTime().toBSON()
+                       << UpdatePositionArgs::kAppliedWallTimeFieldName
+                       << Date_t() + Seconds(opTime1.asOpTime().getSecs())
+                       << UpdatePositionArgs::kDurableOpTimeFieldName << opTime1.asOpTime().toBSON()
+                       << UpdatePositionArgs::kDurableWallTimeFieldName
+                       << Date_t() + Seconds(opTime1.asOpTime().getSecs()))))));
 
     ASSERT_OK(repl->processReplSetUpdatePosition(catchupFirstSecondary, &configVersion));
 
@@ -1873,30 +1859,26 @@ TEST_F(StepDownTestWithUnelectableNode,
     // there is an electable node, so stepDown will complete.
     UpdatePositionArgs catchupOtherSecondary;
 
-    ASSERT_OK(updatePositionArgsInitialize(
-        catchupOtherSecondary,
-        BSON(UpdatePositionArgs::kCommandFieldName
-             << 1 << UpdatePositionArgs::kUpdateArrayFieldName
-             << BSON_ARRAY(BSON(UpdatePositionArgs::kConfigVersionFieldName
-                                << configVersion << UpdatePositionArgs::kMemberIdFieldName << 1
-                                << UpdatePositionArgs::kAppliedOpTimeFieldName
-                                << opTime2.asOpTime().toBSON()
-                                << UpdatePositionArgs::kAppliedWallTimeFieldName
-                                << Date_t() + Seconds(opTime2.asOpTime().getSecs())
-                                << UpdatePositionArgs::kDurableOpTimeFieldName
-                                << opTime2.asOpTime().toBSON()
-                                << UpdatePositionArgs::kDurableWallTimeFieldName
-                                << Date_t() + Seconds(opTime2.asOpTime().getSecs()))
-                           << BSON(UpdatePositionArgs::kConfigVersionFieldName
-                                   << configVersion << UpdatePositionArgs::kMemberIdFieldName << 2
-                                   << UpdatePositionArgs::kAppliedOpTimeFieldName
-                                   << opTime2.asOpTime().toBSON()
-                                   << UpdatePositionArgs::kAppliedWallTimeFieldName
-                                   << Date_t() + Seconds(opTime2.asOpTime().getSecs())
-                                   << UpdatePositionArgs::kDurableOpTimeFieldName
-                                   << opTime2.asOpTime().toBSON()
-                                   << UpdatePositionArgs::kDurableWallTimeFieldName
-                                   << Date_t() + Seconds(opTime2.asOpTime().getSecs()))))));
+    ASSERT_OK(catchupOtherSecondary.initialize(BSON(
+        UpdatePositionArgs::kCommandFieldName
+        << 1 << UpdatePositionArgs::kUpdateArrayFieldName
+        << BSON_ARRAY(
+               BSON(UpdatePositionArgs::kConfigVersionFieldName
+                    << configVersion << UpdatePositionArgs::kMemberIdFieldName << 1
+                    << UpdatePositionArgs::kAppliedOpTimeFieldName << opTime2.asOpTime().toBSON()
+                    << UpdatePositionArgs::kAppliedWallTimeFieldName
+                    << Date_t() + Seconds(opTime2.asOpTime().getSecs())
+                    << UpdatePositionArgs::kDurableOpTimeFieldName << opTime2.asOpTime().toBSON()
+                    << UpdatePositionArgs::kDurableWallTimeFieldName
+                    << Date_t() + Seconds(opTime2.asOpTime().getSecs()))
+               << BSON(UpdatePositionArgs::kConfigVersionFieldName
+                       << configVersion << UpdatePositionArgs::kMemberIdFieldName << 2
+                       << UpdatePositionArgs::kAppliedOpTimeFieldName << opTime2.asOpTime().toBSON()
+                       << UpdatePositionArgs::kAppliedWallTimeFieldName
+                       << Date_t() + Seconds(opTime2.asOpTime().getSecs())
+                       << UpdatePositionArgs::kDurableOpTimeFieldName << opTime2.asOpTime().toBSON()
+                       << UpdatePositionArgs::kDurableWallTimeFieldName
+                       << Date_t() + Seconds(opTime2.asOpTime().getSecs()))))));
 
     ASSERT_OK(repl->processReplSetUpdatePosition(catchupOtherSecondary, &configVersion));
 
@@ -3228,8 +3210,7 @@ TEST_F(ReplCoordTest, DoNotProcessSelfWhenUpdatePositionContainsInfoAboutSelf) {
 
     // receive updatePosition containing ourself, should not process the update for self
     UpdatePositionArgs args;
-    ASSERT_OK(updatePositionArgsInitialize(
-        args,
+    ASSERT_OK(args.initialize(
         BSON(UpdatePositionArgs::kCommandFieldName
              << 1 << UpdatePositionArgs::kUpdateArrayFieldName
              << BSON_ARRAY(BSON(UpdatePositionArgs::kConfigVersionFieldName
@@ -3276,8 +3257,7 @@ TEST_F(ReplCoordTest, DoNotProcessUpdatePositionWhenItsConfigVersionIsIncorrect)
 
     // receive updatePosition with incorrect config version
     UpdatePositionArgs args;
-    ASSERT_OK(updatePositionArgsInitialize(
-        args,
+    ASSERT_OK(args.initialize(
         BSON(UpdatePositionArgs::kCommandFieldName
              << 1 << UpdatePositionArgs::kUpdateArrayFieldName
              << BSON_ARRAY(BSON(UpdatePositionArgs::kConfigVersionFieldName
@@ -3329,8 +3309,7 @@ TEST_F(ReplCoordTest, DoNotProcessUpdatePositionOfMembersWhoseIdsAreNotInTheConf
 
     // receive updatePosition with nonexistent member id
     UpdatePositionArgs args;
-    ASSERT_OK(updatePositionArgsInitialize(
-        args,
+    ASSERT_OK(args.initialize(
         BSON(UpdatePositionArgs::kCommandFieldName
              << 1 << UpdatePositionArgs::kUpdateArrayFieldName
              << BSON_ARRAY(BSON(UpdatePositionArgs::kConfigVersionFieldName
@@ -3385,29 +3364,26 @@ TEST_F(ReplCoordTest,
     replCoordSetMyLastAppliedOpTime(time2, Date_t() + Seconds(100));
     replCoordSetMyLastDurableOpTime(time2, Date_t() + Seconds(100));
     UpdatePositionArgs args;
-    ASSERT_OK(updatePositionArgsInitialize(
-        args,
-        BSON(UpdatePositionArgs::kCommandFieldName
-             << 1 << UpdatePositionArgs::kUpdateArrayFieldName
-             << BSON_ARRAY(
-                    BSON(UpdatePositionArgs::kConfigVersionFieldName
-                         << 2 << UpdatePositionArgs::kMemberIdFieldName << 1
-                         << UpdatePositionArgs::kAppliedOpTimeFieldName << time2.asOpTime().toBSON()
-                         << UpdatePositionArgs::kAppliedWallTimeFieldName
-                         << Date_t() + Seconds(time2.asOpTime().getSecs())
-                         << UpdatePositionArgs::kDurableOpTimeFieldName << time2.asOpTime().toBSON()
-                         << UpdatePositionArgs::kDurableWallTimeFieldName
-                         << Date_t() + Seconds(time2.asOpTime().getSecs()))
-                    << BSON(UpdatePositionArgs::kConfigVersionFieldName
-                            << 2 << UpdatePositionArgs::kMemberIdFieldName << 2
-                            << UpdatePositionArgs::kAppliedOpTimeFieldName
-                            << time2.asOpTime().toBSON()
-                            << UpdatePositionArgs::kAppliedWallTimeFieldName
-                            << Date_t() + Seconds(time2.asOpTime().getSecs())
-                            << UpdatePositionArgs::kDurableOpTimeFieldName
-                            << time2.asOpTime().toBSON()
-                            << UpdatePositionArgs::kDurableWallTimeFieldName
-                            << Date_t() + Seconds(time2.asOpTime().getSecs()))))));
+    ASSERT_OK(args.initialize(BSON(
+        UpdatePositionArgs::kCommandFieldName
+        << 1 << UpdatePositionArgs::kUpdateArrayFieldName
+        << BSON_ARRAY(
+               BSON(UpdatePositionArgs::kConfigVersionFieldName
+                    << 2 << UpdatePositionArgs::kMemberIdFieldName << 1
+                    << UpdatePositionArgs::kAppliedOpTimeFieldName << time2.asOpTime().toBSON()
+                    << UpdatePositionArgs::kAppliedWallTimeFieldName
+                    << Date_t() + Seconds(time2.asOpTime().getSecs())
+                    << UpdatePositionArgs::kDurableOpTimeFieldName << time2.asOpTime().toBSON()
+                    << UpdatePositionArgs::kDurableWallTimeFieldName
+                    << Date_t() + Seconds(time2.asOpTime().getSecs()))
+               << BSON(UpdatePositionArgs::kConfigVersionFieldName
+                       << 2 << UpdatePositionArgs::kMemberIdFieldName << 2
+                       << UpdatePositionArgs::kAppliedOpTimeFieldName << time2.asOpTime().toBSON()
+                       << UpdatePositionArgs::kAppliedWallTimeFieldName
+                       << Date_t() + Seconds(time2.asOpTime().getSecs())
+                       << UpdatePositionArgs::kDurableOpTimeFieldName << time2.asOpTime().toBSON()
+                       << UpdatePositionArgs::kDurableWallTimeFieldName
+                       << Date_t() + Seconds(time2.asOpTime().getSecs()))))));
 
     auto opCtx = makeOperationContext();
 
@@ -4516,7 +4492,7 @@ TEST_F(ReplCoordTest, IgnoreTheContentsOfMetadataWhenItsConfigVersionDoesNotMatc
     ASSERT_EQUALS(OpTime(Timestamp(0, 0), 0), getReplCoord()->getLastCommittedOpTime());
 
     // lower configVersion
-    StatusWith<rpc::ReplSetMetadata> metadata = replReadFromMetadata(BSON(
+    StatusWith<rpc::ReplSetMetadata> metadata = rpc::ReplSetMetadata::readFromMetadata(BSON(
         rpc::kReplSetMetadataFieldName << BSON(
             "lastOpCommitted" << BSON("ts" << Timestamp(10, 0) << "t" << 2) << "lastCommittedWall"
                               << Date_t() + Seconds(100) << "lastOpVisible"
@@ -4526,7 +4502,7 @@ TEST_F(ReplCoordTest, IgnoreTheContentsOfMetadataWhenItsConfigVersionDoesNotMatc
     ASSERT_EQUALS(0, getReplCoord()->getTerm());
 
     // higher configVersion
-    StatusWith<rpc::ReplSetMetadata> metadata2 = replReadFromMetadata(
+    StatusWith<rpc::ReplSetMetadata> metadata2 = rpc::ReplSetMetadata::readFromMetadata(
         BSON(rpc::kReplSetMetadataFieldName
              << BSON("lastOpCommitted"
                      << BSON("ts" << Timestamp(10, 0) << "t" << 2) << "lastCommittedWall"
@@ -4600,7 +4576,7 @@ TEST_F(ReplCoordTest, UpdateTermWhenTheTermFromMetadataIsNewerButNeverUpdateCurr
     ASSERT_EQUALS(1, getReplCoord()->getTerm());
 
     // higher term, should change
-    StatusWith<rpc::ReplSetMetadata> metadata = replReadFromMetadata(BSON(
+    StatusWith<rpc::ReplSetMetadata> metadata = rpc::ReplSetMetadata::readFromMetadata(BSON(
         rpc::kReplSetMetadataFieldName << BSON(
             "lastOpCommitted" << BSON("ts" << Timestamp(10, 0) << "t" << 3) << "lastCommittedWall"
                               << Date_t() + Seconds(100) << "lastOpVisible"
@@ -4612,7 +4588,7 @@ TEST_F(ReplCoordTest, UpdateTermWhenTheTermFromMetadataIsNewerButNeverUpdateCurr
     ASSERT_EQUALS(OpTime(Timestamp(0, 0), 0), getReplCoord()->getLastCommittedOpTime());
 
     // lower term, should not change
-    StatusWith<rpc::ReplSetMetadata> metadata2 = replReadFromMetadata(BSON(
+    StatusWith<rpc::ReplSetMetadata> metadata2 = rpc::ReplSetMetadata::readFromMetadata(BSON(
         rpc::kReplSetMetadataFieldName << BSON(
             "lastOpCommitted" << BSON("ts" << Timestamp(11, 0) << "t" << 3) << "lastCommittedWall"
                               << Date_t() + Seconds(100) << "lastOpVisible"
@@ -4624,7 +4600,7 @@ TEST_F(ReplCoordTest, UpdateTermWhenTheTermFromMetadataIsNewerButNeverUpdateCurr
     ASSERT_EQUALS(OpTime(Timestamp(0, 0), 0), getReplCoord()->getLastCommittedOpTime());
 
     // same term, should not change
-    StatusWith<rpc::ReplSetMetadata> metadata3 = replReadFromMetadata(BSON(
+    StatusWith<rpc::ReplSetMetadata> metadata3 = rpc::ReplSetMetadata::readFromMetadata(BSON(
         rpc::kReplSetMetadataFieldName << BSON(
             "lastOpCommitted" << BSON("ts" << Timestamp(11, 0) << "t" << 3) << "lastCommittedWall"
                               << Date_t() + Seconds(100) << "lastOpVisible"
@@ -4659,7 +4635,7 @@ TEST_F(ReplCoordTest,
     auto config = replCoord->getConfig();
 
     // Higher term - should update term but not last committed optime.
-    StatusWith<rpc::ReplSetMetadata> metadata = replReadFromMetadata(BSON(
+    StatusWith<rpc::ReplSetMetadata> metadata = rpc::ReplSetMetadata::readFromMetadata(BSON(
         rpc::kReplSetMetadataFieldName
         << BSON("lastOpCommitted" << BSON("ts" << Timestamp(10, 0) << "t" << 3)
                                   << "lastCommittedWall" << Date_t() + Seconds(100)
@@ -4763,7 +4739,7 @@ TEST_F(ReplCoordTest, PrepareOplogQueryMetadata) {
     ASSERT_EQ(oqMetadata.getValue().getSyncSourceIndex(), -1);
     ASSERT_EQ(oqMetadata.getValue().getPrimaryIndex(), -1);
 
-    auto replMetadata = replReadFromMetadata(metadata);
+    auto replMetadata = rpc::ReplSetMetadata::readFromMetadata(metadata);
     ASSERT_OK(replMetadata.getStatus());
     ASSERT_EQ(replMetadata.getValue().getLastOpCommitted().opTime, optime1);
     ASSERT_EQ(replMetadata.getValue().getLastOpCommitted().wallTime, wallTime1);
@@ -4797,7 +4773,7 @@ TEST_F(ReplCoordTest, TermAndLastCommittedOpTimeUpdatedFromHeartbeatWhenArbiter)
 
     // Higher term - should update term and lastCommittedOpTime since arbiters learn of the
     // commit point via heartbeats.
-    StatusWith<rpc::ReplSetMetadata> metadata = replReadFromMetadata(BSON(
+    StatusWith<rpc::ReplSetMetadata> metadata = rpc::ReplSetMetadata::readFromMetadata(BSON(
         rpc::kReplSetMetadataFieldName
         << BSON("lastOpCommitted" << BSON("ts" << Timestamp(10, 1) << "t" << 3)
                                   << "lastCommittedWall" << Date_t() + Seconds(100)
@@ -5428,7 +5404,7 @@ TEST_F(ReplCoordTest, UpdatePositionCmdHasMetadata) {
     getReplCoord()->advanceCommitPoint({optime, Date_t() + Seconds(optime.getSecs())}, true);
 
     BSONObj cmd = unittest::assertGet(getReplCoord()->prepareReplSetUpdatePositionCommand());
-    auto metadata = unittest::assertGet(replReadFromMetadata(cmd));
+    auto metadata = unittest::assertGet(rpc::ReplSetMetadata::readFromMetadata(cmd));
     ASSERT_EQUALS(metadata.getTerm(), getReplCoord()->getTerm());
     ASSERT_EQUALS(metadata.getLastOpVisible(), optime);
 
@@ -5466,44 +5442,42 @@ TEST_F(ReplCoordTest, StepDownWhenHandleLivenessTimeoutMarksAMajorityOfVotingNod
 
     // Receive notification that every node is up.
     UpdatePositionArgs args;
-    ASSERT_OK(updatePositionArgsInitialize(
-        args,
-        BSON(
-            UpdatePositionArgs::kCommandFieldName
-            << 1 << UpdatePositionArgs::kUpdateArrayFieldName
-            << BSON_ARRAY(
-                   BSON(UpdatePositionArgs::kConfigVersionFieldName
-                        << 2 << UpdatePositionArgs::kMemberIdFieldName << 1
-                        << UpdatePositionArgs::kAppliedOpTimeFieldName << startingOpTime.toBSON()
-                        << UpdatePositionArgs::kAppliedWallTimeFieldName
-                        << Date_t() + Seconds(startingOpTime.getSecs())
-                        << UpdatePositionArgs::kDurableOpTimeFieldName << startingOpTime.toBSON()
-                        << UpdatePositionArgs::kDurableWallTimeFieldName
-                        << Date_t() + Seconds(startingOpTime.getSecs()))
-                   << BSON(UpdatePositionArgs::kConfigVersionFieldName
-                           << 2 << UpdatePositionArgs::kMemberIdFieldName << 2
-                           << UpdatePositionArgs::kAppliedOpTimeFieldName << startingOpTime.toBSON()
-                           << UpdatePositionArgs::kAppliedWallTimeFieldName
-                           << Date_t() + Seconds(startingOpTime.getSecs())
-                           << UpdatePositionArgs::kDurableOpTimeFieldName << startingOpTime.toBSON()
-                           << UpdatePositionArgs::kDurableWallTimeFieldName
-                           << Date_t() + Seconds(startingOpTime.getSecs()))
-                   << BSON(UpdatePositionArgs::kConfigVersionFieldName
-                           << 2 << UpdatePositionArgs::kMemberIdFieldName << 3
-                           << UpdatePositionArgs::kAppliedOpTimeFieldName << startingOpTime.toBSON()
-                           << UpdatePositionArgs::kAppliedWallTimeFieldName
-                           << Date_t() + Seconds(startingOpTime.getSecs())
-                           << UpdatePositionArgs::kDurableOpTimeFieldName << startingOpTime.toBSON()
-                           << UpdatePositionArgs::kDurableWallTimeFieldName
-                           << Date_t() + Seconds(startingOpTime.getSecs()))
-                   << BSON(UpdatePositionArgs::kConfigVersionFieldName
-                           << 2 << UpdatePositionArgs::kMemberIdFieldName << 4
-                           << UpdatePositionArgs::kAppliedOpTimeFieldName << startingOpTime.toBSON()
-                           << UpdatePositionArgs::kAppliedWallTimeFieldName
-                           << Date_t() + Seconds(startingOpTime.getSecs())
-                           << UpdatePositionArgs::kDurableOpTimeFieldName << startingOpTime.toBSON()
-                           << UpdatePositionArgs::kDurableWallTimeFieldName
-                           << Date_t() + Seconds(startingOpTime.getSecs()))))));
+    ASSERT_OK(args.initialize(BSON(
+        UpdatePositionArgs::kCommandFieldName
+        << 1 << UpdatePositionArgs::kUpdateArrayFieldName
+        << BSON_ARRAY(
+               BSON(UpdatePositionArgs::kConfigVersionFieldName
+                    << 2 << UpdatePositionArgs::kMemberIdFieldName << 1
+                    << UpdatePositionArgs::kAppliedOpTimeFieldName << startingOpTime.toBSON()
+                    << UpdatePositionArgs::kAppliedWallTimeFieldName
+                    << Date_t() + Seconds(startingOpTime.getSecs())
+                    << UpdatePositionArgs::kDurableOpTimeFieldName << startingOpTime.toBSON()
+                    << UpdatePositionArgs::kDurableWallTimeFieldName
+                    << Date_t() + Seconds(startingOpTime.getSecs()))
+               << BSON(UpdatePositionArgs::kConfigVersionFieldName
+                       << 2 << UpdatePositionArgs::kMemberIdFieldName << 2
+                       << UpdatePositionArgs::kAppliedOpTimeFieldName << startingOpTime.toBSON()
+                       << UpdatePositionArgs::kAppliedWallTimeFieldName
+                       << Date_t() + Seconds(startingOpTime.getSecs())
+                       << UpdatePositionArgs::kDurableOpTimeFieldName << startingOpTime.toBSON()
+                       << UpdatePositionArgs::kDurableWallTimeFieldName
+                       << Date_t() + Seconds(startingOpTime.getSecs()))
+               << BSON(UpdatePositionArgs::kConfigVersionFieldName
+                       << 2 << UpdatePositionArgs::kMemberIdFieldName << 3
+                       << UpdatePositionArgs::kAppliedOpTimeFieldName << startingOpTime.toBSON()
+                       << UpdatePositionArgs::kAppliedWallTimeFieldName
+                       << Date_t() + Seconds(startingOpTime.getSecs())
+                       << UpdatePositionArgs::kDurableOpTimeFieldName << startingOpTime.toBSON()
+                       << UpdatePositionArgs::kDurableWallTimeFieldName
+                       << Date_t() + Seconds(startingOpTime.getSecs()))
+               << BSON(UpdatePositionArgs::kConfigVersionFieldName
+                       << 2 << UpdatePositionArgs::kMemberIdFieldName << 4
+                       << UpdatePositionArgs::kAppliedOpTimeFieldName << startingOpTime.toBSON()
+                       << UpdatePositionArgs::kAppliedWallTimeFieldName
+                       << Date_t() + Seconds(startingOpTime.getSecs())
+                       << UpdatePositionArgs::kDurableOpTimeFieldName << startingOpTime.toBSON()
+                       << UpdatePositionArgs::kDurableWallTimeFieldName
+                       << Date_t() + Seconds(startingOpTime.getSecs()))))));
 
     ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(args, nullptr));
     // Become PRIMARY.
@@ -5511,28 +5485,26 @@ TEST_F(ReplCoordTest, StepDownWhenHandleLivenessTimeoutMarksAMajorityOfVotingNod
 
     // Keep two nodes alive via UpdatePosition.
     UpdatePositionArgs args1;
-    ASSERT_OK(updatePositionArgsInitialize(
-        args1,
-        BSON(
-            UpdatePositionArgs::kCommandFieldName
-            << 1 << UpdatePositionArgs::kUpdateArrayFieldName
-            << BSON_ARRAY(
-                   BSON(UpdatePositionArgs::kConfigVersionFieldName
-                        << 2 << UpdatePositionArgs::kMemberIdFieldName << 1
-                        << UpdatePositionArgs::kAppliedOpTimeFieldName << startingOpTime.toBSON()
-                        << UpdatePositionArgs::kAppliedWallTimeFieldName
-                        << Date_t() + Seconds(startingOpTime.getSecs())
-                        << UpdatePositionArgs::kDurableOpTimeFieldName << startingOpTime.toBSON()
-                        << UpdatePositionArgs::kDurableWallTimeFieldName
-                        << Date_t() + Seconds(startingOpTime.getSecs()))
-                   << BSON(UpdatePositionArgs::kConfigVersionFieldName
-                           << 2 << UpdatePositionArgs::kMemberIdFieldName << 2
-                           << UpdatePositionArgs::kAppliedOpTimeFieldName << startingOpTime.toBSON()
-                           << UpdatePositionArgs::kAppliedWallTimeFieldName
-                           << Date_t() + Seconds(startingOpTime.getSecs())
-                           << UpdatePositionArgs::kDurableOpTimeFieldName << startingOpTime.toBSON()
-                           << UpdatePositionArgs::kDurableWallTimeFieldName
-                           << Date_t() + Seconds(startingOpTime.getSecs()))))));
+    ASSERT_OK(args1.initialize(BSON(
+        UpdatePositionArgs::kCommandFieldName
+        << 1 << UpdatePositionArgs::kUpdateArrayFieldName
+        << BSON_ARRAY(
+               BSON(UpdatePositionArgs::kConfigVersionFieldName
+                    << 2 << UpdatePositionArgs::kMemberIdFieldName << 1
+                    << UpdatePositionArgs::kAppliedOpTimeFieldName << startingOpTime.toBSON()
+                    << UpdatePositionArgs::kAppliedWallTimeFieldName
+                    << Date_t() + Seconds(startingOpTime.getSecs())
+                    << UpdatePositionArgs::kDurableOpTimeFieldName << startingOpTime.toBSON()
+                    << UpdatePositionArgs::kDurableWallTimeFieldName
+                    << Date_t() + Seconds(startingOpTime.getSecs()))
+               << BSON(UpdatePositionArgs::kConfigVersionFieldName
+                       << 2 << UpdatePositionArgs::kMemberIdFieldName << 2
+                       << UpdatePositionArgs::kAppliedOpTimeFieldName << startingOpTime.toBSON()
+                       << UpdatePositionArgs::kAppliedWallTimeFieldName
+                       << Date_t() + Seconds(startingOpTime.getSecs())
+                       << UpdatePositionArgs::kDurableOpTimeFieldName << startingOpTime.toBSON()
+                       << UpdatePositionArgs::kDurableWallTimeFieldName
+                       << Date_t() + Seconds(startingOpTime.getSecs()))))));
     const Date_t startDate = getNet()->now();
     getNet()->enterNetwork();
     getNet()->runUntil(startDate + Milliseconds(100));
@@ -5570,19 +5542,17 @@ TEST_F(ReplCoordTest, StepDownWhenHandleLivenessTimeoutMarksAMajorityOfVotingNod
 
     // Keep one node alive via two methods (UpdatePosition and requestHeartbeat).
     UpdatePositionArgs args2;
-    ASSERT_OK(updatePositionArgsInitialize(
-        args2,
-        BSON(UpdatePositionArgs::kCommandFieldName
-             << 1 << UpdatePositionArgs::kUpdateArrayFieldName
-             << BSON_ARRAY(
-                    BSON(UpdatePositionArgs::kConfigVersionFieldName
-                         << 2 << UpdatePositionArgs::kMemberIdFieldName << 1
-                         << UpdatePositionArgs::kDurableOpTimeFieldName << startingOpTime.toBSON()
-                         << UpdatePositionArgs::kDurableWallTimeFieldName
-                         << Date_t() + Seconds(startingOpTime.getSecs())
-                         << UpdatePositionArgs::kAppliedOpTimeFieldName << startingOpTime.toBSON()
-                         << UpdatePositionArgs::kAppliedWallTimeFieldName
-                         << Date_t() + Seconds(startingOpTime.getSecs()))))));
+    ASSERT_OK(args2.initialize(BSON(
+        UpdatePositionArgs::kCommandFieldName
+        << 1 << UpdatePositionArgs::kUpdateArrayFieldName
+        << BSON_ARRAY(BSON(UpdatePositionArgs::kConfigVersionFieldName
+                           << 2 << UpdatePositionArgs::kMemberIdFieldName << 1
+                           << UpdatePositionArgs::kDurableOpTimeFieldName << startingOpTime.toBSON()
+                           << UpdatePositionArgs::kDurableWallTimeFieldName
+                           << Date_t() + Seconds(startingOpTime.getSecs())
+                           << UpdatePositionArgs::kAppliedOpTimeFieldName << startingOpTime.toBSON()
+                           << UpdatePositionArgs::kAppliedWallTimeFieldName
+                           << Date_t() + Seconds(startingOpTime.getSecs()))))));
     ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(args2, nullptr));
 
     hbArgs.setSetName("mySet");
