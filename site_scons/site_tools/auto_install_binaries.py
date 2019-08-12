@@ -44,6 +44,7 @@ SUFFIX_MAP = "AIB_SUFFIX_MAP"
 AIB_MAKE_ARCHIVE_CONTENT = """
 import os
 import sys
+from shutil import which
 
 USAGE = '''
 Usage: {} ARCHIVE_TYPE ARCHIVE_NAME ROOT_DIRECTORY FILES...
@@ -69,7 +70,18 @@ if __name__ == "__main__":
         print(USAGE.format(sys.argv[0]))
         sys.exit(1)
 
-    os.chdir(root_dir)
+    if archive_type == "tar" and which("tar") is not None:
+        import subprocess
+        import shlex
+        tar = which("tar")
+        tar_cmd = "{tar} -C {root_dir} -cf {archive_name} {files}".format(
+            tar=tar,
+            root_dir=root_dir,
+            archive_name=archive_name,
+            files=" ".join(files),
+        )
+        subprocess.run(shlex.split(tar_cmd))
+        sys.exit(0)
 
     if archive_type == "zip":
         from zipfile import ZipFile
@@ -79,6 +91,8 @@ if __name__ == "__main__":
         import tarfile
         archive = tarfile.open(archive_name, mode='w:gz')
         add_file = archive.add
+
+    os.chdir(root_dir)
 
     for filename in files:
         add_file(filename)
