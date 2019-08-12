@@ -1,5 +1,6 @@
 /**
  * Verify the TTL index behavior after restart.
+ * @tags: [requires_persistence]
  */
 (function() {
 'use strict';
