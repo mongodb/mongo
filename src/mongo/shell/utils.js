@@ -890,8 +890,8 @@ shellHelper.show = function(what) {
     }
 
     if (what == "collections" || what == "tables") {
-        db.getCollectionNames().forEach(function(x) {
-            print(x);
+        db.getCollectionInfos({}, true, true).forEach(function(infoObj) {
+            print(infoObj.name);
         });
         return "";
     }
