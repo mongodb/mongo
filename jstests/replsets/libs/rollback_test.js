@@ -120,6 +120,14 @@ function RollbackTest(name = "RollbackTest", replSet) {
 
         rst = replSet;
         lastRBID = assert.commandWorked(curSecondary.adminCommand("replSetGetRBID")).rbid;
+
+        // Insert a document and replicate it to all 3 nodes so that any of the nodes can sync from
+        // any other. If we do not do this, then due to initial sync timing and sync source
+        // selection all nodes may not be guaranteed to have overlapping oplogs.
+        const dbName = "EnsureAnyNodeCanSyncFromAnyOther";
+        assert.commandWorked(curPrimary.getDB(dbName).ensureSyncSource.insert(
+            {thisDocument: 'is inserted to ensure any node can sync from any other'},
+            {writeConcern: {w: 3}}));
     }
 
     /**
