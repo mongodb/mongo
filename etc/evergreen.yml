@@ -10565,7 +10565,7 @@ buildvariants:
   name: hot_backups-rhel-70-64-bit
   display_name: "hot_backups RHEL 7.0"
   batchtime: 1440 # 1 day
-  runs_on:
+  run_on:
   - rhel70
   expansions:
     <<: *enterprise-rhel-70-64-bit-expansions-template
