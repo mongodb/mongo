@@ -87,9 +87,8 @@ public:
     void onOperationConsumed(const BSONObj& op) final {}
 
     void complete(const OpTime& applyThroughOpTime) const {
-        LOG_FOR_RECOVERY(kRecoveryBatchLogLevel)
-            << "Applied " << _numOpsApplied << " operations in " << _numBatches
-            << " batches. Last operation applied with optime: " << applyThroughOpTime;
+        log() << "Applied " << _numOpsApplied << " operations in " << _numBatches
+              << " batches. Last operation applied with optime: " << applyThroughOpTime;
     }
 
 private:
