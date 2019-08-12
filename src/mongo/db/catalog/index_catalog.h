@@ -381,7 +381,7 @@ public:
     /**
      * Returns true if the index 'idx' is multikey, and returns false otherwise.
      */
-    virtual bool isMultikey(OperationContext* const opCtx, const IndexDescriptor* const idx) = 0;
+    virtual bool isMultikey(const IndexDescriptor* const idx) = 0;
 
     /**
      * Returns the path components that cause the index 'idx' to be multikey if the index supports

@@ -193,7 +193,7 @@ public:
     }
 
     // Is this index multikey?
-    bool isMultikey(OperationContext* opCtx) const;
+    bool isMultikey() const;
 
     MultikeyPaths getMultikeyPaths(OperationContext* opCtx) const;
 

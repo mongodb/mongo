@@ -141,53 +141,13 @@ bool IndexCatalogEntryImpl::isReady(OperationContext* opCtx) const {
     return _isReady;
 }
 
-bool IndexCatalogEntryImpl::isMultikey(OperationContext* opCtx) const {
-    auto ret = _isMultikey.load();
-    if (ret) {
-        return true;
-    }
-
-    // Multikey updates are only persisted, to disk and in memory, when the transaction
-    // commits. In the case of multi-statement transactions, a client attempting to read their own
-    // transactions writes can return wrong results if their writes include multikey changes.
-    //
-    // To accomplish this, the write-path will persist multikey changes on the `Session` object
-    // and the read-path will query this state before determining there is no interesting multikey
-    // state. Note, it's always legal, though potentially wasteful, to return `true`.
-    auto txnParticipant = TransactionParticipant::get(opCtx);
-    if (!txnParticipant || !txnParticipant.transactionIsOpen()) {
-        return false;
-    }
-
-    invariant(txnParticipant);
-
-    for (const MultikeyPathInfo& path : txnParticipant.getUncommittedMultikeyPathInfos()) {
-        if (path.nss == ns() && path.indexName == _descriptor->indexName()) {
-            return true;
-        }
-    }
-
-    return false;
+bool IndexCatalogEntryImpl::isMultikey() const {
+    return _isMultikey.load();
 }
 
 MultikeyPaths IndexCatalogEntryImpl::getMultikeyPaths(OperationContext* opCtx) const {
     stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
-
-    auto txnParticipant = TransactionParticipant::get(opCtx);
-    if (!txnParticipant || !txnParticipant.transactionIsOpen()) {
-        return _indexMultikeyPaths;
-    }
-
-    invariant(txnParticipant);
-
-    MultikeyPaths ret = _indexMultikeyPaths;
-    for (const MultikeyPathInfo& path : txnParticipant.getUncommittedMultikeyPathInfos()) {
-        if (path.nss == ns() && path.indexName == _descriptor->indexName()) {
-            MultikeyPathTracker::mergeMultikeyPaths(&ret, path.multikeyPaths);
-        }
-    }
-
-    return ret;
+    return _indexMultikeyPaths;
 }
 
 // ---
@@ -204,7 +164,7 @@ void IndexCatalogEntryImpl::setIsReady(bool newIsReady) {
 
 void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
                                         const MultikeyPaths& multikeyPaths) {
-    if (!_indexTracksPathLevelMultikeyInfo && isMultikey(opCtx)) {
+    if (!_indexTracksPathLevelMultikeyInfo && isMultikey()) {
         // If the index is already set as multikey and we don't have any path-level information to
         // update, then there's nothing more for us to do.
         return;
@@ -339,19 +299,6 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
         [onMultikeyCommitFn, indexMetadataHasChanged](boost::optional<Timestamp>) {
             onMultikeyCommitFn(indexMetadataHasChanged);
         });
-
-    // Within a multi-document transaction, reads should be able to see the effect of previous
-    // writes done within that transaction. If a previous write in a transaction has set the index
-    // to be multikey, then a subsequent read MUST know that fact in order to return correct
-    // results. This is true in general for multikey writes. Since we don't update the in-memory
-    // multikey flag until after the transaction commits, we track extra information here to let
-    // subsequent readers within the same transaction know if this index was set as multikey by a
-    // previous write in the transaction.
-    if (opCtx->inMultiDocumentTransaction()) {
-        invariant(txnParticipant);
-        txnParticipant.addUncommittedMultikeyPathInfo(
-            MultikeyPathInfo{ns(), _descriptor->indexName(), std::move(paths)});
-    }
 }
 
 // ----

@@ -158,8 +158,8 @@ IndexVersion IndexDescriptor::getDefaultIndexVersion() {
     return IndexVersion::kV2;
 }
 
-bool IndexDescriptor::isMultikey(OperationContext* opCtx) const {
-    return _collection->getIndexCatalog()->isMultikey(opCtx, this);
+bool IndexDescriptor::isMultikey() const {
+    return _collection->getIndexCatalog()->isMultikey(this);
 }
 
 MultikeyPaths IndexDescriptor::getMultikeyPaths(OperationContext* opCtx) const {

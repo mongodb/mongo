@@ -558,24 +558,6 @@ public:
         void refreshLocksForPreparedTransaction(OperationContext* opCtx, bool yieldLocks);
 
         /**
-         * May only be called while a multi-document transaction is not committed and adds the
-         * multi-key path info to the set of path infos to be updated at commit time.
-         */
-        void addUncommittedMultikeyPathInfo(MultikeyPathInfo info) {
-            invariant(transactionIsOpen());
-            p().multikeyPathInfo.emplace_back(std::move(info));
-        }
-
-        /**
-         * May only be called while a multi-document transaction is not committed and returns the
-         * path infos which have been added so far.
-         */
-        const std::vector<MultikeyPathInfo>& getUncommittedMultikeyPathInfos() const {
-            invariant(transactionIsOpen());
-            return p().multikeyPathInfo;
-        }
-
-        /**
          * Called after a write under the specified transaction completes while the node is a
          * primary and specifies the statement ids which were written. Must be called while the
          * caller is still in the write's WUOW. Updates the on-disk state of the session to match
@@ -959,11 +941,6 @@ private:
         // The autocommit setting of this transaction. Should always be false for multi-statement
         // transaction. Currently only needed for diagnostics reporting.
         boost::optional<bool> autoCommit;
-
-        // Contains uncommitted multi-key path info entries which were modified under this
-        // transaction so they can be applied to subsequent opreations before the transaction
-        // commits
-        std::vector<MultikeyPathInfo> multikeyPathInfo;
 
         //
         // Retryable writes state

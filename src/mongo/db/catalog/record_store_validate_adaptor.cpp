@@ -103,7 +103,7 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
                      &multikeyPaths,
                      recordId);
 
-        if (!descriptor->isMultikey(_opCtx) &&
+        if (!descriptor->isMultikey() &&
             iam->shouldMarkIndexAsMultikey(
                 {documentKeySet.begin(), documentKeySet.end()},
                 {multikeyMetadataKeys.begin(), multikeyMetadataKeys.end()},
@@ -290,8 +290,8 @@ void RecordStoreValidateAdaptor::validateIndexKeyCount(const IndexDescriptor* id
     // collection. This check is only valid for indexes that are not multikey (indexed arrays
     // produce an index key per array entry) and not $** indexes which can produce index keys for
     // multiple paths within a single document.
-    if (results.valid && !idx->isMultikey(_opCtx) &&
-        idx->getIndexType() != IndexType::INDEX_WILDCARD && numTotalKeys > numRecs) {
+    if (results.valid && !idx->isMultikey() && idx->getIndexType() != IndexType::INDEX_WILDCARD &&
+        numTotalKeys > numRecs) {
         std::string err = str::stream()
             << "index " << idx->indexName() << " is not multi-key, but has more entries ("
             << numTotalKeys << ") than documents in the index (" << numRecs << ")";

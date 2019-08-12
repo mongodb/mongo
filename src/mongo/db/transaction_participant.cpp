@@ -2071,7 +2071,6 @@ void TransactionParticipant::Participant::_resetTransactionState(
     p().transactionOperations.clear();
     o(wl).prepareOpTime = repl::OpTime();
     o(wl).recoveryPrepareOpTime = repl::OpTime();
-    p().multikeyPathInfo.clear();
     p().autoCommit = boost::none;
 
     // Release any locks held by this participant and abort the storage transaction.

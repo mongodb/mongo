@@ -95,7 +95,7 @@ public:
     /**
      * Returns true if this index is multikey and false otherwise.
      */
-    virtual bool isMultikey(OperationContext* opCtx) const = 0;
+    virtual bool isMultikey() const = 0;
 
     /**
      * Returns the path components that cause this index to be multikey if this index supports

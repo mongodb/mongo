@@ -949,10 +949,10 @@ void IndexCatalogImpl::deleteIndexFromDisk(OperationContext* opCtx, const string
     }
 }
 
-bool IndexCatalogImpl::isMultikey(OperationContext* opCtx, const IndexDescriptor* idx) {
+bool IndexCatalogImpl::isMultikey(const IndexDescriptor* const idx) {
     IndexCatalogEntry* entry = _readyIndexes.find(idx);
     invariant(entry);
-    return entry->isMultikey(opCtx);
+    return entry->isMultikey();
 }
 
 MultikeyPaths IndexCatalogImpl::getMultikeyPaths(OperationContext* opCtx,
@@ -1109,7 +1109,7 @@ const IndexDescriptor* IndexCatalogImpl::findShardKeyPrefixedIndex(OperationCont
         if (!shardKey.isPrefixOf(desc->keyPattern(), SimpleBSONElementComparator::kInstance))
             continue;
 
-        if (!desc->isMultikey(opCtx) && hasSimpleCollation)
+        if (!desc->isMultikey() && hasSimpleCollation)
             return desc;
 
         if (!requireSingleKey && hasSimpleCollation)

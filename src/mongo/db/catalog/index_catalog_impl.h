@@ -225,7 +225,7 @@ public:
     /**
      * Returns true if the index 'idx' is multikey, and returns false otherwise.
      */
-    bool isMultikey(OperationContext* opCtx, const IndexDescriptor* idx) override;
+    bool isMultikey(const IndexDescriptor* const idx) override;
 
     /**
      * Returns the path components that cause the index 'idx' to be multikey if the index supports

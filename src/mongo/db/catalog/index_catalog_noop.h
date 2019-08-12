@@ -178,7 +178,7 @@ public:
         return {};
     }
 
-    bool isMultikey(OperationContext* const opCtx, const IndexDescriptor* const idx) {
+    bool isMultikey(const IndexDescriptor* const idx) {
         return false;
     }
 

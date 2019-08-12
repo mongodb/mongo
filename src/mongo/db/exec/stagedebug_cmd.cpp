@@ -292,7 +292,7 @@ public:
             params.bounds.boundInclusion = IndexBounds::makeBoundInclusionFromBoundBools(
                 nodeArgs["startKeyInclusive"].Bool(), nodeArgs["endKeyInclusive"].Bool());
             params.direction = nodeArgs["direction"].numberInt();
-            params.shouldDedup = desc->isMultikey(opCtx);
+            params.shouldDedup = desc->isMultikey();
 
             return new IndexScan(opCtx, params, workingSet, matcher);
         } else if ("andHash" == nodeName) {

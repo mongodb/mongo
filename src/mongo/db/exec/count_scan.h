@@ -59,7 +59,7 @@ struct CountScanParams {
                           descriptor->indexName(),
                           descriptor->keyPattern(),
                           descriptor->getMultikeyPaths(opCtx),
-                          descriptor->isMultikey(opCtx)) {}
+                          descriptor->isMultikey()) {}
 
     const IndexDescriptor* indexDescriptor;
     std::string name;
