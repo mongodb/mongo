@@ -805,6 +805,16 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
+- name: out_of_cache_scanner
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "out_of_cache_scanner"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
 #######################################
 #               Modules               #
 #######################################
@@ -1085,6 +1095,7 @@ buildvariants:
   tasks:
     - name: industry_benchmarks
     - name: smoke_test
+    - name: out_of_cache_scanner
 
 - name: linux-3-shard
   display_name: Linux 3-Shard Cluster
