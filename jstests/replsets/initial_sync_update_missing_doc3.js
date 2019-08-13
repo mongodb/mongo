@@ -63,7 +63,7 @@ var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
 assert.eq(res.initialSyncStatus.fetchedMissingDocs, 0);
 
 secondary.getDB('test').setLogLevel(1, 'replication');
-    turnOffHangBeforeGettingMissingDocFailPoint(primary, secondary, name, 1 /* numFetched */);
+turnOffHangBeforeGettingMissingDocFailPoint(primary, secondary, name, 1 /* numFetched */);
 secondary.getDB('test').setLogLevel(0, 'replication');
 
 replSet.awaitReplication();
