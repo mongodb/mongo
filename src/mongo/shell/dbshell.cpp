@@ -99,10 +99,11 @@ const std::string kDefaultMongoURL = "mongodb://"s + kDefaultMongoHost + ":"s + 
 // to the latest version because there is no feature gating that currently occurs at the mongo shell
 // level. The server is responsible for rejecting usages of new features if its
 // featureCompatibilityVersion is lower.
-MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersion42, ("EndStartupOptionSetup"))
+MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersionLatest,
+                                     ("EndStartupOptionSetup"))
 (InitializerContext* context) {
     mongo::serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
     return Status::OK();
 }
 

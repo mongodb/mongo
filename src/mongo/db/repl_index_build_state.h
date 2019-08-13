@@ -48,15 +48,13 @@ namespace mongo {
 // Indicates which protocol an index build is using.
 enum class IndexBuildProtocol {
     /**
-     * Refers to the pre-FCV 4.2 index build protocol for building indexes in replica sets.
-     * Index builds must complete on the primary before replicating, and are not resumable in
-     * any scenario.
+     * Refers to the legacy index build protocol for building indexes in replica sets. Index builds
+     * must complete on the primary before replicating, and are not resumable in any scenario.
      */
     kSinglePhase,
     /**
-     * Refers to the FCV 4.2 two-phase index build protocol for building indexes in replica
-     * sets. Indexes are built simultaneously on all nodes and are resumable during the draining
-     * phase.
+     * Refers to the two-phase index build protocol for building indexes in replica sets. Indexes
+     * are built simultaneously on all nodes and are resumable during the draining phase.
      */
     kTwoPhase
 };

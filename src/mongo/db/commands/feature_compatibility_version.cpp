@@ -69,9 +69,9 @@ void FeatureCompatibilityVersion::setTargetUpgrade(OperationContext* opCtx) {
     // Sets both 'version' and 'targetVersion' fields.
     _runUpdateCommand(opCtx, [](auto updateMods) {
         updateMods.append(FeatureCompatibilityVersionParser::kVersionField,
-                          FeatureCompatibilityVersionParser::kVersion40);
-        updateMods.append(FeatureCompatibilityVersionParser::kTargetVersionField,
                           FeatureCompatibilityVersionParser::kVersion42);
+        updateMods.append(FeatureCompatibilityVersionParser::kTargetVersionField,
+                          FeatureCompatibilityVersionParser::kVersion44);
     });
 }
 
@@ -79,9 +79,9 @@ void FeatureCompatibilityVersion::setTargetDowngrade(OperationContext* opCtx) {
     // Sets both 'version' and 'targetVersion' fields.
     _runUpdateCommand(opCtx, [](auto updateMods) {
         updateMods.append(FeatureCompatibilityVersionParser::kVersionField,
-                          FeatureCompatibilityVersionParser::kVersion40);
+                          FeatureCompatibilityVersionParser::kVersion42);
         updateMods.append(FeatureCompatibilityVersionParser::kTargetVersionField,
-                          FeatureCompatibilityVersionParser::kVersion40);
+                          FeatureCompatibilityVersionParser::kVersion42);
     });
 }
 
@@ -124,8 +124,8 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
         repl::TimestampedBSONObj{
             BSON("_id" << FeatureCompatibilityVersionParser::kParameterName
                        << FeatureCompatibilityVersionParser::kVersionField
-                       << (storeUpgradeVersion ? FeatureCompatibilityVersionParser::kVersion42
-                                               : FeatureCompatibilityVersionParser::kVersion40)),
+                       << (storeUpgradeVersion ? FeatureCompatibilityVersionParser::kVersion44
+                                               : FeatureCompatibilityVersionParser::kVersion42)),
             Timestamp()},
         repl::OpTime::kUninitializedTerm));  // No timestamp or term because this write is not
                                              // replicated.
@@ -165,7 +165,7 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
         serverGlobalParams.featureCompatibility.setVersion(newVersion);
         updateMinWireVersion();
 
-        if (newVersion != ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40) {
+        if (newVersion != ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42) {
             // Close all incoming connections from internal clients with binary versions lower than
             // ours.
             opCtx->getServiceContext()->getServiceEntryPoint()->endAllSessions(
@@ -176,7 +176,7 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
                 .dropConnections(transport::Session::kKeepOpen);
         }
 
-        if (newVersion != ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
+        if (newVersion != ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
             if (MONGO_FAIL_POINT(hangBeforeAbortingRunningTransactionsOnFCVDowngrade)) {
                 log() << "featureCompatibilityVersion - "
                          "hangBeforeAbortingRunningTransactionsOnFCVDowngrade fail point enabled. "
@@ -196,17 +196,17 @@ void FeatureCompatibilityVersion::updateMinWireVersion() {
     WireSpec& spec = WireSpec::instance();
 
     switch (serverGlobalParams.featureCompatibility.getVersion()) {
-        case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42:
-        case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo42:
-        case ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo40:
+        case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44:
+        case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo44:
+        case ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo42:
             spec.incomingInternalClient.minWireVersion = LATEST_WIRE_VERSION;
             spec.outgoing.minWireVersion = LATEST_WIRE_VERSION;
             return;
-        case ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40:
+        case ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42:
             spec.incomingInternalClient.minWireVersion = LATEST_WIRE_VERSION - 1;
             spec.outgoing.minWireVersion = LATEST_WIRE_VERSION - 1;
             return;
-        case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault40Behavior:
+        case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault42Behavior:
             // getVersion() does not return this value.
             MONGO_UNREACHABLE;
     }
@@ -215,11 +215,11 @@ void FeatureCompatibilityVersion::updateMinWireVersion() {
 void FeatureCompatibilityVersion::_validateVersion(StringData version) {
     uassert(40284,
             str::stream() << "featureCompatibilityVersion must be '"
-                          << FeatureCompatibilityVersionParser::kVersion42 << "' or '"
-                          << FeatureCompatibilityVersionParser::kVersion40 << "'. See "
+                          << FeatureCompatibilityVersionParser::kVersion44 << "' or '"
+                          << FeatureCompatibilityVersionParser::kVersion42 << "'. See "
                           << feature_compatibility_version_documentation::kCompatibilityLink << ".",
-            version == FeatureCompatibilityVersionParser::kVersion42 ||
-                version == FeatureCompatibilityVersionParser::kVersion40);
+            version == FeatureCompatibilityVersionParser::kVersion44 ||
+                version == FeatureCompatibilityVersionParser::kVersion42);
 }
 
 void FeatureCompatibilityVersion::_runUpdateCommand(OperationContext* opCtx,
@@ -275,33 +275,33 @@ void FeatureCompatibilityVersionParameter::append(OperationContext* opCtx,
 
     BSONObjBuilder featureCompatibilityVersionBuilder(b.subobjStart(name));
     switch (serverGlobalParams.featureCompatibility.getVersion()) {
-        case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42:
+        case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44:
+            featureCompatibilityVersionBuilder.append(
+                FeatureCompatibilityVersionParser::kVersionField,
+                FeatureCompatibilityVersionParser::kVersion44);
+            return;
+        case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo44:
             featureCompatibilityVersionBuilder.append(
                 FeatureCompatibilityVersionParser::kVersionField,
                 FeatureCompatibilityVersionParser::kVersion42);
+            featureCompatibilityVersionBuilder.append(
+                FeatureCompatibilityVersionParser::kTargetVersionField,
+                FeatureCompatibilityVersionParser::kVersion44);
             return;
-        case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo42:
+        case ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo42:
             featureCompatibilityVersionBuilder.append(
                 FeatureCompatibilityVersionParser::kVersionField,
-                FeatureCompatibilityVersionParser::kVersion40);
+                FeatureCompatibilityVersionParser::kVersion42);
             featureCompatibilityVersionBuilder.append(
                 FeatureCompatibilityVersionParser::kTargetVersionField,
                 FeatureCompatibilityVersionParser::kVersion42);
             return;
-        case ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo40:
+        case ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42:
             featureCompatibilityVersionBuilder.append(
                 FeatureCompatibilityVersionParser::kVersionField,
-                FeatureCompatibilityVersionParser::kVersion40);
-            featureCompatibilityVersionBuilder.append(
-                FeatureCompatibilityVersionParser::kTargetVersionField,
-                FeatureCompatibilityVersionParser::kVersion40);
+                FeatureCompatibilityVersionParser::kVersion42);
             return;
-        case ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40:
-            featureCompatibilityVersionBuilder.append(
-                FeatureCompatibilityVersionParser::kVersionField,
-                FeatureCompatibilityVersionParser::kVersion40);
-            return;
-        case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault40Behavior:
+        case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault42Behavior:
             // getVersion() does not return this value.
             MONGO_UNREACHABLE;
     }

@@ -2960,7 +2960,7 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
     // receive the replicated version. This is to avoid bugs like SERVER-32639.
     if (newState.arbiter()) {
         serverGlobalParams.featureCompatibility.setVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
     }
 
     _memberState = newState;

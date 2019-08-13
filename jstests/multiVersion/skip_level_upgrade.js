@@ -33,7 +33,8 @@ const defaultOptions = {
 const versions = [
     {binVersion: '3.2', testCollection: 'three_two'},
     {binVersion: '3.4', testCollection: 'three_four'},
-    {binVersion: '3.6', testCollection: 'three_six'}
+    {binVersion: '3.6', testCollection: 'three_six'},
+    {binVersion: '4.0', testCollection: 'four_zero'}
 ];
 
 // Iterate through versions specified in the versions list, and follow the steps outlined at

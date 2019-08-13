@@ -165,40 +165,40 @@ struct ServerGlobalParams {
          *
          * The legal enum (and featureCompatibilityVersion document) states are:
          *
-         * kFullyDowngradedTo40
-         * (4.0, Unset): Only 4.0 features are available, and new and existing storage
-         *               engine entries use the 4.0 format
-         *
-         * kUpgradingTo42
-         * (4.0, 4.2): Only 4.0 features are available, but new storage engine entries
-         *             use the 4.2 format, and existing entries may have either the
-         *             4.0 or 4.2 format
-         *
-         * kFullyUpgradedTo42
-         * (4.2, Unset): 4.2 features are available, and new and existing storage
+         * kFullyDowngradedTo42
+         * (4.2, Unset): Only 4.2 features are available, and new and existing storage
          *               engine entries use the 4.2 format
          *
-         * kDowngradingTo40
-         * (4.0, 4.0): Only 4.0 features are available and new storage engine
-         *             entries use the 4.0 format, but existing entries may have
-         *             either the 4.0 or 4.2 format
+         * kUpgradingTo44
+         * (4.2, 4.4): Only 4.2 features are available, but new storage engine entries
+         *             use the 4.4 format, and existing entries may have either the
+         *             4.2 or 4.4 format
          *
-         * kUnsetDefault40Behavior
+         * kFullyUpgradedTo44
+         * (4.4, Unset): 4.4 features are available, and new and existing storage
+         *               engine entries use the 4.4 format
+         *
+         * kDowngradingTo42
+         * (4.2, 4.2): Only 4.2 features are available and new storage engine
+         *             entries use the 4.2 format, but existing entries may have
+         *             either the 4.2 or 4.4 format
+         *
+         * kUnsetDefault42Behavior
          * (Unset, Unset): This is the case on startup before the fCV document is
          *                 loaded into memory. isVersionInitialized() will return
          *                 false, and getVersion() will return the default
-         *                 (kFullyDowngradedTo40).
+         *                 (kFullyDowngradedTo42).
          *
          */
         enum class Version {
             // The order of these enums matter, higher upgrades having higher values, so that
             // features can be active or inactive if the version is higher than some minimum or
             // lower than some maximum, respectively.
-            kUnsetDefault40Behavior = 0,
-            kFullyDowngradedTo40 = 1,
-            kDowngradingTo40 = 2,
-            kUpgradingTo42 = 3,
-            kFullyUpgradedTo42 = 4,
+            kUnsetDefault42Behavior = 0,
+            kFullyDowngradedTo42 = 1,
+            kDowngradingTo42 = 2,
+            kUpgradingTo44 = 3,
+            kFullyUpgradedTo44 = 4,
         };
 
         /**
@@ -206,7 +206,7 @@ struct ServerGlobalParams {
          * exposes the actual state of the featureCompatibilityVersion if it is uninitialized.
          */
         const bool isVersionInitialized() const {
-            return _version.load() != Version::kUnsetDefault40Behavior;
+            return _version.load() != Version::kUnsetDefault42Behavior;
         }
 
         /**
@@ -226,11 +226,11 @@ struct ServerGlobalParams {
          */
         const Version getVersionUnsafe() const {
             Version v = _version.load();
-            return (v == Version::kUnsetDefault40Behavior) ? Version::kFullyDowngradedTo40 : v;
+            return (v == Version::kUnsetDefault42Behavior) ? Version::kFullyDowngradedTo42 : v;
         }
 
         void reset() {
-            _version.store(Version::kUnsetDefault40Behavior);
+            _version.store(Version::kUnsetDefault42Behavior);
         }
 
         void setVersion(Version version) {
@@ -238,12 +238,12 @@ struct ServerGlobalParams {
         }
 
         bool isVersionUpgradingOrUpgraded() {
-            return (getVersion() == Version::kUpgradingTo42 ||
-                    getVersion() == Version::kFullyUpgradedTo42);
+            return (getVersion() == Version::kUpgradingTo44 ||
+                    getVersion() == Version::kFullyUpgradedTo44);
         }
 
     private:
-        AtomicWord<Version> _version{Version::kUnsetDefault40Behavior};
+        AtomicWord<Version> _version{Version::kUnsetDefault42Behavior};
 
     } featureCompatibility;
 

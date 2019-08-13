@@ -818,8 +818,7 @@ TEST_F(ReplicationRecoveryTest, RecoveryDoesNotApplyOperationsIfAppliedThroughIs
     _assertDocsInOplog(opCtx, {5});
     _assertDocsInTestCollection(opCtx, {});
     ASSERT(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx).isNull());
-    // In 4.0 with RTT, recovering without a `recoverTimestamp` will set `appliedThrough` to the
-    // top of oplog.
+    // Recovering without a `recoverTimestamp` will set `appliedThrough` to the top of oplog.
     ASSERT_EQ(OpTime(Timestamp(5, 5), 1), getConsistencyMarkers()->getAppliedThrough(opCtx));
 }
 

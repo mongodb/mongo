@@ -44,7 +44,6 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/server_options.h"
-#include "mongo/unittest/ensure_fcv.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -53,7 +52,6 @@ namespace {
 using index_key_validate::validateIdIndexSpec;
 using index_key_validate::validateIndexSpec;
 using index_key_validate::validateIndexSpecCollation;
-using unittest::EnsureFCV;
 
 constexpr OperationContext* kDefaultOpCtx = nullptr;
 
@@ -554,7 +552,6 @@ TEST(IndexSpecPartialFilterTest, AcceptsValidPartialFilterExpression) {
 }
 
 TEST(IndexSpecWildcard, SucceedsWithInclusion) {
-    EnsureFCV guard(ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
     auto result =
         validateIndexSpec(kDefaultOpCtx,
                           BSON("key" << BSON("$**" << 1) << "name"
@@ -565,7 +562,6 @@ TEST(IndexSpecWildcard, SucceedsWithInclusion) {
 }
 
 TEST(IndexSpecWildcard, SucceedsWithExclusion) {
-    EnsureFCV guard(ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
     auto result =
         validateIndexSpec(kDefaultOpCtx,
                           BSON("key" << BSON("$**" << 1) << "name"
@@ -576,7 +572,6 @@ TEST(IndexSpecWildcard, SucceedsWithExclusion) {
 }
 
 TEST(IndexSpecWildcard, SucceedsWithExclusionIncludingId) {
-    EnsureFCV guard(ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
     auto result = validateIndexSpec(kDefaultOpCtx,
                                     BSON("key" << BSON("$**" << 1) << "name"
                                                << "indexName"
@@ -587,7 +582,6 @@ TEST(IndexSpecWildcard, SucceedsWithExclusionIncludingId) {
 }
 
 TEST(IndexSpecWildcard, SucceedsWithInclusionExcludingId) {
-    EnsureFCV guard(ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
     auto result = validateIndexSpec(kDefaultOpCtx,
                                     BSON("key" << BSON("$**" << 1) << "name"
                                                << "indexName"
@@ -598,7 +592,6 @@ TEST(IndexSpecWildcard, SucceedsWithInclusionExcludingId) {
 }
 
 TEST(IndexSpecWildcard, FailsWithInclusionExcludingIdSubfield) {
-    EnsureFCV guard(ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
     auto result = validateIndexSpec(kDefaultOpCtx,
                                     BSON("key" << BSON("$**" << 1) << "name"
                                                << "indexName"
@@ -609,7 +602,6 @@ TEST(IndexSpecWildcard, FailsWithInclusionExcludingIdSubfield) {
 }
 
 TEST(IndexSpecWildcard, FailsWithExclusionIncludingIdSubfield) {
-    EnsureFCV guard(ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
     auto result = validateIndexSpec(kDefaultOpCtx,
                                     BSON("key" << BSON("$**" << 1) << "name"
                                                << "indexName"
@@ -619,19 +611,7 @@ TEST(IndexSpecWildcard, FailsWithExclusionIncludingIdSubfield) {
     ASSERT_EQ(result.getStatus().code(), 40178);
 }
 
-TEST(IndexSpecWildcard, FailsWithImproperFeatureCompatabilityVersion) {
-    EnsureFCV guard(ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
-    serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo42);
-    auto result = validateIndexSpec(kDefaultOpCtx,
-                                    BSON("key" << BSON("$**" << 1) << "name"
-                                               << "indexName"),
-                                    serverGlobalParams.featureCompatibility);
-    ASSERT_EQ(result.getStatus().code(), ErrorCodes::CannotCreateIndex);
-}
-
 TEST(IndexSpecWildcard, FailsWithMixedProjection) {
-    EnsureFCV guard(ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
     auto result =
         validateIndexSpec(kDefaultOpCtx,
                           BSON("key" << BSON("$**" << 1) << "name"
@@ -642,7 +622,6 @@ TEST(IndexSpecWildcard, FailsWithMixedProjection) {
 }
 
 TEST(IndexSpecWildcard, FailsWithComputedFieldsInProjection) {
-    EnsureFCV guard(ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
     auto result = validateIndexSpec(kDefaultOpCtx,
                                     BSON("key" << BSON("$**" << 1) << "name"
                                                << "indexName"
@@ -654,7 +633,6 @@ TEST(IndexSpecWildcard, FailsWithComputedFieldsInProjection) {
 }
 
 TEST(IndexSpecWildcard, FailsWhenProjectionPluginNotWildcard) {
-    EnsureFCV guard(ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
     auto result = validateIndexSpec(kDefaultOpCtx,
                                     BSON("key" << BSON("a" << 1) << "name"
                                                << "indexName"
@@ -664,7 +642,6 @@ TEST(IndexSpecWildcard, FailsWhenProjectionPluginNotWildcard) {
 }
 
 TEST(IndexSpecWildcard, FailsWhenProjectionIsNotAnObject) {
-    EnsureFCV guard(ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
     auto result = validateIndexSpec(kDefaultOpCtx,
                                     BSON("key" << BSON("$**" << 1) << "name"
                                                << "indexName"
@@ -674,7 +651,6 @@ TEST(IndexSpecWildcard, FailsWhenProjectionIsNotAnObject) {
 }
 
 TEST(IndexSpecWildcard, FailsWithEmptyProjection) {
-    EnsureFCV guard(ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
     auto result = validateIndexSpec(kDefaultOpCtx,
                                     BSON("key" << BSON("$**" << 1) << "name"
                                                << "indexName"
@@ -684,7 +660,6 @@ TEST(IndexSpecWildcard, FailsWithEmptyProjection) {
 }
 
 TEST(IndexSpecWildcard, FailsWhenInclusionWithSubpath) {
-    EnsureFCV guard(ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
     auto result = validateIndexSpec(kDefaultOpCtx,
                                     BSON("key" << BSON("a.$**" << 1) << "name"
                                                << "indexName"
@@ -694,7 +669,6 @@ TEST(IndexSpecWildcard, FailsWhenInclusionWithSubpath) {
 }
 
 TEST(IndexSpecWildcard, FailsWhenExclusionWithSubpath) {
-    EnsureFCV guard(ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
     auto result = validateIndexSpec(kDefaultOpCtx,
                                     BSON("key" << BSON("a.$**" << 1) << "name"
                                                << "indexName"

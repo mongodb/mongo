@@ -18,17 +18,12 @@ selector:
   - jstests/multiVersion/dumprestore.js
   - jstests/multiVersion/dumprestore_sharded.js
 
-  # TODO: SERVER-35390
+  # TODO: SERVER-42982
   - jstests/multiVersion/upgrade_downgrade_cluster.js
 
-  # TODO SERVER-41230 SERVER-41545: The following tests are expected to fail until the wire version
-  # and feature compatibility version are bumped for MongoDB 4.4.
-  - jstests/multiVersion/add_invalid_shard.js
+  # TODO SERVER-42919: recent work on the ReplicaSetMonitor means that mongoS no longer crashes when
+  # it attempts to connect to an upgraded mongoD. Un-blacklist when SERVER-42919 fixes this issue.
   - jstests/multiVersion/genericSetFCVUsage/crash_mongos_against_upgraded_cluster.js
-  - jstests/multiVersion/genericSetFCVUsage/feature_compatibility_version_lagging_secondary.js
-  - jstests/multiVersion/genericSetFCVUsage/migration_between_mixed_FCV_mixed_version_mongods.js
-  - jstests/multiVersion/genericSetFCVUsage/set_feature_compatibility_version.js
-  - jstests/multiVersion/new_mongos_old_mongod_wire_version_clash.js
 
 # Multiversion tests start their own mongod's.
 executor:

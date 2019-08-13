@@ -72,19 +72,11 @@ namespace {
  * step down.  A deadlock could result if the index build was attempting to acquire a Collection S
  * or X lock while a prepared transaction held a Collection IX lock, and a step down was waiting to
  * acquire the RSTL in mode X.
- * We should only drop the RSTL while in FCV 4.2, as prepared transactions can only
- * occur in FCV 4.2.
  */
 void _unlockRSTLForIndexCleanup(OperationContext* opCtx) {
     if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
         return;
     }
-
-    if (serverGlobalParams.featureCompatibility.getVersion() !=
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
-        return;
-    }
-
     opCtx->lockState()->unlockRSTLforPrepare();
     invariant(!opCtx->lockState()->isRSTLLocked());
 }

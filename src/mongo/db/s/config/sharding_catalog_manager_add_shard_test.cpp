@@ -138,7 +138,6 @@ protected:
         });
     }
 
-    // TODO: SERVER-42654
     void expectSetFeatureCompatibilityVersion(const HostAndPort& target,
                                               StatusWith<BSONObj> response,
                                               BSONObj writeConcern) {
@@ -147,7 +146,7 @@ protected:
             ASSERT_EQ(request.dbname, "admin");
             ASSERT_BSONOBJ_EQ(request.cmdObj,
                               BSON("setFeatureCompatibilityVersion"
-                                   << "4.2"
+                                   << "4.4"
                                    << "writeConcern" << writeConcern));
 
             return response;

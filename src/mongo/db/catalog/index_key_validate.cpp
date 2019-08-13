@@ -305,15 +305,6 @@ StatusWith<BSONObj> validateIndexSpec(
                                 << "Values in the index key pattern cannot be empty strings"};
                 }
             }
-
-            if ((featureCompatibility.getVersion() <
-                 ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) &&
-                (IndexNames::findPluginName(indexSpec.getObjectField(
-                     IndexDescriptor::kKeyPatternFieldName)) == IndexNames::WILDCARD)) {
-                return {ErrorCodes::CannotCreateIndex,
-                        str::stream()
-                            << "Wildcard indexes require feature compatibility version 4.2"};
-            }
             hasKeyPatternField = true;
         } else if (IndexDescriptor::kIndexNameFieldName == indexSpecElemFieldName) {
             if (indexSpecElem.type() != BSONType::String) {

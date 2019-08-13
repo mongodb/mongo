@@ -337,16 +337,15 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
                                                 << "field when attempting to add "
                                                 << connectionString.toString() << " as a shard");
     }
-    // TODO: SERVER-42592
     if (serverGlobalParams.featureCompatibility.getVersion() >
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40) {
-        // If the cluster's FCV is 4.2, or upgrading to / downgrading from, the node being added
-        // must be a v4.2 binary.
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42) {
+        // If the cluster's FCV is 4.4, or upgrading to / downgrading from, the node being added
+        // must be a v4.4 binary.
         invariant(maxWireVersion == WireVersion::LATEST_WIRE_VERSION);
     } else {
-        // If the cluster's FCV is 4.0, the node being added must be a v4.0 or v4.2 binary.
+        // If the cluster's FCV is 4.2, the node being added must be a v4.2 or v4.4 binary.
         invariant(serverGlobalParams.featureCompatibility.getVersion() ==
-                  ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40);
+                  ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42);
         invariant(maxWireVersion >= WireVersion::LATEST_WIRE_VERSION - 1);
     }
 
@@ -647,27 +646,9 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
     AddShard addShardCmd = add_shard_util::createAddShardCmd(opCtx, shardType.getName());
 
-    // TODO: SERVER-42592
-    auto addShardCmdBSON = [&]() {
-        // In 4.2, use the _addShard command to add the shard, which in turn inserts a
-        // shardIdentity document into the shard and triggers sharding state initialization.
-        // In the unlikely scenario that there's a downgrade to 4.0 between the
-        // construction of this command object and the issuing of the command
-        // on the receiving shard, the user will receive a rather harmless
-        // CommandNotFound error for _addShard, and can simply retry.
-        if (serverGlobalParams.featureCompatibility.getVersion() ==
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
-            // Needed for IDL toBSON method
-            BSONObj passthroughFields;
-            return addShardCmd.toBSON(passthroughFields);
-        } else {
-            // To support backwards compatibility with v4.0 shards, insert a shardIdentity document
-            // directly.
-            return add_shard_util::createShardIdentityUpsertForAddShard(addShardCmd);
-        }
-    }();
-
-    auto addShardStatus = runCmdOnNewShard(addShardCmdBSON);
+    // Use the _addShard command to add the shard, which in turn inserts a shardIdentity document
+    // into the shard and triggers sharding state initialization.
+    auto addShardStatus = runCmdOnNewShard(addShardCmd.toBSON({}));
 
     if (!addShardStatus.isOK()) {
         return addShardStatus;
@@ -682,19 +663,18 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         invariant(!opCtx->lockState()->isLocked());
         Lock::SharedLock lk(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
 
-        // TODO: SERVER-42592
         BSONObj setFCVCmd;
         switch (serverGlobalParams.featureCompatibility.getVersion()) {
-            case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42:
-            case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo42:
+            case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44:
+            case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo44:
                 setFCVCmd = BSON(FeatureCompatibilityVersionCommandParser::kCommandName
-                                 << FeatureCompatibilityVersionParser::kVersion42
+                                 << FeatureCompatibilityVersionParser::kVersion44
                                  << WriteConcernOptions::kWriteConcernField
                                  << opCtx->getWriteConcern().toBSON());
                 break;
             default:
                 setFCVCmd = BSON(FeatureCompatibilityVersionCommandParser::kCommandName
-                                 << FeatureCompatibilityVersionParser::kVersion40
+                                 << FeatureCompatibilityVersionParser::kVersion42
                                  << WriteConcernOptions::kWriteConcernField
                                  << opCtx->getWriteConcern().toBSON());
                 break;

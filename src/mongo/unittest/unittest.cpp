@@ -169,7 +169,7 @@ UnsafeScopeGuard<F> MakeUnsafeScopeGuard(F fun) {
 // with a meaningful value will trigger failures as of SERVER-32630.
 void setUpFCV() {
     serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
 }
 void tearDownFCV() {
     serverGlobalParams.featureCompatibility.reset();

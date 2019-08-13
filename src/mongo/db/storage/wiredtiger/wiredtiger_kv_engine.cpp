@@ -118,13 +118,14 @@ bool WiredTigerFileVersion::shouldDowngrade(bool readOnly,
     if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
         // If the FCV document hasn't been read, trust the WT compatibility. MongoD will
         // downgrade to the same compatibility it discovered on startup.
-        return _startupVersion == StartupVersion::IS_40 ||
-            _startupVersion == StartupVersion::IS_36 || _startupVersion == StartupVersion::IS_34;
+        return _startupVersion == StartupVersion::IS_42 ||
+            _startupVersion == StartupVersion::IS_40 || _startupVersion == StartupVersion::IS_36 ||
+            _startupVersion == StartupVersion::IS_34;
     }
 
     if (serverGlobalParams.featureCompatibility.getVersion() !=
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40) {
-        // Only consider downgrading when FCV is set to 4.0
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42) {
+        // Only consider downgrading when FCV is set to 4.2
         return false;
     }
 
@@ -148,7 +149,7 @@ bool WiredTigerFileVersion::shouldDowngrade(bool readOnly,
 
 std::string WiredTigerFileVersion::getDowngradeString() {
     if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
-        invariant(_startupVersion != StartupVersion::IS_42);
+        invariant(_startupVersion != StartupVersion::IS_44);
 
         switch (_startupVersion) {
             case StartupVersion::IS_34:
@@ -157,11 +158,13 @@ std::string WiredTigerFileVersion::getDowngradeString() {
                 return "compatibility=(release=3.0)";
             case StartupVersion::IS_40:
                 return "compatibility=(release=3.1)";
+            case StartupVersion::IS_42:
+                return "compatibility=(release=3.2)";
             default:
                 MONGO_UNREACHABLE;
         }
     }
-    return "compatibility=(release=3.1)";
+    return "compatibility=(release=3.2)";
 }
 
 using std::set;
@@ -745,7 +748,7 @@ void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::str
 
     int ret = wiredtiger_open(path.c_str(), wtEventHandler, configStr.c_str(), &_conn);
     if (!ret) {
-        _fileVersion = {WiredTigerFileVersion::StartupVersion::IS_40};
+        _fileVersion = {WiredTigerFileVersion::StartupVersion::IS_42};
         return;
     }
 

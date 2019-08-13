@@ -133,7 +133,7 @@ void SyncTailTest::setUp() {
     // test fixture does not create a featureCompatibilityVersion document from which to initialize
     // the server parameter.
     serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
 }
 
 void SyncTailTest::tearDown() {

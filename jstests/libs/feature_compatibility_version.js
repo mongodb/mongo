@@ -10,8 +10,8 @@
  * multiple times.
  */
 
-var latestFCV = "4.2";
-var lastStableFCV = "4.0";
+var latestFCV = "4.4";
+var lastStableFCV = "4.2";
 
 /**
  * Checks the featureCompatibilityVersion document and server parameter. The

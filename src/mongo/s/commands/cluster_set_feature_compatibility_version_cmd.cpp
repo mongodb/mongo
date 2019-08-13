@@ -70,14 +70,14 @@ public:
     }
 
     std::string help() const override {
+        using FCVP = FeatureCompatibilityVersionParser;
         return str::stream()
-            << "Set the API version for the cluster. If set to \""
-            << FeatureCompatibilityVersionParser::kVersion40
-            << "\", then 4.2 features are disabled. If \""
-            << FeatureCompatibilityVersionParser::kVersion42
-            << "\", then 4.2 features are enabled, and all nodes in the cluster must be version "
-            << "4.2. See " << feature_compatibility_version_documentation::kCompatibilityLink
-            << ".";
+            << "Set the API version used by this cluster. If set to '" << FCVP::kVersion42
+            << "', then " << FCVP::kVersion44 << " features are disabled. If set to '"
+            << FCVP::kVersion44 << "', then " << FCVP::kVersion44
+            << " features are enabled, and all nodes in the cluster must be binary version "
+            << FCVP::kVersion44 << ". See "
+            << feature_compatibility_version_documentation::kCompatibilityLink << ".";
     }
 
     Status checkAuthForCommand(Client* client,

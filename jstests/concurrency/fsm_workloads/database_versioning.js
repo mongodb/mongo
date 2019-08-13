@@ -6,6 +6,9 @@
  *
  * @tags: [requires_sharding]
  */
+
+load("jstests/libs/feature_compatibility_version.js");  // For lastStableFCV and latestFCV.
+
 var $config = (function() {
     var states = (function() {
         function init(db, collName) {
@@ -16,27 +19,28 @@ var $config = (function() {
 
         function setFCV(db, data) {
             if (data.fcv === undefined) {
-                data.fcv = "4.0";
+                data.fcv = latestFCV;
             }
 
             // First check that the current entries match the current FCV's schema.
             const databases = db.getSiblingDB("config").databases.find().toArray();
             for (let i in databases) {
                 const database = databases[i];
-                if (data.fcv === "3.6") {
-                    assertAlways.eq(undefined,
-                                    database.version,
-                                    "database had a version in FCV 3.6: " + tojson(database));
+                if (data.fcv === lastStableFCV) {
+                    assertAlways.eq(
+                        undefined,
+                        database.version,
+                        "database had a version in FCV " + lastStableFCV + ": " + tojson(database));
                 } else {
                     assertAlways.neq(
                         undefined,
                         database.version,
-                        "database did not have a version in FCV 4.0: " + tojson(database));
+                        "database had a version in FCV " + latestFCV + ": " + tojson(database));
                 }
             }
 
             // Then change the FCV.
-            data.fcv = (data.fcv === "4.0") ? "3.6" : "4.0";
+            data.fcv = (data.fcv === latestFCV) ? lastStableFCV : latestFCV;
             assertAlways.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: data.fcv}));
         }
 
@@ -96,7 +100,7 @@ var $config = (function() {
 
     function setup(db, collName, cluster) {
         // Ensure the cluster starts in FCV 4.0.
-        assertAlways.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: "4.0"}));
+        assertAlways.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 
         // Create a database for the thread doing movePrimary. Use 'enableSharding' rather than
         // an insert to create the database (if an unsharded collection exists in a database and an
