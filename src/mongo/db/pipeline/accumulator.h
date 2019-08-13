@@ -44,6 +44,7 @@
 #include "mongo/db/pipeline/value_comparator.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/summation.h"
+#include "third_party/folly/TDigest.h"
 
 namespace mongo {
 
@@ -303,6 +304,33 @@ private:
     long long _count;
 };
 
+// Adding a new accumulator as 'percentile'
+class AccumulatorPercentile final : public Accumulator {
+public:
+    explicit AccumulatorPercentile(const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    void processInternal(const Value& input, bool merging) final;
+    Value getValue(bool toBeMerged) final;
+    const char* getOpName() const final;
+    void reset() final;
+
+    static boost::intrusive_ptr<Accumulator> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+private:
+    double percentile;
+    double digest_size = 0;
+    double chunk_size = 100;
+    mongo::TDigest digest;
+
+    // to be digested by TDigest algorithm
+    std::vector<double> values;
+
+    // push the vector of values to create tdigest object
+    void _add_to_tdigest();
+
+    bool any_input = false;
+};
 
 class AccumulatorStdDev : public Accumulator {
 public:

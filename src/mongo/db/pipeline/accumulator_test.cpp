@@ -100,6 +100,103 @@ static void assertExpectedResults(
     }
 }
 
+TEST(Accumulators, Percentile) {
+    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
+    assertExpectedResults(
+        "$percentile",
+        expCtx,
+        {           
+           {{}, Value(BSONNULL)},
+
+           {{
+            Value(Document({{"percentile", 0.20}, {"digest_size", 110},{"value", Value(BSONNULL)}})),
+           }, Value(BSONNULL)},
+
+           {{
+            Value(Document({{"percentile", 0.20}, {"digest_size", 120},{"value", 10}})),
+            Value(Document({{"percentile", 0.20}, {"digest_size", 120},{"value", 20}})),
+            Value(Document({{"percentile", 0.20}, {"digest_size", 120},{"value", 30}})),
+            Value(Document({{"percentile", 0.20}, {"digest_size", 120},{"value", Value(BSONNULL)}})),
+           }, Value(11.00)},
+
+           {{
+            Value(Document({{"percentile", 0.20}, {"digest_size", 130},{"value", 10}})),
+            Value(Document({{"percentile", 0.20}, {"digest_size", 130},{"value", 20}})),
+            Value(Document({{"percentile", 0.20}, {"digest_size", 130},{"value", 30}})),
+            Value(Document({{"percentile", 0.20}, {"digest_size", 130},{"value", 40}})),
+           }, Value(13.00)},
+
+           {{
+            Value(Document({{"percentile", 0.50}, {"digest_size", 140},{"value", 10}})),
+            Value(Document({{"percentile", 0.50}, {"digest_size", 140},{"value", 20}})),
+            Value(Document({{"percentile", 0.50}, {"digest_size", 140},{"value", 30}})),
+            Value(Document({{"percentile", 0.50}, {"digest_size", 140},{"value", 40}})),
+            Value(Document({{"percentile", 0.50}, {"digest_size", 140},{"value", 42}})),
+            Value(Document({{"percentile", 0.50}, {"digest_size", 140},{"value", 43}})),
+            Value(Document({{"percentile", 0.50}, {"digest_size", 140},{"value", 44}})),
+            Value(Document({{"percentile", 0.50}, {"digest_size", 140},{"value", 45}})),
+           }, Value(41.25)},  
+
+           {{
+            Value(Document({{"percentile", 0.05}, {"digest_size", 300},{"value", 10}})),
+            Value(Document({{"percentile", 0.05}, {"digest_size", 300},{"value", 20}})),
+            Value(Document({{"percentile", 0.05}, {"digest_size", 300},{"value", 30}})),
+            Value(Document({{"percentile", 0.05}, {"digest_size", 300},{"value", 40}})),
+            Value(Document({{"percentile", 0.05}, {"digest_size", 300},{"value", 50}})),
+            Value(Document({{"percentile", 0.05}, {"digest_size", 300},{"value", 60}})),
+            Value(Document({{"percentile", 0.05}, {"digest_size", 300},{"value", 70}})),
+            Value(Document({{"percentile", 0.05}, {"digest_size", 300},{"value", 80}})),
+            Value(Document({{"percentile", 0.05}, {"digest_size", 300},{"value", 90}})),
+            Value(Document({{"percentile", 0.05}, {"digest_size", 300},{"value", 91}})),
+            Value(Document({{"percentile", 0.05}, {"digest_size", 300},{"value", 92}})),
+            Value(Document({{"percentile", 0.05}, {"digest_size", 300},{"value", 93}})),
+            Value(Document({{"percentile", 0.05}, {"digest_size", 300},{"value", 94}})),
+            Value(Document({{"percentile", 0.05}, {"digest_size", 300},{"value", 95}})),
+            Value(Document({{"percentile", 0.05}, {"digest_size", 300},{"value", 96}})),
+            Value(Document({{"percentile", 0.05}, {"digest_size", 300},{"value", 97}})),
+           }, Value(13.00)},
+
+           {{
+            Value(Document({{"percentile", 0.5}, {"digest_size", 300},{"value", 10}})),
+            Value(Document({{"percentile", 0.5}, {"digest_size", 300},{"value", 20}})),
+            Value(Document({{"percentile", 0.5}, {"digest_size", 300},{"value", 30}})),
+            Value(Document({{"percentile", 0.5}, {"digest_size", 300},{"value", 40}})),
+            Value(Document({{"percentile", 0.5}, {"digest_size", 300},{"value", 50}})),
+            Value(Document({{"percentile", 0.5}, {"digest_size", 300},{"value", 60}})),
+            Value(Document({{"percentile", 0.5}, {"digest_size", 300},{"value", 70}})),
+            Value(Document({{"percentile", 0.5}, {"digest_size", 300},{"value", 80}})),
+            Value(Document({{"percentile", 0.5}, {"digest_size", 300},{"value", 90}})),
+            Value(Document({{"percentile", 0.5}, {"digest_size", 300},{"value", 91}})),
+            Value(Document({{"percentile", 0.5}, {"digest_size", 300},{"value", 92}})),
+            Value(Document({{"percentile", 0.5}, {"digest_size", 300},{"value", 93}})),
+            Value(Document({{"percentile", 0.5}, {"digest_size", 300},{"value", 94}})),
+            Value(Document({{"percentile", 0.5}, {"digest_size", 300},{"value", 95}})),
+            Value(Document({{"percentile", 0.5}, {"digest_size", 300},{"value", 96}})),
+            Value(Document({{"percentile", 0.5}, {"digest_size", 300},{"value", 97}})),
+           }, Value(87.25)}, 
+
+           {{
+            Value(Document({{"percentile", 0.95}, {"digest_size", 300},{"value", 10}})),
+            Value(Document({{"percentile", 0.95}, {"digest_size", 300},{"value", 20}})),
+            Value(Document({{"percentile", 0.95}, {"digest_size", 300},{"value", 30}})),
+            Value(Document({{"percentile", 0.95}, {"digest_size", 300},{"value", 40}})),
+            Value(Document({{"percentile", 0.95}, {"digest_size", 300},{"value", 50}})),
+            Value(Document({{"percentile", 0.95}, {"digest_size", 300},{"value", 60}})),
+            Value(Document({{"percentile", 0.95}, {"digest_size", 300},{"value", 70}})),
+            Value(Document({{"percentile", 0.95}, {"digest_size", 300},{"value", 80}})),
+            Value(Document({{"percentile", 0.95}, {"digest_size", 300},{"value", 90}})),
+            Value(Document({{"percentile", 0.95}, {"digest_size", 300},{"value", 91}})),
+            Value(Document({{"percentile", 0.95}, {"digest_size", 300},{"value", 92}})),
+            Value(Document({{"percentile", 0.95}, {"digest_size", 300},{"value", 93}})),
+            Value(Document({{"percentile", 0.95}, {"digest_size", 300},{"value", 94}})),
+            Value(Document({{"percentile", 0.95}, {"digest_size", 300},{"value", 95}})),
+            Value(Document({{"percentile", 0.95}, {"digest_size", 300},{"value", 96}})),
+            Value(Document({{"percentile", 0.95}, {"digest_size", 300},{"value", 97}})),
+           }, Value(96.7)}, 
+
+           });
+}
+
 TEST(Accumulators, Avg) {
     intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
     assertExpectedResults(

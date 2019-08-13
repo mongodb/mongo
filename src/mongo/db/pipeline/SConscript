@@ -139,7 +139,9 @@ env.Library(
         'accumulator_push.cpp',
         'accumulator_std_dev.cpp',
         'accumulator_sum.cpp',
-        'accumulator_merge_objects.cpp'
+        'accumulator_merge_objects.cpp',
+        'accumulator_percentile.cpp',
+        '$BUILD_DIR/third_party/folly/TDigest.cpp'
         ],
     LIBDEPS=[
         'document_value',
