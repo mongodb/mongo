@@ -117,20 +117,6 @@ using CallbackArgs = TaskExecutor::CallbackArgs;
 
 MONGO_FAIL_POINT_DEFINE(suspendRangeDeletion);
 
-class UnshardedCollection : public ScopedCollectionMetadata::Impl {
-public:
-    UnshardedCollection() = default;
-
-    const CollectionMetadata& get() override {
-        return _metadata;
-    }
-
-private:
-    CollectionMetadata _metadata;
-};
-
-const auto kUnshardedCollection = std::make_shared<UnshardedCollection>();
-
 /**
  * Deletes ranges, in background, until done, normally using a task executor attached to the
  * ShardingState.
