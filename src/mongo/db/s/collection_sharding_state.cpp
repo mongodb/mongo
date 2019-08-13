@@ -208,9 +208,9 @@ boost::optional<ScopedCollectionMetadata> CollectionShardingState::_getMetadataW
     const boost::optional<mongo::LogicalTime>& atClusterTime,
     bool isCollection) {
     const auto optReceivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
-
-    if (!optReceivedShardVersion)
-        return ScopedCollectionMetadata(kUnshardedCollection);
+    if (!optReceivedShardVersion) {
+        return boost::none;
+    }
 
     const auto& receivedShardVersion = *optReceivedShardVersion;
     if (ChunkVersion::isIgnoredVersion(receivedShardVersion)) {
