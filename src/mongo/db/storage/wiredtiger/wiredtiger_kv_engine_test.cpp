@@ -47,16 +47,8 @@ namespace {
 class WiredTigerKVHarnessHelper : public KVHarnessHelper {
 public:
     WiredTigerKVHarnessHelper() : _dbpath("wt-kv-harness") {
-        _engine.reset(new WiredTigerKVEngine(kWiredTigerEngineName,
-                                             _dbpath.path(),
-                                             _cs.get(),
-                                             "",
-                                             1,
-                                             0,
-                                             false,
-                                             false,
-                                             false,
-                                             false));
+        _engine.reset(new WiredTigerKVEngine(
+            kWiredTigerEngineName, _dbpath.path(), _cs.get(), "", 1, false, false, false, false));
     }
 
     virtual ~WiredTigerKVHarnessHelper() {
@@ -65,16 +57,8 @@ public:
 
     virtual KVEngine* restartEngine() {
         _engine.reset(NULL);
-        _engine.reset(new WiredTigerKVEngine(kWiredTigerEngineName,
-                                             _dbpath.path(),
-                                             _cs.get(),
-                                             "",
-                                             1,
-                                             0,
-                                             false,
-                                             false,
-                                             false,
-                                             false));
+        _engine.reset(new WiredTigerKVEngine(
+            kWiredTigerEngineName, _dbpath.path(), _cs.get(), "", 1, false, false, false, false));
         return _engine.get();
     }
 

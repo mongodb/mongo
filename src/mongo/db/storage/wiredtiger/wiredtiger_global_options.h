@@ -46,7 +46,6 @@ public:
           checkpointDelaySecs(0),
           statisticsLogDelaySecs(0),
           directoryForIndexes(false),
-          maxCacheOverflowFileSizeGB(0),
           useCollectionPrefixCompression(false),
           useIndexPrefixCompression(false){};
 
@@ -58,7 +57,6 @@ public:
     size_t statisticsLogDelaySecs;
     std::string journalCompressor;
     bool directoryForIndexes;
-    double maxCacheOverflowFileSizeGB;
     std::string engineConfig;
 
     std::string collectionBlockCompressor;
@@ -67,8 +65,6 @@ public:
     bool useIndexPrefixCompression;
     std::string collectionConfig;
     std::string indexConfig;
-
-    static Status validateMaxCacheOverflowFileSizeGB(double);
 };
 
 extern WiredTigerGlobalOptions wiredTigerGlobalOptions;

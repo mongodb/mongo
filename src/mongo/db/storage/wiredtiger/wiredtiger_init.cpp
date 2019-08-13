@@ -102,15 +102,12 @@ public:
             }
         }
         const bool ephemeral = false;
-        const auto maxCacheOverflowMB =
-            static_cast<size_t>(1024 * wiredTigerGlobalOptions.maxCacheOverflowFileSizeGB);
         WiredTigerKVEngine* kv =
             new WiredTigerKVEngine(getCanonicalName().toString(),
                                    params.dbpath,
                                    getGlobalServiceContext()->getFastClockSource(),
                                    wiredTigerGlobalOptions.engineConfig,
                                    cacheMB,
-                                   maxCacheOverflowMB,
                                    params.dur,
                                    ephemeral,
                                    params.repair,
@@ -120,8 +117,6 @@ public:
         // Intentionally leaked.
         new WiredTigerServerStatusSection(kv);
         new WiredTigerEngineRuntimeConfigParameter(kv);
-        new WiredTigerMaxCacheOverflowSizeGBParameter(
-            kv, wiredTigerGlobalOptions.maxCacheOverflowFileSizeGB);
 
         KVStorageEngineOptions options;
         options.directoryPerDB = params.directoryperdb;
