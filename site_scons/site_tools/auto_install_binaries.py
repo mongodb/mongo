@@ -166,7 +166,7 @@ def get_dependent_actions(
 
     node_roles = {
         role for role
-        in getattr(node.attributes, "aib_roles", set())
+        in getattr(node.attributes, ROLES, set())
         if role != "meta"
     }
     if (
@@ -347,7 +347,12 @@ def auto_install(env, target, source, **kwargs):
         setattr(s.attributes, COMPONENTS, components)
         setattr(s.attributes, ROLES, roles)
 
-        target = env.Dir(target)
+        # We must do an eearly subst here so that the _aib_debugdir
+        # generator has a chance to run while seeing 'source'.
+        #
+        # TODO: Find a way to not need this early subst.
+        target = env.Dir(env.subst(target, source=source))
+
         action = env.Install(
             target=target,
             source=s,
