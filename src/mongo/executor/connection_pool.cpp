@@ -202,7 +202,7 @@ protected:
  */
 class ConnectionPool::SpecificPool final
     : public std::enable_shared_from_this<ConnectionPool::SpecificPool> {
-    static constexpr int kDiagnosticLogLevel = 3;
+    static constexpr int kDiagnosticLogLevel = 4;
 
 public:
     /**
