@@ -258,12 +258,13 @@ public:
     void shuttingDown();
 
     bool isEphemeral();
+
     /**
      * Waits until all commits that happened before this call are durable, either by flushing
      * the log or forcing a checkpoint if forceCheckpoint is true or the journal is disabled.
      * Uses a temporary session. Safe to call without any locks, even during shutdown.
      */
-    void waitUntilDurable(bool forceCheckpoint, bool stableCheckpoint);
+    void waitUntilDurable(OperationContext* opCtx, bool forceCheckpoint, bool stableCheckpoint);
 
     /**
      * Waits until a prepared unit of work has ended (either been commited or aborted). This

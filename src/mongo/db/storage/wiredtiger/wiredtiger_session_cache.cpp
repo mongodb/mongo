@@ -227,7 +227,9 @@ void WiredTigerSessionCache::shuttingDown() {
     closeAll();
 }
 
-void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint, bool stableCheckpoint) {
+void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
+                                              bool forceCheckpoint,
+                                              bool stableCheckpoint) {
     // For inMemory storage engines, the data is "as durable as it's going to get".
     // That is, a restart is equivalent to a complete node failure.
     if (isEphemeral()) {
@@ -259,6 +261,7 @@ void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint, bool stableC
             stdx::unique_lock<stdx::mutex> lk(_journalListenerMutex);
             JournalListener::Token token = _journalListener->getToken();
             auto config = stableCheckpoint ? "use_timestamp=true" : "use_timestamp=false";
+            auto checkpointLock = _engine->getCheckpointLock(opCtx);
             invariantWTOK(s->checkpoint(s, config));
             _journalListener->onDurable(token);
         }
@@ -295,6 +298,7 @@ void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint, bool stableC
         invariantWTOK(_waitUntilDurableSession->log_flush(_waitUntilDurableSession, "sync=on"));
         LOG(4) << "flushed journal";
     } else {
+        auto checkpointLock = _engine->getCheckpointLock(opCtx);
         invariantWTOK(_waitUntilDurableSession->checkpoint(_waitUntilDurableSession, nullptr));
         LOG(4) << "created checkpoint";
     }

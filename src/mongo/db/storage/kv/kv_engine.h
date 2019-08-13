@@ -52,9 +52,19 @@ class SnapshotManager;
 
 class KVEngine {
 public:
-    virtual RecoveryUnit* newRecoveryUnit() = 0;
+    /**
+     * This function should only be called after the StorageEngine is set on the ServiceContext.
+     *
+     * Starts asycnhronous threads for a storage engine's integration layer. Any such thread
+     * generating an OperationContext should be initialized here.
+     *
+     * In order for OperationContexts to be generated with real Locker objects, the generation must
+     * occur after the StorageEngine is instantiated and set on the ServiceContext. Otherwise,
+     * OperationContexts are created with LockerNoops.
+     */
+    virtual void startAsyncThreads() {}
 
-    // ---------
+    virtual RecoveryUnit* newRecoveryUnit() = 0;
 
     /**
      * Requesting multiple copies for the same ns/ident is a rules violation; Calling on a
@@ -227,6 +237,15 @@ public:
     virtual StatusWith<std::vector<std::string>> extendBackupCursor(OperationContext* opCtx) {
         return Status(ErrorCodes::CommandNotSupported,
                       "The current storage engine doesn't support backup mode");
+    }
+
+    /**
+     * See StorageEngine::getCheckpointLock for details.
+     */
+    virtual std::unique_ptr<StorageEngine::CheckpointLock> getCheckpointLock(
+        OperationContext* opCtx) {
+        uasserted(ErrorCodes::CommandNotSupported,
+                  "The current storage engine does not support checkpoints");
     }
 
     /**

@@ -80,16 +80,19 @@ public:
 
 private:
     WiredTigerKVEngine* makeEngine() {
-        return new WiredTigerKVEngine(kWiredTigerEngineName,
-                                      _dbpath.path(),
-                                      _cs.get(),
-                                      "",
-                                      1,
-                                      0,
-                                      false,
-                                      false,
-                                      _forRepair,
-                                      false);
+        auto engine = new WiredTigerKVEngine(kWiredTigerEngineName,
+                                             _dbpath.path(),
+                                             _cs.get(),
+                                             "",
+                                             1,
+                                             0,
+                                             false,
+                                             false,
+                                             _forRepair,
+                                             false);
+        // There are unit tests expecting checkpoints to occur asynchronously.
+        engine->startAsyncThreads();
+        return engine;
     }
 
     const std::unique_ptr<ClockSource> _cs = std::make_unique<ClockSourceMock>();

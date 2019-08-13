@@ -401,7 +401,7 @@ void FSyncLockThread::run() {
             if (_allowFsyncFailure) {
                 warning() << "Locking despite storage engine being unable to begin backup : "
                           << e.toString();
-                opCtx.recoveryUnit()->waitUntilDurable();
+                opCtx.recoveryUnit()->waitUntilDurable(&opCtx);
             } else {
                 error() << "storage engine unable to begin backup : " << e.toString();
                 fsyncCmd.threadStatus = e.toStatus();

@@ -107,9 +107,10 @@ public:
     void commitUnitOfWork() override;
     void abortUnitOfWork() override;
 
-    bool waitUntilDurable() override;
+    bool waitUntilDurable(OperationContext* opCtx) override;
 
-    bool waitUntilUnjournaledWritesDurable(bool stableCheckpoint = true) override;
+    bool waitUntilUnjournaledWritesDurable(OperationContext* opCtx,
+                                           bool stableCheckpoint = true) override;
 
     void abandonSnapshot() override;
     void preallocateSnapshot() override;

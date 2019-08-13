@@ -189,7 +189,7 @@ public:
      * isDurable() returned true. This cannot be called from inside a unit of work, and should
      * fail if it is.
      */
-    virtual bool waitUntilDurable() = 0;
+    virtual bool waitUntilDurable(OperationContext* opCtx) = 0;
 
     /**
      * Unlike `waitUntilDurable`, this method takes a stable checkpoint, making durable any writes
@@ -200,8 +200,9 @@ public:
      * This must not be called by a system taking user writes until after a stable timestamp is
      * passed to the storage engine.
      */
-    virtual bool waitUntilUnjournaledWritesDurable(bool stableCheckpoint = true) {
-        return waitUntilDurable();
+    virtual bool waitUntilUnjournaledWritesDurable(OperationContext* opCtx,
+                                                   bool stableCheckpoint = true) {
+        return waitUntilDurable(opCtx);
     }
 
     /**

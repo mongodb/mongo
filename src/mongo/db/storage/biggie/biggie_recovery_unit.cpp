@@ -91,7 +91,7 @@ void RecoveryUnit::abortUnitOfWork() {
     _abort();
 }
 
-bool RecoveryUnit::waitUntilDurable() {
+bool RecoveryUnit::waitUntilDurable(OperationContext* opCtx) {
     invariant(!_inUnitOfWork(), toString(_getState()));
     return true;  // This is an in-memory storage engine.
 }

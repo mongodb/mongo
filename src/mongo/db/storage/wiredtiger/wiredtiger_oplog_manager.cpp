@@ -33,6 +33,7 @@
 
 #include <cstring>
 
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -162,6 +163,17 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* ses
     // forward cursors.  The timestamp is used to hide oplog entries that might be committed but
     // have uncommitted entries ahead of them.
     while (true) {
+        auto opCtx = cc().makeOperationContext();
+
+        // This thread is started before we finish creating the StorageEngine and consequently
+        // makeOperationContext() returns an OperationContext with a LockerNoop. Rather than trying
+        // to refactor the code to start this thread after the StorageEngine is fully instantiated,
+        // we will use this temporary hack to give the opCtx a real Locker.
+        //
+        // TODO (SERVER-41392): the Replicate Before Journaling project will be removing the
+        // waitUntilDurable() call requiring an opCtx parameter.
+        opCtx->swapLockState(std::make_unique<LockerImpl>());
+
         stdx::unique_lock<stdx::mutex> lk(_oplogVisibilityStateMutex);
         {
             MONGO_IDLE_THREAD_BLOCK;
@@ -219,7 +231,7 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* ses
 
         // In order to avoid oplog holes after an unclean shutdown, we must ensure this proposed
         // oplog read timestamp's documents are durable before publishing that timestamp.
-        sessionCache->waitUntilDurable(/*forceCheckpoint=*/false, false);
+        sessionCache->waitUntilDurable(opCtx.get(), /*forceCheckpoint=*/false, false);
 
         lk.lock();
         // Publish the new timestamp value.  Avoid going backward.

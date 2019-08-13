@@ -177,7 +177,7 @@ StatusWith<int> StorageInterfaceImpl::incrementRollbackID(OperationContext* opCt
 
     // We wait until durable so that we are sure the Rollback ID is updated before rollback ends.
     if (status.isOK()) {
-        opCtx->recoveryUnit()->waitUntilDurable();
+        opCtx->recoveryUnit()->waitUntilDurable(opCtx);
         return newRBID;
     }
     return status;

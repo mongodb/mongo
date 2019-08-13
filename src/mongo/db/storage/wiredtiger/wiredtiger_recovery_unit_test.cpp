@@ -61,6 +61,13 @@ public:
                   false,                  // .repair
                   false                   // .readOnly
           ) {
+        // Deliberately not calling _engine->startAsyncThreads() because it starts an asynchronous
+        // checkpointing thread that can interfere with unit tests manipulating checkpoints
+        // manually.
+        //
+        // Alternatively, we would have to start using wiredTigerGlobalOptions.checkpointDelaySecs
+        // to set a high enough value such that the async thread never runs during testing.
+
         repl::ReplicationCoordinator::set(
             getGlobalServiceContext(),
             std::unique_ptr<repl::ReplicationCoordinator>(new repl::ReplicationCoordinatorMock(
@@ -599,7 +606,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorsAreNotCached) {
 
     ru->abandonSnapshot();
 
-    // Force a checkpoint
+    // Force a checkpoint.
     ASSERT_EQUALS(1, engine->flushAllFiles(opCtx, true));
 
     // Test 2: Checkpoint cursors are not expected to be cached, they
@@ -690,7 +697,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorNotChanged) {
     ASSERT_EQUALS(1, rs->numRecords(opCtx));
     ru->commitUnitOfWork();
 
-    // Force a checkpoint
+    // Force a checkpoint.
     ASSERT_EQUALS(1, engine->flushAllFiles(opCtx, true));
 
     // Test 1: Open a checkpoint cursor and ensure it has the first record.
@@ -709,16 +716,13 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorNotChanged) {
     ASSERT(!originalCheckpointCursor->seekExact(s2.getValue()));
     ASSERT(originalCheckpointCursor->seekExact(s1.getValue()));
 
-    // Test 3: New record does not appear in new checkpoint cursor since no
-    // checkpoint was created.
-    // TODO: Implement in SERVER-42221
-    //
-    // ru->setTimestampReadSource(WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
-    // auto newCheckpointCursor = rs->getCursor(opCtx, true);
-    // ASSERT(!newCheckpointCursor->seekExact(s2.getValue()));
-    //
+    // Test 3: New record does not appear in new checkpoint cursor since no new checkpoint was
+    // created.
+    ru->setTimestampReadSource(WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
+    auto checkpointCursor = rs->getCursor(opCtx, true);
+    ASSERT(!checkpointCursor->seekExact(s2.getValue()));
 
-    // Force a checkpoint
+    // Force a checkpoint.
     ASSERT_EQUALS(1, engine->flushAllFiles(opCtx, true));
 
     // Test 4: Old and new record should appear in new checkpoint cursor. Only old record

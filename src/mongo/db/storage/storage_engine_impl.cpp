@@ -537,6 +537,11 @@ void StorageEngineImpl::cleanShutdown() {
 StorageEngineImpl::~StorageEngineImpl() {}
 
 void StorageEngineImpl::finishInit() {
+    // A storage engine may need to start threads that require OperationsContexts with real Lockers,
+    // as opposed to LockerNoops. Placing the start logic here, after the StorageEngine has been
+    // instantiated, causes makeOperationContext() to create LockerImpls instead of LockerNoops.
+    _engine->startAsyncThreads();
+
     if (_engine->supportsRecoveryTimestamp()) {
         _timestampMonitor = std::make_unique<TimestampMonitor>(
             _engine.get(), getGlobalServiceContext()->getPeriodicRunner());

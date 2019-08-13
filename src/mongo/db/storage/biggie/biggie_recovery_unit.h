@@ -53,7 +53,7 @@ public:
         return _inUnitOfWork();
     }
 
-    virtual bool waitUntilDurable() override;
+    virtual bool waitUntilDurable(OperationContext* opCtx) override;
 
     virtual void abandonSnapshot() override;
 

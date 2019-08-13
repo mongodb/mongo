@@ -206,7 +206,7 @@ void ApplyBatchFinalizerForJournal::_run() {
         }
 
         auto opCtx = cc().makeOperationContext();
-        opCtx->recoveryUnit()->waitUntilDurable();
+        opCtx->recoveryUnit()->waitUntilDurable(opCtx.get());
         _recordDurable(latestOpTimeAndWallTime);
     }
 }

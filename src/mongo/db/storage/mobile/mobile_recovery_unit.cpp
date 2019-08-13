@@ -115,7 +115,7 @@ void MobileRecoveryUnit::abortUnitOfWork() {
     _abort();
 }
 
-bool MobileRecoveryUnit::waitUntilDurable() {
+bool MobileRecoveryUnit::waitUntilDurable(OperationContext* opCtx) {
     // This is going to be slow as we're taking a global X lock and doing a full checkpoint. This
     // should not be needed to do on Android or iOS if we are on WAL and synchronous=NORMAL which
     // are our default settings. The system will make sure any non-flushed writes will not be lost
@@ -123,7 +123,6 @@ bool MobileRecoveryUnit::waitUntilDurable() {
     // not call this (by disabling writeConcern j:true) but allow it when this is used inside
     // mongod.
     if (_sessionPool->getOptions().durabilityLevel < 2) {
-        OperationContext* opCtx = Client::getCurrent()->getOperationContext();
         _ensureSession(opCtx);
         RECOVERY_UNIT_TRACE() << "waitUntilDurable called, attempting to perform a checkpoint";
         int framesInWAL = 0;

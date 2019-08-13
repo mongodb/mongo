@@ -136,13 +136,13 @@ private:
  */
 class RecoveryUnitWithDurabilityTracking : public RecoveryUnitNoop {
 public:
-    bool waitUntilDurable() override;
+    bool waitUntilDurable(OperationContext* opCtx) override;
     bool waitUntilDurableCalled = false;
 };
 
-bool RecoveryUnitWithDurabilityTracking::waitUntilDurable() {
+bool RecoveryUnitWithDurabilityTracking::waitUntilDurable(OperationContext* opCtx) {
     waitUntilDurableCalled = true;
-    return RecoveryUnitNoop::waitUntilDurable();
+    return RecoveryUnitNoop::waitUntilDurable(opCtx);
 }
 
 TEST_F(ReplicationConsistencyMarkersTest, InitialSyncFlag) {

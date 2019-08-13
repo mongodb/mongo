@@ -50,7 +50,7 @@ public:
     void commitUnitOfWork() final;
     void abortUnitOfWork() final;
 
-    virtual bool waitUntilDurable();
+    virtual bool waitUntilDurable(OperationContext* opCtx);
 
     bool inActiveTxn() const;
 

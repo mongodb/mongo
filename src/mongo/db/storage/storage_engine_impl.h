@@ -63,7 +63,7 @@ struct StorageEngineOptions {
 class StorageEngineImpl final : public StorageEngineInterface, public StorageEngine {
 public:
     /**
-     * @param engine - ownership passes to me
+     * @param engine - ownership passes to me.
      */
     StorageEngineImpl(KVEngine* engine, StorageEngineOptions options = StorageEngineOptions());
 
@@ -162,8 +162,6 @@ public:
     SnapshotManager* getSnapshotManager() const final;
 
     void setJournalListener(JournalListener* jl) final;
-
-    // ------ kv ------
 
     /**
      * A TimestampMonitor is used to listen for any changes in the timestamps implemented by the
@@ -309,6 +307,7 @@ public:
     KVEngine* getEngine() {
         return _engine.get();
     }
+
     const KVEngine* getEngine() const {
         return _engine.get();
     }
@@ -320,8 +319,13 @@ public:
     DurableCatalog* getCatalog() {
         return _catalog.get();
     }
+
     const DurableCatalog* getCatalog() const {
         return _catalog.get();
+    }
+
+    std::unique_ptr<CheckpointLock> getCheckpointLock(OperationContext* opCtx) {
+        return _engine->getCheckpointLock(opCtx);
     }
 
     /**

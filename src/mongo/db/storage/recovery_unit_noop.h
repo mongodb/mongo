@@ -64,7 +64,7 @@ public:
 
     virtual void abandonSnapshot() {}
 
-    virtual bool waitUntilDurable() {
+    virtual bool waitUntilDurable(OperationContext* opCtx) {
         return true;
     }
 

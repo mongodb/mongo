@@ -148,7 +148,7 @@ void StorageRepairObserver::_invalidateReplConfigIfNeeded(OperationContext* opCt
     configBuilder.append(repl::ReplSetConfig::kRepairedFieldName, true);
     Helpers::putSingleton(opCtx, kConfigNss.ns().c_str(), configBuilder.obj());
 
-    opCtx->recoveryUnit()->waitUntilDurable();
+    opCtx->recoveryUnit()->waitUntilDurable(opCtx);
 }
 
 }  // namespace mongo

@@ -63,7 +63,10 @@ void EphemeralForTestRecoveryUnit::commitUnitOfWork() {
     // This ensures that the journal listener gets called on each commit.
     // SERVER-22575: Remove this once we add a generic mechanism to periodically wait
     // for durability.
-    waitUntilDurable();
+    if (_waitUntilDurableCallback) {
+        _waitUntilDurableCallback();
+    }
+
     _setState(State::kInactive);
 }
 
@@ -86,7 +89,7 @@ void EphemeralForTestRecoveryUnit::abortUnitOfWork() {
     _setState(State::kInactive);
 }
 
-bool EphemeralForTestRecoveryUnit::waitUntilDurable() {
+bool EphemeralForTestRecoveryUnit::waitUntilDurable(OperationContext* opCtx) {
     if (_waitUntilDurableCallback) {
         _waitUntilDurableCallback();
     }

@@ -114,6 +114,9 @@ public:
     const DurableCatalog* getCatalog() const {
         return nullptr;
     }
+    std::unique_ptr<CheckpointLock> getCheckpointLock(OperationContext* opCtx) {
+        return nullptr;
+    }
 };
 
 /**

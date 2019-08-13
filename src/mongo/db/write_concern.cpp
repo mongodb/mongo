@@ -191,7 +191,7 @@ Status waitForWriteConcern(OperationContext* opCtx,
                 result->fsyncFiles = storageEngine->flushAllFiles(opCtx, true);
             } else {
                 // We only need to commit the journal if we're durable
-                opCtx->recoveryUnit()->waitUntilDurable();
+                opCtx->recoveryUnit()->waitUntilDurable(opCtx);
             }
             break;
         }
@@ -200,10 +200,10 @@ Status waitForWriteConcern(OperationContext* opCtx,
                 // Wait for ops to become durable then update replication system's
                 // knowledge of this.
                 auto appliedOpTimeAndWallTime = replCoord->getMyLastAppliedOpTimeAndWallTime();
-                opCtx->recoveryUnit()->waitUntilDurable();
+                opCtx->recoveryUnit()->waitUntilDurable(opCtx);
                 replCoord->setMyLastDurableOpTimeAndWallTimeForward(appliedOpTimeAndWallTime);
             } else {
-                opCtx->recoveryUnit()->waitUntilDurable();
+                opCtx->recoveryUnit()->waitUntilDurable(opCtx);
             }
             break;
     }
