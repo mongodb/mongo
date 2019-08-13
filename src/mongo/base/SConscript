@@ -18,14 +18,13 @@ generateErrorCodes = env_for_error_codes.Command(
     ],
     source=[
         'generate_error_codes.py',
-        'error_codes.err',
+        'error_codes.yml',
         'error_codes.tpl.h',
         'error_codes.tpl.cpp',
     ],
     action=[
-        '$PYTHON ${SOURCES[0]} ${SOURCES[1]} '
-        '${SOURCES[2]}=${TARGETS[0]} '
-        '${SOURCES[3]}=${TARGETS[1]}'
+        '$PYTHON ${SOURCES[0]} ${SOURCES[1]} ${SOURCES[2]} ${TARGETS[0]}',
+        '$PYTHON ${SOURCES[0]} ${SOURCES[1]} ${SOURCES[3]} ${TARGETS[1]}',
     ],
 )
 
