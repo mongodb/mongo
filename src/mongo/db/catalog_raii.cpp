@@ -63,6 +63,11 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
               !nsOrUUID.dbname().empty() ? nsOrUUID.dbname() : nsOrUUID.nss()->db(),
               isSharedLockMode(modeColl) ? MODE_IS : MODE_IX,
               deadline) {
+    if (auto& nss = nsOrUUID.nss()) {
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Namespace " << *nss << " is not a valid collection name",
+                nss->isValid());
+    }
 
     _collLock.emplace(opCtx, nsOrUUID, modeColl, deadline);
     _resolvedNss = CollectionCatalog::get(opCtx).resolveNamespaceStringOrUUID(nsOrUUID);
