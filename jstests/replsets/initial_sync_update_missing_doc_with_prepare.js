@@ -23,7 +23,6 @@ function doTest(doTransactionWork, numDocuments) {
     const replSet = new ReplSetTest({
         name: name,
         nodes: 1,
-        nodeOptions: {setParameter: {maxNumberOfTransactionOperationsInSingleOplogEntry: 1}}
     });
 
     replSet.startSet();
