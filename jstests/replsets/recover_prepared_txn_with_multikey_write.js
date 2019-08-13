@@ -6,7 +6,9 @@
  */
 (function() {
 // TODO (SERVER-42750) Re-enable this test.
-return;
+if (true) {
+    return;
+}
 const rst = new ReplSetTest({
     nodes: [
         {},
