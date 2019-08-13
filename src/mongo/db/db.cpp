@@ -464,13 +464,21 @@ ExitCode _initAndListen(int listenPort) {
         log() << "finished checking dbs";
         exitCleanly(EXIT_CLEAN);
     }
+    auto replProcess = repl::ReplicationProcess::get(serviceContext);
+    invariant(replProcess);
+    const bool initialSyncFlag =
+        replProcess->getConsistencyMarkers()->getInitialSyncFlag(startupOpCtx.get());
 
     // Assert that the in-memory featureCompatibilityVersion parameter has been explicitly set. If
     // we are part of a replica set and are started up with no data files, we do not set the
     // featureCompatibilityVersion until a primary is chosen. For this case, we expect the in-memory
-    // featureCompatibilityVersion parameter to still be uninitialized until after startup.
+    // featureCompatibilityVersion parameter to still be uninitialized until after startup. If the
+    // initial sync flag is set and we are part of a replica set, we expect the version to be
+    // initialized as part of initial sync after startup.
+    const bool initializeFCVAtInitialSync = replSettings.usingReplSets() && initialSyncFlag;
     if (canCallFCVSetIfCleanStartup &&
-        (!replSettings.usingReplSets() || swNonLocalDatabases.getValue())) {
+        (!replSettings.usingReplSets() || swNonLocalDatabases.getValue()) &&
+        !initializeFCVAtInitialSync) {
         invariant(serverGlobalParams.featureCompatibility.isVersionInitialized());
     }
 
