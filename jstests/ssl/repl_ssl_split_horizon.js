@@ -41,7 +41,7 @@ if (rc != 0) {
                 version is ${glibc_version}, skipping this test.`);
         return;
     } else {
-        var verCheck = runProgram("grep", "/etc/os-release", "\"SUSE Linux Enterprise Server\"")
+        var verCheck = runProgram("grep", "/etc/os-release", "\"SUSE Linux Enterprise Server\"");
         if (verCheck == 0) {
             jsTestLog(
                 `HOSTALIASES does not seem to work as expected but we detected SLES. GLIBC
