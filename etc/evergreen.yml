@@ -167,11 +167,13 @@ variables:
        value: /data/db
      - key: log_path
        value: ${remote_dir}/mongod.log
+     - key: event_logpath
+       value: ${remote_dir}/eventlog
      - key: exit_file
        value: powercycle_exit.yml
 
 - &powercycle_test
-  ec2_artifacts: ${log_path} ${db_path} ${backup_artifacts}
+  ec2_artifacts: ${log_path} ${db_path} ${backup_artifacts} ${event_logpath}
   program_options: --exitYamlFile=${exit_file} --logLevel=info --backupPathBefore=${backup_path_before} --backupPathAfter=${backup_path_after}
   connection_options: --sshUserHost=${private_ip_address} --sshConnection=\"${ssh_identity} ${ssh_connection_options}\"
   test_options: --testLoops=15 --seedDocNum=10000 --rsync --rsyncExcludeFiles=diagnostic.data/metrics.interim* --validate=local --canary=local
@@ -2712,6 +2714,35 @@ functions:
         aws_ec2=$($python buildscripts/aws_ec2.py --imageId ${instance_id} --mode terminate)
         echo "Terminated AMI EC2 instance: $aws_ec2"
 
+  # The event logs on Windows are a useful diagnostic to have when determining if something bad
+  # happened to the remote machine after it was repeatedly crashed during powercycle testing. For
+  # example, the Application and System event logs have previously revealed that the mongod.exe
+  # process abruptly exited due to not being able to open a file despite the process successfully
+  # being restarted and responding to network requests.
+  "gather remote event logs": &gather_remote_event_logs
+    command: shell.exec
+    params:
+      shell: bash
+      working_dir: src
+      script: |
+        if [[ "Windows_NT" != "$OS" || ! -f ${aws_ec2_yml|""} || -n "${ec2_ssh_failure}" ]]; then
+          exit 0
+        fi
+
+        cmds="mkdir -p ${event_logpath}"
+        cmds="$cmds; wevtutil qe Application /c:10000 /rd:true /f:Text > ${event_logpath}/application.log"
+        cmds="$cmds; wevtutil qe Security    /c:10000 /rd:true /f:Text > ${event_logpath}/security.log"
+        cmds="$cmds; wevtutil qe System      /c:10000 /rd:true /f:Text > ${event_logpath}/system.log"
+
+        ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
+        ${activate_virtualenv}
+        $python buildscripts/remote_operations.py          \
+          --verbose                                        \
+          --userHost $USER@${private_ip_address}           \
+          --sshConnectionOptions "$ssh_connection_options" \
+          --retries ${ssh_retries|0}                       \
+          --commands "$cmds"
+
   "gather remote mongo coredumps": &gather_remote_mongo_coredumps
     command: shell.exec
     params:
@@ -2817,6 +2848,7 @@ functions:
   "save ec2 task artifacts":
     - *get_ec2_address
     - *update_ec2_address
+    - *gather_remote_event_logs
     - *tar_ec2_artifacts
     - *copy_ec2_artifacts
     - *gather_remote_mongo_coredumps
