@@ -26,7 +26,8 @@ const replSet = new ReplSetTest({
 replSet.startSet({setParameter: {enableIndexBuildsCoordinatorForCreateIndexesCommand: true}});
 replSet.initiate();
 
-const testDB = replSet.getPrimary().getDB('test');
+const primary = replSet.getPrimary();
+const testDB = primary.getDB('test');
 const coll = testDB.twoPhaseIndexBuild;
 const collName = coll.getName();
 const secondaryColl = replSet.getSecondary().getDB('test')[collName];
@@ -46,12 +47,12 @@ IndexBuildTest.assertIndexes(coll, 2, ["_id_", "a_1"]);
 assert.eq(numDocs, coll.find({a: {$gte: 0}}).hint({a: 1}).itcount());
 
 const cmdNs = testDB.getName() + ".$cmd";
-const localDB = testDB.getSiblingDB("local");
-const oplogColl = localDB.oplog.rs;
 
 // Ensure both oplog entries were written to the oplog.
-assert.eq(1, oplogColl.find({op: "c", ns: cmdNs, "o.startIndexBuild": collName}).itcount());
-assert.eq(1, oplogColl.find({op: "c", ns: cmdNs, "o.commitIndexBuild": collName}).itcount());
+let ops = replSet.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.startIndexBuild': collName});
+assert.eq(1, ops.length, 'incorrect number of startIndexBuild oplog entries: ' + tojson(ops));
+ops = replSet.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.commitIndexBuild': collName});
+assert.eq(1, ops.length, 'incorrect number of commitIndexBuild oplog entries: ' + tojson(ops));
 
 // Ensure the secondary builds the index.
 replSet.waitForAllIndexBuildsToFinish(testDB.getName(), collName);
@@ -66,7 +67,8 @@ IndexBuildTest.assertIndexes(coll, 3, ["_id_", "a_1", "b_1"]);
 assert.eq(numDocs, coll.find({a: {$gte: 0}}).hint({b: 1}).itcount());
 
 // Ensure only one oplog entry was written to the oplog.
-assert.eq(1, oplogColl.find({op: "c", ns: cmdNs, "o.createIndexes": collName}).itcount());
+ops = replSet.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.createIndexes': collName});
+assert.eq(1, ops.length, 'incorrect number of createIndexes oplog entries: ' + tojson(ops));
 
 // Ensure the secondary builds the index.
 replSet.waitForAllIndexBuildsToFinish(testDB.getName(), collName);
