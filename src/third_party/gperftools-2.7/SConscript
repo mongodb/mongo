@@ -2,9 +2,22 @@
 
 Import("env")
 Import("has_option")
+Import("use_libunwind")
 Import("debugBuild")
 
 env = env.Clone()
+
+if use_libunwind:
+    env.Append(
+        CPPDEFINES=[
+            "NO_FRAME_POINTER",
+            ("HAVE_LIBUNWIND_H", "1"),
+            'HAVE_UCONTEXT_H'
+        ],
+    )
+    env.InjectThirdParty(libraries=['unwind'])
+elif has_option('use-cpu-profiler'):
+    env.FatalError("Compiling with --use-cpu-profiler requires --use-libunwind")
 
 files = [
     'src/base/dynamic_annotations.c',
@@ -61,19 +74,6 @@ if has_option( 'use-cpu-profiler' ):
         'src/profiler.cc',
         ]
 
-
-conf = Configure(env.Clone())
-
-if has_option('use-cpu-profiler'):
-    if not conf.CheckLib('unwind', autoadd=False):
-        env.ConfError("Compiling with --use-cpu-profiler requires having libunwind installed")
-    conf.env.Append(
-        CPPDEFINES=["NO_FRAME_POINTER", ("HAVE_LIBUNWIND_H", "1"), 'HAVE_UCONTEXT_H'],
-        SYSLIBDEPS=['unwind']
-    )
-
-env = conf.Finish()
-
 env.Append(
     CPPDEFINES=["NO_HEAP_CHECK"],
 )
@@ -119,5 +119,11 @@ if env['TARGET_ARCH'] == 'ppc64le':
 
 env.Library(
     target='tcmalloc_minimal',
-    source=[env.Dir('dist').File(f) for f in files]
+    source=[
+        env.Dir('dist').File(f) for f in files
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/third_party/shim_unwind' if use_libunwind else [],
+
+    ]
 )
