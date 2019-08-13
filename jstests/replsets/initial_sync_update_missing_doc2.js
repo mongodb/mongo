@@ -53,10 +53,10 @@ var firstOplogEnd = res.initialSyncStatus.initialSyncOplogEnd;
 
 // Temporarily increase log levels so that we can see the 'Inserted missing document' log line.
 secondary.getDB('test').setLogLevel(1, 'replication');
-turnOffHangBeforeGettingMissingDocFailPoint(primary, secondary, name, 1 /* numInserted */);
+turnOffHangBeforeGettingMissingDocFailPoint(primary, secondary, name, 1 /* numFetched */);
 secondary.getDB('test').setLogLevel(0, 'replication');
 
-finishAndValidate(replSet, name, firstOplogEnd, 1 /* numInserted */, 1 /* numDocuments */);
+finishAndValidate(replSet, name, firstOplogEnd, 1 /* numFetched */, 1 /* numDocuments */);
 
 replSet.stopSet();
 })();

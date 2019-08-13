@@ -56,8 +56,8 @@ var turnOffHangBeforeCopyingDatabasesFailPoint = function(secondary) {
 // Must be called after turnOffHangBeforeCopyingDatabasesFailPoint. Turns off the
 // initialSyncHangBeforeGettingMissingDocument fail point so that the secondary can check if the
 // sync source has the missing document.
-var turnOffHangBeforeGettingMissingDocFailPoint = function(primary, secondary, name, numInserted) {
-    if (numInserted === 0) {
+var turnOffHangBeforeGettingMissingDocFailPoint = function(primary, secondary, name, numFetched) {
+    if (numFetched === 0) {
         // If we did not re-insert the missing document, insert an arbitrary document to move
         // forward minValid even though the document was not found.
         assert.commandWorked(
@@ -71,7 +71,7 @@ var turnOffHangBeforeGettingMissingDocFailPoint = function(primary, secondary, n
     // this function, the secondary will insert the missing document after it fails the update.
     // Otherwise, it will fail to fetch anything from the sync source because the document was
     // deleted.
-    if (numInserted > 0) {
+    if (numFetched > 0) {
         checkLog.contains(secondary, 'Inserted missing document');
     } else {
         checkLog.contains(
@@ -80,25 +80,30 @@ var turnOffHangBeforeGettingMissingDocFailPoint = function(primary, secondary, n
     checkLog.contains(secondary, 'initial sync done');
 };
 
-var finishAndValidate = function(replSet, name, firstOplogEnd, numInserted, numDocuments) {
+var finishAndValidate = function(replSet, name, firstOplogEnd, numFetched, numDocuments) {
     replSet.awaitReplication();
     replSet.awaitSecondaryNodes();
     const dbName = 'test';
+    const primary = replSet.getPrimary();
+    const primaryCollection = primary.getDB(dbName).getCollection(name);
     const secondary = replSet.getSecondary();
+    const secondaryCollection = secondary.getDB(dbName).getCollection(name);
 
-    assert.eq(numDocuments,
-              secondary.getDB(dbName).getCollection(name).find().itcount(),
-              'documents successfully synced to secondary');
+    if (numDocuments != secondaryCollection.find().itcount()) {
+        jsTestLog(`Mismatch, primary collection: ${tojson(primaryCollection.find().toArray())}
+secondary collection: ${tojson(secondaryCollection.find().toArray())}`);
+        throw new Error('Did not sync collection');
+    }
 
     const res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
 
     // If we haven't re-inserted any documents after deleting them, the fetch count is 0 because we
     // are unable to get the document from the sync source.
-    assert.eq(res.initialSyncStatus.fetchedMissingDocs, numInserted);
+    assert.eq(res.initialSyncStatus.fetchedMissingDocs, numFetched);
 
     const finalOplogEnd = res.initialSyncStatus.initialSyncOplogEnd;
 
-    if (numInserted > 0) {
+    if (numFetched > 0) {
         assert.neq(firstOplogEnd,
                    finalOplogEnd,
                    "minValid was not moved forward when missing document was fetched");

@@ -45,9 +45,9 @@ var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
 assert.eq(res.initialSyncStatus.fetchedMissingDocs, 0);
 var firstOplogEnd = res.initialSyncStatus.initialSyncOplogEnd;
 
-turnOffHangBeforeGettingMissingDocFailPoint(primary, secondary, name, 0 /* numInserted */);
+turnOffHangBeforeGettingMissingDocFailPoint(primary, secondary, name, 0 /* numFetched */);
 
-finishAndValidate(replSet, name, firstOplogEnd, 0 /* numInserted */, 0 /* numDocuments */);
+finishAndValidate(replSet, name, firstOplogEnd, 0 /* numFetched */, 0 /* numDocuments */);
 
 replSet.stopSet();
 })();

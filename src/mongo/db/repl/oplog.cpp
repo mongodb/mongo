@@ -1498,7 +1498,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         // specifiers in the query for idempotence
                     } else {
                         // this could happen benignly on an oplog duplicate replay of an upsert
-                        // (because we are idempotent), if an regular non-mod update fails the item
+                        // (because we are idempotent), if a regular non-mod update fails the item
                         // is (presumably) missing.
                         if (!upsert) {
                             string msg = str::stream()

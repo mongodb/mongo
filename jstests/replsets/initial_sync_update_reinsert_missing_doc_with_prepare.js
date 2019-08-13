@@ -60,10 +60,10 @@ function doTest(doTransactionWork, numDocuments) {
     // Temporarily increase log levels so that we can see the 'Inserted missing document' log
     // line.
     secondary.getDB('test').setLogLevel(1, 'replication');
-    turnOffHangBeforeGettingMissingDocFailPoint(primary, secondary, name, 1 /* numInserted */);
+        turnOffHangBeforeGettingMissingDocFailPoint(primary, secondary, name, 1 /* numFetched */);
     secondary.getDB('test').setLogLevel(0, 'replication');
 
-    finishAndValidate(replSet, name, firstOplogEnd, 1 /* numInserted */, numDocuments);
+    finishAndValidate(replSet, name, firstOplogEnd, 1 /* numFetched */, numDocuments);
     assert.docEq({_id: 0, x: 3}, coll.findOne({_id: 0}), 'document on secondary matches primary');
 
     replSet.stopSet();

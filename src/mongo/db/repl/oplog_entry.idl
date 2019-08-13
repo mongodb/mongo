@@ -79,7 +79,10 @@ structs:
                 type: bool
                 optional: true
                 description: "If true, treats this update operation as an upsert.
-                              Added for backwards compatibility with updates from 3.6 and before."
+                              Used when extracting individual update oplog entries from the oplog
+                              entry of an applyOps command that was executed with alwaysUpsert true
+                              (the default). Originally added for backwards compatibility with
+                              updates from 3.6 and before."
 
     OplogEntryBase:
         description: A document in which the server stores an oplog entry.
