@@ -2,9 +2,11 @@
  * Test that replication recovery can reconstruct a prepared transaction that includes a write that
  * sets the multikey flag.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [uses_transactions, uses_prepare_transaction, requires_persistence]
  */
 (function() {
+// TODO (SERVER-42750) Re-enable this test.
+return;
 const rst = new ReplSetTest({
     nodes: [
         {},
@@ -21,7 +23,7 @@ const rst = new ReplSetTest({
 rst.startSet();
 rst.initiate();
 
-const primary = rst.getPrimary();
+let primary = rst.getPrimary();
 
 const session = primary.getDB("test").getMongo().startSession();
 const sessionDB = session.getDatabase("test");
@@ -32,12 +34,28 @@ sessionColl.createIndex({x: 1});
 session.startTransaction();
 
 // Make the index multikey.
+jsTestLog("Making the index multikey.");
 sessionColl.insert({x: [1, 2, 3]});
 assert.commandWorked(sessionDB.adminCommand({prepareTransaction: 1}));
 
 // Do an unclean shutdown so we don't force a checkpoint, and then restart.
+jsTestLog("Killing the primary.");
 rst.stop(0, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
 rst.restart(0);
+
+jsTestLog("Waiting for the node to get elected again.");
+primary = rst.getPrimary();
+
+jsTestLog("Making sure no prepare conflicts are generated on the catalog.");
+assert.commandWorked(primary.adminCommand({listDatabases: 1}));
+
+jsTestLog("Aborting the prepared transaction.");
+assert.commandWorked(primary.adminCommand({
+    abortTransaction: 1,
+    lsid: session.getSessionId(),
+    txnNumber: session.getTxnNumber_forTesting(),
+    autocommit: false
+}));
 
 rst.stopSet();
 }());
