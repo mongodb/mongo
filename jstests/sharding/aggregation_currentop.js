@@ -592,14 +592,6 @@ function runLocalOpsTests(conn) {
 runLocalOpsTests(mongosConn);
 runLocalOpsTests(shardConn);
 
-//
-// Stashed transactions tests.
-//
-
-// Test that $currentOp will display stashed transaction locks if 'idleSessions' is true, and
-// will only permit a user to view other users' sessions if the caller possesses the 'inprog'
-// privilege and 'allUsers' is true.
-const userNames = ["user_inprog", "admin", "user_no_inprog"];
 let sessionDBs = [];
 let sessions = [];
 
@@ -615,82 +607,116 @@ function sessionFilter() {
     };
 }
 
-for (let i in userNames) {
-    shardAdminDB.logout();
-    assert(shardAdminDB.auth(userNames[i], "pwd"));
+//
+// Idle sessions tests
+//
 
-    // Create a session for this user.
-    const session = shardAdminDB.getMongo().startSession();
+// Runs a suite of tests to verify idle session behavior with transactions.
+// 1. For the mongos connection, verifies that idle transactions are only shown with
+// 'idleSessions' and 'localOps' set to true.
+// 2. For the shard connection, verifies that stashed transaction locks are displayed only if
+// 'idleSessions' is set to true.
+function runIdleSessionsTests(conn, adminDB, txnDB, useLocalOps) {
+    // Test that $currentOp will display idle transactions if 'idleSessions' is true, and will
+    // only permit a user to view other users' sessions if the caller possesses the 'inprog'
+    // privilege and 'allUsers' is true.
+    const userNames = ["user_inprog", "admin", "user_no_inprog"];
 
-    // For each session, start but do not complete a transaction.
-    const sessionDB = session.getDatabase(shardTestDB.getName());
-    assert.commandWorked(sessionDB.runCommand({
-        insert: "test",
-        documents: [{_id: `txn-insert-${userNames[i]}-${i}`}],
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(i),
-        startTransaction: true,
-        autocommit: false
-    }));
-    sessionDBs.push(sessionDB);
-    sessions.push(session);
+    sessionDBs = [];
+    sessions = [];
 
-    // Use $currentOp to confirm that the incomplete transactions have stashed their locks while
-    // inactive, and that each user can only view their own sessions with 'allUsers:false'.
+    for (let i in userNames) {
+        adminDB.logout();
+        assert(adminDB.auth(userNames[i], "pwd"));
+
+        // Create a session for this user.
+        const session = adminDB.getMongo().startSession();
+
+        // For each session, start but do not complete a transaction.
+        const sessionDB = session.getDatabase(txnDB.getName());
+        assert.commandWorked(sessionDB.runCommand({
+            insert: "test",
+            documents: [{_id: `txn-insert-${conn}-${userNames[i]}-${i}`}],
+            readConcern: {level: "snapshot"},
+            txnNumber: NumberLong(i),
+            startTransaction: true,
+            autocommit: false
+        }));
+        sessionDBs.push(sessionDB);
+        sessions.push(session);
+
+        // Use $currentOp to confirm that each user can only view their own sessions with
+        // 'allUsers:false'.
+        assert.eq(
+            adminDB
+                .aggregate([
+                    {$currentOp: {allUsers: false, idleSessions: true, localOps: useLocalOps}},
+                    {$match: sessionFilter()}
+                ])
+                .itcount(),
+            1);
+    }
+
+    // Log in as 'user_no_inprog' to verify that the user cannot view other users' sessions via
+    // 'allUsers:true'.
+    adminDB.logout();
+    assert(adminDB.auth("user_no_inprog", "pwd"));
+
+    assert.commandFailedWithCode(adminDB.runCommand({
+        aggregate: 1,
+        cursor: {},
+        pipeline: [
+            {$currentOp: {allUsers: true, idleSessions: true, localOps: useLocalOps}},
+            {$match: sessionFilter()}
+        ]
+    }),
+                                 ErrorCodes.Unauthorized);
+
+    // Log in as 'user_inprog' to confirm that a user with the 'inprog' privilege can see all
+    // three idle/stashed transactions with 'allUsers:true'.
+    adminDB.logout();
+    assert(adminDB.auth("user_inprog", "pwd"));
+
+    assert.eq(adminDB
+                  .aggregate([
+                      {$currentOp: {allUsers: true, idleSessions: true, localOps: useLocalOps}},
+                      {$match: sessionFilter()}
+                  ])
+                  .itcount(),
+              3);
+
+    // Confirm that the 'idleSessions' parameter defaults to true.
     assert.eq(
-        shardAdminDB
+        adminDB
             .aggregate(
-                [{$currentOp: {allUsers: false, idleSessions: true}}, {$match: sessionFilter()}])
+                [{$currentOp: {allUsers: true, localOps: useLocalOps}}, {$match: sessionFilter()}])
             .itcount(),
-        1);
+        3);
+
+    // Confirm that idleSessions:false omits the idle/stashed transactions from the report.
+    assert.eq(adminDB
+                  .aggregate([
+                      {$currentOp: {allUsers: true, idleSessions: false, localOps: useLocalOps}},
+                      {$match: sessionFilter()}
+                  ])
+                  .itcount(),
+              0);
+
+    // Cancel all transactions and close the associated sessions.
+    for (let i in userNames) {
+        assert(adminDB.auth(userNames[i], "pwd"));
+        assert.commandWorked(sessionDBs[i].adminCommand({
+            commitTransaction: 1,
+            txnNumber: NumberLong(i),
+            autocommit: false,
+            writeConcern: {w: 'majority'}
+        }));
+        sessions[i].endSession();
+    }
 }
 
-// Log in as 'user_no_inprog' to verify that the user cannot view other users' sessions via
-// 'allUsers:true'.
-shardAdminDB.logout();
-assert(shardAdminDB.auth("user_no_inprog", "pwd"));
-
-assert.commandFailedWithCode(shardAdminDB.runCommand({
-    aggregate: 1,
-    cursor: {},
-    pipeline: [{$currentOp: {allUsers: true, idleSessions: true}}, {$match: sessionFilter()}]
-}),
-                             ErrorCodes.Unauthorized);
-
-// Log in as 'user_inprog' to confirm that a user with the 'inprog' privilege can see all three
-// stashed transactions with 'allUsers:true'.
-shardAdminDB.logout();
-assert(shardAdminDB.auth("user_inprog", "pwd"));
-
-assert.eq(
-    shardAdminDB
-        .aggregate([{$currentOp: {allUsers: true, idleSessions: true}}, {$match: sessionFilter()}])
-        .itcount(),
-    3);
-
-// Confirm that the 'idleSessions' parameter defaults to true.
-assert.eq(
-    shardAdminDB.aggregate([{$currentOp: {allUsers: true}}, {$match: sessionFilter()}]).itcount(),
-    3);
-
-// Confirm that idleSessions:false omits the stashed locks from the report.
-assert.eq(
-    shardAdminDB
-        .aggregate([{$currentOp: {allUsers: true, idleSessions: false}}, {$match: sessionFilter()}])
-        .itcount(),
-    0);
-
-// Allow all transactions to complete and close the associated sessions.
-for (let i in userNames) {
-    assert(shardAdminDB.auth(userNames[i], "pwd"));
-    assert.commandWorked(sessionDBs[i].adminCommand({
-        commitTransaction: 1,
-        txnNumber: NumberLong(i),
-        autocommit: false,
-        writeConcern: {w: 'majority'}
-    }));
-    sessions[i].endSession();
-}
+runIdleSessionsTests(mongosConn, clusterAdminDB, clusterTestDB, true);
+runIdleSessionsTests(shardConn, shardAdminDB, shardTestDB, false);
 
 //
 // No-auth tests.

@@ -58,6 +58,17 @@ env.Library(
 )
 
 env.Library(
+    target="transaction_stats",
+    source=[
+        "single_transaction_stats.cpp"
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/repl/read_concern_args',
+    ],
+)
+
+env.Library(
     target='fill_locker_info',
     source=[
         'fill_locker_info.cpp',

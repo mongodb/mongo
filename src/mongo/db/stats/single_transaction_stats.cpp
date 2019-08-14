@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/single_transaction_stats.h"
+#include "mongo/db/stats/single_transaction_stats.h"
 
 namespace mongo {
 

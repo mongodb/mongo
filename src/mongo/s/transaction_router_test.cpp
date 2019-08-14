@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kTransaction
+
 #include "mongo/platform/basic.h"
 
 #include <map>
@@ -46,7 +48,10 @@
 #include "mongo/s/transaction_router.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/fail_point_service.h"
+#include "mongo/util/log.h"
+#include "mongo/util/net/socket_utils.h"
 #include "mongo/util/tick_source_mock.h"
 
 namespace mongo {
@@ -2798,6 +2803,14 @@ protected:
         return dynamic_cast<TickSourceMock<Microseconds>*>(getServiceContext()->getTickSource());
     }
 
+    /**
+     * Set up and return a mock clock source.
+     */
+    ClockSourceMock* preciseClockSource() {
+        getServiceContext()->setPreciseClockSource(std::make_unique<ClockSourceMock>());
+        return dynamic_cast<ClockSourceMock*>(getServiceContext()->getPreciseClockSource());
+    }
+
     TransactionRouter::Router txnRouter() {
         return TransactionRouter::get(operationContext());
     }
@@ -3130,7 +3143,7 @@ TEST_F(TransactionRouterMetricsTest, SlowLoggingReadConcern_None) {
     beginSlowTxnWithDefaultTxnNumber();
     runCommit(kDummyOkRes);
 
-    ASSERT_EQUALS(1, countLogLinesContaining(readConcern.toBSON()["readConcern"]));
+    ASSERT_EQUALS(0, countLogLinesContaining(readConcern.toBSON()["readConcern"]));
     ASSERT_EQUALS(0, countLogLinesContaining("globalReadTimestamp:"));
 }
 
@@ -3959,6 +3972,167 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsCommitTypeStatsSuccessfulDurat
                   routerTxnMetrics()
                       ->getCommitTypeStats_forTest(CommitType::kSingleShard)
                       .successfulDurationMicros.load());
+}
+
+TEST_F(TransactionRouterMetricsTest, ReportResources) {
+    // Create client and read concern metadata.
+    BSONObjBuilder builder;
+    ASSERT_OK(ClientMetadata::serializePrivate("driverName",
+                                               "driverVersion",
+                                               "osType",
+                                               "osName",
+                                               "osArchitecture",
+                                               "osVersion",
+                                               "appName",
+                                               &builder));
+
+    auto obj = builder.obj();
+    auto clientMetadata = ClientMetadata::parse(obj["client"]);
+    auto& clientMetadataIsMasterState =
+        ClientMetadataIsMasterState::get(operationContext()->getClient());
+    clientMetadataIsMasterState.setClientMetadata(operationContext()->getClient(),
+                                                  std::move(clientMetadata.getValue()));
+
+    repl::ReadConcernArgs readConcernArgs;
+    ASSERT_OK(
+        readConcernArgs.initialize(BSON("find"
+                                        << "test" << repl::ReadConcernArgs::kReadConcernFieldName
+                                        << BSON(repl::ReadConcernArgs::kLevelFieldName
+                                                << "snapshot"))));
+    repl::ReadConcernArgs::get(operationContext()) = readConcernArgs;
+
+    auto clockSource = preciseClockSource();
+    auto startTime = Date_t::now();
+    clockSource->reset(startTime);
+
+    beginTxnWithDefaultTxnNumber();
+
+    // Verify reported parameters match expectations.
+    auto state = txnRouter().reportState(operationContext(), false /* sessionIsActive */);
+    auto transactionDocument = state.getObjectField("transaction");
+
+    auto parametersDocument = transactionDocument.getObjectField("parameters");
+    ASSERT_EQ(parametersDocument.getField("txnNumber").numberLong(), kTxnNumber);
+    ASSERT_EQ(parametersDocument.getField("autocommit").boolean(), false);
+    ASSERT_BSONELT_EQ(parametersDocument.getField("readConcern"),
+                      readConcernArgs.toBSON().getField("readConcern"));
+
+    ASSERT_GTE(transactionDocument.getField("readTimestamp").timestamp(), Timestamp(0, 0));
+    ASSERT_EQ(
+        dateFromISOString(transactionDocument.getField("startWallClockTime").valueStringData())
+            .getValue(),
+        startTime);
+    ASSERT_GTE(transactionDocument.getField("timeOpenMicros").numberLong(), 0);
+    ASSERT_EQ(transactionDocument.getField("numNonReadOnlyParticipants").numberInt(), 0);
+    ASSERT_EQ(transactionDocument.getField("numReadOnlyParticipants").numberInt(), 0);
+
+
+    ASSERT_EQ(state.getField("host").valueStringData().toString(), getHostNameCachedAndPort());
+    ASSERT_EQ(state.getField("desc").valueStringData().toString(), "inactive transaction");
+    ASSERT_BSONOBJ_EQ(state.getField("lsid").Obj(), getSessionId().toBSON());
+    ASSERT_EQ(state.getField("client").valueStringData().toString(), "");
+    ASSERT_EQ(state.getField("connectionId").numberLong(), 0);
+    ASSERT_EQ(state.getField("appName").valueStringData().toString(), "appName");
+    ASSERT_BSONOBJ_EQ(state.getField("clientMetadata").Obj(), obj.getField("client").Obj());
+    ASSERT_EQ(state.getField("active").boolean(), false);
+}
+
+TEST_F(TransactionRouterMetricsTest, ReportResourcesWithParticipantList) {
+    auto clockSource = preciseClockSource();
+    auto startTime = Date_t::now();
+    clockSource->reset(startTime);
+
+    beginTxnWithDefaultTxnNumber();
+    txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+
+    auto state = txnRouter().reportState(operationContext(), true /* sessionIsActive */);
+    auto transactionDocument = state.getObjectField("transaction");
+    auto parametersDocument = transactionDocument.getObjectField("parameters");
+
+    ASSERT_EQ(state.getField("desc").valueStringData().toString(), "active transaction");
+    ASSERT_EQ(state.getField("type").valueStringData().toString(), "activeSession");
+    ASSERT_GTE(transactionDocument.getField("readTimestamp").timestamp(), Timestamp(0, 0));
+    ASSERT_EQ(dateFromISOString(transactionDocument.getField("startWallClockTime").String()),
+              startTime);
+
+    // Verify participants array matches expected values.
+
+    auto participantComp = [](const BSONElement& a, const BSONElement& b) {
+        return a.Obj().getField("name").String() < b.Obj().getField("name").String();
+    };
+
+    auto participantArray = transactionDocument.getField("participants").Array();
+    ASSERT_EQ(participantArray.size(), 2U);
+    std::sort(participantArray.begin(), participantArray.end(), participantComp);
+
+    auto participant1 = participantArray[0].Obj();
+    ASSERT_EQ(participant1.getField("name").String(), "shard1");
+    ASSERT_EQ(participant1.getField("coordinator").boolean(), true);
+
+    auto participant2 = participantArray[1].Obj();
+    ASSERT_EQ(participant2.getField("name").String(), "shard2");
+    ASSERT_EQ(participant2.getField("coordinator").boolean(), false);
+
+    txnRouter().processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
+    txnRouter().processParticipantResponse(operationContext(), shard2, kOkReadOnlyTrueResponse);
+
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kContinue);
+
+    // Verify participants array has been updated with proper ReadOnly responses.
+
+    state = txnRouter().reportState(operationContext(), true /* sessionIsActive */);
+    transactionDocument = state.getObjectField("transaction");
+    participantArray = transactionDocument.getField("participants").Array();
+
+    ASSERT_EQ(participantArray.size(), 2U);
+    std::sort(participantArray.begin(), participantArray.end(), participantComp);
+
+    participant1 = participantArray[0].Obj();
+    ASSERT_EQ(participant1.getField("name").String(), "shard1");
+    ASSERT_EQ(participant1.getField("coordinator").boolean(), true);
+    ASSERT_EQ(participant1.getField("readOnly").boolean(), false);
+
+    participant2 = participantArray[1].Obj();
+    ASSERT_EQ(participant2.getField("name").String(), "shard2");
+    ASSERT_EQ(participant2.getField("coordinator").boolean(), false);
+    ASSERT_EQ(participant2.getField("readOnly").boolean(), true);
+
+    ASSERT_EQ(transactionDocument.getField("numNonReadOnlyParticipants").numberInt(), 1);
+    ASSERT_EQ(transactionDocument.getField("numReadOnlyParticipants").numberInt(), 1);
+
+    ASSERT_EQ(state.getField("active").boolean(), true);
+    ASSERT_GTE(transactionDocument.getField("timeOpenMicros").numberLong(), 0);
+}
+
+TEST_F(TransactionRouterMetricsTest, ReportResourcesCommit) {
+    beginTxnWithDefaultTxnNumber();
+
+    auto clockSource = preciseClockSource();
+    auto commitTime = Date_t::now();
+    clockSource->reset(commitTime);
+
+    runTwoPhaseCommit();
+
+    // Verify commit is reported as expected.
+
+    auto state = txnRouter().reportState(operationContext(), true /* sessionIsActive */);
+    auto transactionDocument = state.getObjectField("transaction");
+    ASSERT_EQ(dateFromISOString(transactionDocument.getField("commitStartWallClockTime").String()),
+              commitTime);
+    ASSERT_EQ(transactionDocument.getField("commitType").String(), "twoPhaseCommit");
+}
+
+TEST_F(TransactionRouterMetricsTest, ReportResourcesRecoveryCommit) {
+    beginSlowRecoverCommitWithDefaultTxnNumber();
+    runRecoverWithTokenCommit(boost::none);
+
+    // Verify that the participant list does not exist if the commit type is recovery.
+
+    auto state = txnRouter().reportState(operationContext(), true /* sessionIsActive */);
+    auto transactionDocument = state.getObjectField("transaction");
+    ASSERT_EQ(transactionDocument.hasField("participants"), false);
 }
 
 }  // unnamed namespace

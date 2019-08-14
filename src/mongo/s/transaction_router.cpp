@@ -52,6 +52,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/socket_utils.h"
 
 namespace mongo {
 namespace {
@@ -281,6 +282,126 @@ TransactionRouter::Participant::Participant(bool inIsCoordinator,
       sharedOptions(std::move(inSharedOptions)),
       stmtIdCreatedAt(inStmtIdCreatedAt) {}
 
+BSONObj TransactionRouter::Observer::reportState(OperationContext* opCtx,
+                                                 bool sessionIsActive) const {
+    BSONObjBuilder builder;
+    reportState(opCtx, &builder, sessionIsActive);
+    return builder.obj();
+}
+
+void TransactionRouter::Observer::reportState(OperationContext* opCtx,
+                                              BSONObjBuilder* builder,
+                                              bool sessionIsActive) const {
+    _reportState(opCtx, builder, sessionIsActive);
+}
+
+void TransactionRouter::Observer::_reportState(OperationContext* opCtx,
+                                               BSONObjBuilder* builder,
+                                               bool sessionIsActive) const {
+    if (o().txnNumber == kUninitializedTxnNumber) {
+        // This transaction router is not yet initialized.
+        return;
+    }
+
+    // Append relevant client metadata.
+
+    builder->append("type", sessionIsActive ? "activeSession" : "idleSession");
+    builder->append("host", getHostNameCachedAndPort());
+    builder->append("desc", sessionIsActive ? "active transaction" : "inactive transaction");
+
+    const auto& lastClientInfo = o().lastClientInfo;
+    builder->append("client", lastClientInfo.clientHostAndPort);
+    builder->append("connectionId", lastClientInfo.connectionId);
+    builder->append("appName", lastClientInfo.appName);
+    builder->append("clientMetadata", lastClientInfo.clientMetadata);
+
+    // Append session and transaction metadata.
+
+    {
+        BSONObjBuilder lsid(builder->subobjStart("lsid"));
+        _sessionId().serialize(&lsid);
+    }
+
+    BSONObjBuilder transactionBuilder(builder->subobjStart("transaction"));
+
+    {
+        BSONObjBuilder parametersBuilder(transactionBuilder.subobjStart("parameters"));
+        parametersBuilder.append("txnNumber", o().txnNumber);
+        parametersBuilder.append("autocommit", false);
+        if (!o().readConcernArgs.isEmpty()) {
+            o().readConcernArgs.appendInfo(&parametersBuilder);
+        }
+    }
+
+    // Append current transaction info.
+
+    if (_atClusterTimeHasBeenSet()) {
+        builder->append("globalReadTimestamp", o().atClusterTime->getTime().asTimestamp());
+    }
+
+    const auto& timingStats = o().timingStats;
+
+    builder->append("startWallClockTime", dateToISOStringLocal(timingStats.startWallClockTime));
+
+    auto tickSource = opCtx->getServiceContext()->getTickSource();
+    auto curTicks = tickSource->getTicks();
+
+    builder->append("timeOpenMicros",
+                    durationCount<Microseconds>(timingStats.getDuration(tickSource, curTicks)));
+
+    // TODO SERVER-41376: Log timeActiveMicros
+
+    // TODO SERVER-41376: Log timeInactiveMicros
+
+    int numReadOnlyParticipants = 0;
+    int numNonReadOnlyParticipants = 0;
+
+    // We don't know the participants if we're recovering the commit.
+    if (o().commitType != CommitType::kRecoverWithToken) {
+        builder->append("numParticipants", static_cast<int>(o().participants.size()));
+
+        BSONArrayBuilder participantsArrayBuilder;
+        for (auto const& participantPair : o().participants) {
+            BSONObjBuilder participantBuilder;
+            participantBuilder.append("name", participantPair.first);
+            participantBuilder.append("coordinator", participantPair.second.isCoordinator);
+
+            if (participantPair.second.readOnly == Participant::ReadOnly::kReadOnly) {
+                participantBuilder.append("readOnly", true);
+                ++numReadOnlyParticipants;
+            } else if (participantPair.second.readOnly == Participant::ReadOnly::kNotReadOnly) {
+                participantBuilder.append("readOnly", false);
+                ++numNonReadOnlyParticipants;
+            }
+            participantsArrayBuilder.append(participantBuilder.obj());
+        }
+
+        transactionBuilder.appendArray("participants", participantsArrayBuilder.obj());
+    }
+
+    if (o().commitType != CommitType::kNotInitiated) {
+        transactionBuilder.append("commitStartWallClockTime",
+                                  dateToISOStringLocal(timingStats.commitStartWallClockTime));
+        transactionBuilder.append("commitType", commitTypeToString(o().commitType));
+    }
+
+    transactionBuilder.append("numReadOnlyParticipants", numReadOnlyParticipants);
+    transactionBuilder.append("numNonReadOnlyParticipants", numNonReadOnlyParticipants);
+
+    transactionBuilder.done();
+
+    builder->append("active", sessionIsActive);
+}
+
+bool TransactionRouter::Observer::_atClusterTimeHasBeenSet() const {
+    return o().atClusterTime.is_initialized() && o().atClusterTime->timeHasBeenSet();
+}
+
+const LogicalSessionId& TransactionRouter::Observer::_sessionId() const {
+    const auto* owningSession = getTransactionRouter.owner(_tr);
+    return owningSession->getSessionId();
+}
+
 BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
     BSONObj cmd, bool isFirstStatementInThisParticipant) const {
     bool hasStartTxn = false;
@@ -503,6 +624,8 @@ TransactionRouter::Participant& TransactionRouter::Router::_createParticipant(
 void TransactionRouter::Router::_setReadOnlyForParticipant(OperationContext* opCtx,
                                                            const ShardId& shard,
                                                            const Participant::ReadOnly readOnly) {
+    invariant(readOnly != Participant::ReadOnly::kUnset);
+
     const auto iter = o().participants.find(shard.toString());
     invariant(iter != o().participants.end());
     const auto currentParticipant = iter->second;
@@ -686,10 +809,6 @@ void TransactionRouter::Router::setDefaultAtClusterTime(OperationContext* opCtx)
         opCtx, repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime(), defaultTime);
 }
 
-bool TransactionRouter::Router::_atClusterTimeHasBeenSet() const {
-    return o().atClusterTime.is_initialized() && o().atClusterTime->timeHasBeenSet();
-}
-
 void TransactionRouter::Router::_setAtClusterTime(
     OperationContext* opCtx,
     const boost::optional<LogicalTime>& afterClusterTime,
@@ -730,12 +849,13 @@ void TransactionRouter::Router::beginOrContinueTxn(OperationContext* opCtx,
                         repl::ReadConcernArgs::get(opCtx).isEmpty());
 
                 repl::ReadConcernArgs::get(opCtx) = o().readConcernArgs;
+
                 ++p().latestStmtId;
-                return;
+                break;
             }
             case TransactionActions::kCommit:
                 ++p().latestStmtId;
-                return;
+                break;
         }
     } else if (txnNumber > o().txnNumber) {
         // This is a newer transaction.
@@ -764,7 +884,7 @@ void TransactionRouter::Router::beginOrContinueTxn(OperationContext* opCtx,
 
                 _onNewTransaction(opCtx);
                 LOG(3) << txnIdToString() << " New transaction started";
-                return;
+                break;
             }
             case TransactionActions::kContinue: {
                 uasserted(ErrorCodes::NoSuchTransaction,
@@ -780,16 +900,12 @@ void TransactionRouter::Router::beginOrContinueTxn(OperationContext* opCtx,
 
                 _onBeginRecoveringDecision(opCtx);
                 LOG(3) << txnIdToString() << " Commit recovery started";
-                return;
+                break;
             }
         };
     }
-    MONGO_UNREACHABLE;
-}
 
-const LogicalSessionId& TransactionRouter::Router::_sessionId() const {
-    const auto* owningSession = getTransactionRouter.owner(_tr);
-    return owningSession->getSessionId();
+    _updateLastClientInfo(opCtx->getClient());
 }
 
 BSONObj TransactionRouter::Router::_handOffCommitToCoordinator(OperationContext* opCtx) {
@@ -918,6 +1034,7 @@ BSONObj TransactionRouter::Router::_commitTransaction(
             o(lk).commitType = CommitType::kSingleShard;
             _onStartCommit(lk, opCtx);
         }
+
 
         return sendCommitDirectlyToShards(opCtx, {shardId});
     }
@@ -1090,6 +1207,11 @@ void TransactionRouter::Router::_resetRouterState(OperationContext* opCtx,
     o(lk).timingStats = TimingStats();
     p().terminationInitiated = false;
 
+    auto tickSource = opCtx->getServiceContext()->getTickSource();
+    o(lk).timingStats.startTime = tickSource->getTicks();
+    o(lk).timingStats.startWallClockTime =
+        opCtx->getServiceContext()->getPreciseClockSource()->now();
+
     // TODO SERVER-37115: Parse statement ids from the client and remember the statement id
     // of the command that started the transaction, if one was included.
     p().latestStmtId = kDefaultFirstStmtId;
@@ -1144,7 +1266,10 @@ std::string TransactionRouter::Router::_transactionInfoForLog(
 
     parametersBuilder.append("txnNumber", o().txnNumber);
     parametersBuilder.append("autocommit", false);
-    o().readConcernArgs.appendInfo(&parametersBuilder);
+
+    if (!o().readConcernArgs.isEmpty()) {
+        o().readConcernArgs.appendInfo(&parametersBuilder);
+    }
 
     sb << "parameters:" << parametersBuilder.obj().toString() << ",";
 
@@ -1187,9 +1312,9 @@ std::string TransactionRouter::Router::_transactionInfoForLog(
            << ",";
     }
 
-    // TODO SERVER-40985: Log timeActiveMicros
+    // TODO SERVER-41376: Log timeActiveMicros
 
-    // TODO SERVER-40985: Log timeInactiveMicros
+    // TODO SERVER-41376: Log timeInactiveMicros
 
     // Total duration of the transaction. Logged at the end of the line for consistency with slow
     // command logging.
@@ -1199,23 +1324,11 @@ std::string TransactionRouter::Router::_transactionInfoForLog(
 }
 
 void TransactionRouter::Router::_onNewTransaction(OperationContext* opCtx) {
-    auto tickSource = opCtx->getServiceContext()->getTickSource();
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        o(lk).timingStats.startTime = tickSource->getTicks();
-    }
-
     auto routerTxnMetrics = RouterTransactionsMetrics::get(opCtx);
     routerTxnMetrics->incrementTotalStarted();
 }
 
 void TransactionRouter::Router::_onBeginRecoveringDecision(OperationContext* opCtx) {
-    auto tickSource = opCtx->getServiceContext()->getTickSource();
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        o(lk).timingStats.startTime = tickSource->getTicks();
-    }
-
     auto routerTxnMetrics = RouterTransactionsMetrics::get(opCtx);
     routerTxnMetrics->incrementTotalStarted();
 }
@@ -1260,7 +1373,11 @@ void TransactionRouter::Router::_onStartCommit(WithLock wl, OperationContext* op
     }
 
     auto tickSource = opCtx->getServiceContext()->getTickSource();
-    o(wl).timingStats.commitStartTime = tickSource->getTicks();
+    {
+        o(wl).timingStats.commitStartTime = tickSource->getTicks();
+        o(wl).timingStats.commitStartWallClockTime =
+            opCtx->getServiceContext()->getPreciseClockSource()->now();
+    }
 
     auto routerTxnMetrics = RouterTransactionsMetrics::get(opCtx);
     routerTxnMetrics->incrementCommitInitiated(o().commitType);
@@ -1321,6 +1438,11 @@ void TransactionRouter::Router::_endTransactionTrackingIfNecessary(
         routerTxnMetrics->incrementCommitSuccessful(
             o().commitType, o().timingStats.getCommitDuration(tickSource, curTicks));
     }
+}
+
+void TransactionRouter::Router::_updateLastClientInfo(Client* client) {
+    stdx::lock_guard<Client> lk(*client);
+    o(lk).lastClientInfo.update(client);
 }
 
 Microseconds TransactionRouter::TimingStats::getDuration(TickSource* tickSource,

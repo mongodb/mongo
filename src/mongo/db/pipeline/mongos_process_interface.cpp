@@ -48,6 +48,7 @@
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query/establish_cursors.h"
 #include "mongo/s/query/router_exec_stage.h"
+#include "mongo/s/transaction_router.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
@@ -250,7 +251,42 @@ BSONObj MongoSInterface::_reportCurrentOpForClient(OperationContext* opCtx,
                                     (backtraceMode == CurrentOpBacktraceMode::kIncludeBacktrace),
                                     &builder);
 
+    OperationContext* clientOpCtx = client->getOperationContext();
+
+    if (clientOpCtx) {
+        if (auto txnRouter = TransactionRouter::get(clientOpCtx)) {
+            txnRouter.reportState(clientOpCtx, &builder, true /* sessionIsActive */);
+        }
+    }
+
     return builder.obj();
+}
+
+void MongoSInterface::_reportCurrentOpsForIdleSessions(OperationContext* opCtx,
+                                                       CurrentOpUserMode userMode,
+                                                       std::vector<BSONObj>* ops) const {
+    auto sessionCatalog = SessionCatalog::get(opCtx);
+
+    const bool authEnabled =
+        AuthorizationSession::get(opCtx->getClient())->getAuthorizationManager().isAuthEnabled();
+
+    // If the user is listing only their own ops, we use makeSessionFilterForAuthenticatedUsers to
+    // create a pattern that will match against all authenticated usernames for the current client.
+    // If the user is listing ops for all users, we create an empty pattern; constructing an
+    // instance of SessionKiller::Matcher with this empty pattern will return all sessions.
+    auto sessionFilter = (authEnabled && userMode == CurrentOpUserMode::kExcludeOthers
+                              ? makeSessionFilterForAuthenticatedUsers(opCtx)
+                              : KillAllSessionsByPatternSet{{}});
+
+    sessionCatalog->scanSessions({std::move(sessionFilter)}, [&](const ObservableSession& session) {
+        if (!session.currentOperation()) {
+            auto op =
+                TransactionRouter::get(session).reportState(opCtx, false /* sessionIsActive */);
+            if (!op.isEmpty()) {
+                ops->emplace_back(op);
+            }
+        }
+    });
 }
 
 std::vector<GenericCursor> MongoSInterface::getIdleCursors(

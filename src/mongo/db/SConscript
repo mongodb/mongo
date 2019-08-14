@@ -531,7 +531,6 @@ env.Library(
         'retryable_writes_stats.cpp',
         'server_transactions_metrics.cpp',
         'session_catalog_mongod.cpp',
-        'single_transaction_stats.cpp',
         'transaction_history_iterator.cpp',
         'transaction_metrics_observer.cpp',
         'transaction_participant.cpp',
@@ -559,6 +558,7 @@ env.Library(
         'query_exec',
         'stats/fill_locker_info',
         'stats/top',
+        'stats/transaction_stats',
         'update/update_driver',
     ]
 )
@@ -1818,6 +1818,7 @@ envWithAsio.CppUnitTest(
         'snapshot_window_util',
         'startup_warnings_mongod',
         'stats/fill_locker_info',
+        'stats/transaction_stats',
         'time_proof_service',
         'transaction',
         'update_index_data',
