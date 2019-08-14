@@ -664,13 +664,15 @@ __txn_commit_timestamps_assert(WT_SESSION_IMPL *session)
 	WT_TXN *txn;
 	WT_TXN_OP *op;
 	WT_UPDATE *upd;
-	wt_timestamp_t op_timestamp;
+	wt_timestamp_t durable_op_timestamp, op_timestamp, prev_op_timestamp;
 	u_int i;
 	const char *open_cursor_cfg[] = {
 	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL };
 	bool op_zero_ts, upd_zero_ts;
 
 	txn = &session->txn;
+	cursor = NULL;
+	durable_op_timestamp = prev_op_timestamp = WT_TS_NONE;
 
 	/*
 	 * Debugging checks on timestamps, if user requested them.
@@ -728,13 +730,15 @@ __txn_commit_timestamps_assert(WT_SESSION_IMPL *session)
 				WT_WITH_BTREE(session, op->btree,
 				    ret = __wt_btcur_search_uncommitted(
 				    (WT_CURSOR_BTREE *)cursor, &upd));
-					WT_TRET(cursor->close(cursor));
 				if (ret != 0)
 					WT_RET_MSG(session, EINVAL,
 					    "prepared update restore failed");
-				op->u.op_upd = upd;
 			} else
-				upd = op->u.op_upd->next;
+				upd = op->u.op_upd;
+
+			WT_ASSERT(session, upd != NULL);
+			op_timestamp = upd->start_ts;
+
 			/*
 			 * Skip over any aborted update structures, internally
 			 * created update structures or ones from our own
@@ -749,6 +753,22 @@ __txn_commit_timestamps_assert(WT_SESSION_IMPL *session)
 			 * first valid update in the chain. They're in
 			 * most recent order.
 			 */
+			if (upd != NULL) {
+				prev_op_timestamp = upd->start_ts;
+				durable_op_timestamp = upd->durable_ts;
+			}
+
+			/*
+			 * We no longer need to access the update structure so
+			 * it's safe to release our reference to the page.
+			 */
+			if (cursor != NULL) {
+				WT_ASSERT(
+				    session, F_ISSET(txn, WT_TXN_PREPARE));
+				WT_RET(cursor->close(cursor));
+				cursor = NULL;
+			}
+
 			if (upd == NULL)
 				continue;
 			/*
@@ -760,7 +780,7 @@ __txn_commit_timestamps_assert(WT_SESSION_IMPL *session)
 			 * Check timestamps are used in order.
 			 */
 			op_zero_ts = !F_ISSET(txn, WT_TXN_HAS_TS_COMMIT);
-			upd_zero_ts = upd->start_ts == WT_TS_NONE;
+			upd_zero_ts = prev_op_timestamp == WT_TS_NONE;
 			if (op_zero_ts != upd_zero_ts)
 				WT_RET_MSG(session, EINVAL,
 				    "per-key timestamps used inconsistently");
@@ -772,7 +792,6 @@ __txn_commit_timestamps_assert(WT_SESSION_IMPL *session)
 			if (op_zero_ts)
 				continue;
 
-			op_timestamp = op->u.op_upd->start_ts;
 			/*
 			 * Only if the update structure doesn't have a timestamp
 			 * then use the one in the transaction structure.
@@ -780,11 +799,11 @@ __txn_commit_timestamps_assert(WT_SESSION_IMPL *session)
 			if (op_timestamp == WT_TS_NONE)
 				op_timestamp = txn->commit_timestamp;
 			if (F_ISSET(txn, WT_TXN_TS_COMMIT_KEYS) &&
-				op_timestamp < upd->start_ts)
+				op_timestamp < prev_op_timestamp)
 				WT_RET_MSG(session, EINVAL,
 				    "out of order commit timestamps");
 			if (F_ISSET(txn, WT_TXN_TS_DURABLE_KEYS) &&
-			    txn->durable_timestamp < upd->durable_ts)
+			    txn->durable_timestamp < durable_op_timestamp)
 				WT_RET_MSG(session, EINVAL,
 				    "out of order durable timestamps");
 		}

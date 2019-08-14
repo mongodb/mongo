@@ -330,6 +330,12 @@ path_setup(const char *home)
 	g.home_log = dmalloc(len);
 	testutil_check(__wt_snprintf(g.home_log, len, "%s/%s", g.home, "log"));
 
+	/* Page dump file. */
+	len = strlen(g.home) + strlen("pagedump") + 2;
+	g.home_pagedump = dmalloc(len);
+	testutil_check(__wt_snprintf(
+	    g.home_pagedump, len, "%s/%s", g.home, "pagedump"));
+
 	/* RNG log file. */
 	len = strlen(g.home) + strlen("rand") + 2;
 	g.home_rand = dmalloc(len);
@@ -674,40 +680,4 @@ alter(void *arg)
 
 	testutil_check(session->close(session, NULL));
 	return (WT_THREAD_RET_VALUE);
-}
-
-/*
- * print_item_data --
- *	Display a single data/size pair, with a tag.
- */
-void
-print_item_data(const char *tag, const uint8_t *data, size_t size)
-{
-	static const char hex[] = "0123456789abcdef";
-	u_char ch;
-
-	fprintf(stderr, "\t%s {", tag);
-	if (g.type == FIX)
-		fprintf(stderr, "0x%02x", data[0]);
-	else
-		for (; size > 0; --size, ++data) {
-			ch = data[0];
-			if (__wt_isprint(ch))
-				fprintf(stderr, "%c", (int)ch);
-			else
-				fprintf(stderr, "%x%x",
-				    (u_int)hex[(data[0] & 0xf0) >> 4],
-				    (u_int)hex[data[0] & 0x0f]);
-		}
-	fprintf(stderr, "}\n");
-}
-
-/*
- * print_item --
- *	Display a single data/size pair, with a tag.
- */
-void
-print_item(const char *tag, WT_ITEM *item)
-{
-	print_item_data(tag, item->data, item->size);
 }

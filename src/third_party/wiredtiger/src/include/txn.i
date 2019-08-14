@@ -232,8 +232,6 @@ __wt_txn_resolve_prepared_op(
 			continue;
 		if (upd->txnid != txn->id)
 			break;
-		if (op->u.op_upd == NULL)
-			op->u.op_upd = upd;
 
 		++(*resolved_update_countp);
 

@@ -718,6 +718,7 @@ __wt_debug_page(
  */
 int
 __wt_debug_cursor_page(void *cursor_arg, const char *ofile)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	WT_CURSOR *cursor;
 	WT_CURSOR_BTREE *cbt;
