@@ -29,7 +29,7 @@ var bulk = coll.initializeUnorderedBulkOp();
 for (var i = 0; i < 10 * 1000; i++) {
     bulk.insert({_id: i});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 jsTest.log("Opening a mongod cursor...");
 
@@ -53,7 +53,7 @@ bulk = coll.initializeUnorderedBulkOp();
 for (var i = 0; i < numChunks; i++) {
     bulk.insert({_id: i});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 sleep(10 * 1000);
 

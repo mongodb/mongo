@@ -90,7 +90,7 @@ createUsers(mongosConn);
 assert(clusterAdminDB.auth("admin", "pwd"));
 
 for (let i = 0; i < 5; i++) {
-    assert.writeOK(clusterTestDB.test.insert({_id: i, a: i}));
+    assert.commandWorked(clusterTestDB.test.insert({_id: i, a: i}));
 }
 
 st.ensurePrimaryShard(clusterTestDB.getName(), shardRS.name);

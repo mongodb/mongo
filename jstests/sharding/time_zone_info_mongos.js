@@ -48,8 +48,8 @@ assert.commandWorked(mongosDB.adminCommand(
     {moveChunk: mongosColl.getFullName(), find: {_id: 1}, to: st.rs1.getURL()}));
 
 // Write a document containing a 'date' field to each chunk.
-assert.writeOK(mongosColl.insert({_id: -1, date: ISODate("2017-11-13T12:00:00.000+0000")}));
-assert.writeOK(mongosColl.insert({_id: 1, date: ISODate("2017-11-13T03:00:00.000+0600")}));
+assert.commandWorked(mongosColl.insert({_id: -1, date: ISODate("2017-11-13T12:00:00.000+0000")}));
+assert.commandWorked(mongosColl.insert({_id: 1, date: ISODate("2017-11-13T03:00:00.000+0600")}));
 
 // Constructs a pipeline which splits the 'date' field into its constituent parts on mongoD,
 // reassembles the original date on mongoS, and verifies that the two match. All timezone

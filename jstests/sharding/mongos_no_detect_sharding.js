@@ -11,7 +11,7 @@ print("Creating unsharded connection...");
 var mongos2 = st._mongos[1];
 
 var coll = mongos2.getCollection("test.foo");
-assert.writeOK(coll.insert({i: 0}));
+assert.commandWorked(coll.insert({i: 0}));
 
 print("Sharding collection...");
 
@@ -30,7 +30,7 @@ var bulk = coll.initializeUnorderedBulkOp();
 for (var i = 0; i < 100; i++) {
     bulk.insert({i: i + 1});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 st.printShardingStatus(true);
 

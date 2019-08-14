@@ -77,18 +77,18 @@ o = {
     _id: 1,
     a: [1, 2]
 };
-assert.writeOK(t.insert(o));
+assert.commandWorked(t.insert(o));
 
-assert.writeOK(t.update({}, {$addToSet: {a: {'x.$.y': 'bad'}}}));
-assert.writeOK(t.update({}, {$addToSet: {a: {b: {'x.$.y': 'bad'}}}}));
+assert.commandWorked(t.update({}, {$addToSet: {a: {'x.$.y': 'bad'}}}));
+assert.commandWorked(t.update({}, {$addToSet: {a: {b: {'x.$.y': 'bad'}}}}));
 
 assert.writeError(t.update({}, {$addToSet: {a: {"$bad": "bad"}}}));
 assert.writeError(t.update({}, {$addToSet: {a: {b: {"$bad": "bad"}}}}));
 
-assert.writeOK(t.update({}, {$addToSet: {a: {_id: {"x.y": 2}}}}));
+assert.commandWorked(t.update({}, {$addToSet: {a: {_id: {"x.y": 2}}}}));
 
-assert.writeOK(t.update({}, {$addToSet: {a: {$each: [{'x.$.y': 'bad'}]}}}));
-assert.writeOK(t.update({}, {$addToSet: {a: {$each: [{b: {'x.$.y': 'bad'}}]}}}));
+assert.commandWorked(t.update({}, {$addToSet: {a: {$each: [{'x.$.y': 'bad'}]}}}));
+assert.commandWorked(t.update({}, {$addToSet: {a: {$each: [{b: {'x.$.y': 'bad'}}]}}}));
 
 assert.writeError(t.update({}, {$addToSet: {a: {$each: [{'$bad': 'bad'}]}}}));
 assert.writeError(t.update({}, {$addToSet: {a: {$each: [{b: {'$bad': 'bad'}}]}}}));
@@ -99,10 +99,10 @@ o = {
     _id: 1,
     a: [1, 2]
 };
-assert.writeOK(t.insert(o));
+assert.commandWorked(t.insert(o));
 
-assert.writeOK(t.update({}, {$addToSet: {a: {_id: ["foo", "bar", "baz"]}}}));
-assert.writeOK(t.update({}, {$addToSet: {a: {_id: /acme.*corp/}}}));
+assert.commandWorked(t.update({}, {$addToSet: {a: {_id: ["foo", "bar", "baz"]}}}));
+assert.commandWorked(t.update({}, {$addToSet: {a: {_id: /acme.*corp/}}}));
 
 // Test that DBRefs are allowed.
 t.drop();
@@ -110,19 +110,19 @@ o = {
     _id: 1,
     a: [1, 2]
 };
-assert.writeOK(t.insert(o));
+assert.commandWorked(t.insert(o));
 
 foo = {
     "foo": "bar"
 };
-assert.writeOK(t.insert(foo));
+assert.commandWorked(t.insert(foo));
 let fooDoc = t.findOne(foo);
 assert.eq(fooDoc.foo, foo.foo);
 
 let fooDocRef = {reference: new DBRef(t.getName(), fooDoc._id, t.getDB().getName())};
 
-assert.writeOK(t.update({_id: o._id}, {$addToSet: {a: fooDocRef}}));
+assert.commandWorked(t.update({_id: o._id}, {$addToSet: {a: fooDocRef}}));
 assert.eq(t.findOne({_id: o._id}).a[2], fooDocRef);
 
-assert.writeOK(t.update({_id: o._id}, {$addToSet: {a: {b: fooDocRef}}}));
+assert.commandWorked(t.update({_id: o._id}, {$addToSet: {a: {b: fooDocRef}}}));
 assert.eq(t.findOne({_id: o._id}).a[3].b, fooDocRef);

@@ -22,7 +22,7 @@ let bulk = coll.initializeUnorderedBulkOp();
 for (let i = -50; i < 50; i++) {
     bulk.insert({_id: i});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 jsTest.log("Create a sharded collection with one chunk on each of the two shards.");
 st.ensurePrimaryShard(dbName, st.shard0.shardName);

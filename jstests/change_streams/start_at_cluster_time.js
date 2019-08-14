@@ -8,14 +8,14 @@ const coll = assertDropAndRecreateCollection(db, jsTestName());
 const testStartTime = db.runCommand({isMaster: 1}).$clusterTime.clusterTime;
 
 // Write a document to each chunk, and wait for replication.
-assert.writeOK(coll.insert({_id: -1}, {writeConcern: {w: "majority"}}));
-assert.writeOK(coll.insert({_id: 1}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(coll.insert({_id: -1}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(coll.insert({_id: 1}, {writeConcern: {w: "majority"}}));
 
 // Perform two updates, then use a change stream to capture the cluster time of the first update
 // to be resumed from.
 const streamToFindClusterTime = coll.watch();
-assert.writeOK(coll.update({_id: -1}, {$set: {updated: true}}));
-assert.writeOK(coll.update({_id: 1}, {$set: {updated: true}}));
+assert.commandWorked(coll.update({_id: -1}, {$set: {updated: true}}));
+assert.commandWorked(coll.update({_id: 1}, {$set: {updated: true}}));
 assert.soon(() => streamToFindClusterTime.hasNext());
 let next = streamToFindClusterTime.next();
 assert.eq(next.operationType, "update");

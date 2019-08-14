@@ -38,7 +38,7 @@ assert.commandWorked(masterDB.runCommand(
 assert.commandWorked(masterDB.runCommand(
     {applyOps: [{op: "c", ns: masterDB.getName() + ".$cmd", o: {create: "keep2", temp: 0}}]}));
 masterDB.runCommand({create: 'keep3'});
-assert.writeOK(masterDB.keep4.insert({}, {writeConcern: {w: 2}}));
+assert.commandWorked(masterDB.keep4.insert({}, {writeConcern: {w: 2}}));
 
 // make sure they exist on primary and secondary
 function countCollection(mydb, nameFilter) {

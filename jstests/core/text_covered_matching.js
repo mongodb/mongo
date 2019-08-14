@@ -17,9 +17,9 @@ const coll = db.text_covered_matching;
 
 coll.drop();
 assert.commandWorked(coll.createIndex({a: "text", b: 1}));
-assert.writeOK(coll.insert({a: "hello", b: 1, c: 1}));
-assert.writeOK(coll.insert({a: "world", b: 2, c: 2}));
-assert.writeOK(coll.insert({a: "hello world", b: 3, c: 3}));
+assert.commandWorked(coll.insert({a: "hello", b: 1, c: 1}));
+assert.commandWorked(coll.insert({a: "world", b: 2, c: 2}));
+assert.commandWorked(coll.insert({a: "hello world", b: 3, c: 3}));
 
 //
 // Test the query {$text: {$search: "hello"}, b: 1} with and without the 'textScore' in the
@@ -107,9 +107,9 @@ assert.eq(explainResult.executionStats.nReturned,
 //
 coll.drop();
 assert.commandWorked(coll.createIndex({a: "text", "b.d": 1}));
-assert.writeOK(coll.insert({a: "hello", b: {d: 1}, c: {e: 1}}));
-assert.writeOK(coll.insert({a: "world", b: {d: 2}, c: {e: 2}}));
-assert.writeOK(coll.insert({a: "hello world", b: {d: 3}, c: {e: 3}}));
+assert.commandWorked(coll.insert({a: "hello", b: {d: 1}, c: {e: 1}}));
+assert.commandWorked(coll.insert({a: "world", b: {d: 2}, c: {e: 2}}));
+assert.commandWorked(coll.insert({a: "hello world", b: {d: 3}, c: {e: 3}}));
 
 // Expected result:
 //   - We examine two keys, for the two documents with "hello" in their text;

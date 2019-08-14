@@ -21,7 +21,7 @@ function run(n) {
     let bulk = t.initializeUnorderedBulkOp();
     for (let i = 0; i < n; i++)
         bulk.insert({_id: i});
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 
     const join = startParallelShell("sleep(50);" +
                                     "db.cursora.remove({});");

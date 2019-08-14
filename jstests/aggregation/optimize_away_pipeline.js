@@ -18,9 +18,9 @@ load("jstests/libs/fixture_helpers.js");  // For 'isMongos' and 'isSharded'.
 
 const coll = db.optimize_away_pipeline;
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, x: 10}));
-assert.writeOK(coll.insert({_id: 2, x: 20}));
-assert.writeOK(coll.insert({_id: 3, x: 30}));
+assert.commandWorked(coll.insert({_id: 1, x: 10}));
+assert.commandWorked(coll.insert({_id: 2, x: 20}));
+assert.commandWorked(coll.insert({_id: 3, x: 30}));
 
 // Asserts that the give pipeline has *not* been optimized away and the request is answered
 // using the aggregation module. There should be pipeline stages present in the explain output.
@@ -144,7 +144,7 @@ assertPipelineDoesNotUseAggregation(
 // Pipelines with a collation.
 
 // Test a simple pipeline with a case-insensitive collation.
-assert.writeOK(coll.insert({_id: 4, x: 40, b: "abc"}));
+assert.commandWorked(coll.insert({_id: 4, x: 40, b: "abc"}));
 assertPipelineDoesNotUseAggregation({
     pipeline: [{$match: {b: "ABC"}}],
     pipelineOptions: {collation: {locale: "en_US", strength: 2}},
@@ -182,7 +182,7 @@ assert.commandWorked(coll.dropIndexes());
 // Pipelines which cannot be optimized away.
 
 // TODO SERVER-40254: Uncovered queries.
-assert.writeOK(coll.insert({_id: 4, x: 40, a: {b: "ab1"}}));
+assert.commandWorked(coll.insert({_id: 4, x: 40, a: {b: "ab1"}}));
 assertPipelineUsesAggregation({
     pipeline: [{$project: {x: 1, _id: 0}}],
     expectedStage: "COLLSCAN",

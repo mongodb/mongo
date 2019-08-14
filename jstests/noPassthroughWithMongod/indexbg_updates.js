@@ -19,7 +19,7 @@ for (var i = 0; i < numDocs; i++) {
 
     bulk.insert(doc);
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 // Perform a bulk update on a single document, targeting the updates on the
 // field being actively indexed in the background
@@ -50,7 +50,7 @@ var backgroundIndexBuildShell = startParallelShell(
 );
 
 print("Do some sets and unsets");
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 print("Start background index build");
 backgroundIndexBuildShell();

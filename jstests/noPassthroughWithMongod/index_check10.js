@@ -106,7 +106,7 @@ function doIt() {
     for (var i = 0; i < 10000; ++i) {
         bulk.insert(obj());
     }
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 
     t.ensureIndex(idx);
     check();
@@ -120,12 +120,12 @@ function doIt() {
         }
         if (Random.rand() > 0.999) {
             print(i);
-            assert.writeOK(bulk.execute());
+            assert.commandWorked(bulk.execute());
             check();
             bulk = t.initializeUnorderedBulkOp();
         }
     }
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
     check();
 }
 

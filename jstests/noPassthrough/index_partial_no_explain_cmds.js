@@ -10,8 +10,8 @@ coll.drop();
 
 assert.commandWorked(coll.ensureIndex({x: 1}, {partialFilterExpression: {a: 1}}));
 
-assert.writeOK(coll.insert({_id: 1, x: 5, a: 2}));  // Not in index.
-assert.writeOK(coll.insert({_id: 2, x: 6, a: 1}));  // In index.
+assert.commandWorked(coll.insert({_id: 1, x: 5, a: 2}));  // Not in index.
+assert.commandWorked(coll.insert({_id: 2, x: 6, a: 1}));  // In index.
 
 // Verify we will throw if the partial index can't be used.
 assert.throws(function() {

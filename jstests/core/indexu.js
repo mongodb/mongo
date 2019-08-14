@@ -11,7 +11,7 @@ var dupDoc2 = {a: [{'1': 1}, 'c']};
 var noDupDoc = {a: [{'1': 1}]};
 
 // Test that we can't index dupDoc.
-assert.writeOK(t.save(dupDoc));
+assert.commandWorked(t.save(dupDoc));
 assert.commandFailed(t.ensureIndex({'a.0': 1}));
 
 t.remove({});
@@ -20,7 +20,7 @@ assert.writeError(t.save(dupDoc));
 
 // Test that we can't index dupDoc2.
 t.drop();
-assert.writeOK(t.save(dupDoc2));
+assert.commandWorked(t.save(dupDoc2));
 assert.commandFailed(t.ensureIndex({'a.1': 1}));
 
 t.remove({});
@@ -30,22 +30,22 @@ assert.writeError(t.save(dupDoc2));
 // Test that we can index dupDoc with a different index.
 t.drop();
 t.ensureIndex({'a.b': 1});
-assert.writeOK(t.save(dupDoc));
+assert.commandWorked(t.save(dupDoc));
 
 // Test number field starting with hyphen.
 t.drop();
 t.ensureIndex({'a.-1': 1});
-assert.writeOK(t.save({a: [{'-1': 1}]}));
+assert.commandWorked(t.save({a: [{'-1': 1}]}));
 
 // Test number field starting with zero.
 t.drop();
 t.ensureIndex({'a.00': 1});
-assert.writeOK(t.save({a: [{'00': 1}]}));
+assert.commandWorked(t.save({a: [{'00': 1}]}));
 
 // Test multiple array indexes
 t.drop();
 t.ensureIndex({'a.0': 1, 'a.1': 1});
-assert.writeOK(t.save({a: [{'1': 1}]}));
+assert.commandWorked(t.save({a: [{'1': 1}]}));
 assert.writeError(t.save({a: [{'1': 1}, 4]}));
 
 // Test that we can index noDupDoc.
@@ -57,7 +57,7 @@ assert.commandWorked(t.ensureIndex({'a.1': 1}));
 t.drop();
 t.ensureIndex({'a.0': 1});
 t.ensureIndex({'a.1': 1});
-assert.writeOK(t.save(noDupDoc));
+assert.commandWorked(t.save(noDupDoc));
 
 // Test that we can query noDupDoc.
 assert.eq(1, t.find({'a.1': 1}).hint({'a.1': 1}).itcount());
@@ -80,7 +80,7 @@ assert.commandFailed(t.ensureIndex({'a.0.0': 1}));
 
 // Check where there is a duplicate for a fully addressed field.
 t.drop();
-assert.writeOK(t.save({a: [[1], {'0': [1]}]}));
+assert.commandWorked(t.save({a: [[1], {'0': [1]}]}));
 assert.commandFailed(t.ensureIndex({'a.0.0': 1}));
 
 // Two ways of addressing parse to an array.

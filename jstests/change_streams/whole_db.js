@@ -27,7 +27,7 @@ let cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collecti
 assert.eq(0, cursor.firstBatch.length, "Cursor had changes: " + tojson(cursor));
 
 // Test that the change stream returns an inserted doc.
-assert.writeOK(db.t1.insert({_id: 0, a: 1}));
+assert.commandWorked(db.t1.insert({_id: 0, a: 1}));
 let expected = {
     documentKey: {_id: 0},
     fullDocument: {_id: 0, a: 1},
@@ -38,7 +38,7 @@ cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
 
 // Test that the change stream returns another inserted doc in a different collection but still
 // in the target db.
-assert.writeOK(db.t2.insert({_id: 0, a: 2}));
+assert.commandWorked(db.t2.insert({_id: 0, a: 2}));
 expected = {
     documentKey: {_id: 0},
     fullDocument: {_id: 0, a: 2},
@@ -53,7 +53,7 @@ const validSystemColls = ["system", "systems.views", "ssystem.views", "test.syst
 validSystemColls.forEach(collName => {
     cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
     const coll = db.getCollection(collName);
-    assert.writeOK(coll.insert({_id: 0, a: 1}));
+    assert.commandWorked(coll.insert({_id: 0, a: 1}));
     expected = [
         {
             documentKey: {_id: 0},
@@ -69,7 +69,7 @@ validSystemColls.forEach(collName => {
     // Insert to the test collection to queue up another change after the drop. This is needed
     // since the number of 'drop' notifications is not deterministic in the sharded passthrough
     // suites.
-    assert.writeOK(coll.insert({_id: 0}));
+    assert.commandWorked(coll.insert({_id: 0}));
     cst.consumeDropUpTo({
         cursor: cursor,
         dropType: "drop",

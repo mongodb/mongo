@@ -34,7 +34,7 @@ assertLastOplog({_id: 1}, null, "save -- setup ");
 var msg = "IncRewriteExistingField: $inc $set";
 coll.save({_id: 1, a: 2});
 assertLastOplog({_id: 1, a: 2}, {_id: 1}, "save " + msg);
-var res = assert.writeOK(coll.update({}, {$inc: {a: 1}, $set: {b: 2}}));
+var res = assert.commandWorked(coll.update({}, {$inc: {a: 1}, $set: {b: 2}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: 3, b: 2}, coll.findOne({}), msg);
 assertLastOplog({$v: 1, $set: {a: 3, b: 2}}, {_id: 1}, msg);
@@ -42,7 +42,7 @@ assertLastOplog({$v: 1, $set: {a: 3, b: 2}}, {_id: 1}, msg);
 var msg = "IncRewriteNonExistingField: $inc $set";
 coll.save({_id: 1, c: 0});
 assertLastOplog({_id: 1, c: 0}, {_id: 1}, "save " + msg);
-res = assert.writeOK(coll.update({}, {$inc: {a: 1}, $set: {b: 2}}));
+res = assert.commandWorked(coll.update({}, {$inc: {a: 1}, $set: {b: 2}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, c: 0, a: 1, b: 2}, coll.findOne({}), msg);
 assertLastOplog({$v: 1, $set: {a: 1, b: 2}}, {_id: 1}, msg);
@@ -50,7 +50,7 @@ assertLastOplog({$v: 1, $set: {a: 1, b: 2}}, {_id: 1}, msg);
 var msg = "TwoNestedPulls: two $pull";
 coll.save({_id: 1, a: {b: [1, 2], c: [1, 2]}});
 assertLastOplog({_id: 1, a: {b: [1, 2], c: [1, 2]}}, {_id: 1}, "save " + msg);
-res = assert.writeOK(coll.update({}, {$pull: {'a.b': 2, 'a.c': 2}}));
+res = assert.commandWorked(coll.update({}, {$pull: {'a.b': 2, 'a.c': 2}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: {b: [1], c: [1]}}, coll.findOne({}), msg);
 assertLastOplog({$v: 1, $set: {'a.b': [1], 'a.c': [1]}}, {_id: 1}, msg);
@@ -58,7 +58,7 @@ assertLastOplog({$v: 1, $set: {'a.b': [1], 'a.c': [1]}}, {_id: 1}, msg);
 var msg = "MultiSets: two $set";
 coll.save({_id: 1, a: 1, b: 1});
 assertLastOplog({_id: 1, a: 1, b: 1}, {_id: 1}, "save " + msg);
-res = assert.writeOK(coll.update({}, {$set: {a: 2, b: 2}}));
+res = assert.commandWorked(coll.update({}, {$set: {a: 2, b: 2}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: 2, b: 2}, coll.findOne({}), msg);
 assertLastOplog({$v: 1, $set: {a: 2, b: 2}}, {_id: 1}, msg);
@@ -68,36 +68,36 @@ assertLastOplog({$v: 1, $set: {a: 2, b: 2}}, {_id: 1}, msg);
 var msg = "bad single $set";
 coll.save({_id: 1, a: 1});
 assertLastOplog({_id: 1, a: 1}, {_id: 1}, "save " + msg);
-res = assert.writeOK(coll.update({}, {$set: {a: 2}}));
+res = assert.commandWorked(coll.update({}, {$set: {a: 2}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: 2}, coll.findOne({}), msg);
 assertLastOplog({$v: 1, $set: {a: 2}}, {_id: 1}, msg);
 
 var msg = "bad single $inc";
-res = assert.writeOK(coll.update({}, {$inc: {a: 1}}));
+res = assert.commandWorked(coll.update({}, {$inc: {a: 1}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: 3}, coll.findOne({}), msg);
 assertLastOplog({$v: 1, $set: {a: 3}}, {_id: 1}, msg);
 
 var msg = "bad double $set";
-res = assert.writeOK(coll.update({}, {$set: {a: 2, b: 2}}));
+res = assert.commandWorked(coll.update({}, {$set: {a: 2, b: 2}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: 2, b: 2}, coll.findOne({}), msg);
 assertLastOplog({$v: 1, $set: {a: 2, b: 2}}, {_id: 1}, msg);
 
 var msg = "bad save";
-assert.writeOK(coll.save({_id: 1, a: [2]}));
+assert.commandWorked(coll.save({_id: 1, a: [2]}));
 assert.docEq({_id: 1, a: [2]}, coll.findOne({}), msg);
 assertLastOplog({_id: 1, a: [2]}, {_id: 1}, msg);
 
 var msg = "bad array $inc";
-res = assert.writeOK(coll.update({}, {$inc: {"a.0": 1}}));
+res = assert.commandWorked(coll.update({}, {$inc: {"a.0": 1}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: [3]}, coll.findOne({}), msg);
 var lastTS = assertLastOplog({$v: 1, $set: {"a.0": 3}}, {_id: 1}, msg);
 
 var msg = "bad $setOnInsert";
-res = assert.writeOK(coll.update({}, {$setOnInsert: {a: -1}}));
+res = assert.commandWorked(coll.update({}, {$setOnInsert: {a: -1}}));
 assert.eq(res.nMatched, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: [3]}, coll.findOne({}), msg);                    // No-op
 var otherTS = assertLastOplog({$v: 1, $set: {"a.0": 3}}, {_id: 1}, msg);  // Nothing new
@@ -107,7 +107,7 @@ coll.remove({});
 assert.eq(coll.find().itcount(), 0, "collection not empty");
 
 var msg = "bad $setOnInsert w/upsert";
-res = assert.writeOK(coll.update({}, {$setOnInsert: {a: 200}}, {upsert: true}));  // upsert
+res = assert.commandWorked(coll.update({}, {$setOnInsert: {a: 200}}, {upsert: true}));  // upsert
 assert.eq(res.nUpserted, 1, "update failed for '" + msg + "': " + res.toString());
 var id = res.getUpsertedId()._id;
 assert.docEq({_id: id, a: 200}, coll.findOne({}), msg);  // No-op
@@ -131,21 +131,22 @@ assertLastOplog({$set:{"a": [1,2,3]}}, {_id:1}, msg); // new format
 
 var msg = "bad array $push 2";
 coll.save({_id: 1, a: "foo"});
-res = assert.writeOK(coll.update({}, {$push: {c: 18}}));
+res = assert.commandWorked(coll.update({}, {$push: {c: 18}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: "foo", c: [18]}, coll.findOne({}), msg);
 assertLastOplog({$v: 1, $set: {"c": [18]}}, {_id: 1}, msg);
 
 var msg = "bad array $push $slice";
 coll.save({_id: 1, a: {b: [18]}});
-res = assert.writeOK(coll.update({_id: {$gt: 0}}, {$push: {"a.b": {$each: [1, 2], $slice: -2}}}));
+res = assert.commandWorked(
+    coll.update({_id: {$gt: 0}}, {$push: {"a.b": {$each: [1, 2], $slice: -2}}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: {b: [1, 2]}}, coll.findOne({}), msg);
 assertLastOplog({$v: 1, $set: {"a.b": [1, 2]}}, {_id: 1}, msg);
 
 var msg = "bad array $push $sort ($slice -100)";
 coll.save({_id: 1, a: {b: [{c: 2}, {c: 1}]}});
-res = assert.writeOK(
+res = assert.commandWorked(
     coll.update({}, {$push: {"a.b": {$each: [{c: -1}], $sort: {c: 1}, $slice: -100}}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: {b: [{c: -1}, {c: 1}, {c: 2}]}}, coll.findOne({}), msg);
@@ -153,7 +154,7 @@ assertLastOplog({$v: 1, $set: {"a.b": [{c: -1}, {c: 1}, {c: 2}]}}, {_id: 1}, msg
 
 var msg = "bad array $push $slice $sort";
 coll.save({_id: 1, a: [{b: 2}, {b: 1}]});
-res = assert.writeOK(
+res = assert.commandWorked(
     coll.update({_id: {$gt: 0}}, {$push: {a: {$each: [{b: -1}], $slice: -2, $sort: {b: 1}}}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: [{b: 1}, {b: 2}]}, coll.findOne({}), msg);
@@ -161,7 +162,7 @@ assertLastOplog({$v: 1, $set: {a: [{b: 1}, {b: 2}]}}, {_id: 1}, msg);
 
 var msg = "bad array $push $slice $sort first two";
 coll.save({_id: 1, a: {b: [{c: 2}, {c: 1}]}});
-res = assert.writeOK(
+res = assert.commandWorked(
     coll.update({_id: {$gt: 0}}, {$push: {"a.b": {$each: [{c: -1}], $slice: -2, $sort: {c: 1}}}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: {b: [{c: 1}, {c: 2}]}}, coll.findOne({}), msg);
@@ -169,7 +170,7 @@ assertLastOplog({$v: 1, $set: {"a.b": [{c: 1}, {c: 2}]}}, {_id: 1}, msg);
 
 var msg = "bad array $push $slice $sort reversed first two";
 coll.save({_id: 1, a: {b: [{c: 1}, {c: 2}]}});
-res = assert.writeOK(
+res = assert.commandWorked(
     coll.update({_id: {$gt: 0}}, {$push: {"a.b": {$each: [{c: -1}], $slice: -2, $sort: {c: -1}}}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: {b: [{c: 1}, {c: -1}]}}, coll.findOne({}), msg);

@@ -13,7 +13,7 @@ var st = new ShardingTest({shards: {rs0: {nodes: 2}}});
 
 jsTest.log('Config nodes up: 3 of 3, shard nodes up: 2 of 2: ' +
            'Insert test data to work with');
-assert.writeOK(st.s0.getDB('TestDB').TestColl.update(
+assert.commandWorked(st.s0.getDB('TestDB').TestColl.update(
     {_id: 0}, {$inc: {count: 1}}, {upsert: true, writeConcern: {w: 2, wtimeout: 30000}}));
 assert.eq([{_id: 0, count: 1}], st.s0.getDB('TestDB').TestColl.find().toArray());
 
@@ -21,7 +21,7 @@ jsTest.log('Config nodes up: 2 of 3, shard nodes up: 2 of 2: ' +
            'Inserts and queries must work');
 st.configRS.stop(0);
 st.restartMongos(0);
-assert.writeOK(st.s0.getDB('TestDB').TestColl.update(
+assert.commandWorked(st.s0.getDB('TestDB').TestColl.update(
     {_id: 0}, {$inc: {count: 1}}, {upsert: true, writeConcern: {w: 2, wtimeout: 30000}}));
 assert.eq([{_id: 0, count: 2}], st.s0.getDB('TestDB').TestColl.find().toArray());
 
@@ -29,7 +29,7 @@ jsTest.log('Config nodes up: 1 of 3, shard nodes up: 2 of 2: ' +
            'Inserts and queries must work');
 st.configRS.stop(1);
 st.restartMongos(0);
-assert.writeOK(st.s0.getDB('TestDB').TestColl.update(
+assert.commandWorked(st.s0.getDB('TestDB').TestColl.update(
     {_id: 0}, {$inc: {count: 1}}, {upsert: true, writeConcern: {w: 2, wtimeout: 30000}}));
 assert.eq([{_id: 0, count: 3}], st.s0.getDB('TestDB').TestColl.find().toArray());
 

@@ -31,7 +31,7 @@ const bulkOp = coll.initializeOrderedBulkOp();
 for (var i = 0; i < nDocs; ++i) {
     bulkOp.insert({_id: i, x: Math.floor(i / 2), y: yValues[i]});
 }
-assert.writeOK(bulkOp.execute());
+assert.commandWorked(bulkOp.execute());
 
 // Split the data into 3 chunks
 assert.commandWorked(shardingTest.s0.adminCommand({split: coll.getFullName(), middle: {_id: 3}}));
@@ -141,7 +141,7 @@ const textColl = db.sharded_agg_sort_text;
 assert.commandWorked(
     shardingTest.s0.adminCommand({shardCollection: textColl.getFullName(), key: {_id: 1}}));
 
-assert.writeOK(textColl.insert([
+assert.commandWorked(textColl.insert([
     {_id: 0, text: "apple"},
     {_id: 1, text: "apple orange banana apple"},
     {_id: 2, text: "apple orange"},

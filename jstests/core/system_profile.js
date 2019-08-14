@@ -43,7 +43,7 @@ assert.commandFailed(testDB.system.profile.runCommand("findAndModify", {query: {
 
 // Using mapReduce to write to "system.profile" should fail.
 assert.commandWorked(testDB.dropDatabase());
-assert.writeOK(testDB.foo.insert({val: 1}));
+assert.commandWorked(testDB.foo.insert({val: 1}));
 assert.commandFailed(testDB.foo.runCommand("mapReduce", {
     map: function() {
         emit(0, this.val);
@@ -56,7 +56,7 @@ assert.commandFailed(testDB.foo.runCommand("mapReduce", {
 
 // Using aggregate to write to "system.profile" should fail.
 assert.commandWorked(testDB.dropDatabase());
-assert.writeOK(testDB.foo.insert({val: 1}));
+assert.commandWorked(testDB.foo.insert({val: 1}));
 assert.commandFailed(testDB.foo.runCommand("aggregate", {pipeline: [{$out: "system.profile"}]}));
 
 // Renaming to/from "system.profile" should fail.

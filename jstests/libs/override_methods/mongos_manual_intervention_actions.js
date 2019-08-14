@@ -17,7 +17,7 @@ var ManualInterventionActions = (function() {
         let stillHasChunks = true;
 
         while (stillHasChunks) {
-            let writeRes = assert.writeOK(mongosConn.getDB('config').chunks.remove(
+            let writeRes = assert.commandWorked(mongosConn.getDB('config').chunks.remove(
                 {ns: ns}, {justOne: true, writeConcern: {w: 'majority'}}));
             stillHasChunks = writeRes.nRemoved > 0;
         }

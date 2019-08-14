@@ -129,7 +129,7 @@ for (var i = 0; i < 100; i++) {
         continue;
     bulk.insert({x: i});
 }
-assert.writeOK(bulk.execute({w: 3}));
+assert.commandWorked(bulk.execute({w: 3}));
 
 // Counts pass the options of the connection - which is slaveOk'd, so we need to wait for
 // replication for this and future tests to pass
@@ -225,7 +225,7 @@ rs.getSecondaries().forEach(function(secondary) {
 
 // Modify data only on the primary replica of the primary shard.
 // { x: 60 } goes to the shard of "rs", which is the primary shard.
-assert.writeOK(ts.insert({primaryOnly: true, x: 60}));
+assert.commandWorked(ts.insert({primaryOnly: true, x: 60}));
 // Read from secondary through mongos, the doc is not there due to replication delay or fsync.
 // But we can guarantee not to read from primary.
 assert.eq(0, ts.find({primaryOnly: true, x: 60}).itcount());
@@ -234,7 +234,7 @@ rs.getSecondaries().forEach(function(secondary) {
     secondary.getDB("test").fsyncUnlock();
 });
 // Clean up the data
-assert.writeOK(ts.remove({primaryOnly: true, x: 60}, {writeConcern: {w: 3}}));
+assert.commandWorked(ts.remove({primaryOnly: true, x: 60}, {writeConcern: {w: 3}}));
 
 for (var i = 0; i < 10; i++) {
     m = new Mongo(s.s.name);

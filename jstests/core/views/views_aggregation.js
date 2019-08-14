@@ -44,7 +44,7 @@ let bulk = coll.initializeUnorderedBulkOp();
 allDocuments.forEach(function(doc) {
     bulk.insert(doc);
 });
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 // Create views on the data.
 assert.commandWorked(viewsDB.runCommand({create: "emptyPipelineView", viewOn: "coll"}));
@@ -104,7 +104,7 @@ assert.commandWorked(
 
 viewsDB.invalidDocs.drop();
 viewsDB.invalidDocsView.drop();
-assert.writeOK(viewsDB.invalidDocs.insert({illegalField: "present"}));
+assert.commandWorked(viewsDB.invalidDocs.insert({illegalField: "present"}));
 assert.commandWorked(viewsDB.createView("invalidDocsView", "invalidDocs", []));
 
 assert.commandWorked(
@@ -122,7 +122,7 @@ const largeStrSize = 10 * 1024 * 1024;
 const largeStr = new Array(largeStrSize).join('x');
 viewsDB.largeColl.drop();
 for (let i = 0; i <= extSortLimit / largeStrSize; ++i) {
-    assert.writeOK(viewsDB.largeColl.insert({x: i, largeStr: largeStr}));
+    assert.commandWorked(viewsDB.largeColl.insert({x: i, largeStr: largeStr}));
 }
 assertErrorCode(viewsDB.largeColl,
                 [{$sort: {x: -1}}],

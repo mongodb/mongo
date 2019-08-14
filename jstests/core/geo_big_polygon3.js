@@ -132,7 +132,7 @@ objects = [
 // Insert GeoJson strictCRS objects
 // Since there is no 2dsphere index, they can be inserted
 objects.forEach(function(o) {
-    assert.writeOK(coll.insert(o), "Geo Json strictCRS insert" + o.name);
+    assert.commandWorked(coll.insert(o), "Geo Json strictCRS insert" + o.name);
 });
 
 // Use Polygon to search for objects which should be ignored
@@ -207,7 +207,7 @@ objects = [
 
 // Insert GeoJson crs84CRS & epsg4326CRS objects
 objects.forEach(function(o) {
-    assert.writeOK(coll.insert(o), "Geo Json insert" + o.name);
+    assert.commandWorked(coll.insert(o), "Geo Json insert" + o.name);
 });
 
 // Make sure stored crs84CRS & epsg4326CRS documents can be found

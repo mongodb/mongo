@@ -9,7 +9,7 @@ load('jstests/aggregation/extras/utils.js');
 var coll = db.agg_concat_arrays_expr;
 coll.drop();
 
-assert.writeOK(coll.insert({a: [1, 2], b: ['three'], c: [], d: [[3], 4], e: null, str: 'x'}));
+assert.commandWorked(coll.insert({a: [1, 2], b: ['three'], c: [], d: [[3], 4], e: null, str: 'x'}));
 
 // Basic concatenation.
 var pipeline = [{$project: {_id: 0, all: {$concatArrays: ['$a', '$b', '$c']}}}];

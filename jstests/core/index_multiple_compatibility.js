@@ -58,40 +58,40 @@ function testIndexCompat(coll, index1, index2, both) {
 
     // Check index 1 document.
     if (index1.hasOwnProperty('doc')) {
-        assert.writeOK(coll.insert(index1.doc));
+        assert.commandWorked(coll.insert(index1.doc));
         assert.eq(coll.find(index1.doc).hint(index1.index.name).itcount(), 1);
         assert.eq(coll.find(index1.doc).hint(index2.index.name).itcount(), 0);
     }
 
     // Check index 2 document.
     if (index2.hasOwnProperty('doc')) {
-        assert.writeOK(coll.insert(index2.doc));
+        assert.commandWorked(coll.insert(index2.doc));
         assert.eq(coll.find(index2.doc).hint(index2.index.name).itcount(), 1);
         assert.eq(coll.find(index2.doc).hint(index1.index.name).itcount(), 0);
     }
 
     // Check for present of both in both index1 and index2.
     if (typeof both !== "undefined") {
-        assert.writeOK(coll.insert(both));
+        assert.commandWorked(coll.insert(both));
         assert.eq(coll.find(both).hint(index1.index.name).itcount(), 1);
         assert.eq(coll.find(both).hint(index2.index.name).itcount(), 1);
     }
 
     // Remove index 1 document.
     if (index1.hasOwnProperty('doc')) {
-        assert.writeOK(coll.remove(index1.doc));
+        assert.commandWorked(coll.remove(index1.doc));
         assert.eq(coll.find(index1.doc).hint(index1.index.name).itcount(), 0);
     }
 
     // Remove index 2 document.
     if (index2.hasOwnProperty('doc')) {
-        assert.writeOK(coll.remove(index2.doc));
+        assert.commandWorked(coll.remove(index2.doc));
         assert.eq(coll.find(index2.doc).hint(index2.index.name).itcount(), 0);
     }
 
     // Remove both.
     if (typeof both !== "undefined") {
-        assert.writeOK(coll.remove(both));
+        assert.commandWorked(coll.remove(both));
         assert.eq(coll.find(both).hint(index1.index.name).itcount(), 0);
         assert.eq(coll.find(both).hint(index2.index.name).itcount(), 0);
     }
@@ -188,7 +188,7 @@ testIndexCompat(coll,
                 {a: "foo"});
 
 // Test that unique constraints are still enforced.
-assert.writeOK(coll.insert({a: "f"}));
+assert.commandWorked(coll.insert({a: "f"}));
 assert.writeError(coll.insert({a: "F"}));
 
 // A unique partial index and non-unique index.
@@ -206,10 +206,10 @@ testIndexCompat(
     {index: {key: {a: 1}, name: "a", collation: enUSStrength2, unique: false}, doc: {a: "foo"}},
     {a: 5});
 
-assert.writeOK(coll.insert({a: 5}));
+assert.commandWorked(coll.insert({a: 5}));
 // Test that uniqueness is only enforced by the partial index.
-assert.writeOK(coll.insert({a: "foo"}));
-assert.writeOK(coll.insert({a: "foo"}));
+assert.commandWorked(coll.insert({a: "foo"}));
+assert.commandWorked(coll.insert({a: "foo"}));
 assert.writeError(coll.insert({a: 5}));
 
 // Two unique indexes with different collations.
@@ -219,7 +219,7 @@ testIndexCompat(coll,
                 {a: "a"});
 
 // Unique enforced on both indexes.
-assert.writeOK(coll.insert({a: "a"}));
+assert.commandWorked(coll.insert({a: "a"}));
 assert.writeError(coll.insert({a: "a"}));
 assert.writeError(coll.insert({a: "A"}));
 
@@ -232,8 +232,8 @@ testIndexCompat(
     {index: {key: {a: 1}, name: "a2", collation: enUSStrength2, unique: false}, doc: {b: 0}},
     {a: "a"});
 
-assert.writeOK(coll.insert({a: "a"}));
-assert.writeOK(coll.insert({}));
-assert.writeOK(coll.insert({}));
+assert.commandWorked(coll.insert({a: "a"}));
+assert.commandWorked(coll.insert({}));
+assert.commandWorked(coll.insert({}));
 assert.writeError(coll.insert({a: "a"}));
 })();

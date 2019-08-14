@@ -60,16 +60,16 @@ for (let rs of [st.rs0, st.rs1]) {
 }
 
 // Write a document to each chunk.
-assert.writeOK(mongosColl.insert({_id: -1}, {writeConcern: {w: "majority"}}));
-assert.writeOK(mongosColl.insert({_id: 1}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: -1}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: 1}, {writeConcern: {w: "majority"}}));
 
 // Test that change streams go to the primary by default.
 let changeStreamComment = "change stream against primary";
 const primaryStream = mongosColl.aggregate([{$changeStream: {fullDocument: "updateLookup"}}],
                                            {comment: changeStreamComment});
 
-assert.writeOK(mongosColl.update({_id: -1}, {$set: {updated: true}}));
-assert.writeOK(mongosColl.update({_id: 1}, {$set: {updated: true}}));
+assert.commandWorked(mongosColl.update({_id: -1}, {$set: {updated: true}}));
+assert.commandWorked(mongosColl.update({_id: 1}, {$set: {updated: true}}));
 
 assert.soon(() => primaryStream.hasNext());
 assert.eq(primaryStream.next().fullDocument, {_id: -1, updated: true});
@@ -100,8 +100,8 @@ const secondaryStream =
     mongosColl.aggregate([{$changeStream: {fullDocument: "updateLookup"}}],
                          {comment: changeStreamComment, $readPreference: {mode: "secondary"}});
 
-assert.writeOK(mongosColl.update({_id: -1}, {$set: {updatedCount: 2}}));
-assert.writeOK(mongosColl.update({_id: 1}, {$set: {updatedCount: 2}}));
+assert.commandWorked(mongosColl.update({_id: -1}, {$set: {updatedCount: 2}}));
+assert.commandWorked(mongosColl.update({_id: 1}, {$set: {updatedCount: 2}}));
 
 assert.soon(() => secondaryStream.hasNext());
 assert.eq(secondaryStream.next().fullDocument, {_id: -1, updated: true, updatedCount: 2});

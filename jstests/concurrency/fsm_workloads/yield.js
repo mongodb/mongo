@@ -68,7 +68,7 @@ var $config = (function() {
                 return;
             }
             var updateDoc = this.genUpdateDoc();
-            assertAlways.writeOK(db[collName].update(randDoc, updateDoc));
+            assertAlways.commandWorked(db[collName].update(randDoc, updateDoc));
         },
 
         /*
@@ -80,9 +80,9 @@ var $config = (function() {
             var doc = db[collName].findOne({_id: id});
             if (doc !== null) {
                 var res = db[collName].remove({_id: id});
-                assertAlways.writeOK(res);
+                assertAlways.commandWorked(res);
                 if (res.nRemoved > 0) {
-                    assertAlways.writeOK(db[collName].insert(doc));
+                    assertAlways.commandWorked(db[collName].insert(doc));
                 }
             }
         },
@@ -144,7 +144,7 @@ var $config = (function() {
             bulk.find({_id: i}).upsert().updateOne(
                 {$set: {a: i, b: N - i, c: i, d: N - i, yield_text: word}});
         }
-        assertAlways.writeOK(bulk.execute());
+        assertAlways.commandWorked(bulk.execute());
     }
 
     /*

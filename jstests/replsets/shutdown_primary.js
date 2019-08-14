@@ -25,13 +25,13 @@ replTest.initiate();
 var primary = replTest.getPrimary();
 var testDB = primary.getDB(name);
 var timeout = ReplSetTest.kDefaultTimeoutMS;
-assert.writeOK(testDB.foo.insert({x: 1}, {writeConcern: {w: 3, wtimeout: timeout}}));
+assert.commandWorked(testDB.foo.insert({x: 1}, {writeConcern: {w: 3, wtimeout: timeout}}));
 
 jsTestLog("Blocking replication to secondaries.");
 stopReplicationOnSecondaries(replTest);
 
 jsTestLog("Executing write to primary.");
-assert.writeOK(testDB.foo.insert({x: 2}));
+assert.commandWorked(testDB.foo.insert({x: 2}));
 
 jsTestLog("Attempting to shut down primary.");
 assert.commandFailedWithCode(primary.adminCommand({shutdown: 1}),
@@ -39,7 +39,7 @@ assert.commandFailedWithCode(primary.adminCommand({shutdown: 1}),
                              "shut down did not fail with 'ExceededTimeLimit'");
 
 jsTestLog("Verifying primary did not shut down.");
-assert.writeOK(testDB.foo.insert({x: 3}));
+assert.commandWorked(testDB.foo.insert({x: 3}));
 
 jsTestLog("Shutting down primary in a parallel shell");
 var awaitShell = startParallelShell(function() {

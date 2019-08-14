@@ -9,8 +9,8 @@ assert.commandWorked(st.s0.adminCommand({shardCollection: "test.foo", key: {_id:
 
 let db = st.s0.getDB("test");
 
-assert.writeOK(db.foo.insert([{}, {}, {}, {}]));
-assert.writeOK(db.bar.insert({_id: 1, x: 1}));
+assert.commandWorked(db.foo.insert([{}, {}, {}, {}]));
+assert.commandWorked(db.bar.insert({_id: 1, x: 1}));
 
 const res = db.foo
                     .aggregate([{

@@ -23,7 +23,7 @@ const unshardedViewName = "unsharded_view";
 const viewOnShardedViewName = "sharded_view_view";
 
 function setUpUnshardedCollectionAndView(st, session, primaryShard) {
-    assert.writeOK(st.s.getDB(unshardedDbName)[unshardedCollName].insert(
+    assert.commandWorked(st.s.getDB(unshardedDbName)[unshardedCollName].insert(
         {_id: 1, x: "unsharded"}, {writeConcern: {w: "majority"}}));
     st.ensurePrimaryShard(unshardedDbName, primaryShard);
 
@@ -37,9 +37,9 @@ function setUpUnshardedCollectionAndView(st, session, primaryShard) {
 function setUpShardedCollectionAndView(st, session, primaryShard) {
     const ns = shardedDbName + "." + shardedCollName;
 
-    assert.writeOK(st.s.getDB(shardedDbName)[shardedCollName].insert(
+    assert.commandWorked(st.s.getDB(shardedDbName)[shardedCollName].insert(
         {_id: -1}, {writeConcern: {w: "majority"}}));
-    assert.writeOK(st.s.getDB(shardedDbName)[shardedCollName].insert(
+    assert.commandWorked(st.s.getDB(shardedDbName)[shardedCollName].insert(
         {_id: 1}, {writeConcern: {w: "majority"}}));
     assert.commandWorked(st.s.adminCommand({enableSharding: shardedDbName}));
     st.ensurePrimaryShard(shardedDbName, primaryShard);
@@ -270,7 +270,7 @@ function assertAggResultEqInTransaction(coll, pipeline, expected) {
 // is supported.
 const lookupDbName = "dbForLookup";
 const lookupCollName = "collForLookup";
-assert.writeOK(
+assert.commandWorked(
     st.s.getDB(lookupDbName)[lookupCollName].insert({_id: 1}, {writeConcern: {w: "majority"}}));
 const lookupColl = session.getDatabase(unshardedDbName)[unshardedCollName];
 

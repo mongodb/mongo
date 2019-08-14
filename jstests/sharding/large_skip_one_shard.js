@@ -18,7 +18,7 @@ assert(admin.runCommand({moveChunk: collSharded + "", find: {_id: 0}, to: st.sha
 
 function testSelectWithSkip(coll) {
     for (var i = -100; i < 100; i++) {
-        assert.writeOK(coll.insert({_id: i}));
+        assert.commandWorked(coll.insert({_id: i}));
     }
 
     // Run a query which only requires 5 results from a single shard

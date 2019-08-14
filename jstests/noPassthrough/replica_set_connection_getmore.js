@@ -28,7 +28,7 @@ coll.drop();
 
 // Insert several document so that we can use a cursor to fetch them in multiple batches.
 var res = coll.insert([{}, {}, {}, {}, {}]);
-assert.writeOK(res);
+assert.commandWorked(res);
 assert.eq(5, res.nInserted);
 
 // Wait for the secondary to catch up because we're going to try and do reads from it.

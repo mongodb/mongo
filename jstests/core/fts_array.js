@@ -40,14 +40,14 @@ assert.writeErrorWithCode(coll.insert({words: "macerate", y: [{z: 1}, {z: 2}]}),
 // Verify that array fields are allowed when positionally indexed.
 coll.drop();
 assert.commandWorked(coll.createIndex({"a.0": 1, words: "text"}));
-assert.writeOK(coll.insert({a: [0, 1, 2], words: "dander"}));
+assert.commandWorked(coll.insert({a: [0, 1, 2], words: "dander"}));
 assert.eq({a: [0, 1, 2], words: "dander"},
           coll.findOne({"a.0": 0, $text: {$search: "dander"}}, {_id: 0, a: 1, words: 1}));
 assert.writeErrorWithCode(coll.insert({a: [[8, 9], 1, 2], words: "dander"}),
                           ErrorCodes.CannotBuildIndexKeys);
 coll.drop();
 assert.commandWorked(coll.createIndex({"a.0.1": 1, words: "text"}));
-assert.writeOK(coll.insert({a: [[8, 9], 1, 2], words: "dander"}));
+assert.commandWorked(coll.insert({a: [[8, 9], 1, 2], words: "dander"}));
 assert.eq({a: [[8, 9], 1, 2], words: "dander"},
           coll.findOne({"a.0.1": 9, $text: {$search: "dander"}}, {_id: 0, a: 1, words: 1}));
 }());

@@ -11,16 +11,16 @@ var coll = db.ensure_sorted;
 
 coll.drop();
 assert.commandWorked(coll.createIndex({a: 1, b: 1}));
-assert.writeOK(coll.insert({a: 1, b: 4}));
-assert.writeOK(coll.insert({a: 2, b: 3}));
-assert.writeOK(coll.insert({a: 3, b: 2}));
-assert.writeOK(coll.insert({a: 4, b: 1}));
+assert.commandWorked(coll.insert({a: 1, b: 4}));
+assert.commandWorked(coll.insert({a: 2, b: 3}));
+assert.commandWorked(coll.insert({a: 3, b: 2}));
+assert.commandWorked(coll.insert({a: 4, b: 1}));
 
 var cursor = coll.find({a: {$lt: 5}}).sort({b: -1}).batchSize(2);
 cursor.next();  // {a: 1, b: 4}.
 cursor.next();  // {a: 2, b: 3}.
 
-assert.writeOK(coll.update({b: 2}, {$set: {b: 5}}));
+assert.commandWorked(coll.update({b: 2}, {$set: {b: 5}}));
 var result = cursor.next();
 
 // We might either drop the document where "b" is 2 from the result set, or we might include the

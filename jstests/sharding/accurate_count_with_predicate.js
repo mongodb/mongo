@@ -26,13 +26,13 @@ st.shardColl(shard0Coll.getName(), {x: 1}, {x: middle}, {x: middle + 1}, "test",
 
 // Insert some docs.
 for (let i = 0; i < num; i++) {
-    assert.writeOK(st.getDB("test").slowcount.insert(getNthDocument(i)));
+    assert.commandWorked(st.getDB("test").slowcount.insert(getNthDocument(i)));
 }
 
 // Insert some orphan documents to shard 0. These are just documents outside the range
 // which shard 0 owns.
 for (let i = middle + 1; i < middle + 3; i++) {
-    assert.writeOK(shard0Coll.insert(getNthDocument(i)));
+    assert.commandWorked(shard0Coll.insert(getNthDocument(i)));
 }
 
 // Run a count on the whole collection. The orphaned documents on shard 0 shouldn't be double

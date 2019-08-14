@@ -50,7 +50,7 @@ var ElectionHandoffTest = (function() {
         // Make sure all secondaries are ready before stepping down. We must additionally
         // make sure that the primary is aware that the secondaries are ready and caught up
         // to the primary's lastApplied, so we issue a dummy write and wait on its optime.
-        assert.writeOK(primary.getDB("test").secondariesMustBeCaughtUpToHere.insert(
+        assert.commandWorked(primary.getDB("test").secondariesMustBeCaughtUpToHere.insert(
             {"a": 1}, {writeConcern: {w: rst.nodes.length}}));
         rst.awaitNodesAgreeOnAppliedOpTime();
 

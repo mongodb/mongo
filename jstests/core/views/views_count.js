@@ -14,7 +14,7 @@ let bulk = coll.initializeUnorderedBulkOp();
 for (let i = 0; i < 10; i++) {
     bulk.insert({x: i});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 // Create views on the data.
 assert.commandWorked(viewsDB.runCommand({create: "identityView", viewOn: "coll"}));

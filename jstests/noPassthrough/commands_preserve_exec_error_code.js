@@ -11,7 +11,7 @@ const db = mongod.getDB("test");
 const coll = db.commands_preserve_exec_error_code;
 coll.drop();
 
-assert.writeOK(coll.insert([{_id: 0}, {_id: 1}, {_id: 2}]));
+assert.commandWorked(coll.insert([{_id: 0}, {_id: 1}, {_id: 2}]));
 assert.commandWorked(coll.createIndex({geo: "2d"}));
 
 assert.commandWorked(

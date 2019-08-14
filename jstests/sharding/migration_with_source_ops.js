@@ -53,9 +53,9 @@ assert.commandWorked(admin.runCommand({split: ns, middle: {a: 20}}));
 // 10 documents in each chunk on the donor
 jsTest.log('Inserting 20 docs into donor shard, 10 in each chunk....');
 for (var i = 0; i < 10; ++i)
-    assert.writeOK(coll.insert({a: i}));
+    assert.commandWorked(coll.insert({a: i}));
 for (var i = 20; i < 30; ++i)
-    assert.writeOK(coll.insert({a: i}));
+    assert.commandWorked(coll.insert({a: i}));
 assert.eq(20, coll.count());
 
 /**
@@ -99,15 +99,15 @@ var joinMoveChunk = moveChunkParallel(
 waitForMigrateStep(recipient, migrateStepNames.cloned);
 
 jsTest.log('Deleting 5 docs from each chunk, migrating chunk and remaining chunk...');
-assert.writeOK(coll.remove({$and: [{a: {$gte: 5}}, {a: {$lt: 25}}]}));
+assert.commandWorked(coll.remove({$and: [{a: {$gte: 5}}, {a: {$lt: 25}}]}));
 
 jsTest.log('Inserting 1 in the migrating chunk range and 1 in the remaining chunk range...');
-assert.writeOK(coll.insert({a: 10}));
-assert.writeOK(coll.insert({a: 30}));
+assert.commandWorked(coll.insert({a: 10}));
+assert.commandWorked(coll.insert({a: 30}));
 
 jsTest.log('Updating 1 in the migrating chunk range and 1 in the remaining chunk range...');
-assert.writeOK(coll.update({a: 0}, {a: 0, updatedData: "updated"}));
-assert.writeOK(coll.update({a: 25}, {a: 25, updatedData: "updated"}));
+assert.commandWorked(coll.update({a: 0}, {a: 0, updatedData: "updated"}));
+assert.commandWorked(coll.update({a: 25}, {a: 25, updatedData: "updated"}));
 
 /**
  * Finish migration. Unpause recipient migration, wait for it to collect

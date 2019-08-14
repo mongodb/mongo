@@ -15,17 +15,17 @@ t.drop();
 
 // Create doubles and NumberDecimals. The double 0.1 is actually 0.10000000000000000555
 // and the double 0.3 is actually 0.2999999999999999888, so we can check ordering.
-assert.writeOK(t.insert({x: 0.1, y: NumberDecimal('0.3000')}));
-assert.writeOK(t.insert({x: 0.1}));
-assert.writeOK(t.insert({y: 0.3}));
+assert.commandWorked(t.insert({x: 0.1, y: NumberDecimal('0.3000')}));
+assert.commandWorked(t.insert({x: 0.1}));
+assert.commandWorked(t.insert({y: 0.3}));
 
 // Create an index on existing numbers.
 assert.commandWorked(t.createIndex({x: 1}));
 assert.commandWorked(t.createIndex({y: -1}));
 
 // Insert some more items after index creation. Use _id for decimal.
-assert.writeOK(t.insert({x: NumberDecimal('0.10')}));
-assert.writeOK(t.insert({_id: NumberDecimal('0E3')}));
+assert.commandWorked(t.insert({x: NumberDecimal('0.10')}));
+assert.commandWorked(t.insert({_id: NumberDecimal('0E3')}));
 assert.writeError(t.insert({_id: -0.0}));
 
 // Check that we return exactly the right document, use an index to do so, and that the

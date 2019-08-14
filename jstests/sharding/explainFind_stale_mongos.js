@@ -15,7 +15,7 @@ let staleMongos = st.s0;
 let freshMongos = st.s1;
 
 jsTest.log("Make the stale mongos load a cache entry for db " + dbName + " once");
-assert.writeOK(staleMongos.getDB(dbName).getCollection(collName).insert({_id: 1}));
+assert.commandWorked(staleMongos.getDB(dbName).getCollection(collName).insert({_id: 1}));
 
 jsTest.log("Call shardCollection on " + ns + " from the fresh mongos");
 assert.commandWorked(freshMongos.adminCommand({enableSharding: dbName}));

@@ -102,7 +102,7 @@ function doSnapshotGetMore(collName, data, getMoreErrorCodes, commitTransactionE
 function insertSessionDoc(db, collName, tid, sessionId) {
     const sessionDoc = {"_id": "sessionDoc" + tid, "id": sessionId};
     const res = db[collName].insert(sessionDoc);
-    assert.writeOK(res);
+    assert.commandWorked(res);
     assert.eq(1, res.nInserted);
 }
 

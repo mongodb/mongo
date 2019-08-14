@@ -32,7 +32,7 @@ var secondary = replSet.getSecondary();
 var numDocuments = 20;
 var bulk = primary.getDB("foo").foo.initializeUnorderedBulkOp();
 var bigString = Array(1024 * 1024).toString();
-assert.writeOK(primary.getDB("foo").foo.insert({big: bigString}));
+assert.commandWorked(primary.getDB("foo").foo.insert({big: bigString}));
 replSet.awaitReplication();
 assert.commandWorked(
     secondary.getDB("admin").runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'}),
@@ -42,7 +42,7 @@ var bufferCountBefore = secondary.getDB('foo').serverStatus().metrics.repl.buffe
 for (var i = 1; i < numDocuments; ++i) {
     bulk.insert({big: bigString});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 jsTestLog('Number of documents inserted into collection on primary: ' + numDocuments);
 assert.eq(numDocuments, primary.getDB("foo").foo.find().itcount());
 
@@ -101,7 +101,7 @@ assert.commandWorked(
 
 // Ensure new primary is writable
 jsTestLog('New primary should be writable after draining is complete');
-assert.writeOK(primary.getDB("foo").flag.insert({sentinel: 1}));
+assert.commandWorked(primary.getDB("foo").flag.insert({sentinel: 1}));
 // Check for at least two entries. There was one prior to freezing op application on the
 // secondary and we cannot guarantee all writes reached the secondary's op queue prior to
 // shutting down the original primary.

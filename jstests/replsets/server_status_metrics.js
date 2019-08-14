@@ -41,7 +41,7 @@ var primary = rt.getPrimary();
 var testDB = primary.getDB("test");
 
 assert.commandWorked(testDB.createCollection('a'));
-assert.writeOK(testDB.b.insert({}, {writeConcern: {w: 2}}));
+assert.commandWorked(testDB.b.insert({}, {writeConcern: {w: 2}}));
 
 var ss = secondary.getDB("test").serverStatus();
 // The number of ops received  and the number of ops applied are not guaranteed to be the same
@@ -55,12 +55,12 @@ var bulk = testDB.a.initializeUnorderedBulkOp();
 for (x = 0; x < 1000; x++) {
     bulk.insert({});
 }
-assert.writeOK(bulk.execute({w: 2}));
+assert.commandWorked(bulk.execute({w: 2}));
 
 testSecondaryMetrics(secondary, 1000, secondaryBaseOplogOpsApplied, secondaryBaseOplogOpsReceived);
 
 var options = {writeConcern: {w: 2}, multi: true, upsert: true};
-assert.writeOK(testDB.a.update({}, {$set: {d: new Date()}}, options));
+assert.commandWorked(testDB.a.update({}, {$set: {d: new Date()}}, options));
 
 testSecondaryMetrics(secondary, 2000, secondaryBaseOplogOpsApplied, secondaryBaseOplogOpsReceived);
 
@@ -70,15 +70,15 @@ var startNum = testDB.serverStatus().metrics.getLastError.wtime.num;
 
 printjson(primary.getDB("test").serverStatus().metrics);
 
-assert.writeOK(testDB.a.insert({x: 1}, {writeConcern: {w: 1, wtimeout: 5000}}));
+assert.commandWorked(testDB.a.insert({x: 1}, {writeConcern: {w: 1, wtimeout: 5000}}));
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.totalMillis, startMillis);
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum);
 
-assert.writeOK(testDB.a.insert({x: 1}, {writeConcern: {w: -11, wtimeout: 5000}}));
+assert.commandWorked(testDB.a.insert({x: 1}, {writeConcern: {w: -11, wtimeout: 5000}}));
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.totalMillis, startMillis);
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum);
 
-assert.writeOK(testDB.a.insert({x: 1}, {writeConcern: {w: 2, wtimeout: 5000}}));
+assert.commandWorked(testDB.a.insert({x: 1}, {writeConcern: {w: 2, wtimeout: 5000}}));
 assert(testDB.serverStatus().metrics.getLastError.wtime.totalMillis >= startMillis);
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum + 1);
 

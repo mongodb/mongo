@@ -21,7 +21,7 @@ for (var i = 0; i < 10; i++) {
     }
     expectedOutColl.push({_id: i, value: j - 1});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 function mapFn() {
     emit(this.idx, 1);

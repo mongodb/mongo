@@ -47,21 +47,21 @@ function runRollbackDirectoryTest(shouldCreateRollbackFiles) {
     }, "Arbiter failed to initialize.");
 
     var options = {writeConcern: {w: 2, wtimeout: replTest.kDefaultTimeoutMS}, upsert: true};
-    assert.writeOK(A.foo.update({key: 'value1'}, {$set: {req: 'req'}}, options));
+    assert.commandWorked(A.foo.update({key: 'value1'}, {$set: {req: 'req'}}, options));
     var AID = replTest.getNodeId(a_conn);
     replTest.stop(AID);
 
     master = replTest.getPrimary();
     assert(b_conn.host == master.host);
     options = {writeConcern: {w: 1, wtimeout: replTest.kDefaultTimeoutMS}, upsert: true};
-    assert.writeOK(B.foo.update({key: 'value1'}, {$set: {res: 'res'}}, options));
+    assert.commandWorked(B.foo.update({key: 'value1'}, {$set: {res: 'res'}}, options));
     var BID = replTest.getNodeId(b_conn);
     replTest.stop(BID);
     replTest.restart(AID);
     master = replTest.getPrimary();
     assert(a_conn.host == master.host);
     options = {writeConcern: {w: 1, wtimeout: replTest.kDefaultTimeoutMS}, upsert: true};
-    assert.writeOK(A.foo.update({key: 'value2'}, {$set: {req: 'req'}}, options));
+    assert.commandWorked(A.foo.update({key: 'value2'}, {$set: {req: 'req'}}, options));
     replTest.restart(BID);  // should rollback
     reconnect(B);
 

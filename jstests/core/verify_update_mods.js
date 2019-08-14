@@ -10,36 +10,36 @@ t.drop();
 
 t.save({_id: 1});
 res = t.update({}, {$set: {a: 1}});
-assert.writeOK(res);
+assert.commandWorked(res);
 t.remove({});
 
 t.save({_id: 1});
 res = t.update({}, {$unset: {a: 1}});
-assert.writeOK(res);
+assert.commandWorked(res);
 t.remove({});
 
 t.save({_id: 1});
 res = t.update({}, {$inc: {a: 1}});
-assert.writeOK(res);
+assert.commandWorked(res);
 t.remove({});
 
 t.save({_id: 1});
 res = t.update({}, {$mul: {a: 1}});
-assert.writeOK(res);
+assert.commandWorked(res);
 t.remove({});
 
 t.save({_id: 1});
 res = t.update({}, {$push: {a: 1}});
-assert.writeOK(res);
+assert.commandWorked(res);
 t.remove({});
 
 res = t.update({}, {$addToSet: {a: 1}});
-assert.writeOK(res);
+assert.commandWorked(res);
 t.remove({});
 
 t.save({_id: 1});
 res = t.update({}, {$pull: {a: 1}});
-assert.writeOK(res);
+assert.commandWorked(res);
 t.remove({});
 
 t.save({_id: 1});
@@ -49,12 +49,12 @@ t.remove({});
 
 t.save({_id: 1});
 res = t.update({}, {$rename: {a: "b"}});
-assert.writeOK(res);
+assert.commandWorked(res);
 t.remove({});
 
 t.save({_id: 1});
 res = t.update({}, {$bit: {a: {and: NumberLong(1)}}});
-assert.writeOK(res);
+assert.commandWorked(res);
 t.remove({});
 
 // SERVER-3223 test $bit can do an upsert
@@ -68,15 +68,15 @@ t.remove({});
 
 t.save({_id: 1});
 res = t.update({}, {$currentDate: {a: true}});
-assert.writeOK(res);
+assert.commandWorked(res);
 t.remove({});
 
 t.save({_id: 1});
 res = t.update({}, {$max: {a: 1}});
-assert.writeOK(res);
+assert.commandWorked(res);
 t.remove({});
 
 t.save({_id: 1});
 res = t.update({}, {$min: {a: 1}});
-assert.writeOK(res);
+assert.commandWorked(res);
 t.remove({});

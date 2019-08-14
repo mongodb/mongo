@@ -14,7 +14,7 @@ master.getDB("admin").createUser({user: "admin", pwd: "pwd", roles: ["root"]}, {
 // Can authenticate replset connection when whole set is up.
 var conn = new Mongo(rs.getURL());
 assert(conn.getDB('admin').auth('admin', 'pwd'));
-assert.writeOK(conn.getDB('admin').foo.insert({a: 1}, {writeConcern: {w: NODE_COUNT}}));
+assert.commandWorked(conn.getDB('admin').foo.insert({a: 1}, {writeConcern: {w: NODE_COUNT}}));
 
 // Make sure there is no primary
 rs.stop(0);

@@ -32,7 +32,7 @@ function runGetMoreInParallelWithEvent(
 
     const awaitShellDoingEventDuringGetMore = startParallelShell(`
 // Signal that the parallel shell has started.
-assert.writeOK(db.getCollection("${ shellSentinelCollection.getName() }").insert({}));
+assert.commandWorked(db.getCollection("${ shellSentinelCollection.getName() }").insert({}));
 
 // Wait for the getMore to appear in currentOp.
 assert.soon(function() {
@@ -132,7 +132,7 @@ const getMoreResponse = assertEventWakesCursor({
     collection: changesCollection,
     awaitDataCursorId: changeCursorId,
     identifyingComment: wholeCollectionStreamComment,
-    event: () => assert.writeOK(db.changes.insert({_id: "wake up"}))
+    event: () => assert.commandWorked(db.changes.insert({_id: "wake up"}))
 });
 assert.eq(getMoreResponse.cursor.nextBatch.length, 1);
 assert.eq(getMoreResponse.cursor.nextBatch[0].operationType,
@@ -148,7 +148,7 @@ assertEventDoesNotWakeCursor({
     collection: changesCollection,
     awaitDataCursorId: changeCursorId,
     identifyingComment: wholeCollectionStreamComment,
-    event: () => assert.writeOK(db.unrelated_collection.insert({_id: "unrelated change"}))
+    event: () => assert.commandWorked(db.unrelated_collection.insert({_id: "unrelated change"}))
 });
 assert.commandWorked(
     db.runCommand({killCursors: changesCollection.getName(), cursors: [changeCursorId]}));
@@ -171,7 +171,7 @@ assertEventDoesNotWakeCursor({
     collection: changesCollection,
     awaitDataCursorId: res.cursor.id,
     identifyingComment: noInvalidatesComment,
-    event: () => assert.writeOK(db.changes.insert({_id: "should not appear"}))
+    event: () => assert.commandWorked(db.changes.insert({_id: "should not appear"}))
 });
 assert.commandWorked(
     db.runCommand({killCursors: changesCollection.getName(), cursors: [res.cursor.id]}));

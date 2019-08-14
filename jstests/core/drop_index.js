@@ -32,7 +32,7 @@ function assertIndexes(expectedIndexNames, msg) {
     }
 }
 
-assert.writeOK(t.insert({_id: 1, a: 2, b: 3, c: 1, d: 1, e: 1}));
+assert.commandWorked(t.insert({_id: 1, a: 2, b: 3, c: 1, d: 1, e: 1}));
 assertIndexes([], 'inserting test document');
 
 assert.commandWorked(t.createIndex({a: 1}));

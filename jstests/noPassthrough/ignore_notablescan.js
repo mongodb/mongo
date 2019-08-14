@@ -14,11 +14,11 @@ function runTests(ServerType) {
     const primaryDB = session.getDatabase(dbName);
 
     // Implicitly create the collection outside of the transaction.
-    assert.writeOK(primaryDB.getCollection(collName).insert({x: 1}));
+    assert.commandWorked(primaryDB.getCollection(collName).insert({x: 1}));
 
     // Run a transaction so the 'config.transactions' collection is implicitly created.
     session.startTransaction();
-    assert.writeOK(primaryDB.getCollection(collName).insert({x: 2}));
+    assert.commandWorked(primaryDB.getCollection(collName).insert({x: 2}));
     assert.commandWorked(session.commitTransaction_forTesting());
 
     // Run a predicate query that would fail if we did not ignore the 'notablescan' flag.

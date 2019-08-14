@@ -9,13 +9,13 @@ load('jstests/aggregation/extras/utils.js');
 var coll = db.agg_filter_expr;
 coll.drop();
 
-assert.writeOK(coll.insert({_id: 0, a: [1, 2, 3, 4, 5]}));
-assert.writeOK(coll.insert({_id: 1, a: [2, 4]}));
-assert.writeOK(coll.insert({_id: 2, a: []}));
-assert.writeOK(coll.insert({_id: 3, a: [1]}));
-assert.writeOK(coll.insert({_id: 4, a: null}));
-assert.writeOK(coll.insert({_id: 5, a: undefined}));
-assert.writeOK(coll.insert({_id: 6}));
+assert.commandWorked(coll.insert({_id: 0, a: [1, 2, 3, 4, 5]}));
+assert.commandWorked(coll.insert({_id: 1, a: [2, 4]}));
+assert.commandWorked(coll.insert({_id: 2, a: []}));
+assert.commandWorked(coll.insert({_id: 3, a: [1]}));
+assert.commandWorked(coll.insert({_id: 4, a: null}));
+assert.commandWorked(coll.insert({_id: 5, a: undefined}));
+assert.commandWorked(coll.insert({_id: 6}));
 
 // Create filter to only accept odd numbers.
 filterDoc = {input: '$a', as: 'x', cond: {$eq: [1, {$mod: ['$$x', 2]}]}};
@@ -85,7 +85,7 @@ filterDoc = {
 assertErrorCode(coll, [{$project: {b: {$filter: filterDoc}}}], 17276);
 
 assert(coll.drop());
-assert.writeOK(coll.insert({a: 'string'}));
+assert.commandWorked(coll.insert({a: 'string'}));
 filterDoc = {input: '$a', as: 'x', cond: true};
 assertErrorCode(coll, [{$project: {b: {$filter: filterDoc}}}], 28651);
 }());

@@ -10,7 +10,7 @@ admin.auth({user: "adminUser", pwd: "pwd"});
 var db = conn.getDB("explain_auth_db");
 var coll = db.explain_auth_coll;
 
-assert.writeOK(coll.insert({_id: 1, a: 1}));
+assert.commandWorked(coll.insert({_id: 1, a: 1}));
 
 /**
  * Runs explains of find, count, remove, and update. Checks that they either succeed or fail with

@@ -19,7 +19,7 @@ replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY);
 
 var primary = replSet.getPrimary();
 assert.eq(primary.host, nodes[0], "primary assumed to be node 0");
-assert.writeOK(primary.getDB(name).foo.insert({x: 1}, {w: 2, wtimeout: 10000}));
+assert.commandWorked(primary.getDB(name).foo.insert({x: 1}, {w: 2, wtimeout: 10000}));
 replSet.awaitReplication();
 
 jsTestLog("Sleeping 30 seconds so the SECONDARY will be considered electable");

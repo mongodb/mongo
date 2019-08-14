@@ -10,11 +10,11 @@ t.drop();
 
 var orig = {"_id": 1, "a": [1, []]};
 res = t.insert(orig);
-assert.writeOK(res, "insert");
+assert.commandWorked(res, "insert");
 assert.eq(orig, t.findOne());
 
 res = t.update({"_id": 1}, {$addToSet: {"a.1": 1}});
-assert.writeOK(res, "update");
+assert.commandWorked(res, "update");
 
 var updated = {"_id": 1, "a": [1, [1]]};
 assert.eq(updated, t.findOne());

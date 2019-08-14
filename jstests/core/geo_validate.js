@@ -48,7 +48,7 @@ assert.throws(function() {
 //
 //
 // Make sure we can do a $within search with a zero-radius circular region
-assert.writeOK(coll.insert({geo: [0, 0]}));
+assert.commandWorked(coll.insert({geo: [0, 0]}));
 assert.neq(null, coll.findOne({geo: {$within: {$center: [[0, 0], 0]}}}));
 assert.neq(null, coll.findOne({geo: {$within: {$centerSphere: [[0, 0], 0]}}}));
 assert.neq(null, coll.findOne({geo: {$within: {$center: [[0, 0], Infinity]}}}));

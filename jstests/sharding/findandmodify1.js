@@ -35,7 +35,7 @@ var bulk = db.sharded_coll.initializeUnorderedBulkOp();
 for (var i = 0; i < numObjs; i++) {
     bulk.insert({_id: i});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 // Put two docs in each chunk (avoid the split in 0, since there are no docs less than 0)
 for (var i = 2; i < numObjs; i += 2) {

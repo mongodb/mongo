@@ -29,7 +29,7 @@ function runTest(host, rst, waitForPrimary) {
     var conn = new Mongo(host);
     var coll = conn.getDB(dbName).getCollection(collName);
     assert(!coll.exists());
-    assert.writeOK(coll.insert([{}, {}, {}, {}, {}]));
+    assert.commandWorked(coll.insert([{}, {}, {}, {}, {}]));
     var cursor = coll.find().batchSize(2);
     // Retrieve the first batch of results.
     cursor.next();

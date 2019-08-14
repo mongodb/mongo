@@ -7,7 +7,7 @@ col.drop();
 
 // Insert some sample data.
 
-assert.writeOK(col.insert([
+assert.commandWorked(col.insert([
     {"a": -1},
     {"a": NumberDecimal("-1")},
     {"a": NumberLong("-1")},
@@ -37,7 +37,7 @@ assert.writeOK(col.insert([
     {"a": NumberDecimal("Infinity")},
     {"a": Infinity}
 ]),
-               "Initial decimal insertion failed");
+                     "Initial decimal insertion failed");
 
 // Simple finds
 assert.eq(col.find({"a": -1}).count(), 4, "A1");
@@ -54,14 +54,14 @@ assert.eq(col.find({$and: [{"a": {$gte: 0}}, {"a": {$lte: 2}}]}).count(), 14, "C
 
 // Proper mixed ordering of decimals and doubles
 col.drop();
-assert.writeOK(col.insert([{"a": NumberDecimal("0.3")}, {"a": 0.3}], "2 insertion failed"));
+assert.commandWorked(col.insert([{"a": NumberDecimal("0.3")}, {"a": 0.3}], "2 insertion failed"));
 
 assert.eq(col.find({"a": {$lt: NumberDecimal("0.3")}}).count(), 1, "D1");
 assert.eq(col.find({"a": {$gt: 0.3}}).count(), 1, "D1");
 
 // Find with NumberLong, but not Double
 col.drop();
-assert.writeOK(col.insert([{"a": NumberDecimal("36028797018963967")}], "3 insertion failed"));
+assert.commandWorked(col.insert([{"a": NumberDecimal("36028797018963967")}], "3 insertion failed"));
 
 assert.eq(col.find({"a": NumberDecimal("36028797018963967")}).count(), 1, "E1");
 // Not representable as double

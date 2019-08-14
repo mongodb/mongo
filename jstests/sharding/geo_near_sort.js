@@ -46,10 +46,10 @@ const doc2 = {
     a: "aa",
     b: 0
 };
-assert.writeOK(coll.insert(docMinus2));
-assert.writeOK(coll.insert(docMinus1));
-assert.writeOK(coll.insert(doc1));
-assert.writeOK(coll.insert(doc2));
+assert.commandWorked(coll.insert(docMinus2));
+assert.commandWorked(coll.insert(docMinus1));
+assert.commandWorked(coll.insert(doc1));
+assert.commandWorked(coll.insert(doc2));
 
 function testSortOrders(query, indexSpec) {
     assert.commandWorked(coll.createIndex(indexSpec));

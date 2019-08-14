@@ -11,12 +11,12 @@ const collName = 'index_bounds_pipe';
 const coll = db.getCollection(collName);
 coll.drop();
 
-assert.writeOK(coll.insert({_id: ''}));
-assert.writeOK(coll.insert({_id: '\\|'}));
-assert.writeOK(coll.insert({_id: 'a'}));
-assert.writeOK(coll.insert({_id: 'a|b'}));
-assert.writeOK(coll.insert({_id: 'b'}));
-assert.writeOK(coll.insert({_id: '|'}));
+assert.commandWorked(coll.insert({_id: ''}));
+assert.commandWorked(coll.insert({_id: '\\|'}));
+assert.commandWorked(coll.insert({_id: 'a'}));
+assert.commandWorked(coll.insert({_id: 'a|b'}));
+assert.commandWorked(coll.insert({_id: 'b'}));
+assert.commandWorked(coll.insert({_id: '|'}));
 
 /**
  * Asserts that a query on a field using 'params.regex' uses index bounds 'params.bounds' and
@@ -56,7 +56,7 @@ function assertIndexBoundsAndResult(params) {
     assert.commandWorked(collRegexValue.createIndex({x: 1}));
 
     const doc = {_id: 0, x: params.regex};
-    assert.writeOK(collRegexValue.insert(doc));
+    assert.commandWorked(collRegexValue.insert(doc));
 
     const regexQuery = {x: params.regex};
     assert.eq(

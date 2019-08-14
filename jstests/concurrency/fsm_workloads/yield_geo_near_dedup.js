@@ -13,13 +13,13 @@ var $config = extendWorkload($config, function($config, $super) {
         var doc = db[collName].findOne({_id: id});
         if (doc !== null) {
             var res = db[collName].remove({_id: id});
-            assertAlways.writeOK(res);
+            assertAlways.commandWorked(res);
             if (res.nRemoved > 0) {
                 // Re-insert the document with the same '_id', but an incremented
                 // 'timesInserted' to
                 // distinguish it from the deleted document.
                 doc.timesInserted++;
-                assertAlways.writeOK(db[collName].insert(doc));
+                assertAlways.commandWorked(db[collName].insert(doc));
             }
         }
     };

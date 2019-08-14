@@ -13,12 +13,12 @@ let testDB = db.getSiblingDB("lookup_absorb_match");
 testDB.dropDatabase();
 
 let locations = testDB.getCollection("locations");
-assert.writeOK(locations.insert({_id: "doghouse", coordinates: [25.0, 60.0]}));
-assert.writeOK(locations.insert({_id: "bullpen", coordinates: [-25.0, -60.0]}));
+assert.commandWorked(locations.insert({_id: "doghouse", coordinates: [25.0, 60.0]}));
+assert.commandWorked(locations.insert({_id: "bullpen", coordinates: [-25.0, -60.0]}));
 
 let animals = testDB.getCollection("animals");
-assert.writeOK(animals.insert({_id: "dog", locationId: "doghouse"}));
-assert.writeOK(animals.insert({_id: "bull", locationId: "bullpen"}));
+assert.commandWorked(animals.insert({_id: "dog", locationId: "doghouse"}));
+assert.commandWorked(animals.insert({_id: "bull", locationId: "bullpen"}));
 
 // Test that a $match with $geoWithin works properly when performed directly on an absorbed
 // lookup field.

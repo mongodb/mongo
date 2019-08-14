@@ -96,7 +96,7 @@ testExpressionWithCollation(coll, {$split: ["abc", "B"]}, ["abc"], caseInsensiti
 
 // Test that an $and which can be optimized out respects the collation.
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, str: "A"}));
+assert.commandWorked(coll.insert({_id: 1, str: "A"}));
 results = coll.aggregate([{$project: {out: {$and: [{$eq: ["$str", "a"]}, {$eq: ["b", "B"]}]}}}],
                          {collation: caseInsensitive})
               .toArray();
@@ -105,7 +105,7 @@ assert.eq(true, results[0].out);
 
 // Test that an $and which cannot be optimized out respects the collation.
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, str: "A", str2: "B"}));
+assert.commandWorked(coll.insert({_id: 1, str: "A", str2: "B"}));
 results = coll.aggregate([{$project: {out: {$and: [{$eq: ["$str", "a"]}, {$eq: ["$str2", "b"]}]}}}],
                          {collation: caseInsensitive})
               .toArray();
@@ -114,7 +114,7 @@ assert.eq(true, results[0].out);
 
 // Test that an $or which can be optimized out respects the collation.
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, str: "A"}));
+assert.commandWorked(coll.insert({_id: 1, str: "A"}));
 results = coll.aggregate([{$project: {out: {$or: [{$eq: ["$str", "a"]}, {$eq: ["b", "c"]}]}}}],
                          {collation: caseInsensitive})
               .toArray();
@@ -123,7 +123,7 @@ assert.eq(true, results[0].out);
 
 // Test that an $or which cannot be optimized out respects the collation.
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, str: "A", str2: "B"}));
+assert.commandWorked(coll.insert({_id: 1, str: "A", str2: "B"}));
 results = coll.aggregate([{$project: {out: {$or: [{$eq: ["$str", "c"]}, {$eq: ["$str2", "b"]}]}}}],
                          {collation: caseInsensitive})
               .toArray();
@@ -174,7 +174,7 @@ testExpressionWithCollation(
 
 // Test that $group stage's _id expressions respect the collation.
 coll.drop();
-assert.writeOK(coll.insert({_id: 1}));
+assert.commandWorked(coll.insert({_id: 1}));
 results = coll.aggregate([{$group: {_id: {a: {$eq: ["a", "A"]}, b: {$eq: ["b", "B"]}}}}],
                          {collation: caseInsensitive})
               .toArray();
@@ -199,9 +199,9 @@ testExpressionWithCollation(
 
 // Test that $switch's subexpressions respect the collation.
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, a: "A"}));
-assert.writeOK(coll.insert({_id: 2, b: "B"}));
-assert.writeOK(coll.insert({_id: 3, c: "C"}));
+assert.commandWorked(coll.insert({_id: 1, a: "A"}));
+assert.commandWorked(coll.insert({_id: 2, b: "B"}));
+assert.commandWorked(coll.insert({_id: 3, c: "C"}));
 results = coll.aggregate([{
                              $project: {
                                  out: {
@@ -224,7 +224,7 @@ assert.eq("baz", results[2].out);
 
 // Test that a $zip's subexpressions respect the collation.
 coll.drop();
-assert.writeOK(coll.insert({_id: 0, evens: [0, 2, 4], odds: [1, 3]}));
+assert.commandWorked(coll.insert({_id: 0, evens: [0, 2, 4], odds: [1, 3]}));
 results = coll.aggregate([{
                              $project: {
                                  out: {

@@ -34,7 +34,7 @@ function setupTest({
     secondaryStartupParams: secondaryStartupParams = {}
 }) {
     jsTestLog("Writing data to collection.");
-    assert.writeOK(primaryColl.insert([{_id: 1}, {_id: 2}]));
+    assert.commandWorked(primaryColl.insert([{_id: 1}, {_id: 2}]));
 
     jsTestLog("Stopping secondary.");
     rst.stop(secondary);
@@ -145,7 +145,7 @@ checkLog.contains(secondary, "initialSyncHangAfterDataCloning fail point enabled
 
 // Insert more data so that these are replicated to secondary node via oplog fetcher.
 jsTestLog("Inserting more data on primary.");
-assert.writeOK(primaryColl.insert([{_id: 3}, {_id: 4}]));
+assert.commandWorked(primaryColl.insert([{_id: 3}, {_id: 4}]));
 
 // Insert is successful. So, enable fail point "waitWithPinnedCursorDuringGetMoreBatch"
 // such that it doesn't drop locks when getmore cmd waits inside the fail point block.

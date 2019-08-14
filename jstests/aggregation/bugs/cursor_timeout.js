@@ -73,9 +73,9 @@ function assertCursorTimesOut(collName, pipeline) {
     assert.eq(ErrorCodes.CursorNotFound, err.code, tojson(err));
 }
 
-assert.writeOK(testDB.source.insert({local: 1}));
+assert.commandWorked(testDB.source.insert({local: 1}));
 for (let i = 0; i < numMatches; ++i) {
-    assert.writeOK(testDB.dest.insert({foreign: 1}));
+    assert.commandWorked(testDB.dest.insert({foreign: 1}));
 }
 
 // Test that a regular aggregation cursor is killed when the timeout is reached.

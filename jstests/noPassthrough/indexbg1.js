@@ -53,7 +53,7 @@ while (1) {  // if indexing finishes before we can run checks, try indexing w/ m
     for (var i = 0; i < size; ++i) {
         bulk.insert({i: i});
     }
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
     assert.eq(size, t.count());
 
     bgIndexBuildPid = doParallel(fullName + ".ensureIndex( {i:1}, {background:true} )");
@@ -76,14 +76,14 @@ while (1) {  // if indexing finishes before we can run checks, try indexing w/ m
         assert(ex.executionStats.totalKeysExamined < 1000,
                "took too long to find 100: " + tojson(ex));
 
-        assert.writeOK(t.remove({i: 40}, true));      // table scan
-        assert.writeOK(t.update({i: 10}, {i: -10}));  // should scan 10
+        assert.commandWorked(t.remove({i: 40}, true));      // table scan
+        assert.commandWorked(t.update({i: 10}, {i: -10}));  // should scan 10
 
         var id = t.find().hint({$natural: -1}).next()._id;
 
-        assert.writeOK(t.update({_id: id}, {i: -2}));
-        assert.writeOK(t.save({i: -50}));
-        assert.writeOK(t.save({i: size + 2}));
+        assert.commandWorked(t.update({_id: id}, {i: -2}));
+        assert.commandWorked(t.save({i: -50}));
+        assert.commandWorked(t.save({i: size + 2}));
 
         assert.eq(size + 1, t.count());
 

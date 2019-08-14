@@ -57,9 +57,9 @@ var getIndexNamesForWinningPlan = function(explain) {
     return indexNameList;
 };
 
-assert.writeOK(col.insert({a: 1, b: 1, c: 1}));
-assert.writeOK(col.insert({a: 2, b: 2, c: 2}));
-assert.writeOK(col.insert({a: 3, b: 3, c: 3}));
+assert.commandWorked(col.insert({a: 1, b: 1, c: 1}));
+assert.commandWorked(col.insert({a: 2, b: 2, c: 2}));
+assert.commandWorked(col.insert({a: 3, b: 3, c: 3}));
 
 //
 // Confirm no index stats object exists prior to index creation.
@@ -105,7 +105,7 @@ res = db.runCommand({findAndModify: colName, query: {a: 2}, remove: true});
 assert.commandWorked(res);
 countA++;
 assert.eq(countA, getUsageCount("a_1"));
-assert.writeOK(col.insert(res.value));
+assert.commandWorked(col.insert(res.value));
 
 //
 // Confirm $and operation ticks indexes for winning plan, but not rejected plans.
@@ -167,14 +167,14 @@ assert.eq(countB, getUsageCount("b_1_c_1"));
 //
 // Confirm index stats tick on update().
 //
-assert.writeOK(col.update({a: 2}, {$set: {d: 2}}));
+assert.commandWorked(col.update({a: 2}, {$set: {d: 2}}));
 countA++;
 assert.eq(countA, getUsageCount("a_1"));
 
 //
 // Confirm index stats tick on remove().
 //
-assert.writeOK(col.remove({a: 2}));
+assert.commandWorked(col.remove({a: 2}));
 countA++;
 assert.eq(countA, getUsageCount("a_1"));
 
@@ -212,9 +212,9 @@ assert.throws(function() {
 //
 const foreignCollection = db[colName + "_foreign"];
 foreignCollection.drop();
-assert.writeOK(foreignCollection.insert([{_id: 0}, {_id: 1}, {_id: 2}]));
+assert.commandWorked(foreignCollection.insert([{_id: 0}, {_id: 1}, {_id: 2}]));
 col.drop();
-assert.writeOK(col.insert([{_id: 0, foreignId: 1}, {_id: 1, foreignId: 2}]));
+assert.commandWorked(col.insert([{_id: 0, foreignId: 1}, {_id: 1, foreignId: 2}]));
 assert.eq(0, getUsageCount("_id_"));
 assert.eq(2,
               col.aggregate([
@@ -238,7 +238,7 @@ assert.eq(2,
 // Confirm index use is recorded for $graphLookup.
 //
 foreignCollection.drop();
-assert.writeOK(foreignCollection.insert([
+assert.commandWorked(foreignCollection.insert([
     {_id: 0, connectedTo: 1},
     {_id: 1, connectedTo: "X"},
     {_id: 2, connectedTo: 3},
@@ -246,7 +246,7 @@ assert.writeOK(foreignCollection.insert([
                                  // $graphLookup doesn't cache the query.
 ]));
 col.drop();
-assert.writeOK(col.insert([{_id: 0, foreignId: 0}, {_id: 1, foreignId: 2}]));
+assert.commandWorked(col.insert([{_id: 0, foreignId: 0}, {_id: 1, foreignId: 2}]));
 assert.eq(0, getUsageCount("_id_"));
 assert.eq(2,
               col.aggregate([

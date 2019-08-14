@@ -16,10 +16,10 @@ var caseAndDiacriticInsensitive = {collation: {locale: "en_US", strength: 1}};
 
 assert.commandWorked(db.createCollection(coll.getName(), caseInsensitive));
 
-assert.writeOK(coll.insert({_id: 0, str: "A", str2: "á"}));
-assert.writeOK(coll.insert({_id: 1, str: "a", str2: "a"}));
-assert.writeOK(coll.insert({_id: 2, str: "B", str2: "é"}));
-assert.writeOK(coll.insert({_id: 3, str: "b", str2: "e"}));
+assert.commandWorked(coll.insert({_id: 0, str: "A", str2: "á"}));
+assert.commandWorked(coll.insert({_id: 1, str: "a", str2: "a"}));
+assert.commandWorked(coll.insert({_id: 2, str: "B", str2: "é"}));
+assert.commandWorked(coll.insert({_id: 3, str: "b", str2: "e"}));
 
 // Ensure that equality of groups respects the collation inherited from the collection default.
 assert.eq(2, coll.aggregate([{$group: {_id: "$str"}}]).itcount());
@@ -71,8 +71,8 @@ assert.eq(true, results[0].areEqual[0]);
 // Test that the $min and $max accumulators respect the inherited collation.
 coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), numericOrdering));
-assert.writeOK(coll.insert({num: "100"}));
-assert.writeOK(coll.insert({num: "2"}));
+assert.commandWorked(coll.insert({num: "100"}));
+assert.commandWorked(coll.insert({num: "2"}));
 results = coll.aggregate([{$group: {_id: null, min: {$min: "$num"}}}]).toArray();
 assert.eq(1, results.length);
 assert.eq("2", results[0].min);

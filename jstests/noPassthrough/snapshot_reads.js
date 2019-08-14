@@ -58,7 +58,7 @@ function runTest({useCausalConsistency, establishCursorCmd, readConcern}) {
 
     // Insert an 11th document which should not be visible to the snapshot cursor. This write is
     // performed outside of the session.
-    assert.writeOK(primaryDB.coll.insert({_id: 10}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(primaryDB.coll.insert({_id: 10}, {writeConcern: {w: "majority"}}));
 
     // Fetch the first 5 documents.
     res = assert.commandWorked(

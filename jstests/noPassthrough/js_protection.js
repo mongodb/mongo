@@ -62,7 +62,7 @@ function assertNoStoredWhere() {
                    {$set: {y: 100}},
                    false,
                    true);
-    assert.writeOK(res);
+    assert.commandWorked(res);
 
     doc = t.findOne({name: "testdoc"});
     assert.neq(null, doc);

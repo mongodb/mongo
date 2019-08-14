@@ -17,7 +17,7 @@ assert.commandWorked(coll.getDB().adminCommand(
 // Test that idhack queries with projections that remove the shard key return correct results.
 // SERVER-14032.
 //
-assert.writeOK(coll.insert({_id: 1, x: 1, y: 1}));
+assert.commandWorked(coll.insert({_id: 1, x: 1, y: 1}));
 assert.eq(1, coll.find().itcount());
 assert.eq(1, coll.find({_id: 1}, {x: 0}).itcount());
 assert.eq(1, coll.find({_id: 1}, {y: 1}).itcount());
@@ -26,8 +26,8 @@ coll.remove({});
 //
 // Test that idhack queries with covered projections do not return orphan documents.  SERVER-14034.
 //
-assert.writeOK(st.shard0.getCollection(coll.getFullName()).insert({_id: 1, x: 1}));
-assert.writeOK(st.shard1.getCollection(coll.getFullName()).insert({_id: 1, x: 1}));
+assert.commandWorked(st.shard0.getCollection(coll.getFullName()).insert({_id: 1, x: 1}));
+assert.commandWorked(st.shard1.getCollection(coll.getFullName()).insert({_id: 1, x: 1}));
 assert.eq(2, coll.count());
 assert.eq(1, coll.find().itcount());
 assert.eq(1, coll.find({_id: 1}, {_id: 1}).itcount());

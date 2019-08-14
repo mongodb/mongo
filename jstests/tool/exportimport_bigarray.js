@@ -25,7 +25,7 @@ var bulk = src.initializeUnorderedBulkOp();
 for (i = 0; i < numDocs; ++i) {
     bulk.insert({x: bigString});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 data = 'data/exportimport_array_test.json';
 

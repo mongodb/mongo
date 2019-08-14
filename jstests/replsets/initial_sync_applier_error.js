@@ -24,7 +24,7 @@ replSet.initiate();
 var primary = replSet.getPrimary();
 
 var coll = primary.getDB('test').getCollection(name);
-assert.writeOK(coll.insert({_id: 0, content: "hi"}));
+assert.commandWorked(coll.insert({_id: 0, content: "hi"}));
 
 // Add a secondary node but make it hang after retrieving the last op on the source
 // but before copying databases.

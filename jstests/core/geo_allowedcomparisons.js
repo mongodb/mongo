@@ -34,7 +34,7 @@ t.ensureIndex({geo: "2d"});
 // 2d doesn't know what to do w/this
 assert.writeError(t.insert({geo: geojsonPoint}));
 // Old points are OK.
-assert.writeOK(t.insert({geo: oldPoint}));
+assert.commandWorked(t.insert({geo: oldPoint}));
 // Lines not OK in 2d
 assert.writeError(t.insert({geo: geojsonLine}));
 // Shapes are not OK to insert in 2d

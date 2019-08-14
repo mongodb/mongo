@@ -43,13 +43,13 @@ function setup() {
     sourceCollection.drop();
     foreignCollection.drop();
     for (let i = 0; i < numMatches; ++i) {
-        assert.writeOK(sourceCollection.insert({_id: i, local: i}));
+        assert.commandWorked(sourceCollection.insert({_id: i, local: i}));
 
         // We want to be able to pause a $lookup stage in a state where it has returned some but
         // not all of the results for a single lookup, so we need to insert at least
         // 'numMatches' matches for each source document.
         for (let j = 0; j < numMatches; ++j) {
-            assert.writeOK(foreignCollection.insert({_id: numMatches * i + j, foreign: i}));
+            assert.commandWorked(foreignCollection.insert({_id: numMatches * i + j, foreign: i}));
         }
     }
 }
@@ -271,14 +271,14 @@ assert.commandWorked(testDB.runCommand(
     {create: sourceCollection.getName(), capped: true, size: maxCappedSizeBytes, max: maxNumDocs}));
 // Fill up about half of the collection.
 for (let i = 0; i < maxNumDocs / 2; ++i) {
-    assert.writeOK(sourceCollection.insert({_id: i}));
+    assert.commandWorked(sourceCollection.insert({_id: i}));
 }
 // Start an aggregation.
 assert.gt(maxNumDocs / 2, batchSize);
 res = assert.commandWorked(testDB.runCommand(defaultAggregateCmdSmallBatch));
 // Insert enough to force a truncation.
 for (let i = maxNumDocs / 2; i < 2 * maxNumDocs; ++i) {
-    assert.writeOK(sourceCollection.insert({_id: i}));
+    assert.commandWorked(sourceCollection.insert({_id: i}));
 }
 assert.eq(maxNumDocs, sourceCollection.count());
 assert.commandFailedWithCode(

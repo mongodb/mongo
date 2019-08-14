@@ -17,7 +17,7 @@ let targetColl = db.explain_writing_aggs_target;
 sourceColl.drop();
 targetColl.drop();
 
-assert.writeOK(sourceColl.insert({_id: 1}));
+assert.commandWorked(sourceColl.insert({_id: 1}));
 
 // Test that $out can be explained with 'queryPlanner' explain verbosity and does not perform
 // any writes.

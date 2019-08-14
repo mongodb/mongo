@@ -26,7 +26,7 @@ var bulk = st.s.getCollection(collName).initializeUnorderedBulkOp();
 for (var i = 0; i < numDocs; i++) {
     bulk.insert({_id: i, key: (i % numKeys), value: i % numKeys});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 // Add orphaned documents directly to the shards to ensure they are properly filtered out.
 st.shard0.getCollection(collName).insert({_id: 0, key: 0, value: 0});

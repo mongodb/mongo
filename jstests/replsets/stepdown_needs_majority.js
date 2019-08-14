@@ -62,7 +62,7 @@ stopReplicationOnSecondaries(replTest);
 // Write to the primary and attempt stepdown
 //
 jsTestLog("Issuing a write to the primary(" + primary.host + ") with write_concern:1");
-assert.writeOK(coll.insert(dummy_doc, {writeConcern: {w: 1, wtimeout: timeout}}));
+assert.commandWorked(coll.insert(dummy_doc, {writeConcern: {w: 1, wtimeout: timeout}}));
 
 jsTestLog("Trying to step down primary with only 1 node out of 5 caught up.");
 assertStepDownFailsWithExceededTimeLimit(primary);
@@ -75,7 +75,7 @@ jsTestLog("Reenabling writes to one secondary (" + nodeIdStr(replTest, secondary
 restartServerReplication(secondaryA);
 
 jsTestLog("Issuing a write to the primary with write_concern:2");
-assert.writeOK(coll.insert(dummy_doc, {writeConcern: {w: 2, wtimeout: timeout}}));
+assert.commandWorked(coll.insert(dummy_doc, {writeConcern: {w: 2, wtimeout: timeout}}));
 
 jsTestLog("Trying to step down primary with only 2 nodes out of 5 caught up.");
 assertStepDownFailsWithExceededTimeLimit(primary);
@@ -88,7 +88,7 @@ jsTestLog("Reenabling writes to another secondary (" + nodeIdStr(replTest, secon
 restartServerReplication(secondaryB);
 
 jsTestLog("Issuing a write to the primary with write_concern:3");
-assert.writeOK(coll.insert(dummy_doc, {writeConcern: {w: 3, wtimeout: timeout}}));
+assert.commandWorked(coll.insert(dummy_doc, {writeConcern: {w: 3, wtimeout: timeout}}));
 
 jsTestLog("Trying to step down primary with 3 nodes out of 5 caught up.");
 assertStepDownSucceeds(primary);

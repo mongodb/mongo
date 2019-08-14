@@ -15,8 +15,10 @@ const st = new ShardingTest({shards: 2, mongos: 1, config: 1});
 
 // Set up a sharded collection with one chunk on each shard.
 
-assert.writeOK(st.s.getDB(dbName)[collName].insert({_id: -1}, {writeConcern: {w: "majority"}}));
-assert.writeOK(st.s.getDB(dbName)[collName].insert({_id: 1}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: -1}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: 1}, {writeConcern: {w: "majority"}}));
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard0.shardName);

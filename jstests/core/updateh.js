@@ -12,7 +12,7 @@ t.drop();
 t.insert({x: 1});
 
 res = t.update({x: 1}, {$set: {y: 1}});  // ok
-assert.writeOK(res);
+assert.commandWorked(res);
 
 res = t.update({x: 1}, {$set: {$z: 1}});  // not ok
 assert.writeError(res);
@@ -46,7 +46,7 @@ res = t.update({n: 0}, {$set: {"$secret.agent.x": 1}});
 assert.writeError(res);
 
 res = t.update({n: 0}, {$set: {"secret.agent$": 1}});
-assert.writeOK(res);
+assert.commandWorked(res);
 t.save({_id: 0, n: 0});
 
 // Test that you cannot update database references into top level fields
@@ -73,15 +73,15 @@ assert.writeError(res);
 // the correct case ( subdoc)
 // SERVER-3231
 res = t.update({n: 0}, {$set: {x: {$ref: '1', $id: 1, $db: '1'}}});
-assert.writeOK(res);
+assert.commandWorked(res);
 t.save({_id: 0, n: 0});
 
 // Test that '$' can occur elsewhere in a field name.
 // SERVER-7557
 res = t.update({n: 0}, {$set: {ke$sha: 1}});
-assert.writeOK(res);
+assert.commandWorked(res);
 t.save({_id: 0, n: 0});
 
 res = t.update({n: 0}, {$set: {more$$moreproblem$: 1}});
-assert.writeOK(res);
+assert.commandWorked(res);
 t.save({_id: 0, n: 0});

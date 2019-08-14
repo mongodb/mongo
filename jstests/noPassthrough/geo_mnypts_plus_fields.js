@@ -39,7 +39,7 @@ for (var fields = 1; fields < maxFields; fields++) {
 
         bulk.insert(doc);
     }
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 
     // Create the query for the additional fields
     const queryFields = {};

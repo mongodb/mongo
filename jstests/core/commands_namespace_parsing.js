@@ -56,7 +56,7 @@ assert.commandWorked(isMaster);
 const isMongos = (isMaster.msg === "isdbgrid");
 
 db.commands_namespace_parsing.drop();
-assert.writeOK(db.commands_namespace_parsing.insert({a: 1}));
+assert.commandWorked(db.commands_namespace_parsing.insert({a: 1}));
 
 // Test aggregate fails with an invalid collection name.
 assertFailsWithInvalidNamespacesForField(

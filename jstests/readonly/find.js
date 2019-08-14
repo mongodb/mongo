@@ -6,7 +6,7 @@ runReadOnlyTest(function() {
         name: 'find',
         load: function(writableCollection) {
             for (var i = 0; i < 10; ++i) {
-                assert.writeOK(writableCollection.insert({x: i, y: 2 * i}));
+                assert.commandWorked(writableCollection.insert({x: i, y: 2 * i}));
             }
         },
         exec: function(readableCollection) {

@@ -6,7 +6,7 @@ coll.drop();
 // Initialize collection with eight 1M documents, and index on field "a".
 var longString = new Array(1024 * 1024).join('x');
 for (var i = 0; i < 100; ++i) {
-    assert.writeOK(coll.insert({a: 1, bigField: longString}));
+    assert.commandWorked(coll.insert({a: 1, bigField: longString}));
 }
 assert.commandWorked(coll.ensureIndex({a: 1}));
 

@@ -13,8 +13,8 @@
 var coll = db.jstests_count_hint;
 coll.drop();
 
-assert.writeOK(coll.insert({i: 1}));
-assert.writeOK(coll.insert({i: 2}));
+assert.commandWorked(coll.insert({i: 1}));
+assert.commandWorked(coll.insert({i: 2}));
 
 assert.eq(2, coll.find().count());
 

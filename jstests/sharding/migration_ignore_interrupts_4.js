@@ -25,14 +25,14 @@ assert.commandWorked(admin.runCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
 assert.commandWorked(admin.runCommand({shardCollection: ns1, key: {a: 1}}));
-assert.writeOK(coll1.insert({a: 0}));
+assert.commandWorked(coll1.insert({a: 0}));
 assert.eq(1, shard0Coll1.find().itcount());
 assert.eq(0, shard1Coll1.find().itcount());
 assert.eq(0, shard2Coll1.find().itcount());
 assert.eq(1, coll1.find().itcount());
 
 assert.commandWorked(admin.runCommand({shardCollection: ns2, key: {a: 1}}));
-assert.writeOK(coll2.insert({a: 0}));
+assert.commandWorked(coll2.insert({a: 0}));
 assert.eq(1, shard0Coll2.find().itcount());
 assert.eq(0, shard1Coll2.find().itcount());
 assert.eq(0, shard2Coll2.find().itcount());
@@ -79,8 +79,8 @@ joinMoveChunk = moveChunkParallel(
 waitForMigrateStep(shard2, migrateStepNames.cloned);
 
 // Populate donor (shard0) xfermods log.
-assert.writeOK(coll2.insert({a: 1}));
-assert.writeOK(coll2.insert({a: 2}));
+assert.commandWorked(coll2.insert({a: 1}));
+assert.commandWorked(coll2.insert({a: 2}));
 assert.eq(3, coll2.find().itcount(), "Failed to insert documents into coll2.");
 assert.eq(3, shard0Coll2.find().itcount());
 

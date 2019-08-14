@@ -22,13 +22,13 @@ var configSecondaryList = st.configRS.getSecondaries();
 var configSecondaryToKill = configSecondaryList[0];
 var delayedConfigSecondary = configSecondaryList[1];
 
-assert.writeOK(testDB.user.insert({_id: 1}));
+assert.commandWorked(testDB.user.insert({_id: 1}));
 
 delayedConfigSecondary.getDB('admin').adminCommand(
     {configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'});
 
 // Do one metadata write in order to bump the optime on mongos
-assert.writeOK(st.getDB('config').TestConfigColl.insert({TestKey: 'Test value'}));
+assert.commandWorked(st.getDB('config').TestConfigColl.insert({TestKey: 'Test value'}));
 
 st.configRS.stopMaster();
 MongoRunner.stopMongod(configSecondaryToKill);

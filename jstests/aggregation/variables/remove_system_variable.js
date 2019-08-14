@@ -7,9 +7,9 @@
 let coll = db[jsTest.name()];
 coll.drop();
 
-assert.writeOK(coll.insert({_id: 1, a: 2, b: 3}));
-assert.writeOK(coll.insert({_id: 2, a: 3, b: 4}));
-assert.writeOK(coll.insert({_id: 3, a: {b: 98, c: 99}}));
+assert.commandWorked(coll.insert({_id: 1, a: 2, b: 3}));
+assert.commandWorked(coll.insert({_id: 2, a: 3, b: 4}));
+assert.commandWorked(coll.insert({_id: 3, a: {b: 98, c: 99}}));
 
 let projectStage = {
     $project: {_id: 0, a: 1, b: {$cond: {if: {$eq: ["$b", 4]}, then: "$$REMOVE", else: "$b"}}}

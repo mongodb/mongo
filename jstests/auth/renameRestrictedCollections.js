@@ -85,10 +85,10 @@ assert.eq(1, res.ok, tojson(res));
 
 // Start with test against inserting to and renaming collections in config and local
 // as userAdminAnyDatabase.
-assert.writeOK(configDB.test.insert({'a': 1}));
+assert.commandWorked(configDB.test.insert({'a': 1}));
 assert.commandWorked(configDB.test.renameCollection('test2'));
 
-assert.writeOK(localDB.test.insert({'a': 1}));
+assert.commandWorked(localDB.test.insert({'a': 1}));
 assert.commandWorked(localDB.test.renameCollection('test2'));
 adminDB.logout();
 

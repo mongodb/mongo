@@ -57,14 +57,14 @@ sleep(3000);
 
 var primary = replSet.getPrimary();
 var writeConcern = {writeConcern: {w: 2, wtimeout: replSet.kDefaultTimeoutMS}};
-assert.writeOK(primary.getDB(name).bar.insert({y: 100}, writeConcern));
+assert.commandWorked(primary.getDB(name).bar.insert({y: 100}, writeConcern));
 
 // Write something so that node 0 is ahead of node 1.
 stopServerReplication(nodes[1]);
 writeConcern = {
     writeConcern: {w: 1, wtimeout: replSet.kDefaultTimeoutMS}
 };
-assert.writeOK(primary.getDB(name).bar.insert({x: 100}, writeConcern));
+assert.commandWorked(primary.getDB(name).bar.insert({x: 100}, writeConcern));
 
 nodes[2].reconnect(nodes[0]);
 nodes[2].reconnect(nodes[1]);

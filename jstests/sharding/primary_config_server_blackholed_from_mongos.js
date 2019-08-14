@@ -16,7 +16,7 @@ var bulk = testDB.ShardedColl.initializeUnorderedBulkOp();
 for (var i = 0; i < 1000; i++) {
     bulk.insert({_id: i});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 const configPrimary = st.configRS.getPrimary();
 const admin = configPrimary.getDB("admin");
@@ -49,7 +49,7 @@ assert.writeError(
 
 jsTest.log('Doing CRUD operations on the sharded collection');
 assert.eq(1000, testDB.ShardedColl.find().itcount());
-assert.writeOK(testDB.ShardedColl.insert({_id: 1000}));
+assert.commandWorked(testDB.ShardedColl.insert({_id: 1000}));
 assert.eq(1001, testDB.ShardedColl.find().count());
 
 jsTest.log('Doing read operations on a config server collection');

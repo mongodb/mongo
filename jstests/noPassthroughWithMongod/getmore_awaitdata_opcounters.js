@@ -8,9 +8,9 @@
 const coll = db.getmore_awaitdata_opcounters;
 coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), {capped: true, size: 1024}));
-assert.writeOK(coll.insert({_id: 1}));
-assert.writeOK(coll.insert({_id: 2}));
-assert.writeOK(coll.insert({_id: 3}));
+assert.commandWorked(coll.insert({_id: 1}));
+assert.commandWorked(coll.insert({_id: 2}));
+assert.commandWorked(coll.insert({_id: 3}));
 
 function getGlobalLatencyStats() {
     return db.serverStatus().opLatencies.reads;

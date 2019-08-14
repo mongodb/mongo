@@ -40,13 +40,13 @@ coll.insert({_id: -2, d: data15PlusMB});
 coll.insert({_id: -1, d: data15PlusMB});
 
 // Docs of assorted sizes
-assert.writeOK(coll.insert({_id: 0, d: "x"}));
-assert.writeOK(coll.insert({_id: 1, d: data15PlusMB}));
-assert.writeOK(coll.insert({_id: 2, d: "x"}));
-assert.writeOK(coll.insert({_id: 3, d: data15MB}));
-assert.writeOK(coll.insert({_id: 4, d: "x"}));
-assert.writeOK(coll.insert({_id: 5, d: data1MB}));
-assert.writeOK(coll.insert({_id: 6, d: "x"}));
+assert.commandWorked(coll.insert({_id: 0, d: "x"}));
+assert.commandWorked(coll.insert({_id: 1, d: data15PlusMB}));
+assert.commandWorked(coll.insert({_id: 2, d: "x"}));
+assert.commandWorked(coll.insert({_id: 3, d: data15MB}));
+assert.commandWorked(coll.insert({_id: 4, d: "x"}));
+assert.commandWorked(coll.insert({_id: 5, d: data1MB}));
+assert.commandWorked(coll.insert({_id: 6, d: "x"}));
 
 assert.eq(9, coll.find().itcount());
 

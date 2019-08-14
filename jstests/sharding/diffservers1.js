@@ -6,9 +6,9 @@ var s = new ShardingTest({shards: 2});
 assert.eq(2, s.config.shards.count(), "server count wrong");
 
 var test1 = s.getDB("test1").foo;
-assert.writeOK(test1.insert({a: 1}));
-assert.writeOK(test1.insert({a: 2}));
-assert.writeOK(test1.insert({a: 3}));
+assert.commandWorked(test1.insert({a: 1}));
+assert.commandWorked(test1.insert({a: 2}));
+assert.commandWorked(test1.insert({a: 3}));
 assert.eq(3, test1.count());
 
 assert.commandFailed(s.s0.adminCommand({addshard: "sdd$%", maxTimeMS: 60000}), "Bad hostname");

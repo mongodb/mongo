@@ -16,14 +16,14 @@ testDB.setProfilingLevel(2);
 function resetCollection() {
     coll.drop();
     for (var i = 0; i < 10; ++i) {
-        assert.writeOK(coll.insert({a: i}));
+        assert.commandWorked(coll.insert({a: i}));
     }
 }
 function resetForeignCollection() {
     testDB.foreign.drop();
     const forColl = testDB.getCollection("foreign");
     for (var i = 4; i < 18; i += 2)
-        assert.writeOK(forColl.insert({b: i}));
+        assert.commandWorked(forColl.insert({b: i}));
 }
 //
 // Confirm hasSortStage with in-memory sort.

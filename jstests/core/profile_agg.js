@@ -19,7 +19,7 @@ testDB.setProfilingLevel(2);
 //
 var i;
 for (i = 0; i < 10; ++i) {
-    assert.writeOK(coll.insert({a: i}));
+    assert.commandWorked(coll.insert({a: i}));
 }
 assert.commandWorked(coll.createIndex({a: 1}));
 
@@ -59,7 +59,7 @@ coll.drop();
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({b: 1}));
 for (i = 0; i < 5; ++i) {
-    assert.writeOK(coll.insert({a: i, b: i}));
+    assert.commandWorked(coll.insert({a: i, b: i}));
 }
 
 assert.eq(1, coll.aggregate([{$match: {a: 3, b: 3}}]).itcount());
@@ -73,7 +73,7 @@ assert.eq(profileObj.fromMultiPlanner, true, tojson(profileObj));
 coll.drop();
 assert.commandWorked(coll.createIndex({a: 1}));
 for (i = 0; i < 5; ++i) {
-    assert.writeOK(coll.insert({a: i, b: i}));
+    assert.commandWorked(coll.insert({a: i, b: i}));
 }
 
 assert.eq(1, coll.aggregate([{$match: {a: 3, b: 3}}], {hint: {_id: 1}}).itcount());

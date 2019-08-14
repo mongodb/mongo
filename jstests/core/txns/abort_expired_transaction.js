@@ -26,7 +26,7 @@ try {
     assert.commandWorked(db.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: 1}));
 
     jsTest.log("Create a collection '" + ns + "' outside of the transaction.");
-    assert.writeOK(testColl.insert({foo: "bar"}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(testColl.insert({foo: "bar"}, {writeConcern: {w: "majority"}}));
 
     jsTest.log("Set up the session.");
     const sessionOptions = {causalConsistency: false};

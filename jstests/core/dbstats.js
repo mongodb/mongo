@@ -29,7 +29,7 @@ const doc = {
     _id: 1,
     x: 1
 };
-assert.writeOK(coll.insert(doc));
+assert.commandWorked(coll.insert(doc));
 
 let dbStats = testDB.runCommand({dbStats: 1});
 assert.commandWorked(dbStats);

@@ -17,7 +17,7 @@ var configDB = st.config;
 var coll = configDB.test;
 
 for (var x = 0; x < 10; x++) {
-    assert.writeOK(coll.insert({v: x}));
+    assert.commandWorked(coll.insert({v: x}));
 }
 
 if (st.configRS) {

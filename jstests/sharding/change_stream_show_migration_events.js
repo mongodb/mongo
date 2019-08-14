@@ -72,8 +72,8 @@ assert.commandWorked(
     mongos.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
 
 // Insert two documents.
-assert.writeOK(mongosColl.insert({_id: 0}, {writeConcern: {w: "majority"}}));
-assert.writeOK(mongosColl.insert({_id: 20}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: 0}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: 20}, {writeConcern: {w: "majority"}}));
 
 // Split the collection into two chunks: [MinKey, 10) and [10, MaxKey].
 assert.commandWorked(mongos.adminCommand({split: mongosColl.getFullName(), middle: {_id: 10}}));
@@ -100,8 +100,8 @@ checkEvents(changeStreamShardZero, shardZeroEventsAfterNewShard);
 checkEvents(changeStreamShardOne, shardOneEvents);
 
 // Insert into both the chunks.
-assert.writeOK(mongosColl.insert({_id: 1}, {writeConcern: {w: "majority"}}));
-assert.writeOK(mongosColl.insert({_id: 21}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: 1}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: 21}, {writeConcern: {w: "majority"}}));
 
 // Split again, and move a second chunk to the first shard. The new chunks are:
 // [MinKey, 0), [0, 10), and [10, MaxKey].
@@ -115,9 +115,9 @@ assert.commandWorked(mongos.adminCommand({
 }));
 
 // Insert again, into all three chunks.
-assert.writeOK(mongosColl.insert({_id: -2}, {writeConcern: {w: "majority"}}));
-assert.writeOK(mongosColl.insert({_id: 2}, {writeConcern: {w: "majority"}}));
-assert.writeOK(mongosColl.insert({_id: 22}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: -2}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: 2}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: 22}, {writeConcern: {w: "majority"}}));
 
 var shardZeroEvents = [
     makeEvent(1, "insert"),
@@ -146,9 +146,9 @@ assert(!changeStreamShardOne.hasNext());
 
 // Insert into all three chunks.
 jsTestLog("Insert into all three chunks");
-assert.writeOK(mongosColl.insert({_id: -3}, {writeConcern: {w: "majority"}}));
-assert.writeOK(mongosColl.insert({_id: 3}, {writeConcern: {w: "majority"}}));
-assert.writeOK(mongosColl.insert({_id: 23}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: -3}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: 3}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: 23}, {writeConcern: {w: "majority"}}));
 
 jsTestLog("Move the [Minkey, 0) chunk to shard 1.");
 assert.commandWorked(mongos.adminCommand({
@@ -159,9 +159,9 @@ assert.commandWorked(mongos.adminCommand({
 }));
 
 // Insert again, into all three chunks.
-assert.writeOK(mongosColl.insert({_id: -4}, {writeConcern: {w: "majority"}}));
-assert.writeOK(mongosColl.insert({_id: 4}, {writeConcern: {w: "majority"}}));
-assert.writeOK(mongosColl.insert({_id: 24}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: -4}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: 4}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: 24}, {writeConcern: {w: "majority"}}));
 
 // Check that each change stream returns the expected events.
 shardZeroEvents = [
@@ -194,9 +194,9 @@ const changeStreamNewShard = newShard.getPrimary().getCollection('test.chunk_mig
 
 // At this point, there haven't been any migrations to that shard; check that the changeStream
 // works normally.
-assert.writeOK(mongosColl.insert({_id: -5}, {writeConcern: {w: "majority"}}));
-assert.writeOK(mongosColl.insert({_id: 5}, {writeConcern: {w: "majority"}}));
-assert.writeOK(mongosColl.insert({_id: 25}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: -5}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: 5}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: 25}, {writeConcern: {w: "majority"}}));
 
 shardOneEvents = [
     makeEvent(-5, "insert"),
@@ -208,16 +208,16 @@ assert(!changeStreamShardZero.hasNext(), "Do not expect any results");
 checkEvents(changeStreamShardOne, shardOneEvents);
 assert(!changeStreamNewShard.hasNext(), "Do not expect any results yet");
 
-assert.writeOK(mongosColl.insert({_id: 16}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: 16}, {writeConcern: {w: "majority"}}));
 
 // Now migrate a chunk to the new shard and verify the stream continues to return results
 // from both before and after the migration.
 jsTestLog("Migrating [10, MaxKey] chunk to new shard.");
 assert.commandWorked(mongos.adminCommand(
     {moveChunk: mongosColl.getFullName(), find: {_id: 20}, to: "newShard", _waitForDelete: true}));
-assert.writeOK(mongosColl.insert({_id: -6}, {writeConcern: {w: "majority"}}));
-assert.writeOK(mongosColl.insert({_id: 6}, {writeConcern: {w: "majority"}}));
-assert.writeOK(mongosColl.insert({_id: 26}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: -6}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: 6}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: 26}, {writeConcern: {w: "majority"}}));
 
 let shardOneEventsBeforeNewShard = [
     makeEvent(16, "insert"),

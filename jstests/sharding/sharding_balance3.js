@@ -31,7 +31,7 @@ while (inserted < (40 * 1024 * 1024)) {
     bulk.insert({_id: num++, s: bigString});
     inserted += bigString.length;
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 s.adminCommand({shardcollection: "test.foo", key: {_id: 1}});
 assert.lt(20, s.config.chunks.count({"ns": "test.foo"}), "setup2");

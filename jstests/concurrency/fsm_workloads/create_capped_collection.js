@@ -32,7 +32,7 @@ var $config = (function() {
         var doc = makeDocWithSize(targetSize);
 
         var res = db[collName].insert(doc);
-        assertAlways.writeOK(res);
+        assertAlways.commandWorked(res);
         assertAlways.eq(1, res.nInserted);
 
         return doc._id;

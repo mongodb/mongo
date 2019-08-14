@@ -67,7 +67,7 @@ s.getDB(adminUser.db)
 login(adminUser);
 
 // Set the chunk size, disable the secondary throttle (so the test doesn't run so slow)
-assert.writeOK(
+assert.commandWorked(
     s.getDB("config").settings.update({_id: "balancer"},
                                       {$set: {"_secondaryThrottle": false, "_waitForDelete": true}},
                                       {upsert: true}));
@@ -151,7 +151,7 @@ login(testUser);
 assert.eq(s.getDB("test").foo.findOne(), null);
 
 print("insert try 2");
-assert.writeOK(s.getDB("test").foo.insert({x: 1}));
+assert.commandWorked(s.getDB("test").foo.insert({x: 1}));
 assert.eq(1, s.getDB("test").foo.find().itcount(), tojson(result));
 
 logout(testUser);
@@ -181,7 +181,7 @@ var bulk = s.getDB("test").foo.initializeUnorderedBulkOp();
 for (i = 0; i < num; i++) {
     bulk.insert({_id: i, x: i, abc: "defg", date: new Date(), str: "all the talk on the market"});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 s.startBalancer(60000);
 

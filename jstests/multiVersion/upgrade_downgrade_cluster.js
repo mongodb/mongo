@@ -31,10 +31,10 @@ var runTest = function(isRSCluster) {
                "...");
 
     var testCRUDAndAgg = function(db) {
-        assert.writeOK(db.foo.insert({x: 1}));
-        assert.writeOK(db.foo.insert({x: -1}));
-        assert.writeOK(db.foo.update({x: 1}, {$set: {y: 1}}));
-        assert.writeOK(db.foo.update({x: -1}, {$set: {y: 1}}));
+        assert.commandWorked(db.foo.insert({x: 1}));
+        assert.commandWorked(db.foo.insert({x: -1}));
+        assert.commandWorked(db.foo.update({x: 1}, {$set: {y: 1}}));
+        assert.commandWorked(db.foo.update({x: -1}, {$set: {y: 1}}));
         var doc1 = db.foo.findOne({x: 1});
         assert.eq(1, doc1.y);
         var doc2 = db.foo.findOne({x: -1});
@@ -50,8 +50,8 @@ var runTest = function(isRSCluster) {
             assert.eq(2, db.sanity_check.find().itcount());
         }());
 
-        assert.writeOK(db.foo.remove({x: 1}, true));
-        assert.writeOK(db.foo.remove({x: -1}, true));
+        assert.commandWorked(db.foo.remove({x: 1}, true));
+        assert.commandWorked(db.foo.remove({x: -1}, true));
         assert.eq(null, db.foo.findOne());
     };
 

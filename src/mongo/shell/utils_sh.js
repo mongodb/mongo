@@ -55,7 +55,7 @@ sh._pchunk = function(chunk) {
  * directly, instead go through the start/stopBalancer calls and the balancerStart/Stop commands.
  */
 sh._writeBalancerStateDeprecated = function(onOrNot) {
-    return assert.writeOK(
+    return assert.commandWorked(
         sh._getConfigDB().settings.update({_id: 'balancer'},
                                           {$set: {stopped: onOrNot ? false : true}},
                                           {upsert: true, writeConcern: {w: 'majority'}}));
@@ -182,7 +182,7 @@ sh.startBalancer = function(timeoutMs, interval) {
 sh.enableAutoSplit = function(configDB) {
     if (configDB === undefined)
         configDB = sh._getConfigDB();
-    return assert.writeOK(
+    return assert.commandWorked(
         configDB.settings.update({_id: 'autosplit'},
                                  {$set: {enabled: true}},
                                  {upsert: true, writeConcern: {w: 'majority', wtimeout: 30000}}));
@@ -191,7 +191,7 @@ sh.enableAutoSplit = function(configDB) {
 sh.disableAutoSplit = function(configDB) {
     if (configDB === undefined)
         configDB = sh._getConfigDB();
-    return assert.writeOK(
+    return assert.commandWorked(
         configDB.settings.update({_id: 'autosplit'},
                                  {$set: {enabled: false}},
                                  {upsert: true, writeConcern: {w: 'majority', wtimeout: 30000}}));
@@ -268,7 +268,7 @@ sh.disableBalancing = function(coll) {
         sh._checkMongos();
     }
 
-    return assert.writeOK(dbase.getSisterDB("config").collections.update(
+    return assert.commandWorked(dbase.getSisterDB("config").collections.update(
         {_id: coll + ""},
         {$set: {"noBalance": true}},
         {writeConcern: {w: 'majority', wtimeout: 60000}}));
@@ -285,7 +285,7 @@ sh.enableBalancing = function(coll) {
         sh._checkMongos();
     }
 
-    return assert.writeOK(dbase.getSisterDB("config").collections.update(
+    return assert.commandWorked(dbase.getSisterDB("config").collections.update(
         {_id: coll + ""},
         {$set: {"noBalance": false}},
         {writeConcern: {w: 'majority', wtimeout: 60000}}));
@@ -347,7 +347,7 @@ sh.addShardTag = function(shard, tag) {
     if (config.shards.findOne({_id: shard}) == null) {
         throw Error("can't find a shard with name: " + shard);
     }
-    return assert.writeOK(config.shards.update(
+    return assert.commandWorked(config.shards.update(
         {_id: shard}, {$addToSet: {tags: tag}}, {writeConcern: {w: 'majority', wtimeout: 60000}}));
 };
 
@@ -361,7 +361,7 @@ sh.removeShardTag = function(shard, tag) {
     if (config.shards.findOne({_id: shard}) == null) {
         throw Error("can't find a shard with name: " + shard);
     }
-    return assert.writeOK(config.shards.update(
+    return assert.commandWorked(config.shards.update(
         {_id: shard}, {$pull: {tags: tag}}, {writeConcern: {w: 'majority', wtimeout: 60000}}));
 };
 
@@ -376,7 +376,7 @@ sh.addTagRange = function(ns, min, max, tag) {
     }
 
     var config = sh._getConfigDB();
-    return assert.writeOK(
+    return assert.commandWorked(
         config.tags.update({_id: {ns: ns, min: min}},
                            {_id: {ns: ns, min: min}, ns: ns, min: min, max: max, tag: tag},
                            {upsert: true, writeConcern: {w: 'majority', wtimeout: 60000}}));
@@ -399,8 +399,9 @@ sh.removeTagRange = function(ns, min, max, tag) {
     }
     // max and tag criteria not really needed, but including them avoids potentially unexpected
     // behavior.
-    return assert.writeOK(config.tags.remove({_id: {ns: ns, min: min}, max: max, tag: tag},
-                                             {writeConcern: {w: 'majority', wtimeout: 60000}}));
+    return assert.commandWorked(
+        config.tags.remove({_id: {ns: ns, min: min}, max: max, tag: tag},
+                           {writeConcern: {w: 'majority', wtimeout: 60000}}));
 };
 
 sh.addShardToZone = function(shardName, zoneName) {

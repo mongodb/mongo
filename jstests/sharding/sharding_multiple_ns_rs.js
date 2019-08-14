@@ -22,8 +22,8 @@ for (var i = 0; i < 100; i++) {
     bulk.insert({_id: i, x: i});
     bulk2.insert({_id: i, x: i});
 }
-assert.writeOK(bulk.execute());
-assert.writeOK(bulk2.execute());
+assert.commandWorked(bulk.execute());
+assert.commandWorked(bulk2.execute());
 
 s.splitAt("test.foo", {_id: 50});
 

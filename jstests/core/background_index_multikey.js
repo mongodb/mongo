@@ -15,7 +15,7 @@ function testIndexBuilds(isBackground) {
 
     // Build index after multikey document is in the collection.
     let doc = {_id: 0, a: [1, 2]};
-    assert.writeOK(coll.insert(doc));
+    assert.commandWorked(coll.insert(doc));
     assert.commandWorked(coll.createIndex({a: 1}, {background: isBackground}));
     assert.eq(1, coll.count({a: 1}));
     assert.eq(doc, coll.findOne({a: 1}));
@@ -24,7 +24,7 @@ function testIndexBuilds(isBackground) {
 
     // Build index where multikey is in an embedded document.
     doc = {_id: 1, b: {c: [1, 2]}};
-    assert.writeOK(coll.insert(doc));
+    assert.commandWorked(coll.insert(doc));
     assert.commandWorked(coll.createIndex({'b.c': 1}, {background: isBackground}));
     assert.eq(1, coll.count({'b.c': 1}));
     assert.eq(doc, coll.findOne({'b.c': 1}));
@@ -33,7 +33,7 @@ function testIndexBuilds(isBackground) {
 
     // Add new multikey path to embedded path.
     doc = {_id: 2, b: [1, 2]};
-    assert.writeOK(coll.insert(doc));
+    assert.commandWorked(coll.insert(doc));
     assert.eq(1, coll.count({b: 1}));
     assert.eq(doc, coll.findOne({b: 1}));
     assert.eq(1, coll.count({b: 2}));
@@ -41,11 +41,11 @@ function testIndexBuilds(isBackground) {
 
     // Build index on a large collection that is not multikey, and then make it multikey.
     for (let i = 100; i < 1100; i++) {
-        assert.writeOK(coll.insert({_id: i, d: i}));
+        assert.commandWorked(coll.insert({_id: i, d: i}));
     }
     assert.commandWorked(coll.createIndex({d: 1}, {background: isBackground}));
     doc = {_id: 3, d: [1, 2]};
-    assert.writeOK(coll.insert(doc));
+    assert.commandWorked(coll.insert(doc));
     assert.eq(1, coll.count({d: 1}));
     assert.eq(doc, coll.findOne({d: 1}));
     assert.eq(1, coll.count({d: 2}));
@@ -53,7 +53,7 @@ function testIndexBuilds(isBackground) {
 
     // Build compound multikey index.
     doc = {_id: 4, e: [1, 2]};
-    assert.writeOK(coll.insert(doc));
+    assert.commandWorked(coll.insert(doc));
     assert.commandWorked(coll.createIndex({'e': 1, 'f': 1}, {background: isBackground}));
     assert.eq(1, coll.count({e: 1}));
     assert.eq(doc, coll.findOne({e: 1}));
@@ -62,7 +62,7 @@ function testIndexBuilds(isBackground) {
 
     // Add new multikey path to compound index.
     doc = {_id: 5, f: [1, 2]};
-    assert.writeOK(coll.insert(doc));
+    assert.commandWorked(coll.insert(doc));
     assert.eq(1, coll.count({f: 1}));
     assert.eq(doc, coll.findOne({f: 1}));
     assert.eq(1, coll.count({f: 2}));

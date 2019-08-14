@@ -26,8 +26,8 @@
 
     // Create some test documents and put them in each collection.
     [{a: 1, b: 2, c: 4}, {a: 2, b: 4, c: 8}, {a: 3, b: 6, c: 12}].forEach(d => {
-        assert.writeOK(testDB.coll1.insert(d));
-        assert.writeOK(testDB.coll2.insert(d));
+        assert.commandWorked(testDB.coll1.insert(d));
+        assert.commandWorked(testDB.coll2.insert(d));
     });
 
     // Create indexes on each collection.

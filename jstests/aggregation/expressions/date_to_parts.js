@@ -7,7 +7,7 @@ const coll = db.dateToParts;
 coll.drop();
 
 /* --------------------------------------------------------------------------------------- */
-assert.writeOK(coll.insert([
+assert.commandWorked(coll.insert([
     {_id: 0, date: new ISODate("2017-06-19T15:13:25.713Z"), tz: "UTC"},
     {_id: 1, date: new ISODate("2017-06-19T15:13:25.713Z"), tz: "Europe/London"},
     {_id: 2, date: new ISODate("2017-06-19T15:13:25.713Z"), tz: "America/New_York", iso: true},
@@ -195,7 +195,7 @@ assert.eq(
 /* Tests with timestamp */
 assert(coll.drop());
 
-assert.writeOK(coll.insert([
+assert.commandWorked(coll.insert([
     {
         _id: ObjectId("58c7cba47bbadf523cf2c313"),
         date: new ISODate("2017-06-19T15:13:25.713Z"),
@@ -272,7 +272,7 @@ assert.eq(
 /* --------------------------------------------------------------------------------------- */
 assert(coll.drop());
 
-assert.writeOK(coll.insert([
+assert.commandWorked(coll.insert([
     {_id: 0, date: ISODate("2017-06-27T12:00:20Z")},
 ]));
 
@@ -286,7 +286,7 @@ assert.eq(
 /* --------------------------------------------------------------------------------------- */
 assert(coll.drop());
 
-assert.writeOK(coll.insert([
+assert.commandWorked(coll.insert([
     {_id: 0, date: ISODate("2017-06-27T12:00:20Z")},
 ]));
 
@@ -300,7 +300,7 @@ assert.eq(
 /* --------------------------------------------------------------------------------------- */
 assert(coll.drop());
 
-assert.writeOK(coll.insert([
+assert.commandWorked(coll.insert([
     {_id: 0, tz: "Europe/London"},
 ]));
 

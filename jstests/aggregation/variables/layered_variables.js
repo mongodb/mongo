@@ -6,7 +6,7 @@ const testDB = db.getSiblingDB("layered_variables");
 assert.commandWorked(testDB.dropDatabase());
 const coll = testDB.getCollection("test");
 
-assert.writeOK(coll.insert({_id: 1, has_permissions: 1, my_array: [2, 3]}));
+assert.commandWorked(coll.insert({_id: 1, has_permissions: 1, my_array: [2, 3]}));
 
 const res = assert.commandWorked(testDB.runCommand({
         aggregate: "test",

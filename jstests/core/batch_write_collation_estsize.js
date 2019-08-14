@@ -11,7 +11,7 @@
 
 // Setup the test collection.
 db.batch_write_collation_estsize.drop();
-assert.writeOK(db.batch_write_collation_estsize.insert({str: "FOO"}));
+assert.commandWorked(db.batch_write_collation_estsize.insert({str: "FOO"}));
 
 if (db.getMongo().writeMode() !== "commands") {
     // Cannot use the bulk API to set a collation when using legacy write ops.
@@ -160,7 +160,7 @@ if (db.getMongo().writeMode() !== "commands") {
     assert.eq(1, res.deletedCount);
 
     // Reinsert a document to test deleteMany bulk write operation.
-    assert.writeOK(db.batch_write_collation_estsize.insert({str: "FOO"}));
+    assert.commandWorked(db.batch_write_collation_estsize.insert({str: "FOO"}));
 
     // Test deleteMany bulk write operation with collation specification.
     res = db.batch_write_collation_estsize.bulkWrite([{

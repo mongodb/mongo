@@ -37,7 +37,7 @@ assert.commandWorked(st.s0.adminCommand({enableSharding: 'db'}));
 assert.eq(st.s0.getDB('config').databases.findOne({_id: 'db'}).partitioned, true);
 
 // Verify config.databases metadata.
-assert.writeOK(st.s0.getDB('unsharded').foo.insert({aKey: "aValue"}));
+assert.commandWorked(st.s0.getDB('unsharded').foo.insert({aKey: "aValue"}));
 assert.eq(st.s0.getDB('config').databases.findOne({_id: 'unsharded'}).partitioned, false);
 assert.commandWorked(st.s0.adminCommand({enableSharding: 'unsharded'}));
 assert.eq(st.s0.getDB('config').databases.findOne({_id: 'unsharded'}).partitioned, true);
@@ -46,8 +46,8 @@ assert.eq(st.s0.getDB('config').databases.findOne({_id: 'unsharded'}).partitione
 assert.commandFailed(st.s0.adminCommand({shardCollection: 'TestDB.TestColl', key: {_id: 1}}));
 assert.commandFailed(st.s1.adminCommand({shardCollection: 'TestDB.TestColl', key: {_id: 1}}));
 
-assert.writeOK(st.s0.getDB('TestDB').TestColl.insert({_id: 0}));
-assert.writeOK(st.s1.getDB('TestDB').TestColl.insert({_id: 1}));
+assert.commandWorked(st.s0.getDB('TestDB').TestColl.insert({_id: 0}));
+assert.commandWorked(st.s1.getDB('TestDB').TestColl.insert({_id: 1}));
 
 // Calling 'enableSharding' on one mongos and 'shardCollection' through another must work
 assert.commandWorked(st.s0.adminCommand({enableSharding: 'TestDB'}));

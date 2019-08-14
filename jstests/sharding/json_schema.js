@@ -30,10 +30,10 @@ assert.commandWorked(testDB.adminCommand(
     {moveChunk: coll.getFullName(), find: {_id: 150}, to: st.shard1.shardName}));
 
 // Write one document into each of the chunks.
-assert.writeOK(coll.insert({_id: -150, a: 1}));
-assert.writeOK(coll.insert({_id: -50, a: 10}));
-assert.writeOK(coll.insert({_id: 50, a: "str"}));
-assert.writeOK(coll.insert({_id: 150}));
+assert.commandWorked(coll.insert({_id: -150, a: 1}));
+assert.commandWorked(coll.insert({_id: -50, a: 10}));
+assert.commandWorked(coll.insert({_id: 50, a: "str"}));
+assert.commandWorked(coll.insert({_id: 150}));
 
 // Test that $jsonSchema in a find command returns the correct results.
 assert.eq(4, coll.find({$jsonSchema: {}}).itcount());
@@ -46,7 +46,7 @@ let res = coll.update(
     {$jsonSchema: {properties: {_id: {type: "number", minimum: 100}, a: {type: "number"}}}},
     {$inc: {a: 1}},
     {multi: true});
-assert.writeOK(res);
+assert.commandWorked(res);
 assert.eq(1, res.nModified);
 
 const schema = {
@@ -54,7 +54,7 @@ const schema = {
     required: ["_id"]
 };
 res = coll.update({$jsonSchema: schema}, {$set: {b: 1}}, {multi: true});
-assert.writeOK(res);
+assert.commandWorked(res);
 assert.eq(1, res.nModified);
 
 // Test that $jsonSchema works correctly in a findAndModify command.

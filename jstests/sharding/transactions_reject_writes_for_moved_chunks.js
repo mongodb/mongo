@@ -26,8 +26,10 @@ const st = new ShardingTest({shards: 3, mongos: 1, config: 1});
 
 // Set up one sharded collection with 2 chunks, both on the primary shard.
 
-assert.writeOK(st.s.getDB(dbName)[collName].insert({_id: -5}, {writeConcern: {w: "majority"}}));
-assert.writeOK(st.s.getDB(dbName)[collName].insert({_id: 5}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: -5}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: 5}, {writeConcern: {w: "majority"}}));
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard0.shardName);
@@ -155,8 +157,8 @@ function runTest(testCase, moveChunkBack) {
         assert.commandWorked(
             st.s.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.shard1.shardName}));
     }
-    assert.writeOK(sessionColl.remove({}));
-    assert.writeOK(sessionColl.insert([{_id: 5}, {_id: -5}]));
+    assert.commandWorked(sessionColl.remove({}));
+    assert.commandWorked(sessionColl.insert([{_id: 5}, {_id: -5}]));
 }
 
 kCommandTestCases.forEach(testCase => runTest(testCase, false /*moveChunkBack*/));

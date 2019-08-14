@@ -17,13 +17,13 @@ replSet.initiate();
 var primary = replSet.getPrimary();
 var collection = primary.getDB('test').getCollection(name);
 
-assert.writeOK(collection.insert({_id: 1, val: 'x'}));
+assert.commandWorked(collection.insert({_id: 1, val: 'x'}));
 assertLastOplogHasWT(primary, 'insert');
 
-assert.writeOK(collection.update({_id: 1}, {val: 'y'}));
+assert.commandWorked(collection.update({_id: 1}, {val: 'y'}));
 assertLastOplogHasWT(primary, 'update');
 
-assert.writeOK(collection.remove({_id: 1}));
+assert.commandWorked(collection.remove({_id: 1}));
 assertLastOplogHasWT(primary, 'remove');
 
 replSet.stopSet();

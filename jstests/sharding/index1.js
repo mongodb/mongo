@@ -12,7 +12,7 @@ for (var i = 0; i < 22; i++) {
     for (var j = 0; j < 300; j++) {
         bulk.insert({num: j, x: 1});
     }
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 
     if (i == 0) {
         s.adminCommand({enablesharding: "" + coll._db});

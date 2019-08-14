@@ -35,7 +35,7 @@ function insertRandomPoints(num, minDist, maxDist) {
         var lat = sign() * (minDist + random() * (maxDist - minDist));
         var lng = sign() * (minDist + random() * (maxDist - minDist));
         var point = {geo: {type: "Point", coordinates: [lng, lat]}};
-        assert.writeOK(t.insert(point));
+        assert.commandWorked(t.insert(point));
     }
 }
 

@@ -5,9 +5,9 @@
 var t = db.getSiblingDB("test").getCollection("fts_score_sort");
 t.drop();
 
-assert.writeOK(t.insert({_id: 0, a: "textual content"}));
-assert.writeOK(t.insert({_id: 1, a: "additional content"}));
-assert.writeOK(t.insert({_id: 2, a: "irrelevant content"}));
+assert.commandWorked(t.insert({_id: 0, a: "textual content"}));
+assert.commandWorked(t.insert({_id: 1, a: "additional content"}));
+assert.commandWorked(t.insert({_id: 2, a: "irrelevant content"}));
 assert.commandWorked(t.ensureIndex({a: "text"}));
 
 // $meta sort specification should be rejected if it has additional keys.

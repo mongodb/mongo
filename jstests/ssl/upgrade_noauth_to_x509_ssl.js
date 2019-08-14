@@ -34,7 +34,7 @@ var testDB = rstConn1.getDB(dbName);
 assert.commandWorked(rstConn1.adminCommand(
     {createUser: 'root', pwd: 'root', roles: ['root'], writeConcern: {w: 3}}));
 
-assert.writeOK(testDB.a.insert({a: 1, str: 'TESTTESTTEST'}));
+assert.commandWorked(testDB.a.insert({a: 1, str: 'TESTTESTTEST'}));
 assert.eq(1, testDB.a.count(), 'Error interacting with replSet');
 
 print('=== UPGRADE transition to x509/allowSSL -> transition to x509/preferSSL ===');
@@ -43,7 +43,7 @@ rst.nodes.forEach(function(node) {
 });
 rst.awaitSecondaryNodes();
 testDB = rst.getPrimary().getDB(dbName);
-assert.writeOK(testDB.a.insert({a: 1, str: 'TESTTESTTEST'}));
+assert.commandWorked(testDB.a.insert({a: 1, str: 'TESTTESTTEST'}));
 assert.eq(2, testDB.a.count(), 'Error interacting with replSet');
 
 print('=== UPGRADE transition to x509/preferSSL -> x509/requireSSL ===');
@@ -51,7 +51,7 @@ rst.upgradeSet(x509RequireSSL, 'root', 'root');
 
 // upgradeSet leaves its connections logged in as root
 testDB = rst.getPrimary().getDB(dbName);
-assert.writeOK(testDB.a.insert({a: 1, str: 'TESTTESTTEST'}));
+assert.commandWorked(testDB.a.insert({a: 1, str: 'TESTTESTTEST'}));
 assert.eq(3, testDB.a.count(), 'Error interacting with replSet');
 
 rst.stopSet();

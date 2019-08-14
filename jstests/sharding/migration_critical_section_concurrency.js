@@ -18,15 +18,15 @@ assert.commandWorked(st.s0.adminCommand({shardCollection: 'TestDB.Coll0', key: {
 assert.commandWorked(st.s0.adminCommand({split: 'TestDB.Coll0', middle: {Key: 0}}));
 
 var coll0 = testDB.Coll0;
-assert.writeOK(coll0.insert({Key: -1, Value: '-1'}));
-assert.writeOK(coll0.insert({Key: 1, Value: '1'}));
+assert.commandWorked(coll0.insert({Key: -1, Value: '-1'}));
+assert.commandWorked(coll0.insert({Key: 1, Value: '1'}));
 
 assert.commandWorked(st.s0.adminCommand({shardCollection: 'TestDB.Coll1', key: {Key: 1}}));
 assert.commandWorked(st.s0.adminCommand({split: 'TestDB.Coll1', middle: {Key: 0}}));
 
 var coll1 = testDB.Coll1;
-assert.writeOK(coll1.insert({Key: -1, Value: '-1'}));
-assert.writeOK(coll1.insert({Key: 1, Value: '1'}));
+assert.commandWorked(coll1.insert({Key: -1, Value: '-1'}));
+assert.commandWorked(coll1.insert({Key: 1, Value: '1'}));
 
 // Ensure that coll0 has chunks on both shards so we can test queries against both donor and
 // recipient for Coll1's migration below
@@ -44,8 +44,8 @@ waitForMoveChunkStep(st.shard0, moveChunkStepNames.chunkDataCommitted);
 // Ensure that all operations for 'Coll0', which is not being migrated are not stalled
 assert.eq(1, coll0.find({Key: {$lte: -1}}).itcount());
 assert.eq(1, coll0.find({Key: {$gte: 1}}).itcount());
-assert.writeOK(coll0.insert({Key: -2, Value: '-2'}));
-assert.writeOK(coll0.insert({Key: 2, Value: '2'}));
+assert.commandWorked(coll0.insert({Key: -2, Value: '-2'}));
+assert.commandWorked(coll0.insert({Key: 2, Value: '2'}));
 assert.eq(2, coll0.find({Key: {$lte: -1}}).itcount());
 assert.eq(2, coll0.find({Key: {$gte: 1}}).itcount());
 
@@ -56,7 +56,7 @@ assert.eq(1, coll1.find({Key: {$gte: 1}}).itcount());
 // Ensure that all operations for non-sharded collections are not stalled
 var collUnsharded = testDB.CollUnsharded;
 assert.eq(0, collUnsharded.find({}).itcount());
-assert.writeOK(collUnsharded.insert({TestKey: 0, Value: 'Zero'}));
+assert.commandWorked(collUnsharded.insert({TestKey: 0, Value: 'Zero'}));
 assert.eq(1, collUnsharded.find({}).itcount());
 
 unpauseMoveChunkAtStep(st.shard0, moveChunkStepNames.chunkDataCommitted);

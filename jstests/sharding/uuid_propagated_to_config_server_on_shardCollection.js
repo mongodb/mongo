@@ -22,7 +22,7 @@ for (let i = 0; i < 3; i++) {
     // It shouldn't matter whether the collection existed on the shard already or not; test
     // both cases.
     if (i === 0) {
-        assert.writeOK(st.s.getDB(db).getCollection(coll).insert({x: 1}));
+        assert.commandWorked(st.s.getDB(db).getCollection(coll).insert({x: 1}));
     }
 
     assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: {_id: 1}}));

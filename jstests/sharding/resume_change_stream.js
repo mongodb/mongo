@@ -54,20 +54,20 @@ function testResume(mongosColl, collToWatch) {
         {moveChunk: mongosColl.getFullName(), find: {_id: 1}, to: st.rs1.getURL()}));
 
     // Write a document to each chunk.
-    assert.writeOK(mongosColl.insert({_id: -1}, {writeConcern: {w: "majority"}}));
-    assert.writeOK(mongosColl.insert({_id: 1}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(mongosColl.insert({_id: -1}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(mongosColl.insert({_id: 1}, {writeConcern: {w: "majority"}}));
 
     let changeStream = cst.startWatchingChanges(
         {pipeline: [{$changeStream: {}}], collection: collToWatch, includeToken: true});
 
     // We awaited the replication of the first writes, so the change stream shouldn't return
     // them.
-    assert.writeOK(mongosColl.update({_id: -1}, {$set: {updated: true}}));
+    assert.commandWorked(mongosColl.update({_id: -1}, {$set: {updated: true}}));
 
     // Record current time to resume a change stream later in the test.
     const resumeTimeFirstUpdate = mongosDB.runCommand({isMaster: 1}).$clusterTime.clusterTime;
 
-    assert.writeOK(mongosColl.update({_id: 1}, {$set: {updated: true}}));
+    assert.commandWorked(mongosColl.update({_id: 1}, {$set: {updated: true}}));
 
     // Test that we see the two writes, and remember their resume tokens.
     let next = cst.getOneChange(changeStream);
@@ -82,8 +82,8 @@ function testResume(mongosColl, collToWatch) {
 
     // Write some additional documents, then test that it's possible to resume after the first
     // update.
-    assert.writeOK(mongosColl.insert({_id: -2}, {writeConcern: {w: "majority"}}));
-    assert.writeOK(mongosColl.insert({_id: 2}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(mongosColl.insert({_id: -2}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(mongosColl.insert({_id: 2}, {writeConcern: {w: "majority"}}));
 
     changeStream = cst.startWatchingChanges({
         pipeline: [{$changeStream: {resumeAfter: resumeTokenFromFirstUpdateOnShard0}}],
@@ -115,7 +115,7 @@ function testResume(mongosColl, collToWatch) {
 
     while (!oplogIsRolledOver()) {
         let idVal = 100 + (i++);
-        assert.writeOK(
+        assert.commandWorked(
             mongosColl.insert({_id: idVal, long_str: largeStr}, {writeConcern: {w: "majority"}}));
         sleep(100);
     }
@@ -165,23 +165,23 @@ function testResume(mongosColl, collToWatch) {
 
     // Insert test documents.
     for (let counter = 0; counter < numberOfDocs / 5; ++counter) {
-        assert.writeOK(mongosColl.insert({_id: "abcd" + counter, shardKey: counter * 5 + 0},
-                                         {writeConcern: {w: "majority"}}));
-        assert.writeOK(mongosColl.insert({_id: "Abcd" + counter, shardKey: counter * 5 + 1},
-                                         {writeConcern: {w: "majority"}}));
-        assert.writeOK(mongosColl.insert({_id: "aBcd" + counter, shardKey: counter * 5 + 2},
-                                         {writeConcern: {w: "majority"}}));
-        assert.writeOK(mongosColl.insert({_id: "abCd" + counter, shardKey: counter * 5 + 3},
-                                         {writeConcern: {w: "majority"}}));
-        assert.writeOK(mongosColl.insert({_id: "abcD" + counter, shardKey: counter * 5 + 4},
-                                         {writeConcern: {w: "majority"}}));
+        assert.commandWorked(mongosColl.insert({_id: "abcd" + counter, shardKey: counter * 5 + 0},
+                                               {writeConcern: {w: "majority"}}));
+        assert.commandWorked(mongosColl.insert({_id: "Abcd" + counter, shardKey: counter * 5 + 1},
+                                               {writeConcern: {w: "majority"}}));
+        assert.commandWorked(mongosColl.insert({_id: "aBcd" + counter, shardKey: counter * 5 + 2},
+                                               {writeConcern: {w: "majority"}}));
+        assert.commandWorked(mongosColl.insert({_id: "abCd" + counter, shardKey: counter * 5 + 3},
+                                               {writeConcern: {w: "majority"}}));
+        assert.commandWorked(mongosColl.insert({_id: "abcD" + counter, shardKey: counter * 5 + 4},
+                                               {writeConcern: {w: "majority"}}));
     }
 
     let allChangesCursor = cst.startWatchingChanges(
         {pipeline: [{$changeStream: {}}], collection: collToWatch, includeToken: true});
 
     // Perform the multi-update that will induce timestamp collisions
-    assert.writeOK(mongosColl.update({}, {$set: {updated: true}}, {multi: true}));
+    assert.commandWorked(mongosColl.update({}, {$set: {updated: true}}, {multi: true}));
 
     // Loop over documents and open inner change streams resuming from a specified position.
     // Note we skip the last document as it does not have the next document so we would

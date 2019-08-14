@@ -15,15 +15,15 @@ assert.commandWorked(mongosDB.adminCommand({
 }));
 
 // Insert a document with a literal undefined value.
-assert.writeOK(mongosColl.insert({x: undefined}));
+assert.commandWorked(mongosColl.insert({x: undefined}));
 
 jsTestLog("Doing writes that generate oplog entries including undefined document key");
 
-assert.writeOK(mongosColl.update(
+assert.commandWorked(mongosColl.update(
     {},
     {$set: {a: 1}},
     {multi: true, writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMs}}));
-assert.writeOK(
+assert.commandWorked(
     mongosColl.remove({}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMs}}));
 
 st.stop();

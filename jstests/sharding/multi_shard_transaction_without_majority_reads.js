@@ -15,22 +15,22 @@ st.ensurePrimaryShard('TestDB', st.shard0.shardName);
 assert.commandWorked(st.s0.adminCommand({shardCollection: 'TestDB.TestColl', key: {_id: 1}}));
 
 const coll = st.s0.getDB('TestDB').TestColl;
-assert.writeOK(coll.insert({_id: -1, x: 0}));
-assert.writeOK(coll.insert({_id: 1, x: 0}));
+assert.commandWorked(coll.insert({_id: -1, x: 0}));
+assert.commandWorked(coll.insert({_id: 1, x: 0}));
 assert.commandWorked(st.s0.adminCommand({split: 'TestDB.TestColl', middle: {_id: 1}}));
 assert.commandWorked(
     st.s0.adminCommand({moveChunk: 'TestDB.TestColl', find: {_id: 1}, to: st.shard1.shardName}));
 
-assert.writeOK(coll.update({_id: -1}, {$inc: {x: 1}}));
-assert.writeOK(coll.update({_id: 1}, {$inc: {x: 1}}));
+assert.commandWorked(coll.update({_id: -1}, {$inc: {x: 1}}));
+assert.commandWorked(coll.update({_id: 1}, {$inc: {x: 1}}));
 
 const session = st.s0.startSession();
 const sessionColl = session.getDatabase('TestDB').TestColl;
 
 session.startTransaction();
 
-assert.writeOK(sessionColl.update({_id: -1}, {$inc: {x: 1}}));
-assert.writeOK(sessionColl.update({_id: 1}, {$inc: {x: 1}}));
+assert.commandWorked(sessionColl.update({_id: -1}, {$inc: {x: 1}}));
+assert.commandWorked(sessionColl.update({_id: 1}, {$inc: {x: 1}}));
 
 assert.commandFailedWithCode(session.commitTransaction_forTesting(),
                              ErrorCodes.ReadConcernMajorityNotEnabled);

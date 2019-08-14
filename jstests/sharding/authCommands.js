@@ -74,7 +74,7 @@ for (var i = 0; i < 100; i++) {
     for (var j = 0; j < 10; j++) {
         bulk.insert({i: i, j: j, str: str});
     }
-    assert.writeOK(bulk.execute({w: "majority"}));
+    assert.commandWorked(bulk.execute({w: "majority"}));
     // Split the chunk we just inserted so that we have something to balance.
     assert.commandWorked(st.splitFind("test.foo", {i: i, j: 0}));
 }
@@ -82,7 +82,8 @@ for (var i = 0; i < 100; i++) {
 assert.eq(expectedDocs, testDB.foo.count());
 
 // Wait for the balancer to start back up
-assert.writeOK(configDB.settings.update({_id: 'balancer'}, {$set: {_waitForDelete: true}}, true));
+assert.commandWorked(
+    configDB.settings.update({_id: 'balancer'}, {$set: {_waitForDelete: true}}, true));
 st.startBalancer();
 
 // Make sure we've done at least some splitting, so the balancer will work

@@ -25,7 +25,7 @@ var $config = (function() {
         assertAlways.commandWorked(db[collName].ensureIndex({c: 1}));
 
         for (var i = 0; i < 10; i++) {
-            assertAlways.writeOK(db[collName].insert({a: 1, b: 1, c: 1}));
+            assertAlways.commandWorked(db[collName].insert({a: 1, b: 1, c: 1}));
         }
     }
 

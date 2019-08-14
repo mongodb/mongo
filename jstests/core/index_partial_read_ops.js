@@ -14,8 +14,8 @@ var coll = db.index_partial_read_ops;
 coll.drop();
 
 assert.commandWorked(coll.ensureIndex({x: 1}, {partialFilterExpression: {a: {$lte: 1.5}}}));
-assert.writeOK(coll.insert({x: 5, a: 2}));  // Not in index.
-assert.writeOK(coll.insert({x: 6, a: 1}));  // In index.
+assert.commandWorked(coll.insert({x: 5, a: 2}));  // Not in index.
+assert.commandWorked(coll.insert({x: 6, a: 1}));  // In index.
 
 //
 // Verify basic functionality with find().

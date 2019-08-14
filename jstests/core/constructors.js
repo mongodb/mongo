@@ -77,7 +77,7 @@ function whereConstructorTest(constructorList) {
     constructorList = addConstructorsWithNew(constructorList);
     t = db.where_constructors;
     t.drop();
-    assert.writeOK(t.insert({x: 1}));
+    assert.commandWorked(t.insert({x: 1}));
 
     constructorList.valid.forEach(function(constructor) {
         try {

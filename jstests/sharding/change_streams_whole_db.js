@@ -35,7 +35,7 @@ let cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collecti
 assert.eq(0, cursor.firstBatch.length, "Cursor had changes: " + tojson(cursor));
 
 // Test that the change stream returns operations on the unsharded test collection.
-assert.writeOK(mongosColl.insert({_id: 0}));
+assert.commandWorked(mongosColl.insert({_id: 0}));
 let expected = {
     documentKey: {_id: 0},
     fullDocument: {_id: 0},
@@ -52,8 +52,8 @@ const mongosCollShardedOnX = mongosDB[jsTestName() + "_sharded_on_x"];
 st.shardColl(mongosCollShardedOnX.getName(), {x: 1}, {x: 0}, {x: 1}, mongosDB.getName());
 
 // Write a document to each chunk.
-assert.writeOK(mongosCollShardedOnX.insert({_id: 0, x: -1}));
-assert.writeOK(mongosCollShardedOnX.insert({_id: 1, x: 1}));
+assert.commandWorked(mongosCollShardedOnX.insert({_id: 0, x: -1}));
+assert.commandWorked(mongosCollShardedOnX.insert({_id: 1, x: 1}));
 
 // Verify that the change stream returns both inserts.
 expected = [
@@ -74,8 +74,8 @@ cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});
 
 // Now send inserts to both the sharded and unsharded collections, and verify that the change
 // streams returns them in order.
-assert.writeOK(mongosCollShardedOnX.insert({_id: 2, x: 2}));
-assert.writeOK(mongosColl.insert({_id: 1}));
+assert.commandWorked(mongosCollShardedOnX.insert({_id: 2, x: 2}));
+assert.commandWorked(mongosColl.insert({_id: 1}));
 
 // Verify that the change stream returns both inserts.
 expected = [
@@ -106,8 +106,8 @@ st.shardColl(mongosCollShardedCompound.getName(),
              mongosDB.getName());
 
 // Write a document to each chunk.
-assert.writeOK(mongosCollShardedCompound.insert({_id: 0, y: -1, x: 0}));
-assert.writeOK(mongosCollShardedCompound.insert({_id: 1, y: 1, x: 0}));
+assert.commandWorked(mongosCollShardedCompound.insert({_id: 0, y: -1, x: 0}));
+assert.commandWorked(mongosCollShardedCompound.insert({_id: 1, y: 1, x: 0}));
 
 // Verify that the change stream returns both inserts.
 expected = [
@@ -128,9 +128,9 @@ cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});
 
 // Send inserts to all 3 collections and verify that the results contain the correct
 // documentKeys and are in the correct order.
-assert.writeOK(mongosCollShardedOnX.insert({_id: 3, x: 3}));
-assert.writeOK(mongosColl.insert({_id: 3}));
-assert.writeOK(mongosCollShardedCompound.insert({_id: 2, x: 0, y: -2}));
+assert.commandWorked(mongosCollShardedOnX.insert({_id: 3, x: 3}));
+assert.commandWorked(mongosColl.insert({_id: 3}));
+assert.commandWorked(mongosCollShardedCompound.insert({_id: 2, x: 0, y: -2}));
 
 // Verify that the change stream returns both inserts.
 expected = [
@@ -160,7 +160,7 @@ const resumeTokenBeforeDrop = results[0]._id;
 
 // Write one more document to the collection that will be dropped, to be returned after
 // resuming.
-assert.writeOK(mongosCollShardedOnX.insert({_id: 4, x: 4}));
+assert.commandWorked(mongosCollShardedOnX.insert({_id: 4, x: 4}));
 
 // Drop the collection, invalidating the open change stream.
 assertDropCollection(mongosDB, mongosCollShardedOnX.getName());

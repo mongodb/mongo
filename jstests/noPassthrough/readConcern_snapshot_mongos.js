@@ -30,7 +30,7 @@ let testDB = st.getDB(dbName);
 let coll = testDB.coll;
 
 // Insert data to create the collection.
-assert.writeOK(testDB[collName].insert({x: 1}));
+assert.commandWorked(testDB[collName].insert({x: 1}));
 
 flushRoutersAndRefreshShardMetadata(st, {ns: dbName + "." + collName, dbNames: [dbName]});
 

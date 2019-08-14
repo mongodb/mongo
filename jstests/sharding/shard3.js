@@ -75,7 +75,7 @@ function doCounts(name, total, onlyItCounts) {
 }
 
 var total = doCounts("before wrong save");
-assert.writeOK(secondary.insert({_id: 111, num: -3}));
+assert.commandWorked(secondary.insert({_id: 111, num: -3}));
 doCounts("after wrong save", total, true);
 e = a.find().explain("executionStats").executionStats;
 assert.eq(3, e.nReturned, "ex1");

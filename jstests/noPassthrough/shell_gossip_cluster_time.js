@@ -70,7 +70,7 @@ assert(session2.getClusterTime() === undefined,
 
 // Advance the clusterTime outside of either of the sessions.
 testCommandGossipedWithClusterTime(function() {
-    assert.writeOK(coll.insert({}));
+    assert.commandWorked(coll.insert({}));
 }, primary.getClusterTime());
 
 assert(session1.getClusterTime() === undefined,
@@ -82,14 +82,14 @@ assert(session2.getClusterTime() === undefined,
 // since session1 hasn't been used yet.
 testCommandGossipedWithClusterTime(function() {
     const coll = session1.getDatabase("test").mycoll;
-    assert.writeOK(coll.insert({}));
+    assert.commandWorked(coll.insert({}));
 }, primary.getClusterTime());
 
 assert.eq(session1.getClusterTime(), primary.getClusterTime());
 
 testCommandGossipedWithClusterTime(function() {
     const coll = session1.getDatabase("test").mycoll;
-    assert.writeOK(coll.insert({}));
+    assert.commandWorked(coll.insert({}));
 }, session1.getClusterTime());
 
 assert(session2.getClusterTime() === undefined,
@@ -105,7 +105,7 @@ assert(primary.getClusterTime() === undefined,
 session2.advanceClusterTime(session1.getClusterTime());
 testCommandGossipedWithClusterTime(function() {
     const coll = session2.getDatabase("test").mycoll;
-    assert.writeOK(coll.insert({}));
+    assert.commandWorked(coll.insert({}));
 }, session2.getClusterTime());
 
 assert.eq(session2.getClusterTime(), primary.getClusterTime());
@@ -120,7 +120,7 @@ assert(primary.getClusterTime() === undefined,
 primary.advanceClusterTime(session1.getClusterTime());
 testCommandGossipedWithClusterTime(function() {
     const coll = session2.getDatabase("test").mycoll;
-    assert.writeOK(coll.insert({}));
+    assert.commandWorked(coll.insert({}));
 }, session2.getClusterTime());
 
 rst.stopSet();

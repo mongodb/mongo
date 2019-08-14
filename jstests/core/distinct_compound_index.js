@@ -9,10 +9,10 @@ var coll = db.distinct_multikey_index;
 
 coll.drop();
 for (var i = 0; i < 10; i++) {
-    assert.writeOK(coll.save({a: 1, b: 1}));
-    assert.writeOK(coll.save({a: 1, b: 2}));
-    assert.writeOK(coll.save({a: 2, b: 1}));
-    assert.writeOK(coll.save({a: 2, b: 3}));
+    assert.commandWorked(coll.save({a: 1, b: 1}));
+    assert.commandWorked(coll.save({a: 1, b: 2}));
+    assert.commandWorked(coll.save({a: 2, b: 1}));
+    assert.commandWorked(coll.save({a: 2, b: 3}));
 }
 coll.createIndex({a: 1, b: 1});
 

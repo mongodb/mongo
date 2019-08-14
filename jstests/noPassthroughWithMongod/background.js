@@ -11,7 +11,7 @@ var bulk = t.initializeUnorderedBulkOp();
 for (var i = 0; i < 100000; i++) {
     bulk.insert({y: 'aaaaaaaaaaaa', i: i});
     if (i % 10000 == 0) {
-        assert.writeOK(bulk.execute());
+        assert.commandWorked(bulk.execute());
         bulk = t.initializeUnorderedBulkOp();
         print(i);
     }
@@ -26,13 +26,13 @@ for (var i = 0; i < 100000; i++) {
     bulk.insert({i: i});
     if (i % 10000 == 0) {
         printjson(db.currentOp());
-        assert.writeOK(bulk.execute());
+        assert.commandWorked(bulk.execute());
         bulk = t.initializeUnorderedBulkOp();
         print(i);
     }
 }
 
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 printjson(db.currentOp());
 

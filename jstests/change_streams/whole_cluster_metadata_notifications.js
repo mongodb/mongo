@@ -29,9 +29,9 @@ let aggCursor = cst.startWatchingAllChangesForCluster();
 
 // Generate oplog entries of type insert, update, and delete across both databases.
 for (let coll of [db1Coll, db2Coll]) {
-    assert.writeOK(coll.insert({_id: 1}));
-    assert.writeOK(coll.update({_id: 1}, {$set: {a: 1}}));
-    assert.writeOK(coll.remove({_id: 1}));
+    assert.commandWorked(coll.insert({_id: 1}));
+    assert.commandWorked(coll.update({_id: 1}, {$set: {a: 1}}));
+    assert.commandWorked(coll.remove({_id: 1}));
 }
 
 // Drop the second database, which should generate a 'drop' entry for the collection followed
@@ -64,7 +64,7 @@ db1Coll = assertDropAndRecreateCollection(testDB1, db1Coll.getName());
 // Get a valid resume token that the next change stream can use.
 aggCursor = cst.startWatchingAllChangesForCluster();
 
-assert.writeOK(db1Coll.insert({_id: 1}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(db1Coll.insert({_id: 1}, {writeConcern: {w: "majority"}}));
 
 let change = cst.getOneChange(aggCursor, false);
 const resumeToken = change._id;
@@ -96,7 +96,7 @@ for (let collToInvalidate of [db1Coll, db2Coll]) {
     // Insert into the collections on both databases, and verify the change stream is able to
     // pick them up.
     for (let collToWrite of [db1Coll, db2Coll]) {
-        assert.writeOK(collToWrite.insert({_id: _idForTest}));
+        assert.commandWorked(collToWrite.insert({_id: _idForTest}));
         change = cst.getOneChange(aggCursor);
         assert.eq(change.operationType, "insert", tojson(change));
         assert.eq(change.documentKey._id, _idForTest);
@@ -112,7 +112,7 @@ for (let collToInvalidate of [db1Coll, db2Coll]) {
 
         // Start watching all changes in the cluster.
         aggCursor = cst.startWatchingAllChangesForCluster();
-        assert.writeOK(collToInvalidate.renameCollection("renamed_coll"));
+        assert.commandWorked(collToInvalidate.renameCollection("renamed_coll"));
         cst.assertNextChangesEqual({
             cursor: aggCursor,
             expectedChanges: [
@@ -128,8 +128,8 @@ for (let collToInvalidate of [db1Coll, db2Coll]) {
         // collection.
         collToInvalidate = testDB.getCollection("renamed_coll");
         assertDropAndRecreateCollection(testDB, collName);
-        assert.writeOK(testDB[collName].insert({_id: 0}));
-        assert.writeOK(collToInvalidate.renameCollection(collName, true /* dropTarget */));
+        assert.commandWorked(testDB[collName].insert({_id: 0}));
+        assert.commandWorked(collToInvalidate.renameCollection(collName, true /* dropTarget */));
         cst.assertNextChangesEqual({
             cursor: aggCursor,
             expectedChanges: [
@@ -188,14 +188,14 @@ for (let collToInvalidate of [db1Coll, db2Coll]) {
 
         // The change stream should not be invalidated by the rename(s).
         assert.eq(0, cst.getNextBatch(aggCursor).nextBatch.length);
-        assert.writeOK(collToInvalidate.insert({_id: 2}));
+        assert.commandWorked(collToInvalidate.insert({_id: 2}));
         assert.eq(cst.getOneChange(aggCursor).operationType, "insert");
 
         // Test that renaming a "system" collection to a user collection *does* return a rename
         // notification.
         assert.commandWorked(
             testDB.runCommand({create: "view1", viewOn: collToInvalidate.getName(), pipeline: []}));
-        assert.writeOK(testDB.system.views.renameCollection("non_system_collection"));
+        assert.commandWorked(testDB.system.views.renameCollection("non_system_collection"));
         cst.assertNextChangesEqual({
             cursor: aggCursor,
             expectedChanges: [{
@@ -211,17 +211,17 @@ for (let collToInvalidate of [db1Coll, db2Coll]) {
         assert.commandWorked(
             testDB.runCommand({create: "view1", viewOn: collToInvalidate.getName(), pipeline: []}));
         // Note that the target of the rename must be a valid "system" collection.
-        assert.writeOK(testDB.system.views.renameCollection("system.users"));
+        assert.commandWorked(testDB.system.views.renameCollection("system.users"));
         // Verify that the change stream filters out the rename above, instead returning the
         // next insert to the test collection.
-        assert.writeOK(collToInvalidate.insert({_id: 1}));
+        assert.commandWorked(collToInvalidate.insert({_id: 1}));
         change = cst.getOneChange(aggCursor);
         assert.eq(change.operationType, "insert", tojson(change));
         assert.eq(change.ns, {db: testDB.getName(), coll: collToInvalidate.getName()});
 
         // Test that renaming a user collection to a "system" collection *does* return a rename
         // notification.
-        assert.writeOK(collToInvalidate.renameCollection("system.views"));
+        assert.commandWorked(collToInvalidate.renameCollection("system.views"));
         cst.assertNextChangesEqual({
             cursor: aggCursor,
             expectedChanges: [{
@@ -235,7 +235,7 @@ for (let collToInvalidate of [db1Coll, db2Coll]) {
         assertDropCollection(testDB, "system.views");
 
         // Recreate the test collection for the remainder of the test.
-        assert.writeOK(collToInvalidate.insert({_id: 0}));
+        assert.commandWorked(collToInvalidate.insert({_id: 0}));
         cst.assertNextChangesEqual({
             cursor: aggCursor,
             expectedChanges: [{
@@ -252,7 +252,7 @@ for (let collToInvalidate of [db1Coll, db2Coll]) {
     // Insert to the test collection to queue up another change after the drop. This is needed
     // since the number of 'drop' notifications is not deterministic in the sharded passthrough
     // suites.
-    assert.writeOK(collToInvalidate.insert({_id: 0}));
+    assert.commandWorked(collToInvalidate.insert({_id: 0}));
     cst.consumeDropUpTo({
         cursor: aggCursor,
         dropType: "drop",
@@ -275,7 +275,7 @@ for (let collToInvalidate of [db1Coll, db2Coll]) {
     // Verify that the change stream does not report the insertion into "system.views", and is
     // not invalidated by dropping the system collection. Instead, it correctly reports the next
     // write to the test collection.
-    assert.writeOK(collToInvalidate.insert({_id: 1}));
+    assert.commandWorked(collToInvalidate.insert({_id: 1}));
     change = cst.getOneChange(aggCursor);
     assert.eq(change.operationType, "insert", tojson(change));
     assert.eq(change.ns, {db: testDB.getName(), coll: collToInvalidate.getName()});

@@ -24,7 +24,7 @@ const documents = [
     {_id: 3, ts: new Timestamp(1, 0)},
     {_id: 4, ts: new Timestamp(Math.pow(2, 32) - 1, Math.pow(2, 32) - 1)}
 ];
-assert.writeOK(coll.insert(documents));
+assert.commandWorked(coll.insert(documents));
 
 // Sanity check the timestamp bounds generation plan.
 let plan;

@@ -30,16 +30,16 @@ var collSOk = mongosSOK.getCollection("" + coll);
 var rsA = shardTest.rs0;
 var rsB = shardTest.rs1;
 
-assert.writeOK(rsA.getPrimary().getDB("test_a").dummy.insert({x: 1}));
-assert.writeOK(rsB.getPrimary().getDB("test_b").dummy.insert({x: 1}));
+assert.commandWorked(rsA.getPrimary().getDB("test_a").dummy.insert({x: 1}));
+assert.commandWorked(rsB.getPrimary().getDB("test_b").dummy.insert({x: 1}));
 
 rsA.awaitReplication();
 rsB.awaitReplication();
 
 print("1: initial insert");
 
-assert.writeOK(coll.save({_id: -1, a: "a", date: new Date()}));
-assert.writeOK(coll.save({_id: 1, b: "b", date: new Date()}));
+assert.commandWorked(coll.save({_id: -1, a: "a", date: new Date()}));
+assert.commandWorked(coll.save({_id: 1, b: "b", date: new Date()}));
 
 print("2: shard collection");
 

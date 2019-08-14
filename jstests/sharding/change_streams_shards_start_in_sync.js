@@ -98,17 +98,17 @@ function waitForShardCursor(rs) {
 // Make sure the shard 0 $changeStream cursor is established before doing the first writes.
 waitForShardCursor(st.rs0);
 
-assert.writeOK(mongosColl.insert({_id: -1000}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: -1000}, {writeConcern: {w: "majority"}}));
 
 // This write to shard 1 occurs before the $changeStream cursor on shard 1 is open, because the
 // mongos where the $changeStream is running is disconnected from shard 1.
-assert.writeOK(mongosColl.insert({_id: 1001}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: 1001}, {writeConcern: {w: "majority"}}));
 
 jsTestLog("Reconnecting");
 st.rs1.getPrimary().reconnect(st.s1);
 waitForShardCursor(st.rs1);
 
-assert.writeOK(mongosColl.insert({_id: -1002}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: -1002}, {writeConcern: {w: "majority"}}));
 waitForShell();
 st.stop();
 })();

@@ -47,13 +47,13 @@ assertValidChangeStreamNss(db.getName(), "systemindexes");
 assertValidChangeStreamNss(db.getName(), "system_users");
 
 // Similar test but for DB names that are not considered internal.
-assert.writeOK(db.getSiblingDB("admincustomDB")["test"].insert({}));
+assert.commandWorked(db.getSiblingDB("admincustomDB")["test"].insert({}));
 assertValidChangeStreamNss("admincustomDB");
 
-assert.writeOK(db.getSiblingDB("local_")["test"].insert({}));
+assert.commandWorked(db.getSiblingDB("local_")["test"].insert({}));
 assertValidChangeStreamNss("local_");
 
-assert.writeOK(db.getSiblingDB("_config_")["test"].insert({}));
+assert.commandWorked(db.getSiblingDB("_config_")["test"].insert({}));
 assertValidChangeStreamNss("_config_");
 
 let cst = new ChangeStreamTest(db);
@@ -63,7 +63,7 @@ jsTestLog("Testing single insert");
 // Test that if there are no changes, we return an empty batch.
 assert.eq(0, cursor.firstBatch.length, "Cursor had changes: " + tojson(cursor));
 
-assert.writeOK(db.t1.insert({_id: 0, a: 1}));
+assert.commandWorked(db.t1.insert({_id: 0, a: 1}));
 let expected = {
     documentKey: {_id: 0},
     fullDocument: {_id: 0, a: 1},
@@ -78,7 +78,7 @@ assert.eq(0, cursor.nextBatch.length, "Cursor had changes: " + tojson(cursor));
 
 jsTestLog("Testing second insert");
 cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
-assert.writeOK(db.t1.insert({_id: 1, a: 2}));
+assert.commandWorked(db.t1.insert({_id: 1, a: 2}));
 expected = {
     documentKey: {_id: 1},
     fullDocument: {_id: 1, a: 2},
@@ -89,7 +89,7 @@ cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
 
 jsTestLog("Testing update");
 cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
-assert.writeOK(db.t1.update({_id: 0}, {_id: 0, a: 3}));
+assert.commandWorked(db.t1.update({_id: 0}, {_id: 0, a: 3}));
 expected = {
     documentKey: {_id: 0},
     fullDocument: {_id: 0, a: 3},
@@ -100,7 +100,7 @@ cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
 
 jsTestLog("Testing update of another field");
 cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
-assert.writeOK(db.t1.update({_id: 0}, {_id: 0, b: 3}));
+assert.commandWorked(db.t1.update({_id: 0}, {_id: 0, b: 3}));
 expected = {
     documentKey: {_id: 0},
     fullDocument: {_id: 0, b: 3},
@@ -111,7 +111,7 @@ cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
 
 jsTestLog("Testing upsert");
 cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
-assert.writeOK(db.t1.update({_id: 2}, {_id: 2, a: 4}, {upsert: true}));
+assert.commandWorked(db.t1.update({_id: 2}, {_id: 2, a: 4}, {upsert: true}));
 expected = {
     documentKey: {_id: 2},
     fullDocument: {_id: 2, a: 4},
@@ -121,9 +121,9 @@ expected = {
 cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
 
 jsTestLog("Testing partial update with $inc");
-assert.writeOK(db.t1.insert({_id: 3, a: 5, b: 1}));
+assert.commandWorked(db.t1.insert({_id: 3, a: 5, b: 1}));
 cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
-assert.writeOK(db.t1.update({_id: 3}, {$inc: {b: 2}}));
+assert.commandWorked(db.t1.update({_id: 3}, {$inc: {b: 2}}));
 expected = {
     documentKey: {_id: 3},
     ns: {db: "test", coll: "t1"},
@@ -133,10 +133,10 @@ expected = {
 cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
 
 jsTestLog("Testing multi:true update");
-assert.writeOK(db.t1.insert({_id: 4, a: 0, b: 1}));
-assert.writeOK(db.t1.insert({_id: 5, a: 0, b: 1}));
+assert.commandWorked(db.t1.insert({_id: 4, a: 0, b: 1}));
+assert.commandWorked(db.t1.insert({_id: 5, a: 0, b: 1}));
 cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
-assert.writeOK(db.t1.update({a: 0}, {$set: {b: 2}}, {multi: true}));
+assert.commandWorked(db.t1.update({a: 0}, {$set: {b: 2}}, {multi: true}));
 expected = [
     {
         documentKey: {_id: 4},
@@ -155,7 +155,7 @@ cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});
 
 jsTestLog("Testing delete");
 cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
-assert.writeOK(db.t1.remove({_id: 1}));
+assert.commandWorked(db.t1.remove({_id: 1}));
 expected = {
     documentKey: {_id: 1},
     ns: {db: "test", coll: "t1"},
@@ -164,10 +164,10 @@ expected = {
 cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
 
 jsTestLog("Testing justOne:false delete");
-assert.writeOK(db.t1.insert({_id: 6, a: 1, b: 1}));
-assert.writeOK(db.t1.insert({_id: 7, a: 1, b: 1}));
+assert.commandWorked(db.t1.insert({_id: 6, a: 1, b: 1}));
+assert.commandWorked(db.t1.insert({_id: 7, a: 1, b: 1}));
 cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
-assert.writeOK(db.t1.remove({a: 1}, {justOne: false}));
+assert.commandWorked(db.t1.remove({a: 1}, {justOne: false}));
 expected = [
     {
         documentKey: {_id: 6},
@@ -185,7 +185,7 @@ cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});
 jsTestLog("Testing intervening write on another collection");
 cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
 let t2cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t2});
-assert.writeOK(db.t2.insert({_id: 100, c: 1}));
+assert.commandWorked(db.t2.insert({_id: 100, c: 1}));
 cst.assertNoChange(cursor);
 expected = {
     documentKey: {_id: 100},
@@ -196,7 +196,7 @@ expected = {
 cst.assertNextChangesEqual({cursor: t2cursor, expectedChanges: [expected]});
 
 jsTestLog("Testing drop of unrelated collection");
-assert.writeOK(db.dropping.insert({}));
+assert.commandWorked(db.dropping.insert({}));
 assertDropCollection(db, db.dropping.getName());
 // Should still see the previous change from t2, shouldn't see anything about 'dropping'.
 
@@ -205,7 +205,7 @@ assertDropCollection(db, "dne1");
 assertDropCollection(db, "dne2");
 const dne1cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.dne1});
 const dne2cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.dne2});
-assert.writeOK(db.t2.insert({_id: 101, renameCollection: "test.dne1", to: "test.dne2"}));
+assert.commandWorked(db.t2.insert({_id: 101, renameCollection: "test.dne1", to: "test.dne2"}));
 cst.assertNoChange(dne1cursor);
 cst.assertNoChange(dne2cursor);
 
@@ -227,7 +227,7 @@ let resumeCursor =
     cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.resume1});
 
 // Insert a document and save the resulting change stream.
-assert.writeOK(db.resume1.insert({_id: 1}));
+assert.commandWorked(db.resume1.insert({_id: 1}));
 const firstInsertChangeDoc = cst.getOneChange(resumeCursor);
 assert.docEq(firstInsertChangeDoc.fullDocument, {_id: 1});
 
@@ -239,10 +239,10 @@ resumeCursor = cst.startWatchingChanges({
 });
 
 jsTestLog("Inserting additional documents.");
-assert.writeOK(db.resume1.insert({_id: 2}));
+assert.commandWorked(db.resume1.insert({_id: 2}));
 const secondInsertChangeDoc = cst.getOneChange(resumeCursor);
 assert.docEq(secondInsertChangeDoc.fullDocument, {_id: 2});
-assert.writeOK(db.resume1.insert({_id: 3}));
+assert.commandWorked(db.resume1.insert({_id: 3}));
 const thirdInsertChangeDoc = cst.getOneChange(resumeCursor);
 assert.docEq(thirdInsertChangeDoc.fullDocument, {_id: 3});
 

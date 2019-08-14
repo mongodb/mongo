@@ -31,9 +31,9 @@ var dbEntryCheck = function(dbEntry, onConfig) {
 
 // Non-config-server db checks.
 {
-    assert.writeOK(mongos.getDB("blah").foo.insert({_id: 1}));
-    assert.writeOK(mongos.getDB("foo").foo.insert({_id: 1}));
-    assert.writeOK(mongos.getDB("raw").foo.insert({_id: 1}));
+    assert.commandWorked(mongos.getDB("blah").foo.insert({_id: 1}));
+    assert.commandWorked(mongos.getDB("foo").foo.insert({_id: 1}));
+    assert.commandWorked(mongos.getDB("raw").foo.insert({_id: 1}));
 
     res = mongos.adminCommand("listDatabases");
     dbArray = res.databases;
@@ -53,8 +53,8 @@ var dbEntryCheck = function(dbEntry, onConfig) {
 
 // Admin and config are always reported on the config shard.
 {
-    assert.writeOK(mongos.getDB("admin").test.insert({_id: 1}));
-    assert.writeOK(mongos.getDB("config").test.insert({_id: 1}));
+    assert.commandWorked(mongos.getDB("admin").test.insert({_id: 1}));
+    assert.commandWorked(mongos.getDB("config").test.insert({_id: 1}));
 
     res = mongos.adminCommand("listDatabases");
     dbArray = res.databases;

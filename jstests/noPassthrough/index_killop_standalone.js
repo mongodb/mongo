@@ -11,7 +11,7 @@ assert.neq(null, conn, "mongod was unable to start up");
 
 const testDB = conn.getDB("test");
 assert.commandWorked(testDB.dropDatabase());
-assert.writeOK(testDB.test.insert({a: 1}));
+assert.commandWorked(testDB.test.insert({a: 1}));
 const coll = testDB.test;
 
 // Test that building an index with 'options' can be aborted using killop.

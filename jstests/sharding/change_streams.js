@@ -77,14 +77,14 @@ function runTest(collName, shardKey) {
                  makeShardKey(1) /* move to shard 1 */);
 
     // Write a document to each chunk.
-    assert.writeOK(mongosColl.insert(makeShardKeyDocument(-1)));
-    assert.writeOK(mongosColl.insert(makeShardKeyDocument(1)));
+    assert.commandWorked(mongosColl.insert(makeShardKeyDocument(-1)));
+    assert.commandWorked(mongosColl.insert(makeShardKeyDocument(1)));
 
     let changeStream = mongosColl.aggregate([{$changeStream: {}}]);
 
     // Test that a change stream can see inserts on shard 0.
-    assert.writeOK(mongosColl.insert(makeShardKeyDocument(1000)));
-    assert.writeOK(mongosColl.insert(makeShardKeyDocument(-1000)));
+    assert.commandWorked(mongosColl.insert(makeShardKeyDocument(1000)));
+    assert.commandWorked(mongosColl.insert(makeShardKeyDocument(-1000)));
 
     assert.soon(() => changeStream.hasNext(), "expected to be able to see the first insert");
     assertChangeStreamEventEq(changeStream.next(), {
@@ -96,7 +96,7 @@ function runTest(collName, shardKey) {
 
     // Because the periodic noop writer is disabled, do another write to shard 0 in order to
     // advance that shard's clock and enabling the stream to return the earlier write to shard 1
-    assert.writeOK(mongosColl.insert(makeShardKeyDocument(1001)));
+    assert.commandWorked(mongosColl.insert(makeShardKeyDocument(1001)));
 
     assert.soon(() => changeStream.hasNext(), "expected to be able to see the second insert");
     assertChangeStreamEventEq(changeStream.next(), {
@@ -122,11 +122,11 @@ function runTest(collName, shardKey) {
     changeStream.close();
 
     jsTestLog('Testing multi-update change streams with shard key ' + shardKey);
-    assert.writeOK(mongosColl.insert(makeShardKeyDocument(10, {a: 0, b: 0})));
-    assert.writeOK(mongosColl.insert(makeShardKeyDocument(-10, {a: 0, b: 0})));
+    assert.commandWorked(mongosColl.insert(makeShardKeyDocument(10, {a: 0, b: 0})));
+    assert.commandWorked(mongosColl.insert(makeShardKeyDocument(-10, {a: 0, b: 0})));
     changeStream = mongosColl.aggregate([{$changeStream: {}}]);
 
-    assert.writeOK(mongosColl.update({a: 0}, {$set: {b: 2}}, {multi: true}));
+    assert.commandWorked(mongosColl.update({a: 0}, {$set: {b: 2}}, {multi: true}));
 
     assert.soon(() => changeStream.hasNext());
     assertChangeStreamEventEq(changeStream.next(), {
@@ -154,11 +154,11 @@ function runTest(collName, shardKey) {
     assert.commandWorked(
         st.s0.adminCommand({setParameter: 1, internalQueryProhibitMergingOnMongoS: false}));
 
-    assert.writeOK(mongosColl.remove({}));
+    assert.commandWorked(mongosColl.remove({}));
     // We awaited the replication of the first write, so the change stream shouldn't return it.
     // Use { w: "majority" } to deal with journaling correctly, even though we only have one
     // node.
-    assert.writeOK(
+    assert.commandWorked(
         mongosColl.insert(makeShardKeyDocument(0, {a: 1}), {writeConcern: {w: "majority"}}));
 
     changeStream = mongosColl.aggregate([{$changeStream: {}}]);
@@ -188,15 +188,19 @@ function runTest(collName, shardKey) {
                  makeShardKey(1) /* move to shard 1 */);
 
     // Write one document to each chunk.
-    assert.writeOK(mongosColl.insert(makeShardKeyDocument(-1), {writeConcern: {w: "majority"}}));
-    assert.writeOK(mongosColl.insert(makeShardKeyDocument(1), {writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        mongosColl.insert(makeShardKeyDocument(-1), {writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        mongosColl.insert(makeShardKeyDocument(1), {writeConcern: {w: "majority"}}));
 
     changeStream = mongosColl.aggregate([{$changeStream: {}}]);
     assert(!changeStream.hasNext());
 
     // Store a valid resume token before dropping the collection, to be used later in the test
-    assert.writeOK(mongosColl.insert(makeShardKeyDocument(-2), {writeConcern: {w: "majority"}}));
-    assert.writeOK(mongosColl.insert(makeShardKeyDocument(2), {writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        mongosColl.insert(makeShardKeyDocument(-2), {writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        mongosColl.insert(makeShardKeyDocument(2), {writeConcern: {w: "majority"}}));
 
     assert.soon(() => changeStream.hasNext());
     const resumeToken = changeStream.next()._id;

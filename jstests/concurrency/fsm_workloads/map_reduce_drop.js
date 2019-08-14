@@ -58,7 +58,7 @@ var $config = (function() {
                 bulk.insert({key: Random.randInt(10000)});
             }
             var res = bulk.execute();
-            assertAlways.writeOK(res);
+            assertAlways.commandWorked(res);
 
             var options = {
                 finalize: function finalize(key, reducedValue) {

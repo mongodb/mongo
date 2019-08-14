@@ -10,7 +10,7 @@ var coll = db.agg_slice_expr;
 coll.drop();
 
 // Need to have at least one document to ensure the pipeline executes.
-assert.writeOK(coll.insert({}));
+assert.commandWorked(coll.insert({}));
 
 function testSlice(sliceArgs, expArray) {
     var pipeline = [{$project: {_id: 0, slice: {$slice: sliceArgs}}}];

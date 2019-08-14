@@ -51,7 +51,7 @@ if (jsTest.options().storageEngine && (jsTest.options().storageEngine !== "wired
 
     jsTestLog("insert data");
     for (let i = 0; i < 200; i++) {
-        assert.writeOK(testDB.foo.insert({x: value}));
+        assert.commandWorked(testDB.foo.insert({x: value}));
     }
 
     let connport = conn.port;

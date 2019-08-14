@@ -25,7 +25,7 @@ var primaryColl = db[collName];
 var collNss = primaryColl.getFullName();
 
 jsTestLog("Writing data to collection.");
-assert.writeOK(primaryColl.insert({_id: 'readOp'}, {"writeConcern": {"w": 2}}));
+assert.commandWorked(primaryColl.insert({_id: 'readOp'}, {"writeConcern": {"w": 2}}));
 
 TestData.dbName = dbName;
 TestData.collName = collName;
@@ -120,7 +120,7 @@ testAbortOrCommitTxnFailsWithCode(
     {failPoint: "hangBeforeAbortingTxn", op: "session.abortTransaction_forTesting()"});
 
 jsTestLog("Testing stepdown during running transaction in inactive state.");
-TestData.cmd = "assert.writeOK(sessionColl.insert({_id: 'inactiveTxnOp'}))";
+TestData.cmd = "assert.commandWorked(sessionColl.insert({_id: 'inactiveTxnOp'}))";
 // Do not start the transaction in parallel shell because when the parallel
 // shell work is done, implicit call to "endSessions" and "abortTransaction"
 // cmds are made. So, during step down we might not have any running

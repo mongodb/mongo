@@ -28,7 +28,7 @@ var master = replTest.getPrimary();
 
 // do a write
 print("\ndo a write");
-assert.writeOK(master.getDB("foo").bar.insert({x: 1}));
+assert.commandWorked(master.getDB("foo").bar.insert({x: 1}));
 replTest.awaitReplication();
 
 // In the event of any error, we have to unlock any nodes that we have fsyncLocked.
@@ -61,7 +61,7 @@ try {
 
     for (var i = 0; i < 11; i++) {
         // do another write
-        assert.writeOK(master.getDB("foo").bar.insert({x: i}));
+        assert.commandWorked(master.getDB("foo").bar.insert({x: i}));
     }
 
     let res = assert.commandWorked(master.adminCommand({replSetGetStatus: 1}));

@@ -68,7 +68,7 @@ if (storageEngine !== "wiredTiger") {
         for (var j = 0; j < 100; j++) {
             batch.insert({a: bigstr});
         }
-        assert.writeOK(batch.execute());
+        assert.commandWorked(batch.execute());
     }
     rst.stopSet();
 }

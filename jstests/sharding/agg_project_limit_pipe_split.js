@@ -14,7 +14,7 @@ const bulkOp = coll.initializeOrderedBulkOp();
 for (let i = 0; i < 400; ++i) {
     bulkOp.insert({x: i, y: ["a", "b", "c"], z: Math.floor(i / 12)});
 }
-assert.writeOK(bulkOp.execute());
+assert.commandWorked(bulkOp.execute());
 
 let agg = coll.aggregate([
     {$match: {$or: [{z: 9}, {z: 10}]}},

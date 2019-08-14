@@ -22,16 +22,16 @@ var coll = mydb.fake;
 // force:true is for replset passthroughs
 assert.commandFailed(coll.runCommand("compact", {force: true}));
 noDB(mydb);
-assert.writeOK(coll.insert({}));
+assert.commandWorked(coll.insert({}));
 mydb.dropDatabase();
 
 assert.commandFailed(coll.runCommand("dropIndexes"));
 noDB(mydb);
-assert.writeOK(coll.insert({}));
+assert.commandWorked(coll.insert({}));
 mydb.dropDatabase();
 
 assert.commandFailed(coll.runCommand("collMod", {expireAfterSeconds: 1}));
 noDB(mydb);
-assert.writeOK(coll.insert({}));
+assert.commandWorked(coll.insert({}));
 mydb.dropDatabase();
 }());

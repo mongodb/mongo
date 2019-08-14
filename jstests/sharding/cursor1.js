@@ -20,7 +20,7 @@ var bulk = db.foo.initializeUnorderedBulkOp();
 for (i = 0; i < numObjs; i++) {
     bulk.insert({_id: i});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 assert.eq(1,
           s.config.chunks.count({"ns": "test.foo"}),
           "test requires collection to have one chunk initially");

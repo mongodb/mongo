@@ -29,7 +29,7 @@ for (var i = 0; i < doccount; ++i) {
     bulk.insert({_id: i, x: bigstring});
     bigstring += "a";
 }
-var result = assert.writeOK(bulk.execute());
+var result = assert.commandWorked(bulk.execute());
 jsTestLog('insert 0-' + (doccount - 1) + ' result: ' + tojson(result));
 assert.eq(doccount, result.nInserted);
 assert.eq(doccount + 1, mdc.find().itcount());
@@ -40,7 +40,7 @@ bulk = mdc.initializeUnorderedBulkOp();
 for (i = doccount; i < doccount * 2; ++i) {
     bulk.insert({_id: i, x: i});
 }
-result = assert.writeOK(bulk.execute());
+result = assert.commandWorked(bulk.execute());
 jsTestLog('insert ' + doccount + '-' + (doccount * 2 - 1) + ' result: ' + tojson(result));
 assert.eq(doccount, result.nInserted);
 assert.eq(doccount * 2 + 1, mdc.find().itcount());
@@ -50,7 +50,7 @@ bulk = mdc.initializeUnorderedBulkOp();
 for (i = 0; i < doccount; ++i) {
     bulk.find({_id: i}).remove();
 }
-result = assert.writeOK(bulk.execute());
+result = assert.commandWorked(bulk.execute());
 jsTestLog('delete 0-' + (doccount - 1) + ' result: ' + tojson(result));
 assert.eq(doccount, result.nRemoved);
 assert.eq(doccount + 1, mdc.find().itcount());
@@ -68,7 +68,7 @@ for (i = doccount * 2; i > doccount; --i) {
     bulk.find({_id: i}).update({$set: {x: bigstring}});
     bigstring = bigstring.slice(0, -1);  // remove last char
 }
-result = assert.writeOK(bulk.execute({w: rt.nodes.length}));
+result = assert.commandWorked(bulk.execute({w: rt.nodes.length}));
 jsTestLog('update ' + (doccount + 1) + '-' + (doccount * 2 - 1) + ' result: ' + tojson(result));
 assert.eq(doccount - 1, result.nMatched);
 assert.eq(doccount - 1, result.nModified);

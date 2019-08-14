@@ -51,7 +51,7 @@ for (let i = 0; i < 2; i++) {
     assert.writeError(coll.update({_id: 1, key: 1}, {$set: {key: 2}}));
     assert.eq(coll.findOne({_id: 1}).key, 1, 'key unchanged');
 
-    assert.writeOK(coll.update({_id: 1, key: 1}, {$set: {foo: 2}}));
+    assert.commandWorked(coll.update({_id: 1, key: 1}, {$set: {foo: 2}}));
 
     coll.update({key: 17}, {$inc: {x: 5}}, true);
     assert.eq(5, coll.findOne({key: 17}).x, "up1");
@@ -60,12 +60,12 @@ for (let i = 0; i < 2; i++) {
     assert.eq(5, coll.findOne({key: 18}).x, "up2");
 
     // Make sure we can extract exact _id from certain queries
-    assert.writeOK(coll.update({_id: ObjectId()}, {$set: {x: 1}}, {multi: false}));
-    assert.writeOK(coll.update({_id: {$eq: ObjectId()}}, {$set: {x: 1}}, {multi: false}));
-    assert.writeOK(coll.update({_id: {$all: [ObjectId()]}}, {$set: {x: 1}}, {multi: false}));
-    assert.writeOK(coll.update({$or: [{_id: ObjectId()}]}, {$set: {x: 1}}, {multi: false}));
-    assert.writeOK(coll.update({$and: [{_id: ObjectId()}]}, {$set: {x: 1}}, {multi: false}));
-    assert.writeOK(coll.update({_id: {$in: [ObjectId()]}}, {$set: {x: 1}}, {multi: false}));
+    assert.commandWorked(coll.update({_id: ObjectId()}, {$set: {x: 1}}, {multi: false}));
+    assert.commandWorked(coll.update({_id: {$eq: ObjectId()}}, {$set: {x: 1}}, {multi: false}));
+    assert.commandWorked(coll.update({_id: {$all: [ObjectId()]}}, {$set: {x: 1}}, {multi: false}));
+    assert.commandWorked(coll.update({$or: [{_id: ObjectId()}]}, {$set: {x: 1}}, {multi: false}));
+    assert.commandWorked(coll.update({$and: [{_id: ObjectId()}]}, {$set: {x: 1}}, {multi: false}));
+    assert.commandWorked(coll.update({_id: {$in: [ObjectId()]}}, {$set: {x: 1}}, {multi: false}));
 
     // Invalid extraction of exact _id from query
     assert.writeError(coll.update({}, {$set: {x: 1}}, {multi: false}));
@@ -77,12 +77,12 @@ for (let i = 0; i < 2; i++) {
     assert.writeError(coll.update({'_id.x': ObjectId()}, {$set: {x: 1}}, {multi: false}));
 
     // Make sure we can extract exact shard key from certain queries
-    assert.writeOK(coll.update({key: ObjectId()}, {$set: {x: 1}}, {multi: false}));
-    assert.writeOK(coll.update({key: {$eq: ObjectId()}}, {$set: {x: 1}}, {multi: false}));
-    assert.writeOK(coll.update({key: {$in: [ObjectId()]}}, {$set: {x: 1}}, {multi: false}));
-    assert.writeOK(coll.update({key: {$all: [ObjectId()]}}, {$set: {x: 1}}, {multi: false}));
-    assert.writeOK(coll.update({$or: [{key: ObjectId()}]}, {$set: {x: 1}}, {multi: false}));
-    assert.writeOK(coll.update({$and: [{key: ObjectId()}]}, {$set: {x: 1}}, {multi: false}));
+    assert.commandWorked(coll.update({key: ObjectId()}, {$set: {x: 1}}, {multi: false}));
+    assert.commandWorked(coll.update({key: {$eq: ObjectId()}}, {$set: {x: 1}}, {multi: false}));
+    assert.commandWorked(coll.update({key: {$in: [ObjectId()]}}, {$set: {x: 1}}, {multi: false}));
+    assert.commandWorked(coll.update({key: {$all: [ObjectId()]}}, {$set: {x: 1}}, {multi: false}));
+    assert.commandWorked(coll.update({$or: [{key: ObjectId()}]}, {$set: {x: 1}}, {multi: false}));
+    assert.commandWorked(coll.update({$and: [{key: ObjectId()}]}, {$set: {x: 1}}, {multi: false}));
 
     // Invalid extraction of exact key from query
     assert.writeError(coll.update({}, {$set: {x: 1}}, {multi: false}));
@@ -93,16 +93,20 @@ for (let i = 0; i < 2; i++) {
     assert[hashedKey ? "writeError" : "writeOK"](
         coll.update({key: {$gt: 0}}, {$set: {x: 1}}, {multi: false}));
     // Note: {key:-1} and {key:-2} fall on shard0 for both hashed and ascending shardkeys.
-    assert.writeOK(coll.update({$or: [{key: -1}, {key: -2}]}, {$set: {x: 1}}, {multi: false}));
-    assert.writeOK(coll.update({$and: [{key: -1}, {key: -2}]}, {$set: {x: 1}}, {multi: false}));
+    assert.commandWorked(
+        coll.update({$or: [{key: -1}, {key: -2}]}, {$set: {x: 1}}, {multi: false}));
+    assert.commandWorked(
+        coll.update({$and: [{key: -1}, {key: -2}]}, {$set: {x: 1}}, {multi: false}));
 
     // In cases where an inexact query does target multiple shards, single update is rejected.
     assert.writeError(coll.update({key: {$gt: MinKey}}, {$set: {x: 1}}, {multi: false}));
     assert.writeError(coll.update({$or: [{key: -10}, {key: 10}]}, {$set: {x: 1}}, {multi: false}));
 
     // Make sure failed shard key or _id extraction doesn't affect the other
-    assert.writeOK(coll.update({'_id.x': ObjectId(), key: 1}, {$set: {x: 1}}, {multi: false}));
-    assert.writeOK(coll.update({_id: ObjectId(), 'key.x': 1}, {$set: {x: 1}}, {multi: false}));
+    assert.commandWorked(
+        coll.update({'_id.x': ObjectId(), key: 1}, {$set: {x: 1}}, {multi: false}));
+    assert.commandWorked(
+        coll.update({_id: ObjectId(), 'key.x': 1}, {$set: {x: 1}}, {multi: false}));
 }
 
 s.stop();

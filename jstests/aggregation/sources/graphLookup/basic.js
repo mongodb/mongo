@@ -30,7 +30,7 @@ assert.eq(local.aggregate([basicGraphLookup]).toArray().length,
           "expected an empty result set for a $graphLookup with non-existent local and foreign " +
               "collections");
 
-assert.writeOK(foreign.insert({}));
+assert.commandWorked(foreign.insert({}));
 
 assert.eq(local.aggregate([basicGraphLookup]).toArray().length,
           0,
@@ -39,7 +39,7 @@ assert.eq(local.aggregate([basicGraphLookup]).toArray().length,
 local.drop();
 foreign.drop();
 
-assert.writeOK(local.insert({_id: 0}));
+assert.commandWorked(local.insert({_id: 0}));
 
 assert.eq(local.aggregate([basicGraphLookup]).toArray(),
           [{_id: 0, results: []}],
@@ -52,9 +52,9 @@ var bulk = foreign.initializeUnorderedBulkOp();
 for (var i = 0; i < 100; i++) {
     bulk.insert({_id: i, neighbors: [i - 1, i + 1]});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
-assert.writeOK(local.insert({starting: 50}));
+assert.commandWorked(local.insert({starting: 50}));
 
 // Perform a simple $graphLookup and ensure it retrieves every result.
 var res = local
@@ -125,9 +125,9 @@ assert.eq(res.integers.length, 3);
 // mistakenly does, then it would look for a 'connectToField' value of null. In order to prevent
 // regressions, we insert a document with a 'connectToField' value of null, then perform a
 // $graphLookup, and ensure that we do not find the erroneous document.
-assert.writeOK(foreign.remove({_id: 51}));
-assert.writeOK(foreign.insert({_id: 51}));
-assert.writeOK(foreign.insert({_id: null, neighbors: [50, 52]}));
+assert.commandWorked(foreign.remove({_id: 51}));
+assert.commandWorked(foreign.insert({_id: 51}));
+assert.commandWorked(foreign.insert({_id: null, neighbors: [50, 52]}));
 
 res = local
               .aggregate({
@@ -145,11 +145,11 @@ res = local
 assert.eq(res.integers.length, 52);
 
 // Perform a $graphLookup and ensure we don't go into an infinite loop when our graph is cyclic.
-assert.writeOK(foreign.remove({_id: {$in: [null, 51]}}));
-assert.writeOK(foreign.insert({_id: 51, neighbors: [50, 52]}));
+assert.commandWorked(foreign.remove({_id: {$in: [null, 51]}}));
+assert.commandWorked(foreign.insert({_id: 51, neighbors: [50, 52]}));
 
-assert.writeOK(foreign.update({_id: 99}, {$set: {neighbors: [98, 0]}}));
-assert.writeOK(foreign.update({_id: 0}, {$set: {neighbors: [99, 1]}}));
+assert.commandWorked(foreign.update({_id: 99}, {$set: {neighbors: [98, 0]}}));
+assert.commandWorked(foreign.update({_id: 0}, {$set: {neighbors: [99, 1]}}));
 
 res = local
               .aggregate({

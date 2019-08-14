@@ -18,13 +18,13 @@ var checkBasicCRUD = function(coll) {
     var doc = coll.findOne({_id: 'marker', y: {$exists: false}});
     assert.neq(null, doc);
 
-    assert.writeOK(coll.update({_id: 'marker'}, {$set: {y: 2}}));
+    assert.commandWorked(coll.update({_id: 'marker'}, {$set: {y: 2}}));
     assert.eq(2, coll.findOne({_id: 'marker'}).y);
 
-    assert.writeOK(coll.remove({_id: 'marker'}));
+    assert.commandWorked(coll.remove({_id: 'marker'}));
     assert.eq(null, coll.findOne({_id: 'marker'}));
 
-    assert.writeOK(coll.insert({_id: 'marker'}, {writeConcern: {w: NUM_NODES}}));
+    assert.commandWorked(coll.insert({_id: 'marker'}, {writeConcern: {w: NUM_NODES}}));
     assert.eq('marker', coll.findOne({_id: 'marker'})._id);
 };
 
@@ -49,10 +49,10 @@ if (jsTestOptions().shardMixedBinVersions) {
     replShard.awaitReplication();
 }
 
-assert.writeOK(priConn.getDB('test').unsharded.insert({_id: 'marker'}));
+assert.commandWorked(priConn.getDB('test').unsharded.insert({_id: 'marker'}));
 checkBasicCRUD(priConn.getDB('test').unsharded);
 
-assert.writeOK(priConn.getDB('test').sharded.insert({_id: 'marker'}));
+assert.commandWorked(priConn.getDB('test').sharded.insert({_id: 'marker'}));
 checkBasicCRUD(priConn.getDB('test').sharded);
 
 for (var x = 0; x < NUM_NODES; x++) {
@@ -76,7 +76,7 @@ checkBasicCRUD(st.s.getDB('test').unsharded);
 checkBasicCRUD(st.s.getDB('test').sharded);
 
 for (x = 0; x < 4; x++) {
-    assert.writeOK(st.s.getDB('test').sharded.insert({_id: x}));
+    assert.commandWorked(st.s.getDB('test').sharded.insert({_id: x}));
     assert.commandWorked(st.s.adminCommand({split: 'test.sharded', middle: {_id: x}}));
 }
 

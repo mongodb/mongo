@@ -8,8 +8,8 @@ const conn = MongoRunner.runMongod();
 assert.neq(null, conn);
 const db = conn.getDB("test");
 db.fs.chunks.drop();
-assert.writeOK(db.fs.chunks.insert({files_id: 1, n: 0, data: new BinData(0, "64string")}));
-assert.writeOK(db.fs.chunks.insert({files_id: 1, n: 1, data: new BinData(0, "test")}));
+assert.commandWorked(db.fs.chunks.insert({files_id: 1, n: 0, data: new BinData(0, "64string")}));
+assert.commandWorked(db.fs.chunks.insert({files_id: 1, n: 1, data: new BinData(0, "test")}));
 db.fs.chunks.ensureIndex({files_id: 1, n: 1});
 
 const kFailPointName = "waitInFilemd5DuringManualYield";

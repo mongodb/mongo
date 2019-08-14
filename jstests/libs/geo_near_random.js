@@ -34,7 +34,7 @@ GeoNearRandomTest.prototype.insertPts = function(nPts, indexBounds, scale) {
     for (var i = 0; i < nPts; i++) {
         bulk.insert({_id: i, loc: this.mkPt(scale, indexBounds)});
     }
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 
     if (!indexBounds)
         this.t.ensureIndex({loc: '2d'});

@@ -58,15 +58,15 @@ var a = a_conn.getDB("foo");
 var b = b_conn.getDB("foo");
 
 // initial data for both nodes
-assert.writeOK(a.bar.insert({q: 0}));
-assert.writeOK(a.bar.insert({q: 1, a: "foo"}));
-assert.writeOK(a.bar.insert({q: 2, a: "foo", x: 1}));
-assert.writeOK(a.bar.insert({q: 3, bb: 9, a: "foo"}));
-assert.writeOK(a.bar.insert({q: 40, a: 1}));
-assert.writeOK(a.bar.insert({q: 40, a: 2}));
-assert.writeOK(a.bar.insert({q: 70, txt: 'willremove'}));
+assert.commandWorked(a.bar.insert({q: 0}));
+assert.commandWorked(a.bar.insert({q: 1, a: "foo"}));
+assert.commandWorked(a.bar.insert({q: 2, a: "foo", x: 1}));
+assert.commandWorked(a.bar.insert({q: 3, bb: 9, a: "foo"}));
+assert.commandWorked(a.bar.insert({q: 40, a: 1}));
+assert.commandWorked(a.bar.insert({q: 40, a: 2}));
+assert.commandWorked(a.bar.insert({q: 70, txt: 'willremove'}));
 a.createCollection("kap", {capped: true, size: 5000});
-assert.writeOK(a.kap.insert({foo: 1}));
+assert.commandWorked(a.kap.insert({foo: 1}));
 // going back to empty on capped is a special case and must be tested
 a.createCollection("kap2", {capped: true, size: 5501});
 replTest.awaitReplication();
@@ -83,17 +83,17 @@ assert.soon(function() {
 }, "node B did not become master as expected", ReplSetTest.kDefaultTimeoutMS);
 
 // do operations on B and B alone, these will be rolled back
-assert.writeOK(b.bar.insert({q: 4}));
-assert.writeOK(b.bar.update({q: 3}, {q: 3, rb: true}));
-assert.writeOK(b.bar.remove({q: 40}));  // multi remove test
-assert.writeOK(b.bar.update({q: 2}, {q: 39, rb: true}));
+assert.commandWorked(b.bar.insert({q: 4}));
+assert.commandWorked(b.bar.update({q: 3}, {q: 3, rb: true}));
+assert.commandWorked(b.bar.remove({q: 40}));  // multi remove test
+assert.commandWorked(b.bar.update({q: 2}, {q: 39, rb: true}));
 // rolling back a delete will involve reinserting the item(s)
-assert.writeOK(b.bar.remove({q: 1}));
-assert.writeOK(b.bar.update({q: 0}, {$inc: {y: 1}}));
-assert.writeOK(b.kap.insert({foo: 2}));
-assert.writeOK(b.kap2.insert({foo: 2}));
+assert.commandWorked(b.bar.remove({q: 1}));
+assert.commandWorked(b.bar.update({q: 0}, {$inc: {y: 1}}));
+assert.commandWorked(b.kap.insert({foo: 2}));
+assert.commandWorked(b.kap2.insert({foo: 2}));
 // create a collection (need to roll back the whole thing)
-assert.writeOK(b.newcoll.insert({a: true}));
+assert.commandWorked(b.newcoll.insert({a: true}));
 // create a new empty collection (need to roll back the whole thing)
 b.createCollection("abc");
 
@@ -117,9 +117,9 @@ assert.soon(function() {
     }
 });
 assert.gte(a.bar.find().itcount(), 1, "count check");
-assert.writeOK(a.bar.insert({txt: 'foo'}));
-assert.writeOK(a.bar.remove({q: 70}));
-assert.writeOK(a.bar.update({q: 0}, {$inc: {y: 33}}));
+assert.commandWorked(a.bar.insert({txt: 'foo'}));
+assert.commandWorked(a.bar.remove({q: 70}));
+assert.commandWorked(a.bar.update({q: 0}, {$inc: {y: 33}}));
 
 // A is 1 2 3 7 8
 // B is 1 2 3 4 5 6

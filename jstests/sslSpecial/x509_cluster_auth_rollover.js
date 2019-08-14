@@ -59,7 +59,7 @@ const rolloverConfig = function(newConfig) {
     assert.soon(() => {
         let primary = rst.getPrimary();
         assert.commandWorked(primary.getDB("admin").runCommand({isMaster: 1}));
-        assert.writeOK(primary.getDB('test').a.insert({a: 1, str: 'TESTTESTTEST'}));
+        assert.commandWorked(primary.getDB('test').a.insert({a: 1, str: 'TESTTESTTEST'}));
 
         // Start a shell that connects to the server with the current CA/cert configuration
         // and ensure that it's able to connect and authenticate with x509.

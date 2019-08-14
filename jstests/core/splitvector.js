@@ -73,7 +73,7 @@ let bulkInsertDocs = function(coll, numDocs, filler) {
     for (let i = 1; i <= numDocs; i++) {
         bulk.insert({x: i, y: filler});
     }
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 };
 
 // Inserts numDocs into the given collection using a bulk operation. Each document's x value is set
@@ -83,7 +83,7 @@ let bulkInsertDocsFixedX = function(coll, numDocs, filler, xVal) {
     for (let i = 1; i <= numDocs; i++) {
         bulk.insert({x: xVal, y: filler});
     }
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 };
 
 // -------------------------

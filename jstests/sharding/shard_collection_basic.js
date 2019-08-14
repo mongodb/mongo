@@ -55,7 +55,7 @@ function getIndexSpecByName(coll, indexName) {
 // Fail if db is not sharded.
 assert.commandFailed(mongos.adminCommand({shardCollection: kDbName + '.foo', key: {_id: 1}}));
 
-assert.writeOK(mongos.getDB(kDbName).foo.insert({a: 1, b: 1}));
+assert.commandWorked(mongos.getDB(kDbName).foo.insert({a: 1, b: 1}));
 
 // Fail if db is not sharding enabled.
 assert.commandFailed(mongos.adminCommand({shardCollection: kDbName + '.foo', key: {_id: 1}}));
@@ -71,7 +71,7 @@ assert.commandFailed(mongos.adminCommand({shardCollection: 'foo', key: "aaa"}));
 assert.commandFailed(
     mongos.getDB('test').runCommand({shardCollection: kDbName + '.foo', key: {_id: 1}}));
 
-assert.writeOK(mongos.getDB(kDbName).foo.insert({a: 1, b: 1}));
+assert.commandWorked(mongos.getDB(kDbName).foo.insert({a: 1, b: 1}));
 // Can't shard if key is not specified.
 assert.commandFailed(mongos.adminCommand({shardCollection: kDbName + '.foo'}));
 
@@ -119,28 +119,28 @@ testAndClenaupWithKeyNoIndexOK({_id: 'hashed'});
 testAndClenaupWithKeyNoIndexOK({a: 1});
 
 // Cant shard collection with data and no index on the shard key.
-assert.writeOK(mongos.getDB(kDbName).foo.insert({a: 1, b: 1}));
+assert.commandWorked(mongos.getDB(kDbName).foo.insert({a: 1, b: 1}));
 testAndClenaupWithKeyNoIndexFailed({a: 1});
 
-assert.writeOK(mongos.getDB(kDbName).foo.insert({a: 1, b: 1}));
+assert.commandWorked(mongos.getDB(kDbName).foo.insert({a: 1, b: 1}));
 testAndClenaupWithKeyOK({a: 1});
 
 // Shard by a hashed key.
 testAndClenaupWithKeyNoIndexOK({a: 'hashed'});
 
-assert.writeOK(mongos.getDB(kDbName).foo.insert({a: 1, b: 1}));
+assert.commandWorked(mongos.getDB(kDbName).foo.insert({a: 1, b: 1}));
 testAndClenaupWithKeyNoIndexFailed({a: 'hashed'});
 
-assert.writeOK(mongos.getDB(kDbName).foo.insert({a: 1, b: 1}));
+assert.commandWorked(mongos.getDB(kDbName).foo.insert({a: 1, b: 1}));
 testAndClenaupWithKeyOK({a: 'hashed'});
 
 // Shard by a compound key.
 testAndClenaupWithKeyNoIndexOK({x: 1, y: 1});
 
-assert.writeOK(mongos.getDB(kDbName).foo.insert({x: 1, y: 1}));
+assert.commandWorked(mongos.getDB(kDbName).foo.insert({x: 1, y: 1}));
 testAndClenaupWithKeyNoIndexFailed({x: 1, y: 1});
 
-assert.writeOK(mongos.getDB(kDbName).foo.insert({x: 1, y: 1}));
+assert.commandWorked(mongos.getDB(kDbName).foo.insert({x: 1, y: 1}));
 testAndClenaupWithKeyOK({x: 1, y: 1});
 
 testAndClenaupWithKeyNoIndexFailed({x: 'hashed', y: 1});
@@ -152,21 +152,21 @@ testAndClenaupWithKeyOK({'z.x': 'hashed'});
 
 // Can't shard by a multikey.
 assert.commandWorked(mongos.getDB(kDbName).foo.createIndex({a: 1}));
-assert.writeOK(mongos.getDB(kDbName).foo.insert({a: [1, 2, 3, 4, 5], b: 1}));
+assert.commandWorked(mongos.getDB(kDbName).foo.insert({a: [1, 2, 3, 4, 5], b: 1}));
 testAndClenaupWithKeyNoIndexFailed({a: 1});
 
 assert.commandWorked(mongos.getDB(kDbName).foo.createIndex({a: 1, b: 1}));
-assert.writeOK(mongos.getDB(kDbName).foo.insert({a: [1, 2, 3, 4, 5], b: 1}));
+assert.commandWorked(mongos.getDB(kDbName).foo.insert({a: [1, 2, 3, 4, 5], b: 1}));
 testAndClenaupWithKeyNoIndexFailed({a: 1, b: 1});
 
-assert.writeOK(mongos.getDB(kDbName).foo.insert({a: 1, b: 1}));
+assert.commandWorked(mongos.getDB(kDbName).foo.insert({a: 1, b: 1}));
 testAndClenaupWithKeyNoIndexFailed({a: 'hashed'});
 
-assert.writeOK(mongos.getDB(kDbName).foo.insert({a: 1, b: 1}));
+assert.commandWorked(mongos.getDB(kDbName).foo.insert({a: 1, b: 1}));
 testAndClenaupWithKeyOK({a: 'hashed'});
 
 // Cant shard by a parallel arrays.
-assert.writeOK(mongos.getDB(kDbName).foo.insert({a: [1, 2, 3, 4, 5], b: [1, 2, 3, 4, 5]}));
+assert.commandWorked(mongos.getDB(kDbName).foo.insert({a: [1, 2, 3, 4, 5], b: [1, 2, 3, 4, 5]}));
 testAndClenaupWithKeyNoIndexFailed({a: 1, b: 1});
 
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
@@ -260,7 +260,7 @@ assert.commandWorked(mongos.adminCommand({shardCollection: kDbName + '.foo', key
 // shard key as a prefix has a non-simple collation.
 mongos.getDB(kDbName).foo.drop();
 assert.commandWorked(mongos.getDB(kDbName).createCollection('foo', {collation: {locale: 'en_US'}}));
-assert.writeOK(mongos.getDB(kDbName).foo.insert({a: 'foo'}));
+assert.commandWorked(mongos.getDB(kDbName).foo.insert({a: 'foo'}));
 // This index will inherit the collection's default collation.
 assert.commandWorked(mongos.getDB(kDbName).foo.createIndex({a: 1}));
 assert.commandFailed(mongos.adminCommand(

@@ -20,10 +20,10 @@ var testColl = testDB.TestColl;
 
 // Create 3 chunks with one document each and move them so that 0 is on shard0, 1 is on shard1,
 // etc.
-assert.writeOK(testColl.insert({Key: 0, Value: 'Value'}));
-assert.writeOK(testColl.insert({Key: 100, Value: 'Value'}));
-assert.writeOK(testColl.insert({Key: 101, Value: 'Value'}));
-assert.writeOK(testColl.insert({Key: 200, Value: 'Value'}));
+assert.commandWorked(testColl.insert({Key: 0, Value: 'Value'}));
+assert.commandWorked(testColl.insert({Key: 100, Value: 'Value'}));
+assert.commandWorked(testColl.insert({Key: 101, Value: 'Value'}));
+assert.commandWorked(testColl.insert({Key: 200, Value: 'Value'}));
 
 assert.commandWorked(st.s0.adminCommand({split: 'TestDB.TestColl', middle: {Key: 100}}));
 assert.commandWorked(st.s0.adminCommand({split: 'TestDB.TestColl', middle: {Key: 101}}));

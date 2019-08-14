@@ -14,10 +14,11 @@ function testGeoWithinCenterSphereLinePolygon(coll) {
     }
 
     // Basic tests.
-    assert.writeOK(coll.insert({name: "Point1", geoField: {type: "Point", coordinates: [1, 1]}}));
-    assert.writeOK(coll.insert(
+    assert.commandWorked(
+        coll.insert({name: "Point1", geoField: {type: "Point", coordinates: [1, 1]}}));
+    assert.commandWorked(coll.insert(
         {name: "LineString1", geoField: {type: "LineString", coordinates: [[1, 1], [2, 2]]}}));
-    assert.writeOK(coll.insert({
+    assert.commandWorked(coll.insert({
         name: "Polygon1",
         geoField: {type: "Polygon", coordinates: [[[1, 1], [2, 2], [2, 1], [1, 1]]]}
     }));
@@ -35,7 +36,7 @@ function testGeoWithinCenterSphereLinePolygon(coll) {
                 [[151.0997772216797, -33.86157820443923], [151.21719360351562, -33.8952122494965]]
         }
     };
-    assert.writeOK(coll.insert(geoDoc));
+    assert.commandWorked(coll.insert(geoDoc));
 
     // Test for a LineString within a geowithin sphere.
     testGeoWithinCenterSphere([[151.16789425018004, -33.8508357122312], 0.0011167360027064348],
@@ -58,7 +59,7 @@ function testGeoWithinCenterSphereLinePolygon(coll) {
             ]
         }
     };
-    assert.writeOK(coll.insert(geoDoc));
+    assert.commandWorked(coll.insert(geoDoc));
 
     // Test for a LineString forming a closed loop rectangle within a geowithin sphere.
     testGeoWithinCenterSphere([[174.75211152791763, -36.88962755605813], 0.000550933650273084],
@@ -86,7 +87,7 @@ function testGeoWithinCenterSphereLinePolygon(coll) {
             ]]
         }
     };
-    assert.writeOK(coll.insert(geoDoc));
+    assert.commandWorked(coll.insert(geoDoc));
 
     // Test for a Polygon within a geowithin sphere.
     testGeoWithinCenterSphere([[174.78536621904806, -41.30510816038769], 0.0009483659386360411],
@@ -127,7 +128,7 @@ function testGeoWithinCenterSphereLinePolygon(coll) {
         }
     };
 
-    assert.writeOK(coll.insert(geoDoc));
+    assert.commandWorked(coll.insert(geoDoc));
 
     // Test for a MultiPolygon (two seperate polygons) within a geowithin sphere.
     testGeoWithinCenterSphere([[151.20821632978107, -33.865139891361636], 0.000981007241416606],
@@ -161,7 +162,7 @@ function testGeoWithinCenterSphereLinePolygon(coll) {
             ]]
         }
     };
-    assert.writeOK(coll.insert(geoDoc));
+    assert.commandWorked(coll.insert(geoDoc));
 
     // Test for a MultiPolygon (with a hole) within a geowithin sphere.
     testGeoWithinCenterSphere([[151.20936119647115, -33.875266834633265], 0.00020277354002627845],
@@ -200,7 +201,7 @@ function testGeoWithinCenterSphereLinePolygon(coll) {
             "coordinates": [[96.328125, 5.61598581915534], [153.984375, -6.315298538330033]]
         }
     };
-    assert.writeOK(coll.insert(geoDoc));
+    assert.commandWorked(coll.insert(geoDoc));
 
     // Test for a large query cap containing both of line vertices but not the line itself.
     // (should not return a match).
@@ -223,7 +224,7 @@ function testGeoWithinCenterSphereLinePolygon(coll) {
             ]]
         }
     };
-    assert.writeOK(coll.insert(geoDoc));
+    assert.commandWorked(coll.insert(geoDoc));
 
     // Test for a large query cap containing both of line vertices but not the line itself.
     // (should not return a match).

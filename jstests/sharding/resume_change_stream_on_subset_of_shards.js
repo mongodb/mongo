@@ -40,13 +40,13 @@ assert.commandWorked(mongosDB.adminCommand(
 let changeStream = mongosColl.watch();
 
 // ... then do one write to produce a resume token...
-assert.writeOK(mongosColl.insert({_id: -2}));
+assert.commandWorked(mongosColl.insert({_id: -2}));
 assert.soon(() => changeStream.hasNext());
 const resumeToken = changeStream.next()._id;
 
 // ... followed by one write to each chunk for testing purposes, i.e. shards 0 and 1.
-assert.writeOK(mongosColl.insert({_id: -1}));
-assert.writeOK(mongosColl.insert({_id: 1}));
+assert.commandWorked(mongosColl.insert({_id: -1}));
+assert.commandWorked(mongosColl.insert({_id: 1}));
 
 // The change stream should see all the inserts after establishing cursors on all shards.
 for (let nextId of [-1, 1]) {
@@ -58,7 +58,7 @@ for (let nextId of [-1, 1]) {
 }
 
 // Insert another document after storing the resume token.
-assert.writeOK(mongosColl.insert({_id: 2}));
+assert.commandWorked(mongosColl.insert({_id: 2}));
 
 // Resume the change stream and verify that it correctly sees the next insert.  This is meant
 // to test resuming a change stream when not all shards are aware that the collection exists,

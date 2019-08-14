@@ -20,7 +20,7 @@ replTest.awaitReplication();
 // on the secondary (due to starting up), and we need to be within 10 seconds
 // to step down.
 var options = {writeConcern: {w: 2, wtimeout: 30000}};
-assert.writeOK(master.getDB("test").foo.insert({x: 2}, options));
+assert.commandWorked(master.getDB("test").foo.insert({x: 2}, options));
 // lock secondary, to pause replication
 print("\nlock secondary");
 var locked = replTest._slaves[0];

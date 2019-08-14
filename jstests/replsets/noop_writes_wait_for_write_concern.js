@@ -51,7 +51,7 @@ var commands = [];
 commands.push({
     req: {applyOps: [{op: "i", ns: coll.getFullName(), o: {_id: 1}}]},
     setupFunc: function() {
-        assert.writeOK(coll.insert({_id: 1}));
+        assert.commandWorked(coll.insert({_id: 1}));
     },
     confirmFunc: function(res) {
         assert.commandWorkedIgnoringWriteConcernErrors(res);
@@ -66,8 +66,8 @@ commands.push({
 commands.push({
     req: {update: collName, updates: [{q: {a: 1}, u: {b: 2}}]},
     setupFunc: function() {
-        assert.writeOK(coll.insert({a: 1}));
-        assert.writeOK(coll.update({a: 1}, {b: 2}));
+        assert.commandWorked(coll.insert({a: 1}));
+        assert.commandWorked(coll.update({a: 1}, {b: 2}));
     },
     confirmFunc: function(res) {
         assert.commandWorkedIgnoringWriteConcernErrors(res);
@@ -82,8 +82,8 @@ commands.push({
 commands.push({
     req: {update: collName, updates: [{q: {a: 1}, u: {$set: {b: 2}}}]},
     setupFunc: function() {
-        assert.writeOK(coll.insert({a: 1}));
-        assert.writeOK(coll.update({a: 1}, {$set: {b: 2}}));
+        assert.commandWorked(coll.insert({a: 1}));
+        assert.commandWorked(coll.update({a: 1}, {$set: {b: 2}}));
     },
     confirmFunc: function(res) {
         assert.commandWorkedIgnoringWriteConcernErrors(res);
@@ -97,8 +97,8 @@ commands.push({
 commands.push({
     req: {delete: collName, deletes: [{q: {a: 1}, limit: 1}]},
     setupFunc: function() {
-        assert.writeOK(coll.insert({a: 1}));
-        assert.writeOK(coll.remove({a: 1}));
+        assert.commandWorked(coll.insert({a: 1}));
+        assert.commandWorked(coll.remove({a: 1}));
     },
     confirmFunc: function(res) {
         assert.commandWorkedIgnoringWriteConcernErrors(res);
@@ -110,7 +110,7 @@ commands.push({
 commands.push({
     req: {createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]},
     setupFunc: function() {
-        assert.writeOK(coll.insert({a: 1}));
+        assert.commandWorked(coll.insert({a: 1}));
         assert.commandWorkedIgnoringWriteConcernErrors(
             db.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]}));
     },
@@ -125,7 +125,7 @@ commands.push({
 commands.push({
     req: {findAndModify: collName, query: {a: 1}, update: {b: 2}},
     setupFunc: function() {
-        assert.writeOK(coll.insert({a: 1}));
+        assert.commandWorked(coll.insert({a: 1}));
         assert.commandWorkedIgnoringWriteConcernErrors(
             db.runCommand({findAndModify: collName, query: {a: 1}, update: {b: 2}}));
     },
@@ -141,7 +141,7 @@ commands.push({
 commands.push({
     req: {findAndModify: collName, query: {a: 1}, update: {$set: {b: 2}}},
     setupFunc: function() {
-        assert.writeOK(coll.insert({a: 1}));
+        assert.commandWorked(coll.insert({a: 1}));
         assert.commandWorkedIgnoringWriteConcernErrors(
             db.runCommand({findAndModify: collName, query: {a: 1}, update: {$set: {b: 2}}}));
     },
@@ -156,7 +156,7 @@ commands.push({
 commands.push({
     req: {dropDatabase: 1},
     setupFunc: function() {
-        assert.writeOK(coll.insert({a: 1}));
+        assert.commandWorked(coll.insert({a: 1}));
         assert.commandWorkedIgnoringWriteConcernErrors(db.runCommand({dropDatabase: 1}));
     },
     confirmFunc: function(res) {
@@ -167,7 +167,7 @@ commands.push({
 commands.push({
     req: {drop: collName},
     setupFunc: function() {
-        assert.writeOK(coll.insert({a: 1}));
+        assert.commandWorked(coll.insert({a: 1}));
         assert.commandWorkedIgnoringWriteConcernErrors(db.runCommand({drop: collName}));
     },
     confirmFunc: function(res) {
@@ -188,7 +188,7 @@ commands.push({
 commands.push({
     req: {insert: collName, documents: [{_id: 1}]},
     setupFunc: function() {
-        assert.writeOK(coll.insert({_id: 1}));
+        assert.commandWorked(coll.insert({_id: 1}));
     },
     confirmFunc: function(res) {
         assert.commandWorkedIgnoringWriteErrorsAndWriteConcernErrors(res);

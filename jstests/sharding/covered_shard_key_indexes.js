@@ -22,7 +22,7 @@ assert.commandWorked(
     st.shard0.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 5}}}));
 
 // Insert some data
-assert.writeOK(coll.insert({_id: true, a: true, b: true}));
+assert.commandWorked(coll.insert({_id: true, a: true, b: true}));
 
 // Index without shard key query - not covered
 assert.commandWorked(coll.ensureIndex({a: 1}));
@@ -49,7 +49,7 @@ assert.commandWorked(st.s0.adminCommand({shardCollection: coll + "", key: {_id: 
 st.printShardingStatus();
 
 // Insert some data
-assert.writeOK(coll.insert({_id: true, a: true, b: true}));
+assert.commandWorked(coll.insert({_id: true, a: true, b: true}));
 
 // Index without shard key query - not covered
 assert.commandWorked(coll.ensureIndex({a: 1}));
@@ -67,7 +67,7 @@ assert.commandWorked(st.s0.adminCommand({shardCollection: coll + "", key: {a: 1,
 st.printShardingStatus();
 
 // Insert some data
-assert.writeOK(coll.insert({_id: true, a: true, b: true, c: true, d: true}));
+assert.commandWorked(coll.insert({_id: true, a: true, b: true, c: true, d: true}));
 
 // Index without shard key query - not covered
 assert.commandWorked(coll.ensureIndex({c: 1}));
@@ -101,7 +101,7 @@ assert.commandWorked(st.s0.adminCommand({shardCollection: coll + "", key: {'a.b'
 st.printShardingStatus();
 
 // Insert some data
-assert.writeOK(coll.insert({_id: true, a: {b: true}, c: true}));
+assert.commandWorked(coll.insert({_id: true, a: {b: true}, c: true}));
 
 // Index without shard key query - not covered
 assert.commandWorked(coll.ensureIndex({c: 1}));
@@ -124,7 +124,7 @@ assert.commandWorked(st.s0.adminCommand({shardCollection: coll + "", key: {a: 1}
 st.printShardingStatus();
 
 // Insert some bad data manually on the shard
-assert.writeOK(st.shard0.getCollection(coll.toString()).insert({_id: "bad data", c: true}));
+assert.commandWorked(st.shard0.getCollection(coll.toString()).insert({_id: "bad data", c: true}));
 
 // Index without shard key query - not covered but succeeds
 assert.commandWorked(coll.ensureIndex({c: 1}));

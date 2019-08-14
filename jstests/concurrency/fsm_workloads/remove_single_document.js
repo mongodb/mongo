@@ -44,7 +44,7 @@ var $config = (function() {
                 return db[collName].remove(query, options);
             },
             assertResult: function assertResult(res) {
-                assertAlways.writeOK(res);
+                assertAlways.commandWorked(res);
                 // when running on its own collection,
                 // this iteration should remove exactly one document
                 assertWhenOwnColl.eq(1, res.nRemoved, tojson(res));

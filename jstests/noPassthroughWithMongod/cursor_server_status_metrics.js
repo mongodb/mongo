@@ -4,9 +4,9 @@
 (function() {
 var coll = db[jsTest.name()];
 coll.drop();
-assert.writeOK(coll.insert({_id: 1}));
-assert.writeOK(coll.insert({_id: 2}));
-assert.writeOK(coll.insert({_id: 3}));
+assert.commandWorked(coll.insert({_id: 1}));
+assert.commandWorked(coll.insert({_id: 2}));
+assert.commandWorked(coll.insert({_id: 3}));
 
 assert.eq(3, coll.find().count());
 

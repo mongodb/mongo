@@ -13,13 +13,13 @@ var local = db.facetLookupLocal;
 var foreign = db.facetLookupForeign;
 
 local.drop();
-assert.writeOK(local.insert({_id: 0}));
-assert.writeOK(local.insert({_id: 1}));
+assert.commandWorked(local.insert({_id: 0}));
+assert.commandWorked(local.insert({_id: 1}));
 
 foreign.drop();
-assert.writeOK(foreign.insert({_id: 0, foreignKey: 0}));
-assert.writeOK(foreign.insert({_id: 1, foreignKey: 1}));
-assert.writeOK(foreign.insert({_id: 2, foreignKey: 2}));
+assert.commandWorked(foreign.insert({_id: 0, foreignKey: 0}));
+assert.commandWorked(foreign.insert({_id: 1, foreignKey: 1}));
+assert.commandWorked(foreign.insert({_id: 2, foreignKey: 2}));
 
 function runTest(lookupStage) {
     const lookupResults = local.aggregate([lookupStage]).toArray();

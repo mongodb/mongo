@@ -6,8 +6,8 @@ TestData.disableImplicitSessions = true;
 var conn = MongoRunner.runMongod({setParameter: {maxSessions: 2}});
 var testDB = conn.getDB("test");
 
-assert.writeOK(testDB.foo.insert({data: 1}));
-assert.writeOK(testDB.foo.insert({data: 2}));
+assert.commandWorked(testDB.foo.insert({data: 1}));
+assert.commandWorked(testDB.foo.insert({data: 2}));
 
 for (var i = 0; i < 2; i++) {
     var session = conn.startSession();

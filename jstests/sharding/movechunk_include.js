@@ -32,7 +32,7 @@ function setupMoveChunkTest(shardOptions) {
         bulk.insert({_id: num++, s: str});
         data += str.length;
     }
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 
     // Make sure there are chunks to move
     for (var i = 0; i < 10; ++i) {

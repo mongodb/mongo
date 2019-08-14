@@ -31,8 +31,8 @@ assert.eq(bigStr.length, 16 * oneMB);
 bigStr = bigStr.substring(0, (16 * oneMB) - oneKB);
 
 // Collection has one ~1 MB doc followed by one ~16 MB doc.
-assert.writeOK(coll.insert({_id: 0, padding: smallStr}));
-assert.writeOK(coll.insert({_id: 1, padding: bigStr}));
+assert.commandWorked(coll.insert({_id: 0, padding: smallStr}));
+assert.commandWorked(coll.insert({_id: 1, padding: bigStr}));
 
 // Find command should just return the first doc, as adding the last would create an invalid
 // command response document.
@@ -78,7 +78,7 @@ while (bigStr.length < (16 * oneMB)) {
 bigStr = bigStr.substring(0, (16 * oneMB) - 32);
 var maxSizeDoc = {_id: 0, padding: bigStr};
 assert.eq(Object.bsonsize(maxSizeDoc), 16 * oneMB);
-assert.writeOK(coll.insert(maxSizeDoc));
+assert.commandWorked(coll.insert(maxSizeDoc));
 
 cmdRes = db.runCommand({find: collName});
 assert.commandWorked(cmdRes);

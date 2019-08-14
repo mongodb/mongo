@@ -13,15 +13,15 @@ var frenchAccentOrdering = {collation: {locale: "fr", backwards: true}};
 
 var coll = db.collation_sort;
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, word1: "pêche", word2: "côté"}));
-assert.writeOK(coll.insert({_id: 2, word1: "pêche", word2: "coté"}));
-assert.writeOK(coll.insert({_id: 3, word1: "pêche", word2: "côte"}));
-assert.writeOK(coll.insert({_id: 4, word1: "pèché", word2: "côté"}));
-assert.writeOK(coll.insert({_id: 5, word1: "pèché", word2: "coté"}));
-assert.writeOK(coll.insert({_id: 6, word1: "pèché", word2: "côte"}));
-assert.writeOK(coll.insert({_id: 7, word1: "pêché", word2: "côté"}));
-assert.writeOK(coll.insert({_id: 8, word1: "pêché", word2: "coté"}));
-assert.writeOK(coll.insert({_id: 9, word1: "pêché", word2: "côte"}));
+assert.commandWorked(coll.insert({_id: 1, word1: "pêche", word2: "côté"}));
+assert.commandWorked(coll.insert({_id: 2, word1: "pêche", word2: "coté"}));
+assert.commandWorked(coll.insert({_id: 3, word1: "pêche", word2: "côte"}));
+assert.commandWorked(coll.insert({_id: 4, word1: "pèché", word2: "côté"}));
+assert.commandWorked(coll.insert({_id: 5, word1: "pèché", word2: "coté"}));
+assert.commandWorked(coll.insert({_id: 6, word1: "pèché", word2: "côte"}));
+assert.commandWorked(coll.insert({_id: 7, word1: "pêché", word2: "côté"}));
+assert.commandWorked(coll.insert({_id: 8, word1: "pêché", word2: "coté"}));
+assert.commandWorked(coll.insert({_id: 9, word1: "pêché", word2: "côte"}));
 
 // Test that ascending sort respects the collation.
 assert.eq([{_id: "pèché"}, {_id: "pêche"}, {_id: "pêché"}],

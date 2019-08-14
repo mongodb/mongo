@@ -33,7 +33,7 @@ function enableShardingAndShardColl(keyDoc) {
 
 function dropAndRecreateColl(keyDoc) {
     assert.commandWorked(mongos.getDB(kDbName).runCommand({drop: kCollName}));
-    assert.writeOK(mongos.getCollection(kNsName).insert(keyDoc));
+    assert.commandWorked(mongos.getCollection(kNsName).insert(keyDoc));
 }
 
 function dropAndReshardColl(keyDoc) {
@@ -81,8 +81,8 @@ function setupCRUDBeforeRefine() {
     const sessionDB = session.getDatabase(kDbName);
 
     // The documents below will be read after refineCollectionShardKey to verify data integrity.
-    assert.writeOK(sessionDB.getCollection(kCollName).insert({a: 5, b: 5, c: 5, d: 5}));
-    assert.writeOK(sessionDB.getCollection(kCollName).insert({a: 10, b: 10, c: 10, d: 10}));
+    assert.commandWorked(sessionDB.getCollection(kCollName).insert({a: 5, b: 5, c: 5, d: 5}));
+    assert.commandWorked(sessionDB.getCollection(kCollName).insert({a: 10, b: 10, c: 10, d: 10}));
 }
 
 function validateCRUDAfterRefine() {
@@ -104,17 +104,17 @@ function validateCRUDAfterRefine() {
                               ErrorCodes.ShardKeyNotFound);
     assert.writeErrorWithCode(sessionDB.getCollection(kCollName).insert({a: -1, b: -1}),
                               ErrorCodes.ShardKeyNotFound);
-    assert.writeOK(sessionDB.getCollection(kCollName).insert({a: 1, b: 1, c: 1, d: 1}));
-    assert.writeOK(sessionDB.getCollection(kCollName).insert({a: -1, b: -1, c: -1, d: -1}));
+    assert.commandWorked(sessionDB.getCollection(kCollName).insert({a: 1, b: 1, c: 1, d: 1}));
+    assert.commandWorked(sessionDB.getCollection(kCollName).insert({a: -1, b: -1, c: -1, d: -1}));
 
     // The full shard key is required when updating documents.
     assert.writeErrorWithCode(
         sessionDB.getCollection(kCollName).update({a: 1, b: 1}, {$set: {b: 2}}), 31025);
     assert.writeErrorWithCode(
         sessionDB.getCollection(kCollName).update({a: -1, b: -1}, {$set: {b: 2}}), 31025);
-    assert.writeOK(
+    assert.commandWorked(
         sessionDB.getCollection(kCollName).update({a: 1, b: 1, c: 1, d: 1}, {$set: {b: 2}}));
-    assert.writeOK(
+    assert.commandWorked(
         sessionDB.getCollection(kCollName).update({a: -1, b: -1, c: -1, d: -1}, {$set: {b: 4}}));
 
     assert.eq(2, sessionDB.getCollection(kCollName).findOne({a: 1}).b);
@@ -131,10 +131,12 @@ function validateCRUDAfterRefine() {
                               ErrorCodes.ShardKeyNotFound);
     assert.writeErrorWithCode(sessionDB.getCollection(kCollName).remove({a: -1, b: -1}, true),
                               ErrorCodes.ShardKeyNotFound);
-    assert.writeOK(sessionDB.getCollection(kCollName).remove({a: 1, b: 2, c: 1, d: 1}, true));
-    assert.writeOK(sessionDB.getCollection(kCollName).remove({a: -1, b: 4, c: -1, d: -1}, true));
-    assert.writeOK(sessionDB.getCollection(kCollName).remove({a: 5, b: 5, c: 5, d: 5}, true));
-    assert.writeOK(sessionDB.getCollection(kCollName).remove({a: 10, b: 10, c: 10, d: 10}, true));
+    assert.commandWorked(sessionDB.getCollection(kCollName).remove({a: 1, b: 2, c: 1, d: 1}, true));
+    assert.commandWorked(
+        sessionDB.getCollection(kCollName).remove({a: -1, b: 4, c: -1, d: -1}, true));
+    assert.commandWorked(sessionDB.getCollection(kCollName).remove({a: 5, b: 5, c: 5, d: 5}, true));
+    assert.commandWorked(
+        sessionDB.getCollection(kCollName).remove({a: 10, b: 10, c: 10, d: 10}, true));
     assert.eq(null, sessionDB.getCollection(kCollName).findOne());
 }
 
@@ -259,7 +261,7 @@ assert.commandFailedWithCode(
     mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}}),
     ErrorCodes.NamespaceNotFound);
 
-assert.writeOK(mongos.getCollection(kNsName).insert({aKey: 1}));
+assert.commandWorked(mongos.getCollection(kNsName).insert({aKey: 1}));
 
 // Should fail because namespace 'db.foo' is not sharded. NOTE: This NamespaceNotSharded error
 // is thrown in RefineCollectionShardKeyCommand by 'getShardedCollectionRoutingInfoWithRefresh'.
@@ -378,7 +380,7 @@ assert.commandFailedWithCode(
 // Should fail because only a multikey index exists for new shard key {_id: 1, aKey: 1}.
 dropAndReshardColl({_id: 1});
 assert.commandWorked(mongos.getCollection(kNsName).createIndex({_id: 1, aKey: 1}));
-assert.writeOK(mongos.getCollection(kNsName).insert({aKey: [1, 2, 3, 4, 5]}));
+assert.commandWorked(mongos.getCollection(kNsName).insert({aKey: [1, 2, 3, 4, 5]}));
 
 assert.commandFailedWithCode(
     mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}}),
@@ -408,7 +410,7 @@ validateConfigChangelog(1);
 // shard key {_id: 1, aKey: 1}.
 dropAndReshardColl({_id: 1});
 assert.commandWorked(mongos.getCollection(kNsName).createIndex({_id: 1, aKey: 1}));
-assert.writeOK(mongos.getCollection(kNsName).insert({_id: 12345}));
+assert.commandWorked(mongos.getCollection(kNsName).insert({_id: 12345}));
 
 assert.commandFailedWithCode(
     mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}}),

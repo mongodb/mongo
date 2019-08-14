@@ -22,11 +22,11 @@ st.ensurePrimaryShard(mongosDB.getName(), st.rs1.getURL());
 // about the location of the collection before the move.
 const mongos2DB = st.s1.getDB(testName);
 const mongos2Coll = mongos2DB[testName];
-assert.writeOK(mongos2Coll.insert({_id: 0, a: 0}));
+assert.commandWorked(mongos2Coll.insert({_id: 0, a: 0}));
 
 st.ensurePrimaryShard(mongosDB.getName(), st.rs0.getURL());
 
-assert.writeOK(mongos2Coll.insert({_id: 1, a: 0}));
+assert.commandWorked(mongos2Coll.insert({_id: 1, a: 0}));
 
 st.stop();
 })();

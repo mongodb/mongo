@@ -24,7 +24,7 @@ function doExecutionTest(conn) {
     // Insert a bunch of documents of the form above.
     const nDocs = 10;
     for (let i = 0; i < nDocs; i++) {
-        assert.writeOK(coll.insert({"_id": i, "2i": i * 2, "3i": i * 3}));
+        assert.commandWorked(coll.insert({"_id": i, "2i": i * 2, "3i": i * 3}));
     }
 
     // Add the minimum, maximum, and average temperatures, and make sure that doing the same

@@ -39,7 +39,7 @@ function testFCVNoop(targetVersion) {
     replTest.stop(1);
 
     // Insert a document to ensure there is a last optime.
-    assert.writeOK(primary.getDB("test").foo.insert({x: 1}));
+    assert.commandWorked(primary.getDB("test").foo.insert({x: 1}));
 
     // We run the command on a different connection. If the the command were run on the same
     // connection, then the client last op for the noop write would be the last op of the

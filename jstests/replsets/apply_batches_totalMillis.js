@@ -21,7 +21,7 @@ function performBulkInsert(coll, key, num) {
         doc[key] = i;
         bulk.insert(doc);
     }
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
     rst.awaitReplication();
 }
 
@@ -35,7 +35,7 @@ let secondary = rst.getSecondary();
 let coll = primary.getDB(name)["foo"];
 
 // Perform an initial write on the system and ensure steady state.
-assert.writeOK(coll.insert({init: 0}));
+assert.commandWorked(coll.insert({init: 0}));
 rst.awaitReplication();
 let baseTime = getTotalMillis(secondary);
 

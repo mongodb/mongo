@@ -22,7 +22,7 @@ for (var test = 0; test < 2; test++) {
     var coll = mongos.getCollection("foo.bar");
     var db = coll.getDB();
 
-    assert.writeOK(coll.insert({hello: "world"}));
+    assert.commandWorked(coll.insert({hello: "world"}));
 
     jsTest.log("Creating new connections...");
 

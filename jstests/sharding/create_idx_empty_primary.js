@@ -15,7 +15,7 @@ assert.commandWorked(testDB.adminCommand({shardcollection: 'test.user', key: {_i
 assert.commandWorked(
     testDB.adminCommand({movechunk: 'test.user', find: {_id: 0}, to: st.shard0.shardName}));
 
-assert.writeOK(testDB.user.insert({_id: 0}));
+assert.commandWorked(testDB.user.insert({_id: 0}));
 
 var res = testDB.user.ensureIndex({i: 1});
 assert.commandWorked(res);

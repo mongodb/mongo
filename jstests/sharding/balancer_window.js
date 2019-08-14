@@ -56,16 +56,17 @@ var shard0Chunks = configDB.chunks.find({ns: 'test.user', shard: st.shard0.shard
 
 var startDate = new Date();
 var hourMinStart = new HourAndMinute(startDate.getHours(), startDate.getMinutes());
-assert.writeOK(configDB.settings.update({_id: 'balancer'},
-                                        {
-                                            $set: {
-                                                activeWindow: {
-                                                    start: hourMinStart.addHour(-2).toString(),
-                                                    stop: hourMinStart.addHour(-1).toString()
-                                                },
-                                            }
-                                        },
-                                        true));
+assert.commandWorked(
+    configDB.settings.update({_id: 'balancer'},
+                             {
+                                 $set: {
+                                     activeWindow: {
+                                         start: hourMinStart.addHour(-2).toString(),
+                                         stop: hourMinStart.addHour(-1).toString()
+                                     },
+                                 }
+                             },
+                             true));
 st.startBalancer();
 
 st.waitForBalancer(true, 60000);
@@ -73,7 +74,7 @@ st.waitForBalancer(true, 60000);
 var shard0ChunksAfter = configDB.chunks.find({ns: 'test.user', shard: st.shard0.shardName}).count();
 assert.eq(shard0Chunks, shard0ChunksAfter);
 
-assert.writeOK(configDB.settings.update(
+assert.commandWorked(configDB.settings.update(
     {_id: 'balancer'},
     {
         $set: {

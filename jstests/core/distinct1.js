@@ -6,11 +6,11 @@ coll.drop();
 
 assert.eq(0, coll.distinct("a").length, "test empty");
 
-assert.writeOK(coll.insert({a: 1}));
-assert.writeOK(coll.insert({a: 2}));
-assert.writeOK(coll.insert({a: 2}));
-assert.writeOK(coll.insert({a: 2}));
-assert.writeOK(coll.insert({a: 3}));
+assert.commandWorked(coll.insert({a: 1}));
+assert.commandWorked(coll.insert({a: 2}));
+assert.commandWorked(coll.insert({a: 2}));
+assert.commandWorked(coll.insert({a: 2}));
+assert.commandWorked(coll.insert({a: 3}));
 
 // Test that distinct returns all the distinct values.
 assert.eq([1, 2, 3], coll.distinct("a").sort(), "distinct returned unexpected results");
@@ -22,10 +22,10 @@ assert.eq([1, 2],
 
 assert(coll.drop());
 
-assert.writeOK(coll.insert({a: {b: "a"}, c: 12}));
-assert.writeOK(coll.insert({a: {b: "b"}, c: 12}));
-assert.writeOK(coll.insert({a: {b: "c"}, c: 12}));
-assert.writeOK(coll.insert({a: {b: "c"}, c: 12}));
+assert.commandWorked(coll.insert({a: {b: "a"}, c: 12}));
+assert.commandWorked(coll.insert({a: {b: "b"}, c: 12}));
+assert.commandWorked(coll.insert({a: {b: "c"}, c: 12}));
+assert.commandWorked(coll.insert({a: {b: "c"}, c: 12}));
 
 // Test that distinct works on fields in embedded documents.
 assert.eq(["a", "b", "c"],
@@ -34,8 +34,8 @@ assert.eq(["a", "b", "c"],
 
 assert(coll.drop());
 
-assert.writeOK(coll.insert({_id: 1, a: 1}));
-assert.writeOK(coll.insert({_id: 2, a: 2}));
+assert.commandWorked(coll.insert({_id: 1, a: 1}));
+assert.commandWorked(coll.insert({_id: 2, a: 2}));
 
 // Test that distinct works on the _id field.
 assert.eq([1, 2], coll.distinct("_id").sort(), "distinct on _id returned unexpected results");
@@ -46,13 +46,13 @@ assert.eq(
 
 assert(coll.drop());
 
-assert.writeOK(coll.insert({a: 1, b: 2}));
-assert.writeOK(coll.insert({a: 2, b: 2}));
-assert.writeOK(coll.insert({a: 2, b: 1}));
-assert.writeOK(coll.insert({a: 2, b: 2}));
-assert.writeOK(coll.insert({a: 3, b: 2}));
-assert.writeOK(coll.insert({a: 4, b: 1}));
-assert.writeOK(coll.insert({a: 4, b: 1}));
+assert.commandWorked(coll.insert({a: 1, b: 2}));
+assert.commandWorked(coll.insert({a: 2, b: 2}));
+assert.commandWorked(coll.insert({a: 2, b: 1}));
+assert.commandWorked(coll.insert({a: 2, b: 2}));
+assert.commandWorked(coll.insert({a: 3, b: 2}));
+assert.commandWorked(coll.insert({a: 4, b: 1}));
+assert.commandWorked(coll.insert({a: 4, b: 1}));
 
 // Test running the distinct command directly, rather than via shell helper.
 let res = assert.commandWorked(db.runCommand({distinct: collName, key: "a"}));

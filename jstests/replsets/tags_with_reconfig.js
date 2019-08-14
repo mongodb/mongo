@@ -36,10 +36,10 @@ var master = replTest.getPrimary();
 var db = master.getDB("test");
 
 // Insert a document with write concern : anydc
-assert.writeOK(db.foo.insert({x: 1}, {writeConcern: {w: 'anydc', wtimeout: wtimeout}}));
+assert.commandWorked(db.foo.insert({x: 1}, {writeConcern: {w: 'anydc', wtimeout: wtimeout}}));
 
 // Insert a document with write concern : alldc
-assert.writeOK(db.foo.insert({x: 2}, {writeConcern: {w: 'alldc', wtimeout: wtimeout}}));
+assert.commandWorked(db.foo.insert({x: 2}, {writeConcern: {w: 'alldc', wtimeout: wtimeout}}));
 
 // Add a new tag to the replica set
 var config = master.getDB("local").system.replset.findOne();
@@ -64,10 +64,10 @@ master = replTest.getPrimary();
 var db = master.getDB("test");
 
 // Insert a document with write concern : anydc
-assert.writeOK(db.foo.insert({x: 3}, {writeConcern: {w: 'anydc', wtimeout: wtimeout}}));
+assert.commandWorked(db.foo.insert({x: 3}, {writeConcern: {w: 'anydc', wtimeout: wtimeout}}));
 
 // Insert a document with write concern : alldc
-assert.writeOK(db.foo.insert({x: 4}, {writeConcern: {w: 'alldc', wtimeout: wtimeout}}));
+assert.commandWorked(db.foo.insert({x: 4}, {writeConcern: {w: 'alldc', wtimeout: wtimeout}}));
 
 replTest.stopSet();
 }());

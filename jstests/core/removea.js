@@ -19,7 +19,7 @@ for (let v = 0; v < 2; ++v) {  // Try each index version.
             let i = y + (B * x);
             batch.push({a: i});
         }
-        assert.writeOK(t.insert(batch));
+        assert.commandWorked(t.insert(batch));
     }
     assert.eq(t.count(), S * B);
 
@@ -27,6 +27,6 @@ for (let v = 0; v < 2; ++v) {  // Try each index version.
     for (let i = 0; i < S * B; ++i) {
         toDrop.push(Random.randInt(10000));  // Dups in the query will be ignored.
     }
-    assert.writeOK(t.remove({a: {$in: toDrop}}));
+    assert.commandWorked(t.remove({a: {$in: toDrop}}));
 }
 })();

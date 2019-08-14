@@ -17,22 +17,22 @@ assert.isnull(ret);
 // Test update:{} when a document matches the query.  The document is "replaced with the empty
 // object" (i.e. all non-_id fields are unset).
 coll.remove({});
-assert.writeOK(coll.insert({_id: 0, a: 1}));
+assert.commandWorked(coll.insert({_id: 0, a: 1}));
 ret = coll.findAndModify({query: {a: 1}, update: {}});
 assert.eq(ret, {_id: 0, a: 1});
 assert.eq(coll.findOne({_id: 0}), {_id: 0});
 
 // Test update:{} with new:true.
 coll.remove({});
-assert.writeOK(coll.insert({_id: 0, a: 1}));
+assert.commandWorked(coll.insert({_id: 0, a: 1}));
 ret = coll.findAndModify({query: {a: 1}, update: {}, new: true});
 assert.eq(ret, {_id: 0});
 assert.eq(coll.findOne({_id: 0}), {_id: 0});
 
 // Test update:{} with a sort.
 coll.remove({});
-assert.writeOK(coll.insert({_id: 0, a: 1}));
-assert.writeOK(coll.insert({_id: 1, a: 1}));
+assert.commandWorked(coll.insert({_id: 0, a: 1}));
+assert.commandWorked(coll.insert({_id: 1, a: 1}));
 ret = coll.findAndModify({query: {a: 1}, update: {}, sort: {_id: 1}});
 assert.eq(ret, {_id: 0, a: 1});
 assert.eq(coll.findOne({_id: 0}), {_id: 0});

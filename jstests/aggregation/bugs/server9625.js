@@ -8,7 +8,7 @@ load('jstests/aggregation/extras/utils.js');
 'use strict';
 var coll = db.server9625;
 coll.drop();
-assert.writeOK(coll.insert({}));
+assert.commandWorked(coll.insert({}));
 
 // Helper for testing that op returns expResult.
 function testOp(op, expResult) {
@@ -51,7 +51,7 @@ testOp({$stdDevSamp: [1, 2, 3, NaN]}, NaN);
 // optimization will evaluate them all into one, without calling isAssociative() nor
 // isCommutative().
 coll.drop();
-assert.writeOK(coll.insert({"a": 1, "b": 6}));
+assert.commandWorked(coll.insert({"a": 1, "b": 6}));
 
 // These expressions are associative and commutative so inner expression can be combined with
 // outer.

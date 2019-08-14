@@ -9,7 +9,7 @@ const conn = st.s;
 
 const db = conn.getDB("killOp");
 const coll = db.test;
-assert.writeOK(db.getCollection(coll.getName()).insert({x: 1}));
+assert.commandWorked(db.getCollection(coll.getName()).insert({x: 1}));
 
 const kFailPointName = "waitInFindBeforeMakingBatch";
 assert.commandWorked(conn.adminCommand({"configureFailPoint": kFailPointName, "mode": "alwaysOn"}));

@@ -45,15 +45,15 @@ assert.commandWorked(mongosDB.adminCommand(
     {moveChunk: mongosColl.getFullName(), find: {shardKey: 1}, to: st.rs1.getURL()}));
 
 // Write a document to each chunk.
-assert.writeOK(mongosColl.insert({shardKey: -1, _id: -1}, {writeConcern: {w: "majority"}}));
-assert.writeOK(mongosColl.insert({shardKey: 1, _id: 1}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({shardKey: -1, _id: -1}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({shardKey: 1, _id: 1}, {writeConcern: {w: "majority"}}));
 
 let changeStream = mongosColl.watch();
 
 // We awaited the replication of the first writes, so the change stream shouldn't return them.
-assert.writeOK(mongosColl.update({shardKey: -1, _id: -1}, {$set: {updated: true}}));
-assert.writeOK(mongosColl.update({shardKey: 1, _id: 1}, {$set: {updated: true}}));
-assert.writeOK(mongosColl.insert({shardKey: 2, _id: 2}));
+assert.commandWorked(mongosColl.update({shardKey: -1, _id: -1}, {$set: {updated: true}}));
+assert.commandWorked(mongosColl.update({shardKey: 1, _id: 1}, {$set: {updated: true}}));
+assert.commandWorked(mongosColl.insert({shardKey: 2, _id: 2}));
 
 // Drop the collection and test that we return a "drop" entry, followed by an "invalidate"
 // entry.

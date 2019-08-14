@@ -468,9 +468,9 @@ assert.commandWorked(viewsDB.runCommand({
     collation: {locale: "en", strength: 1}
 }));
 
-assert.writeOK(viewsDB.case_sensitive_coll.insert({f: "case"}));
-assert.writeOK(viewsDB.case_sensitive_coll.insert({f: "Case"}));
-assert.writeOK(viewsDB.case_sensitive_coll.insert({f: "CASE"}));
+assert.commandWorked(viewsDB.case_sensitive_coll.insert({f: "case"}));
+assert.commandWorked(viewsDB.case_sensitive_coll.insert({f: "Case"}));
+assert.commandWorked(viewsDB.case_sensitive_coll.insert({f: "CASE"}));
 
 let explain, cursorStage;
 

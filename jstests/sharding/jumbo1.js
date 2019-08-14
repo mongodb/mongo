@@ -24,7 +24,7 @@ for (; x < 1500; x++) {
     bulk.insert({x: x, big: big});
 }
 
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 s.printShardingStatus(true);
 

@@ -87,7 +87,7 @@ var $config = (function() {
 
     function setup(db, collName, cluster) {
         let coll = db[collName];
-        assertAlways.writeOK(coll.insert({x: 1}));
+        assertAlways.commandWorked(coll.insert({x: 1}));
 
         for (let viewName of this.viewList) {
             assertAlways.commandWorked(db.createView(viewName, collName, []));

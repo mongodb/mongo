@@ -41,7 +41,7 @@ assert.commandWorked(
     mongosDB.adminCommand({moveChunk: coll.getFullName(), find: {a: 5}, to: "view_rewrite-rs1"}));
 
 for (let i = 0; i < 10; ++i) {
-    assert.writeOK(coll.insert({a: i}));
+    assert.commandWorked(coll.insert({a: i}));
 }
 
 assert.commandWorked(mongosDB.createView("view", coll.getName(), []));

@@ -43,16 +43,16 @@ assert.commandWorked(mongosDB.adminCommand(
     {moveChunk: mongosColl.getFullName(), find: {_id: 1}, to: st.rs1.getURL()}));
 
 // Write a document to each chunk.
-assert.writeOK(mongosColl.insert({_id: -1}));
-assert.writeOK(mongosColl.insert({_id: 1}));
+assert.commandWorked(mongosColl.insert({_id: -1}));
+assert.commandWorked(mongosColl.insert({_id: 1}));
 
 const changeStream = mongosColl.aggregate([{$changeStream: {fullDocument: "updateLookup"}}]);
 
 // Do some writes.
-assert.writeOK(mongosColl.insert({_id: 1000}));
-assert.writeOK(mongosColl.insert({_id: -1000}));
-assert.writeOK(mongosColl.update({_id: 1000}, {$set: {updatedCount: 1}}));
-assert.writeOK(mongosColl.update({_id: -1000}, {$set: {updatedCount: 1}}));
+assert.commandWorked(mongosColl.insert({_id: 1000}));
+assert.commandWorked(mongosColl.insert({_id: -1000}));
+assert.commandWorked(mongosColl.update({_id: 1000}, {$set: {updatedCount: 1}}));
+assert.commandWorked(mongosColl.update({_id: -1000}, {$set: {updatedCount: 1}}));
 
 for (let nextId of [1000, -1000]) {
     assert.soon(() => changeStream.hasNext());
@@ -72,8 +72,8 @@ for (let nextId of [1000, -1000]) {
 
 // Test that the change stream can still see the updated post image, even if a chunk is
 // migrated.
-assert.writeOK(mongosColl.update({_id: 1000}, {$set: {updatedCount: 2}}));
-assert.writeOK(mongosColl.update({_id: -1000}, {$set: {updatedCount: 2}}));
+assert.commandWorked(mongosColl.update({_id: 1000}, {$set: {updatedCount: 2}}));
+assert.commandWorked(mongosColl.update({_id: -1000}, {$set: {updatedCount: 2}}));
 
 // Split the [0, MaxKey) chunk into 2: [0, 500), [500, MaxKey).
 assert.commandWorked(mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {_id: 500}}));

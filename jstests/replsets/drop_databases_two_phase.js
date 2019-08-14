@@ -65,7 +65,7 @@ var collNameToDrop = "collectionToDrop";
 
 // Create the collection that will be dropped and let it replicate.
 var collToDrop = dbToDrop.getCollection(collNameToDrop);
-assert.writeOK(
+assert.commandWorked(
     collToDrop.insert({_id: 0}, {writeConcern: {w: 2, wtimeout: replTest.kDefaultTimeoutMS}}));
 assert.eq(1, collToDrop.find().itcount());
 

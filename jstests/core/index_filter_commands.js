@@ -215,7 +215,7 @@ var collationEN = {locale: "en_US"};
 assert.commandWorked(t.createIndex(indexA1, {collation: collationEN, name: "a_1:en_US"}));
 assert.commandWorked(t.createIndex(indexA1, {name: "a_1"}));
 
-assert.writeOK(t.insert({a: "a"}));
+assert.commandWorked(t.insert({a: "a"}));
 
 assert.commandWorked(t.runCommand('planCacheSetFilter', {query: queryAA, indexes: [indexA1]}));
 
@@ -244,7 +244,7 @@ assert(isCollscan(db, explain.queryPlanner.winningPlan), "Expected collscan: " +
 //
 
 t.drop();
-assert.writeOK(t.insert({a: "a"}));
+assert.commandWorked(t.insert({a: "a"}));
 assert.commandWorked(t.createIndex(indexA1, {name: "a_1"}));
 
 assert.commandWorked(t.runCommand(
@@ -264,7 +264,7 @@ assert.eq(0, filters.length, tojson(filters));
 //
 
 t.drop();
-assert.writeOK(t.insert({a: "a"}));
+assert.commandWorked(t.insert({a: "a"}));
 assert.commandWorked(t.createIndex(indexA1, {name: "a_1"}));
 
 assert.commandFailed(

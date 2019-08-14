@@ -23,7 +23,7 @@ var $config = extendWorkload($config, function($config, $super) {
         for (var i = 0; i < 20; ++i) {
             var res = db[collName].remove({value: {$gte: Random.randInt(this.numDocs / 10)}},
                                           {justOne: true});
-            assertAlways.writeOK(res);
+            assertAlways.commandWorked(res);
             assertAlways.lte(0, res.nRemoved, tojson(res));
         }
     };

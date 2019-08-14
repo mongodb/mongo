@@ -46,7 +46,7 @@ var bulk = testDB.user.initializeUnorderedBulkOp();
 for (var x = -1200; x < 1200; x++) {
     bulk.insert({_id: x, val: kiloDoc});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 assert.eq(1, configDB.chunks.find({ns: 'test.user', min: {$gte: {_id: 0}}}).itcount());
 
@@ -89,7 +89,7 @@ bulk = testDB.compound.initializeUnorderedBulkOp();
 for (x = -1200; x < 1200; x++) {
     bulk.insert({x: x, y: x, val: kiloDoc});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 assert.eq(1, configDB.chunks.find({ns: 'test.compound', min: {$gte: {x: 0, y: 0}}}).itcount());
 assert.commandWorked(configDB.adminCommand(

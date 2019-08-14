@@ -73,7 +73,7 @@ for (var idx = 0; idx < dropAction.length; idx++) {
     for (var i = 0; i < size; ++i) {
         bulk.insert({i: i});
     }
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 
     jsTest.log("Starting background indexing for test of: " + JSON.stringify(dc));
     masterDB.getCollection(collection).ensureIndex({i: 1}, {background: true});

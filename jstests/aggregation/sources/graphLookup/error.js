@@ -11,7 +11,7 @@ load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
 var local = db.local;
 
 local.drop();
-assert.writeOK(local.insert({b: 0}));
+assert.commandWorked(local.insert({b: 0}));
 
 var pipeline = {$graphLookup: 4};
 assertErrorCode(local, pipeline, ErrorCodes.FailedToParse, "$graphLookup spec must be an object");
@@ -291,7 +291,7 @@ assert.throws(
 
 let foreign = db.foreign;
 foreign.drop();
-assert.writeOK(foreign.insert({a: 0, x: 0}));
+assert.commandWorked(foreign.insert({a: 0, x: 0}));
 
 // Test a restrictSearchWithMatch expression that fails to parse.
 pipeline = {
@@ -333,7 +333,7 @@ for (var i = 0; i < 8; i++) {
     initial.push(i);
     bulk.insert(obj);
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 pipeline = {
         $graphLookup: {
@@ -356,7 +356,7 @@ for (var i = 0; i < 14; i++) {
     obj['s'] = new Array(7 * 1024 * 1024).join(' ');
     bulk.insert(obj);
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 pipeline = {
         $graphLookup: {
@@ -379,7 +379,7 @@ for (var i = 0; i < 13; i++) {
     obj['s'] = new Array(7 * 1024 * 1024).join(' ');
     bulk.insert(obj);
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 var res = local
                   .aggregate({

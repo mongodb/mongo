@@ -34,7 +34,7 @@ for (var j = 0; j < 100; j++) {
         bulk.insert({j: j, i: i});
     }
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 function map() {
     emit(this.i, 1);
@@ -69,8 +69,8 @@ assertCollectionNotOnShard(st.shard0.getDB("mrShard"), "outSharded");
 assert.commandWorked(admin.runCommand({split: "mrShard.outSharded", middle: {"_id": 2000}}));
 assert.commandWorked(admin.runCommand(
     {moveChunk: "mrShard.outSharded", find: {"_id": 2000}, to: st.shard0.shardName}));
-assert.writeOK(st.s.getCollection("mrShard.outSharded").insert({_id: 1000}));
-assert.writeOK(st.s.getCollection("mrShard.outSharded").insert({_id: 2001}));
+assert.commandWorked(st.s.getCollection("mrShard.outSharded").insert({_id: 1000}));
+assert.commandWorked(st.s.getCollection("mrShard.outSharded").insert({_id: 2001}));
 origUUID = getUUIDFromConfigCollections(st.s, "mrShard.outSharded");
 
 out = db.srcSharded.mapReduce(map, reduce, {out: {merge: "outSharded", sharded: true}});

@@ -33,7 +33,7 @@ coll.getDB().system.profile.drop();
 assert.commandWorked(coll.getDB().runCommand({profile: 2}));
 
 // Test update with large string element in query portion.
-assert.writeOK(coll.update({a: hugeStr}, {}));
+assert.commandWorked(coll.update({a: hugeStr}, {}));
 var results = coll.getDB().system.profile.find().toArray();
 assert.eq(1, results.length);
 var result = results[0];
@@ -50,7 +50,7 @@ coll.getDB().system.profile.drop();
 assert.commandWorked(coll.getDB().runCommand({profile: 2}));
 
 // Test update with large string element in update portion.
-assert.writeOK(coll.update({}, {a: hugeStr}));
+assert.commandWorked(coll.update({}, {a: hugeStr}));
 var results = coll.getDB().system.profile.find().toArray();
 assert.eq(1, results.length);
 var result = results[0];

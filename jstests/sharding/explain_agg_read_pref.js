@@ -41,7 +41,7 @@ const rs1Primary = st.rs1.getPrimary();
 const rs1Secondary = st.rs1.getSecondary();
 
 for (let i = 0; i < 10; ++i) {
-    assert.writeOK(coll.insert({a: i}));
+    assert.commandWorked(coll.insert({a: i}));
 }
 
 //

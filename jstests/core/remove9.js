@@ -17,7 +17,7 @@ const bulk = t.initializeUnorderedBulkOp();
 for (let i = 0; i < 1000; ++i) {
     bulk.insert({i: i});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 const s = startParallelShell(function() {
     const t = db.jstests_remove9;

@@ -66,7 +66,7 @@ if (!isDebugBuild) {
 
     // Insert enough docs to trigger splits into all chunks
     for (var i = 0; i < totalInserts; i++) {
-        assert.writeOK(coll.insert({_id: i % numChunks + (i / totalInserts), pad: pad}));
+        assert.commandWorked(coll.insert({_id: i % numChunks + (i / totalInserts), pad: pad}));
         // Splitting is asynchronous so we should wait after each insert
         // for autosplitting to happen
         waitForOngoingChunkSplits(st);

@@ -16,7 +16,7 @@ runReadOnlyTest(function() {
                     var idx = i * bulkSize + j;
                     bulk.insert({x: idx, y: idx + 1});
                 }
-                assert.writeOK(bulk.execute());
+                assert.commandWorked(bulk.execute());
             }
             assert.eq(writableCollection.count(), this.count);
         },

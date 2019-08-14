@@ -41,7 +41,7 @@ var $config = (function() {
             this.bsonsize = Object.bsonsize(doc);
 
             var res = db[collName].insert(doc);
-            assertAlways.writeOK(res);
+            assertAlways.commandWorked(res);
             assertAlways.eq(1, res.nInserted);
         }
 

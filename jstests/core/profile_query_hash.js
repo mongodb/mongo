@@ -20,10 +20,10 @@ function getShapes(collection) {
     return res.shapes;
 }
 
-assert.writeOK(coll.insert({a: 1, b: 1}));
-assert.writeOK(coll.insert({a: 1, b: 2}));
-assert.writeOK(coll.insert({a: 1, b: 2}));
-assert.writeOK(coll.insert({a: 2, b: 2}));
+assert.commandWorked(coll.insert({a: 1, b: 1}));
+assert.commandWorked(coll.insert({a: 1, b: 2}));
+assert.commandWorked(coll.insert({a: 1, b: 2}));
+assert.commandWorked(coll.insert({a: 2, b: 2}));
 
 // We need two indices since we do not currently create cache entries for queries with a single
 // candidate plan.

@@ -49,7 +49,7 @@ for (i = 0; i < numDocs; ++i) {
 }
 
 var res = bulk.execute();
-assert.writeOK(res);
+assert.commandWorked(res);
 assert.eq(numDocs, res.nInserted);
 
 db.dest.drop();

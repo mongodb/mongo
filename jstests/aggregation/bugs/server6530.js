@@ -13,8 +13,8 @@ assert.commandWorked(coll.createIndex({point2d: "2d"}));
 assert.commandWorked(coll.createIndex({point2dsphere: "2dsphere"}));
 
 // Populate the collection so that successful queries can return at least one result.
-assert.writeOK(coll.insert({point2d: [0.25, 0.35]}));
-assert.writeOK(coll.insert({point2dsphere: [0.25, 0.35]}));
+assert.commandWorked(coll.insert({point2d: [0.25, 0.35]}));
+assert.commandWorked(coll.insert({point2dsphere: [0.25, 0.35]}));
 
 const nearQuery = {
     point2d: {$near: [0, 0]}

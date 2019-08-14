@@ -27,8 +27,8 @@ const tests = [
 ];
 tests.forEach((test) => {
     test.source.drop();
-    assert.writeOK(test.source.insert({}));
-    assert.writeOK(test.target.insert({}));
+    assert.commandWorked(test.source.insert({}));
+    assert.commandWorked(test.target.insert({}));
 
     let ts = local.oplog.rs.find().sort({$natural: -1}).limit(1).next().ts;
     let cmd = {

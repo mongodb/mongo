@@ -38,7 +38,7 @@ var $config = (function() {
                 bulk.insert({});
             }
             let res = bulk.execute();
-            assertAlways.writeOK(res);
+            assertAlways.commandWorked(res);
             assertAlways.eq(this.numDocs, res.nInserted, tojson(res));
 
             this.indexSpecs.forEach(indexSpec => {

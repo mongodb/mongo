@@ -13,7 +13,7 @@ var testColl = testDB.getCollection(collName);
 
 // Insert a document and implicitly create the collection.
 let resetCollection = function(w) {
-    assert.writeOK(
+    assert.commandWorked(
         testColl.insert({_id: 0}, {writeConcern: {w: w, wtimeout: replTest.kDefaultTimeoutMS}}));
     assert.eq(1, testColl.find().itcount());
 };

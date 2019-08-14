@@ -64,8 +64,8 @@ function shardKeyFromId(id) {
 // Do some writes.
 for (let id = 0; id < nDocs; ++id) {
     const documentKey = Object.merge({_id: id}, shardKeyFromId(id));
-    assert.writeOK(mongosColl.insert(documentKey));
-    assert.writeOK(mongosColl.update(documentKey, {$set: {updatedCount: 1}}));
+    assert.commandWorked(mongosColl.insert(documentKey));
+    assert.commandWorked(mongosColl.update(documentKey, {$set: {updatedCount: 1}}));
 }
 
 [changeStreamSingleColl, changeStreamWholeDb].forEach(function(changeStream) {
@@ -89,7 +89,7 @@ for (let id = 0; id < nDocs; ++id) {
 // migrated.
 for (let id = 0; id < nDocs; ++id) {
     const documentKey = Object.merge({_id: id}, shardKeyFromId(id));
-    assert.writeOK(mongosColl.update(documentKey, {$set: {updatedCount: 2}}));
+    assert.commandWorked(mongosColl.update(documentKey, {$set: {updatedCount: 2}}));
 }
 
 // Move the upper chunk back to shard 0.

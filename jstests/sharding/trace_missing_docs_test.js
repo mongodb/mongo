@@ -23,9 +23,9 @@ var testDocMissing = function(useReplicaSet) {
     coll.ensureIndex({sk: 1});
     assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {sk: 1}}));
 
-    assert.writeOK(coll.insert({_id: 12345, sk: 67890, hello: "world"}));
-    assert.writeOK(coll.update({_id: 12345}, {$set: {baz: 'biz'}}));
-    assert.writeOK(coll.update({sk: 67890}, {$set: {baz: 'boz'}}));
+    assert.commandWorked(coll.insert({_id: 12345, sk: 67890, hello: "world"}));
+    assert.commandWorked(coll.update({_id: 12345}, {$set: {baz: 'biz'}}));
+    assert.commandWorked(coll.update({sk: 67890}, {$set: {baz: 'boz'}}));
 
     assert.commandWorked(admin.runCommand(
         {moveChunk: coll + "", find: {sk: 0}, to: st.shard1.shardName, _waitForDelete: true}));

@@ -18,8 +18,8 @@ let cst = new ChangeStreamTest(testDB);
 let resumeCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
 
 // Insert a single document to each collection and save the resume token from the first insert.
-assert.writeOK(coll.insert({_id: 1}));
-assert.writeOK(otherColl.insert({_id: 2}));
+assert.commandWorked(coll.insert({_id: 1}));
+assert.commandWorked(otherColl.insert({_id: 2}));
 const firstInsertChangeDoc = cst.getOneChange(resumeCursor);
 assert.docEq(firstInsertChangeDoc.fullDocument, {_id: 1});
 assert.eq(firstInsertChangeDoc.ns, {db: testDB.getName(), coll: coll.getName()});
@@ -37,7 +37,7 @@ assert.docEq(secondInsertChangeDoc.fullDocument, {_id: 2});
 assert.eq(secondInsertChangeDoc.ns, {db: testDB.getName(), coll: otherColl.getName()});
 
 // Insert a third document to the first collection and test that the change stream picks it up.
-assert.writeOK(coll.insert({_id: 3}));
+assert.commandWorked(coll.insert({_id: 3}));
 const thirdInsertChangeDoc = cst.getOneChange(resumeCursor);
 assert.docEq(thirdInsertChangeDoc.fullDocument, {_id: 3});
 assert.eq(thirdInsertChangeDoc.ns, {db: testDB.getName(), coll: coll.getName()});
@@ -67,7 +67,7 @@ if (!FixtureHelpers.isSharded(coll)) {
     assertDropCollection(renameColl.getDB(), renameColl.getName());
 
     resumeCursor = cst.startWatchingChanges({collection: 1, pipeline: [{$changeStream: {}}]});
-    assert.writeOK(coll.renameCollection(renameColl.getName()));
+    assert.commandWorked(coll.renameCollection(renameColl.getName()));
 
     const renameChanges = cst.assertNextChangesEqual({
         cursor: resumeCursor,
@@ -82,7 +82,7 @@ if (!FixtureHelpers.isSharded(coll)) {
     const resumeTokenRename = renameChanges[0]._id;
 
     // Insert into the renamed collection.
-    assert.writeOK(renameColl.insert({_id: "after rename"}));
+    assert.commandWorked(renameColl.insert({_id: "after rename"}));
 
     // Resume from the rename notification using 'resumeAfter' and verify that the change stream
     // returns the next insert.
@@ -110,7 +110,7 @@ if (!FixtureHelpers.isSharded(coll)) {
 
     // Rename back to the original collection for reliability of the collection drops when
     // dropping the database.
-    assert.writeOK(renameColl.renameCollection(coll.getName()));
+    assert.commandWorked(renameColl.renameCollection(coll.getName()));
 }
 
 // Explicitly drop one collection to ensure reliability of the order of notifications from the
@@ -149,7 +149,7 @@ const resumeTokenInvalidate =
 });
 
 // Recreate the test collection.
-assert.writeOK(coll.insert({_id: "after recreate"}));
+assert.commandWorked(coll.insert({_id: "after recreate"}));
 
 // Test resuming from the 'dropDatabase' entry using 'resumeAfter'.
 resumeCursor = cst.startWatchingChanges({

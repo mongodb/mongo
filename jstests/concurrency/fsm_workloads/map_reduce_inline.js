@@ -78,7 +78,7 @@ var $config = (function() {
         }
 
         var res = bulk.execute();
-        assertAlways.writeOK(res);
+        assertAlways.commandWorked(res);
         assertAlways.eq(this.numDocs, res.nInserted);
     }
 

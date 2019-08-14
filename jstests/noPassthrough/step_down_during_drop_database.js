@@ -26,7 +26,7 @@ var bulk = testDB.getCollection(collName).initializeUnorderedBulkOp();
 for (var i = 0; i < size; ++i) {
     bulk.insert({i: i});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 replSet.awaitReplication();
 
 const failpoint = "dropDatabaseHangAfterAllCollectionsDrop";

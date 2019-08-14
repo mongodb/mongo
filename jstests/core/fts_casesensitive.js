@@ -5,7 +5,7 @@ var coll = db.fts_casesensitive;
 
 coll.drop();
 
-assert.writeOK(coll.insert({_id: 0, a: "The Quick Brown Fox Jumps Over The Lazy Dog"}));
+assert.commandWorked(coll.insert({_id: 0, a: "The Quick Brown Fox Jumps Over The Lazy Dog"}));
 assert.commandWorked(coll.ensureIndex({a: "text"}));
 
 assert.throws(function() {

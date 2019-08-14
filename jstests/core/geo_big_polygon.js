@@ -39,11 +39,11 @@ var polarPoint = {type: "Point", coordinates: [85, 85]};
 
 var lineEquator = {type: "LineString", coordinates: [[-20, 0], [20, 0]]};
 
-assert.writeOK(coll.insert({loc: poly10}));
-assert.writeOK(coll.insert({loc: line10}));
-assert.writeOK(coll.insert({loc: centerPoint}));
-assert.writeOK(coll.insert({loc: polarPoint}));
-assert.writeOK(coll.insert({loc: lineEquator}));
+assert.commandWorked(coll.insert({loc: poly10}));
+assert.commandWorked(coll.insert({loc: line10}));
+assert.commandWorked(coll.insert({loc: centerPoint}));
+assert.commandWorked(coll.insert({loc: polarPoint}));
+assert.commandWorked(coll.insert({loc: lineEquator}));
 assert.eq(coll.find({}).count(), 5);
 
 jsTest.log("Starting query...");
@@ -70,7 +70,7 @@ var bigPoly10 = {
     crs: bigCRS
 };
 
-assert.writeOK(coll.insert({_id: "bigPoly10", loc: bigPoly10}));
+assert.commandWorked(coll.insert({_id: "bigPoly10", loc: bigPoly10}));
 
 assert.eq(coll.find({loc: {$geoWithin: {$geometry: bigPoly20}}}).count(), 3);
 assert.eq(coll.find({loc: {$geoIntersects: {$geometry: bigPoly20}}}).count(), 4);
@@ -81,7 +81,7 @@ assert.eq(coll.find({loc: {$geoIntersects: {$geometry: bigPoly20Comp}}}).count()
 assert.commandFailed(coll.ensureIndex({loc: "2dsphere"}));
 
 // 3. After removing big polygon, index builds successfully
-assert.writeOK(coll.remove({_id: "bigPoly10"}));
+assert.commandWorked(coll.remove({_id: "bigPoly10"}));
 assert.commandWorked(coll.ensureIndex({loc: "2dsphere"}));
 
 // 4. With index, insert fails.

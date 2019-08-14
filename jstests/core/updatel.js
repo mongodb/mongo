@@ -47,11 +47,11 @@ assert.eq([{_id: 0, a: [{b: {c: 1}}]}], t.find().toArray(), "No update occurred.
 t.drop();
 t.insert({_id: 1, arr: [{a: "z", b: 1}]});
 res = t.update({"arr.a": /^z$/}, {$set: {"arr.$.b": 2}}, false, true);
-assert.writeOK(res);
+assert.commandWorked(res);
 assert.eq(t.findOne().arr[0], {a: "z", b: 2});
 
 t.drop();
 t.insert({_id: 1, arr: [{a: "z", b: 1}, {a: "abc", b: 2}, {a: "lmn", b: 3}]});
 res = t.update({"arr.a": /l/}, {$inc: {"arr.$.b": 2}}, false, true);
-assert.writeOK(res);
+assert.commandWorked(res);
 assert.eq(t.findOne().arr[2], {a: "lmn", b: 5});

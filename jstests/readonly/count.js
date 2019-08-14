@@ -25,7 +25,7 @@ runReadOnlyTest(function() {
                 bulk.insert({x: 70});
             }
 
-            assert.writeOK(bulk.execute());
+            assert.commandWorked(bulk.execute());
         },
         exec: function(readableCollection) {
             assert.eq(readableCollection.find({x: {$lt: 10}}).count(), this.countLt10);

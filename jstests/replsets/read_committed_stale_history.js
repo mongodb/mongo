@@ -57,7 +57,7 @@ var primary = rst.getPrimary();
 var secondaries = rst.getSecondaries();
 assert.eq(nodes[0], primary);
 // Wait for all data bearing nodes to get up to date.
-assert.writeOK(nodes[0].getDB(dbName).getCollection(collName).insert(
+assert.commandWorked(nodes[0].getDB(dbName).getCollection(collName).insert(
     {a: 1}, {writeConcern: {w: 3, wtimeout: rst.kDefaultTimeoutMS}}));
 
 // Stop the secondaries from replicating.
@@ -67,7 +67,7 @@ assert.commandWorked(
     nodes[0].adminCommand({configureFailPoint: 'blockHeartbeatStepdown', mode: 'alwaysOn'}));
 
 jsTestLog("Do a write that won't ever reach a majority of nodes");
-assert.writeOK(nodes[0].getDB(dbName).getCollection(collName).insert({a: 2}));
+assert.commandWorked(nodes[0].getDB(dbName).getCollection(collName).insert({a: 2}));
 
 // Ensure that the write that was just done is not visible in the committed snapshot.
 checkDocNotCommitted(nodes[0], {a: 2});
@@ -90,7 +90,7 @@ restartServerReplication(secondaries);
 waitForPrimary(nodes[1]);
 
 jsTest.log("Do a write to the new primary");
-assert.writeOK(nodes[1].getDB(dbName).getCollection(collName).insert(
+assert.commandWorked(nodes[1].getDB(dbName).getCollection(collName).insert(
     {a: 3}, {writeConcern: {w: 2, wtimeout: rst.kDefaultTimeoutMS}}));
 
 // Ensure the new primary still cannot see the write from the old primary.

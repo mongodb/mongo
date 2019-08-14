@@ -102,7 +102,7 @@ function inspectFirstCommandForAfterClusterTime(conn, cmdName, isCausal, expectR
 
 function testInsert(conn, isCausal, expectRetry) {
     inspectFirstCommandForAfterClusterTime(conn, "insert", isCausal, expectRetry, (coll) => {
-        assert.writeOK(coll.insert({x: 1}));
+        assert.commandWorked(coll.insert({x: 1}));
     });
 }
 

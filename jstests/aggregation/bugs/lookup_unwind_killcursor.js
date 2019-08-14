@@ -24,11 +24,11 @@ function runTest(pipeline) {
     const batchSize = 2;
 
     testDB.source.drop();
-    assert.writeOK(testDB.source.insert({x: 1}));
+    assert.commandWorked(testDB.source.insert({x: 1}));
 
     testDB.dest.drop();
     for (let i = 0; i < 5; ++i) {
-        assert.writeOK(testDB.dest.insert({x: 1}));
+        assert.commandWorked(testDB.dest.insert({x: 1}));
     }
 
     const res = assert.commandWorked(testDB.runCommand({

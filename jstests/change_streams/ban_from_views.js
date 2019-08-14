@@ -7,7 +7,7 @@
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 
 const coll = assertDropAndRecreateCollection(db, "change_stream_ban_from_views");
-assert.writeOK(coll.insert({_id: 1}));
+assert.commandWorked(coll.insert({_id: 1}));
 
 const normalViewName = "nonChangeStreamView";
 const csViewName = "changeStreamView";

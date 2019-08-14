@@ -42,7 +42,7 @@ let bulk = testColl.initializeUnorderedBulkOp();
 for (let i = 0; i < 2; ++i) {
     bulk.insert({_id: i});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 jsTest.log("Setting up a prepared transaction...");
 const session = primary.startSession();

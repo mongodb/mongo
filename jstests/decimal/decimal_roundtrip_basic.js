@@ -7,7 +7,7 @@ col.drop();
 
 // Insert some sample data.
 
-assert.writeOK(col.insert([
+assert.commandWorked(col.insert([
     {"decimal": NumberDecimal("0")},
     {"decimal": NumberDecimal("0.00")},
     {"decimal": NumberDecimal("-0")},
@@ -22,7 +22,7 @@ assert.writeOK(col.insert([
     {"decimal": NumberDecimal("9999999999999999999999999999999999E6111")},
     {"decimal": NumberDecimal("1E-6176")},
 ]),
-               "Initial insertion of decimals failed");
+                     "Initial insertion of decimals failed");
 
 // Check that the searching for queryValue results in finding expectedValues.
 // All arguments are string representations of NumberDecimal values.

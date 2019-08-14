@@ -34,7 +34,7 @@ const numDocs = 2;
 const minDocSizeMB = 10;
 
 for (let i = 0; i < numDocs; ++i) {
-    assert.writeOK(
+    assert.commandWorked(
         coll.save({_id: i, i: 0, x: 'x'.repeat(minDocSizeMB * 1024 * 1024)},
                   {writeConcern: {w: nodes.length, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 }
@@ -57,7 +57,7 @@ checkLog.contains(secondary,
                   'initial sync - initialSyncHangBeforeCopyingDatabases fail point enabled');
 for (let i = 0; i < numDocs; ++i) {
     for (let j = 0; j < numUpdates; ++j) {
-        assert.writeOK(coll.update({_id: i}, {$inc: {i: 1}}));
+        assert.commandWorked(coll.update({_id: i}, {$inc: {i: 1}}));
     }
 }
 

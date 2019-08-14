@@ -130,7 +130,7 @@ function testNonemptyZonedCollection() {
         [{min: {x: 0}, max: {x: 10}}, {min: {x: 10}, max: {x: 20}}, {min: {x: 20}, max: {x: 40}}];
 
     for (let i = 0; i < 40; i++) {
-        assert.writeOK(testColl.insert({x: i}));
+        assert.commandWorked(testColl.insert({x: i}));
     }
 
     assert.commandWorked(testColl.createIndex(shardKey));

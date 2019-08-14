@@ -37,7 +37,7 @@ function getLastVoteDoc(conn) {
 
 function setLastVoteDoc(conn, term, candidate) {
     var newLastVote = {term: term, candidateIndex: rst.getNodeId(candidate)};
-    return assert.writeOK(conn.getCollection(lastVoteNS).update({}, newLastVote));
+    return assert.commandWorked(conn.getCollection(lastVoteNS).update({}, newLastVote));
 }
 
 function assertNodeHasLastVote(node, term, candidate) {

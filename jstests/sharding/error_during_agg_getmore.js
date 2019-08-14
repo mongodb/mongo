@@ -26,8 +26,8 @@ assert.commandWorked(mongosDB.adminCommand(
     {moveChunk: mongosColl.getFullName(), find: {_id: 1}, to: st.shard1.shardName}));
 
 // Write a document to each chunk.
-assert.writeOK(mongosColl.insert({_id: -1}));
-assert.writeOK(mongosColl.insert({_id: 1}));
+assert.commandWorked(mongosColl.insert({_id: -1}));
+assert.commandWorked(mongosColl.insert({_id: 1}));
 
 // Delay messages between shard 1 and the mongos, long enough that shard 1's responses will
 // likely arrive after the response from shard 0, but not so long that the background cluster

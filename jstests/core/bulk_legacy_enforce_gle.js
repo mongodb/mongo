@@ -16,7 +16,7 @@ const coll = db.bulk_legacy_enforce_gle;
 function insertDocument(doc) {
     let res = coll.insert(doc);
     if (res) {
-        assert.writeOK(res);
+        assert.commandWorked(res);
     } else {
         assert.gleOK(db.runCommand({getLastError: 1}));
     }
@@ -25,7 +25,7 @@ function insertDocument(doc) {
 coll.drop();
 let bulk = coll.initializeUnorderedBulkOp();
 bulk.find({_id: 1}).upsert().updateOne({_id: 1});
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 let gle = assert.gleOK(db.runCommand({getLastError: 1}));
 assert.eq(1, gle.n, tojson(gle));
 

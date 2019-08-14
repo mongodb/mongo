@@ -4,11 +4,11 @@
 const coll = db.dotted_path_in_null;
 coll.drop();
 
-assert.writeOK(coll.insert({_id: 1, a: [{b: 5}]}));
-assert.writeOK(coll.insert({_id: 2, a: [{}]}));
-assert.writeOK(coll.insert({_id: 3, a: []}));
-assert.writeOK(coll.insert({_id: 4, a: [{}, {b: 5}]}));
-assert.writeOK(coll.insert({_id: 5, a: [5, {b: 5}]}));
+assert.commandWorked(coll.insert({_id: 1, a: [{b: 5}]}));
+assert.commandWorked(coll.insert({_id: 2, a: [{}]}));
+assert.commandWorked(coll.insert({_id: 3, a: []}));
+assert.commandWorked(coll.insert({_id: 4, a: [{}, {b: 5}]}));
+assert.commandWorked(coll.insert({_id: 5, a: [5, {b: 5}]}));
 
 function getIds(query) {
     let ids = [];

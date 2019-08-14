@@ -16,21 +16,21 @@ checkFCV(adminDB, latestFCV);
 
 // Updating the featureCompatibilityVersion document changes the featureCompatibilityVersion
 // server parameter.
-assert.writeOK(adminDB.system.version.update({_id: "featureCompatibilityVersion"},
-                                             {$set: {version: lastStableFCV}}));
+assert.commandWorked(adminDB.system.version.update({_id: "featureCompatibilityVersion"},
+                                                   {$set: {version: lastStableFCV}}));
 checkFCV(adminDB, lastStableFCV);
 
-assert.writeOK(
+assert.commandWorked(
     adminDB.system.version.update({_id: "featureCompatibilityVersion"},
                                   {$set: {version: lastStableFCV, targetVersion: latestFCV}}));
 checkFCV(adminDB, lastStableFCV, latestFCV);
 
-assert.writeOK(
+assert.commandWorked(
     adminDB.system.version.update({_id: "featureCompatibilityVersion"},
                                   {$set: {version: lastStableFCV, targetVersion: lastStableFCV}}));
 checkFCV(adminDB, lastStableFCV, lastStableFCV);
 
-assert.writeOK(
+assert.commandWorked(
     adminDB.system.version.update({_id: "featureCompatibilityVersion"},
                                   {$set: {version: latestFCV}, $unset: {targetVersion: true}}));
 checkFCV(adminDB, latestFCV);

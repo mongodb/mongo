@@ -17,7 +17,7 @@ const coll = testDB.currentop_includes_await_time;
 
 coll.drop();
 assert.commandWorked(testDB.createCollection(coll.getName(), {capped: true, size: 1024}));
-assert.writeOK(coll.insert({_id: 1}));
+assert.commandWorked(coll.insert({_id: 1}));
 
 let cmdRes = assert.commandWorked(
     testDB.runCommand({find: coll.getName(), tailable: true, awaitData: true}));
@@ -46,7 +46,7 @@ assert.soon(function() {
 
 // A capped insertion should unblock the getMore, allowing the test to complete before the
 // getMore's awaitData time expires.
-assert.writeOK(coll.insert({_id: 2}));
+assert.commandWorked(coll.insert({_id: 2}));
 
 cleanupShell();
 MongoRunner.stopMongod(conn);

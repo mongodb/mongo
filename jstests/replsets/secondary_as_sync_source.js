@@ -21,7 +21,7 @@ function addTestDocuments(db) {
     for (var i = 0; i < size; ++i) {
         bulk.insert({i: i});
     }
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 }
 
 let replSet = new ReplSetTest({name: "indexBuilds", nodes: 2, useBridge: true});

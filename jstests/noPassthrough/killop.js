@@ -12,7 +12,7 @@ const collName = "test";
 function runTest(conn, shardConn) {
     const db = conn.getDB(dbName);
     assert.commandWorked(db.dropDatabase());
-    assert.writeOK(db.getCollection(collName).insert({x: 1}));
+    assert.commandWorked(db.getCollection(collName).insert({x: 1}));
 
     assert.commandWorked(
         shardConn.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));

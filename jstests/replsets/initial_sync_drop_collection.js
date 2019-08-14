@@ -35,7 +35,7 @@ var nss = primaryColl.getFullName();
 // the collection on the secondary is empty.
 function setupTest({failPoint, secondaryStartupParams}) {
     jsTestLog("Writing data to collection.");
-    assert.writeOK(primaryColl.insert([{_id: 1}, {_id: 2}]));
+    assert.commandWorked(primaryColl.insert([{_id: 1}, {_id: 2}]));
 
     jsTestLog("Restarting secondary with failPoint " + failPoint + " set for " + nss);
     secondaryStartupParams = secondaryStartupParams || {};
@@ -69,7 +69,7 @@ function finishTest({failPoint, secondaryStartupParams, expectedLog, waitForDrop
 
     if (createNew) {
         jsTestLog("Creating a new collection with the same name: " + primaryColl.getFullName());
-        assert.writeOK(primaryColl.insert({_id: "not the same collection"}));
+        assert.commandWorked(primaryColl.insert({_id: "not the same collection"}));
     }
 
     jsTestLog("Allowing secondary to continue.");

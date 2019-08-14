@@ -19,12 +19,12 @@ var s = st.s;
 var testDb = st.getDB('test');
 
 function setup() {
-    assert.writeOK(testDb.test.insert({_id: 0}));
-    assert.writeOK(testDb.test.insert({_id: 1}));
+    assert.commandWorked(testDb.test.insert({_id: 0}));
+    assert.commandWorked(testDb.test.insert({_id: 1}));
 
-    assert.writeOK(testDb.dummy.insert({_id: 0}));
-    assert.writeOK(testDb.dummy.insert({_id: 1}));
-    assert.writeOK(testDb.dummy.insert({_id: 2}));
+    assert.commandWorked(testDb.dummy.insert({_id: 0}));
+    assert.commandWorked(testDb.dummy.insert({_id: 1}));
+    assert.commandWorked(testDb.dummy.insert({_id: 2}));
 }
 
 function validate(valid) {

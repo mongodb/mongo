@@ -10,7 +10,7 @@ var padding = new Array(1024 * 1024).join("x");
 
 // Insert ~20 MB of data.
 for (var i = 0; i < 20; i++) {
-    assert.writeOK(coll.insert({_id: i, padding: padding}));
+    assert.commandWorked(coll.insert({_id: i, padding: padding}));
 }
 
 // The limit is 18, but we should end up with fewer documents since 18 docs won't fit in a

@@ -34,7 +34,7 @@ function checkResults(results, verbosity) {
 }
 
 for (let i = 0; i < kNumDocs; i++) {
-    assert.writeOK(coll.insert({a: i}));
+    assert.commandWorked(coll.insert({a: i}));
 }
 
 // Execute several aggregations with a sort stage combined with various single document

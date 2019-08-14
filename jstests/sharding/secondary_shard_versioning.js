@@ -20,7 +20,7 @@ let freshMongos = st.s0;
 let staleMongos = st.s1;
 
 jsTest.log("do insert from stale mongos to make it load the routing table before the move");
-assert.writeOK(staleMongos.getDB('test').foo.insert({x: 1}));
+assert.commandWorked(staleMongos.getDB('test').foo.insert({x: 1}));
 
 jsTest.log("do moveChunk from fresh mongos");
 assert.commandWorked(freshMongos.adminCommand({

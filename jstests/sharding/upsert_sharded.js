@@ -20,7 +20,7 @@ var upsertedResult = function(query, expr) {
 };
 
 var upsertedField = function(query, expr, fieldName) {
-    assert.writeOK(upsertedResult(query, expr));
+    assert.commandWorked(upsertedResult(query, expr));
     return coll.findOne()[fieldName];
 };
 

@@ -28,9 +28,9 @@ assert.eq(2, s.config.chunks.count({"ns": "test.foo"}), "should be 2 shards");
 var chunks = s.config.chunks.find({"ns": "test.foo"}).toArray();
 assert.eq(chunks[0].shard, chunks[1].shard, "server should be the same after a split");
 
-assert.writeOK(db.foo.save({num: 1, name: "eliot"}));
-assert.writeOK(db.foo.save({num: 2, name: "sara"}));
-assert.writeOK(db.foo.save({num: -1, name: "joe"}));
+assert.commandWorked(db.foo.save({num: 1, name: "eliot"}));
+assert.commandWorked(db.foo.save({num: 2, name: "sara"}));
+assert.commandWorked(db.foo.save({num: -1, name: "joe"}));
 
 assert.eq(
     3, s.getPrimaryShard("test").getDB("test").foo.find().length(), "not right directly to db A");
@@ -64,15 +64,15 @@ assert.neq(chunks[0].shard, chunks[1].shard, "servers should NOT be the same aft
 placeCheck(3);
 
 // Test inserts go to right server/shard
-assert.writeOK(db.foo.save({num: 3, name: "bob"}));
+assert.commandWorked(db.foo.save({num: 3, name: "bob"}));
 assert.eq(1, primary.foo.find().length(), "after move insert go wrong place?");
 assert.eq(3, secondary.foo.find().length(), "after move insert go wrong place?");
 
-assert.writeOK(db.foo.save({num: -2, name: "funny man"}));
+assert.commandWorked(db.foo.save({num: -2, name: "funny man"}));
 assert.eq(2, primary.foo.find().length(), "after move insert go wrong place?");
 assert.eq(3, secondary.foo.find().length(), "after move insert go wrong place?");
 
-assert.writeOK(db.foo.save({num: 0, name: "funny guy"}));
+assert.commandWorked(db.foo.save({num: 0, name: "funny guy"}));
 assert.eq(2, primary.foo.find().length(), "boundary A");
 assert.eq(4, secondary.foo.find().length(), "boundary B");
 
@@ -197,7 +197,7 @@ placeCheck(8);
 
 printAll();
 var total = db.foo.find().count();
-var res = assert.writeOK(db.foo.update({}, {$inc: {x: 1}}, false, true));
+var res = assert.commandWorked(db.foo.update({}, {$inc: {x: 1}}, false, true));
 printAll();
 assert.eq(total, res.nModified, res.toString());
 

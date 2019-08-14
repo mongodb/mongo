@@ -13,7 +13,7 @@ var db = standalone.getDB("test");
 
 var coll = db.getCollection("apply_ops_mode1");
 coll.drop();
-assert.writeOK(coll.insert({_id: 1}));
+assert.commandWorked(coll.insert({_id: 1}));
 
 // ------------ Testing normal updates ---------------
 
@@ -42,7 +42,7 @@ assert.eq(coll.count({x: 1}), 1);
 coll = db.getCollection("apply_ops_mode2");
 coll.drop();
 updateOp.ns = coll.getFullName();
-assert.writeOK(coll.insert({_id: 1}));
+assert.commandWorked(coll.insert({_id: 1}));
 
 // Test default succeeds in 'InitialSync' mode.
 assert.commandWorked(db.adminCommand({applyOps: [updateOp], oplogApplicationMode: "InitialSync"}));

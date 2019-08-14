@@ -7,7 +7,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and testExp
 
 var coll = db.split;
 coll.drop();
-assert.writeOK(coll.insert({}));
+assert.commandWorked(coll.insert({}));
 
 testExpression(coll, {$split: ["abc", "b"]}, ["a", "c"]);
 testExpression(coll, {$split: ["aaa", "b"]}, ["aaa"]);

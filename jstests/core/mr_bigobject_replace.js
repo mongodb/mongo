@@ -45,7 +45,7 @@ function runTest(testOptions) {
     db.mr_bigobject_replace.drop();
 
     // Insert a document so the mapper gets run.
-    assert.writeOK(db.input.insert({}));
+    assert.commandWorked(db.input.insert({}));
 
     var res = db.runCommand(Object.extend({
         mapReduce: "input",

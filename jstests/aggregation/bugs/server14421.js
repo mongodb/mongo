@@ -3,7 +3,7 @@
 'use strict';
 var coll = db.mindistance;
 coll.drop();
-assert.writeOK(coll.insert([
+assert.commandWorked(coll.insert([
     {_id: 0, loc: {type: "Point", coordinates: [0, 0]}},
     {_id: 1, loc: {type: "Point", coordinates: [0, 0.01]}}
 ]));

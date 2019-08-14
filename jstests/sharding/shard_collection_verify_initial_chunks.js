@@ -27,7 +27,7 @@ assert.commandFailed(mongos.adminCommand(
     {shardCollection: 'TestDB.RangeCollEmpty', key: {aKey: 1}, numInitialChunks: 6}));
 
 // Unsupported: Hashed sharding + numInitialChunks + non-empty collection
-assert.writeOK(db.HashedCollNotEmpty.insert({aKey: 1}));
+assert.commandWorked(db.HashedCollNotEmpty.insert({aKey: 1}));
 assert.commandWorked(db.HashedCollNotEmpty.createIndex({aKey: "hashed"}));
 assert.commandFailed(mongos.adminCommand(
     {shardCollection: 'TestDB.HashedCollNotEmpty', key: {aKey: "hashed"}, numInitialChunks: 6}));

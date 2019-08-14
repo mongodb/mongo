@@ -16,7 +16,7 @@ function testInitialSyncAbortsWithUnsupportedAuthSchema(schema) {
     // invalid or outdated version
     var versionColl = rst.getPrimary().getDB('admin').system.version;
     var res = versionColl.insert(schema);
-    assert.writeOK(res);
+    assert.commandWorked(res);
 
     // Add another node to the replica set to allow an initial sync to occur
     var initSyncNode = rst.add({setParameter: 'numInitialSyncAttempts=1'});
@@ -63,7 +63,7 @@ function testInitialSyncAbortsWithExistingUserAndNoAuthSchema() {
     // a corresponding auth schema
     var userColl = rst.getPrimary().getDB('admin').system.users;
     var res = userColl.insert({});
-    assert.writeOK(res);
+    assert.commandWorked(res);
 
     // Add another node to the replica set to allow an initial sync to occur
     var initSyncNode = rst.add({setParameter: 'numInitialSyncAttempts=1'});

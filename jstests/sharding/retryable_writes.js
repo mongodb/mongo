@@ -141,8 +141,8 @@ function runTests(mainConn, priConn) {
     initialStatus = priConn.adminCommand({serverStatus: 1});
     verifyServerStatusFields(initialStatus);
 
-    assert.writeOK(testDBMain.user.insert({_id: 40, x: 1}));
-    assert.writeOK(testDBMain.user.insert({_id: 50, y: 1}));
+    assert.commandWorked(testDBMain.user.insert({_id: 40, x: 1}));
+    assert.commandWorked(testDBMain.user.insert({_id: 50, y: 1}));
 
     assert.eq(2, testDBPri.user.find({x: 1}).itcount());
     assert.eq(2, testDBPri.user.find({y: 1}).itcount());
@@ -294,8 +294,8 @@ function runTests(mainConn, priConn) {
     initialStatus = priConn.adminCommand({serverStatus: 1});
     verifyServerStatusFields(initialStatus);
 
-    assert.writeOK(testDBMain.user.insert({_id: 70, f: 1}));
-    assert.writeOK(testDBMain.user.insert({_id: 80, f: 1}));
+    assert.commandWorked(testDBMain.user.insert({_id: 70, f: 1}));
+    assert.commandWorked(testDBMain.user.insert({_id: 80, f: 1}));
 
     cmd = {
         findAndModify: 'user',

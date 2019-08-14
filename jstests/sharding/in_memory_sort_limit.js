@@ -25,7 +25,7 @@ var bulkOp = mongosCol.initializeOrderedBulkOp();
 for (var i = 0; i < 12800; i++) {
     bulkOp.insert({x: i, str: filler});
 }
-assert.writeOK(bulkOp.execute());
+assert.commandWorked(bulkOp.execute());
 
 var passLimit = 2000;
 var failLimit = 4000;

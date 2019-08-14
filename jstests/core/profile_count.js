@@ -20,7 +20,7 @@ testDB.setProfilingLevel(2);
 //
 var i;
 for (i = 0; i < 10; ++i) {
-    assert.writeOK(coll.insert({a: i}));
+    assert.commandWorked(coll.insert({a: i}));
 }
 
 assert.eq(10, coll.count({}, {collation: {locale: "fr"}}));
@@ -45,7 +45,7 @@ assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 //
 coll.drop();
 for (i = 0; i < 10; ++i) {
-    assert.writeOK(coll.insert({a: i}));
+    assert.commandWorked(coll.insert({a: i}));
 }
 
 var query = {a: {$gte: 5}};
@@ -60,7 +60,7 @@ assert.eq(profileObj.docsExamined, 10, tojson(profileObj));
 //
 coll.drop();
 for (i = 0; i < 10; ++i) {
-    assert.writeOK(coll.insert({a: i}));
+    assert.commandWorked(coll.insert({a: i}));
 }
 assert.commandWorked(coll.createIndex({a: 1}));
 
@@ -83,7 +83,7 @@ coll.drop();
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({b: 1}));
 for (i = 0; i < 5; ++i) {
-    assert.writeOK(coll.insert({a: i, b: i}));
+    assert.commandWorked(coll.insert({a: i, b: i}));
 }
 
 assert.eq(1, coll.count({a: 3, b: 3}));

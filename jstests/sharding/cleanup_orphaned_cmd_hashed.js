@@ -42,7 +42,7 @@ for (var s = 0; s < 2; s++) {
     var bulk = shardColl.initializeUnorderedBulkOp();
     for (var i = 0; i < 100; i++)
         bulk.insert({_id: i});
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 }
 
 assert.eq(200,

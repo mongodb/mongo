@@ -22,7 +22,7 @@ var $config = (function() {
         function init(db, collName) {
             for (var i = 0; i < this.numDocsPerThread; ++i) {
                 var res = db[collName].insert(makeDoc(this.tid));
-                assertAlways.writeOK(res);
+                assertAlways.commandWorked(res);
                 assertAlways.eq(1, res.nInserted);
             }
         }

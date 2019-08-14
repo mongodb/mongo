@@ -18,7 +18,7 @@ testDB.setProfilingLevel(2);
 //
 var i;
 for (i = 0; i < 10; ++i) {
-    assert.writeOK(coll.insert({a: i}));
+    assert.commandWorked(coll.insert({a: i}));
 }
 assert.commandWorked(coll.createIndex({a: 1}));
 
@@ -61,7 +61,7 @@ assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 //
 coll.drop();
 for (i = 0; i < 10; ++i) {
-    assert.writeOK(coll.insert({a: i}));
+    assert.commandWorked(coll.insert({a: i}));
 }
 
 cursor = coll.find({a: {$gt: 0}}).sort({a: 1}).batchSize(2);
@@ -78,7 +78,7 @@ assert.eq(profileObj.hasSortStage, true, tojson(profileObj));
 //
 coll.drop();
 for (i = 0; i < 3; ++i) {
-    assert.writeOK(coll.insert({a: i}));
+    assert.commandWorked(coll.insert({a: i}));
 }
 
 cursor = coll.find().batchSize(2);
@@ -98,7 +98,7 @@ assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 //
 coll.drop();
 for (i = 0; i < 20; ++i) {
-    assert.writeOK(coll.insert({a: i}));
+    assert.commandWorked(coll.insert({a: i}));
 }
 assert.commandWorked(coll.createIndex({a: 1}));
 
@@ -136,7 +136,7 @@ for (i = 0; i < 501; i++) {
 
 coll.drop();
 for (i = 0; i < 4; i++) {
-    assert.writeOK(coll.insert(docToInsert));
+    assert.commandWorked(coll.insert(docToInsert));
 }
 
 cursor = coll.find(docToInsert).comment("profile_getmore").batchSize(2);

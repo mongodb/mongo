@@ -18,7 +18,7 @@ var jsonZeroPt = {type: "Point", coordinates: [0, 0]};
 var legacy90Pt = [90, 0];
 var json90Pt = {type: "Point", coordinates: [90, 0]};
 
-assert.writeOK(coll.insert({geo: json90Pt}));
+assert.commandWorked(coll.insert({geo: json90Pt}));
 
 var earthRadiusMeters = 6378.1 * 1000;
 var result = null;
@@ -32,7 +32,7 @@ assert.close(result[0].dis, Math.PI / 2);
 result = runQuery(jsonZeroPt);
 assert.close(result[0].dis, (Math.PI / 2) * earthRadiusMeters);
 
-assert.writeOK(coll.remove({}));
+assert.commandWorked(coll.remove({}));
 assert.commandWorked(coll.dropIndexes());
 
 //
@@ -41,7 +41,7 @@ assert.commandWorked(coll.dropIndexes());
 
 assert.commandWorked(coll.ensureIndex({geo: "2d"}));
 
-assert.writeOK(coll.insert({geo: legacy90Pt}));
+assert.commandWorked(coll.insert({geo: legacy90Pt}));
 
 result = runQuery(legacyZeroPt);
 assert.close(result[0].dis, Math.PI / 2);

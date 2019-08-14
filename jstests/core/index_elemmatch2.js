@@ -10,10 +10,10 @@ load("jstests/libs/analyze_plan.js");
 const coll = db.elemMatch_index;
 coll.drop();
 
-assert.writeOK(coll.insert({a: 1}));
-assert.writeOK(coll.insert({a: [{}]}));
-assert.writeOK(coll.insert({a: [1, null]}));
-assert.writeOK(coll.insert({a: [{type: "Point", coordinates: [0, 0]}]}));
+assert.commandWorked(coll.insert({a: 1}));
+assert.commandWorked(coll.insert({a: [{}]}));
+assert.commandWorked(coll.insert({a: [1, null]}));
+assert.commandWorked(coll.insert({a: [{type: "Point", coordinates: [0, 0]}]}));
 
 assert.commandWorked(coll.createIndex({a: 1}, {sparse: true}));
 

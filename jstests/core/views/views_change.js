@@ -42,7 +42,7 @@ resetCollectionAndViews();
 
 // A view is updated when its viewOn is modified. When auth is enabled, we expect collMod to
 // fail when specifying "viewOn" but not "pipeline".
-assert.writeOK(collection.insert(doc));
+assert.commandWorked(collection.insert(doc));
 assertFindResultEq("view", [doc]);
 let res = viewDB.runCommand({collMod: "view", viewOn: "nonexistent"});
 if (jsTest.options().auth) {
@@ -56,8 +56,8 @@ resetCollectionAndViews();
 
 // A view is updated when its pipeline is modified. When auth is enabled, we expect collMod to
 // fail when specifying "pipeline" but not "viewOn".
-assert.writeOK(collection.insert(doc));
-assert.writeOK(collection.insert({a: 7}));
+assert.commandWorked(collection.insert(doc));
+assert.commandWorked(collection.insert({a: 7}));
 assertFindResultEq("view", [doc]);
 res = viewDB.runCommand({collMod: "view", pipeline: [{$match: {a: {$gt: 4}}}]});
 if (jsTest.options().auth) {
@@ -70,15 +70,15 @@ if (jsTest.options().auth) {
 resetCollectionAndViews();
 
 // A view is updated when the backing collection is updated.
-assert.writeOK(collection.insert(doc));
+assert.commandWorked(collection.insert(doc));
 assertFindResultEq("view", [doc]);
-assert.writeOK(collection.update({a: 1}, {$set: {a: 2}}));
+assert.commandWorked(collection.update({a: 1}, {$set: {a: 2}}));
 assertFindResultEq("view", []);
 
 resetCollectionAndViews();
 
 // A view is updated when a backing view is updated.
-assert.writeOK(collection.insert(doc));
+assert.commandWorked(collection.insert(doc));
 assertFindResultEq("viewOnView", [doc]);
 assert.commandWorked(viewDB.runCommand(
     {collMod: "view", viewOn: "collection", pipeline: [{$match: {nonexistent: 1}}]}));
@@ -87,7 +87,7 @@ assertFindResultEq("viewOnView", []);
 resetCollectionAndViews();
 
 // A view appears empty if the backing collection is dropped.
-assert.writeOK(collection.insert(doc));
+assert.commandWorked(collection.insert(doc));
 assertFindResultEq("view", [doc]);
 assert.commandWorked(viewDB.runCommand({drop: "collection"}));
 assertFindResultEq("view", []);
@@ -95,7 +95,7 @@ assertFindResultEq("view", []);
 resetCollectionAndViews();
 
 // A view appears empty if a backing view is dropped.
-assert.writeOK(collection.insert(doc));
+assert.commandWorked(collection.insert(doc));
 assertFindResultEq("viewOnView", [doc]);
 assert.commandWorked(viewDB.runCommand({drop: "view"}));
 assertFindResultEq("viewOnView", []);

@@ -367,11 +367,11 @@ const withoutDefaultCollationColl = mongosDB[testName + "_without_default"];
 
 assert.commandWorked(
     mongosDB.createCollection(withDefaultCollationColl.getName(), caseInsensitive));
-assert.writeOK(withDefaultCollationColl.insert({_id: "lowercase", str: "abc"}));
+assert.commandWorked(withDefaultCollationColl.insert({_id: "lowercase", str: "abc"}));
 
-assert.writeOK(withoutDefaultCollationColl.insert({_id: "lowercase", str: "abc"}));
-assert.writeOK(withoutDefaultCollationColl.insert({_id: "uppercase", str: "ABC"}));
-assert.writeOK(withoutDefaultCollationColl.insert({_id: "unmatched", str: "def"}));
+assert.commandWorked(withoutDefaultCollationColl.insert({_id: "lowercase", str: "abc"}));
+assert.commandWorked(withoutDefaultCollationColl.insert({_id: "uppercase", str: "ABC"}));
+assert.commandWorked(withoutDefaultCollationColl.insert({_id: "unmatched", str: "def"}));
 
 //
 // Sharded collection with default collation and unsharded collection without a default

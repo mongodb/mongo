@@ -25,7 +25,7 @@ var checkShardMajorVersion = function(conn, expectedVersion) {
 // mongos0: 1|0|a
 
 var testDB_s1 = st.s1.getDB('test');
-assert.writeOK(testDB_s1.user.insert({x: 1}));
+assert.commandWorked(testDB_s1.user.insert({x: 1}));
 assert.commandWorked(
     testDB_s1.adminCommand({moveChunk: 'test.user', find: {x: 0}, to: st.shard0.shardName}));
 
@@ -62,7 +62,7 @@ assert.neq(null, testDB_s3.user.findOne({x: 1}));
 // mongos versions: s0, s2, s3: 2|0|a
 
 testDB_s1.user.drop();
-assert.writeOK(testDB_s1.user.insert({x: 10}));
+assert.commandWorked(testDB_s1.user.insert({x: 10}));
 
 // shard0: 0|0|0
 // shard1: 0|0|0

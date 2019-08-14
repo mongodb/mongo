@@ -32,8 +32,8 @@ assert(planHasStage(db, explain.queryPlanner.winningPlan, "EOF"));
 
 // Insert the data to perform distinct() on.
 for (var i = 0; i < 10; i++) {
-    assert.writeOK(coll.insert({a: 1, b: 1}));
-    assert.writeOK(coll.insert({a: 2, c: 1}));
+    assert.commandWorked(coll.insert({a: 1, b: 1}));
+    assert.commandWorked(coll.insert({a: 2, c: 1}));
 }
 
 assert.commandFailed(runDistinctExplain(coll, {}, {}));            // Bad keyString.

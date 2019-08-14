@@ -35,9 +35,9 @@ for (let key of Object.keys(ChangeStreamWatchMode)) {
 
     // Be sure we can read from the change stream. Use {w: "majority"} so that we're still
     // guaranteed to be able to read after the failover.
-    assert.writeOK(coll.insert({_id: 0}, {writeConcern: {w: "majority"}}));
-    assert.writeOK(coll.insert({_id: 1}, {writeConcern: {w: "majority"}}));
-    assert.writeOK(coll.insert({_id: 2}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(coll.insert({_id: 0}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(coll.insert({_id: 1}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(coll.insert({_id: 2}, {writeConcern: {w: "majority"}}));
 
     const firstChange = cst.getOneChange(changeStream);
     assert.docEq(firstChange.fullDocument, {_id: 0});

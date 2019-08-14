@@ -11,14 +11,14 @@ t.insert({zip: "10001", data: [{loc: [10, 10], type: "home"}, {loc: [29, 29], ty
 t.insert({zip: "10002", data: [{loc: [20, 20], type: "home"}, {loc: [39, 39], type: "work"}]});
 var res =
     t.insert({zip: "10003", data: [{loc: [30, 30], type: "home"}, {loc: [49, 49], type: "work"}]});
-assert.writeOK(res);
+assert.commandWorked(res);
 
 assert.commandWorked(t.ensureIndex({"data.loc": "2d", zip: 1}));
 assert.eq(2, t.getIndexKeys().length);
 
 res =
     t.insert({zip: "10004", data: [{loc: [40, 40], type: "home"}, {loc: [59, 59], type: "work"}]});
-assert.writeOK(res);
+assert.commandWorked(res);
 
 // test normal access
 

@@ -10,7 +10,7 @@ const st = new ShardingTest({shards: 2});
 const db = st.s.getDB("test");
 const coll = db.capped;
 assert.commandWorked(db.runCommand({create: "capped", capped: true, size: 1024}));
-assert.writeOK(coll.insert({}));
+assert.commandWorked(coll.insert({}));
 const findResult = assert.commandWorked(
     db.runCommand({find: "capped", filter: {}, tailable: true, awaitData: true}));
 

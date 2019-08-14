@@ -68,7 +68,7 @@ let a1 = nodeA.getDB("test1");
 let b1 = nodeB.getDB("test1");
 
 // Initial data for both nodes.
-assert.writeOK(a1.coll.insert([{_id: 1, x: 1}, {_id: 2, x: 2}]));
+assert.commandWorked(a1.coll.insert([{_id: 1, x: 1}, {_id: 2, x: 2}]));
 
 // Wait for initial replication.
 replTest.awaitReplication();
@@ -80,16 +80,16 @@ assert.soon(() => replTest.getPrimary() == nodeB, "node B did not become primary
 
 // Do operations on B and B alone, these will be rolled back.
 // For the collection creation, first create a view with the same name, stressing rollback.
-assert.writeOK(b1.coll.remove({x: 2}));
+assert.commandWorked(b1.coll.remove({x: 2}));
 assert.commandWorked(b1.createView("x", "coll", [{$match: {x: 1}}]));
 let b2 = b1.getSiblingDB("test2");
-assert.writeOK(b2.coll.insert([{_id: 1, y: 1}, {_id: 2, y: 2}]));
+assert.commandWorked(b2.coll.insert([{_id: 1, y: 1}, {_id: 2, y: 2}]));
 assert.commandWorked(b2.createView("y", "coll", [{$match: {y: 2}}]));
 let b3 = b1.getSiblingDB("test3");
 assert.commandWorked(b3.createView("z", "coll", []));
-assert.writeOK(b3.system.views.remove({}));
-assert.writeOK(b3.z.insert([{z: 1}, {z: 2}, {z: 3}]));
-assert.writeOK(b3.z.remove({z: 1}));
+assert.commandWorked(b3.system.views.remove({}));
+assert.commandWorked(b3.z.insert([{z: 1}, {z: 2}, {z: 3}]));
+assert.commandWorked(b3.z.remove({z: 1}));
 
 // Isolate B, bring A back into contact with the arbiter, then wait for A to become primary.
 // Insert new data into A, so that B will need to rollback when it reconnects to A.
@@ -100,12 +100,12 @@ assert.soon(() => replTest.getPrimary() == nodeA, "nodeA did not become primary 
 
 // A is now primary and will perform writes that must be copied by B after rollback.
 assert.eq(a1.coll.find().itcount(), 2, "expected two documents in test1.coll");
-assert.writeOK(a1.x.insert({_id: 3, x: "string in test1.x"}));
+assert.commandWorked(a1.x.insert({_id: 3, x: "string in test1.x"}));
 let a2 = a1.getSiblingDB("test2");
 assert.commandWorked(a2.createView("y", "coll", [{$match: {y: 2}}]));
-assert.writeOK(a2.coll.insert([{_id: 1, y: 1}, {_id: 2, y: 2}]));
+assert.commandWorked(a2.coll.insert([{_id: 1, y: 1}, {_id: 2, y: 2}]));
 let a3 = a1.getSiblingDB("test3");
-assert.writeOK(a3.coll.insert([{z: 1}, {z: 2}, {z: 3}]));
+assert.commandWorked(a3.coll.insert([{z: 1}, {z: 2}, {z: 3}]));
 assert.commandWorked(a3.createView("z", "coll", [{$match: {z: 3}}]));
 
 // A is collections: test1.{coll,x}, test2.{coll,system.views}, test3.{coll,system.views}

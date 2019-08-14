@@ -102,7 +102,7 @@ config.getCollectionInfos().forEach(function(c) {
     assert.commandWorked(configCopy.createCollection(c.name, c.options));
     // Clone the docs.
     config.getCollection(c.name).find().hint({_id: 1}).forEach(function(d) {
-        assert.writeOK(configCopy.getCollection(c.name).insert(d));
+        assert.commandWorked(configCopy.getCollection(c.name).insert(d));
     });
     // Build the indexes.
     config.getCollection(c.name).getIndexes().forEach(function(i) {
@@ -179,11 +179,11 @@ function testCollDetails(args) {
     assert.commandWorked(admin.runCommand(cmdObj));
 
     if (args.hasOwnProperty("unique")) {
-        assert.writeOK(mongos.getDB("config").collections.update({_id: collName},
-                                                                 {$set: {"unique": args.unique}}));
+        assert.commandWorked(mongos.getDB("config").collections.update(
+            {_id: collName}, {$set: {"unique": args.unique}}));
     }
     if (args.hasOwnProperty("noBalance")) {
-        assert.writeOK(mongos.getDB("config").collections.update(
+        assert.commandWorked(mongos.getDB("config").collections.update(
             {_id: collName}, {$set: {"noBalance": args.noBalance}}));
     }
 
@@ -217,7 +217,7 @@ function testCollDetails(args) {
         mongos.getCollection(collName).drop();
     } catch (e) {
         // Ignore drop errors because they are from the illegal values in the collection entry
-        assert.writeOK(mongos.getDB("config").collections.remove({_id: collName}));
+        assert.commandWorked(mongos.getDB("config").collections.remove({_id: collName}));
     }
 
     testCollDetailsNum++;

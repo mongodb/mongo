@@ -31,7 +31,7 @@ function createIndexAndRunExplain(testOptions) {
     coll.drop();
 
     assert.commandWorked(coll.createIndex(keyPattern));
-    assert.writeOK(coll.insert(testOptions.docToInsert));
+    assert.commandWorked(coll.insert(testOptions.docToInsert));
 
     var explain = db.runCommand({explain: testOptions.commandObj});
     assert.commandWorked(explain);

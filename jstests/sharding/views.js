@@ -58,7 +58,7 @@ assert.commandWorked(
     db.adminCommand({moveChunk: coll.getFullName(), find: {a: 25}, to: st.shard1.shardName}));
 
 for (let i = 0; i < 10; ++i) {
-    assert.writeOK(coll.insert({a: i}));
+    assert.commandWorked(coll.insert({a: i}));
 }
 
 assert.commandWorked(db.createView("view", coll.getName(), [{$match: {a: {$gte: 4}}}]));

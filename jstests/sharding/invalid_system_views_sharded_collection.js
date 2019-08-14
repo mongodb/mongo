@@ -26,10 +26,10 @@ function runTest(st, badViewDefinition) {
     assert.commandWorked(viewsCollection.createIndex({x: 1}));
 
     const unshardedColl = db.getCollection("unshardedColl");
-    assert.writeOK(unshardedColl.insert({b: "boo"}));
+    assert.commandWorked(unshardedColl.insert({b: "boo"}));
 
-    assert.writeOK(db.system.views.insert(badViewDefinition),
-                   "failed to insert " + tojson(badViewDefinition));
+    assert.commandWorked(db.system.views.insert(badViewDefinition),
+                         "failed to insert " + tojson(badViewDefinition));
 
     // Test that a command involving views properly fails with a views-specific error code.
     assert.commandFailedWithCode(
@@ -44,12 +44,12 @@ function runTest(st, badViewDefinition) {
             " in system.views";
     }
 
-    assert.writeOK(viewsCollection.insert({y: "baz", a: 5}), makeErrorMessage("insert"));
+    assert.commandWorked(viewsCollection.insert({y: "baz", a: 5}), makeErrorMessage("insert"));
 
-    assert.writeOK(viewsCollection.update({y: "baz"}, {$set: {y: "qux"}}),
-                   makeErrorMessage("update"));
+    assert.commandWorked(viewsCollection.update({y: "baz"}, {$set: {y: "qux"}}),
+                         makeErrorMessage("update"));
 
-    assert.writeOK(viewsCollection.remove({y: "baz"}), makeErrorMessage("remove"));
+    assert.commandWorked(viewsCollection.remove({y: "baz"}), makeErrorMessage("remove"));
 
     assert.commandWorked(
         db.runCommand(

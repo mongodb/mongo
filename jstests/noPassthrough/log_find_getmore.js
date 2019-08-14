@@ -39,7 +39,7 @@ const coll = testDB.test;
 assert.commandWorked(testDB.dropDatabase());
 
 for (let i = 1; i <= 10; ++i) {
-    assert.writeOK(coll.insert({a: i}));
+    assert.commandWorked(coll.insert({a: i}));
 }
 
 assert.commandWorked(coll.createIndex({a: 1}));

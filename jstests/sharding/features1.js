@@ -19,8 +19,8 @@ assert.commandWorked(s.s0.adminCommand({split: "test.foo", middle: {num: 10}}));
 assert.commandWorked(s.s0.adminCommand(
     {movechunk: "test.foo", find: {num: 20}, to: s.getOther(s.getPrimaryShard("test")).name}));
 
-assert.writeOK(db.foo.insert({num: 5}));
-assert.writeOK(db.foo.save({num: 15}));
+assert.commandWorked(db.foo.insert({num: 5}));
+assert.commandWorked(db.foo.save({num: 15}));
 
 let a = s.rs0.getPrimary().getDB("test");
 let b = s.rs1.getPrimary().getDB("test");
@@ -66,8 +66,8 @@ assert.commandWorked(s.s0.adminCommand({split: "test.foo4", middle: {num: 10}}))
 assert.commandWorked(s.s0.adminCommand(
     {movechunk: "test.foo4", find: {num: 20}, to: s.getOther(s.getPrimaryShard("test")).name}));
 
-assert.writeOK(db.foo4.insert({num: 5}));
-assert.writeOK(db.foo4.insert({num: 15}));
+assert.commandWorked(db.foo4.insert({num: 5}));
+assert.commandWorked(db.foo4.insert({num: 15}));
 
 assert.eq(1, a.foo4.count(), "ua1");
 assert.eq(1, b.foo4.count(), "ub1");
@@ -79,7 +79,7 @@ assert(a.foo4.getIndexes()[1].unique, "ua3");
 assert(b.foo4.getIndexes()[1].unique, "ub3");
 
 assert.eq(2, db.foo4.count(), "uc1");
-assert.writeOK(db.foo4.insert({num: 7}));
+assert.commandWorked(db.foo4.insert({num: 7}));
 assert.eq(3, db.foo4.count(), "uc2");
 assert.writeError(db.foo4.insert({num: 7}));
 assert.eq(3, db.foo4.count(), "uc4");
@@ -106,12 +106,12 @@ assert(db.foo5.isCapped(), "cb1");
 assert.commandFailed(s.s0.adminCommand({shardcollection: "test.foo5", key: {num: 1}}));
 
 // ---- can't shard non-empty collection without index -----
-assert.writeOK(db.foo8.insert({a: 1}));
+assert.commandWorked(db.foo8.insert({a: 1}));
 assert.commandFailed(s.s0.adminCommand({shardcollection: "test.foo8", key: {a: 1}}),
                      "non-empty collection");
 
 // ---- can't shard non-empty collection with null values in shard key ----
-assert.writeOK(db.foo9.insert({b: 1}));
+assert.commandWorked(db.foo9.insert({b: 1}));
 assert.commandWorked(db.foo9.createIndex({a: 1}));
 assert.commandFailed(s.s0.adminCommand({shardcollection: "test.foo9", key: {a: 1}}),
                      "entry with null value");

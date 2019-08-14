@@ -80,7 +80,7 @@ var $config = extendWorkload($config, function($config, $super) {
 
         const collection = this.session.getDatabase(db.getName()).getCollection(collName);
         withTxnAndAutoRetry(this.session, () => {
-            assertWhenOwnColl.writeOK(collection.remove({_id: idToDelete}, {multi: false}));
+            assertWhenOwnColl.commandWorked(collection.remove({_id: idToDelete}, {multi: false}));
         });
 
         // Remove the deleted document from the in-memory representation.
@@ -105,7 +105,7 @@ var $config = extendWorkload($config, function($config, $super) {
 
         const collection = this.session.getDatabase(db.getName()).getCollection(collName);
         withTxnAndAutoRetry(this.session, () => {
-            assertWhenOwnColl.writeOK(
+            assertWhenOwnColl.commandWorked(
                 collection.remove({tid: this.tid, groupId: groupIdToDelete}, {multi: true}));
         });
 
@@ -153,7 +153,8 @@ var $config = extendWorkload($config, function($config, $super) {
         // deleted by group later.
         let nextGroupId = 0;
         db[collName].find({tid: this.tid}).forEach(doc => {
-            assert.writeOK(db[collName].update({_id: doc._id}, {$set: {groupId: nextGroupId}}));
+            assert.commandWorked(
+                db[collName].update({_id: doc._id}, {$set: {groupId: nextGroupId}}));
             nextGroupId = (nextGroupId + 1) % this.numGroupsWithinThread;
         });
 

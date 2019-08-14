@@ -90,7 +90,7 @@ var bulk = coll.initializeUnorderedBulkOp();
 for (var i = 0; i < 300; i++) {
     bulk.insert({i: i % 10, str: str});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 assert.eq(300, coll.find().itcount());
 

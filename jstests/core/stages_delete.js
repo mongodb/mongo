@@ -14,9 +14,9 @@ var deleteStage;
 
 // Test delete stage with isMulti: true.
 coll.drop();
-assert.writeOK(coll.insert({deleteMe: true}));
-assert.writeOK(coll.insert({deleteMe: true}));
-assert.writeOK(coll.insert({deleteMe: false}));
+assert.commandWorked(coll.insert({deleteMe: true}));
+assert.commandWorked(coll.insert({deleteMe: true}));
+assert.commandWorked(coll.insert({deleteMe: false}));
 deleteStage = {
     delete: {args: {node: collScanStage, isMulti: true}}
 };
@@ -27,9 +27,9 @@ assert.eq(coll.count({deleteMe: false}), 1);
 
 // Test delete stage with isMulti: false.
 coll.drop();
-assert.writeOK(coll.insert({deleteMe: true}));
-assert.writeOK(coll.insert({deleteMe: true}));
-assert.writeOK(coll.insert({deleteMe: false}));
+assert.commandWorked(coll.insert({deleteMe: true}));
+assert.commandWorked(coll.insert({deleteMe: true}));
+assert.commandWorked(coll.insert({deleteMe: false}));
 deleteStage = {
     delete: {args: {node: collScanStage, isMulti: false}}
 };

@@ -42,7 +42,7 @@ syncFrom = function(syncingNode, desiredSyncSource, rst) {
 
     stopServerReplication(syncingNode);
 
-    assert.writeOK(rst.getPrimary().getDB(dummyName).getCollection(dummyName).insert({a: 1}));
+    assert.commandWorked(rst.getPrimary().getDB(dummyName).getCollection(dummyName).insert({a: 1}));
     // Wait for 'desiredSyncSource' to get the dummy write we just did so we know it's
     // definitely ahead of 'syncingNode' before we call replSetSyncFrom.
     assert.soonNoExcept(function() {

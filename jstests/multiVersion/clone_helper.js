@@ -32,7 +32,7 @@ let bulk = masterDB[testColName].initializeUnorderedBulkOp();
 for (let i = 0; i < numDocs; i++) {
     bulk.insert({x: i, text: str});
 }
-assert.writeOK(bulk.execute({w: 3}));
+assert.commandWorked(bulk.execute({w: 3}));
 
 jsTest.log("Create view on replica set");
 assert.commandWorked(masterDB.runCommand({create: testViewName, viewOn: testColName}));

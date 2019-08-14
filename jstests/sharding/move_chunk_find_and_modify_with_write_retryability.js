@@ -93,7 +93,7 @@ var tests = [
             for (let i = 0; i < 10; i++) {
                 bulk.insert({x: 10});
             }
-            assert.writeOK(bulk.execute());
+            assert.commandWorked(bulk.execute());
         },
         checkRetryResult: function(result, retryResult) {
             checkFindAndModifyResult(result, retryResult);

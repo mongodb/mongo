@@ -40,12 +40,12 @@ var testUserAndDatabaseAtSymbolConflation = function() {
 
     // Ensure that they can both successfully authenticate to their correct database.
     assert(cDB.auth('a@b', 'pass1'));
-    assert.writeOK(cDB.col.insert({data: 1}));
+    assert.commandWorked(cDB.col.insert({data: 1}));
     assert.writeError(bcDB.col.insert({data: 2}));
     assert(cDB.logout());
 
     assert(bcDB.auth('a', 'pass2'));
-    assert.writeOK(bcDB.col.insert({data: 3}));
+    assert.commandWorked(bcDB.col.insert({data: 3}));
     assert.writeError(cDB.col.insert({data: 4}));
     assert(bcDB.logout());
 

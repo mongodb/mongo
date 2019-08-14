@@ -35,7 +35,7 @@ var $config = (function() {
             var index = Random.randInt(this.numDocs + 1);
             var update = Random.randInt(this.numDocs + 1);
             var res = db[collName].update({_id: index}, {$set: {to: update}});
-            assertWhenOwnColl.writeOK(res);
+            assertWhenOwnColl.commandWorked(res);
         }
     };
 
@@ -48,7 +48,7 @@ var $config = (function() {
             bulk.insert({_id: i, to: i + 1});
         }
         var res = bulk.execute();
-        assertWhenOwnColl.writeOK(res);
+        assertWhenOwnColl.commandWorked(res);
         assertWhenOwnColl.eq(this.numDocs, res.nInserted);
         assertWhenOwnColl.eq(this.numDocs, db[collName].find().itcount());
     }

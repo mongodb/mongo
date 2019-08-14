@@ -21,7 +21,7 @@ var bulk = coll.initializeUnorderedBulkOp();
 for (var i = 0; i < numDocs; i++) {
     bulk.insert({_id: i, data: data});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 // Make sure everything got inserted
 assert.eq(numDocs, coll.find().itcount());

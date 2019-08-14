@@ -102,7 +102,7 @@ function testReadConcernLevel(level) {
     var snapshot2 = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
 
     for (var i = 0; i < 10; i++) {
-        assert.writeOK(t.insert({_id: i, version: 3}));
+        assert.commandWorked(t.insert({_id: i, version: 3}));
     }
 
     assertNoSnapshotAvailableForReadConcernLevel();
@@ -111,7 +111,7 @@ function testReadConcernLevel(level) {
 
     assertNoSnapshotAvailableForReadConcernLevel();
 
-    assert.writeOK(t.update({}, {$set: {version: 4}}, false, true));
+    assert.commandWorked(t.update({}, {$set: {version: 4}}, false, true));
     var snapshot4 = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
 
     // Collection didn't exist in snapshot 1.
@@ -171,7 +171,7 @@ function testReadConcernLevel(level) {
     assert.eq(getCursorForReadConcernLevel().itcount(), 10);
 
     // Reindex bumps the min snapshot.
-    assert.writeOK(t.bump.insert({a: 1}));  // Bump timestamp.
+    assert.commandWorked(t.bump.insert({a: 1}));  // Bump timestamp.
     t.reIndex();
     assertNoSnapshotAvailableForReadConcernLevel();
     newSnapshot = assert.commandWorked(db.adminCommand("makeSnapshot")).name;

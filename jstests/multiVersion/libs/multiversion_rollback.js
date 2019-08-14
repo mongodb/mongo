@@ -26,10 +26,10 @@ function testMultiversionRollback(testName, rollbackNodeVersion, syncSourceVersi
 
     let CommonOps = (node) => {
         // Insert four documents on both nodes.
-        assert.writeOK(node.getDB(dbName)["bothNodesKeep"].insert({a: 1}));
-        assert.writeOK(node.getDB(dbName)["rollbackNodeDeletes"].insert({b: 1}));
-        assert.writeOK(node.getDB(dbName)["rollbackNodeUpdates"].insert({c: 1}));
-        assert.writeOK(node.getDB(dbName)["bothNodesUpdate"].insert({d: 1}));
+        assert.commandWorked(node.getDB(dbName)["bothNodesKeep"].insert({a: 1}));
+        assert.commandWorked(node.getDB(dbName)["rollbackNodeDeletes"].insert({b: 1}));
+        assert.commandWorked(node.getDB(dbName)["rollbackNodeUpdates"].insert({c: 1}));
+        assert.commandWorked(node.getDB(dbName)["bothNodesUpdate"].insert({d: 1}));
     };
 
     let RollbackOps = (node) => {
@@ -38,17 +38,17 @@ function testMultiversionRollback(testName, rollbackNodeVersion, syncSourceVersi
         //   2. Update a document only on this node.
         //   3. Update a document on both nodes.
         // All three documents will be refetched during rollback.
-        assert.writeOK(node.getDB(dbName)["rollbackNodeDeletes"].remove({b: 1}));
-        assert.writeOK(node.getDB(dbName)["rollbackNodeUpdates"].update({c: 1}, {c: 0}));
-        assert.writeOK(node.getDB(dbName)["bothNodesUpdate"].update({d: 1}, {d: 0}));
+        assert.commandWorked(node.getDB(dbName)["rollbackNodeDeletes"].remove({b: 1}));
+        assert.commandWorked(node.getDB(dbName)["rollbackNodeUpdates"].update({c: 1}, {c: 0}));
+        assert.commandWorked(node.getDB(dbName)["bothNodesUpdate"].update({d: 1}, {d: 0}));
     };
 
     let SyncSourceOps = (node) => {
         // Perform operations only on the sync source:
         //   1. Make a conflicting write on one of the documents the rollback node updates.
         //   2. Insert a new document.
-        assert.writeOK(node.getDB(dbName)["bothNodesUpdate"].update({d: 1}, {d: 2}));
-        assert.writeOK(node.getDB(dbName)["syncSourceInserts"].insert({e: 1}));
+        assert.commandWorked(node.getDB(dbName)["bothNodesUpdate"].update({d: 1}, {d: 2}));
+        assert.commandWorked(node.getDB(dbName)["syncSourceInserts"].insert({e: 1}));
     };
 
     // Set up replica set.

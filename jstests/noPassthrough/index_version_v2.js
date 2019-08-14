@@ -57,7 +57,7 @@ indexSpec = getIndexSpecByName(testDB.collation, "withCollation");
 assert.eq(2, indexSpec.v, tojson(indexSpec));
 
 // Test that indexing decimal data succeeds.
-assert.writeOK(testDB.decimal.insert({_id: new NumberDecimal("42")}));
+assert.commandWorked(testDB.decimal.insert({_id: new NumberDecimal("42")}));
 
 //
 // Index version v=1
@@ -97,7 +97,7 @@ if (storageEnginesUsingKeyString.has(storageEngine)) {
     assert.writeErrorWithCode(testDB.decimal.insert({num: new NumberDecimal("42")}),
                               ErrorCodes.UnsupportedFormat);
 } else {
-    assert.writeOK(testDB.decimal.insert({num: new NumberDecimal("42")}));
+    assert.commandWorked(testDB.decimal.insert({num: new NumberDecimal("42")}));
 }
 
 //

@@ -63,23 +63,23 @@ var a = a_conn.getDB("foo");
 var b = b_conn.getDB("foo");
 
 // initial data for both nodes
-assert.writeOK(a.b.insert({x: 1}));
+assert.commandWorked(a.b.insert({x: 1}));
 a.b.ensureIndex({x: 1});
-assert.writeOK(a.oldname.insert({y: 1}));
-assert.writeOK(a.oldname.insert({y: 2}));
+assert.commandWorked(a.oldname.insert({y: 1}));
+assert.commandWorked(a.oldname.insert({y: 2}));
 a.oldname.ensureIndex({y: 1}, true);
-assert.writeOK(a.bar.insert({q: 0}));
-assert.writeOK(a.bar.insert({q: 1, a: "foo"}));
-assert.writeOK(a.bar.insert({q: 2, a: "foo", x: 1}));
-assert.writeOK(a.bar.insert({q: 3, bb: 9, a: "foo"}));
-assert.writeOK(a.bar.insert({q: 40333333, a: 1}));
+assert.commandWorked(a.bar.insert({q: 0}));
+assert.commandWorked(a.bar.insert({q: 1, a: "foo"}));
+assert.commandWorked(a.bar.insert({q: 2, a: "foo", x: 1}));
+assert.commandWorked(a.bar.insert({q: 3, bb: 9, a: "foo"}));
+assert.commandWorked(a.bar.insert({q: 40333333, a: 1}));
 for (var i = 0; i < 200; i++) {
-    assert.writeOK(a.bar.insert({i: i}));
+    assert.commandWorked(a.bar.insert({i: i}));
 }
-assert.writeOK(a.bar.insert({q: 40, a: 2}));
-assert.writeOK(a.bar.insert({q: 70, txt: 'willremove'}));
+assert.commandWorked(a.bar.insert({q: 40, a: 2}));
+assert.commandWorked(a.bar.insert({q: 70, txt: 'willremove'}));
 a.createCollection("kap", {capped: true, size: 5000});
-assert.writeOK(a.kap.insert({foo: 1}));
+assert.commandWorked(a.kap.insert({foo: 1}));
 replTest.awaitReplication();
 
 // isolate A and wait for B to become master
@@ -94,17 +94,17 @@ assert.soon(function() {
 });
 
 // do operations on B and B alone, these will be rolled back
-assert.writeOK(b.bar.insert({q: 4}));
-assert.writeOK(b.bar.update({q: 3}, {q: 3, rb: true}));
-assert.writeOK(b.bar.remove({q: 40}));  // multi remove test
-assert.writeOK(b.bar.update({q: 2}, {q: 39, rb: true}));
+assert.commandWorked(b.bar.insert({q: 4}));
+assert.commandWorked(b.bar.update({q: 3}, {q: 3, rb: true}));
+assert.commandWorked(b.bar.remove({q: 40}));  // multi remove test
+assert.commandWorked(b.bar.update({q: 2}, {q: 39, rb: true}));
 // rolling back a delete will involve reinserting the item(s)
-assert.writeOK(b.bar.remove({q: 1}));
-assert.writeOK(b.bar.update({q: 0}, {$inc: {y: 1}}));
-assert.writeOK(b.kap.insert({foo: 2}));
-assert.writeOK(b.kap2.insert({foo: 2}));
+assert.commandWorked(b.bar.remove({q: 1}));
+assert.commandWorked(b.bar.update({q: 0}, {$inc: {y: 1}}));
+assert.commandWorked(b.kap.insert({foo: 2}));
+assert.commandWorked(b.kap2.insert({foo: 2}));
 // create a collection (need to roll back the whole thing)
-assert.writeOK(b.newcoll.insert({a: true}));
+assert.commandWorked(b.newcoll.insert({a: true}));
 // create a new empty collection (need to roll back the whole thing)
 b.createCollection("abc");
 // drop a collection - we'll need all its data back!
@@ -119,8 +119,8 @@ assert(b.fooname.find().itcount() > 0, "count rename");
 b.fooname.ensureIndex({q: 1});
 // test roll back (drop) a whole database
 var abc = b.getSisterDB("abc");
-assert.writeOK(abc.foo.insert({x: 1}));
-assert.writeOK(abc.bar.insert({y: 999}));
+assert.commandWorked(abc.foo.insert({x: 1}));
+assert.commandWorked(abc.bar.insert({y: 999}));
 
 // isolate B, bring A back into contact with the arbiter, then wait for A to become master
 // insert new data into A so that B will need to rollback when it reconnects to A
@@ -142,9 +142,9 @@ assert.soon(function() {
     }
 });
 assert(a.bar.find().itcount() >= 1, "count check");
-assert.writeOK(a.bar.insert({txt: 'foo'}));
-assert.writeOK(a.bar.remove({q: 70}));
-assert.writeOK(a.bar.update({q: 0}, {$inc: {y: 33}}));
+assert.commandWorked(a.bar.insert({txt: 'foo'}));
+assert.commandWorked(a.bar.remove({q: 70}));
+assert.commandWorked(a.bar.update({q: 0}, {$inc: {y: 33}}));
 
 // A is 1 2 3 7 8
 // B is 1 2 3 4 5 6

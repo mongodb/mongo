@@ -70,8 +70,8 @@ var oldPrimaryColl = oldPrimary.getCollection(collName);
 var newPrimaryColl = newPrimary.getCollection(collName);
 
 // Set up initial state.
-assert.writeOK(oldPrimaryColl.insert({_id: 1, state: 'old'},
-                                     {writeConcern: {w: 'majority', wtimeout: 30000}}));
+assert.commandWorked(oldPrimaryColl.insert({_id: 1, state: 'old'},
+                                           {writeConcern: {w: 'majority', wtimeout: 30000}}));
 assert.eq(doDirtyRead(oldPrimaryColl), 'old');
 assert.eq(doCommittedRead(oldPrimaryColl), 'old');
 assert.eq(doDirtyRead(newPrimaryColl), 'old');
@@ -86,7 +86,7 @@ oldPrimary.disconnect([newPrimary, pureSecondary]);
 assert.eq(doDirtyRead(newPrimaryColl), 'old');
 
 // This write will only make it to oldPrimary and will never become committed.
-assert.writeOK(oldPrimaryColl.save({_id: 1, state: 'INVALID'}));
+assert.commandWorked(oldPrimaryColl.save({_id: 1, state: 'INVALID'}));
 assert.eq(doDirtyRead(oldPrimaryColl), 'INVALID');
 assert.eq(doCommittedRead(oldPrimaryColl), 'old');
 
@@ -106,7 +106,7 @@ assert.soon(function() {
 // Stop applier on pureSecondary to ensure that writes to newPrimary won't become committed yet.
 assert.commandWorked(
     pureSecondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"}));
-assert.writeOK(newPrimaryColl.save({_id: 1, state: 'new'}));
+assert.commandWorked(newPrimaryColl.save({_id: 1, state: 'new'}));
 assert.eq(doDirtyRead(newPrimaryColl), 'new');
 // Note that we still can't do a committed read from the new primary and reliably get anything,
 // since we never proved that it learned about the commit level from the old primary before
@@ -135,12 +135,12 @@ assert.commandWorked(
     pureSecondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"}));
 // Do a write to the new primary so that the old primary can establish a sync source to learn
 // about the new commit.
-assert.writeOK(newPrimary.getDB(name).unrelatedCollection.insert(
+assert.commandWorked(newPrimary.getDB(name).unrelatedCollection.insert(
     {a: 1}, {writeConcern: {w: 'majority', wtimeout: replTest.kDefaultTimeoutMS}}));
 assert.eq(doCommittedRead(newPrimaryColl), 'new');
 // Do another write to the new primary so that the old primary can be sure to receive the
 // new committed optime.
-assert.writeOK(newPrimary.getDB(name).unrelatedCollection.insert(
+assert.commandWorked(newPrimary.getDB(name).unrelatedCollection.insert(
     {a: 2}, {writeConcern: {w: 'majority', wtimeout: replTest.kDefaultTimeoutMS}}));
 assert.eq(doCommittedRead(oldPrimaryColl), 'new');
 

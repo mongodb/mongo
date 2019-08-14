@@ -10,7 +10,7 @@ function doTest() {
     for (var i = 1; i < 1026; ++i) {
         var db = m.getDB("db" + i);
         var coll = db.getCollection("coll" + i);
-        assert.writeOK(coll.insert({}));
+        assert.commandWorked(coll.insert({}));
     }
 
     MongoRunner.stopMongod(m);

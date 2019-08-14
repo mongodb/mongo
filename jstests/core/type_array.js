@@ -21,14 +21,14 @@ function extractSortedIdsFromCursor(cursor) {
 }
 
 function runTests() {
-    assert.writeOK(coll.remove({}));
-    assert.writeOK(coll.insert({_id: 1, a: [1, 2, 3]}));
-    assert.writeOK(coll.insert({_id: 2, a: [1, "foo", 3]}));
-    assert.writeOK(coll.insert({_id: 3, a: []}));
-    assert.writeOK(coll.insert({_id: 4, a: [[]]}));
-    assert.writeOK(coll.insert({_id: 5, a: [[[]]]}));
-    assert.writeOK(coll.insert({_id: 6, a: 1}));
-    assert.writeOK(coll.insert({_id: 7, a: "foo"}));
+    assert.commandWorked(coll.remove({}));
+    assert.commandWorked(coll.insert({_id: 1, a: [1, 2, 3]}));
+    assert.commandWorked(coll.insert({_id: 2, a: [1, "foo", 3]}));
+    assert.commandWorked(coll.insert({_id: 3, a: []}));
+    assert.commandWorked(coll.insert({_id: 4, a: [[]]}));
+    assert.commandWorked(coll.insert({_id: 5, a: [[[]]]}));
+    assert.commandWorked(coll.insert({_id: 6, a: 1}));
+    assert.commandWorked(coll.insert({_id: 7, a: "foo"}));
 
     assert.eq([1, 2, 6], extractSortedIdsFromCursor(coll.find({a: {$type: "number"}})));
     assert.eq([2, 7], extractSortedIdsFromCursor(coll.find({a: {$type: "string"}})));
@@ -36,14 +36,14 @@ function runTests() {
     assert.eq([4, 5], extractSortedIdsFromCursor(coll.find({"a.0": {$type: "array"}})));
     assert.eq([5], extractSortedIdsFromCursor(coll.find({"a.0.0": {$type: "array"}})));
 
-    assert.writeOK(coll.remove({}));
-    assert.writeOK(coll.insert({_id: 0, a: 1}));
-    assert.writeOK(coll.insert({_id: 1, a: NumberInt(1)}));
-    assert.writeOK(coll.insert({_id: 2, a: NumberLong(1)}));
-    assert.writeOK(coll.insert({_id: 3, a: "str"}));
-    assert.writeOK(coll.insert({_id: 4, a: []}));
-    assert.writeOK(coll.insert({_id: 5, a: [NumberInt(1), "str"]}));
-    assert.writeOK(coll.insert({_id: 6}));
+    assert.commandWorked(coll.remove({}));
+    assert.commandWorked(coll.insert({_id: 0, a: 1}));
+    assert.commandWorked(coll.insert({_id: 1, a: NumberInt(1)}));
+    assert.commandWorked(coll.insert({_id: 2, a: NumberLong(1)}));
+    assert.commandWorked(coll.insert({_id: 3, a: "str"}));
+    assert.commandWorked(coll.insert({_id: 4, a: []}));
+    assert.commandWorked(coll.insert({_id: 5, a: [NumberInt(1), "str"]}));
+    assert.commandWorked(coll.insert({_id: 6}));
 
     // Test that $type fails when given array that contains an element that is neither a string
     // nor a number.
@@ -67,6 +67,6 @@ function runTests() {
 
 // Verify $type queries both with and without an index.
 runTests();
-assert.writeOK(coll.createIndex({a: 1}));
+assert.commandWorked(coll.createIndex({a: 1}));
 runTests();
 }());

@@ -20,10 +20,10 @@ st.ensurePrimaryShard(dbName, donor.shardName);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
 jsTest.log("Insert a document with {_id: 0} into " + ns + " through mongos");
-assert.writeOK(st.s.getCollection(ns).insert({_id: 0}));
+assert.commandWorked(st.s.getCollection(ns).insert({_id: 0}));
 
 jsTest.log("Insert a document with {_id: 1} into " + ns + " directly on the recipient");
-assert.writeOK(recipient.getCollection(ns).insert({_id: 1}));
+assert.commandWorked(recipient.getCollection(ns).insert({_id: 1}));
 
 jsTest.log("Check that the UUID on the recipient differs from the UUID on the donor");
 const recipientUUIDBefore =

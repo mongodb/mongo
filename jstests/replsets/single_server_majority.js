@@ -9,5 +9,5 @@ col = db.getCollection("single_server_majority");
 col.drop();
 
 // see if we can get a majority write on this single server
-assert.writeOK(col.save({a: "test"}, {writeConcern: {w: 'majority'}}));
+assert.commandWorked(col.save({a: "test"}, {writeConcern: {w: 'majority'}}));
 MongoRunner.stopMongod(mongod);

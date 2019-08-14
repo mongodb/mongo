@@ -47,7 +47,7 @@ var bulk = masterColl.initializeUnorderedBulkOp();
 for (var i = 0; i < size; ++i) {
     bulk.insert({i: i, j: i * i});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 IndexBuildTest.pauseIndexBuilds(second);
 

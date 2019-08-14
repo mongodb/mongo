@@ -5,7 +5,7 @@
 const coll = db.date_expressions_with_time_zones;
 coll.drop();
 
-assert.writeOK(coll.insert([
+assert.commandWorked(coll.insert([
     // Three sales on 2017-06-16 in UTC.
     {_id: 0, date: new ISODate("2017-06-16T00:00:00.000Z"), sales: 1},
     {_id: 1, date: new ISODate("2017-06-16T12:02:21.013Z"), sales: 2},

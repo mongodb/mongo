@@ -16,7 +16,7 @@ var $config = (function() {
             for (var i = 0; i < 100; ++i) {
                 bulk.insert({});
             }
-            assert.writeOK(bulk.execute());
+            assert.commandWorked(bulk.execute());
         },
 
         remove: function remove(db, collName) {

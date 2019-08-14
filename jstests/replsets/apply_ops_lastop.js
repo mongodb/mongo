@@ -30,7 +30,7 @@ var badPreCondition = [{ns: 'foo.bar', q: {_id: 10, a: "aaa"}, res: {a: "aaa"}}]
 var majorityWriteConcern = {w: 'majority', wtimeout: 30000};
 
 // Set up some data
-assert.writeOK(coll.insert({x: 1}));  // creating the collection so applyOps works
+assert.commandWorked(coll.insert({x: 1}));  // creating the collection so applyOps works
 assert.commandWorked(
     m1.getDB('foo').runCommand({applyOps: insertApplyOps, writeConcern: majorityWriteConcern}));
 var insertOp = m1.getDB('foo').getLastErrorObj('majority', 30000).lastOp;

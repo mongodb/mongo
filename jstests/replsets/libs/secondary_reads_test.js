@@ -97,7 +97,7 @@ function SecondaryReadsTest(name = "secondary_reads_test") {
     this.stopReaders = function() {
         print("signaling readers to stop...");
         assert.gt(readers.length, 0, "no readers to stop");
-        assert.writeOK(primaryDB.getCollection(signalColl).insert({_id: testDoneId}));
+        assert.commandWorked(primaryDB.getCollection(signalColl).insert({_id: testDoneId}));
         for (let i = 0; i < readers.length; i++) {
             const await = readers[i];
             await ();

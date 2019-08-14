@@ -54,9 +54,9 @@ const docWithGeoLine = {
 assert.commandWorked(coll.createIndex({geo: "2dsphere"}));
 
 // Populate the collection.
-assert.writeOK(coll.insert(docWithLegacyPoint));
-assert.writeOK(coll.insert(docWithGeoPoint));
-assert.writeOK(coll.insert(docWithGeoLine));
+assert.commandWorked(coll.insert(docWithLegacyPoint));
+assert.commandWorked(coll.insert(docWithGeoPoint));
+assert.commandWorked(coll.insert(docWithGeoLine));
 
 // Define a custom way to compare documents since the results here might differ by insignificant
 // amounts.

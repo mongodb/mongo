@@ -19,7 +19,7 @@ var $config = (function() {
                 bulk.insert({i: i});
             }
             var res = bulk.execute();
-            assertAlways.writeOK(res);
+            assertAlways.commandWorked(res);
             assertAlways.eq(this.numDocs, res.nInserted);
             assertAlways.commandWorked(db[this.threadCollName].ensureIndex({i: 1}));
         }

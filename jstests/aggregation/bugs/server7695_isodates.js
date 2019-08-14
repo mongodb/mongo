@@ -10,7 +10,7 @@ load('jstests/libs/dateutil.js');
 coll.drop();
 
 // Seed collection so that the pipeline will execute.
-assert.writeOK(coll.insert({}));
+assert.commandWorked(coll.insert({}));
 
 /**
  * Helper for testing that 'op' returns 'expResult'.

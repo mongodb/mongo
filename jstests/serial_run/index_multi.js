@@ -26,7 +26,7 @@ for (var i = 0; i < 1e4; i++) {
 
     bulk.insert(doc);
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 // Array of all index specs
 var specs = [];
@@ -107,7 +107,7 @@ for (i = 0; i < 1e4; i++) {
 
     bulk.find(criteria).update(mod);
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 indexJobs.forEach(function(join) {
     join();

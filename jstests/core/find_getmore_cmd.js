@@ -12,7 +12,7 @@ var coll = db[collName];
 
 coll.drop();
 for (var i = 0; i < 150; i++) {
-    assert.writeOK(coll.insert({a: i}));
+    assert.commandWorked(coll.insert({a: i}));
 }
 
 // Verify result of a find command that specifies none of the optional arguments.

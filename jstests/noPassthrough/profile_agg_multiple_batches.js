@@ -21,7 +21,7 @@ const coll = testDB.getCollection("coll");
 testDB.setProfilingLevel(2);
 
 for (let i = 0; i < 10; ++i) {
-    assert.writeOK(coll.insert({a: i, b: i}));
+    assert.commandWorked(coll.insert({a: i, b: i}));
 }
 
 assert.commandWorked(coll.createIndex({a: 1}));

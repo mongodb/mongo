@@ -20,8 +20,8 @@ const sessionDb = session.getDatabase(dbName);
 const sessionColl = sessionDb[collName];
 
 jsTest.log("Prepopulate the collection.");
-assert.writeOK(testColl.insert([{_id: 0, a: 0}, {_id: 1, a: 1}, {_id: 2, a: 2}],
-                               {writeConcern: {w: "majority"}}));
+assert.commandWorked(testColl.insert([{_id: 0, a: 0}, {_id: 1, a: 1}, {_id: 2, a: 2}],
+                                     {writeConcern: {w: "majority"}}));
 
 /***********************************************************************************************
  * Do a non-matching find-and-modify with remove.

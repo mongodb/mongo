@@ -13,7 +13,7 @@ var bulk = db.conc.initializeUnorderedBulkOp();
 for (var i = 0; i < NRECORDS; i++) {
     bulk.insert({x: i});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 print("making an index (this will take a while)");
 db.conc.ensureIndex({x: 1});
@@ -24,11 +24,11 @@ const updater = startParallelShell(
     "db = db.getSisterDB('concurrency');\
                                   db.concflag.insert({ inprog: true });\
                                   sleep(20);\
-                                  assert.writeOK(db.conc.update({}, \
+                                  assert.commandWorked(db.conc.update({}, \
                                                  { $inc: { x: " +
     NRECORDS +
     "}}, false, true)); \
-                                  assert.writeOK(db.concflag.update({}, { inprog: false }));");
+                                  assert.commandWorked(db.concflag.update({}, { inprog: false }));");
 
 assert.soon(function() {
     var x = db.concflag.findOne();

@@ -184,7 +184,7 @@ if (res.primary != addShardRes.shardAdded) {
     assert.commandWorked(st.s.adminCommand({movePrimary: 'test', to: addShardRes.shardAdded}));
 }
 
-assert.writeOK(st.s.getDB('test').foo.insert({x: 1}));
+assert.commandWorked(st.s.getDB('test').foo.insert({x: 1}));
 assert.neq(null, rst5.getPrimary().getDB('test').foo.findOne());
 
 assert.commandWorked(st.s.getDB('test').runCommand({dropDatabase: 1}));

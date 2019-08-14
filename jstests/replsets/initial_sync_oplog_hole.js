@@ -35,7 +35,7 @@ TestData.testName = testName;
 TestData.collectionName = collName;
 
 jsTestLog("Writing data before oplog hole to collection.");
-assert.writeOK(primaryColl.insert({_id: "a"}));
+assert.commandWorked(primaryColl.insert({_id: "a"}));
 // Make sure it gets written out.
 assert.eq(primaryColl.find({_id: "a"}).itcount(), 1);
 
@@ -55,7 +55,7 @@ checkLog.contains(primaryDB.getMongo(),
                   "hangAfterCollectionInserts fail point enabled for " + primaryColl.getFullName());
 
 jsTest.log("Create a write following the uncommitted write.");
-assert.writeOK(primaryColl.insert({_id: "c"}));
+assert.commandWorked(primaryColl.insert({_id: "c"}));
 // Make sure it gets written out.
 assert.eq(primaryColl.find({_id: "c"}).itcount(), 1);
 

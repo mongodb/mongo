@@ -51,7 +51,7 @@ let listedViews =
 assert.sameMembers(listedViews, expectedViews, "persisted view definitions not correctly loaded");
 
 // Insert an invalid view definition directly into system.views to bypass normal validation.
-assert.writeOK(viewsDB.system.views.insert({_id: "badView", pipeline: "badType"}));
+assert.commandWorked(viewsDB.system.views.insert({_id: "badView", pipeline: "badType"}));
 
 // Skip collection validation during stopMongod if invalid views exists.
 TestData.skipValidationOnInvalidViewDefinitions = true;
@@ -78,7 +78,7 @@ assert.commandFailedWithCode(viewsDB.runCommand({listCollections: 1}),
 
 // Manually remove the invalid view definition from system.views, and then verify that view
 // operations work successfully without requiring a server restart.
-assert.writeOK(viewsDB.system.views.remove({_id: "badView"}));
+assert.commandWorked(viewsDB.system.views.remove({_id: "badView"}));
 assert.commandWorked(viewsDB.runCommand({find: "view2"}));
 assert.commandWorked(viewsDB.runCommand({create: "view4", viewOn: "collection"}));
 assert.commandWorked(viewsDB.runCommand({collMod: "view2", viewOn: "view4"}));

@@ -22,7 +22,7 @@ let rollbackNode = rollbackTest.getPrimary();
 let syncSourceNode = rollbackTest.getSecondary();
 
 // Perform initial insert (common operation).
-assert.writeOK(rollbackNode.getDB(oldDbName)["beforeRollback"].insert({"num": 1}));
+assert.commandWorked(rollbackNode.getDB(oldDbName)["beforeRollback"].insert({"num": 1}));
 
 // Set a failpoint on the original primary, so that it blocks after it commits the last
 // 'dropCollection' entry but before the 'dropDatabase' entry is logged.
@@ -63,7 +63,7 @@ rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
 
 // Perform an insert on another database while interfacing with the new primary.
 // This is the sync source's divergent oplog entry.
-assert.writeOK(syncSourceNode.getDB(newDbName)["afterRollback"].insert({"num": 2}));
+assert.commandWorked(syncSourceNode.getDB(newDbName)["afterRollback"].insert({"num": 2}));
 
 rollbackTest.transitionToSyncSourceOperationsDuringRollback();
 rollbackTest.transitionToSteadyStateOperations();

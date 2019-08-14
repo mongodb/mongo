@@ -22,10 +22,10 @@ assert.commandWorked(
 //
 // Insert documents into collection and create text index.
 //
-assert.writeOK(coll.insert({_id: 1, a: "pizza"}));
-assert.writeOK(coll.insert({_id: -1, a: "pizza pizza"}));
-assert.writeOK(coll.insert({_id: 2, a: "pizza pizza pizza"}));
-assert.writeOK(coll.insert({_id: -2, a: "pizza pizza pizza pizza"}));
+assert.commandWorked(coll.insert({_id: 1, a: "pizza"}));
+assert.commandWorked(coll.insert({_id: -1, a: "pizza pizza"}));
+assert.commandWorked(coll.insert({_id: 2, a: "pizza pizza pizza"}));
+assert.commandWorked(coll.insert({_id: -2, a: "pizza pizza pizza pizza"}));
 assert.commandWorked(coll.ensureIndex({a: "text"}));
 
 //

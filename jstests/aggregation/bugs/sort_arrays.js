@@ -5,7 +5,7 @@
 
 const coll = db.foo;
 coll.drop();
-assert.writeOK(coll.insert([{_id: 2, a: [2, 3]}, {_id: 3, a: [2, 4]}, {_id: 4, a: [2, 1]}]));
+assert.commandWorked(coll.insert([{_id: 2, a: [2, 3]}, {_id: 3, a: [2, 4]}, {_id: 4, a: [2, 1]}]));
 const expectedOrder = [{_id: 4, a: [2, 1]}, {_id: 2, a: [2, 3]}, {_id: 3, a: [2, 4]}];
 
 assert.eq(coll.aggregate([{$sort: {a: 1, _id: 1}}]).toArray(), expectedOrder);

@@ -73,7 +73,7 @@ rs.awaitSecondaryNodes();
 var mId = rs.getNodeId(master);
 var slave = rs._slaves[0];
 assert.eq(1, master.getDB("admin").auth("foo", "bar"));
-assert.writeOK(master.getDB("test").foo.insert(
+assert.commandWorked(master.getDB("test").foo.insert(
     {x: 1}, {writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 
 print("try some legal and illegal reads");
@@ -110,7 +110,7 @@ var bulk = master.getDB("test").foo.initializeUnorderedBulkOp();
 for (var i = 0; i < 1000; i++) {
     bulk.insert({x: i, foo: "bar"});
 }
-assert.writeOK(bulk.execute({w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}));
+assert.commandWorked(bulk.execute({w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}));
 
 print("fail over");
 rs.stop(mId);
@@ -123,7 +123,7 @@ bulk = master.getDB("test").foo.initializeUnorderedBulkOp();
 for (var i = 0; i < 1000; i++) {
     bulk.insert({x: i, foo: "bar"});
 }
-assert.writeOK(bulk.execute({w: 2}));
+assert.commandWorked(bulk.execute({w: 2}));
 
 print("resync");
 rs.restart(mId, {"keyFile": key1_600});

@@ -25,7 +25,7 @@ const initialDoc = {
     _id: "pretransaction1",
     x: 0
 };
-assert.writeOK(sessionColl.insert(initialDoc, {writeConcern: {w: "majority"}}));
+assert.commandWorked(sessionColl.insert(initialDoc, {writeConcern: {w: "majority"}}));
 
 jsTest.log("Start a transaction with a read");
 

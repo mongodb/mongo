@@ -309,7 +309,7 @@ function RollbackTest(name = "RollbackTest", replSet) {
 
         // Insert one document to ensure rollback will not be skipped.
         let dbName = "EnsureThereIsAtLeastOneOperationToRollback";
-        assert.writeOK(curPrimary.getDB(dbName).ensureRollback.insert(
+        assert.commandWorked(curPrimary.getDB(dbName).ensureRollback.insert(
             {thisDocument: 'is inserted to ensure rollback is not skipped'}));
 
         log(`Isolating the primary ${curPrimary.host} so it will step down`);

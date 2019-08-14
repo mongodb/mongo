@@ -10,7 +10,7 @@ var db1 = conn1.getDB("testDB");
 
 var numObjs = 3;
 for (var i = 0; i < numObjs; i++) {
-    assert.writeOK(db1.foo.save({a: i}));
+    assert.commandWorked(db1.foo.save({a: i}));
 }
 
 var configDB = s.s.getDB('config');
@@ -29,10 +29,10 @@ assert.eq(1024, newShardDoc.maxSize);
 var conn2 = MongoRunner.runMongod({'shardsvr': ""});
 
 var db2 = conn2.getDB("otherDB");
-assert.writeOK(db2.foo.save({a: 1}));
+assert.commandWorked(db2.foo.save({a: 1}));
 
 var db3 = conn2.getDB("testDB");
-assert.writeOK(db3.foo.save({a: 1}));
+assert.commandWorked(db3.foo.save({a: 1}));
 
 s.config.databases.find().forEach(printjson);
 

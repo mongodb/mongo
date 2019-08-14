@@ -17,7 +17,7 @@ testDB.setProfilingLevel(2);
 //
 coll.drop();
 for (var i = 0; i < 3; i++) {
-    assert.writeOK(coll.insert({_id: i, a: i, b: [0]}));
+    assert.commandWorked(coll.insert({_id: i, a: i, b: [0]}));
 }
 assert.commandWorked(coll.createIndex({b: 1}));
 
@@ -53,7 +53,7 @@ assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 //
 coll.drop();
 for (var i = 0; i < 3; i++) {
-    assert.writeOK(coll.insert({_id: i, a: i}));
+    assert.commandWorked(coll.insert({_id: i, a: i}));
 }
 
 assert.eq({_id: 2, a: 2}, coll.findAndModify({query: {a: 2}, remove: true}));
@@ -75,7 +75,7 @@ assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 //
 coll.drop();
 for (var i = 0; i < 3; i++) {
-    assert.writeOK(coll.insert({_id: i, a: i}));
+    assert.commandWorked(coll.insert({_id: i, a: i}));
 }
 
 assert.eq({_id: 4, a: 1},
@@ -100,7 +100,7 @@ assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 //
 coll.drop();
 for (var i = 0; i < 3; i++) {
-    assert.writeOK(coll.insert({_id: i, a: i}));
+    assert.commandWorked(coll.insert({_id: i, a: i}));
 }
 
 assert.eq({_id: 2, a: 2}, coll.findAndModify({query: {_id: 2}, update: {$inc: {b: 1}}}));
@@ -117,7 +117,7 @@ assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 //
 coll.drop();
 for (var i = 0; i < 3; i++) {
-    assert.writeOK(coll.insert({_id: i, a: i}));
+    assert.commandWorked(coll.insert({_id: i, a: i}));
 }
 
 assert.eq({a: 2},
@@ -139,7 +139,7 @@ assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 //
 coll.drop();
 for (var i = 0; i < 3; i++) {
-    assert.writeOK(coll.insert({_id: i, a: i}));
+    assert.commandWorked(coll.insert({_id: i, a: i}));
 }
 
 assert.eq({a: 2}, coll.findAndModify({query: {a: 2}, remove: true, fields: {_id: 0, a: 1}}));
@@ -157,7 +157,7 @@ assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 //
 coll.drop();
 for (var i = 0; i < 3; i++) {
-    assert.writeOK(coll.insert({_id: i, a: i}));
+    assert.commandWorked(coll.insert({_id: i, a: i}));
 }
 
 assert.eq({_id: 0, a: 0},
@@ -174,7 +174,7 @@ coll.drop();
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({b: 1}));
 for (i = 0; i < 5; ++i) {
-    assert.writeOK(coll.insert({a: i, b: i}));
+    assert.commandWorked(coll.insert({a: i, b: i}));
 }
 
 coll.findAndModify({query: {a: 3, b: 3}, update: {$set: {c: 1}}});

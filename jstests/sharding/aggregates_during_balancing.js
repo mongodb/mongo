@@ -46,7 +46,7 @@ for (i = 0; i < nItems; ++i) {
         filler: "0123456789012345678901234567890123456789"
     });
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 jsTestLog('a project and group in shards, result combined in mongos');
 var a1 = db.ts1
@@ -200,7 +200,7 @@ assert.eq(db.ts1.find().sort({_id: 1}).toArray(), outCollection.find().sort({_id
 assert.commandFailed(
     db.runCommand({aggregate: outCollection.getName(), pipeline: [{$out: db.ts1.getName()}]}));
 
-assert.writeOK(db.literal.save({dollar: false}));
+assert.commandWorked(db.literal.save({dollar: false}));
 
 result =
     db.literal

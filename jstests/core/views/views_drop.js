@@ -14,7 +14,7 @@ let viewsDB = db.getSiblingDB(viewsDBName);
 viewsDB.dropDatabase();
 
 // Create collection and a view on it.
-assert.writeOK(viewsDB.coll.insert({x: 1}));
+assert.commandWorked(viewsDB.coll.insert({x: 1}));
 assert.commandWorked(viewsDB.createView("view", "coll", []));
 assert.eq(
     viewsDB.view.find({}, {_id: 0}).toArray(), [{x: 1}], "couldn't find expected doc in view");

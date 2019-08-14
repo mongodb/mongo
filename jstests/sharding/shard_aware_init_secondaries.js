@@ -37,7 +37,7 @@ var shardIdentityQuery = {
 var shardIdentityUpdate = {
     $set: {configsvrConnectionString: shardIdentityDoc.configsvrConnectionString}
 };
-assert.writeOK(priConn.getDB('admin').system.version.update(
+assert.commandWorked(priConn.getDB('admin').system.version.update(
     shardIdentityQuery, shardIdentityUpdate, {upsert: true, writeConcern: {w: 2}}));
 
 var secConn = replTest.getSecondary();

@@ -46,7 +46,7 @@ var $config = (function() {
         insertDocs: function insertDocs(db, collName) {
             for (let i = 0; i < this.numDocsToInsertPerThread; ++i) {
                 const res = db[collName].insert({value: this.valueToBeInserted});
-                assertWhenOwnColl.writeOK(res);
+                assertWhenOwnColl.commandWorked(res);
                 assertWhenOwnColl.eq(1, res.nInserted);
             }
         },
@@ -146,7 +146,7 @@ var $config = (function() {
         assertWhenOwnColl.commandWorked(db.runCommand({create: collName}));
         for (let i = 0; i < this.numIds; ++i) {
             const res = db[collName].insert({_id: i, value: this.valueToBeInserted});
-            assert.writeOK(res);
+            assert.commandWorked(res);
             assert.eq(1, res.nInserted);
         }
     }

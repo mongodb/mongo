@@ -216,7 +216,8 @@ for (var i = 0; i < types.length; i++) {
     assert.eq(1, c.find({xx: {$exists: true}}).count(), curT.name + " xx 2 ");
     assert.eq(curT.values[3], getKey(c.findOne({xx: 17})), curT.name + " xx 3 ");
 
-    assert.writeOK(c.update(makeObjectDotted(curT.values[3]), {$set: {xx: 17}}, {upsert: true}));
+    assert.commandWorked(
+        c.update(makeObjectDotted(curT.values[3]), {$set: {xx: 17}}, {upsert: true}));
 
     assert.commandWorked(c.ensureIndex({_id: 1}));
 

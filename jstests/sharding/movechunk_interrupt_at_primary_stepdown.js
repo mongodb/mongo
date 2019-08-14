@@ -23,7 +23,7 @@ assert.commandWorked(mongos.adminCommand({shardCollection: 'TestDB.TestColl', ke
 var coll = mongos.getDB('TestDB').TestColl;
 
 // We have one chunk initially
-assert.writeOK(coll.insert({Key: 0, Value: 'Test value'}));
+assert.commandWorked(coll.insert({Key: 0, Value: 'Test value'}));
 
 pauseMigrateAtStep(st.shard1, migrateStepNames.deletedPriorDataInRange);
 

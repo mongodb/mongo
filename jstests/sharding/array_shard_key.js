@@ -23,11 +23,11 @@ assert.writeError(coll.insert({i: [1, 2]}));
 assert.writeError(coll.insert({_id: [1, 2], i: 3}));
 
 // Insert an object with valid array key
-assert.writeOK(coll.insert({i: 1}));
+assert.commandWorked(coll.insert({i: 1}));
 
 // Update the value with valid other field
 value = coll.findOne({i: 1});
-assert.writeOK(coll.update(value, {$set: {j: 2}}));
+assert.commandWorked(coll.update(value, {$set: {j: 2}}));
 
 // Update the value with invalid other fields
 value = coll.findOne({i: 1});
@@ -39,7 +39,7 @@ assert.writeError(coll.update(value, Object.merge(value, {i: [3, 4]}), false, tr
 
 // Multi-update the value with other fields (won't work, but no error)
 value = coll.findOne({i: 1});
-assert.writeOK(coll.update(Object.merge(value, {i: [1, 1]}), {$set: {k: 4}}, false, true));
+assert.commandWorked(coll.update(Object.merge(value, {i: [1, 1]}), {$set: {k: 4}}, false, true));
 
 // Query the value with other fields (won't work, but no error)
 value = coll.findOne({i: 1});
@@ -51,29 +51,29 @@ coll.remove(Object.extend(value, {i: [1, 2, 3, 4]}));
 
 // Can't remove using multikey, but shouldn't error
 value = coll.findOne({i: 1});
-assert.writeOK(coll.remove(Object.extend(value, {i: [1, 2, 3, 4, 5]})));
+assert.commandWorked(coll.remove(Object.extend(value, {i: [1, 2, 3, 4, 5]})));
 assert.eq(coll.find().itcount(), 1);
 
 value = coll.findOne({i: 1});
-assert.writeOK(coll.remove(Object.extend(value, {i: 1})));
+assert.commandWorked(coll.remove(Object.extend(value, {i: 1})));
 assert.eq(coll.find().itcount(), 0);
 
 coll.ensureIndex({_id: 1, i: 1, j: 1});
 // Can insert document that will make index into a multi-key as long as it's not part of shard
 // key.
 coll.remove({});
-assert.writeOK(coll.insert({i: 1, j: [1, 2]}));
+assert.commandWorked(coll.insert({i: 1, j: [1, 2]}));
 assert.eq(coll.find().itcount(), 1);
 
 // Same is true for updates.
 coll.remove({});
 coll.insert({_id: 1, i: 1});
-assert.writeOK(coll.update({_id: 1, i: 1}, {_id: 1, i: 1, j: [1, 2]}));
+assert.commandWorked(coll.update({_id: 1, i: 1}, {_id: 1, i: 1, j: [1, 2]}));
 assert.eq(coll.find().itcount(), 1);
 
 // Same for upserts.
 coll.remove({});
-assert.writeOK(coll.update({_id: 1, i: 1}, {_id: 1, i: 1, j: [1, 2]}, true));
+assert.commandWorked(coll.update({_id: 1, i: 1}, {_id: 1, i: 1, j: [1, 2]}, true));
 assert.eq(coll.find().itcount(), 1);
 
 printjson("Sharding-then-inserting-multikey tested, now trying inserting-then-sharding-multikey");
@@ -82,7 +82,7 @@ printjson("Sharding-then-inserting-multikey tested, now trying inserting-then-sh
 var coll = mongos.getCollection("" + coll + "2");
 for (var i = 0; i < 10; i++) {
     // TODO : does not check weird cases like [ i, i ]
-    assert.writeOK(coll.insert({i: [i, i + 1]}));
+    assert.commandWorked(coll.insert({i: [i, i + 1]}));
 }
 
 coll.ensureIndex({_id: 1, i: 1});
@@ -99,7 +99,7 @@ st.printShardingStatus();
 var coll = mongos.getCollection("" + coll + "3");
 for (var i = 0; i < 10; i++) {
     // TODO : does not check weird cases like [ i, i ]
-    assert.writeOK(coll.insert({i: i}));
+    assert.commandWorked(coll.insert({i: i}));
 }
 
 coll.ensureIndex({_id: 1, i: 1});

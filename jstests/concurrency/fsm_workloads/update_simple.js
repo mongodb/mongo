@@ -37,7 +37,7 @@ var $config = (function() {
             // make sure the inserted docs have a 'value' field, so they won't need
             // to grow when this workload runs against a capped collection
             var res = db[collName].insert({_id: i, value: 0});
-            assertWhenOwnColl.writeOK(res);
+            assertWhenOwnColl.commandWorked(res);
             assertWhenOwnColl.eq(1, res.nInserted);
         }
     }

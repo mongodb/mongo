@@ -5,8 +5,8 @@
 const coll = db.jstests_sortc;
 coll.drop();
 
-assert.writeOK(coll.insert({a: 1}));
-assert.writeOK(coll.insert({a: 2}));
+assert.commandWorked(coll.insert({a: 1}));
+assert.commandWorked(coll.insert({a: 2}));
 
 function checkA(a, sort, skip, query) {
     query = query || {};

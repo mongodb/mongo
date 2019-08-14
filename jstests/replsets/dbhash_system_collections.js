@@ -10,14 +10,14 @@ var primary = rst.getPrimary();
 var secondary = rst.getSecondary();
 
 var testDB = primary.getDB('test');
-assert.writeOK(testDB.system.users.insert({users: 1}));
-assert.writeOK(testDB.system.js.insert({js: 1}));
+assert.commandWorked(testDB.system.users.insert({users: 1}));
+assert.commandWorked(testDB.system.js.insert({js: 1}));
 
 var adminDB = primary.getDB('admin');
-assert.writeOK(adminDB.system.roles.insert({roles: 1}));
-assert.writeOK(adminDB.system.version.insert({version: 1}));
-assert.writeOK(adminDB.system.new_users.insert({new_users: 1}));
-assert.writeOK(adminDB.system.backup_users.insert({backup_users: 1}));
+assert.commandWorked(adminDB.system.roles.insert({roles: 1}));
+assert.commandWorked(adminDB.system.version.insert({version: 1}));
+assert.commandWorked(adminDB.system.new_users.insert({new_users: 1}));
+assert.commandWorked(adminDB.system.backup_users.insert({backup_users: 1}));
 
 rst.awaitReplication();
 

@@ -7,7 +7,7 @@ col.drop();
 
 // Insert some sample data.
 
-assert.writeOK(col.insert([
+assert.commandWorked(col.insert([
     {'decimal': NumberDecimal('0')},
     {'decimal': NumberDecimal('0.00')},
     {'decimal': NumberDecimal('-0')},
@@ -20,7 +20,7 @@ assert.writeOK(col.insert([
     {'decimal': NumberDecimal('Infinity')},
     {'decimal': NumberDecimal('-Infinity')},
 ]),
-               'Initial insertion failed');
+                     'Initial insertion failed');
 
 assert.eq(col.find({'decimal': {$eq: NumberDecimal('1')}}).count(), '2');
 assert.eq(col.find({'decimal': {$lt: NumberDecimal('1.00000000000001')}}).count(), 6);
@@ -36,7 +36,7 @@ assert.eq(
 
 // Test $mod
 col.drop();
-assert.writeOK(col.insert([
+assert.commandWorked(col.insert([
     {'decimal': NumberDecimal('0')},
     {'decimal': NumberDecimal('0.00')},
     {'decimal': NumberDecimal('-0')},
@@ -44,6 +44,6 @@ assert.writeOK(col.insert([
     {'decimal': NumberDecimal('1.00')},
     {'decimal': NumberDecimal('2.00')},
 ]),
-               '2 insertion failed');
+                     '2 insertion failed');
 assert.eq(col.find({'decimal': {$mod: [2, 0]}}).count(), 4, "$mod count incorrect");
 }());

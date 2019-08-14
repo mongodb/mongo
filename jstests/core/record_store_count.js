@@ -12,8 +12,8 @@ load("jstests/libs/fixture_helpers.js");  // For isMongos and isSharded.
 var coll = db.record_store_count;
 coll.drop();
 
-assert.writeOK(coll.insert({x: 0}));
-assert.writeOK(coll.insert({x: 1}));
+assert.commandWorked(coll.insert({x: 0}));
+assert.commandWorked(coll.insert({x: 1}));
 
 assert.commandWorked(coll.ensureIndex({x: 1}));
 

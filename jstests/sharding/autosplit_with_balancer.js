@@ -23,7 +23,7 @@ for (var j = 0; j < 30; j++) {
             bulk.insert({num: i, s: bigString});
             i++;
         }
-        assert.writeOK(bulk.execute());
+        assert.commandWorked(bulk.execute());
     }));
 }
 

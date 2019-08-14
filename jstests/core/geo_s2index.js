@@ -106,11 +106,11 @@ res = t.insert({
 assert.writeError(res);
 assert.eq(0, t.find().itcount());
 res = t.insert({loc: {type: 'Point', coordinates: [40, 5]}});
-assert.writeOK(res);
+assert.commandWorked(res);
 res = t.insert({
     loc: {type: 'Point', coordinates: [40, 5], crs: {type: 'name', properties: {name: 'EPSG:4326'}}}
 });
-assert.writeOK(res);
+assert.commandWorked(res);
 res = t.insert({
     loc: {
         type: 'Point',
@@ -118,7 +118,7 @@ res = t.insert({
         crs: {type: 'name', properties: {name: 'urn:ogc:def:crs:OGC:1.3:CRS84'}}
     }
 });
-assert.writeOK(res);
+assert.commandWorked(res);
 
 // We can pass level parameters and we verify that they're valid.
 // 0 <= coarsestIndexedLevel <= finestIndexedLevel <= 30.

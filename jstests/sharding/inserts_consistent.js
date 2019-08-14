@@ -31,13 +31,13 @@ jsTest.log("Inserting docs that needs to be retried...");
 var nextId = -1;
 for (var i = 0; i < 2; i++) {
     printjson("Inserting " + nextId);
-    assert.writeOK(collB.insert({_id: nextId--, hello: "world"}));
+    assert.commandWorked(collB.insert({_id: nextId--, hello: "world"}));
 }
 
 jsTest.log("Inserting doc which successfully goes through...");
 
 // Do second write
-assert.writeOK(collB.insert({_id: nextId--, goodbye: "world"}));
+assert.commandWorked(collB.insert({_id: nextId--, goodbye: "world"}));
 
 // Assert that write went through
 assert.eq(coll.find().itcount(), 3);
@@ -60,7 +60,7 @@ printjson(adminB.runCommand({flushRouterConfig: 1}));
 jsTest.log("Inserting second doc which successfully goes through...");
 
 // Do second write
-assert.writeOK(collB.insert({_id: nextId--, goodbye: "world"}));
+assert.commandWorked(collB.insert({_id: nextId--, goodbye: "world"}));
 
 jsTest.log("All docs written this time!");
 

@@ -15,7 +15,8 @@ enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
 // Set up two unsharded collections in different databases with shard0 as their primary.
 
-assert.writeOK(st.s.getDB(dbName)[collName].insert({_id: 0}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: 0}, {writeConcern: {w: "majority"}}));
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
@@ -45,7 +46,8 @@ session.startTransaction();
 const dbName2 = "test2";
 const sessionDB2 = session.getDatabase(dbName2);
 
-assert.writeOK(st.s.getDB(dbName2)[collName].insert({_id: 0}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.getDB(dbName2)[collName].insert({_id: 0}, {writeConcern: {w: "majority"}}));
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName2}));
 st.ensurePrimaryShard(dbName2, st.shard1.shardName);
 
@@ -70,7 +72,7 @@ assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.N
 const otherDbName = "other_test";
 const otherCollName = "bar";
 
-assert.writeOK(
+assert.commandWorked(
     st.s.getDB(otherDbName)[otherCollName].insert({_id: 0}, {writeConcern: {w: "majority"}}));
 assert.commandWorked(st.s.adminCommand({enableSharding: otherDbName}));
 st.ensurePrimaryShard(otherDbName, st.shard0.shardName);
@@ -80,7 +82,7 @@ const sessionOtherDB = session.getDatabase(otherDbName);
 // Advance the router's cached last committed opTime for Shard0, so it chooses a read timestamp
 // after the collection is created on shard1, to avoid SnapshotUnavailable.
 assert.commandWorked(sessionOtherDB.runCommand({find: otherCollName}));  // Not database versioned.
-assert.writeOK(sessionDB[collName].insert({_id: 1}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(sessionDB[collName].insert({_id: 1}, {writeConcern: {w: "majority"}}));
 
 session.startTransaction();
 

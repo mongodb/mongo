@@ -16,8 +16,8 @@ var db = st.s0.getDB('TestDB');
 var coll = db.TestColl;
 
 // Insert documents for the test
-assert.writeOK(coll.insert({x: 1, value: 'Test value 1'}));
-assert.writeOK(coll.insert({x: 2, value: 'Test value 2'}));
+assert.commandWorked(coll.insert({x: 1, value: 'Test value 1'}));
+assert.commandWorked(coll.insert({x: 2, value: 'Test value 2'}));
 
 // Establish a cursor on the primary (by not using slaveOk read)
 var findCursor = assert.commandWorked(db.runCommand({find: 'TestColl', batchSize: 1})).cursor;

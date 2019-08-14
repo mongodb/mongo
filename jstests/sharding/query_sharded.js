@@ -11,7 +11,7 @@ var coll = mongos.getCollection("foo.bar");
 //
 // Ensure we can't use exhaust option through mongos
 coll.remove({});
-assert.writeOK(coll.insert({a: 'b'}));
+assert.commandWorked(coll.insert({a: 'b'}));
 var query = coll.find({});
 assert.neq(null, query.next());
 query = coll.find({}).addOption(DBQuery.Option.exhaust);
@@ -23,7 +23,7 @@ assert.throws(function() {
 //
 // Ensure we can't trick mongos by inserting exhaust option on a command through mongos
 coll.remove({});
-assert.writeOK(coll.insert({a: 'b'}));
+assert.commandWorked(coll.insert({a: 'b'}));
 var cmdColl = mongos.getCollection(coll.getDB().toString() + ".$cmd");
 var cmdQuery = cmdColl.find({ping: 1}).limit(1);
 assert.commandWorked(cmdQuery.next());

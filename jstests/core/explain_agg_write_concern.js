@@ -20,7 +20,7 @@ let outColl = db[collName + "_out"];
 coll.drop();
 outColl.drop();
 
-assert.writeOK(coll.insert({_id: 1}));
+assert.commandWorked(coll.insert({_id: 1}));
 
 // Agg should accept write concern if the last stage is a $out.
 assert.commandWorked(db.runCommand({

@@ -38,7 +38,7 @@ for (var j = 0; j < 100; j++) {
         bulk.insert({i: idInc++, val: valInc++, y: str});
     }
 }
-assert.writeOK(bulk.execute({w: 2, wtimeout: 10 * 60 * 1000}));
+assert.commandWorked(bulk.execute({w: 2, wtimeout: 10 * 60 * 1000}));
 
 jsTest.log("Documents inserted, doing double-checks of insert...");
 
@@ -126,7 +126,7 @@ for (var j = 0; j < 100; j++) {
     for (i = 0; i < 512; i++) {
         bulk.insert({i: idInc++, val: valInc++, y: str});
     }
-    assert.writeOK(bulk.execute({w: 2, wtimeout: 10 * 60 * 1000}));
+    assert.commandWorked(bulk.execute({w: 2, wtimeout: 10 * 60 * 1000}));
 }
 
 jsTest.log("No errors...");

@@ -10,10 +10,10 @@ var mongosB = st.s1;
 jsTest.log("Adding new collections...");
 
 var collA = mongosA.getCollection(jsTestName() + ".coll");
-assert.writeOK(collA.insert({hello: "world"}));
+assert.commandWorked(collA.insert({hello: "world"}));
 
 var collB = mongosB.getCollection("" + collA);
-assert.writeOK(collB.insert({hello: "world"}));
+assert.commandWorked(collB.insert({hello: "world"}));
 
 jsTest.log("Enabling sharding...");
 
@@ -26,7 +26,7 @@ collA.findOne();
 
 jsTest.log("Trigger shard version mismatch...");
 
-assert.writeOK(collB.insert({goodbye: "world"}));
+assert.commandWorked(collB.insert({goodbye: "world"}));
 
 print("Inserted...");
 

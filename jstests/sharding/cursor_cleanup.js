@@ -27,8 +27,8 @@ for (var i = -150; i < 150; i++) {
     bulk.insert({_id: i});
     bulk2.insert({_id: i});
 }
-assert.writeOK(bulk.execute());
-assert.writeOK(bulk2.execute());
+assert.commandWorked(bulk.execute());
+assert.commandWorked(bulk2.execute());
 
 jsTest.log("Open a cursor to a sharded and unsharded collection.");
 

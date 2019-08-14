@@ -136,7 +136,7 @@ assertIndexesCreated(
     () => coll.createIndex({a: 1},
                            {name: "caseInsensitive", collation: {locale: "en_US", strength: 2}}));
 
-assert.writeOK(coll.insert([{a: "a"}, {a: "A"}, {a: 20}]));
+assert.commandWorked(coll.insert([{a: "a"}, {a: "A"}, {a: 20}]));
 
 // An ambiguous hint pattern fails.
 assert.throws(() => coll.find({a: 1}).hint({a: 1}).itcount());

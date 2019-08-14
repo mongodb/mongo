@@ -43,7 +43,8 @@ for (var i = 0; i < numCollectionsToCreate; i++) {
 
     // Insert a single document with a 'date' field that is already expired according to the
     // index definition.
-    assert.writeOK(testDB[collName].insert({date: new Date(now - expireAfterSeconds * 1000)}));
+    assert.commandWorked(
+        testDB[collName].insert({date: new Date(now - expireAfterSeconds * 1000)}));
 }
 
 // Increase the verbosity of the TTL monitor's output.

@@ -30,7 +30,7 @@ var bulk = s.s0.getDB('TestDB').TestColl.initializeUnorderedBulkOp();
 for (var i = 0; i < 2100; i++) {
     bulk.insert({_id: i, x: i});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 assert.commandWorked(s.s0.adminCommand({enablesharding: 'TestDB'}));
 s.ensurePrimaryShard('TestDB', s.shard0.shardName);

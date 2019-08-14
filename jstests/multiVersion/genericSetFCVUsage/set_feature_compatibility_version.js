@@ -120,7 +120,7 @@ MongoRunner.stopMongod(conn);
 conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: lastStable});
 assert.neq(
     null, conn, "mongod was unable to start up with version=" + lastStable + " and no data files");
-assert.writeOK(conn.getDB("test").coll.insert({a: 5}));
+assert.commandWorked(conn.getDB("test").coll.insert({a: 5}));
 adminDB = conn.getDB("admin");
 checkFCV(adminDB, lastStableFCV);
 MongoRunner.stopMongod(conn);
@@ -227,7 +227,7 @@ replSetConfig.members[2].priority = 0;
 reconfig(rst, replSetConfig);
 
 // Verify that the 'lastStable' secondary successfully performed its initial sync.
-assert.writeOK(
+assert.commandWorked(
     primaryAdminDB.getSiblingDB("test").coll.insert({awaitRepl: true}, {writeConcern: {w: 3}}));
 
 // Test that a 'lastStable' secondary can no longer replicate from the primary after the FCV is
@@ -238,7 +238,7 @@ stopServerReplication(secondary);
 assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 restartServerReplication(secondary);
 checkFCV(secondaryAdminDB, lastStableFCV);
-assert.writeOK(primaryAdminDB.getSiblingDB("test").coll.insert({shouldReplicate: false}));
+assert.commandWorked(primaryAdminDB.getSiblingDB("test").coll.insert({shouldReplicate: false}));
 assert.eq(secondaryAdminDB.getSiblingDB("test").coll.find({shouldReplicate: false}).itcount(), 0);
 rst.stopSet();
 
@@ -257,7 +257,7 @@ secondary = rst.add({binVersion: lastStable});
 rst.reInitiate();
 
 // Ensure the 'lastStable' binary node succeeded its initial sync.
-assert.writeOK(primary.getDB("test").coll.insert({awaitRepl: true}, {writeConcern: {w: 3}}));
+assert.commandWorked(primary.getDB("test").coll.insert({awaitRepl: true}, {writeConcern: {w: 3}}));
 
 // Run {setFCV: lastStableFCV}. This should be idempotent.
 assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));

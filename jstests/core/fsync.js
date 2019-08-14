@@ -36,7 +36,7 @@ var fsyncLockDB = db.getSisterDB('fsyncLockTestDB');
 fsyncLockDB.dropDatabase();
 
 // Test that a single, regular write works as expected.
-assert.writeOK(fsyncLockDB.coll.insert({x: 1}));
+assert.commandWorked(fsyncLockDB.coll.insert({x: 1}));
 
 // Test that fsyncLock doesn't work unless invoked against the admin DB.
 var resFail = fsyncLockDB.runCommand({fsync: 1, lock: 1});
@@ -64,7 +64,7 @@ assert(db.currentOp().fsyncLock == null, "fsyncUnlock is not null in db.currentO
 
 // Make sure the db is unlocked and the initial write made it through.
 writeOpHandle();
-assert.writeOK(fsyncLockDB.coll.insert({x: 2}));
+assert.commandWorked(fsyncLockDB.coll.insert({x: 2}));
 
 assert.eq(3, fsyncLockDB.coll.count({}));
 

@@ -7,7 +7,7 @@ col.drop();
 
 // Insert some sample data.
 
-assert.writeOK(col.insert([
+assert.commandWorked(col.insert([
     {"decimal": NumberDecimal("0")},
     {"decimal": NumberDecimal("0.00")},
     {"decimal": NumberDecimal("-0")},
@@ -20,7 +20,7 @@ assert.writeOK(col.insert([
     {"decimal": NumberDecimal("-Infinity")},
     {"decimal": NumberDecimal("Infinity")},
 ]),
-               "Initial insertion of decimals failed");
+                     "Initial insertion of decimals failed");
 
 // Zeros
 assert.eq(col.find({"decimal": NumberDecimal("0")}).count(), "3");
@@ -44,7 +44,7 @@ assert.eq(col.find({"decimal": NumberDecimal("12345678901234567890.1234567890123
 col.drop();
 
 // Maximum and Minimum Values
-assert.writeOK(col.insert([
+assert.commandWorked(col.insert([
     {"max": NumberDecimal("9999999999999999999999999999999999E6111")},
     {"min": NumberDecimal("1E-6176")}
 ]));

@@ -5,19 +5,19 @@ var coll = db.is_array_expr;
 coll.drop();
 
 // Non-array types.
-assert.writeOK(coll.insert({_id: 0, x: 0}));
-assert.writeOK(coll.insert({_id: 1, x: '0'}));
-assert.writeOK(coll.insert({_id: 2, x: new ObjectId()}));
-assert.writeOK(coll.insert({_id: 3, x: new NumberLong(0)}));
-assert.writeOK(coll.insert({_id: 4, x: {y: []}}));
-assert.writeOK(coll.insert({_id: 5, x: null}));
-assert.writeOK(coll.insert({_id: 6, x: NaN}));
-assert.writeOK(coll.insert({_id: 7, x: undefined}));
+assert.commandWorked(coll.insert({_id: 0, x: 0}));
+assert.commandWorked(coll.insert({_id: 1, x: '0'}));
+assert.commandWorked(coll.insert({_id: 2, x: new ObjectId()}));
+assert.commandWorked(coll.insert({_id: 3, x: new NumberLong(0)}));
+assert.commandWorked(coll.insert({_id: 4, x: {y: []}}));
+assert.commandWorked(coll.insert({_id: 5, x: null}));
+assert.commandWorked(coll.insert({_id: 6, x: NaN}));
+assert.commandWorked(coll.insert({_id: 7, x: undefined}));
 
 // Array types.
-assert.writeOK(coll.insert({_id: 8, x: []}));
-assert.writeOK(coll.insert({_id: 9, x: [0]}));
-assert.writeOK(coll.insert({_id: 10, x: ['0']}));
+assert.commandWorked(coll.insert({_id: 8, x: []}));
+assert.commandWorked(coll.insert({_id: 9, x: [0]}));
+assert.commandWorked(coll.insert({_id: 10, x: ['0']}));
 
 // Project field is_array to represent whether the field x was an array.
 var results = coll.aggregate([

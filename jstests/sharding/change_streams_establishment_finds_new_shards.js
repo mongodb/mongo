@@ -68,8 +68,8 @@ assert(!changeStream.hasNext(), "Do not expect any results yet");
 awaitNewShard();
 
 // Insert two documents in different shards.
-assert.writeOK(mongosColl.insert({_id: 0}, {writeConcern: {w: "majority"}}));
-assert.writeOK(mongosColl.insert({_id: 20}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: 0}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: 20}, {writeConcern: {w: "majority"}}));
 
 // Expect to see them both.
 for (let id of [0, 20]) {

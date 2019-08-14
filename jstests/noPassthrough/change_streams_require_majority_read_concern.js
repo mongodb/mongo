@@ -49,7 +49,7 @@ function assertNextBatchIsEmpty(cursor) {
 
 // Test read concerns other than "majority" are not supported.
 const primaryColl = db.foo;
-assert.writeOK(primaryColl.insert({_id: 1}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(primaryColl.insert({_id: 1}, {writeConcern: {w: "majority"}}));
 let res = primaryColl.runCommand({
     aggregate: primaryColl.getName(),
     pipeline: [{$changeStream: {}}],
@@ -81,7 +81,7 @@ let cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collecti
 assert.eq(cursor.firstBatch.length, 0);
 
 // Insert a document on the primary only.
-assert.writeOK(primaryColl.insert({_id: 2}, {writeConcern: {w: 1}}));
+assert.commandWorked(primaryColl.insert({_id: 2}, {writeConcern: {w: 1}}));
 assertNextBatchIsEmpty(cursor);
 
 // Restart data replicaiton and wait until the new write becomes visible.

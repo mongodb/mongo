@@ -72,10 +72,10 @@ assert.gte(bsonWoCompare({shardKey: "abc"}, {shardKey: "aBC"}), 1);
 // know the update lookup will use both the _id and the shard key, and we want to make sure it
 // is only targeting a single shard. Also note that _id is a string, since we want to make sure
 // the _id index can only be used if we are using the collection's default collation.
-assert.writeOK(mongosColl.insert({_id: "abc_1", shardKey: "ABC"}));
-assert.writeOK(mongosColl.insert({_id: "abc_2", shardKey: "ABC"}));
-assert.writeOK(mongosColl.insert({_id: "abc_1", shardKey: "abc"}));
-assert.writeOK(mongosColl.insert({_id: "abc_2", shardKey: "abc"}));
+assert.commandWorked(mongosColl.insert({_id: "abc_1", shardKey: "ABC"}));
+assert.commandWorked(mongosColl.insert({_id: "abc_2", shardKey: "ABC"}));
+assert.commandWorked(mongosColl.insert({_id: "abc_1", shardKey: "abc"}));
+assert.commandWorked(mongosColl.insert({_id: "abc_2", shardKey: "abc"}));
 
 // Verify that the post-change lookup uses the simple collation to target to a single shard,
 // then uses the collection-default collation to perform the lookup on the shard.
@@ -128,10 +128,10 @@ const strengthOneCollation = {
 
 // Insert some documents that might be confused with existing documents under the change
 // stream's collation, but should not be confused during the update lookup.
-assert.writeOK(mongosColl.insert({_id: "abç_1", shardKey: "ABÇ"}));
-assert.writeOK(mongosColl.insert({_id: "abç_2", shardKey: "ABÇ"}));
-assert.writeOK(mongosColl.insert({_id: "abç_1", shardKey: "abç"}));
-assert.writeOK(mongosColl.insert({_id: "abç_2", shardKey: "abç"}));
+assert.commandWorked(mongosColl.insert({_id: "abç_1", shardKey: "ABÇ"}));
+assert.commandWorked(mongosColl.insert({_id: "abç_2", shardKey: "ABÇ"}));
+assert.commandWorked(mongosColl.insert({_id: "abç_1", shardKey: "abç"}));
+assert.commandWorked(mongosColl.insert({_id: "abç_2", shardKey: "abç"}));
 
 assert.eq(mongosColl.find({shardKey: "abc"}).collation(strengthOneCollation).itcount(), 8);
 

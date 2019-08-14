@@ -71,7 +71,7 @@ function runTest(st, collName, numShardsToError, errorCode, isSharded) {
 
         // Clean up after insert to avoid duplicate key errors.
         if (commandName === "insert") {
-            assert.writeOK(sessionDB[collName].remove({_id: {$in: [1, 11]}}));
+            assert.commandWorked(sessionDB[collName].remove({_id: {$in: [1, 11]}}));
         }
 
         //
@@ -89,7 +89,7 @@ function runTest(st, collName, numShardsToError, errorCode, isSharded) {
 
         // Clean up after insert to avoid duplicate key errors.
         if (commandName === "insert") {
-            assert.writeOK(sessionDB[collName].remove({_id: {$in: [1, 11]}}));
+            assert.commandWorked(sessionDB[collName].remove({_id: {$in: [1, 11]}}));
         }
 
         //
@@ -118,7 +118,8 @@ enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
 jsTestLog("Unsharded transaction");
 
-assert.writeOK(st.s.getDB(dbName)[collName].insert({_id: 5}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: 5}, {writeConcern: {w: "majority"}}));
 st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
 for (let errorCode of kSnapshotErrors) {
@@ -132,7 +133,8 @@ st.ensurePrimaryShard(dbName, st.shard0.shardName);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 10}}));
-assert.writeOK(st.s.getDB(dbName)[collName].insert({_id: 15}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: 15}, {writeConcern: {w: "majority"}}));
 
 jsTestLog("One shard sharded transaction");
 

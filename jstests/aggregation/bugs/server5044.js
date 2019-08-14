@@ -4,10 +4,10 @@ var t = db.server5044;
 
 function test(data, popExpected, sampExpected) {
     t.drop();
-    assert.writeOK(t.insert({}));  // need one document to ensure we get output
+    assert.commandWorked(t.insert({}));  // need one document to ensure we get output
 
     for (var i = 0; i < data.length; i++)
-        assert.writeOK(t.insert({num: data[i]}));
+        assert.commandWorked(t.insert({num: data[i]}));
 
     var res = t.aggregate({
                    $group: {

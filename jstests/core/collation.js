@@ -249,7 +249,7 @@ if (db.getMongo().useReadCommands()) {
     coll.drop();
     assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "fr_CA"}}));
     assert.commandWorked(coll.createIndex({b: 1}));
-    assert.writeOK(coll.insert({a: "foo", b: "foo"}));
+    assert.commandWorked(coll.insert({a: "foo", b: "foo"}));
     assert.eq(1, coll.find().collation({locale: "fr_CA"}).hint({a: 1}).returnKey().itcount());
     assert.neq("foo", coll.find().collation({locale: "fr_CA"}).hint({a: 1}).returnKey().next().a);
     assert.eq(1, coll.find().collation({locale: "fr_CA"}).hint({b: 1}).returnKey().itcount());
@@ -304,8 +304,8 @@ assert.eq(0, coll.aggregate([], {collation: {locale: "fr"}}).itcount());
 
 // Aggregation should return correct results when collation specified and collection does exist.
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-assert.writeOK(coll.insert({_id: 2, str: "bar"}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 2, str: "bar"}));
 assert.eq(0, coll.aggregate([{$match: {str: "FOO"}}]).itcount());
 assert.eq(1,
           coll.aggregate([{$match: {str: "FOO"}}], {collation: {locale: "en_US", strength: 2}})
@@ -316,7 +316,7 @@ assert.eq(1,
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-assert.writeOK(coll.insert({str: "foo"}));
+assert.commandWorked(coll.insert({str: "foo"}));
 assert.eq(1, coll.aggregate([{$match: {str: "FOO"}}]).itcount());
 
 // Aggregation should return correct results when "simple" collation specified and collection
@@ -324,7 +324,7 @@ assert.eq(1, coll.aggregate([{$match: {str: "FOO"}}]).itcount());
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-assert.writeOK(coll.insert({str: "foo"}));
+assert.commandWorked(coll.insert({str: "foo"}));
 assert.eq(0, coll.aggregate([{$match: {str: "FOO"}}], {collation: {locale: "simple"}}).itcount());
 
 // Aggregation should select compatible index when no collation specified and collection has a
@@ -356,8 +356,8 @@ assert.eq(0, coll.find({str: "FOO"}).collation({locale: "en_US"}).count());
 
 // Count should return correct results when collation specified and collection does exist.
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-assert.writeOK(coll.insert({_id: 2, str: "bar"}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 2, str: "bar"}));
 assert.eq(0, coll.find({str: "FOO"}).count());
 assert.eq(0, coll.find({str: "FOO"}).collation({locale: "en_US"}).count());
 assert.eq(1, coll.find({str: "FOO"}).collation({locale: "en_US", strength: 2}).count());
@@ -370,7 +370,7 @@ assert.eq(1, coll.count({str: "FOO"}, {collation: {locale: "en_US", strength: 2}
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-assert.writeOK(coll.insert({str: "foo"}));
+assert.commandWorked(coll.insert({str: "foo"}));
 assert.eq(1, coll.find({str: "FOO"}).count());
 
 // Count should return correct results when "simple" collation specified and collection has a
@@ -378,13 +378,13 @@ assert.eq(1, coll.find({str: "FOO"}).count());
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-assert.writeOK(coll.insert({str: "foo"}));
+assert.commandWorked(coll.insert({str: "foo"}));
 assert.eq(0, coll.find({str: "FOO"}).collation({locale: "simple"}).count());
 
 // Count should return correct results when collation specified and when run with explain.
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-assert.writeOK(coll.insert({_id: 2, str: "bar"}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 2, str: "bar"}));
 explainRes = coll.explain("executionStats").find({str: "FOO"}).collation({locale: "en_US"}).count();
 assert.commandWorked(explainRes);
 planStage = getPlanStage(explainRes.executionStats.executionStages, "COLLSCAN");
@@ -461,8 +461,8 @@ assert.eq(0, coll.distinct("str", {}, {collation: {locale: "en_US", strength: 2}
 
 // Distinct should return correct results when collation specified and no indexes exist.
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-assert.writeOK(coll.insert({_id: 2, str: "FOO"}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 2, str: "FOO"}));
 var res = coll.distinct("str", {}, {collation: {locale: "en_US", strength: 2}});
 assert.eq(1, res.length);
 assert.eq("foo", res[0].toLowerCase());
@@ -482,8 +482,8 @@ assert.eq(2, coll.distinct("str", {}, {collation: {locale: "en_US", strength: 3}
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-assert.writeOK(coll.insert({str: "foo"}));
-assert.writeOK(coll.insert({str: "FOO"}));
+assert.commandWorked(coll.insert({str: "foo"}));
+assert.commandWorked(coll.insert({str: "FOO"}));
 assert.eq(1, coll.distinct("str").length);
 assert.eq(2, coll.distinct("_id", {str: "foo"}).length);
 
@@ -492,8 +492,8 @@ assert.eq(2, coll.distinct("_id", {str: "foo"}).length);
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-assert.writeOK(coll.insert({str: "foo"}));
-assert.writeOK(coll.insert({str: "FOO"}));
+assert.commandWorked(coll.insert({str: "foo"}));
+assert.commandWorked(coll.insert({str: "FOO"}));
 assert.eq(2, coll.distinct("str", {}, {collation: {locale: "simple"}}).length);
 assert.eq(1, coll.distinct("_id", {str: "foo"}, {collation: {locale: "simple"}}).length);
 
@@ -588,13 +588,13 @@ if (db.getMongo().useReadCommands()) {
 
     // Find should return correct results when collation specified and filter is a match on _id.
     coll.drop();
-    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-    assert.writeOK(coll.insert({_id: 2, str: "bar"}));
-    assert.writeOK(coll.insert({_id: "foo"}));
+    assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 2, str: "bar"}));
+    assert.commandWorked(coll.insert({_id: "foo"}));
     assert.eq(0, coll.find({_id: "FOO"}).itcount());
     assert.eq(0, coll.find({_id: "FOO"}).collation({locale: "en_US"}).itcount());
     assert.eq(1, coll.find({_id: "FOO"}).collation({locale: "en_US", strength: 2}).itcount());
-    assert.writeOK(coll.remove({_id: "foo"}));
+    assert.commandWorked(coll.remove({_id: "foo"}));
 
     // Find should return correct results when collation specified and no indexes exist.
     assert.eq(0, coll.find({str: "FOO"}).itcount());
@@ -626,17 +626,17 @@ if (db.getMongo().useReadCommands()) {
     assert.eq(
         1,
         coll.find({str: "foo"}).collation({locale: "en_US", strength: 2}).hint({str: 1}).itcount());
-    assert.writeOK(coll.insert({_id: 3, str: "goo"}));
+    assert.commandWorked(coll.insert({_id: 3, str: "goo"}));
     assert.eq(
         0,
         coll.find({str: "goo"}).collation({locale: "en_US", strength: 2}).hint({str: 1}).itcount());
-    assert.writeOK(coll.remove({_id: 3}));
+    assert.commandWorked(coll.remove({_id: 3}));
     assert.commandWorked(coll.dropIndexes());
 
     // Queries that use a index with a non-matching collation should add a sort
     // stage if needed.
     coll.drop();
-    assert.writeOK(coll.insert([{a: "A"}, {a: "B"}, {a: "b"}, {a: "a"}]));
+    assert.commandWorked(coll.insert([{a: "A"}, {a: "B"}, {a: "b"}, {a: "a"}]));
 
     // Ensure results from an index that doesn't match the query collation are sorted to match
     // the requested collation.
@@ -649,7 +649,7 @@ if (db.getMongo().useReadCommands()) {
 
     // Find should return correct results when collation specified and query contains $expr.
     coll.drop();
-    assert.writeOK(coll.insert([{a: "A"}, {a: "B"}]));
+    assert.commandWorked(coll.insert([{a: "A"}, {a: "B"}]));
     assert.eq(
         1,
         coll.find({$expr: {$eq: ["$a", "a"]}}).collation({locale: "en_US", strength: 2}).itcount());
@@ -660,9 +660,9 @@ if (db.getMongo().useReadCommands()) {
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-assert.writeOK(coll.insert({str: "foo"}));
-assert.writeOK(coll.insert({str: "FOO"}));
-assert.writeOK(coll.insert({str: "bar"}));
+assert.commandWorked(coll.insert({str: "foo"}));
+assert.commandWorked(coll.insert({str: "FOO"}));
+assert.commandWorked(coll.insert({str: "bar"}));
 assert.eq(3, coll.find({str: {$in: ["foo", "bar"]}}).itcount());
 assert.eq(2, coll.find({str: "foo"}).itcount());
 assert.eq(1, coll.find({str: {$ne: "foo"}}).itcount());
@@ -674,7 +674,7 @@ assert.eq([{str: "bar"}, {str: "foo"}, {str: "FOO"}],
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-assert.writeOK(coll.insert({_id: "foo"}));
+assert.commandWorked(coll.insert({_id: "foo"}));
 assert.eq(1, coll.find({_id: "FOO"}).itcount());
 
 // Find on _id should use idhack stage when query inherits collection default collation.
@@ -690,7 +690,7 @@ assert.neq(null, planStage);
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-assert.writeOK(coll.insert([{a: "A"}, {a: "B"}]));
+assert.commandWorked(coll.insert([{a: "A"}, {a: "B"}]));
 assert.eq(1, coll.find({$expr: {$eq: ["$a", "a"]}}).itcount());
 
 if (db.getMongo().useReadCommands()) {
@@ -699,9 +699,9 @@ if (db.getMongo().useReadCommands()) {
     coll.drop();
     assert.commandWorked(
         db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-    assert.writeOK(coll.insert({str: "foo"}));
-    assert.writeOK(coll.insert({str: "FOO"}));
-    assert.writeOK(coll.insert({str: "bar"}));
+    assert.commandWorked(coll.insert({str: "foo"}));
+    assert.commandWorked(coll.insert({str: "FOO"}));
+    assert.commandWorked(coll.insert({str: "bar"}));
     assert.eq(2, coll.find({str: {$in: ["foo", "bar"]}}).collation({locale: "simple"}).itcount());
     assert.eq(1, coll.find({str: "foo"}).collation({locale: "simple"}).itcount());
     assert.eq(
@@ -713,8 +713,8 @@ if (db.getMongo().useReadCommands()) {
     coll.drop();
     assert.commandWorked(
         db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 3}}));
-    assert.writeOK(coll.insert({_id: "foo"}));
-    assert.writeOK(coll.insert({_id: "FOO"}));
+    assert.commandWorked(coll.insert({_id: "foo"}));
+    assert.commandWorked(coll.insert({_id: "FOO"}));
     assert.eq(2, coll.find({_id: "foo"}).collation({locale: "en_US", strength: 2}).itcount());
 
     // Find on _id should use idhack stage when explicitly given query collation matches
@@ -772,7 +772,7 @@ assert(isIxscan(db, explain.queryPlanner.winningPlan));
 
 // Find should return correct results when collation specified and run with explain.
 coll.drop();
-assert.writeOK(coll.insert({str: "foo"}));
+assert.commandWorked(coll.insert({str: "foo"}));
 explainRes =
     coll.explain("executionStats").find({str: "FOO"}).collation({locale: "en_US"}).finish();
 assert.commandWorked(explainRes);
@@ -867,8 +867,8 @@ if (!db.getMongo().useReadCommands()) {
     // find() shell helper should error if a collation is specified and the shell is not using
     // read commands.
     coll.drop();
-    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-    assert.writeOK(coll.insert({_id: 2, str: "bar"}));
+    assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 2, str: "bar"}));
     assert.throws(function() {
         coll.find().collation({locale: "fr"}).itcount();
     });
@@ -888,8 +888,8 @@ assert.eq(
 
 // Update-findAndModify should return correct results when collation specified.
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-assert.writeOK(coll.insert({_id: 2, str: "bar"}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 2, str: "bar"}));
 assert.eq({_id: 1, str: "baz"}, coll.findAndModify({
     query: {str: "FOO"},
     update: {$set: {str: "baz"}},
@@ -911,8 +911,8 @@ assert.eq(1, planStage.nWouldModify);
 
 // Delete-findAndModify should return correct results when collation specified.
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-assert.writeOK(coll.insert({_id: 2, str: "bar"}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 2, str: "bar"}));
 assert.eq({_id: 1, str: "foo"},
           coll.findAndModify(
               {query: {str: "FOO"}, remove: true, collation: {locale: "en_US", strength: 2}}));
@@ -933,7 +933,7 @@ assert.eq(1, planStage.nWouldDelete);
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
 assert.eq({_id: 1, str: "foo"}, coll.findAndModify({query: {str: "FOO"}, update: {$set: {x: 1}}}));
 assert.eq({_id: 1, str: "foo", x: 1}, coll.findAndModify({query: {str: "FOO"}, remove: true}));
 
@@ -942,7 +942,7 @@ assert.eq({_id: 1, str: "foo", x: 1}, coll.findAndModify({query: {str: "FOO"}, r
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
 assert.eq(null,
           coll.findAndModify(
               {query: {str: "FOO"}, update: {$set: {x: 1}}, collation: {locale: "simple"}}));
@@ -969,8 +969,8 @@ assert.throws(function() {
 
 // mapReduce should return correct results when collation specified and no indexes exist.
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-assert.writeOK(coll.insert({_id: 2, str: "bar"}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 2, str: "bar"}));
 var mapReduceOut = coll.mapReduce(
     function() {
         emit(this.str, 1);
@@ -987,7 +987,7 @@ assert.eq(mapReduceOut.results.length, 1);
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
 var mapReduceOut = coll.mapReduce(
     function() {
         emit(this.str, 1);
@@ -1004,7 +1004,7 @@ assert.eq(mapReduceOut.results.length, 1);
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
 var mapReduceOut = coll.mapReduce(
     function() {
         emit(this.str, 1);
@@ -1023,21 +1023,21 @@ assert.eq(mapReduceOut.results.length, 0);
 if (db.getMongo().writeMode() === "commands") {
     // Remove should succeed when collation specified and collection does not exist.
     coll.drop();
-    assert.writeOK(coll.remove({str: "foo"}, {justOne: true, collation: {locale: "fr"}}));
+    assert.commandWorked(coll.remove({str: "foo"}, {justOne: true, collation: {locale: "fr"}}));
 
     // Remove should return correct results when collation specified.
     coll.drop();
-    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-    assert.writeOK(coll.insert({_id: 2, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
     writeRes =
         coll.remove({str: "FOO"}, {justOne: true, collation: {locale: "en_US", strength: 2}});
-    assert.writeOK(writeRes);
+    assert.commandWorked(writeRes);
     assert.eq(1, writeRes.nRemoved);
 
     // Explain of remove should return correct results when collation specified.
     coll.drop();
-    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-    assert.writeOK(coll.insert({_id: 2, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
     explainRes = coll.explain("executionStats").remove({str: "FOO"}, {
         justOne: true,
         collation: {locale: "en_US", strength: 2}
@@ -1053,9 +1053,9 @@ if (db.getMongo().writeMode() === "commands") {
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
 writeRes = coll.remove({str: "FOO"}, {justOne: true});
-assert.writeOK(writeRes);
+assert.commandWorked(writeRes);
 assert.eq(1, writeRes.nRemoved);
 
 // Remove with idhack should return correct results when no collation specified and collection
@@ -1063,9 +1063,9 @@ assert.eq(1, writeRes.nRemoved);
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-assert.writeOK(coll.insert({_id: "foo"}));
+assert.commandWorked(coll.insert({_id: "foo"}));
 writeRes = coll.remove({_id: "FOO"}, {justOne: true});
-assert.writeOK(writeRes);
+assert.commandWorked(writeRes);
 assert.eq(1, writeRes.nRemoved);
 
 // Remove on _id should use idhack stage when query inherits collection default collation.
@@ -1082,9 +1082,9 @@ if (db.getMongo().writeMode() === "commands") {
     coll.drop();
     assert.commandWorked(
         db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
     writeRes = coll.remove({str: "FOO"}, {justOne: true, collation: {locale: "simple"}});
-    assert.writeOK(writeRes);
+    assert.commandWorked(writeRes);
     assert.eq(0, writeRes.nRemoved);
 
     // Remove on _id should return correct results when "simple" collation specified and
@@ -1092,9 +1092,9 @@ if (db.getMongo().writeMode() === "commands") {
     coll.drop();
     assert.commandWorked(
         db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-    assert.writeOK(coll.insert({_id: "foo"}));
+    assert.commandWorked(coll.insert({_id: "foo"}));
     writeRes = coll.remove({_id: "FOO"}, {justOne: true, collation: {locale: "simple"}});
-    assert.writeOK(writeRes);
+    assert.commandWorked(writeRes);
     assert.eq(0, writeRes.nRemoved);
 
     // Remove on _id should use idhack stage when explicit query collation matches collection
@@ -1122,8 +1122,8 @@ if (db.getMongo().writeMode() !== "commands") {
     // remove() shell helper should error if a collation is specified and the shell is not using
     // write commands.
     coll.drop();
-    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-    assert.writeOK(coll.insert({_id: 2, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
     assert.throws(function() {
         coll.remove({str: "FOO"}, {justOne: true, collation: {locale: "en_US", strength: 2}});
     });
@@ -1140,13 +1140,13 @@ if (db.getMongo().writeMode() !== "commands") {
 if (db.getMongo().writeMode() === "commands") {
     // Update should succeed when collation specified and collection does not exist.
     coll.drop();
-    assert.writeOK(
+    assert.commandWorked(
         coll.update({str: "foo"}, {$set: {other: 99}}, {multi: true, collation: {locale: "fr"}}));
 
     // Update should return correct results when collation specified.
     coll.drop();
-    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-    assert.writeOK(coll.insert({_id: 2, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
     writeRes = coll.update({str: "FOO"},
                            {$set: {other: 99}},
                            {multi: true, collation: {locale: "en_US", strength: 2}});
@@ -1154,8 +1154,8 @@ if (db.getMongo().writeMode() === "commands") {
 
     // Explain of update should return correct results when collation specified.
     coll.drop();
-    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-    assert.writeOK(coll.insert({_id: 2, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
     explainRes = coll.explain("executionStats").update({str: "FOO"}, {$set: {other: 99}}, {
         multi: true,
         collation: {locale: "en_US", strength: 2}
@@ -1171,9 +1171,9 @@ if (db.getMongo().writeMode() === "commands") {
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
 writeRes = coll.update({str: "FOO"}, {$set: {other: 99}});
-assert.writeOK(writeRes);
+assert.commandWorked(writeRes);
 assert.eq(1, writeRes.nMatched);
 
 // Update with idhack should return correct results when no collation specified and collection
@@ -1181,9 +1181,9 @@ assert.eq(1, writeRes.nMatched);
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-assert.writeOK(coll.insert({_id: "foo"}));
+assert.commandWorked(coll.insert({_id: "foo"}));
 writeRes = coll.update({_id: "FOO"}, {$set: {other: 99}});
-assert.writeOK(writeRes);
+assert.commandWorked(writeRes);
 assert.eq(1, writeRes.nMatched);
 
 // Update on _id should use idhack stage when query inherits collection default collation.
@@ -1200,9 +1200,9 @@ if (db.getMongo().writeMode() === "commands") {
     coll.drop();
     assert.commandWorked(
         db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
     writeRes = coll.update({str: "FOO"}, {$set: {other: 99}}, {collation: {locale: "simple"}});
-    assert.writeOK(writeRes);
+    assert.commandWorked(writeRes);
     assert.eq(0, writeRes.nModified);
 
     // Update on _id should return correct results when "simple" collation specified and
@@ -1210,9 +1210,9 @@ if (db.getMongo().writeMode() === "commands") {
     coll.drop();
     assert.commandWorked(
         db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-    assert.writeOK(coll.insert({_id: "foo"}));
+    assert.commandWorked(coll.insert({_id: "foo"}));
     writeRes = coll.update({_id: "FOO"}, {$set: {other: 99}}, {collation: {locale: "simple"}});
-    assert.writeOK(writeRes);
+    assert.commandWorked(writeRes);
     assert.eq(0, writeRes.nModified);
 
     // Update on _id should use idhack stage when explicitly given query collation matches
@@ -1242,8 +1242,8 @@ if (db.getMongo().writeMode() !== "commands") {
     // update() shell helper should error if a collation is specified and the shell is not using
     // write commands.
     coll.drop();
-    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-    assert.writeOK(coll.insert({_id: 2, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
     assert.throws(function() {
         coll.update({str: "FOO"},
                     {$set: {other: 99}},
@@ -1277,7 +1277,7 @@ assert.commandFailedWithCode(db.runCommand({
 
 // $geoNear rejects the now-deprecated "collation" option.
 coll.drop();
-assert.writeOK(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, str: "abc"}));
+assert.commandWorked(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, str: "abc"}));
 assert.commandFailedWithCode(db.runCommand({
     aggregate: coll.getName(),
     cursor: {},
@@ -1335,7 +1335,7 @@ coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
 assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
-assert.writeOK(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, str: "abc"}));
+assert.commandWorked(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, str: "abc"}));
 assert.eq(1, coll.aggregate([geoNearStage]).itcount());
 
 // $geoNear should return correct results when "simple" collation specified and collection has
@@ -1344,7 +1344,7 @@ coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
 assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
-assert.writeOK(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, str: "abc"}));
+assert.commandWorked(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, str: "abc"}));
 assert.eq(0, coll.aggregate([geoNearStage], {collation: {locale: "simple"}}).itcount());
 
 //
@@ -1365,7 +1365,7 @@ if (db.getMongo().useReadCommands()) {
     // Find with $nearSphere should return correct results when collation specified and string
     // predicate not indexed.
     coll.drop();
-    assert.writeOK(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, str: "abc"}));
+    assert.commandWorked(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, str: "abc"}));
     assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
     assert.eq(
         0,
@@ -1438,8 +1438,8 @@ var bulk;
 
 if (db.getMongo().writeMode() !== "commands") {
     coll.drop();
-    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-    assert.writeOK(coll.insert({_id: 2, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
 
     // Can't use the bulk API to set a collation when using legacy write ops.
     bulk = coll.initializeUnorderedBulkOp();
@@ -1454,44 +1454,44 @@ if (db.getMongo().writeMode() !== "commands") {
 } else {
     // update().
     coll.drop();
-    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-    assert.writeOK(coll.insert({_id: 2, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
     bulk = coll.initializeUnorderedBulkOp();
     bulk.find({str: "FOO"}).collation({locale: "en_US", strength: 2}).update({$set: {other: 99}});
     writeRes = bulk.execute();
-    assert.writeOK(writeRes);
+    assert.commandWorked(writeRes);
     assert.eq(2, writeRes.nModified);
 
     // updateOne().
     coll.drop();
-    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-    assert.writeOK(coll.insert({_id: 2, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
     bulk = coll.initializeUnorderedBulkOp();
     bulk.find({str: "FOO"}).collation({locale: "en_US", strength: 2}).updateOne({
         $set: {other: 99}
     });
     writeRes = bulk.execute();
-    assert.writeOK(writeRes);
+    assert.commandWorked(writeRes);
     assert.eq(1, writeRes.nModified);
 
     // replaceOne().
     coll.drop();
-    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-    assert.writeOK(coll.insert({_id: 2, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
     bulk = coll.initializeUnorderedBulkOp();
     bulk.find({str: "FOO"}).collation({locale: "en_US", strength: 2}).replaceOne({str: "oof"});
     writeRes = bulk.execute();
-    assert.writeOK(writeRes);
+    assert.commandWorked(writeRes);
     assert.eq(1, writeRes.nModified);
 
     // replaceOne() with upsert().
     coll.drop();
-    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-    assert.writeOK(coll.insert({_id: 2, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
     bulk = coll.initializeUnorderedBulkOp();
     bulk.find({str: "FOO"}).collation({locale: "en_US"}).upsert().replaceOne({str: "foo"});
     writeRes = bulk.execute();
-    assert.writeOK(writeRes);
+    assert.commandWorked(writeRes);
     assert.eq(1, writeRes.nUpserted);
     assert.eq(0, writeRes.nModified);
 
@@ -1500,28 +1500,28 @@ if (db.getMongo().writeMode() !== "commands") {
         str: "foo"
     });
     writeRes = bulk.execute();
-    assert.writeOK(writeRes);
+    assert.commandWorked(writeRes);
     assert.eq(0, writeRes.nUpserted);
     assert.eq(1, writeRes.nModified);
 
     // removeOne().
     coll.drop();
-    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-    assert.writeOK(coll.insert({_id: 2, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
     bulk = coll.initializeUnorderedBulkOp();
     bulk.find({str: "FOO"}).collation({locale: "en_US", strength: 2}).removeOne();
     writeRes = bulk.execute();
-    assert.writeOK(writeRes);
+    assert.commandWorked(writeRes);
     assert.eq(1, writeRes.nRemoved);
 
     // remove().
     coll.drop();
-    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-    assert.writeOK(coll.insert({_id: 2, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+    assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
     bulk = coll.initializeUnorderedBulkOp();
     bulk.find({str: "FOO"}).collation({locale: "en_US", strength: 2}).remove();
     writeRes = bulk.execute();
-    assert.writeOK(writeRes);
+    assert.commandWorked(writeRes);
     assert.eq(2, writeRes.nRemoved);
 }
 
@@ -1531,8 +1531,8 @@ if (db.getMongo().writeMode() !== "commands") {
 
 // deleteOne().
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-assert.writeOK(coll.insert({_id: 2, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
 if (db.getMongo().writeMode() === "commands") {
     var res = coll.deleteOne({str: "FOO"}, {collation: {locale: "en_US", strength: 2}});
     assert.eq(1, res.deletedCount);
@@ -1544,8 +1544,8 @@ if (db.getMongo().writeMode() === "commands") {
 
 // deleteMany().
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-assert.writeOK(coll.insert({_id: 2, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
 if (db.getMongo().writeMode() === "commands") {
     var res = coll.deleteMany({str: "FOO"}, {collation: {locale: "en_US", strength: 2}});
     assert.eq(2, res.deletedCount);
@@ -1557,14 +1557,14 @@ if (db.getMongo().writeMode() === "commands") {
 
 // findOneAndDelete().
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
 assert.eq({_id: 1, str: "foo"},
           coll.findOneAndDelete({str: "FOO"}, {collation: {locale: "en_US", strength: 2}}));
 assert.eq(null, coll.findOne({_id: 1}));
 
 // findOneAndReplace().
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
 assert.eq({_id: 1, str: "foo"},
           coll.findOneAndReplace(
               {str: "FOO"}, {str: "bar"}, {collation: {locale: "en_US", strength: 2}}));
@@ -1572,7 +1572,7 @@ assert.neq(null, coll.findOne({str: "bar"}));
 
 // findOneAndUpdate().
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
 assert.eq({_id: 1, str: "foo"},
           coll.findOneAndUpdate(
               {str: "FOO"}, {$set: {other: 99}}, {collation: {locale: "en_US", strength: 2}}));
@@ -1580,8 +1580,8 @@ assert.neq(null, coll.findOne({other: 99}));
 
 // replaceOne().
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-assert.writeOK(coll.insert({_id: 2, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
 if (db.getMongo().writeMode() === "commands") {
     var res =
         coll.replaceOne({str: "FOO"}, {str: "bar"}, {collation: {locale: "en_US", strength: 2}});
@@ -1594,8 +1594,8 @@ if (db.getMongo().writeMode() === "commands") {
 
 // updateOne().
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-assert.writeOK(coll.insert({_id: 2, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
 if (db.getMongo().writeMode() === "commands") {
     var res = coll.updateOne(
         {str: "FOO"}, {$set: {other: 99}}, {collation: {locale: "en_US", strength: 2}});
@@ -1609,8 +1609,8 @@ if (db.getMongo().writeMode() === "commands") {
 
 // updateMany().
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-assert.writeOK(coll.insert({_id: 2, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
 if (db.getMongo().writeMode() === "commands") {
     var res = coll.updateMany(
         {str: "FOO"}, {$set: {other: 99}}, {collation: {locale: "en_US", strength: 2}});
@@ -1624,8 +1624,8 @@ if (db.getMongo().writeMode() === "commands") {
 
 // updateOne with bulkWrite().
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-assert.writeOK(coll.insert({_id: 2, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
 if (db.getMongo().writeMode() === "commands") {
     var res = coll.bulkWrite([{
         updateOne: {
@@ -1649,8 +1649,8 @@ if (db.getMongo().writeMode() === "commands") {
 
 // updateMany with bulkWrite().
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-assert.writeOK(coll.insert({_id: 2, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
 if (db.getMongo().writeMode() === "commands") {
     var res = coll.bulkWrite([{
         updateMany: {
@@ -1674,8 +1674,8 @@ if (db.getMongo().writeMode() === "commands") {
 
 // replaceOne with bulkWrite().
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-assert.writeOK(coll.insert({_id: 2, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
 if (db.getMongo().writeMode() === "commands") {
     var res = coll.bulkWrite([{
         replaceOne: {
@@ -1699,8 +1699,8 @@ if (db.getMongo().writeMode() === "commands") {
 
 // deleteOne with bulkWrite().
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-assert.writeOK(coll.insert({_id: 2, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
 if (db.getMongo().writeMode() === "commands") {
     var res = coll.bulkWrite(
         [{deleteOne: {filter: {str: "FOO"}, collation: {locale: "en_US", strength: 2}}}]);
@@ -1714,8 +1714,8 @@ if (db.getMongo().writeMode() === "commands") {
 
 // deleteMany with bulkWrite().
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-assert.writeOK(coll.insert({_id: 2, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
 if (db.getMongo().writeMode() === "commands") {
     var res = coll.bulkWrite(
         [{deleteMany: {filter: {str: "FOO"}, collation: {locale: "en_US", strength: 2}}}]);
@@ -1729,8 +1729,8 @@ if (db.getMongo().writeMode() === "commands") {
 
 // Two deleteOne ops with bulkWrite using different collations.
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-assert.writeOK(coll.insert({_id: 2, str: "bar"}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 2, str: "bar"}));
 if (db.getMongo().writeMode() === "commands") {
     var res = coll.bulkWrite([
         {deleteOne: {filter: {str: "FOO"}, collation: {locale: "fr", strength: 2}}},
@@ -1751,7 +1751,7 @@ if (!isMongos) {
     coll.drop();
     assert.commandWorked(
         db.createCollection("collation", {collation: {locale: "en_US", strength: 2}}));
-    assert.writeOK(coll.insert({_id: "foo", x: 5, str: "bar"}));
+    assert.commandWorked(coll.insert({_id: "foo", x: 5, str: "bar"}));
 
     // preCondition.q respects collection default collation.
     assert.commandFailed(db.runCommand({
@@ -1798,8 +1798,8 @@ if (!isMongos) {
     const originalCollectionInfos = db.getCollectionInfos({name: coll.getName()});
     assert.eq(originalCollectionInfos.length, 1, tojson(originalCollectionInfos));
 
-    assert.writeOK(coll.insert({_id: "FOO"}));
-    assert.writeOK(coll.insert({_id: "bar"}));
+    assert.commandWorked(coll.insert({_id: "FOO"}));
+    assert.commandWorked(coll.insert({_id: "bar"}));
     assert.eq([{_id: "FOO"}],
               coll.find({_id: "foo"}).toArray(),
               "query should have performed a case-insensitive match");
@@ -1822,14 +1822,14 @@ if (!isMongos) {
 // Test that the find command's min/max options respect the collation.
 if (db.getMongo().useReadCommands()) {
     coll.drop();
-    assert.writeOK(coll.insert({str: "a"}));
-    assert.writeOK(coll.insert({str: "A"}));
-    assert.writeOK(coll.insert({str: "b"}));
-    assert.writeOK(coll.insert({str: "B"}));
-    assert.writeOK(coll.insert({str: "c"}));
-    assert.writeOK(coll.insert({str: "C"}));
-    assert.writeOK(coll.insert({str: "d"}));
-    assert.writeOK(coll.insert({str: "D"}));
+    assert.commandWorked(coll.insert({str: "a"}));
+    assert.commandWorked(coll.insert({str: "A"}));
+    assert.commandWorked(coll.insert({str: "b"}));
+    assert.commandWorked(coll.insert({str: "B"}));
+    assert.commandWorked(coll.insert({str: "c"}));
+    assert.commandWorked(coll.insert({str: "C"}));
+    assert.commandWorked(coll.insert({str: "d"}));
+    assert.commandWorked(coll.insert({str: "D"}));
 
     // This query should fail, since there is no index to support the min/max.
     let err = assert.throws(() => coll.find()
@@ -1880,7 +1880,7 @@ if (db.getMongo().useReadCommands()) {
     // Ensure results from index with min/max query are sorted to match requested collation.
     coll.drop();
     assert.commandWorked(coll.ensureIndex({a: 1, b: 1}));
-    assert.writeOK(
+    assert.commandWorked(
         coll.insert([{a: 1, b: 1}, {a: 1, b: 2}, {a: 1, b: "A"}, {a: 1, b: "a"}, {a: 2, b: 2}]));
     var expected = [{a: 1, b: 1}, {a: 1, b: 2}, {a: 1, b: "a"}, {a: 1, b: "A"}, {a: 2, b: 2}];
     res = coll.find({}, {_id: 0})

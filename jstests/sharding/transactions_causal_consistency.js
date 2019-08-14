@@ -29,8 +29,10 @@ assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 1}, to: st.shard1.shardName}));
 
-assert.writeOK(st.s.getDB(dbName)[collName].insert({_id: -1}, {writeConcern: {w: "majority"}}));
-assert.writeOK(st.s.getDB(dbName)[collName].insert({_id: 1}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: -1}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: 1}, {writeConcern: {w: "majority"}}));
 
 // Verifies transactions using causal consistency read all causally prior operations.
 function runTest(st, readConcern) {
@@ -69,7 +71,7 @@ function runTest(st, readConcern) {
     // Clean up for the next iteration.
     assert.commandWorked(
         st.s.adminCommand({moveChunk: ns, find: docToInsert, to: st.shard1.shardName}));
-    assert.writeOK(sessionDB[collName].remove(docToInsert));
+    assert.commandWorked(sessionDB[collName].remove(docToInsert));
 }
 
 const kAllowedReadConcernLevels = ["local", "majority", "snapshot"];

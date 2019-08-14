@@ -37,7 +37,7 @@ let bulk = coll.initializeUnorderedBulkOp();
 allDocuments.forEach(function(doc) {
     bulk.insert(doc);
 });
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 // Create views on the data.
 assert.commandWorked(
@@ -93,7 +93,7 @@ assert.eq(explainPlan.executionStats.nReturned, 5);
 assert(explainPlan.executionStats.hasOwnProperty("allPlansExecution"));
 
 // Only simple 0 or 1 projections are allowed on views.
-assert.writeOK(viewsDB.coll.insert({arr: [{x: 1}]}));
+assert.commandWorked(viewsDB.coll.insert({arr: [{x: 1}]}));
 assert.commandFailedWithCode(
     viewsDB.runCommand({find: "identityView", projection: {arr: {$elemMatch: {x: 1}}}}),
     ErrorCodes.InvalidPipelineOperator);

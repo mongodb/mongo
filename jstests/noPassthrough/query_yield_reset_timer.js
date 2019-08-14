@@ -33,7 +33,7 @@ assert.commandWorked(coll.getDB().adminCommand({
 // timing-based yield (incorrect accounting for timing-based yields was the cause for
 // SERVER-21341).
 for (var i = 0; i < 40; ++i) {
-    assert.writeOK(coll.insert({}));
+    assert.commandWorked(coll.insert({}));
 }
 var explainRes = coll.find().explain("executionStats");
 // We expect 4 yields, but we throw in a fudge factor of 2 for test reliability. We also can

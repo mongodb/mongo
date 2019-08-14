@@ -19,7 +19,7 @@ while (inserted < (20 * 1024 * 1024)) {
     bulk.insert({_id: num++, s: bigString});
     inserted += bigString.length;
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 // Make sure that there's only one chunk holding all the data.
 s.printChunks();

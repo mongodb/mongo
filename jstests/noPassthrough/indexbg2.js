@@ -58,7 +58,7 @@ let turnFailPointOff = function(failPointName) {
 // for the duration of the build.
 let failOnExistingDuplicateValue = function(coll) {
     let duplicateKey = 0;
-    assert.writeOK(coll.save({i: duplicateKey}));
+    assert.commandWorked(coll.save({i: duplicateKey}));
 
     let bgIndexBuildPid = indexBuild();
     waitProgram(bgIndexBuildPid);
@@ -81,7 +81,7 @@ let failOnInsertedDuplicateValue = function(coll) {
         jsTestLog("Waiting to hang before index build of i=" + duplicateKey);
         checkLog.contains(conn, "Hanging before index build of i=" + duplicateKey);
 
-        assert.writeOK(coll.save({i: duplicateKey}));
+        assert.commandWorked(coll.save({i: duplicateKey}));
     } finally {
         turnFailPointOff("hangBeforeIndexBuildOf");
     }
@@ -135,7 +135,7 @@ let doTest = function() {
     coll.drop();
 
     for (let i = 0; i < size; ++i) {
-        assert.writeOK(coll.save({i: i}));
+        assert.commandWorked(coll.save({i: i}));
     }
     assert.eq(size, coll.count());
     assert.eq(1, coll.getIndexes().length, "_id index should already exist");

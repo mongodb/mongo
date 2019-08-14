@@ -170,7 +170,7 @@ var $config = (function() {
             for (var i = partition.lower; i < partition.upper; ++i) {
                 bulk.insert({_id: i});
             }
-            assertAlways.writeOK(bulk.execute());
+            assertAlways.commandWorked(bulk.execute());
 
             // Add split point for lower end of this thread's partition.
             // Since a split point will be created at the low end of each partition,

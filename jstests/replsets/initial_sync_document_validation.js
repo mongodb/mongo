@@ -15,7 +15,7 @@ var primary = replSet.getPrimary();
 var secondary = replSet.getSecondary();
 
 var coll = primary.getDB('test').getCollection(name);
-assert.writeOK(coll.insert({_id: 0, x: 1}));
+assert.commandWorked(coll.insert({_id: 0, x: 1}));
 assert.commandWorked(coll.runCommand("collMod", {"validator": {a: {$exists: true}}}));
 
 secondary = replSet.restart(secondary, {startClean: true});

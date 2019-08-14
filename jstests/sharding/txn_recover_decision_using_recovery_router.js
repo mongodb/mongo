@@ -245,7 +245,8 @@ txnNumber++;
 const recoveryToken = startNewMultiShardWriteTransaction();
 assert.commandWorked(sendCommitViaOriginalMongos(lsid, txnNumber, recoveryToken));
 
-assert.writeOK(st.rs1.getPrimary().getDB("config").transactions.remove({}, false /* justOne */));
+assert.commandWorked(
+    st.rs1.getPrimary().getDB("config").transactions.remove({}, false /* justOne */));
 
 assert.commandFailedWithCode(sendCommitViaRecoveryMongos(lsid, txnNumber, recoveryToken),
                              ErrorCodes.NoSuchTransaction);

@@ -34,7 +34,7 @@ function setupCollection() {
     for (let i = 0; i < nDocs; i++) {
         bulk.insert({_id: i, a: i});
     }
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
     assert.commandWorked(coll.createIndex({a: 1}));
 }
 

@@ -26,7 +26,7 @@ rst.initiate(conf);
 var master = rst.getPrimary();  // Waits for PRIMARY state.
 
 // Push some ops through before setting slave delay.
-assert.writeOK(master.getCollection(ns).insert([{}, {}, {}], {writeConcern: {w: 2}}));
+assert.commandWorked(master.getCollection(ns).insert([{}, {}, {}], {writeConcern: {w: 2}}));
 
 // Set slaveDelay and wait for secondary to receive the change.
 conf = rst.getReplSetConfigFromNode();
@@ -40,7 +40,7 @@ sleep(2000);  // The secondary apply loop only checks for slaveDelay changes onc
 var secondary = rst.getSecondary();
 const lastOp = getLatestOp(secondary);
 
-assert.writeOK(master.getCollection(ns).insert([{}, {}, {}]));
+assert.commandWorked(master.getCollection(ns).insert([{}, {}, {}]));
 assert.soon(() => secondary.adminCommand('serverStatus').metrics.repl.buffer.count > 0,
             () => secondary.adminCommand('serverStatus').metrics.repl);
 assert.neq(getLatestOp(master), lastOp);

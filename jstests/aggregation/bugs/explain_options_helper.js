@@ -8,7 +8,7 @@ const coll = db.explain_options;
 coll.drop();
 
 for (let i = 0; i < 10; ++i) {
-    assert.writeOK(coll.insert({_id: i}));
+    assert.commandWorked(coll.insert({_id: i}));
 }
 
 const collation = {

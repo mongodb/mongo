@@ -122,9 +122,9 @@ function runSubTest(name, fun) {
     updateSetParameters(stepParams);
 }
 
-assert.writeOK(mongosDB.test.insert({x: 1}));
-assert.writeOK(mongosDB.test.insert({x: 2}));
-assert.writeOK(mongosDB.test.insert({x: 3}));
+assert.commandWorked(mongosDB.test.insert({x: 1}));
+assert.commandWorked(mongosDB.test.insert({x: 2}));
+assert.commandWorked(mongosDB.test.insert({x: 3}));
 st.rs0.awaitReplication();
 
 runSubTest("MinSize", function() {

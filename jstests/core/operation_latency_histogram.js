@@ -48,13 +48,13 @@ var lastHistogram = getHistogramStats(testColl);
 // Insert
 var numRecords = 100;
 for (var i = 0; i < numRecords; i++) {
-    assert.writeOK(testColl.insert({_id: i}));
+    assert.commandWorked(testColl.insert({_id: i}));
 }
 lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 0, numRecords, 0);
 
 // Update
 for (var i = 0; i < numRecords; i++) {
-    assert.writeOK(testColl.update({_id: i}, {x: i}));
+    assert.commandWorked(testColl.update({_id: i}, {x: i}));
 }
 lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 0, numRecords, 0);
 
@@ -85,13 +85,13 @@ lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 0, 0, numRecords 
 
 // Remove
 for (var i = 0; i < numRecords; i++) {
-    assert.writeOK(testColl.remove({_id: i}));
+    assert.commandWorked(testColl.remove({_id: i}));
 }
 lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 0, numRecords, 0);
 
 // Upsert
 for (var i = 0; i < numRecords; i++) {
-    assert.writeOK(testColl.update({_id: i}, {x: i}, {upsert: 1}));
+    assert.commandWorked(testColl.update({_id: i}, {x: i}, {upsert: 1}));
 }
 lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 0, numRecords, 0);
 

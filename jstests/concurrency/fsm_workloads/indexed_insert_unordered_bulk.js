@@ -25,7 +25,7 @@ var $config = extendWorkload($config, function($config, $super) {
             bulk.insert(doc);
         }
         var res = bulk.execute();
-        assertAlways.writeOK(res);
+        assertAlways.commandWorked(res);
         assertAlways.eq(this.docsPerInsert, res.nInserted, tojson(res));
 
         this.nInserted += this.docsPerInsert;

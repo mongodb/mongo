@@ -52,12 +52,12 @@ var primary = replTest.getPrimary();
 var secondaries = replTest.getSecondaries();
 
 // Do a write to have something to read.
-assert.writeOK(primary.getDB("test").foo.insert(
+assert.commandWorked(primary.getDB("test").foo.insert(
     {"number": 7}, {"writeConcern": {"w": "majority", "wtimeout": ReplSetTest.kDefaultTimeoutMS}}));
 
 jsTestLog("Testing linearizable readConcern parsing");
 // This command is sent to the primary, and the primary is fully connected so it should work.
-var goodRead = assert.writeOK(primary.getDB("test").runCommand(
+var goodRead = assert.commandWorked(primary.getDB("test").runCommand(
     {'find': 'foo', readConcern: {level: "linearizable"}, "maxTimeMS": 60000}));
 assert.eq(goodRead.cursor.firstBatch[0].number, 7);
 

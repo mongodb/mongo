@@ -30,7 +30,7 @@ function runTest(s0, s1) {
 
     // Connect as basic user and create a session.
     assert(admin.auth('user', 'pass'));
-    assert.writeOK(admin.mycoll.insert({_id: "foo", data: "bar"}));
+    assert.commandWorked(admin.mycoll.insert({_id: "foo", data: "bar"}));
 
     // Perform administrative commands via separate shell.
     function evalCmd(cmd) {

@@ -26,7 +26,7 @@ const insertDocs = function(collection, nDocs) {
         bulk.insert({a: i});
     }
 
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 
     print("Bulk insert " + nDocs + " documents completed");
 };
@@ -46,7 +46,7 @@ const p = startParallelShell(function() {
         for (let j = 0; j < 100; ++j) {
             bulk.insert({a: i + j});
         }
-        assert.writeOK(bulk.execute());
+        assert.commandWorked(bulk.execute());
         if (i % 1000 === 0) {
             print(i - 20000 + " of second set of 20000 documents inserted");
         }

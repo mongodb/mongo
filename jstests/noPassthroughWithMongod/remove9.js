@@ -7,7 +7,7 @@ pid = startMongoProgramNoConnect("mongo", "--eval", js, db ? db.getMongo().host 
 
 Random.setRandomSeed();
 for (var i = 0; i < 10000; ++i) {
-    assert.writeOK(t.remove({i: Random.randInt(10000)}));
+    assert.commandWorked(t.remove({i: Random.randInt(10000)}));
 }
 
 stopMongoProgramByPid(pid);

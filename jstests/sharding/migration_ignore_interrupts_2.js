@@ -17,7 +17,7 @@ var mongos = st.s0, admin = mongos.getDB('admin'), dbName = "testDB", ns1 = dbNa
 assert.commandWorked(admin.runCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard0.shardName);
 assert.commandWorked(admin.runCommand({shardCollection: ns1, key: {a: 1}}));
-assert.writeOK(coll1.insert({a: 0}));
+assert.commandWorked(coll1.insert({a: 0}));
 assert.eq(1, shard0Coll1.find().itcount());
 assert.eq(0, shard1Coll1.find().itcount());
 assert.eq(1, coll1.find().itcount());

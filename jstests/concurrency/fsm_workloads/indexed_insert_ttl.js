@@ -12,13 +12,13 @@ var $config = (function() {
     var states = {
         init: function init(db, collName) {
             var res = db[collName].insert({indexed_insert_ttl: new ISODate(), first: true});
-            assertAlways.writeOK(res);
+            assertAlways.commandWorked(res);
             assertWhenOwnColl.eq(1, res.nInserted, tojson(res));
         },
 
         insert: function insert(db, collName) {
             var res = db[collName].insert({indexed_insert_ttl: new ISODate()});
-            assertAlways.writeOK(res);
+            assertAlways.commandWorked(res);
             assertWhenOwnColl.eq(1, res.nInserted, tojson(res));
         }
     };

@@ -34,7 +34,7 @@ var bulk = testDBReplSet1.foo.initializeUnorderedBulkOp();
 for (var i = 0; i < numDocs; i++) {
     bulk.insert({x: i, text: textString});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 // Get connection to mongos for the cluster
 var mongosConn = shardingTest.s;
@@ -50,7 +50,7 @@ assert.commandWorked(mongosConn.getDB('admin').runCommand(
     {shardcollection: testDBName + '.' + testCollName, key: {x: 1}}));
 
 // Test case where GLE should return an error
-assert.writeOK(testDB.foo.insert({_id: 'a', x: 1}));
+assert.commandWorked(testDB.foo.insert({_id: 'a', x: 1}));
 assert.writeError(testDB.foo.insert({_id: 'a', x: 1}, {writeConcern: {w: 2, wtimeout: 30000}}));
 
 // Add more data
@@ -58,7 +58,7 @@ bulk = testDB.foo.initializeUnorderedBulkOp();
 for (var i = numDocs; i < 2 * numDocs; i++) {
     bulk.insert({x: i, text: textString});
 }
-assert.writeOK(bulk.execute({w: replNodes, wtimeout: 30000}));
+assert.commandWorked(bulk.execute({w: replNodes, wtimeout: 30000}));
 
 // Take down two nodes and make sure slaveOk reads still work
 var primary = replSet1._master;

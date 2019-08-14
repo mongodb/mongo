@@ -3,7 +3,7 @@
 var testColl = db.regex_not_id;
 testColl.drop();
 
-assert.writeOK(testColl.insert({_id: "ABCDEF1"}));
+assert.commandWorked(testColl.insert({_id: "ABCDEF1"}));
 
 // Should be an error.
 assert.writeError(testColl.insert({_id: /^A/}));

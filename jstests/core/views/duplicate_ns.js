@@ -14,9 +14,9 @@ const collName = "myns";
 const viewId = dbName + "." + collName;
 
 assert.commandWorked(viewsDb.dropDatabase());
-assert.writeOK(viewsDb.system.views.remove({_id: viewId}));
+assert.commandWorked(viewsDb.system.views.remove({_id: viewId}));
 assert.commandWorked(viewsDb.runCommand({create: collName}));
-assert.writeOK(viewsDb.system.views.insert({
+assert.commandWorked(viewsDb.system.views.insert({
     _id: viewId,
     viewOn: "coll",
     pipeline: [],

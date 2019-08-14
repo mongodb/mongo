@@ -12,7 +12,7 @@ const caseInsensitive = {
 var coll = db.collation_geonear;
 coll.drop();
 assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
-assert.writeOK(coll.insert({loc: [0, 0], str: "A"}));
+assert.commandWorked(coll.insert({loc: [0, 0], str: "A"}));
 
 // Test that the $geoNear agg stage respects an explicit collation.
 assert.eq(0,
@@ -54,7 +54,7 @@ assert.throws(function() {
 coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), caseInsensitive));
 assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
-assert.writeOK(coll.insert({loc: [0, 0], str: "A"}));
+assert.commandWorked(coll.insert({loc: [0, 0], str: "A"}));
 
 // Test that the $geoNear agg stage respects an inherited collation.
 assert.eq(1,

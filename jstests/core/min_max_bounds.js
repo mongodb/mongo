@@ -10,9 +10,9 @@ load('jstests/aggregation/extras/utils.js');  // For resultsEq.
 
 var coll = db.query_bound_inclusion;
 coll.drop();
-assert.writeOK(coll.insert({a: 1, b: 1}));
-assert.writeOK(coll.insert({a: 2, b: 2}));
-assert.writeOK(coll.insert({a: 3, b: 3}));
+assert.commandWorked(coll.insert({a: 1, b: 1}));
+assert.commandWorked(coll.insert({a: 2, b: 2}));
+assert.commandWorked(coll.insert({a: 3, b: 3}));
 
 assert.commandWorked(coll.createIndex({a: 1}));
 

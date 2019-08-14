@@ -26,7 +26,8 @@ const session2Db = session2.getDatabase(dbName);
 const session2Coll = session2Db.getCollection(collName);
 
 jsTest.log("Prepopulate the collection.");
-assert.writeOK(testColl.insert([{_id: 0}, {_id: 1}, {_id: 2}], {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    testColl.insert([{_id: 0}, {_id: 1}, {_id: 2}], {writeConcern: {w: "majority"}}));
 
 // Create a constant array of documents we expect to be returned during a read-only transaction.
 // The value should not change since external changes should not be visible within this
@@ -61,7 +62,7 @@ assert.sameMembers(expectedDocs, sessionColl.find().toArray());
 jsTestLog(
     "Writes that occur outside of a transaction should not be visible to a read only transaction.");
 
-assert.writeOK(testColl.insert({_id: 4}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(testColl.insert({_id: 4}, {writeConcern: {w: "majority"}}));
 
 assert.sameMembers(expectedDocs, sessionColl.find().toArray());
 

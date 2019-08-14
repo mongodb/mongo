@@ -37,7 +37,7 @@ s.adminCommand({
 var bulk = db.foo.initializeUnorderedBulkOp();
 for (i = 0; i < N; i++)
     bulk.insert({_id: i});
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 // Flush all writes to disk since some of the stats are dependent on state in disk (like
 // totalIndexSize).

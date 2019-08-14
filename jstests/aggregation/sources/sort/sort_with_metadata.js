@@ -4,10 +4,10 @@
 
 var coll = db.sort_with_metadata;
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, text: "apple", words: 1}));
-assert.writeOK(coll.insert({_id: 2, text: "banana", words: 1}));
-assert.writeOK(coll.insert({_id: 3, text: "apple banana", words: 2}));
-assert.writeOK(coll.insert({_id: 4, text: "cantaloupe", words: 1}));
+assert.commandWorked(coll.insert({_id: 1, text: "apple", words: 1}));
+assert.commandWorked(coll.insert({_id: 2, text: "banana", words: 1}));
+assert.commandWorked(coll.insert({_id: 3, text: "apple banana", words: 2}));
+assert.commandWorked(coll.insert({_id: 4, text: "cantaloupe", words: 1}));
 
 assert.commandWorked(coll.createIndex({text: "text"}));
 

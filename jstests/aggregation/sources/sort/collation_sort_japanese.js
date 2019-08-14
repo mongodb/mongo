@@ -47,7 +47,7 @@ function runTests(docs) {
     for (let doc of docs) {
         bulk.insert(doc);
     }
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 
     let sortOrder;
 

@@ -22,7 +22,7 @@ const primaryDB = primary.getDB('d');
 const primaryColl = primaryDB.coll;
 
 jsTestLog('Create a collection (with a UUID) and insert a document.');
-assert.writeOK(primaryColl.insert({_id: 0}));
+assert.commandWorked(primaryColl.insert({_id: 0}));
 
 const collInfo = primaryDB.getCollectionInfos({name: primaryColl.getName()})[0];
 assert(collInfo.info.uuid, 'newly created collection expected to have a UUID: ' + tojson(collInfo));
@@ -48,7 +48,7 @@ function ResyncWithFailpoint(failpointName, failpointData) {
 
     jsTestLog('Remove collection on the primary and insert a new document, recreating it.');
     assert(primaryColl.drop());
-    assert.writeOK(primaryColl.insert({_id: 0}, {writeConcern: {w: 'majority'}}));
+    assert.commandWorked(primaryColl.insert({_id: 0}, {writeConcern: {w: 'majority'}}));
     const newCollInfo = primaryDB.getCollectionInfos({name: primaryColl.getName()})[0];
     assert(collInfo.info.uuid, 'recreated collection expected to have a UUID: ' + tojson(collInfo));
     assert.neq(collInfo.info.uuid,

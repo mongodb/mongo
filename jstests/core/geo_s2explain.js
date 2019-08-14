@@ -6,7 +6,7 @@ t.drop();
 
 var point1 = {loc: {type: "Point", coordinates: [10, 10]}};
 var point2 = {loc: {type: "Point", coordinates: [10.001, 10]}};
-assert.writeOK(t.insert([point1, point2]));
+assert.commandWorked(t.insert([point1, point2]));
 
 assert.commandWorked(t.ensureIndex({loc: "2dsphere"}));
 
@@ -23,7 +23,7 @@ for (var i = 10; i < 70; i += 0.1) {
     points.push({loc: {type: "Point", coordinates: [i, i]}});
 }
 
-assert.writeOK(t.insert(points));
+assert.commandWorked(t.insert(points));
 
 explain = t.find({loc: {$nearSphere: {type: "Point", coordinates: [10, 10]}}})
               .limit(10)

@@ -15,35 +15,35 @@ var m2 = new Mongo(primary.host);
 // Do a write with m1, then a write with m2, then a no-op write with m1. m1 should have a lastOp
 // of m2's write.
 
-assert.writeOK(m1.getCollection("test.foo").insert({m1: 1}));
+assert.commandWorked(m1.getCollection("test.foo").insert({m1: 1}));
 var firstOp = m1.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
 
-assert.writeOK(m2.getCollection("test.foo").insert({m2: 99}));
+assert.commandWorked(m2.getCollection("test.foo").insert({m2: 99}));
 var secondOp = m2.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
 
 // No-op update
-assert.writeOK(m1.getCollection("test.foo").update({m1: 1}, {$set: {m1: 1}}));
+assert.commandWorked(m1.getCollection("test.foo").update({m1: 1}, {$set: {m1: 1}}));
 var noOp = m1.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
 
 assert.eq(noOp, secondOp);
 
-assert.writeOK(m1.getCollection("test.foo").remove({m1: 1}));
+assert.commandWorked(m1.getCollection("test.foo").remove({m1: 1}));
 var thirdOp = m1.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
 
-assert.writeOK(m2.getCollection("test.foo").insert({m2: 98}));
+assert.commandWorked(m2.getCollection("test.foo").insert({m2: 98}));
 var fourthOp = m2.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
 
 // No-op delete
-assert.writeOK(m1.getCollection("test.foo").remove({m1: 1}));
+assert.commandWorked(m1.getCollection("test.foo").remove({m1: 1}));
 noOp = m1.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
 
 assert.eq(noOp, fourthOp);
 
 // Dummy write, for a new lastOp.
-assert.writeOK(m1.getCollection("test.foo").insert({m1: 99}));
+assert.commandWorked(m1.getCollection("test.foo").insert({m1: 99}));
 var fifthOp = m1.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
 
-assert.writeOK(m2.getCollection("test.foo").insert({m2: 97}));
+assert.commandWorked(m2.getCollection("test.foo").insert({m2: 97}));
 var sixthOp = m2.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
 
 // No-op find-and-modify delete
@@ -55,7 +55,7 @@ assert.eq(noOp, sixthOp);
 assert.commandWorked(m1.getCollection("test.foo").createIndex({x: 1}));
 var seventhOp = m1.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
 
-assert.writeOK(m2.getCollection("test.foo").insert({m2: 96}));
+assert.commandWorked(m2.getCollection("test.foo").insert({m2: 96}));
 var eighthOp = m2.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
 
 // No-op create index.
@@ -64,10 +64,10 @@ noOp = m1.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
 
 assert.eq(noOp, eighthOp);
 
-assert.writeOK(m1.getCollection("test.foo").insert({_id: 1, x: 1}));
+assert.commandWorked(m1.getCollection("test.foo").insert({_id: 1, x: 1}));
 var ninthOp = m1.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
 
-assert.writeOK(m2.getCollection("test.foo").insert({m2: 991}));
+assert.commandWorked(m2.getCollection("test.foo").insert({m2: 991}));
 var tenthOp = m2.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
 
 // update with immutable field error
@@ -78,7 +78,7 @@ noOp = m1.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
 
 assert.eq(noOp, tenthOp);
 
-assert.writeOK(m2.getCollection("test.foo").insert({m2: 992}));
+assert.commandWorked(m2.getCollection("test.foo").insert({m2: 992}));
 var eleventhOp = m2.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
 
 // find-and-modify immutable field error
@@ -94,13 +94,13 @@ noOp = m1.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
 assert.eq(noOp, eleventhOp);
 
 var bigString = new Array(3000).toString();
-assert.writeOK(m2.getCollection("test.foo").insert({m2: 994, m3: bigString}));
+assert.commandWorked(m2.getCollection("test.foo").insert({m2: 994, m3: bigString}));
 
 // No-op insert
-assert.writeOK(m1.getCollection("test.foo").insert({_id: 5, x: 5}));
+assert.commandWorked(m1.getCollection("test.foo").insert({_id: 5, x: 5}));
 var thirteenthOp = m1.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
 
-assert.writeOK(m2.getCollection("test.foo").insert({m2: 991}));
+assert.commandWorked(m2.getCollection("test.foo").insert({m2: 991}));
 var fourteenthOp = m2.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
 
 // Hits DuplicateKey error and fails insert -- no-op

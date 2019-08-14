@@ -10,7 +10,7 @@ t.drop();
 const N = 20;
 
 for (let i = 0; i < N; i++) {
-    assert.writeOK(t.insert({_id: i, x: new Timestamp()}));
+    assert.commandWorked(t.insert({_id: i, x: new Timestamp()}));
     sleep(100);
 }
 
@@ -37,7 +37,7 @@ for (let i = 0; i < N - 1; i++) {
 assert.eq(N, t.find({x: {$type: 17}}).itcount());
 assert.eq(0, t.find({x: {$type: 3}}).itcount());
 
-assert.writeOK(t.insert({_id: 100, x: new Timestamp(123456, 50)}));
+assert.commandWorked(t.insert({_id: 100, x: new Timestamp(123456, 50)}));
 const x = t.findOne({_id: 100}).x;
 assert.eq(123456, x.t);
 assert.eq(50, x.i);

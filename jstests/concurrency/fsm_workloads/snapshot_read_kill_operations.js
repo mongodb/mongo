@@ -131,7 +131,7 @@ var $config = (function() {
         assertWhenOwnColl.commandWorked(db.runCommand({create: collName}));
         for (let i = 0; i < this.numIds; ++i) {
             const res = db[collName].insert({_id: i, value: i});
-            assert.writeOK(res);
+            assert.commandWorked(res);
             assert.eq(1, res.nInserted);
         }
     }

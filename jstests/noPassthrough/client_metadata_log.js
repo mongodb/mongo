@@ -7,7 +7,7 @@
 
 let checkLog = function(conn) {
     let coll = conn.getCollection("test.foo");
-    assert.writeOK(coll.insert({_id: 1}));
+    assert.commandWorked(coll.insert({_id: 1}));
 
     print(`Checking ${conn.fullOptions.logFile} for client metadata message`);
     let log = cat(conn.fullOptions.logFile);

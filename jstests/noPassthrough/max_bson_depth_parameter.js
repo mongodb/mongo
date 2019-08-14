@@ -20,8 +20,8 @@ assert.commandFailedWithCode(
     "Expected server to reject command for exceeding the nesting depth limit");
 
 // Confirm depth limits for $lookup.
-assert.writeOK(testDB.coll1.insert({_id: 1}));
-assert.writeOK(testDB.coll2.insert({_id: 1}));
+assert.commandWorked(testDB.coll1.insert({_id: 1}));
+assert.commandWorked(testDB.coll2.insert({_id: 1}));
 
 assert.commandWorked(testDB.runCommand({
     aggregate: "coll1",

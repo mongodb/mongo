@@ -7,7 +7,7 @@ load('jstests/aggregation/extras/utils.js');
 'use strict';
 var coll = db.log_exponential_expressions;
 coll.drop();
-assert.writeOK(coll.insert({_id: 0}));
+assert.commandWorked(coll.insert({_id: 0}));
 
 var decimalE = NumberDecimal("2.718281828459045235360287471352662");
 var decimal1overE = NumberDecimal("0.3678794411714423215955237701614609");

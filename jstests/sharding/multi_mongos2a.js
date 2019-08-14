@@ -9,7 +9,7 @@ st.ensurePrimaryShard('test', st.shard1.shardName);
 
 assert.commandWorked(st.s0.adminCommand({shardcollection: "test.foo", key: {num: 1}}));
 
-assert.writeOK(st.s0.getDB('test').existing.insert({_id: 1}));
+assert.commandWorked(st.s0.getDB('test').existing.insert({_id: 1}));
 assert.eq(1, st.s0.getDB('test').existing.count({_id: 1}));
 assert.eq(1, st.s1.getDB('test').existing.count({_id: 1}));
 

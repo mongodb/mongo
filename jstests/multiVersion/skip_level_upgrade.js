@@ -53,7 +53,7 @@ for (let i = 0; i < versions.length; i++) {
     // then shut it down.
     let testDB = conn.getDB('test');
     assert.commandWorked(testDB.createCollection(version.testCollection));
-    assert.writeOK(testDB[version.testCollection].insert({a: 1}));
+    assert.commandWorked(testDB[version.testCollection].insert({a: 1}));
     assert.commandWorked(testDB[version.testCollection].createIndex({a: 1}));
     MongoRunner.stopMongod(conn);
 

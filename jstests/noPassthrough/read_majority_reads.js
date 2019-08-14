@@ -129,15 +129,15 @@ function runTests(coll, mongodConnection) {
         var getCursor = cursorTestCases[testName];
 
         // Setup initial state.
-        assert.writeOK(coll.remove({}));
-        assert.writeOK(coll.save({_id: 1, state: 'before', point: [0, 0]}));
+        assert.commandWorked(coll.remove({}));
+        assert.commandWorked(coll.save({_id: 1, state: 'before', point: [0, 0]}));
         setCommittedSnapshot(makeSnapshot());
 
         // Check initial conditions.
         assert.eq(getCursor(coll).next().state, 'before');
 
         // Change state without making it committed.
-        assert.writeOK(coll.save({_id: 1, state: 'after', point: [0, 0]}));
+        assert.commandWorked(coll.save({_id: 1, state: 'after', point: [0, 0]}));
 
         // Cursor still sees old state.
         assert.eq(getCursor(coll).next().state, 'before');
@@ -163,15 +163,15 @@ function runTests(coll, mongodConnection) {
         var expectedAfter = nonCursorTestCases[testName].expectedAfter;
 
         // Setup initial state.
-        assert.writeOK(coll.remove({}));
-        assert.writeOK(coll.save({_id: 1, state: 'before', point: [0, 0]}));
+        assert.commandWorked(coll.remove({}));
+        assert.commandWorked(coll.save({_id: 1, state: 'before', point: [0, 0]}));
         setCommittedSnapshot(makeSnapshot());
 
         // Check initial conditions.
         assert.eq(getResult(coll), expectedBefore);
 
         // Change state without making it committed.
-        assert.writeOK(coll.save({_id: 1, state: 'after', point: [0, 0]}));
+        assert.commandWorked(coll.save({_id: 1, state: 'after', point: [0, 0]}));
 
         // Cursor still sees old state.
         assert.eq(getResult(coll), expectedBefore);

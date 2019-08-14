@@ -25,7 +25,7 @@ let testMongoD = function() {
     assert.neq(null, conn, 'mongod was unable to start up');
 
     let coll = conn.getCollection(db_name + ".foo");
-    assert.writeOK(coll.insert({_id: 1}));
+    assert.commandWorked(coll.insert({_id: 1}));
 
     MongoRunner.stopMongod(conn);
 };

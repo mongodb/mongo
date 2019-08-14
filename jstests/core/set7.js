@@ -57,8 +57,8 @@ assert.eq([0, 1, -2, 3, 4, 5, 6, 7, 8, 9, 10, 11], t.findOne().a);
 
 // Test multiple updates to a non-existent array element.
 t.drop();
-assert.writeOK(t.insert({a: []}));
-assert.writeOK(t.update({}, {$set: {"a.2.b": 1, "a.2.c": 1}}));
+assert.commandWorked(t.insert({a: []}));
+assert.commandWorked(t.update({}, {$set: {"a.2.b": 1, "a.2.c": 1}}));
 assert.docEq({a: [null, null, {b: 1, c: 1}]}, t.findOne({}, {_id: 0}));
 
 // Test upsert case
@@ -70,7 +70,7 @@ assert.eq([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], t.findOne().a);
 t.drop();
 t.save({a: []});
 res = t.update({}, {$set: {"a.1500000": 1}});  // current limit
-assert.writeOK(res);
+assert.commandWorked(res);
 
 t.drop();
 t.save({a: []});

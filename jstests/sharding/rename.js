@@ -11,14 +11,14 @@ var s = new ShardingTest({shards: 2, mongos: 1, rs: {oplogSize: 10}});
 var db = s.getDB("test");
 var replTest = s.rs0;
 
-assert.writeOK(db.foo.insert({_id: 1}));
+assert.commandWorked(db.foo.insert({_id: 1}));
 db.foo.renameCollection('bar');
 assert.isnull(db.getLastError(), '1.0');
 assert.eq(db.bar.findOne(), {_id: 1}, '1.1');
 assert.eq(db.bar.count(), 1, '1.2');
 assert.eq(db.foo.count(), 0, '1.3');
 
-assert.writeOK(db.foo.insert({_id: 2}));
+assert.commandWorked(db.foo.insert({_id: 2}));
 db.foo.renameCollection('bar', true);
 assert.isnull(db.getLastError(), '2.0');
 assert.eq(db.bar.findOne(), {_id: 2}, '2.1');
@@ -50,7 +50,7 @@ assert.commandFailed(primary.getDB('test').bar.renameCollection('shardedColl', d
 
 jsTest.log("Testing write concern (1)");
 
-assert.writeOK(db.foo.insert({_id: 3}));
+assert.commandWorked(db.foo.insert({_id: 3}));
 db.foo.renameCollection('bar', true);
 
 var ans = db.runCommand({getLastError: 1, w: 3});
@@ -75,7 +75,7 @@ let liveSlaves = replTest._slaves.filter(function(node) {
 replTest.awaitSecondaryNodes(null, liveSlaves);
 awaitRSClientHosts(s.s, replTest.getPrimary(), {ok: true, ismaster: true}, replTest.name);
 
-assert.writeOK(db.foo.insert({_id: 4}));
+assert.commandWorked(db.foo.insert({_id: 4}));
 assert.commandWorked(db.foo.renameCollection('bar', true));
 
 ans = db.runCommand({getLastError: 1, w: 3, wtimeout: 5000});

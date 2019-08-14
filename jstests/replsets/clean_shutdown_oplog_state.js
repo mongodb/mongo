@@ -34,7 +34,7 @@ primary.getCollection("test.coll").insert({_id: -1});
 
 // Start a w:2 write that will block until replication is resumed.
 var waitForReplStart = startParallelShell(function() {
-    printjson(assert.writeOK(
+    printjson(assert.commandWorked(
         db.getCollection('side').insert({}, {writeConcern: {w: 2, wtimeout: 30 * 60 * 1000}})));
 }, primary.host.split(':')[1]);
 
@@ -43,7 +43,7 @@ var op = primary.getCollection("test.coll").initializeUnorderedBulkOp();
 for (var i = 0; i < 1000 * 1000; i++) {
     op.insert({_id: i});
 }
-assert.writeOK(op.execute());
+assert.commandWorked(op.execute());
 
 // Resume replication and wait for ops to start replicating, then do a clean shutdown on the
 // secondary.

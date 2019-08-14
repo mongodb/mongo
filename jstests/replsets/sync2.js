@@ -39,13 +39,13 @@ var option = {writeConcern: {w: conns.length - 1, wtimeout: replTest.kDefaultTim
 // to bridging, it will not change sync sources and receive the write in time. This was not a
 // problem in 3.0 because the old version of mongobridge caused all the nodes to restart during
 // partitioning, forcing the set to rebuild the spanning tree.
-assert.writeOK(master.getDB("foo").bar.insert({x: 1}, option));
+assert.commandWorked(master.getDB("foo").bar.insert({x: 1}, option));
 
 // 4 is connected to 3
 conns[4].disconnect(conns[2]);
 conns[4].reconnect(conns[3]);
 
-assert.writeOK(master.getDB("foo").bar.insert({x: 1}, option));
+assert.commandWorked(master.getDB("foo").bar.insert({x: 1}, option));
 
 replTest.stopSet();
 }());

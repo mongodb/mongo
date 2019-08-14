@@ -14,7 +14,7 @@ assert.eq(coll.aggregate([{$sample: {size: 10}}]).toArray(), []);
 
 var nItems = 3;
 for (var i = 0; i < nItems; i++) {
-    assert.writeOK(coll.insert({_id: i}));
+    assert.commandWorked(coll.insert({_id: i}));
 }
 
 [0, 1, nItems, nItems + 1].forEach(function(size) {

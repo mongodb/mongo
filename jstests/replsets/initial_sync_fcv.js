@@ -24,7 +24,7 @@ const primary = rst.getPrimary();
 const dbName = 'foo';
 const collName = 'bar';
 
-assert.writeOK(primary.getDB(dbName).getCollection(collName).insert({a: 1}));
+assert.commandWorked(primary.getDB(dbName).getCollection(collName).insert({a: 1}));
 
 function runInitialSync(cmd, initialFCV) {
     assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: initialFCV}));

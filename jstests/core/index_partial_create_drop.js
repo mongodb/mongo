@@ -43,7 +43,7 @@ assert.commandFailed(coll.createIndex(
     {x: 1}, {partialFilterExpression: {$expr: {$eq: [{$trim: {input: "$x"}}, "hi"]}}}));
 
 for (var i = 0; i < 10; i++) {
-    assert.writeOK(coll.insert({x: i, a: i}));
+    assert.commandWorked(coll.insert({x: i, a: i}));
 }
 
 // Create partial index.

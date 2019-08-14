@@ -12,7 +12,7 @@ assert.commandWorked(coll.createIndex({a: 1}));
 const insertedFunc = function() {
     return 1;
 };
-assert.writeOK(coll.insert({a: insertedFunc}));
+assert.commandWorked(coll.insert({a: insertedFunc}));
 
 // Test that queries involving comparison operators with values of type Code are covered.
 const proj = {
@@ -39,9 +39,9 @@ assertCoveredQueryAndCount(
 
 // Test that documents that lie outside of the generated index bounds are not returned.
 coll.remove({});
-assert.writeOK(coll.insert({a: "string"}));
-assert.writeOK(coll.insert({a: {b: 1}}));
-assert.writeOK(coll.insert({a: MaxKey}));
+assert.commandWorked(coll.insert({a: "string"}));
+assert.commandWorked(coll.insert({a: {b: 1}}));
+assert.commandWorked(coll.insert({a: MaxKey}));
 
 assertCoveredQueryAndCount({collection: coll, query: {a: {$gt: func}}, project: proj, count: 0});
 assertCoveredQueryAndCount({collection: coll, query: {a: {$gte: func}}, project: proj, count: 0});

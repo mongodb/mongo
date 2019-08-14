@@ -10,7 +10,7 @@ function test(index) {
     t.insert({zip: "10001", loc: [[10, 10], [50, 50]]});
     t.insert({zip: "10002", loc: [[20, 20], [50, 50]]});
     var res = t.insert({zip: "10003", loc: [[30, 30], [50, 50]]});
-    assert.writeOK(res);
+    assert.commandWorked(res);
 
     if (index) {
         assert.commandWorked(t.ensureIndex({loc: "2d", zip: 1}));
@@ -18,7 +18,7 @@ function test(index) {
     }
 
     res = t.insert({zip: "10004", loc: [[40, 40], [50, 50]]});
-    assert.writeOK(res);
+    assert.commandWorked(res);
 
     // test normal access
     printjson(t.find({loc: {$within: {$box: [[0, 0], [45, 45]]}}}).toArray());

@@ -13,7 +13,7 @@ assert.commandWorked(viewsDB.createView("view", "collection", []));
 let coll = viewsDB.getCollection("collection");
 
 for (let i = 0; i < 10; ++i) {
-    assert.writeOK(coll.insert({a: i}));
+    assert.commandWorked(coll.insert({a: i}));
 }
 
 conn.forceReadMode("legacy");

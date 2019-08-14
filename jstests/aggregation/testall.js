@@ -118,7 +118,7 @@ assert(arrayEq(firstBatch, u1result), tojson({got: firstBatch, expected: u1resul
 
 // unwind an array at the end of a dotted path
 testDB.ut.drop();
-assert.writeOK(testDB.ut.insert({_id: 4, a: 1, b: {e: 7, f: [4, 3, 2, 1]}, c: 12, d: 17}));
+assert.commandWorked(testDB.ut.insert({_id: 4, a: 1, b: {e: 7, f: [4, 3, 2, 1]}, c: 12, d: 17}));
 let u2 = testDB.runCommand(
     {aggregate: "ut", pipeline: [{$unwind: "$b.f"}, {$sort: {"b.f": -1}}], cursor: {}});
 

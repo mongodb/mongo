@@ -32,7 +32,7 @@ const runPrimaryTest = function(fn) {
 rst.getPrimary().getDB('admin').createUser({user: 'root', pwd: 'root', roles: ['root']});
 
 runPrimaryTest((curPrimary) => {
-    assert.writeOK(curPrimary.getDB('test').a.insert({a: 1, str: 'TESTTESTTEST'}));
+    assert.commandWorked(curPrimary.getDB('test').a.insert({a: 1, str: 'TESTTESTTEST'}));
     assert.eq(1, curPrimary.getDB('test').a.count(), 'Error interacting with replSet');
 });
 
@@ -76,7 +76,7 @@ const rolloverKey = function(keyFileForServers, keyFileForAuth) {
 rolloverKey("jstests/libs/keyForRollover", "jstests/libs/key1");
 
 runPrimaryTest((curPrimary) => {
-    assert.writeOK(curPrimary.getDB('test').a.insert({a: 1, str: 'TESTTESTTEST'}));
+    assert.commandWorked(curPrimary.getDB('test').a.insert({a: 1, str: 'TESTTESTTEST'}));
     assert.eq(2, curPrimary.getDB('test').a.count(), 'Error interacting with replSet');
 });
 
@@ -84,7 +84,7 @@ jsTestLog("Upgrading set to use key2");
 rolloverKey("jstests/libs/key2", "jstests/libs/key2");
 
 runPrimaryTest((curPrimary) => {
-    assert.writeOK(curPrimary.getDB('test').a.insert({a: 1, str: 'TESTTESTTEST'}));
+    assert.commandWorked(curPrimary.getDB('test').a.insert({a: 1, str: 'TESTTESTTEST'}));
     assert.eq(3, curPrimary.getDB('test').a.count(), 'Error interacting with replSet');
 });
 

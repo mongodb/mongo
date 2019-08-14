@@ -34,7 +34,7 @@ while (inserted < (40 * 1024 * 1024)) {
     bulk.insert({_id: num++, s: bigString});
     inserted += bigString.length;
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {_id: 1}}));
 assert.gt(s.config.chunks.count({"ns": "test.foo"}), 10);
@@ -60,7 +60,7 @@ while (getShardSize(shardConn) < maxSizeBytes) {
     for (var x = 0; x < 20; x++) {
         localBulk.insert({x: x, val: bigString});
     }
-    assert.writeOK(localBulk.execute());
+    assert.commandWorked(localBulk.execute());
 
     // Force the storage engine to flush files to disk so shardSize will get updated.
     assert.commandWorked(shardConn.getDB('admin').runCommand({fsync: 1}));

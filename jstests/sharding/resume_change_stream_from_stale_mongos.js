@@ -34,8 +34,8 @@ st.ensurePrimaryShard(firstMongosDB.getName(), st.rs0.getURL());
 // record a resume token after the first chunk migration.
 let changeStream = firstMongosColl.aggregate([{$changeStream: {}}]);
 
-assert.writeOK(firstMongosColl.insert({_id: -1}));
-assert.writeOK(firstMongosColl.insert({_id: 1}));
+assert.commandWorked(firstMongosColl.insert({_id: -1}));
+assert.commandWorked(firstMongosColl.insert({_id: 1}));
 
 for (let nextId of [-1, 1]) {
     assert.soon(() => changeStream.hasNext());
@@ -54,8 +54,8 @@ assert.commandWorked(firstMongosDB.adminCommand(
     {moveChunk: firstMongosColl.getFullName(), find: {_id: 1}, to: st.rs1.getURL()}));
 
 // Then do one insert to each shard.
-assert.writeOK(firstMongosColl.insert({_id: -2}));
-assert.writeOK(firstMongosColl.insert({_id: 2}));
+assert.commandWorked(firstMongosColl.insert({_id: -2}));
+assert.commandWorked(firstMongosColl.insert({_id: 2}));
 
 // The change stream should see all the inserts after internally re-establishing cursors after
 // the chunk split.
@@ -69,8 +69,8 @@ for (let nextId of [-2, 2]) {
 }
 
 // Do some writes that occur on each shard after the resume token.
-assert.writeOK(firstMongosColl.insert({_id: -3}));
-assert.writeOK(firstMongosColl.insert({_id: 3}));
+assert.commandWorked(firstMongosColl.insert({_id: -3}));
+assert.commandWorked(firstMongosColl.insert({_id: 3}));
 
 // Now try to resume the change stream using a stale mongos which believes the collection is
 // unsharded. The first mongos should use the shard versioning protocol to discover that the

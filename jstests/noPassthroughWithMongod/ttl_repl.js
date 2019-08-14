@@ -35,7 +35,7 @@ var bulk = mastercol.initializeUnorderedBulkOp();
 for (i = 0; i < 24; i++) {
     bulk.insert({x: new Date(now - (3600 * 1000 * i))});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 rt.awaitReplication();
 assert.eq(24, mastercol.count(), "docs not inserted on primary");
 assert.eq(24, slave1col.count(), "docs not inserted on secondary");

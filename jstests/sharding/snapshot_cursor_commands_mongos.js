@@ -199,7 +199,7 @@ function runTest(testScenario, {useCausalConsistency, commands, collName}) {
 
         // Insert an 11th document which should not be visible to the snapshot cursor. This
         // write is performed outside of the session.
-        assert.writeOK(mainDb[collName].insert({_id: 10}, {writeConcern: {w: "majority"}}));
+        assert.commandWorked(mainDb[collName].insert({_id: 10}, {writeConcern: {w: "majority"}}));
 
         verifyInvalidGetMoreAttempts(mainDb, collName, cursorId, lsid, txnNumber);
 
@@ -247,7 +247,7 @@ function runTest(testScenario, {useCausalConsistency, commands, collName}) {
         assert.eq(11, res.cursor.firstBatch.length);
 
         // Remove the 11th document to preserve the collection for the next command.
-        assert.writeOK(mainDb[collName].remove({_id: 10}, {writeConcern: {w: "majority"}}));
+        assert.commandWorked(mainDb[collName].remove({_id: 10}, {writeConcern: {w: "majority"}}));
 
         assert.commandWorked(session.commitTransaction_forTesting());
         session.endSession();

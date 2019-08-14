@@ -35,17 +35,17 @@ function verifyResultIds(results, expectedIds) {
  */
 function reset(t) {
     t.drop();
-    assert.writeOK(t.insert({_id: 0, a: 1, b: 1}));
-    assert.writeOK(t.insert({_id: 1, a: 1, b: 2}));
-    assert.writeOK(t.insert({_id: 2, a: 1, b: 3}));
+    assert.commandWorked(t.insert({_id: 0, a: 1, b: 1}));
+    assert.commandWorked(t.insert({_id: 1, a: 1, b: 2}));
+    assert.commandWorked(t.insert({_id: 2, a: 1, b: 3}));
 
-    assert.writeOK(t.insert({_id: 3, a: 2, b: 1}));
-    assert.writeOK(t.insert({_id: 4, a: 2, b: 2}));
-    assert.writeOK(t.insert({_id: 5, a: 2, b: 3}));
+    assert.commandWorked(t.insert({_id: 3, a: 2, b: 1}));
+    assert.commandWorked(t.insert({_id: 4, a: 2, b: 2}));
+    assert.commandWorked(t.insert({_id: 5, a: 2, b: 3}));
 
-    assert.writeOK(t.insert({_id: 6, a: 3, b: 1}));
-    assert.writeOK(t.insert({_id: 7, a: 3, b: 2}));
-    assert.writeOK(t.insert({_id: 8, a: 3, b: 3}));
+    assert.commandWorked(t.insert({_id: 6, a: 3, b: 1}));
+    assert.commandWorked(t.insert({_id: 7, a: 3, b: 2}));
+    assert.commandWorked(t.insert({_id: 8, a: 3, b: 3}));
 }
 
 // Two helpers to save typing

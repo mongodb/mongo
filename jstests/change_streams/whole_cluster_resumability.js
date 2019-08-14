@@ -15,7 +15,7 @@ let cst = new ChangeStreamTest(adminDB);
 let resumeCursor = cst.startWatchingAllChangesForCluster();
 
 // Insert a document in the first database and save the resulting change stream.
-assert.writeOK(db1Coll.insert({_id: 1}));
+assert.commandWorked(db1Coll.insert({_id: 1}));
 const firstInsertChangeDoc = cst.getOneChange(resumeCursor);
 assert.docEq(firstInsertChangeDoc.fullDocument, {_id: 1});
 
@@ -28,12 +28,12 @@ resumeCursor = cst.startWatchingChanges({
 });
 
 // Write the next document into the second database.
-assert.writeOK(db2Coll.insert({_id: 2}));
+assert.commandWorked(db2Coll.insert({_id: 2}));
 const secondInsertChangeDoc = cst.getOneChange(resumeCursor);
 assert.docEq(secondInsertChangeDoc.fullDocument, {_id: 2});
 
 // Write the third document into the first database again.
-assert.writeOK(db1Coll.insert({_id: 3}));
+assert.commandWorked(db1Coll.insert({_id: 3}));
 const thirdInsertChangeDoc = cst.getOneChange(resumeCursor);
 assert.docEq(thirdInsertChangeDoc.fullDocument, {_id: 3});
 
@@ -68,7 +68,7 @@ if (!FixtureHelpers.isSharded(db1Coll)) {
         pipeline: [{$changeStream: {allChangesForCluster: true}}],
         aggregateOptions: {cursor: {batchSize: 0}}
     });
-    assert.writeOK(db1Coll.renameCollection(renameColl.getName()));
+    assert.commandWorked(db1Coll.renameCollection(renameColl.getName()));
 
     const renameChanges = cst.assertNextChangesEqual({
         cursor: resumeCursor,
@@ -83,7 +83,7 @@ if (!FixtureHelpers.isSharded(db1Coll)) {
     const resumeTokenRename = renameChanges[0]._id;
 
     // Insert into the renamed collection.
-    assert.writeOK(renameColl.insert({_id: "after rename"}));
+    assert.commandWorked(renameColl.insert({_id: "after rename"}));
 
     // Resume from the rename notification using 'resumeAfter' and verify that the change stream
     // returns the next insert.
@@ -117,7 +117,7 @@ if (!FixtureHelpers.isSharded(db1Coll)) {
 
     // Rename back to the original collection for reliability of the collection drops when
     // dropping the database.
-    assert.writeOK(renameColl.renameCollection(db1Coll.getName()));
+    assert.commandWorked(renameColl.renameCollection(db1Coll.getName()));
 }
 
 // Dropping a database should generate a 'drop' notification for the collection followed by a
@@ -128,7 +128,7 @@ const dropDbChanges = cst.assertDatabaseDrop({cursor: resumeCursor, db: testDBs[
 const resumeTokenDbDrop = dropDbChanges[dropDbChanges.length - 1]._id;
 
 // Recreate the collection and insert a document.
-assert.writeOK(db1Coll.insert({_id: "after recreate"}));
+assert.commandWorked(db1Coll.insert({_id: "after recreate"}));
 
 let expectedInsert = {
     operationType: "insert",

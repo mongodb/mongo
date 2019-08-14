@@ -4,10 +4,10 @@
 
 const coll = db.expr_match;
 coll.drop();
-assert.writeOK(coll.insert({x: 0}));
-assert.writeOK(coll.insert({x: 1, y: 1}));
-assert.writeOK(coll.insert({x: 2, y: 4}));
-assert.writeOK(coll.insert({x: 3, y: 9}));
+assert.commandWorked(coll.insert({x: 0}));
+assert.commandWorked(coll.insert({x: 1, y: 1}));
+assert.commandWorked(coll.insert({x: 2, y: 4}));
+assert.commandWorked(coll.insert({x: 3, y: 9}));
 
 // $match with $expr representing local document field path reference.
 assert.eq(1, coll.aggregate([{$match: {$expr: {$eq: ["$x", 2]}}}]).itcount());

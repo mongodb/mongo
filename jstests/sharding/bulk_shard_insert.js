@@ -76,7 +76,7 @@ while (docsInserted < numDocs) {
         docsInserted++;
     }
 
-    assert.writeOK(coll.insert(bulk));
+    assert.commandWorked(coll.insert(bulk));
 
     if (docsInserted % 10000 == 0) {
         print("Inserted " + docsInserted + " documents.");

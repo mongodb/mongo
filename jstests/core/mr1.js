@@ -167,7 +167,7 @@ if (true) {
             correct[k] = 1;
         bulk.insert({x: i, tags: [k]});
     }
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 
     res = db.runCommand({mapreduce: "mr1", out: "mr1_foo", map: m, reduce: r});
     d(res);

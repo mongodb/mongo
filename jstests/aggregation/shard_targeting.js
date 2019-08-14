@@ -70,10 +70,10 @@ assert.commandWorked(mongosDB.adminCommand(
     {moveChunk: mongosColl.getFullName(), find: {_id: 150}, to: st.shard1.shardName}));
 
 // Write one document into each of the chunks.
-assert.writeOK(mongosColl.insert({_id: -150}));
-assert.writeOK(mongosColl.insert({_id: -50}));
-assert.writeOK(mongosColl.insert({_id: 50}));
-assert.writeOK(mongosColl.insert({_id: 150}));
+assert.commandWorked(mongosColl.insert({_id: -150}));
+assert.commandWorked(mongosColl.insert({_id: -50}));
+assert.commandWorked(mongosColl.insert({_id: 50}));
+assert.commandWorked(mongosColl.insert({_id: 150}));
 
 const shardExceptions =
     [ErrorCodes.StaleConfig, ErrorCodes.StaleShardVersion, ErrorCodes.StaleEpoch];

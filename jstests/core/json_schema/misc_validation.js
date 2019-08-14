@@ -84,8 +84,8 @@ assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
 
 // Test that a valid $jsonSchema is legal in a count command.
 coll.drop();
-assert.writeOK(coll.insert({a: 1, b: "str"}));
-assert.writeOK(coll.insert({a: 1, b: 1}));
+assert.commandWorked(coll.insert({a: 1, b: "str"}));
+assert.commandWorked(coll.insert({a: 1, b: 1}));
 assert.eq(1, coll.count({$jsonSchema: {properties: {a: {type: "number"}, b: {type: "string"}}}}));
 
 // Test that a valid $jsonSchema is legal in a $geoNear stage.
@@ -93,8 +93,8 @@ const point = {
     type: "Point",
     coordinates: [31.0, 41.0]
 };
-assert.writeOK(coll.insert({geo: point, a: 1}));
-assert.writeOK(coll.insert({geo: point, a: 0}));
+assert.commandWorked(coll.insert({geo: point, a: 1}));
+assert.commandWorked(coll.insert({geo: point, a: 0}));
 assert.commandWorked(coll.createIndex({geo: "2dsphere"}));
 res = coll.aggregate({
               $geoNear: {
@@ -111,10 +111,10 @@ assert.eq(res[0].loc, point, tojson(res));
 
 // Test that a valid $jsonSchema is legal in a distinct command.
 coll.drop();
-assert.writeOK(coll.insert({a: 1}));
-assert.writeOK(coll.insert({a: 2}));
-assert.writeOK(coll.insert({a: "str"}));
-assert.writeOK(coll.insert({a: ["STR", "str"]}));
+assert.commandWorked(coll.insert({a: 1}));
+assert.commandWorked(coll.insert({a: 2}));
+assert.commandWorked(coll.insert({a: "str"}));
+assert.commandWorked(coll.insert({a: ["STR", "str"]}));
 
 assert(arrayEq([1, 2], coll.distinct("a", {$jsonSchema: {properties: {a: {type: "number"}}}})));
 
@@ -127,16 +127,16 @@ const caseInsensitiveCollation = {
 coll.drop();
 assert.commandWorked(
     testDB.createCollection(coll.getName(), {collation: caseInsensitiveCollation}));
-assert.writeOK(coll.insert({a: "str"}));
-assert.writeOK(coll.insert({a: ["STR", "sTr"]}));
+assert.commandWorked(coll.insert({a: "str"}));
+assert.commandWorked(coll.insert({a: ["STR", "sTr"]}));
 assert.eq(0, coll.find({$jsonSchema: schema}).itcount());
 assert.eq(2, coll.find({$jsonSchema: {properties: {a: {uniqueItems: true}}}}).itcount());
 assert.eq(2, coll.find({a: "STR"}).itcount());
 
 // Test that $jsonSchema does not respect the collation set explicitly on a query.
 coll.drop();
-assert.writeOK(coll.insert({a: "str"}));
-assert.writeOK(coll.insert({a: ["STR", "sTr"]}));
+assert.commandWorked(coll.insert({a: "str"}));
+assert.commandWorked(coll.insert({a: ["STR", "sTr"]}));
 
 if (testDB.getMongo().useReadCommands()) {
     assert.eq(0, coll.find({$jsonSchema: schema}).collation(caseInsensitiveCollation).itcount());
@@ -155,7 +155,7 @@ if (testDB.getMongo().useReadCommands()) {
     bulk.insert({name: "John", age: "unknown"});
     bulk.insert({name: "Mark"});
     bulk.insert({});
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 
     assert.commandWorked(testDB.createView(
         "seniorCitizens", coll.getName(), [{
@@ -186,9 +186,9 @@ const foreign = testDB.json_schema_foreign;
 foreign.drop();
 coll.drop();
 for (let i = 0; i < 10; i++) {
-    assert.writeOK(foreign.insert({_id: i, n: [i - 1, i + 1]}));
+    assert.commandWorked(foreign.insert({_id: i, n: [i - 1, i + 1]}));
 }
-assert.writeOK(coll.insert({starting: 0}));
+assert.commandWorked(coll.insert({starting: 0}));
 
 res = coll.aggregate({
                   $graphLookup: {
@@ -206,10 +206,10 @@ assert.eq(res[0].integers.length, 5);
 
 // Test that $jsonSchema is legal in a delete command.
 coll.drop();
-assert.writeOK(coll.insert({a: 1}));
-assert.writeOK(coll.insert({a: 2}));
-assert.writeOK(coll.insert({a: "str"}));
-assert.writeOK(coll.insert({a: [3]}));
+assert.commandWorked(coll.insert({a: 1}));
+assert.commandWorked(coll.insert({a: 2}));
+assert.commandWorked(coll.insert({a: "str"}));
+assert.commandWorked(coll.insert({a: [3]}));
 
 schema = {
     properties: {a: {type: "number", maximum: 2}}
@@ -235,18 +235,18 @@ if (db.getMongo().writeMode() === "commands") {
 
 // Test that $jsonSchema is legal in an update command.
 coll.drop();
-assert.writeOK(coll.insert({a: 1}));
-assert.writeOK(coll.insert({a: 2}));
+assert.commandWorked(coll.insert({a: 1}));
+assert.commandWorked(coll.insert({a: 2}));
 
 res = coll.update({$jsonSchema: schema}, {$inc: {a: 1}}, {multi: true});
-assert.writeOK(res);
+assert.commandWorked(res);
 assert.eq(2, res.nMatched);
 assert.eq(1, coll.find({$jsonSchema: schema}).itcount());
 
 // Test that $jsonSchema is legal in a findAndModify command.
 coll.drop();
-assert.writeOK(coll.insert({a: "long_string"}));
-assert.writeOK(coll.insert({a: "short"}));
+assert.commandWorked(coll.insert({a: "long_string"}));
+assert.commandWorked(coll.insert({a: "short"}));
 
 schema = {
     properties: {a: {type: "string", minLength: 6}}
@@ -257,9 +257,9 @@ assert.eq(1, coll.find({$jsonSchema: schema}).itcount());
 
 // Test that $jsonSchema works correctly in the presence of a basic b-tree index.
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, a: 1, b: 1}));
-assert.writeOK(coll.insert({_id: 2, a: 2, b: 2, point: [5, 5]}));
-assert.writeOK(coll.insert({_id: 3, a: "temp text test"}));
+assert.commandWorked(coll.insert({_id: 1, a: 1, b: 1}));
+assert.commandWorked(coll.insert({_id: 2, a: 2, b: 2, point: [5, 5]}));
+assert.commandWorked(coll.insert({_id: 3, a: "temp text test"}));
 
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.eq(3, coll.find({$jsonSchema: {}}).itcount());
@@ -312,7 +312,7 @@ assert.eq(1, coll.find({$and: [{$jsonSchema: {}}, {$text: {$search: "TEST"}}]}).
 
 if (!isMongos) {
     coll.drop();
-    assert.writeOK(coll.insert({_id: 0, a: true}));
+    assert.commandWorked(coll.insert({_id: 0, a: true}));
 
     // Test $jsonSchema in the precondition checking for applyOps.
     res = testDB.adminCommand({
@@ -331,6 +331,6 @@ if (!isMongos) {
     // Use majority write concern to clear the drop-pending that can cause lock conflicts with
     // transactions.
     coll.drop({writeConcern: {w: "majority"}});
-    assert.writeOK(coll.insert({_id: 1, a: true}));
+    assert.commandWorked(coll.insert({_id: 1, a: true}));
 }
 }());

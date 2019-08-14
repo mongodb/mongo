@@ -28,7 +28,7 @@ const shardColl = shardDB.test;
 const collNS = mongosColl.getFullName();
 
 for (let i = 0; i < 5; ++i) {
-    assert.writeOK(mongosColl.insert({_id: i, a: i}));
+    assert.commandWorked(mongosColl.insert({_id: i, a: i}));
 }
 
 // The profiler will be used to verify that comments are present on the shard.

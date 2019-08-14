@@ -19,7 +19,7 @@ assert.neq(null, conn, 'mongod was unable to start up');
 
 // Now connect to the mongod, do a journaled write and abruptly stop the server.
 var testDB = conn.getDB('test');
-assert.writeOK(testDB.synced.insert({synced: true}, {writeConcern: {j: true}}));
+assert.commandWorked(testDB.synced.insert({synced: true}, {writeConcern: {j: true}}));
 MongoRunner.stopMongod(conn, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
 
 // Restart the mongod.

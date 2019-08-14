@@ -9,7 +9,7 @@ load("jstests/aggregation/extras/utils.js");
 var coll = db.server19548;
 coll.drop();
 // Seed collection so that the pipeline will execute.
-assert.writeOK(coll.insert({}));
+assert.commandWorked(coll.insert({}));
 
 // Helper for testing that op returns expResult.
 function testOp(op, expResult) {

@@ -42,14 +42,14 @@ function testPipeline(pipeline, expectedResult, collection) {
 // Pipeline syntax using 'let' variables.
 //
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, x: 1}));
-assert.writeOK(coll.insert({_id: 2, x: 2}));
-assert.writeOK(coll.insert({_id: 3, x: 3}));
+assert.commandWorked(coll.insert({_id: 1, x: 1}));
+assert.commandWorked(coll.insert({_id: 2, x: 2}));
+assert.commandWorked(coll.insert({_id: 3, x: 3}));
 
 from.drop();
-assert.writeOK(from.insert({_id: 1}));
-assert.writeOK(from.insert({_id: 2}));
-assert.writeOK(from.insert({_id: 3}));
+assert.commandWorked(from.insert({_id: 1}));
+assert.commandWorked(from.insert({_id: 2}));
+assert.commandWorked(from.insert({_id: 3}));
 
 // Basic non-equi theta join via $project.
 let pipeline = [
@@ -425,7 +425,7 @@ testPipeline(pipeline, expectedResults, coll);
 
 // Comparison where a 'let' variable references an array.
 coll.drop();
-assert.writeOK(coll.insert({x: [1, 2, 3]}));
+assert.commandWorked(coll.insert({x: [1, 2, 3]}));
 
 pipeline = [
         {
@@ -448,7 +448,7 @@ testPipeline(pipeline, expectedResults, coll);
 // Pipeline syntax with nested object.
 //
 coll.drop();
-assert.writeOK(coll.insert({x: {y: {z: 10}}}));
+assert.commandWorked(coll.insert({x: {y: {z: 10}}}));
 
 // Subfields of 'let' variables can be referenced via dotted path.
 pipeline = [
@@ -508,24 +508,24 @@ testPipeline(pipeline, expectedResults, coll);
 // Pipeline syntax with nested $lookup.
 //
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, w: 1}));
-assert.writeOK(coll.insert({_id: 2, w: 2}));
-assert.writeOK(coll.insert({_id: 3, w: 3}));
+assert.commandWorked(coll.insert({_id: 1, w: 1}));
+assert.commandWorked(coll.insert({_id: 2, w: 2}));
+assert.commandWorked(coll.insert({_id: 3, w: 3}));
 
 from.drop();
-assert.writeOK(from.insert({_id: 1, x: 1}));
-assert.writeOK(from.insert({_id: 2, x: 2}));
-assert.writeOK(from.insert({_id: 3, x: 3}));
+assert.commandWorked(from.insert({_id: 1, x: 1}));
+assert.commandWorked(from.insert({_id: 2, x: 2}));
+assert.commandWorked(from.insert({_id: 3, x: 3}));
 
 thirdColl.drop();
-assert.writeOK(thirdColl.insert({_id: 1, y: 1}));
-assert.writeOK(thirdColl.insert({_id: 2, y: 2}));
-assert.writeOK(thirdColl.insert({_id: 3, y: 3}));
+assert.commandWorked(thirdColl.insert({_id: 1, y: 1}));
+assert.commandWorked(thirdColl.insert({_id: 2, y: 2}));
+assert.commandWorked(thirdColl.insert({_id: 3, y: 3}));
 
 fourthColl.drop();
-assert.writeOK(fourthColl.insert({_id: 1, z: 1}));
-assert.writeOK(fourthColl.insert({_id: 2, z: 2}));
-assert.writeOK(fourthColl.insert({_id: 3, z: 3}));
+assert.commandWorked(fourthColl.insert({_id: 1, z: 1}));
+assert.commandWorked(fourthColl.insert({_id: 2, z: 2}));
+assert.commandWorked(fourthColl.insert({_id: 3, z: 3}));
 
 // Nested $lookup pipeline.
 pipeline = [

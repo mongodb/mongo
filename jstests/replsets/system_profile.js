@@ -18,13 +18,13 @@ var getLatestOp = function() {
 };
 
 var primaryDB = rst.getPrimary().getDB('test');
-assert.writeOK(primaryDB.foo.insert({}));
+assert.commandWorked(primaryDB.foo.insert({}));
 var op = getLatestOp();
 
 // Enable profiling on the primary
 assert.commandWorked(primaryDB.runCommand({profile: 2}));
 assert.eq(op, getLatestOp(), "oplog entry created when profile was enabled");
-assert.writeOK(primaryDB.foo.insert({}));
+assert.commandWorked(primaryDB.foo.insert({}));
 op = getLatestOp();
 assert.commandWorked(primaryDB.runCommand({profile: 0}));
 assert.eq(op, getLatestOp(), "oplog entry created when profile was disabled");
@@ -36,7 +36,7 @@ assert.eq(op, getLatestOp(), "oplog entry created when system.profile was droppe
 assert.commandWorked(primaryDB.createCollection("system.profile", {capped: true, size: 1000}));
 assert.eq(op, getLatestOp(), "oplog entry created when system.profile was created");
 assert.commandWorked(primaryDB.runCommand({profile: 2}));
-assert.writeOK(primaryDB.foo.insert({}));
+assert.commandWorked(primaryDB.foo.insert({}));
 op = getLatestOp();
 assert.commandWorked(primaryDB.runCommand({profile: 0}));
 

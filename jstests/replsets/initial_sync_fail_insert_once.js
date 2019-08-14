@@ -15,7 +15,7 @@ var primary = replSet.getPrimary();
 var secondary = replSet.getSecondary();
 
 var coll = primary.getDB('test').getCollection(name);
-assert.writeOK(coll.insert({_id: 0, x: 1}, {writeConcern: {w: 2}}));
+assert.commandWorked(coll.insert({_id: 0, x: 1}, {writeConcern: {w: 2}}));
 
 jsTest.log("Enabling Failpoint failCollectionInserts on " + tojson(secondary));
 assert.commandWorked(secondary.getDB("admin").adminCommand({

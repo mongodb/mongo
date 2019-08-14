@@ -36,7 +36,7 @@ var coll = db.indexofbytes;
 coll.drop();
 
 // Insert a dummy document so something flows through the pipeline.
-assert.writeOK(coll.insert({}));
+assert.commandWorked(coll.insert({}));
 
 testExpressionBytes(coll, {$indexOfBytes: ["abc", "b"]}, 1);
 

@@ -73,16 +73,16 @@ const expectedResults = [
 assert.commandWorked(mongos0DB.adminCommand({enableSharding: mongos0DB.getName()}));
 st.ensurePrimaryShard(mongos0DB.getName(), st.shard0.shardName);
 
-assert.writeOK(mongos0LocalColl.insert({_id: 0, a: 1}));
-assert.writeOK(mongos0LocalColl.insert({_id: 1, a: null}));
+assert.commandWorked(mongos0LocalColl.insert({_id: 0, a: 1}));
+assert.commandWorked(mongos0LocalColl.insert({_id: 1, a: null}));
 
-assert.writeOK(mongos0ForeignColl.insert({_id: 0, b: 1}));
-assert.writeOK(mongos0ForeignColl.insert({_id: 1, b: null}));
+assert.commandWorked(mongos0ForeignColl.insert({_id: 0, b: 1}));
+assert.commandWorked(mongos0ForeignColl.insert({_id: 1, b: null}));
 
 // Send writes through mongos1 such that it's aware of the collections and believes they are
 // unsharded.
-assert.writeOK(mongos1LocalColl.insert({_id: 2}));
-assert.writeOK(mongos1ForeignColl.insert({_id: 2}));
+assert.commandWorked(mongos1LocalColl.insert({_id: 2}));
+assert.commandWorked(mongos1ForeignColl.insert({_id: 2}));
 
 //
 // Test unsharded local and sharded foreign collections, with the primary shard unaware that
@@ -161,9 +161,9 @@ assert.eq(mongos1LocalColl.aggregate(pipeline).toArray(), [
 
 // Recreate the foreign collection as unsharded.
 mongos0ForeignColl.drop();
-assert.writeOK(mongos0ForeignColl.insert({_id: 0, b: 1}));
-assert.writeOK(mongos0ForeignColl.insert({_id: 1, b: null}));
-assert.writeOK(mongos0ForeignColl.insert({_id: 2}));
+assert.commandWorked(mongos0ForeignColl.insert({_id: 0, b: 1}));
+assert.commandWorked(mongos0ForeignColl.insert({_id: 1, b: null}));
+assert.commandWorked(mongos0ForeignColl.insert({_id: 2}));
 
 // Verify $lookup results through the fresh mongos.
 restartPrimaryShard(st.rs0, mongos0LocalColl, mongos0ForeignColl);

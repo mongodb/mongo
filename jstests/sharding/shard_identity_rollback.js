@@ -37,7 +37,7 @@ var shardIdentityDoc = {
     clusterId: ObjectId()
 };
 
-assert.writeOK(priConn.getDB('admin').system.version.update(
+assert.commandWorked(priConn.getDB('admin').system.version.update(
     {_id: 'shardIdentity'}, shardIdentityDoc, {upsert: true}));
 
 // Ensure sharding state on the primary was initialized
@@ -71,7 +71,7 @@ restartServerReplication(secondaries);
 // Wait for a new healthy primary
 var newPriConn = replTest.getPrimary();
 assert.neq(priConn, newPriConn);
-assert.writeOK(newPriConn.getDB('test').foo.insert({a: 1}, {writeConcern: {w: 'majority'}}));
+assert.commandWorked(newPriConn.getDB('test').foo.insert({a: 1}, {writeConcern: {w: 'majority'}}));
 
 // Restart the original primary so it triggers a rollback of the shardIdentity insert.
 jsTest.log("Restarting original primary");

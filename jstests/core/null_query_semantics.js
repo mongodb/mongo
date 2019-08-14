@@ -19,7 +19,7 @@ function extractAValues(results) {
 function testNotEqualsNullSemantics() {
     // For the first portion of the test, only insert documents without arrays. This will avoid
     // making the indexes multi-key, which may allow an index to be used to answer the queries.
-    assert.writeOK(coll.insert([
+    assert.commandWorked(coll.insert([
         {_id: "a_empty_subobject", a: {}},
         {_id: "a_null", a: null},
         {_id: "a_number", a: 4},
@@ -214,7 +214,7 @@ function testNotEqualsNullSemantics() {
         assert.eq(writeResult.getWriteErrors()[0].code, 16766, tojson(writeResult));
         return;
     }
-    assert.writeOK(writeResult);
+    assert.commandWorked(writeResult);
 
     // Test the semantics of the query {a: {$eq: null}}.
     (function testBasicNullQuery() {

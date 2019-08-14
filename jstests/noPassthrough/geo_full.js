@@ -394,7 +394,7 @@ for (var test = 0; test < numTests; test++) {
         doc._id = i;
         bulk.insert(doc);
     }
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 
     var indexDoc = {"locs.loc": "2d"};
     randIndexAdditions(indexDoc);

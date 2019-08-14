@@ -61,7 +61,7 @@ function doExecutionTest(conn) {
     for (let i = 0; i < nDocs; i++) {
         bulk.insert(generateRandomDocument());
     }
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 
     // Extract the contents of the address field, and make sure that doing the same
     // with replaceRoot yields the correct answer.

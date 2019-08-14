@@ -36,7 +36,7 @@ function test(st, db, sharded, indexType) {
         var lng = 180 - Random.rand() * 360;
         bulk.insert({rand: Math.random(), loc: [lng, lat]});
     }
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
     assert.eq(db[coll].count(), numPts);
 
     assert.commandWorked(db[coll].ensureIndex({loc: indexType}));

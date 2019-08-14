@@ -11,7 +11,7 @@ var config = replTest.getReplSetConfigFromNode();
 
 var runTest = function(testDB, primaryConn) {
     var dbName = testDB.getName();
-    assert.writeOK(primaryConn.getDB(dbName).user.insert({x: 1}, {writeConcern: {w: 2}}));
+    assert.commandWorked(primaryConn.getDB(dbName).user.insert({x: 1}, {writeConcern: {w: 2}}));
 
     var localDB = primaryConn.getDB('local');
 

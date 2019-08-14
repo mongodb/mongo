@@ -59,7 +59,7 @@ let CommonOps = (node) => {
     jsTestLog('Inserting ' + numDocs + ' documents of ' + minDocSizeMB + ' MB each into ' +
               collName + '.');
     for (let i = 0; i < numDocs; ++i) {
-        assert.writeOK(
+        assert.commandWorked(
             coll.save({_id: i, a: 0, x: largeString},
                       {writeConcern: {w: 'majority', wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
     }
@@ -72,7 +72,7 @@ let RollbackOps = (node) => {
     jsTestLog('Updating ' + numDocs +
               ' documents on the primary. These updates will be rolled back.');
     for (let i = 0; i < numDocs; ++i) {
-        assert.writeOK(coll.update({_id: i}, {$inc: {a: 1}}));
+        assert.commandWorked(coll.update({_id: i}, {$inc: {a: 1}}));
     }
 };
 

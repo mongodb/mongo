@@ -7,7 +7,7 @@ col.drop();
 
 // Insert some sample data.
 
-assert.writeOK(col.insert([
+assert.commandWorked(col.insert([
     {d: NumberDecimal('1')},
     {d: NumberDecimal(1)},
     {d: NumberDecimal(NumberLong('1'))},
@@ -15,7 +15,7 @@ assert.writeOK(col.insert([
     {d: NumberDecimal('NaN')},
     {d: NumberDecimal('-NaN')}
 ]),
-               'Initial insertion of decimals failed');
+                     'Initial insertion of decimals failed');
 
 var exactDoubleString = "1427247692705959881058285969449495136382746624";
 var exactDoubleTinyString =

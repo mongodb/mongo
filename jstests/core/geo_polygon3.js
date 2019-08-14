@@ -15,7 +15,7 @@ for (let n = 0; n < numTests; n++) {
     for (let x = 1; x < 9; x++) {
         for (let y = 1; y < 9; y++) {
             let o = {_id: num++, loc: [x, y]};
-            assert.writeOK(t.insert(o));
+            assert.commandWorked(t.insert(o));
         }
     }
 
@@ -51,14 +51,15 @@ for (let n = 0; n < numTests; n++) {
         [2, 0]  // Bottom
     ];
 
-    assert.writeOK(t.insert({loc: [1, 3]}));  // Add a point that's in
+    assert.commandWorked(t.insert({loc: [1, 3]}));  // Add a point that's in
     assert.commandWorked(t.createIndex({loc: "2d"}, {bits: 2 + n}));
 
     assert.eq(1, t.find({loc: {$within: {$polygon: pacman}}}).itcount(), "Pacman single point");
 
-    assert.writeOK(t.insert({loc: [5, 3]}));   // Add a point that's out right in the mouth opening
-    assert.writeOK(t.insert({loc: [3, 7]}));   // Add a point above the center of the head
-    assert.writeOK(t.insert({loc: [3, -1]}));  // Add a point below the center of the bottom
+    assert.commandWorked(
+        t.insert({loc: [5, 3]}));  // Add a point that's out right in the mouth opening
+    assert.commandWorked(t.insert({loc: [3, 7]}));   // Add a point above the center of the head
+    assert.commandWorked(t.insert({loc: [3, -1]}));  // Add a point below the center of the bottom
 
     assert.eq(1, t.find({loc: {$within: {$polygon: pacman}}}).itcount(), "Pacman double point");
 }

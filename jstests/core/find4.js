@@ -4,7 +4,7 @@
 const coll = db.find4;
 coll.drop();
 
-assert.writeOK(coll.insert({a: 1123, b: 54332}));
+assert.commandWorked(coll.insert({a: 1123, b: 54332}));
 
 let o = coll.findOne();
 assert.eq(1123, o.a, "A");
@@ -23,8 +23,8 @@ assert(!o.a, "I");
 
 assert(coll.drop());
 
-assert.writeOK(coll.insert({a: 1, b: 1}));
-assert.writeOK(coll.insert({a: 2, b: 2}));
+assert.commandWorked(coll.insert({a: 1, b: 1}));
+assert.commandWorked(coll.insert({a: 2, b: 2}));
 assert.eq("1-1,2-2",
           coll.find()
               .sort({a: 1})

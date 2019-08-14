@@ -63,8 +63,8 @@ let explicitCaseInsensitiveStream = cst.startWatchingChanges({
     aggregateOptions: {collation: caseInsensitive}
 });
 
-assert.writeOK(caseInsensitiveCollection.insert({_id: 0, text: "aBc"}));
-assert.writeOK(caseInsensitiveCollection.insert({_id: 1, text: "abc"}));
+assert.commandWorked(caseInsensitiveCollection.insert({_id: 0, text: "aBc"}));
+assert.commandWorked(caseInsensitiveCollection.insert({_id: 1, text: "abc"}));
 
 // 'didNotInheritCollationStream' should not have inherited the collection's case-insensitive
 // default collation, and should only see the second insert.  'explicitCaseInsensitiveStream'
@@ -90,8 +90,8 @@ explicitCaseInsensitiveStream = cst.startWatchingChanges({
     doNotModifyInPassthroughs: true
 });
 
-assert.writeOK(similarNameCollection.insert({_id: 0, text: "aBc"}));
-assert.writeOK(caseInsensitiveCollection.insert({_id: 2, text: "ABC"}));
+assert.commandWorked(similarNameCollection.insert({_id: 0, text: "aBc"}));
+assert.commandWorked(caseInsensitiveCollection.insert({_id: 2, text: "ABC"}));
 
 // The case-insensitive stream should not see the first insert (to the other collection), only
 // the second. We do not expect to see the insert in 'didNotInheritCollationStream'.
@@ -109,7 +109,7 @@ const streamCreatedBeforeNoCollationCollection = cst.startWatchingChanges({
 });
 
 noCollationCollection = assertCreateCollection(db, noCollationCollection);
-assert.writeOK(noCollationCollection.insert({_id: 0}));
+assert.commandWorked(noCollationCollection.insert({_id: 0}));
 
 cst.assertNextChangesEqual(
     {cursor: streamCreatedBeforeNoCollationCollection, expectedChanges: [{docId: 0}]});
@@ -128,7 +128,7 @@ const streamCreatedBeforeSimpleCollationCollection = cst.startWatchingChanges({
 
 simpleCollationCollection =
     assertCreateCollection(db, simpleCollationCollection, {collation: {locale: "simple"}});
-assert.writeOK(simpleCollationCollection.insert({_id: 0}));
+assert.commandWorked(simpleCollationCollection.insert({_id: 0}));
 
 cst.assertNextChangesEqual(
     {cursor: streamCreatedBeforeSimpleCollationCollection, expectedChanges: [{docId: 0}]});
@@ -147,7 +147,7 @@ const frenchChangeStream = cst.startWatchingChanges({
 });
 
 frenchCollection = assertCreateCollection(db, frenchCollection, {collation: {locale: "fr"}});
-assert.writeOK(frenchCollection.insert({_id: 0}));
+assert.commandWorked(frenchCollection.insert({_id: 0}));
 
 cst.assertNextChangesEqual({cursor: frenchChangeStream, expectedChanges: [{docId: 0}]});
 }());
@@ -169,7 +169,7 @@ const englishCaseInsensitiveStream = cst.startWatchingChanges({
 });
 
 germanCollection = assertCreateCollection(db, germanCollection, {collation: {locale: "de"}});
-assert.writeOK(germanCollection.insert({_id: 0, text: "aBc"}));
+assert.commandWorked(germanCollection.insert({_id: 0, text: "aBc"}));
 
 cst.assertNextChangesEqual({cursor: englishCaseInsensitiveStream, expectedChanges: [{docId: 0}]});
 }());
@@ -190,8 +190,8 @@ const englishCaseSensitiveStream = cst.startWatchingChanges({
     collection: caseInsensitiveCollection
 });
 
-assert.writeOK(caseInsensitiveCollection.insert({_id: 0, text: "aBc"}));
-assert.writeOK(caseInsensitiveCollection.insert({_id: 1, text: "abc"}));
+assert.commandWorked(caseInsensitiveCollection.insert({_id: 0, text: "aBc"}));
+assert.commandWorked(caseInsensitiveCollection.insert({_id: 1, text: "abc"}));
 
 cst.assertNextChangesEqual({cursor: englishCaseSensitiveStream, expectedChanges: [{docId: 1}]});
 }());
@@ -206,8 +206,8 @@ const cursor = noCollationCollection.watch(
     [{$match: {"fullDocument.text": "abc"}}, {$project: {docId: "$documentKey._id"}}],
     {collation: caseInsensitive});
 assert(!cursor.hasNext());
-assert.writeOK(noCollationCollection.insert({_id: 0, text: "aBc"}));
-assert.writeOK(noCollationCollection.insert({_id: 1, text: "abc"}));
+assert.commandWorked(noCollationCollection.insert({_id: 0, text: "aBc"}));
+assert.commandWorked(noCollationCollection.insert({_id: 1, text: "abc"}));
 assert.soon(() => cursor.hasNext());
 assertChangeStreamEventEq(cursor.next(), {docId: 0});
 assert.soon(() => cursor.hasNext());
@@ -225,7 +225,7 @@ let caseInsensitiveCollection =
 let changeStream = caseInsensitiveCollection.watch([{$match: {"fullDocument.text": "abc"}}],
                                                    {collation: caseInsensitive});
 
-assert.writeOK(caseInsensitiveCollection.insert({_id: 0, text: "abc"}));
+assert.commandWorked(caseInsensitiveCollection.insert({_id: 0, text: "abc"}));
 
 assert.soon(() => changeStream.hasNext());
 const next = changeStream.next();
@@ -233,7 +233,7 @@ assert.docEq(next.documentKey, {_id: 0});
 const resumeToken = next._id;
 
 // Insert a second document to see after resuming.
-assert.writeOK(caseInsensitiveCollection.insert({_id: "dropped_coll", text: "ABC"}));
+assert.commandWorked(caseInsensitiveCollection.insert({_id: "dropped_coll", text: "ABC"}));
 
 // Drop the collection to invalidate the stream.
 assertDropCollection(db, collName);
@@ -276,7 +276,7 @@ let caseInsensitiveCollection =
 let changeStream = caseInsensitiveCollection.watch([{$match: {"fullDocument.text": "abc"}}],
                                                    {collation: caseInsensitive});
 
-assert.writeOK(caseInsensitiveCollection.insert({_id: 0, text: "abc"}));
+assert.commandWorked(caseInsensitiveCollection.insert({_id: 0, text: "abc"}));
 
 assert.soon(() => changeStream.hasNext());
 const next = changeStream.next();
@@ -284,12 +284,12 @@ assert.docEq(next.documentKey, {_id: 0});
 const resumeToken = next._id;
 
 // Insert a second document to see after resuming.
-assert.writeOK(caseInsensitiveCollection.insert({_id: "dropped_coll", text: "ABC"}));
+assert.commandWorked(caseInsensitiveCollection.insert({_id: "dropped_coll", text: "ABC"}));
 
 // Recreate the collection with a different collation.
 caseInsensitiveCollection = assertDropAndRecreateCollection(
     db, caseInsensitiveCollection.getName(), {collation: {locale: "simple"}});
-assert.writeOK(caseInsensitiveCollection.insert({_id: "new collection", text: "abc"}));
+assert.commandWorked(caseInsensitiveCollection.insert({_id: "new collection", text: "abc"}));
 
 // Verify that the stream sees the insert before the drop and then is exhausted. We won't
 // see the invalidate because the pipeline has a $match stage after the $changeStream.

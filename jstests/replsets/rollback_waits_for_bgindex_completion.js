@@ -61,7 +61,7 @@ CommonOps(originalPrimary);
 
 // Insert a document so that there is an operation to rollback.
 const rollbackNode = rollbackTest.transitionToRollbackOperations();
-assert.writeOK(rollbackNode.getDB(dbName)["rollbackColl"].insert({x: 1}));
+assert.commandWorked(rollbackNode.getDB(dbName)["rollbackColl"].insert({x: 1}));
 
 // Allow rollback to start. There are no sync source ops.
 rollbackTest.transitionToSyncSourceOperationsBeforeRollback();

@@ -72,7 +72,7 @@ let testCases = {
     addShardToZone: {skip: "primary only"},
     aggregate: {
         setUp: function(mongosConn) {
-            assert.writeOK(mongosConn.getCollection(nss).insert({x: 1}));
+            assert.commandWorked(mongosConn.getCollection(nss).insert({x: 1}));
         },
         command: {aggregate: coll, pipeline: [{$match: {x: 1}}], cursor: {batchSize: 10}},
         checkResults: function(res) {
@@ -108,7 +108,7 @@ let testCases = {
     convertToCapped: {skip: "primary only"},
     count: {
         setUp: function(mongosConn) {
-            assert.writeOK(mongosConn.getCollection(nss).insert({x: 1}));
+            assert.commandWorked(mongosConn.getCollection(nss).insert({x: 1}));
         },
         command: {count: coll, query: {x: 1}},
         checkResults: function(res) {
@@ -130,8 +130,8 @@ let testCases = {
     delete: {skip: "primary only"},
     distinct: {
         setUp: function(mongosConn) {
-            assert.writeOK(mongosConn.getCollection(nss).insert({x: 1}));
-            assert.writeOK(mongosConn.getCollection(nss).insert({x: 1}));
+            assert.commandWorked(mongosConn.getCollection(nss).insert({x: 1}));
+            assert.commandWorked(mongosConn.getCollection(nss).insert({x: 1}));
         },
         command: {distinct: coll, key: "x"},
         checkResults: function(res) {
@@ -158,7 +158,7 @@ let testCases = {
     filemd5: {skip: "does not return user data"},
     find: {
         setUp: function(mongosConn) {
-            assert.writeOK(mongosConn.getCollection(nss).insert({x: 1}));
+            assert.commandWorked(mongosConn.getCollection(nss).insert({x: 1}));
         },
         command: {find: coll, filter: {x: 1}},
         checkResults: function(res) {
@@ -210,8 +210,8 @@ let testCases = {
     makeSnapshot: {skip: "does not return user data"},
     mapReduce: {
         setUp: function(mongosConn) {
-            assert.writeOK(mongosConn.getCollection(nss).insert({x: 1}));
-            assert.writeOK(mongosConn.getCollection(nss).insert({x: 1}));
+            assert.commandWorked(mongosConn.getCollection(nss).insert({x: 1}));
+            assert.commandWorked(mongosConn.getCollection(nss).insert({x: 1}));
         },
         command: {
             mapReduce: coll,

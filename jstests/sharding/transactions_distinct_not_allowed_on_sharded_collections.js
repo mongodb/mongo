@@ -27,8 +27,8 @@ const session = st.s.startSession();
 const unshardedCollDB = session.getDatabase(unshardedDbName);
 const shardedCollDB = session.getDatabase(shardedDbName);
 
-assert.writeOK(unshardedCollDB[unshardedCollName].insert({_id: "jack"}));
-assert.writeOK(shardedCollDB[shardedCollName].insert({_id: "jack"}));
+assert.commandWorked(unshardedCollDB[unshardedCollName].insert({_id: "jack"}));
+assert.commandWorked(shardedCollDB[shardedCollName].insert({_id: "jack"}));
 
 // Reload metadata to avoid stale config or stale database version errors.
 flushRoutersAndRefreshShardMetadata(st, {ns: shardedNs, dbNames: [unshardedDbName]});

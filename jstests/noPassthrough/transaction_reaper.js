@@ -90,7 +90,7 @@ function Fixture(impl) {
     for (var i = 0; i < nSessions; i++) {
         // make a session and get it to the collection
         var session = this.sessions[i];
-        assert.writeOK(session.getDatabase("test").test.save({a: 1}));
+        assert.commandWorked(session.getDatabase("test").test.save({a: 1}));
     }
 
     // Ensure a write flushes a transaction

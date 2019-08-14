@@ -28,7 +28,7 @@ let renameOutput = localDB.oplog.rs.renameCollection("poison");
 assert.eq(renameOutput.ok, 0);
 assert.eq(renameOutput.errmsg, "can't rename live oplog while replicating");
 
-assert.writeOK(localDB.foo.insert({a: 1}));
+assert.commandWorked(localDB.foo.insert({a: 1}));
 renameOutput = localDB.foo.renameCollection("oplog.rs");
 assert.eq(renameOutput.ok, 0);
 assert.eq(renameOutput.errmsg, "can't rename to live oplog while replicating");

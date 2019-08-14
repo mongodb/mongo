@@ -64,9 +64,9 @@ function checkMatchResults(indexed) {
     coll.remove({});
     assertResults([], {});
 
-    assert.writeOK(coll.insert({_id: 0, a: 1}));
-    assert.writeOK(coll.insert({_id: 1, a: 2}));
-    assert.writeOK(coll.insert({_id: 2, a: 3}));
+    assert.commandWorked(coll.insert({_id: 0, a: 1}));
+    assert.commandWorked(coll.insert({_id: 1, a: 2}));
+    assert.commandWorked(coll.insert({_id: 2, a: 3}));
 
     // Empty query.
     assertResults([{_id: 0, a: 1}, {_id: 1, a: 2}, {_id: 2, a: 3}], {});
@@ -80,76 +80,76 @@ function checkMatchResults(indexed) {
 
     // Regular expression.
     coll.remove({});
-    assert.writeOK(coll.insert({_id: 0, a: 'x'}));
-    assert.writeOK(coll.insert({_id: 1, a: 'yx'}));
+    assert.commandWorked(coll.insert({_id: 0, a: 'x'}));
+    assert.commandWorked(coll.insert({_id: 1, a: 'yx'}));
     assertResults([{_id: 0, a: 'x'}], {a: /^x/});
     assertResults([{_id: 0, a: 'x'}, {_id: 1, a: 'yx'}], {a: /x/});
 
     // Dotted field.
     coll.remove({});
-    assert.writeOK(coll.insert({_id: 0, a: {b: 4}}));
-    assert.writeOK(coll.insert({_id: 1, a: 2}));
+    assert.commandWorked(coll.insert({_id: 0, a: {b: 4}}));
+    assert.commandWorked(coll.insert({_id: 1, a: 2}));
     assertResults([{_id: 0, a: {b: 4}}], {'a.b': 4});
 
     // Value within an array.
     coll.remove({});
-    assert.writeOK(coll.insert({_id: 0, a: [1, 2, 3]}));
-    assert.writeOK(coll.insert({_id: 1, a: [2, 2, 3]}));
-    assert.writeOK(coll.insert({_id: 2, a: [2, 2, 2]}));
+    assert.commandWorked(coll.insert({_id: 0, a: [1, 2, 3]}));
+    assert.commandWorked(coll.insert({_id: 1, a: [2, 2, 3]}));
+    assert.commandWorked(coll.insert({_id: 2, a: [2, 2, 2]}));
     assertResults([{_id: 0, a: [1, 2, 3]}, {_id: 1, a: [2, 2, 3]}], {a: 3});
 
     // Missing, null, $exists matching.
     coll.remove({});
-    assert.writeOK(coll.insert({_id: 0}));
-    assert.writeOK(coll.insert({_id: 1, a: null}));
-    assert.writeOK(coll.insert({_id: 3, a: 0}));
+    assert.commandWorked(coll.insert({_id: 0}));
+    assert.commandWorked(coll.insert({_id: 1, a: null}));
+    assert.commandWorked(coll.insert({_id: 3, a: 0}));
     assertResults([{_id: 0}, {_id: 1, a: null}], {a: null});
     assertResults(null, {a: {$exists: true}});
     assertResults(null, {a: {$exists: false}});
 
     // $elemMatch
     coll.remove({});
-    assert.writeOK(coll.insert({_id: 0, a: [1, 2]}));
-    assert.writeOK(coll.insert({_id: 1, a: [1, 2, 3]}));
+    assert.commandWorked(coll.insert({_id: 0, a: [1, 2]}));
+    assert.commandWorked(coll.insert({_id: 1, a: [1, 2, 3]}));
     assertResults([{_id: 1, a: [1, 2, 3]}], {a: {$elemMatch: {$gt: 1, $mod: [2, 1]}}});
 
     coll.remove({});
-    assert.writeOK(coll.insert({_id: 0, a: [{b: 1}, {c: 2}]}));
-    assert.writeOK(coll.insert({_id: 1, a: [{b: 1, c: 2}]}));
+    assert.commandWorked(coll.insert({_id: 0, a: [{b: 1}, {c: 2}]}));
+    assert.commandWorked(coll.insert({_id: 1, a: [{b: 1, c: 2}]}));
     assertResults([{_id: 1, a: [{b: 1, c: 2}]}], {a: {$elemMatch: {b: 1, c: 2}}});
 
     // $size
     coll.remove({});
-    assert.writeOK(coll.insert({}));
-    assert.writeOK(coll.insert({a: null}));
-    assert.writeOK(coll.insert({a: []}));
-    assert.writeOK(coll.insert({a: [1]}));
-    assert.writeOK(coll.insert({a: [1, 2]}));
+    assert.commandWorked(coll.insert({}));
+    assert.commandWorked(coll.insert({a: null}));
+    assert.commandWorked(coll.insert({a: []}));
+    assert.commandWorked(coll.insert({a: [1]}));
+    assert.commandWorked(coll.insert({a: [1, 2]}));
     assertResults(null, {a: {$size: 0}});
     assertResults(null, {a: {$size: 1}});
     assertResults(null, {a: {$size: 2}});
 
     // $type
     coll.remove({});
-    assert.writeOK(coll.insert({}));
-    assert.writeOK(coll.insert({a: null}));
-    assert.writeOK(coll.insert({a: NumberInt(1)}));
-    assert.writeOK(coll.insert({a: NumberLong(2)}));
-    assert.writeOK(coll.insert({a: 66.6}));
-    assert.writeOK(coll.insert({a: 'abc'}));
-    assert.writeOK(coll.insert({a: /xyz/}));
-    assert.writeOK(coll.insert({a: {q: 1}}));
-    assert.writeOK(coll.insert({a: true}));
-    assert.writeOK(coll.insert({a: new Date()}));
-    assert.writeOK(coll.insert({a: new ObjectId()}));
+    assert.commandWorked(coll.insert({}));
+    assert.commandWorked(coll.insert({a: null}));
+    assert.commandWorked(coll.insert({a: NumberInt(1)}));
+    assert.commandWorked(coll.insert({a: NumberLong(2)}));
+    assert.commandWorked(coll.insert({a: 66.6}));
+    assert.commandWorked(coll.insert({a: 'abc'}));
+    assert.commandWorked(coll.insert({a: /xyz/}));
+    assert.commandWorked(coll.insert({a: {q: 1}}));
+    assert.commandWorked(coll.insert({a: true}));
+    assert.commandWorked(coll.insert({a: new Date()}));
+    assert.commandWorked(coll.insert({a: new ObjectId()}));
     for (let type = 1; type <= 18; ++type) {
         assertResults(null, {a: {$type: type}});
     }
 
     coll.remove({});
-    assert.writeOK(coll.insert({_id: 0, a: 1}));
-    assert.writeOK(coll.insert({_id: 1, a: 2}));
-    assert.writeOK(coll.insert({_id: 2, a: 3}));
+    assert.commandWorked(coll.insert({_id: 0, a: 1}));
+    assert.commandWorked(coll.insert({_id: 1, a: 2}));
+    assert.commandWorked(coll.insert({_id: 2, a: 3}));
 
     // $and
     assertResults([{_id: 1, a: 2}], {$and: [{a: 2}, {_id: 1}]});

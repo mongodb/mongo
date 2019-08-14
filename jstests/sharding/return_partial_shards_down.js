@@ -40,7 +40,7 @@ st.printShardingStatus();
 var inserts = [{_id: -1}, {_id: 1}, {_id: 1000}];
 
 collOneShard.insert(inserts);
-assert.writeOK(collAllShards.insert(inserts));
+assert.commandWorked(collAllShards.insert(inserts));
 
 var returnPartialFlag = 1 << 7;
 

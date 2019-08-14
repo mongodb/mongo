@@ -12,7 +12,7 @@ var dbpath = MongoRunner.dataPath + baseName;
 var mongod = MongoRunner.runMongod({dbpath: dbpath});
 var db = mongod.getDB("test");
 var collection = db.getCollection(baseName);
-assert.writeOK(collection.insert({}));
+assert.commandWorked(collection.insert({}));
 
 var awaitShell = startParallelShell(
     "db." + baseName + ".count( { $where: function() { while( 1 ) { ; } } } )", mongod.port);

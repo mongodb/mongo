@@ -107,8 +107,8 @@ function runTest(mongod) {
     assert(testA.auth('user1', 'pass'));
     assert(testB.auth('user3', 'pass'));
     for (var i = 0; i < 101; ++i) {
-        assert.writeOK(testA.coll.insert({_id: i}));
-        assert.writeOK(testB.coll.insert({_id: i}));
+        assert.commandWorked(testA.coll.insert({_id: i}));
+        assert.commandWorked(testB.coll.insert({_id: i}));
     }
     testA.logout();
     testB.logout();

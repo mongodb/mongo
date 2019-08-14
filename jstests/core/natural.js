@@ -8,9 +8,9 @@ var coll = db.jstests_natural;
 coll.drop();
 
 assert.commandWorked(coll.ensureIndex({a: 1}));
-assert.writeOK(coll.insert({_id: 1, a: 3}));
-assert.writeOK(coll.insert({_id: 2, a: 2}));
-assert.writeOK(coll.insert({_id: 3, a: 1}));
+assert.commandWorked(coll.insert({_id: 1, a: 3}));
+assert.commandWorked(coll.insert({_id: 2, a: 2}));
+assert.commandWorked(coll.insert({_id: 3, a: 1}));
 
 // Regression test for SERVER-20660. Ensures that documents returned with $natural don't have
 // any extraneous fields.

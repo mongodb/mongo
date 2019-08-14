@@ -35,8 +35,8 @@ assert.commandFailed(res, "Setting the invalidation interval to an disallowed va
 res = st.s1.getDB('admin').runCommand({getParameter: 1, userCacheInvalidationIntervalSecs: 1});
 
 assert.eq(5, res.userCacheInvalidationIntervalSecs);
-assert.writeOK(st.s1.getDB('test').foo.insert({a: 1}));  // initial data
-assert.writeOK(st.s1.getDB('test').bar.insert({a: 1}));  // initial data
+assert.commandWorked(st.s1.getDB('test').foo.insert({a: 1}));  // initial data
+assert.commandWorked(st.s1.getDB('test').bar.insert({a: 1}));  // initial data
 st.s1.getDB('admin').createUser({user: 'admin', pwd: 'pwd', roles: ['userAdminAnyDatabase']});
 st.s1.getDB('admin').logout();
 
@@ -104,7 +104,7 @@ db3.auth('spencer', 'pwd');
         "myRole", [{resource: {db: 'test', collection: ''}, actions: ['update']}]);
 
     // s0/db1 should update its cache instantly
-    assert.writeOK(db1.foo.update({}, {$inc: {a: 1}}));
+    assert.commandWorked(db1.foo.update({}, {$inc: {a: 1}}));
     assert.eq(2, db1.foo.findOne().a);
 
     // s1/db2 should update its cache in 10 seconds.
@@ -118,7 +118,7 @@ db3.auth('spencer', 'pwd');
 
     // We manually invalidate the cache on s2/db3.
     db3.adminCommand("invalidateUserCache");
-    assert.writeOK(db3.foo.update({}, {$inc: {a: 1}}));
+    assert.commandWorked(db3.foo.update({}, {$inc: {a: 1}}));
     assert.eq(4, db3.foo.findOne().a);
 })();
 
@@ -153,7 +153,7 @@ db3.auth('spencer', 'pwd');
     db1.getSiblingDB('test').grantRolesToUser("spencer", ['readWrite']);
 
     // s0/db1 should update its cache instantly
-    assert.writeOK(db1.foo.update({}, {$inc: {a: 1}}));
+    assert.commandWorked(db1.foo.update({}, {$inc: {a: 1}}));
 
     // s1/db2 should update its cache in 10 seconds.
     assert.soon(function() {
@@ -162,21 +162,21 @@ db3.auth('spencer', 'pwd');
 
     // We manually invalidate the cache on s1/db3.
     db3.adminCommand("invalidateUserCache");
-    assert.writeOK(db3.foo.update({}, {$inc: {a: 1}}));
+    assert.commandWorked(db3.foo.update({}, {$inc: {a: 1}}));
 })();
 
 (function testConcurrentUserModification() {
     jsTestLog("Testing having 2 mongoses modify the same user at the same time");  // SERVER-13850
 
-    assert.writeOK(db1.foo.update({}, {$inc: {a: 1}}));
-    assert.writeOK(db3.foo.update({}, {$inc: {a: 1}}));
+    assert.commandWorked(db1.foo.update({}, {$inc: {a: 1}}));
+    assert.commandWorked(db3.foo.update({}, {$inc: {a: 1}}));
 
     db1.getSiblingDB('test').revokeRolesFromUser("spencer", ['readWrite']);
 
     // At this point db3 still thinks "spencer" has readWrite.  Use it to add a different role
     // and make sure it doesn't add back readWrite
     hasAuthzError(db1.foo.update({}, {$inc: {a: 1}}));
-    assert.writeOK(db3.foo.update({}, {$inc: {a: 1}}));
+    assert.commandWorked(db3.foo.update({}, {$inc: {a: 1}}));
 
     db3.getSiblingDB('test').grantRolesToUser("spencer", ['dbAdmin']);
 

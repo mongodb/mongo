@@ -21,7 +21,7 @@ function withPinnedCursor(
     coll.drop();
     db.active_cursor_sentinel.drop();
     for (let i = 0; i < 100; ++i) {
-        assert.writeOK(coll.insert({value: i}));
+        assert.commandWorked(coll.insert({value: i}));
     }
     let cleanup = null;
     try {

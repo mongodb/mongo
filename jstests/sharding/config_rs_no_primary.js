@@ -35,7 +35,7 @@ var testOps = function(mongos) {
     jsTestLog("Doing ops that don't require metadata writes and thus should succeed against: " +
               mongos);
     var initialCount = mongos.getDB('test').foo.count();
-    assert.writeOK(mongos.getDB('test').foo.insert({a: 1}));
+    assert.commandWorked(mongos.getDB('test').foo.insert({a: 1}));
     assert.eq(initialCount + 1, mongos.getDB('test').foo.count());
 
     assert.throws(function() {

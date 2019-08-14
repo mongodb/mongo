@@ -18,7 +18,7 @@ function runTest(level, sessionOptions, supported) {
     const sessionColl = sessionDB[collName];
 
     // Set up the collection.
-    assert.writeOK(sessionColl.insert({_id: 0}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(sessionColl.insert({_id: 0}, {writeConcern: {w: "majority"}}));
 
     if (level) {
         session.startTransaction({readConcern: {level: level}});

@@ -19,11 +19,11 @@ function assertQueryCorrect(query, count) {
 // Tests on numbers.
 
 coll.drop();
-assert.writeOK(coll.insert({a: 0}));
-assert.writeOK(coll.insert({a: 1}));
-assert.writeOK(coll.insert({a: 54}));
-assert.writeOK(coll.insert({a: 88}));
-assert.writeOK(coll.insert({a: 255}));
+assert.commandWorked(coll.insert({a: 0}));
+assert.commandWorked(coll.insert({a: 1}));
+assert.commandWorked(coll.insert({a: 54}));
+assert.commandWorked(coll.insert({a: 88}));
+assert.commandWorked(coll.insert({a: 255}));
 assert.commandWorked(coll.createIndex({a: 1}));
 
 // Tests with bitmask.
@@ -74,9 +74,9 @@ assertQueryCorrect({a: {$bitsAllSet: 54, $bitsAllClear: 201}}, 1);
 // Tests on negative numbers.
 
 coll.drop();
-assert.writeOK(coll.insert({a: -0}));
-assert.writeOK(coll.insert({a: -1}));
-assert.writeOK(coll.insert({a: -54}));
+assert.commandWorked(coll.insert({a: -0}));
+assert.commandWorked(coll.insert({a: -1}));
+assert.commandWorked(coll.insert({a: -54}));
 
 // Tests with bitmask.
 assertQueryCorrect({a: {$bitsAllSet: 0}}, 3);
@@ -118,10 +118,10 @@ assertQueryCorrect({a: {$bitsAllSet: 74, $bitsAllClear: 53}}, 1);
 // Tests on BinData.
 
 coll.drop();
-assert.writeOK(coll.insert({a: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")}));
-assert.writeOK(coll.insert({a: BinData(0, "AANgAAAAAAAAAAAAAAAAAAAAAAAA")}));
-assert.writeOK(coll.insert({a: BinData(0, "JANgqwetkqwklEWRbWERKKJREtbq")}));
-assert.writeOK(coll.insert({a: BinData(0, "////////////////////////////")}));
+assert.commandWorked(coll.insert({a: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")}));
+assert.commandWorked(coll.insert({a: BinData(0, "AANgAAAAAAAAAAAAAAAAAAAAAAAA")}));
+assert.commandWorked(coll.insert({a: BinData(0, "JANgqwetkqwklEWRbWERKKJREtbq")}));
+assert.commandWorked(coll.insert({a: BinData(0, "////////////////////////////")}));
 assert.commandWorked(coll.createIndex({a: 1}));
 
 // Tests with binary string bitmask.

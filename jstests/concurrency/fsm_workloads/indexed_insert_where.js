@@ -26,7 +26,7 @@ var $config = (function() {
                 bulk.insert(this.generateDocumentToInsert());
             }
             var res = bulk.execute();
-            assertAlways.writeOK(res);
+            assertAlways.commandWorked(res);
             assertAlways.eq(this.documentsToInsert, res.nInserted);
             this.insertedDocuments += this.documentsToInsert;
         },

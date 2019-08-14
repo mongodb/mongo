@@ -62,7 +62,7 @@ for (i = 0; i < N; i++) {
 for (i = 0; i < N * 9; i++) {
     doUpdate(bulk, false);
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 for (var i = 0; i < 50; i++) {
     s.printChunks("test.foo");
@@ -130,7 +130,7 @@ function diff1() {
                 }
             }
 
-            assert.writeOK(res);
+            assert.commandWorked(res);
         });
     } else {
         consecutiveNoProgressMadeErrors = 0;

@@ -43,18 +43,18 @@ shard0Coll.remove({});
 assert.writeError(shard0Coll.save({_id: 3}));
 
 // Full shard key in save
-assert.writeOK(shard0Coll.save({_id: 1, a: 1}));
+assert.commandWorked(shard0Coll.save({_id: 1, a: 1}));
 
 // Full shard key on replacement (basically the same as above)
 shard0Coll.remove({});
-assert.writeOK(shard0Coll.update({_id: 1}, {a: 1}, true));
+assert.commandWorked(shard0Coll.update({_id: 1}, {a: 1}, true));
 
 // Full shard key after $set
 shard0Coll.remove({});
-assert.writeOK(shard0Coll.update({_id: 1}, {$set: {a: 1}}, true));
+assert.commandWorked(shard0Coll.update({_id: 1}, {$set: {a: 1}}, true));
 
 // Update existing doc (replacement), same shard key value
-assert.writeOK(shard0Coll.update({_id: 1}, {a: 1}));
+assert.commandWorked(shard0Coll.update({_id: 1}, {a: 1}));
 
 // Update existing doc ($set), same shard key value
 assert.commandWorked(shard0Coll.update({_id: 1}, {$set: {a: 1}}));
@@ -74,7 +74,7 @@ assert.writeError(shard0Coll.update({_id: 1}, {$unset: {a: 1}}));
 // Error due to removing all the embedded fields.
 shard0Coll.remove({});
 
-assert.writeOK(shard0Coll.save({_id: 2, a: {c: 1, b: 1}}));
+assert.commandWorked(shard0Coll.save({_id: 2, a: {c: 1, b: 1}}));
 
 assert.writeError(shard0Coll.update({}, {$unset: {"a.c": 1}}));
 assert.writeError(shard0Coll.update({}, {$unset: {"a.b": 1, "a.c": 1}}));

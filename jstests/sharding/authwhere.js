@@ -20,11 +20,11 @@ var test1Reader = {
 };
 
 function assertRemove(collection, pattern) {
-    assert.writeOK(collection.remove(pattern));
+    assert.commandWorked(collection.remove(pattern));
 }
 
 function assertInsert(collection, obj) {
-    assert.writeOK(collection.insert(obj));
+    assert.commandWorked(collection.insert(obj));
 }
 
 // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.

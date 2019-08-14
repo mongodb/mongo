@@ -68,8 +68,8 @@ assert.eq(1, t.getIndexes().length);
 // But with no index we can insert bad polygons and bad multi-polygons.
 //
 t.drop();
-assert.writeOK(t.insert({p: poly}));
-assert.writeOK(t.insert({p: multiPoly}));
+assert.commandWorked(t.insert({p: poly}));
+assert.commandWorked(t.insert({p: multiPoly}));
 
 t.drop();
 

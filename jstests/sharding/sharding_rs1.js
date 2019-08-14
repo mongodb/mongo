@@ -23,7 +23,7 @@ while (insertedBytes < (10 * 1024 * 1024)) {
     bulk.insert({_id: num++, s: bigString, x: Math.random()});
     insertedBytes += bigString.length;
 }
-assert.writeOK(bulk.execute({w: 3}));
+assert.commandWorked(bulk.execute({w: 3}));
 
 assert.commandWorked(s.s.adminCommand({shardcollection: "test.foo", key: {_id: 1}}));
 

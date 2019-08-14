@@ -68,7 +68,7 @@ assert.commandWorked(db.runCommandWithMetadata({find: collName}, {}).commandRepl
 
 // Retryable write commands that can be retried succeed.
 failNextCommand(db, "insert");
-assert.writeOK(db[collName].insert({x: 1}));
+assert.commandWorked(db[collName].insert({x: 1}));
 
 failNextCommand(db, "insert");
 assert.commandWorked(db.runCommandWithMetadata({

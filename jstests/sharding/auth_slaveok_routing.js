@@ -75,7 +75,7 @@ var bulk = coll.initializeUnorderedBulkOp();
 for (var x = 0; x < 20; x++) {
     bulk.insert({v: x, k: 10});
 }
-assert.writeOK(bulk.execute({w: nodeCount}));
+assert.commandWorked(bulk.execute({w: nodeCount}));
 
 /* Although mongos never caches query results, try to do a different query
  * everytime just to be sure.

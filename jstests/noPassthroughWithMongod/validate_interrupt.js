@@ -13,7 +13,7 @@ var i;
 for (i = 0; i < 1000; i++) {
     bulk.insert({a: i});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 function setTimeoutFailPoint(mode) {
     var res = db.adminCommand({configureFailPoint: 'maxTimeAlwaysTimeOut', mode: mode});

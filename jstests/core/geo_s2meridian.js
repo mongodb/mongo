@@ -12,7 +12,7 @@ meridianCrossingLine = {
     geo: {type: "LineString", coordinates: [[-178.0, 10.0], [178.0, 10.0]]}
 };
 
-assert.writeOK(t.insert(meridianCrossingLine));
+assert.commandWorked(t.insert(meridianCrossingLine));
 
 lineAlongMeridian = {
     type: "LineString",

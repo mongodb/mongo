@@ -42,7 +42,7 @@ function testInsert(docs, writeCmd, wc) {
 function testFind(readCmd) {
     coll.drop();
     for (var i = 0; i < 100; i++) {
-        assert.writeOK(coll.insert({}));
+        assert.commandWorked(coll.insert({}));
     }
 
     var res = executeBenchRun([
@@ -54,7 +54,7 @@ function testFind(readCmd) {
 function testFindOne(readCmd) {
     coll.drop();
     for (var i = 0; i < 100; i++) {
-        assert.writeOK(coll.insert({}));
+        assert.commandWorked(coll.insert({}));
     }
 
     var res =

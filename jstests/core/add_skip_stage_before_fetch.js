@@ -29,7 +29,7 @@ for (let i = 0; i < 10000; i++) {
         d: Math.floor(Math.random() * 1000)
     });
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 // The {a: 0, b: 2} query will match exactly one quarter of the documents in the collection:
 // 2500 in total. In the test queries below, we skip the first 2400, returning exactly 100

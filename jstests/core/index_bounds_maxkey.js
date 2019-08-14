@@ -9,7 +9,7 @@ const coll = db.index_bounds_maxkey;
 coll.drop();
 
 assert.commandWorked(coll.createIndex({a: 1}));
-assert.writeOK(coll.insert({a: MaxKey}));
+assert.commandWorked(coll.insert({a: MaxKey}));
 
 // Test that queries involving comparison operators with MaxKey are covered.
 const proj = {
@@ -24,9 +24,9 @@ assertCoveredQueryAndCount({collection: coll, query: {a: {$lte: MaxKey}}, projec
 // Test that all documents are considered less than MaxKey, regardless of the presence of
 // the queried field 'a'.
 coll.remove({});
-assert.writeOK(coll.insert({a: "string"}));
-assert.writeOK(coll.insert({a: {b: 1}}));
-assert.writeOK(coll.insert({}));
+assert.commandWorked(coll.insert({a: "string"}));
+assert.commandWorked(coll.insert({a: {b: 1}}));
+assert.commandWorked(coll.insert({}));
 assertCoveredQueryAndCount({collection: coll, query: {a: {$gt: MaxKey}}, project: proj, count: 0});
 assertCoveredQueryAndCount({collection: coll, query: {a: {$gte: MaxKey}}, project: proj, count: 0});
 assertCoveredQueryAndCount({collection: coll, query: {a: {$lt: MaxKey}}, project: proj, count: 3});

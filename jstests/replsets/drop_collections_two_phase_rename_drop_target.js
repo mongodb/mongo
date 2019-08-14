@@ -57,8 +57,8 @@ assert.commandWorked(toColl.ensureIndex({a: 1}, {name: longIndexName}));
 assert.commandWorked(toColl.ensureIndex({b: 1}, {name: shortIndexName}));
 
 // Insert documents into both collections so that we can tell them apart.
-assert.writeOK(fromColl.insert({_id: 'from'}));
-assert.writeOK(toColl.insert({_id: 'to'}));
+assert.commandWorked(fromColl.insert({_id: 'from'}));
+assert.commandWorked(toColl.insert({_id: 'to'}));
 replTest.awaitReplication();
 
 // Prevent renameCollection from being applied on the secondary so that we can examine the state

@@ -23,7 +23,7 @@ assert.commandWorked(testDB.adminCommand({enableSharding: 'BlackHoleDB'}));
 assert.commandWorked(
     testDB.adminCommand({shardCollection: testDB.ShardedColl.getFullName(), key: {_id: 1}}));
 
-assert.writeOK(testDB.ShardedColl.insert({a: 1}));
+assert.commandWorked(testDB.ShardedColl.insert({a: 1}));
 
 jsTest.log('Making all the config servers appear as a blackhole to mongos');
 st._configServers.forEach(function(configSvr) {

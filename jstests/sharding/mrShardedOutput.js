@@ -40,7 +40,7 @@ var bulk = testDB.foo.initializeUnorderedBulkOp();
 for (var i = 0; i < numBatch; ++i) {
     bulk.insert({a: numDocs + i, y: str, i: numDocs + i});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 numDocs += numBatch;
 
@@ -100,7 +100,7 @@ bulk = testDB.foo.initializeUnorderedBulkOp();
 for (var i = 0; i < numBatch; ++i) {
     bulk.insert({a: numDocs + i, y: str, i: numDocs + i});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 jsTest.log("No errors on insert batch.");
 numDocs += numBatch;
 

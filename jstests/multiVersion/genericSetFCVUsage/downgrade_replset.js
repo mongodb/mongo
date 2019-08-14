@@ -43,7 +43,7 @@ function runDowngradeTest() {
         let coll = new Mongo(rsURL).getCollection(collParam);
         let count = 10;
         while (!isFinished()) {
-            assert.writeOK(coll.insert({_id: count, str: "hello world"}));
+            assert.commandWorked(coll.insert({_id: count, str: "hello world"}));
             count++;
         }
     }

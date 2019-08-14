@@ -67,7 +67,7 @@ function addTestDocuments(db) {
     for (var i = 0; i < size; ++i) {
         bulk.insert({i: i, j: i * i, k: 1});
     }
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 }
 
 function startIndexBuildOnSecondaryAndLeaveUnfinished(primaryDB, writeConcern, secondaryDB) {

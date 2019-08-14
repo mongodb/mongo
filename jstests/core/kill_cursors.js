@@ -20,7 +20,7 @@ var coll = db.jstest_killcursors;
 coll.drop();
 
 for (var i = 0; i < 10; i++) {
-    assert.writeOK(coll.insert({_id: i}));
+    assert.commandWorked(coll.insert({_id: i}));
 }
 
 // killCursors command should fail if the collection name is not a string.

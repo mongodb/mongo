@@ -22,7 +22,7 @@ let bulk = coll.initializeUnorderedBulkOp();
 allDocuments.forEach(function(doc) {
     bulk.insert(doc);
 });
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 // Create views on the data.
 assert.commandWorked(viewsDB.runCommand({create: "identityView", viewOn: "coll"}));
@@ -106,7 +106,7 @@ bulk = coll.initializeUnorderedBulkOp();
 allDocuments.forEach(function(doc) {
     bulk.insert(doc);
 });
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 assertIdentityViewDistinctMatchesCollection("a");
 assertIdentityViewDistinctMatchesCollection("b");

@@ -17,10 +17,10 @@ const indexSpec = {
     b: 1
 };
 
-assert.writeOK(coll.insert({_id: 0, a: 0, b: 0}));
-assert.writeOK(coll.insert({_id: 1, a: 0, b: 1}));
-assert.writeOK(coll.insert({_id: 2, a: 1, b: 0}));
-assert.writeOK(coll.insert({_id: 3, a: 1, b: 1}));
+assert.commandWorked(coll.insert({_id: 0, a: 0, b: 0}));
+assert.commandWorked(coll.insert({_id: 1, a: 0, b: 1}));
+assert.commandWorked(coll.insert({_id: 2, a: 1, b: 0}));
+assert.commandWorked(coll.insert({_id: 3, a: 1, b: 1}));
 
 /**
  * Helper to test that for a given pipeline, the same results are returned whether or not an

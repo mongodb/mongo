@@ -8,12 +8,12 @@ t.drop();
 // Include helpers for analyzing explain output.
 load("jstests/libs/analyze_plan.js");
 
-assert.writeOK(t.insert({_id: {x: 1}, z: 1}));
-assert.writeOK(t.insert({_id: {x: 2}, z: 2}));
-assert.writeOK(t.insert({_id: {x: 3}, z: 3}));
-assert.writeOK(t.insert({_id: 1, z: 4}));
-assert.writeOK(t.insert({_id: 2, z: 5}));
-assert.writeOK(t.insert({_id: 3, z: 6}));
+assert.commandWorked(t.insert({_id: {x: 1}, z: 1}));
+assert.commandWorked(t.insert({_id: {x: 2}, z: 2}));
+assert.commandWorked(t.insert({_id: {x: 3}, z: 3}));
+assert.commandWorked(t.insert({_id: 1, z: 4}));
+assert.commandWorked(t.insert({_id: 2, z: 5}));
+assert.commandWorked(t.insert({_id: 3, z: 6}));
 
 assert.eq(2, t.findOne({_id: {x: 2}}).z);
 assert.eq(2, t.find({_id: {$gte: 2}}).count());
@@ -46,7 +46,7 @@ explain = t.find(query).skip(1).explain();
 assert(!isIdhack(db, explain.queryPlanner.winningPlan));
 
 // ID hack cannot be used with a regex predicate.
-assert.writeOK(t.insert({_id: "abc"}));
+assert.commandWorked(t.insert({_id: "abc"}));
 explain = t.find({_id: /abc/}).explain();
 assert.eq({_id: "abc"}, t.findOne({_id: /abc/}));
 assert(!isIdhack(db, explain.queryPlanner.winningPlan));
@@ -62,8 +62,8 @@ assert.eq({_id: {x: 2}}, t.findOne(query, {_id: 1}));
 //
 
 t.drop();
-assert.writeOK(t.insert({_id: 0, a: 0, b: [{c: 1}, {c: 2}]}));
-assert.writeOK(t.insert({_id: 1, a: 1, b: [{c: 3}, {c: 4}]}));
+assert.commandWorked(t.insert({_id: 0, a: 0, b: [{c: 1}, {c: 2}]}));
+assert.commandWorked(t.insert({_id: 1, a: 1, b: [{c: 3}, {c: 4}]}));
 
 // Simple inclusion.
 assert.eq({_id: 1, a: 1}, t.find({_id: 1}, {a: 1}).next());

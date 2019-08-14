@@ -24,7 +24,7 @@ try {
         largeStr += 'x';
     }
     for (var i = 0; i < 100; ++i) {
-        assert.writeOK(coll.insert({a: largeStr, b: i}));
+        assert.commandWorked(coll.insert({a: largeStr, b: i}));
     }
 
     // Verify that an unindexed sort of this data fails with a find() if no limit is specified.

@@ -34,7 +34,7 @@ var $config = (function() {
             }
 
             var res = bulk.execute();
-            assertAlways.writeOK(res);
+            assertAlways.commandWorked(res);
             assertAlways.eq((this.tid + 1) * 200, res.nInserted);
 
             assertWhenOwnDB(!db[this.threadCollName].isCapped());

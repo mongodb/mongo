@@ -56,7 +56,7 @@ function stepUpNode(node) {
 // Do an initial insert to prevent the secondary from going into recovery
 var numDocuments = 20;
 var coll = primary.getDB("foo").foo;
-assert.writeOK(coll.insert({x: 0}, {writeConcern: {w: 3}}));
+assert.commandWorked(coll.insert({x: 0}, {writeConcern: {w: 3}}));
 replSet.awaitReplication();
 
 // Enable fail point to stop replication.
@@ -65,7 +65,7 @@ secondaries.forEach(enableFailPoint);
 
 var bufferCountBefore = secondary.getDB('foo').serverStatus().metrics.repl.buffer.count;
 for (var i = 1; i < numDocuments; ++i) {
-    assert.writeOK(coll.insert({x: i}));
+    assert.commandWorked(coll.insert({x: i}));
 }
 jsTestLog('Number of documents inserted into collection on primary: ' + numDocuments);
 assert.eq(numDocuments, primary.getDB("foo").foo.find().itcount());

@@ -61,7 +61,7 @@ function populateData(conn, nDocs) {
         const doc = generateRandomDocument(i);
         bulk.insert(doc);
     }
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 }
 
 function doExecutionTest(conn) {

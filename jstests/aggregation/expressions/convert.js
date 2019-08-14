@@ -9,7 +9,7 @@ function populateCollection(documentList) {
     coll.drop();
     var bulk = coll.initializeOrderedBulkOp();
     documentList.forEach(doc => bulk.insert(doc));
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 }
 
 //

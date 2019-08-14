@@ -87,7 +87,7 @@ function test(db, sharded, indexType) {
     for (var i = 0; i < numPts; i++) {
         bulk.insert({rand: Math.random(), loc: pointMaker.mkPt()});
     }
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 
     assert.eq(db[coll].count(), numPts);
 

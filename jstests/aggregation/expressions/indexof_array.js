@@ -9,7 +9,7 @@ var coll = db.indexofarray;
 coll.drop();
 
 // Insert a dummy document to ensure something flows through the pipeline.
-assert.writeOK(coll.insert({}));
+assert.commandWorked(coll.insert({}));
 
 testExpression(coll, {$indexOfArray: [[1, 2, 3], 2]}, 1);
 

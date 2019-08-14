@@ -25,7 +25,7 @@ var doTest = function(count) {
     }
 
     // Store the document
-    assert.writeOK(testDB.collection.insert(doc));
+    assert.commandWorked(testDB.collection.insert(doc));
 
     // Try to read the document using a large projection
     try {

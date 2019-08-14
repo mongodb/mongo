@@ -39,7 +39,7 @@ var bulk = foo.bar.initializeUnorderedBulkOp();
 for (var i = 0; i < 100; i++) {
     bulk.insert({date: new Date(), x: i, str: "all the talk on the market"});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 print("total in foo: " + foo.bar.find().itcount());
 
 print("4. Make sure synced");
@@ -97,7 +97,7 @@ bulk = foo.bar.initializeUnorderedBulkOp();
 for (var i = 0; i < 100; i++) {
     bulk.insert({date: new Date(), x: i, str: "all the talk on the market"});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 print("11. Everyone happy eventually");
 replTest.awaitReplication();

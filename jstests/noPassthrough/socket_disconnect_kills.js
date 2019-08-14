@@ -129,9 +129,9 @@ function runCommand(cmd) {
 function runTests(client) {
     let admin = client.getDB("admin");
 
-    assert.writeOK(client.getDB(testName).test.insert({x: 1}));
-    assert.writeOK(client.getDB(testName).test.insert({x: 2}));
-    assert.writeOK(client.getDB(testName).test.insert({x: 3}));
+    assert.commandWorked(client.getDB(testName).test.insert({x: 1}));
+    assert.commandWorked(client.getDB(testName).test.insert({x: 2}));
+    assert.commandWorked(client.getDB(testName).test.insert({x: 3}));
 
     [[checkClosedEarly, runCommand({find: "test", filter: {}})],
      [

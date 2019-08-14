@@ -41,9 +41,9 @@ assert.eq(0, aggregate.toArray().length);
 
 c.save({a: null, b: null});
 c.save({a: 1, b: 1});
-assert.writeOK(c.remove(unsatisfiable));
+assert.commandWorked(c.remove(unsatisfiable));
 assert.eq(2, c.count());
-assert.writeOK(c.update(unsatisfiable, {$set: {c: 1}}, false, true));
+assert.commandWorked(c.update(unsatisfiable, {$set: {c: 1}}, false, true));
 assert.eq(2, c.count());
 assert.eq(0, c.count({c: 1}));
 

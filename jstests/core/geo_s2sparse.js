@@ -25,7 +25,7 @@ var bulkInsertDocs = function(coll, numDocs, makeDocFn) {
         bulk.insert(makeDocFn(i));
     }
 
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 
     print("Bulk inserting " + numDocs + " documents completed");
 };

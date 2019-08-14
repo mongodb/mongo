@@ -22,8 +22,8 @@ for (i = 0; i < N; i++) {
     bulk.insert({_id: i, s: S});
     bulk2.insert({_id: i, s: S, s2: S});
 }
-assert.writeOK(bulk.execute());
-assert.writeOK(bulk2.execute());
+assert.commandWorked(bulk.execute());
+assert.commandWorked(bulk2.execute());
 
 s.printShardingStatus();
 

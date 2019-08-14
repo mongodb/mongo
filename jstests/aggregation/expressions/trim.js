@@ -28,7 +28,7 @@ testExpressionWithCollation(coll, {$ltrim: {input: "xXx", chars: "x"}}, "Xx", ca
 
 // Test using inputs from documents.
 coll.drop();
-assert.writeOK(coll.insert([
+assert.commandWorked(coll.insert([
     {_id: 0, name: ", Charlie"},
     {_id: 1, name: "Obama\t,  Barack"},
     {_id: 2, name: " Ride,  Sally   "}
@@ -43,7 +43,7 @@ assert.eq(
     [{_id: 0, firstName: "Charlie"}, {_id: 1, firstName: "Barack"}, {_id: 2, firstName: "Sally"}]);
 
 coll.drop();
-assert.writeOK(coll.insert([
+assert.commandWorked(coll.insert([
     {_id: 0, poorlyParsedWebTitle: "The title of my document"},
     {_id: 1, poorlyParsedWebTitle: "\u2001\u2002 Odd unicode indentation"},
     {_id: 2, poorlyParsedWebTitle: "\u2001\u2002 Odd unicode indentation\u200A"},
@@ -59,7 +59,7 @@ assert.eq(
     ]);
 
 coll.drop();
-assert.writeOK(coll.insert([
+assert.commandWorked(coll.insert([
     {_id: 0, proof: "Left as an exercise for the reader∎"},
     {_id: 1, proof: "∎∃ proof∎"},
     {_id: 2, proof: "Just view the problem as a continuous DAG whose elements are taylor series∎"},

@@ -21,8 +21,8 @@ function insertFunctionFactory(checkpoint) {
             for (var i = 0; i < 100; ++i) {
                 bulk.insert({unjournaled: i});
             }
-            assert.writeOK(bulk.execute({j: false}));
-            assert.writeOK(db.nojournal.insert({journaled: iter}, {writeConcern: {j: true}}));
+            assert.commandWorked(bulk.execute({j: false}));
+            assert.commandWorked(db.nojournal.insert({journaled: iter}, {writeConcern: {j: true}}));
             if (__checkpoint_template_placeholder__ && iter === 50) {
                 assert.commandWorked(db.adminCommand({fsync: 1}));
             }
@@ -59,7 +59,7 @@ function runTest(options) {
             // We saw 100 journaled inserts, but visibility does not guarantee durability, so
             // do an extra journaled write to make all visible commits durable, before killing
             // the mongod.
-            assert.writeOK(testDB.nojournal.insert({final: true}, {writeConcern: {j: true}}));
+            assert.commandWorked(testDB.nojournal.insert({final: true}, {writeConcern: {j: true}}));
             MongoRunner.stopMongod(conn, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
             return true;
         }
@@ -84,7 +84,7 @@ function runTest(options) {
                'journaled write operations since the last checkpoint were not replayed');
 
     var initialNumLogWrites = testDB.serverStatus().wiredTiger.log['log write operations'];
-    assert.writeOK(testDB.nojournal.insert({a: 1}, {writeConcern: {fsync: true}}));
+    assert.commandWorked(testDB.nojournal.insert({a: 1}, {writeConcern: {fsync: true}}));
     assert.eq(initialNumLogWrites,
               testDB.serverStatus().wiredTiger.log['log write operations'],
               'journaling is still enabled even though --nojournal was specified');
@@ -103,7 +103,7 @@ function runTest(options) {
     testDB = conn.getDB('test');
     initialNumLogWrites = testDB.serverStatus().wiredTiger.log['log write operations'];
 
-    assert.writeOK(testDB.nojournal.insert({a: 1}, {writeConcern: {fsync: true}}));
+    assert.commandWorked(testDB.nojournal.insert({a: 1}, {writeConcern: {fsync: true}}));
     assert.lt(initialNumLogWrites,
               testDB.serverStatus().wiredTiger.log['log write operations'],
               'journaling is still disabled even though --journal was specified');

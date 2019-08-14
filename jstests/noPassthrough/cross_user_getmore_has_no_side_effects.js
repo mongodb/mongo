@@ -46,7 +46,7 @@ let coll = testDB.security_501;
 coll.drop();
 
 for (let i = 0; i < 100; i++) {
-    assert.writeOK(coll.insert({_id: i}));
+    assert.commandWorked(coll.insert({_id: i}));
 }
 
 // Create our two users.

@@ -69,10 +69,10 @@ if (lastTop === undefined) {
 }
 
 lastHistogram = getHistogramStats(view);
-assert.writeOK(coll.insert({}));
-assert.writeOK(coll.update({}, {$set: {x: 1}}));
+assert.commandWorked(coll.insert({}));
+assert.commandWorked(coll.update({}, {$set: {x: 1}}));
 coll.aggregate([{$match: {}}]);
-assert.writeOK(coll.remove({}));
+assert.commandWorked(coll.remove({}));
 
 assertTopDiffEq(view, lastTop, "insert", 0);
 assertTopDiffEq(view, lastTop, "update", 0);

@@ -190,7 +190,7 @@ var queryConfigChunks = function(st) {
     // Setup.
     assert.commandWorked(st.s.adminCommand({shardcollection: testColl.getFullName(), key: {e: 1}}));
     for (var i = 0; i < testCollData.length; i++) {
-        assert.writeOK(testColl.insert(testCollData[i]));
+        assert.commandWorked(testColl.insert(testCollData[i]));
     }
     assert.commandWorked(st.s.adminCommand({split: testColl.getFullName(), middle: {e: 2}}));
     assert.commandWorked(st.s.adminCommand({split: testColl.getFullName(), middle: {e: 6}}));
@@ -256,7 +256,7 @@ var queryUserCreated = function(database) {
     // Setup.
     dropCollectionIfExists(userColl);
     for (var i = 0; i < userCollData.length; i++) {
-        assert.writeOK(userColl.insert(userCollData[i]));
+        assert.commandWorked(userColl.insert(userCollData[i]));
     }
     assert.commandWorked(userColl.createIndex({s: 1}));
 

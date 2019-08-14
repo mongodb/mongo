@@ -34,7 +34,8 @@ const deterministicAlgorithm = "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic";
 const shell = Mongo(conn.host, clientSideFLEOptions);
 const keyVault = shell.getKeyVault();
 
-assert.writeOK(keyVault.createKey("local", "arn:aws:kms:us-east-1:fake:fake:fake", ['mongoKey']));
+assert.commandWorked(
+    keyVault.createKey("local", "arn:aws:kms:us-east-1:fake:fake:fake", ['mongoKey']));
 
 const clientEncrypt = shell.getClientEncryption();
 const keyId = keyVault.getKeyByAltName("mongoKey").toArray()[0]._id;
@@ -45,7 +46,7 @@ const encryptedStr = clientEncrypt.encrypt(keyId, "mongodb", deterministicAlgori
 const collection = conn.getDB("test").getCollection("collection");
 
 for (var i = 0; i < 150; i++) {
-    assert.writeOK(collection.insert({string: encryptedStr, id: 1}));
+    assert.commandWorked(collection.insert({string: encryptedStr, id: 1}));
 }
 
 // Ensure string is auto decrypted

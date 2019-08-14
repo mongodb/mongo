@@ -17,12 +17,12 @@ var coll = db.index_type_change;
 coll.drop();
 assert.commandWorked(coll.ensureIndex({a: 1}));
 
-assert.writeOK(coll.insert({a: 2}));
+assert.commandWorked(coll.insert({a: 2}));
 assert.eq(1, coll.find({a: {$type: "double"}}).itcount());
 
 var newVal = new NumberLong(2);
 var res = coll.update({}, {a: newVal});  // Replacement update.
-assert.writeOK(res);
+assert.commandWorked(res);
 assert.eq(res.nMatched, 1);
 if (coll.getMongo().writeMode() == "commands")
     assert.eq(res.nModified, 1);

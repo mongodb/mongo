@@ -7,7 +7,7 @@ load('jstests/aggregation/extras/utils.js');
 'use strict';
 var coll = db.sqrt;
 coll.drop();
-assert.writeOK(coll.insert({_id: 0}));
+assert.commandWorked(coll.insert({_id: 0}));
 
 // Helper for testing that op returns expResult.
 function testOp(op, expResult) {

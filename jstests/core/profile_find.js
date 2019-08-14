@@ -23,7 +23,7 @@ const profileEntryFilter = {
 //
 var i;
 for (i = 0; i < 3; ++i) {
-    assert.writeOK(coll.insert({a: i, b: i}));
+    assert.commandWorked(coll.insert({a: i, b: i}));
 }
 assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "fr"}}));
 
@@ -70,7 +70,7 @@ assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 //
 coll.drop();
 for (i = 0; i < 3; ++i) {
-    assert.writeOK(coll.insert({a: i, b: i}));
+    assert.commandWorked(coll.insert({a: i, b: i}));
 }
 assert.commandWorked(coll.createIndex({a: 1}));
 
@@ -91,7 +91,7 @@ coll.drop();
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({b: 1}));
 for (i = 0; i < 5; ++i) {
-    assert.writeOK(coll.insert({a: i, b: i}));
+    assert.commandWorked(coll.insert({a: i, b: i}));
 }
 
 assert.neq(coll.findOne({a: 3, b: 3}), null);
@@ -110,8 +110,8 @@ coll.drop();
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({b: 1}));
 for (i = 0; i < 20; ++i) {
-    assert.writeOK(coll.insert({a: 5, b: i}));
-    assert.writeOK(coll.insert({a: i, b: 10}));
+    assert.commandWorked(coll.insert({a: 5, b: i}));
+    assert.commandWorked(coll.insert({a: i, b: 10}));
 }
 
 // Until we get the failpoint described in the above comment (regarding SERVER-23620), we must
@@ -133,7 +133,7 @@ assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 // Confirm that query modifiers such as "hint" are in the profiler document.
 //
 coll.drop();
-assert.writeOK(coll.insert({_id: 2}));
+assert.commandWorked(coll.insert({_id: 2}));
 
 assert.eq(coll.find().hint({_id: 1}).itcount(), 1);
 profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);

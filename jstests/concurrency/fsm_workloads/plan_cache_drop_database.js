@@ -17,7 +17,7 @@ var $config = (function() {
             bulk.insert({a: 1, b: Random.rand()});
         }
         var res = bulk.execute();
-        assertAlways.writeOK(res);
+        assertAlways.commandWorked(res);
 
         // Create two indexes to force plan caching: The {a: 1} index is
         // cached by the query planner because we query on a single value

@@ -32,7 +32,7 @@ for (i = 0; i < 100; i++) {
     bulk.insert({num: i, str: longStr});
     bulk.insert({num: i + 100, x: i, str: longStr});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 // no usable index yet, should throw
 assert.throws(function() {
@@ -43,13 +43,13 @@ assert.throws(function() {
 assert.commandWorked(coll.ensureIndex({num: 1, x: 1}));
 
 // usable index, but doc with empty 'num' value, so still should throw
-assert.writeOK(coll.insert({x: -5}));
+assert.commandWorked(coll.insert({x: -5}));
 assert.throws(function() {
     s.adminCommand({shardCollection: coll.getFullName(), key: {num: 1}});
 });
 
 // remove the bad doc.  now should finally succeed
-assert.writeOK(coll.remove({x: -5}));
+assert.commandWorked(coll.remove({x: -5}));
 assert.commandWorked(s.s0.adminCommand({shardCollection: coll.getFullName(), key: {num: 1}}));
 
 // make sure extra index is not created
@@ -167,7 +167,7 @@ for (i = 0; i < 3; i++) {
             bulk.insert({skey: 0, extra: i, superfluous: j});
         }
     }
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 
     // split on that key, and check it makes 2 chunks
     var splitRes = admin.runCommand({split: coll2 + "", middle: {skey: 0}});

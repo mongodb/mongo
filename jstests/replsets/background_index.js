@@ -19,7 +19,7 @@ var coll = primary.getCollection("test.foo");
 var adminDB = primary.getDB("admin");
 
 for (var i = 0; i < 100; i++) {
-    assert.writeOK(coll.insert({_id: i, x: i * 3, str: "hello world"}));
+    assert.commandWorked(coll.insert({_id: i, x: i * 3, str: "hello world"}));
 }
 
 // Add a background index.

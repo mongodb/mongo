@@ -33,7 +33,7 @@ var reduceFunction = function(a, b) {
 //
 coll.drop();
 for (var i = 0; i < 3; i++) {
-    assert.writeOK(coll.insert({a: i, b: i}));
+    assert.commandWorked(coll.insert({a: i, b: i}));
 }
 assert.commandWorked(coll.createIndex({a: 1}));
 
@@ -63,7 +63,7 @@ assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 //
 coll.drop();
 for (var i = 0; i < 5; i++) {
-    assert.writeOK(coll.insert({a: i, b: i}));
+    assert.commandWorked(coll.insert({a: i, b: i}));
 }
 
 coll.mapReduce(mapFunction, reduceFunction, {sort: {b: 1}, out: {inline: 1}});
@@ -77,7 +77,7 @@ assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 //
 coll.drop();
 for (var i = 0; i < 3; i++) {
-    assert.writeOK(coll.insert({a: i, b: i}));
+    assert.commandWorked(coll.insert({a: i, b: i}));
 }
 
 var outputCollectionName = "output_col";
@@ -93,7 +93,7 @@ coll.drop();
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({b: 1}));
 for (i = 0; i < 5; ++i) {
-    assert.writeOK(coll.insert({a: i, b: i}));
+    assert.commandWorked(coll.insert({a: i, b: i}));
 }
 
 coll.mapReduce(mapFunction, reduceFunction, {query: {a: 3, b: 3}, out: {inline: 1}});

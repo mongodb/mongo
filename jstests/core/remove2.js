@@ -27,7 +27,7 @@ function g() {
 
     const res = t.remove({x: {$gte: 3}});
 
-    assert.writeOK(res);
+    assert.commandWorked(res);
     assert(t.findOne({x: 3}) == null);
     assert(t.findOne({x: 8}) == null);
     assert(t.validate().valid);

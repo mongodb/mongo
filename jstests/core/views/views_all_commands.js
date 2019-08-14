@@ -254,8 +254,8 @@ let viewsCommandTests = {
     getLog: {skip: isUnrelated},
     getMore: {
         setup: function(conn) {
-            assert.writeOK(conn.collection.remove({}));
-            assert.writeOK(conn.collection.insert([{_id: 1}, {_id: 2}, {_id: 3}]));
+            assert.commandWorked(conn.collection.remove({}));
+            assert.commandWorked(conn.collection.insert([{_id: 1}, {_id: 2}, {_id: 3}]));
         },
         command: function(conn) {
             function testGetMoreForCommand(cmd) {
@@ -308,8 +308,8 @@ let viewsCommandTests = {
     isMaster: {skip: isUnrelated},
     killCursors: {
         setup: function(conn) {
-            assert.writeOK(conn.collection.remove({}));
-            assert.writeOK(conn.collection.insert([{_id: 1}, {_id: 2}, {_id: 3}]));
+            assert.commandWorked(conn.collection.remove({}));
+            assert.commandWorked(conn.collection.insert([{_id: 1}, {_id: 2}, {_id: 3}]));
         },
         command: function(conn) {
             // First get and check a partial result for an aggregate command.
@@ -592,7 +592,7 @@ for (let command of commands) {
         // 'collection'.
         assert.commandWorked(dbHandle.dropDatabase());
         assert.commandWorked(dbHandle.runCommand({create: "view", viewOn: "collection"}));
-        assert.writeOK(dbHandle.collection.insert({x: 1}));
+        assert.commandWorked(dbHandle.collection.insert({x: 1}));
         if (subtest.setup !== undefined)
             subtest.setup(dbHandle);
 

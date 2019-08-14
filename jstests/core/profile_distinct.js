@@ -20,7 +20,7 @@ testDB.setProfilingLevel(2);
 //
 var i;
 for (i = 0; i < 10; ++i) {
-    assert.writeOK(coll.insert({a: i % 5, b: i}));
+    assert.commandWorked(coll.insert({a: i % 5, b: i}));
 }
 assert.commandWorked(coll.createIndex({b: 1}));
 
@@ -49,7 +49,7 @@ coll.drop();
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({b: 1}));
 for (i = 0; i < 5; ++i) {
-    assert.writeOK(coll.insert({a: i, b: i}));
+    assert.commandWorked(coll.insert({a: i, b: i}));
 }
 
 coll.distinct("a", {a: 3, b: 3});

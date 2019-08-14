@@ -25,7 +25,7 @@ var bulk = t.initializeUnorderedBulkOp();
 for (var i = 0; i < 200000; i++) {
     bulk.insert({a: i});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 // enable sharding of the collection. Only 1 chunk.
 t.ensureIndex({a: 1});

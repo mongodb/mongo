@@ -28,8 +28,8 @@ let indexedDoc = {
     "geoJson": {"type": "Polygon", "coordinates": [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]]}
 };
 
-assert.writeOK(coll.insert(unindexedDoc));
-assert.writeOK(coll.insert(indexedDoc));
+assert.commandWorked(coll.insert(unindexedDoc));
+assert.commandWorked(coll.insert(indexedDoc));
 
 // Return the one indexed document.
 assert.eq(
@@ -42,7 +42,7 @@ assert.eq(
 assert.writeError(coll.update({_id: 0}, {$set: {isIndexed: 1}}));
 
 // Update the indexed document to remove it from the index.
-assert.writeOK(coll.update({_id: 1}, {$set: {isIndexed: -1}}));
+assert.commandWorked(coll.update({_id: 1}, {$set: {isIndexed: -1}}));
 
 // This query should now return zero documents.
 assert.eq(
@@ -52,11 +52,11 @@ assert.eq(
         .itcount());
 
 // Re-index the document.
-assert.writeOK(coll.update({_id: 1}, {$set: {isIndexed: 1}}));
+assert.commandWorked(coll.update({_id: 1}, {$set: {isIndexed: 1}}));
 
 // Remove both should succeed without error.
-assert.writeOK(coll.remove({_id: 0}));
-assert.writeOK(coll.remove({_id: 1}));
+assert.commandWorked(coll.remove({_id: 0}));
+assert.commandWorked(coll.remove({_id: 1}));
 
 assert.eq(
     0,

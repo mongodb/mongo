@@ -8,7 +8,7 @@ t.ensureIndex({geo: "2dsphere"});
 
 function testDuplicates(shapeName, shapeWithDupes, shapeWithoutDupes) {
     // insert a doc with dupes
-    assert.writeOK(t.insert(shapeWithDupes));
+    assert.commandWorked(t.insert(shapeWithDupes));
 
     // duplicates are preserved when the document is fetched by _id
     assert.eq(shapeWithDupes, t.findOne({_id: shapeName}));

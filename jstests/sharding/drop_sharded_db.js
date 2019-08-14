@@ -29,7 +29,7 @@ for (var i = 0; i < numColls; i++) {
 }
 
 // Insert a document to an unsharded collection and make sure that the document is there.
-assert.writeOK(dbA.unsharded.insert({dummy: 1}));
+assert.commandWorked(dbA.unsharded.insert({dummy: 1}));
 var shardName = config.databases.findOne({_id: dbA.getName()}).primary;
 var shardHostConn = new Mongo(config.shards.findOne({_id: shardName}).host);
 var dbAOnShard = shardHostConn.getDB(dbA.getName());

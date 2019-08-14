@@ -22,7 +22,7 @@
     for (var i = 0; i < N; ++i) {
         bulk.insert({_id: i, x: i, a: {}});
     }
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 
     jsTestLog("3. Make sure synced");
     replTest.awaitReplication();

@@ -16,7 +16,7 @@ var $config = (function() {
 
         function insertAndRemove(db, collName) {
             var res = db[collName].insert({tid: this.tid, value: this.iter});
-            assertAlways.writeOK(res);
+            assertAlways.commandWorked(res);
             assertAlways.eq(1, res.nInserted);
 
             res = db.runCommand({

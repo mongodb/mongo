@@ -20,10 +20,10 @@ coll.drop();
 //
 
 // Test that dotted field names are allowed.
-assert.writeOK(coll.insert({"a.b": 1}));
-assert.writeOK(coll.insert({"_id.a": 1}));
-assert.writeOK(coll.insert({a: {"a.b": 1}}));
-assert.writeOK(coll.insert({_id: {"a.b": 1}}));
+assert.commandWorked(coll.insert({"a.b": 1}));
+assert.commandWorked(coll.insert({"_id.a": 1}));
+assert.commandWorked(coll.insert({a: {"a.b": 1}}));
+assert.commandWorked(coll.insert({_id: {"a.b": 1}}));
 
 // Test that _id cannot be a regex.
 assert.writeError(coll.insert({_id: /a/}));
@@ -32,7 +32,7 @@ assert.writeError(coll.insert({_id: /a/}));
 assert.writeError(coll.insert({_id: [9]}));
 
 // Test that $-prefixed field names are allowed in embedded objects.
-assert.writeOK(coll.insert({a: {$b: 1}}));
+assert.commandWorked(coll.insert({a: {$b: 1}}));
 assert.eq(1, coll.find({"a.$b": 1}).itcount());
 
 // Test that $-prefixed field names are not allowed at the top level.
@@ -49,9 +49,9 @@ assert.writeErrorWithCode(coll.insert({_id: {$b: 1}}), ErrorCodes.DollarPrefixed
 assert.writeErrorWithCode(coll.insert({_id: {a: 1, $b: 1}}), ErrorCodes.DollarPrefixedFieldName);
 
 // Should not enforce the same restrictions on an embedded _id field.
-assert.writeOK(coll.insert({a: {_id: [9]}}));
-assert.writeOK(coll.insert({a: {_id: /a/}}));
-assert.writeOK(coll.insert({a: {_id: {$b: 1}}}));
+assert.commandWorked(coll.insert({a: {_id: [9]}}));
+assert.commandWorked(coll.insert({a: {_id: /a/}}));
+assert.commandWorked(coll.insert({a: {_id: {$b: 1}}}));
 
 //
 // Update command field name validation.
@@ -59,20 +59,20 @@ assert.writeOK(coll.insert({a: {_id: {$b: 1}}}));
 coll.drop();
 
 // Dotted fields are allowed in an update.
-assert.writeOK(coll.update({}, {"a.b": 1}, {upsert: true}));
+assert.commandWorked(coll.update({}, {"a.b": 1}, {upsert: true}));
 assert.eq(0, coll.find({"a.b": 1}).itcount());
 assert.eq(1, coll.find({}).itcount());
 
 // Dotted fields represent paths in $set.
-assert.writeOK(coll.update({}, {$set: {"a.b": 1}}, {upsert: true}));
+assert.commandWorked(coll.update({}, {$set: {"a.b": 1}}, {upsert: true}));
 assert.eq(1, coll.find({"a.b": 1}).itcount());
 
 // Dotted fields represent paths in the query object.
-assert.writeOK(coll.update({"a.b": 1}, {$set: {"a.b": 2}}));
+assert.commandWorked(coll.update({"a.b": 1}, {$set: {"a.b": 2}}));
 assert.eq(1, coll.find({"a.b": 2}).itcount());
 assert.eq(1, coll.find({a: {b: 2}}).itcount());
 
-assert.writeOK(coll.update({"a.b": 2}, {"a.b": 3}));
+assert.commandWorked(coll.update({"a.b": 2}, {"a.b": 3}));
 assert.eq(0, coll.find({"a.b": 3}).itcount());
 
 // $-prefixed field names are not allowed.
@@ -132,7 +132,7 @@ assert.throws(function() {
 //
 coll.drop();
 
-assert.writeOK(coll.insert({_id: {a: 1, b: 2}, "c.d": 3}));
+assert.commandWorked(coll.insert({_id: {a: 1, b: 2}, "c.d": 3}));
 
 // Dotted fields represent paths in an aggregation pipeline.
 assert.eq(coll.aggregate([{$match: {"_id.a": 1}}, {$project: {"_id.b": 1}}]).toArray(),

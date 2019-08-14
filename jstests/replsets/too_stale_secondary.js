@@ -55,7 +55,8 @@ function overflowOplog(conn, db, writeConcern) {
     // Keep inserting large documents until the oplog rolls over.
     const largeStr = new Array(32 * 1024).join('aaaaaaaa');
     while (bsonWoCompare(getFirstOplogEntry(conn), firstOplogEntry) === 0) {
-        assert.writeOK(db[collName].insert({data: largeStr}, {writeConcern: {w: writeConcern}}));
+        assert.commandWorked(
+            db[collName].insert({data: largeStr}, {writeConcern: {w: writeConcern}}));
     }
 }
 
@@ -109,7 +110,7 @@ var primary = replTest.getPrimary();
 var primaryTestDB = primary.getDB(dbName);
 
 jsTestLog("1: Insert one document on the primary (Node 0) and ensure it is replicated.");
-assert.writeOK(primaryTestDB[collName].insert({a: 1}, {writeConcern: {w: 3}}));
+assert.commandWorked(primaryTestDB[collName].insert({a: 1}, {writeConcern: {w: 3}}));
 assert(!tooStale(replTest.nodes[2]));
 
 jsTestLog("2: Stop Node 2.");

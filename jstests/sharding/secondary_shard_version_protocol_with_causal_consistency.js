@@ -25,7 +25,7 @@ let freshMongos = st.s0;
 let staleMongos = st.s1;
 
 jsTest.log("do insert from stale mongos to make it load the routing table before the move");
-assert.writeOK(staleMongos.getCollection(ns).insert({x: 1}));
+assert.commandWorked(staleMongos.getCollection(ns).insert({x: 1}));
 
 jsTest.log("do moveChunk from fresh mongos");
 assert.commandWorked(freshMongos.adminCommand({

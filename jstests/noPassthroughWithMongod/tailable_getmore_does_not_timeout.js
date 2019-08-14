@@ -15,7 +15,7 @@ coll.drop();
 assert.commandWorked(db.runCommand({create: coll.getName(), capped: true, size: 1024}));
 
 for (let i = 0; i < 10; ++i) {
-    assert.writeOK(coll.insert({_id: i}));
+    assert.commandWorked(coll.insert({_id: i}));
 }
 
 const findResponse = assert.commandWorked(

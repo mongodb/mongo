@@ -5,7 +5,7 @@ runReadOnlyTest(function() {
     return {
         name: 'write_ops',
         load: function(writableCollection) {
-            assert.writeOK(writableCollection.insert({_id: 0, x: 1}));
+            assert.commandWorked(writableCollection.insert({_id: 0, x: 1}));
         },
         exec: function(readableCollection) {
             // Test that insert fails.

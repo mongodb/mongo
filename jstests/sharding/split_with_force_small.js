@@ -27,7 +27,7 @@ var bulk = coll.initializeUnorderedBulkOp();
 for (var i = 0; i < 1024; i++) {
     bulk.insert({_id: -(i + 1)});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 jsTest.log("Insert 32 docs into the high chunk of a collection");
 
@@ -35,7 +35,7 @@ bulk = coll.initializeUnorderedBulkOp();
 for (var i = 0; i < 32; i++) {
     bulk.insert({_id: i});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 jsTest.log("Split off MaxKey chunk...");
 

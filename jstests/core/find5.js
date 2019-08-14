@@ -6,8 +6,8 @@
 const coll = db.find5;
 coll.drop();
 
-assert.writeOK(coll.insert({a: 1}));
-assert.writeOK(coll.insert({b: 5}));
+assert.commandWorked(coll.insert({a: 1}));
+assert.commandWorked(coll.insert({b: 5}));
 
 assert.eq(2, coll.find({}, {b: 1}).count(), "A");
 
@@ -40,7 +40,7 @@ assert.eq(5, second.b, "C8");
 
 assert(coll.drop());
 
-assert.writeOK(coll.insert({a: 1, b: {c: 2, d: 3, e: 4}}));
+assert.commandWorked(coll.insert({a: 1, b: {c: 2, d: 3, e: 4}}));
 assert.eq(2, coll.findOne({}, {"b.c": 1}).b.c, "D");
 
 const o = coll.findOne({}, {"b.c": 1, "b.d": 1});
@@ -51,6 +51,6 @@ assert(!o.b.e, "E 3");
 assert(!coll.findOne({}, {"b.c": 1}).b.d, "F");
 
 assert(coll.drop());
-assert.writeOK(coll.insert({a: {b: {c: 1}}}));
+assert.commandWorked(coll.insert({a: {b: {c: 1}}}));
 assert.eq(1, coll.findOne({}, {"a.b.c": 1}).a.b.c, "G");
 }());

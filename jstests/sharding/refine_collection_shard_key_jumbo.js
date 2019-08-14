@@ -25,7 +25,7 @@ function generateJumboChunk() {
         bulk.insert({x: x, y: i, big: big});
     }
 
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 }
 
 function runBalancer() {

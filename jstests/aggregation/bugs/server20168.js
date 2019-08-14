@@ -16,7 +16,7 @@ assert.eq(0, results.length, "$unwind returned the wrong number of results");
  */
 function testPreserveNullAndEmptyArraysParam(inputDoc, unwindPath, outputDoc) {
     coll.drop();
-    assert.writeOK(coll.insert(inputDoc));
+    assert.commandWorked(coll.insert(inputDoc));
 
     // If preserveNullAndEmptyArrays is passed, we should get an output document.
     var preservedResults =

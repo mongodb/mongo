@@ -28,7 +28,7 @@ var batch = masterColl.initializeOrderedBulkOp();
 for (var i = 0; i < nDocuments; i++) {
     batch.insert({_id: i});
 }
-assert.writeOK(batch.execute());
+assert.commandWorked(batch.execute());
 replTest.awaitReplication();
 
 function checkCollection(coll) {

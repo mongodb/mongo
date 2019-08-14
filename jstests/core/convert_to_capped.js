@@ -17,7 +17,7 @@ testDb.dropDatabase();
 // Create a collection with some data.
 let num = 10;
 for (let i = 0; i < num; ++i) {
-    assert.writeOK(coll.insert({_id: i}));
+    assert.commandWorked(coll.insert({_id: i}));
 }
 
 // Ensure we do not allow overflowing the size long long on the server (SERVER-33078).

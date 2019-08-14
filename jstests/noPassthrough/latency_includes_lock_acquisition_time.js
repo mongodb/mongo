@@ -45,7 +45,7 @@ function runTests() {
     // lines, we are just verifying that the log line appears, which implies that the recorded
     // latency exceeds slowms.
     runWithWait(hangMillis, function() {
-        assert.writeOK(testColl.insert({a: 1}));
+        assert.commandWorked(testColl.insert({a: 1}));
     });
     let profileEntry;
     if (conn.writeMode() === "commands") {
@@ -66,7 +66,7 @@ function runTests() {
 
     // Test that update profiler/logs include lock acquisition time.
     runWithWait(hangMillis, function() {
-        assert.writeOK(testColl.update({}, {$set: {b: 1}}));
+        assert.commandWorked(testColl.update({}, {$set: {b: 1}}));
     });
     profileEntry = getLatestProfilerEntry(testDB, {
         ns: testColl.getFullName(),
@@ -87,7 +87,7 @@ function runTests() {
     checkLog.contains(conn, "find { find: \"lock_acquisition_time\"");
 
     // Test that getMore profiler/logs include lock acquisition time.
-    assert.writeOK(testColl.insert([{a: 2}, {a: 3}]));
+    assert.commandWorked(testColl.insert([{a: 2}, {a: 3}]));
     runWithWait(hangMillis, function() {
         // Include a batchSize in order to ensure that a getMore is issued.
         assert.eq(3, testColl.find().batchSize(2).itcount());
@@ -98,7 +98,7 @@ function runTests() {
     });
     assert.gte(profileEntry.millis, hangMillis - padding);
     checkLog.contains(conn, "originatingCommand: { find: \"lock_acquisition_time\"");
-    assert.writeOK(testColl.remove({a: {$gt: 1}}));
+    assert.commandWorked(testColl.remove({a: {$gt: 1}}));
 
     // Test that aggregate profiler/logs include lock acquisition time.
     runWithWait(hangMillis, function() {
@@ -135,7 +135,7 @@ function runTests() {
 
     // Test that delete profiler/logs include lock acquisition time.
     runWithWait(hangMillis, function() {
-        assert.writeOK(testColl.remove({b: 1}));
+        assert.commandWorked(testColl.remove({b: 1}));
     });
     profileEntry = getLatestProfilerEntry(testDB, {
         ns: testColl.getFullName(),

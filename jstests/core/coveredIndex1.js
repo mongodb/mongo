@@ -15,12 +15,12 @@ coll.drop();
 // Include helpers for analyzing explain output.
 load("jstests/libs/analyze_plan.js");
 
-assert.writeOK(coll.insert({order: 0, fn: "john", ln: "doe"}));
-assert.writeOK(coll.insert({order: 1, fn: "jack", ln: "doe"}));
-assert.writeOK(coll.insert({order: 2, fn: "john", ln: "smith"}));
-assert.writeOK(coll.insert({order: 3, fn: "jack", ln: "black"}));
-assert.writeOK(coll.insert({order: 4, fn: "bob", ln: "murray"}));
-assert.writeOK(coll.insert({order: 5, fn: "aaa", ln: "bbb", obj: {a: 1, b: "blah"}}));
+assert.commandWorked(coll.insert({order: 0, fn: "john", ln: "doe"}));
+assert.commandWorked(coll.insert({order: 1, fn: "jack", ln: "doe"}));
+assert.commandWorked(coll.insert({order: 2, fn: "john", ln: "smith"}));
+assert.commandWorked(coll.insert({order: 3, fn: "jack", ln: "black"}));
+assert.commandWorked(coll.insert({order: 4, fn: "bob", ln: "murray"}));
+assert.commandWorked(coll.insert({order: 5, fn: "aaa", ln: "bbb", obj: {a: 1, b: "blah"}}));
 
 /**
  * Asserts that running the find command with query 'query' and projection 'projection' is

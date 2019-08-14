@@ -36,7 +36,7 @@ const mongosColl = mongosDB[jsTestName()];
 assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
 assert.commandWorked(
     mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
-assert.writeOK(mongosColl.insert({_id: 1}));
+assert.commandWorked(mongosColl.insert({_id: 1}));
 
 // Verify that the pipeline splits and merges on mongoS despite only targeting a single shard.
 const explainPlan = assert.commandWorked(

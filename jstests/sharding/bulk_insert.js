@@ -14,7 +14,7 @@ var collUn = mongos.getCollection(jsTestName() + ".collUnsharded");
 var collDi = st.shard0.getCollection(jsTestName() + ".collDirect");
 
 jsTest.log('Checking write to config collections...');
-assert.writeOK(admin.TestColl.insert({SingleDoc: 1}));
+assert.commandWorked(admin.TestColl.insert({SingleDoc: 1}));
 
 jsTest.log("Setting up collections...");
 
@@ -33,9 +33,9 @@ assert.commandWorked(admin.runCommand(
     {moveChunk: collSh + "", find: {ukey: 0}, to: st.shard0.shardName, _waitForDelete: true}));
 
 var resetColls = function() {
-    assert.writeOK(collSh.remove({}));
-    assert.writeOK(collUn.remove({}));
-    assert.writeOK(collDi.remove({}));
+    assert.commandWorked(collSh.remove({}));
+    assert.commandWorked(collUn.remove({}));
+    assert.commandWorked(collDi.remove({}));
 };
 
 var isDupKeyError = function(err) {
@@ -54,13 +54,13 @@ jsTest.log("Bulk insert (no ContinueOnError) to single shard...");
 resetColls();
 var inserts = [{ukey: 0}, {ukey: 1}];
 
-assert.writeOK(collSh.insert(inserts));
+assert.commandWorked(collSh.insert(inserts));
 assert.eq(2, collSh.find().itcount());
 
-assert.writeOK(collUn.insert(inserts));
+assert.commandWorked(collUn.insert(inserts));
 assert.eq(2, collUn.find().itcount());
 
-assert.writeOK(collDi.insert(inserts));
+assert.commandWorked(collDi.insert(inserts));
 assert.eq(2, collDi.find().itcount());
 
 jsTest.log("Bulk insert (no COE) with mongos error...");
@@ -107,13 +107,13 @@ jsTest.log("Bulk insert (no COE) on second shard...");
 resetColls();
 var inserts = [{ukey: 0}, {ukey: -1}];
 
-assert.writeOK(collSh.insert(inserts));
+assert.commandWorked(collSh.insert(inserts));
 assert.eq(2, collSh.find().itcount());
 
-assert.writeOK(collUn.insert(inserts));
+assert.commandWorked(collUn.insert(inserts));
 assert.eq(2, collUn.find().itcount());
 
-assert.writeOK(collDi.insert(inserts));
+assert.commandWorked(collDi.insert(inserts));
 assert.eq(2, collDi.find().itcount());
 
 jsTest.log("Bulk insert to second shard (no COE) with mongos error...");
@@ -245,7 +245,7 @@ assert.commandWorked(admin.runCommand(
 assert.commandWorked(admin.runCommand(
     {moveChunk: collSh + "", find: {ukey: 0}, to: st.shard0.shardName, _waitForDelete: true}));
 
-assert.writeOK(staleCollSh.insert(inserts));
+assert.commandWorked(staleCollSh.insert(inserts));
 
 //
 // Test when the legacy batch exceeds the BSON object size limit

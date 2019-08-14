@@ -34,7 +34,7 @@ var seedList = rst.name + "/" + rst.nodes[1].host;  // node 1 is guaranteed to n
     // perform writes to the config servers.
     var mongos = MongoRunner.runMongos({configdb: seedList});
     var admin = mongos.getDB('admin');
-    assert.writeOK(admin.foo.insert({a: 1}));
+    assert.commandWorked(admin.foo.insert({a: 1}));
     assert.eq(1, admin.foo.findOne().a);
     MongoRunner.stopMongos(mongos);
 }

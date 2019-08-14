@@ -19,9 +19,9 @@ var bulk = foreign.initializeUnorderedBulkOp();
 for (var i = 0; i < 100; i++) {
     bulk.insert({_id: i, neighbors: [{id: i + 1}, {id: i + 2}]});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
-assert.writeOK(local.insert({starting: 0}));
+assert.commandWorked(local.insert({starting: 0}));
 
 var res = local
                   .aggregate({
@@ -43,7 +43,7 @@ var bulk = foreign.initializeUnorderedBulkOp();
 for (var i = 0; i < 100; i++) {
     bulk.insert({previous: [{neighbor: i}, {neighbor: i - 1}], value: i + 1});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 var res = local
                   .aggregate({
@@ -68,7 +68,7 @@ for (var i = 0; i < 100; i++) {
         values: [{neighbor: i + 1}, {neighbor: i + 2}]
     });
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 var res = local
                   .aggregate({

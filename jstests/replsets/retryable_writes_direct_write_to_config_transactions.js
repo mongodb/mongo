@@ -20,8 +20,8 @@ var priConn = replTest.getPrimary();
 var db = priConn.getDB('TestDB');
 var config = priConn.getDB('config');
 
-assert.writeOK(db.user.insert({_id: 0}));
-assert.writeOK(db.user.insert({_id: 1}));
+assert.commandWorked(db.user.insert({_id: 0}));
+assert.commandWorked(db.user.insert({_id: 1}));
 
 const lsid1 = UUID();
 const lsid2 = UUID();
@@ -48,7 +48,7 @@ assert.eq(1, config.transactions.find({'_id.id': lsid1}).itcount());
 assert.eq(1, config.transactions.find({'_id.id': lsid2}).itcount());
 
 // Invalidating lsid1 doesn't impact lsid2, but allows same statement to be executed again
-assert.writeOK(config.transactions.remove({'_id.id': lsid1}));
+assert.commandWorked(config.transactions.remove({'_id.id': lsid1}));
 assert.commandWorked(db.runCommand(cmdObj1));
 assert.eq(2, db.user.find({_id: 0}).toArray()[0].x);
 assert.commandWorked(db.runCommand(cmdObj2));
@@ -65,8 +65,8 @@ assert.writeError(config.transactions.insert({_id: {UnknownField: 'Garbage'}}));
 // Ensure inserting an invalid session record manually without all the required fields causes
 // the session to not work anymore for retryable writes for that session, but not for any other
 const lsidManual = config.transactions.find({'_id.id': lsid1}).toArray()[0]._id;
-assert.writeOK(config.transactions.remove({'_id.id': lsid1}));
-assert.writeOK(config.transactions.insert({_id: lsidManual}));
+assert.commandWorked(config.transactions.remove({'_id.id': lsid1}));
+assert.commandWorked(config.transactions.insert({_id: lsidManual}));
 
 const lsid3 = UUID();
 assert.commandWorked(db.runCommand({

@@ -32,7 +32,7 @@ for (var i = 0; i < count - 2; ++i) {
 var longString = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 bulk.insert({_id: count - 2, x: count - 2, longString: longString});
 bulk.insert({_id: count - 1, x: count - 1, longString: longString});
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 // Create a unique index on {x: 1}.
 assert.commandWorked(masterColl.ensureIndex({x: 1}, {unique: true}));
@@ -63,16 +63,16 @@ assert.soon(function() {
 // Delete {_id: count - 2} to make a hole. Grow {_id: 0} so that it moves into that hole. This
 // will cause the secondary to clone {_id: 0} again.
 // Change the value for 'x' so that we are not testing the uniqueness of 'x' in this case.
-assert.writeOK(masterColl.remove({_id: 0, x: 0}));
-assert.writeOK(masterColl.remove({_id: count - 2, x: count - 2}));
-assert.writeOK(masterColl.insert({_id: 0, x: count, longString: longString}));
+assert.commandWorked(masterColl.remove({_id: 0, x: 0}));
+assert.commandWorked(masterColl.remove({_id: count - 2, x: count - 2}));
+assert.commandWorked(masterColl.insert({_id: 0, x: count, longString: longString}));
 
 // Delete {_id: count - 1} to make a hole. Grow {x: 1} so that it moves into that hole. This
 // will cause the secondary to clone {x: 1} again.
 // Change the value for _id so that we are not testing the uniqueness of _id in this case.
-assert.writeOK(masterColl.remove({_id: 1, x: 1}));
-assert.writeOK(masterColl.remove({_id: count - 1, x: count - 1}));
-assert.writeOK(masterColl.insert({_id: count, x: 1, longString: longString}));
+assert.commandWorked(masterColl.remove({_id: 1, x: 1}));
+assert.commandWorked(masterColl.remove({_id: count - 1, x: count - 1}));
+assert.commandWorked(masterColl.insert({_id: count, x: 1, longString: longString}));
 
 // Resume initial sync.
 assert.commandWorked(secondary.adminCommand(

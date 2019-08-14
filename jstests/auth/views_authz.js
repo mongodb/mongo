@@ -109,7 +109,7 @@ function runTest(conn) {
     assert.eq(1, adminDB.auth("admin", "admin"));
     assert.commandWorked(viewsDB.createView("view2", "forbidden", []));
     for (let i = 0; i < 10; i++) {
-        assert.writeOK(viewsDB.forbidden.insert({x: 1}));
+        assert.commandWorked(viewsDB.forbidden.insert({x: 1}));
     }
     adminDB.logout();
 

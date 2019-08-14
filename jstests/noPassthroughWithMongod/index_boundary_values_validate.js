@@ -6,15 +6,15 @@
 var t = db.index_boundary_values_validate;
 t.drop();
 
-assert.writeOK(t.insert({a: MaxKey, b: MaxKey}));
-assert.writeOK(t.insert({a: MaxKey, b: MinKey}));
-assert.writeOK(t.insert({a: MinKey, b: MaxKey}));
-assert.writeOK(t.insert({a: MinKey, b: MinKey}));
+assert.commandWorked(t.insert({a: MaxKey, b: MaxKey}));
+assert.commandWorked(t.insert({a: MaxKey, b: MinKey}));
+assert.commandWorked(t.insert({a: MinKey, b: MaxKey}));
+assert.commandWorked(t.insert({a: MinKey, b: MinKey}));
 
-assert.writeOK(t.insert({a: {}}));
-assert.writeOK(t.insert({b: {}}));
-assert.writeOK(t.insert({unindexed_field: {}}));
-assert.writeOK(t.insert({a: {}, b: {}}));
+assert.commandWorked(t.insert({a: {}}));
+assert.commandWorked(t.insert({b: {}}));
+assert.commandWorked(t.insert({unindexed_field: {}}));
+assert.commandWorked(t.insert({a: {}, b: {}}));
 
 assert.commandWorked(t.createIndex({a: 1, b: 1}));
 assert.commandWorked(t.createIndex({a: 1, b: -1}));

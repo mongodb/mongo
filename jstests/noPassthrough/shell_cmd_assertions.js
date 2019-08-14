@@ -25,7 +25,7 @@ const sampleWriteConcernError = {
 
 function setup() {
     db.coll.drop();
-    assert.writeOK(db.coll.insert({_id: 1}));
+    assert.commandWorked(db.coll.insert({_id: 1}));
 }
 
 // Raw command responses.

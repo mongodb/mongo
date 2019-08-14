@@ -15,11 +15,11 @@ const sessionColl = sessionDb.getCollection(collName);
 
 assert.commandWorked(sessionDb.runCommand({create: collName}));
 
-assert.writeOK(sessionColl.insert({a: 1}));
+assert.commandWorked(sessionColl.insert({a: 1}));
 assert.commandWorked(sessionColl.createIndex({a: 1}));
 
 session.startTransaction();
-assert.writeOK(sessionColl.update({}, {$set: {a: [1, 2, 3]}}));
+assert.commandWorked(sessionColl.update({}, {$set: {a: [1, 2, 3]}}));
 assert.eq(1, sessionColl.find({}, {_id: 0, a: 1}).sort({a: 1}).itcount());
 assert.commandWorked(session.commitTransaction_forTesting());
 

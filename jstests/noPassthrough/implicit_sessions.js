@@ -69,7 +69,7 @@ function runTest() {
     const testDB = conn.getDB("test");
     const coll = testDB.getCollection("foo");
     const implicitId = inspectCommandForSessionId(function() {
-        assert.writeOK(coll.insert({x: 1}));
+        assert.commandWorked(coll.insert({x: 1}));
     }, {shouldIncludeId: true});
 
     // Unacknowledged writes have no session id.
@@ -88,43 +88,43 @@ function runTest() {
 
     // Further commands run on the same database should reuse the implicit session.
     inspectCommandForSessionId(function() {
-        assert.writeOK(coll.insert({x: 1}));
+        assert.commandWorked(coll.insert({x: 1}));
     }, {shouldIncludeId: true, expectedId: implicitId});
 
     // New collections from the same database should inherit the implicit session.
     const collTwo = testDB.getCollection("bar");
     inspectCommandForSessionId(function() {
-        assert.writeOK(collTwo.insert({x: 1}));
+        assert.commandWorked(collTwo.insert({x: 1}));
     }, {shouldIncludeId: true, expectedId: implicitId});
 
     // Sibling databases should inherit the implicit session.
     let siblingColl = testDB.getSiblingDB("foo").getCollection("bar");
     inspectCommandForSessionId(function() {
-        assert.writeOK(siblingColl.insert({x: 1}));
+        assert.commandWorked(siblingColl.insert({x: 1}));
     }, {shouldIncludeId: true, expectedId: implicitId});
 
     // A new database from the same connection should inherit the implicit session.
     const newCollSameConn = conn.getDB("testTwo").getCollection("foo");
     inspectCommandForSessionId(function() {
-        assert.writeOK(newCollSameConn.insert({x: 1}));
+        assert.commandWorked(newCollSameConn.insert({x: 1}));
     }, {shouldIncludeId: true, expectedId: implicitId});
 
     // A new database from a new connection should use a different implicit session.
     const newCollNewConn = new Mongo(conn.host).getDB("test").getCollection("foo");
     inspectCommandForSessionId(function() {
-        assert.writeOK(newCollNewConn.insert({x: 1}));
+        assert.commandWorked(newCollNewConn.insert({x: 1}));
     }, {shouldIncludeId: true, differentFromId: implicitId});
 
     // The original implicit session should still live on the first database.
     inspectCommandForSessionId(function() {
-        assert.writeOK(coll.insert({x: 1}));
+        assert.commandWorked(coll.insert({x: 1}));
     }, {shouldIncludeId: true, expectedId: implicitId});
 
     // Databases created from an explicit session should override any implicit sessions.
     const session = conn.startSession();
     const sessionColl = session.getDatabase("test").getCollection("foo");
     const explicitId = inspectCommandForSessionId(function() {
-        assert.writeOK(sessionColl.insert({x: 1}));
+        assert.commandWorked(sessionColl.insert({x: 1}));
     }, {shouldIncludeId: true, differentFromId: implicitId});
 
     assert(bsonBinaryEqual(session.getSessionId(), explicitId),
@@ -137,14 +137,14 @@ function runTest() {
 
     // The original implicit session should still live on the first database.
     inspectCommandForSessionId(function() {
-        assert.writeOK(coll.insert({x: 1}));
+        assert.commandWorked(coll.insert({x: 1}));
     }, {shouldIncludeId: true, expectedId: implicitId});
 
     // New databases on the same connection as the explicit session should still inherit the
     // original implicit session.
     const newCollSameConnAfter = conn.getDB("testThree").getCollection("foo");
     inspectCommandForSessionId(function() {
-        assert.writeOK(newCollSameConnAfter.insert({x: 1}));
+        assert.commandWorked(newCollSameConnAfter.insert({x: 1}));
     }, {shouldIncludeId: true, expectedId: implicitId});
 
     session.endSession();
@@ -158,13 +158,13 @@ function runTestTransitionToDisabled() {
     // Existing implicit sessions should be erased when the disable flag is set.
     const coll = conn.getDB("test").getCollection("foo");
     const implicitId = inspectCommandForSessionId(function() {
-        assert.writeOK(coll.insert({x: 1}));
+        assert.commandWorked(coll.insert({x: 1}));
     }, {shouldIncludeId: true});
 
     TestData.disableImplicitSessions = true;
 
     inspectCommandForSessionId(function() {
-        assert.writeOK(coll.insert({x: 1}));
+        assert.commandWorked(coll.insert({x: 1}));
     }, {shouldIncludeId: false});
 
     // After the flag is unset, databases using existing connections with implicit sessions will
@@ -173,30 +173,30 @@ function runTestTransitionToDisabled() {
     TestData.disableImplicitSessions = false;
 
     inspectCommandForSessionId(function() {
-        assert.writeOK(coll.insert({x: 1}));
+        assert.commandWorked(coll.insert({x: 1}));
     }, {shouldIncludeId: true, expectedId: implicitId});
 
     const newColl = conn.getDB("test").getCollection("foo");
     inspectCommandForSessionId(function() {
-        assert.writeOK(newColl.insert({x: 1}));
+        assert.commandWorked(newColl.insert({x: 1}));
     }, {shouldIncludeId: true, expectedId: implicitId});
 
     const newCollNewConn = new Mongo(conn.host).getDB("test").getCollection("foo");
     inspectCommandForSessionId(function() {
-        assert.writeOK(newCollNewConn.insert({x: 1}));
+        assert.commandWorked(newCollNewConn.insert({x: 1}));
     }, {shouldIncludeId: true, differentFromId: implicitId});
 
     // Explicit sessions should not be affected by the disable flag being set.
     const session = conn.startSession();
     const sessionColl = session.getDatabase("test").getCollection("foo");
     const explicitId = inspectCommandForSessionId(function() {
-        assert.writeOK(sessionColl.insert({x: 1}));
+        assert.commandWorked(sessionColl.insert({x: 1}));
     }, {shouldIncludeId: true});
 
     TestData.disableImplicitSessions = true;
 
     inspectCommandForSessionId(function() {
-        assert.writeOK(sessionColl.insert({x: 1}));
+        assert.commandWorked(sessionColl.insert({x: 1}));
     }, {shouldIncludeId: true, expectedId: explicitId});
 
     session.endSession();
@@ -210,14 +210,14 @@ function runTestDisabled() {
     // Commands run without an explicit session should not use an implicit one.
     const coll = conn.getDB("test").getCollection("foo");
     inspectCommandForSessionId(function() {
-        assert.writeOK(coll.insert({x: 1}));
+        assert.commandWorked(coll.insert({x: 1}));
     }, {shouldIncludeId: false});
 
     // Explicit sessions should still include session ids.
     const session = conn.startSession();
     const sessionColl = session.getDatabase("test").getCollection("foo");
     inspectCommandForSessionId(function() {
-        assert.writeOK(sessionColl.insert({x: 1}));
+        assert.commandWorked(sessionColl.insert({x: 1}));
     }, {shouldIncludeId: true});
 
     // Commands run in a parallel shell inherit the disable flag.
@@ -225,7 +225,7 @@ function runTestDisabled() {
     const awaitShell = startParallelShell(function() {
         const parallelColl = db.getCollection("foo");
         TestData.inspectCommandForSessionId(function() {
-            assert.writeOK(parallelColl.insert({x: 1}));
+            assert.commandWorked(parallelColl.insert({x: 1}));
         }, {shouldIncludeId: false});
     }, conn.port);
     awaitShell();

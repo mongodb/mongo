@@ -115,8 +115,8 @@ function createCollections(sharded) {
     assert.commandWorked(db.createCollection('bar', barOptions));
 
     for (let i = 0; i < 3; i++) {
-        assert.writeOK(db.foo.insert({a: i}));
-        assert.writeOK(db.bar.insert({a: i}));
+        assert.commandWorked(db.foo.insert({a: i}));
+        assert.commandWorked(db.bar.insert({a: i}));
     }
     assert.eq(3, db.foo.count());
     assert.eq(3, db.bar.count());

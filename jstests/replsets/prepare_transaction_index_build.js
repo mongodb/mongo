@@ -29,7 +29,7 @@ const bulk = testColl.initializeUnorderedBulkOp();
 for (let i = 0; i < 10; ++i) {
     bulk.insert({x: i});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 // activate failpoint to hang index build on secondary.
 secondary.getDB("admin").runCommand(

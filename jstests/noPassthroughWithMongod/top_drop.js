@@ -56,9 +56,9 @@ function checkTopEntries(expectedEntries) {
 }
 
 // Create a few entries in top.
-assert.writeOK(topDB.coll1.insert({}));
-assert.writeOK(topDB.coll2.insert({}));
-assert.writeOK(topDB.coll3.insert({}));
+assert.commandWorked(topDB.coll1.insert({}));
+assert.commandWorked(topDB.coll2.insert({}));
+assert.commandWorked(topDB.coll3.insert({}));
 checkTopEntries([topDB.coll1, topDB.coll2, topDB.coll3]);
 
 // Check that dropping a collection removes that collection but leaves the others.

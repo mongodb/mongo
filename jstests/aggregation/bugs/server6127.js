@@ -10,9 +10,9 @@
 "use strict";
 db.s6127.drop();
 
-assert.writeOK(db.s6127.insert({_id: 0, a: 1}));
-assert.writeOK(db.s6127.insert({_id: 1, foo: 2}));
-assert.writeOK(db.s6127.insert({_id: 2, foo: {bar: 3}}));
+assert.commandWorked(db.s6127.insert({_id: 0, a: 1}));
+assert.commandWorked(db.s6127.insert({_id: 1, foo: 2}));
+assert.commandWorked(db.s6127.insert({_id: 2, foo: {bar: 3}}));
 
 // Aggregate checking the field foo and the path foo.bar.
 const cursor = db.s6127.aggregate(

@@ -159,7 +159,7 @@ for (let shardDB of [shard0DB, shard1DB]) {
 // Write a document to shard0, and confirm that - despite the fact that shard1 is still idle - a
 // getMore with a high maxTimeMS returns the document before this timeout expires.
 csCursorId = reopenChangeStream(csCursorId);
-assert.writeOK(mongosColl.insert({_id: -1}));
+assert.commandWorked(mongosColl.insert({_id: -1}));
 startTime = (new Date()).getTime();
 const csResult = assert.commandWorked(mongosDB.runCommand(
     {getMore: csCursorId, collection: mongosColl.getName(), maxTimeMS: thirtyMins}));

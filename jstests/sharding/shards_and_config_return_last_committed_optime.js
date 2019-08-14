@@ -116,7 +116,7 @@ let secondary = st.rs0.getSecondary();
 
 st.rs0.awaitLastOpCommitted();
 stopServerReplication(secondary);
-assert.writeOK(primary.getDB("test").foo.insert({x: 1}, {writeConcern: {w: 1}}));
+assert.commandWorked(primary.getDB("test").foo.insert({x: 1}, {writeConcern: {w: 1}}));
 
 // Sharded collection.
 assertReturnsLastCommittedOpTime(primary.getDB("test"), "foo", "sharding-aware shard primary");
@@ -141,7 +141,7 @@ secondary = st.configRS.getSecondary();
 
 st.configRS.awaitLastOpCommitted();
 stopServerReplication(secondary);
-assert.writeOK(primary.getDB("config").foo.insert({x: 1}, {writeConcern: {w: 1}}));
+assert.commandWorked(primary.getDB("config").foo.insert({x: 1}, {writeConcern: {w: 1}}));
 
 assertReturnsLastCommittedOpTime(primary.getDB("test"), "foo", "config server primary");
 assertReturnsLastCommittedOpTime(secondary.getDB("test"), "foo", "config server secondary");

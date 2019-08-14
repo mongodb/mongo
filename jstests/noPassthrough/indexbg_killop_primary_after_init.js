@@ -39,7 +39,7 @@ if (!enableIndexBuildsCoordinator) {
     return;
 }
 
-assert.writeOK(coll.insert({a: 1}));
+assert.commandWorked(coll.insert({a: 1}));
 
 assert.commandWorked(primary.adminCommand(
     {configureFailPoint: 'hangAfterInitializingIndexBuild', mode: 'alwaysOn'}));

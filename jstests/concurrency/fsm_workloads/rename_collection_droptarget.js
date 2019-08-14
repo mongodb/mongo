@@ -23,7 +23,7 @@ var $config = (function() {
         function insert(db, collName, numDocs) {
             for (var i = 0; i < numDocs; ++i) {
                 var res = db[collName].insert({});
-                assertAlways.writeOK(res);
+                assertAlways.commandWorked(res);
                 assertAlways.eq(1, res.nInserted);
             }
         }

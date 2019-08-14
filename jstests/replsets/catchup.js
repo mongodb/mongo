@@ -63,7 +63,7 @@ function stopReplicationAndEnforceNewPrimaryToCatchUp() {
     var oldPrimary = rst.getPrimary();
     stopServerReplication(oldSecondaries);
     for (var i = 0; i < 3; i++) {
-        assert.writeOK(oldPrimary.getDB("test").foo.insert({x: i}));
+        assert.commandWorked(oldPrimary.getDB("test").foo.insert({x: i}));
     }
     var latestOpOnOldPrimary = getLatestOp(oldPrimary);
 

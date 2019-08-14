@@ -29,12 +29,12 @@ var coll = db.getCollection(collName);
 // Split chunk again
 assert.commandWorked(s.s0.adminCommand({split: ns, find: {_id: 3}}));
 
-assert.writeOK(coll.update({_id: 3}, {_id: 3}));
+assert.commandWorked(coll.update({_id: 3}, {_id: 3}));
 
 // Split chunk again
 assert.commandWorked(s.s0.adminCommand({split: ns, find: {_id: 3}}));
 
-assert.writeOK(coll.update({_id: 3}, {_id: 3}));
+assert.commandWorked(coll.update({_id: 3}, {_id: 3}));
 
 // Split chunk again
 assert.commandWorked(s.s0.adminCommand({split: ns, find: {_id: 3}}));

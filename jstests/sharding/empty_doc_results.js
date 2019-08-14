@@ -23,7 +23,7 @@ for (var i = -50; i < 50; i++) {
     var doc = {};
     if (i >= 0)
         doc.positiveId = true;
-    assert.writeOK(coll.insert(doc));
+    assert.commandWorked(coll.insert(doc));
 }
 
 //

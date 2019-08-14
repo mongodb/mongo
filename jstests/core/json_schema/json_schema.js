@@ -12,16 +12,16 @@ load("jstests/libs/assert_schema_match.js");
 let coll = db.jstests_json_schema;
 coll.drop();
 
-assert.writeOK(coll.insert({_id: 0, num: 3}));
-assert.writeOK(coll.insert({_id: 1, num: -3}));
-assert.writeOK(coll.insert({_id: 2, num: NumberInt(2)}));
-assert.writeOK(coll.insert({_id: 3, num: NumberInt(-2)}));
-assert.writeOK(coll.insert({_id: 4, num: NumberLong(1)}));
-assert.writeOK(coll.insert({_id: 5, num: NumberLong(-1)}));
-assert.writeOK(coll.insert({_id: 6, num: {}}));
-assert.writeOK(coll.insert({_id: 7, num: "str"}));
-assert.writeOK(coll.insert({_id: 8, num: "string"}));
-assert.writeOK(coll.insert({_id: 9}));
+assert.commandWorked(coll.insert({_id: 0, num: 3}));
+assert.commandWorked(coll.insert({_id: 1, num: -3}));
+assert.commandWorked(coll.insert({_id: 2, num: NumberInt(2)}));
+assert.commandWorked(coll.insert({_id: 3, num: NumberInt(-2)}));
+assert.commandWorked(coll.insert({_id: 4, num: NumberLong(1)}));
+assert.commandWorked(coll.insert({_id: 5, num: NumberLong(-1)}));
+assert.commandWorked(coll.insert({_id: 6, num: {}}));
+assert.commandWorked(coll.insert({_id: 7, num: "str"}));
+assert.commandWorked(coll.insert({_id: 8, num: "string"}));
+assert.commandWorked(coll.insert({_id: 9}));
 
 // Test that $jsonSchema fails to parse if its argument is not an object.
 assert.throws(function() {
@@ -176,10 +176,10 @@ assert.eq([{_id: 8}, {_id: 9}],
               .toArray());
 
 coll.drop();
-assert.writeOK(coll.insert({_id: 0, obj: 3}));
-assert.writeOK(coll.insert({_id: 1, obj: {f1: {f3: "str"}, f2: "str"}}));
-assert.writeOK(coll.insert({_id: 2, obj: {f1: "str", f2: "str"}}));
-assert.writeOK(coll.insert({_id: 3, obj: {f1: 1, f2: "str"}}));
+assert.commandWorked(coll.insert({_id: 0, obj: 3}));
+assert.commandWorked(coll.insert({_id: 1, obj: {f1: {f3: "str"}, f2: "str"}}));
+assert.commandWorked(coll.insert({_id: 2, obj: {f1: "str", f2: "str"}}));
+assert.commandWorked(coll.insert({_id: 3, obj: {f1: 1, f2: "str"}}));
 
 // Test that properties keyword can be used recursively, and that it does not apply when the
 // field does not contain on object.
@@ -224,11 +224,11 @@ assert.eq([{_id: 0}, {_id: 1}, {_id: 2}],
               .toArray());
 
 coll.drop();
-assert.writeOK(coll.insert({_id: 0, arr: 3}));
-assert.writeOK(coll.insert({_id: 1, arr: [1, "foo"]}));
-assert.writeOK(coll.insert({_id: 2, arr: [{a: 1}, {b: 2}]}));
-assert.writeOK(coll.insert({_id: 3, arr: []}));
-assert.writeOK(coll.insert({_id: 4, arr: {a: []}}));
+assert.commandWorked(coll.insert({_id: 0, arr: 3}));
+assert.commandWorked(coll.insert({_id: 1, arr: [1, "foo"]}));
+assert.commandWorked(coll.insert({_id: 2, arr: [{a: 1}, {b: 2}]}));
+assert.commandWorked(coll.insert({_id: 3, arr: []}));
+assert.commandWorked(coll.insert({_id: 4, arr: {a: []}}));
 
 // Test that the type:"array" restriction works as expected.
 assert.eq([{_id: 1}, {_id: 2}, {_id: 3}],
@@ -323,8 +323,8 @@ assert.eq(listCollectionsOutput.cursor.firstBatch[0].options.validator, {$jsonSc
 // Test that $jsonSchema and various internal match expressions work correctly with sibling
 // predicates.
 coll.drop();
-assert.writeOK(coll.insert({_id: 1, a: 1, b: 1}));
-assert.writeOK(coll.insert({_id: 2, a: 2, b: 2}));
+assert.commandWorked(coll.insert({_id: 1, a: 1, b: 1}));
+assert.commandWorked(coll.insert({_id: 2, a: 2, b: 2}));
 
 assert.eq(
     1,

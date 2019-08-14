@@ -12,7 +12,7 @@ coll.drop();
 
 let nDocs = 1000;
 for (var i = 0; i < nDocs; i++) {
-    assert.writeOK(coll.insert({a: i}));
+    assert.commandWorked(coll.insert({a: i}));
 }
 
 // Test that $collStats must be first stage.
@@ -50,7 +50,7 @@ assert(result.hasOwnProperty("storageStats"));
 assert.eq(nDocs, result.storageStats.count);
 
 // Test the record count against an empty collection.
-assert.writeOK(coll.remove({}));
+assert.commandWorked(coll.remove({}));
 pipeline = [{$collStats: {count: {}}}];
 result = coll.aggregate(pipeline).next();
 assert.eq(0, result.count);

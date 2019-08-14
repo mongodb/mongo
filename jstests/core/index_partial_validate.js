@@ -13,7 +13,7 @@ res = t.ensureIndex({b: 1});
 assert.commandWorked(res);
 
 res = t.insert({non_indexed_field: 'x'});
-assert.writeOK(res);
+assert.commandWorked(res);
 
 res = t.validate(true);
 assert.commandWorked(res);

@@ -6,8 +6,8 @@
 function test(op, val) {
     const coll = db.server6779;
     coll.drop();
-    assert.writeOK(coll.insert({a: true}));
-    assert.writeOK(coll.insert({a: false}));
+    assert.commandWorked(coll.insert({a: true}));
+    assert.commandWorked(coll.insert({a: false}));
 
     const obj = {};
     obj[op] = ['$a', val];

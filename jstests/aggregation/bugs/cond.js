@@ -48,14 +48,14 @@ assertResult(1, [{$and: []}, {$add: [1]}, {$add: [1, 1]}]);
 assertResult(2, [{$or: []}, {$add: [1]}, {$add: [1, 1]}]);
 
 assert(coll.drop());
-assert.writeOK(coll.insert({t: true, f: false, x: 'foo', y: 'bar'}));
+assert.commandWorked(coll.insert({t: true, f: false, x: 'foo', y: 'bar'}));
 
 // Field path expressions.
 assertResult('foo', ['$t', '$x', '$y']);
 assertResult('bar', ['$f', '$x', '$y']);
 
 assert(coll.drop());
-assert.writeOK(coll.insert({}));
+assert.commandWorked(coll.insert({}));
 
 // Coerce to bool.
 assertResult('a', [1, 'a', 'b']);
@@ -64,10 +64,10 @@ assertResult('b', [0, 'a', 'b']);
 
 // Nested.
 assert(coll.drop());
-assert.writeOK(coll.insert({noonSense: 'am', mealCombined: 'no'}));
-assert.writeOK(coll.insert({noonSense: 'am', mealCombined: 'yes'}));
-assert.writeOK(coll.insert({noonSense: 'pm', mealCombined: 'yes'}));
-assert.writeOK(coll.insert({noonSense: 'pm', mealCombined: 'no'}));
+assert.commandWorked(coll.insert({noonSense: 'am', mealCombined: 'no'}));
+assert.commandWorked(coll.insert({noonSense: 'am', mealCombined: 'yes'}));
+assert.commandWorked(coll.insert({noonSense: 'pm', mealCombined: 'yes'}));
+assert.commandWorked(coll.insert({noonSense: 'pm', mealCombined: 'no'}));
 assert.eq(['breakfast', 'brunch', 'dinner', 'linner'],
           coll.aggregate([
                   {

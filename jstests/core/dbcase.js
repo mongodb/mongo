@@ -6,7 +6,7 @@ b = db.getSisterDB("dbcasetest_dbnameA");
 a.dropDatabase();
 b.dropDatabase();
 
-assert.writeOK(a.foo.save({x: 1}));
+assert.commandWorked(a.foo.save({x: 1}));
 
 res = b.foo.save({x: 1});
 assert.writeError(res);

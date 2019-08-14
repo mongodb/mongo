@@ -104,7 +104,7 @@ coll.drop();
 // Can insert documents with valid language_override into text-indexed collection.
 assert.commandWorked(coll.ensureIndex({a: "text"}));
 coll.insert({a: ""});
-assert.writeOK(coll.insert({a: "", language: "spanish"}));
+assert.commandWorked(coll.insert({a: "", language: "spanish"}));
 coll.drop();
 
 // Can't insert documents with invalid language_override into text-indexed collection.

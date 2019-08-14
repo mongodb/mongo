@@ -9,7 +9,7 @@ var caseInsensitive = {collation: {locale: "en_US", strength: 2}};
 
 var coll = db.collation_redact;
 coll.drop();
-assert.writeOK(coll.insert({a: "a"}));
+assert.commandWorked(coll.insert({a: "a"}));
 
 // Test that $redact respects an explicit collation. Since the top-level of the document gets
 // pruned, we end up redacting the entire document and returning no results.
@@ -20,7 +20,7 @@ assert.eq(
 
 coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), caseInsensitive));
-assert.writeOK(coll.insert({a: "a"}));
+assert.commandWorked(coll.insert({a: "a"}));
 
 // Test that $redact respects the inherited collation. Since the top-level of the document gets
 // pruned, we end up redacting the entire document and returning no results.

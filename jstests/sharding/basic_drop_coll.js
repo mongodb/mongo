@@ -11,7 +11,7 @@ var testDB = st.s.getDB('test');
 
 // Test dropping an unsharded collection.
 
-assert.writeOK(testDB.bar.insert({x: 1}));
+assert.commandWorked(testDB.bar.insert({x: 1}));
 assert.neq(null, testDB.bar.findOne({x: 1}));
 
 assert.commandWorked(testDB.runCommand({drop: 'bar'}));
@@ -29,8 +29,8 @@ assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard1.shardName, zon
 assert.commandWorked(st.s.adminCommand(
     {updateZoneKeyRange: 'test.user', min: {_id: 0}, max: {_id: 10}, zone: 'foo'}));
 
-assert.writeOK(testDB.user.insert({_id: 10}));
-assert.writeOK(testDB.user.insert({_id: -10}));
+assert.commandWorked(testDB.user.insert({_id: 10}));
+assert.commandWorked(testDB.user.insert({_id: -10}));
 
 assert.neq(null, st.shard0.getDB('test').user.findOne({_id: -10}));
 assert.neq(null, st.shard1.getDB('test').user.findOne({_id: 10}));

@@ -30,7 +30,7 @@ var lastTs = lastOplogDoc.ts;
 var newTs = Timestamp(lastTs.t + 1, 1);
 var term = lastOplogDoc.t;
 
-assert.writeOK(oplog.insert({
+assert.commandWorked(oplog.insert({
     ts: newTs,
     t: term,
     h: 1,
@@ -56,8 +56,8 @@ var injectedMinValidDoc = {
 // This weird mechanism is the only way to bypass mongod's attempt to fill in null
 // Timestamps.
 var minValidColl = conn.getCollection('local.replset.minvalid');
-assert.writeOK(minValidColl.remove({}));
-assert.writeOK(minValidColl.update({}, {$set: injectedMinValidDoc}, {upsert: true}));
+assert.commandWorked(minValidColl.remove({}));
+assert.commandWorked(minValidColl.update({}, {$set: injectedMinValidDoc}, {upsert: true}));
 assert.eq(minValidColl.findOne(),
           injectedMinValidDoc,
           "If the Timestamps differ, the server may be filling in the null timestamps");

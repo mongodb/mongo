@@ -8,7 +8,7 @@ let conn = MongoRunner.runMongod({useLogFiles: true});
 assert.neq(null, conn, 'mongod was unable to start up');
 
 let coll = conn.getCollection("test.foo");
-assert.writeOK(coll.insert({_id: 1}));
+assert.commandWorked(coll.insert({_id: 1}));
 
 // Do a really slow query beyond the 100ms threshold
 let count = coll.count({

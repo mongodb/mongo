@@ -17,7 +17,7 @@ const bulk = coll.initializeUnorderedBulkOp();
 for (let i = 0; i < 100; ++i) {
     bulk.insert({_id: i, x: "string", a: -i, y: i % 2});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 function assertQueryCoversProjectionAndSort(pipeline) {
     const explainOutput = coll.explain().aggregate(pipeline);

@@ -83,20 +83,20 @@ var BackupRestoreTest = function(options) {
                                 doc: largeValue.substring(0, match % largeValue.length),
                             });
                         }
-                        assert.writeOK(bulk.execute(writeConcern));
+                        assert.commandWorked(bulk.execute(writeConcern));
                     } else if (op < 0.4) {
                         // 20% of the operations: update docs.
                         var updateOpts = {upsert: true, multi: true, writeConcern: writeConcern};
-                        assert.writeOK(coll.update({x: {$gte: match}},
-                                                   {$inc: {x: baseNum}, $set: {n: 'hello'}},
-                                                   updateOpts));
+                        assert.commandWorked(coll.update({x: {$gte: match}},
+                                                         {$inc: {x: baseNum}, $set: {n: 'hello'}},
+                                                         updateOpts));
                     } else if (op < 0.9) {
                         // 50% of the operations: find matchings docs.
                         // itcount() consumes the cursor
                         coll.find({x: {$gte: match}}).itcount();
                     } else {
                         // 10% of the operations: remove matching docs.
-                        assert.writeOK(
+                        assert.commandWorked(
                             coll.remove({x: {$gte: match}}, {writeConcern: writeConcern}));
                     }
                 } catch (e) {
@@ -393,7 +393,7 @@ var BackupRestoreTest = function(options) {
 
         jsTestLog('Inserting single document into primary ' + primary.host +
                   ' with writeConcern w:' + rst.nodes.length);
-        var writeResult = assert.writeOK(primary.getDB("test").foo.insert(
+        var writeResult = assert.commandWorked(primary.getDB("test").foo.insert(
             {}, {writeConcern: {w: rst.nodes.length, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 
         // Stop set.

@@ -64,7 +64,7 @@ function good(start, mod, expected) {
     t.remove({});
     t.save(start);
     var res = t.update({}, mod);
-    assert.writeOK(res);
+    assert.commandWorked(res);
     var got = t.findOne();
     delete got._id;
     assert.docEq(expected, got);
@@ -129,7 +129,7 @@ function l(start, mod, query, expected) {
     t.remove({});
     t.save(start);
     var res = t.update({}, mod);
-    assert.writeOK(res);
+    assert.commandWorked(res);
     var got = t.find(query).hint({a: 1}).next();
     delete got._id;
     assert.docEq(expected, got);

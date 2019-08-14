@@ -23,7 +23,7 @@ assert.commandFailed(db.runCommand({captrunc: "capped_truncate", n: 0}),
                      "captrunc didn't return an error when attempting to remove 0 documents");
 
 for (var j = 1; j <= 10; j++) {
-    assert.writeOK(t.insert({x: j}));
+    assert.commandWorked(t.insert({x: j}));
 }
 
 // It is an error to try and remove more documents than what exist in the capped collection.
@@ -50,7 +50,7 @@ db[collName].drop();
 
 assert.commandWorked(db.runCommand({create: collName, capped: false}));
 for (var j = 1; j <= 10; j++) {
-    assert.writeOK(db[collName].insert({x: j}));
+    assert.commandWorked(db[collName].insert({x: j}));
 }
 assert.commandFailed(db.runCommand({captrunc: collName, n: 5}),
                      "captrunc didn't return an error for a non-capped collection");

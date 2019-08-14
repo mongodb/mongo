@@ -9,7 +9,7 @@ let coll = db.array_to_object_expr;
 coll.drop();
 
 // Write one document so that the aggregations which use $const produce a result.
-assert.writeOK(coll.insert({_id: "sentinel", a: 1}));
+assert.commandWorked(coll.insert({_id: "sentinel", a: 1}));
 
 /*
  * Check that the collapsed, object form of 'expanded' (which is computed using $arrayToObject)

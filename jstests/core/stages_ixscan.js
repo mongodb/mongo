@@ -182,7 +182,7 @@ var ixscanName = {
     }
 };
 
-assert.writeOK(t.insert([{a: "1234"}, {a: "124"}]));
+assert.commandWorked(t.insert([{a: "1234"}, {a: "124"}]));
 var res = db.runCommand({stageDebug: {collection: collname, plan: ixscanName}});
 assert.commandWorked(res);
 assert.eq(res.results.map((doc) => doc.a), ["124", "1234"]);

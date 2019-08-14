@@ -56,7 +56,7 @@ var bulk = masterColl.initializeUnorderedBulkOp();
 for (var i = 0; i < size; ++i) {
     bulk.insert({i: i});
 }
-assert.writeOK(bulk.execute({j: true}));
+assert.commandWorked(bulk.execute({j: true}));
 assert.eq(size, masterColl.count(), 'unexpected number of documents after bulk insert.');
 
 // Make sure the documents get replicated to the secondary.

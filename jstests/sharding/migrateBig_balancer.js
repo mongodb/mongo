@@ -36,7 +36,7 @@ for (var i = 0; i < 40; i++) {
     bulk.insert({data: dataObj});
 }
 
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 assert.eq(40, coll.count(), "prep1");
 
 assert.commandWorked(admin.runCommand({shardcollection: "" + coll, key: {_id: 1}}));

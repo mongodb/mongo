@@ -123,7 +123,7 @@ for (var i = 0; i < maxWriteBatchSize; ++i) {
     insertBatch.insert({_id: i});
     batch.push({q: {_id: i}, limit: 0});
 }
-assert.writeOK(insertBatch.execute());
+assert.commandWorked(insertBatch.execute());
 request = {
     delete: coll.getName(),
     deletes: batch,
@@ -144,7 +144,7 @@ for (var i = 0; i < maxWriteBatchSize + 1; ++i) {
     insertBatch.insert({_id: i});
     batch.push({q: {_id: i}, limit: 0});
 }
-assert.writeOK(insertBatch.execute());
+assert.commandWorked(insertBatch.execute());
 request = {
     delete: coll.getName(),
     deletes: batch,

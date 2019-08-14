@@ -27,7 +27,7 @@ bulk.insert({_id: "Oakland", state: "CA", pop: 3});
 bulk.insert({_id: "Palo Alto", state: "CA", pop: 10});
 bulk.insert({_id: "San Francisco", state: "CA", pop: 4});
 bulk.insert({_id: "Trenton", state: "NJ", pop: 5});
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 // Test creating views on both collections and other views, using the database command and the
 // shell helper.

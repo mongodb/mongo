@@ -11,10 +11,10 @@ load("jstests/libs/analyze_plan.js");
 var coll = db.jstests_bindata_indexonly;
 
 coll.drop();
-assert.writeOK(coll.insert({_id: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA"), a: 1}));
-assert.writeOK(coll.insert({_id: BinData(0, "AQAAAAEBAAVlbl9VSwAAAAAAAAhv"), a: 2}));
-assert.writeOK(coll.insert({_id: BinData(0, "AQAAAAEBAAVlbl9VSwAAAAAAAAhz"), a: 3}));
-assert.writeOK(coll.insert({_id: BinData(0, "////////////////////////////"), a: 4}));
+assert.commandWorked(coll.insert({_id: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA"), a: 1}));
+assert.commandWorked(coll.insert({_id: BinData(0, "AQAAAAEBAAVlbl9VSwAAAAAAAAhv"), a: 2}));
+assert.commandWorked(coll.insert({_id: BinData(0, "AQAAAAEBAAVlbl9VSwAAAAAAAAhz"), a: 3}));
+assert.commandWorked(coll.insert({_id: BinData(0, "////////////////////////////"), a: 4}));
 assert.commandWorked(coll.createIndex({_id: 1, a: 1}));
 
 assert.throws(function() {

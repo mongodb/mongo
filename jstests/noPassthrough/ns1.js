@@ -8,7 +8,7 @@ const check = function(n, isNew) {
     var coll = mydb["x" + n];
     if (isNew) {
         assert.eq(0, coll.count(), "pop a: " + n);
-        assert.writeOK(coll.insert({_id: n}));
+        assert.commandWorked(coll.insert({_id: n}));
     }
     assert.eq(1, coll.count(), "pop b: " + n);
     assert.eq(n, coll.findOne()._id, "pop c: " + n);

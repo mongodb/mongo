@@ -16,13 +16,13 @@ const foreignName = "foreign";
 const foreignColl = testDB.getCollection(foreignName);
 foreignColl.drop();
 
-assert.writeOK(localColl.insert({_id: "A"}));
-assert.writeOK(localColl.insert({_id: "B"}));
-assert.writeOK(localColl.insert({_id: "C"}));
+assert.commandWorked(localColl.insert({_id: "A"}));
+assert.commandWorked(localColl.insert({_id: "B"}));
+assert.commandWorked(localColl.insert({_id: "C"}));
 
-assert.writeOK(foreignColl.insert({_id: 1}));
-assert.writeOK(foreignColl.insert({_id: 2}));
-assert.writeOK(foreignColl.insert({_id: 3}));
+assert.commandWorked(foreignColl.insert({_id: 1}));
+assert.commandWorked(foreignColl.insert({_id: 2}));
+assert.commandWorked(foreignColl.insert({_id: 3}));
 
 // Basic non-correlated lookup returns expected results.
 let cursor = localColl.aggregate([

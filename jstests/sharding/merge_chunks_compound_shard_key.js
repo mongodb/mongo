@@ -56,11 +56,11 @@ assert.commandWorked(admin.runCommand({split: coll + "", middle: {x: 2, y: 0}}))
 assert.commandWorked(admin.runCommand({split: coll + "", middle: {x: 2, y: 1}}));
 
 jsTest.log("Insert some data into each of the chunk ranges.");
-assert.writeOK(coll.insert({x: -1, y: 2}));
-assert.writeOK(coll.insert({x: 0, y: 2}));
-assert.writeOK(coll.insert({x: 1, y: 2}));
-assert.writeOK(coll.insert({x: 2, y: 1}));
-assert.writeOK(coll.insert({x: 2, y: 3}));
+assert.commandWorked(coll.insert({x: -1, y: 2}));
+assert.commandWorked(coll.insert({x: 0, y: 2}));
+assert.commandWorked(coll.insert({x: 1, y: 2}));
+assert.commandWorked(coll.insert({x: 2, y: 1}));
+assert.commandWorked(coll.insert({x: 2, y: 3}));
 
 // Chunks after merge:
 // (MinKey, { x: 0, y: 1 })

@@ -37,7 +37,7 @@ var shardIdentityQuery = {
 var shardIdentityUpdate = {
     $set: {configsvrConnectionString: shardIdentityDoc.configsvrConnectionString}
 };
-assert.writeOK(primaryConn.getDB('admin').system.version.update(
+assert.commandWorked(primaryConn.getDB('admin').system.version.update(
     shardIdentityQuery, shardIdentityUpdate, {upsert: true, writeConcern: {w: 'majority'}}));
 
 replTest.stopMaster();

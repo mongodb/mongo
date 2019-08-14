@@ -8,7 +8,7 @@ c.drop();
 
 const docCount = 4;
 for (var i = 0; i < docCount; i++) {
-    assert.writeOK(c.insert({a: i}));
+    assert.commandWorked(c.insert({a: i}));
 }
 
 // Check that the query works without exhaust set

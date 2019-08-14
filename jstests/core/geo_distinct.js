@@ -14,10 +14,10 @@ let res;
 //
 
 coll.drop();
-assert.writeOK(coll.insert({loc: {type: 'Point', coordinates: [10, 20]}}));
-assert.writeOK(coll.insert({loc: {type: 'Point', coordinates: [10, 20]}}));
-assert.writeOK(coll.insert({loc: {type: 'Point', coordinates: [20, 30]}}));
-assert.writeOK(coll.insert({loc: {type: 'Point', coordinates: [20, 30]}}));
+assert.commandWorked(coll.insert({loc: {type: 'Point', coordinates: [10, 20]}}));
+assert.commandWorked(coll.insert({loc: {type: 'Point', coordinates: [10, 20]}}));
+assert.commandWorked(coll.insert({loc: {type: 'Point', coordinates: [20, 30]}}));
+assert.commandWorked(coll.insert({loc: {type: 'Point', coordinates: [20, 30]}}));
 assert.eq(4, coll.count());
 
 // Test distinct on GeoJSON points with/without a 2dsphere index.
@@ -65,7 +65,7 @@ for (let i = 0; i < 50; ++i) {
     bulk.insert({zone: 4, loc: {type: 'Point', coordinates: [10, 10]}});
     bulk.insert({zone: 5, loc: {type: 'Point', coordinates: [20, 20]}});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 const originGeoJSON = {
     type: 'Point',

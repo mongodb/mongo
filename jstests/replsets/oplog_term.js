@@ -12,7 +12,7 @@ replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY, 5 * 1000);
 // Default protocol version is 1 - 'term' field should present in oplog entry.
 var primary = replSet.getPrimary();
 var collection = primary.getDB('test').getCollection(name);
-assert.writeOK(collection.save({_id: 1}));
+assert.commandWorked(collection.save({_id: 1}));
 
 var oplogEntry = getLatestOp(primary);
 assert(oplogEntry, 'unexpected empty oplog');

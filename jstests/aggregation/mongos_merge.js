@@ -69,9 +69,9 @@ var georng = new GeoNearRandomTest(mongosColl);
 
 // Write 400 documents across the 4 chunks.
 for (let i = -200; i < 200; i++) {
-    assert.writeOK(mongosColl.insert(
+    assert.commandWorked(mongosColl.insert(
         {_id: i, a: [i], b: {redactThisDoc: true}, c: true, geo: georng.mkPt(), text: "txt"}));
-    assert.writeOK(unshardedColl.insert({_id: i, x: i}));
+    assert.commandWorked(unshardedColl.insert({_id: i, x: i}));
 }
 
 let testNameHistory = new Set();

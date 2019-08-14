@@ -38,7 +38,7 @@ var $config = (function() {
             updateDoc.$push[this.opName] = id;
 
             var res = ownedDB[collName].update({_id: this.tid}, updateDoc, {upsert: true});
-            assertAlways.writeOK(res);
+            assertAlways.commandWorked(res);
 
             assertAlways.contains(res.nMatched, [0, 1], tojson(res));
             if (res.nMatched === 0) {
@@ -96,7 +96,7 @@ var $config = (function() {
             bulk.insert(doc);
         }
         var res = bulk.execute();
-        assertAlways.writeOK(res);
+        assertAlways.commandWorked(res);
         assertAlways.eq(this.numDocs, res.nInserted);
 
         this.getIndexSpecs().forEach(function ensureIndex(indexSpec) {

@@ -8,8 +8,8 @@ var st = new ShardingTest({shards: 1});
 var db = st.s.getDB('testDb');
 var coll = db.testColl;
 
-assert.writeOK(coll.insert({x: 1, z: 1}));
-assert.writeOK(coll.insert({y: 1, z: 1}));
+assert.commandWorked(coll.insert({x: 1, z: 1}));
+assert.commandWorked(coll.insert({y: 1, z: 1}));
 
 assert.commandWorked(db.adminCommand({enableSharding: 'testDb'}));
 

@@ -40,7 +40,7 @@ var bulk = masterDB.jstests_bgsec.initializeUnorderedBulkOp();
 for (var i = 0; i < size; ++i) {
     bulk.insert({i: i});
 }
-assert.writeOK(bulk.execute({j: true}));
+assert.commandWorked(bulk.execute({j: true}));
 assert.eq(size, coll.count(), 'unexpected number of documents after bulk insert.');
 
 // Make sure the documents make it to the secondary.

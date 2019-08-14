@@ -15,7 +15,7 @@ res = coll.ensureIndex({content: "text"}, {default_language: "none"});
 assert.commandWorked(res);
 
 res = coll.insert({content: "some data"});
-assert.writeOK(res);
+assert.commandWorked(res);
 
 const explain =
     coll.find({$text: {$search: "\"a\" -b -\"c\""}}, {content: 1, score: {$meta: "textScore"}})

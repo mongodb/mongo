@@ -101,14 +101,14 @@ assert.commandWorked(db.adminCommand(
 // Write 20 documents which all go to the primary shard in the unsharded collection.
 for (var i = 1; i <= 10; ++i) {
     // These go to shard 1.
-    assert.writeOK(shardedCol.insert({_id: i, x: i}));
+    assert.commandWorked(shardedCol.insert({_id: i, x: i}));
 
     // These go to shard 0.
-    assert.writeOK(shardedCol.insert({_id: -i, x: -i}));
+    assert.commandWorked(shardedCol.insert({_id: -i, x: -i}));
 
     // These go to shard 0 inside the non-sharded collection.
-    assert.writeOK(unshardedCol.insert({_id: i, x: i}));
-    assert.writeOK(unshardedCol.insert({_id: -i, x: -i}));
+    assert.commandWorked(unshardedCol.insert({_id: i, x: i}));
+    assert.commandWorked(unshardedCol.insert({_id: -i, x: -i}));
 }
 
 //

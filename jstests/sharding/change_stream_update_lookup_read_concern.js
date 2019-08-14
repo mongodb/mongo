@@ -63,7 +63,7 @@ assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()})
 assert.commandWorked(
     mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
 
-assert.writeOK(mongosColl.insert({_id: 1}));
+assert.commandWorked(mongosColl.insert({_id: 1}));
 rst.awaitReplication();
 
 // Make sure reads with read preference tag 'closestSecondary' go to the tagged secondary.
@@ -88,7 +88,7 @@ const changeStream = mongosColl.aggregate([{$changeStream: {fullDocument: "updat
     comment: changeStreamComment,
     $readPreference: {mode: "nearest", tags: [{tag: "closestSecondary"}]}
 });
-assert.writeOK(mongosColl.update({_id: 1}, {$set: {updatedCount: 1}}));
+assert.commandWorked(mongosColl.update({_id: 1}, {$set: {updatedCount: 1}}));
 assert.soon(() => changeStream.hasNext());
 let latestChange = changeStream.next();
 assert.eq(latestChange.operationType, "update");
@@ -160,7 +160,7 @@ profilerHasSingleMatchingEntryOrThrow({
 // the new, lagged secondary. Even though it's lagged, the lookup should use 'afterClusterTime'
 // to ensure it does not return until the node can see the change it's looking up.
 stopServerReplication(newClosestSecondary);
-assert.writeOK(mongosColl.update({_id: 1}, {$set: {updatedCount: 2}}));
+assert.commandWorked(mongosColl.update({_id: 1}, {$set: {updatedCount: 2}}));
 
 // Since we stopped replication, we expect the update lookup to block indefinitely until we
 // resume replication, so we resume replication in a parallel shell while this thread is blocked

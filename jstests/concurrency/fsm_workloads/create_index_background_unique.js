@@ -75,7 +75,7 @@ var $config = (function() {
                 const uniqueValuePrefix = i.toString() + "_";
                 bulk.insert(this.buildvariableSizedDoc(uniqueValuePrefix));
             }
-            assertAlways.writeOK(bulk.execute());
+            assertAlways.commandWorked(bulk.execute());
             assertAlways.eq(this.numDocsToLoad, db[collectionName].find({}).itcount());
         }
     }

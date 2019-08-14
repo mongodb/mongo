@@ -4,7 +4,7 @@
 function doRenames(dbName, collName, otherName) {
     const repeatRename = 200;
     // Signal to the parent shell that the parallel shell has started.
-    assert.writeOK(db.await_data.insert({_id: "signal parent shell"}));
+    assert.commandWorked(db.await_data.insert({_id: "signal parent shell"}));
     let renameDB = db.getSiblingDB(dbName);
     for (let i = 0; i < repeatRename; i++) {
         // Rename the collection back and forth.
@@ -12,5 +12,5 @@ function doRenames(dbName, collName, otherName) {
         assert.commandWorked(renameDB[otherName].renameCollection(collName));
     }
     // Signal to the parent shell that the renames have completed.
-    assert.writeOK(db.await_data.insert({_id: "rename has ended"}));
+    assert.commandWorked(db.await_data.insert({_id: "rename has ended"}));
 }

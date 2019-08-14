@@ -10,7 +10,7 @@ load('jstests/libs/analyze_plan.js');         // For planHasStage().
 let coll = db.remove_redundant_projects;
 coll.drop();
 
-assert.writeOK(coll.insert({_id: {a: 1, b: 1}, a: 1, c: {d: 1}, e: ['elem1']}));
+assert.commandWorked(coll.insert({_id: {a: 1, b: 1}, a: 1, c: {d: 1}, e: ['elem1']}));
 
 let indexSpec = {a: 1, 'c.d': 1, 'e.0': 1};
 

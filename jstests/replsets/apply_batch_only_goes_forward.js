@@ -43,10 +43,10 @@ var stepDownSecs = 30;
 var stepDownCmd = {replSetStepDown: stepDownSecs, force: true};
 
 // Write op
-assert.writeOK(
+assert.commandWorked(
     mTest.foo.save({}, {writeConcern: {w: 'majority', wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 replTest.waitForState(slave, ReplSetTest.State.SECONDARY);
-assert.writeOK(
+assert.commandWorked(
     mTest.foo.save({}, {writeConcern: {w: 'majority', wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 
 // Set minvalid to something far in the future for the current primary, to simulate recovery.
@@ -63,7 +63,7 @@ const minValidUpdate = {
 };
 jsTestLog("Current minvalid is " + tojson(mMinvalid.findOne()));
 jsTestLog("Updating minValid to: " + tojson(minValidUpdate));
-printjson(assert.writeOK(mMinvalid.update(
+printjson(assert.commandWorked(mMinvalid.update(
     {},
     minValidUpdate,
     {upsert: true, writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS}})));
@@ -80,7 +80,7 @@ replTest.awaitNodesAgreeOnPrimary();
 // Slave is now master... Do a write to advance the optime on the primary so that it will be
 // considered as a sync source -  this is more relevant to PV0 because we do not write a new
 // entry to the oplog on becoming primary.
-assert.writeOK(replTest.getPrimary().getDB("test").foo.save(
+assert.commandWorked(replTest.getPrimary().getDB("test").foo.save(
     {}, {writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 
 // Sync source selection will log this message if it does not detect min valid in the sync

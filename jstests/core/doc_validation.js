@@ -38,10 +38,10 @@ function runInsertUpdateValidationTest(validator) {
     assert.commandWorked(db.createCollection(collName, {validator: validator}));
 
     // Insert and upsert documents that will pass validation.
-    assert.writeOK(coll.insert({_id: "valid1", a: 1}));
-    assert.writeOK(coll.update({_id: "valid2"}, {_id: "valid2", a: 2}, {upsert: true}));
-    assert.writeOK(coll.runCommand("findAndModify",
-                                   {query: {_id: "valid3"}, update: {$set: {a: 3}}, upsert: true}));
+    assert.commandWorked(coll.insert({_id: "valid1", a: 1}));
+    assert.commandWorked(coll.update({_id: "valid2"}, {_id: "valid2", a: 2}, {upsert: true}));
+    assert.commandWorked(coll.runCommand(
+        "findAndModify", {query: {_id: "valid3"}, update: {$set: {a: 3}}, upsert: true}));
 
     // Insert and upsert documents that will not pass validation.
     assertFailsValidation(coll.insert({_id: "invalid3", b: 1}));
@@ -50,32 +50,32 @@ function runInsertUpdateValidationTest(validator) {
         "findAndModify", {query: {_id: "invalid4"}, update: {$set: {b: 3}}, upsert: true}));
 
     // Assert that we can remove the document that passed validation.
-    assert.writeOK(coll.remove({_id: "valid1"}));
+    assert.commandWorked(coll.remove({_id: "valid1"}));
 
     // Check that we can only update documents that pass validation. We insert a valid and an
     // invalid document, then set the validator.
     coll.drop();
-    assert.writeOK(coll.insert({_id: "valid1", a: 1}));
-    assert.writeOK(coll.insert({_id: "invalid2", b: 1}));
+    assert.commandWorked(coll.insert({_id: "valid1", a: 1}));
+    assert.commandWorked(coll.insert({_id: "invalid2", b: 1}));
     assert.commandWorked(coll.runCommand("collMod", {validator: validator}));
 
     // Assert that updates on a conforming document succeed when they affect fields not involved
     // in validator.
     // Add a new field.
-    assert.writeOK(coll.update({_id: "valid1"}, {$set: {z: 1}}));
-    assert.writeOK(
+    assert.commandWorked(coll.update({_id: "valid1"}, {$set: {z: 1}}));
+    assert.commandWorked(
         coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$set: {y: 2}}}));
     // In-place update.
-    assert.writeOK(coll.update({_id: "valid1"}, {$inc: {z: 1}}));
-    assert.writeOK(
+    assert.commandWorked(coll.update({_id: "valid1"}, {$inc: {z: 1}}));
+    assert.commandWorked(
         coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$inc: {y: 1}}}));
     // Out-of-place update.
-    assert.writeOK(coll.update({_id: "valid1"}, {$set: {z: array}}));
-    assert.writeOK(
+    assert.commandWorked(coll.update({_id: "valid1"}, {$set: {z: array}}));
+    assert.commandWorked(
         coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$set: {y: array}}}));
     // No-op update.
-    assert.writeOK(coll.update({_id: "valid1"}, {a: 1}));
-    assert.writeOK(
+    assert.commandWorked(coll.update({_id: "valid1"}, {a: 1}));
+    assert.commandWorked(
         coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$set: {a: 1}}}));
 
     // Verify those same updates will fail on non-conforming document.
@@ -90,40 +90,40 @@ function runInsertUpdateValidationTest(validator) {
         coll.runCommand("findAndModify", {query: {_id: "invalid2"}, update: {$set: {y: array}}}));
 
     // A no-op update of an invalid doc will succeed.
-    assert.writeOK(coll.update({_id: "invalid2"}, {$set: {b: 1}}));
-    assert.writeOK(
+    assert.commandWorked(coll.update({_id: "invalid2"}, {$set: {b: 1}}));
+    assert.commandWorked(
         coll.runCommand("findAndModify", {query: {_id: "invalid2"}, update: {$set: {b: 1}}}));
 
     // Verify that we can't make a conforming document fail validation, but can update a
     // non-conforming document to pass validation.
     coll.drop();
-    assert.writeOK(coll.insert({_id: "valid1", a: 1}));
-    assert.writeOK(coll.insert({_id: "invalid2", b: 1}));
-    assert.writeOK(coll.insert({_id: "invalid3", b: 1}));
+    assert.commandWorked(coll.insert({_id: "valid1", a: 1}));
+    assert.commandWorked(coll.insert({_id: "invalid2", b: 1}));
+    assert.commandWorked(coll.insert({_id: "invalid3", b: 1}));
     assert.commandWorked(coll.runCommand("collMod", {validator: validator}));
 
     assertFailsValidation(coll.update({_id: "valid1"}, {$unset: {a: 1}}));
-    assert.writeOK(coll.update({_id: "invalid2"}, {$set: {a: 1}}));
+    assert.commandWorked(coll.update({_id: "invalid2"}, {$set: {a: 1}}));
     assertFailsValidation(
         coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$unset: {a: 1}}}));
-    assert.writeOK(
+    assert.commandWorked(
         coll.runCommand("findAndModify", {query: {_id: "invalid3"}, update: {$set: {a: 1}}}));
 
     // Modify the collection to remove the document validator.
     assert.commandWorked(coll.runCommand("collMod", {validator: {}}));
 
     // Verify that no validation is applied to updates.
-    assert.writeOK(coll.update({_id: "valid1"}, {$set: {z: 1}}));
-    assert.writeOK(coll.update({_id: "invalid2"}, {$set: {z: 1}}));
-    assert.writeOK(coll.update({_id: "valid1"}, {$unset: {a: 1}}));
-    assert.writeOK(coll.update({_id: "invalid2"}, {$set: {a: 1}}));
-    assert.writeOK(
+    assert.commandWorked(coll.update({_id: "valid1"}, {$set: {z: 1}}));
+    assert.commandWorked(coll.update({_id: "invalid2"}, {$set: {z: 1}}));
+    assert.commandWorked(coll.update({_id: "valid1"}, {$unset: {a: 1}}));
+    assert.commandWorked(coll.update({_id: "invalid2"}, {$set: {a: 1}}));
+    assert.commandWorked(
         coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$set: {z: 2}}}));
-    assert.writeOK(
+    assert.commandWorked(
         coll.runCommand("findAndModify", {query: {_id: "invalid2"}, update: {$set: {z: 2}}}));
-    assert.writeOK(
+    assert.commandWorked(
         coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$unset: {a: 1}}}));
-    assert.writeOK(
+    assert.commandWorked(
         coll.runCommand("findAndModify", {query: {_id: "invalid2"}, update: {$set: {a: 1}}}));
 }
 
@@ -143,14 +143,14 @@ function runCollationValidationTest(validator) {
         collName, {validator: validator, collation: {locale: "en_US", strength: 2}}));
 
     // An insert that matches the validator should succeed.
-    assert.writeOK(coll.insert({_id: 0, a: "xyz", b: "foo"}));
+    assert.commandWorked(coll.insert({_id: 0, a: "xyz", b: "foo"}));
 
     const isJSONSchema = validator.hasOwnProperty("$jsonSchema");
 
     // A normal validator should respect the collation and the inserts should succeed. A JSON
     // Schema validator ignores the collation and the inserts should fail.
     const assertCorrectResult =
-        isJSONSchema ? res => assertFailsValidation(res) : res => assert.writeOK(res);
+        isJSONSchema ? res => assertFailsValidation(res) : res => assert.commandWorked(res);
     assertCorrectResult(coll.insert({a: "XYZ"}));
     assertCorrectResult(coll.insert({a: "XyZ", b: "foo"}));
     assertCorrectResult(coll.update({_id: 0}, {a: "xyZ", b: "foo"}));
@@ -180,10 +180,10 @@ runCollationValidationTest({$jsonSchema: {properties: {a: {enum: ["xyz"]}}}});
 // The validator is allowed to contain $expr.
 coll.drop();
 assert.commandWorked(db.createCollection(collName, {validator: {$expr: {$eq: ["$a", 5]}}}));
-assert.writeOK(coll.insert({a: 5}));
+assert.commandWorked(coll.insert({a: 5}));
 assertFailsValidation(coll.insert({a: 4}));
 assert.commandWorked(db.runCommand({"collMod": collName, "validator": {$expr: {$eq: ["$a", 4]}}}));
-assert.writeOK(coll.insert({a: 4}));
+assert.commandWorked(coll.insert({a: 4}));
 assertFailsValidation(coll.insert({a: 5}));
 
 // The validator supports $expr with the date extraction expressions (with a timezone
@@ -192,7 +192,7 @@ coll.drop();
 assert.commandWorked(db.createCollection(
     collName,
     {validator: {$expr: {$eq: [1, {$dayOfMonth: {date: "$a", timezone: "America/New_York"}}]}}}));
-assert.writeOK(coll.insert({a: ISODate("2017-10-01T22:00:00")}));
+assert.commandWorked(coll.insert({a: ISODate("2017-10-01T22:00:00")}));
 assertFailsValidation(coll.insert({a: ISODate("2017-10-01T00:00:00")}));
 
 // The validator supports $expr with a $dateToParts expression.
@@ -215,7 +215,7 @@ assert.commandWorked(db.createCollection(collName, {
         }
     }
 }));
-assert.writeOK(coll.insert({a: ISODate("2017-10-01T22:00:00")}));
+assert.commandWorked(coll.insert({a: ISODate("2017-10-01T22:00:00")}));
 assertFailsValidation(coll.insert({a: ISODate("2017-10-01T00:00:00")}));
 
 // The validator supports $expr with $dateToString expression.
@@ -236,7 +236,7 @@ assert.commandWorked(db.createCollection(collName, {
         }
     }
 }));
-assert.writeOK(coll.insert({date: new ISODate("2017-07-04T14:56:42.911Z"), tz: "UTC"}));
+assert.commandWorked(coll.insert({date: new ISODate("2017-07-04T14:56:42.911Z"), tz: "UTC"}));
 assertFailsValidation(
     coll.insert({date: new ISODate("2017-07-04T14:56:42.911Z"), tz: "America/New_York"}));
 
@@ -252,7 +252,7 @@ assert.commandWorked(db.createCollection(collName, {
         }
     }
 }));
-assert.writeOK(coll.insert({_id: 0, year: 2017, month: 6, day: 19, timezone: "Asia/Tokyo"}));
+assert.commandWorked(coll.insert({_id: 0, year: 2017, month: 6, day: 19, timezone: "Asia/Tokyo"}));
 assertFailsValidation(
     coll.insert({_id: 1, year: 2022, month: 1, day: 1, timezone: "America/New_York"}));
 
@@ -268,16 +268,16 @@ assert.commandWorked(db.createCollection(collName, {
         }
     }
 }));
-assert.writeOK(coll.insert({_id: 0, date: "2017-07-04T11:56:02"}));
+assert.commandWorked(coll.insert({_id: 0, date: "2017-07-04T11:56:02"}));
 assertFailsValidation(coll.insert({_id: 1, date: "2015-02-02T11:00:00"}));
 
 // The validator can contain an $expr that may throw at runtime.
 coll.drop();
 assert.commandWorked(
     db.createCollection(collName, {validator: {$expr: {$eq: ["$a", {$divide: [1, "$b"]}]}}}));
-assert.writeOK(coll.insert({a: 1, b: 1}));
+assert.commandWorked(coll.insert({a: 1, b: 1}));
 let res = coll.insert({a: 1, b: 0});
 assert.writeError(res);
 assert.eq(res.getWriteError().code, 16608);
-assert.writeOK(coll.insert({a: -1, b: -1}));
+assert.commandWorked(coll.insert({a: -1, b: -1}));
 })();

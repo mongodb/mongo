@@ -19,8 +19,8 @@ var id = 12345;
 
 jsTest.log("Inserting a document with id : 12345 into both shards with diff shard key...");
 
-assert.writeOK(coll.insert({_id: id, skey: -1}));
-assert.writeOK(coll.insert({_id: id, skey: 1}));
+assert.commandWorked(coll.insert({_id: id, skey: -1}));
+assert.commandWorked(coll.insert({_id: id, skey: 1}));
 
 printjson(st.shard0.getCollection(coll + "").find({_id: id}).toArray());
 printjson(st.shard1.getCollection(coll + "").find({_id: id}).toArray());

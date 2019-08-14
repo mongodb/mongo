@@ -8,7 +8,7 @@ var coll = db.fts_diacriticsensitive;
 
 coll.drop();
 
-assert.writeOK(coll.insert(
+assert.commandWorked(coll.insert(
     {_id: 0, a: "O próximo vôo à noite sobre o Atlântico, põe freqüentemente o único médico."}));
 
 assert.commandWorked(coll.ensureIndex({a: "text"}, {default_language: "portuguese"}));

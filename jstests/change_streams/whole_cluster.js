@@ -32,7 +32,7 @@ let cursor = cst.startWatchingAllChangesForCluster();
 assert.eq(0, cursor.firstBatch.length, "Cursor had changes: " + tojson(cursor));
 
 // Test that the change stream returns an inserted doc.
-assert.writeOK(db.t1.insert({_id: 0, a: 1}));
+assert.commandWorked(db.t1.insert({_id: 0, a: 1}));
 let expected = {
     documentKey: {_id: 0},
     fullDocument: {_id: 0, a: 1},
@@ -42,7 +42,7 @@ let expected = {
 cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
 
 // Test that the change stream returns another inserted doc in a different database.
-assert.writeOK(otherDB.t2.insert({_id: 0, a: 2}));
+assert.commandWorked(otherDB.t2.insert({_id: 0, a: 2}));
 expected = {
     documentKey: {_id: 0},
     fullDocument: {_id: 0, a: 2},
@@ -65,7 +65,7 @@ const validUserDBs = [
     "_config_"
 ];
 validUserDBs.forEach(dbName => {
-    assert.writeOK(db.getSiblingDB(dbName).test.insert({_id: 0, a: 1}));
+    assert.commandWorked(db.getSiblingDB(dbName).test.insert({_id: 0, a: 1}));
     expected = [
         {
             documentKey: {_id: 0},
@@ -81,7 +81,7 @@ validUserDBs.forEach(dbName => {
 // includes "system" but is not considered an internal collection.
 const validSystemColls = ["system", "systems.views", "ssystem.views", "test.system"];
 validSystemColls.forEach(collName => {
-    assert.writeOK(db.getCollection(collName).insert({_id: 0, a: 1}));
+    assert.commandWorked(db.getCollection(collName).insert({_id: 0, a: 1}));
     expected = [
         {
             documentKey: {_id: 0},
@@ -101,10 +101,10 @@ filteredDBs.forEach(dbName => {
     if (FixtureHelpers.isMongos(db) && dbName == "local")
         return;
 
-    assert.writeOK(db.getSiblingDB(dbName).test.insert({_id: 0, a: 1}));
+    assert.commandWorked(db.getSiblingDB(dbName).test.insert({_id: 0, a: 1}));
     // Insert to the test collection to ensure that the change stream has something to
     // return.
-    assert.writeOK(db.t1.insert({_id: dbName}));
+    assert.commandWorked(db.t1.insert({_id: dbName}));
     expected = [
         {
             documentKey: {_id: dbName},

@@ -7,13 +7,13 @@ const coll = db.numeric_grouping;
 
 coll.drop();
 
-assert.writeOK(coll.insert({key: new NumberInt(24), value: 17}));
-assert.writeOK(coll.insert({key: new NumberLong(24), value: 8}));
-assert.writeOK(coll.insert({key: 24, value: 5}));
+assert.commandWorked(coll.insert({key: new NumberInt(24), value: 17}));
+assert.commandWorked(coll.insert({key: new NumberLong(24), value: 8}));
+assert.commandWorked(coll.insert({key: 24, value: 5}));
 
-assert.writeOK(coll.insert({key: new NumberInt(42), value: 11}));
-assert.writeOK(coll.insert({key: new NumberLong(42), value: 13}));
-assert.writeOK(coll.insert({key: 42, value: 6}));
+assert.commandWorked(coll.insert({key: new NumberInt(42), value: 11}));
+assert.commandWorked(coll.insert({key: new NumberLong(42), value: 13}));
+assert.commandWorked(coll.insert({key: 42, value: 6}));
 
 const results = coll.aggregate({$group: {_id: "$key", s: {$sum: "$value"}}}).toArray();
 

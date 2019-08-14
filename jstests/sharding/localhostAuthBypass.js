@@ -135,9 +135,9 @@ var assertCanRunCommands = function(mongo, st) {
     // this will throw if it fails
     test.system.users.findOne();
 
-    assert.writeOK(test.foo.save({_id: 0}));
-    assert.writeOK(test.foo.update({_id: 0}, {$set: {x: 20}}));
-    assert.writeOK(test.foo.remove({_id: 0}));
+    assert.commandWorked(test.foo.save({_id: 0}));
+    assert.commandWorked(test.foo.update({_id: 0}, {$set: {x: 20}}));
+    assert.commandWorked(test.foo.remove({_id: 0}));
 
     // Multi-shard
     test.foo.mapReduce(

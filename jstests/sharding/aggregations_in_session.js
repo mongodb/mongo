@@ -21,7 +21,7 @@ const mongosColl = session.getDatabase("test")[jsTestName()];
 // merging on a mongod - otherwise the entire pipeline will be forwarded without a split and
 // without a $mergeCursors stage.
 st.shardColl(mongosColl, {_id: 1}, {_id: 1}, {_id: 1});
-assert.writeOK(mongosColl.insert([{_id: 0}, {_id: 1}, {_id: 2}]));
+assert.commandWorked(mongosColl.insert([{_id: 0}, {_id: 1}, {_id: 2}]));
 
 // This assertion will reproduce the hang described in SERVER-33660.
 assert.eq(

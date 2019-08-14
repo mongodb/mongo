@@ -18,7 +18,7 @@ const allElements = [
     {_id: "a_string", a: "hello"}
 ];
 
-assert.writeOK(coll.insert(allElements));
+assert.commandWorked(coll.insert(allElements));
 
 function testQueriesWithMinOrMaxKey() {
     const eqMinRes = coll.find({a: {$eq: MinKey}}).toArray();

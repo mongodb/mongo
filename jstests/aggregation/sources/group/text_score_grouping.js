@@ -7,8 +7,8 @@ const coll = db.text_score_grouping;
 
 coll.drop();
 
-assert.writeOK(coll.insert({"_id": 1, "title": "cakes"}));
-assert.writeOK(coll.insert({"_id": 2, "title": "cookies and cakes"}));
+assert.commandWorked(coll.insert({"_id": 1, "title": "cakes"}));
+assert.commandWorked(coll.insert({"_id": 2, "title": "cookies and cakes"}));
 
 assert.commandWorked(coll.createIndex({title: "text"}));
 

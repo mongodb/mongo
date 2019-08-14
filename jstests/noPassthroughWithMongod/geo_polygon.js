@@ -13,7 +13,7 @@ for (x = -180; x < 180; x += .5) {
         bulk.insert(o);
     }
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 var numTests = 31;
 for (var n = 0; n < numTests; n++) {

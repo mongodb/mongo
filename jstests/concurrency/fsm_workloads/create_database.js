@@ -28,7 +28,7 @@ var $config = (function() {
             if (mayFailWithDatabaseDifferCase && res.hasWriteError())
                 assertAlways.writeErrorWithCode(res, ErrorCodes.DatabaseDifferCase);
             else
-                assertAlways.writeOK(res);
+                assertAlways.commandWorked(res);
             return res;
         }
     };

@@ -9,8 +9,8 @@
 "use strict";
 db.s6147.drop();
 
-assert.writeOK(db.s6147.insert({a: 1}));
-assert.writeOK(db.s6147.insert({a: 2}));
+assert.commandWorked(db.s6147.insert({a: 1}));
+assert.commandWorked(db.s6147.insert({a: 2}));
 
 // Aggregate checking various combinations of the constant and the field.
 const cursor = db.s6147.aggregate([

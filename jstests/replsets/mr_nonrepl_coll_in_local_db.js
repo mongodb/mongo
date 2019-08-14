@@ -29,7 +29,7 @@ for (let i = 0; i < 1000; i++) {
     const array = Array.from({lengthToInsert: 10000}, _ => Math.floor(Math.random() * 100));
     bulk.insert({arr: array});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 // Run a simple map-reduce.
 const result = coll.mapReduce(

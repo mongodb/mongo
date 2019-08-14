@@ -36,7 +36,7 @@ var setup = function(coll) {
         bulk.insert({x: 10});
         bulk.insert({x: 20});
     }
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 };
 var checkRetryResult = function(result, retryResult) {
     assert.eq(result.ok, retryResult.ok);

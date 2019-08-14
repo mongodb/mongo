@@ -126,10 +126,10 @@ var $config = (function() {
     function setup(db, collName, cluster) {
         const coll = db[collName];
 
-        assertAlways.writeOK(coll.insert({a: 1, b: 2}));
-        assertAlways.writeOK(coll.insert({a: 2, b: 3}));
-        assertAlways.writeOK(coll.insert({a: 3, b: 4}));
-        assertAlways.writeOK(coll.insert({a: 4, b: 1}));
+        assertAlways.commandWorked(coll.insert({a: 1, b: 2}));
+        assertAlways.commandWorked(coll.insert({a: 2, b: 3}));
+        assertAlways.commandWorked(coll.insert({a: 3, b: 4}));
+        assertAlways.commandWorked(coll.insert({a: 4, b: 1}));
 
         for (let viewName of this.viewList) {
             assertAlways.commandWorked(db.createView(viewName, collName, []));

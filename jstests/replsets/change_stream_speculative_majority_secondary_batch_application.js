@@ -46,9 +46,9 @@ assert.commandWorked(secondaryDB.adminCommand(
 stopServerReplication(secondary);
 
 jsTestLog("Do some writes on the primary.");
-assert.writeOK(primaryColl.update({_id: 0}, {$set: {v: 1}}));
-assert.writeOK(primaryColl.update({_id: 0}, {$set: {v: 2}}));
-assert.writeOK(primaryColl.update({_id: 0}, {$set: {v: 3}}));
+assert.commandWorked(primaryColl.update({_id: 0}, {$set: {v: 1}}));
+assert.commandWorked(primaryColl.update({_id: 0}, {$set: {v: 2}}));
+assert.commandWorked(primaryColl.update({_id: 0}, {$set: {v: 3}}));
 
 // Restart server replication on secondary and wait for the failpoint to be hit.
 jsTestLog("Restarting server replication on secondary.");

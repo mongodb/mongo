@@ -24,7 +24,7 @@ var coll = db[collName];
 // Create a non-capped collection with 10 documents.
 coll.drop();
 for (var i = 0; i < 10; i++) {
-    assert.writeOK(coll.insert({a: i}));
+    assert.commandWorked(coll.insert({a: i}));
 }
 
 // Find with tailable flag set should fail for a non-capped collection.
@@ -44,7 +44,7 @@ assert.eq(cmdRes.cursor.firstBatch.length, 0);
 // Create a capped collection with 10 documents.
 assert.commandWorked(db.createCollection(collName, {capped: true, size: 2048}));
 for (var i = 0; i < 10; i++) {
-    assert.writeOK(coll.insert({a: i}));
+    assert.commandWorked(coll.insert({a: i}));
 }
 
 // GetMore should succeed if query has awaitData but no maxTimeMS is supplied.
@@ -161,7 +161,7 @@ assert.eq(cmdRes.cursor.firstBatch.length, 0);
 // the user if a document was inserted, but it did not match the filter.
 let insertshell = startParallelShell(() => {
     // Signal to the original shell that the parallel shell has successfully started.
-    assert.writeOK(db.await_data.insert({_id: "signal parent shell"}));
+    assert.commandWorked(db.await_data.insert({_id: "signal parent shell"}));
 
     // Wait for the parent shell to start watching for the next document.
     assert.soon(() => db.currentOp({
@@ -171,7 +171,7 @@ let insertshell = startParallelShell(() => {
                 () => tojson(db.currentOp().inprog));
 
     // Now write a non-matching document to the collection.
-    assert.writeOK(db.await_data.insert({_id: "no match", x: 0}));
+    assert.commandWorked(db.await_data.insert({_id: "no match", x: 0}));
 
     // Make sure the getMore has not ended after a while.
     sleep(2000);
@@ -182,7 +182,7 @@ let insertshell = startParallelShell(() => {
         tojson(db.currentOp().inprog));
 
     // Now write a matching document to wake it up.
-    assert.writeOK(db.await_data.insert({_id: "match", x: 1}));
+    assert.commandWorked(db.await_data.insert({_id: "match", x: 1}));
 });
 
 // Wait until we receive confirmation that the parallel shell has started.

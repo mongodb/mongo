@@ -14,7 +14,7 @@ var coll = db.set_type_change;
 coll.drop();
 assert.commandWorked(coll.ensureIndex({a: 1}));
 
-assert.writeOK(coll.insert({a: 2}));
+assert.commandWorked(coll.insert({a: 2}));
 
 var newVal = new NumberLong(2);
 var res = coll.update({}, {$set: {a: newVal}});

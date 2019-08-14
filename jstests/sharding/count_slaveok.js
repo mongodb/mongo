@@ -24,7 +24,7 @@ var bulk = coll.initializeUnorderedBulkOp();
 for (var i = 0; i < 300; i++) {
     bulk.insert({i: i % 10});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 var connA = conn;
 var connB = new Mongo(st.s.host);

@@ -31,13 +31,13 @@ t.drop();
 // Single insert, no error.
 opCounters = newdb.serverStatus().opcounters;
 res = t.insert({_id: 0});
-assert.writeOK(res);
+assert.commandWorked(res);
 assert.eq(opCounters.insert + 1, newdb.serverStatus().opcounters.insert);
 
 // Bulk insert, no error.
 opCounters = newdb.serverStatus().opcounters;
 res = t.insert([{_id: 1}, {_id: 2}]);
-assert.writeOK(res);
+assert.commandWorked(res);
 assert.eq(opCounters.insert + 2, newdb.serverStatus().opcounters.insert);
 
 // Test is not run when in compatibility mode as errors are not counted
@@ -71,7 +71,7 @@ t.insert({_id: 0});
 // Update, no error.
 opCounters = newdb.serverStatus().opcounters;
 res = t.update({_id: 0}, {$set: {a: 1}});
-assert.writeOK(res);
+assert.commandWorked(res);
 assert.eq(opCounters.update + 1, newdb.serverStatus().opcounters.update);
 
 // Update, with error.
@@ -90,7 +90,7 @@ t.insert([{_id: 0}, {_id: 1}]);
 // Delete, no error.
 opCounters = newdb.serverStatus().opcounters;
 res = t.remove({_id: 0});
-assert.writeOK(res);
+assert.commandWorked(res);
 assert.eq(opCounters.delete + 1, newdb.serverStatus().opcounters.delete);
 
 // Delete, with error.

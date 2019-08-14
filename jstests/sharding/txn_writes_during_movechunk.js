@@ -13,8 +13,8 @@ st.ensurePrimaryShard('test', st.shard0.shardName);
 assert.commandWorked(st.s0.adminCommand({shardCollection: 'test.user', key: {_id: 1}}));
 
 let coll = st.s.getDB('test').user;
-assert.writeOK(coll.insert({_id: 'updateMe'}));
-assert.writeOK(coll.insert({_id: 'deleteMe'}));
+assert.commandWorked(coll.insert({_id: 'updateMe'}));
+assert.commandWorked(coll.insert({_id: 'deleteMe'}));
 
 pauseMigrateAtStep(st.shard1, migrateStepNames.deletedPriorDataInRange);
 

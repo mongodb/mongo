@@ -243,7 +243,7 @@ var $config = extendWorkload($config, function($config, $super) {
                 this.generateRandomUpdateStyle(idToUpdate, newShardKey, counterForId),
                 {multi: false});
             try {
-                assertWhenOwnColl.writeOK(updateResult);
+                assertWhenOwnColl.commandWorked(updateResult);
                 this.expectedCounters[idToUpdate] = counterForId + 1;
             } catch (e) {
                 const err = updateResult instanceof WriteResult ? updateResult.getWriteError()
@@ -331,7 +331,7 @@ var $config = extendWorkload($config, function($config, $super) {
         // Assign a default counter value to each document owned by this thread.
         db[collName].find({tid: this.tid}).forEach(doc => {
             this.expectedCounters[doc._id] = 0;
-            assert.writeOK(db[collName].update({_id: doc._id}, {$set: {counter: 0}}));
+            assert.commandWorked(db[collName].update({_id: doc._id}, {$set: {counter: 0}}));
         });
     };
 
@@ -354,7 +354,7 @@ var $config = extendWorkload($config, function($config, $super) {
                 bulk.insert({_id: i, skey: i, tid: tid});
             }
 
-            assertAlways.writeOK(bulk.execute());
+            assertAlways.commandWorked(bulk.execute());
 
             // Create a chunk with boundaries matching the partition's. The low chunk's lower bound
             // is minKey, so a split is not necessary.

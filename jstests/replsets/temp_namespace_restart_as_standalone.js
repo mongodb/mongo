@@ -96,7 +96,7 @@ rst.start(secondaryNodeId, {}, restart);
 
 // Verify that writes are replicated to the temporary collection and can successfully be applied
 // by the secondary after having restarted it.
-assert.writeOK(primaryDB.temp_collection.insert(
+assert.commandWorked(primaryDB.temp_collection.insert(
     {}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 
 rst.stopSet();

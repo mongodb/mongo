@@ -38,8 +38,8 @@ var awaitShell = startParallelShell(function() {
         for (var i = 0; i < 100; ++i) {
             bulk.insert({unjournaled: i});
         }
-        assert.writeOK(bulk.execute({j: false}));
-        assert.writeOK(db.nojournal.insert({journaled: loopNum}, {writeConcern: {j: true}}));
+        assert.commandWorked(bulk.execute({j: false}));
+        assert.commandWorked(db.nojournal.insert({journaled: loopNum}, {writeConcern: {j: true}}));
 
         // Create a checkpoint slightly before the mongod is terminated.
         if (loopNum === 90) {

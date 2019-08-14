@@ -30,7 +30,7 @@ var $config = (function() {
                 bulk.insert({a: Random.randInt(10), b: Random.randInt(10), c: Random.randInt(10)});
             }
             var res = bulk.execute();
-            assertAlways.writeOK(res);
+            assertAlways.commandWorked(res);
             assertAlways.eq(this.nDocumentsToInsert, res.nInserted);
         }
 

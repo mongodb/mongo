@@ -22,13 +22,13 @@ var userDocs = [
 ];
 
 userDocs.forEach(function(userDoc) {
-    assert.writeOK(users.insert(userDoc));
+    assert.commandWorked(users.insert(userDoc));
 });
 
 var followers = [{_f: "djw", _t: "jsr"}, {_f: "jsr", _t: "bmw"}, {_f: "ftr", _t: "bmw"}];
 
 followers.forEach(function(f) {
-    assert.writeOK(follower.insert(f));
+    assert.commandWorked(follower.insert(f));
 });
 
 // Find the social network of "Darren", that is, people Darren follows, and people who are

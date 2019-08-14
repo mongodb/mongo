@@ -9,12 +9,12 @@ load("jstests/libs/analyze_plan.js");
 const coll = db.jstests_geonear_key;
 coll.drop();
 
-assert.writeOK(coll.insert({_id: 0, a: [1, 1]}));
-assert.writeOK(coll.insert({_id: 1, a: [1, 2]}));
-assert.writeOK(coll.insert({_id: 2, b: {c: [1, 1]}}));
-assert.writeOK(coll.insert({_id: 3, b: {c: [1, 2]}}));
-assert.writeOK(coll.insert({_id: 4, b: {d: [1, 1]}}));
-assert.writeOK(coll.insert({_id: 5, b: {d: [1, 2]}}));
+assert.commandWorked(coll.insert({_id: 0, a: [1, 1]}));
+assert.commandWorked(coll.insert({_id: 1, a: [1, 2]}));
+assert.commandWorked(coll.insert({_id: 2, b: {c: [1, 1]}}));
+assert.commandWorked(coll.insert({_id: 3, b: {c: [1, 2]}}));
+assert.commandWorked(coll.insert({_id: 4, b: {d: [1, 1]}}));
+assert.commandWorked(coll.insert({_id: 5, b: {d: [1, 2]}}));
 
 /**
  * Runs an aggregation consisting of a single $geoNear stage described by 'nearParams', and

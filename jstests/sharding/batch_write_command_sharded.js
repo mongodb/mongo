@@ -131,7 +131,7 @@ var oldChunks = config.chunks.find().toArray();
 
 var staleMongos = MongoRunner.runMongos({configdb: configConnStr});
 brokenColl = staleMongos.getCollection(brokenColl.toString());
-assert.writeOK(brokenColl.insert({hello: "world"}));
+assert.commandWorked(brokenColl.insert({hello: "world"}));
 
 // Modify the chunks to make shards at a higher version
 
@@ -140,9 +140,9 @@ assert.commandWorked(
 
 // Rewrite the old chunks back to the config server
 
-assert.writeOK(config.chunks.remove({}));
+assert.commandWorked(config.chunks.remove({}));
 for (var i = 0; i < oldChunks.length; i++) {
-    assert.writeOK(config.chunks.insert(oldChunks[i]));
+    assert.commandWorked(config.chunks.insert(oldChunks[i]));
 }
 
 // Ensure that the inserts have propagated to all secondary nodes

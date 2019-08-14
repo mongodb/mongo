@@ -43,7 +43,7 @@ syncFrom(nodes[4], nodes[1], replTest);
 // write that should reach all nodes
 var timeout = ReplSetTest.kDefaultTimeoutMS;
 var options = {writeConcern: {w: numNodes, wtimeout: timeout}};
-assert.writeOK(primary.getDB(name).foo.insert({x: 1}, options));
+assert.commandWorked(primary.getDB(name).foo.insert({x: 1}, options));
 
 // Re-enable 'maxSyncSourceLagSecs' checking on sync source.
 assert.commandWorked(nodes[1].getDB('admin').runCommand(
@@ -67,7 +67,7 @@ primary = replTest.getPrimary();
 const liveSlaves = [nodes[1], nodes[2], nodes[3]];
 replTest.awaitReplication(null, null, liveSlaves);
 options.writeConcern.w = 4;
-assert.writeOK(primary.getDB(name).foo.insert({x: 2}, options));
+assert.commandWorked(primary.getDB(name).foo.insert({x: 2}, options));
 
 replTest.stopSet();
 }());

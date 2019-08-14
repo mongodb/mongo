@@ -18,7 +18,7 @@ function assertSchemaMatch(coll, schema, doc, valid) {
     // Test that after inserting 'doc', we can find it again using $jsonSchema in the find command
     // iff 'valid' is true.
     coll.drop();
-    assert.writeOK(coll.insert(doc));
+    assert.commandWorked(coll.insert(doc));
     let count = coll.find({$jsonSchema: schema}).itcount();
     assert.eq(count, valid ? 1 : 0, errmsg);
 
@@ -34,7 +34,7 @@ function assertSchemaMatch(coll, schema, doc, valid) {
     assert.commandWorked(coll.runCommand("create", {validator: {$jsonSchema: schema}}));
     let res = coll.insert(doc);
     if (valid) {
-        assert.writeOK(res, errmsg + " during insert document validation");
+        assert.commandWorked(res, errmsg + " during insert document validation");
     } else {
         assert.writeErrorWithCode(res,
                                   ErrorCodes.DocumentValidationFailure,
@@ -44,7 +44,7 @@ function assertSchemaMatch(coll, schema, doc, valid) {
     // Test that we can update an existing document to look like 'doc' when the collection has
     // 'schema' as its document validator in "strict" mode iff 'valid' is true.
     assert.commandWorked(coll.runCommand("drop"));
-    assert.writeOK(coll.insert({_id: 0}));
+    assert.commandWorked(coll.insert({_id: 0}));
     assert.commandWorked(
         coll.runCommand("collMod", {validator: {$jsonSchema: schema}, validationLevel: "strict"}));
 
@@ -54,7 +54,7 @@ function assertSchemaMatch(coll, schema, doc, valid) {
     delete docCopy._id;
     res = coll.update({_id: 0}, docCopy);
     if (valid) {
-        assert.writeOK(res, errmsg + " during update document validation in strict mode");
+        assert.commandWorked(res, errmsg + " during update document validation in strict mode");
     } else {
         assert.writeErrorWithCode(res,
                                   ErrorCodes.DocumentValidationFailure,

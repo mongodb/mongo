@@ -34,7 +34,7 @@ var bulk = insertMongos.getCollection(coll + "").initializeUnorderedBulkOp();
 for (var i = 0; i < 100; i++) {
     bulk.insert({_id: i, test: "a"});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 assert.eq(100, staleMongos.getCollection(coll + "").find({test: "a"}).itcount());
 
 assert(coll.drop());
@@ -56,7 +56,7 @@ bulk = insertMongos.getCollection(coll + "").initializeUnorderedBulkOp();
 for (var i = 0; i < 100; i++) {
     bulk.insert({notId: i, test: "b"});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 assert.eq(100, staleMongos.getCollection(coll + "").find({test: "b"}).itcount());
 assert.eq(0, staleMongos.getCollection(coll + "").find({test: {$in: ["a"]}}).itcount());
 
@@ -74,7 +74,7 @@ bulk = insertMongos.getCollection(coll + "").initializeUnorderedBulkOp();
 for (var i = 0; i < 100; i++) {
     bulk.insert({test: "c"});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 assert.eq(100, staleMongos.getCollection(coll + "").find({test: "c"}).itcount());
 assert.eq(0, staleMongos.getCollection(coll + "").find({test: {$in: ["a", "b"]}}).itcount());

@@ -21,7 +21,7 @@ for (j = 0; j < 100; j++) {
         bulk.insert({j: j, i: i});
     }
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 function map() {
     emit(this.i, 1);

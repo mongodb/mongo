@@ -64,7 +64,8 @@ jsTestLog("Doing a write to primary.");
 var testDB = replTest.getPrimary().getDB('testdb');
 var coll = testDB.stepdown_needs_electable_secondary;
 var timeout = ReplSetTest.kDefaultTimeoutMS;
-assert.writeOK(coll.insert({"dummy_key": "dummy_val"}, {writeConcern: {w: 1, wtimeout: timeout}}));
+assert.commandWorked(
+    coll.insert({"dummy_key": "dummy_val"}, {writeConcern: {w: 1, wtimeout: timeout}}));
 
 // Try to step down with only the primary caught up (1 node out of 5).
 // stepDown should fail.
@@ -89,7 +90,8 @@ jsTestLog("Re-enabling writes to unelectable secondary: node #" +
 restartServerReplication(secondaryB_unelectable);
 
 // Wait for this secondary to catch up by issuing a write that must be replicated to 2 nodes
-assert.writeOK(coll.insert({"dummy_key": "dummy_val"}, {writeConcern: {w: 2, wtimeout: timeout}}));
+assert.commandWorked(
+    coll.insert({"dummy_key": "dummy_val"}, {writeConcern: {w: 2, wtimeout: timeout}}));
 
 // Try to step down and fail
 jsTestLog("Trying to step down primary with only 2 nodes out of 5 caught up.");
@@ -103,7 +105,8 @@ jsTestLog("Re-enabling writes to unelectable secondary: node #" +
 restartServerReplication(secondaryC_unelectable);
 
 // Wait for this secondary to catch up by issuing a write that must be replicated to 3 nodes
-assert.writeOK(coll.insert({"dummy_key": "dummy_val"}, {writeConcern: {w: 3, wtimeout: timeout}}));
+assert.commandWorked(
+    coll.insert({"dummy_key": "dummy_val"}, {writeConcern: {w: 3, wtimeout: timeout}}));
 
 // Try to step down and fail
 jsTestLog("Trying to step down primary with a caught up majority that " +
@@ -118,7 +121,8 @@ jsTestLog("Re-enabling writes to electable secondary: node #" +
 restartServerReplication(secondaryA_electable);
 
 // Wait for this secondary to catch up by issuing a write that must be replicated to 4 nodes
-assert.writeOK(coll.insert({"dummy_key": "dummy_val"}, {writeConcern: {w: 4, wtimeout: timeout}}));
+assert.commandWorked(
+    coll.insert({"dummy_key": "dummy_val"}, {writeConcern: {w: 4, wtimeout: timeout}}));
 
 // Try to step down. We expect success, so catch the exception thrown by 'replSetStepDown'.
 jsTestLog("Trying to step down primary with a caught up majority that " +

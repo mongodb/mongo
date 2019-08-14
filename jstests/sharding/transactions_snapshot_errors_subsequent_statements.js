@@ -76,7 +76,8 @@ enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
 jsTestLog("Unsharded transaction");
 
-assert.writeOK(st.s.getDB(dbName)[collName].insert({_id: 5}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: 5}, {writeConcern: {w: "majority"}}));
 st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
 // Single shard case simulates the storage engine discarding an in-use snapshot.
@@ -91,7 +92,8 @@ assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 // Set up 2 chunks, [minKey, 10), [10, maxKey), each with one document (includes the document
 // already inserted).
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 10}}));
-assert.writeOK(st.s.getDB(dbName)[collName].insert({_id: 15}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: 15}, {writeConcern: {w: "majority"}}));
 
 jsTestLog("One shard transaction");
 

@@ -3,7 +3,8 @@
 
 var s = new ShardingTest({name: "migrateBig", shards: 2, other: {chunkSize: 1}});
 
-assert.writeOK(s.config.settings.update({_id: "balancer"}, {$set: {_waitForDelete: true}}, true));
+assert.commandWorked(
+    s.config.settings.update({_id: "balancer"}, {$set: {_waitForDelete: true}}, true));
 assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
 s.ensurePrimaryShard('test', s.shard1.shardName);
 assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {x: 1}}));
@@ -19,7 +20,7 @@ var bulk = coll.initializeUnorderedBulkOp();
 for (var x = 0; x < 100; x++) {
     bulk.insert({x: x, big: big});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 assert.commandWorked(s.s0.adminCommand({split: "test.foo", middle: {x: 30}}));
 assert.commandWorked(s.s0.adminCommand({split: "test.foo", middle: {x: 66}}));
@@ -35,7 +36,7 @@ print("direct : " + direct);
 var directDB = direct.getDB("test");
 
 for (var done = 0; done < 2 * 1024 * 1024; done += big.length) {
-    assert.writeOK(directDB.foo.insert({x: 50 + Math.random(), big: big}));
+    assert.commandWorked(directDB.foo.insert({x: 50 + Math.random(), big: big}));
 }
 
 s.printShardingStatus();

@@ -17,7 +17,7 @@ var bulk = db.data.initializeUnorderedBulkOp();
 for (var i = 0; i < numDocs; i++) {
     bulk.insert({_id: i, s: bigString});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 var avgObjSize = db.data.stats().avgObjSize;
 var dataSize = db.data.stats().size;

@@ -36,7 +36,7 @@ var restartWithConfig = function() {
 
 var restartWithoutConfig = function() {
     var localDB = conn.getDB("local");
-    assert.writeOK(localDB.system.replset.remove({}));
+    assert.commandWorked(localDB.system.replset.remove({}));
 
     MongoRunner.stopMongod(conn);
 

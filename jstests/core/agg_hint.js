@@ -72,7 +72,7 @@ function confirmAggUsesIndex({
 // Specify hint as a string, representing index name.
 assert.commandWorked(coll.createIndex({x: 1}));
 for (let i = 0; i < 5; ++i) {
-    assert.writeOK(coll.insert({x: i}));
+    assert.commandWorked(coll.insert({x: i}));
 }
 
 confirmAggUsesIndex({
@@ -94,7 +94,7 @@ confirmAggUsesIndex({
 coll.drop();
 assert.commandWorked(coll.createIndex({x: 1}));
 for (let i = 0; i < 5; ++i) {
-    assert.writeOK(coll.insert({x: i}));
+    assert.commandWorked(coll.insert({x: i}));
 }
 
 confirmAggUsesIndex({
@@ -125,7 +125,7 @@ coll.drop();
 assert.commandWorked(coll.createIndex({x: 1}));
 assert.commandWorked(coll.createIndex({y: 1}));
 for (let i = 0; i < 5; ++i) {
-    assert.writeOK(coll.insert({x: i, y: i}));
+    assert.commandWorked(coll.insert({x: i, y: i}));
 }
 
 confirmAggUsesIndex({
@@ -155,7 +155,7 @@ coll.drop();
 assert.commandWorked(coll.createIndex({x: 1}));
 assert.commandWorked(coll.createIndex({x: 1, y: 1}));
 for (let i = 0; i < 5; ++i) {
-    assert.writeOK(coll.insert({x: i, y: i}));
+    assert.commandWorked(coll.insert({x: i, y: i}));
 }
 
 confirmAggUsesIndex({
@@ -183,7 +183,7 @@ coll.drop();
 view.drop();
 assert.commandWorked(coll.createIndex({x: 1}));
 for (let i = 0; i < 5; ++i) {
-    assert.writeOK(coll.insert({x: i}));
+    assert.commandWorked(coll.insert({x: i}));
 }
 assert.commandWorked(testDB.createView("view", "test", [{$match: {x: {$gte: 0}}}]));
 
@@ -213,7 +213,7 @@ coll.drop();
 view.drop();
 assert.commandWorked(coll.createIndex({x: 1}));
 for (let i = 0; i < 5; ++i) {
-    assert.writeOK(coll.insert({x: i}));
+    assert.commandWorked(coll.insert({x: i}));
 }
 assert.commandWorked(testDB.createView("view", "test", []));
 
@@ -240,7 +240,7 @@ coll.drop();
 view.drop();
 assert.commandWorked(coll.createIndex({x: 1}));
 for (let i = 0; i < 5; ++i) {
-    assert.writeOK(coll.insert({x: i}));
+    assert.commandWorked(coll.insert({x: i}));
 }
 assert.commandWorked(testDB.createView("view", "test", []));
 

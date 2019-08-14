@@ -25,7 +25,7 @@ const cmdNs = db.getName() + '.$cmd';
 const systemIndexesNs = db.getCollection('system.indexes').getFullName();
 
 assert.commandWorked(db.createCollection(t.getName()));
-assert.writeOK(t.save({_id: 100, a: 100}));
+assert.commandWorked(t.save({_id: 100, a: 100}));
 
 // Tests that db.collection.createIndex() fails when given an index spec containing an unknown
 // field.

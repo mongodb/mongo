@@ -9,7 +9,7 @@ const coll = db.server11118;
 // Used to verify expected output format
 function testFormat(date, formatStr, expectedStr) {
     coll.drop();
-    assert.writeOK(coll.insert({date: date}));
+    assert.commandWorked(coll.insert({date: date}));
 
     const res =
         coll.aggregate([
@@ -23,7 +23,7 @@ function testFormat(date, formatStr, expectedStr) {
 // Used to verify that server recognizes bad formats
 function testFormatError(formatObj, errCode) {
     coll.drop();
-    assert.writeOK(coll.insert({date: ISODate()}));
+    assert.commandWorked(coll.insert({date: ISODate()}));
 
     assertErrorCode(coll, {$project: {_id: 0, formatted: {$dateToString: formatObj}}}, errCode);
 }
@@ -31,7 +31,7 @@ function testFormatError(formatObj, errCode) {
 // Used to verify that only date values are accepted for date parameter
 function testDateValueError(dateVal, errCode) {
     coll.drop();
-    assert.writeOK(coll.insert({date: dateVal}));
+    assert.commandWorked(coll.insert({date: dateVal}));
 
     assertErrorCode(
         coll, {$project: {formatted: {$dateToString: {format: "%Y", date: "$date"}}}}, errCode);

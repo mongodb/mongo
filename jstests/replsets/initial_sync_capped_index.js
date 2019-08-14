@@ -34,7 +34,7 @@ load("jstests/libs/check_log.js");
  */
 function overflowCappedColl(coll, docToInsert) {
     // Insert one document and save its _id.
-    assert.writeOK(coll.insert(docToInsert));
+    assert.commandWorked(coll.insert(docToInsert));
     var origFirstDocId = coll.findOne()["_id"];
 
     // Detect overflow by seeing if the original first doc of the collection is still present.
@@ -99,7 +99,7 @@ checkLog.contains(
 // additional documents.
 var docsToAppend = 2;
 for (var i = 0; i < docsToAppend; i++) {
-    assert.writeOK(primaryDB[cappedCollName].insert(largeDoc));
+    assert.commandWorked(primaryDB[cappedCollName].insert(largeDoc));
 }
 
 // Let the 'getMore' requests for the capped collection clone continue.

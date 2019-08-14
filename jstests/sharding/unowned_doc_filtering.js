@@ -25,7 +25,7 @@ var inserts = [];
 for (var i = 0; i < 100; i++) {
     inserts.push({x: i});
 }
-assert.writeOK(testDB.foo.insert(inserts));
+assert.commandWorked(testDB.foo.insert(inserts));
 
 assert.commandWorked(testDB.adminCommand({split: 'test.foo', find: {x: 50}}));
 assert.commandWorked(

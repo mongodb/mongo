@@ -95,7 +95,7 @@ for (var test = 0; test < numTests; test++) {
         docsOut: docsOut
     });
 
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
     assert.eq(docsIn + docsOut, numDocs);
     assert.eq(pointsIn + pointsOut, totalPoints);
 

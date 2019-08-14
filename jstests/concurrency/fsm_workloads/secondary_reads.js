@@ -36,7 +36,7 @@ var $config = (function() {
             bulk.insert({_id: i, x: i});
         }
         let res = bulk.execute(writeConcern);
-        assertWhenOwnColl.writeOK(res);
+        assertWhenOwnColl.commandWorked(res);
         assertWhenOwnColl.eq(this.nDocumentsToInsert, res.nInserted);
         this.nDocumentsInTotal += this.nDocumentsToInsert;
     }

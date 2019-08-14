@@ -38,7 +38,7 @@ function test(index) {
         }
         gc();  // needed with low skip values
     }
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 
     if (index) {
         t.ensureIndex({loc: index});

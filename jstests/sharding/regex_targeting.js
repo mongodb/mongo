@@ -70,84 +70,84 @@ assert.writeError(collHashed.insert({_id: /regex value/, hash: 0}));
 //
 //
 // (For now) we can insert a regex shard key
-assert.writeOK(collSharded.insert({a: /regex value/}));
-assert.writeOK(collCompound.insert({a: /regex value/, b: "other value"}));
-assert.writeOK(collNested.insert({a: {b: /regex value/}}));
-assert.writeOK(collHashed.insert({hash: /regex value/}));
+assert.commandWorked(collSharded.insert({a: /regex value/}));
+assert.commandWorked(collCompound.insert({a: /regex value/, b: "other value"}));
+assert.commandWorked(collNested.insert({a: {b: /regex value/}}));
+assert.commandWorked(collHashed.insert({hash: /regex value/}));
 
 //
 //
 // Query by regex should hit all matching keys, across all shards if applicable
 coll.remove({});
-assert.writeOK(coll.insert({a: "abcde-0"}));
-assert.writeOK(coll.insert({a: "abcde-1"}));
-assert.writeOK(coll.insert({a: /abcde.*/}));
+assert.commandWorked(coll.insert({a: "abcde-0"}));
+assert.commandWorked(coll.insert({a: "abcde-1"}));
+assert.commandWorked(coll.insert({a: /abcde.*/}));
 assert.eq(coll.find().itcount(), coll.find({a: /abcde.*/}).itcount());
 
 collSharded.remove({});
-assert.writeOK(collSharded.insert({a: "abcde-0"}));
-assert.writeOK(collSharded.insert({a: "abcde-1"}));
-assert.writeOK(collSharded.insert({a: /abcde.*/}));
+assert.commandWorked(collSharded.insert({a: "abcde-0"}));
+assert.commandWorked(collSharded.insert({a: "abcde-1"}));
+assert.commandWorked(collSharded.insert({a: /abcde.*/}));
 assert.eq(collSharded.find().itcount(), collSharded.find({a: /abcde.*/}).itcount());
 
 collCompound.remove({});
-assert.writeOK(collCompound.insert({a: "abcde-0", b: 0}));
-assert.writeOK(collCompound.insert({a: "abcde-1", b: 0}));
-assert.writeOK(collCompound.insert({a: /abcde.*/, b: 0}));
+assert.commandWorked(collCompound.insert({a: "abcde-0", b: 0}));
+assert.commandWorked(collCompound.insert({a: "abcde-1", b: 0}));
+assert.commandWorked(collCompound.insert({a: /abcde.*/, b: 0}));
 assert.eq(collCompound.find().itcount(), collCompound.find({a: /abcde.*/}).itcount());
 
 collNested.remove({});
-assert.writeOK(collNested.insert({a: {b: "abcde-0"}}));
-assert.writeOK(collNested.insert({a: {b: "abcde-1"}}));
-assert.writeOK(collNested.insert({a: {b: /abcde.*/}}));
+assert.commandWorked(collNested.insert({a: {b: "abcde-0"}}));
+assert.commandWorked(collNested.insert({a: {b: "abcde-1"}}));
+assert.commandWorked(collNested.insert({a: {b: /abcde.*/}}));
 assert.eq(collNested.find().itcount(), collNested.find({'a.b': /abcde.*/}).itcount());
 
 collHashed.remove({});
 while (st.shard0.getCollection(collHashed.toString()).count() == 0 ||
        st.shard1.getCollection(collHashed.toString()).count() == 0) {
-    assert.writeOK(collHashed.insert({hash: "abcde-" + ObjectId().toString()}));
+    assert.commandWorked(collHashed.insert({hash: "abcde-" + ObjectId().toString()}));
 }
-assert.writeOK(collHashed.insert({hash: /abcde.*/}));
+assert.commandWorked(collHashed.insert({hash: /abcde.*/}));
 assert.eq(collHashed.find().itcount(), collHashed.find({hash: /abcde.*/}).itcount());
 
 //
 //
 // Update by regex should hit all matching keys, across all shards if applicable
 coll.remove({});
-assert.writeOK(coll.insert({a: "abcde-0"}));
-assert.writeOK(coll.insert({a: "abcde-1"}));
-assert.writeOK(coll.insert({a: /abcde.*/}));
-assert.writeOK(coll.update({a: /abcde.*/}, {$set: {updated: true}}, {multi: true}));
+assert.commandWorked(coll.insert({a: "abcde-0"}));
+assert.commandWorked(coll.insert({a: "abcde-1"}));
+assert.commandWorked(coll.insert({a: /abcde.*/}));
+assert.commandWorked(coll.update({a: /abcde.*/}, {$set: {updated: true}}, {multi: true}));
 assert.eq(coll.find().itcount(), coll.find({updated: true}).itcount());
 
 collSharded.remove({});
-assert.writeOK(collSharded.insert({a: "abcde-0"}));
-assert.writeOK(collSharded.insert({a: "abcde-1"}));
-assert.writeOK(collSharded.insert({a: /abcde.*/}));
-assert.writeOK(collSharded.update({a: /abcde.*/}, {$set: {updated: true}}, {multi: true}));
+assert.commandWorked(collSharded.insert({a: "abcde-0"}));
+assert.commandWorked(collSharded.insert({a: "abcde-1"}));
+assert.commandWorked(collSharded.insert({a: /abcde.*/}));
+assert.commandWorked(collSharded.update({a: /abcde.*/}, {$set: {updated: true}}, {multi: true}));
 assert.eq(collSharded.find().itcount(), collSharded.find({updated: true}).itcount());
 
 collCompound.remove({});
-assert.writeOK(collCompound.insert({a: "abcde-0", b: 0}));
-assert.writeOK(collCompound.insert({a: "abcde-1", b: 0}));
-assert.writeOK(collCompound.insert({a: /abcde.*/, b: 0}));
-assert.writeOK(collCompound.update({a: /abcde.*/}, {$set: {updated: true}}, {multi: true}));
+assert.commandWorked(collCompound.insert({a: "abcde-0", b: 0}));
+assert.commandWorked(collCompound.insert({a: "abcde-1", b: 0}));
+assert.commandWorked(collCompound.insert({a: /abcde.*/, b: 0}));
+assert.commandWorked(collCompound.update({a: /abcde.*/}, {$set: {updated: true}}, {multi: true}));
 assert.eq(collCompound.find().itcount(), collCompound.find({updated: true}).itcount());
 
 collNested.remove({});
-assert.writeOK(collNested.insert({a: {b: "abcde-0"}}));
-assert.writeOK(collNested.insert({a: {b: "abcde-1"}}));
-assert.writeOK(collNested.insert({a: {b: /abcde.*/}}));
-assert.writeOK(collNested.update({'a.b': /abcde.*/}, {$set: {updated: true}}, {multi: true}));
+assert.commandWorked(collNested.insert({a: {b: "abcde-0"}}));
+assert.commandWorked(collNested.insert({a: {b: "abcde-1"}}));
+assert.commandWorked(collNested.insert({a: {b: /abcde.*/}}));
+assert.commandWorked(collNested.update({'a.b': /abcde.*/}, {$set: {updated: true}}, {multi: true}));
 assert.eq(collNested.find().itcount(), collNested.find({updated: true}).itcount());
 
 collHashed.remove({});
 while (st.shard0.getCollection(collHashed.toString()).count() == 0 ||
        st.shard1.getCollection(collHashed.toString()).count() == 0) {
-    assert.writeOK(collHashed.insert({hash: "abcde-" + ObjectId().toString()}));
+    assert.commandWorked(collHashed.insert({hash: "abcde-" + ObjectId().toString()}));
 }
-assert.writeOK(collHashed.insert({hash: /abcde.*/}));
-assert.writeOK(collHashed.update({hash: /abcde.*/}, {$set: {updated: true}}, {multi: true}));
+assert.commandWorked(collHashed.insert({hash: /abcde.*/}));
+assert.commandWorked(collHashed.update({hash: /abcde.*/}, {$set: {updated: true}}, {multi: true}));
 assert.eq(collHashed.find().itcount(), collHashed.find({updated: true}).itcount());
 
 collSharded.remove({});
@@ -219,40 +219,40 @@ assert.commandFailedWithCode(collNested.update({c: 1}, {a: {b: /abcde.*/}}, {ups
 //
 // Remove by regex should hit all matching keys, across all shards if applicable
 coll.remove({});
-assert.writeOK(coll.insert({a: "abcde-0"}));
-assert.writeOK(coll.insert({a: "abcde-1"}));
-assert.writeOK(coll.insert({a: /abcde.*/}));
-assert.writeOK(coll.remove({a: /abcde.*/}));
+assert.commandWorked(coll.insert({a: "abcde-0"}));
+assert.commandWorked(coll.insert({a: "abcde-1"}));
+assert.commandWorked(coll.insert({a: /abcde.*/}));
+assert.commandWorked(coll.remove({a: /abcde.*/}));
 assert.eq(0, coll.find({}).itcount());
 
 collSharded.remove({});
-assert.writeOK(collSharded.insert({a: "abcde-0"}));
-assert.writeOK(collSharded.insert({a: "abcde-1"}));
-assert.writeOK(collSharded.insert({a: /abcde.*/}));
-assert.writeOK(collSharded.remove({a: /abcde.*/}));
+assert.commandWorked(collSharded.insert({a: "abcde-0"}));
+assert.commandWorked(collSharded.insert({a: "abcde-1"}));
+assert.commandWorked(collSharded.insert({a: /abcde.*/}));
+assert.commandWorked(collSharded.remove({a: /abcde.*/}));
 assert.eq(0, collSharded.find({}).itcount());
 
 collCompound.remove({});
-assert.writeOK(collCompound.insert({a: "abcde-0", b: 0}));
-assert.writeOK(collCompound.insert({a: "abcde-1", b: 0}));
-assert.writeOK(collCompound.insert({a: /abcde.*/, b: 0}));
-assert.writeOK(collCompound.remove({a: /abcde.*/}));
+assert.commandWorked(collCompound.insert({a: "abcde-0", b: 0}));
+assert.commandWorked(collCompound.insert({a: "abcde-1", b: 0}));
+assert.commandWorked(collCompound.insert({a: /abcde.*/, b: 0}));
+assert.commandWorked(collCompound.remove({a: /abcde.*/}));
 assert.eq(0, collCompound.find({}).itcount());
 
 collNested.remove({});
-assert.writeOK(collNested.insert({a: {b: "abcde-0"}}));
-assert.writeOK(collNested.insert({a: {b: "abcde-1"}}));
-assert.writeOK(collNested.insert({a: {b: /abcde.*/}}));
-assert.writeOK(collNested.remove({'a.b': /abcde.*/}));
+assert.commandWorked(collNested.insert({a: {b: "abcde-0"}}));
+assert.commandWorked(collNested.insert({a: {b: "abcde-1"}}));
+assert.commandWorked(collNested.insert({a: {b: /abcde.*/}}));
+assert.commandWorked(collNested.remove({'a.b': /abcde.*/}));
 assert.eq(0, collNested.find({}).itcount());
 
 collHashed.remove({});
 while (st.shard0.getCollection(collHashed.toString()).count() == 0 ||
        st.shard1.getCollection(collHashed.toString()).count() == 0) {
-    assert.writeOK(collHashed.insert({hash: "abcde-" + ObjectId().toString()}));
+    assert.commandWorked(collHashed.insert({hash: "abcde-" + ObjectId().toString()}));
 }
-assert.writeOK(collHashed.insert({hash: /abcde.*/}));
-assert.writeOK(collHashed.remove({hash: /abcde.*/}));
+assert.commandWorked(collHashed.insert({hash: /abcde.*/}));
+assert.commandWorked(collHashed.remove({hash: /abcde.*/}));
 assert.eq(0, collHashed.find({}).itcount());
 
 //
@@ -260,23 +260,24 @@ assert.eq(0, collHashed.find({}).itcount());
 // Query/Update/Remove by nested regex is different depending on how the nested regex is
 // specified
 coll.remove({});
-assert.writeOK(coll.insert({a: {b: "abcde-0"}}));
-assert.writeOK(coll.insert({a: {b: "abcde-1"}}));
-assert.writeOK(coll.insert({a: {b: /abcde.*/}}));
+assert.commandWorked(coll.insert({a: {b: "abcde-0"}}));
+assert.commandWorked(coll.insert({a: {b: "abcde-1"}}));
+assert.commandWorked(coll.insert({a: {b: /abcde.*/}}));
 assert.eq(1, coll.find({a: {b: /abcde.*/}}).itcount());
-assert.writeOK(coll.update({a: {b: /abcde.*/}}, {$set: {updated: true}}, {multi: true}));
+assert.commandWorked(coll.update({a: {b: /abcde.*/}}, {$set: {updated: true}}, {multi: true}));
 assert.eq(1, coll.find({updated: true}).itcount());
-assert.writeOK(coll.remove({a: {b: /abcde.*/}}));
+assert.commandWorked(coll.remove({a: {b: /abcde.*/}}));
 assert.eq(2, coll.find().itcount());
 
 collNested.remove({});
-assert.writeOK(collNested.insert({a: {b: "abcde-0"}}));
-assert.writeOK(collNested.insert({a: {b: "abcde-1"}}));
-assert.writeOK(collNested.insert({a: {b: /abcde.*/}}));
+assert.commandWorked(collNested.insert({a: {b: "abcde-0"}}));
+assert.commandWorked(collNested.insert({a: {b: "abcde-1"}}));
+assert.commandWorked(collNested.insert({a: {b: /abcde.*/}}));
 assert.eq(1, collNested.find({a: {b: /abcde.*/}}).itcount());
-assert.writeOK(collNested.update({a: {b: /abcde.*/}}, {$set: {updated: true}}, {multi: true}));
+assert.commandWorked(
+    collNested.update({a: {b: /abcde.*/}}, {$set: {updated: true}}, {multi: true}));
 assert.eq(1, collNested.find({updated: true}).itcount());
-assert.writeOK(collNested.remove({a: {b: /abcde.*/}}));
+assert.commandWorked(collNested.remove({a: {b: /abcde.*/}}));
 assert.eq(2, collNested.find().itcount());
 
 st.stop();

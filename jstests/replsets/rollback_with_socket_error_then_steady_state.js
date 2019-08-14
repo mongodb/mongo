@@ -41,7 +41,7 @@ jsTestLog("Make sure node 0 is primary.");
 stepUp(rst, nodes[0]);
 assert.eq(nodes[0], rst.getPrimary());
 // Wait for all data bearing nodes to get up to date.
-assert.writeOK(nodes[0].getCollection(collName).insert(
+assert.commandWorked(nodes[0].getCollection(collName).insert(
     {a: counter++}, {writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 
 jsTestLog("Create two partitions: [1] and [0,2,3,4].");
@@ -51,7 +51,7 @@ nodes[1].disconnect(nodes[3]);
 nodes[1].disconnect(nodes[4]);
 
 jsTestLog("Do a write that is replicated to [0,2,3,4].");
-assert.writeOK(nodes[0].getCollection(collName).insert(
+assert.commandWorked(nodes[0].getCollection(collName).insert(
     {a: counter++}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 
 jsTestLog("Repartition to: [0,2] and [1,3,4].");
@@ -68,7 +68,7 @@ waitForState(nodes[1], ReplSetTest.State.PRIMARY);
 assert.eq(nodes[1], rst.getPrimary());
 
 jsTestLog("Do a write to node 1 on the [1,3,4] side of the partition.");
-assert.writeOK(nodes[1].getCollection(collName).insert({a: counter++}));
+assert.commandWorked(nodes[1].getCollection(collName).insert({a: counter++}));
 
 // Turn on failpoint on node 2 to pause rollback before doing anything.
 assert.commandWorked(
@@ -112,7 +112,7 @@ waitForState(nodes[0], ReplSetTest.State.PRIMARY);
 assert.eq(nodes[0], rst.getPrimary());
 
 jsTestLog("w:2 write to node 0 (replicated to node 2)");
-assert.writeOK(nodes[0].getCollection(collName).insert(
+assert.commandWorked(nodes[0].getCollection(collName).insert(
     {a: counter++}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 
 // At this point node 2 has failed rollback before making any durable changes, including writing

@@ -17,8 +17,10 @@ const st = new ShardingTest({shards: 2, config: 1});
 
 // Set up a sharded collection with 2 chunks, one on each shard.
 
-assert.writeOK(st.s.getDB(dbName)[collName].insert({_id: -1}, {writeConcern: {w: "majority"}}));
-assert.writeOK(st.s.getDB(dbName)[collName].insert({_id: 1}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: -1}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: 1}, {writeConcern: {w: "majority"}}));
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard0.shardName);
@@ -65,7 +67,7 @@ function runTest(st, readConcern, sessionOptions) {
     assert.commandWorked(session.commitTransaction_forTesting());
 
     // Clean up for the next iteration.
-    assert.writeOK(sessionDB[collName].remove({_id: 5}));
+    assert.commandWorked(sessionDB[collName].remove({_id: 5}));
 }
 
 // Specifying no read concern level is allowed and should not compute a global snapshot.

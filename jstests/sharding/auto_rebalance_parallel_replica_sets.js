@@ -13,10 +13,10 @@ assert.commandWorked(st.s0.adminCommand({shardCollection: 'TestDB.TestColl', key
 var coll = st.s0.getDB('TestDB').TestColl;
 
 // Create 4 chunks initially and ensure they get balanced within 1 balancer round
-assert.writeOK(coll.insert({Key: 1, Value: 'Test value 1'}));
-assert.writeOK(coll.insert({Key: 10, Value: 'Test value 10'}));
-assert.writeOK(coll.insert({Key: 20, Value: 'Test value 20'}));
-assert.writeOK(coll.insert({Key: 30, Value: 'Test value 30'}));
+assert.commandWorked(coll.insert({Key: 1, Value: 'Test value 1'}));
+assert.commandWorked(coll.insert({Key: 10, Value: 'Test value 10'}));
+assert.commandWorked(coll.insert({Key: 20, Value: 'Test value 20'}));
+assert.commandWorked(coll.insert({Key: 30, Value: 'Test value 30'}));
 
 assert.commandWorked(st.splitAt('TestDB.TestColl', {Key: 10}));
 assert.commandWorked(st.splitAt('TestDB.TestColl', {Key: 20}));

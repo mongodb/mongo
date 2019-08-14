@@ -12,7 +12,7 @@ idx = {
 
 t.insert({zip: "06525", loc: [41.352964, 73.01212]});
 t.insert({zip: "10024", loc: [40.786387, 73.97709]});
-assert.writeOK(t.insert({zip: "94061", loc: [37.463911, 122.23396]}));
+assert.commandWorked(t.insert({zip: "94061", loc: [37.463911, 122.23396]}));
 
 // test "2d" has to be first
 assert.eq(1, t.getIndexKeys().length, "S1");
@@ -40,4 +40,4 @@ assert.eq("06525", t.find({loc: wb.loc})[0].zip, "C3");
 t.drop();
 
 t.ensureIndex({loc: "2d"}, {min: -500, max: 500, bits: 4});
-assert.writeOK(t.insert({loc: [200, 200]}));
+assert.commandWorked(t.insert({loc: [200, 200]}));

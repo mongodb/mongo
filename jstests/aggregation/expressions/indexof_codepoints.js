@@ -34,7 +34,7 @@ var coll = db.indexofcp;
 coll.drop();
 
 // Insert a dummy document so something flows through the pipeline.
-assert.writeOK(coll.insert({}));
+assert.commandWorked(coll.insert({}));
 
 testExpressionCodePoints(coll, {$indexOfCP: ["∫aƒ", "ƒ"]}, 2);
 

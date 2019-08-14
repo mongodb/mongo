@@ -15,7 +15,7 @@ var bulk = testDB.foo.initializeUnorderedBulkOp();
 for (var i = 0; i < 9; i++) {
     bulk.insert({_id: i, x: i});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 assert.commandWorked(st.s0.adminCommand({shardCollection: 'test.foo', key: {_id: 1}}));
 

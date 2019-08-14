@@ -128,8 +128,8 @@ let deleteCmd = {
 primary = replTest.getPrimary();
 testDB = primary.getDB("test");
 
-assert.writeOK(testDB.foo.insert({_id: 40, x: 1}));
-assert.writeOK(testDB.foo.insert({_id: 50, y: 1}));
+assert.commandWorked(testDB.foo.insert({_id: 40, x: 1}));
+assert.commandWorked(testDB.foo.insert({_id: 50, y: 1}));
 
 // Run the command on the primary and wait for replication.
 result = assert.commandWorked(testDB.runCommand(deleteCmd));

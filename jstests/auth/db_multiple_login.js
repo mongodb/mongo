@@ -21,7 +21,7 @@ assert.throws(function() {
 
 // Writer logged in, can read and write.
 test.auth('writer', 'a');
-assert.writeOK(test.docs.insert({value: 1}));
+assert.commandWorked(test.docs.insert({value: 1}));
 test.foo.findOne();
 
 // Reader logged in, replacing writer, can only read.

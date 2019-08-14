@@ -50,7 +50,7 @@ var $config = extendWorkload($config, function($config, $super) {
 
         const collection = this.session.getDatabase(db.getName()).getCollection(collName);
         withTxnAndAutoRetry(this.session, () => {
-            assertWhenOwnColl.writeOK(
+            assertWhenOwnColl.commandWorked(
                 collection.update({_id: idToUpdate}, {$inc: {counter: 1}}, {multi: false}));
         });
 
@@ -65,7 +65,7 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.states.multiUpdate = function multiUpdate(db, collName, connCache) {
         const collection = this.session.getDatabase(db.getName()).getCollection(collName);
         withTxnAndAutoRetry(this.session, () => {
-            assertWhenOwnColl.writeOK(
+            assertWhenOwnColl.commandWorked(
                 collection.update({tid: this.tid}, {$inc: {counter: 1}}, {multi: true}));
         });
 
@@ -100,7 +100,7 @@ var $config = extendWorkload($config, function($config, $super) {
         // Assign a default counter value to each document owned by this thread.
         db[collName].find({tid: this.tid}).forEach(doc => {
             this.expectedCounters[doc._id] = 0;
-            assert.writeOK(db[collName].update({_id: doc._id}, {$set: {counter: 0}}));
+            assert.commandWorked(db[collName].update({_id: doc._id}, {$set: {counter: 0}}));
         });
     };
 

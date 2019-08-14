@@ -10,14 +10,14 @@ var t = db[collname];
 t.drop();
 assert.commandWorked(db.createCollection(collname, {capped: true, size: 1024}));
 
-assert.writeOK(t.insert({_id: 1}));
-assert.writeOK(t.insert({_id: 2}));
+assert.commandWorked(t.insert({_id: 1}));
+assert.commandWorked(t.insert({_id: 2}));
 
 // Non-tailable with skip
 var cursor = t.find().skip(1);
 assert.eq(2, cursor.next()["_id"]);
 assert(!cursor.hasNext());
-assert.writeOK(t.insert({_id: 3}));
+assert.commandWorked(t.insert({_id: 3}));
 assert(!cursor.hasNext());
 
 // Non-tailable with limit
@@ -26,7 +26,7 @@ for (var i = 1; i <= 3; i++) {
     assert.eq(i, cursor.next()["_id"]);
 }
 assert(!cursor.hasNext());
-assert.writeOK(t.insert({_id: 4}));
+assert.commandWorked(t.insert({_id: 4}));
 assert(!cursor.hasNext());
 
 // Non-tailable with negative limit
@@ -35,14 +35,14 @@ for (var i = 1; i <= 4; i++) {
     assert.eq(i, cursor.next()["_id"]);
 }
 assert(!cursor.hasNext());
-assert.writeOK(t.insert({_id: 5}));
+assert.commandWorked(t.insert({_id: 5}));
 assert(!cursor.hasNext());
 
 // Tailable with skip
 cursor = t.find().addOption(2).skip(4);
 assert.eq(5, cursor.next()["_id"]);
 assert(!cursor.hasNext());
-assert.writeOK(t.insert({_id: 6}));
+assert.commandWorked(t.insert({_id: 6}));
 assert(cursor.hasNext());
 assert.eq(6, cursor.next()["_id"]);
 
@@ -52,7 +52,7 @@ for (var i = 1; i <= 6; i++) {
     assert.eq(i, cursor.next()["_id"]);
 }
 assert(!cursor.hasNext());
-assert.writeOK(t.insert({_id: 7}));
+assert.commandWorked(t.insert({_id: 7}));
 assert(cursor.hasNext());
 assert.eq(7, cursor.next()["_id"]);
 
@@ -88,6 +88,6 @@ assert.eq(cmdRes.cursor.firstBatch.length, 0);
 
 // Test that the cursor works in the shell.
 assert.eq(t.find().addOption(2).itcount(), 0);
-assert.writeOK(t.insert({a: 1}));
+assert.commandWorked(t.insert({a: 1}));
 assert.eq(t.find().addOption(2).itcount(), 1);
 })();

@@ -13,7 +13,7 @@ var bulk = coll.initializeUnorderedBulkOp();
 for (var i = 0; i < 10; i++) {
     bulk.insert({_id: i, even: (i % 2 == 0)});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 var map = function() {
     emit(this.even, 1);

@@ -36,7 +36,7 @@ assert.neq(null,
 
 // Ensure that the 'lastStable' binary mongos can perform reads and writes to the shards in the
 // cluster.
-assert.writeOK(lastStableMongos.getDB("test").foo.insert({x: 1}));
+assert.commandWorked(lastStableMongos.getDB("test").foo.insert({x: 1}));
 let foundDoc = lastStableMongos.getDB("test").foo.findOne({x: 1});
 assert.neq(null, foundDoc);
 assert.eq(1, foundDoc.x, tojson(foundDoc));

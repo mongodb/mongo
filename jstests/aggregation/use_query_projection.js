@@ -17,7 +17,7 @@ const bulk = coll.initializeUnorderedBulkOp();
 for (let i = 0; i < 100; ++i) {
     bulk.insert({_id: i, x: "string", a: -i, y: i % 2});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 function assertQueryCoversProjection({pipeline = [], pipelineOptimizedAway = true} = {}) {
     const explainOutput = coll.explain().aggregate(pipeline);
@@ -107,7 +107,7 @@ assertQueryCoversProjection({
 
 // Test that a multikey index will prevent a covered plan.
 assert.commandWorked(coll.dropIndex({x: 1}));  // Make sure there is only one plan considered.
-assert.writeOK(coll.insert({x: ["an", "array!"]}));
+assert.commandWorked(coll.insert({x: ["an", "array!"]}));
 assertQueryDoesNotCoverProjection({
     pipeline: [{$match: {x: "string"}}, {$project: {_id: 1, x: 1}}],
     pipelineOptimizedAway: false

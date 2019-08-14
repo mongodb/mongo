@@ -11,7 +11,7 @@ load("jstests/libs/analyze_plan.js");
 let coll = db.match_swapping_renamed_fields;
 coll.drop();
 
-assert.writeOK(coll.insert([{a: 1, b: 1, c: 1}, {a: 2, b: 2, c: 2}, {a: 3, b: 3, c: 3}]));
+assert.commandWorked(coll.insert([{a: 1, b: 1, c: 1}, {a: 2, b: 2, c: 2}, {a: 3, b: 3, c: 3}]));
 assert.commandWorked(coll.createIndex({a: 1}));
 
 // Test that a $match can result in index usage after moving past a field renamed by $project.
@@ -52,8 +52,8 @@ explain = coll.explain().aggregate(pipeline);
 assert.neq(null, getAggPlanStage(explain, "IXSCAN"), tojson(explain));
 
 coll.drop();
-assert.writeOK(coll.insert({_id: 0, a: [{b: 1, c: 1}, {b: 2, c: 2}]}));
-assert.writeOK(coll.insert({_id: 1, a: [{b: 3, c: 3}, {b: 4, c: 4}]}));
+assert.commandWorked(coll.insert({_id: 0, a: [{b: 1, c: 1}, {b: 2, c: 2}]}));
+assert.commandWorked(coll.insert({_id: 1, a: [{b: 3, c: 3}, {b: 4, c: 4}]}));
 assert.commandWorked(coll.createIndex({"a.b": 1, "a.c": 1}));
 
 // Test that a $match can result in index usage after moving past a dotted array path renamed by
@@ -96,8 +96,8 @@ assert.neq(null, ixscan, tojson(explain));
 assert.eq({"a.b": 1, "a.c": 1}, ixscan.keyPattern, tojson(ixscan));
 
 coll.drop();
-assert.writeOK(coll.insert({_id: 0, a: [{b: [{c: 1}, {c: 2}]}, {b: [{c: 3}, {c: 4}]}]}));
-assert.writeOK(coll.insert({_id: 1, a: [{b: [{c: 5}, {c: 6}]}, {b: [{c: 7}, {c: 8}]}]}));
+assert.commandWorked(coll.insert({_id: 0, a: [{b: [{c: 1}, {c: 2}]}, {b: [{c: 3}, {c: 4}]}]}));
+assert.commandWorked(coll.insert({_id: 1, a: [{b: [{c: 5}, {c: 6}]}, {b: [{c: 7}, {c: 8}]}]}));
 assert.commandWorked(coll.createIndex({"a.b.c": 1}));
 
 // Test that a $match can result in index usage by moving past a rename of a field inside

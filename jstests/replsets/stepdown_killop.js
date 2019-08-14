@@ -35,7 +35,7 @@ assert.eq(primary.host, nodes[0], "primary assumed to be node 0");
 
 // do a write then ask the PRIMARY to stepdown
 jsTestLog("Initiating stepdown");
-assert.writeOK(primary.getDB(name).foo.insert(
+assert.commandWorked(primary.getDB(name).foo.insert(
     {myDoc: true, x: 1}, {writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 var stepDownCmd = function() {
     var res =
@@ -76,7 +76,7 @@ primary.getDB('admin').killOp(stepDownOpID);
 var exitCode = stepDowner();
 assert.eq(0, exitCode);
 
-assert.writeOK(primary.getDB(name).foo.remove({}));
+assert.commandWorked(primary.getDB(name).foo.remove({}));
 restartServerReplication(secondary);
 replSet.stopSet();
 })();

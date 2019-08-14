@@ -7,9 +7,9 @@
 const coll = db.jstests_existsa;
 coll.drop();
 
-assert.writeOK(coll.insert({}));
-assert.writeOK(coll.insert({a: 1}));
-assert.writeOK(coll.insert({a: {x: 1}, b: 1}));
+assert.commandWorked(coll.insert({}));
+assert.commandWorked(coll.insert({a: 1}));
+assert.commandWorked(coll.insert({a: {x: 1}, b: 1}));
 
 let indexKeySpec = {};
 let indexKeyField = '';
@@ -89,9 +89,9 @@ assertExists({$or: [{a: {$exists: true}}]});                // $exists:true not 
 
 // Behavior is similar with $elemMatch.
 coll.drop();
-assert.writeOK(coll.insert({a: [{}]}));
-assert.writeOK(coll.insert({a: [{b: 1}]}));
-assert.writeOK(coll.insert({a: [{b: [1]}]}));
+assert.commandWorked(coll.insert({a: [{}]}));
+assert.commandWorked(coll.insert({a: [{b: 1}]}));
+assert.commandWorked(coll.insert({a: [{b: [1]}]}));
 setIndex('a.b');
 
 assertMissing({a: {$elemMatch: {b: {$exists: false}}}});
@@ -105,7 +105,7 @@ assertExistsUnindexed({'a.b': {$elemMatch: {$gt: 0, $not: {$exists: false}}}}, 1
 
 // A non sparse index will not be disallowed.
 coll.drop();
-assert.writeOK(coll.insert({}));
+assert.commandWorked(coll.insert({}));
 coll.ensureIndex({a: 1});
 assert.eq(1, coll.find({a: {$exists: false}}).itcount());
 })();

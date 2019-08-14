@@ -30,7 +30,7 @@ replSet.initiate();
 var primary = replSet.getPrimary();
 
 var coll = primary.getDB('test').foo;
-assert.writeOK(coll.insert({a: 1}));
+assert.commandWorked(coll.insert({a: 1}));
 
 function getFirstOplogEntry(conn) {
     return conn.getDB('local').oplog.rs.find().sort({$natural: 1}).limit(1)[0];
@@ -53,7 +53,7 @@ checkLog.contains(secondary,
 const largeStr = new Array(4 * 1024 * oplogSizeOnPrimary).join('aaaaaaaa');
 var i = 0;
 while (bsonWoCompare(getFirstOplogEntry(primary), firstOplogEntry) === 0) {
-    assert.writeOK(coll.insert({a: 2, x: i++, long_str: largeStr}));
+    assert.commandWorked(coll.insert({a: 2, x: i++, long_str: largeStr}));
     sleep(100);
 }
 

@@ -20,12 +20,12 @@ function runTest(badViewDefinition) {
     assert.commandWorked(viewsDB.dropDatabase());
 
     // Create a regular collection, then insert an invalid view into system.views.
-    assert.writeOK(viewsDB.collection.insert({x: 1}));
+    assert.commandWorked(viewsDB.collection.insert({x: 1}));
     assert.commandWorked(viewsDB.runCommand({create: "collection2"}));
     assert.commandWorked(viewsDB.runCommand({create: "collection3"}));
     assert.commandWorked(viewsDB.collection.createIndex({x: 1}));
-    assert.writeOK(viewsDB.system.views.insert(badViewDefinition),
-                   "failed to insert " + tojson(badViewDefinition));
+    assert.commandWorked(viewsDB.system.views.insert(badViewDefinition),
+                         "failed to insert " + tojson(badViewDefinition));
 
     // Test that a command involving views properly fails with a views-specific error code.
     assert.commandFailedWithCode(
@@ -49,12 +49,12 @@ function runTest(badViewDefinition) {
             makeErrorMessage("applyOps"));
     }
 
-    assert.writeOK(viewsDB.collection.insert({y: "baz"}), makeErrorMessage("insert"));
+    assert.commandWorked(viewsDB.collection.insert({y: "baz"}), makeErrorMessage("insert"));
 
-    assert.writeOK(viewsDB.collection.update({y: "baz"}, {$set: {y: "qux"}}),
-                   makeErrorMessage("update"));
+    assert.commandWorked(viewsDB.collection.update({y: "baz"}, {$set: {y: "qux"}}),
+                         makeErrorMessage("update"));
 
-    assert.writeOK(viewsDB.collection.remove({y: "baz"}), makeErrorMessage("remove"));
+    assert.commandWorked(viewsDB.collection.remove({y: "baz"}), makeErrorMessage("remove"));
 
     assert.commandWorked(
         viewsDB.runCommand({findAndModify: "collection", query: {x: 1}, update: {x: 2}}),
@@ -116,7 +116,7 @@ function runTest(badViewDefinition) {
     assert.commandWorked(viewsDB.runCommand({drop: "collection2"}), makeErrorMessage("drop"));
 
     // Drop the offending view so that the validate hook succeeds.
-    assert.writeOK(viewsDB.system.views.remove(badViewDefinition));
+    assert.commandWorked(viewsDB.system.views.remove(badViewDefinition));
 }
 
 runTest({_id: "invalid_system_views.badViewStringPipeline", viewOn: "collection", pipeline: "bad"});

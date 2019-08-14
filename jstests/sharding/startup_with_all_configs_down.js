@@ -29,7 +29,7 @@ var st = new ShardingTest({shards: 2, other: {shardAsReplicaSet: false}});
 jsTestLog("Setting up initial data");
 
 for (var i = 0; i < 100; i++) {
-    assert.writeOK(st.s.getDB('test').foo.insert({_id: i}));
+    assert.commandWorked(st.s.getDB('test').foo.insert({_id: i}));
 }
 
 assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));

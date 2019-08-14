@@ -8,7 +8,7 @@ coll.drop();
 
 /* --------------------------------------------------------------------------------------- */
 
-assert.writeOK(coll.insert([
+assert.commandWorked(coll.insert([
     {_id: 0, date: new ISODate("2017-07-04T14:56:42.911Z"), tz: "UTC"},
     {_id: 1, date: new ISODate("2017-07-04T14:56:42.911Z"), tz: "Europe/London"},
     {_id: 2, date: new ISODate("2017-07-04T14:56:42.911Z"), tz: "America/New_York"},
@@ -47,7 +47,7 @@ assert.eq(
 /* --------------------------------------------------------------------------------------- */
 coll.drop();
 
-assert.writeOK(coll.insert([
+assert.commandWorked(coll.insert([
     {_id: 0, date: new ISODate("2017-01-04T15:08:51.911Z")},
     {_id: 1, date: new ISODate("2017-07-04T15:09:12.911Z")},
     {_id: 2, date: new ISODate("2017-12-04T15:09:14.911Z")},
@@ -78,7 +78,7 @@ assert.eq(
 /* --------------------------------------------------------------------------------------- */
 coll.drop();
 
-assert.writeOK(coll.insert([
+assert.commandWorked(coll.insert([
     {_id: 0, date: new ISODate("2017-01-04T15:08:51.911Z")},
     {_id: 1, date: new ISODate("2017-07-04T15:09:12.911Z")},
     {_id: 2, date: new ISODate("2017-12-04T15:09:14.911Z")},
@@ -105,7 +105,7 @@ assert.eq(
 /* --------------------------------------------------------------------------------------- */
 coll.drop();
 
-assert.writeOK(coll.insert([
+assert.commandWorked(coll.insert([
     {_id: 0, date: new ISODate("2017-01-01T15:08:51.911Z")},
     {_id: 1, date: new ISODate("2017-07-04T15:09:12.911Z")},
     {_id: 2, date: new ISODate("2017-12-04T15:09:14.911Z")},
@@ -133,7 +133,7 @@ assert.eq(
 /* Test that missing expressions, turn into BSON null values */
 coll.drop();
 
-assert.writeOK(coll.insert([
+assert.commandWorked(coll.insert([
     {_id: 0, date: new ISODate("2017-01-04T15:08:51.911Z")},
     {_id: 1, date: new ISODate("2017-01-04T15:08:51.911Z"), timezone: null},
     {_id: 2, date: new ISODate("2017-01-04T15:08:51.911Z"), timezone: undefined},
@@ -171,7 +171,7 @@ assert.eq(
 /* Test that the default format is "%Y-%m-%dT%H:%M:%S.%LZ" if none specified. */
 coll.drop();
 
-assert.writeOK(coll.insert([
+assert.commandWorked(coll.insert([
     {_id: 0, date: new ISODate("2017-01-04T15:08:51.911Z")},
     {_id: 1, date: new ISODate("2017-07-04T15:09:12.911Z")},
     {_id: 2, date: new ISODate("2017-12-04T15:09:14.911Z")},
@@ -192,7 +192,7 @@ assert.eq(
 /* --------------------------------------------------------------------------------------- */
 /* Test that null is returned when 'format' evaluates to nullish. */
 coll.drop();
-assert.writeOK(coll.insert({_id: 0}));
+assert.commandWorked(coll.insert({_id: 0}));
 
 assert.eq([{_id: 0, date: null}],
           coll.aggregate({

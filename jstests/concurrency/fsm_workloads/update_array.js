@@ -114,7 +114,7 @@ var $config = (function() {
         assertAlways.commandWorked(db[collName].ensureIndex({arr: 1}));
         for (var i = 0; i < this.numDocs; ++i) {
             var res = db[collName].insert({_id: i, arr: []});
-            assertWhenOwnColl.writeOK(res);
+            assertWhenOwnColl.commandWorked(res);
             assertWhenOwnColl.eq(1, res.nInserted);
         }
     }

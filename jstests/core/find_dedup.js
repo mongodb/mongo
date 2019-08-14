@@ -20,11 +20,11 @@ function checkDedup(query, idArray) {
 // Deduping $or
 coll.drop();
 coll.ensureIndex({a: 1, b: 1});
-assert.writeOK(coll.insert({_id: 1, a: 1, b: 1}));
-assert.writeOK(coll.insert({_id: 2, a: 1, b: 1}));
-assert.writeOK(coll.insert({_id: 3, a: 2, b: 2}));
-assert.writeOK(coll.insert({_id: 4, a: 3, b: 3}));
-assert.writeOK(coll.insert({_id: 5, a: 3, b: 3}));
+assert.commandWorked(coll.insert({_id: 1, a: 1, b: 1}));
+assert.commandWorked(coll.insert({_id: 2, a: 1, b: 1}));
+assert.commandWorked(coll.insert({_id: 3, a: 2, b: 2}));
+assert.commandWorked(coll.insert({_id: 4, a: 3, b: 3}));
+assert.commandWorked(coll.insert({_id: 5, a: 3, b: 3}));
 checkDedup({
     $or: [
         {a: {$gte: 0, $lte: 2}, b: {$gte: 0, $lte: 2}},
@@ -36,8 +36,8 @@ checkDedup({
 
 // Deduping multikey
 assert(coll.drop());
-assert.writeOK(coll.insert({_id: 1, a: [1, 2, 3], b: [4, 5, 6]}));
-assert.writeOK(coll.insert({_id: 2, a: [1, 2, 3], b: [4, 5, 6]}));
+assert.commandWorked(coll.insert({_id: 1, a: [1, 2, 3], b: [4, 5, 6]}));
+assert.commandWorked(coll.insert({_id: 2, a: [1, 2, 3], b: [4, 5, 6]}));
 assert.eq(2, coll.count());
 
 checkDedup({$or: [{a: {$in: [1, 2]}}, {b: {$in: [4, 5]}}]}, [1, 2]);

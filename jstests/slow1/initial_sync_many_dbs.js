@@ -31,7 +31,7 @@ for (var i = 0; i < num_dbs; i++) {
         var collname = name + '_coll' + j;
         var coll = primary.getDB(dbname)[collname];
         for (var k = 0; k < num_docs; k++) {
-            assert.writeOK(coll.insert({_id: k}));
+            assert.commandWorked(coll.insert({_id: k}));
         }
     }
 }

@@ -17,7 +17,7 @@ st.ensurePrimaryShard(coll.getDB().getName(), st.shard0.shardName);
 assert.commandWorked(mongos.adminCommand({shardCollection: coll + '', key: {_id: 1}}));
 
 // Insert one document
-assert.writeOK(coll.insert({hello: 'world'}));
+assert.commandWorked(coll.insert({hello: 'world'}));
 
 // Migrate the collection to and from shard1 so shard0 loads the shard1 host
 assert.commandWorked(mongos.adminCommand(

@@ -25,13 +25,13 @@ function p() {
 
 p();
 
-assert.writeOK(
+assert.commandWorked(
     t.update({"loc": {"$within": {"$center": [[5, 5], 2]}}}, {'$inc': {'z': 1}}, false, true));
 p();
 
-assert.writeOK(t.update({}, {'$inc': {'z': 1}}, false, true));
+assert.commandWorked(t.update({}, {'$inc': {'z': 1}}, false, true));
 p();
 
-assert.writeOK(
+assert.commandWorked(
     t.update({"loc": {"$within": {"$center": [[5, 5], 2]}}}, {'$inc': {'z': 1}}, false, true));
 p();

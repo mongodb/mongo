@@ -10,7 +10,8 @@ let rs = st.rs0;
 
 // Create `test.coll` and add some indexes on it:
 // with index versions as default, v=1 and v=2; both unique and standard types
-assert.writeOK(mongos.getDB("test").coll.insert({_id: 1, a: 1, b: 1, c: 1, d: 1, e: 1, f: 1}));
+assert.commandWorked(
+    mongos.getDB("test").coll.insert({_id: 1, a: 1, b: 1, c: 1, d: 1, e: 1, f: 1}));
 assert.commandWorked(mongos.getDB("test").coll.createIndex({a: 1}, {"v": 1}));
 assert.commandWorked(mongos.getDB("test").coll.createIndex({b: 1}, {"v": 1, "unique": true}));
 assert.commandWorked(mongos.getDB("test").coll.createIndex({c: 1}, {"v": 2}));

@@ -35,14 +35,14 @@ var numRecords = 100;
 
 //  Insert
 for (var i = 0; i < numRecords; i++) {
-    assert.writeOK(testColl.insert({_id: i}));
+    assert.commandWorked(testColl.insert({_id: i}));
 }
 assertTopDiffEq(testColl, lastTop, "insert", numRecords);
 lastTop = assertTopDiffEq(testColl, lastTop, "writeLock", numRecords);
 
 // Update
 for (i = 0; i < numRecords; i++) {
-    assert.writeOK(testColl.update({_id: i}, {x: i}));
+    assert.commandWorked(testColl.update({_id: i}, {x: i}));
 }
 lastTop = assertTopDiffEq(testColl, lastTop, "update", numRecords);
 
@@ -65,13 +65,13 @@ lastTop = assertTopDiffEq(testColl, lastTop, "getmore", numRecords);
 
 // Remove
 for (i = 0; i < numRecords; i++) {
-    assert.writeOK(testColl.remove({_id: 1}));
+    assert.commandWorked(testColl.remove({_id: 1}));
 }
 lastTop = assertTopDiffEq(testColl, lastTop, "remove", numRecords);
 
 // Upsert, note that these are counted as updates, not inserts
 for (i = 0; i < numRecords; i++) {
-    assert.writeOK(testColl.update({_id: i}, {x: i}, {upsert: 1}));
+    assert.commandWorked(testColl.update({_id: i}, {x: i}, {upsert: 1}));
 }
 lastTop = assertTopDiffEq(testColl, lastTop, "update", numRecords);
 

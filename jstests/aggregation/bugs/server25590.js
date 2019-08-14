@@ -6,7 +6,7 @@
 const coll = db.server25590;
 coll.drop();
 
-assert.writeOK(coll.insert({}));
+assert.commandWorked(coll.insert({}));
 
 assert.commandFailedWithCode(db.runCommand({aggregate: coll.getName(), pipeline: 1}),
                              ErrorCodes.TypeMismatch);

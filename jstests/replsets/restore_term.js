@@ -31,7 +31,7 @@ var primaryColl = primary.getDB("test").coll;
 // Current term may be greater than 1 if election race happens.
 var firstSuccessfulTerm = getCurrentTerm(primary);
 assert.gte(firstSuccessfulTerm, 1);
-assert.writeOK(primaryColl.insert({x: 1}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(primaryColl.insert({x: 1}, {writeConcern: {w: "majority"}}));
 assert.eq(getCurrentTerm(primary), firstSuccessfulTerm);
 
 // Check that the insert op has the initial term.

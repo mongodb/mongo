@@ -42,7 +42,7 @@ if (conns[0].getDB('test').serverBuildInfo().bits !== 32) {
     for (var i = 0; i < size; ++i) {
         bulk.insert({i: i});
     }
-    assert.writeOK(bulk.execute({w: "majority"}));
+    assert.commandWorked(bulk.execute({w: "majority"}));
 
     jsTest.log("Creating index");
     masterDB.jstests_fgsec.ensureIndex({i: 1});

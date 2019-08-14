@@ -7,9 +7,9 @@
 var s = new ShardingTest({shards: 2});
 var db = s.getDB("test");
 
-assert.writeOK(db.foo.insert({num: 1, name: "eliot"}));
-assert.writeOK(db.foo.insert({num: 2, name: "sara"}));
-assert.writeOK(db.foo.insert({num: -1, name: "joe"}));
+assert.commandWorked(db.foo.insert({num: 1, name: "eliot"}));
+assert.commandWorked(db.foo.insert({num: 2, name: "sara"}));
+assert.commandWorked(db.foo.insert({num: -1, name: "joe"}));
 
 assert.commandWorked(db.foo.ensureIndex({num: 1}));
 

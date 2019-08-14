@@ -58,7 +58,7 @@ assert.commandWorked(mongosDB.createCollection(testName));
 // triggering a refresh when a change stream is established through mongos2.
 const mongos2DB = st.s2.getDB(testName);
 const mongos2Coll = mongos2DB[testName];
-assert.writeOK(mongos2Coll.insert({_id: 0, a: 0}));
+assert.commandWorked(mongos2Coll.insert({_id: 0, a: 0}));
 
 // Create index on the shard key.
 assert.commandWorked(mongos2Coll.createIndex({a: 1}));
@@ -92,7 +92,7 @@ assert.eq(0, cursor.firstBatch.length, "Cursor had changes: " + tojson(cursor));
 assert.eq(false, isShardAware(st.rs0.getPrimary(), mongosColl.getFullName()));
 
 // Insert a doc and verify that the primary shard is now aware that the collection is sharded.
-assert.writeOK(mongosColl.insert({_id: 1, a: 1}));
+assert.commandWorked(mongosColl.insert({_id: 1, a: 1}));
 assert.eq(true, isShardAware(st.rs0.getPrimary(), mongosColl.getFullName()));
 
 // Verify that both cursors are able to pick up an inserted document.
@@ -123,10 +123,10 @@ assert.commandWorked(mongosDB.adminCommand({
 }));
 
 // Update the document on the primary shard.
-assert.writeOK(mongosColl.update({_id: 1, a: 1}, {$set: {b: 1}}));
+assert.commandWorked(mongosColl.update({_id: 1, a: 1}, {$set: {b: 1}}));
 // Insert another document to each shard.
-assert.writeOK(mongosColl.insert({_id: -2, a: -2}));
-assert.writeOK(mongosColl.insert({_id: 2, a: 2}));
+assert.commandWorked(mongosColl.insert({_id: -2, a: -2}));
+assert.commandWorked(mongosColl.insert({_id: 2, a: 2}));
 
 // Verify that both cursors pick up the first inserted doc regardless of the moveChunk
 // operation.

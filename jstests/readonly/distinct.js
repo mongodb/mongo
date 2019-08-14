@@ -19,7 +19,7 @@ runReadOnlyTest(function() {
             for (var [color, num] of zip2(cycleN(this.colors, N), cycleN(this.nums, N))) {
                 bulk.insert({color, num});
             }
-            assert.writeOK(bulk.execute());
+            assert.commandWorked(bulk.execute());
         },
         exec: function(readableCollection) {
             var distinctColors = readableCollection.distinct('color');

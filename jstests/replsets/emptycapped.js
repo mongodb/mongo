@@ -12,7 +12,7 @@ var primaryAdminDB = rst.getPrimary().getDB('admin');
 var secondaryTestDB = rst.getSecondary().getDB('test');
 
 // Truncate a non-capped collection.
-assert.writeOK(primaryTestDB.noncapped.insert({x: 1}));
+assert.commandWorked(primaryTestDB.noncapped.insert({x: 1}));
 assert.commandWorked(primaryTestDB.runCommand({emptycapped: 'noncapped'}));
 assert.eq(primaryTestDB.noncapped.find().itcount(),
           0,
@@ -31,7 +31,7 @@ assert.commandFailedWithCode(primaryTestDB.runCommand({emptycapped: 'nonexistent
 
 // Truncate a capped collection.
 assert.commandWorked(primaryTestDB.createCollection("capped", {capped: true, size: 4096}));
-assert.writeOK(primaryTestDB.capped.insert({}));
+assert.commandWorked(primaryTestDB.capped.insert({}));
 assert.eq(primaryTestDB.capped.find().itcount(), 1, "Expected 1 document to exist after an insert");
 assert.commandWorked(primaryTestDB.runCommand({emptycapped: 'capped'}));
 assert.eq(primaryTestDB.capped.find().itcount(),
@@ -49,7 +49,7 @@ assert.commandFailedWithCode(primaryLocalDB.runCommand({emptycapped: "oplog.rs"}
 // Test system collections, which cannot be truncated except system.profile.
 
 // Truncate the local system.js collection.
-assert.writeOK(primaryTestDB.system.js.insert({_id: "mystring", value: "var root = this;"}));
+assert.commandWorked(primaryTestDB.system.js.insert({_id: "mystring", value: "var root = this;"}));
 assert.commandFailedWithCode(primaryTestDB.runCommand({emptycapped: "system.js"}),
                              ErrorCodes.IllegalOperation);
 

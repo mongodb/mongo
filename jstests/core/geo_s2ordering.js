@@ -27,7 +27,7 @@ function makepoints(needle) {
         }
     }
     bulk.insert({nongeo: needle, geo: {type: "Point", coordinates: [0, 0]}});
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 }
 
 function runTest(index) {

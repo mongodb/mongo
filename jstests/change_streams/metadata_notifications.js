@@ -51,7 +51,7 @@ assert.eq(change.nextBatch.length, 0, tojson(change.nextBatch));
 
 // After collection creation, we expect to see oplog entries for each subsequent operation.
 let coll = assertCreateCollection(db, collName);
-assert.writeOK(coll.insert({_id: 0}));
+assert.commandWorked(coll.insert({_id: 0}));
 
 // Determine the number of shards that the collection is distributed across.
 const numShards = FixtureHelpers.numberOfShardsForCollection(coll);
@@ -60,9 +60,9 @@ change = cst.getOneChange(cursor);
 assert.eq(change.operationType, "insert", tojson(change));
 
 // Create oplog entries of type insert, update, delete, and drop.
-assert.writeOK(coll.insert({_id: 1}));
-assert.writeOK(coll.update({_id: 1}, {$set: {a: 1}}));
-assert.writeOK(coll.remove({_id: 1}));
+assert.commandWorked(coll.insert({_id: 1}));
+assert.commandWorked(coll.update({_id: 1}, {$set: {a: 1}}));
+assert.commandWorked(coll.remove({_id: 1}));
 assertDropCollection(db, coll.getName());
 
 // We should get oplog entries of type insert, update, delete, drop, and invalidate. The cursor
@@ -100,7 +100,7 @@ assert.commandWorked(db.runCommand({
 
 // Recreate the collection.
 coll = assertCreateCollection(db, collName);
-assert.writeOK(coll.insert({_id: "after recreate"}));
+assert.commandWorked(coll.insert({_id: "after recreate"}));
 
 // Test resuming the change stream from the collection drop using 'resumeAfter'. If running in a
 // sharded passthrough suite, resuming from the drop will first return the drop from the other
@@ -156,7 +156,7 @@ cst.consumeDropUpTo({
 if (!FixtureHelpers.isSharded(coll)) {
     cursor = cst.startWatchingChanges({collection: collName, pipeline: [{$changeStream: {}}]});
     assertDropCollection(db, "renamed_coll");
-    assert.writeOK(coll.renameCollection("renamed_coll"));
+    assert.commandWorked(coll.renameCollection("renamed_coll"));
     expectedChanges = [
         {
             operationType: "rename",
@@ -172,7 +172,7 @@ if (!FixtureHelpers.isSharded(coll)) {
 
     // Repeat the test, this time with a change stream open on the target.
     cursor = cst.startWatchingChanges({collection: collName, pipeline: [{$changeStream: {}}]});
-    assert.writeOK(coll.renameCollection(collName));
+    assert.commandWorked(coll.renameCollection(collName));
     expectedChanges = [
         {
             operationType: "rename",
@@ -186,7 +186,7 @@ if (!FixtureHelpers.isSharded(coll)) {
     const resumeTokenInvalidate = changes[1]._id;
 
     coll = db[collName];
-    assert.writeOK(coll.insert({_id: "after rename"}));
+    assert.commandWorked(coll.insert({_id: "after rename"}));
 
     // Test resuming the change stream from the collection rename using 'resumeAfter'.
     assertResumeExpected({
@@ -224,13 +224,13 @@ if (!FixtureHelpers.isSharded(coll)) {
     });
 
     assertDropAndRecreateCollection(db, "renamed_coll");
-    assert.writeOK(db.renamed_coll.insert({_id: 0}));
+    assert.commandWorked(db.renamed_coll.insert({_id: 0}));
 
     // Repeat the test again, this time using the 'dropTarget' option with an existing target
     // collection.
     cursor =
         cst.startWatchingChanges({collection: "renamed_coll", pipeline: [{$changeStream: {}}]});
-    assert.writeOK(coll.renameCollection("renamed_coll", true /* dropTarget */));
+    assert.commandWorked(coll.renameCollection("renamed_coll", true /* dropTarget */));
     expectedChanges = [
         {
             operationType: "rename",

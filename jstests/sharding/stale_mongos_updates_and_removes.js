@@ -27,8 +27,8 @@ function resetCollection() {
     assert.commandWorked(staleMongos.adminCommand({shardCollection: collNS, key: {x: 1}}));
 
     for (let i = 0; i < numShardKeys; i++) {
-        assert.writeOK(staleMongos.getCollection(collNS).insert({x: i, fieldToUpdate: 0}));
-        assert.writeOK(staleMongos.getCollection(collNS).insert({x: i, fieldToUpdate: 0}));
+        assert.commandWorked(staleMongos.getCollection(collNS).insert({x: i, fieldToUpdate: 0}));
+        assert.commandWorked(staleMongos.getCollection(collNS).insert({x: i, fieldToUpdate: 0}));
     }
 
     // Make sure data has replicated to all config servers so freshMongos finds a sharded
@@ -116,7 +116,7 @@ function checkAllRemoveQueries(makeMongosStaleFunc) {
 
     function doRemove(query, multiOption, makeMongosStaleFunc) {
         makeMongosStaleFunc();
-        assert.writeOK(staleMongos.getCollection(collNS).remove(query, multiOption));
+        assert.commandWorked(staleMongos.getCollection(collNS).remove(query, multiOption));
         if (multiOption.justOne) {
             // A total of one document should have been removed from the collection.
             assert.eq(numDocs - 1, staleMongos.getCollection(collNS).find().itcount());
@@ -159,7 +159,7 @@ function checkAllUpdateQueries(makeMongosStaleFunc) {
 
     function doUpdate(query, update, multiOption, makeMongosStaleFunc) {
         makeMongosStaleFunc();
-        assert.writeOK(staleMongos.getCollection(collNS).update(query, update, multiOption));
+        assert.commandWorked(staleMongos.getCollection(collNS).update(query, update, multiOption));
         if (multiOption.multi) {
             // All documents matching the query should have been updated.
             assert.eq(staleMongos.getCollection(collNS).find(query).itcount(),

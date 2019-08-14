@@ -54,7 +54,7 @@ let changeStreamCursor = coll.watch();
 assert(!changeStreamCursor.hasNext());
 
 // Write the first document into the collection. We will save the resume token from this change.
-assert.writeOK(coll.insert({_id: 0, x: 1}));
+assert.commandWorked(coll.insert({_id: 0, x: 1}));
 let resumeToken;
 
 // Test that each of the change stream cursors picks up the change.
@@ -110,7 +110,7 @@ checkNextChange(changeStreamCursor, {docId: 1});
 jsTestLog("Testing watch() with updateLookup");
 changeStreamCursor = coll.watch([], {fullDocument: "updateLookup"});
 
-assert.writeOK(coll.update({_id: 0}, {$set: {x: 10}}));
+assert.commandWorked(coll.update({_id: 0}, {$set: {x: 10}}));
 expected = {
     documentKey: {_id: 0},
     fullDocument: {_id: 0, x: 10},
@@ -127,7 +127,7 @@ const isMongos = FixtureHelpers.isMongos(db);
 if (!isMongos) {
     // Increase a field by 5 times and verify the batch size is respected.
     for (let i = 0; i < 5; i++) {
-        assert.writeOK(coll.update({_id: 1}, {$inc: {x: 1}}));
+        assert.commandWorked(coll.update({_id: 1}, {$inc: {x: 1}}));
     }
 
     // Only watch the "update" changes of the specific doc since the beginning.
@@ -166,7 +166,7 @@ testCommandIsCalled(() => assert(!changeStreamCursor.hasNext()), (cmdObj) => {
 
 jsTestLog("Testing the cursor gets closed when the collection gets dropped");
 changeStreamCursor = coll.watch([{$project: {clusterTime: 0}}]);
-assert.writeOK(coll.insert({_id: 2, x: 1}));
+assert.commandWorked(coll.insert({_id: 2, x: 1}));
 expected = {
     documentKey: {_id: 2},
     fullDocument: {_id: 2, x: 1},

@@ -26,7 +26,7 @@ doTest = function(signal) {
     waitForAllMembers(master);
 
     // insert a record
-    assert.writeOK(master.foo.insert({x: 1}, {writeConcern: {w: 2}}));
+    assert.commandWorked(master.foo.insert({x: 1}, {writeConcern: {w: 2}}));
 
     var doc = master.foo.findOne();
     assert.eq(doc.x, 1);
@@ -65,7 +65,7 @@ doTest = function(signal) {
     master = reconfig(replTest, config);
     master = master.getSisterDB(name);
 
-    assert.writeOK(master.foo.insert(
+    assert.commandWorked(master.foo.insert(
         {_id: 123, x: 'foo'}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 
     for (var i = 0; i < 8; i++) {

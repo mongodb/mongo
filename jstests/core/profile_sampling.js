@@ -16,13 +16,13 @@ try {
     assert.eq(0, profileDB.system.profile.count());
 
     profileDB.createCollection(coll.getName());
-    assert.writeOK(coll.insert({x: 1}));
+    assert.commandWorked(coll.insert({x: 1}));
 
     assert.commandWorked(profileDB.setProfilingLevel(1, {sampleRate: 0, slowms: -1}));
 
     assert.neq(null, coll.findOne({x: 1}));
     assert.eq(1, coll.find({x: 1}).count());
-    assert.writeOK(coll.update({x: 1}, {$inc: {a: 1}}));
+    assert.commandWorked(coll.update({x: 1}, {$inc: {a: 1}}));
 
     assert.commandWorked(profileDB.setProfilingLevel(0));
 
@@ -34,7 +34,7 @@ try {
     // This should generate about 500 profile log entries.
     for (let i = 0; i < 500; i++) {
         assert.neq(null, coll.findOne({x: 1}));
-        assert.writeOK(coll.update({x: 1}, {$inc: {a: 1}}));
+        assert.commandWorked(coll.update({x: 1}, {$inc: {a: 1}}));
     }
 
     assert.commandWorked(profileDB.setProfilingLevel(0));
@@ -47,7 +47,7 @@ try {
     // This should generate exactly 1000 profile log entries.
     for (let i = 0; i < 5; i++) {
         assert.neq(null, coll.findOne({x: 1}));
-        assert.writeOK(coll.update({x: 1}, {$inc: {a: 1}}));
+        assert.commandWorked(coll.update({x: 1}, {$inc: {a: 1}}));
     }
     assert.commandWorked(profileDB.setProfilingLevel(0));
     assert.eq(10, profileDB.system.profile.count());

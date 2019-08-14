@@ -53,7 +53,7 @@ var bulk = coll.initializeUnorderedBulkOp();
 for (var i = -nDocsPerShard; i < nDocsPerShard; i++) {
     bulk.insert({_id: i});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 assert.eq(nDocsPerShard, shards[0].getCollection(coll.getFullName()).count());
 assert.eq(nDocsPerShard, shards[1].getCollection(coll.getFullName()).count());
 

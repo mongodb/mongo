@@ -4,7 +4,7 @@
 var coll = db.exprs_in_arrays;
 coll.drop();
 
-assert.writeOK(coll.insert({_id: 0, a: ['foo', 'bar', 'baz'], b: 'bar', c: 'Baz'}));
+assert.commandWorked(coll.insert({_id: 0, a: ['foo', 'bar', 'baz'], b: 'bar', c: 'Baz'}));
 
 // An array of constants should still evaluate to an array of constants.
 var pipeline = [{$project: {_id: 0, d: ['constant', 1]}}];
@@ -43,7 +43,7 @@ assert.eq(coll.aggregate(pipeline).toArray(), [{d: [[1, 'foo', 'bar']]}]);
 coll.drop();
 
 // Should replace missing values with NULL to preserve indices.
-assert.writeOK(coll.insert({_id: 1, x: 1, z: 2}));
+assert.commandWorked(coll.insert({_id: 1, x: 1, z: 2}));
 
 pipeline = [{$project: {_id: 0, coordinate: ['$x', '$y', '$z']}}];
 assert.eq(coll.aggregate(pipeline).toArray(), [{coordinate: [1, null, 2]}]);

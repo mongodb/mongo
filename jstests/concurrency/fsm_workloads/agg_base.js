@@ -60,7 +60,7 @@ var $config = (function() {
                                this.docSize));
         }
         var res = bulk.execute();
-        assertWhenOwnColl.writeOK(res);
+        assertWhenOwnColl.commandWorked(res);
         assertWhenOwnColl.eq(this.numDocs, res.nInserted);
         assertWhenOwnColl.eq(this.numDocs, db[collName].find().itcount());
         assertWhenOwnColl.eq(this.numDocs / 2, db[collName].find({flag: false}).itcount());

@@ -31,7 +31,7 @@ for (var i = 0; i < maxPoints; ++i) {
         {from: {type: "Point", coordinates: fromCoord}, to: {type: "Point", coordinates: toCoord}});
 }
 res = t.insert(arr);
-assert.writeOK(res);
+assert.commandWorked(res);
 assert.eq(t.count(), maxPoints);
 
 function semiRigorousTime(func) {

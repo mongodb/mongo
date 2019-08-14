@@ -20,7 +20,7 @@ function checkUUIDs() {
 }
 
 db[collName].drop();
-assert.writeOK(db[collName].insert({}));
+assert.commandWorked(db[collName].insert({}));
 checkUUIDs();
 let cmd = {applyOps: [{ns: "test.$cmd", op: "c", o: {collMod: collName}}]};
 let res = db.runCommand(cmd);

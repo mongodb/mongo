@@ -9,7 +9,7 @@ const coll = db.date_from_string;
 /* Normal format tests. */
 
 coll.drop();
-assert.writeOK(coll.insert({_id: 0}));
+assert.commandWorked(coll.insert({_id: 0}));
 
 let testCases = [
     {
@@ -76,7 +76,7 @@ testCases.forEach(function(testCase) {
 /* Normal format tests with timezone. */
 
 coll.drop();
-assert.writeOK(coll.insert({_id: 0}));
+assert.commandWorked(coll.insert({_id: 0}));
 
 testCases = [
     {
@@ -132,7 +132,7 @@ testCases.forEach(function(testCase) {
 /* Normal format tests with UTC offset. */
 
 coll.drop();
-assert.writeOK(coll.insert({_id: 0}));
+assert.commandWorked(coll.insert({_id: 0}));
 
 testCases = [
     {
@@ -186,7 +186,7 @@ testCases.forEach(function(testCase) {
 /* Normal format tests from data. */
 
 coll.drop();
-assert.writeOK(coll.insert([
+assert.commandWorked(coll.insert([
     {_id: 0, dateString: "2017-07-06T12:35:37Z", format: "%Y-%m-%dT%H:%M:%SZ"},
     {_id: 1, dateString: "2017-07-06T12:35:37.513Z", format: "%Y-%m-%dT%H:%M:%S.%LZ"},
     {_id: 2, dateString: "2017-07-06T12:35:37", format: "%Y-%m-%dT%H:%M:%S"},
@@ -252,7 +252,7 @@ assert.eq(
 /* Normal format tests from data, with time zone. */
 
 coll.drop();
-assert.writeOK(coll.insert([
+assert.commandWorked(coll.insert([
     {_id: 0, dateString: "2017-07-06T12:35:37.513", timezone: "GMT"},
     {_id: 1, dateString: "2017-07-06T12:35:37.513", timezone: "UTC"},
     {_id: 2, dateString: "1960-07-10T12:35:37.513", timezone: "America/New_York"},
@@ -305,7 +305,7 @@ assert.eq(expectedResults,
 /* dateString from data with timezone as constant */
 
 coll.drop();
-assert.writeOK(coll.insert([
+assert.commandWorked(coll.insert([
     {_id: 0, dateString: "2017-07-06T12:35:37"},
 ]));
 
@@ -326,7 +326,7 @@ assert.eq(
 /* dateString from constant with timezone from data */
 
 coll.drop();
-assert.writeOK(coll.insert([
+assert.commandWorked(coll.insert([
     {_id: 0, timezone: "Europe/London"},
     {_id: 1, timezone: "America/New_York"},
     {_id: 2, timezone: "-05:00"},
@@ -355,7 +355,7 @@ assert.eq(
 /* BI format tests. */
 
 coll.drop();
-assert.writeOK(coll.insert({_id: 0}));
+assert.commandWorked(coll.insert({_id: 0}));
 
 let pipelines = [
     {
@@ -397,7 +397,7 @@ pipelines.forEach(function(pipeline) {
 /* Tests with additional timezone information . */
 
 coll.drop();
-assert.writeOK(coll.insert({_id: 0}));
+assert.commandWorked(coll.insert({_id: 0}));
 
 testCases = [
     // GMT based variants
@@ -445,7 +445,7 @@ testCases.forEach(function(testCase) {
 /* BI format tests from data. */
 
 coll.drop();
-assert.writeOK(coll.insert([
+assert.commandWorked(coll.insert([
     {_id: 0, dateString: "2017-01-01 00:00:00"},
     {_id: 1, dateString: "2017-07-01 00:00:00"},
     {_id: 2, dateString: "2017-07-06"},
@@ -477,7 +477,7 @@ assert.eq(
 /* Wacky format tests from data. */
 
 coll.drop();
-assert.writeOK(coll.insert([
+assert.commandWorked(coll.insert([
     {_id: 0, dateString: "July 4th, 2017"},
     {_id: 1, dateString: "July 4th, 2017 12:39:30 BST"},
     {_id: 2, dateString: "July 4th, 2017 11am"},
@@ -513,7 +513,7 @@ assert.eq(
 /* Tests formats that aren't supported with the normal $dateFromString parser. */
 
 coll.drop();
-assert.writeOK(coll.insert({_id: 0}));
+assert.commandWorked(coll.insert({_id: 0}));
 
 testCases = [
     {inputString: "05 12 1988", format: "%d %m %Y", expect: "1988-12-05T00:00:00Z"},
@@ -573,7 +573,7 @@ testCases.forEach(function(testCase) {
 
 coll.drop();
 
-assert.writeOK(coll.insert([
+assert.commandWorked(coll.insert([
     {_id: 0},
 ]));
 
@@ -594,7 +594,7 @@ pipelines.forEach(function(pipeline) {
 
 coll.drop();
 
-assert.writeOK(coll.insert([
+assert.commandWorked(coll.insert([
     {_id: 0},
 ]));
 
@@ -612,7 +612,7 @@ pipelines.forEach(function(pipeline) {
 /* NULL returns. */
 
 coll.drop();
-assert.writeOK(coll.insert([
+assert.commandWorked(coll.insert([
     {_id: 0, date: new ISODate("2017-06-19T15:13:25.713Z")},
     {_id: 1, date: new ISODate("2017-06-19T15:13:25.713Z"), tz: null},
     {_id: 2, date: new ISODate("2017-06-19T15:13:25.713Z"), tz: undefined},
@@ -635,7 +635,7 @@ pipelines.forEach(function(pipeline) {
 });
 
 coll.drop();
-assert.writeOK(coll.insert([
+assert.commandWorked(coll.insert([
     {_id: 0},
     {_id: 1, format: null},
     {_id: 2, format: undefined},

@@ -22,9 +22,9 @@ let coll = assertDropAndRecreateCollection(testDB, collName);
 let aggCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
 
 // Create oplog entries of type insert, update, and delete.
-assert.writeOK(coll.insert({_id: 1}));
-assert.writeOK(coll.update({_id: 1}, {$set: {a: 1}}));
-assert.writeOK(coll.remove({_id: 1}));
+assert.commandWorked(coll.insert({_id: 1}));
+assert.commandWorked(coll.update({_id: 1}, {$set: {a: 1}}));
+assert.commandWorked(coll.remove({_id: 1}));
 
 // Drop and recreate the collection.
 const collAgg = assertDropAndRecreateCollection(testDB, collName);
@@ -40,7 +40,7 @@ change = cst.getOneChange(aggCursor);
 assert.eq(change.operationType, "drop", tojson(change));
 
 // Get a valid resume token that the next change stream can use.
-assert.writeOK(collAgg.insert({_id: 1}));
+assert.commandWorked(collAgg.insert({_id: 1}));
 
 change = cst.getOneChange(aggCursor, false);
 const resumeToken = change._id;
@@ -57,7 +57,7 @@ assert.commandWorked(testDB.runCommand(
 // Test that invalidation entries for other databases are filtered out.
 const otherDB = testDB.getSiblingDB(jsTestName() + "other");
 const otherDBColl = otherDB[collName + "_other"];
-assert.writeOK(otherDBColl.insert({_id: 0}));
+assert.commandWorked(otherDBColl.insert({_id: 0}));
 
 // Create collection on the database being watched.
 coll = assertDropAndRecreateCollection(testDB, collName);
@@ -73,7 +73,7 @@ assertDropCollection(otherDB, otherDBColl.getName());
 
 // Insert into the collection in the watched database, and verify the change stream is able to
 // pick it up.
-assert.writeOK(coll.insert({_id: 1}));
+assert.commandWorked(coll.insert({_id: 1}));
 change = cst.getOneChange(aggCursor);
 assert.eq(change.operationType, "insert", tojson(change));
 assert.eq(change.documentKey._id, 1);
@@ -85,7 +85,7 @@ if (!FixtureHelpers.isSharded(coll)) {
     assertDropAndRecreateCollection(testDB, coll.getName());
     assertDropCollection(testDB, "renamed_coll");
     aggCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
-    assert.writeOK(coll.renameCollection("renamed_coll"));
+    assert.commandWorked(coll.renameCollection("renamed_coll"));
     cst.assertNextChangesEqual({
         cursor: aggCursor,
         expectedChanges: [{
@@ -99,8 +99,8 @@ if (!FixtureHelpers.isSharded(coll)) {
     // collection.
     coll = testDB["renamed_coll"];
     assertCreateCollection(testDB, collName);
-    assert.writeOK(testDB[collName].insert({_id: 0}));
-    assert.writeOK(coll.renameCollection(collName, true /* dropTarget */));
+    assert.commandWorked(testDB[collName].insert({_id: 0}));
+    assert.commandWorked(coll.renameCollection(collName, true /* dropTarget */));
     cst.assertNextChangesEqual({
         cursor: aggCursor,
         expectedChanges: [
@@ -159,7 +159,7 @@ if (!FixtureHelpers.isSharded(coll)) {
 
     // The change stream should not be invalidated by the rename(s).
     assert.eq(0, cst.getNextBatch(aggCursor).nextBatch.length);
-    assert.writeOK(coll.insert({_id: 2}));
+    assert.commandWorked(coll.insert({_id: 2}));
     assert.eq(cst.getOneChange(aggCursor).operationType, "insert");
 
     // Drop the new collection to avoid an additional 'drop' notification when the database is
@@ -189,7 +189,7 @@ assertDropCollection(testDB, "system.views");
 // Verify that the change stream does not report the insertion into "system.views", and is
 // not invalidated by dropping the system collection. Instead, it correctly reports the next
 // write to the test collection.
-assert.writeOK(coll.insert({_id: 0}));
+assert.commandWorked(coll.insert({_id: 0}));
 change = cst.getOneChange(aggCursor);
 assert.eq(change.operationType, "insert", tojson(change));
 assert.eq(change.ns, {db: testDB.getName(), coll: coll.getName()});
@@ -197,7 +197,7 @@ assert.eq(change.ns, {db: testDB.getName(), coll: coll.getName()});
 // Test that renaming a "system" collection *does* return a notification if the target of
 // the rename is a non-system collection.
 assert.commandWorked(testDB.runCommand({create: "view1", viewOn: coll.getName(), pipeline: []}));
-assert.writeOK(testDB.system.views.renameCollection("non_system_collection"));
+assert.commandWorked(testDB.system.views.renameCollection("non_system_collection"));
 cst.assertNextChangesEqual({
     cursor: aggCursor,
     expectedChanges: [{
@@ -212,17 +212,17 @@ cst.assertNextChangesEqual({
 aggCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
 assert.commandWorked(testDB.runCommand({create: "view1", viewOn: coll.getName(), pipeline: []}));
 // Note that the target of the rename must be a valid "system" collection.
-assert.writeOK(testDB.system.views.renameCollection("system.users"));
+assert.commandWorked(testDB.system.views.renameCollection("system.users"));
 // Verify that the change stream filters out the rename above, instead returning the next insert
 // to the test collection.
-assert.writeOK(coll.insert({_id: 1}));
+assert.commandWorked(coll.insert({_id: 1}));
 change = cst.getOneChange(aggCursor);
 assert.eq(change.operationType, "insert", tojson(change));
 assert.eq(change.ns, {db: testDB.getName(), coll: coll.getName()});
 
 // Test that renaming a user collection to a "system" collection *is* returned in the change
 // stream.
-assert.writeOK(coll.renameCollection("system.views"));
+assert.commandWorked(coll.renameCollection("system.views"));
 cst.assertNextChangesEqual({
     cursor: aggCursor,
     expectedChanges: [{

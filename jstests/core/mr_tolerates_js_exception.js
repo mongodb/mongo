@@ -15,7 +15,7 @@
 let coll = db.mr_tolerates_js_exception;
 coll.drop();
 for (let i = 0; i < 100; i++) {
-    assert.writeOK(coll.insert({_id: i, a: 1}));
+    assert.commandWorked(coll.insert({_id: i, a: 1}));
 }
 
 // Test that the command fails with a JS interpreter failure error when the reduce function

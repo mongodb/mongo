@@ -40,23 +40,23 @@ let rollbackOps = {
             assert.commandWorked(db.createCollection(collName));
         },
         op: (db, collName) => {
-            assert.writeOK(db[collName].insert({_id: 0}));
+            assert.commandWorked(db[collName].insert({_id: 0}));
         }
     }],
     "update": [{
         init: (db, collName) => {
-            assert.writeOK(db[collName].insert({_id: 0, val: 0}));
+            assert.commandWorked(db[collName].insert({_id: 0, val: 0}));
         },
         op: (db, collName) => {
-            assert.writeOK(db[collName].update({_id: 0}, {val: 1}));
+            assert.commandWorked(db[collName].update({_id: 0}, {val: 1}));
         },
     }],
     "delete": [{
         init: (db, collName) => {
-            assert.writeOK(db[collName].insert({_id: 0}));
+            assert.commandWorked(db[collName].insert({_id: 0}));
         },
         op: (db, collName) => {
-            assert.writeOK(db[collName].remove({_id: 0}));
+            assert.commandWorked(db[collName].remove({_id: 0}));
         },
     }],
     "create": [{

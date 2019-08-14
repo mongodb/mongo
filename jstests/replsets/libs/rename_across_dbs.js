@@ -105,7 +105,7 @@ var RenameAcrossDatabasesTest = function(options) {
         // options.dropTarget is true.
         const dropTarget = options.dropTarget || false;
         if (dropTarget) {
-            assert.writeOK(targetColl.insert({_id: 1000, target: 1}));
+            assert.commandWorked(targetColl.insert({_id: 1000, target: 1}));
             assert.commandWorked(targetColl.createIndex({target: 1}));
         }
 
@@ -116,7 +116,7 @@ var RenameAcrossDatabasesTest = function(options) {
         const numDocs = 10;
         _testLog('Inserting ' + numDocs + ' documents into source collection.');
         for (let i = 0; i < numDocs; ++i) {
-            assert.writeOK(sourceColl.insert({_id: i, source: 1}));
+            assert.commandWorked(sourceColl.insert({_id: i, source: 1}));
         }
         const numNonIdIndexes = 3;
         _testLog('Creating ' + numNonIdIndexes + ' indexes.');

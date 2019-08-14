@@ -8,33 +8,33 @@ assert.commandWorked(isMaster);
 const isMongos = (isMaster.msg === "isdbgrid");
 
 t.drop();
-assert.writeOK(t.save({a: "bcd"}));
+assert.commandWorked(t.save({a: "bcd"}));
 assert.eq(1, t.count({a: /b/}), "A");
 assert.eq(1, t.count({a: /bc/}), "B");
 assert.eq(1, t.count({a: /bcd/}), "C");
 assert.eq(0, t.count({a: /bcde/}), "D");
 
 t.drop();
-assert.writeOK(t.save({a: {b: "cde"}}));
+assert.commandWorked(t.save({a: {b: "cde"}}));
 assert.eq(1, t.count({'a.b': /de/}), "E");
 
 t.drop();
-assert.writeOK(t.save({a: {b: ["cde"]}}));
+assert.commandWorked(t.save({a: {b: ["cde"]}}));
 assert.eq(1, t.count({'a.b': /de/}), "F");
 
 t.drop();
-assert.writeOK(t.save({a: [{b: "cde"}]}));
+assert.commandWorked(t.save({a: [{b: "cde"}]}));
 assert.eq(1, t.count({'a.b': /de/}), "G");
 
 t.drop();
-assert.writeOK(t.save({a: [{b: ["cde"]}]}));
+assert.commandWorked(t.save({a: [{b: ["cde"]}]}));
 assert.eq(1, t.count({'a.b': /de/}), "H");
 
 //
 // Confirm match and explain serialization for $elemMatch with $regex.
 //
 t.drop();
-assert.writeOK(t.insert({x: ["abc"]}));
+assert.commandWorked(t.insert({x: ["abc"]}));
 
 const query = {
     x: {$elemMatch: {$regex: 'ABC', $options: 'i'}}

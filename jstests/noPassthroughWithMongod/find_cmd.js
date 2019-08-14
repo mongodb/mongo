@@ -25,7 +25,7 @@ assert.eq([], res.cursor.firstBatch);
 if (jsTest.options().storageEngine !== "mobile") {
     coll.drop();
     assert.commandWorked(coll.getDB().createCollection(collname, {capped: true, size: 2048}));
-    assert.writeOK(coll.insert({_id: 1}));
+    assert.commandWorked(coll.insert({_id: 1}));
     res = coll.runCommand("find", {tailable: true});
     assert.commandWorked(res);
     assert.neq(0, res.cursor.id);
@@ -35,7 +35,7 @@ if (jsTest.options().storageEngine !== "mobile") {
 // Multiple batches.
 coll.drop();
 for (var i = 0; i < 150; i++) {
-    assert.writeOK(coll.insert({_id: i}));
+    assert.commandWorked(coll.insert({_id: i}));
 }
 res = coll.runCommand("find", {filter: {_id: {$lt: 140}}});
 assert.commandWorked(res);

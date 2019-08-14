@@ -17,7 +17,7 @@ coll.drop();
 assert.commandWorked(db.fsyncLock());
 
 const awaitInsertShell = startParallelShell(function() {
-    assert.writeOK(db.jstests_currentop.insert({}));
+    assert.commandWorked(db.jstests_currentop.insert({}));
 });
 
 // Wait until the write appears in the currentOp output reporting that it is waiting for a lock.

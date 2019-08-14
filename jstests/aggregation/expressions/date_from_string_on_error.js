@@ -10,7 +10,7 @@ const onErrorValue = ISODate("2017-07-04T11:56:02Z");
 const coll = db.date_from_string_on_error;
 coll.drop();
 
-assert.writeOK(coll.insert({_id: 0}));
+assert.commandWorked(coll.insert({_id: 0}));
 
 // Test that the 'onError' value is returned when 'dateString' is not a valid date/time.
 for (let inputDate of ["July 4th",

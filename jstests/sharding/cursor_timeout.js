@@ -67,7 +67,7 @@ assert.commandWorked(adminDB.runCommand({
 }));
 
 for (let x = 0; x < 20; x++) {
-    assert.writeOK(routerColl.insert({x: x}));
+    assert.commandWorked(routerColl.insert({x: x}));
 }
 
 // Open both a normal and a no-timeout cursor on mongos. Batch size is 1 to ensure that

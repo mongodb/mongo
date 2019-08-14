@@ -19,7 +19,7 @@ const isMongos = (isMaster.msg === "isdbgrid");
 //
 
 coll.drop();
-assert.writeOK(coll.insert({a: 0}));
+assert.commandWorked(coll.insert({a: 0}));
 assert.eq(1, coll.aggregate([{$match: {$expr: {$eq: ["$a", 0]}}}]).itcount());
 assert.throws(function() {
     coll.aggregate([{$match: {$expr: {$eq: ["$a", "$$unbound"]}}}]);
@@ -33,7 +33,7 @@ assert.throws(function() {
 //
 
 coll.drop();
-assert.writeOK(coll.insert({a: 0}));
+assert.commandWorked(coll.insert({a: 0}));
 assert.eq(1, coll.find({$expr: {$eq: ["$a", 0]}}).count());
 assert.throws(function() {
     coll.find({$expr: {$eq: ["$a", "$$unbound"]}}).count();
@@ -47,7 +47,7 @@ assert.throws(function() {
 //
 
 coll.drop();
-assert.writeOK(coll.insert({a: 0}));
+assert.commandWorked(coll.insert({a: 0}));
 assert.eq(1, coll.distinct("a", {$expr: {$eq: ["$a", 0]}}).length);
 assert.throws(function() {
     coll.distinct("a", {$expr: {$eq: ["$a", "$$unbound"]}});
@@ -62,12 +62,12 @@ assert.throws(function() {
 
 // $expr is allowed in query.
 coll.drop();
-assert.writeOK(coll.insert({a: 0}));
+assert.commandWorked(coll.insert({a: 0}));
 assert.eq(1, coll.find({$expr: {$eq: ["$a", 0]}}).itcount());
 
 // $expr with time zone expression across getMore (SERVER-31664).
 coll.drop();
-assert.writeOK(coll.insert({a: ISODate("2017-10-01T22:00:00")}));
+assert.commandWorked(coll.insert({a: ISODate("2017-10-01T22:00:00")}));
 
 let res = assert.commandWorked(db.runCommand({
     find: coll.getName(),
@@ -120,7 +120,7 @@ assert.throws(function() {
 
 // $expr is not allowed in $elemMatch projection.
 coll.drop();
-assert.writeOK(coll.insert({a: [{b: 5}]}));
+assert.commandWorked(coll.insert({a: [{b: 5}]}));
 assert.throws(function() {
     coll.find({}, {a: {$elemMatch: {$expr: {$eq: ["$b", 5]}}}}).itcount();
 });
@@ -131,7 +131,7 @@ assert.throws(function() {
 
 // $expr is allowed in the query when upsert=false.
 coll.drop();
-assert.writeOK(coll.insert({_id: 0, a: 0}));
+assert.commandWorked(coll.insert({_id: 0, a: 0}));
 assert.eq({_id: 0, a: 0, b: 6},
           coll.findAndModify(
               {query: {_id: 0, $expr: {$eq: ["$a", 0]}}, update: {$set: {b: 6}}, new: true}));
@@ -149,7 +149,7 @@ assert.throws(function() {
 
 // $expr is not allowed in the query when upsert=true.
 coll.drop();
-assert.writeOK(coll.insert({_id: 0, a: 0}));
+assert.commandWorked(coll.insert({_id: 0, a: 0}));
 assert.throws(function() {
     coll.findAndModify(
         {query: {_id: 0, $expr: {$eq: ["$a", 0]}}, update: {$set: {b: 6}}, upsert: true});
@@ -157,7 +157,7 @@ assert.throws(function() {
 
 // $expr is not allowed in $pull filter.
 coll.drop();
-assert.writeOK(coll.insert({_id: 0, a: [{b: 5}]}));
+assert.commandWorked(coll.insert({_id: 0, a: [{b: 5}]}));
 assert.throws(function() {
     coll.findAndModify({query: {_id: 0}, update: {$pull: {a: {$expr: {$eq: ["$b", 5]}}}}});
 });
@@ -165,7 +165,7 @@ assert.throws(function() {
 // $expr is not allowed in arrayFilters.
 if (db.getMongo().writeMode() === "commands") {
     coll.drop();
-    assert.writeOK(coll.insert({_id: 0, a: [{b: 5}]}));
+    assert.commandWorked(coll.insert({_id: 0, a: [{b: 5}]}));
     assert.throws(function() {
         coll.findAndModify({
             query: {_id: 0},
@@ -180,7 +180,7 @@ if (db.getMongo().writeMode() === "commands") {
 //
 
 coll.drop();
-assert.writeOK(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, a: 0}));
+assert.commandWorked(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, a: 0}));
 assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
 assert.eq(1,
           coll.aggregate({
@@ -215,7 +215,7 @@ assert.throws(() => coll.aggregate({
 //
 
 coll.drop();
-assert.writeOK(coll.insert({a: 0}));
+assert.commandWorked(coll.insert({a: 0}));
 let mapReduceOut = coll.mapReduce(
     function() {
         emit(this.a, 1);
@@ -252,18 +252,18 @@ assert.throws(function() {
 //
 
 coll.drop();
-assert.writeOK(coll.insert({_id: 0, a: 0}));
+assert.commandWorked(coll.insert({_id: 0, a: 0}));
 let writeRes = coll.remove({_id: 0, $expr: {$eq: ["$a", 0]}});
-assert.writeOK(writeRes);
+assert.commandWorked(writeRes);
 assert.eq(1, writeRes.nRemoved);
 assert.writeError(coll.remove({_id: 0, $expr: {$eq: ["$a", "$$unbound"]}}));
-assert.writeOK(coll.insert({_id: 0, a: 0}));
+assert.commandWorked(coll.insert({_id: 0, a: 0}));
 assert.writeError(coll.remove({_id: 0, $expr: {$divide: [1, "$a"]}}));
 
 // Any writes preceding the write that fails to parse are executed.
 coll.drop();
-assert.writeOK(coll.insert({_id: 0}));
-assert.writeOK(coll.insert({_id: 1}));
+assert.commandWorked(coll.insert({_id: 0}));
+assert.commandWorked(coll.insert({_id: 1}));
 writeRes = db.runCommand({
     delete: coll.getName(),
     deletes: [{q: {_id: 0}, limit: 1}, {q: {$expr: "$$unbound"}, limit: 1}]
@@ -278,8 +278,8 @@ assert.eq(writeRes.n, 1, tojson(writeRes));
 
 // $expr is allowed in the query when upsert=false.
 coll.drop();
-assert.writeOK(coll.insert({_id: 0, a: 0}));
-assert.writeOK(coll.update({_id: 0, $expr: {$eq: ["$a", 0]}}, {$set: {b: 6}}));
+assert.commandWorked(coll.insert({_id: 0, a: 0}));
+assert.commandWorked(coll.update({_id: 0, $expr: {$eq: ["$a", 0]}}, {$set: {b: 6}}));
 assert.eq({_id: 0, a: 0, b: 6}, coll.findOne({_id: 0}));
 
 // $expr with unbound variable fails.
@@ -290,18 +290,18 @@ assert.writeError(coll.update({_id: 0, $expr: {$divide: [1, "$a"]}}, {$set: {b: 
 
 // $expr is not allowed in the query when upsert=true.
 coll.drop();
-assert.writeOK(coll.insert({_id: 0, a: 5}));
+assert.commandWorked(coll.insert({_id: 0, a: 5}));
 assert.writeError(coll.update({_id: 0, $expr: {$eq: ["$a", 5]}}, {$set: {b: 6}}, {upsert: true}));
 
 // $expr is not allowed in $pull filter.
 coll.drop();
-assert.writeOK(coll.insert({_id: 0, a: [{b: 5}]}));
+assert.commandWorked(coll.insert({_id: 0, a: [{b: 5}]}));
 assert.writeError(coll.update({_id: 0}, {$pull: {a: {$expr: {$eq: ["$b", 5]}}}}));
 
 // $expr is not allowed in arrayFilters.
 if (db.getMongo().writeMode() === "commands") {
     coll.drop();
-    assert.writeOK(coll.insert({_id: 0, a: [{b: 5}]}));
+    assert.commandWorked(coll.insert({_id: 0, a: [{b: 5}]}));
     assert.writeError(coll.update({_id: 0},
                                   {$set: {"a.$[i].b": 6}},
                                   {arrayFilters: [{"i.b": 5, $expr: {$eq: ["$i.b", 5]}}]}));
@@ -309,8 +309,8 @@ if (db.getMongo().writeMode() === "commands") {
 
 // Any writes preceding the write that fails to parse are executed.
 coll.drop();
-assert.writeOK(coll.insert({_id: 0}));
-assert.writeOK(coll.insert({_id: 1}));
+assert.commandWorked(coll.insert({_id: 0}));
+assert.commandWorked(coll.insert({_id: 1}));
 writeRes = db.runCommand({
     update: coll.getName(),
     updates: [{q: {_id: 0}, u: {$set: {b: 6}}}, {q: {$expr: "$$unbound"}, u: {$set: {b: 6}}}]

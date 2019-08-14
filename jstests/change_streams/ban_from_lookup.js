@@ -10,7 +10,7 @@ load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Col
 const coll = assertDropAndRecreateCollection(db, "change_stream_ban_from_lookup");
 const foreignColl = "unsharded";
 
-assert.writeOK(coll.insert({_id: 1}));
+assert.commandWorked(coll.insert({_id: 1}));
 
 // Verify that we cannot create a $lookup using a pipeline which begins with $changeStream.
 assertErrorCode(

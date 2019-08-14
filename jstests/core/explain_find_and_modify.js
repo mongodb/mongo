@@ -61,7 +61,7 @@ assert.commandFailed(db.runCommand({remove: true, new: true}));
 
 // 4. Explaining findAndModify should not modify any contents of the collection.
 var onlyDoc = {_id: 0, i: 1};
-assert.writeOK(t.insert(onlyDoc));
+assert.commandWorked(t.insert(onlyDoc));
 
 // Explaining a delete should not delete anything.
 var matchingRemoveCmd = {findAndModify: cName, remove: true, query: {_id: onlyDoc._id}};

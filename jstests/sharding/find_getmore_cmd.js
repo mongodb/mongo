@@ -15,12 +15,12 @@ var db = st.s.getDB("test");
 var coll = db.getCollection("find_getmore_cmd");
 
 coll.drop();
-assert.writeOK(coll.insert({_id: -9, a: 4, b: "foo foo"}));
-assert.writeOK(coll.insert({_id: -5, a: 8}));
-assert.writeOK(coll.insert({_id: -1, a: 10, b: "foo"}));
-assert.writeOK(coll.insert({_id: 1, a: 5}));
-assert.writeOK(coll.insert({_id: 5, a: 20, b: "foo foo foo"}));
-assert.writeOK(coll.insert({_id: 9, a: 3}));
+assert.commandWorked(coll.insert({_id: -9, a: 4, b: "foo foo"}));
+assert.commandWorked(coll.insert({_id: -5, a: 8}));
+assert.commandWorked(coll.insert({_id: -1, a: 10, b: "foo"}));
+assert.commandWorked(coll.insert({_id: 1, a: 5}));
+assert.commandWorked(coll.insert({_id: 5, a: 20, b: "foo foo foo"}));
+assert.commandWorked(coll.insert({_id: 9, a: 3}));
 
 assert.commandWorked(coll.ensureIndex({b: "text"}));
 

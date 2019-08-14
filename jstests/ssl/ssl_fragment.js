@@ -14,7 +14,7 @@ function runTest(conn) {
     }
 
     const ssl_frag = conn.getCollection('test.ssl_frag');
-    assert.writeOK(ssl_frag.insert({_id: "large_str", foo: s}));
+    assert.commandWorked(ssl_frag.insert({_id: "large_str", foo: s}));
 
     const read = ssl_frag.find({_id: "large_str"}).toArray()[0].foo;
     assert.eq(s, read, "Did not receive value written");

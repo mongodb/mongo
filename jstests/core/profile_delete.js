@@ -19,14 +19,14 @@ testDB.setProfilingLevel(2);
 //
 var i;
 for (i = 0; i < 10; ++i) {
-    assert.writeOK(coll.insert({a: i, b: i}));
+    assert.commandWorked(coll.insert({a: i, b: i}));
 }
 assert.commandWorked(coll.createIndex({a: 1}));
 
-assert.writeOK(coll.remove({a: {$gte: 2}, b: {$gte: 2}},
-                           db.getMongo().writeMode() === "commands"
-                               ? {justOne: true, collation: {locale: "fr"}}
-                               : {justOne: true}));
+assert.commandWorked(coll.remove({a: {$gte: 2}, b: {$gte: 2}},
+                                 db.getMongo().writeMode() === "commands"
+                                     ? {justOne: true, collation: {locale: "fr"}}
+                                     : {justOne: true}));
 
 var profileObj = getLatestProfilerEntry(testDB);
 
@@ -51,10 +51,10 @@ assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 //
 coll.drop();
 for (i = 0; i < 10; ++i) {
-    assert.writeOK(coll.insert({a: i}));
+    assert.commandWorked(coll.insert({a: i}));
 }
 
-assert.writeOK(coll.remove({a: {$gte: 2}}));
+assert.commandWorked(coll.remove({a: {$gte: 2}}));
 profileObj = getLatestProfilerEntry(testDB);
 
 assert.eq(profileObj.ndeleted, 8, tojson(profileObj));
@@ -68,10 +68,10 @@ coll.drop();
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({b: 1}));
 for (i = 0; i < 5; ++i) {
-    assert.writeOK(coll.insert({a: i, b: i}));
+    assert.commandWorked(coll.insert({a: i, b: i}));
 }
 
-assert.writeOK(coll.remove({a: 3, b: 3}));
+assert.commandWorked(coll.remove({a: 3, b: 3}));
 profileObj = getLatestProfilerEntry(testDB);
 
 assert.eq(profileObj.fromMultiPlanner, true, tojson(profileObj));

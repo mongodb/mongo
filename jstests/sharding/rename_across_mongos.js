@@ -10,7 +10,7 @@ st.s1.getDB(dbName).dropDatabase();
 
 // Create collection on first mongos and insert a document
 assert.commandWorked(st.s0.getDB(dbName).runCommand({create: 'CollNameBeforeRename'}));
-assert.writeOK(st.s0.getDB(dbName).CollNameBeforeRename.insert({Key: 1, Value: 1}));
+assert.commandWorked(st.s0.getDB(dbName).CollNameBeforeRename.insert({Key: 1, Value: 1}));
 
 if (st.configRS) {
     // Ensure that the second mongos will see the newly created database metadata when

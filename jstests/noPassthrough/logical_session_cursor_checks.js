@@ -16,8 +16,8 @@ function runFixture(Fixture) {
     admin.logout();
 
     data.auth("user0", "password");
-    assert.writeOK(data.test.insert({name: "first", data: 1}));
-    assert.writeOK(data.test.insert({name: "second", data: 2}));
+    assert.commandWorked(data.test.insert({name: "first", data: 1}));
+    assert.commandWorked(data.test.insert({name: "second", data: 2}));
 
     // Test that getMore works correctly on the same session.
     {

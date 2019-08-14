@@ -18,8 +18,8 @@ var bulk = foreign.initializeUnorderedBulkOp();
 for (var i = 0; i < 100; i++) {
     bulk.insert({_id: i, neighbors: [i - 1, i + 1]});
 }
-assert.writeOK(bulk.execute());
-assert.writeOK(local.insert({starting: 0}));
+assert.commandWorked(bulk.execute());
+assert.commandWorked(local.insert({starting: 0}));
 
 // Assert that the graphLookup only retrieves ten documents, with _id from 0 to 9.
 var res = local
@@ -55,9 +55,9 @@ res = local
 assert.eq(res.integers.length, 0);
 
 foreign.drop();
-assert.writeOK(foreign.insert({from: 0, to: 1, shouldBeIncluded: true}));
-assert.writeOK(foreign.insert({from: 1, to: 2, shouldBeIncluded: false}));
-assert.writeOK(foreign.insert({from: 2, to: 3, shouldBeIncluded: true}));
+assert.commandWorked(foreign.insert({from: 0, to: 1, shouldBeIncluded: true}));
+assert.commandWorked(foreign.insert({from: 1, to: 2, shouldBeIncluded: false}));
+assert.commandWorked(foreign.insert({from: 2, to: 3, shouldBeIncluded: true}));
 
 // Assert that the $graphLookup stops exploring when it finds a document that doesn't match the
 // filter.

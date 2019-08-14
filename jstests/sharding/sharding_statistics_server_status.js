@@ -87,7 +87,7 @@ incrementStatsAndCheckServerShardStats(stats[0], stats[1], numDocsInserted);
 
 // Insert docs and then move chunk again from shard1 to shard0.
 for (let i = 0; i < numDocsToInsert; ++i) {
-    assert.writeOK(coll.insert({_id: i}));
+    assert.commandWorked(coll.insert({_id: i}));
     ++numDocsInserted;
 }
 assert.commandWorked(mongos.adminCommand(

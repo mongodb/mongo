@@ -8,7 +8,7 @@ var coll = db.fts_index_version2;
 
 coll.drop();
 
-assert.writeOK(coll.insert(
+assert.commandWorked(coll.insert(
     {_id: 0, a: "O próximo Vôo à Noite sobre o Atlântico, Põe Freqüentemente o único Médico."}));
 
 assert.commandWorked(

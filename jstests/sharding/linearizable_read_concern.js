@@ -91,7 +91,7 @@ jsTestLog("Testing linearizable read from primaries.");
 
 // Execute a linearizable read from primaries (targeting both shards) which should succeed.
 st.s.setReadPref("primary");
-var res = assert.writeOK(testDB.runReadCommand({
+var res = assert.commandWorked(testDB.runReadCommand({
     find: collName,
     sort: {x: 1},
     filter: dualShardQueryFilter,

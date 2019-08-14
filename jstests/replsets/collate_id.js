@@ -51,8 +51,8 @@ for (var i = 0; i < 1000; i++) {
         }
     }
 
-    assert.writeOK(primaryColl.insert({_id: strId}));
-    assert.writeOK(primaryColl.remove({_id: strId}));
+    assert.commandWorked(primaryColl.insert({_id: strId}));
+    assert.commandWorked(primaryColl.remove({_id: strId}));
 }
 
 // Since the inserts and deletes happen in pairs, we should be left with an empty collection on

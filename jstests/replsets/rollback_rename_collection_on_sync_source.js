@@ -18,18 +18,18 @@ let doc2 = {x: 2};
 
 let CommonOps = (node) => {
     // Insert a document that will exist on the sync source and rollback node.
-    assert.writeOK(node.getDB(dbName)[sourceCollName].insert(doc1));
+    assert.commandWorked(node.getDB(dbName)[sourceCollName].insert(doc1));
 };
 
 let RollbackOps = (node) => {
     // Delete the document on rollback node so it will be refetched from sync source.
-    assert.writeOK(node.getDB(dbName)[sourceCollName].remove(doc1));
+    assert.commandWorked(node.getDB(dbName)[sourceCollName].remove(doc1));
 };
 
 let SyncSourceOps = (node) => {
     // Rename the original collection on the sync source.
     assert.commandWorked(node.getDB(dbName)[sourceCollName].renameCollection(destCollName));
-    assert.writeOK(node.getDB(dbName)[destCollName].insert(doc2));
+    assert.commandWorked(node.getDB(dbName)[destCollName].insert(doc2));
 };
 
 // Set up Rollback Test.

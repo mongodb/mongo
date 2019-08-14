@@ -19,11 +19,11 @@ testDB.setProfilingLevel(2);
 //
 var i;
 for (i = 0; i < 10; ++i) {
-    assert.writeOK(coll.insert({a: i}));
+    assert.commandWorked(coll.insert({a: i}));
 }
 assert.commandWorked(coll.createIndex({a: 1}));
 
-assert.writeOK(coll.update({a: {$gte: 2}}, {$set: {c: 1}, $inc: {a: -10}}));
+assert.commandWorked(coll.update({a: {$gte: 2}}, {$set: {c: 1}, $inc: {a: -10}}));
 
 var profileObj = getLatestProfilerEntry(testDB);
 
@@ -48,9 +48,9 @@ assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 
 if (db.getMongo().writeMode() === "commands") {
     coll.drop();
-    assert.writeOK(coll.insert({_id: 0, a: [0]}));
+    assert.commandWorked(coll.insert({_id: 0, a: [0]}));
 
-    assert.writeOK(coll.update(
+    assert.commandWorked(coll.update(
         {_id: 0}, {$set: {"a.$[i]": 1}}, {collation: {locale: "fr"}, arrayFilters: [{i: 0}]}));
 
     profileObj = getLatestProfilerEntry(testDB);
@@ -66,11 +66,11 @@ if (db.getMongo().writeMode() === "commands") {
 //
 coll.drop();
 for (i = 0; i < 10; ++i) {
-    assert.writeOK(coll.insert({a: i}));
+    assert.commandWorked(coll.insert({a: i}));
 }
 assert.commandWorked(coll.createIndex({a: 1}));
 
-assert.writeOK(coll.update({a: {$gte: 5}}, {$set: {c: 1}, $inc: {a: -10}}, {multi: true}));
+assert.commandWorked(coll.update({a: {$gte: 5}}, {$set: {c: 1}, $inc: {a: -10}}, {multi: true}));
 profileObj = getLatestProfilerEntry(testDB);
 
 assert.eq(profileObj.keysExamined, 5, tojson(profileObj));
@@ -88,11 +88,11 @@ assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 //
 coll.drop();
 for (i = 0; i < 10; ++i) {
-    assert.writeOK(coll.insert({a: i}));
+    assert.commandWorked(coll.insert({a: i}));
 }
 assert.commandWorked(coll.createIndex({a: 1}));
 
-assert.writeOK(coll.update({_id: "new value", a: 4}, {$inc: {b: 1}}, {upsert: true}));
+assert.commandWorked(coll.update({_id: "new value", a: 4}, {$inc: {b: 1}}, {upsert: true}));
 profileObj = getLatestProfilerEntry(testDB);
 
 assert.eq(profileObj.command,
@@ -115,10 +115,10 @@ coll.drop();
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({b: 1}));
 for (i = 0; i < 5; ++i) {
-    assert.writeOK(coll.insert({a: i, b: i}));
+    assert.commandWorked(coll.insert({a: i, b: i}));
 }
 
-assert.writeOK(coll.update({a: 3, b: 3}, {$set: {c: 1}}));
+assert.commandWorked(coll.update({a: 3, b: 3}, {$set: {c: 1}}));
 profileObj = getLatestProfilerEntry(testDB);
 
 assert.eq(profileObj.fromMultiPlanner, true, tojson(profileObj));

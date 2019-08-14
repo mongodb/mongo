@@ -55,8 +55,8 @@ const changeStream = mongosColl.aggregate([{$changeStream: {fullDocument: "updat
 // Write enough documents that we likely have some on each shard.
 const nDocs = 1000;
 for (let id = 0; id < nDocs; ++id) {
-    assert.writeOK(mongosColl.insert({_id: id, shardKey: id}));
-    assert.writeOK(mongosColl.update({shardKey: id}, {$set: {updatedCount: 1}}));
+    assert.commandWorked(mongosColl.insert({_id: id, shardKey: id}));
+    assert.commandWorked(mongosColl.update({shardKey: id}, {$set: {updatedCount: 1}}));
 }
 
 for (let id = 0; id < nDocs; ++id) {

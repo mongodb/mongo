@@ -6,11 +6,12 @@ load("jstests/libs/fts.js");
 const coll = db.text_spanish;
 coll.drop();
 
-assert.writeOK(coll.insert({_id: 1, title: "mi blog", text: "Este es un blog de prueba"}));
-assert.writeOK(coll.insert({_id: 2, title: "mi segundo post", text: "Este es un blog de prueba"}));
-assert.writeOK(coll.insert(
+assert.commandWorked(coll.insert({_id: 1, title: "mi blog", text: "Este es un blog de prueba"}));
+assert.commandWorked(
+    coll.insert({_id: 2, title: "mi segundo post", text: "Este es un blog de prueba"}));
+assert.commandWorked(coll.insert(
     {_id: 3, title: "cuchillos son divertidos", text: "este es mi tercer blog stemmed"}));
-assert.writeOK(coll.insert(
+assert.commandWorked(coll.insert(
     {_id: 4, language: "en", title: "My fourth blog", text: "This stemmed blog is in english"}));
 
 // Create a text index, giving more weight to the "title" field.

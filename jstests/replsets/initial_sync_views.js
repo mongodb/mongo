@@ -16,7 +16,7 @@ replTest.initiate();
 let primaryDB = replTest.getPrimary().getDB(testName);
 
 for (let i = 0; i < 10; ++i) {
-    assert.writeOK(primaryDB.coll.insert({a: i}));
+    assert.commandWorked(primaryDB.coll.insert({a: i}));
 }
 
 // Setup view.

@@ -11,7 +11,7 @@ for (var i = 0; i < totalPts; i++) {
     var ii = i % 10000;
     bulk.insert({loc: [ii % 100, Math.floor(ii / 100)]});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 coll.ensureIndex({loc: "2d"});
 

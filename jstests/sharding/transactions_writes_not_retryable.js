@@ -97,7 +97,8 @@ const sessionDB = session.getDatabase(dbName);
 // Unsharded.
 jsTestLog("Testing against unsharded collection");
 
-assert.writeOK(st.s.getDB(dbName)[collName].insert({_id: 0}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: 0}, {writeConcern: {w: "majority"}}));
 
 kCmdTestCases.forEach(cmdTestCase => {
     runTest(st, session, sessionDB, cmdTestCase.name, cmdTestCase.command, false /*isSharded*/);

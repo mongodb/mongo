@@ -8,7 +8,7 @@ const onNullValue = ISODate("2017-07-04T11:56:02Z");
 const coll = db.date_to_string_on_null;
 coll.drop();
 
-assert.writeOK(coll.insert({_id: 0}));
+assert.commandWorked(coll.insert({_id: 0}));
 
 for (let nullishValue of [null, undefined, "$missing"]) {
     // Test that the 'onNull' value is returned when the 'date' is nullish.

@@ -28,7 +28,7 @@ var bulk = foreign.initializeUnorderedBulkOp();
 airports.forEach(function(a) {
     bulk.insert(a);
 });
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 // Insert a dummy document so that something will flow through the pipeline.
 local.insert({});

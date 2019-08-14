@@ -6,9 +6,9 @@
 const coll = db.remove_undefined;
 coll.drop();
 
-assert.writeOK(coll.insert({_id: 1}));
-assert.writeOK(coll.insert({_id: 2}));
-assert.writeOK(coll.insert({_id: null}));
+assert.commandWorked(coll.insert({_id: 1}));
+assert.commandWorked(coll.insert({_id: 2}));
+assert.commandWorked(coll.insert({_id: null}));
 
 const obj = {
     foo: 1,
@@ -27,7 +27,7 @@ assert.writeErrorWithCode(coll.remove({_id: undefined}), ErrorCodes.BadValue);
 coll.remove({_id: obj.nullElem});
 assert.eq(2, coll.count());
 
-assert.writeOK(coll.insert({_id: null}));
+assert.commandWorked(coll.insert({_id: null}));
 assert.eq(3, coll.count());
 
 assert.writeErrorWithCode(coll.remove({_id: undefined}), ErrorCodes.BadValue);

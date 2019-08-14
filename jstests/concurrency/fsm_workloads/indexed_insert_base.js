@@ -35,7 +35,7 @@ var $config = (function() {
 
         insert: function insert(db, collName) {
             var res = db[collName].insert(this.getDoc());
-            assertAlways.writeOK(res);
+            assertAlways.commandWorked(res);
             assertAlways.eq(1, res.nInserted, tojson(res));
             this.nInserted += this.docsPerInsert;
         },

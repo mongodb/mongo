@@ -66,10 +66,10 @@ for (let i = 0; i < 100; i++) {
     bulk.insert({_id: nextId(), group: 13, x: [{a: 1, b: 1}, {a: 1, b: 2}]});
     bulk.insert({_id: nextId(), group: 13, x: [{a: 1, b: 2}, {a: 1, b: 1}]});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
-assert.writeOK(coll.createIndex({group: 1, 'y.d': 1}));
-assert.writeOK(coll.createIndex({group: 1, covered: 1}));  // for covered index test
+assert.commandWorked(coll.createIndex({group: 1, 'y.d': 1}));
+assert.commandWorked(coll.createIndex({group: 1, covered: 1}));  // for covered index test
 
 // Tests for the $-positional operator.
 assert.eq(1,

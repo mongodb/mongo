@@ -62,7 +62,8 @@ function doCommittedRead() {
 }
 
 jsTest.log("doing write");
-assert.writeOK(t.save({_id: 1, state: 0}, {writeConcern: {w: "majority", wtimeout: 10 * 1000}}));
+assert.commandWorked(
+    t.save({_id: 1, state: 0}, {writeConcern: {w: "majority", wtimeout: 10 * 1000}}));
 jsTest.log("doing read");
 assert.eq(doDirtyRead(), 0);
 jsTest.log("doing committed read");

@@ -80,28 +80,28 @@ var getCollections = (mydb, prefixes) => prefixes.map((prefix) => mydb[prefix]);
 var tests = {
     crud: (mydb) => {
         let [x, y, z] = getCollections(mydb, ['x', 'y', 'z']);
-        assert.writeOK(x.insert({_id: 1}));
-        assert.writeOK(x.update({_id: 1}, {$set: {x: 1}}));
-        assert.writeOK(x.remove({_id: 1}));
+        assert.commandWorked(x.insert({_id: 1}));
+        assert.commandWorked(x.update({_id: 1}, {$set: {x: 1}}));
+        assert.commandWorked(x.remove({_id: 1}));
 
-        assert.writeOK(y.update({_id: 1}, {y: 1}));
-        assert.writeOK(y.insert({_id: 2, y: false, z: false}));
-        assert.writeOK(y.update({_id: 2}, {y: 2}));
+        assert.commandWorked(y.update({_id: 1}, {y: 1}));
+        assert.commandWorked(y.insert({_id: 2, y: false, z: false}));
+        assert.commandWorked(y.update({_id: 2}, {y: 2}));
 
-        assert.writeOK(z.insert({_id: 1, z: 1}));
-        assert.writeOK(z.remove({_id: 1}));
-        assert.writeOK(z.insert({_id: 1}));
-        assert.writeOK(z.insert({_id: 2, z: 2}));
+        assert.commandWorked(z.insert({_id: 1, z: 1}));
+        assert.commandWorked(z.remove({_id: 1}));
+        assert.commandWorked(z.insert({_id: 1}));
+        assert.commandWorked(z.insert({_id: 2, z: 2}));
     },
     renameCollectionWithinDatabase: (mydb) => {
         let [x, y, z] = getCollections(mydb, ['x', 'y', 'z']);
-        assert.writeOK(x.insert({_id: 1, x: 1}));
-        assert.writeOK(y.insert({_id: 1, y: 1}));
+        assert.commandWorked(x.insert({_id: 1, x: 1}));
+        assert.commandWorked(y.insert({_id: 1, y: 1}));
 
         assert.commandWorked(x.renameCollection(z.getName()));
-        assert.writeOK(z.insert({_id: 2, x: 2}));
-        assert.writeOK(x.insert({_id: 2, x: false}));
-        assert.writeOK(y.insert({y: 2}));
+        assert.commandWorked(z.insert({_id: 2, x: 2}));
+        assert.commandWorked(x.insert({_id: 2, x: false}));
+        assert.commandWorked(y.insert({y: 2}));
 
         assert.commandWorked(y.renameCollection(x.getName(), true));
         assert.commandWorked(z.renameCollection(y.getName()));
@@ -129,14 +129,14 @@ var tests = {
         let otherdb = mydb.getSiblingDB(mydb + '_');
         let [x, y] = getCollections(mydb, ['x', 'y']);
         let [z] = getCollections(otherdb, ['z']);
-        assert.writeOK(x.insert({_id: 1, x: 1}));
-        assert.writeOK(y.insert({_id: 1, y: 1}));
+        assert.commandWorked(x.insert({_id: 1, x: 1}));
+        assert.commandWorked(y.insert({_id: 1, y: 1}));
 
         assert.commandWorked(
             mydb.adminCommand({renameCollection: x.getFullName(), to: z.getFullName()}));
-        assert.writeOK(z.insert({_id: 2, x: 2}));
-        assert.writeOK(x.insert({_id: 2, x: false}));
-        assert.writeOK(y.insert({y: 2}));
+        assert.commandWorked(z.insert({_id: 2, x: 2}));
+        assert.commandWorked(x.insert({_id: 2, x: false}));
+        assert.commandWorked(y.insert({y: 2}));
 
         assert.commandWorked(mydb.adminCommand(
             {renameCollection: y.getFullName(), to: x.getFullName(), dropTarget: true}));
@@ -170,10 +170,10 @@ var tests = {
     createIndex: (mydb) => {
         let [x, y] = getCollections(mydb, ['x', 'y']);
         assert.commandWorked(x.createIndex({x: 1}));
-        assert.writeOK(x.insert({_id: 1, x: 1}));
-        assert.writeOK(y.insert({_id: 1, y: 1}));
+        assert.commandWorked(x.insert({_id: 1, x: 1}));
+        assert.commandWorked(y.insert({_id: 1, y: 1}));
         assert.commandWorked(y.createIndex({y: 1}));
-        assert.writeOK(y.insert({_id: 2, y: 2}));
+        assert.commandWorked(y.insert({_id: 2, y: 2}));
     },
 };
 

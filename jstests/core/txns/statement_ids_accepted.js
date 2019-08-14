@@ -92,7 +92,7 @@ assert.commandWorked(sessionDb.runCommand({
 
 jsTestLog("Check that find and getmore accept a statement ID");
 // Put in some data to find so getMore has a cursor to use.
-assert.writeOK(testColl.insert([{_id: 0}, {_id: 1}], {writeConcern: {w: "majority"}}));
+assert.commandWorked(testColl.insert([{_id: 0}, {_id: 1}], {writeConcern: {w: "majority"}}));
 let res = assert.commandWorked(sessionDb.runCommand({
     find: collName,
     batchSize: 1,
@@ -169,10 +169,10 @@ if (!isMongos) {
     // Skip commands that do not exist on mongos.
 
     jsTestLog("Check that geoSearch accepts a statement ID");
-    assert.writeOK(testColl.insert({geo: {type: "Point", coordinates: [0, 0]}, a: 0}),
-                   {writeConcern: {w: "majority"}});
-    assert.writeOK(testColl.insert({geoh: {lat: 0, long: 0}, b: 0}),
-                   {writeConcern: {w: "majority"}});
+    assert.commandWorked(testColl.insert({geo: {type: "Point", coordinates: [0, 0]}, a: 0}),
+                         {writeConcern: {w: "majority"}});
+    assert.commandWorked(testColl.insert({geoh: {lat: 0, long: 0}, b: 0}),
+                         {writeConcern: {w: "majority"}});
     assert.commandWorked(sessionDb.runCommand({
         createIndexes: collName,
         indexes: [

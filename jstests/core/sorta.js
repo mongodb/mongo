@@ -21,7 +21,7 @@ const bulk = coll.initializeUnorderedBulkOp();
 for (let doc of docs) {
     bulk.insert(doc);
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 assert.eq(coll.find().sort({a: 1, _id: 1}).toArray(), docs);
 

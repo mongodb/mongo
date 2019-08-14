@@ -20,7 +20,7 @@ for (var i = 0; i < 3; i++) {
 
     assert.commandWorked(t.ensureIndex({a: 1}));
     assert.commandWorked(t.ensureIndex({b: 1}));
-    assert.writeOK(t.insert({_id: 1, a: 1, b: 1}));
+    assert.commandWorked(t.insert({_id: 1, a: 1, b: 1}));
 
     var join =
         startParallelShell("db.find_and_modify_concurrent.update({a: 1, b: 1}, {$inc: {a: 1}});");

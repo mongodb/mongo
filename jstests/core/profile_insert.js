@@ -25,7 +25,7 @@ testDB.setProfilingLevel(2);
 var doc = {_id: 1};
 var result = coll.insert(doc);
 if (isWriteCommand) {
-    assert.writeOK(result);
+    assert.commandWorked(result);
 }
 
 var profileObj = getLatestProfilerEntry(testDB);
@@ -60,7 +60,7 @@ bulk.insert(docArray[0]);
 bulk.insert(docArray[1]);
 result = bulk.execute();
 if (isWriteCommand) {
-    assert.writeOK(result);
+    assert.commandWorked(result);
 }
 
 profileObj = getLatestProfilerEntry(testDB);
@@ -84,7 +84,7 @@ doc = {
     _id: 1
 };
 var wtimeout = 60000;
-assert.writeOK(coll.insert(doc, {writeConcern: {w: 1, wtimeout: wtimeout}, ordered: false}));
+assert.commandWorked(coll.insert(doc, {writeConcern: {w: 1, wtimeout: wtimeout}, ordered: false}));
 
 profileObj = getLatestProfilerEntry(testDB);
 

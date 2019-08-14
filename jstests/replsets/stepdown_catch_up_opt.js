@@ -53,7 +53,7 @@ function disableFailPoint() {
 // shut down.
 try {
     jsTestLog('Write to primary to make secondary out of sync.');
-    assert.writeOK(primary.getDB('test').foo.insert({i: 1}), 'Failed to insert document.');
+    assert.commandWorked(primary.getDB('test').foo.insert({i: 1}), 'Failed to insert document.');
     sleep(1000);
     // Secondary is now at least 1 second behind.
 

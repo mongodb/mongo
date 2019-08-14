@@ -47,7 +47,7 @@ const writeConcernForSuccessfulOp = {
     w: 'majority',
     wtimeout: replTest.kDefaultTimeoutMS
 };
-assert.writeOK(collForInserts.insert({_id: 0}, {writeConcern: writeConcernForSuccessfulOp}));
+assert.commandWorked(collForInserts.insert({_id: 0}, {writeConcern: writeConcernForSuccessfulOp}));
 
 // PREPARE collection drop.
 twoPhaseDropTest.prepareDropCollection(collName);
@@ -80,7 +80,7 @@ try {
 
 // After the reaper is unblocked, an operation waiting on a majority write concern should run
 // complete successfully.
-assert.writeOK(collForInserts.insert({_id: 3}, {writeConcern: writeConcernForSuccessfulOp}));
+assert.commandWorked(collForInserts.insert({_id: 3}, {writeConcern: writeConcernForSuccessfulOp}));
 assert.eq(4, collForInserts.find().itcount());
 
 // COMMIT collection drop.

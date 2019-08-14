@@ -79,7 +79,7 @@ var runTest = function(mongodConn, configConnStr, awaitVersionUpdate) {
     };
 
     // Simulate the upsert that is performed by a config server on addShard.
-    assert.writeOK(mongodConn.getDB('admin').system.version.update(
+    assert.commandWorked(mongodConn.getDB('admin').system.version.update(
         {
             _id: shardIdentityDoc._id,
             shardName: shardIdentityDoc.shardName,

@@ -551,7 +551,7 @@ objects.forEach(function(o) {
     if (o.geo.crs && o.geo.crs == strictCRS) {
         assert.writeError(coll.insert(o), "insert " + o.name);
     } else {
-        assert.writeOK(coll.insert(o), "insert " + o.name);
+        assert.commandWorked(coll.insert(o), "insert " + o.name);
     }
 });
 

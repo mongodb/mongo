@@ -12,7 +12,7 @@ var coll = db[collName];
 coll.drop();
 
 for (var i = 0; i < 10; i++) {
-    assert.writeOK(coll.insert({a: i}));
+    assert.commandWorked(coll.insert({a: i}));
 }
 
 // Can't attach maxTimeMS to a getMore command for a non-tailable cursor over a non-capped
@@ -25,7 +25,7 @@ assert.commandFailed(cmdRes);
 coll.drop();
 assert.commandWorked(db.createCollection(collName, {capped: true, size: 1024}));
 for (var i = 0; i < 10; i++) {
-    assert.writeOK(coll.insert({a: i}));
+    assert.commandWorked(coll.insert({a: i}));
 }
 
 // Can't attach maxTimeMS to a getMore command for a non-tailable cursor over a capped

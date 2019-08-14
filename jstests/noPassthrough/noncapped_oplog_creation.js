@@ -28,7 +28,7 @@ assert.writeError(localDB.oplog.rs.insert({}));
 assert.commandFailed(localDB.runCommand({godinsert: 'oplog.$main', obj: {}}));
 
 // Test that creating a non-capped oplog collection fails when using $out.
-assert.writeOK(localDB.input.insert({}));
+assert.commandWorked(localDB.input.insert({}));
 assert.commandFailed(localDB.runCommand({
     aggregate: 'input',
     pipeline: [{$out: 'oplog.aggregation'}],

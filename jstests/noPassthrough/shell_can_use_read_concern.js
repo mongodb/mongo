@@ -97,7 +97,7 @@ function runTests({withSession}) {
 
     {
         testCommandCanBeCausallyConsistent(function() {
-            assert.writeOK(coll.insert([{}, {}, {}, {}, {}]));
+            assert.commandWorked(coll.insert([{}, {}, {}, {}, {}]));
         }, {expectedSession: withSession, expectedAfterClusterTime: false});
 
         testCommandCanBeCausallyConsistent(function() {

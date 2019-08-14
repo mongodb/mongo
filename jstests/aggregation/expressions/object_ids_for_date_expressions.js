@@ -11,7 +11,7 @@ let testOpCount = 0;
 coll.drop();
 
 // Seed collection so that the pipeline will execute.
-assert.writeOK(coll.insert({}));
+assert.commandWorked(coll.insert({}));
 
 function makeObjectIdFromDate(dt) {
     try {

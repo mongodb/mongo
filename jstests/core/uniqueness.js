@@ -20,7 +20,7 @@ t.drop();
 // test uniqueness of _id
 
 res = t.save({_id: 3});
-assert.writeOK(res);
+assert.commandWorked(res);
 
 // this should yield an error
 res = t.insert({_id: 3});
@@ -28,7 +28,7 @@ assert.writeError(res);
 assert.eq(1, t.count());
 
 res = t.insert({_id: 4, x: 99});
-assert.writeOK(res);
+assert.commandWorked(res);
 
 // this should yield an error
 res = t.update({_id: 4}, {_id: 3, x: 99});

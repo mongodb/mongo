@@ -15,7 +15,7 @@ let bulk = coll.initializeUnorderedBulkOp();
 for (let i = 0; i < nDocs; i++) {
     bulk.insert({_id: i});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 // Make sure we know which shard will host the data to begin.
 st.ensurePrimaryShard(dbName, st.shard0.shardName);

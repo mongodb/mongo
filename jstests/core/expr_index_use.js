@@ -8,43 +8,43 @@ load("jstests/libs/analyze_plan.js");
 const coll = db.expr_index_use;
 coll.drop();
 
-assert.writeOK(coll.insert({a: {b: 1}}));
-assert.writeOK(coll.insert({a: {b: [1]}}));
-assert.writeOK(coll.insert({a: [{b: 1}]}));
-assert.writeOK(coll.insert({a: [{b: [1]}]}));
+assert.commandWorked(coll.insert({a: {b: 1}}));
+assert.commandWorked(coll.insert({a: {b: [1]}}));
+assert.commandWorked(coll.insert({a: [{b: 1}]}));
+assert.commandWorked(coll.insert({a: [{b: [1]}]}));
 assert.commandWorked(coll.createIndex({"a.b": 1}));
 
-assert.writeOK(coll.insert({c: {d: 1}}));
+assert.commandWorked(coll.insert({c: {d: 1}}));
 assert.commandWorked(coll.createIndex({"c.d": 1}));
 
-assert.writeOK(coll.insert({e: [{f: 1}]}));
+assert.commandWorked(coll.insert({e: [{f: 1}]}));
 assert.commandWorked(coll.createIndex({"e.f": 1}));
 
-assert.writeOK(coll.insert({g: {h: [1]}}));
+assert.commandWorked(coll.insert({g: {h: [1]}}));
 assert.commandWorked(coll.createIndex({"g.h": 1}));
 
-assert.writeOK(coll.insert({i: 1, j: [1]}));
+assert.commandWorked(coll.insert({i: 1, j: [1]}));
 assert.commandWorked(coll.createIndex({i: 1, j: 1}));
 
-assert.writeOK(coll.insert({k: 1, l: "abc"}));
+assert.commandWorked(coll.insert({k: 1, l: "abc"}));
 assert.commandWorked(coll.createIndex({k: 1, l: "text"}));
 
-assert.writeOK(coll.insert({x: 0}));
-assert.writeOK(coll.insert({x: 1, y: 1}));
-assert.writeOK(coll.insert({x: 2, y: 2}));
-assert.writeOK(coll.insert({x: 3, y: 10}));
-assert.writeOK(coll.insert({y: 20}));
+assert.commandWorked(coll.insert({x: 0}));
+assert.commandWorked(coll.insert({x: 1, y: 1}));
+assert.commandWorked(coll.insert({x: 2, y: 2}));
+assert.commandWorked(coll.insert({x: 3, y: 10}));
+assert.commandWorked(coll.insert({y: 20}));
 assert.commandWorked(coll.createIndex({x: 1, y: 1}));
 
-assert.writeOK(coll.insert({w: 123}));
-assert.writeOK(coll.insert({}));
-assert.writeOK(coll.insert({w: null}));
-assert.writeOK(coll.insert({w: undefined}));
-assert.writeOK(coll.insert({w: NaN}));
-assert.writeOK(coll.insert({w: "foo"}));
-assert.writeOK(coll.insert({w: "FOO"}));
-assert.writeOK(coll.insert({w: {z: 1}}));
-assert.writeOK(coll.insert({w: {z: 2}}));
+assert.commandWorked(coll.insert({w: 123}));
+assert.commandWorked(coll.insert({}));
+assert.commandWorked(coll.insert({w: null}));
+assert.commandWorked(coll.insert({w: undefined}));
+assert.commandWorked(coll.insert({w: NaN}));
+assert.commandWorked(coll.insert({w: "foo"}));
+assert.commandWorked(coll.insert({w: "FOO"}));
+assert.commandWorked(coll.insert({w: {z: 1}}));
+assert.commandWorked(coll.insert({w: {z: 2}}));
 assert.commandWorked(coll.createIndex({w: 1}));
 assert.commandWorked(coll.createIndex({"w.z": 1}));
 
@@ -232,8 +232,8 @@ assert.throws(
 // there is an index with a matching collation and when there isn't.
 assert.commandWorked(db.runCommand({drop: coll.getName()}));
 assert.commandWorked(db.createCollection(coll.getName(), {collation: caseInsensitiveCollation}));
-assert.writeOK(coll.insert({a: "foo", b: "bar"}));
-assert.writeOK(coll.insert({a: "FOO", b: "BAR"}));
+assert.commandWorked(coll.insert({a: "foo", b: "bar"}));
+assert.commandWorked(coll.insert({a: "FOO", b: "BAR"}));
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({b: 1}, {collation: {locale: "simple"}}));
 

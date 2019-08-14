@@ -14,7 +14,7 @@ replSet.initiate();
 let primary = replSet.getPrimary();
 
 let coll = primary.getDB('test').foo;
-assert.writeOK(coll.insert({a: 1}));
+assert.commandWorked(coll.insert({a: 1}));
 
 // Add a secondary node but make it hang before copying databases.
 let secondary = replSet.add();
@@ -24,7 +24,7 @@ assert.commandWorked(secondary.getDB('admin').runCommand(
     {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'alwaysOn'}));
 replSet.reInitiate();
 
-assert.writeOK(primary.getDB('test').system.views.insert({invalid: NumberLong(1000)}));
+assert.commandWorked(primary.getDB('test').system.views.insert({invalid: NumberLong(1000)}));
 
 assert.commandWorked(secondary.getDB('admin').runCommand(
     {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'off'}));

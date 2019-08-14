@@ -16,7 +16,7 @@ var recoveryDoc = {
     minOpTimeUpdaters: 2
 };
 
-assert.writeOK(st.shard0.getDB('admin').system.version.insert(recoveryDoc));
+assert.commandWorked(st.shard0.getDB('admin').system.version.insert(recoveryDoc));
 
 // Make sure test is setup correctly.
 var minOpTimeRecoveryDoc =

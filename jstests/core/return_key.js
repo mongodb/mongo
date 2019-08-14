@@ -17,9 +17,9 @@ var explain;
 var coll = db.jstests_returnkey;
 coll.drop();
 
-assert.writeOK(coll.insert({a: 1, b: 3}));
-assert.writeOK(coll.insert({a: 2, b: 2}));
-assert.writeOK(coll.insert({a: 3, b: 1}));
+assert.commandWorked(coll.insert({a: 1, b: 3}));
+assert.commandWorked(coll.insert({a: 2, b: 2}));
+assert.commandWorked(coll.insert({a: 3, b: 1}));
 
 assert.commandWorked(coll.ensureIndex({a: 1}));
 assert.commandWorked(coll.ensureIndex({b: 1}));

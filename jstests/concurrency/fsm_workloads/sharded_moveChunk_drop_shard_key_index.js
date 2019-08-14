@@ -61,7 +61,7 @@ var $config = (function() {
         }
 
         var res = bulk.execute();
-        assertAlways.writeOK(res);
+        assertAlways.commandWorked(res);
         assertAlways.eq(this.numSplitPoints, res.nInserted, tojson(res));
 
         for (i = 0; i < this.numSplitPoints; ++i) {

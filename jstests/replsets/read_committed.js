@@ -24,27 +24,27 @@ const testCases = {
     insert: {
         prepareCollection: function(coll) {},  // No-op
         write: function(coll, writeConcern) {
-            assert.writeOK(coll.insert({_id: 1}, writeConcern));
+            assert.commandWorked(coll.insert({_id: 1}, writeConcern));
         },
         expectedBefore: [],
         expectedAfter: [{_id: 1}],
     },
     update: {
         prepareCollection: function(coll) {
-            assert.writeOK(coll.insert({_id: 1, state: 'before'}, majorityWriteConcern));
+            assert.commandWorked(coll.insert({_id: 1, state: 'before'}, majorityWriteConcern));
         },
         write: function(coll, writeConcern) {
-            assert.writeOK(coll.update({_id: 1}, {$set: {state: 'after'}}, writeConcern));
+            assert.commandWorked(coll.update({_id: 1}, {$set: {state: 'after'}}, writeConcern));
         },
         expectedBefore: [{_id: 1, state: 'before'}],
         expectedAfter: [{_id: 1, state: 'after'}],
     },
     remove: {
         prepareCollection: function(coll) {
-            assert.writeOK(coll.insert({_id: 1}, majorityWriteConcern));
+            assert.commandWorked(coll.insert({_id: 1}, majorityWriteConcern));
         },
         write: function(coll, writeConcern) {
-            assert.writeOK(coll.remove({_id: 1}, writeConcern));
+            assert.commandWorked(coll.remove({_id: 1}, writeConcern));
         },
         expectedBefore: [{_id: 1}],
         expectedAfter: [],
@@ -121,7 +121,7 @@ for (var testName in testCases) {
     var test = testCases[testName];
 
     const setUpInitialState = function setUpInitialState() {
-        assert.writeOK(coll.remove({}, majorityWriteConcern));
+        assert.commandWorked(coll.remove({}, majorityWriteConcern));
         test.prepareCollection(coll);
         // Do some sanity checks.
         assert.eq(doDirtyRead(coll), test.expectedBefore);

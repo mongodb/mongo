@@ -6,8 +6,8 @@
 let coll = db.rename_change_target_type;
 coll.drop();
 
-assert.writeOK(coll.insert({to: NumberLong(100), from: 100}));
-assert.writeOK(coll.update({}, {$rename: {from: "to"}}));
+assert.commandWorked(coll.insert({to: NumberLong(100), from: 100}));
+assert.commandWorked(coll.update({}, {$rename: {from: "to"}}));
 
 let aggResult = coll.aggregate([{$project: {toType: {$type: "$to"}}}]).toArray();
 assert.eq(aggResult.length, 1);

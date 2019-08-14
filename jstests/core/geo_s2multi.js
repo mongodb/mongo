@@ -8,13 +8,13 @@ multiPointA = {
     "type": "MultiPoint",
     "coordinates": [[100.0, 0.0], [101.0, 1.0]]
 };
-assert.writeOK(t.insert({geo: multiPointA}));
+assert.commandWorked(t.insert({geo: multiPointA}));
 
 multiLineStringA = {
     "type": "MultiLineString",
     "coordinates": [[[100.0, 0.0], [101.0, 1.0]], [[102.0, 2.0], [103.0, 3.0]]]
 };
-assert.writeOK(t.insert({geo: multiLineStringA}));
+assert.commandWorked(t.insert({geo: multiLineStringA}));
 
 multiPolygonA = {
     "type": "MultiPolygon",
@@ -26,7 +26,7 @@ multiPolygonA = {
         ]
     ]
 };
-assert.writeOK(t.insert({geo: multiPolygonA}));
+assert.commandWorked(t.insert({geo: multiPolygonA}));
 
 assert.eq(3, t.find({
                   geo: {$geoIntersects: {$geometry: {"type": "Point", "coordinates": [100, 0]}}}
@@ -65,7 +65,7 @@ partialPolygonA = {
     "type": "Polygon",
     "coordinates": [[[102.0, 2.0], [103.0, 2.0], [103.0, 3.0], [102.0, 3.0], [102.0, 2.0]]]
 };
-assert.writeOK(t.insert({geo: partialPolygonA}));
+assert.commandWorked(t.insert({geo: partialPolygonA}));
 // Polygon contains itself, the partial poly, and the multipoint
 assert.eq(3, t.find({geo: {$geoWithin: {$geometry: multiPolygonA}}}).itcount());
 

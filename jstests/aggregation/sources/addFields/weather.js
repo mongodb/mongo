@@ -56,7 +56,7 @@ function doExecutionTest(conn) {
     // Insert a bunch of documents of the form above.
     const nDocs = 10;
     for (let i = 0; i < nDocs; i++) {
-        assert.writeOK(coll.insert(generateRandomDocument()));
+        assert.commandWorked(coll.insert(generateRandomDocument()));
     }
 
     // Add the minimum, maximum, and average temperatures, and make sure that doing the same

@@ -25,7 +25,7 @@ for (var j = 0; j < 100; j++) {
         bulk.insert({j: j, i: i});
     }
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 function map() {
     emit(this.i, 1);
@@ -74,9 +74,9 @@ verifyOutput(out);
 // Ensure that the collation option is propagated to the shards. This uses a case-insensitive
 // collation, and the query seeding the mapReduce should only match the document if the
 // collation is passed along to the shards.
-assert.writeOK(db.srcSharded.remove({}));
+assert.commandWorked(db.srcSharded.remove({}));
 assert.eq(db.srcSharded.find().itcount(), 0);
-assert.writeOK(db.srcSharded.insert({i: 0, j: 0, str: "FOO"}));
+assert.commandWorked(db.srcSharded.insert({i: 0, j: 0, str: "FOO"}));
 out = db.srcSharded.mapReduce(
     map,
     reduce,

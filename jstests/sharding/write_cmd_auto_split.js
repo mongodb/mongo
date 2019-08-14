@@ -22,7 +22,7 @@ assert.eq(1, configDB.chunks.find({"ns": "test.insert"}).itcount());
 // a max chunk size of 1MB we'd expect the autosplitter to split this into
 // at least 3 chunks
 for (var x = 0; x < 3100; x++) {
-    assert.writeOK(testDB.runCommand(
+    assert.commandWorked(testDB.runCommand(
         {insert: 'insert', documents: [{x: x, v: doc1k}], ordered: false, writeConcern: {w: 1}}));
 }
 
@@ -41,7 +41,7 @@ assert.commandWorked(configDB.adminCommand({shardCollection: 'test.update', key:
 assert.eq(1, configDB.chunks.find({"ns": "test.update"}).itcount());
 
 for (var x = 0; x < 2100; x++) {
-    assert.writeOK(testDB.runCommand({
+    assert.commandWorked(testDB.runCommand({
         update: 'update',
         updates: [{q: {x: x}, u: {x: x, v: doc1k}, upsert: true}],
         ordered: false,
@@ -62,7 +62,7 @@ assert.commandWorked(configDB.adminCommand({shardCollection: 'test.delete', key:
 assert.eq(1, configDB.chunks.find({"ns": "test.delete"}).itcount());
 
 for (var x = 0; x < 1100; x++) {
-    assert.writeOK(testDB.runCommand({
+    assert.commandWorked(testDB.runCommand({
         delete: 'delete',
         deletes: [{q: {x: x, v: doc1k}, limit: NumberInt(0)}],
         ordered: false,
@@ -94,7 +94,7 @@ for (var x = 0; x < 2100; x += 400) {
         docs.push({x: (x + y), v: doc1k});
     }
 
-    assert.writeOK(testDB.runCommand(
+    assert.commandWorked(testDB.runCommand(
         {insert: 'insert', documents: docs, ordered: false, writeConcern: {w: 1}}));
 }
 
@@ -118,7 +118,7 @@ for (var x = 0; x < 2100; x += 400) {
         docs.push({q: {x: id}, u: {x: id, v: doc1k}, upsert: true});
     }
 
-    assert.writeOK(
+    assert.commandWorked(
         testDB.runCommand({update: 'update', updates: docs, ordered: false, writeConcern: {w: 1}}));
 }
 
@@ -142,7 +142,7 @@ for (var x = 0; x < 2100; x += 400) {
         docs.push({q: {x: id, v: doc1k}, top: 0});
     }
 
-    assert.writeOK(testDB.runCommand({
+    assert.commandWorked(testDB.runCommand({
         delete: 'delete',
         deletes: [{q: {x: x, v: doc1k}, limit: NumberInt(0)}],
         ordered: false,

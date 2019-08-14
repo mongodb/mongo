@@ -38,7 +38,7 @@ function insertDocsAndWaitForSplit(numDocs) {
     for (; i < curMaxKey + numDocs; i++) {
         bulk.insert({num: i, s: bigString});
     }
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
 
     waitForOngoingChunkSplits(s);
 

@@ -18,7 +18,7 @@ if (res.ok !== 1) {
 }
 
 for (var i = 0; i < 1000; ++i) {
-    assert.writeOK(t.save({a: Math.random(1000), b: Math.random(10000)}));
+    assert.commandWorked(t.save({a: Math.random(1000), b: Math.random(10000)}));
 }
 
 function m() {

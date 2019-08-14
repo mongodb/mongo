@@ -40,7 +40,7 @@ function benchrun_sub_update(use_write_command) {
     }];
 
     for (var i = 0; i < 100; ++i) {
-        assert.writeOK(t.insert({x: i}));
+        assert.commandWorked(t.insert({x: i}));
     }
 
     res = benchRun({parallel: 1, seconds: 10, ops: ops, host: db.getMongo().host});
@@ -65,7 +65,7 @@ function benchrun_sub_remove(use_write_command) {
     }];
 
     for (var i = 0; i < 100; ++i) {
-        assert.writeOK(t.insert({x: i}));
+        assert.commandWorked(t.insert({x: i}));
     }
 
     res = benchRun({parallel: 1, seconds: 10, ops: ops, host: db.getMongo().host});

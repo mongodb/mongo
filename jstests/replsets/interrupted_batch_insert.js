@@ -79,7 +79,7 @@ restartServerReplication(conns[2]);
 
 // Issue a write to the new primary.
 var collOnNewPrimary = replTest.nodes[1].getCollection(collName);
-assert.writeOK(collOnNewPrimary.insert({singleDoc: 1}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(collOnNewPrimary.insert({singleDoc: 1}, {writeConcern: {w: "majority"}}));
 
 // Isolate node 1, forcing it to step down as primary, and reconnect node 0, allowing it to step
 // up again.

@@ -127,13 +127,13 @@ if (storageEngine == 'wiredTiger') {
 // Create a database named 'a' repeated 63 times.
 var dbNameAA = Array(64).join('a');
 var dbAA = m.getDB(dbNameAA);
-assert.writeOK(dbAA[baseName].insert({}));
+assert.commandWorked(dbAA[baseName].insert({}));
 assertDocumentCount(dbAA, 1);
 m = checkDBFilesInDBDirectory(m, dbAA);
 
 // Create a database named '&'.
 var dbAnd = m.getDB('&');
-assert.writeOK(dbAnd[baseName].insert({}));
+assert.commandWorked(dbAnd[baseName].insert({}));
 assertDocumentCount(dbAnd, 1);
 m = checkDBFilesInDBDirectory(m, dbAnd);
 
@@ -144,14 +144,14 @@ if (!_isWindows()) {
     // Create a database named '処'.
     var dbNameU = '処';
     var dbU = m.getDB(dbNameU);
-    assert.writeOK(dbU[baseName].insert({}));
+    assert.commandWorked(dbU[baseName].insert({}));
     assertDocumentCount(dbU, 1);
     m = checkDBFilesInDBDirectory(m, dbU);
 
     // Create a database named '処' repeated 21 times.
     var dbNameUU = Array(22).join('処');
     var dbUU = m.getDB(dbNameUU);
-    assert.writeOK(dbUU[baseName].insert({}));
+    assert.commandWorked(dbUU[baseName].insert({}));
     assertDocumentCount(dbUU, 1);
     m = checkDBFilesInDBDirectory(m, dbUU);
 }

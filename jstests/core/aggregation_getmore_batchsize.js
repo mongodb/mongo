@@ -10,7 +10,7 @@ db.getMongo().forceReadMode("commands");
 var coll = db["aggregation_getmore_batchsize"];
 
 // Insert some data to query for
-assert.writeOK(coll.insert([{a: 1}, {a: 1}, {a: 1}, {a: 1}, {a: 1}, {a: 1}]));
+assert.commandWorked(coll.insert([{a: 1}, {a: 1}, {a: 1}, {a: 1}, {a: 1}, {a: 1}]));
 
 // Create a cursor with a batch size of 2 (should require three full batches to return all
 // documents).

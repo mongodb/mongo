@@ -54,7 +54,7 @@ jsTest.log('Inserting 5 docs into donor shard, ensuring one orphan on the recipi
 
 // Insert just one document into the collection and fail a migration after the cloning step in
 // order to get an orphan onto the recipient shard with the correct UUID for the collection.
-assert.writeOK(coll.insert({_id: 2}));
+assert.commandWorked(coll.insert({_id: 2}));
 assert.eq(1, donorColl.count());
 assert.commandWorked(
     recipient.adminCommand({configureFailPoint: "failMigrationLeaveOrphans", mode: "alwaysOn"}));
@@ -65,10 +65,10 @@ assert.commandWorked(
     recipient.adminCommand({configureFailPoint: "failMigrationLeaveOrphans", mode: "off"}));
 
 // Insert the remaining documents into the collection.
-assert.writeOK(coll.insert({_id: 0}));
-assert.writeOK(coll.insert({_id: 1}));
-assert.writeOK(coll.insert({_id: 3}));
-assert.writeOK(coll.insert({_id: 4}));
+assert.commandWorked(coll.insert({_id: 0}));
+assert.commandWorked(coll.insert({_id: 1}));
+assert.commandWorked(coll.insert({_id: 3}));
+assert.commandWorked(coll.insert({_id: 4}));
 assert.eq(5, donorColl.count());
 
 /**
@@ -100,8 +100,8 @@ waitForMigrateStep(recipient, migrateStepNames.cloned);
 
 jsTest.log('Update 1 doc and delete 1 doc on donor within the currently migrating chunk...');
 
-assert.writeOK(coll.update({_id: 3}, {_id: 3, a: "updated doc"}));
-assert.writeOK(coll.remove({_id: 4}));
+assert.commandWorked(coll.update({_id: 3}, {_id: 3, a: "updated doc"}));
+assert.commandWorked(coll.remove({_id: 4}));
 
 /**
  * Finish migration. Unpause recipient migration, wait for it to collect

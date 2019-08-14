@@ -117,7 +117,7 @@ var $config = extendWorkload($config, function($config, $super) {
                 // Give each document the same shard key and _id value, but a different tid.
                 bulk.insert({_id: i, skey: i, tid: chosenThread});
             }
-            assertAlways.writeOK(bulk.execute());
+            assertAlways.commandWorked(bulk.execute());
 
             // Create a chunk with boundaries matching the partition's. The low chunk's lower bound
             // is minKey, so a split is not necessary.

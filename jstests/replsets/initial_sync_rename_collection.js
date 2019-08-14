@@ -32,8 +32,8 @@ const collAcrossFinal_name = 'renamed_across';
 
 // Create two collections on the same database. One will be renamed within the database
 // and the other will be renamed to a different database.
-assert.writeOK(primary_db0[collRenameWithinDB_name].save({}));
-assert.writeOK(primary_db0[collRenameAcrossDBs_name].save({}));
+assert.commandWorked(primary_db0[collRenameWithinDB_name].save({}));
+assert.commandWorked(primary_db0[collRenameAcrossDBs_name].save({}));
 
 jsTestLog('Waiting for replication');
 rst.awaitReplication();

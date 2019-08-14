@@ -36,10 +36,10 @@ assert.commandWorked(
 st.printShardingStatus();
 
 // Insert some data into each of the consolidated ranges
-assert.writeOK(coll.insert({_id: 0}));
-assert.writeOK(coll.insert({_id: 10}));
-assert.writeOK(coll.insert({_id: 40}));
-assert.writeOK(coll.insert({_id: 110}));
+assert.commandWorked(coll.insert({_id: 0}));
+assert.commandWorked(coll.insert({_id: 10}));
+assert.commandWorked(coll.insert({_id: 40}));
+assert.commandWorked(coll.insert({_id: 110}));
 
 var staleCollection = staleMongos.getCollection(coll + "");
 

@@ -27,9 +27,10 @@ let insertDataForConn = function(conn, dbs, nodeOptions) {
                     continue;
                 }
                 // Config servers have a majority write concern.
-                assert.writeOK(conn.getDB(dbs[j]).foo.insert(doc, {writeConcern: {w: "majority"}}));
+                assert.commandWorked(
+                    conn.getDB(dbs[j]).foo.insert(doc, {writeConcern: {w: "majority"}}));
             } else {
-                assert.writeOK(conn.getDB(dbs[j]).foo.insert(doc));
+                assert.commandWorked(conn.getDB(dbs[j]).foo.insert(doc));
             }
         }
     }

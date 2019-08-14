@@ -34,7 +34,7 @@ const bulk = coll.initializeUnorderedBulkOp();
 for (let i = 0; i < nDocs; i++) {
     bulk.insert({_id: i, stringField: "string"});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 res = assert.commandWorked(
     testDB.runCommand({aggregate: coll.getName(), pipeline: [], cursor: {batchSize: 0}}));

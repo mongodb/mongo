@@ -30,9 +30,9 @@ assert.commandWorked(st.s.adminCommand({split: ns, middle: {skey: 10}}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {skey: 5}, to: st.shard1.shardName}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {skey: 15}, to: st.shard2.shardName}));
 
-assert.writeOK(st.s.getDB(dbName)[collName].insert({_id: 1, counter: 0, skey: -5}));
-assert.writeOK(st.s.getDB(dbName)[collName].insert({_id: 2, counter: 0, skey: 5}));
-assert.writeOK(st.s.getDB(dbName)[collName].insert({_id: 3, counter: 0, skey: 15}));
+assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: 1, counter: 0, skey: -5}));
+assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: 2, counter: 0, skey: 5}));
+assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: 3, counter: 0, skey: 15}));
 
 // Runs the given multi-write and asserts a manually inserted orphan document is not affected.
 // The write is assumed to target chunks [min, 0) and [0, 10), which begin on shard0 and shard1,
@@ -58,7 +58,8 @@ function runTest(st, session, writeCmd, staleRouter) {
     }
 
     const orphanShardDB = st[orphanShardName].getPrimary().getDB(dbName);
-    assert.writeOK(orphanShardDB[collName].insert(orphanDoc, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        orphanShardDB[collName].insert(orphanDoc, {writeConcern: {w: "majority"}}));
 
     // Start a transaction with majority read concern to ensure the orphan will be visible if
     // its shard is targeted and send the multi-write.
@@ -98,13 +99,13 @@ function runTest(st, session, writeCmd, staleRouter) {
 
     // Reset the database state for the next iteration.
     if (isUpdate) {
-        assert.writeOK(sessionDB[collName].update({}, {$set: {counter: 0}}, {multi: true}));
+        assert.commandWorked(sessionDB[collName].update({}, {$set: {counter: 0}}, {multi: true}));
     } else {  // isDelete
-        assert.writeOK(st.s.getDB(dbName)[collName].insert({_id: 1, counter: 0, skey: -5}));
-        assert.writeOK(st.s.getDB(dbName)[collName].insert({_id: 2, counter: 0, skey: 5}));
+        assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: 1, counter: 0, skey: -5}));
+        assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: 2, counter: 0, skey: 5}));
     }
 
-    assert.writeOK(orphanShardDB[collName].remove({skey: orphanDoc.skey}));
+    assert.commandWorked(orphanShardDB[collName].remove({skey: orphanDoc.skey}));
 
     if (staleRouter) {
         // Move the chunk back with the main router so it isn't stale.

@@ -12,8 +12,8 @@ assert.commandWorked(coll.ensureIndex(
     {x: 1}, {expireAfterSeconds: 0, partialFilterExpression: {z: {$exists: true}}}));
 
 var now = new Date();
-assert.writeOK(coll.insert({x: now, z: 2}));
-assert.writeOK(coll.insert({x: now}));
+assert.commandWorked(coll.insert({x: now, z: 2}));
+assert.commandWorked(coll.insert({x: now}));
 
 // Wait for the TTL monitor to run at least twice (in case we weren't finished setting up our
 // collection when it ran the first time).

@@ -85,8 +85,8 @@ function testShardedLookup(shardingTest) {
         barBulk.insert({_id: i});
         lookupShouldReturn.push({_id: i, bar_docs: [{_id: i}]});
     }
-    assert.writeOK(fooBulk.execute());
-    assert.writeOK(barBulk.execute());
+    assert.commandWorked(fooBulk.execute());
+    assert.commandWorked(barBulk.execute());
 
     var docs =
         lookupdb.foo
@@ -154,7 +154,7 @@ function mixedShardTest(options1, options2, shouldSucceed) {
         for (var i = 0; i < 128; i++) {
             bulk.insert({_id: i, string: bigstr});
         }
-        assert.writeOK(bulk.execute());
+        assert.commandWorked(bulk.execute());
         assert.eq(128, db1.col.count(), "error retrieving documents from cluster");
 
         // Split chunk to make it small enough to move

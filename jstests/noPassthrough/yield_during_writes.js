@@ -27,16 +27,16 @@ const coll = mongod.getDB('test').yield_during_writes;
 coll.drop();
 
 for (let i = 0; i < nDocsToInsert; i++) {
-    assert.writeOK(coll.insert({_id: i}));
+    assert.commandWorked(coll.insert({_id: i}));
 }
 
 // A multi-update doing a collection scan should yield about nDocsToInsert / worksPerYield
 // times.
-assert.writeOK(coll.update({}, {$inc: {counter: 1}}, {multi: true}));
+assert.commandWorked(coll.update({}, {$inc: {counter: 1}}, {multi: true}));
 assert.gt(countOpYields(coll, 'update'), (nDocsToInsert / worksPerYield) - 2);
 
 // Likewise, a multi-remove should also yield approximately every worksPerYield documents.
-assert.writeOK(coll.remove({}, {multi: true}));
+assert.commandWorked(coll.remove({}, {multi: true}));
 assert.gt(countOpYields(coll, 'remove'), (nDocsToInsert / worksPerYield) - 2);
 
 MongoRunner.stopMongod(mongod);

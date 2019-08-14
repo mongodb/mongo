@@ -14,10 +14,10 @@ var graphColl = db.facetGraphLookup;
 
 // The graph in ASCII form: 0 --- 1 --- 2    3
 graphColl.drop();
-assert.writeOK(graphColl.insert({_id: 0, edges: [1]}));
-assert.writeOK(graphColl.insert({_id: 1, edges: [0, 2]}));
-assert.writeOK(graphColl.insert({_id: 2, edges: [1]}));
-assert.writeOK(graphColl.insert({_id: 3}));
+assert.commandWorked(graphColl.insert({_id: 0, edges: [1]}));
+assert.commandWorked(graphColl.insert({_id: 1, edges: [0, 2]}));
+assert.commandWorked(graphColl.insert({_id: 2, edges: [1]}));
+assert.commandWorked(graphColl.insert({_id: 3}));
 
 // For each document in the collection, this will compute all the other documents that are
 // reachable from this one.

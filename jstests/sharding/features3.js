@@ -37,7 +37,7 @@ var bulk = dbForTest.foo.initializeUnorderedBulkOp();
 for (var i = 0; i < numDocs; i++) {
     bulk.insert({_id: i});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 var x = dbForTest.foo.stats();
 

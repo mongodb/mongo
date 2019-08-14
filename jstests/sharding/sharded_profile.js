@@ -23,7 +23,7 @@ var profileColl = st.shard0.getDB(coll.getDB().toString()).system.profile;
 
 var inserts = [{_id: 0}, {_id: 1}, {_id: 2}];
 
-assert.writeOK(st.s1.getCollection(coll.toString()).insert(inserts));
+assert.commandWorked(st.s1.getCollection(coll.toString()).insert(inserts));
 
 profileEntry = profileColl.findOne();
 assert.neq(null, profileEntry);

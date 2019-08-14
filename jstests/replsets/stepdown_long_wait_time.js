@@ -33,7 +33,7 @@ stopServerReplication(secondary);
 
 jsTestLog("do a write then ask the PRIMARY to stepdown");
 var options = {writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS}};
-assert.writeOK(primary.getDB(name).foo.insert({x: 1}, options));
+assert.commandWorked(primary.getDB(name).foo.insert({x: 1}, options));
 
 var stepDownCmd = function() {
     assert.commandWorked(db.adminCommand({replSetStepDown: 60, secondaryCatchUpPeriodSecs: 60}));

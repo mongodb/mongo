@@ -12,7 +12,7 @@ assert.commandWorked(st.s0.adminCommand({shardcollection: "test.foo", key: {num:
 st.configRS.awaitLastOpCommitted();
 
 // "test.existing" - unsharded
-assert.writeOK(st.s0.getDB('test').existing.insert({_id: 1}));
+assert.commandWorked(st.s0.getDB('test').existing.insert({_id: 1}));
 assert.eq(1, st.s0.getDB('test').existing.count({_id: 1}));
 assert.eq(1, st.s1.getDB('test').existing.count({_id: 1}));
 
@@ -27,7 +27,7 @@ assert.eq(1, st.s0.getDB('test').existing.count({_id: 1}));  // SERVER-2828
 assert.eq(1, st.s1.getDB('test').existing.count({_id: 1}));
 
 // Test stats
-assert.writeOK(st.s0.getDB('test').existing2.insert({_id: 1}));
+assert.commandWorked(st.s0.getDB('test').existing2.insert({_id: 1}));
 assert.eq(1, st.s0.getDB('test').existing2.count({_id: 1}));
 assert.eq(1, st.s1.getDB('test').existing2.count({_id: 1}));
 
@@ -43,10 +43,10 @@ assert.commandWorked(st.s1.adminCommand({split: "test.existing2", middle: {_id: 
 }
 
 // Test admin commands
-assert.writeOK(st.s0.getDB('test').existing3.insert({_id: 1}));
+assert.commandWorked(st.s0.getDB('test').existing3.insert({_id: 1}));
 assert.eq(1, st.s0.getDB('test').existing3.count({_id: 1}));
 assert.eq(1, st.s1.getDB('test').existing3.count({_id: 1}));
-assert.writeOK(st.s1.adminCommand({shardcollection: "test.existing3", key: {_id: 1}}));
+assert.commandWorked(st.s1.adminCommand({shardcollection: "test.existing3", key: {_id: 1}}));
 st.configRS.awaitLastOpCommitted();
 
 assert.commandWorked(st.s1.adminCommand({split: "test.existing3", middle: {_id: 5}}));

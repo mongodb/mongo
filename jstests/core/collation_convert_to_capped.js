@@ -21,8 +21,8 @@ assert.commandWorked(
 const originalCollectionInfos = testDb.getCollectionInfos({name: coll.getName()});
 assert.eq(originalCollectionInfos.length, 1, tojson(originalCollectionInfos));
 
-assert.writeOK(coll.insert({_id: "FOO"}));
-assert.writeOK(coll.insert({_id: "bar"}));
+assert.commandWorked(coll.insert({_id: "FOO"}));
+assert.commandWorked(coll.insert({_id: "bar"}));
 assert.eq([{_id: "FOO"}],
           coll.find({_id: "foo"}).toArray(),
           "query should have performed a case-insensitive match");

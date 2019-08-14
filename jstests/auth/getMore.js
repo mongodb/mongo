@@ -20,9 +20,9 @@ function runTest(conn) {
     const testDBName = "auth_getMore";
     let testDB = adminDB.getSiblingDB(testDBName);
     testDB.dropDatabase();
-    assert.writeOK(testDB.foo.insert({_id: 0}));
-    assert.writeOK(testDB.foo.insert({_id: 1}));
-    assert.writeOK(testDB.foo.insert({_id: 2}));
+    assert.commandWorked(testDB.foo.insert({_id: 0}));
+    assert.commandWorked(testDB.foo.insert({_id: 1}));
+    assert.commandWorked(testDB.foo.insert({_id: 2}));
 
     //
     // Test that a user can only run a getMore on a cursor that they created.
@@ -241,7 +241,7 @@ function runTest(conn) {
     //
 
     assert.eq(1, adminDB.auth("admin", "admin"));
-    assert.writeOK(testDB.bar.insert({_id: 0}));
+    assert.commandWorked(testDB.bar.insert({_id: 0}));
 
     // Create a user "fooUser" on the test database that can read the "foo" collection.
     assert.commandWorked(testDB.runCommand({

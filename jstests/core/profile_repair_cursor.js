@@ -14,7 +14,7 @@ var testColl = testDB.testColl;
 assert.commandWorked(testDB.dropDatabase());
 
 // Insert some data to scan over.
-assert.writeOK(testColl.insert([{}, {}, {}, {}]));
+assert.commandWorked(testColl.insert([{}, {}, {}, {}]));
 
 testDB.setProfilingLevel(2);
 

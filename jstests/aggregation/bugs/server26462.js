@@ -7,10 +7,10 @@
 db.server26462.drop();
 
 // Insert some test documents into the collection.
-assert.writeOK(db.server26462.insert({"_id": 1, "title": "cakes and ale"}));
-assert.writeOK(db.server26462.insert({"_id": 2, "title": "more cakes"}));
-assert.writeOK(db.server26462.insert({"_id": 3, "title": "bread"}));
-assert.writeOK(db.server26462.insert({"_id": 4, "title": "some cakes"}));
+assert.commandWorked(db.server26462.insert({"_id": 1, "title": "cakes and ale"}));
+assert.commandWorked(db.server26462.insert({"_id": 2, "title": "more cakes"}));
+assert.commandWorked(db.server26462.insert({"_id": 3, "title": "bread"}));
+assert.commandWorked(db.server26462.insert({"_id": 4, "title": "some cakes"}));
 
 // Create a text index on the documents.
 assert.commandWorked(db.server26462.createIndex({title: "text"}));

@@ -10,7 +10,7 @@ function shardSetup(shardConfig, dbName, collName) {
     var db = st.getDB(dbName);
 
     // Set the balancer mode to only balance on autoSplit
-    assert.writeOK(st.s.getDB('config').settings.update(
+    assert.commandWorked(st.s.getDB('config').settings.update(
         {_id: 'balancer'},
         {'$unset': {stopped: ''}, '$set': {mode: 'autoSplitOnly'}},
         {writeConcern: {w: 'majority'}}));
@@ -108,7 +108,7 @@ function runTest(test) {
         }
     }
 
-    assert.writeOK(configDB.tags.remove({ns: db + "." + collName}));
+    assert.commandWorked(configDB.tags.remove({ns: db + "." + collName}));
     // End of test cleanup
 }
 

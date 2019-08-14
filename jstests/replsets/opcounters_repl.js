@@ -66,21 +66,21 @@ assert.eq(diff.secondary.command, 1);
 
 // 2. Insert a document.
 diff = getOpCountersDiff(() => {
-    assert.writeOK(primaryColl.insert({_id: 0}, {writeConcern: {w: 2}}));
+    assert.commandWorked(primaryColl.insert({_id: 0}, {writeConcern: {w: 2}}));
 });
 assert.eq(diff.primary.insert, 1);
 assert.eq(diff.secondary.insert, 1);
 
 // 3. Update a document.
 diff = getOpCountersDiff(() => {
-    assert.writeOK(primaryColl.update({_id: 0}, {$set: {a: 1}}, {writeConcern: {w: 2}}));
+    assert.commandWorked(primaryColl.update({_id: 0}, {$set: {a: 1}}, {writeConcern: {w: 2}}));
 });
 assert.eq(diff.primary.update, 1);
 assert.eq(diff.secondary.update, 1);
 
 // 4. Delete a document.
 diff = getOpCountersDiff(() => {
-    assert.writeOK(primaryColl.remove({_id: 0}, {writeConcern: {w: 2}}));
+    assert.commandWorked(primaryColl.remove({_id: 0}, {writeConcern: {w: 2}}));
 });
 assert.eq(diff.primary.delete, 1);
 assert.eq(diff.secondary.delete, 1);

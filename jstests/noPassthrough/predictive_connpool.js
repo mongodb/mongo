@@ -131,9 +131,9 @@ function walkThroughBehavior({primaryFollows, secondaryFollows}) {
     dropConnections();
 }
 
-assert.writeOK(mongos.test.insert({x: 1}));
-assert.writeOK(mongos.test.insert({x: 2}));
-assert.writeOK(mongos.test.insert({x: 3}));
+assert.commandWorked(mongos.test.insert({x: 1}));
+assert.commandWorked(mongos.test.insert({x: 2}));
+assert.commandWorked(mongos.test.insert({x: 3}));
 st.rs0.awaitReplication();
 
 jsTestLog("Following disabled");

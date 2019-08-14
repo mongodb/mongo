@@ -15,14 +15,14 @@ var testDB = st.s.getDB('test');
 assert.eq(null, testDB.user.findOne());
 assert.eq(null, configDB.databases.findOne({_id: 'test'}));
 
-assert.writeOK(testDB.user.insert({x: 1}));
+assert.commandWorked(testDB.user.insert({x: 1}));
 
 var testDBDoc = configDB.databases.findOne();
 assert.eq('test', testDBDoc._id, tojson(testDBDoc));
 
 // Test that inserting to another collection in the same database will not modify the existing
 // config.databases entry.
-assert.writeOK(testDB.bar.insert({y: 1}));
+assert.commandWorked(testDB.bar.insert({y: 1}));
 assert.eq(testDBDoc, configDB.databases.findOne());
 
 st.s.adminCommand({enableSharding: 'foo'});

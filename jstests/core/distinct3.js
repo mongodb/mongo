@@ -20,7 +20,7 @@ for (i = 0; i < 50; ++i) {
 for (i = 0; i < 100; ++i) {
     bulk.insert({b: i, c: i + 50});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 // Attempt to remove the last match for the {a:1} index scan while distinct is yielding.
 p = startParallelShell('for( i = 0; i < 100; ++i ) {                              ' +
@@ -29,7 +29,7 @@ p = startParallelShell('for( i = 0; i < 100; ++i ) {                            
                        '    for( j = 0; j < 20; ++j ) {                           ' +
                        '        bulk.insert( { a:49, c:49, d:j } );               ' +
                        '    }                                                     ' +
-                       '    assert.writeOK(bulk.execute());                       ' +
+                       '    assert.commandWorked(bulk.execute());                       ' +
                        '}                                                         ');
 
 for (i = 0; i < 100; ++i) {

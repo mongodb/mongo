@@ -44,7 +44,7 @@ var bulk = coll.initializeUnorderedBulkOp();
 for (var i = 0; i < toInsert; i++) {
     bulk.insert({my: "test", data: "to", insert: i});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 print("starting updating phase");
 
@@ -55,7 +55,7 @@ for (var i = 0; i < toUpdate; i++) {
     var id = coll.findOne({insert: i})._id;
     bulk.find({insert: i, _id: id}).update({$inc: {counter: 1}});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 print("starting deletion");
 
@@ -65,7 +65,7 @@ bulk = coll.initializeUnorderedBulkOp();
 for (var i = 0; i < toDelete; i++) {
     bulk.find({insert: i}).removeOne();
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 // Make sure the right amount of data is there
 assert.eq(coll.find().itcount({my: 'test'}), toInsert / 2);

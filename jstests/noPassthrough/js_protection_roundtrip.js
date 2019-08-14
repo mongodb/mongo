@@ -48,7 +48,7 @@ var result = t.insert({
         return "yes";
     }
 });
-assert.writeOK(result);
+assert.commandWorked(result);
 
 testFunctionUnmarshall(true, withJavaScriptProtection);
 testFunctionUnmarshall(false, withoutJavaScriptProtection);

@@ -6,10 +6,10 @@ load('jstests/libs/fixture_helpers.js');      // For 'FixtureHelpers'
 const coll = db.server11675;
 coll.drop();
 
-assert.writeOK(coll.insert({_id: 1, text: "apple", words: 1}));
-assert.writeOK(coll.insert({_id: 2, text: "banana", words: 1}));
-assert.writeOK(coll.insert({_id: 3, text: "apple banana", words: 2}));
-assert.writeOK(coll.insert({_id: 4, text: "cantaloupe", words: 1}));
+assert.commandWorked(coll.insert({_id: 1, text: "apple", words: 1}));
+assert.commandWorked(coll.insert({_id: 2, text: "banana", words: 1}));
+assert.commandWorked(coll.insert({_id: 3, text: "apple banana", words: 2}));
+assert.commandWorked(coll.insert({_id: 4, text: "cantaloupe", words: 1}));
 
 assert.commandWorked(coll.createIndex({text: "text"}));
 
@@ -202,7 +202,7 @@ res = coll.aggregate([
 assert(!("scoreAgain" in res[0]));
 
 // Make sure metadata works after a $unwind
-assert.writeOK(coll.insert({_id: 5, text: 'mango', words: [1, 2, 3]}));
+assert.commandWorked(coll.insert({_id: 5, text: 'mango', words: [1, 2, 3]}));
 res = coll.aggregate([
               {$match: {$text: {$search: 'mango'}}},
               {$project: {score: {$meta: "textScore"}, _id: 1, words: 1}},

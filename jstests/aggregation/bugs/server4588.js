@@ -5,11 +5,11 @@
 const coll = db.server4588;
 coll.drop();
 
-assert.writeOK(coll.insert({_id: 0}));
-assert.writeOK(coll.insert({_id: 1, x: null}));
-assert.writeOK(coll.insert({_id: 2, x: []}));
-assert.writeOK(coll.insert({_id: 3, x: [1, 2, 3]}));
-assert.writeOK(coll.insert({_id: 4, x: 5}));
+assert.commandWorked(coll.insert({_id: 0}));
+assert.commandWorked(coll.insert({_id: 1, x: null}));
+assert.commandWorked(coll.insert({_id: 2, x: []}));
+assert.commandWorked(coll.insert({_id: 3, x: [1, 2, 3]}));
+assert.commandWorked(coll.insert({_id: 4, x: 5}));
 
 // Without includeArrayIndex.
 let actualResults = coll.aggregate([{$unwind: {path: "$x"}}, {$sort: {_id: 1, x: 1}}]).toArray();

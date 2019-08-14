@@ -43,7 +43,7 @@ var bulk = masterDB[collName].initializeUnorderedBulkOp();
 for (var i = 0; i < size; ++i) {
     bulk.insert({i: i, j: i, k: i});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 jsTest.log("Creating index");
 masterDB[collName].ensureIndex({i: 1});

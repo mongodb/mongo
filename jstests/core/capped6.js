@@ -70,7 +70,7 @@ function runCapTrunc(valueArray, valueArrayCurIndex, n, inc) {
     assert.gt(n, 0);
     assert.gte(valueArray.length, maxDocuments);
     for (var i = valueArrayCurIndex; i < maxDocuments; ++i) {
-        assert.writeOK(coll.insert(valueArray[i]));
+        assert.commandWorked(coll.insert(valueArray[i]));
     }
     count = coll.count();
 

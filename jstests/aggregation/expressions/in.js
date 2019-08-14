@@ -32,7 +32,7 @@ function testExpressionCollectionCollation(options, collationSpec) {
 
 function testExpressionInternal(options) {
     var pipeline = {$project: {included: {$in: ["$elementField", {$literal: options.array}]}}};
-    assert.writeOK(coll.insert({elementField: options.element}));
+    assert.commandWorked(coll.insert({elementField: options.element}));
     var res = coll.aggregate(pipeline).toArray();
     assert.eq(res.length, 1);
     assert.eq(res[0].included, options.elementIsIncluded);

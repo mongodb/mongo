@@ -29,7 +29,7 @@ const shard1DB = st.shard1.getDB(kDBName);
 let coll = mongosDB.sharded_agg_cleanup_on_error;
 
 for (let i = 0; i < 10; i++) {
-    assert.writeOK(coll.insert({_id: i}));
+    assert.commandWorked(coll.insert({_id: i}));
 }
 
 st.shardColl(coll, {_id: 1}, {_id: 5}, {_id: 6}, kDBName, false);

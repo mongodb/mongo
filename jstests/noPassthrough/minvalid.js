@@ -22,7 +22,7 @@ var lastOp = local.oplog.rs.find().sort({$natural: -1}).limit(1).next();
 printjson(lastOp);
 
 print("3: change minvalid");
-assert.writeOK(local.replset.minvalid.update(
+assert.commandWorked(local.replset.minvalid.update(
     {}, {$set: {ts: new Timestamp(lastOp.ts.t, lastOp.ts.i + 1)}}, {upsert: true}));
 printjson(local.replset.minvalid.findOne());
 

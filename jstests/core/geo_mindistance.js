@@ -195,9 +195,9 @@ assert.eq(n_docs_within(1000) - n_docs_within(500),
 
 t.drop();
 assert.commandWorked(t.createIndex({loc: "2d"}));
-assert.writeOK(t.insert({loc: [0, 40]}));
-assert.writeOK(t.insert({loc: [0, 41]}));
-assert.writeOK(t.insert({loc: [0, 42]}));
+assert.commandWorked(t.insert({loc: [0, 40]}));
+assert.commandWorked(t.insert({loc: [0, 41]}));
+assert.commandWorked(t.insert({loc: [0, 42]}));
 
 // Test minDistance for 2d index with $near.
 assert.eq(3, t.find({loc: {$near: [0, 0]}}).itcount());

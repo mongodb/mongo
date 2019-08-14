@@ -12,7 +12,7 @@ var t = db.apply_ops_dups;
 t.drop();
 
 // Check that duplicate _id fields don't cause an error
-assert.writeOK(t.insert({_id: 0, x: 1}));
+assert.commandWorked(t.insert({_id: 0, x: 1}));
 assert.commandWorked(t.createIndex({x: 1}, {unique: true}));
 var a = assert.commandWorked(db.adminCommand({
     applyOps: [

@@ -50,7 +50,7 @@ coll.drop();
 assert.commandWorked(coll.createIndex({a: 1}));
 
 for (let i = 0; i < kCollSize; i++) {
-    assert.writeOK(coll.insert({a: 1}));
+    assert.commandWorked(coll.insert({a: 1}));
 }
 
 const pipeline = [{$match: {a: 1}}, {$limit: kLimit}];

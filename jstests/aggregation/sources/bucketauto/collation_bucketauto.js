@@ -14,15 +14,15 @@ var coll = db.collation_bucket;
 coll.drop();
 
 function insertData() {
-    assert.writeOK(coll.insert({num: "1"}));
-    assert.writeOK(coll.insert({num: "2"}));
-    assert.writeOK(coll.insert({num: "5"}));
-    assert.writeOK(coll.insert({num: "10"}));
-    assert.writeOK(coll.insert({num: "20"}));
-    assert.writeOK(coll.insert({num: "50"}));
-    assert.writeOK(coll.insert({num: "100"}));
-    assert.writeOK(coll.insert({num: "200"}));
-    assert.writeOK(coll.insert({num: "500"}));
+    assert.commandWorked(coll.insert({num: "1"}));
+    assert.commandWorked(coll.insert({num: "2"}));
+    assert.commandWorked(coll.insert({num: "5"}));
+    assert.commandWorked(coll.insert({num: "10"}));
+    assert.commandWorked(coll.insert({num: "20"}));
+    assert.commandWorked(coll.insert({num: "50"}));
+    assert.commandWorked(coll.insert({num: "100"}));
+    assert.commandWorked(coll.insert({num: "200"}));
+    assert.commandWorked(coll.insert({num: "500"}));
 }
 
 insertData();

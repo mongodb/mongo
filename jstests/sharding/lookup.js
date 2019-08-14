@@ -42,13 +42,13 @@ function runTest(coll, from, thirdColl, fourthColl) {
     assert.commandWorked(thirdColl.remove({}));
     assert.commandWorked(fourthColl.remove({}));
 
-    assert.writeOK(coll.insert({_id: 0, a: 1}));
-    assert.writeOK(coll.insert({_id: 1, a: null}));
-    assert.writeOK(coll.insert({_id: 2}));
+    assert.commandWorked(coll.insert({_id: 0, a: 1}));
+    assert.commandWorked(coll.insert({_id: 1, a: null}));
+    assert.commandWorked(coll.insert({_id: 2}));
 
-    assert.writeOK(from.insert({_id: 0, b: 1}));
-    assert.writeOK(from.insert({_id: 1, b: null}));
-    assert.writeOK(from.insert({_id: 2}));
+    assert.commandWorked(from.insert({_id: 0, b: 1}));
+    assert.commandWorked(from.insert({_id: 1, b: null}));
+    assert.commandWorked(from.insert({_id: 2}));
 
     //
     // Basic functionality.
@@ -258,17 +258,17 @@ function runTest(coll, from, thirdColl, fourthColl) {
     //
 
     assert.commandWorked(coll.remove({}));
-    assert.writeOK(coll.insert({_id: 0, a: 1}));
-    assert.writeOK(coll.insert({_id: 1, a: null}));
-    assert.writeOK(coll.insert({_id: 2}));
-    assert.writeOK(coll.insert({_id: 3, a: {c: 1}}));
+    assert.commandWorked(coll.insert({_id: 0, a: 1}));
+    assert.commandWorked(coll.insert({_id: 1, a: null}));
+    assert.commandWorked(coll.insert({_id: 2}));
+    assert.commandWorked(coll.insert({_id: 3, a: {c: 1}}));
 
     assert.commandWorked(from.remove({}));
-    assert.writeOK(from.insert({_id: 0, b: 1}));
-    assert.writeOK(from.insert({_id: 1, b: null}));
-    assert.writeOK(from.insert({_id: 2}));
-    assert.writeOK(from.insert({_id: 3, b: {c: 1}}));
-    assert.writeOK(from.insert({_id: 4, b: {c: 2}}));
+    assert.commandWorked(from.insert({_id: 0, b: 1}));
+    assert.commandWorked(from.insert({_id: 1, b: null}));
+    assert.commandWorked(from.insert({_id: 2}));
+    assert.commandWorked(from.insert({_id: 3, b: {c: 1}}));
+    assert.commandWorked(from.insert({_id: 4, b: {c: 2}}));
 
     // Once without a dotted field.
     let pipeline = [{$lookup: {localField: "a", foreignField: "b", from: "from", as: "same"}}];
@@ -293,11 +293,11 @@ function runTest(coll, from, thirdColl, fourthColl) {
 
     // With an $unwind stage.
     assert.commandWorked(coll.remove({}));
-    assert.writeOK(coll.insert({_id: 0, a: {b: 1}}));
-    assert.writeOK(coll.insert({_id: 1}));
+    assert.commandWorked(coll.insert({_id: 0, a: {b: 1}}));
+    assert.commandWorked(coll.insert({_id: 1}));
 
     assert.commandWorked(from.remove({}));
-    assert.writeOK(from.insert({_id: 0, target: 1}));
+    assert.commandWorked(from.insert({_id: 0, target: 1}));
 
     pipeline = [
             {
@@ -331,11 +331,11 @@ function runTest(coll, from, thirdColl, fourthColl) {
 
     // This must only do an equality match rather than treating the value as a regex.
     assert.commandWorked(coll.remove({}));
-    assert.writeOK(coll.insert({_id: 0, a: /a regex/}));
+    assert.commandWorked(coll.insert({_id: 0, a: /a regex/}));
 
     assert.commandWorked(from.remove({}));
-    assert.writeOK(from.insert({_id: 0, b: /a regex/}));
-    assert.writeOK(from.insert({_id: 1, b: "string that matches /a regex/"}));
+    assert.commandWorked(from.insert({_id: 0, b: /a regex/}));
+    assert.commandWorked(from.insert({_id: 1, b: "string that matches /a regex/"}));
 
     pipeline = [
             {
@@ -356,11 +356,11 @@ function runTest(coll, from, thirdColl, fourthColl) {
 
     // Basic array corresponding to multiple documents.
     assert.commandWorked(coll.remove({}));
-    assert.writeOK(coll.insert({_id: 0, a: [0, 1, 2]}));
+    assert.commandWorked(coll.insert({_id: 0, a: [0, 1, 2]}));
 
     assert.commandWorked(from.remove({}));
-    assert.writeOK(from.insert({_id: 0}));
-    assert.writeOK(from.insert({_id: 1}));
+    assert.commandWorked(from.insert({_id: 0}));
+    assert.commandWorked(from.insert({_id: 1}));
 
     pipeline = [
             {
@@ -377,11 +377,11 @@ function runTest(coll, from, thirdColl, fourthColl) {
 
     // Basic array corresponding to a single document.
     assert.commandWorked(coll.remove({}));
-    assert.writeOK(coll.insert({_id: 0, a: [1]}));
+    assert.commandWorked(coll.insert({_id: 0, a: [1]}));
 
     assert.commandWorked(from.remove({}));
-    assert.writeOK(from.insert({_id: 0}));
-    assert.writeOK(from.insert({_id: 1}));
+    assert.commandWorked(from.insert({_id: 0}));
+    assert.commandWorked(from.insert({_id: 1}));
 
     pipeline = [
             {
@@ -398,14 +398,14 @@ function runTest(coll, from, thirdColl, fourthColl) {
 
     // Array containing regular expressions.
     assert.commandWorked(coll.remove({}));
-    assert.writeOK(coll.insert({_id: 0, a: [/a regex/, /^x/]}));
-    assert.writeOK(coll.insert({_id: 1, a: [/^x/]}));
+    assert.commandWorked(coll.insert({_id: 0, a: [/a regex/, /^x/]}));
+    assert.commandWorked(coll.insert({_id: 1, a: [/^x/]}));
 
     assert.commandWorked(from.remove({}));
-    assert.writeOK(from.insert({_id: 0, b: "should not match a regex"}));
-    assert.writeOK(from.insert({_id: 1, b: "xxxx"}));
-    assert.writeOK(from.insert({_id: 2, b: /a regex/}));
-    assert.writeOK(from.insert({_id: 3, b: /^x/}));
+    assert.commandWorked(from.insert({_id: 0, b: "should not match a regex"}));
+    assert.commandWorked(from.insert({_id: 1, b: "xxxx"}));
+    assert.commandWorked(from.insert({_id: 2, b: /a regex/}));
+    assert.commandWorked(from.insert({_id: 3, b: /^x/}));
 
     pipeline = [
             {
@@ -425,13 +425,13 @@ function runTest(coll, from, thirdColl, fourthColl) {
 
     // 'localField' references a field within an array of sub-objects.
     assert.commandWorked(coll.remove({}));
-    assert.writeOK(coll.insert({_id: 0, a: [{b: 1}, {b: 2}]}));
+    assert.commandWorked(coll.insert({_id: 0, a: [{b: 1}, {b: 2}]}));
 
     assert.commandWorked(from.remove({}));
-    assert.writeOK(from.insert({_id: 0}));
-    assert.writeOK(from.insert({_id: 1}));
-    assert.writeOK(from.insert({_id: 2}));
-    assert.writeOK(from.insert({_id: 3}));
+    assert.commandWorked(from.insert({_id: 0}));
+    assert.commandWorked(from.insert({_id: 1}));
+    assert.commandWorked(from.insert({_id: 2}));
+    assert.commandWorked(from.insert({_id: 3}));
 
     pipeline = [
             {

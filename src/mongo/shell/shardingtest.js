@@ -1484,7 +1484,7 @@ var ShardingTest = function(params) {
     // If chunkSize has been requested for this test, write the configuration
     if (otherParams.chunkSize) {
         function setChunkSize() {
-            assert.writeOK(csrsPrimary.getDB('config').settings.update(
+            assert.commandWorked(csrsPrimary.getDB('config').settings.update(
                 {_id: 'chunksize'},
                 {$set: {value: otherParams.chunkSize}},
                 {upsert: true, writeConcern: {w: 'majority', wtimeout: kDefaultWTimeoutMs}}));

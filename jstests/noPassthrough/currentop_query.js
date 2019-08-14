@@ -71,7 +71,7 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
     dropAndRecreateTestCollection();
 
     for (let i = 0; i < 5; ++i) {
-        assert.writeOK(coll.insert({_id: i, a: i}));
+        assert.commandWorked(coll.insert({_id: i, a: i}));
     }
 
     const isLocalMongosCurOp = (FixtureHelpers.isMongos(testDB) && localOps);
@@ -280,8 +280,8 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
             },
             {
                 test: function(db) {
-                    assert.writeOK(db.currentop_query.remove({a: 2, $comment: "currentop_query"},
-                                                             {collation: {locale: "fr"}}));
+                    assert.commandWorked(db.currentop_query.remove(
+                        {a: 2, $comment: "currentop_query"}, {collation: {locale: "fr"}}));
                 },
                 operation: "remove",
                 planSummary: "COLLSCAN",
@@ -294,7 +294,7 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
             },
             {
                 test: function(db) {
-                    assert.writeOK(
+                    assert.commandWorked(
                         db.currentop_query.update({a: 1, $comment: "currentop_query"},
                                                   {$inc: {b: 1}},
                                                   {collation: {locale: "fr"}, multi: true}));
@@ -372,7 +372,7 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
         //
         dropAndRecreateTestCollection();
         for (let i = 0; i < 10; ++i) {
-            assert.writeOK(coll.insert({a: i}));
+            assert.commandWorked(coll.insert({a: i}));
         }
 
         const originatingCommands = {
@@ -493,7 +493,7 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
      */
     function runTruncationTests() {
         dropAndRecreateTestCollection();
-        assert.writeOK(coll.insert({a: 1}));
+        assert.commandWorked(coll.insert({a: 1}));
 
         // When the currentOp command serializes the query object as a string, individual string
         // values inside it are truncated at 150 characters. To test "total length" truncation

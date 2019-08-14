@@ -13,7 +13,7 @@
 var coll = db.collation_plan_cache;
 coll.drop();
 
-assert.writeOK(coll.insert({a: 'foo', b: 5}));
+assert.commandWorked(coll.insert({a: 'foo', b: 5}));
 
 // We need two indexes that each query can use so that a plan cache entry is created.
 assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: 'en_US'}}));

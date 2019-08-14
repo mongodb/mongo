@@ -14,7 +14,7 @@ var bulk = t.initializeUnorderedBulkOp();
 for (let i = 0; i < N; i++) {
     bulk.insert({_id: i, x: 1});
 }
-assert.writeOK(bulk.execute());
+assert.commandWorked(bulk.execute());
 
 const join = startParallelShell(
     "while( db.foo.findOne( { _id : 0 } ).x == 1 ); db.foo.ensureIndex( { x : 1 } );");

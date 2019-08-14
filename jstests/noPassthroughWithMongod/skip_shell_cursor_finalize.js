@@ -6,7 +6,7 @@ const coll = db.skip_shell_cursor_finalize;
 coll.drop();
 
 for (let i = 0; i < 3; i++) {
-    assert.writeOK(coll.insert({_id: i}));
+    assert.commandWorked(coll.insert({_id: i}));
 }
 
 function checkShellCursorFinalize(skip = true) {

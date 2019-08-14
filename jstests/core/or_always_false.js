@@ -5,7 +5,7 @@
 const coll = db.or_always_false;
 coll.drop();
 
-assert.writeOK(coll.insert([{}, {}, {}]));
+assert.commandWorked(coll.insert([{}, {}, {}]));
 const emptyOrError = assert.throws(() => coll.find({$or: []}).itcount());
 assert.eq(emptyOrError.code, ErrorCodes.BadValue);
 
