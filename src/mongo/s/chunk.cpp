@@ -47,14 +47,14 @@ PseudoRandom prng(static_cast<int64_t>(time(0)));
 
 // Assume user has 64MB chunkSize setting. It is ok if this assumption is wrong since it is only
 // a heuristic.
-const int64_t kMaxDataWritten = 64 / Chunk::kSplitTestFactor;
+const int64_t kMaxDataWrittenBytes = 64 * 1024 * 1024 / Chunk::kSplitTestFactor;
 
 /**
- * Generates a random value for _dataWritten so that a mongos restart wouldn't cause delay in
+ * Generates a random value for _dataWrittenBytes so that a mongos restart wouldn't cause delay in
  * splitting.
  */
-int64_t mkDataWritten() {
-    return prng.nextInt64(kMaxDataWritten);
+int64_t mkDataWrittenBytes() {
+    return prng.nextInt64(kMaxDataWrittenBytes);
 }
 
 }  // namespace
@@ -64,7 +64,7 @@ Chunk::Chunk(const ChunkType& from)
       _shardId(from.getShard()),
       _lastmod(from.getVersion()),
       _jumbo(from.getJumbo()),
-      _dataWritten(mkDataWritten()) {
+      _dataWrittenBytes(mkDataWrittenBytes()) {
     invariantOK(from.validate());
 }
 
@@ -73,16 +73,16 @@ bool Chunk::containsKey(const BSONObj& shardKey) const {
 }
 
 uint64_t Chunk::getBytesWritten() const {
-    return _dataWritten;
+    return _dataWrittenBytes;
 }
 
 uint64_t Chunk::addBytesWritten(uint64_t bytesWrittenIncrement) {
-    _dataWritten += bytesWrittenIncrement;
-    return _dataWritten;
+    _dataWrittenBytes += bytesWrittenIncrement;
+    return _dataWrittenBytes;
 }
 
 void Chunk::clearBytesWritten() {
-    _dataWritten = 0;
+    _dataWrittenBytes = 0;
 }
 
 bool Chunk::shouldSplit(uint64_t desiredChunkSize, bool minIsInf, bool maxIsInf) const {
@@ -93,7 +93,7 @@ bool Chunk::shouldSplit(uint64_t desiredChunkSize, bool minIsInf, bool maxIsInf)
         : desiredChunkSize;
 
     // Check if there are enough estimated bytes written to warrant a split
-    return _dataWritten >= splitThreshold / kSplitTestFactor;
+    return _dataWrittenBytes >= splitThreshold / kSplitTestFactor;
 }
 
 std::string Chunk::toString() const {
