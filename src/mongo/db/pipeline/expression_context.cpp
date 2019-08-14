@@ -29,10 +29,13 @@
 
 #include "mongo/platform/basic.h"
 
+#include <utility>
+
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/stub_mongo_process_interface.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 
@@ -48,24 +51,60 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                                      std::shared_ptr<MongoProcessInterface> processInterface,
                                      StringMap<ResolvedNamespace> resolvedNamespaces,
                                      boost::optional<UUID> collUUID)
-    : ExpressionContext(opCtx, collator.get()) {
-    explain = request.getExplain();
-    comment = request.getComment();
-    fromMongos = request.isFromMongos();
-    needsMerge = request.needsMerge();
-    allowDiskUse = request.shouldAllowDiskUse();
-    bypassDocumentValidation = request.shouldBypassDocumentValidation();
-    ns = request.getNamespaceString();
-    mongoProcessInterface = std::move(processInterface);
-    collation = request.getCollation();
-    _ownedCollator = std::move(collator);
-    _resolvedNamespaces = std::move(resolvedNamespaces);
-    uuid = std::move(collUUID);
-    if (request.getRuntimeConstants()) {
-        variables.setRuntimeConstants(request.getRuntimeConstants().get());
-    } else {
+    : ExpressionContext(opCtx,
+                        request.getExplain(),
+                        request.getComment(),
+                        request.isFromMongos(),
+                        request.needsMerge(),
+                        request.shouldAllowDiskUse(),
+                        request.shouldBypassDocumentValidation(),
+                        request.getNamespaceString(),
+                        request.getCollation(),
+                        request.getRuntimeConstants(),
+                        std::move(collator),
+                        std::move(processInterface),
+                        std::move(resolvedNamespaces),
+                        std::move(collUUID)) {}
+
+ExpressionContext::ExpressionContext(
+    OperationContext* opCtx,
+    const boost::optional<ExplainOptions::Verbosity>& explain,
+    StringData comment,
+    bool fromMongos,
+    bool needsMerge,
+    bool allowDiskUse,
+    bool bypassDocumentValidation,
+    const NamespaceString& ns,
+    const BSONObj& collation,
+    const boost::optional<RuntimeConstants>& runtimeConstants,
+    std::unique_ptr<CollatorInterface> collator,
+    const std::shared_ptr<MongoProcessInterface>& mongoProcessInterface,
+    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
+    boost::optional<UUID> collUUID)
+    : explain(explain),
+      comment(comment),
+      fromMongos(fromMongos),
+      needsMerge(needsMerge),
+      allowDiskUse(allowDiskUse),
+      bypassDocumentValidation(bypassDocumentValidation),
+      ns(ns),
+      uuid(std::move(collUUID)),
+      opCtx(opCtx),
+      mongoProcessInterface(mongoProcessInterface),
+      timeZoneDatabase(opCtx && opCtx->getServiceContext()
+                           ? TimeZoneDatabase::get(opCtx->getServiceContext())
+                           : nullptr),
+      collation(collation),
+      variablesParseState(variables.useIdGenerator()),
+      _ownedCollator(std::move(collator)),
+      _unownedCollator(_ownedCollator.get()),
+      _documentComparator(_unownedCollator),
+      _valueComparator(_unownedCollator),
+      _resolvedNamespaces(std::move(resolvedNamespaces)) {
+    if (runtimeConstants)
+        variables.setRuntimeConstants(*runtimeConstants);
+    else
         variables.setDefaultRuntimeConstants(opCtx);
-    }
 }
 
 ExpressionContext::ExpressionContext(OperationContext* opCtx,
@@ -77,21 +116,13 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                            ? TimeZoneDatabase::get(opCtx->getServiceContext())
                            : nullptr),
       variablesParseState(variables.useIdGenerator()),
-      _collator(collator),
-      _documentComparator(_collator),
-      _valueComparator(_collator) {
+      _unownedCollator(collator),
+      _documentComparator(_unownedCollator),
+      _valueComparator(_unownedCollator) {
     if (runtimeConstants) {
         variables.setRuntimeConstants(*runtimeConstants);
     }
 }
-
-ExpressionContext::ExpressionContext(NamespaceString nss,
-                                     std::shared_ptr<MongoProcessInterface> processInterface,
-                                     const TimeZoneDatabase* tzDb)
-    : ns(std::move(nss)),
-      mongoProcessInterface(std::move(processInterface)),
-      timeZoneDatabase(tzDb),
-      variablesParseState(variables.useIdGenerator()) {}
 
 void ExpressionContext::checkForInterrupt() {
     // This check could be expensive, at least in relative terms, so don't check every time.
@@ -108,7 +139,7 @@ ExpressionContext::CollatorStash::CollatorStash(
     : _expCtx(expCtx),
       _originalCollation(_expCtx->collation),
       _originalCollatorOwned(std::move(_expCtx->_ownedCollator)),
-      _originalCollatorUnowned(_expCtx->_collator) {
+      _originalCollatorUnowned(_expCtx->_unownedCollator) {
     _expCtx->setCollator(std::move(newCollator));
     _expCtx->collation =
         _expCtx->getCollator() ? _expCtx->getCollator()->getSpec().toBSON().getOwned() : BSONObj();
@@ -136,49 +167,58 @@ std::unique_ptr<ExpressionContext::CollatorStash> ExpressionContext::temporarily
 }
 
 void ExpressionContext::setCollator(const CollatorInterface* collator) {
-    _collator = collator;
+    _unownedCollator = collator;
 
     // Document/Value comparisons must be aware of the collation.
-    _documentComparator = DocumentComparator(_collator);
-    _valueComparator = ValueComparator(_collator);
+    _documentComparator = DocumentComparator(_unownedCollator);
+    _valueComparator = ValueComparator(_unownedCollator);
 }
 
 intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     NamespaceString ns,
     boost::optional<UUID> uuid,
-    boost::optional<std::unique_ptr<CollatorInterface>> collator) const {
-    intrusive_ptr<ExpressionContext> expCtx =
-        new ExpressionContext(std::move(ns), mongoProcessInterface, timeZoneDatabase);
+    boost::optional<std::unique_ptr<CollatorInterface>> updatedCollator) const {
 
-    expCtx->uuid = std::move(uuid);
-    expCtx->explain = explain;
-    expCtx->comment = comment;
-    expCtx->needsMerge = needsMerge;
-    expCtx->fromMongos = fromMongos;
+    auto [collationParam, collatorParam] = [&]() {
+        if (updatedCollator)
+            return std::pair(*updatedCollator ? (*updatedCollator)->getSpec().toBSON()
+                                              : CollationSpec::kSimpleSpec,
+                             std::move(*updatedCollator));
+        else
+            return std::pair(collation,
+                             _ownedCollator ? _ownedCollator->clone()
+                                            : std::unique_ptr<CollatorInterface>{});
+    }();
+
+    auto expCtx = make_intrusive<ExpressionContext>(opCtx,
+                                                    explain,
+                                                    comment,
+                                                    fromMongos,
+                                                    needsMerge,
+                                                    allowDiskUse,
+                                                    bypassDocumentValidation,
+                                                    ns,
+                                                    std::move(collationParam),
+                                                    boost::none,  // runtimeConstants
+                                                    std::move(collatorParam),
+                                                    mongoProcessInterface,
+                                                    _resolvedNamespaces,
+                                                    uuid);
+
     expCtx->inMongos = inMongos;
-    expCtx->allowDiskUse = allowDiskUse;
-    expCtx->bypassDocumentValidation = bypassDocumentValidation;
     expCtx->maxFeatureCompatibilityVersion = maxFeatureCompatibilityVersion;
     expCtx->subPipelineDepth = subPipelineDepth;
-
     expCtx->tempDir = tempDir;
 
-    expCtx->opCtx = opCtx;
-
-    if (collator) {
-        expCtx->collation =
-            *collator ? (*collator)->getSpec().toBSON() : CollationSpec::kSimpleSpec;
-        expCtx->setCollator(std::move(*collator));
-    } else {
-        expCtx->collation = collation;
-        if (_ownedCollator) {
-            expCtx->setCollator(_ownedCollator->clone());
-        } else if (_collator) {
-            expCtx->setCollator(_collator);
-        }
-    }
-
-    expCtx->_resolvedNamespaces = _resolvedNamespaces;
+    // ExpressionContext is used both universally in Agg and in Find within a $expr. In the case
+    // that this context is for use in $expr, the collator will be unowned and we will pass nullptr
+    // in the constructor call above. If this is the case we must manually update the unowned
+    // collator argument in the new ExpressionContext to match the old one. SERVER-31294 tracks an
+    // effort to divorce the ExpressionContext from general Agg resources by creating an
+    // AggregationContext. If that effort comes to fruition, this special-case collator handling
+    // will be made unnecessary.
+    if (!updatedCollator && !collatorParam && _unownedCollator)
+        expCtx->setCollator(_unownedCollator);
 
     expCtx->variables = variables;
     expCtx->variablesParseState = variablesParseState.copyWith(expCtx->variables.useIdGenerator());

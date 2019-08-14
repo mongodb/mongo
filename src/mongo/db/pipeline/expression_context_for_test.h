@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/stub_mongo_process_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
@@ -50,18 +52,29 @@ public:
         : ExpressionContextForTest(NamespaceString{"test"_sd, "namespace"_sd}) {}
 
     ExpressionContextForTest(NamespaceString nss)
-        : ExpressionContext(
-              std::move(nss), std::make_shared<StubMongoProcessInterface>(), kNullTimeZoneDatabase),
+        : ExpressionContext(nullptr,      // opCtx, nullptr while base class is constructed.
+                            boost::none,  // explain
+                            "",           // comment
+                            false,        // fromMongos,
+                            false,        // needsMerge,
+                            false,        // allowDiskUse,
+                            false,        // bypassDocumentValidation,
+                            nss,
+                            {},  // collation,
+                            RuntimeConstants(Date_t::now(), Timestamp(1, 0)),
+                            {},  // collator
+                            std::make_shared<StubMongoProcessInterface>(),
+                            {},  // resolvedNamespaces
+                            {}   // collUUID
+                            ),
           _testOpCtx(_serviceContext.makeOperationContext()) {
         TimeZoneDatabase::set(_serviceContext.getServiceContext(),
                               std::make_unique<TimeZoneDatabase>());
-
-        // As we don't have the TimeZoneDatabase prior to ExpressionContext construction, we must
-        // initialize with a nullptr and set post-construction.
+        // As we don't have an OperationContext or TimeZoneDatabase prior to base class
+        // ExpressionContext construction, we must initialize with a nullptr and set
+        // post-construction.
         timeZoneDatabase = TimeZoneDatabase::get(_serviceContext.getServiceContext());
         opCtx = _testOpCtx.get();
-        RuntimeConstants constants(Date_t::now(), Timestamp(1, 0));
-        variables.setRuntimeConstants(constants);
     }
 
     ExpressionContextForTest(OperationContext* opCtx, const AggregationRequest& request)
