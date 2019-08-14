@@ -2694,6 +2694,12 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock() {
         _externalState->forceSnapshotCreation();
     }
 
+    if (!newState.readable() && _memberState.readable()) {
+        // Avoid accumulating history after transitioning to a non-readable state.
+        log() << "Dropping all snapshots on transition from " << _memberState << " to " << newState;
+        _dropAllSnapshots_inlock();
+    }
+
     if (newState.rollback()) {
         // When we start rollback, we need to drop all snapshots since we may need to create
         // out-of-order snapshots. This would be necessary even if the SnapshotName was completely
