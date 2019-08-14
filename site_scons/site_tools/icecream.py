@@ -56,8 +56,7 @@ def generate(env):
         # then fetch it to somewhere under $BUILD_ROOT/scons/icecc
         # with its "correct" name (i.e. the md5 hash), and symlink it
         # to some other deterministic name to use as icecc_version.
-
-        pass
+        env["ENV"]["ICECC_VERSION"] = env["ICECC_VERSION"]
     else:
         # Make a predictable name for the toolchain
         icecc_version_target_filename = env.subst('$CC$CXX').replace('/', '_')
@@ -124,7 +123,8 @@ def generate(env):
         # Add ICECC_VERSION to the environment, pointed at the generated
         # file so that we can expand it in the realpath expressions for
         # CXXCOM and friends below.
-        env['ICECC_VERSION'] = icecc_version
+        env['ICECC_SYMLINK_VERSION'] = icecc_version
+        env['ENV']['ICECC_VERSION'] = os.path.realpath(env.File("$ICECC_SYMLINK_VERSION").abspath)
 
     if env.ToolchainIs('clang'):
         env['ENV']['ICECC_CLANG_REMOTE_CPP'] = 1
@@ -138,23 +138,7 @@ def generate(env):
     if 'ICECC_SCHEDULER' in env:
         env['ENV']['USE_SCHEDULER'] = env['ICECC_SCHEDULER']
 
-    # Not all platforms have the readlink utility, so create our own
-    # generator for that.
-    def icecc_version_gen(target, source, env, for_signature):
-        f = env.File('$ICECC_VERSION')
-        if not f.islink():
-            return f
-        return env.File(os.path.realpath(f.abspath))
-    env['ICECC_VERSION_GEN'] = icecc_version_gen
-
-    def icecc_version_arch_gen(target, source, env, for_signature):
-        if 'ICECC_VERSION_ARCH' in env:
-            return "${ICECC_VERSION_ARCH}:"
-        return str()
-    env['ICECC_VERSION_ARCH_GEN'] = icecc_version_arch_gen
-
     # Make compile jobs flow through icecc
-    env['ENV']['ICECC_VERSION'] = env.subst('${ICECC_VERSION_ARCH_GEN}${ICECC_VERSION_GEN}')
     env['CCCOM'] = '$( $ICECC $) ' + env['CCCOM']
     env['CXXCOM'] = '$( $ICECC $) ' + env['CXXCOM']
     env['SHCCCOM'] = '$( $ICECC $) ' + env['SHCCCOM']
