@@ -211,7 +211,7 @@ public:
 
     class BulkBuilder {
     public:
-        using Sorter = mongo::Sorter<BSONObj, RecordId>;
+        using Sorter = mongo::Sorter<KeyString::Value, mongo::NullValue>;
 
         virtual ~BulkBuilder() = default;
 

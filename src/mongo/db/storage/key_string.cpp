@@ -2458,6 +2458,12 @@ RecordId decodeRecordId(BufReader* reader) {
 }
 
 int compare(const char* leftBuf, const char* rightBuf, size_t leftSize, size_t rightSize) {
+    // memcmp has undefined behavior if either leftBuf or rightBuf is a null pointer.
+    if (MONGO_unlikely(leftSize == 0))
+        return rightSize == 0 ? 0 : -1;
+    else if (MONGO_unlikely(rightSize == 0))
+        return 1;
+
     int min = std::min(leftSize, rightSize);
 
     int cmp = memcmp(leftBuf, rightBuf, min);

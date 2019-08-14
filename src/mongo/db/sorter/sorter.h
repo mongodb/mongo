@@ -39,6 +39,7 @@
 #include <vector>
 
 #include "mongo/bson/util/builder.h"
+#include "mongo/util/bufreader.h"
 
 /**
  * This is the public API for the Sorter (both in-memory and external)
@@ -47,7 +48,7 @@
  * require the following public members:
  *
  * // A type carrying extra information used by the deserializer. Contents are
- * // up to you, but  it should be cheap to copy. Use an empty struct if your
+ * // up to you, but it should be cheap to copy. Use an empty struct if your
  * // deserializer doesn't need extra data.
  * struct SorterDeserializeSettings {};
  *
@@ -127,6 +128,26 @@ struct SortOptions {
     SortOptions& TempDir(const std::string& newTempDir) {
         tempDir = newTempDir;
         return *this;
+    }
+};
+
+/**
+ * This is a 0-sized dummy object that satisfies Sorter's Key/Value interface.
+ */
+class NullValue {
+public:
+    struct SorterDeserializeSettings {};  // unused
+    void serializeForSorter(BufBuilder& buf) const {
+        return;
+    }
+    static NullValue deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&) {
+        return {};
+    }
+    int memUsageForSorter() const {
+        return 0;
+    }
+    NullValue getOwned() const {
+        return {};
     }
 };
 

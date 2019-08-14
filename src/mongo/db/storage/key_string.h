@@ -291,8 +291,13 @@ private:
 class Value {
 
 public:
+    Value() : _version(Version::kLatestVersion), _typeBits(Version::kLatestVersion), _size(0) {}
+
     Value(Version version, TypeBits typeBits, size_t size, ConstSharedBuffer buffer)
         : _version(version), _typeBits(typeBits), _size(size), _buffer(std::move(buffer)) {}
+
+    Value(const Value&) = default;
+    Value(Value&&) = default;
 
     Value& operator=(const Value& other);
 
@@ -322,6 +327,36 @@ public:
      * Returns a hex encoding of this key.
      */
     std::string toString() const;
+
+    /// Members for Sorter
+    struct SorterDeserializeSettings {
+        SorterDeserializeSettings(Version version) : keyStringVersion(version) {}
+        Version keyStringVersion;
+    };
+
+    void serializeForSorter(BufBuilder& buf) const {
+        invariant(_size < std::numeric_limits<unsigned int>::max());
+        buf.appendNum(static_cast<unsigned int>(_size));            // Serialize size of Keystring
+        buf.appendBuf(_buffer.get(), _size);                        // Serialize Keystring
+        buf.appendBuf(_typeBits.getBuffer(), _typeBits.getSize());  // Serialize Typebits
+    }
+
+    static Value deserializeForSorter(BufReader& buf, const SorterDeserializeSettings& settings) {
+        const size_t sizeOfKeystring = buf.read<LittleEndian<unsigned int>>();
+        const void* keystringPtr = buf.skip(sizeOfKeystring);
+
+        BufBuilder newBuf;
+        newBuf.appendBuf(keystringPtr, sizeOfKeystring);
+
+        auto typeBits = TypeBits::fromBuffer(settings.keyStringVersion, &buf);  // advances the buf
+
+        return {settings.keyStringVersion, typeBits, sizeOfKeystring, newBuf.release()};
+    }
+
+    int memUsageForSorter() const {
+        return sizeof(Value) + _size + _typeBits.getSize();
+    }
+    /// Members for Sorter
 
 private:
     Version _version;

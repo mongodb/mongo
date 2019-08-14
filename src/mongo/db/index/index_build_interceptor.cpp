@@ -256,7 +256,7 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
         key,
         _indexCatalogEntry->ordering(),
         opRecordId);
-    const KeyStringSet keySet{std::move(keyString.release())};
+    const KeyStringSet keySet{keyString.release()};
 
     auto accessMethod = _indexCatalogEntry->accessMethod();
     if (opType == Op::kInsert) {

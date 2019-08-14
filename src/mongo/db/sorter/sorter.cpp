@@ -62,7 +62,6 @@
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/bufreader.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/unowned_ptr.h"

@@ -86,24 +86,11 @@ std::vector<KeyString::Value> asVector(const KeyStringSet& keySet) {
 }
 }  // namespace
 
-class BtreeExternalSortComparison {
-public:
-    BtreeExternalSortComparison(const BSONObj& ordering, IndexVersion version)
-        : _ordering(Ordering::make(ordering)), _version(version) {
-        invariant(IndexDescriptor::isIndexVersionSupported(version));
-    }
-
-    typedef std::pair<BSONObj, RecordId> Data;
-
+struct BtreeExternalSortComparison {
+    typedef std::pair<KeyString::Value, mongo::NullValue> Data;
     int operator()(const Data& l, const Data& r) const {
-        if (int x = l.first.woCompare(r.first, _ordering, /*considerfieldname*/ false))
-            return x;
-        return l.second.compare(r.second);
+        return l.first.compare(r.first);
     }
-
-private:
-    const Ordering _ordering;
-    const IndexVersion _version;
 };
 
 AbstractIndexAccessMethod::AbstractIndexAccessMethod(IndexCatalogEntry* btreeState,
@@ -510,12 +497,14 @@ std::unique_ptr<IndexAccessMethod::BulkBuilder> AbstractIndexAccessMethod::initi
 AbstractIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(const IndexAccessMethod* index,
                                                             const IndexDescriptor* descriptor,
                                                             size_t maxMemoryUsageBytes)
-    : _sorter(Sorter::make(
-          SortOptions()
-              .TempDir(storageGlobalParams.dbpath + "/_tmp")
-              .ExtSortAllowed()
-              .MaxMemoryUsageBytes(maxMemoryUsageBytes),
-          BtreeExternalSortComparison(descriptor->keyPattern(), descriptor->version()))),
+    : _sorter(Sorter::make(SortOptions()
+                               .TempDir(storageGlobalParams.dbpath + "/_tmp")
+                               .ExtSortAllowed()
+                               .MaxMemoryUsageBytes(maxMemoryUsageBytes),
+                           BtreeExternalSortComparison(),
+                           std::pair<KeyString::Value::SorterDeserializeSettings,
+                                     mongo::NullValue::SorterDeserializeSettings>(
+                               {index->getSortedDataInterface()->getKeyStringVersion()}, {}))),
       _real(index) {}
 
 Status AbstractIndexAccessMethod::BulkBuilderImpl::insert(OperationContext* opCtx,
@@ -544,11 +533,7 @@ Status AbstractIndexAccessMethod::BulkBuilderImpl::insert(OperationContext* opCt
     }
 
     for (const auto& keyString : keys) {
-        auto key = KeyString::toBson(keyString.getBuffer(),
-                                     keyString.getSize(),
-                                     _real->getSortedDataInterface()->getOrdering(),
-                                     keyString.getTypeBits());
-        _sorter->add(key, loc);
+        _sorter->add(keyString, mongo::NullValue());
         ++_keysInserted;
     }
 
@@ -572,11 +557,7 @@ bool AbstractIndexAccessMethod::BulkBuilderImpl::isMultikey() const {
 IndexAccessMethod::BulkBuilder::Sorter::Iterator*
 AbstractIndexAccessMethod::BulkBuilderImpl::done() {
     for (const auto& keyString : _multikeyMetadataKeys) {
-        auto key = KeyString::toBson(keyString.getBuffer(),
-                                     keyString.getSize(),
-                                     _real->getSortedDataInterface()->getOrdering(),
-                                     keyString.getTypeBits());
-        _sorter->add(key, kMultikeyMetadataKeyId);
+        _sorter->add(keyString, mongo::NullValue());
         ++_keysInserted;
     }
     return _sorter->done();
@@ -610,8 +591,7 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
     auto builder = std::unique_ptr<SortedDataBuilderInterface>(
         _newInterface->getBulkBuilder(opCtx, dupsAllowed));
 
-    BSONObj previousKey;
-    const Ordering ordering = Ordering::make(_descriptor->keyPattern());
+    KeyString::Value previousKey;
 
     while (it->more()) {
         opCtx->checkForInterrupt();
@@ -622,7 +602,8 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
         BulkBuilder::Sorter::Data data = it->next();
 
         // Assert that keys are retrieved from the sorter in non-decreasing order.
-        int cmpData = data.first.woCompare(previousKey, ordering);
+        int cmpData;
+        cmpData = data.first.compareWithoutRecordId(previousKey);
 
         if (cmpData < 0) {
             severe() << "expected the next key" << data.first.toString()
@@ -631,23 +612,28 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
             fassertFailedNoTrace(31171);
         }
 
+        RecordId recordId =
+            KeyString::decodeRecordIdAtEnd(data.first.getBuffer(), data.first.getSize());
+
         // Before attempting to insert, perform a duplicate key check.
         bool isDup = false;
         if (_descriptor->unique()) {
             isDup = cmpData == 0;
             if (isDup && !dupsAllowed) {
                 if (dupRecords) {
-                    dupRecords->insert(data.second);
+                    dupRecords->insert(recordId);
                     continue;
                 }
-                return buildDupKeyErrorStatus(data.first,
+                auto dupKey =
+                    KeyString::toBson(data.first, getSortedDataInterface()->getOrdering());
+                return buildDupKeyErrorStatus(dupKey.getOwned(),
                                               _descriptor->parentNS(),
                                               _descriptor->indexName(),
                                               _descriptor->keyPattern());
             }
         }
 
-        Status status = builder->addKey(data.first, data.second);
+        Status status = builder->addKey(data.first, recordId);
 
         if (!status.isOK()) {
             // Duplicates are checked before inserting.
@@ -655,10 +641,11 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
             return status;
         }
 
-        previousKey = data.first.getOwned();
+        previousKey = data.first;
 
         if (isDup && dupsAllowed && dupKeysInserted) {
-            dupKeysInserted->push_back(data.first.getOwned());
+            auto dupKey = KeyString::toBson(data.first, getSortedDataInterface()->getOrdering());
+            dupKeysInserted->push_back(dupKey.getOwned());
         }
 
         // If we're here either it's a dup and we're cool with it or the addKey went just fine.
@@ -768,4 +755,4 @@ std::string nextFileName() {
 }  // namespace mongo
 
 #include "mongo/db/sorter/sorter.cpp"
-MONGO_CREATE_SORTER(mongo::BSONObj, mongo::RecordId, mongo::BtreeExternalSortComparison);
+MONGO_CREATE_SORTER(mongo::KeyString::Value, mongo::NullValue, mongo::BtreeExternalSortComparison);
