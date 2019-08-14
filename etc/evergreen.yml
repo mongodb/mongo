@@ -10889,11 +10889,11 @@ buildvariants:
 # This variant is to intentionally test uncommon features nightly
 - <<: *enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit-kitchen-sink
-  display_name: "~ Enterprise RHEL 7.0 (Dagger, tcmalloc-profiling)"
+  display_name: "~ Enterprise RHEL 7.0 (Dagger, tcmalloc-profiling, libunwind)"
   batchtime: 1440 # 1 day
   expansions:
     <<: *enterprise-rhel-70-64-bit-expansions-template
-    compile_flags: --ssl --use-cpu-profiler MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl --use-cpu-profiler --use-libunwind MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     additional_targets: dagger # If this moves to another variant, update the compile_all task
   tasks:
   - name: compile_all_run_unittests_TG
@@ -10912,7 +10912,7 @@ buildvariants:
   - rhel70
   expansions:
     <<: *enterprise-rhel-70-64-bit-expansions-template
-    compile_flags: --ssl --use-cpu-profiler MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enterprise-features=hot_backups
+    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enterprise-features=hot_backups
     has_packages: false
     mh_target: ""
   tasks:
