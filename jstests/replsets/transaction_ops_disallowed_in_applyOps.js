@@ -5,7 +5,7 @@
  * other external tools that use applyOps should be converting transactional oplog entries to a
  * non-transactional format before running them through applyOps.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [uses_transactions, uses_prepare_transaction, exclude_from_large_txns]
  */
 (function() {
 "use strict";
