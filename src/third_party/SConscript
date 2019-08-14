@@ -206,7 +206,9 @@ def injectThirdParty(thisEnv, libraries=[], parts=[]):
     libraries = thisEnv.Flatten([libraries])
     parts = thisEnv.Flatten([parts])
     for lib in libraries:
-        mods = thirdPartyEnvironmentModifications[lib]
+        mods = thirdPartyEnvironmentModifications.get(lib, None)
+        if mods is None:
+            continue
         if not parts:
             thisEnv.PrependUnique(**mods)
         else:
