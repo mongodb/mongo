@@ -78,3 +78,8 @@ structs:
                 optional: true
                 description: "Specifies that this applyOps command is part of a multi-statement
                               transaction that has not yet been committed or prepared."
+            count:
+                type: safeInt64
+                optional: true
+                description: "The number of operations contained in this multi-oplog-entry
+                              transaction."
