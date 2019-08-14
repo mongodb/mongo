@@ -110,7 +110,7 @@ private:
     mutable bool _jumbo;
 
     // Statistics for the approximate data written to this chunk
-    mutable uint64_t _dataWritten;
+    mutable uint64_t _dataWrittenBytes;
 };
 
 class Chunk {
