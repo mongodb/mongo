@@ -114,10 +114,10 @@ Value ExpressionInternalJsEmit::evaluate(const Document& root, Variables* variab
     Value thisVal = _thisRef->evaluate(root, variables);
     uassert(31225, "'this' must be an object.", thisVal.getType() == BSONType::Object);
 
-    // If the scope does not exist and is created by the call to ExpressionContext::getJsExec(),
-    // then make sure to re-bind emit() and the given function to the new scope.
+    // If the scope does not exist and is created by the following call, then make sure to
+    // re-bind emit() and the given function to the new scope.
     auto expCtx = getExpressionContext();
-    auto [jsExec, newlyCreated] = expCtx->mongoProcessInterface->getJsExec();
+    auto [jsExec, newlyCreated] = expCtx->getJsExecWithScope();
     if (newlyCreated) {
         jsExec->getScope()->loadStored(expCtx->opCtx, true);
 
@@ -135,7 +135,7 @@ Value ExpressionInternalJsEmit::evaluate(const Document& root, Variables* variab
     std::vector<Value> output;
 
     for (const BSONObj& obj : _emittedObjects) {
-        output.push_back(Value(std::move(obj)));
+        output.push_back(Value(obj));
     }
 
     // Need to const_cast here in order to clean out _emittedObjects which were added in the call to
@@ -197,7 +197,7 @@ Value ExpressionInternalJs::evaluate(const Document& root, Variables* variables)
                           << " can't be run on this process. Javascript is disabled.",
             getGlobalScriptEngine());
 
-    auto [jsExec, newlyCreated] = expCtx->mongoProcessInterface->getJsExec();
+    auto [jsExec, newlyCreated] = expCtx->getJsExecWithScope();
     if (newlyCreated) {
         jsExec->getScope()->loadStored(expCtx->opCtx, true);
 

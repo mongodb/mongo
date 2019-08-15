@@ -414,7 +414,7 @@ public:
      * Returns a pointer to a JsExecution and a boolean to indicate whether the JS Scope was newly
      * created.
      */
-    virtual std::pair<JsExecution*, bool> getJsExec() = 0;
+    virtual std::pair<JsExecution*, bool> getJsExec(const BSONObj& scope) = 0;
     virtual void releaseJsExec() = 0;
 };
 

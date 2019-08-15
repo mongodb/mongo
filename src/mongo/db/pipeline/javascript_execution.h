@@ -42,10 +42,12 @@ namespace mongo {
 class JsExecution {
 public:
     /**
-     * Construct with a thread-local scope.
+     * Construct with a thread-local scope and initialize with the given scope variables.
      */
-    JsExecution() : _scope(nullptr) {
-        _scope.reset(getGlobalScriptEngine()->newScopeForCurrentThread());
+    JsExecution(const BSONObj& scopeVars)
+        : _scope(getGlobalScriptEngine()->newScopeForCurrentThread()) {
+        _scopeVars = scopeVars.getOwned();
+        _scope->init(&_scopeVars);
     }
 
     /**
@@ -84,6 +86,7 @@ public:
     }
 
 private:
+    BSONObj _scopeVars;
     std::unique_ptr<Scope> _scope;
 };
 }  // namespace mongo

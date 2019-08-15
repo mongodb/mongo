@@ -197,6 +197,19 @@ public:
     auto getRuntimeConstants() const {
         return variables.getRuntimeConstants();
     }
+
+    /**
+     * Retrieves the Javascript Scope for the current thread or creates a new one if it has not been
+     * created yet. Initializes the Scope with the 'jsScope' variables from the runtimeConstants.
+     *
+     * Returns a JsExec and a boolean indicating whether the Scope was created as part of this call.
+     */
+    auto getJsExecWithScope() const {
+        RuntimeConstants runtimeConstants = getRuntimeConstants();
+        const boost::optional<mongo::BSONObj>& scope = runtimeConstants.getJsScope();
+        return mongoProcessInterface->getJsExec(scope.get_value_or(BSONObj()));
+    }
+
     // The explain verbosity requested by the user, or boost::none if no explain was requested.
     boost::optional<ExplainOptions::Verbosity> explain;
 

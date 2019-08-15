@@ -12,6 +12,9 @@ selector:
   - jstests/aggregation/bugs/lookup_unwind_killcursor.js
   # TODO: Remove when SERVER-23229 is fixed.
   - jstests/aggregation/bugs/groupMissing.js
+  # Mongos does not support runtimeConstants.
+  - jstests/aggregation/accumulators/internal_js_reduce_with_scope.js
+  - jstests/aggregation/expressions/internal_js_emit_with_scope.js
   exclude_with_any_tags:
   - requires_profiling
   # The following tests start their own ShardingTest or ReplSetTest, respectively.

@@ -83,6 +83,7 @@ public:
     static constexpr Variables::Id kRemoveId = Id(-2);
     static constexpr Variables::Id kNowId = Id(-3);
     static constexpr Variables::Id kClusterTimeId = Id(-4);
+    static constexpr Variables::Id kJsScopeId = Id(-5);
 
     // Map from builtin var name to reserved id number.
     static const StringMap<Id> kBuiltinVarNameToId;

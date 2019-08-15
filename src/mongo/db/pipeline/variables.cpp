@@ -40,8 +40,11 @@ namespace mongo {
 constexpr Variables::Id Variables::kRootId;
 constexpr Variables::Id Variables::kRemoveId;
 
-const StringMap<Variables::Id> Variables::kBuiltinVarNameToId = {
-    {"ROOT", kRootId}, {"REMOVE", kRemoveId}, {"NOW", kNowId}, {"CLUSTER_TIME", kClusterTimeId}};
+const StringMap<Variables::Id> Variables::kBuiltinVarNameToId = {{"ROOT", kRootId},
+                                                                 {"REMOVE", kRemoveId},
+                                                                 {"NOW", kNowId},
+                                                                 {"CLUSTER_TIME", kClusterTimeId},
+                                                                 {"JS_SCOPE", kJsScopeId}};
 
 void Variables::uassertValidNameForUserWrite(StringData varName) {
     // System variables users allowed to write to (currently just one)
@@ -180,6 +183,9 @@ RuntimeConstants Variables::getRuntimeConstants() const {
     if (auto it = _runtimeConstants.find(kClusterTimeId); it != _runtimeConstants.end()) {
         constants.setClusterTime(it->second.getTimestamp());
     }
+    if (auto it = _runtimeConstants.find(kJsScopeId); it != _runtimeConstants.end()) {
+        constants.setJsScope(it->second.getDocument().toBson());
+    }
 
     return constants;
 }
@@ -191,6 +197,10 @@ void Variables::setRuntimeConstants(const RuntimeConstants& constants) {
     // IDL to serialize a RuntimConstants without clusterTime, which should always be an error.
     if (!constants.getClusterTime().isNull()) {
         _runtimeConstants[kClusterTimeId] = Value(constants.getClusterTime());
+    }
+
+    if (constants.getJsScope()) {
+        _runtimeConstants[kJsScopeId] = Value(constants.getJsScope().get());
     }
 }
 

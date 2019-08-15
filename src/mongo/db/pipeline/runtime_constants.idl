@@ -48,3 +48,8 @@ structs:
               cpp_name: clusterTime
               type: timestamp
               description: A value of the $$CLUSTER_TIME variable.
+          jsScope:
+              cpp_name: jsScope
+              type: object
+              optional: true
+              description: Optional scope variables accessible from internal javacsript expressions.

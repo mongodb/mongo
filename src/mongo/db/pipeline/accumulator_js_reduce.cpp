@@ -106,15 +106,17 @@ Value AccumulatorInternalJsReduce::getValue(bool toBeMerged) {
             bsonValues << val;
         }
 
-        // Function signature: reduce(key, values).
-        BSONObj params = BSON_ARRAY(_key << bsonValues.arr());
-        auto [jsExec, newlyCreated] = getExpressionContext()->mongoProcessInterface->getJsExec();
+        auto expCtx = getExpressionContext();
+        auto [jsExec, newlyCreated] = expCtx->getJsExecWithScope();
         ScriptingFunction func = jsExec->getScope()->createFunction(_funcSource.c_str());
 
         uassert(31247, "The reduce function failed to parse in the javascript engine", func);
 
-        BSONObj thisObj;  // For reduce, the key and values are both passed as 'params' so there's
-                          // no need to set 'this'.
+        // Function signature: reduce(key, values).
+        BSONObj params = BSON_ARRAY(_key << bsonValues.arr());
+        // For reduce, the key and values are both passed as 'params' so there's no need to set
+        // 'this'.
+        BSONObj thisObj;
         return jsExec->callFunction(func, params, thisObj);
     }();
 
