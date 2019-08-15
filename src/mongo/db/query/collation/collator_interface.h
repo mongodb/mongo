@@ -115,6 +115,12 @@ public:
     virtual ComparisonKey getComparisonKey(StringData stringData) const = 0;
 
     /**
+     * Returns the comparison key string for 'stringData', according to this collation. See
+     * ComparisonKey's comments for details.
+     */
+    std::string getComparisonString(StringData stringData) const;
+
+    /**
      * Returns whether this collation has the same matching and sorting semantics as 'other'.
      */
     bool operator==(const CollatorInterface& other) const {

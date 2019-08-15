@@ -109,6 +109,7 @@ icuEnv.CppUnitTest(
         "collator_interface_mock_test.cpp",
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/storage/key_string',
         "collator_factory_mock",
         "collator_icu",
         "collator_interface",

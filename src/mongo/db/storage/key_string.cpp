@@ -342,14 +342,16 @@ void BuilderBase<BufferT>::resetToKey(const BSONObj& obj,
 }
 
 template <class BufferT>
-void BuilderBase<BufferT>::appendBSONElement(const BSONElement& elem) {
+void BuilderBase<BufferT>::appendBSONElement(const BSONElement& elem, const StringTransformFn& f) {
+    invariant(_state == BuildState::kEmpty || _state == BuildState::kAppendingBSONElements);
+
     const int elemIdx = _elemCount++;
     const bool invert = (_ordering.get(elemIdx) == -1);
 
     if (_state == BuildState::kEmpty) {
         _transition(BuildState::kAppendingBSONElements);
     }
-    _appendBsonValue(elem, invert, nullptr);
+    _appendBsonValue(elem, invert, nullptr, f);
 }
 
 template <class BufferT>
@@ -409,6 +411,7 @@ void BuilderBase<BufferT>::_appendAllElementsForIndexing(const BSONObj& obj,
 
 template <class BufferT>
 void BuilderBase<BufferT>::appendRecordId(RecordId loc) {
+    _doneAppending();
     _transition(BuildState::kAppendedRecordID);
     // The RecordId encoding must be able to determine the full length starting from the last
     // byte, without knowing where the first byte is since it is stored at the end of a
@@ -494,10 +497,14 @@ void BuilderBase<BufferT>::_appendOID(OID val, bool invert) {
 }
 
 template <class BufferT>
-void BuilderBase<BufferT>::_appendString(StringData val, bool invert) {
+void BuilderBase<BufferT>::_appendString(StringData val, bool invert, const StringTransformFn& f) {
     _typeBits.appendString();
     _append(CType::kStringLike, invert);
-    _appendStringLike(val, invert);
+    if (f) {
+        _appendStringLike(f(val), invert);
+    } else {
+        _appendStringLike(val, invert);
+    }
 }
 
 template <class BufferT>
@@ -517,7 +524,7 @@ template <class BufferT>
 void BuilderBase<BufferT>::_appendCodeWString(const BSONCodeWScope& val, bool invert) {
     _append(CType::kCodeWithScope, invert);
     _appendStringLike(val.code, invert);
-    _appendBson(val.scope, invert);
+    _appendBson(val.scope, invert, nullptr);
 }
 
 template <class BufferT>
@@ -554,19 +561,23 @@ void BuilderBase<BufferT>::_appendDBRef(const BSONDBRef& val, bool invert) {
 }
 
 template <class BufferT>
-void BuilderBase<BufferT>::_appendArray(const BSONArray& val, bool invert) {
+void BuilderBase<BufferT>::_appendArray(const BSONArray& val,
+                                        bool invert,
+                                        const StringTransformFn& f) {
     _append(CType::kArray, invert);
     BSONForEach(elem, val) {
         // No generic ctype byte needed here since no name is encoded.
-        _appendBsonValue(elem, invert, nullptr);
+        _appendBsonValue(elem, invert, nullptr, f);
     }
     _append(int8_t(0), invert);
 }
 
 template <class BufferT>
-void BuilderBase<BufferT>::_appendObject(const BSONObj& val, bool invert) {
+void BuilderBase<BufferT>::_appendObject(const BSONObj& val,
+                                         bool invert,
+                                         const StringTransformFn& f) {
     _append(CType::kObject, invert);
-    _appendBson(val, invert);
+    _appendBson(val, invert, f);
 }
 
 template <class BufferT>
@@ -823,7 +834,8 @@ void BuilderBase<BufferT>::_appendNumberDecimal(const Decimal128 dec, bool inver
 template <class BufferT>
 void BuilderBase<BufferT>::_appendBsonValue(const BSONElement& elem,
                                             bool invert,
-                                            const StringData* name) {
+                                            const StringData* name,
+                                            const StringTransformFn& f) {
     if (name) {
         _appendBytes(name->rawData(), name->size() + 1, invert);  // + 1 for NUL
     }
@@ -841,13 +853,13 @@ void BuilderBase<BufferT>::_appendBsonValue(const BSONElement& elem,
             _appendNumberDouble(elem._numberDouble(), invert);
             break;
         case String:
-            _appendString(elem.valueStringData(), invert);
+            _appendString(elem.valueStringData(), invert, f);
             break;
         case Object:
-            _appendObject(elem.Obj(), invert);
+            _appendObject(elem.Obj(), invert, f);
             break;
         case Array:
-            _appendArray(BSONArray(elem.Obj()), invert);
+            _appendArray(BSONArray(elem.Obj()), invert, f);
             break;
         case BinData: {
             int len;
@@ -873,6 +885,13 @@ void BuilderBase<BufferT>::_appendBsonValue(const BSONElement& elem,
             _appendDBRef(BSONDBRef(elem.dbrefNS(), elem.dbrefOID()), invert);
             break;
         case Symbol:
+            if (f) {
+                uasserted(
+                    ErrorCodes::CannotBuildIndexKeys,
+                    str::stream()
+                        << "Cannot index type Symbol with a collation. Failed to index element: "
+                        << elem << ".");
+            }
             _appendSymbol(elem.valueStringData(), invert);
             break;
         case Code:
@@ -924,12 +943,14 @@ void BuilderBase<BufferT>::_appendStringLike(StringData str, bool invert) {
 }
 
 template <class BufferT>
-void BuilderBase<BufferT>::_appendBson(const BSONObj& obj, bool invert) {
+void BuilderBase<BufferT>::_appendBson(const BSONObj& obj,
+                                       bool invert,
+                                       const StringTransformFn& f) {
     BSONForEach(elem, obj) {
         // Force the order to be based on (ctype, name, value).
         _append(bsonTypeToGenericKeyStringType(elem.type()), invert);
         StringData name = elem.fieldNameStringData();
-        _appendBsonValue(elem, invert, &name);
+        _appendBsonValue(elem, invert, &name, f);
     }
     _append(int8_t(0), invert);
 }

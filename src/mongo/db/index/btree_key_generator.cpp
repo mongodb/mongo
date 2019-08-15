@@ -152,23 +152,17 @@ void BtreeKeyGenerator::getKeys(const BSONObj& obj,
         BSONElement e = obj["_id"];
         if (e.eoo()) {
             keys->insert(_nullKeyString);
-        } else if (_collator) {
-            BSONObjBuilder b;
-            CollationIndexKey::collationAwareIndexKeyAppend(e, _collator, &b);
-
-            KeyString::Builder keyString(_keyStringVersion, b.obj(), _ordering);
-            if (id) {
-                keyString.appendRecordId(*id);
-            }
-            /*
-             * Insert a copy so its buffer size fits the key size.
-             */
-            keys->insert(keyString.getValueCopy());
         } else {
-            int size = e.size() + 5 /* bson over head*/ - 3 /* remove _id string */;
-            BSONObjBuilder b(size);
-            b.appendAs(e, "");
-            KeyString::Builder keyString(_keyStringVersion, b.obj(), _ordering);
+            KeyString::Builder keyString(_keyStringVersion, _ordering);
+
+            if (_collator) {
+                keyString.appendBSONElement(e, [&](StringData stringData) {
+                    return _collator->getComparisonString(stringData);
+                });
+            } else {
+                keyString.appendBSONElement(e);
+            }
+
             if (id) {
                 keyString.appendRecordId(*id);
             }
@@ -274,11 +268,16 @@ void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*> fieldNames,
         if (_isSparse && numNotFound == fieldNames.size()) {
             return;
         }
-        BSONObjBuilder b(_sizeTracker);
-        for (std::vector<BSONElement>::iterator i = fixed.begin(); i != fixed.end(); ++i) {
-            CollationIndexKey::collationAwareIndexKeyAppend(*i, _collator, &b);
+        KeyString::HeapBuilder keyString(_keyStringVersion, _ordering);
+        for (const auto& elem : fixed) {
+            if (_collator) {
+                keyString.appendBSONElement(elem, [&](StringData stringData) {
+                    return _collator->getComparisonString(stringData);
+                });
+            } else {
+                keyString.appendBSONElement(elem);
+            }
         }
-        KeyString::HeapBuilder keyString(_keyStringVersion, b.obj(), _ordering);
         if (id) {
             keyString.appendRecordId(*id);
         }

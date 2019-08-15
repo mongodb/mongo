@@ -40,4 +40,8 @@ void CollatorInterface::hash_combine(size_t& seed, StringData stringToHash) cons
     SimpleStringDataComparator::kInstance.hash_combine(seed, comparisonKey.getKeyData());
 }
 
+std::string CollatorInterface::getComparisonString(StringData stringData) const {
+    return getComparisonKey(stringData).getKeyData().toString();
+}
+
 }  // namespace mongo

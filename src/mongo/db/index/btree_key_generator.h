@@ -82,7 +82,6 @@ private:
     const bool _isIdIndex;
     const bool _isSparse;
     const KeyString::Value _nullKeyString;  // A full key with all fields null.
-    const BSONSizeTracker _sizeTracker;
 
     std::vector<BSONElement> _fixed;
     /**
