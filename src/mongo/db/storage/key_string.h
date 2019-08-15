@@ -357,13 +357,39 @@ enum DecimalContinuationMarker {
 template <class BufferT>
 class BuilderBase {
 public:
-    BuilderBase(Version version, Ordering ord, Discriminator discriminator)
+    static const uint8_t kHeapAllocatorDefaultBytes = 32;
+
+    /*
+     * This constructor is enabled only for KeyString::HeapBuilder.
+     */
+    template <class T = BufferT>
+    BuilderBase(Version version,
+                Ordering ord,
+                Discriminator discriminator,
+                typename std::enable_if<std::is_same<T, BufBuilder>::value>::type* = nullptr)
+        : version(version),
+          _typeBits(version),
+          _buffer(kHeapAllocatorDefaultBytes),
+          _state(BuildState::kEmpty),
+          _elemCount(0),
+          _ordering(ord),
+          _discriminator(discriminator) {}
+
+    /*
+     * This constructor is enabled only for KeyString::Builder.
+     */
+    template <class T = BufferT>
+    BuilderBase(Version version,
+                Ordering ord,
+                Discriminator discriminator,
+                typename std::enable_if<std::is_same<T, StackBufBuilder>::value>::type* = nullptr)
         : version(version),
           _typeBits(version),
           _state(BuildState::kEmpty),
           _elemCount(0),
           _ordering(ord),
           _discriminator(discriminator) {}
+
     BuilderBase(Version version, Ordering ord)
         : BuilderBase(version, ord, Discriminator::kInclusive) {}
     explicit BuilderBase(Version version)
