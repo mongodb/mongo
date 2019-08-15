@@ -89,11 +89,15 @@ RollBackLocalOperations::RollBackLocalOperations(const OplogInterface& localOplo
 }
 
 RollBackLocalOperations::RollbackCommonPoint::RollbackCommonPoint(BSONObj oplogBSON,
-                                                                  RecordId recordId)
+                                                                  RecordId recordId,
+                                                                  BSONObj nextOplogBSON)
     : _recordId(std::move(recordId)) {
     auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(oplogBSON));
     _opTime = oplogEntry.getOpTime();
     _wallClockTime = oplogEntry.getWallClockTime();
+    // nextOplogEntry holds the oplog entry immediately after the common point.
+    auto nextOplogEntry = uassertStatusOK(repl::OplogEntry::parse(nextOplogBSON));
+    _firstWallClockTimeAfterCommonPoint = nextOplogEntry.getWallClockTime();
 }
 
 StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollBackLocalOperations::onRemoteOperation(
@@ -105,6 +109,10 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollBackLocalOperations
         }
         _localOplogValue = result.getValue();
     }
+
+    // As we iterate through the oplog in reverse, opAfterCurrentEntry holds the oplog entry
+    // immediately after the entry stored in _localOplogValue.
+    BSONObj opAfterCurrentEntry = _localOplogValue.first;
 
     while (getTimestamp(_localOplogValue) > getTimestamp(operation)) {
         _scanned++;
@@ -126,13 +134,16 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollBackLocalOperations
                                         << getTimestamp(_localOplogValue).toString()
                                         << "}");
         }
+        opAfterCurrentEntry = _localOplogValue.first;
         _localOplogValue = result.getValue();
     }
 
     if (getTimestamp(_localOplogValue) == getTimestamp(operation)) {
         _scanned++;
+
         if (getHash(_localOplogValue) == getHash(operation)) {
-            return RollbackCommonPoint(_localOplogValue.first, _localOplogValue.second);
+            return RollbackCommonPoint(
+                _localOplogValue.first, _localOplogValue.second, opAfterCurrentEntry);
         }
 
         LOG(2) << "Local oplog entry to roll back: " << redact(_localOplogValue.first);
@@ -194,8 +205,8 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> syncRollBackLocalOperat
     RollBackLocalOperations finder(localOplog, rollbackOperation);
     Timestamp theirTime;
     while (remoteResult.isOK()) {
-        theirTime = remoteResult.getValue().first["ts"].timestamp();
         BSONObj theirObj = remoteResult.getValue().first;
+        theirTime = theirObj["ts"].timestamp();
         auto result = finder.onRemoteOperation(theirObj);
         if (result.isOK()) {
             return result.getValue();
