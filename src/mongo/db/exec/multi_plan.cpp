@@ -282,7 +282,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
             size_t runnerUpIdx = ranking->candidateOrder[1];
 
             LOG(1) << "Winning plan tied with runner-up. Not caching."
-                   << " ns: " << collection()->ns() << " " << redact(_query->toStringShort())
+                   << " query: " << redact(_query->toStringShort())
                    << " winner score: " << ranking->scores[0]
                    << " winner summary: " << Explain::getPlanSummary(_candidates[winnerIdx].root)
                    << " runner-up score: " << ranking->scores[1] << " runner-up summary: "
@@ -296,7 +296,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
             size_t winnerIdx = ranking->candidateOrder[0];
             LOG(1) << "Winning plan had zero results. Not caching."
-                   << " ns: " << collection()->ns() << " " << redact(_query->toStringShort())
+                   << " query: " << redact(_query->toStringShort())
                    << " winner score: " << ranking->scores[0]
                    << " winner summary: " << Explain::getPlanSummary(_candidates[winnerIdx].root);
         }

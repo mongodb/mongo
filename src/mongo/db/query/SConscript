@@ -86,6 +86,9 @@ env.Library(
         "query_planner",
         "query_request",
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/curop_failpoint_helpers',
+    ],
 )
 
 env.Library(
