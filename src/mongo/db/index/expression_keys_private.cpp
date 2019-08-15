@@ -384,16 +384,16 @@ void ExpressionKeysPrivate::getHashKeys(const BSONObj& obj,
             fieldVal.type() != Array);
 
     if (!fieldVal.eoo()) {
-        BSONObj key = BSON("" << makeSingleHashKey(fieldVal, seed, hashVersion));
-        KeyString::HeapBuilder keyString(keyStringVersion, key, ordering);
+        KeyString::HeapBuilder keyString(keyStringVersion, ordering);
+        keyString.appendNumberLong(makeSingleHashKey(fieldVal, seed, hashVersion));
         if (id) {
             keyString.appendRecordId(*id);
         }
         keys->insert(keyString.release());
     } else if (!isSparse) {
         BSONObj nullObj = BSON("" << BSONNULL);
-        BSONObj key = BSON("" << makeSingleHashKey(nullObj.firstElement(), seed, hashVersion));
-        KeyString::HeapBuilder keyString(keyStringVersion, key, ordering);
+        KeyString::HeapBuilder keyString(keyStringVersion, ordering);
+        keyString.appendNumberLong(makeSingleHashKey(nullObj.firstElement(), seed, hashVersion));
         if (id) {
             keyString.appendRecordId(*id);
         }
