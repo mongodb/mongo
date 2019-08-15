@@ -93,16 +93,15 @@ const otherDbName = "other";
     assert.commandWorked(db[fromCollName].renameCollection(toCollName));
     assert.eq(db[toCollName].findOne(), {_id: 1});
 
-    // TODO: Server-42348 Make _configsvrRenameCollection update sharding catalog.
-    // checkNotInShardingCatalog({fromNs, mongosConn: st.s});
-    // checkInShardingCatalog({
-    //     ns: toNs,
-    //     shardKey: "_id",
-    //     unique: false,
-    //     distributionMode: "unsharded",
-    //     numChunks: 1,
-    //     mongosConn: st.s
-    // });
+    checkNotInShardingCatalog({ns: fromNs, mongosConn: st.s});
+    checkInShardingCatalog({
+        ns: toNs,
+        shardKey: "_id",
+        unique: false,
+        distributionMode: "unsharded",
+        numChunks: 1,
+        mongosConn: st.s
+    });
     checkInStorageCatalog(
         {dbName: dbName, collName: toCollName, type: "collection", shardConn: st.shard0});
     checkNotInStorageCatalog(
@@ -202,8 +201,7 @@ const otherDbName = "other";
     assert.commandWorked(db.adminCommand({renameCollection: fromNs, to: toNs, dropTarget: true}));
     assert.eq(db[toCollName].findOne(), {_id: 1});
 
-    // TODO: Server-42348 Make _configsvrRenameCollection update sharding catalog.
-    // checkNotInShardingCatalog({fromNs, mongosConn: st.s});
+    checkNotInShardingCatalog({ns: fromNs, mongosConn: st.s});
     checkInShardingCatalog({
         ns: toNs,
         shardKey: "_id",
@@ -243,16 +241,15 @@ const otherDbName = "other";
     assert.commandWorked(db.adminCommand({renameCollection: fromNs, to: toNs}));
     assert.eq(otherDb[toCollName].findOne(), {_id: 1});
 
-    // TODO: Server-42348 Make _configsvrRenameCollection update sharding catalog.
-    // checkNotInShardingCatalog({fromNs, mongosConn: st.s});
-    // checkInShardingCatalog({
-    //     ns: toNs,
-    //     shardKey: "_id",
-    //     unique: false,
-    //     distributionMode: "unsharded",
-    //     numChunks: 1,
-    //     mongosConn: st.s
-    // });
+    checkNotInShardingCatalog({ns: fromNs, mongosConn: st.s});
+    checkInShardingCatalog({
+        ns: toNs,
+        shardKey: "_id",
+        unique: false,
+        distributionMode: "unsharded",
+        numChunks: 1,
+        mongosConn: st.s
+    });
     checkInStorageCatalog(
         {dbName: otherDbName, collName: toCollName, type: "collection", shardConn: st.shard0});
     checkNotInStorageCatalog(
@@ -364,8 +361,7 @@ const otherDbName = "other";
         mongosConn: st.s
     });
 
-    // TODO: Server-42348 Make _configsvrRenameCollection update sharding catalog.
-    // checkNotInShardingCatalog({fromNs, mongosConn: st.s});
+    checkNotInShardingCatalog({ns: fromNs, mongosConn: st.s});
     checkInStorageCatalog(
         {dbName: otherDbName, collName: toCollName, type: "collection", shardConn: st.shard0});
     checkNotInStorageCatalog(
@@ -400,16 +396,15 @@ const otherDbName = "other";
         toNs,
         st.rs0.getPrimary());
 
-    // TODO: Server-42348 Make _configsvrRenameCollection update sharding catalog.
-    // checkInShardingCatalog({
-    //     ns: toNs,
-    //     shardKey: "_id",
-    //     unique: false,
-    //     distributionMode: "unsharded",
-    //     numChunks: 1,
-    //     mongosConn: st.s
-    // });
-    // checkNotInShardingCatalog({ns: fromCollName, mongosConn: st.s});
+    checkInShardingCatalog({
+        ns: toNs,
+        shardKey: "_id",
+        unique: false,
+        distributionMode: "unsharded",
+        numChunks: 1,
+        mongosConn: st.s
+    });
+    checkNotInShardingCatalog({ns: fromNs, mongosConn: st.s});
     checkInStorageCatalog(
         {dbName: dbName, collName: toCollName, type: "collection", shardConn: st.shard0});
     checkNotInStorageCatalog(
@@ -444,16 +439,15 @@ const otherDbName = "other";
         toNs,
         st.configRS.getPrimary());
 
-    // TODO: Server-42348 Make _configsvrRenameCollection update sharding catalog.
-    // checkInShardingCatalog({
-    //     ns: toNs,
-    //     shardKey: "_id",
-    //     unique: false,
-    //     distributionMode: "unsharded",
-    //     numChunks: 1,
-    //     mongosConn: st.s
-    // });
-    // checkNotInShardingCatalog({ns: fromCollName, mongosConn: st.s});
+    checkInShardingCatalog({
+        ns: toNs,
+        shardKey: "_id",
+        unique: false,
+        distributionMode: "unsharded",
+        numChunks: 1,
+        mongosConn: st.s
+    });
+    checkNotInShardingCatalog({ns: fromNs, mongosConn: st.s});
     checkInStorageCatalog(
         {dbName: dbName, collName: toCollName, type: "collection", shardConn: st.shard0});
     checkNotInStorageCatalog(

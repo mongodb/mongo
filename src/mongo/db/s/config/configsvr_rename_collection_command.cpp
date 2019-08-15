@@ -79,9 +79,7 @@ public:
                                     opCtx, ns(), repl::ReadConcernLevel::kLocalReadConcern))
                     .value;
             uassert(ErrorCodes::InternalError, "Expected UUID", sourceColl.getUUID());
-            // For renameCollection within a database, we already take an exclusive lock on the
-            // database, so subsequent locks are more of a locking pattern formality rather than
-            // a necessity. Currently only assumes renaming within a database not across databases.
+
             auto scopedDbLockSource =
                 ShardingCatalogManager::get(opCtx)->serializeCreateOrDropDatabase(opCtx,
                                                                                   nssSource.db());
@@ -130,6 +128,62 @@ public:
             }
 
             uassertStatusOK(cmdResponse.commandStatus);
+
+            // Updating sharding catalog by first deleting existing document entries in
+            // config.collections and config.chunks relating to the source and target namespaces,
+            // and inserting a new document entry into config.collections and config.chunks relating
+            // to the target namespace. Directly updating the document will not work since namespace
+            // is an immutable field.
+            auto updatedCollType =
+                (uassertStatusOK(catalogClient->getCollection(
+                                     opCtx, nssSource, repl::ReadConcernLevel::kLocalReadConcern))
+                     .value);
+            updatedCollType.setNs(nssTarget);
+            uassertStatusOK(catalogClient->removeConfigDocuments(
+                opCtx,
+                CollectionType::ConfigNS,
+                BSON(CollectionType::fullNs(nssSource.toString())),
+                ShardingCatalogClient::kLocalWriteConcern));
+            uassertStatusOK(catalogClient->removeConfigDocuments(
+                opCtx,
+                CollectionType::ConfigNS,
+                BSON(CollectionType::fullNs(nssTarget.toString())),
+                ShardingCatalogClient::kLocalWriteConcern));
+            uassertStatusOK(
+                catalogClient->insertConfigDocument(opCtx,
+                                                    CollectionType::ConfigNS,
+                                                    updatedCollType.toBSON(),
+                                                    ShardingCatalogClient::kLocalWriteConcern));
+
+            auto sourceChunks = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getChunks(
+                opCtx,
+                BSON(ChunkType::ns(nssSource.toString())),
+                BSONObj(),
+                boost::none,
+                nullptr,
+                repl::ReadConcernLevel::kLocalReadConcern));
+
+            // Unsharded collections should only have one chunk returned in the vector.
+            invariant(sourceChunks.size() == 1);
+
+            auto& updatedChunkType = sourceChunks[0];
+            updatedChunkType.setNS(nssTarget);
+            updatedChunkType.setName(OID::gen());
+            uassertStatusOK(
+                catalogClient->removeConfigDocuments(opCtx,
+                                                     ChunkType::ConfigNS,
+                                                     BSON(ChunkType::ns(nssSource.toString())),
+                                                     ShardingCatalogClient::kLocalWriteConcern));
+            uassertStatusOK(
+                catalogClient->removeConfigDocuments(opCtx,
+                                                     ChunkType::ConfigNS,
+                                                     BSON(ChunkType::ns(nssTarget.toString())),
+                                                     ShardingCatalogClient::kLocalWriteConcern));
+            uassertStatusOK(
+                catalogClient->insertConfigDocument(opCtx,
+                                                    ChunkType::ConfigNS,
+                                                    updatedChunkType.toConfigBSON(),
+                                                    ShardingCatalogClient::kLocalWriteConcern));
         }
 
     private:

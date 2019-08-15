@@ -95,7 +95,7 @@ public:
                     scopedRenameCollection.emplaceStatus(
                         {ErrorCodes::InternalError,
                          str::stream()
-                             << "Severe error occurred while running shardCollection command: "
+                             << "Severe error occurred while running renameCollection command: "
                              << e.what()});
                     throw;
                 }
