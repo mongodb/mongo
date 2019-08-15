@@ -40,7 +40,10 @@ function configureReplSetFailpoint(name, modeValue) {
         assert.commandWorked(node.getDB("admin").runCommand({
             configureFailPoint: name,
             mode: modeValue,
-            data: {shouldCheckForInterrupt: true},
+            data: {
+                shouldCheckForInterrupt: true,
+                nss: kDbName + ".test",
+            },
         }));
     });
 }
