@@ -23,3 +23,6 @@ variable-rgx=[a-z_][a-z0-9_]{1,50}$
 # W0611 - unused-import - typing module is needed for mypy
 
 disable=bad-continuation,fixme,import-error,line-too-long,no-member,locally-disabled,redefined-variable-type,too-few-public-methods,unused-import
+
+[IMPORTS]
+known-third-party=boto3,botocore,psutil,yaml

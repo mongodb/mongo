@@ -193,7 +193,8 @@ Status ensureAllCollectionsHaveUUIDs(OperationContext* opCtx,
                 return {
                     ErrorCodes::MustDowngrade,
                     str::stream()
-                        << "Collection " << coll->ns().ns()
+                        << "Collection "
+                        << coll->ns().ns()
                         << " is missing an UUID. We expect all collections to have UUIDs starting "
                            "in FCV 3.6. Please make sure the FCV is version 3.6 before attempting "
                            "an upgrade to 4.0; see "
