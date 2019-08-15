@@ -370,6 +370,13 @@ void BuilderBase<BufferT>::appendNumberLong(long long num) {
 }
 
 template <class BufferT>
+void BuilderBase<BufferT>::appendNull() {
+    _verifyAppendingState();
+    _append(CType::kNullish, _shouldInvertOnAppend());
+    _elemCount++;
+}
+
+template <class BufferT>
 void BuilderBase<BufferT>::_appendDiscriminator(const Discriminator discriminator) {
     // The discriminator forces this KeyString to compare Less/Greater than any KeyString with
     // the same prefix of keys. As an example, this can be used to land on the first key in the

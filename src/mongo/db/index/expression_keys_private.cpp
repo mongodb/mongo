@@ -59,36 +59,6 @@ using namespace mongo;
 namespace dps = ::mongo::dotted_path_support;
 
 //
-// Helper functions for getHaystackKeys
-//
-
-/**
- * Build a new BSONObj with root in it.  If e is non-empty, append that to the key.
- * Insert the BSONObj into keys.
- * Used by getHaystackKeys.
- */
-void addKey(const string& root,
-            const BSONElement& e,
-            KeyStringSet* keys,
-            KeyString::Version keyStringVersion,
-            Ordering ordering,
-            boost::optional<RecordId> id) {
-    BSONObjBuilder buf;
-    buf.append("", root);
-
-    if (e.eoo())
-        buf.appendNull("");
-    else
-        buf.appendAs(e, "");
-
-    KeyString::HeapBuilder keyString(keyStringVersion, buf.obj(), ordering);
-    if (id) {
-        keyString.appendRecordId(*id);
-    }
-    keys->insert(keyString.release());
-}
-
-//
 // Helper functions for getS2Keys
 //
 
@@ -437,7 +407,7 @@ void ExpressionKeysPrivate::getHaystackKeys(const BSONObj& obj,
                                   hashHaystackElement(y, bucketSize));
     }
 
-    verify(otherFields.size() == 1);
+    invariant(otherFields.size() == 1);
 
     BSONElementSet all;
 
@@ -448,14 +418,26 @@ void ExpressionKeysPrivate::getHaystackKeys(const BSONObj& obj,
         // We're indexing a document that doesn't have the secondary non-geo field present.
         // XXX: do we want to add this even if all.size() > 0?  result:empty search terms
         // match everything instead of only things w/empty search terms)
-        addKey(root, BSONElement(), keys, keyStringVersion, ordering, id);
+        KeyString::HeapBuilder keyString(keyStringVersion, ordering);
+        keyString.appendString(root);
+        keyString.appendNull();
+        if (id) {
+            keyString.appendRecordId(*id);
+        }
+        keys->insert(keyString.release());
     } else {
         // Ex:If our secondary field is type: "foo" or type: {a:"foo", b:"bar"},
         // all.size()==1.  We can query on the complete field.
         // Ex: If our secondary field is type: ["A", "B"] all.size()==2 and all has values
         // "A" and "B".  The query looks for any of the fields in the array.
-        for (BSONElementSet::iterator i = all.begin(); i != all.end(); ++i) {
-            addKey(root, *i, keys, keyStringVersion, ordering, id);
+        for (const auto& elem : all) {
+            KeyString::HeapBuilder keyString(keyStringVersion, ordering);
+            keyString.appendString(root);
+            keyString.appendBSONElement(elem);
+            if (id) {
+                keyString.appendRecordId(*id);
+            }
+            keys->insert(keyString.release());
         }
     }
 }

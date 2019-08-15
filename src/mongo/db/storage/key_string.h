@@ -453,6 +453,7 @@ public:
     void appendString(StringData val);
     void appendNumberDouble(double num);
     void appendNumberLong(long long num);
+    void appendNull();
 
     /**
      * Resets to an empty state.
