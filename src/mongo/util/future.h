@@ -689,7 +689,7 @@ private:
     }
 
     template <typename Sig>
-    NOINLINE_DECL auto wrapCBHelper(unique_function<Sig>&& func);
+    MONGO_COMPILER_NOINLINE auto wrapCBHelper(unique_function<Sig>&& func);
 
     using SemiFuture<T>::unsafeToInlineFuture;
 
@@ -1123,7 +1123,7 @@ using FutureContinuationResult =
 
 template <typename T>
 template <typename Sig>
-NOINLINE_DECL auto ExecutorFuture<T>::wrapCBHelper(unique_function<Sig>&& func) {
+MONGO_COMPILER_NOINLINE auto ExecutorFuture<T>::wrapCBHelper(unique_function<Sig>&& func) {
     using namespace future_details;
     return [
         func = std::move(func),

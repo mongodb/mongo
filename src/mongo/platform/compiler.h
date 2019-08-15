@@ -146,6 +146,13 @@
  *    MONGO_COMPILER_NORETURN. In almost all cases MONGO_UNREACHABLE is preferred.
  *
  *
+ * MONGO_COMPILER_NOINLINE
+ *
+ *    Tells the compiler that it should not attempt to inline a function.  This option is not
+ *    guaranteed to eliminate all optimizations, it only is used to prevent a function from being
+ *    inlined.
+ *
+ *
  * MONGO_WARN_UNUSED_RESULT_CLASS
  *
  *    Tells the compiler that a class defines a type for which checking results is necessary.  Types

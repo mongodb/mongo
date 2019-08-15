@@ -31,7 +31,6 @@
 
 #include <benchmark/benchmark.h>
 
-#include "mongo/bson/inline_decls.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"

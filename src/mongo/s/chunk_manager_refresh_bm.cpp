@@ -32,7 +32,6 @@
 #include <benchmark/benchmark.h>
 
 #include "mongo/base/init.h"
-#include "mongo/bson/inline_decls.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/chunk_manager.h"
@@ -86,16 +85,18 @@ ShardId optimalShardSelector(int i, int nShards, int nChunks) {
     return ShardId(str::stream() << "shard" << shardNum);
 }
 
-NOINLINE_DECL auto makeChunkManagerWithPessimalBalancedDistribution(int nShards, uint32_t nChunks) {
+MONGO_COMPILER_NOINLINE auto makeChunkManagerWithPessimalBalancedDistribution(int nShards,
+                                                                              uint32_t nChunks) {
     return makeChunkManagerWithShardSelector(nShards, nChunks, pessimalShardSelector);
 }
 
-NOINLINE_DECL auto makeChunkManagerWithOptimalBalancedDistribution(int nShards, uint32_t nChunks) {
+MONGO_COMPILER_NOINLINE auto makeChunkManagerWithOptimalBalancedDistribution(int nShards,
+                                                                             uint32_t nChunks) {
     return makeChunkManagerWithShardSelector(nShards, nChunks, optimalShardSelector);
 }
 
-NOINLINE_DECL auto runIncrementalUpdate(const CollectionMetadata& cm,
-                                        const std::vector<ChunkType>& newChunks) {
+MONGO_COMPILER_NOINLINE auto runIncrementalUpdate(const CollectionMetadata& cm,
+                                                  const std::vector<ChunkType>& newChunks) {
     auto rt = cm.getChunkManager()->getRoutingHistory()->makeUpdated(newChunks);
     return std::make_unique<CollectionMetadata>(std::make_shared<ChunkManager>(rt, boost::none),
                                                 ShardId("shard0"));

@@ -80,7 +80,7 @@ void DBException::traceIfNeeded(const DBException& e) {
     }
 }
 
-NOINLINE_DECL void verifyFailed(const char* expr, const char* file, unsigned line) {
+MONGO_COMPILER_NOINLINE void verifyFailed(const char* expr, const char* file, unsigned line) {
     assertionCount.condrollover(assertionCount.regular.addAndFetch(1));
     error() << "Assertion failure " << expr << ' ' << file << ' ' << std::dec << line << std::endl;
     logContext();
@@ -97,17 +97,19 @@ NOINLINE_DECL void verifyFailed(const char* expr, const char* file, unsigned lin
     error_details::throwExceptionForStatus(Status(ErrorCodes::UnknownError, temp.str()));
 }
 
-NOINLINE_DECL void invariantFailed(const char* expr, const char* file, unsigned line) noexcept {
+MONGO_COMPILER_NOINLINE void invariantFailed(const char* expr,
+                                             const char* file,
+                                             unsigned line) noexcept {
     severe() << "Invariant failure " << expr << ' ' << file << ' ' << std::dec << line << std::endl;
     breakpoint();
     severe() << "\n\n***aborting after invariant() failure\n\n" << std::endl;
     std::abort();
 }
 
-NOINLINE_DECL void invariantFailedWithMsg(const char* expr,
-                                          const std::string& msg,
-                                          const char* file,
-                                          unsigned line) noexcept {
+MONGO_COMPILER_NOINLINE void invariantFailedWithMsg(const char* expr,
+                                                    const std::string& msg,
+                                                    const char* file,
+                                                    unsigned line) noexcept {
     severe() << "Invariant failure " << expr << " " << msg << " " << file << ' ' << std::dec << line
              << std::endl;
     breakpoint();
@@ -115,10 +117,10 @@ NOINLINE_DECL void invariantFailedWithMsg(const char* expr,
     std::abort();
 }
 
-NOINLINE_DECL void invariantOKFailed(const char* expr,
-                                     const Status& status,
-                                     const char* file,
-                                     unsigned line) noexcept {
+MONGO_COMPILER_NOINLINE void invariantOKFailed(const char* expr,
+                                               const Status& status,
+                                               const char* file,
+                                               unsigned line) noexcept {
     severe() << "Invariant failure: " << expr << " resulted in status " << redact(status) << " at "
              << file << ' ' << std::dec << line;
     breakpoint();
@@ -126,11 +128,11 @@ NOINLINE_DECL void invariantOKFailed(const char* expr,
     std::abort();
 }
 
-NOINLINE_DECL void invariantOKFailedWithMsg(const char* expr,
-                                            const Status& status,
-                                            const std::string& msg,
-                                            const char* file,
-                                            unsigned line) noexcept {
+MONGO_COMPILER_NOINLINE void invariantOKFailedWithMsg(const char* expr,
+                                                      const Status& status,
+                                                      const std::string& msg,
+                                                      const char* file,
+                                                      unsigned line) noexcept {
     severe() << "Invariant failure: " << expr << " " << msg << " resulted in status "
              << redact(status) << " at " << file << ' ' << std::dec << line;
     breakpoint();
@@ -138,16 +140,18 @@ NOINLINE_DECL void invariantOKFailedWithMsg(const char* expr,
     std::abort();
 }
 
-NOINLINE_DECL void fassertFailedWithLocation(int msgid, const char* file, unsigned line) noexcept {
+MONGO_COMPILER_NOINLINE void fassertFailedWithLocation(int msgid,
+                                                       const char* file,
+                                                       unsigned line) noexcept {
     severe() << "Fatal Assertion " << msgid << " at " << file << " " << std::dec << line;
     breakpoint();
     severe() << "\n\n***aborting after fassert() failure\n\n" << std::endl;
     std::abort();
 }
 
-NOINLINE_DECL void fassertFailedNoTraceWithLocation(int msgid,
-                                                    const char* file,
-                                                    unsigned line) noexcept {
+MONGO_COMPILER_NOINLINE void fassertFailedNoTraceWithLocation(int msgid,
+                                                              const char* file,
+                                                              unsigned line) noexcept {
     severe() << "Fatal Assertion " << msgid << " at " << file << " " << std::dec << line;
     breakpoint();
     severe() << "\n\n***aborting after fassert() failure\n\n" << std::endl;
@@ -176,13 +180,17 @@ MONGO_COMPILER_NORETURN void fassertFailedWithStatusNoTraceWithLocation(int msgi
     quickExit(EXIT_ABRUPT);
 }
 
-NOINLINE_DECL void uassertedWithLocation(const Status& status, const char* file, unsigned line) {
+MONGO_COMPILER_NOINLINE void uassertedWithLocation(const Status& status,
+                                                   const char* file,
+                                                   unsigned line) {
     assertionCount.condrollover(assertionCount.user.addAndFetch(1));
     LOG(1) << "User Assertion: " << redact(status) << ' ' << file << ' ' << std::dec << line;
     error_details::throwExceptionForStatus(status);
 }
 
-NOINLINE_DECL void msgassertedWithLocation(const Status& status, const char* file, unsigned line) {
+MONGO_COMPILER_NOINLINE void msgassertedWithLocation(const Status& status,
+                                                     const char* file,
+                                                     unsigned line) {
     assertionCount.condrollover(assertionCount.msg.addAndFetch(1));
     error() << "Assertion: " << redact(status) << ' ' << file << ' ' << std::dec << line;
     error_details::throwExceptionForStatus(status);

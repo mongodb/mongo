@@ -38,7 +38,6 @@
 #include <vector>
 
 #include "mongo/base/static_assert.h"
-#include "mongo/bson/inline_decls.h"
 #include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/util/debug_util.h"
 
@@ -559,7 +558,7 @@ bool canAttach(const Element::RepIdx id, const ElementRep& rep) {
 
 // Returns a Status describing why 'canAttach' returned false. This function should not
 // be inlined since it just makes the callers larger for no real gain.
-NOINLINE_DECL Status getAttachmentError(const ElementRep& rep);
+MONGO_COMPILER_NOINLINE Status getAttachmentError(const ElementRep& rep);
 Status getAttachmentError(const ElementRep& rep) {
     if (rep.sibling.left != Element::kInvalidRepIdx)
         return Status(ErrorCodes::IllegalOperation, "dangling left sibling");

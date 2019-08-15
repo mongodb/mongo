@@ -33,7 +33,6 @@
 
 #include "mongo/db/operation_context.h"
 
-#include "mongo/bson/inline_decls.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/random.h"

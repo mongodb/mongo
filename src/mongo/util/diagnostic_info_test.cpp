@@ -33,7 +33,6 @@
 
 #include <string>
 
-#include "mongo/bson/inline_decls.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/log.h"
@@ -138,7 +137,7 @@ TEST(DiagnosticInfo, StackTraceTest) {
 #endif
 }
 
-void NOINLINE_DECL recurseAndCaptureInfo(MaybeDiagnosticInfo& info, size_t i) {
+MONGO_COMPILER_NOINLINE void recurseAndCaptureInfo(MaybeDiagnosticInfo& info, size_t i) {
     // Prevent tail-call optimization.
 #ifndef _WIN32
     asm volatile("");  // NOLINT

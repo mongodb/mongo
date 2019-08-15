@@ -661,12 +661,12 @@ private:
     }
 
     template <typename A, typename B>
-    NOINLINE_DECL ComparisonAssertion(const char* theFile,
-                                      unsigned theLine,
-                                      StringData aExpression,
-                                      StringData bExpression,
-                                      const A& a,
-                                      const B& b) {
+    MONGO_COMPILER_NOINLINE ComparisonAssertion(const char* theFile,
+                                                unsigned theLine,
+                                                StringData aExpression,
+                                                StringData bExpression,
+                                                const A& a,
+                                                const B& b) {
         if (comparator(OpTag<op>{})(a, b)) {
             return;
         }

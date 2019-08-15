@@ -697,10 +697,11 @@ BSONElement BSONElement::operator[](StringData field) const {
 }
 
 namespace {
-NOINLINE_DECL void msgAssertedBadType [[noreturn]] (int8_t type) {
+MONGO_COMPILER_NOINLINE void msgAssertedBadType [[noreturn]] (int8_t type) {
     msgasserted(10320, str::stream() << "BSONElement: bad type " << (int)type);
 }
 }  // namespace
+
 int BSONElement::computeSize() const {
     enum SizeStyle : uint8_t {
         kFixed,         // Total size is a fixed amount + key length.
@@ -759,7 +760,7 @@ int BSONElement::computeSize() const {
     if (MONGO_likely(sizeInfo.style == SizeStyle::kIntPlusFixed))
         return sizeInfo.bytes + fieldNameSize() + valuestrsize();
 
-    return [this, type]() NOINLINE_DECL {
+    return [this, type]() {
         // Regex is two c-strings back-to-back.
         invariant(type == BSONType::RegEx);
         const char* p = value();

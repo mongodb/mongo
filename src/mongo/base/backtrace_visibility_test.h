@@ -32,8 +32,6 @@
  * functions appear in backtraces, see unwind_test.cpp.
  */
 
-#include "mongo/bson/inline_decls.h"
-
 #include <string>
 
 namespace mongo {
@@ -41,7 +39,7 @@ namespace mongo {
 namespace unwind_test_detail {
 
 // Store a stack trace in s.
-NOINLINE_DECL void normal_function(std::string& s);
+void normal_function(std::string& s);
 
 }  // namespace unwind_test_detail
 

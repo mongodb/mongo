@@ -39,8 +39,8 @@
 
 #include <sstream>
 
-// "static" means internal linkage only for functions in global namespace.
-NOINLINE_DECL static void static_function(std::string& s) {
+// "static" means internal linkage only for functions at namespace scope.
+MONGO_COMPILER_NOINLINE static void static_function(std::string& s) {
     std::ostringstream ostream;
     mongo::printStackTrace(ostream);
     s = ostream.str();
@@ -49,14 +49,14 @@ NOINLINE_DECL static void static_function(std::string& s) {
 }
 
 namespace {
-NOINLINE_DECL void anonymous_namespace_function(std::string& s) {
+MONGO_COMPILER_NOINLINE void anonymous_namespace_function(std::string& s) {
     static_function(s);
     // Prevent tail-call optimization.
     asm volatile("");  // NOLINT
 }
 }  // namespace
 
-NOINLINE_DECL MONGO_COMPILER_API_HIDDEN_FUNCTION void hidden_function(std::string& s) {
+MONGO_COMPILER_NOINLINE MONGO_COMPILER_API_HIDDEN_FUNCTION void hidden_function(std::string& s) {
     anonymous_namespace_function(s);
     // Prevent tail-call optimization.
     asm volatile("");  // NOLINT
@@ -65,7 +65,7 @@ NOINLINE_DECL MONGO_COMPILER_API_HIDDEN_FUNCTION void hidden_function(std::strin
 namespace mongo {
 
 namespace unwind_test_detail {
-NOINLINE_DECL void normal_function(std::string& s) {
+MONGO_COMPILER_NOINLINE void normal_function(std::string& s) {
     hidden_function(s);
     // Prevent tail-call optimization.
     asm volatile("");  // NOLINT

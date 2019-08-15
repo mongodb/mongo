@@ -139,7 +139,7 @@ TEST(SharedFuture, ModificationsArePrivate) {
                         });
 }
 
-NOINLINE_DECL void useALotOfStackSpace() {
+MONGO_COMPILER_NOINLINE void useALotOfStackSpace() {
     // Try to force the compiler to allocate 100K of stack.
     volatile char buffer[100'000];  // NOLINT
     buffer[99'999] = 'x';
