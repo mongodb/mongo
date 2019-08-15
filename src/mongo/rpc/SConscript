@@ -74,6 +74,19 @@ env.Library(
     ],
 )
 
+env.CppLibfuzzerTest(
+    target='protocol_fuzzer',
+    source=[
+        'protocol_fuzzer.cpp',
+    ],
+    LIBDEPS=[
+        'protocol',
+        'rpc',
+        '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
+        '$BUILD_DIR/mongo/transport/message_compressor',
+    ],
+)
+
 env.Library(
     target=[
         'metadata',
