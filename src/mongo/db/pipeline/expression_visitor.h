@@ -140,6 +140,7 @@ class ExpressionHyperbolicSine;
 class ExpressionDegreesToRadians;
 class ExpressionRadiansToDegrees;
 class ExpressionInternalJsEmit;
+class ExpressionInternalJs;
 
 class AccumulatorAvg;
 class AccumulatorMax;
@@ -277,6 +278,7 @@ public:
     virtual void visit(ExpressionFromAccumulator<AccumulatorMergeObjects>*) = 0;
     virtual void visit(ExpressionTests::Testable*) = 0;
     virtual void visit(ExpressionInternalJsEmit*) = 0;
+    virtual void visit(ExpressionInternalJs*) = 0;
 };
 
 }  // namespace mongo

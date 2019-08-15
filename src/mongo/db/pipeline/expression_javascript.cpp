@@ -37,6 +37,7 @@ namespace mongo {
 
 REGISTER_EXPRESSION(_internalJsEmit, ExpressionInternalJsEmit::parse);
 
+REGISTER_EXPRESSION(_internalJs, ExpressionInternalJs::parse);
 namespace {
 
 /**
@@ -142,5 +143,83 @@ Value ExpressionInternalJsEmit::evaluate(const Document& root, Variables* variab
     const_cast<ExpressionInternalJsEmit*>(this)->_emittedObjects.clear();
 
     return Value{std::move(output)};
+}
+
+ExpressionInternalJs::ExpressionInternalJs(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                           boost::intrusive_ptr<Expression> passedArgs,
+                                           std::string funcSource)
+    : Expression(expCtx, {std::move(passedArgs)}),
+      _passedArgs(_children[0]),
+      _funcSource(std::move(funcSource)) {}
+
+Value ExpressionInternalJs::serialize(bool explain) const {
+    return Value(
+        Document{{kExpressionName,
+                  Document{{"eval", _funcSource}, {"args", _passedArgs->serialize(explain)}}}});
+}
+
+void ExpressionInternalJs::_doAddDependencies(mongo::DepsTracker* deps) const {
+    _children[0]->addDependencies(deps);
+}
+
+boost::intrusive_ptr<Expression> ExpressionInternalJs::parse(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    BSONElement expr,
+    const VariablesParseState& vps) {
+
+    uassert(ErrorCodes::BadValue,
+            str::stream() << kExpressionName << " not allowed without enabling test commands.",
+            getTestCommandsEnabled());
+
+    uassert(31260,
+            str::stream() << kExpressionName
+                          << " requires an object as an argument, found: " << expr.type(),
+            expr.type() == BSONType::Object);
+
+    BSONElement evalField = expr["eval"];
+
+    uassert(31261, "The eval function must be specified.", evalField);
+    uassert(31262,
+            "The eval function must be of type string, code, or code w/ scope",
+            evalField.type() == BSONType::String || evalField.type() == BSONType::Code);
+
+    BSONElement argsField = expr["args"];
+    uassert(31263, "The args field must be specified.", argsField);
+    boost::intrusive_ptr<Expression> argsExpr = parseOperand(expCtx, argsField, vps);
+
+    return new ExpressionInternalJs(expCtx, argsExpr, evalField._asCode());
+}
+
+Value ExpressionInternalJs::evaluate(const Document& root, Variables* variables) const {
+    auto& expCtx = getExpressionContext();
+    uassert(31264,
+            str::stream() << kExpressionName
+                          << " can't be run on this process. Javascript is disabled.",
+            getGlobalScriptEngine());
+
+    auto [jsExec, newlyCreated] = expCtx->mongoProcessInterface->getJsExec();
+    if (newlyCreated) {
+        jsExec->getScope()->loadStored(expCtx->opCtx, true);
+
+        const_cast<ExpressionInternalJs*>(this)->_func =
+            jsExec->getScope()->createFunction(_funcSource.c_str());
+        uassert(31265, "The eval function did not evaluate", _func);
+    }
+    auto argExpressions = _passedArgs->evaluate(root, variables);
+    uassert(
+        31266, "The args field must be of type array", argExpressions.getType() == BSONType::Array);
+    const auto& args = argExpressions.getArray();
+    uassert(31267,
+            str::stream() << kExpressionName << " args field must have length 2",
+            args.size() == 2);
+    int argNum = 0;
+    BSONObjBuilder bob;
+    for (const auto& arg : args) {
+        arg.addToBsonObj(&bob, "arg" + std::to_string(argNum++));
+    }
+    BSONObj params = bob.done();
+    auto result = jsExec->callFunction(_func, params, {});
+
+    return result;
 }
 }  // namespace mongo
