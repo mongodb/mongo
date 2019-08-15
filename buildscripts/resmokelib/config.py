@@ -21,12 +21,13 @@ MONGO_RUNNER_SUBDIR = "mongorunner"
 # The latter is set automatically as part of resmoke's option parsing on startup.
 ##
 
-# Default path for where to look for executables.
+# We default to search for executables in the current working directory or in /data/multiversion
+# which are both part of the PATH.
 DEFAULT_DBTEST_EXECUTABLE = os.path.join(os.curdir, "dbtest")
-DEFAULT_MONGO_EXECUTABLE = os.path.join(os.curdir, "mongo")
-DEFAULT_MONGOEBENCH_EXECUTABLE = os.path.join(os.curdir, "mongoebench")
-DEFAULT_MONGOD_EXECUTABLE = os.path.join(os.curdir, "mongod")
-DEFAULT_MONGOS_EXECUTABLE = os.path.join(os.curdir, "mongos")
+DEFAULT_MONGOEBENCH_EXECUTABLE = "mongoebench"
+DEFAULT_MONGO_EXECUTABLE = "mongo"
+DEFAULT_MONGOD_EXECUTABLE = "mongod"
+DEFAULT_MONGOS_EXECUTABLE = "mongos"
 
 DEFAULT_BENCHMARK_REPETITIONS = 3
 DEFAULT_BENCHMARK_MIN_TIME = datetime.timedelta(seconds=5)
@@ -34,6 +35,10 @@ DEFAULT_BENCHMARK_MIN_TIME = datetime.timedelta(seconds=5)
 # Default root directory for where resmoke.py puts directories containing data files of mongod's it
 # starts, as well as those started by individual tests.
 DEFAULT_DBPATH_PREFIX = os.path.normpath("/data/db")
+
+# Default directory that we expect to contain binaries for multiversion testing. This directory is
+# added to the PATH when calling programs.make_process().
+DEFAULT_MULTIVERSION_DIR = os.path.normpath("/data/multiversion")
 
 # Default location for the genny executable. Override this in the YAML suite configuration if
 # desired.
