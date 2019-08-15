@@ -3795,7 +3795,14 @@ if get_option('install-mode') == 'hygienic':
                 "debug"
             ]
         ),
-        
+
+        ".pdb": env.SuffixMap(
+            directory="$PREFIX_DEBUGDIR",
+            default_roles=[
+                "debug"
+            ]
+        ),
+
         ".lib": env.SuffixMap(
             directory="$PREFIX_LIBDIR",
             default_roles=[
@@ -3815,6 +3822,12 @@ if get_option('install-mode') == 'hygienic':
         component="dist",
         role="runtime",
         name="${{SERVER_DIST_BASENAME[{PREFIX_LEN}:]}}".format(PREFIX_LEN=len(env.get("AIB_PACKAGE_PREFIX")))
+    )
+
+    env.AddPackageNameAlias(
+        component="dist",
+        role="debug",
+        name="${{SERVER_DIST_BASENAME[{PREFIX_LEN}:]}}-debugsymbols".format(PREFIX_LEN=len(env.get("AIB_PACKAGE_PREFIX")))
     )
 
     if env['PLATFORM'] == 'posix':
@@ -4185,8 +4198,10 @@ if get_option('install-mode') == 'hygienic':
     # the evergreen.yml make this decision
     if env.TargetOSIs("windows"):
         env.Alias("archive-dist", "zip-dist")
+        env.Alias("archive-dist-debug", "zip-dist-debug")
     else:
         env.Alias("archive-dist", "tar-dist")
+        env.Alias("archive-dist-debug", "tar-dist-debug")
 
 # We don't want installing files to cause them to flow into the cache,	
 # since presumably we can re-install them from the origin if needed.	

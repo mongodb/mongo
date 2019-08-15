@@ -3574,11 +3574,22 @@ tasks:
     - func: "build new tools"
     - func: "scons compile"
       vars:
-        targets: core tools dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|} ${mh_target|}
+        targets: core tools ${mh_target|}
         task_compile_flags: >-
           --use-new-tools
           --build-mongoreplay="${build_mongoreplay}"
           --detect-odr-violations
+    - func: "scons compile"
+      vars:
+        targets: archive-dist archive-dist-debug distsrc-${ext|tgz} ${msi_target|}
+        additional_targets: ""
+        task_compile_flags: >-
+          --use-new-tools
+          --build-mongoreplay="${build_mongoreplay}"
+          --detect-odr-violations
+          --install-mode=hygienic
+          --separate-debug
+          --legacy-tarball
     - command: shell.exec
       type: test
       params:

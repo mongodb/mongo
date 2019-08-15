@@ -85,6 +85,8 @@ def _update_builder(env, builder, bitcode):
                 bitcode_file = env.File(str(target[0]) + ".bcsymbolmap")
         elif env.TargetOSIs('posix'):
             debug_file = env.File(str(target[0]) + ".debug")
+        elif env.TargetOSIs('windows'):
+            debug_file = env.File(env.subst('${PDB}', target=target))
         else:
             pass
 

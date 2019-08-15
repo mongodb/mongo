@@ -74,7 +74,7 @@ if __name__ == "__main__":
         import subprocess
         import shlex
         tar = which("tar")
-        tar_cmd = "{tar} -C {root_dir} -cf {archive_name} {files}".format(
+        tar_cmd = "{tar} -C {root_dir} -czf {archive_name} {files}".format(
             tar=tar,
             root_dir=root_dir,
             archive_name=archive_name,
@@ -84,8 +84,8 @@ if __name__ == "__main__":
         sys.exit(0)
 
     if archive_type == "zip":
-        from zipfile import ZipFile
-        archive = ZipFile(archive_name, mode='w')
+        import zipfile
+        archive = zipfile.ZipFile(archive_name, mode='w', compression=zipfile.ZIP_DEFLATED)
         add_file = archive.write
     else:
         import tarfile
@@ -610,8 +610,12 @@ def generate(env):  # pylint: disable=too-many-statements
     # TODO: make this configurable?
     env[ROLE_DEPENDENCIES] = {
         "debug": [
-            "runtime",
-            "base",
+            # TODO: Debug should depend on these when making packages, but shouldn't when building
+            # the legacy tarball. Probably fuel for the above configurability fire. For now, make it not
+            # depend so that we can get AIB in place for the dist builders.
+
+            # "runtime",
+            # "base",
         ],
         "dev": [
             "runtime",

@@ -809,23 +809,12 @@ else:
                                  distsrc.File('THIRD-PARTY-NOTICES'),
                                  distsrc.File('MPL-2')])
 
-enterprise_license = [banner for banner in env["MODULE_BANNERS"] if banner.name ==  "LICENSE-Enterprise.txt"]
-if hygienic:
-    env.AutoInstall(
-        target='$DESTDIR',
-        source=[
-            enterprise_license[0]
-            if enterprise_license else distsrc.File('LICENSE-Community.txt'),
-        ],
-        AIB_COMPONENT='common',
-        AIB_COMPONENTS_EXTRA=['dist'],
-        AIB_ROLE='base',
-    )
 # If no module has introduced a file named LICENSE-Enterprise.txt then this
 # is a Community build, so inject the AGPL and the Community license
-elif not enterprise_license:
+
+enterprise_license = [banner for banner in env["MODULE_BANNERS"] if banner.name ==  "LICENSE-Enterprise.txt"]
+if not enterprise_license:
     env.Append(MODULE_BANNERS = [distsrc.File('LICENSE-Community.txt')])
-    
 
 # All module banners get staged to the top level of the tarfile, so we
 # need to fail if we are going to have a name collision.
@@ -833,6 +822,15 @@ module_banner_filenames = set([f.name for f in env['MODULE_BANNERS']])
 if not len(module_banner_filenames) == len(env['MODULE_BANNERS']):
     # TODO: Be nice and identify conflicts in error.
     env.FatalError("ERROR: Filename conflicts exist in module banners.")
+
+if hygienic:
+    env.AutoInstall(
+        target='$DESTDIR',
+        source=env.get('MODULE_BANNERS', []),
+        AIB_COMPONENT='common',
+        AIB_COMPONENTS_EXTRA=['dist'],
+        AIB_ROLE='base',
+    )
 
 # Build a set of directories containing module banners, and use that
 # to build a --transform option for each directory so that the files
@@ -914,28 +912,29 @@ if has_option("use-new-tools") and not hygienic:
 
     env.Alias("dist", server_archive)
     env.NoCache(server_archive)
+
+    debug_symbols_dist = env.Command(
+        target='#/${SERVER_DIST_BASENAME}-debugsymbols${DIST_ARCHIVE_SUFFIX}',
+        source=['#buildscripts/make_archive.py'] + distDebugSymbols,
+        action=' '.join(
+            [
+                '$PYTHON ${SOURCES[0]} -o $TARGET',
+                '--transform $BUILD_DIR/mongo/db/modules/enterprise=$SERVER_DIST_BASENAME',
+                '--transform $BUILD_DIR/mongo=$SERVER_DIST_BASENAME',
+                '${TEMPFILE(SOURCES[1:])}',
+            ]
+        ),
+        BUILD_DIR=env.Dir('$BUILD_DIR').path
+    )
+
+    env.Alias('dist-debugsymbols', debug_symbols_dist)
+    env.NoCache(debug_symbols_dist)
+
 elif not hygienic:
     def failDist(env, target, source):
         env.FatalError("ERROR: 'dist' target only valid with --use-new-tools.")
     env.Alias("dist", [], [ failDist ] )
     env.AlwaysBuild("dist")
-
-debug_symbols_dist = env.Command(
-    target='#/${SERVER_DIST_BASENAME}-debugsymbols${DIST_ARCHIVE_SUFFIX}',
-    source=['#buildscripts/make_archive.py'] + distDebugSymbols,
-    action=' '.join(
-        [
-            '$PYTHON ${SOURCES[0]} -o $TARGET',
-            '--transform $BUILD_DIR/mongo/db/modules/enterprise=$SERVER_DIST_BASENAME',
-            '--transform $BUILD_DIR/mongo=$SERVER_DIST_BASENAME',
-            '${TEMPFILE(SOURCES[1:])}',
-        ]
-    ),
-    BUILD_DIR=env.Dir('$BUILD_DIR').path
-)
-
-env.Alias('dist-debugsymbols', debug_symbols_dist)
-env.NoCache(debug_symbols_dist)
 
 #final alias
 if not hygienic:
