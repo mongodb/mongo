@@ -184,14 +184,18 @@ void WildcardKeyGenerator::_addKey(BSONElement elem,
                                    KeyStringSet* keys,
                                    boost::optional<RecordId> id) const {
     // Wildcard keys are of the form { "": "path.to.field", "": <collation-aware value> }.
-    BSONObjBuilder bob;
-    bob.append("", fullPath.dottedField());
-    if (elem) {
-        CollationIndexKey::collationAwareIndexKeyAppend(elem, _collator, &bob);
+    KeyString::HeapBuilder keyString(_keyStringVersion, _ordering);
+    keyString.appendString(fullPath.dottedField());
+    if (_collator && elem) {
+        keyString.appendBSONElement(elem, [&](StringData stringData) {
+            return _collator->getComparisonString(stringData);
+        });
+    } else if (elem) {
+        keyString.appendBSONElement(elem);
     } else {
-        bob.appendUndefined("");
+        keyString.appendUndefined();
     }
-    KeyString::HeapBuilder keyString(_keyStringVersion, bob.obj(), _ordering);
+
     if (id) {
         keyString.appendRecordId(*id);
     }

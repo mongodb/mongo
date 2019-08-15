@@ -454,6 +454,7 @@ public:
     void appendNumberDouble(double num);
     void appendNumberLong(long long num);
     void appendNull();
+    void appendUndefined();
 
     /**
      * Resets to an empty state.
