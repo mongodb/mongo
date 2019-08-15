@@ -32,6 +32,7 @@
 #include <limits>
 
 #include "mongo/base/static_assert.h"
+#include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -455,6 +456,8 @@ public:
     void appendNumberLong(long long num);
     void appendNull();
     void appendUndefined();
+    void appendBinData(const BSONBinData& data);
+    void appendSetAsArray(const BSONElementSet& set, const StringTransformFn& f = nullptr);
 
     /**
      * Resets to an empty state.
@@ -537,6 +540,7 @@ private:
     void _appendRegex(const BSONRegEx& val, bool invert);
     void _appendDBRef(const BSONDBRef& val, bool invert);
     void _appendArray(const BSONArray& val, bool invert, const StringTransformFn& f);
+    void _appendSetAsArray(const BSONElementSet& val, bool invert, const StringTransformFn& f);
     void _appendObject(const BSONObj& val, bool invert, const StringTransformFn& f);
     void _appendNumberDouble(const double num, bool invert);
     void _appendNumberLong(const long long num, bool invert);

@@ -270,8 +270,6 @@ void ExpressionKeysPrivate::get2DKeys(const BSONObj& obj,
                     continue;
             }
 
-            BSONObjBuilder b(64);
-
             // Stop if we don't need to get anything but location objects
             if (!keys) {
                 if (singleElement)
@@ -280,7 +278,8 @@ void ExpressionKeysPrivate::get2DKeys(const BSONObj& obj,
                     continue;
             }
 
-            params.geoHashConverter->hash(locObj, &obj).appendHashMin(&b, "");
+            KeyString::Builder keyString(keyStringVersion, ordering);
+            params.geoHashConverter->hash(locObj, &obj).appendHashMin(&keyString);
 
             // Go through all the other index keys
             for (vector<pair<string, int>>::const_iterator i = params.other.begin();
@@ -291,21 +290,15 @@ void ExpressionKeysPrivate::get2DKeys(const BSONObj& obj,
                 dps::extractAllElementsAlongPath(obj, i->first, eSet);
 
                 if (eSet.size() == 0)
-                    b.appendNull("");
+                    keyString.appendNull();
                 else if (eSet.size() == 1)
-                    b.appendAs(*(eSet.begin()), "");
+                    keyString.appendBSONElement(*(eSet.begin()));
                 else {
                     // If we have more than one key, store as an array of the objects
-                    BSONArrayBuilder aBuilder;
-
-                    for (BSONElementSet::iterator ei = eSet.begin(); ei != eSet.end(); ++ei) {
-                        aBuilder.append(*ei);
-                    }
-
-                    b.append("", aBuilder.arr());
+                    keyString.appendSetAsArray(eSet);
                 }
             }
-            KeyString::Builder keyString(keyStringVersion, b.obj(), ordering);
+
             if (id) {
                 keyString.appendRecordId(*id);
             }

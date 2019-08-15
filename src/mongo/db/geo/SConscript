@@ -11,6 +11,7 @@ env.Library("geometry", [ "hash.cpp",
                           "r2_region_coverer.cpp" ],
             LIBDEPS = [ "$BUILD_DIR/mongo/base",
                         "$BUILD_DIR/mongo/db/common",
+                        '$BUILD_DIR/mongo/db/storage/key_string',
                         "$BUILD_DIR/third_party/s2/s2" ])
 
 # Geometry / BSON parsing and wrapping

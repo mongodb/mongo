@@ -384,6 +384,20 @@ void BuilderBase<BufferT>::appendUndefined() {
 }
 
 template <class BufferT>
+void BuilderBase<BufferT>::appendBinData(const BSONBinData& data) {
+    _verifyAppendingState();
+    _appendBinData(data, _shouldInvertOnAppend());
+    _elemCount++;
+}
+
+template <class BufferT>
+void BuilderBase<BufferT>::appendSetAsArray(const BSONElementSet& set, const StringTransformFn& f) {
+    _verifyAppendingState();
+    _appendSetAsArray(set, _shouldInvertOnAppend(), nullptr);
+    _elemCount++;
+}
+
+template <class BufferT>
 void BuilderBase<BufferT>::_appendDiscriminator(const Discriminator discriminator) {
     // The discriminator forces this KeyString to compare Less/Greater than any KeyString with
     // the same prefix of keys. As an example, this can be used to land on the first key in the
@@ -594,7 +608,19 @@ void BuilderBase<BufferT>::_appendArray(const BSONArray& val,
                                         bool invert,
                                         const StringTransformFn& f) {
     _append(CType::kArray, invert);
-    BSONForEach(elem, val) {
+    for (const auto& elem : val) {
+        // No generic ctype byte needed here since no name is encoded.
+        _appendBsonValue(elem, invert, nullptr, f);
+    }
+    _append(int8_t(0), invert);
+}
+
+template <class BufferT>
+void BuilderBase<BufferT>::_appendSetAsArray(const BSONElementSet& val,
+                                             bool invert,
+                                             const StringTransformFn& f) {
+    _append(CType::kArray, invert);
+    for (const auto& elem : val) {
         // No generic ctype byte needed here since no name is encoded.
         _appendBsonValue(elem, invert, nullptr, f);
     }

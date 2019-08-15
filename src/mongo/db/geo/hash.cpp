@@ -498,9 +498,29 @@ static void appendHashToBuilder(long long hash, BSONObjBuilder* builder, const c
     builder->appendBinData(fieldName, 8, bdtCustom, buf);
 }
 
+static void appendHashToKeyString(long long hash, KeyString::Builder* ks) {
+    char buf[8];
+#if MONGO_CONFIG_BYTE_ORDER == MONGO_LITTLE_ENDIAN
+    // Reverse the order of bytes when copying between BinData and GeoHash.
+    // GeoHashes are meant to be compared from MSB to LSB, where the first 2 MSB indicate the
+    // quadrant.
+    // In BinData, the GeoHash of a 2D index is compared from LSB to MSB, so the bytes should be
+    // reversed on little-endian systems
+    copyAndReverse(buf, (char*)&hash);
+#else
+    std::memcpy(buf, reinterpret_cast<char*>(&hash), 8);
+#endif
+    ks->appendBinData(BSONBinData(buf, 8, bdtCustom));
+}
+
 void GeoHash::appendHashMin(BSONObjBuilder* builder, const char* fieldName) const {
     // The min bound of a GeoHash region has all the unused suffix bits set to 0
     appendHashToBuilder(_hash, builder, fieldName);
+}
+
+void GeoHash::appendHashMin(KeyString::Builder* ks) const {
+    // The min bound of a GeoHash region has all the unused suffix bits set to 0
+    appendHashToKeyString(_hash, ks);
 }
 
 void GeoHash::appendHashMax(BSONObjBuilder* builder, const char* fieldName) const {
