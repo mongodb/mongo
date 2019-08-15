@@ -9621,7 +9621,7 @@ buildvariants:
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: '/cygdrive/c/python/python37/python.exe'
-    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling,uses_transactions
+    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
     ext: zip
     scons_cache_scope: shared
     multiversion_platform: windows
@@ -9644,6 +9644,7 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
     distros:
     - windows-64-vs2017-compile
+  - name: initial_sync_fuzzer_gen
   - name: .jscore .common !.decimal !.compat !.sharding
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
@@ -11972,6 +11973,7 @@ buildvariants:
   - name: .concurrency !.ubsan !.no_txns
     distros:
     - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
+  - name: initial_sync_fuzzer_gen
   - name: .integration !.audit
     distros:
     - rhel62-large
