@@ -129,6 +129,18 @@ public:
             level = kValidateFull;
         }
 
+        // TODO (SERVER-30357): Add support for background validation.
+        const bool background = false;
+
+        // Background validation requires the storage engine to support checkpoints because it
+        // performs the validation on a checkpoint using checkpoint cursors.
+        if (background && !opCtx->getServiceContext()->getStorageEngine()->supportsCheckpoints()) {
+            uasserted(ErrorCodes::CommandFailed,
+                      str::stream() << "Running validate on collection " << nss
+                                    << " with { background: true } is not supported on the "
+                                    << storageGlobalParams.engine << " storage engine");
+        }
+
         if (!serverGlobalParams.quiet.load()) {
             LOG(0) << "CMD: validate " << nss.ns();
         }
@@ -171,9 +183,6 @@ public:
             _validationsInProgress.erase(nss.ns());
             _validationNotifier.notify_all();
         });
-
-        // TODO (SERVER-30357): Add support for background validation.
-        const bool background = false;
 
         ValidateResults results;
         Status status =

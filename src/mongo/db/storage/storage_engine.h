@@ -199,6 +199,13 @@ public:
     }
 
     /**
+     * Returns whether the storage engine supports checkpoints.
+     */
+    virtual bool supportsCheckpoints() const {
+        return false;
+    }
+
+    /**
      * Returns whether the engine supports a journalling concept or not.
      */
     virtual bool isDurable() const = 0;

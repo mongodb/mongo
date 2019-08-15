@@ -660,6 +660,10 @@ StatusWith<std::vector<std::string>> StorageEngineImpl::extendBackupCursor(
     return _engine->extendBackupCursor(opCtx);
 }
 
+bool StorageEngineImpl::supportsCheckpoints() const {
+    return _engine->supportsCheckpoints();
+}
+
 bool StorageEngineImpl::isDurable() const {
     return _engine->isDurable();
 }

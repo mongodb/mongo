@@ -87,6 +87,13 @@ public:
 
     bool supportsDirectoryPerDB() const override;
 
+    /**
+     * WiredTiger supports checkpoints when it isn't running in memory.
+     */
+    bool supportsCheckpoints() const override {
+        return !isEphemeral();
+    }
+
     bool isDurable() const override {
         return _durable;
     }
