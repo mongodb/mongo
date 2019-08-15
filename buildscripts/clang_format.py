@@ -218,7 +218,7 @@ class ClangFormat(object):
                 elif sys.platform == "darwin":
                     get_clang_format_from_darwin_cache(self.path)
                 else:
-                    print("ERROR: clang-format.py does not support downloading clang-format " +
+                    print("ERROR: clang_format.py does not support downloading clang-format " +
                           " on this platform, please install clang-format " + CLANG_FORMAT_VERSION)
 
         # Validate we have the correct version
@@ -264,7 +264,7 @@ class ClangFormat(object):
                 # Take a lock to ensure diffs do not get mixed when printed to the screen
                 with self.print_lock:
                     print("ERROR: Found diff for " + file_name)
-                    print("To fix formatting errors, run `buildscripts/clang-format.py format`")
+                    print("To fix formatting errors, run `buildscripts/clang_format.py format`")
                     for line in result:
                         print(line.rstrip())
 
@@ -542,7 +542,7 @@ def reformat_branch(  # pylint: disable=too-many-branches,too-many-locals,too-ma
 def usage():
     """Print usage."""
     print(
-        "clang-format.py supports 6 commands [ lint, lint-all, lint-patch, format, format-my, reformat-branch]."
+        "clang_format.py supports 6 commands (lint, lint-all, lint-patch, format, format-my, reformat-branch)."
     )
     print("\nformat-my <origin branch>")
     print("   <origin branch>  - upstream branch to compare against")
