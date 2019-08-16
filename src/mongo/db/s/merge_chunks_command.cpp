@@ -92,7 +92,7 @@ void mergeChunks(OperationContext* opCtx,
 
     // We now have the collection distributed lock, refresh metadata to latest version and sanity
     // check
-    forceShardFilteringMetadataRefresh(opCtx, nss);
+    forceShardFilteringMetadataRefresh(opCtx, nss, true /* forceRefreshFromThisThread */);
 
     const auto metadata = [&] {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
@@ -216,7 +216,7 @@ void mergeChunks(OperationContext* opCtx,
 
     // Refresh metadata to pick up new chunk definitions (regardless of the results returned from
     // running _configsvrCommitChunkMerge).
-    forceShardFilteringMetadataRefresh(opCtx, nss);
+    forceShardFilteringMetadataRefresh(opCtx, nss, true /* forceRefreshFromThisThread */);
 
     // If _configsvrCommitChunkMerge returned an error, look at this shard's metadata to determine
     // if the merge actually did happen. This can happen if there's a network error getting the
