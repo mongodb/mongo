@@ -603,7 +603,7 @@ void DurableCatalogImpl::putMetaData(OperationContext* opCtx,
 
     LOG(3) << "recording new metadata: " << obj;
     Status status = _rs->updateRecord(opCtx, loc, obj.objdata(), obj.objsize());
-    fassert(28521, status.isOK());
+    fassert(28521, status);
 }
 
 Status DurableCatalogImpl::_replaceEntry(OperationContext* opCtx,
@@ -628,7 +628,7 @@ Status DurableCatalogImpl::_replaceEntry(OperationContext* opCtx,
 
         BSONObj obj = b.obj();
         Status status = _rs->updateRecord(opCtx, loc, obj.objdata(), obj.objsize());
-        fassert(28522, status.isOK());
+        fassert(28522, status);
     }
 
     stdx::lock_guard<stdx::mutex> lk(_identsLock);
