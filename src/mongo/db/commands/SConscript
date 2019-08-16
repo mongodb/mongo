@@ -352,6 +352,7 @@ env.Library(
         "dbhash.cpp",
         "driverHelpers.cpp",
         "haystack.cpp",
+        "map_reduce_agg.cpp",
         "map_reduce_command.cpp",
         "map_reduce_finish_command.cpp",
         "mr.cpp",
@@ -393,6 +394,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/exec/stagedebug_cmd',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
+        '$BUILD_DIR/mongo/db/query/mr_response_formatter',
         '$BUILD_DIR/mongo/db/repl/dbcheck',
         '$BUILD_DIR/mongo/db/repl/oplog',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
@@ -403,6 +405,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/net/ssl_manager',
         'core',
         'kill_common',
+        'map_reduce_parser',
         'mongod_fcv',
         'mongod_fsync',
         'profile_common',
@@ -484,6 +487,18 @@ env.Library(
     ]
 )
 
+env.Library(
+    target='map_reduce_parser',
+    source=[
+        'map_reduce_out_options.cpp',
+        env.Idlc('map_reduce.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/write_concern_options',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ]
+)
+
 if has_option('use-cpu-profiler'):
     profEnv = env.Clone()
     profEnv.InjectThirdParty('gperftools')
@@ -504,13 +519,12 @@ if has_option('use-cpu-profiler'):
 env.CppUnitTest(
     target="map_reduce_parse_test",
     source=[
-        "map_reduce_out_options.cpp",
         "map_reduce_parse_test.cpp",
-        env.Idlc('map_reduce.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/write_concern_options',
         '$BUILD_DIR/mongo/idl/idl_parser',
+        'map_reduce_parser'
     ]
 )
 

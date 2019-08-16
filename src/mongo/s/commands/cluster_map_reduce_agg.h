@@ -27,14 +27,16 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/operation_context.h"
+
 namespace mongo {
 
 bool runAggregationMapReduce(OperationContext* opCtx,
                              const std::string& dbname,
                              const BSONObj& cmd,
                              std::string& errmsg,
-                             BSONObjBuilder& result) {
-    return false;
-}
+                             BSONObjBuilder& result);
 
 }  // namespace mongo

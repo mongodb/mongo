@@ -204,6 +204,11 @@ if (typeof _threadInject != "undefined") {
             // This test works close to the BSON document limit for entries in the durable catalog,
             // so running it in parallel with other tests will cause failures.
             "long_collection_names.js",
+
+            // TODO: SERVER-42680 Remove once we have a proper pipeline for MR in Agg.
+            // This test sets the internal parameter to use the aggregation path for MR which
+            // currently uses a dummy pipeline,
+            "mr_output_conversion.js",
         ]);
 
         // The following tests cannot run when shell readMode is legacy.

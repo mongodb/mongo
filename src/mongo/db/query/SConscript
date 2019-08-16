@@ -99,6 +99,17 @@ env.Library(
 )
 
 env.Library(
+    target='mr_response_formatter',
+    source=[
+        'mr_response_formatter.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/namespace_string',
+    ],
+)
+
+env.Library(
     target='command_request_response',
     source=[
         "count_command_as_aggregation_command.cpp",
@@ -234,6 +245,7 @@ env.CppUnitTest(
         "killcursors_request_test.cpp",
         "killcursors_response_test.cpp",
         "lru_key_value_test.cpp",
+        "mr_response_formatter_test.cpp",
         "parsed_distinct_test.cpp",
         "parsed_projection_test.cpp",
         "plan_cache_indexability_test.cpp",
@@ -266,6 +278,7 @@ env.CppUnitTest(
         "command_request_response",
         "explain_options",
         "hint_parser",
+        "mr_response_formatter",
         "query_common",
         "query_planner",
         "query_planner_test_fixture",

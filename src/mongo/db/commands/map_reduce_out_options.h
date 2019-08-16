@@ -82,6 +82,18 @@ public:
             sub.append("sharded", true);
     }
 
+    OutputType getOutputType() const {
+        return _outputType;
+    }
+
+    const std::string& getCollectionName() const {
+        return _collectionName;
+    }
+
+    const std::string& getDatabaseName() const {
+        return _databaseName;
+    }
+
 private:
     std::string _databaseName;
     std::string _collectionName;
