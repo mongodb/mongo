@@ -40,8 +40,7 @@ if (buildInfo()["modules"].some((mod) => {
     mongodOptions.auditFormat = "JSON";
 }
 
-const checkMask = (topDir, expected, honoringUmask) => {
-    const maybeNot = honoringUmask ? "" : " not";
+function checkMask(topDir, expected, honoringUmask, customUmask = false) {
     const processDirectory = (dir) => {
         jsTestLog(`Checking ${dir}`);
         ls(dir).forEach((file) => {
@@ -54,13 +53,18 @@ const checkMask = (topDir, expected, honoringUmask) => {
             }
             const mode = new Number(getFileMode(file));
             const modeStr = mode.toString(8);
-            const msg = `Mode for ${file} is ${modeStr} when${maybeNot} honoring system umask`;
+            let msg = `Mode for ${file} is ${modeStr} when `;
+            if (customUmask) {
+                msg += ' using custom umask';
+            } else {
+                msg += (honoringUmask ? '' : 'not ') + ' honoring system umask';
+            }
             assert.eq(mode.valueOf(), expected, msg);
         });
     };
 
     processDirectory(topDir);
-};
+}
 
 // First we start up the mongod normally, all the files except mongod.lock should have the mode
 // 0600
@@ -74,7 +78,32 @@ mongodOptions.setParameter = {
 };
 conn = MongoRunner.runMongod(mongodOptions);
 MongoRunner.stopMongod(conn);
-checkMask(conn.fullOptions.dbpath, permissiveUmask, false);
+checkMask(conn.fullOptions.dbpath, permissiveUmask, true);
+
+// Restart the mongod with custom umask as string, all files should have the mode 0644
+const worldReadableUmask = Number.parseInt("644", 8);
+mongodOptions.setParameter = {
+    processUmask: '022',
+};
+conn = MongoRunner.runMongod(mongodOptions);
+MongoRunner.stopMongod(conn);
+checkMask(conn.fullOptions.dbpath, worldReadableUmask, false, true);
+
+// Fail to start up with both honorSystemUmask and processUmask set.
+mongodOptions.setParameter = {
+    honorSystemUmask: true,
+    processUmask: '022',
+};
+assert.eq(null, MongoRunner.runMongod(mongodOptions));
+
+// Okay to start with both if honorSystemUmask is false.
+mongodOptions.setParameter = {
+    honorSystemUmask: false,
+    processUmask: '022',
+};
+conn = MongoRunner.runMongod(mongodOptions);
+MongoRunner.stopMongod(conn);
+checkMask(conn.fullOptions.dbpath, worldReadableUmask, false, true);
 
 umask(oldUmask.valueOf());
 })();

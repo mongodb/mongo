@@ -205,12 +205,9 @@ void forkServerOrDie() {
         quickExit(EXIT_FAILURE);
 }
 
-// On POSIX platforms we need to set our umask before opening any log files, so this
-// should depend on MungeUmask above, but not on Windows.
-MONGO_INITIALIZER_GENERAL(
-    ServerLogRedirection,
-    ("GlobalLogManager", "EndStartupOptionHandling", "ForkServer", "MungeUmask"),
-    ("default"))
+MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
+                          ("GlobalLogManager", "EndStartupOptionHandling", "ForkServer"),
+                          ("default"))
 (InitializerContext*) {
     using logger::LogManager;
     using logger::MessageEventDetailsEncoder;
@@ -337,27 +334,6 @@ MONGO_INITIALIZER(RegisterShortCircuitExitHandler)(InitializerContext*) {
     return Status::OK();
 }
 
-// On non-windows platforms, drop rwx for group and other unless the
-// user has opted into using the system umask. To do so, we first read
-// out the current umask (by temporarily setting it to
-// no-permissions), and then or the returned umask with the
-// restrictions we want to apply and set it back. The overall effect
-// is to set the bits for 'other' and 'group', but leave umask bits
-// bits for 'user' unaltered.
-namespace {
-
-MONGO_INITIALIZER_WITH_PREREQUISITES(MungeUmask, ("EndStartupOptionHandling"))
-(InitializerContext*) {
-#ifndef _WIN32
-    if (!gHonorSystemUmask) {
-        umask(umask(S_IRWXU | S_IRWXG | S_IRWXO) | S_IRWXG | S_IRWXO);
-    }
-#endif
-
-    return Status::OK();
-}
-}  // namespace
-
 bool initializeServerGlobalState(ServiceContext* service, PidFileWrite pidWrite) {
 #ifndef _WIN32
     if (!serverGlobalParams.noUnixSocket && !fs::is_directory(serverGlobalParams.socket)) {
@@ -374,6 +350,119 @@ bool initializeServerGlobalState(ServiceContext* service, PidFileWrite pidWrite)
     }
 
     return true;
+}
+
+#ifndef _WIN32
+namespace {
+// Handling for `honorSystemUmask` and `processUmask` setParameters.
+// Non-Windows platforms only.
+//
+// If honorSystemUmask is true, processUmask may not be set
+// and the umask will be left exactly as set by the OS.
+//
+// If honorSystemUmask is false, then we will still honor the 'user'
+// portion of the current umask, but the group/other bits will be
+// set to 1, or whatever value is provided by processUmask if specified.
+
+// processUmask set parameter may only override group/other bits.
+constexpr mode_t kValidUmaskBits = S_IRWXG | S_IRWXO;
+
+// By default, honorSystemUmask==false masks all group/other bits.
+constexpr mode_t kDefaultProcessUmask = S_IRWXG | S_IRWXO;
+
+bool honorSystemUmask = false;
+boost::optional<mode_t> umaskOverride;
+
+mode_t getUmaskOverride() {
+    return umaskOverride ? *umaskOverride : kDefaultProcessUmask;
+}
+
+// We need to set our umask before opening any log files.
+MONGO_INITIALIZER_GENERAL(MungeUmask, ("EndStartupOptionHandling"), ("ServerLogRedirection"))
+(InitializerContext*) {
+    if (!honorSystemUmask) {
+        // POSIX does not provide a mechanism for reading the current umask
+        // without modifying it.
+        // Do this conservatively by setting a short-lived umask of 0777
+        // in order to pull out the user portion of the current umask.
+        umask((umask(S_IRWXU | S_IRWXG | S_IRWXO) & S_IRWXU) | getUmaskOverride());
+    }
+
+    return Status::OK();
+}
+}  // namespace
+#endif
+
+// --setParameter honorSystemUmask
+Status HonorSystemUMaskServerParameter::setFromString(const std::string& value) {
+#ifndef _WIN32
+    if ((value == "0") || (value == "false")) {
+        // false may be specified with processUmask
+        // since it defines precisely how we're not honoring system umask.
+        honorSystemUmask = false;
+        return Status::OK();
+    }
+
+    if ((value == "1") || (value == "true")) {
+        if (umaskOverride) {
+            return {ErrorCodes::BadValue,
+                    "honorSystemUmask and processUmask may not be specified together"};
+        } else {
+            honorSystemUmask = true;
+            return Status::OK();
+        }
+    }
+
+    return {ErrorCodes::BadValue, "honorSystemUmask must be 'true' or 'false'"};
+#else
+    return {ErrorCodes::InternalError, "honerSystemUmask is not available on windows"};
+#endif
+}
+
+void HonorSystemUMaskServerParameter::append(OperationContext*,
+                                             BSONObjBuilder& b,
+                                             const std::string& name) {
+#ifndef _WIN32
+    b << name << honorSystemUmask;
+#endif
+}
+
+// --setParameter processUmask
+Status ProcessUMaskServerParameter::setFromString(const std::string& value) {
+#ifndef _WIN32
+    if (honorSystemUmask) {
+        return {ErrorCodes::BadValue,
+                "honorSystemUmask and processUmask may not be specified together"};
+    }
+
+    // Convert base from octal
+    const char* val = value.c_str();
+    char* end = nullptr;
+
+    auto mask = std::strtoul(val, &end, 8);
+    if (end && (end != (val + value.size()))) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "'" << value << "' is not a valid octal value"};
+    }
+
+    if ((mask & kValidUmaskBits) != mask) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "'" << value << "' attempted to set invalid umask bits"};
+    }
+
+    umaskOverride = static_cast<mode_t>(mask);
+    return Status::OK();
+#else
+    return {ErrorCodes::InternalError, "processUmask is not available on windows"};
+#endif
+}
+
+void ProcessUMaskServerParameter::append(OperationContext*,
+                                         BSONObjBuilder& b,
+                                         const std::string& name) {
+#ifndef _WIN32
+    b << name << static_cast<int>(getUmaskOverride());
+#endif
 }
 
 }  // namespace mongo

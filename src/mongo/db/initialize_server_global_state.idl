@@ -40,12 +40,18 @@ server_parameters:
     set_at: [ startup, runtime ]
   
   honorSystemUmask:
-    cpp_varname: gHonorSystemUmask
-    cpp_vartype: bool
+    description: 'Use the system provided umask, rather than overriding with processUmask config value'
+    set_at: startup
+    cpp_class: HonorSystemUMaskServerParameter
     condition:
       preprocessor: '!defined(_WIN32)'
-    default: false
-    description: 'Max log size in kilobytes'
-    set_at: [ startup ]
-  
-  
+
+  processUmask:
+    description: >
+        Override system umask for group/other permissions when honorSystemUmask is false.
+        User umask is always preserved.
+    set_at: startup
+    cpp_class: ProcessUMaskServerParameter
+    condition:
+      preprocessor: '!defined(_WIN32)'
+
