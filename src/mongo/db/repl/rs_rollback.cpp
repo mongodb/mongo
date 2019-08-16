@@ -419,6 +419,11 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
 
                 return Status::OK();
             }
+            // TODO(SERVER-39452): Ignore no-op commitIndexBuild command for now. Revisit when we
+            // are ready to implement rollback logic.
+            case OplogEntry::CommandType::kCommitIndexBuild: {
+                return Status::OK();
+            }
             case OplogEntry::CommandType::kRenameCollection: {
                 // Example rename collection obj
                 // o:{
