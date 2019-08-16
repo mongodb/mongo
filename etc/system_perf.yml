@@ -426,6 +426,16 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
+- name: validate_cmd
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "validate_cmd"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
 - name: map_reduce_workloads
   priority: 5
   commands:
@@ -753,6 +763,7 @@ buildvariants:
     - name: non_sharded_workloads
     - name: bestbuy_agg
     - name: bestbuy_query
+    - name: validate_cmd
 
 - name: linux-standalone-audit
   display_name: Linux Standalone Audit
