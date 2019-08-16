@@ -58,6 +58,15 @@ import SCons.Warnings
 
 from SCons.Debug import Trace
 
+# SERVER-25436: to work around an issue with python on windows where shutil.copy<2> methods
+# didn't appropriately close files, which caused build failures with the cached build.
+if sys.platform == "win32":
+    import win32api
+    _copy = _copy2 = win32api.CopyFile
+else:
+    _copy = shutil.copy
+    _copy2 = shutil.copy2
+
 print_duplicate = 0
 
 MD5_TIMESTAMP_DEBUG = False
@@ -257,7 +266,7 @@ else:
     _softlink_func = None
 
 def _copy_func(fs, src, dest):
-    shutil.copy2(src, dest)
+    _copy2(src, dest)
     st = fs.stat(src)
     fs.chmod(dest, stat.S_IMODE(st[stat.ST_MODE]) | stat.S_IWRITE)
 
@@ -1094,9 +1103,9 @@ class LocalFS(object):
     def chmod(self, path, mode):
         return os.chmod(path, mode)
     def copy(self, src, dst):
-        return shutil.copy(src, dst)
+        return _copy(src, dst)
     def copy2(self, src, dst):
-        return shutil.copy2(src, dst)
+        return _copy2(src, dst)
     def exists(self, path):
         return os.path.exists(path)
     def getmtime(self, path):
