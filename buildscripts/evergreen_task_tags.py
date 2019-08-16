@@ -24,6 +24,8 @@ def parse_command_line():
     parser.add_argument("--list-tags", action="store_true", default=False,
                         help="List all tags used by tasks in evergreen yml.")
     parser.add_argument("--list-tasks", type=str, help="List all tasks for the given buildvariant.")
+    parser.add_argument("--list-variants-and-tasks", action="store_true",
+                        help="List all tasks for every buildvariant.")
     parser.add_argument("-t", "--tasks-for-tag", type=str, default=None, action="append",
                         help="List all tasks that use the given tag.")
     parser.add_argument("-x", "--remove-tasks-for-tag-filter", type=str, default=None,
@@ -78,6 +80,18 @@ def list_all_tasks(evg_config, build_variant):
         print(task)
 
 
+def list_all_variants_and_tasks(evg_config):
+    """
+    Print all tasks for every build variant.
+
+    :param evg_config: Evergreen configuration.
+    """
+    for variant in evg_config.variant_names:
+        tasks = get_all_tasks(evg_config, variant)
+        for task in tasks:
+            print("%s | %s" % (variant, task))
+
+
 def is_task_tagged(task, tags, filters):
     """
     Determine if given task match tag query.
@@ -127,6 +141,9 @@ def main():
 
     if options.list_tags:
         list_all_tags(evg_config)
+
+    if options.list_variants_and_tasks:
+        list_all_variants_and_tasks(evg_config)
 
     if options.list_tasks:
         list_all_tasks(evg_config, options.list_tasks)
