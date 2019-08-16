@@ -1138,7 +1138,8 @@ TEST_F(RollbackImplTest, RollbackProperlySavesFilesWhenInsertsAndDropOfCollectio
     const auto nss = NamespaceString("db.people").makeDropPendingNamespace(dropOpTime);
     const auto uuid = UUID::gen();
     const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
-    DropPendingCollectionReaper::get(_opCtx.get())->addDropPendingNamespace(dropOpTime, nss);
+    DropPendingCollectionReaper::get(_opCtx.get())
+        ->addDropPendingNamespace(_opCtx.get(), dropOpTime, nss);
 
     // Insert documents into the collection. We'll write them out even though the collection is
     // later dropped.

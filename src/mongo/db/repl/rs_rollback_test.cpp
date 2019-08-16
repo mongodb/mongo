@@ -964,7 +964,7 @@ TEST_F(RSRollbackTest, RollbackDropCollectionCommand) {
     CollectionOptions options;
     options.uuid = UUID::gen();
     auto coll = _createCollection(_opCtx.get(), dpns, options);
-    _dropPendingCollectionReaper->addDropPendingNamespace(dropTime, dpns);
+    _dropPendingCollectionReaper->addDropPendingNamespace(_opCtx.get(), dropTime, dpns);
 
     auto commonOperation = makeOpAndRecordId(1);
     auto dropCollectionOperation =
@@ -1126,7 +1126,7 @@ TEST_F(RSRollbackTest, RollbackRenameCollectionInDatabaseWithDropTargetTrueComma
     CollectionOptions droppedCollOptions;
     droppedCollOptions.uuid = UUID::gen();
     auto droppedColl = _createCollection(_opCtx.get(), dpns, droppedCollOptions);
-    _dropPendingCollectionReaper->addDropPendingNamespace(dropTime, dpns);
+    _dropPendingCollectionReaper->addDropPendingNamespace(_opCtx.get(), dropTime, dpns);
     auto droppedCollectionUUID = droppedColl->uuid();
 
     CollectionOptions renamedCollOptions;
@@ -1285,7 +1285,7 @@ TEST_F(RSRollbackTest, RollbackDropCollectionThenRenameCollectionToDroppedCollec
     droppedCollOptions.uuid = UUID::gen();
     auto droppedCollection = _createCollection(_opCtx.get(), dpns, droppedCollOptions);
     auto droppedCollectionUUID = droppedCollection->uuid();
-    _dropPendingCollectionReaper->addDropPendingNamespace(dropTime, dpns);
+    _dropPendingCollectionReaper->addDropPendingNamespace(_opCtx.get(), dropTime, dpns);
 
     auto commonOperation = makeOpAndRecordId(1);
 

@@ -82,7 +82,8 @@ public:
     /**
      * Adds a new drop-pending namespace, with its drop optime, to be managed by this class.
      */
-    void addDropPendingNamespace(const OpTime& dropOpTime,
+    void addDropPendingNamespace(OperationContext* opCtx,
+                                 const OpTime& dropOpTime,
                                  const NamespaceString& dropPendingNamespace);
 
     /**
