@@ -59,7 +59,8 @@ namespace mongo {
  */
 class DocumentSourceShardCheckResumability final : public DocumentSource {
 public:
-    GetNextResult getNext() final;
+    static constexpr StringData kStageName = "$_internalCheckShardResumability"_sd;
+
     const char* getSourceName() const final;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
@@ -92,6 +93,8 @@ private:
     DocumentSourceShardCheckResumability(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                          ResumeTokenData token);
 
+    GetNextResult doGetNext() final;
+
     void _assertOplogHasEnoughHistory(const GetNextResult& nextInput);
 
     ResumeTokenData _tokenFromClient;
@@ -105,6 +108,7 @@ private:
  */
 class DocumentSourceEnsureResumeTokenPresent final : public DocumentSource {
 public:
+    static constexpr StringData kStageName = "$_internalEnsureResumeTokenPresent"_sd;
     // Used to record the results of comparing the token data extracted from documents in the
     // resumed stream against the client's resume token.
     enum class ResumeStatus {
@@ -113,7 +117,6 @@ public:
         kCheckNextDoc     // The next document produced by the stream may contain the resume token.
     };
 
-    GetNextResult getNext() final;
     const char* getSourceName() const final;
 
     StageConstraints constraints(Pipeline::SplitState) const final {
@@ -153,6 +156,8 @@ private:
      */
     DocumentSourceEnsureResumeTokenPresent(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                            ResumeTokenData token);
+
+    GetNextResult doGetNext() final;
 
     /**
      * Check the given event to determine whether it matches the client's resume token. If so, we

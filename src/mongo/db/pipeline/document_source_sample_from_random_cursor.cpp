@@ -50,14 +50,14 @@ DocumentSourceSampleFromRandomCursor::DocumentSourceSampleFromRandomCursor(
     long long size,
     std::string idField,
     long long nDocsInCollection)
-    : DocumentSource(pExpCtx),
+    : DocumentSource(kStageName, pExpCtx),
       _size(size),
       _idField(std::move(idField)),
       _seenDocs(pExpCtx->getValueComparator().makeUnorderedValueSet()),
       _nDocsInColl(nDocsInCollection) {}
 
 const char* DocumentSourceSampleFromRandomCursor::getSourceName() const {
-    return "$sampleFromRandomCursor";
+    return kStageName.rawData();
 }
 
 namespace {
@@ -75,9 +75,7 @@ double smallestFromSampleOfUniform(PseudoRandom* prng, size_t N) {
 }
 }  // namespace
 
-DocumentSource::GetNextResult DocumentSourceSampleFromRandomCursor::getNext() {
-    pExpCtx->checkForInterrupt();
-
+DocumentSource::GetNextResult DocumentSourceSampleFromRandomCursor::doGetNext() {
     if (_seenDocs.size() >= static_cast<size_t>(_size))
         return GetNextResult::makeEOF();
 

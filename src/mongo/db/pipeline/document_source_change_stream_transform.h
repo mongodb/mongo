@@ -39,6 +39,7 @@ namespace mongo {
 
 class DocumentSourceChangeStreamTransform : public DocumentSource {
 public:
+    static constexpr StringData kStageName = "$_internalChangeStreamTransform"_sd;
     /**
      * Creates a new transformation stage from the given specification.
      */
@@ -58,10 +59,12 @@ public:
         return boost::none;
     }
 
-    DocumentSource::GetNextResult getNext();
     const char* getSourceName() const {
         return DocumentSourceChangeStream::kStageName.rawData();
     }
+
+protected:
+    DocumentSource::GetNextResult doGetNext() override;
 
 private:
     // This constructor is private, callers should use the 'create()' method above.

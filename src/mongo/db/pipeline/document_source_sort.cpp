@@ -104,7 +104,7 @@ DocumentSourceSort::DocumentSourceSort(const boost::intrusive_ptr<ExpressionCont
                                        const BSONObj& sortOrder,
                                        uint64_t limit,
                                        uint64_t maxMemoryUsageBytes)
-    : DocumentSource(pExpCtx),
+    : DocumentSource(kStageName, pExpCtx),
       _sortExecutor({{sortOrder, pExpCtx},
                      limit,
                      maxMemoryUsageBytes,
@@ -122,9 +122,7 @@ REGISTER_DOCUMENT_SOURCE(sort,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceSort::createFromBson);
 
-DocumentSource::GetNextResult DocumentSourceSort::getNext() {
-    pExpCtx->checkForInterrupt();
-
+DocumentSource::GetNextResult DocumentSourceSort::doGetNext() {
     if (!_populated) {
         const auto populationResult = populate();
         if (populationResult.isPaused()) {
@@ -214,7 +212,6 @@ DepsTracker::State DocumentSourceSort::getDependencies(DepsTracker* deps) const 
 
     return DepsTracker::State::SEE_NEXT;
 }
-
 
 intrusive_ptr<DocumentSource> DocumentSourceSort::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {

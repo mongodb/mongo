@@ -89,9 +89,10 @@ public:
     using BatchObject = B;
     using BatchedObjects = std::vector<BatchObject>;
 
-    DocumentSourceWriter(NamespaceString outputNs,
+    DocumentSourceWriter(const char* stageName,
+                         NamespaceString outputNs,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSource(expCtx),
+        : DocumentSource(stageName, expCtx),
           _outputNs(std::move(outputNs)),
           _writeConcern(expCtx->opCtx->getWriteConcern()) {}
 
@@ -119,9 +120,8 @@ public:
         return _outputNs;
     }
 
-    GetNextResult getNext() final override;
-
 protected:
+    GetNextResult doGetNext() final override;
     /**
      * Prepares the stage to be able to write incoming batches.
      */
@@ -165,9 +165,7 @@ private:
 };
 
 template <typename B>
-DocumentSource::GetNextResult DocumentSourceWriter<B>::getNext() {
-    pExpCtx->checkForInterrupt();
-
+DocumentSource::GetNextResult DocumentSourceWriter<B>::doGetNext() {
     if (_done) {
         return GetNextResult::makeEOF();
     }

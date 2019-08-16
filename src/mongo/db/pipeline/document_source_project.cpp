@@ -81,7 +81,7 @@ intrusive_ptr<DocumentSource> DocumentSourceProject::create(
                 throw;
             }
         }(),
-        DocumentSourceProject::kStageName.rawData(),
+        kStageName,
         isIndependentOfAnyCollection));
     return project;
 }

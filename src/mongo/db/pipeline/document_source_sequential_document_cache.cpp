@@ -39,7 +39,7 @@ constexpr StringData DocumentSourceSequentialDocumentCache::kStageName;
 
 DocumentSourceSequentialDocumentCache::DocumentSourceSequentialDocumentCache(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, SequentialDocumentCache* cache)
-    : DocumentSource(expCtx), _cache(cache) {
+    : DocumentSource(kStageName, expCtx), _cache(cache) {
     invariant(_cache);
     invariant(!_cache->isAbandoned());
 
@@ -48,11 +48,9 @@ DocumentSourceSequentialDocumentCache::DocumentSourceSequentialDocumentCache(
     }
 }
 
-DocumentSource::GetNextResult DocumentSourceSequentialDocumentCache::getNext() {
+DocumentSource::GetNextResult DocumentSourceSequentialDocumentCache::doGetNext() {
     // Either we're reading from the cache, or we have an input source to build the cache from.
     invariant(pSource || _cache->isServing());
-
-    pExpCtx->checkForInterrupt();
 
     if (_cacheIsEOF) {
         return GetNextResult::makeEOF();

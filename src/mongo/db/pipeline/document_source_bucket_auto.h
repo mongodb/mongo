@@ -44,9 +44,10 @@ namespace mongo {
  */
 class DocumentSourceBucketAuto final : public DocumentSource {
 public:
+    static constexpr StringData kStageName = "$bucketAuto"_sd;
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
-    GetNextResult getNext() final;
+
     const char* getSourceName() const final;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
@@ -93,6 +94,7 @@ public:
     const std::vector<AccumulationStatement>& getAccumulatedFields() const;
 
 protected:
+    GetNextResult doGetNext() final;
     void doDispose() final;
 
 private:

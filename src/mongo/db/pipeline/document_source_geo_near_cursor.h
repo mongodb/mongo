@@ -53,7 +53,7 @@ public:
     /**
      * The name of this stage.
      */
-    static constexpr auto kStageName = "$geoNearCursor";
+    static constexpr StringData kStageName = "$geoNearCursor"_sd;
 
     /**
      * Create a new DocumentSourceGeoNearCursor. If specified, 'distanceMultiplier' must be

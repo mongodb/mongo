@@ -43,7 +43,7 @@ namespace mongo {
  */
 class DocumentSourceListCachedAndActiveUsers final : public DocumentSource {
 public:
-    static const char* kStageName;
+    static constexpr StringData kStageName = "$listCachedAndActiveUsers"_sd;
 
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
@@ -78,10 +78,8 @@ public:
         }
     };
 
-    GetNextResult getNext() final;
-
     const char* getSourceName() const final {
-        return kStageName;
+        return kStageName.rawData();
     }
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
@@ -111,6 +109,8 @@ public:
 
 private:
     DocumentSourceListCachedAndActiveUsers(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+    GetNextResult doGetNext() final;
 
     std::vector<AuthorizationManager::CachedUserInfo> _users;
 };

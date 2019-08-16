@@ -49,7 +49,6 @@
 #include "mongo/db/query/plan_executor.h"
 
 namespace mongo {
-constexpr const char* DocumentSourceGeoNearCursor::kStageName;
 
 boost::intrusive_ptr<DocumentSourceGeoNearCursor> DocumentSourceGeoNearCursor::create(
     Collection* collection,
@@ -81,7 +80,7 @@ DocumentSourceGeoNearCursor::DocumentSourceGeoNearCursor(
 }
 
 const char* DocumentSourceGeoNearCursor::getSourceName() const {
-    return kStageName;
+    return DocumentSourceGeoNearCursor::kStageName.rawData();
 }
 
 Document DocumentSourceGeoNearCursor::transformBSONObjToDocument(const BSONObj& obj) const {

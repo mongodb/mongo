@@ -36,7 +36,7 @@ namespace mongo {
 
 class DocumentSourceRedact final : public DocumentSource {
 public:
-    GetNextResult getNext() final;
+    static constexpr StringData kStageName = "$redact"_sd;
     const char* getSourceName() const final;
     boost::intrusive_ptr<DocumentSource> optimize() final;
 
@@ -74,6 +74,8 @@ public:
 private:
     DocumentSourceRedact(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                          const boost::intrusive_ptr<Expression>& previsit);
+
+    GetNextResult doGetNext() final;
 
     // These both work over pExpCtx->variables.
     boost::optional<Document> redactObject(const Document& root);  // redacts CURRENT

@@ -45,12 +45,12 @@ public:
     DocumentSourceSingleDocumentTransformation(
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         std::unique_ptr<TransformerInterface> parsedTransform,
-        std::string name,
+        const StringData name,
         bool independentOfAnyCollection);
 
     // virtuals from DocumentSource
     const char* getSourceName() const final;
-    GetNextResult getNext() final;
+
     boost::intrusive_ptr<DocumentSource> optimize() final;
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
@@ -90,6 +90,7 @@ public:
     }
 
 protected:
+    GetNextResult doGetNext() final;
     void doDispose() final;
 
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,

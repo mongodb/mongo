@@ -322,7 +322,7 @@ DocumentSourceMerge::DocumentSourceMerge(NamespaceString outputNs,
                                          boost::optional<std::vector<BSONObj>> pipeline,
                                          std::set<FieldPath> mergeOnFields,
                                          boost::optional<ChunkVersion> targetCollectionVersion)
-    : DocumentSourceWriter(std::move(outputNs), expCtx),
+    : DocumentSourceWriter(kStageName.rawData(), std::move(outputNs), expCtx),
       _targetCollectionVersion(targetCollectionVersion),
       _descriptor(descriptor),
       _pipeline(std::move(pipeline)),

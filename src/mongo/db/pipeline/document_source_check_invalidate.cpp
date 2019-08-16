@@ -58,9 +58,7 @@ bool isInvalidatingCommand(const boost::intrusive_ptr<ExpressionContext>& pExpCt
 
 }  // namespace
 
-DocumentSource::GetNextResult DocumentSourceCheckInvalidate::getNext() {
-    pExpCtx->checkForInterrupt();
-
+DocumentSource::GetNextResult DocumentSourceCheckInvalidate::doGetNext() {
     if (_queuedInvalidate) {
         const auto res = DocumentSource::GetNextResult(std::move(_queuedInvalidate.get()));
         _queuedInvalidate.reset();

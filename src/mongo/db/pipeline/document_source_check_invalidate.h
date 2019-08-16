@@ -40,11 +40,11 @@ namespace mongo {
  */
 class DocumentSourceCheckInvalidate final : public DocumentSource {
 public:
-    GetNextResult getNext() final;
+    static constexpr StringData kStageName = "$_checkInvalidate"_sd;
 
     const char* getSourceName() const final {
         // This is used in error reporting.
-        return "$_checkInvalidate";
+        return DocumentSourceCheckInvalidate::kStageName.rawData();
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
@@ -80,10 +80,13 @@ private:
      */
     DocumentSourceCheckInvalidate(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                   boost::optional<ResumeTokenData> startAfterInvalidate)
-        : DocumentSource(expCtx), _startAfterInvalidate(std::move(startAfterInvalidate)) {
+        : DocumentSource(kStageName, expCtx),
+          _startAfterInvalidate(std::move(startAfterInvalidate)) {
         invariant(!_startAfterInvalidate ||
                   _startAfterInvalidate->fromInvalidate == ResumeTokenData::kFromInvalidate);
     }
+
+    GetNextResult doGetNext() final;
 
     boost::optional<ResumeTokenData> _startAfterInvalidate;
     boost::optional<Document> _queuedInvalidate;

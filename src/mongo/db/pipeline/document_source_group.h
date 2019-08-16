@@ -96,7 +96,6 @@ public:
     boost::intrusive_ptr<DocumentSource> optimize() final;
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-    GetNextResult getNext() final;
     const char* getSourceName() const final;
     GetModPathsReturn getModifiedPaths() const final;
     StringMap<boost::intrusive_ptr<Expression>> getIdFields() const;
@@ -130,7 +129,6 @@ public:
         constraints.canSwapWithMatch = true;
         return constraints;
     }
-
 
     /**
      * Add an accumulator, which will become a field in each Document that results from grouping.
@@ -179,6 +177,7 @@ public:
         const;
 
 protected:
+    GetNextResult doGetNext() final;
     void doDispose() final;
 
 private:

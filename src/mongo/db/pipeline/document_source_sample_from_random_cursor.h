@@ -40,7 +40,7 @@ namespace mongo {
  */
 class DocumentSourceSampleFromRandomCursor final : public DocumentSource {
 public:
-    GetNextResult getNext() final;
+    static constexpr StringData kStageName = "$sampleFromRandomCursor"_sd;
     const char* getSourceName() const final;
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
@@ -70,6 +70,8 @@ private:
                                          long long size,
                                          std::string idField,
                                          long long collectionSize);
+
+    GetNextResult doGetNext() final;
 
     /**
      * Keep asking for documents from the random cursor until it yields a new document. Errors if a

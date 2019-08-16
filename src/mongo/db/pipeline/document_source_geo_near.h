@@ -37,7 +37,7 @@ namespace mongo {
 class DocumentSourceGeoNear : public DocumentSource {
 public:
     static constexpr StringData kKeyFieldName = "key"_sd;
-    static constexpr auto kStageName = "$geoNear";
+    static constexpr StringData kStageName = "$geoNear"_sd;
 
     /**
      * Only exposed for testing.
@@ -46,7 +46,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>&);
 
     const char* getSourceName() const final {
-        return kStageName;
+        return DocumentSourceGeoNear::kStageName.rawData();
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
@@ -63,9 +63,8 @@ public:
      * DocumentSourceGeoNear should always be replaced by a DocumentSourceGeoNearCursor before
      * executing a pipeline, so this method should never be called.
      */
-    GetNextResult getNext() final {
-        // TODO: Replace with a MONGO_UNREACHABLE as part of SERVER-38995.
-        uasserted(51048, "DocumentSourceGeoNear's getNext should never be called");
+    GetNextResult doGetNext() final {
+        MONGO_UNREACHABLE;
     }
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
@@ -132,7 +131,6 @@ public:
      * In a sharded cluster, this becomes a merge sort by distance, from nearest to furthest.
      */
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
-
 
 private:
     explicit DocumentSourceGeoNear(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);

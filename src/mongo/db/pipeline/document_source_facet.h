@@ -58,6 +58,7 @@ class NamespaceString;
  */
 class DocumentSourceFacet final : public DocumentSource {
 public:
+    static constexpr StringData kStageName = "$facet"_sd;
     struct FacetPipeline {
         FacetPipeline(std::string name, std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
             : name(std::move(name)), pipeline(std::move(pipeline)) {}
@@ -105,11 +106,6 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
-     * Blocking call. Will consume all input and produces one output document.
-     */
-    GetNextResult getNext() final;
-
-    /**
      * Optimizes inner pipelines.
      */
     boost::intrusive_ptr<DocumentSource> optimize() final;
@@ -120,7 +116,7 @@ public:
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 
     const char* getSourceName() const final {
-        return "$facet";
+        return DocumentSourceFacet::kStageName.rawData();
     }
 
     /**
@@ -155,6 +151,10 @@ public:
     bool usedDisk() final;
 
 protected:
+    /**
+     * Blocking call. Will consume all input and produces one output document.
+     */
+    GetNextResult doGetNext() final;
     void doDispose() final;
 
 private:

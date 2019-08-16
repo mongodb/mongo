@@ -47,23 +47,21 @@ using std::vector;
 
 DocumentSourceRedact::DocumentSourceRedact(const intrusive_ptr<ExpressionContext>& expCtx,
                                            const intrusive_ptr<Expression>& expression)
-    : DocumentSource(expCtx), _expression(expression) {}
+    : DocumentSource(kStageName, expCtx), _expression(expression) {}
 
 REGISTER_DOCUMENT_SOURCE(redact,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceRedact::createFromBson);
 
 const char* DocumentSourceRedact::getSourceName() const {
-    return "$redact";
+    return kStageName.rawData();
 }
 
 static const Value descendVal = Value("descend"_sd);
 static const Value pruneVal = Value("prune"_sd);
 static const Value keepVal = Value("keep"_sd);
 
-DocumentSource::GetNextResult DocumentSourceRedact::getNext() {
-    pExpCtx->checkForInterrupt();
-
+DocumentSource::GetNextResult DocumentSourceRedact::doGetNext() {
     auto nextInput = pSource->getNext();
     for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
         auto& variables = pExpCtx->variables;
@@ -191,7 +189,6 @@ intrusive_ptr<DocumentSource> DocumentSourceRedact::createFromBson(
     variables.setValue(decendId, descendVal);
     variables.setValue(pruneId, pruneVal);
     variables.setValue(keepId, keepVal);
-
 
     return source;
 }

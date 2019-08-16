@@ -52,14 +52,15 @@ std::vector<SHA256Block> listSessionsUsersToDigests(const std::vector<ListSessio
  */
 class DocumentSourceListLocalSessions final : public DocumentSource {
 public:
-    static const char* kStageName;
+    static constexpr StringData kStageName = "$listLocalSessions"_sd;
 
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
         static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
                                                  const BSONElement& spec) {
 
-            return std::make_unique<LiteParsed>(listSessionsParseSpec(kStageName, spec));
+            return std::make_unique<LiteParsed>(
+                listSessionsParseSpec(DocumentSourceListLocalSessions::kStageName, spec));
         }
 
         explicit LiteParsed(const ListSessionsSpec& spec) : _spec(spec) {}
@@ -82,7 +83,9 @@ public:
 
         void assertSupportsReadConcern(const repl::ReadConcernArgs& readConcern) const {
             uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "Aggregation stage " << kStageName << " cannot run with a "
+                    str::stream() << "Aggregation stage "
+                                  << DocumentSourceListLocalSessions::kStageName
+                                  << " cannot run with a "
                                   << "readConcern other than 'local', or in a multi-document "
                                   << "transaction. Current readConcern: " << readConcern.toString(),
                     readConcern.getLevel() == repl::ReadConcernLevel::kLocalReadConcern);
@@ -92,10 +95,8 @@ public:
         const ListSessionsSpec _spec;
     };
 
-    GetNextResult getNext() final;
-
     const char* getSourceName() const final {
-        return kStageName;
+        return DocumentSourceListLocalSessions::kStageName.rawData();
     }
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
@@ -126,6 +127,8 @@ public:
 private:
     DocumentSourceListLocalSessions(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                     const ListSessionsSpec& spec);
+
+    GetNextResult doGetNext() final;
 
     const ListSessionsSpec _spec;
     const LogicalSessionCache* _cache;

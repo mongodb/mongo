@@ -36,7 +36,7 @@ namespace mongo {
 
 class DocumentSourcePlanCacheStats final : public DocumentSource {
 public:
-    static const char* kStageName;
+    static constexpr StringData kStageName = "$planCacheStats"_sd;
 
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
@@ -67,7 +67,8 @@ public:
 
         void assertSupportsReadConcern(const repl::ReadConcernArgs& readConcern) const {
             uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "Aggregation stage " << kStageName
+                    str::stream() << "Aggregation stage "
+                                  << DocumentSourcePlanCacheStats::kStageName
                                   << " requires read concern local but found "
                                   << readConcern.toString(),
                     readConcern.getLevel() == repl::ReadConcernLevel::kLocalReadConcern);
@@ -81,8 +82,6 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     virtual ~DocumentSourcePlanCacheStats() = default;
-
-    GetNextResult getNext() override;
 
     StageConstraints constraints(
         Pipeline::SplitState = Pipeline::SplitState::kUnsplit) const override {
@@ -105,7 +104,7 @@ public:
     }
 
     const char* getSourceName() const override {
-        return kStageName;
+        return DocumentSourcePlanCacheStats::kStageName.rawData();
     }
 
     /**
@@ -121,6 +120,8 @@ public:
 
 private:
     DocumentSourcePlanCacheStats(const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    GetNextResult doGetNext() final;
 
     Value serialize(
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override {

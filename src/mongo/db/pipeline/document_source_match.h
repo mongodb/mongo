@@ -40,6 +40,7 @@ namespace mongo {
 
 class DocumentSourceMatch : public DocumentSource {
 public:
+    static constexpr StringData kStageName = "$match"_sd;
     /**
      * Convenience method for creating a $match stage.
      */
@@ -76,8 +77,6 @@ public:
      * MatchExpression. Takes ownership of 'filter'.
      */
     void rebuild(BSONObj filter);
-
-    GetNextResult getNext() override;
 
     boost::intrusive_ptr<DocumentSource> optimize() final;
 
@@ -170,6 +169,7 @@ public:
     }
 
 protected:
+    GetNextResult doGetNext() override;
     DocumentSourceMatch(const BSONObj& query,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 

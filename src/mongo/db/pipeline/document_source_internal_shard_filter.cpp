@@ -46,11 +46,9 @@ namespace mongo {
 DocumentSourceInternalShardFilter::DocumentSourceInternalShardFilter(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     std::unique_ptr<ShardFilterer> shardFilterer)
-    : DocumentSource(pExpCtx), _shardFilterer(std::move(shardFilterer)) {}
+    : DocumentSource(kStageName, pExpCtx), _shardFilterer(std::move(shardFilterer)) {}
 
-DocumentSource::GetNextResult DocumentSourceInternalShardFilter::getNext() {
-    pExpCtx->checkForInterrupt();
-
+DocumentSource::GetNextResult DocumentSourceInternalShardFilter::doGetNext() {
     auto next = pSource->getNext();
     invariant(_shardFilterer);
     for (; next.isAdvanced(); next = pSource->getNext()) {

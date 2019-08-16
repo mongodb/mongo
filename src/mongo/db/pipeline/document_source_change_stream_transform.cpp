@@ -82,7 +82,7 @@ DocumentSourceChangeStreamTransform::DocumentSourceChangeStreamTransform(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ServerGlobalParams::FeatureCompatibility::Version& fcv,
     BSONObj changeStreamSpec)
-    : DocumentSource(expCtx),
+    : DocumentSource(DocumentSourceChangeStreamTransform::kStageName, expCtx),
       _changeStreamSpec(changeStreamSpec.getOwned()),
       _isIndependentOfAnyCollection(expCtx->ns.isCollectionlessAggregateNS()),
       _fcv(fcv) {
@@ -393,9 +393,7 @@ DocumentSource::GetModPathsReturn DocumentSourceChangeStreamTransform::getModifi
     return {DocumentSource::GetModPathsReturn::Type::kAllPaths, std::set<string>{}, {}};
 }
 
-DocumentSource::GetNextResult DocumentSourceChangeStreamTransform::getNext() {
-    pExpCtx->checkForInterrupt();
-
+DocumentSource::GetNextResult DocumentSourceChangeStreamTransform::doGetNext() {
     uassert(50988,
             "Illegal attempt to execute an internal change stream stage on mongos. A $changeStream "
             "stage must be the first stage in a pipeline",

@@ -84,12 +84,10 @@ std::string nextFileName() {
 }  // namespace
 
 const char* DocumentSourceBucketAuto::getSourceName() const {
-    return "$bucketAuto";
+    return kStageName.rawData();
 }
 
-DocumentSource::GetNextResult DocumentSourceBucketAuto::getNext() {
-    pExpCtx->checkForInterrupt();
-
+DocumentSource::GetNextResult DocumentSourceBucketAuto::doGetNext() {
     if (!_populated) {
         const auto populationResult = populateSorter();
         if (populationResult.isPaused()) {
@@ -426,7 +424,7 @@ DocumentSourceBucketAuto::DocumentSourceBucketAuto(
     std::vector<AccumulationStatement> accumulationStatements,
     const boost::intrusive_ptr<GranularityRounder>& granularityRounder,
     uint64_t maxMemoryUsageBytes)
-    : DocumentSource(pExpCtx),
+    : DocumentSource(kStageName, pExpCtx),
       _nBuckets(numBuckets),
       _maxMemoryUsageBytes(maxMemoryUsageBytes),
       _groupByExpression(groupByExpression),

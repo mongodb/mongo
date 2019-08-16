@@ -39,6 +39,8 @@ namespace mongo {
  */
 class DocumentSourceCollStats : public DocumentSource {
 public:
+    static constexpr StringData kStageName = "$collStats"_sd;
+
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
         static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
@@ -69,9 +71,7 @@ public:
     };
 
     DocumentSourceCollStats(const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
-        : DocumentSource(pExpCtx) {}
-
-    GetNextResult getNext() final;
+        : DocumentSource(kStageName, pExpCtx) {}
 
     const char* getSourceName() const final;
 
@@ -98,6 +98,8 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:
+    GetNextResult doGetNext() final;
+
     // The raw object given to $collStats containing user specified options.
     BSONObj _collStatsSpec;
     bool _finished = false;

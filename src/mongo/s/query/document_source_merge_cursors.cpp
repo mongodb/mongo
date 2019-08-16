@@ -50,7 +50,7 @@ DocumentSourceMergeCursors::DocumentSourceMergeCursors(
     AsyncResultsMergerParams armParams,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<BSONObj> ownedParamsSpec)
-    : DocumentSource(expCtx),
+    : DocumentSource(kStageName, expCtx),
       _armParamsObj(std::move(ownedParamsSpec)),
       _executor(std::move(executor)),
       _armParams(std::move(armParams)) {}
@@ -95,7 +95,7 @@ std::unique_ptr<RouterStageMerge> DocumentSourceMergeCursors::convertToRouterSta
     return std::make_unique<RouterStageMerge>(pExpCtx->opCtx, _executor, std::move(*_armParams));
 }
 
-DocumentSource::GetNextResult DocumentSourceMergeCursors::getNext() {
+DocumentSource::GetNextResult DocumentSourceMergeCursors::doGetNext() {
     if (!_blockingResultsMerger) {
         populateMerger();
     }

@@ -39,9 +39,12 @@ namespace mongo {
  */
 class DocumentSourceTestOptimizations : public DocumentSource {
 public:
-    DocumentSourceTestOptimizations() : DocumentSource(new ExpressionContextForTest()) {}
+    static constexpr StringData kStageName = "$_internalTestOptimizations"_sd;
+    DocumentSourceTestOptimizations()
+        : DocumentSource(DocumentSourceTestOptimizations::kStageName,
+                         new ExpressionContextForTest()) {}
     virtual ~DocumentSourceTestOptimizations() = default;
-    virtual GetNextResult getNext() override {
+    virtual GetNextResult doGetNext() override {
         MONGO_UNREACHABLE;
     }
     virtual StageConstraints constraints(Pipeline::SplitState) const override {

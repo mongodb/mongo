@@ -48,7 +48,6 @@ public:
         using LiteParsedDocumentSourceForeignCollections::
             LiteParsedDocumentSourceForeignCollections;
 
-
         static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
                                                  const BSONElement& spec);
 
@@ -95,7 +94,7 @@ public:
 private:
     DocumentSourceOut(NamespaceString outputNs,
                       const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSourceWriter(std::move(outputNs), expCtx) {}
+        : DocumentSourceWriter(kStageName.rawData(), std::move(outputNs), expCtx) {}
 
     void initialize() override;
 

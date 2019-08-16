@@ -81,8 +81,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSplitPipeline::create
     return new DocumentSourceInternalSplitPipeline(expCtx, mergeType);
 }
 
-DocumentSource::GetNextResult DocumentSourceInternalSplitPipeline::getNext() {
-    pExpCtx->checkForInterrupt();
+DocumentSource::GetNextResult DocumentSourceInternalSplitPipeline::doGetNext() {
     return pSource->getNext();
 }
 

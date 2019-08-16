@@ -101,8 +101,6 @@ public:
         return boost::none;
     }
 
-    GetNextResult getNext() final;
-
     std::size_t getNumRemotes() const;
 
     /**
@@ -148,6 +146,7 @@ public:
     }
 
 protected:
+    GetNextResult doGetNext() final;
     void doDispose() final;
 
 private:

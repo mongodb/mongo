@@ -49,6 +49,7 @@ namespace mongo {
 class DocumentSourceLookUp final : public DocumentSource {
 public:
     static constexpr size_t kMaxSubPipelineDepth = 20;
+    static constexpr StringData kStageName = "$lookup"_sd;
 
     struct LetVariable {
         LetVariable(std::string name, boost::intrusive_ptr<Expression> expression, Variables::Id id)
@@ -112,7 +113,6 @@ public:
         const boost::optional<LiteParsedPipeline> _liteParsedPipeline;
     };
 
-    GetNextResult getNext() final;
     const char* getSourceName() const final;
     void serializeToArray(
         std::vector<Value>& array,
@@ -220,6 +220,7 @@ public:
     }
 
 protected:
+    GetNextResult doGetNext() final;
     void doDispose() final;
 
     /**

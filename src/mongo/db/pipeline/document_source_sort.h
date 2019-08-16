@@ -44,8 +44,6 @@ class DocumentSourceSort final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$sort"_sd;
 
-    GetNextResult getNext() final;
-
     const char* getSourceName() const final {
         return kStageName.rawData();
     }
@@ -135,6 +133,7 @@ public:
     }
 
 protected:
+    GetNextResult doGetNext() final;
     /**
      * Attempts to absorb a subsequent $limit stage so that it can perform a top-k sort.
      */

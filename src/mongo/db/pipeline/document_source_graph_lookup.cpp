@@ -84,12 +84,10 @@ REGISTER_DOCUMENT_SOURCE(graphLookup,
                          DocumentSourceGraphLookUp::createFromBson);
 
 const char* DocumentSourceGraphLookUp::getSourceName() const {
-    return "$graphLookup";
+    return kStageName.rawData();
 }
 
-DocumentSource::GetNextResult DocumentSourceGraphLookUp::getNext() {
-    pExpCtx->checkForInterrupt();
-
+DocumentSource::GetNextResult DocumentSourceGraphLookUp::doGetNext() {
     if (_unwind) {
         return getNextUnwound();
     }
@@ -445,7 +443,7 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
     boost::optional<FieldPath> depthField,
     boost::optional<long long> maxDepth,
     boost::optional<boost::intrusive_ptr<DocumentSourceUnwind>> unwindSrc)
-    : DocumentSource(expCtx),
+    : DocumentSource(kStageName, expCtx),
       _from(std::move(from)),
       _as(std::move(as)),
       _connectFromField(std::move(connectFromField)),

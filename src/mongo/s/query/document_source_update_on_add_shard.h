@@ -47,6 +47,8 @@ namespace mongo {
  */
 class DocumentSourceUpdateOnAddShard final : public DocumentSource {
 public:
+    static constexpr StringData kStageName = "$_internalUpdateOnAddShard"_sd;
+
     /**
      * Creates a new stage which will establish a new cursor and add it to the cursors being merged
      * by 'mergeCursorsStage' whenever a new shard is detected by a change stream.
@@ -79,14 +81,14 @@ public:
         return boost::none;
     }
 
-    GetNextResult getNext() final;
-
 private:
     DocumentSourceUpdateOnAddShard(const boost::intrusive_ptr<ExpressionContext>&,
                                    std::shared_ptr<executor::TaskExecutor> executor,
                                    const boost::intrusive_ptr<DocumentSourceMergeCursors>&,
                                    std::vector<ShardId>&& shardsWithCursors,
                                    BSONObj cmdToRunOnNewShards);
+
+    GetNextResult doGetNext() final;
 
     /**
      * Establish the new cursors and tell the RouterStageMerge about them.

@@ -45,7 +45,7 @@ using boost::intrusive_ptr;
 
 DocumentSourceSkip::DocumentSourceSkip(const intrusive_ptr<ExpressionContext>& pExpCtx,
                                        long long nToSkip)
-    : DocumentSource(pExpCtx), _nToSkip(nToSkip) {}
+    : DocumentSource(kStageName, pExpCtx), _nToSkip(nToSkip) {}
 
 REGISTER_DOCUMENT_SOURCE(skip,
                          LiteParsedDocumentSourceDefault::parse,
@@ -53,9 +53,7 @@ REGISTER_DOCUMENT_SOURCE(skip,
 
 constexpr StringData DocumentSourceSkip::kStageName;
 
-DocumentSource::GetNextResult DocumentSourceSkip::getNext() {
-    pExpCtx->checkForInterrupt();
-
+DocumentSource::GetNextResult DocumentSourceSkip::doGetNext() {
     while (_nSkippedSoFar < _nToSkip) {
         // For performance reasons, a streaming stage must not keep references to documents across
         // calls to getNext(). Such stages must retrieve a result from their child and then release

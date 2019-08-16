@@ -63,8 +63,6 @@ public:
                                 ChangeStreamRequirement::kBlacklist);
     }
 
-    GetNextResult getNext() override;
-
     Value serialize(
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override;
 
@@ -76,6 +74,8 @@ public:
                                                      Pipeline::SourceContainer* container) override;
 
 private:
+    GetNextResult doGetNext() override;
+
     std::unique_ptr<ShardFilterer> _shardFilterer;
 };
 

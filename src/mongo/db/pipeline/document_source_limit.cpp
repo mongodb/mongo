@@ -44,7 +44,7 @@ using boost::intrusive_ptr;
 
 DocumentSourceLimit::DocumentSourceLimit(const intrusive_ptr<ExpressionContext>& pExpCtx,
                                          long long limit)
-    : DocumentSource(pExpCtx), _limit(limit) {}
+    : DocumentSource(kStageName, pExpCtx), _limit(limit) {}
 
 REGISTER_DOCUMENT_SOURCE(limit,
                          LiteParsedDocumentSourceDefault::parse,
@@ -70,9 +70,7 @@ Pipeline::SourceContainer::iterator DocumentSourceLimit::doOptimizeAt(
     return std::next(itr);
 }
 
-DocumentSource::GetNextResult DocumentSourceLimit::getNext() {
-    pExpCtx->checkForInterrupt();
-
+DocumentSource::GetNextResult DocumentSourceLimit::doGetNext() {
     if (_nReturned >= _limit) {
         return GetNextResult::makeEOF();
     }

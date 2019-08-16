@@ -160,7 +160,7 @@ DocumentSourceUnwind::DocumentSourceUnwind(const intrusive_ptr<ExpressionContext
                                            const FieldPath& fieldPath,
                                            bool preserveNullAndEmptyArrays,
                                            const boost::optional<FieldPath>& indexPath)
-    : DocumentSource(pExpCtx),
+    : DocumentSource(kStageName, pExpCtx),
       _unwindPath(fieldPath),
       _preserveNullAndEmptyArrays(preserveNullAndEmptyArrays),
       _indexPath(indexPath),
@@ -171,7 +171,7 @@ REGISTER_DOCUMENT_SOURCE(unwind,
                          DocumentSourceUnwind::createFromBson);
 
 const char* DocumentSourceUnwind::getSourceName() const {
-    return "$unwind";
+    return kStageName.rawData();
 }
 
 intrusive_ptr<DocumentSourceUnwind> DocumentSourceUnwind::create(
@@ -187,9 +187,7 @@ intrusive_ptr<DocumentSourceUnwind> DocumentSourceUnwind::create(
     return source;
 }
 
-DocumentSource::GetNextResult DocumentSourceUnwind::getNext() {
-    pExpCtx->checkForInterrupt();
-
+DocumentSource::GetNextResult DocumentSourceUnwind::doGetNext() {
     auto nextOut = _unwinder->getNext();
     while (nextOut.isEOF()) {
         // No more elements in array currently being unwound. This will loop if the input

@@ -46,7 +46,7 @@ REGISTER_DOCUMENT_SOURCE(collStats,
                          DocumentSourceCollStats::createFromBson);
 
 const char* DocumentSourceCollStats::getSourceName() const {
-    return "$collStats";
+    return kStageName.rawData();
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceCollStats::createFromBson(
@@ -98,9 +98,7 @@ intrusive_ptr<DocumentSource> DocumentSourceCollStats::createFromBson(
     return collStats;
 }
 
-DocumentSource::GetNextResult DocumentSourceCollStats::getNext() {
-    pExpCtx->checkForInterrupt();
-
+DocumentSource::GetNextResult DocumentSourceCollStats::doGetNext() {
     if (_finished) {
         return GetNextResult::makeEOF();
     }

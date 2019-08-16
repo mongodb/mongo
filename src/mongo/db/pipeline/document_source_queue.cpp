@@ -40,13 +40,13 @@ boost::intrusive_ptr<DocumentSourceQueue> DocumentSourceQueue::create(
 
 DocumentSourceQueue::DocumentSourceQueue(std::deque<GetNextResult> results,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSource(expCtx), _queue(std::move(results)) {}
+    : DocumentSource(kStageName, expCtx), _queue(std::move(results)) {}
 
 const char* DocumentSourceQueue::getSourceName() const {
     return kStageName.rawData();
 }
 
-DocumentSource::GetNextResult DocumentSourceQueue::getNext() {
+DocumentSource::GetNextResult DocumentSourceQueue::doGetNext() {
     if (_queue.empty()) {
         return GetNextResult::makeEOF();
     }

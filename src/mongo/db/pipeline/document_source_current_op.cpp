@@ -103,14 +103,11 @@ std::unique_ptr<DocumentSourceCurrentOp::LiteParsed> DocumentSourceCurrentOp::Li
     return std::make_unique<DocumentSourceCurrentOp::LiteParsed>(allUsers, localOps);
 }
 
-
 const char* DocumentSourceCurrentOp::getSourceName() const {
     return kStageName.rawData();
 }
 
-DocumentSource::GetNextResult DocumentSourceCurrentOp::getNext() {
-    pExpCtx->checkForInterrupt();
-
+DocumentSource::GetNextResult DocumentSourceCurrentOp::doGetNext() {
     if (_ops.empty()) {
         _ops = pExpCtx->mongoProcessInterface->getCurrentOps(pExpCtx,
                                                              _includeIdleConnections,

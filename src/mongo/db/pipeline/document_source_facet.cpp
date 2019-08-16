@@ -57,7 +57,7 @@ using std::vector;
 
 DocumentSourceFacet::DocumentSourceFacet(std::vector<FacetPipeline> facetPipelines,
                                          const intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSource(expCtx),
+    : DocumentSource(kStageName, expCtx),
       _teeBuffer(TeeBuffer::create(facetPipelines.size())),
       _facets(std::move(facetPipelines)) {
     for (size_t facetId = 0; facetId < _facets.size(); ++facetId) {
@@ -179,9 +179,7 @@ void DocumentSourceFacet::doDispose() {
     }
 }
 
-DocumentSource::GetNextResult DocumentSourceFacet::getNext() {
-    pExpCtx->checkForInterrupt();
-
+DocumentSource::GetNextResult DocumentSourceFacet::doGetNext() {
     if (_done) {
         return GetNextResult::makeEOF();
     }

@@ -102,8 +102,6 @@ public:
         CursorMode idleCursors = CursorMode::kExcludeCursors,
         BacktraceMode backtrace = BacktraceMode::kExcludeBacktrace);
 
-    GetNextResult getNext() final;
-
     const char* getSourceName() const final;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
@@ -140,7 +138,7 @@ private:
                             TruncationMode truncateOps,
                             CursorMode idleCursors,
                             BacktraceMode backtrace)
-        : DocumentSource(pExpCtx),
+        : DocumentSource(kStageName, pExpCtx),
           _includeIdleConnections(includeIdleConnections),
           _includeIdleSessions(includeIdleSessions),
           _includeOpsFromAllUsers(includeOpsFromAllUsers),
@@ -148,6 +146,8 @@ private:
           _truncateOps(truncateOps),
           _idleCursors(idleCursors),
           _backtrace(backtrace) {}
+
+    GetNextResult doGetNext() final;
 
     ConnMode _includeIdleConnections = ConnMode::kExcludeIdle;
     SessionMode _includeIdleSessions = SessionMode::kIncludeIdle;

@@ -49,6 +49,7 @@ class Value;
  */
 class DocumentSourceTeeConsumer : public DocumentSource {
 public:
+    static constexpr StringData kStageName = "$teeConsumer"_sd;
     static boost::intrusive_ptr<DocumentSourceTeeConsumer> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         size_t facetId,
@@ -68,8 +69,6 @@ public:
         return boost::none;
     }
 
-    GetNextResult getNext() final;
-
     /**
      * Returns SEE_NEXT, since it requires no fields, and changes nothing about the documents.
      */
@@ -80,6 +79,7 @@ public:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
 protected:
+    GetNextResult doGetNext() final;
     void doDispose() final;
 
 private:

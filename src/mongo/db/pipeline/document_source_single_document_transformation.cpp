@@ -46,20 +46,18 @@ using boost::intrusive_ptr;
 DocumentSourceSingleDocumentTransformation::DocumentSourceSingleDocumentTransformation(
     const intrusive_ptr<ExpressionContext>& pExpCtx,
     std::unique_ptr<TransformerInterface> parsedTransform,
-    std::string name,
+    const StringData name,
     bool isIndependentOfAnyCollection)
-    : DocumentSource(pExpCtx),
+    : DocumentSource(name, pExpCtx),
       _parsedTransform(std::move(parsedTransform)),
-      _name(std::move(name)),
+      _name(name.toString()),
       _isIndependentOfAnyCollection(isIndependentOfAnyCollection) {}
 
 const char* DocumentSourceSingleDocumentTransformation::getSourceName() const {
     return _name.c_str();
 }
 
-DocumentSource::GetNextResult DocumentSourceSingleDocumentTransformation::getNext() {
-    pExpCtx->checkForInterrupt();
-
+DocumentSource::GetNextResult DocumentSourceSingleDocumentTransformation::doGetNext() {
     // Get the next input document.
     auto input = pSource->getNext();
     if (!input.isAdvanced()) {

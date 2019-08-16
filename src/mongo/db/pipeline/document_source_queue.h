@@ -52,7 +52,6 @@ public:
                         const boost::intrusive_ptr<ExpressionContext>& expCtx);
     virtual ~DocumentSourceQueue() {}
 
-    GetNextResult getNext() override;
     const char* getSourceName() const override;
     Value serialize(
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override {
@@ -100,6 +99,7 @@ public:
     }
 
 protected:
+    GetNextResult doGetNext() override;
     // Return documents from front of queue.
     std::deque<GetNextResult> _queue;
 };

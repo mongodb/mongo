@@ -47,7 +47,7 @@ public:
     static constexpr StringData kStageName = "$sequentialCache"_sd;
 
     const char* getSourceName() const final {
-        return kStageName.rawData();
+        return DocumentSourceSequentialDocumentCache::kStageName.rawData();
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const {
@@ -68,8 +68,6 @@ public:
         return boost::none;
     }
 
-    GetNextResult getNext() final;
-
     static boost::intrusive_ptr<DocumentSourceSequentialDocumentCache> create(
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx, SequentialDocumentCache* cache) {
         return new DocumentSourceSequentialDocumentCache(pExpCtx, cache);
@@ -85,6 +83,7 @@ public:
     }
 
 protected:
+    GetNextResult doGetNext() final;
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) final;
 

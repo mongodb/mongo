@@ -244,7 +244,7 @@ public:
                 LookupRequirement::kAllowed};
     }
 
-    DocumentSource::GetNextResult getNext() final {
+    DocumentSource::GetNextResult doGetNext() final {
         return pSource->getNext();
     }
 

@@ -242,7 +242,6 @@ std::string DocumentSourceChangeStream::getNsRegexForChangeStream(const Namespac
     }
 }
 
-
 BSONObj DocumentSourceChangeStream::buildMatchFilter(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Timestamp startFrom,

@@ -191,6 +191,8 @@ private:
 
 class DocumentSourceExchange final : public DocumentSource {
 public:
+    static constexpr StringData kStageName = "$_internalExchange"_sd;
+
     /**
      * Create an Exchange consumer. 'resourceYielder' is so the exchange may temporarily yield
      * resources (such as the Session) while waiting for other threads to do
@@ -201,8 +203,6 @@ public:
                            const boost::intrusive_ptr<Exchange> exchange,
                            size_t consumerId,
                            std::unique_ptr<ResourceYielder> yielder);
-
-    GetNextResult getNext() final;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return {StreamType::kStreaming,
@@ -230,8 +230,6 @@ public:
         invariant(!source);
     }
 
-    GetNextResult getNext(size_t consumerId);
-
     size_t getConsumers() const {
         return _exchange->getConsumers();
     }
@@ -249,6 +247,8 @@ public:
     }
 
 private:
+    GetNextResult doGetNext() final;
+
     boost::intrusive_ptr<Exchange> _exchange;
 
     const size_t _consumerId;

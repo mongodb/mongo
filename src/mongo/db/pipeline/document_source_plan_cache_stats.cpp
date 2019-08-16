@@ -33,8 +33,6 @@
 
 namespace mongo {
 
-const char* DocumentSourcePlanCacheStats::kStageName = "$planCacheStats";
-
 REGISTER_DOCUMENT_SOURCE(planCacheStats,
                          DocumentSourcePlanCacheStats::LiteParsed::parse,
                          DocumentSourcePlanCacheStats::createFromBson);
@@ -60,7 +58,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourcePlanCacheStats::createFromBso
 
 DocumentSourcePlanCacheStats::DocumentSourcePlanCacheStats(
     const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSource(expCtx) {}
+    : DocumentSource(kStageName, expCtx) {}
 
 void DocumentSourcePlanCacheStats::serializeToArray(
     std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
@@ -93,7 +91,7 @@ Pipeline::SourceContainer::iterator DocumentSourcePlanCacheStats::doOptimizeAt(
     return container->erase(itrToNext);
 }
 
-DocumentSource::GetNextResult DocumentSourcePlanCacheStats::getNext() {
+DocumentSource::GetNextResult DocumentSourcePlanCacheStats::doGetNext() {
     if (!_haveRetrievedStats) {
         const auto matchExpr = _absorbedMatch ? _absorbedMatch->getMatchExpression() : nullptr;
         _results = pExpCtx->mongoProcessInterface->getMatchingPlanCacheEntryStats(

@@ -42,11 +42,7 @@ REGISTER_TEST_DOCUMENT_SOURCE(listCachedAndActiveUsers,
                               DocumentSourceListCachedAndActiveUsers::LiteParsed::parse,
                               DocumentSourceListCachedAndActiveUsers::createFromBson);
 
-const char* DocumentSourceListCachedAndActiveUsers::kStageName = "$listCachedAndActiveUsers";
-
-DocumentSource::GetNextResult DocumentSourceListCachedAndActiveUsers::getNext() {
-    pExpCtx->checkForInterrupt();
-
+DocumentSource::GetNextResult DocumentSourceListCachedAndActiveUsers::doGetNext() {
     if (!_users.empty()) {
         const auto info = std::move(_users.back());
         _users.pop_back();
@@ -75,7 +71,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListCachedAndActiveUsers::cre
 
 DocumentSourceListCachedAndActiveUsers::DocumentSourceListCachedAndActiveUsers(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx), _users() {
+    : DocumentSource(kStageName, pExpCtx), _users() {
     auto authMgr = AuthorizationManager::get(pExpCtx->opCtx->getServiceContext());
     _users = authMgr->getUserCacheInfo();
 }

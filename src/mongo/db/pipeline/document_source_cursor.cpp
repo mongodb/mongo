@@ -53,12 +53,10 @@ using std::shared_ptr;
 using std::string;
 
 const char* DocumentSourceCursor::getSourceName() const {
-    return "$cursor";
+    return kStageName.rawData();
 }
 
-DocumentSource::GetNextResult DocumentSourceCursor::getNext() {
-    pExpCtx->checkForInterrupt();
-
+DocumentSource::GetNextResult DocumentSourceCursor::doGetNext() {
     if (_currentBatch.empty()) {
         loadBatch();
     }
@@ -308,7 +306,7 @@ DocumentSourceCursor::DocumentSourceCursor(
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
     const intrusive_ptr<ExpressionContext>& pCtx,
     bool trackOplogTimestamp)
-    : DocumentSource(pCtx),
+    : DocumentSource(kStageName, pCtx),
       _docsAddedToBatches(0),
       _exec(std::move(exec)),
       _trackOplogTS(trackOplogTimestamp) {

@@ -150,13 +150,11 @@ public:
 
     enum class ChangeStreamType { kSingleCollection, kSingleDatabase, kAllChangesForCluster };
 
-
     /**
      * Helpers for Determining which regex to match a change stream against.
      */
     static ChangeStreamType getChangeStreamType(const NamespaceString& nss);
     static std::string getNsRegexForChangeStream(const NamespaceString& nss);
-
 
     /**
      * Produce the BSON object representing the filter for the $match stage to filter oplog entries
@@ -215,7 +213,7 @@ public:
 
     const char* getSourceName() const final;
 
-    GetNextResult getNext() final {
+    GetNextResult doGetNext() final {
         // We should never execute this stage directly. We expect this stage to be absorbed into the
         // cursor feeding the pipeline, and executing this stage may result in the use of the wrong
         // collation. The comparisons against the oplog must use the simple collation, regardless of

@@ -55,8 +55,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalInhibitOptimization::
     return new DocumentSourceInternalInhibitOptimization(expCtx);
 }
 
-DocumentSource::GetNextResult DocumentSourceInternalInhibitOptimization::getNext() {
-    pExpCtx->checkForInterrupt();
+DocumentSource::GetNextResult DocumentSourceInternalInhibitOptimization::doGetNext() {
     return pSource->getNext();
 }
 

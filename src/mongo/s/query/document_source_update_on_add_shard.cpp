@@ -66,13 +66,13 @@ DocumentSourceUpdateOnAddShard::DocumentSourceUpdateOnAddShard(
     const boost::intrusive_ptr<DocumentSourceMergeCursors>& mergeCursors,
     std::vector<ShardId>&& shardsWithCursors,
     BSONObj cmdToRunOnNewShards)
-    : DocumentSource(expCtx),
+    : DocumentSource(kStageName, expCtx),
       _executor(std::move(executor)),
       _mergeCursors(mergeCursors),
       _shardsWithCursors(std::move(shardsWithCursors)),
       _cmdToRunOnNewShards(cmdToRunOnNewShards.getOwned()) {}
 
-DocumentSource::GetNextResult DocumentSourceUpdateOnAddShard::getNext() {
+DocumentSource::GetNextResult DocumentSourceUpdateOnAddShard::doGetNext() {
     auto childResult = pSource->getNext();
 
     while (childResult.isAdvanced() && needsUpdate(childResult.getDocument())) {

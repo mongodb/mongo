@@ -45,7 +45,7 @@ using boost::intrusive_ptr;
 DocumentSourceTeeConsumer::DocumentSourceTeeConsumer(const intrusive_ptr<ExpressionContext>& expCtx,
                                                      size_t facetId,
                                                      const intrusive_ptr<TeeBuffer>& bufferSource)
-    : DocumentSource(expCtx), _facetId(facetId), _bufferSource(bufferSource) {}
+    : DocumentSource(kStageName, expCtx), _facetId(facetId), _bufferSource(bufferSource) {}
 
 boost::intrusive_ptr<DocumentSourceTeeConsumer> DocumentSourceTeeConsumer::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -54,8 +54,7 @@ boost::intrusive_ptr<DocumentSourceTeeConsumer> DocumentSourceTeeConsumer::creat
     return new DocumentSourceTeeConsumer(expCtx, facetId, bufferSource);
 }
 
-DocumentSource::GetNextResult DocumentSourceTeeConsumer::getNext() {
-    pExpCtx->checkForInterrupt();
+DocumentSource::GetNextResult DocumentSourceTeeConsumer::doGetNext() {
     return _bufferSource->getNext(_facetId);
 }
 

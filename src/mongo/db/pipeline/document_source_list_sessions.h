@@ -47,13 +47,14 @@ namespace mongo {
  */
 class DocumentSourceListSessions final : public DocumentSourceMatch {
 public:
-    static const char* kStageName;
+    static constexpr StringData kStageName = "$listSessions"_sd;
 
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
         static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
                                                  const BSONElement& spec) {
-            return std::make_unique<LiteParsed>(listSessionsParseSpec(kStageName, spec));
+            return std::make_unique<LiteParsed>(
+                listSessionsParseSpec(DocumentSourceListSessions::kStageName, spec));
         }
 
         explicit LiteParsed(const ListSessionsSpec& spec) : _spec(spec) {}
@@ -79,7 +80,7 @@ public:
     };
 
     const char* getSourceName() const final {
-        return kStageName;
+        return DocumentSourceListSessions::kStageName.rawData();
     }
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;

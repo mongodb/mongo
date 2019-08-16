@@ -119,7 +119,7 @@ intrusive_ptr<DocumentSource> DocumentSourceReplaceRoot::createFromBson(
             newRootExpression,
             (stageName == kStageName) ? ReplaceRootTransformation::UserSpecifiedName::kReplaceRoot
                                       : ReplaceRootTransformation::UserSpecifiedName::kReplaceWith),
-        kStageName.toString(),
+        kStageName.rawData(),
         isIndependentOfAnyCollection);
 }
 

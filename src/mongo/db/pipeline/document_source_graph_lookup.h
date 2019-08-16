@@ -39,6 +39,8 @@ namespace mongo {
 
 class DocumentSourceGraphLookUp final : public DocumentSource {
 public:
+    static constexpr StringData kStageName = "$graphLookup"_sd;
+
     class LiteParsed : public LiteParsedDocumentSourceForeignCollections {
     public:
         LiteParsed(NamespaceString foreignNss, PrivilegeVector privileges)
@@ -51,8 +53,6 @@ public:
     };
     static std::unique_ptr<LiteParsed> liteParse(const AggregationRequest& request,
                                                  const BSONElement& spec);
-
-    GetNextResult getNext() final;
 
     const char* getSourceName() const final;
 
@@ -130,6 +130,7 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 protected:
+    GetNextResult doGetNext() final;
     void doDispose() final;
 
     /**

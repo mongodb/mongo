@@ -58,11 +58,6 @@ public:
     using DocumentSourceQueue::DocumentSourceQueue;
     DocumentSourceMock(std::deque<GetNextResult>);
 
-    GetNextResult getNext() override {
-        invariant(!isDisposed);
-        invariant(!isDetachedFromOpCtx);
-        return DocumentSourceQueue::getNext();
-    }
     Value serialize(
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override {
         // Unlike the queue, it's okay to serialize this stage for testing purposes.
@@ -100,6 +95,12 @@ public:
     bool isOptimized = false;
 
 protected:
+    GetNextResult doGetNext() override {
+        invariant(!isDisposed);
+        invariant(!isDetachedFromOpCtx);
+        return DocumentSourceQueue::doGetNext();
+    }
+
     void doDispose() override {
         isDisposed = true;
     }

@@ -43,11 +43,11 @@ namespace mongo {
  */
 class DocumentSourceCloseCursor final : public DocumentSource {
 public:
-    GetNextResult getNext() final;
+    static constexpr StringData kStageName = "$changeStream"_sd;
 
     const char* getSourceName() const final {
         // This is used in error reporting.
-        return "$changeStream";
+        return DocumentSourceCloseCursor::kStageName.rawData();
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
@@ -88,7 +88,9 @@ private:
      * Use the create static method to create a DocumentSourceCloseCursor.
      */
     DocumentSourceCloseCursor(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSource(expCtx) {}
+        : DocumentSource(kStageName, expCtx) {}
+
+    GetNextResult doGetNext() final;
 
     bool _shouldCloseCursor = false;
 };

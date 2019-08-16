@@ -53,7 +53,7 @@ constexpr size_t DocumentSourceLookUp::kMaxSubPipelineDepth;
 DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
                                            std::string as,
                                            const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSource(expCtx),
+    : DocumentSource(kStageName, expCtx),
       _fromNs(std::move(fromNs)),
       _as(std::move(as)),
       _variables(expCtx->variables),
@@ -161,7 +161,7 @@ REGISTER_DOCUMENT_SOURCE(lookup,
                          DocumentSourceLookUp::createFromBson);
 
 const char* DocumentSourceLookUp::getSourceName() const {
-    return "$lookup";
+    return kStageName.rawData();
 }
 
 StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState) const {
@@ -227,9 +227,7 @@ BSONObj buildEqualityOrQuery(const std::string& fieldName, const BSONArray& valu
 
 }  // namespace
 
-DocumentSource::GetNextResult DocumentSourceLookUp::getNext() {
-    pExpCtx->checkForInterrupt();
-
+DocumentSource::GetNextResult DocumentSourceLookUp::doGetNext() {
     if (_unwindSrc) {
         return unwindResult();
     }

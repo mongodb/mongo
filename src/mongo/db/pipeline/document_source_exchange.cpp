@@ -88,7 +88,7 @@ constexpr size_t Exchange::kMaxBufferSize;
 constexpr size_t Exchange::kMaxNumberConsumers;
 
 const char* DocumentSourceExchange::getSourceName() const {
-    return "$_internalExchange";
+    return kStageName.rawData();
 }
 
 Value DocumentSourceExchange::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
@@ -100,12 +100,12 @@ DocumentSourceExchange::DocumentSourceExchange(
     const boost::intrusive_ptr<Exchange> exchange,
     size_t consumerId,
     std::unique_ptr<ResourceYielder> yielder)
-    : DocumentSource(expCtx),
+    : DocumentSource(kStageName, expCtx),
       _exchange(exchange),
       _consumerId(consumerId),
       _resourceYielder(std::move(yielder)) {}
 
-DocumentSource::GetNextResult DocumentSourceExchange::getNext() {
+DocumentSource::GetNextResult DocumentSourceExchange::doGetNext() {
     return _exchange->getNext(pExpCtx->opCtx, _consumerId, _resourceYielder.get());
 }
 

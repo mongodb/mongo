@@ -47,7 +47,7 @@ public:
         BSONElement, const boost::intrusive_ptr<ExpressionContext>&);
 
     DocumentSourceInternalInhibitOptimization(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSource(expCtx) {}
+        : DocumentSource(kStageName, expCtx) {}
 
     const char* getSourceName() const final {
         return kStageName.rawData();
@@ -67,9 +67,8 @@ public:
         return boost::none;
     }
 
-    GetNextResult getNext() final;
-
 private:
+    GetNextResult doGetNext() final;
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 };
 

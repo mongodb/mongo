@@ -66,7 +66,7 @@ intrusive_ptr<DocumentSource> DocumentSourceAddFields::create(
                     throw;
                 }
             }(),
-            userSpecifiedName.toString(),
+            userSpecifiedName == kStageName ? kStageName : kAliasNameSet,
             isIndependentOfAnyCollection));
     return addFields;
 }

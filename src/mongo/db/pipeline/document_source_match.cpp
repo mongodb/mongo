@@ -58,7 +58,7 @@ REGISTER_DOCUMENT_SOURCE(match,
                          DocumentSourceMatch::createFromBson);
 
 const char* DocumentSourceMatch::getSourceName() const {
-    return "$match";
+    return kStageName.rawData();
 }
 
 Value DocumentSourceMatch::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
@@ -80,9 +80,7 @@ intrusive_ptr<DocumentSource> DocumentSourceMatch::optimize() {
     return this;
 }
 
-DocumentSource::GetNextResult DocumentSourceMatch::getNext() {
-    pExpCtx->checkForInterrupt();
-
+DocumentSource::GetNextResult DocumentSourceMatch::doGetNext() {
     // The user facing error should have been generated earlier.
     massert(17309, "Should never call getNext on a $match stage with $text clause", !_isTextQuery);
 
@@ -497,7 +495,7 @@ DepsTracker::State DocumentSourceMatch::getDependencies(DepsTracker* deps) const
 
 DocumentSourceMatch::DocumentSourceMatch(const BSONObj& query,
                                          const intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSource(expCtx) {
+    : DocumentSource(kStageName, expCtx) {
     rebuild(query);
 }
 

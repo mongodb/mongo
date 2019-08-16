@@ -43,7 +43,6 @@ namespace mongo {
 using boost::intrusive_ptr;
 
 constexpr StringData DocumentSourceGeoNear::kKeyFieldName;
-constexpr const char* DocumentSourceGeoNear::kStageName;
 
 REGISTER_DOCUMENT_SOURCE(geoNear,
                          LiteParsedDocumentSourceDefault::parse,
@@ -234,7 +233,7 @@ DepsTracker::State DocumentSourceGeoNear::getDependencies(DepsTracker* deps) con
 }
 
 DocumentSourceGeoNear::DocumentSourceGeoNear(const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx), coordsIsArray(false), spherical(false) {}
+    : DocumentSource(kStageName, pExpCtx), coordsIsArray(false), spherical(false) {}
 
 boost::optional<DocumentSource::DistributedPlanLogic>
 DocumentSourceGeoNear::distributedPlanLogic() {

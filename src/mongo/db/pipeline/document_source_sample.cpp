@@ -44,17 +44,15 @@ using boost::intrusive_ptr;
 constexpr StringData DocumentSourceSample::kStageName;
 
 DocumentSourceSample::DocumentSourceSample(const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx), _size(0) {}
+    : DocumentSource(kStageName, pExpCtx), _size(0) {}
 
 REGISTER_DOCUMENT_SOURCE(sample,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceSample::createFromBson);
 
-DocumentSource::GetNextResult DocumentSourceSample::getNext() {
+DocumentSource::GetNextResult DocumentSourceSample::doGetNext() {
     if (_size == 0)
         return GetNextResult::makeEOF();
-
-    pExpCtx->checkForInterrupt();
 
     if (!_sortStage->isPopulated()) {
         // Exhaust source stage, add random metadata, and push all into sorter.
@@ -116,7 +114,6 @@ intrusive_ptr<DocumentSource> DocumentSourceSample::createFromBson(
 
     return sample;
 }
-
 
 boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSample::distributedPlanLogic() {
     // On the merger we need to merge the pre-sorted documents by their random values, then limit to

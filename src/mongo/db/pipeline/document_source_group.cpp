@@ -132,9 +132,7 @@ const char* DocumentSourceGroup::getSourceName() const {
     return kStageName.rawData();
 }
 
-DocumentSource::GetNextResult DocumentSourceGroup::getNext() {
-    pExpCtx->checkForInterrupt();
-
+DocumentSource::GetNextResult DocumentSourceGroup::doGetNext() {
     if (!_initialized) {
         const auto initializationResult = initialize();
         if (initializationResult.isPaused()) {
@@ -328,7 +326,7 @@ intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
 
 DocumentSourceGroup::DocumentSourceGroup(const intrusive_ptr<ExpressionContext>& pExpCtx,
                                          boost::optional<size_t> maxMemoryUsageBytes)
-    : DocumentSource(pExpCtx),
+    : DocumentSource(kStageName, pExpCtx),
       _usedDisk(false),
       _doingMerge(false),
       _maxMemoryUsageBytes(maxMemoryUsageBytes ? *maxMemoryUsageBytes

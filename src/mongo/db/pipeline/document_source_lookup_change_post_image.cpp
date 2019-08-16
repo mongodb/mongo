@@ -51,9 +51,7 @@ Value assertFieldHasType(const Document& fullDoc, StringData fieldName, BSONType
 }
 }  // namespace
 
-DocumentSource::GetNextResult DocumentSourceLookupChangePostImage::getNext() {
-    pExpCtx->checkForInterrupt();
-
+DocumentSource::GetNextResult DocumentSourceLookupChangePostImage::doGetNext() {
     auto input = pSource->getNext();
     if (!input.isAdvanced()) {
         return input;

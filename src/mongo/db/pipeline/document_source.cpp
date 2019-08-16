@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/document_source.h"
 
+#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_internal_shard_filter.h"
@@ -51,8 +52,9 @@ using std::list;
 using std::string;
 using std::vector;
 
-DocumentSource::DocumentSource(const intrusive_ptr<ExpressionContext>& pCtx)
-    : pSource(nullptr), pExpCtx(pCtx) {}
+DocumentSource::DocumentSource(const StringData stageName,
+                               const intrusive_ptr<ExpressionContext>& pCtx)
+    : pSource(nullptr), pExpCtx(pCtx), _commonStats(stageName.rawData()) {}
 
 namespace {
 // Used to keep track of which DocumentSources are registered under which name.
@@ -83,6 +85,21 @@ list<intrusive_ptr<DocumentSource>> DocumentSource::parse(
             it != parserMap.end());
 
     return it->second(stageSpec, expCtx);
+}
+
+DocumentSource::GetNextResult DocumentSource::getNext() {
+    pExpCtx->checkForInterrupt();
+    invariant(pExpCtx->opCtx->getServiceContext());
+    invariant(pExpCtx->opCtx->getServiceContext()->getFastClockSource());
+    ScopedTimer timer(pExpCtx->opCtx->getServiceContext()->getFastClockSource(),
+                      &_commonStats.executionTimeMillis);
+    ++_commonStats.works;
+
+    GetNextResult next = doGetNext();
+    if (next.isAdvanced()) {
+        ++_commonStats.advanced;
+    }
+    return next;
 }
 
 const char* DocumentSource::getSourceName() const {

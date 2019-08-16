@@ -38,7 +38,6 @@ class DocumentSourceSample final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$sample"_sd;
 
-    GetNextResult getNext() final;
     const char* getSourceName() const final {
         return kStageName.rawData();
     }
@@ -69,6 +68,8 @@ public:
 
 private:
     explicit DocumentSourceSample(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+    GetNextResult doGetNext() final;
 
     long long _size;
 

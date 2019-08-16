@@ -46,8 +46,8 @@ namespace mongo {
  */
 class DocumentSourceCursor : public DocumentSource {
 public:
+    static constexpr StringData kStageName = "$cursor"_sd;
     // virtuals from DocumentSource
-    GetNextResult getNext() final;
 
     const char* getSourceName() const override;
 
@@ -161,6 +161,8 @@ protected:
                          std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                          bool trackOplogTimestamp = false);
+
+    GetNextResult doGetNext() final;
 
     ~DocumentSourceCursor();
 

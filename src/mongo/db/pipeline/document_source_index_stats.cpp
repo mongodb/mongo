@@ -44,12 +44,10 @@ REGISTER_DOCUMENT_SOURCE(indexStats,
                          DocumentSourceIndexStats::createFromBson);
 
 const char* DocumentSourceIndexStats::getSourceName() const {
-    return "$indexStats";
+    return kStageName.rawData();
 }
 
-DocumentSource::GetNextResult DocumentSourceIndexStats::getNext() {
-    pExpCtx->checkForInterrupt();
-
+DocumentSource::GetNextResult DocumentSourceIndexStats::doGetNext() {
     if (_indexStatsMap.empty()) {
         _indexStatsMap = pExpCtx->mongoProcessInterface->getIndexStats(pExpCtx->opCtx, pExpCtx->ns);
         _indexStatsIter = _indexStatsMap.begin();
@@ -71,7 +69,7 @@ DocumentSource::GetNextResult DocumentSourceIndexStats::getNext() {
 }
 
 DocumentSourceIndexStats::DocumentSourceIndexStats(const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx), _processName(getHostNameCachedAndPort()) {}
+    : DocumentSource(kStageName, pExpCtx), _processName(getHostNameCachedAndPort()) {}
 
 intrusive_ptr<DocumentSource> DocumentSourceIndexStats::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {

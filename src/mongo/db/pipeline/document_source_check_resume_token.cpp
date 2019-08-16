@@ -168,7 +168,7 @@ ResumeStatus compareAgainstClientResumeToken(const intrusive_ptr<ExpressionConte
 }  // namespace
 
 const char* DocumentSourceEnsureResumeTokenPresent::getSourceName() const {
-    return "$_ensureResumeTokenPresent";
+    return kStageName.rawData();
 }
 
 Value DocumentSourceEnsureResumeTokenPresent::serialize(
@@ -186,11 +186,9 @@ DocumentSourceEnsureResumeTokenPresent::create(const intrusive_ptr<ExpressionCon
 
 DocumentSourceEnsureResumeTokenPresent::DocumentSourceEnsureResumeTokenPresent(
     const intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token)
-    : DocumentSource(expCtx), _tokenFromClient(std::move(token)) {}
+    : DocumentSource(kStageName, expCtx), _tokenFromClient(std::move(token)) {}
 
-DocumentSource::GetNextResult DocumentSourceEnsureResumeTokenPresent::getNext() {
-    pExpCtx->checkForInterrupt();
-
+DocumentSource::GetNextResult DocumentSourceEnsureResumeTokenPresent::doGetNext() {
     if (_resumeStatus == ResumeStatus::kSurpassedToken) {
         // We've already verified the resume token is present.
         return pSource->getNext();
@@ -256,7 +254,7 @@ DocumentSourceEnsureResumeTokenPresent::_checkNextDocAndSwallowResumeToken(
 }
 
 const char* DocumentSourceShardCheckResumability::getSourceName() const {
-    return "$_checkShardResumability";
+    return kStageName.rawData();
 }
 
 Value DocumentSourceShardCheckResumability::serialize(
@@ -279,11 +277,9 @@ intrusive_ptr<DocumentSourceShardCheckResumability> DocumentSourceShardCheckResu
 
 DocumentSourceShardCheckResumability::DocumentSourceShardCheckResumability(
     const intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token)
-    : DocumentSource(expCtx), _tokenFromClient(std::move(token)) {}
+    : DocumentSource(kStageName, expCtx), _tokenFromClient(std::move(token)) {}
 
-DocumentSource::GetNextResult DocumentSourceShardCheckResumability::getNext() {
-    pExpCtx->checkForInterrupt();
-
+DocumentSource::GetNextResult DocumentSourceShardCheckResumability::doGetNext() {
     if (_surpassedResumeToken)
         return pSource->getNext();
 

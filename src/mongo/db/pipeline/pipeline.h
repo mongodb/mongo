@@ -35,6 +35,7 @@
 
 #include <boost/intrusive_ptr.hpp>
 
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/dependencies.h"
@@ -251,7 +252,6 @@ public:
      * metadata is present on documents that are input to the front of the pipeline.
      */
     DepsTracker getDependencies(DepsTracker::MetadataAvailable metadataAvailable) const;
-
 
     const SourceContainer& getSources() const {
         return _sources;

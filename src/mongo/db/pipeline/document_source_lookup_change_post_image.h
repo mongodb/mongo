@@ -93,11 +93,6 @@ public:
         return DepsTracker::State::SEE_NEXT;
     }
 
-    /**
-     * Performs the lookup to retrieve the full document.
-     */
-    GetNextResult getNext() final;
-
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
         if (explain) {
             return Value{Document{{kStageName, Document()}}};
@@ -111,7 +106,12 @@ public:
 
 private:
     DocumentSourceLookupChangePostImage(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSource(expCtx) {}
+        : DocumentSource(kStageName, expCtx) {}
+
+    /**
+     * Performs the lookup to retrieve the full document.
+     */
+    GetNextResult doGetNext() final;
 
     /**
      * Uses the "documentKey" field from 'updateOp' to look up the current version of the document.
