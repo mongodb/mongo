@@ -45,11 +45,6 @@ __wt_atomic_fetch_add##name(type *vp, type v)				\
 	return (_InterlockedExchangeAdd ## s((t *)(vp), (t)(v)));	\
 }									\
 static inline ret							\
-__wt_atomic_store##name(type *vp, type v)				\
-{									\
-	return (_InterlockedExchange ## s((t *)(vp), (t)(v)));		\
-}									\
-static inline ret							\
 __wt_atomic_sub##name(type *vp, type v)					\
 {									\
 	return (_InterlockedExchangeAdd ## s((t *)(vp), - (t)v) - (v));	\

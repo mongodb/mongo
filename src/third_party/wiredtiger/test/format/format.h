@@ -70,6 +70,7 @@ typedef struct {
 	char *home_config;			/* Run CONFIG file path */
 	char *home_init;			/* Initialize home command */
 	char *home_log;				/* Operation log file path */
+	char *home_pagedump;			/* Page dump filename */
 	char *home_rand;			/* RNG log file path */
 	char *home_salvage_copy;		/* Salvage copy command */
 	char *home_stats;			/* Statistics file path */
@@ -266,6 +267,8 @@ typedef enum { NEXT, PREV, SEARCH, SEARCH_NEAR } read_operation;
 
 typedef struct {
 	thread_op op;				/* Operation */
+	uint64_t  opid;				/* Operation ID */
+
 	uint64_t  keyno;			/* Row number */
 
 	uint64_t  ts;				/* Read/commit timestamp */
@@ -311,6 +314,8 @@ typedef struct {
 	WT_ITEM	 *lastkey, _lastkey;
 
 	bool repeatable_reads;			/* if read ops repeatable */
+	bool repeatable_wrap;			/* if circular buffer wrapped */
+	uint64_t opid;				/* Operation ID */
 	uint64_t read_ts;			/* read timestamp */
 	uint64_t commit_ts;			/* commit timestamp */
 	SNAP_OPS *snap, *snap_first, snap_list[512];
@@ -348,10 +353,9 @@ void	 key_gen_teardown(WT_ITEM *);
 void	 key_init(void);
 WT_THREAD_RET lrt(void *);
 void	 path_setup(const char *);
-void	 print_item(const char *, WT_ITEM *);
-void	 print_item_data(const char *, const uint8_t *, size_t);
 int	 read_row_worker(WT_CURSOR *, uint64_t, WT_ITEM *, WT_ITEM *, bool);
 uint32_t rng(WT_RAND_STATE *);
+void	 snap_init(TINFO *, uint64_t, bool);
 void	 snap_repeat_single(WT_CURSOR *, TINFO *);
 int	 snap_repeat_txn(WT_CURSOR *, TINFO *);
 void	 snap_repeat_update(TINFO *, bool);

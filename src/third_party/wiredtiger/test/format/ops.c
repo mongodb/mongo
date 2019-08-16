@@ -338,11 +338,10 @@ begin_transaction_ts(TINFO *tinfo, u_int *iso_configp)
 		    buf, sizeof(buf), "read_timestamp=%" PRIx64, ts));
 		ret = session->timestamp_transaction(session, buf);
 		if (ret == 0) {
-			tinfo->read_ts = ts;
-			tinfo->repeatable_reads = true;
+			snap_init(tinfo, ts, true);
 			logop(session,
 			    "begin snapshot read-ts=%" PRIu64 " (repeatable)",
-			    tinfo->read_ts);
+			    ts);
 			return;
 		}
 		if (ret != EINVAL)
@@ -371,11 +370,9 @@ begin_transaction_ts(TINFO *tinfo, u_int *iso_configp)
 
 	testutil_check(pthread_rwlock_unlock(&g.ts_lock));
 
-	tinfo->read_ts = ts;
-	tinfo->repeatable_reads = false;
-
-	logop(session, "begin snapshot read-ts=%" PRIu64 " (not repeatable)",
-	    tinfo->read_ts);
+	snap_init(tinfo, ts, false);
+	logop(session,
+	    "begin snapshot read-ts=%" PRIu64 " (not repeatable)", ts);
 }
 
 /*
@@ -415,9 +412,7 @@ begin_transaction(TINFO *tinfo, u_int *iso_configp)
 
 	wiredtiger_begin_transaction(session, config);
 
-	tinfo->read_ts = WT_TS_NONE;
-	tinfo->repeatable_reads = false;
-
+	snap_init(tinfo, WT_TS_NONE, false);
 	logop(session, "begin %s", log);
 }
 
@@ -719,8 +714,6 @@ ops(void *arg)
 				begin_transaction_ts(tinfo, &iso_config);
 			else
 				begin_transaction(tinfo, &iso_config);
-
-			tinfo->snap_first = tinfo->snap;
 			intxn = true;
 		}
 
@@ -899,7 +892,7 @@ remove_instead_of_truncate:
 			 */
 			greater_than = mmrand(&tinfo->rnd, 0, 1) == 1;
 			range = g.rows < 20 ?
-			    1 : mmrand(&tinfo->rnd, 1, (u_int)g.rows / 20);
+			    0 : mmrand(&tinfo->rnd, 0, (u_int)g.rows / 20);
 			tinfo->last = tinfo->keyno;
 			if (greater_than) {
 				if (g.c_reverse) {

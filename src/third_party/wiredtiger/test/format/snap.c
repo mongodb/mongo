@@ -29,6 +29,22 @@
 #include "format.h"
 
 /*
+ * snap_init --
+ *	Initialize the repeatable operation tracking.
+ */
+void
+snap_init(TINFO *tinfo, uint64_t read_ts, bool repeatable_reads)
+{
+	++tinfo->opid;
+
+	tinfo->snap_first = tinfo->snap;
+
+	tinfo->read_ts = read_ts;
+	tinfo->repeatable_reads = repeatable_reads;
+	tinfo->repeatable_wrap = false;
+}
+
+/*
  * snap_track --
  *     Add a single snapshot isolation returned value to the list.
  */
@@ -40,10 +56,12 @@ snap_track(TINFO *tinfo, thread_op op)
 
 	snap = tinfo->snap;
 	snap->op = op;
+	snap->opid = tinfo->opid;
 	snap->keyno = tinfo->keyno;
 	snap->ts = WT_TS_NONE;
 	snap->repeatable = false;
 	snap->last = op == TRUNCATE ? tinfo->last : 0;
+	snap->ksize = snap->vsize = 0;
 
 	if (op == INSERT && g.type == ROW) {
 		ip = tinfo->key;
@@ -63,15 +81,43 @@ snap_track(TINFO *tinfo, thread_op op)
 		memcpy(snap->vdata, ip->data, snap->vsize = ip->size);
 	}
 
-	/*
-	 * Move to the next slot, wrap at the end of the circular buffer.
-	 *
-	 * It's possible to pass this transaction's buffer starting point and
-	 * start replacing our own entries. That's OK, we just skip earlier
-	 * operations when we check.
-	 */
+	/* Move to the next slot, wrap at the end of the circular buffer. */
 	if (++tinfo->snap >= &tinfo->snap_list[WT_ELEMENTS(tinfo->snap_list)])
 		tinfo->snap = tinfo->snap_list;
+
+	/*
+	 * It's possible to pass this transaction's buffer starting point and
+	 * start replacing our own entries. If that happens, we can't repeat
+	 * operations because we don't know which ones were previously modified.
+	 */
+	if (tinfo->snap->opid == tinfo->opid)
+		tinfo->repeatable_wrap = true;
+}
+
+/*
+ * print_item_data --
+ *	Display a single data/size pair, with a tag.
+ */
+static void
+print_item_data(const char *tag, const uint8_t *data, size_t size)
+{
+	static const char hex[] = "0123456789abcdef";
+	u_char ch;
+
+	fprintf(stderr, "%s {", tag);
+	if (g.type == FIX)
+		fprintf(stderr, "0x%02x", data[0]);
+	else
+		for (; size > 0; --size, ++data) {
+			ch = data[0];
+			if (__wt_isprint(ch))
+				fprintf(stderr, "%c", (int)ch);
+			else
+				fprintf(stderr, "%x%x",
+				    (u_int)hex[(data[0] & 0xf0) >> 4],
+				    (u_int)hex[data[0] & 0x0f]);
+		}
+	fprintf(stderr, "}\n");
 }
 
 /*
@@ -83,10 +129,14 @@ snap_verify(WT_CURSOR *cursor, TINFO *tinfo, SNAP_OPS *snap)
 {
 	WT_DECL_RET;
 	WT_ITEM *key, *value;
+	uint64_t keyno;
 	uint8_t bitfield;
+
+	testutil_assert(snap->op != TRUNCATE);
 
 	key = tinfo->key;
 	value = tinfo->value;
+	keyno = snap->keyno;
 
 	/*
 	 * Retrieve the key/value pair by key. Row-store inserts have a unique
@@ -100,10 +150,10 @@ snap_verify(WT_CURSOR *cursor, TINFO *tinfo, SNAP_OPS *snap)
 		switch (g.type) {
 		case FIX:
 		case VAR:
-			cursor->set_key(cursor, snap->keyno);
+			cursor->set_key(cursor, keyno);
 			break;
 		case ROW:
-			key_gen(key, snap->keyno);
+			key_gen(key, keyno);
 			cursor->set_key(cursor, key);
 			break;
 		}
@@ -125,12 +175,11 @@ snap_verify(WT_CURSOR *cursor, TINFO *tinfo, SNAP_OPS *snap)
 	}
 
 	/* Check for simple matches. */
-	if (ret == 0 &&
-	    snap->op != REMOVE && snap->op != TRUNCATE &&
+	if (ret == 0 && snap->op != REMOVE &&
 	    value->size == snap->vsize &&
 	    memcmp(value->data, snap->vdata, value->size) == 0)
 		return (0);
-	if (ret == WT_NOTFOUND && (snap->op == REMOVE || snap->op == TRUNCATE))
+	if (ret == WT_NOTFOUND && snap->op == REMOVE)
 		return (0);
 
 	/*
@@ -142,18 +191,23 @@ snap_verify(WT_CURSOR *cursor, TINFO *tinfo, SNAP_OPS *snap)
 		if (ret == WT_NOTFOUND &&
 		    snap->vsize == 1 && *(uint8_t *)snap->vdata == 0)
 			return (0);
-		if ((snap->op == REMOVE || snap->op == TRUNCATE) &&
+		if (snap->op == REMOVE &&
 		    value->size == 1 && *(uint8_t *)value->data == 0)
 			return (0);
 	}
 
 	/* Things went pear-shaped. */
+#ifdef HAVE_DIAGNOSTIC
+	fprintf(stderr,
+	    "snapshot-isolation error: Dumping page to %s\n", g.home_pagedump);
+	testutil_check(__wt_debug_cursor_page(cursor, g.home_pagedump));
+#endif
 	switch (g.type) {
 	case FIX:
 		testutil_die(ret,
 		    "snapshot-isolation: %" PRIu64 " search: "
 		    "expected {0x%02x}, found {0x%02x}",
-		    snap->keyno,
+		    keyno,
 		    snap->op == REMOVE ? 0 : *(uint8_t *)snap->vdata,
 		    ret == WT_NOTFOUND ? 0 : *(uint8_t *)value->data);
 		/* NOTREACHED */
@@ -177,8 +231,7 @@ snap_verify(WT_CURSOR *cursor, TINFO *tinfo, SNAP_OPS *snap)
 		/* NOTREACHED */
 	case VAR:
 		fprintf(stderr,
-		    "snapshot-isolation %" PRIu64 " search mismatch\n",
-		    snap->keyno);
+		    "snapshot-isolation %" PRIu64 " search mismatch\n", keyno);
 
 		if (snap->op == REMOVE)
 			fprintf(stderr, "expected {deleted}\n");
@@ -190,8 +243,7 @@ snap_verify(WT_CURSOR *cursor, TINFO *tinfo, SNAP_OPS *snap)
 			print_item_data("   found", value->data, value->size);
 
 		testutil_die(ret,
-		    "snapshot-isolation: %" PRIu64 " search mismatch",
-		    snap->keyno);
+		    "snapshot-isolation: %" PRIu64 " search mismatch", keyno);
 		/* NOTREACHED */
 	}
 
@@ -209,7 +261,7 @@ snap_ts_clear(TINFO *tinfo, uint64_t ts)
 	SNAP_OPS *snap;
 	int count;
 
-	/* Check from the first operation to the last. */
+	/* Check from the first slot to the last. */
 	for (snap = tinfo->snap_list,
 	    count = WT_ELEMENTS(tinfo->snap_list); count > 0; --count, ++snap)
 		if (snap->repeatable && snap->ts <= ts)
@@ -253,10 +305,16 @@ snap_repeat_ok_match(SNAP_OPS *current, SNAP_OPS *a)
  * committed successfully.
  */
 static bool
-snap_repeat_ok_commit(
-    TINFO *tinfo, SNAP_OPS *current, SNAP_OPS *first, SNAP_OPS *last)
+snap_repeat_ok_commit(TINFO *tinfo, SNAP_OPS *current)
 {
 	SNAP_OPS *p;
+
+	/*
+	 * Truncates can't be repeated, we don't know the exact range of records
+	 * that were removed (if any).
+	 */
+	if (current->op == TRUNCATE)
+		return (false);
 
 	/*
 	 * For updates, check for subsequent changes to the record and don't
@@ -266,13 +324,10 @@ snap_repeat_ok_commit(
 	 * do the repeatable read in that case.)
 	 */
 	for (p = current;;) {
-		/*
-		 * Wrap at the end of the circular buffer; "last" is the element
-		 * after the last element we want to test.
-		 */
+		/* Wrap at the end of the circular buffer. */
 		if (++p >= &tinfo->snap_list[WT_ELEMENTS(tinfo->snap_list)])
 			p = tinfo->snap_list;
-		if (p == last)
+		if (p->opid != tinfo->opid)
 			break;
 
 		if (!snap_repeat_ok_match(current, p))
@@ -282,21 +337,18 @@ snap_repeat_ok_commit(
 	if (current->op != READ)
 		return (true);
 	for (p = current;;) {
-		/*
-		 * Wrap at the beginning of the circular buffer; "first" is the
-		 * last element we want to test.
-		 */
-		if (p == first)
-			return (true);
+		/* Wrap at the beginning of the circular buffer. */
 		if (--p < tinfo->snap_list)
 			p = &tinfo->snap_list[
 			    WT_ELEMENTS(tinfo->snap_list) - 1];
+		if (p->opid != tinfo->opid)
+			break;
 
 		if (!snap_repeat_ok_match(current, p))
 			return (false);
 
 	}
-	/* NOTREACHED */
+	return (true);
 }
 
 /*
@@ -305,7 +357,7 @@ snap_repeat_ok_commit(
  * transaction has rolled back.
  */
 static bool
-snap_repeat_ok_rollback(TINFO *tinfo, SNAP_OPS *current, SNAP_OPS *first)
+snap_repeat_ok_rollback(TINFO *tinfo, SNAP_OPS *current)
 {
 	SNAP_OPS *p;
 
@@ -318,21 +370,18 @@ snap_repeat_ok_rollback(TINFO *tinfo, SNAP_OPS *current, SNAP_OPS *first)
 	 * the read in that case.
 	 */
 	for (p = current;;) {
-		/*
-		 * Wrap at the beginning of the circular buffer; "first" is the
-		 * last element we want to test.
-		 */
-		if (p == first)
-			return (true);
+		/* Wrap at the beginning of the circular buffer. */
 		if (--p < tinfo->snap_list)
 			p = &tinfo->snap_list[
 			    WT_ELEMENTS(tinfo->snap_list) - 1];
+		if (p->opid != tinfo->opid)
+			break;
 
 		if (!snap_repeat_ok_match(current, p))
 			return (false);
 
 	}
-	/* NOTREACHED */
+	return (true);
 }
 
 /*
@@ -342,31 +391,21 @@ snap_repeat_ok_rollback(TINFO *tinfo, SNAP_OPS *current, SNAP_OPS *first)
 int
 snap_repeat_txn(WT_CURSOR *cursor, TINFO *tinfo)
 {
-	SNAP_OPS *current, *stop;
+	SNAP_OPS *current;
+
+	/* If we wrapped the buffer, we can't repeat operations. */
+	if (tinfo->repeatable_wrap)
+		return (0);
 
 	/* Check from the first operation we saved to the last. */
-	for (current = tinfo->snap_first, stop = tinfo->snap;; ++current) {
+	for (current = tinfo->snap_first;; ++current) {
 		/* Wrap at the end of the circular buffer. */
 		if (current >= &tinfo->snap_list[WT_ELEMENTS(tinfo->snap_list)])
 			current = tinfo->snap_list;
-		if (current == stop)
+		if (current->opid != tinfo->opid)
 			break;
 
-		/*
-		 * We don't test all of the records in a truncate range, only
-		 * the first because that matches the rest of the isolation
-		 * checks. If a truncate range was from the start of the table,
-		 * switch to the record at the end. This is done in the first
-		 * routine that considers if operations are repeatable, and the
-		 * rest of those functions depend on it already being done.
-		 */
-		if (current->op == TRUNCATE && current->keyno == 0) {
-			current->keyno = current->last;
-			testutil_assert(current->keyno != 0);
-		}
-
-		if (snap_repeat_ok_commit(
-		    tinfo, current, tinfo->snap_first, stop))
+		if (snap_repeat_ok_commit(tinfo, current))
 			WT_RET(snap_verify(cursor, tinfo, current));
 	}
 
@@ -381,19 +420,18 @@ snap_repeat_txn(WT_CURSOR *cursor, TINFO *tinfo)
 void
 snap_repeat_update(TINFO *tinfo, bool committed)
 {
-	SNAP_OPS *start, *stop;
+	SNAP_OPS *current;
 
-	/*
-	 * Check from the first operation we saved to the last. It's possible
-	 * to update none at all if we did exactly the number of operations
-	 * in the circular buffer, it will look like we didn't do any. That's
-	 * OK, it's a big enough buffer that it's not going to matter.
-	 */
-	for (start = tinfo->snap_first, stop = tinfo->snap;; ++start) {
+	/* If we wrapped the buffer, we can't repeat operations. */
+	if (tinfo->repeatable_wrap)
+		return;
+
+	/* Check from the first operation we saved to the last. */
+	for (current = tinfo->snap_first;; ++current) {
 		/* Wrap at the end of the circular buffer. */
-		if (start >= &tinfo->snap_list[WT_ELEMENTS(tinfo->snap_list)])
-			start = tinfo->snap_list;
-		if (start == stop)
+		if (current >= &tinfo->snap_list[WT_ELEMENTS(tinfo->snap_list)])
+			current = tinfo->snap_list;
+		if (current->opid != tinfo->opid)
 			break;
 
 		/*
@@ -401,23 +439,23 @@ snap_repeat_update(TINFO *tinfo, bool committed)
 		 * timestamp chosen wasn't older than all concurrently running
 		 * uncommitted updates.
 		 */
-		if (!tinfo->repeatable_reads && start->op == READ)
+		if (!tinfo->repeatable_reads && current->op == READ)
 			continue;
 
 		/*
 		 * Second, check based on the transaction resolution (the rules
 		 * are different if the transaction committed or rolled back).
 		 */
-		start->repeatable = committed ? snap_repeat_ok_commit(
-		    tinfo, start, tinfo->snap_first, stop) :
-		    snap_repeat_ok_rollback(tinfo, start, tinfo->snap_first);
+		current->repeatable = committed ?
+		    snap_repeat_ok_commit(tinfo, current) :
+		    snap_repeat_ok_rollback(tinfo, current);
 
 		/*
 		 * Repeat reads at the transaction's read timestamp and updates
 		 * at the commit timestamp.
 		 */
-		if (start->repeatable)
-			start->ts = start->op == READ ?
+		if (current->repeatable)
+			current->ts = current->op == READ ?
 			    tinfo->read_ts : tinfo->commit_ts;
 	}
 }

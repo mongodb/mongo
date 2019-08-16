@@ -155,7 +155,7 @@ __txn_op_apply(
 			 * than using cursor modify to create a partial update
 			 * (for no particular reason than simplicity).
 			 */
-			WT_ERR(__wt_modify_apply(session, cursor, value.data));
+			WT_ERR(__wt_modify_apply(cursor, value.data));
 			WT_ERR(cursor->insert(cursor));
 		}
 		break;
@@ -222,7 +222,7 @@ __txn_op_apply(
 			 * than using cursor modify to create a partial update
 			 * (for no particular reason than simplicity).
 			 */
-			WT_ERR(__wt_modify_apply(session, cursor, value.data));
+			WT_ERR(__wt_modify_apply(cursor, value.data));
 			WT_ERR(cursor->insert(cursor));
 		}
 		break;

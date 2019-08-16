@@ -508,10 +508,8 @@ __curjoin_entry_in_range(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
 		if (!passed) {
 			if (iter != NULL &&
 			    (iter->is_equal ||
-			    F_ISSET(end, WT_CURJOIN_END_LT))) {
-				WT_RET(__curjoin_iter_bump(iter));
+			    F_ISSET(end, WT_CURJOIN_END_LT)))
 				return (WT_NOTFOUND);
-			}
 			if (!disjunction)
 				return (WT_NOTFOUND);
 			iter = NULL;
@@ -606,6 +604,9 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
 	WT_ITEM v;
 	bool bloom_found;
 
+	/* We cannot have a bloom filter on a join entry with subordinates. */
+	WT_ASSERT(session, entry->bloom == NULL || entry->subjoin == NULL);
+
 	if (entry->subjoin == NULL && iter != NULL &&
 	    (iter->end_pos + iter->end_skip >= entry->ends_next ||
 	    (iter->end_skip > 0 &&
@@ -633,16 +634,19 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
 		bloom_found = true;
 	}
 	if (entry->subjoin != NULL) {
+		/*
+		 * If we have a subordinate join, the membership
+		 * check is delegated to it.
+		 */
 		WT_ASSERT(session,
 		    iter == NULL || entry->subjoin == iter->child->cjoin);
-		ret = __curjoin_entries_in_range(session, entry->subjoin,
-		    key, iter == NULL ? NULL : iter->child);
+		WT_ERR(__curjoin_entries_in_range(session, entry->subjoin,
+		    key, iter == NULL ? NULL : iter->child));
 		if (iter != NULL &&
-		    WT_CURJOIN_ITER_CONSUMED(iter->child)) {
-			WT_ERR(__curjoin_iter_bump(iter));
-			ret = WT_NOTFOUND;
-		}
-		return (ret);
+		    WT_CURJOIN_ITER_CONSUMED(iter->child))
+			return (WT_NOTFOUND);
+		/* There's nothing more to do for this node. */
+		return (0);
 	}
 	if (entry->index != NULL) {
 		/*

@@ -1506,8 +1506,11 @@ __wt_btcur_modify(WT_CURSOR_BTREE *cbt, WT_MODIFY *entries, int nentries)
 	if (!F_ISSET(cursor, WT_CURSTD_KEY_INT) ||
 	    !F_ISSET(cursor, WT_CURSTD_VALUE_INT))
 		WT_ERR(__wt_btcur_search(cbt));
+
+	WT_ERR(__wt_modify_pack(cursor, &modify, entries, nentries));
+
 	orig = cursor->value.size;
-	WT_ERR(__wt_modify_apply_api(session, cursor, entries, nentries));
+	WT_ERR(__wt_modify_apply(cursor, modify->data));
 	new = cursor->value.size;
 	WT_ERR(__cursor_size_chk(session, &cursor->value));
 
@@ -1527,8 +1530,7 @@ __wt_btcur_modify(WT_CURSOR_BTREE *cbt, WT_MODIFY *entries, int nentries)
 	F_CLR(cursor, WT_CURSTD_OVERWRITE);
 	if (cursor->value.size <= 64 || __cursor_chain_exceeded(cbt))
 		ret = __btcur_update(cbt, &cursor->value, WT_UPDATE_STANDARD);
-	else if ((ret =
-	    __wt_modify_pack(session, &modify, entries, nentries)) == 0)
+	else
 		ret = __btcur_update(cbt, modify, WT_UPDATE_MODIFY);
 	if (overwrite)
 	       F_SET(cursor, WT_CURSTD_OVERWRITE);

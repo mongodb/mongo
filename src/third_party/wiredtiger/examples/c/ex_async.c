@@ -37,7 +37,7 @@ static const char *home;
 #elif defined(_WIN32)
 #define	ATOMIC_ADD(v, val)      (_InterlockedExchangeAdd(&(v), val) + val)
 #else
-#define	ATOMIC_ADD(v, val)      __sync_add_and_fetch(&(v), val)
+#define	ATOMIC_ADD(v, val)      __atomic_add_fetch(&(v), val, __ATOMIC_SEQ_CST)
 #endif
 
 static int global_error = 0;

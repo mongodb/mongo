@@ -931,7 +931,7 @@ __cursor_modify(WT_CURSOR *cursor, WT_MODIFY *entries, int nentries)
 
 	/* Get the current value, apply the modifications. */
 	WT_ERR(cursor->search(cursor));
-	WT_ERR(__wt_modify_apply_api(session, cursor, entries, nentries));
+	WT_ERR(__wt_modify_apply_api(cursor, entries, nentries));
 
 	/* We know both key and value are set, "overwrite" doesn't matter. */
 	ret = cursor->update(cursor);

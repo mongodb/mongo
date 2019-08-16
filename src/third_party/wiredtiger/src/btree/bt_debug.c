@@ -718,6 +718,7 @@ __wt_debug_page(
  */
 int
 __wt_debug_cursor_page(void *cursor_arg, const char *ofile)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	WT_CURSOR *cursor;
 	WT_CURSOR_BTREE *cbt;
@@ -889,7 +890,7 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
 	if (split_gen != 0)
 		WT_RET(ds->f(ds, ", split-gen=%" PRIu64, split_gen));
 	if (mod != NULL)
-		WT_RET(ds->f(ds, ", write-gen=%" PRIu32, mod->write_gen));
+		WT_RET(ds->f(ds, ", page-state=%" PRIu32, mod->page_state));
 	WT_RET(ds->f(ds,
 	    ", memory-size %" WT_SIZET_FMT, page->memory_footprint));
 	WT_RET(ds->f(ds, "\n"));
