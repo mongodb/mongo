@@ -765,6 +765,16 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
+- name: initialsync-large
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "initialsync-large"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
 - name: change_streams_throughput
   priority: 5
   commands:
@@ -1282,6 +1292,7 @@ buildvariants:
   tasks:
     - name: initialsync
     - name: initialsync-logkeeper-short
+    - name: initialsync-large
 
 - name: linux-replSet-initialsync-logkeeper
   display_name: Linux ReplSet Initial Sync LogKeeper
