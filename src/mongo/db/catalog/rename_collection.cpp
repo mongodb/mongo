@@ -349,7 +349,6 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
 
     auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, source.db());
     Collection* const sourceColl = db->getCollection(opCtx, source);
-    Collection* targetColl = db->getCollection(opCtx, target);
 
     AutoStatsTracker statsTracker(opCtx,
                                   source,
@@ -357,66 +356,80 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
                                   AutoStatsTracker::LogMode::kUpdateTopAndCurop,
                                   db->getProfilingLevel());
 
-    if (targetColl) {
-        if (sourceColl->uuid() == targetColl->uuid()) {
-            if (!uuidToDrop || uuidToDrop == targetColl->uuid()) {
-                return Status::OK();
-            }
-
-            // During initial sync, it is possible that the collection already
-            // got renamed to the target, so there is not much left to do other
-            // than drop the dropTarget. See SERVER-40861 for more details.
-            return writeConflictRetry(opCtx, "renameCollection", target.ns(), [&] {
-                WriteUnitOfWork wunit(opCtx);
-                auto collToDropBasedOnUUID = getNamespaceFromUUID(opCtx, *uuidToDrop);
-                if (!collToDropBasedOnUUID)
+    return writeConflictRetry(opCtx, "renameCollection", target.ns(), [&] {
+        Collection* targetColl = db->getCollection(opCtx, target);
+        WriteUnitOfWork wuow(opCtx);
+        if (targetColl) {
+            if (sourceColl->uuid() == targetColl->uuid()) {
+                if (!uuidToDrop || uuidToDrop == targetColl->uuid()) {
+                    wuow.commit();
                     return Status::OK();
+                }
+
+                // During initial sync, it is possible that the collection already
+                // got renamed to the target, so there is not much left to do other
+                // than drop the dropTarget. See SERVER-40861 for more details.
+                auto collToDropBasedOnUUID = getNamespaceFromUUID(opCtx, *uuidToDrop);
+                if (!collToDropBasedOnUUID) {
+                    wuow.commit();
+                    return Status::OK();
+                }
                 repl::UnreplicatedWritesBlock uwb(opCtx);
                 Status status =
                     db->dropCollection(opCtx, *collToDropBasedOnUUID, renameOpTimeFromApplyOps);
                 if (!status.isOK())
                     return status;
-                wunit.commit();
+                wuow.commit();
                 return Status::OK();
-            });
-        }
-        if (!uuidToDrop || (uuidToDrop && uuidToDrop != targetColl->uuid())) {
-            // We need to rename the targetColl to a temporary name.
-            auto status = renameTargetCollectionToTmp(
-                opCtx, source, sourceColl->uuid(), db, target, targetColl->uuid());
-            if (!status.isOK())
-                return status;
-            targetColl = nullptr;
-        }
-    }
+            }
 
-    // When reapplying oplog entries (such as in the case of initial sync) we need
-    // to identify the collection to drop by UUID, as otherwise we might end up
-    // dropping the wrong collection.
-    if (!targetColl && uuidToDrop) {
-        invariant(options.dropTarget);
-        auto collToDropBasedOnUUID = getNamespaceFromUUID(opCtx, uuidToDrop.get());
-        if (collToDropBasedOnUUID && !collToDropBasedOnUUID->isDropPendingNamespace()) {
-            invariant(collToDropBasedOnUUID->db() == target.db());
-            targetColl = db->getCollection(opCtx, *collToDropBasedOnUUID);
+            if (!uuidToDrop || (uuidToDrop && uuidToDrop != targetColl->uuid())) {
+                // We need to rename the targetColl to a temporary name.
+                auto status = renameTargetCollectionToTmp(
+                    opCtx, source, sourceColl->uuid(), db, target, targetColl->uuid());
+                if (!status.isOK())
+                    return status;
+                targetColl = nullptr;
+            }
         }
-    }
 
-    if (!targetColl) {
-        return renameCollectionDirectly(opCtx, db, sourceColl->uuid(), source, target, options);
-    } else {
-        if (sourceColl == targetColl)
-            return Status::OK();
+        // When reapplying oplog entries (such as in the case of initial sync) we need
+        // to identify the collection to drop by UUID, as otherwise we might end up
+        // dropping the wrong collection.
+        if (!targetColl && uuidToDrop) {
+            invariant(options.dropTarget);
+            auto collToDropBasedOnUUID = getNamespaceFromUUID(opCtx, uuidToDrop.get());
+            if (collToDropBasedOnUUID && !collToDropBasedOnUUID->isDropPendingNamespace()) {
+                invariant(collToDropBasedOnUUID->db() == target.db());
+                targetColl = db->getCollection(opCtx, *collToDropBasedOnUUID);
+            }
+        }
 
-        return renameCollectionAndDropTarget(opCtx,
-                                             db,
-                                             sourceColl->uuid(),
-                                             source,
-                                             target,
-                                             targetColl,
-                                             options,
-                                             renameOpTimeFromApplyOps);
-    }
+        Status ret = Status::OK();
+        if (!targetColl) {
+            ret = renameCollectionDirectly(opCtx, db, sourceColl->uuid(), source, target, options);
+        } else {
+            if (sourceColl == targetColl) {
+                wuow.commit();
+                return Status::OK();
+            }
+
+            ret = renameCollectionAndDropTarget(opCtx,
+                                                db,
+                                                sourceColl->uuid(),
+                                                source,
+                                                target,
+                                                targetColl,
+                                                options,
+                                                renameOpTimeFromApplyOps);
+        }
+
+        if (ret.isOK()) {
+            wuow.commit();
+        }
+
+        return ret;
+    });
 }
 
 Status renameBetweenDBs(OperationContext* opCtx,
