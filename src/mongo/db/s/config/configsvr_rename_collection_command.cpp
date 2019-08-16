@@ -41,9 +41,6 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-MONGO_FAIL_POINT_DEFINE(hangRenameCollectionAfterSendingRenameToPrimaryShard);
-
 namespace {
 /**
  * Internal command run on config servers to rename a collection.
@@ -97,93 +94,8 @@ public:
             auto collDistLockTarget = uassertStatusOK(catalogClient->getDistLockManager()->lock(
                 opCtx, nssTarget.ns(), "renameCollection", DistLockManager::kDefaultLockTimeout));
 
-            ShardsvrRenameCollection shardsvrRenameCollectionRequest;
-            shardsvrRenameCollectionRequest.setRenameCollection(nssSource);
-            shardsvrRenameCollectionRequest.setTo(nssTarget);
-            shardsvrRenameCollectionRequest.setDropTarget(request().getDropTarget());
-            shardsvrRenameCollectionRequest.setStayTemp(request().getStayTemp());
-            shardsvrRenameCollectionRequest.setDbName(request().getDbName());
-            shardsvrRenameCollectionRequest.setUuid(*sourceColl.getUUID());
-
-            const auto dbType = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getDatabase(
-                                                    opCtx,
-                                                    nssSource.db().toString(),
-                                                    repl::ReadConcernArgs::get(opCtx).getLevel()))
-                                    .value;
-            const auto primaryShardId = dbType.getPrimary();
-            const auto primaryShard =
-                uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, primaryShardId));
-            auto cmdResponse = uassertStatusOK(primaryShard->runCommandWithFixedRetryAttempts(
-                opCtx,
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                "admin",
-                shardsvrRenameCollectionRequest.toBSON(
-                    CommandHelpers::filterCommandRequestForPassthrough(_requestBody)),
-                Shard::RetryPolicy::kIdempotent));
-
-            if (MONGO_FAIL_POINT(hangRenameCollectionAfterSendingRenameToPrimaryShard)) {
-                log() << "Hit hangRenameCollectionAfterSendingRenameToPrimaryShard";
-                MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
-                    opCtx, hangRenameCollectionAfterSendingRenameToPrimaryShard);
-            }
-
-            uassertStatusOK(cmdResponse.commandStatus);
-
-            // Updating sharding catalog by first deleting existing document entries in
-            // config.collections and config.chunks relating to the source and target namespaces,
-            // and inserting a new document entry into config.collections and config.chunks relating
-            // to the target namespace. Directly updating the document will not work since namespace
-            // is an immutable field.
-            auto updatedCollType =
-                (uassertStatusOK(catalogClient->getCollection(
-                                     opCtx, nssSource, repl::ReadConcernLevel::kLocalReadConcern))
-                     .value);
-            updatedCollType.setNs(nssTarget);
-            uassertStatusOK(catalogClient->removeConfigDocuments(
-                opCtx,
-                CollectionType::ConfigNS,
-                BSON(CollectionType::fullNs(nssSource.toString())),
-                ShardingCatalogClient::kLocalWriteConcern));
-            uassertStatusOK(catalogClient->removeConfigDocuments(
-                opCtx,
-                CollectionType::ConfigNS,
-                BSON(CollectionType::fullNs(nssTarget.toString())),
-                ShardingCatalogClient::kLocalWriteConcern));
-            uassertStatusOK(
-                catalogClient->insertConfigDocument(opCtx,
-                                                    CollectionType::ConfigNS,
-                                                    updatedCollType.toBSON(),
-                                                    ShardingCatalogClient::kLocalWriteConcern));
-
-            auto sourceChunks = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getChunks(
-                opCtx,
-                BSON(ChunkType::ns(nssSource.toString())),
-                BSONObj(),
-                boost::none,
-                nullptr,
-                repl::ReadConcernLevel::kLocalReadConcern));
-
-            // Unsharded collections should only have one chunk returned in the vector.
-            invariant(sourceChunks.size() == 1);
-
-            auto& updatedChunkType = sourceChunks[0];
-            updatedChunkType.setNS(nssTarget);
-            updatedChunkType.setName(OID::gen());
-            uassertStatusOK(
-                catalogClient->removeConfigDocuments(opCtx,
-                                                     ChunkType::ConfigNS,
-                                                     BSON(ChunkType::ns(nssSource.toString())),
-                                                     ShardingCatalogClient::kLocalWriteConcern));
-            uassertStatusOK(
-                catalogClient->removeConfigDocuments(opCtx,
-                                                     ChunkType::ConfigNS,
-                                                     BSON(ChunkType::ns(nssTarget.toString())),
-                                                     ShardingCatalogClient::kLocalWriteConcern));
-            uassertStatusOK(
-                catalogClient->insertConfigDocument(opCtx,
-                                                    ChunkType::ConfigNS,
-                                                    updatedChunkType.toConfigBSON(),
-                                                    ShardingCatalogClient::kLocalWriteConcern));
+            ShardingCatalogManager::get(opCtx)->renameCollection(
+                opCtx, request(), *sourceColl.getUUID(), _requestBody);
         }
 
     private:

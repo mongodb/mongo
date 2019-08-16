@@ -39,6 +39,7 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/request_types/rename_collection_gen.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/mutex.h"
 
@@ -272,6 +273,22 @@ public:
      */
 
     void ensureDropCollectionCompleted(OperationContext* opCtx, const NamespaceString& nss);
+
+    /**
+     * Renames collection with namespace 'nssSource' to namespace 'nssTarget'.
+     *
+     * request - the renameCollection request parsed into an idlType. Contains the fields specified
+     * in the docs that renameCollection requires: {renameCollection, to, dropTarget, stayTemp}.
+     * sourceUuid - the collection's uuid.
+     * passthroughFields - the requestBody in the opMsg, used to get the passthrough fields of the
+     * request.
+     *
+     * Throws exceptions on errors.
+     */
+    void renameCollection(OperationContext* opCtx,
+                          const ConfigsvrRenameCollection& request,
+                          const UUID& sourceUuid,
+                          const BSONObj& passthroughFields);
 
     /**
      * Shards collection with namespace 'nss' and implicitly assumes that the database is enabled
