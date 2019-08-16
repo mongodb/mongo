@@ -831,9 +831,9 @@ functions:
         do
             for file in $files
             do
-                mv mongodb*/$file.$file_ext . 2>/dev/null || true
+                mv mongodb*/bin/$file.$file_ext . 2>/dev/null || true
             done
-            rm -r mongodb*/*.$file_ext 2>/dev/null || true
+            rm -r mongodb*/bin/*.$file_ext 2>/dev/null || true
         done
         rm mongo-debugsymbols.tgz 2>/dev/null || true
 
