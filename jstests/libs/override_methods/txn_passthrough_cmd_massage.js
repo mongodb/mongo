@@ -34,22 +34,17 @@ function runCommandInMultiStmtTxnPassthrough(
     // is done to make sure that the pending drop of the two phase drop won't try to contest
     // with db/coll locks in the background.
 
-    if (commandName === "mapReduce" || commandName === "mapreduce") {
-        if (typeof massagedCmd.out === 'string') {
-            massagedCmd.out = {replace: commandObjUnwrapped.out, writeConcern: majority};
-        } else if (typeof massagedCmd.out === 'object') {
-            let outOptions = massagedCmd.out;
-            if (!outOptions.hasOwnProperty('inline')) {
-                if (outOptions.hasOwnProperty('writeConcern')) {
-                    if (outOptions.writeConcern.w !== 'majority') {
-                        throw new Error(
-                            'Running mapReduce with non majority write concern: ' +
-                            tojson(commandObj) + '. Consider blacklisting the test ' +
-                            'since the 2 phase drop can interfere with lock acquisitions.');
-                    }
-                } else {
-                    outOptions.writeConcern = majority;
+    if (commandName === 'mapReduce' || commandName === 'mapreduce') {
+        if (typeof massagedCmd.out === 'string' ||
+            (typeof massagedCmd.out === 'object' && !massagedCmd.out.hasOwnProperty('inline'))) {
+            if (massagedCmd.hasOwnProperty('writeConcern')) {
+                if (massagedCmd.writeConcern.w !== 'majority') {
+                    throw new Error('Running mapReduce with non majority write concern: ' +
+                                    tojson(commandObj) + '. Consider blacklisting the test ' +
+                                    'since the 2 phase drop can interfere with lock acquisitions.');
                 }
+            } else {
+                massagedCmd.writeConcern = majority;
             }
         }
     } else if (commandName === 'drop') {
