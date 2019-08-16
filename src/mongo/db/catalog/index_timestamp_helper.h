@@ -37,6 +37,13 @@ namespace mongo {
 namespace IndexTimestampHelper {
 
 /**
+ * Returns true if writes to the catalog entry for the input namespace require being
+ * timestamped. A ghost write is when the operation is not committed with an oplog entry and
+ * implies the caller will look at the logical clock to choose a time to use.
+ */
+bool requiresGhostCommitTimestampForCatalogWrite(OperationContext* opCtx, NamespaceString nss);
+
+/**
  * If required, sets a timestamp on an active WriteUnitOfWork. A ghost write is when the
  * operation is not committed with an oplog entry, which may be necessary for certain index
  * build operations not associated with a unique optime. This implementation uses the

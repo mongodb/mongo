@@ -145,6 +145,8 @@ public:
 
         ASSERT(c->getIndexCatalog()->haveIdIndex(&_opCtx));
         wuow.commit();
+
+        _opCtx.getServiceContext()->getStorageEngine()->setOldestTimestamp(_lastSetOldestTimestamp);
     }
     ~Base() {
         // Replication is not supported by mobile SE.
@@ -239,6 +241,8 @@ protected:
                     if (auto tsElem = ops.front()["ts"]) {
                         _opCtx.getServiceContext()->getStorageEngine()->setOldestTimestamp(
                             tsElem.timestamp());
+                        _lastSetOldestTimestamp =
+                            std::max(_lastSetOldestTimestamp, tsElem.timestamp());
                     }
                 }
             }
@@ -306,6 +310,7 @@ protected:
             repl::UnreplicatedWritesBlock uwb(&_opCtx);
             coll->insertDocument(&_opCtx, InsertStatement(o), nullOpDebug, true)
                 .transitional_ignore();
+            ASSERT_OK(_opCtx.recoveryUnit()->setTimestamp(_lastSetOldestTimestamp));
             wunit.commit();
             return;
         }
@@ -318,6 +323,7 @@ protected:
         repl::UnreplicatedWritesBlock uwb(&_opCtx);
         coll->insertDocument(&_opCtx, InsertStatement(b.obj()), nullOpDebug, true)
             .transitional_ignore();
+        ASSERT_OK(_opCtx.recoveryUnit()->setTimestamp(_lastSetOldestTimestamp));
         wunit.commit();
     }
     static BSONObj wid(const char* json) {
@@ -328,6 +334,8 @@ protected:
         b.appendElements(fromjson(json));
         return b.obj();
     }
+
+    Timestamp _lastSetOldestTimestamp = Timestamp(1, 1);
 };
 
 

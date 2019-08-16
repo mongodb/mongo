@@ -102,13 +102,8 @@ void IndexTimestampHelper::setGhostCommitTimestampForWrite(OperationContext* opC
     fassert(51053, status);
 }
 
-/**
- * Returns true if writes to the catalog entry for the input namespace require being
- * timestamped. A ghost write is when the operation is not committed with an oplog entry and
- * implies the caller will look at the logical clock to choose a time to use.
- */
-namespace {
-bool requiresGhostCommitTimestampForCatalogWrite(OperationContext* opCtx, NamespaceString nss) {
+bool IndexTimestampHelper::requiresGhostCommitTimestampForCatalogWrite(OperationContext* opCtx,
+                                                                       NamespaceString nss) {
     if (opCtx->writesAreReplicated()) {
         return false;
     }
@@ -148,7 +143,6 @@ bool requiresGhostCommitTimestampForCatalogWrite(OperationContext* opCtx, Namesp
 
     return true;
 }
-}  // namespace
 
 bool IndexTimestampHelper::setGhostCommitTimestampForCatalogWrite(OperationContext* opCtx,
                                                                   const NamespaceString& nss) {

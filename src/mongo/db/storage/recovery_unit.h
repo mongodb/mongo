@@ -563,6 +563,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    void setMustBeTimestamped() {
+        _mustBeTimestamped = true;
+    }
+
 protected:
     RecoveryUnit() {}
 
@@ -600,6 +604,8 @@ protected:
     bool _isCommittingOrAborting() const {
         return State::kCommitting == _state || State::kAborting == _state;
     }
+
+    bool _mustBeTimestamped = false;
 
 private:
     typedef std::vector<std::unique_ptr<Change>> Changes;

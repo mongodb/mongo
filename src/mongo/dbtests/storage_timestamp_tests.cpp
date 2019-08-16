@@ -230,6 +230,9 @@ public:
             if (collRaii.getCollection()) {
                 WriteUnitOfWork wunit(_opCtx);
                 invariant(collRaii.getCollection()->truncate(_opCtx).isOK());
+                if (_opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
+                    ASSERT_OK(_opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 1)));
+                }
                 collRaii.getCollection()->getIndexCatalog()->dropAllIndexes(_opCtx, false);
                 wunit.commit();
                 return;
@@ -237,6 +240,9 @@ public:
 
             AutoGetOrCreateDb dbRaii(_opCtx, nss.db(), LockMode::MODE_X);
             WriteUnitOfWork wunit(_opCtx);
+            if (_opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
+                ASSERT_OK(_opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 1)));
+            }
             invariant(dbRaii.getDb()->createCollection(_opCtx, nss));
             wunit.commit();
         });

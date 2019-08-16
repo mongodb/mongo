@@ -36,6 +36,7 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/catalog/index_timestamp_helper.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
@@ -601,6 +602,11 @@ void DurableCatalogImpl::putMetaData(OperationContext* opCtx,
         obj = b.obj();
     }
 
+    if (IndexTimestampHelper::requiresGhostCommitTimestampForCatalogWrite(opCtx, nss) &&
+        !nss.isDropPendingNamespace()) {
+        opCtx->recoveryUnit()->setMustBeTimestamped();
+    }
+
     LOG(3) << "recording new metadata: " << obj;
     Status status = _rs->updateRecord(opCtx, loc, obj.objdata(), obj.objsize());
     fassert(28521, status);
@@ -641,6 +647,11 @@ Status DurableCatalogImpl::_replaceEntry(OperationContext* opCtx,
 
     _idents.erase(fromIt);
     _idents[toNss.toString()] = Entry(old["ident"].String(), loc);
+
+    if (IndexTimestampHelper::requiresGhostCommitTimestampForCatalogWrite(opCtx, fromNss) &&
+        !fromNss.isDropPendingNamespace()) {
+        opCtx->recoveryUnit()->setMustBeTimestamped();
+    }
 
     return Status::OK();
 }

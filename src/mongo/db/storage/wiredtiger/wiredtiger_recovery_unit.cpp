@@ -347,6 +347,10 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
             conf << "durable_timestamp=" << integerToHex(_durableTimestamp.asULL());
         }
 
+        if (_mustBeTimestamped) {
+            invariant(_isTimestamped);
+        }
+
         wtRet = s->commit_transaction(s, conf.str().c_str());
         LOG(3) << "WT commit_transaction for snapshot id " << _mySnapshotId;
     } else {
@@ -384,6 +388,7 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     _isOplogReader = false;
     _oplogVisibleTs = boost::none;
     _orderedCommit = true;  // Default value is true; we assume all writes are ordered.
+    _mustBeTimestamped = false;
 }
 
 SnapshotId WiredTigerRecoveryUnit::getSnapshotId() const {

@@ -105,7 +105,17 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
     }
     MultiIndexBlock indexer;
     ON_BLOCK_EXIT([&] { indexer.cleanUpAfterBuild(opCtx, coll); });
-    Status status = indexer.init(opCtx, coll, spec, MultiIndexBlock::kNoopOnInitFn).getStatus();
+    Status status = indexer
+                        .init(opCtx,
+                              coll,
+                              spec,
+                              [opCtx](const std::vector<BSONObj>& specs) -> Status {
+                                  if (opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
+                                      return opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 1));
+                                  }
+                                  return Status::OK();
+                              })
+                        .getStatus();
     if (status == ErrorCodes::IndexAlreadyExists) {
         return Status::OK();
     }
@@ -123,6 +133,7 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
     WriteUnitOfWork wunit(opCtx);
     ASSERT_OK(indexer.commit(
         opCtx, coll, MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn));
+    ASSERT_OK(opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 1)));
     wunit.commit();
     return Status::OK();
 }
