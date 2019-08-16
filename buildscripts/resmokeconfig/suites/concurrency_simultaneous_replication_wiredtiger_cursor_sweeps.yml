@@ -86,6 +86,6 @@ executor:
         # Lower the interval at which WiredTiger checks for file handles to close.
         wiredTigerFileHandleCloseScanInterval: 1
         # Lower the number of files open before WiredTiger starts looking for cursors to close. At
-        # least 1 file should always be open, so cursor sweeps will always run when scheduled. 
+        # least 1 file should always be open, so cursor sweeps will always run when scheduled.
         wiredTigerFileHandleCloseMinimum: 1
     num_nodes: 3
