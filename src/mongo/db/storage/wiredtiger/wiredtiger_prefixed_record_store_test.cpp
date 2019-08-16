@@ -124,6 +124,7 @@ public:
         params.cappedMaxDocs = -1;
         params.cappedCallback = nullptr;
         params.sizeStorer = nullptr;
+        params.tracksSizeAdjustments = true;
 
         auto ret = std::make_unique<PrefixedWiredTigerRecordStore>(
             _engine.get(), &opCtx, params, KVPrefix::generateNextPrefix());
@@ -171,6 +172,7 @@ public:
         params.cappedMaxDocs = cappedMaxDocs;
         params.cappedCallback = nullptr;
         params.sizeStorer = nullptr;
+        params.tracksSizeAdjustments = true;
 
         auto ret =
             std::make_unique<PrefixedWiredTigerRecordStore>(_engine.get(), &opCtx, params, prefix);

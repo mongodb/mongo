@@ -112,6 +112,7 @@ public:
         CappedCallback* cappedCallback;
         WiredTigerSizeStorer* sizeStorer;
         bool isReadOnly;
+        bool tracksSizeAdjustments;
     };
 
     WiredTigerRecordStore(WiredTigerKVEngine* kvEngine, OperationContext* opCtx, Params params);
@@ -356,6 +357,7 @@ private:
 
     WiredTigerSizeStorer* _sizeStorer;  // not owned, can be NULL
     std::shared_ptr<WiredTigerSizeStorer::SizeInfo> _sizeInfo;
+    bool _tracksSizeAdjustments;
     WiredTigerKVEngine* _kvEngine;  // not owned.
 
     // Non-null if this record store is underlying the active oplog.

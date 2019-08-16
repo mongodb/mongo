@@ -1220,6 +1220,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getGroupedRecordStore(
     params.cappedCallback = nullptr;
     params.sizeStorer = _sizeStorer.get();
     params.isReadOnly = _readOnly;
+    params.tracksSizeAdjustments = true;
 
     params.cappedMaxSize = -1;
     if (options.capped) {
@@ -1321,6 +1322,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
     params.cappedCallback = nullptr;
     // Temporary collections do not need to persist size information to the size storer.
     params.sizeStorer = nullptr;
+    params.tracksSizeAdjustments = true;
     params.isReadOnly = false;
 
     params.cappedMaxSize = -1;

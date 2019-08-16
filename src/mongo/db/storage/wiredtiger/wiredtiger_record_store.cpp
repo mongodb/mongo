@@ -659,6 +659,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
       _shuttingDown(false),
       _cappedDeleteCheckCount(0),
       _sizeStorer(params.sizeStorer),
+      _tracksSizeAdjustments(params.tracksSizeAdjustments),
       _kvEngine(kvEngine) {
     invariant(_ident.size() > 0);
 
@@ -901,6 +902,10 @@ bool WiredTigerRecordStore::cappedAndNeedDelete() const {
 
 int64_t WiredTigerRecordStore::_cappedDeleteAsNeeded(OperationContext* opCtx,
                                                      const RecordId& justInserted) {
+    if (!_tracksSizeAdjustments) {
+        return 0;
+    }
+
     // If the collection does not need size adjustment, then we are in replication recovery and
     // replaying operations we've already played. This may occur after rollback or after a shutdown.
     // Any inserts beyond the stable timestamp have been undone, but any documents deleted from
@@ -1661,6 +1666,10 @@ private:
 };
 
 void WiredTigerRecordStore::_changeNumRecords(OperationContext* opCtx, int64_t diff) {
+    if (!_tracksSizeAdjustments) {
+        return;
+    }
+
     if (!sizeRecoveryState(getGlobalServiceContext()).collectionNeedsSizeAdjustment(_ident)) {
         return;
     }
@@ -1684,6 +1693,10 @@ private:
 };
 
 void WiredTigerRecordStore::_increaseDataSize(OperationContext* opCtx, int64_t amount) {
+    if (!_tracksSizeAdjustments) {
+        return;
+    }
+
     if (!sizeRecoveryState(getGlobalServiceContext()).collectionNeedsSizeAdjustment(_ident)) {
         return;
     }
