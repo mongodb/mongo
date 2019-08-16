@@ -411,6 +411,16 @@ public:
         resetToKey(obj, ord, discriminator);
     }
 
+    BuilderBase(const BuilderBase& other)
+        : version(other.version),
+          _typeBits(other.getTypeBits()),
+          _state(other._state),
+          _elemCount(other._elemCount),
+          _ordering(other._ordering),
+          _discriminator(other._discriminator) {
+        resetFromBuffer(other.getBuffer(), other.getSize());
+    }
+
     BuilderBase(Version version, RecordId rid) : BuilderBase(version) {
         appendRecordId(rid);
     }

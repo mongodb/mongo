@@ -33,6 +33,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/storage/key_string.h"
 
 class S2CellId;
 class S2RegionCoverer;
@@ -83,5 +84,11 @@ struct S2IndexingParams {
 };
 
 BSONObj S2CellIdToIndexKey(const S2CellId& cellId, S2IndexVersion indexVersion);
+void S2CellIdToIndexKeyStringAppend(const S2CellId& cellId,
+                                    S2IndexVersion indexVersion,
+                                    const std::vector<KeyString::HeapBuilder>& keysToAdd,
+                                    std::vector<KeyString::HeapBuilder>* out,
+                                    KeyString::Version keyStringVersion,
+                                    Ordering ordering);
 
 }  // namespace mongo

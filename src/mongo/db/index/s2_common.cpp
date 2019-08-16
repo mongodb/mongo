@@ -107,4 +107,50 @@ BSONObj S2CellIdToIndexKey(const S2CellId& cellId, S2IndexVersion indexVersion) 
     // Return a copy so its buffer size fits the object size.
     return b.obj().copy();
 }
+
+void S2CellIdToIndexKeyStringAppend(const S2CellId& cellId,
+                                    S2IndexVersion indexVersion,
+                                    const std::vector<KeyString::HeapBuilder>& keysToAdd,
+                                    std::vector<KeyString::HeapBuilder>* out,
+                                    KeyString::Version keyStringVersion,
+                                    Ordering ordering) {
+    // The range of an unsigned long long is
+    // |-----------------|------------------|
+    // 0                2^32               2^64 - 1
+    // 000...           100...             111...
+    // The range of a signed long long is
+    // |-----------------|------------------|
+    // -2^63             0                 2^63 - 1
+    // 100...           000...             011...
+    // S2 gives us an unsigned long long, and we need
+    // to use signed long longs for the index.
+    //
+    // The relative ordering may be changed with unsigned
+    // numbers around 2^32 being converted to signed
+    //
+    // However, because a single cell cannot span over
+    // more than once face, individual intervals will
+    // never cross that threshold. Thus, scans will still
+    // produce the same results.
+    if (indexVersion >= S2_INDEX_VERSION_3) {
+        if (keysToAdd.empty()) {
+            out->emplace_back(keyStringVersion, ordering);
+            out->back().appendNumberLong(cellId.id());
+        }
+        for (const auto& ks : keysToAdd) {
+            out->emplace_back(ks);
+            out->back().appendNumberLong(cellId.id());
+        }
+        return;
+    }
+
+    if (keysToAdd.empty()) {
+        out->emplace_back(keyStringVersion, ordering);
+        out->back().appendString(cellId.ToString());
+    }
+    for (const auto& ks : keysToAdd) {
+        out->emplace_back(ks);
+        out->back().appendString(cellId.ToString());
+    }
+}
 }  // namespace mongo
