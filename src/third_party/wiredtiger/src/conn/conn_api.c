@@ -7,6 +7,8 @@
  */
 
 #include "wt_internal.h"
+#include "extern.h"
+#include "gcc.h"
 
 /*
  * ext_collate --

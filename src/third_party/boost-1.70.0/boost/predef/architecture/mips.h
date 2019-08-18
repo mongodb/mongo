@@ -39,7 +39,7 @@ http://www.boost.org/LICENSE_1_0.txt)
 #define BOOST_ARCH_MIPS BOOST_VERSION_NUMBER_NOT_AVAILABLE
 
 #if defined(__mips__) || defined(__mips) || \
-    defined(__MIPS__)
+    defined(__MIPS__) || defined(__mips64el__)  || defined(__mips64)
 #   undef BOOST_ARCH_MIPS
 #   if !defined(BOOST_ARCH_MIPS) && (defined(__mips))
 #       define BOOST_ARCH_MIPS BOOST_VERSION_NUMBER(__mips,0,0)

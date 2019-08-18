@@ -135,7 +135,7 @@
  * Porting to other related platforms should not be difficult.
  */
 #if (defined(__i386__) || defined(__x86_64__) || defined(__arm__) || \
-     defined(__mips__) || defined(__PPC__) || \
+     defined(__mips__) || defined(__mips64) || defined(__mips64el__) || defined(__PPC__) || \
      defined(__aarch64__) || defined(__s390__)) \
   && (defined(__linux))
 

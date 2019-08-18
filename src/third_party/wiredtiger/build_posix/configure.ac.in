@@ -68,6 +68,11 @@ AS_CASE([$host_cpu],
 AM_CONDITIONAL([ARM64_HOST], [test "$wt_cv_arm64" = "yes"])
 AS_CASE([$host_os], [*solaris*], [wt_cv_solaris="yes"], [wt_cv_solaris="no"])
 
+AS_CASE([$host_cpu],
+	[mips64el*], [wt_cv_misp6el="yes"],
+	[wt_cv_mips64el="no"])
+AM_CONDITIONAL([MIPS64EL_HOST], [test "$wt_cv_mips64el" = "yes"])
+
 # This is a workaround as part of WT-2459. Currently, clang (v3.7) does not
 # support compiling the ASM code we have to perform the CRC checks on PowerPC.
 # To compile with clang we need to override the ASM compiler with CCAS to use
