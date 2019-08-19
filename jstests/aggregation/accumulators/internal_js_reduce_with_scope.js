@@ -8,10 +8,11 @@
 
 load('jstests/aggregation/extras/utils.js');
 
-db.js_reduce_with_scope.drop();
+const coll = db.js_reduce_with_scope;
+coll.drop();
 
 for (const i of ["hello", "world", "world", "hello", "hi"]) {
-    db.js_reduce.insert({word: i, val: 1});
+    assert.commandWorked(coll.insert({word: i, val: 1}));
 }
 
 // Simple reduce function which calculates the word value based on weights defined in a local JS
@@ -26,7 +27,7 @@ function reduce(key, values) {
 }
 
 const command = {
-    aggregate: 'js_reduce',
+    aggregate: coll.getName(),
     cursor: {},
     runtimeConstants:
         {localNow: new Date(), clusterTime: new Timestamp(0, 0), jsScope: {weights: weights}},
