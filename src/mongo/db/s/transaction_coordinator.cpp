@@ -201,9 +201,9 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
                     }
 
                     if (_decision->getDecision() == CommitDecision::kCommit) {
-                        LOG(3) << "Advancing cluster time to the commit timestamp "
-                               << *_decision->getCommitTimestamp() << " for " << _lsid.getId()
-                               << ':' << _txnNumber;
+                        LOG(3) << txn::txnIdToString(_lsid, _txnNumber)
+                               << " Advancing cluster time to the commit timestamp "
+                               << *_decision->getCommitTimestamp();
 
                         uassertStatusOK(LogicalClock::get(_serviceContext)
                                             ->advanceClusterTime(
@@ -382,7 +382,7 @@ void TransactionCoordinator::_done(Status status) {
                         str::stream() << "Coordinator " << _lsid.getId() << ':' << _txnNumber
                                       << " stopped due to: " << status.reason());
 
-    LOG(3) << "Two-phase commit for " << _lsid.getId() << ':' << _txnNumber << " completed with "
+    LOG(3) << txn::txnIdToString(_lsid, _txnNumber) << " Two-phase commit completed with "
            << redact(status);
 
     stdx::unique_lock<stdx::mutex> ul(_mutex);
