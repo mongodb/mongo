@@ -125,17 +125,6 @@ private:
     Status _refreshDbVersionNow(OperationContext* opCtx);
 
     /**
-     * Returns a vector of ShardEndpoints where a document might need to be placed.
-     *
-     * Returns !OK with message if replacement could not be targeted
-     *
-     * If 'collation' is empty, we use the collection default collation for targeting.
-     */
-    StatusWith<std::vector<ShardEndpoint>> _targetDoc(OperationContext* opCtx,
-                                                      const BSONObj& doc,
-                                                      const BSONObj& collation) const;
-
-    /**
      * Returns a vector of ShardEndpoints for a potentially multi-shard query.
      *
      * Returns !OK with message if query could not be targeted.

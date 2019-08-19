@@ -594,13 +594,6 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetDelete(
     return _targetQuery(opCtx, deleteDoc.getQ(), collation);
 }
 
-StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::_targetDoc(
-    OperationContext* opCtx, const BSONObj& doc, const BSONObj& collation) const {
-    // NOTE: This is weird and fragile, but it's the way our language works right now - documents
-    // are either A) invalid or B) valid equality queries over themselves.
-    return _targetQuery(opCtx, doc, collation);
-}
-
 StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::_targetQuery(
     OperationContext* opCtx, const BSONObj& query, const BSONObj& collation) const {
     if (!_routingInfo->db().primary() && !_routingInfo->cm()) {
