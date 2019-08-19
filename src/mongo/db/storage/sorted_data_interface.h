@@ -385,13 +385,12 @@ public:
     virtual ~SortedDataBuilderInterface() {}
 
     /**
-     * Adds 'key' or 'keyString' to intermediate storage.
+     * Adds 'keyString' to intermediate storage.
      *
-     * 'key' must be > or >= the last key passed to this function (depends on _dupsAllowed).  If
-     * this is violated an error Status (ErrorCodes::InternalError) will be returned.
+     * 'keyString' must be > or >= the last key passed to this function (depends on _dupsAllowed).
+     * If this is violated an error Status (ErrorCodes::InternalError) will be returned.
      */
-    virtual Status addKey(const BSONObj& key, const RecordId& loc) = 0;
-    virtual Status addKey(const KeyString::Value& keyString, const RecordId& loc) = 0;
+    virtual Status addKey(const KeyString::Value& keyString) = 0;
 
     /**
      * Do any necessary work to finish building the tree.

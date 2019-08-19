@@ -612,15 +612,14 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
             fassertFailedNoTrace(31171);
         }
 
-        RecordId recordId =
-            KeyString::decodeRecordIdAtEnd(data.first.getBuffer(), data.first.getSize());
-
         // Before attempting to insert, perform a duplicate key check.
         bool isDup = false;
         if (_descriptor->unique()) {
             isDup = cmpData == 0;
             if (isDup && !dupsAllowed) {
                 if (dupRecords) {
+                    RecordId recordId = KeyString::decodeRecordIdAtEnd(data.first.getBuffer(),
+                                                                       data.first.getSize());
                     dupRecords->insert(recordId);
                     continue;
                 }
@@ -633,7 +632,7 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
             }
         }
 
-        Status status = builder->addKey(data.first, recordId);
+        Status status = builder->addKey(data.first);
 
         if (!status.isOK()) {
             // Duplicates are checked before inserting.

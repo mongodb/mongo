@@ -169,11 +169,7 @@ class DevNullSortedDataBuilderInterface : public SortedDataBuilderInterface {
 public:
     DevNullSortedDataBuilderInterface() {}
 
-    virtual Status addKey(const BSONObj& key, const RecordId& loc) {
-        return Status::OK();
-    }
-
-    virtual Status addKey(const KeyString::Value& keyString, const RecordId& loc) {
+    virtual Status addKey(const KeyString::Value& keyString) {
         return Status::OK();
     }
 };

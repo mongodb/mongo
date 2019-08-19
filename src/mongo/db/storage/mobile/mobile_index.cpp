@@ -247,16 +247,7 @@ public:
 
     virtual ~BulkBuilderBase() {}
 
-    Status addKey(const BSONObj& key, const RecordId& recId) override {
-        invariant(recId.isValid());
-        invariant(!key.hasFieldNames());
-
-        KeyString::HeapBuilder keyString(
-            _index->getKeyStringVersion(), key, _index->getOrdering(), recId);
-        return addKey(std::move(keyString.release()), recId);
-    }
-
-    Status addKey(const KeyString::Value& keyString, const RecordId& recId) override {
+    Status addKey(const KeyString::Value& keyString) override {
         Status status = _checkNextKey(keyString);
         if (!status.isOK()) {
             return status;
@@ -264,7 +255,7 @@ public:
 
         _lastKeyString.resetFromBuffer(keyString.getBuffer(), keyString.getSize());
 
-        return _addKey(keyString, recId);
+        return _addKey(keyString);
     }
 
     void commit(bool mayInterrupt) override {}
@@ -285,7 +276,7 @@ protected:
         return Status::OK();
     }
 
-    virtual Status _addKey(const KeyString::Value& keyString, const RecordId& recId) = 0;
+    virtual Status _addKey(const KeyString::Value& keyString) = 0;
 
     MobileIndex* _index;
     OperationContext* const _opCtx;
@@ -310,7 +301,7 @@ public:
         : BulkBuilderBase(index, opCtx, dupsAllowed, collectionNamespace, indexName, keyPattern) {}
 
 protected:
-    Status _addKey(const KeyString::Value& keyString, const RecordId&) override {
+    Status _addKey(const KeyString::Value& keyString) override {
         KeyString::TypeBits typeBits = keyString.getTypeBits();
         return _index->doInsert(
             _opCtx, keyString.getBuffer(), keyString.getSize(), typeBits, typeBits, false);
@@ -334,9 +325,10 @@ public:
     }
 
 protected:
-    Status _addKey(const KeyString::Value& keyString, const RecordId& recId) override {
-        dassert(recId ==
-                KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
+    Status _addKey(const KeyString::Value& keyString) override {
+        dassert(
+            KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()).isValid());
+        RecordId recId = KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
 
         KeyString::Builder value(_index->getKeyStringVersion(), recId);
         KeyString::TypeBits typeBits = keyString.getTypeBits();

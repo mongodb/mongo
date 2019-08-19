@@ -48,8 +48,7 @@ public:
                                const std::string& indexName,
                                const BSONObj& keyPattern);
     void commit(bool mayInterrupt) override;
-    virtual Status addKey(const BSONObj& key, const RecordId& loc);
-    virtual Status addKey(const KeyString::Value& keyString, const RecordId& loc);
+    virtual Status addKey(const KeyString::Value& keyString);
 
 private:
     OperationContext* _opCtx;

@@ -214,17 +214,9 @@ void SortedDataBuilderInterface::commit(bool mayInterrupt) {
     wunit.commit();
 }
 
-Status SortedDataBuilderInterface::addKey(const BSONObj& key, const RecordId& loc) {
-    invariant(loc.isNormal() || loc.isReserved());
-    invariant(!hasFieldNames(key));
-
-    KeyString::HeapBuilder keyString(KeyString::Version::V1, key, _order, loc);
-
-    return addKey(std::move(keyString.release()), loc);
-}
-
-Status SortedDataBuilderInterface::addKey(const KeyString::Value& keyString, const RecordId& loc) {
-    dassert(loc == KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
+Status SortedDataBuilderInterface::addKey(const KeyString::Value& keyString) {
+    dassert(KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()).isValid());
+    RecordId loc = KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
 
     StringStore* workingCopy(RecoveryUnit::get(_opCtx)->getHead());
     auto sizeWithoutRecordId =

@@ -601,14 +601,9 @@ public:
     StandardBulkBuilder(WiredTigerIndex* idx, OperationContext* opCtx, KVPrefix prefix)
         : BulkBuilder(idx, opCtx, prefix), _idx(idx) {}
 
-    Status addKey(const BSONObj& key, const RecordId& id) override {
-        KeyString::HeapBuilder keyString(_idx->getKeyStringVersion(), key, _idx->_ordering, id);
-
-        return addKey(std::move(keyString.release()), id);
-    }
-
-    Status addKey(const KeyString::Value& keyString, const RecordId& id) override {
-        dassert(id == KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
+    Status addKey(const KeyString::Value& keyString) override {
+        dassert(
+            KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()).isValid());
 
         // Can't use WiredTigerCursor since we aren't using the cache.
         WiredTigerItem item(keyString.getBuffer(), keyString.getSize());
@@ -656,20 +651,13 @@ public:
           _dupsAllowed(dupsAllowed),
           _previousKeyString(idx->getKeyStringVersion()) {}
 
-    Status addKey(const BSONObj& newKey, const RecordId& id) override {
-        KeyString::HeapBuilder newKeyString(
-            _idx->getKeyStringVersion(), newKey, _idx->getOrdering(), id);
-        return addKey(std::move(newKeyString.release()), id);
-    }
-
-    Status addKey(const KeyString::Value& newKeyString, const RecordId& id) override {
-        dassert(id ==
-                KeyString::decodeRecordIdAtEnd(newKeyString.getBuffer(), newKeyString.getSize()));
-
+    Status addKey(const KeyString::Value& newKeyString) override {
+        dassert(KeyString::decodeRecordIdAtEnd(newKeyString.getBuffer(), newKeyString.getSize())
+                    .isValid());
         if (_idx->isTimestampSafeUniqueIdx()) {
             return addKeyTimestampSafe(newKeyString);
         }
-        return addKeyTimestampUnsafe(newKeyString, id);
+        return addKeyTimestampUnsafe(newKeyString);
     }
 
     void commit(bool mayInterrupt) override {
@@ -720,7 +708,7 @@ private:
         return Status::OK();
     }
 
-    Status addKeyTimestampUnsafe(const KeyString::Value& newKeyString, const RecordId& id) {
+    Status addKeyTimestampUnsafe(const KeyString::Value& newKeyString) {
         const int cmp = newKeyString.compareWithoutRecordId(_previousKeyString);
         if (cmp != 0) {
             if (!_previousKeyString.isEmpty()) {
@@ -743,6 +731,8 @@ private:
             // _previousKey which is correct since any dups seen later are likely to be newer.
         }
 
+        RecordId id =
+            KeyString::decodeRecordIdAtEnd(newKeyString.getBuffer(), newKeyString.getSize());
         _records.push_back(std::make_pair(id, newKeyString.getTypeBits()));
         _previousKeyString.resetFromBuffer(newKeyString.getBuffer(), newKeyString.getSize());
 

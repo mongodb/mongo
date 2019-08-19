@@ -87,7 +87,7 @@ public:
         invariant(_data->empty());
     }
 
-    Status addKey(const BSONObj& key, const RecordId& loc) {
+    Status _addKey(const BSONObj& key, const RecordId& loc) {
         // inserts should be in ascending (key, RecordId) order.
 
         invariant(loc.isValid());
@@ -111,12 +111,14 @@ public:
         return Status::OK();
     }
 
-    Status addKey(const KeyString::Value& keyString, const RecordId& loc) {
-        dassert(loc == KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
+    Status addKey(const KeyString::Value& keyString) {
+        dassert(
+            KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()).isValid());
+        RecordId loc = KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
 
         auto key = KeyString::toBson(keyString, _ordering);
 
-        return addKey(key, loc);
+        return _addKey(key, loc);
     }
 
 private:
