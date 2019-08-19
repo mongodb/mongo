@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/bsonobj.h"
@@ -36,63 +34,45 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/map_reduce_agg.h"
 #include "mongo/db/commands/map_reduce_gen.h"
-// #include "mongo/db/commands/map_reduce_out_options.h"
+#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/mr_response_formatter.h"
 
 namespace mongo {
 
-// Exhaust the cursor from the aggregation response and extract results and statistics.
-std::vector<BSONObj> getAllAggregationResults(OperationContext* opCtx,
-                                              const std::string& dbname,
-                                              CursorResponse& response) {
-    CursorId cursorId = response.getCursorId();
-    auto fullBatch = response.releaseBatch();
-    while (cursorId != 0) {
-        GetMoreRequest request(
-            response.getNSS(), cursorId, boost::none, boost::none, boost::none, boost::none);
-        BSONObj getMoreResponse = CommandHelpers::runCommandDirectly(
-            opCtx, OpMsgRequest::fromDBAndBody(dbname, request.toBSON()));
-        auto getMoreCursorResponse = CursorResponse::parseFromBSONThrowing(getMoreResponse);
-        auto nextBatch = getMoreCursorResponse.releaseBatch();
-        fullBatch.insert(fullBatch.end(), nextBatch.begin(), nextBatch.end());
-        cursorId = getMoreCursorResponse.getCursorId();
-    }
-    return fullBatch;
+namespace {
+
+std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
+    MapReduce parsedMr, boost::intrusive_ptr<ExpressionContext> expCtx) {
+    return uassertStatusOK(Pipeline::create({}, expCtx));
 }
 
+boost::intrusive_ptr<ExpressionContext> makeExpressionContext() {
+    return nullptr;
+}
+
+}  // namespace
+
+// Update MapReduceFormatter
 bool runAggregationMapReduce(OperationContext* opCtx,
                              const std::string& dbname,
                              const BSONObj& cmd,
                              std::string& errmsg,
                              BSONObjBuilder& result) {
-    // Pretend we have built the appropriate pipeline and aggregation request.
-    NamespaceString nss(dbname, cmd.firstElement().valueStringData());
-    const BSONObj aggRequest =
-        fromjson(str::stream() << "{aggregate: '" << nss.coll()
-                               << "', pipeline: [ { $group: { _id: { user: \"$user\" },"
-                               << "count: { $sum: 1 } } } ], cursor: {}}");
-    BSONObj aggResult = CommandHelpers::runCommandDirectly(
-        opCtx, OpMsgRequest::fromDBAndBody(dbname, std::move(aggRequest)));
-
     auto mrRequest = MapReduce::parse(IDLParserErrorContext("MapReduce"), cmd);
-    bool inMemory = mrRequest.getOutOptions().getOutputType() == OutputType::InMemory;
-    std::string outColl = mrRequest.getOutOptions().getCollectionName();
-    std::string outDb = mrRequest.getOutOptions().getDatabaseName();
-    // Either inline response specified or we have an output collection.
-    invariant(inMemory ^ !outColl.empty());
+    [[maybe_unused]] bool inMemory =
+        mrRequest.getOutOptions().getOutputType() == OutputType::InMemory;
 
-    auto cursorResponse = CursorResponse::parseFromBSONThrowing(aggResult);
-    auto completeBatch = getAllAggregationResults(opCtx, dbname, cursorResponse);
-    CursorResponse completeCursor(
-        cursorResponse.getNSS(), cursorResponse.getCursorId(), std::move(completeBatch));
+    [[maybe_unused]] auto pipe = translateFromMR(mrRequest, makeExpressionContext());
 
-    MapReduceResponseFormatter(
-        std::move(completeCursor),
-        boost::make_optional(!inMemory, NamespaceString(std::move(outDb), std::move(outColl))),
-        boost::get_optional_value_or(mrRequest.getVerbose(), false))
-        .appendAsMapReduceResponse(&result);
+    // MapReduceResponseFormatter(
+    //     std::move(completeCursor),
+    //     boost::make_optional(!inMemory, NamespaceString(std::move(outDb), std::move(outColl))),
+    //     boost::get_optional_value_or(mrRequest.getVerbose(), false))
+    //     .appendAsMapReduceResponse(&result);
     return true;
 }
 
