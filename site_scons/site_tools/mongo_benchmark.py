@@ -1,6 +1,5 @@
 """Pseudo-builders for building and registering benchmarks.
 """
-import os
 from SCons.Script import Action
 
 def exists(env):
@@ -38,20 +37,7 @@ def build_benchmark(env, target, source, **kwargs):
     bmEnv.RegisterBenchmark(result[0])
     hygienic = bmEnv.GetOption('install-mode') == 'hygienic'
     if not hygienic:
-        installed_test = bmEnv.Install("#/build/benchmark/", result[0])
-        env.Command(
-            target="#+{}".format(os.path.basename(installed_test[0].path)),
-            source=installed_test,
-            action="${SOURCES[0]}"
-        )
-    else:
-        test_bin_name = os.path.basename(result[0].path)
-        env.Command(
-            target="#+{}".format(test_bin_name),
-            source=["$PREFIX_BINDIR/{}".format(test_bin_name)],
-            action="${SOURCES[0]}"
-        )
-
+        bmEnv.Install("#/build/benchmark/", result[0])
     return result
 
 
