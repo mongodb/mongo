@@ -349,9 +349,13 @@ void TransactionRouter::Observer::_reportState(OperationContext* opCtx,
     builder->append("timeOpenMicros",
                     durationCount<Microseconds>(timingStats.getDuration(tickSource, curTicks)));
 
-    // TODO SERVER-41376: Log timeActiveMicros
+    builder->append(
+        "timeActiveMicros",
+        durationCount<Microseconds>(timingStats.getTimeActiveMicros(tickSource, curTicks)));
 
-    // TODO SERVER-41376: Log timeInactiveMicros
+    builder->append(
+        "timeInactiveMicros",
+        durationCount<Microseconds>(timingStats.getTimeInactiveMicros(tickSource, curTicks)));
 
     int numReadOnlyParticipants = 0;
     int numNonReadOnlyParticipants = 0;

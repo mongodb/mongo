@@ -4329,6 +4329,8 @@ TEST_F(TransactionRouterMetricsTest, ReportResources) {
             .getValue(),
         startTime);
     ASSERT_GTE(transactionDocument.getField("timeOpenMicros").numberLong(), 0);
+    ASSERT_GTE(transactionDocument.getField("timeActiveMicros").numberLong(), 0);
+    ASSERT_GTE(transactionDocument.getField("timeInactiveMicros").numberLong(), 0);
     ASSERT_EQ(transactionDocument.getField("numNonReadOnlyParticipants").numberInt(), 0);
     ASSERT_EQ(transactionDocument.getField("numReadOnlyParticipants").numberInt(), 0);
 
@@ -4410,6 +4412,8 @@ TEST_F(TransactionRouterMetricsTest, ReportResourcesWithParticipantList) {
 
     ASSERT_EQ(state.getField("active").boolean(), true);
     ASSERT_GTE(transactionDocument.getField("timeOpenMicros").numberLong(), 0);
+    ASSERT_GTE(transactionDocument.getField("timeActiveMicros").numberLong(), 0);
+    ASSERT_GTE(transactionDocument.getField("timeInactiveMicros").numberLong(), 0);
 }
 
 TEST_F(TransactionRouterMetricsTest, ReportResourcesCommit) {

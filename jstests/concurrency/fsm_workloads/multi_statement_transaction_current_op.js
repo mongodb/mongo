@@ -21,7 +21,6 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.data.verifyMongosSessionsWithTxns = function verifyMongosSessionsWithTxns(sessions) {
         const acceptableReadConcernLevels = ['snapshot', 'local'];
         sessions.forEach((session) => {
-            jsTestLog("xxx here is session: " + tojson(session));
             const transactionDocument = session.transaction;
 
             assertAlways.gte(transactionDocument.parameters.txnNumber, 0);
@@ -35,6 +34,17 @@ var $config = extendWorkload($config, function($config, $super) {
             }
             assertAlways.gt(ISODate(transactionDocument.startWallClockTime),
                             ISODate("1970-01-01T00:00:00.000Z"));
+
+            assertAlways.hasFields(transactionDocument,
+                                   ["timeOpenMicros", "timeActiveMicros", "timeInactiveMicros"]);
+            const timeOpen = Number(transactionDocument["timeOpenMicros"]);
+            const timeActive = Number(transactionDocument["timeActiveMicros"]);
+            const timeInactive = Number(transactionDocument["timeInactiveMicros"]);
+
+            assertAlways.gte(timeOpen, 0);
+            assertAlways.gte(timeActive, 0);
+            assertAlways.gte(timeInactive, 0);
+            assertAlways.eq(timeActive + timeInactive, timeOpen, () => tojson(transactionDocument));
 
             if (transactionDocument.numParticipants > 0) {
                 const participants = transactionDocument.participants;
