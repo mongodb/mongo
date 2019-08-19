@@ -372,8 +372,10 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getAllShardedCollections
 
     std::vector<NamespaceString> collectionsToReturn;
     for (const auto& coll : collectionsOnConfig) {
-        if (coll.getDropped())
+        if (coll.getDropped() ||
+            coll.getDistributionMode() == CollectionType::DistributionMode::kUnsharded) {
             continue;
+        }
 
         collectionsToReturn.push_back(coll.getNs());
     }

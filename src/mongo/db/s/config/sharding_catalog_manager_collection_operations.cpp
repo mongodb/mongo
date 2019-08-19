@@ -495,6 +495,20 @@ void ShardingCatalogManager::renameCollection(OperationContext* opCtx,
     const NamespaceString& nssTarget = request.getTo();
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
+    const auto dbTypeSource =
+        uassertStatusOK(
+            Grid::get(opCtx)->catalogClient()->getDatabase(
+                opCtx, nssSource.db().toString(), repl::ReadConcernArgs::get(opCtx).getLevel()))
+            .value;
+    const auto dbTypeTarget =
+        uassertStatusOK(
+            Grid::get(opCtx)->catalogClient()->getDatabase(
+                opCtx, nssTarget.db().toString(), repl::ReadConcernArgs::get(opCtx).getLevel()))
+            .value;
+    uassert(ErrorCodes::IllegalOperation,
+            "Source and target cannot be on different namespaces.",
+            dbTypeSource.getPrimary() == dbTypeTarget.getPrimary());
+
     ShardsvrRenameCollection shardsvrRenameCollectionRequest;
     shardsvrRenameCollectionRequest.setRenameCollection(nssSource);
     shardsvrRenameCollectionRequest.setTo(nssTarget);

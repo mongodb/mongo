@@ -49,7 +49,7 @@ function runCollectionRenameWithConfigStepdownAtFailpointInPrimaryConfigsvr(
 }
 
 const st = new ShardingTest({
-    shards: 1,
+    shards: 2,
     mongos: 1,
     other: {
         mongosOptions: {
@@ -68,6 +68,11 @@ const st = new ShardingTest({
 });
 const dbName = "test";
 const otherDbName = "other";
+
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
+st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(st.s.adminCommand({enableSharding: otherDbName}));
+st.ensurePrimaryShard(otherDbName, st.shard0.shardName);
 
 // Test renaming within a db when target doesn't exist.
 (() => {
@@ -115,8 +120,9 @@ const otherDbName = "other";
     const [toCollName, toNs] = getNewNs(dbName);
     assert.commandWorked(db[fromCollName].insert({_id: 1}));
     assert.commandWorked(db[toCollName].insert({_id: 2}));
-    jsTest.log(`Check renaming a collection within DB while target exists will fail; fromNS: ${
-        fromNs}; toNS: ${toNs}`);
+    jsTest.log(
+        `Check renaming a collection within DB while target exists will fail; fromNS: \
+${fromNs}; toNS: ${toNs}`);
 
     checkInShardingCatalog({
         ns: fromNs,
@@ -174,8 +180,8 @@ const otherDbName = "other";
     assert.commandWorked(db[fromCollName].insert({_id: 1}));
     assert.commandWorked(db[toCollName].insert({_id: 2}));
     jsTest.log(
-        `Check renaming a collection within DB while target exists and target is dropped; fromNS: ${
-            fromNs}; toNS: ${toNs}`);
+        `Check renaming a collection within DB while target exists and target is dropped; \
+fromNS: ${fromNs}; toNS: ${toNs}`);
 
     checkInShardingCatalog({
         ns: fromNs,
@@ -265,8 +271,8 @@ const otherDbName = "other";
     assert.commandWorked(db[fromCollName].insert({_id: 1}));
     assert.commandWorked(otherDb[toCollName].insert({_id: 2}));
     jsTest.log(
-        `Check renaming a collection across databases while target exists will fail; fromNS: ${
-            fromNs}; toNS: ${toNs}`);
+        `Check renaming a collection across databases while target exists will fail; fromNS: \
+${fromNs}; toNS: ${toNs}`);
 
     checkInShardingCatalog({
         ns: fromNs,
@@ -325,8 +331,8 @@ const otherDbName = "other";
     assert.commandWorked(db[fromCollName].insert({_id: 1}));
     assert.commandWorked(otherDb[toCollName].insert({_id: 2}));
     jsTest.log(
-        `Check renaming a collection across databases while target exists and target is dropped; fromNS: ${
-            fromNs}; toNS: ${toNs}`);
+        `Check renaming a collection across databases while target exists and target is dropped; \
+fromNS: ${fromNs}; toNS: ${toNs}`);
 
     checkInShardingCatalog({
         ns: fromNs,
@@ -374,9 +380,9 @@ const otherDbName = "other";
     const [fromCollName, fromNs] = getNewNs(dbName);
     const [toCollName, toNs] = getNewNs(dbName);
     jsTest.log(
-        `Check config stepdown during renameCollection while shard is attempting the rename; fromNS: ${
-            fromNs}; toNS: ${toNs}`);
-    assert.commandWorked(st.s.getDB(dbName)[fromCollName].insert({_id: 1}));
+        `Check config stepdown during renameCollection while shard is attempting the rename; \
+fromNS: ${fromNs}; toNS: ${toNs}`);
+    assert.commandWorked(db[fromCollName].insert({_id: 1}));
 
     checkInShardingCatalog({
         ns: fromNs,
@@ -417,9 +423,9 @@ const otherDbName = "other";
     const [fromCollName, fromNs] = getNewNs(dbName);
     const [toCollName, toNs] = getNewNs(dbName);
     jsTest.log(
-        `Check config stepdown during renameCollection after sending renameCollection to the primary shard; fromNS: ${
-            fromNs}; toNS: ${toNs}`);
-    assert.commandWorked(st.s.getDB(dbName)[fromCollName].insert({_id: 1}));
+        `Check config stepdown during renameCollection after sending renameCollection to the primary \
+shard; fromNS: ${fromNs}; toNS: ${toNs}`);
+    assert.commandWorked(db[fromCollName].insert({_id: 1}));
 
     checkInShardingCatalog({
         ns: fromNs,
@@ -452,6 +458,58 @@ const otherDbName = "other";
         {dbName: dbName, collName: toCollName, type: "collection", shardConn: st.shard0});
     checkNotInStorageCatalog(
         {dbName: dbName, collName: fromCollName, type: "collection", shardConn: st.shard0});
+})();
+
+// Test renaming across dbs on different primary shards.
+(() => {
+    let db = st.s.getDB(dbName);
+    let otherDb = st.s.getDB(otherDbName);
+    const [fromCollName, fromNs] = getNewNs(dbName);
+    const [toCollName, toNs] = getNewNs(otherDbName);
+    jsTest.log(
+        `Check renaming a collection across databases while databases are on different primary shards \
+will fail; fromNS: ${fromNs}; toNS: ${toNs}`);
+    assert.commandWorked(db[fromCollName].insert({_id: 1}));
+    assert.commandWorked(otherDb[fromCollName].insert({_id: 2}));
+
+    // DB other's primary shard is now shard1 and DB test's primary is on shard0.
+    assert.commandWorked(otherDb.adminCommand({movePrimary: otherDbName, to: st.shard1.shardName}));
+
+    checkInShardingCatalog({
+        ns: fromNs,
+        shardKey: "_id",
+        unique: false,
+        distributionMode: "unsharded",
+        numChunks: 1,
+        mongosConn: st.s
+    });
+    checkNotInShardingCatalog({ns: toCollName, mongosConn: st.s});
+    checkInStorageCatalog(
+        {dbName: dbName, collName: fromCollName, type: "collection", shardConn: st.shard0});
+    checkNotInStorageCatalog(
+        {dbName: otherDbName, collName: toCollName, type: "collection", shardConn: st.shard0});
+    checkNotInStorageCatalog(
+        {dbName: otherDbName, collName: toCollName, type: "collection", shardConn: st.shard1});
+
+    assert.commandFailedWithCode(db.adminCommand({renameCollection: fromNs, to: toNs}),
+                                 ErrorCodes.IllegalOperation);
+    assert.eq(db[fromCollName].findOne(), {_id: 1});
+
+    checkInShardingCatalog({
+        ns: fromNs,
+        shardKey: "_id",
+        unique: false,
+        distributionMode: "unsharded",
+        numChunks: 1,
+        mongosConn: st.s
+    });
+    checkNotInShardingCatalog({ns: toCollName, mongosConn: st.s});
+    checkInStorageCatalog(
+        {dbName: dbName, collName: fromCollName, type: "collection", shardConn: st.shard0});
+    checkNotInStorageCatalog(
+        {dbName: otherDbName, collName: toCollName, type: "collection", shardConn: st.shard0});
+    checkNotInStorageCatalog(
+        {dbName: otherDbName, collName: toCollName, type: "collection", shardConn: st.shard1});
 })();
 
 st.stop();
