@@ -1087,19 +1087,18 @@ void receivedKillCursors(OperationContext* opCtx, const Message& m) {
     DbMessage dbmessage(m);
     int n = dbmessage.pullInt();
 
+    if (n > 2000) {
+        (n < 30000 ? warning() : error()) << "receivedKillCursors, n=" << n;
+        verify(n < 30000);
+    }
+
     uassert(13659, "sent 0 cursors to kill", n != 0);
     massert(13658,
             str::stream() << "bad kill cursors size: " << m.dataSize(),
             m.dataSize() == 8 + (8 * n));
     uassert(13004, str::stream() << "sent negative cursors to kill: " << n, n >= 1);
 
-    if (n > 2000) {
-        (n < 30000 ? warning() : error()) << "receivedKillCursors, n=" << n;
-        verify(n < 30000);
-    }
-
     const char* cursorArray = dbmessage.getArray(n);
-
     int found = runOpKillCursors(opCtx, static_cast<size_t>(n), cursorArray);
 
     if (shouldLog(logger::LogSeverity::Debug(1)) || found != n) {
