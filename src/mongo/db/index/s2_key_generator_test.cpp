@@ -77,7 +77,7 @@ std::string dumpMultikeyPaths(const MultikeyPaths& multikeyPaths) {
     return ss.str();
 }
 
-bool assertKeysetsEqual(const KeyStringSet& expectedKeys, const KeyStringSet& actualKeys) {
+bool areKeysetsEqual(const KeyStringSet& expectedKeys, const KeyStringSet& actualKeys) {
     if (expectedKeys.size() != actualKeys.size()) {
         log() << "Expected: " << dumpKeyset(expectedKeys) << ", "
               << "Actual: " << dumpKeyset(actualKeys);
@@ -171,7 +171,7 @@ TEST(S2KeyGeneratorTest, GetS2KeysFromSubobjectWithArrayOfGeoAndNonGeoSubobjects
     KeyStringSet expectedKeys{
         keyString1.release(), keyString2.release(), keyString3.release(), keyString4.release()};
 
-    assertKeysetsEqual(expectedKeys, actualKeys);
+    ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
     assertMultikeyPathsEqual(MultikeyPaths{{1U}, {1U}}, actualMultikeyPaths);
 }
 
@@ -207,7 +207,7 @@ TEST(S2KeyGeneratorTest, GetS2KeysFromArrayOfNonGeoSubobjectsWithArrayValues) {
                                       Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(), keyString2.release(), keyString3.release()};
 
-    assertKeysetsEqual(expectedKeys, actualKeys);
+    ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
     assertMultikeyPathsEqual(MultikeyPaths{{0U, 1U}, std::set<size_t>{}}, actualMultikeyPaths);
 }
 
@@ -242,7 +242,7 @@ TEST(S2KeyGeneratorTest, GetS2KeysFromMultiPointInGeoField) {
                                       Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(), keyString2.release(), keyString3.release()};
 
-    assertKeysetsEqual(expectedKeys, actualKeys);
+    ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
     assertMultikeyPathsEqual(MultikeyPaths{std::set<size_t>{}, {0U}}, actualMultikeyPaths);
 }
 
@@ -270,7 +270,7 @@ TEST(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldAfterGeoField) {
                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
 
-    assertKeysetsEqual(expectedKeys, actualKeys);
+    ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
     assertMultikeyPathsEqual(MultikeyPaths{std::set<size_t>{}, std::set<size_t>{}},
                              actualMultikeyPaths);
 }
@@ -300,7 +300,7 @@ TEST(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldBeforeGeoField) {
                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
 
-    assertKeysetsEqual(expectedKeys, actualKeys);
+    ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
     assertMultikeyPathsEqual(MultikeyPaths{std::set<size_t>{}, std::set<size_t>{}},
                              actualMultikeyPaths);
 }
@@ -331,7 +331,7 @@ TEST(S2KeyGeneratorTest, CollationAppliedToAllNonGeoStringFields) {
                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
 
-    assertKeysetsEqual(expectedKeys, actualKeys);
+    ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
     assertMultikeyPathsEqual(
         MultikeyPaths{std::set<size_t>{}, std::set<size_t>{}, std::set<size_t>{}},
         actualMultikeyPaths);
@@ -361,7 +361,7 @@ TEST(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldWithMultiplePathComp
                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
 
-    assertKeysetsEqual(expectedKeys, actualKeys);
+    ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
     assertMultikeyPathsEqual(MultikeyPaths{std::set<size_t>{}, std::set<size_t>{}},
                              actualMultikeyPaths);
 }
@@ -394,7 +394,7 @@ TEST(S2KeyGeneratorTest, CollationAppliedToStringsInArray) {
                                       Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(), keyString2.release()};
 
-    assertKeysetsEqual(expectedKeys, actualKeys);
+    ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
     assertMultikeyPathsEqual(MultikeyPaths{std::set<size_t>{}, {0U}}, actualMultikeyPaths);
 }
 
@@ -444,7 +444,7 @@ TEST(S2KeyGeneratorTest, CollationAppliedToStringsInAllArrays) {
     KeyStringSet expectedKeys{
         keyString1.release(), keyString2.release(), keyString3.release(), keyString4.release()};
 
-    assertKeysetsEqual(expectedKeys, actualKeys);
+    ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
     assertMultikeyPathsEqual(MultikeyPaths{std::set<size_t>{}, {0U}, {0U}}, actualMultikeyPaths);
 }
 
@@ -471,7 +471,7 @@ TEST(S2KeyGeneratorTest, CollationDoesNotAffectNonStringFields) {
                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
 
-    assertKeysetsEqual(expectedKeys, actualKeys);
+    ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
     assertMultikeyPathsEqual(MultikeyPaths{std::set<size_t>{}, std::set<size_t>{}},
                              actualMultikeyPaths);
 }
@@ -501,7 +501,7 @@ TEST(S2KeyGeneratorTest, CollationAppliedToStringsInNestedObjects) {
                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
 
-    assertKeysetsEqual(expectedKeys, actualKeys);
+    ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
     assertMultikeyPathsEqual(MultikeyPaths{std::set<size_t>{}, std::set<size_t>{}},
                              actualMultikeyPaths);
 }
@@ -530,7 +530,7 @@ TEST(S2KeyGeneratorTest, NoCollation) {
                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
 
-    assertKeysetsEqual(expectedKeys, actualKeys);
+    ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
     assertMultikeyPathsEqual(MultikeyPaths{std::set<size_t>{}, std::set<size_t>{}},
                              actualMultikeyPaths);
 }
@@ -558,7 +558,7 @@ TEST(S2KeyGeneratorTest, EmptyArrayForLeadingFieldIsConsideredMultikey) {
                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
 
-    assertKeysetsEqual(expectedKeys, actualKeys);
+    ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
     assertMultikeyPathsEqual(MultikeyPaths{{0U}, std::set<size_t>{}}, actualMultikeyPaths);
 }
 
@@ -585,12 +585,12 @@ TEST(S2KeyGeneratorTest, EmptyArrayForTrailingFieldIsConsideredMultikey) {
                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
 
-    assertKeysetsEqual(expectedKeys, actualKeys);
+    ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
     assertMultikeyPathsEqual(MultikeyPaths{std::set<size_t>{}, {0U}}, actualMultikeyPaths);
 }
 
 TEST(S2KeyGeneratorTest, SingleElementTrailingArrayIsConsideredMultikey) {
-    BSONObj obj = fromjson("{a: {c: [99]}}, b: {type: 'Point', coordinates: [0, 0]}}");
+    BSONObj obj = fromjson("{a: {c: [99]}, b: {type: 'Point', coordinates: [0, 0]}}");
     BSONObj keyPattern = fromjson("{'a.c': 1, b: '2dsphere'}");
     BSONObj infoObj = fromjson("{key: {'a.c': 1, b: '2dsphere'}, '2dsphereIndexVersion': 3}");
     S2IndexingParams params;
@@ -612,12 +612,12 @@ TEST(S2KeyGeneratorTest, SingleElementTrailingArrayIsConsideredMultikey) {
                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
 
-    assertKeysetsEqual(expectedKeys, actualKeys);
+    ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
     assertMultikeyPathsEqual(MultikeyPaths{{1U}, std::set<size_t>{}}, actualMultikeyPaths);
 }
 
 TEST(S2KeyGeneratorTest, MidPathSingleElementArrayIsConsideredMultikey) {
-    BSONObj obj = fromjson("{a: [{c: 99}]}, b: {type: 'Point', coordinates: [0, 0]}}");
+    BSONObj obj = fromjson("{a: [{c: 99}], b: {type: 'Point', coordinates: [0, 0]}}");
     BSONObj keyPattern = fromjson("{'a.c': 1, b: '2dsphere'}");
     BSONObj infoObj = fromjson("{key: {'a.c': 1, b: '2dsphere'}, '2dsphereIndexVersion': 3}");
     S2IndexingParams params;
@@ -639,7 +639,7 @@ TEST(S2KeyGeneratorTest, MidPathSingleElementArrayIsConsideredMultikey) {
                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
 
-    assertKeysetsEqual(expectedKeys, actualKeys);
+    ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
     assertMultikeyPathsEqual(MultikeyPaths{{0U}, std::set<size_t>{}}, actualMultikeyPaths);
 }
 
