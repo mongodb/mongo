@@ -198,9 +198,7 @@ BSONObj fixForShards(const BSONObj& orig,
         b.append("splitInfo", maxChunkSizeBytes);
     }
 
-    // mapReduce creates temporary collections and renames them at the end, so it will handle
-    // cluster collection creation differently.
-    return appendAllowImplicitCreate(b.obj(), true);
+    return appendAllowImplicitCreate(b.obj(), false);
 }
 
 bool runMapReduce(OperationContext* opCtx,
@@ -321,7 +319,7 @@ bool runMapReduce(OperationContext* opCtx,
         bool ok =
             conn->runCommand(dbname,
                              appendAllowImplicitCreate(
-                                 CommandHelpers::filterCommandRequestForPassthrough(cmdObj), true),
+                                 CommandHelpers::filterCommandRequestForPassthrough(cmdObj), false),
                              res);
         conn.done();
 
@@ -478,7 +476,8 @@ bool runMapReduce(OperationContext* opCtx,
             uassertStatusOK(shardRegistry->getShard(opCtx, outputDbInfo.primaryId()));
 
         ShardConnection conn(opCtx, outputShard->getConnString(), outputCollNss.ns());
-        ok = conn->runCommand(outDB, appendAllowImplicitCreate(finalCmd.obj(), true), singleResult);
+        ok =
+            conn->runCommand(outDB, appendAllowImplicitCreate(finalCmd.obj(), false), singleResult);
 
         BSONObj counts = singleResult.getObjectField("counts");
         postCountsB.append(conn->getServerAddress(), counts);
@@ -576,7 +575,7 @@ bool runMapReduce(OperationContext* opCtx,
                 opCtx, outputCollNss.ns(), "mr-post-process", kNoDistLockTimeout);
             uassertStatusOK(scopedDistLock.getStatus());
 
-            BSONObj finalCmdObj = appendAllowImplicitCreate(finalCmd.obj(), true);
+            BSONObj finalCmdObj = appendAllowImplicitCreate(finalCmd.obj(), false);
             mrCommandResults.clear();
 
             try {

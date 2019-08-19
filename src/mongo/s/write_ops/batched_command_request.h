@@ -196,7 +196,7 @@ private:
     boost::optional<DatabaseVersion> _dbVersion;
 
     boost::optional<BSONObj> _writeConcern;
-    bool _allowImplicitCollectionCreation = true;
+    bool _allowImplicitCollectionCreation = false;
 };
 
 /**

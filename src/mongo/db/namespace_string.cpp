@@ -200,6 +200,25 @@ StatusWith<repl::OpTime> NamespaceString::getDropPendingNamespaceOpTime() const 
     return repl::OpTime(Timestamp(Seconds(seconds), increment), term);
 }
 
+bool NamespaceString::isNamespaceAlwaysUnsharded() const {
+    // Local and admin never have sharded collections
+    if (db() == NamespaceString::kLocalDb || db() == NamespaceString::kAdminDb)
+        return true;
+
+    // Certain config collections can never be sharded
+    if (ns() == kSessionTransactionsTableNamespace.ns())
+        return true;
+
+    if (isSystemDotProfile())
+        return true;
+
+    if (ns() == "config.cache.databases" || ns() == "config.cache.collections" ||
+        (db() == "config" && coll().startsWith("cache.chunks")))
+        return true;
+
+    return false;
+}
+
 bool NamespaceString::isReplicated() const {
     if (isLocal()) {
         return false;

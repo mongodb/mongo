@@ -135,23 +135,25 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
     const BSONObj& cmdObj,
     const BSONObj& query,
     const BSONObj& collation) {
+
+    auto cmdToSend = cmdObj;
+    if (!cmdToSend.hasField(kAllowImplicitCollectionCreation)) {
+        cmdToSend = appendAllowImplicitCreate(cmdToSend, false);
+    }
+
     if (!routingInfo.cm()) {
         // The collection is unsharded. Target only the primary shard for the database.
 
         // Attach shardVersion "UNSHARDED", unless targeting the config server.
         const auto cmdObjWithShardVersion = (routingInfo.db().primaryId() != "config")
-            ? appendShardVersion(cmdObj, ChunkVersion::UNSHARDED())
-            : cmdObj;
+            ? appendShardVersion(cmdToSend, ChunkVersion::UNSHARDED())
+            : cmdToSend;
+
 
         return buildUnversionedRequestsForShards(
             opCtx,
             {routingInfo.db().primaryId()},
             appendDbVersionIfPresent(cmdObjWithShardVersion, routingInfo.db()));
-    }
-
-    auto cmdToSend = cmdObj;
-    if (!cmdToSend.hasField(kAllowImplicitCollectionCreation)) {
-        cmdToSend = appendAllowImplicitCreate(cmdToSend, false);
     }
 
     std::vector<AsyncRequestsSender::Request> requests;

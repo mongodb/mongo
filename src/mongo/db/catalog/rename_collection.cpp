@@ -674,6 +674,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
 }
 
 }  // namespace
+
 void validateAndRunRenameCollection(OperationContext* opCtx,
                                     const NamespaceString& source,
                                     const NamespaceString& target,

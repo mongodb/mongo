@@ -310,8 +310,7 @@ public:
             dbName,
             nss,
             routingInfo,
-            appendAllowImplicitCreate(CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
-                                      true),
+            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
             Shard::RetryPolicy::kIdempotent,
             &result);
     }

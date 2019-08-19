@@ -592,7 +592,9 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
 
     uassert(CannotImplicitlyCreateCollectionInfo(nss),
             "request doesn't allow collection to be created implicitly",
-            OperationShardingState::get(opCtx).allowImplicitCollectionCreation());
+            serverGlobalParams.clusterRole != ClusterRole::ShardServer ||
+                OperationShardingState::get(opCtx).allowImplicitCollectionCreation() ||
+                options.temp);
 
     auto coordinator = repl::ReplicationCoordinator::get(opCtx);
     bool canAcceptWrites =

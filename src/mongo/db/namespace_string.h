@@ -242,6 +242,12 @@ public:
     }
 
     /**
+     * Returns whether the specified namespace is used for internal purposes only and can
+     * never be marked as anything other than UNSHARDED.
+     */
+    bool isNamespaceAlwaysUnsharded() const;
+
+    /**
      * Returns whether a namespace is replicated, based only on its string value. One notable
      * omission is that map reduce `tmp.mr` collections may or may not be replicated. Callers must
      * decide how to handle that case separately.

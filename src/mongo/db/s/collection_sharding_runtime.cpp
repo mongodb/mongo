@@ -53,18 +53,7 @@ bool isNamespaceAlwaysUnsharded(const NamespaceString& nss) {
     if (serverGlobalParams.clusterRole != ClusterRole::ShardServer)
         return true;
 
-    // Local and admin never have sharded collections
-    if (nss.db() == NamespaceString::kLocalDb || nss.db() == NamespaceString::kAdminDb)
-        return true;
-
-    // Certain config collections can never be sharded
-    if (nss == NamespaceString::kSessionTransactionsTableNamespace)
-        return true;
-
-    if (nss.isSystemDotProfile())
-        return true;
-
-    return false;
+    return nss.isNamespaceAlwaysUnsharded();
 }
 
 }  // namespace

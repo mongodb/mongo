@@ -275,7 +275,8 @@ private:
         bool isRetryableWrite = opCtx->getTxnNumber() && !TransactionRouter::get(opCtx);
         const auto response = [&] {
             std::vector<AsyncRequestsSender::Request> requests;
-            BSONObj filteredCmdObj = CommandHelpers::filterCommandRequestForPassthrough(cmdObj);
+            BSONObj filteredCmdObj = appendAllowImplicitCreate(
+                CommandHelpers::filterCommandRequestForPassthrough(cmdObj), false);
             BSONObj cmdObjWithVersions(std::move(filteredCmdObj));
             if (dbVersion) {
                 cmdObjWithVersions = appendDbVersionIfPresent(cmdObjWithVersions, *dbVersion);

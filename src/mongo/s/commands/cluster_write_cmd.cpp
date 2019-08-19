@@ -434,11 +434,6 @@ private:
                  const OpMsgRequest& request,
                  BatchedCommandRequest& batchedRequest,
                  BSONObjBuilder& result) const {
-        auto db = batchedRequest.getNS().db();
-        if (db != NamespaceString::kAdminDb && db != NamespaceString::kConfigDb) {
-            batchedRequest.setAllowImplicitCreate(false);
-        }
-
         BatchWriteExecStats stats;
         BatchedCommandResponse response;
         ClusterWriter::write(opCtx, batchedRequest, &stats, &response);

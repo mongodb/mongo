@@ -134,8 +134,7 @@ BSONObj createCommandForMergingShard(const AggregationRequest& request,
         mergeCmd.remove("readConcern");
     }
 
-    // agg creates temp collection and should handle implicit create separately.
-    return appendAllowImplicitCreate(mergeCmd.freeze().toBson(), true);
+    return appendAllowImplicitCreate(mergeCmd.freeze().toBson(), false);
 }
 
 sharded_agg_helpers::DispatchShardPipelineResults dispatchExchangeConsumerPipeline(

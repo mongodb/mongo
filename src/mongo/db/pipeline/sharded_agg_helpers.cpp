@@ -117,8 +117,7 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
             Value(static_cast<long long>(*opCtx->getTxnNumber()));
     }
 
-    // agg creates temp collection and should handle implicit create separately.
-    return appendAllowImplicitCreate(cmdForShards.freeze().toBson(), true);
+    return appendAllowImplicitCreate(cmdForShards.freeze().toBson(), false);
 }
 
 StatusWith<CachedCollectionRoutingInfo> getExecutionNsRoutingInfo(OperationContext* opCtx,
