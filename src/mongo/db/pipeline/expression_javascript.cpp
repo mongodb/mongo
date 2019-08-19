@@ -120,27 +120,28 @@ Value ExpressionInternalJsEmit::evaluate(const Document& root, Variables* variab
     auto [jsExec, newlyCreated] = expCtx->getJsExecWithScope();
     if (newlyCreated) {
         jsExec->getScope()->loadStored(expCtx->opCtx, true);
-
-        const_cast<ExpressionInternalJsEmit*>(this)->_func =
-            jsExec->getScope()->createFunction(_funcSource.c_str());
-        uassert(31226, "The map function failed to parse in the javascript engine", _func);
-        jsExec->getScope()->injectNative(
-            "emit", emitFromJS, &const_cast<ExpressionInternalJsEmit*>(this)->_emittedObjects);
     }
+
+    // Although inefficient to "create" a new function every time we evaluate, this will usually end
+    // up being a simple cache lookup. This is needed because the JS Scope may have been recreated
+    // on a new thread if the expression is evaluated across getMores.
+    auto func = jsExec->getScope()->createFunction(_funcSource.c_str());
+    uassert(31226, "The map function failed to parse in the javascript engine", func);
+
+    // For a given invocation of the user-defined function, this vector holds the results of each
+    // call to emit().
+    std::vector<BSONObj> emittedObjects;
+    jsExec->getScope()->injectNative("emit", emitFromJS, &emittedObjects);
 
     BSONObj thisBSON = thisVal.getDocument().toBson();
     BSONObj params;
-    jsExec->callFunctionWithoutReturn(_func, params, thisBSON);
+    jsExec->callFunctionWithoutReturn(func, params, thisBSON);
 
     std::vector<Value> output;
 
-    for (const BSONObj& obj : _emittedObjects) {
+    for (const auto& obj : emittedObjects) {
         output.push_back(Value(obj));
     }
-
-    // Need to const_cast here in order to clean out _emittedObjects which were added in the call to
-    // JS in this function. This is so _emittedObjects is empty again for the next JS invocation.
-    const_cast<ExpressionInternalJsEmit*>(this)->_emittedObjects.clear();
 
     return Value{std::move(output)};
 }
@@ -200,26 +201,25 @@ Value ExpressionInternalJs::evaluate(const Document& root, Variables* variables)
     auto [jsExec, newlyCreated] = expCtx->getJsExecWithScope();
     if (newlyCreated) {
         jsExec->getScope()->loadStored(expCtx->opCtx, true);
-
-        const_cast<ExpressionInternalJs*>(this)->_func =
-            jsExec->getScope()->createFunction(_funcSource.c_str());
-        uassert(31265, "The eval function did not evaluate", _func);
     }
+
+    ScriptingFunction func = jsExec->getScope()->createFunction(_funcSource.c_str());
+    uassert(31265, "The eval function did not evaluate", func);
+
     auto argExpressions = _passedArgs->evaluate(root, variables);
     uassert(
         31266, "The args field must be of type array", argExpressions.getType() == BSONType::Array);
+
     const auto& args = argExpressions.getArray();
     uassert(31267,
             str::stream() << kExpressionName << " args field must have length 2",
             args.size() == 2);
+
     int argNum = 0;
     BSONObjBuilder bob;
     for (const auto& arg : args) {
         arg.addToBsonObj(&bob, "arg" + std::to_string(argNum++));
     }
-    BSONObj params = bob.done();
-    auto result = jsExec->callFunction(_func, params, {});
-
-    return result;
+    return jsExec->callFunction(func, bob.done(), {});
 }
 }  // namespace mongo

@@ -58,20 +58,14 @@ public:
     }
 
 private:
-    const boost::intrusive_ptr<Expression>& _thisRef;
-
     ExpressionInternalJsEmit(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                              boost::intrusive_ptr<Expression> thisRef,
                              std::string funcSourceString);
 
-    // Vector needs to be a member on the class so that it can be attached to the JS scope in the
-    // constructor and stay alive through the lifetime of the Expression object.
-    std::vector<BSONObj> _emittedObjects{};
-
     void _doAddDependencies(DepsTracker* deps) const final override;
 
+    const boost::intrusive_ptr<Expression>& _thisRef;
     std::string _funcSource;
-    ScriptingFunction _func;
 
     static constexpr auto kExpressionName = "$_internalJsEmit"_sd;
 };
@@ -99,11 +93,10 @@ private:
     ExpressionInternalJs(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                          boost::intrusive_ptr<Expression> passedArgs,
                          std::string funcSourceString);
-
-    const boost::intrusive_ptr<Expression> _passedArgs;
-    std::string _funcSource;
-    ScriptingFunction _func;
     void _doAddDependencies(DepsTracker* deps) const final override;
+
+    const boost::intrusive_ptr<Expression>& _passedArgs;
+    std::string _funcSource;
     static constexpr auto kExpressionName = "$_internalJs"_sd;
 };
 }  // namespace mongo
