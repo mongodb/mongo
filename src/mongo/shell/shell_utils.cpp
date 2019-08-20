@@ -300,9 +300,7 @@ BSONObj JSGetMemInfo(const BSONObj& args, void* data) {
     return b.obj();
 }
 
-#if !defined(_WIN32)
-thread_local unsigned int _randomSeed = 0;
-#endif
+thread_local auto _prng = PseudoRandom(0);
 
 BSONObj JSSrand(const BSONObj& a, void* data) {
     unsigned int seed;
@@ -314,23 +312,13 @@ BSONObj JSSrand(const BSONObj& a, void* data) {
         std::unique_ptr<SecureRandom> rand(SecureRandom::create());
         seed = static_cast<unsigned int>(rand->nextInt64());
     }
-#if !defined(_WIN32)
-    _randomSeed = seed;
-#else
-    srand(seed);
-#endif
+    _prng = PseudoRandom(seed);
     return BSON("" << static_cast<double>(seed));
 }
 
 BSONObj JSRand(const BSONObj& a, void* data) {
     uassert(12519, "rand accepts no arguments", a.nFields() == 0);
-    unsigned r;
-#if !defined(_WIN32)
-    r = rand_r(&_randomSeed);
-#else
-    r = rand();
-#endif
-    return BSON("" << double(r) / (double(RAND_MAX) + 1));
+    return BSON("" << _prng.nextCanonicalDouble());
 }
 
 BSONObj isWindows(const BSONObj& a, void* data) {
