@@ -132,6 +132,98 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorReversed) {
     }
 }
 
+// Insert multiple keys on the _id index and try to iterate through all of them using a forward
+// cursor while calling save() and restore() in succession.
+TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorOnIdIndex) {
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newIdIndexSortedDataInterface());
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    int nToInsert = 10;
+    for (int i = 0; i < nToInsert; i++) {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            BSONObj key = BSON("" << i);
+            RecordId loc(42, i * 2);
+            ASSERT_OK(sorted->insert(opCtx.get(), key, loc, true));
+            uow.commit();
+        }
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
+            sorted->newCursor(opCtx.get(), false));
+        int i = nToInsert - 1;
+        for (auto entry = cursor->seek(kMaxBSONKey, true); entry; i--, entry = cursor->next()) {
+            ASSERT_GTE(i, 0);
+            ASSERT_EQ(entry, IndexKeyEntry(BSON("" << i), RecordId(42, i * 2)));
+
+            cursor->save();
+            cursor->restore();
+        }
+        ASSERT(!cursor->next());
+        ASSERT_EQ(i, -1);
+    }
+}
+
+// Insert multiple keys on the _id index and try to iterate through all of them using a reverse
+// cursor while calling save() and restore() in succession.
+TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorReversedOnIdIndex) {
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newIdIndexSortedDataInterface());
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    int nToInsert = 10;
+    for (int i = 0; i < nToInsert; i++) {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            BSONObj key = BSON("" << i);
+            RecordId loc(42, i * 2);
+            ASSERT_OK(sorted->insert(opCtx.get(), key, loc, true));
+            uow.commit();
+        }
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
+            sorted->newCursor(opCtx.get(), false));
+        int i = nToInsert - 1;
+        for (auto entry = cursor->seek(kMaxBSONKey, true); entry; i--, entry = cursor->next()) {
+            ASSERT_GTE(i, 0);
+            ASSERT_EQ(entry, IndexKeyEntry(BSON("" << i), RecordId(42, i * 2)));
+
+            cursor->save();
+            cursor->restore();
+        }
+        ASSERT(!cursor->next());
+        ASSERT_EQ(i, -1);
+    }
+}
+
 // Insert the same key multiple times and try to iterate through each
 // occurrence using a forward cursor while calling savePosition() and
 // restorePosition() in succession. Verify that the RecordId is saved

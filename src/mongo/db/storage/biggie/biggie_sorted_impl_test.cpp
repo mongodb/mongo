@@ -52,6 +52,23 @@ private:
 
 public:
     SortedDataInterfaceTestHarnessHelper() : _order(Ordering::make(BSONObj())) {}
+
+    std::unique_ptr<mongo::SortedDataInterface> newIdIndexSortedDataInterface() final {
+        std::string ns = "test.biggie";
+        OperationContextNoop opCtx(newRecoveryUnit().release());
+
+        BSONObj spec = BSON("key" << BSON("_id" << 1) << "name"
+                                  << "_id_"
+                                  << "v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion)
+                                  << "unique" << true);
+
+        auto collection = std::make_unique<CollectionMock>(NamespaceString(ns));
+        IndexDescriptor desc(collection.get(), "", spec);
+        invariant(desc.isIdIndex());
+
+        return std::make_unique<SortedDataInterface>(&opCtx, "ident"_sd, &desc);
+    }
+
     std::unique_ptr<mongo::SortedDataInterface> newSortedDataInterface(bool unique,
                                                                        bool partial) final {
         std::string ns = "test.biggie";

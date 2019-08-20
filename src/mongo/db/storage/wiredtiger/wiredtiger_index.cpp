@@ -902,10 +902,17 @@ public:
         dassert(!atOrPastEndPointAfterSeeking());
         dassert(!_id.isNull());
 
+        // Most keys will have a RecordId appeneded to the end, with the exception of the _id index
+        // and timestamp unsafe unique indexes. The contract of this function is to always return a
+        // KeyString with a RecordId, so append one if it does not exists already.
         auto sizeWithoutRecordId = KeyString::getKeySize(
             _key.getBuffer(), _key.getSize(), _idx.getOrdering(), _key.getTypeBits());
         if (_key.getSize() == sizeWithoutRecordId) {
-            _key.appendRecordId(_id);
+            // Create a copy of _key with a RecordId. Because _key is used during cursor restore(),
+            // appending the RecordId would cause the cursor to be repositioned incorrectly.
+            KeyString::Builder keyWithRecordId(_key);
+            keyWithRecordId.appendRecordId(_id);
+            return KeyStringEntry(keyWithRecordId.getValueCopy(), _id);
         }
         return KeyStringEntry(_key.getValueCopy(), _id);
     }

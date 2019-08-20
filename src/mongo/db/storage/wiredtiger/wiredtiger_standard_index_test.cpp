@@ -70,6 +70,30 @@ public:
         _conn->close(_conn, nullptr);
     }
 
+    std::unique_ptr<SortedDataInterface> newIdIndexSortedDataInterface() final {
+        std::string ns = "test.wt";
+        OperationContextNoop opCtx(newRecoveryUnit().release());
+
+        BSONObj spec = BSON("key" << BSON("_id" << 1) << "name"
+                                  << "_id_"
+                                  << "v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion)
+                                  << "unique" << true);
+
+        auto collection = std::make_unique<CollectionMock>(NamespaceString(ns));
+        IndexDescriptor desc(collection.get(), "", spec);
+        invariant(desc.isIdIndex());
+
+        KVPrefix prefix = KVPrefix::kNotPrefixed;
+        StatusWith<std::string> result = WiredTigerIndex::generateCreateString(
+            kWiredTigerEngineName, "", "", desc, prefix.isPrefixed());
+        ASSERT_OK(result.getStatus());
+
+        string uri = "table:" + ns;
+        invariantWTOK(WiredTigerIndex::Create(&opCtx, uri, result.getValue()));
+
+        return std::make_unique<WiredTigerIndexUnique>(&opCtx, uri, &desc, prefix);
+    }
+
     std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique, bool partial) final {
         std::string ns = "test.wt";
         OperationContextNoop opCtx(newRecoveryUnit().release());

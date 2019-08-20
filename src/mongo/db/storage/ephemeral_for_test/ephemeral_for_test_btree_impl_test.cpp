@@ -32,6 +32,7 @@
 #include <memory>
 
 #include "mongo/base/init.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/unittest/unittest.h"
@@ -43,6 +44,21 @@ class EphemeralForBtreeImplTestHarnessHelper final
     : public virtual SortedDataInterfaceHarnessHelper {
 public:
     EphemeralForBtreeImplTestHarnessHelper() : _order(Ordering::make(BSONObj())) {}
+
+    std::unique_ptr<SortedDataInterface> newIdIndexSortedDataInterface() final {
+        BSONObj spec = BSON("key" << BSON("_id" << 1) << "name"
+                                  << "_id_"
+                                  << "v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion)
+                                  << "unique" << true);
+
+        return std::unique_ptr<SortedDataInterface>(
+            getEphemeralForTestBtreeImpl(_order,
+                                         true /* unique */,
+                                         NamespaceString("test.EphemeralForTest"),
+                                         "indexName",
+                                         spec,
+                                         &_data));
+    }
 
     std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique, bool partial) final {
         return std::unique_ptr<SortedDataInterface>(

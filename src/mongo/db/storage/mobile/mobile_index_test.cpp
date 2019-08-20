@@ -54,6 +54,10 @@ public:
         _sessionPool.reset(new MobileSessionPool(_fullPath));
     }
 
+    std::unique_ptr<SortedDataInterface> newIdIndexSortedDataInterface() final {
+        return newSortedDataInterface(true /* unique */, false /* partial */);
+    }
+
     std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool isUnique, bool isPartial) {
         std::string ident("index_" + std::to_string(inc++));
         OperationContextNoop opCtx(newRecoveryUnit().release());

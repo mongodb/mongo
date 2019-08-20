@@ -486,7 +486,11 @@ public:
                                                          _index.getOrdering(),
                                                          _savedKey.getTypeBits());
         if (_savedKey.getSize() == sizeWithoutRecordId) {
-            _savedKey.appendRecordId(_savedRecId);
+            // Create a copy of _key with a RecordId. Because _key is used during cursor restore(),
+            // appending the RecordId would cause the cursor to be repositioned incorrectly.
+            KeyString::Builder keyWithRecordId(_savedKey);
+            keyWithRecordId.appendRecordId(_savedRecId);
+            return KeyStringEntry(keyWithRecordId.getValueCopy(), _savedRecId);
         }
         return KeyStringEntry(_savedKey.getValueCopy(), _savedRecId);
     }

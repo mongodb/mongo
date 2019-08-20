@@ -91,6 +91,7 @@ public:
     virtual std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique,
                                                                         bool partial) = 0;
 
+    virtual std::unique_ptr<SortedDataInterface> newIdIndexSortedDataInterface() = 0;
     /**
      * Creates a new SDI with some initial data.
      *
