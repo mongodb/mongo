@@ -5,6 +5,7 @@
 //   requires_getmore,
 //   requires_non_retryable_commands,
 //   requires_non_retryable_writes,
+//   uses_map_reduce_with_temp_collections,
 // ]
 
 /*

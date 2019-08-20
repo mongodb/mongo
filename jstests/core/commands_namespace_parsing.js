@@ -8,6 +8,7 @@
 //   requires_getmore,
 //   requires_non_retryable_commands,
 //   uses_testing_only_commands,
+//   uses_map_reduce_with_temp_collections,
 // ]
 
 // This file tests that commands namespace parsing rejects embedded null bytes.

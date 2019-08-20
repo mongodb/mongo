@@ -1,6 +1,7 @@
 // Test that commands other than retryable writes may not use txnNumber outside transactions.
 // @tags: [
 //   requires_document_locking,
+//   uses_map_reduce_with_temp_collections,
 // ]
 (function() {
 "use strict";

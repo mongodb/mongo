@@ -339,6 +339,11 @@ selector:
   - cannot_create_unique_index_when_using_hashed_shard_key
   # Retrying a query can change whether a plan cache entry is active.
   - inspects_whether_plan_cache_entry_is_active
+  # The following tests can't work in this suite. One override of this suite changes the
+  # writeConcern of all commands, and the other attempts to adjust certain mapReduce commands to use
+  # majority write concern. Note that in sharded deployments even non "replace" output modes may use
+  # temporary collections for intermediate results.
+  - uses_map_reduce_with_temp_collections
 
 executor:
   archive:

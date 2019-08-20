@@ -4,6 +4,7 @@
 //   requires_collstats,
 //   requires_non_retryable_commands,
 //   requires_non_retryable_writes,
+//   uses_map_reduce_with_temp_collections,
 // ]
 
 // Test various user operations against "system.profile" collection.  SERVER-18111.

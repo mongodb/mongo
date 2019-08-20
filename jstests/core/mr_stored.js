@@ -6,6 +6,7 @@
 //   does_not_support_causal_consistency,
 //   does_not_support_stepdowns,
 //   requires_non_retryable_writes,
+//   uses_map_reduce_with_temp_collections,
 // ]
 (function() {
 "use strict";

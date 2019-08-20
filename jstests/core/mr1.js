@@ -4,6 +4,7 @@
 //   does_not_support_stepdowns,
 //   requires_fastcount,
 //   requires_getmore,
+//   uses_map_reduce_with_temp_collections,
 // ]
 
 t = db.mr1;

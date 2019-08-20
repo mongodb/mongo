@@ -3,6 +3,7 @@
 //   does_not_support_causal_consistency,
 //   does_not_support_stepdowns,
 //   requires_profiling,
+//   uses_map_reduce_with_temp_collections,
 // ]
 
 // Confirms that profiled findAndModify execution contains all expected metrics with proper values.
