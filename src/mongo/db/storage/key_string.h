@@ -286,20 +286,31 @@ private:
 
 
 /**
- * Value owns a buffer that corresponds to a completely generated KeyString::Builder.
+ * Value owns a buffer that corresponds to a completely generated KeyString::Builder with the
+ * TypeBits appended.
+ *
+ * To optimize copy performance and space requirements of this structure, the buffer will contain
+ * the full KeyString with the TypeBits appended at the end.
  */
 class Value {
 
 public:
-    Value() : _version(Version::kLatestVersion), _typeBits(Version::kLatestVersion), _size(0) {}
+    Value() : _version(Version::kLatestVersion), _ksSize(0), _bufSize(0) {}
 
-    Value(Version version, TypeBits typeBits, size_t size, ConstSharedBuffer buffer)
-        : _version(version), _typeBits(typeBits), _size(size), _buffer(std::move(buffer)) {}
+    Value(Version version, int32_t ksSize, int32_t bufSize, ConstSharedBuffer buffer)
+        : _version(version), _ksSize(ksSize), _bufSize(bufSize), _buffer(std::move(buffer)) {}
 
     Value(const Value&) = default;
     Value(Value&&) = default;
 
-    Value& operator=(const Value& other);
+    // Use a copy-and-swap, which prevents unnecessary allocation and deallocations.
+    Value& operator=(Value copy) noexcept {
+        _version = copy._version;
+        _ksSize = copy._ksSize;
+        _bufSize = copy._bufSize;
+        std::swap(_buffer, copy._buffer);
+        return *this;
+    }
 
     template <class T>
     int compare(const T& other) const;
@@ -307,20 +318,25 @@ public:
     template <class T>
     int compareWithoutRecordId(const T& other) const;
 
+    // Returns the size of the stored KeyString.
     size_t getSize() const {
-        return _size;
+        return _ksSize;
     }
 
+    // Returns whether the size of the stored KeyString is 0.
     bool isEmpty() const {
-        return _size == 0;
+        return _ksSize == 0;
     }
 
     const char* getBuffer() const {
         return _buffer.get();
     }
 
-    const TypeBits& getTypeBits() const {
-        return _typeBits;
+    // Returns the stored TypeBits.
+    TypeBits getTypeBits() const {
+        const char* buf = _buffer.get() + _ksSize;
+        BufReader reader(buf, _bufSize - _ksSize);
+        return TypeBits::fromBuffer(_version, &reader);
     }
 
     /**
@@ -360,8 +376,11 @@ public:
 
 private:
     Version _version;
-    TypeBits _typeBits;
-    size_t _size;
+    // _ksSize is the total length that the KeyString takes up in the buffer.
+    int32_t _ksSize;
+    // _bufSize is the total length of _buffer. If this is greater than the _ksSize, then
+    // TypeBits are appended.
+    int32_t _bufSize;
     ConstSharedBuffer _buffer;
 };
 
@@ -474,7 +493,15 @@ public:
     typename std::enable_if<std::is_same<T, BufBuilder>::value, Value>::type release() {
         _doneAppending();
         _transition(BuildState::kReleased);
-        return {version, _typeBits, static_cast<size_t>(_buffer.len()), _buffer.release()};
+
+        // Before releasing, append the TypeBits.
+        int32_t ksSize = _buffer.len();
+        if (_typeBits.isAllZeros()) {
+            _buffer.appendChar(0);
+        } else {
+            _buffer.appendBuf(_typeBits.getBuffer(), _typeBits.getSize());
+        }
+        return {version, ksSize, _buffer.len(), _buffer.release()};
     }
 
     /**
@@ -483,9 +510,16 @@ public:
      */
     Value getValueCopy() {
         _doneAppending();
-        BufBuilder newBuf(_buffer.len());
+
+        // Create a new buffer that is a concatenation of the KeyString and its TypeBits.
+        BufBuilder newBuf(_buffer.len() + _typeBits.getSize());
         newBuf.appendBuf(_buffer.buf(), _buffer.len());
-        return {version, _typeBits, static_cast<size_t>(newBuf.len()), newBuf.release()};
+        if (_typeBits.isAllZeros()) {
+            newBuf.appendChar(0);
+        } else {
+            newBuf.appendBuf(_typeBits.getBuffer(), _typeBits.getSize());
+        }
+        return {version, _buffer.len(), newBuf.len(), newBuf.release()};
     }
 
     void appendRecordId(RecordId loc);
