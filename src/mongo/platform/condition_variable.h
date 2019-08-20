@@ -32,72 +32,140 @@
 
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/util/diagnostic_info.h"
-
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
-class ConditionVariable : private stdx::condition_variable_any {
-    using lock_t = stdx::unique_lock<Mutex>;
+
+class Mutex;
+
+class ConditionVariableActions {
+public:
+    virtual ~ConditionVariableActions() = default;
+    virtual void onUnfulfilledConditionVariable(const StringData& name) = 0;
+    virtual void onFulfilledConditionVariable() = 0;
+};
+
+class ConditionVariable {
+    friend class ::mongo::Waitable;
 
 public:
-    void wait(lock_t& lock);
+    static constexpr Milliseconds kUnfulfilledConditionVariableTimeout = Milliseconds(100);
 
-    template <class Predicate>
-    void wait(lock_t& lock, Predicate pred);
+    template <class Lock>
+    void wait(Lock& lock);
 
-    template <class Rep, class Period>
-    stdx::cv_status wait_for(lock_t& lock, const stdx::chrono::duration<Rep, Period>& rel_time);
+    template <class Lock, class Predicate>
+    void wait(Lock& lock, Predicate pred);
 
-    template <class Rep, class Period, class Predicate>
-    bool wait_for(lock_t& lock,
-                  const stdx::chrono::duration<Rep, Period>& rel_time,
-                  Predicate pred);
+    template <class Lock, class Rep, class Period>
+    stdx::cv_status wait_for(Lock& lock, const stdx::chrono::duration<Rep, Period>& rel_time);
 
-    template <class Clock, class Duration>
-    stdx::cv_status wait_until(lock_t& lock,
+    template <class Lock, class Rep, class Period, class Predicate>
+    bool wait_for(Lock& lock, const stdx::chrono::duration<Rep, Period>& rel_time, Predicate pred);
+
+    template <class Lock, class Clock, class Duration>
+    stdx::cv_status wait_until(Lock& lock,
                                const stdx::chrono::time_point<Clock, Duration>& timeout_time);
 
-    template <class Clock, class Duration, class Predicate>
-    bool wait_until(lock_t& lock,
+    template <class Lock, class Clock, class Duration, class Predicate>
+    bool wait_until(Lock& lock,
                     const stdx::chrono::time_point<Clock, Duration>& timeout_time,
                     Predicate pred);
 
     void notify_one() noexcept;
     void notify_all() noexcept;
 
+    static void setConditionVariableActions(std::unique_ptr<ConditionVariableActions> actions);
+
+protected:
+    template <typename Callback>
+    void _runWithNotifyable(Notifyable& notifyable, Callback&& cb) noexcept {
+        _condvar._runWithNotifyable(notifyable, cb);
+    }
+
 private:
+    const Seconds _conditionVariableTimeout = Seconds(604800);
     stdx::condition_variable_any _condvar;
+
+    inline static std::unique_ptr<ConditionVariableActions> _conditionVariableActions;
+
+    template <class Lock, class Duration>
+    auto _wait(Lock& lock, const Duration& rel_time) {
+        const auto guard = makeGuard([&] {
+            if (_conditionVariableActions) {
+                _conditionVariableActions->onFulfilledConditionVariable();
+            }
+        });
+
+        if (auto cvstatus = _condvar.wait_for(
+                lock, std::min(rel_time, kUnfulfilledConditionVariableTimeout.toSystemDuration()));
+            cvstatus == stdx::cv_status::no_timeout ||
+            rel_time <= kUnfulfilledConditionVariableTimeout.toSystemDuration()) {
+            return cvstatus;
+        }
+
+        if (_conditionVariableActions) {
+            if constexpr (std::is_same<decltype(lock), Mutex>::value) {
+                _conditionVariableActions->onUnfulfilledConditionVariable(lock.getName());
+            } else {
+                _conditionVariableActions->onUnfulfilledConditionVariable("AnonymousLock");
+            }
+        }
+
+        if (auto cvstatus = _condvar.wait_for(
+                lock, rel_time - kUnfulfilledConditionVariableTimeout.toSystemDuration());
+            cvstatus == stdx::cv_status::no_timeout) {
+            return cvstatus;
+        }
+
+        uasserted(ErrorCodes::InternalError, "Unable to take latch, wait time exceeds set timeout");
+    }
+
+    template <class Lock, class Duration, class Predicate>
+    auto _waitWithPredicate(Lock& lock, const Duration& rel_time, Predicate pred) {
+        while (!pred()) {
+            if (_wait(lock, rel_time) == std::cv_status::timeout) {
+                return pred();
+            }
+        }
+        return true;
+    }
 };
 
-template <class Predicate>
-void ConditionVariable::wait(lock_t& lock, Predicate pred) {
-    _condvar.wait(lock, pred);
+template <class Lock>
+void ConditionVariable::wait(Lock& lock) {
+    _wait(lock, _conditionVariableTimeout.toSystemDuration());
 }
 
-template <class Rep, class Period>
-stdx::cv_status ConditionVariable::wait_for(lock_t& lock,
+template <class Lock, class Predicate>
+void ConditionVariable::wait(Lock& lock, Predicate pred) {
+    _waitWithPredicate(lock, _conditionVariableTimeout.toSystemDuration(), std::move(pred));
+}
+
+template <class Lock, class Rep, class Period>
+stdx::cv_status ConditionVariable::wait_for(Lock& lock,
                                             const stdx::chrono::duration<Rep, Period>& rel_time) {
-    return _condvar.wait_for(lock, rel_time);
+    return _wait(lock, rel_time);
 }
 
-template <class Rep, class Period, class Predicate>
-bool ConditionVariable::wait_for(lock_t& lock,
+template <class Lock, class Rep, class Period, class Predicate>
+bool ConditionVariable::wait_for(Lock& lock,
                                  const stdx::chrono::duration<Rep, Period>& rel_time,
                                  Predicate pred) {
-    return _condvar.wait_for(lock, rel_time, pred);
+    return _waitWithPredicate(lock, rel_time, pred);
 }
 
-template <class Clock, class Duration>
+template <class Lock, class Clock, class Duration>
 stdx::cv_status ConditionVariable::wait_until(
-    lock_t& lock, const stdx::chrono::time_point<Clock, Duration>& timeout_time) {
-    return _condvar.wait_until(lock, timeout_time);
+    Lock& lock, const stdx::chrono::time_point<Clock, Duration>& timeout_time) {
+    return _wait(lock, timeout_time - stdx::chrono::steady_clock::now());
 }
 
-template <class Clock, class Duration, class Predicate>
-bool ConditionVariable::wait_until(lock_t& lock,
+template <class Lock, class Clock, class Duration, class Predicate>
+bool ConditionVariable::wait_until(Lock& lock,
                                    const stdx::chrono::time_point<Clock, Duration>& timeout_time,
                                    Predicate pred) {
-    return _condvar.wait_until(lock, timeout_time, pred);
+    return _waitWithPredicate(lock, timeout_time - stdx::chrono::steady_clock::now(), pred);
 }
 
 }  // namespace mongo

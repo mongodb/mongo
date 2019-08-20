@@ -44,6 +44,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/client.h"
+#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/log.h"
@@ -77,11 +78,35 @@ MONGO_INITIALIZER(LockActions)(InitializerContext* context) {
             }
         }
     };
-    std::unique_ptr<LockActions> myPointer = std::make_unique<LockActionsSubclass>();
-    Mutex::setLockActions(std::move(myPointer));
+
+    std::unique_ptr<LockActions> mutexPointer = std::make_unique<LockActionsSubclass>();
+    Mutex::setLockActions(std::move(mutexPointer));
 
     return Status::OK();
 }
+
+MONGO_INITIALIZER(ConditionVariableActions)(InitializerContext* context) {
+
+    class ConditionVariableActionsSubclass : public ConditionVariableActions {
+        void onUnfulfilledConditionVariable(const StringData& name) override {
+            if (haveClient()) {
+                DiagnosticInfo::Diagnostic::set(
+                    Client::getCurrent(),
+                    std::make_shared<DiagnosticInfo>(takeDiagnosticInfo(name)));
+            }
+        }
+        void onFulfilledConditionVariable() override {
+            DiagnosticInfo::Diagnostic::clearDiagnostic();
+        }
+    };
+
+    std::unique_ptr<ConditionVariableActions> conditionVariablePointer =
+        std::make_unique<ConditionVariableActionsSubclass>();
+    ConditionVariable::setConditionVariableActions(std::move(conditionVariablePointer));
+
+    return Status::OK();
+}
+
 }  // namespace
 
 auto DiagnosticInfo::Diagnostic::get(Client* const client) -> std::shared_ptr<DiagnosticInfo> {
