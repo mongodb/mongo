@@ -231,8 +231,12 @@ JSFunction::JSFunction(const std::string& type, const BSONElement& e) {
     _type = type;
     _code = e._asCode();
 
-    if (e.type() == CodeWScope)
+    if (e.type() == CodeWScope) {
+        if (_sampler.tick())
+            warning() << "Use of CodeWScope with MapReduce is deprecated. Prefer putting all scope "
+                         "variables in the scope parameter of the MapReduce command";
         _wantedScope = e.codeWScopeObject();
+    }
 }
 
 void JSFunction::init(State* state) {

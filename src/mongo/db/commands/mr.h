@@ -39,6 +39,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/util/debug_util.h"
 
 namespace mongo {
 
@@ -129,6 +130,8 @@ private:
     std::string _type;
     std::string _code;     // actual javascript code
     BSONObj _wantedScope;  // this is for CodeWScope
+    // Used to log occassional deprecation warnings when CodeWScope is used in MapReduce.
+    Rarely _sampler;
 
     Scope* _scope;  // this is not owned by us, and might be shared
     ScriptingFunction _func;
