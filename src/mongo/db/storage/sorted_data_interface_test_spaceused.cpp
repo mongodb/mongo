@@ -47,14 +47,6 @@ TEST(SortedDataInterface, GetSpaceUsedBytesEmpty) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
-
-    // SERVER-15416 mmapv1 test harness does not use SimpleRecordStoreV1 as its record store
-    //              and HeapRecordStoreBtree::dataSize does not have an actual implementation
-    // {
-    //     const ServiceContext::UniqueOperationContext opCtx( harnessHelper->newOperationContext()
-    //     );
-    //     ASSERT( sorted->getSpaceUsedBytes( opCtx.get() ) == 0 );
-    // }
 }
 
 // Verify that a nonempty index takes up some space.
@@ -75,7 +67,8 @@ TEST(SortedDataInterface, GetSpaceUsedBytesNonEmpty) {
             WriteUnitOfWork uow(opCtx.get());
             BSONObj key = BSON("" << i);
             RecordId loc(42, i * 2);
-            ASSERT_OK(sorted->insert(opCtx.get(), key, loc, true));
+            ASSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), loc, true));
             uow.commit();
         }
     }
@@ -84,25 +77,6 @@ TEST(SortedDataInterface, GetSpaceUsedBytesNonEmpty) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
     }
-
-    // SERVER-15416 mmapv1 test harness does not use SimpleRecordStoreV1 as its record store
-    //              and HeapRecordStoreBtree::dataSize does not have an actual implementation
-    // long long spaceUsedBytes;
-    // {
-    //     const ServiceContext::UniqueOperationContext opCtx( harnessHelper->newOperationContext()
-    //     );
-    //     spaceUsedBytes = sorted->getSpaceUsedBytes( opCtx.get() );
-    //     ASSERT( spaceUsedBytes > 0 );
-    // }
-
-    // {
-    //     // getSpaceUsedBytes() returns the same value when called multiple times
-    //     // and there were not interleaved write operations.
-    //     const ServiceContext::UniqueOperationContext opCtx( harnessHelper->newOperationContext()
-    //     );
-    //     ASSERT_EQUALS( spaceUsedBytes, sorted->getSpaceUsedBytes( opCtx.get() ) );
-    //     ASSERT_EQUALS( spaceUsedBytes, sorted->getSpaceUsedBytes( opCtx.get() ) );
-    // }
 }
 
 }  // namespace

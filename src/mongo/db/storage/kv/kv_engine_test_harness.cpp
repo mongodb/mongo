@@ -180,7 +180,12 @@ TEST(KVEngineTestHarness, SimpleSorted1) {
     {
         MyOperationContext opCtx(engine);
         WriteUnitOfWork uow(&opCtx);
-        ASSERT_OK(sorted->insert(&opCtx, BSON("" << 5), RecordId(6, 4), true));
+        const RecordId recordId(6, 4);
+        const KeyString::Value keyString =
+            KeyString::HeapBuilder(
+                sorted->getKeyStringVersion(), BSON("" << 5), sorted->getOrdering(), recordId)
+                .release();
+        ASSERT_OK(sorted->insert(&opCtx, keyString, recordId, true));
         uow.commit();
     }
 

@@ -982,8 +982,13 @@ public:
         auto sortedDataInterface = accessMethod->getSortedDataInterface();
         {
             WriteUnitOfWork wunit(&_opCtx);
-            const BSONObj indexKey = BSON("" << 1 << ""
-                                             << "non_existent_path");
+            const KeyString::Value indexKey =
+                KeyString::HeapBuilder(sortedDataInterface->getKeyStringVersion(),
+                                       BSON("" << 1 << ""
+                                               << "non_existent_path"),
+                                       sortedDataInterface->getOrdering(),
+                                       recordId)
+                    .release();
             auto insertStatus =
                 sortedDataInterface->insert(&_opCtx, indexKey, recordId, true /* dupsAllowed */);
             ASSERT_OK(insertStatus);
@@ -999,8 +1004,13 @@ public:
         lockDb(MODE_X);
         {
             WriteUnitOfWork wunit(&_opCtx);
-            const BSONObj indexKey = BSON("" << 1 << ""
-                                             << "mk_1");
+            const KeyString::Value indexKey =
+                KeyString::HeapBuilder(sortedDataInterface->getKeyStringVersion(),
+                                       BSON("" << 1 << ""
+                                               << "mk_1"),
+                                       sortedDataInterface->getOrdering(),
+                                       recordId)
+                    .release();
             sortedDataInterface->unindex(&_opCtx, indexKey, recordId, true /* dupsAllowed */);
             wunit.commit();
         }
@@ -1092,9 +1102,14 @@ public:
         lockDb(MODE_X);
         {
             WriteUnitOfWork wunit(&_opCtx);
-            const BSONObj indexKey = BSON("" << 1 << ""
-                                             << "a");
             RecordId recordId(RecordId::ReservedId::kWildcardMultikeyMetadataId);
+            const KeyString::Value indexKey =
+                KeyString::HeapBuilder(sortedDataInterface->getKeyStringVersion(),
+                                       BSON("" << 1 << ""
+                                               << "a"),
+                                       sortedDataInterface->getOrdering(),
+                                       recordId)
+                    .release();
             sortedDataInterface->unindex(&_opCtx, indexKey, recordId, true /* dupsAllowed */);
             wunit.commit();
         }

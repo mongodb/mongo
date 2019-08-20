@@ -92,19 +92,9 @@ public:
                     bool readOnly);
 
     virtual Status insert(OperationContext* opCtx,
-                          const BSONObj& key,
-                          const RecordId& id,
-                          bool dupsAllowed);
-
-    virtual Status insert(OperationContext* opCtx,
                           const KeyString::Value& keyString,
                           const RecordId& id,
                           bool dupsAllowed);
-
-    virtual void unindex(OperationContext* opCtx,
-                         const BSONObj& key,
-                         const RecordId& id,
-                         bool dupsAllowed);
 
     virtual void unindex(OperationContext* opCtx,
                          const KeyString::Value& keyString,

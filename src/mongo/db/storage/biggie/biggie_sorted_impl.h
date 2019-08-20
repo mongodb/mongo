@@ -82,17 +82,9 @@ public:
     virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* opCtx,
                                                        bool dupsAllowed) override;
     virtual Status insert(OperationContext* opCtx,
-                          const BSONObj& key,
-                          const RecordId& loc,
-                          bool dupsAllowed) override;
-    virtual Status insert(OperationContext* opCtx,
                           const KeyString::Value& keyString,
                           const RecordId& loc,
                           bool dupsAllowed) override;
-    virtual void unindex(OperationContext* opCtx,
-                         const BSONObj& key,
-                         const RecordId& loc,
-                         bool dupsAllowed) override;
     virtual void unindex(OperationContext* opCtx,
                          const KeyString::Value& keyString,
                          const RecordId& loc,

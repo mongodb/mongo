@@ -245,21 +245,6 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
       _isIdIndex(desc->isIdIndex()) {}
 
 Status WiredTigerIndex::insert(OperationContext* opCtx,
-                               const BSONObj& key,
-                               const RecordId& id,
-                               bool dupsAllowed) {
-    dassert(opCtx->lockState()->isWriteLocked());
-    invariant(id.isValid());
-    dassert(!key.hasFieldNames());
-
-    TRACE_INDEX << " key: " << key << " id: " << id;
-
-    KeyString::HeapBuilder keyString(getKeyStringVersion(), key, _ordering, id);
-
-    return insert(opCtx, std::move(keyString.release()), id, dupsAllowed);
-}
-
-Status WiredTigerIndex::insert(OperationContext* opCtx,
                                const KeyString::Value& keyString,
                                const RecordId& id,
                                bool dupsAllowed) {
@@ -276,20 +261,10 @@ Status WiredTigerIndex::insert(OperationContext* opCtx,
 }
 
 void WiredTigerIndex::unindex(OperationContext* opCtx,
-                              const BSONObj& key,
-                              const RecordId& id,
-                              bool dupsAllowed) {
-    invariant(id.isValid());
-    dassert(!key.hasFieldNames());
-    KeyString::HeapBuilder keyString(getKeyStringVersion(), key, _ordering, id);
-
-    unindex(opCtx, std::move(keyString.release()), id, dupsAllowed);
-}
-
-void WiredTigerIndex::unindex(OperationContext* opCtx,
                               const KeyString::Value& keyString,
                               const RecordId& id,
                               bool dupsAllowed) {
+    invariant(id.isValid());
     dassert(opCtx->lockState()->isWriteLocked());
     dassert(id == KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
 

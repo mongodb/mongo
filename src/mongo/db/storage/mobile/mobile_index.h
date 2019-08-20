@@ -53,19 +53,9 @@ public:
     virtual ~MobileIndex() {}
 
     Status insert(OperationContext* opCtx,
-                  const BSONObj& key,
-                  const RecordId& recId,
-                  bool dupsAllowed) override;
-
-    Status insert(OperationContext* opCtx,
                   const KeyString::Value& keyString,
                   const RecordId& recId,
                   bool dupsAllowed) override;
-
-    void unindex(OperationContext* opCtx,
-                 const BSONObj& key,
-                 const RecordId& recId,
-                 bool dupsAllowed) override;
 
     void unindex(OperationContext* opCtx,
                  const KeyString::Value& keyString,

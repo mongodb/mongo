@@ -60,18 +60,6 @@ MobileIndex::MobileIndex(OperationContext* opCtx,
       _keyPattern(desc->keyPattern()) {}
 
 Status MobileIndex::insert(OperationContext* opCtx,
-                           const BSONObj& key,
-                           const RecordId& recId,
-                           bool dupsAllowed) {
-    invariant(recId.isValid());
-    invariant(!key.hasFieldNames());
-
-    KeyString::HeapBuilder keyString(_keyStringVersion, key, _ordering, recId);
-
-    return insert(opCtx, std::move(keyString.release()), recId, dupsAllowed);
-}
-
-Status MobileIndex::insert(OperationContext* opCtx,
                            const KeyString::Value& keyString,
                            const RecordId& recId,
                            bool dupsAllowed) {
@@ -118,21 +106,10 @@ Status MobileIndex::doInsert(OperationContext* opCtx,
 }
 
 void MobileIndex::unindex(OperationContext* opCtx,
-                          const BSONObj& key,
-                          const RecordId& recId,
-                          bool dupsAllowed) {
-    invariant(recId.isValid());
-    invariant(!key.hasFieldNames());
-
-    KeyString::HeapBuilder keyString(_keyStringVersion, key, _ordering, recId);
-
-    unindex(opCtx, std::move(keyString.release()), recId, dupsAllowed);
-}
-
-void MobileIndex::unindex(OperationContext* opCtx,
                           const KeyString::Value& keyString,
                           const RecordId& recId,
                           bool dupsAllowed) {
+    invariant(recId.isValid());
     _unindex(opCtx, keyString, recId, dupsAllowed);
 }
 

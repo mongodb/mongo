@@ -59,7 +59,8 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursor) {
             WriteUnitOfWork uow(opCtx.get());
             BSONObj key = BSON("" << i);
             RecordId loc(42, i * 2);
-            ASSERT_OK(sorted->insert(opCtx.get(), key, loc, true));
+            ASSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), loc, true));
             uow.commit();
         }
     }
@@ -105,7 +106,8 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorReversed) {
             WriteUnitOfWork uow(opCtx.get());
             BSONObj key = BSON("" << i);
             RecordId loc(42, i * 2);
-            ASSERT_OK(sorted->insert(opCtx.get(), key, loc, true));
+            ASSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), loc, true));
             uow.commit();
         }
     }
@@ -244,7 +246,10 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeys) {
         {
             WriteUnitOfWork uow(opCtx.get());
             RecordId loc(42, i * 2);
-            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc, true /* allow duplicates */));
+            ASSERT_OK(sorted->insert(opCtx.get(),
+                                     makeKeyString(sorted.get(), key1, loc),
+                                     loc,
+                                     true /* allow duplicates */));
             uow.commit();
         }
     }
@@ -290,7 +295,10 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeysRev
         {
             WriteUnitOfWork uow(opCtx.get());
             RecordId loc(42, i * 2);
-            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc, true /* allow duplicates */));
+            ASSERT_OK(sorted->insert(opCtx.get(),
+                                     makeKeyString(sorted.get(), key1, loc),
+                                     loc,
+                                     true /* allow duplicates */));
             uow.commit();
         }
     }
@@ -333,7 +341,8 @@ TEST(SortedDataInterface, SavePositionWithoutRestore) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, false));
+            ASSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), loc1, false));
             uow.commit();
         }
     }
@@ -366,7 +375,8 @@ TEST(SortedDataInterface, SavePositionWithoutRestoreReversed) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, true));
+            ASSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), loc1, true));
             uow.commit();
         }
     }

@@ -78,23 +78,6 @@ public:
                                                        bool dupsAllowed) = 0;
 
     /**
-     * Insert an entry into the index with the specified key and RecordId.
-     *
-     * @param opCtx the transaction under which the insert takes place
-     * @param dupsAllowed true if duplicate keys are allowed, and false
-     *        otherwise
-     *
-     * @return Status::OK() if the insert succeeded,
-     *
-     *         ErrorCodes::DuplicateKey if 'key' already exists in 'this' index
-     *         at a RecordId other than 'loc' and duplicates were not allowed
-     */
-    virtual Status insert(OperationContext* opCtx,
-                          const BSONObj& key,
-                          const RecordId& loc,
-                          bool dupsAllowed) = 0;
-
-    /**
      * Insert an entry into the index with the specified KeyString and RecordId.
      *
      * @param opCtx the transaction under which the insert takes place
@@ -110,18 +93,6 @@ public:
                           const KeyString::Value& keyString,
                           const RecordId& loc,
                           bool dupsAllowed) = 0;
-
-    /**
-     * Remove the entry from the index with the specified key and RecordId.
-     *
-     * @param opCtx the transaction under which the remove takes place
-     * @param dupsAllowed true if duplicate keys are allowed, and false
-     *        otherwise
-     */
-    virtual void unindex(OperationContext* opCtx,
-                         const BSONObj& key,
-                         const RecordId& loc,
-                         bool dupsAllowed) = 0;
 
     /**
      * Remove the entry from the index with the specified KeyString and RecordId.
