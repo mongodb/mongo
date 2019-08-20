@@ -308,40 +308,19 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
         log() << "** WARNING: getrlimit failed. " << errmsg << startupWarningsLog;
     }
 
-// Solaris does not have RLIMIT_NPROC & RLIMIT_MEMLOCK, these are exposed via getrctl(2) instead
+// Solaris does not have RLIMIT_MEMLOCK, these are exposed via getrctl(2) instead
 #ifndef __sun
-    // Check # of processes >= # of files/2
     // Check we can lock at least 16 pages for the SecureAllocator
-    const double filesToProcsRatio = 2.0;
     const unsigned int minLockedPages = 16;
 
     struct rlimit rlmemlock;
-    struct rlimit rlnproc;
 
-    if (!getrlimit(RLIMIT_NPROC, &rlnproc) && !getrlimit(RLIMIT_MEMLOCK, &rlmemlock)) {
+    if (!getrlimit(RLIMIT_MEMLOCK, &rlmemlock)) {
         if ((rlmemlock.rlim_cur / ProcessInfo::getPageSize()) < minLockedPages) {
             log() << startupWarningsLog;
             log() << "** WARNING: soft rlimits too low. The locked memory size is "
                   << rlmemlock.rlim_cur << " bytes, it should be at least "
                   << minLockedPages * ProcessInfo::getPageSize() << " bytes" << startupWarningsLog;
-        }
-
-        if (false) {
-            // juse to make things cleaner
-        }
-#ifdef __APPLE__
-        else if (rlnproc.rlim_cur >= 709) {
-            // os x doesn't make it easy to go higher
-            // ERH thinks its ok not to add the warning in this case 7/3/2012
-        }
-#endif
-        else if (rlnproc.rlim_cur < rlnofile.rlim_cur / filesToProcsRatio) {
-            log() << startupWarningsLog;
-            log() << "** WARNING: soft rlimits too low. rlimits set to " << rlnproc.rlim_cur
-                  << " processes, " << rlnofile.rlim_cur
-                  << " files. Number of processes should be at least "
-                  << rlnofile.rlim_cur / filesToProcsRatio << " : " << 1 / filesToProcsRatio
-                  << " times number of files." << startupWarningsLog;
         }
     } else {
         const auto errmsg = errnoWithDescription();
