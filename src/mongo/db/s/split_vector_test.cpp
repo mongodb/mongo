@@ -347,5 +347,73 @@ TEST_F(SplitVectorJumboTest, JumboChunk) {
     ASSERT_EQUALS(splitKeys.size(), 0UL);
 }
 
+const NamespaceString kMaxResponseNss = NamespaceString("foo", "bar3");
+
+// This is not the actual max bytes size -- we are rounding down from 512000.
+int maxShardingUnitTestOplogDocSize = 510000;
+
+// We need a number of documents two over the threshold so that we will hit the max size threshold
+// before we reach the end of the document scan.
+int numDocs = (BSONObjMaxUserSize / maxShardingUnitTestOplogDocSize) + 2;
+
+/**
+ * Assert that once the cumulative size of the splitVector BSON objects reaches the max BSON size
+ * limit (adding another split point would tip over the limit), the splitVector function returns.
+ */
+class SplitVectorMaxResponseSizeTest : public ShardServerTestFixture {
+public:
+    void setUp() {
+        ShardServerTestFixture::setUp();
+
+        DBDirectClient dbclient(operationContext());
+        ASSERT_TRUE(dbclient.createCollection(kMaxResponseNss.ns()));
+        dbclient.createIndex(kMaxResponseNss.ns(), BSON("a" << 1));
+
+        for (int i = 0; i < numDocs; ++i) {
+            BSONObjBuilder builder;
+            // splitVector won't create more than one split key for each unique document, so we must
+            // ensure that our documents are unique.
+            builder.append("a", createUniqueHalfMegabyteString(i));
+            BSONObj obj = builder.obj();
+            dbclient.insert(kMaxResponseNss.toString(), obj);
+        }
+        ASSERT_EQUALS(numDocs, (int)dbclient.count(kMaxResponseNss.toString()));
+    }
+
+    std::string createUniqueHalfMegabyteString(int uniqueInt) {
+        StringBuilder sb;
+        for (int i = 0; i < maxShardingUnitTestOplogDocSize; ++i) {
+            sb << "a";
+        }
+        sb << uniqueInt;
+        return sb.str();
+    }
+};
+
+TEST_F(SplitVectorMaxResponseSizeTest, MaxResponseSize) {
+    std::vector<BSONObj> splitKeys = unittest::assertGet(splitVector(operationContext(),
+                                                                     kMaxResponseNss,
+                                                                     BSON("a" << 1),
+                                                                     {},
+                                                                     {},
+                                                                     false,
+                                                                     boost::none,
+                                                                     boost::none,
+                                                                     boost::none,
+                                                                     1LL));
+
+    ASSERT_EQUALS((int)splitKeys.size(), numDocs - 2);
+
+    int runningDocSize = 0;
+    for (const auto& key : splitKeys) {
+        ASSERT_LT(key.objsize(), BSONObjMaxUserSize);
+        ASSERT_LT(runningDocSize, BSONObjMaxUserSize);
+        runningDocSize += key.objsize();
+    }
+
+    auto overflowDoc = BSON("a" << createUniqueHalfMegabyteString(100));
+    ASSERT_GT(runningDocSize + overflowDoc.objsize(), BSONObjMaxUserSize);
+}
+
 }  // namespace
 }  // namespace mongo

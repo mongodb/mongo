@@ -50,6 +50,7 @@ namespace mongo {
 namespace {
 
 const int kMaxObjectPerChunk{250000};
+const int estimatedAdditionalBytesPerItemInBSONArray{2};
 
 BSONObj prettyKey(const BSONObj& keyPattern, const BSONObj& key) {
     return key.replaceFieldNames(keyPattern).clientReadable();
@@ -68,6 +69,7 @@ StatusWith<std::vector<BSONObj>> splitVector(OperationContext* opCtx,
                                              boost::optional<long long> maxChunkSize,
                                              boost::optional<long long> maxChunkSizeBytes) {
     std::vector<BSONObj> splitKeys;
+    std::size_t splitVectorResponseSize = 0;
 
     // Always have a default value for maxChunkObjects
     if (!maxChunkObjects) {
@@ -221,11 +223,29 @@ StatusWith<std::vector<BSONObj>> splitVector(OperationContext* opCtx,
                 if (currCount > keyCount && !force) {
                     currKey = dotted_path_support::extractElementsBasedOnTemplate(
                         prettyKey(idx->keyPattern(), currKey.getOwned()), keyPattern);
+
                     // Do not use this split key if it is the same used in the previous split
                     // point.
                     if (currKey.woCompare(splitKeys.back()) == 0) {
                         tooFrequentKeys.insert(currKey.getOwned());
                     } else {
+                        auto additionalKeySize =
+                            currKey.objsize() + estimatedAdditionalBytesPerItemInBSONArray;
+                        if (splitVectorResponseSize + additionalKeySize > BSONObjMaxUserSize) {
+                            if (splitKeys.empty()) {
+                                // Keep trying until we get at least one split point that isn't
+                                // above the max object user size.
+                                state = exec->getNext(&currKey, nullptr);
+                                continue;
+                            }
+
+                            log() << "Max BSON response size reached for split vector before the"
+                                  << " end of chunk " << nss.toString() << " " << redact(minKey)
+                                  << " -->> " << redact(maxKey);
+                            break;
+                        }
+
+                        splitVectorResponseSize += additionalKeySize;
                         splitKeys.push_back(currKey.getOwned());
                         currCount = 0;
                         numChunks++;
@@ -294,9 +314,6 @@ StatusWith<std::vector<BSONObj>> splitVector(OperationContext* opCtx,
                       << " numSplits: " << splitKeys.size() << " lookedAt: " << currCount
                       << " took " << timer.millis() << "ms";
         }
-
-        // Warning: we are sending back an array of keys but are currently limited to 4MB work of
-        // 'result' size. This should be okay for now.
     }
 
     // Make sure splitKeys is in ascending order
