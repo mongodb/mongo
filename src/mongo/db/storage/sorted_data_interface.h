@@ -107,15 +107,6 @@ public:
                          bool dupsAllowed) = 0;
 
     /**
-     * Return ErrorCodes::DuplicateKey if there is more than one occurence of 'key' in this index,
-     * and Status::OK() otherwise. This call is only allowed on a unique index, and will invariant
-     * otherwise.
-     *
-     * @param opCtx the transaction under which this operation takes place
-     */
-    virtual Status dupKeyCheck(OperationContext* opCtx, const BSONObj& key) = 0;
-
-    /**
      * Return ErrorCodes::DuplicateKey if there is more than one occurence of 'KeyString' in this
      * index, and Status::OK() otherwise. This call is only allowed on a unique index, and will
      * invariant otherwise.

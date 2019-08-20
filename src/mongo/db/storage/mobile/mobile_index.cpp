@@ -208,14 +208,6 @@ Status MobileIndex::create(OperationContext* opCtx, const std::string& ident) {
     return Status::OK();
 }
 
-Status MobileIndex::dupKeyCheck(OperationContext* opCtx, const BSONObj& key) {
-    invariant(!key.hasFieldNames());
-    invariant(_isUnique);
-
-    KeyString::Builder keyString(_keyStringVersion, key, _ordering);
-    return dupKeyCheck(opCtx, keyString.getValueCopy());
-}
-
 Status MobileIndex::dupKeyCheck(OperationContext* opCtx, const KeyString::Value& key) {
     invariant(_isUnique);
 

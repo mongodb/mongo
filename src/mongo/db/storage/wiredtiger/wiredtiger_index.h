@@ -107,8 +107,6 @@ public:
     virtual bool appendCustomStats(OperationContext* opCtx,
                                    BSONObjBuilder* output,
                                    double scale) const;
-    virtual Status dupKeyCheck(OperationContext* opCtx, const BSONObj& key);
-
     virtual Status dupKeyCheck(OperationContext* opCtx, const KeyString::Value& keyString);
 
     virtual bool isEmpty(OperationContext* opCtx);

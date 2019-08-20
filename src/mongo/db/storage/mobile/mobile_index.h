@@ -78,8 +78,6 @@ public:
 
     Status initAsEmpty(OperationContext* opCtx) override;
 
-    Status dupKeyCheck(OperationContext* opCtx, const BSONObj& key) override;
-
     Status dupKeyCheck(OperationContext* opCtx, const KeyString::Value& key) override;
 
     // Beginning of MobileIndex-specific methods

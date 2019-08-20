@@ -235,7 +235,7 @@ public:
         return _currentKeySize + (sizeof(IndexKeyEntry) * _data->size());
     }
 
-    virtual Status dupKeyCheck(OperationContext* opCtx, const BSONObj& key) {
+    Status _dupKeyCheck(OperationContext* opCtx, const BSONObj& key) {
         invariant(!key.hasFieldNames());
         if (isDup(*_data, key))
             return buildDupKeyErrorStatus(key, _collectionNamespace, _indexName, _keyPattern);
@@ -245,7 +245,7 @@ public:
     virtual Status dupKeyCheck(OperationContext* opCtx, const KeyString::Value& keyString) {
         const BSONObj key = KeyString::toBson(
             keyString.getBuffer(), keyString.getSize(), _ordering, keyString.getTypeBits());
-        return dupKeyCheck(opCtx, key);
+        return _dupKeyCheck(opCtx, key);
     }
 
     virtual bool isEmpty(OperationContext* opCtx) {

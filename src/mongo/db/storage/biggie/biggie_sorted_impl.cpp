@@ -469,12 +469,6 @@ Status SortedDataInterface::truncate(OperationContext* opCtx) {
     return Status::OK();
 }
 
-Status SortedDataInterface::dupKeyCheck(OperationContext* opCtx, const BSONObj& key) {
-    KeyString::Builder ks(KeyString::Version::V1, key, _ordering);
-
-    return dupKeyCheck(opCtx, ks.getValueCopy());
-}
-
 Status SortedDataInterface::dupKeyCheck(OperationContext* opCtx, const KeyString::Value& key) {
     invariant(_isUnique);
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());

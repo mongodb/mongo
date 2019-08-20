@@ -356,14 +356,6 @@ bool WiredTigerIndex::appendCustomStats(OperationContext* opCtx,
     return true;
 }
 
-Status WiredTigerIndex::dupKeyCheck(OperationContext* opCtx, const BSONObj& key) {
-    invariant(!key.hasFieldNames());
-    invariant(unique());
-
-    KeyString::Builder keyString(getKeyStringVersion(), key, _ordering);
-    return dupKeyCheck(opCtx, keyString.getValueCopy());
-}
-
 Status WiredTigerIndex::dupKeyCheck(OperationContext* opCtx, const KeyString::Value& key) {
     invariant(unique());
 

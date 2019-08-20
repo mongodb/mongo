@@ -201,10 +201,6 @@ public:
                          const RecordId& loc,
                          bool dupsAllowed) {}
 
-    virtual Status dupKeyCheck(OperationContext* opCtx, const BSONObj& key) {
-        return Status::OK();
-    }
-
     virtual Status dupKeyCheck(OperationContext* opCtx, const KeyString::Value& keyString) {
         return Status::OK();
     }
