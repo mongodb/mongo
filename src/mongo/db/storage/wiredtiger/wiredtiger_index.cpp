@@ -622,10 +622,10 @@ public:
         WiredTigerItem item(keyString.getBuffer(), keyString.getSize());
         setKey(_cursor, item.Get());
 
-        const KeyString::TypeBits typeBits = keyString.getTypeBits();
-        WiredTigerItem valueItem = typeBits.isAllZeros()
+        WiredTigerItem valueItem = keyString.getTypeBits().isAllZeros()
             ? emptyItem
-            : WiredTigerItem(typeBits.getBuffer(), typeBits.getSize());
+            : WiredTigerItem(keyString.getTypeBits().getBuffer(),
+                             keyString.getTypeBits().getSize());
 
         _cursor->set_value(_cursor, valueItem.Get());
 
@@ -712,10 +712,10 @@ private:
         WiredTigerItem keyItem(newKeyString.getBuffer(), newKeyString.getSize());
         setKey(_cursor, keyItem.Get());
 
-        const KeyString::TypeBits typeBits = newKeyString.getTypeBits();
-        WiredTigerItem valueItem = typeBits.isAllZeros()
+        WiredTigerItem valueItem = newKeyString.getTypeBits().isAllZeros()
             ? emptyItem
-            : WiredTigerItem(typeBits.getBuffer(), typeBits.getSize());
+            : WiredTigerItem(newKeyString.getTypeBits().getBuffer(),
+                             newKeyString.getTypeBits().getSize());
 
         _cursor->set_value(_cursor, valueItem.Get());
 
@@ -1448,9 +1448,8 @@ Status WiredTigerIndexUnique::_insertTimestampUnsafe(OperationContext* opCtx,
     WiredTigerItem keyItem(keyString.getBuffer(), sizeWithoutRecordId);
 
     KeyString::Builder value(getKeyStringVersion(), id);
-    const KeyString::TypeBits typeBits = keyString.getTypeBits();
-    if (!typeBits.isAllZeros())
-        value.appendTypeBits(typeBits);
+    if (!keyString.getTypeBits().isAllZeros())
+        value.appendTypeBits(keyString.getTypeBits());
 
     WiredTigerItem valueItem(value.getBuffer(), value.getSize());
     setKey(c, keyItem.Get());
@@ -1486,7 +1485,7 @@ Status WiredTigerIndexUnique::_insertTimestampUnsafe(OperationContext* opCtx,
 
         if (!insertedId && id < idInIndex) {
             value.appendRecordId(id);
-            value.appendTypeBits(typeBits);
+            value.appendTypeBits(keyString.getTypeBits());
             insertedId = true;
         }
 
@@ -1503,7 +1502,7 @@ Status WiredTigerIndexUnique::_insertTimestampUnsafe(OperationContext* opCtx,
     if (!insertedId) {
         // This id is higher than all currently in the index for this key
         value.appendRecordId(id);
-        value.appendTypeBits(typeBits);
+        value.appendTypeBits(keyString.getTypeBits());
     }
 
     valueItem = WiredTigerItem(value.getBuffer(), value.getSize());
@@ -1564,10 +1563,9 @@ Status WiredTigerIndexUnique::_insertTimestampSafe(OperationContext* opCtx,
     // Now create the table key/value, the actual data record.
     WiredTigerItem keyItem(keyString.getBuffer(), keyString.getSize());
 
-    const KeyString::TypeBits typeBits = keyString.getTypeBits();
-    WiredTigerItem valueItem = typeBits.isAllZeros()
+    WiredTigerItem valueItem = keyString.getTypeBits().isAllZeros()
         ? emptyItem
-        : WiredTigerItem(typeBits.getBuffer(), typeBits.getSize());
+        : WiredTigerItem(keyString.getTypeBits().getBuffer(), keyString.getTypeBits().getSize());
     setKey(c, keyItem.Get());
     c->set_value(c, valueItem.Get());
     ret = WT_OP_CHECK(c->insert(c));
@@ -1766,10 +1764,9 @@ Status WiredTigerIndexStandard::_insert(OperationContext* opCtx,
 
     WiredTigerItem keyItem(keyString.getBuffer(), keyString.getSize());
 
-    const KeyString::TypeBits typeBits = keyString.getTypeBits();
-    WiredTigerItem valueItem = typeBits.isAllZeros()
+    WiredTigerItem valueItem = keyString.getTypeBits().isAllZeros()
         ? emptyItem
-        : WiredTigerItem(typeBits.getBuffer(), typeBits.getSize());
+        : WiredTigerItem(keyString.getTypeBits().getBuffer(), keyString.getTypeBits().getSize());
 
     setKey(c, keyItem.Get());
     c->set_value(c, valueItem.Get());

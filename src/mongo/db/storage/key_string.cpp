@@ -2194,6 +2194,19 @@ TypeBits& TypeBits::operator=(const TypeBits& tb) {
     return *this;
 }
 
+Value& Value::operator=(const Value& other) {
+    if (&other == this) {
+        return *this;
+    }
+
+    _version = other._version;
+    _typeBits = other._typeBits;
+    _size = other._size;
+    _buffer = other._buffer;
+
+    return *this;
+}
+
 uint32_t TypeBits::readSizeFromBuffer(BufReader* reader) {
     const uint8_t firstByte = reader->peek<uint8_t>();
 
