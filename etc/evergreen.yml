@@ -1526,6 +1526,7 @@ functions:
         file: src/expansions.yml
     - *configure_evergreen_api_credentials
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         shell: bash
@@ -1566,6 +1567,7 @@ functions:
         file: src/expansions.yml
 
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -4896,6 +4898,7 @@ tasks:
   - func: "set up virtualenv"
   - func: "configure evergreen api credentials"
   - command: shell.exec
+    type: test
     params:
       working_dir: src
       shell: bash
