@@ -215,8 +215,11 @@ const failureModes = {
         beforeStatements: noop,
         beforeCommit: () => {
             // Participant primary steps down.
+            let primary = st.rs0.getPrimary();
             assert.commandWorked(
-                st.shard0.adminCommand({replSetStepDown: 1 /* stepDownSecs */, force: true}));
+                primary.adminCommand({replSetStepDown: 60 /* stepDownSecs */, force: true}));
+            st.rs0.waitForState(primary, ReplSetTest.State.SECONDARY);
+            assert.commandWorked(primary.adminCommand({replSetFreeze: 0}));
         },
         getCommitCommand: (lsid, txnNumber) => {
             return addTxnFields(defaultCommitCommand, lsid, txnNumber);
