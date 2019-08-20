@@ -153,6 +153,79 @@ void BM_KeyStringToBSON(benchmark::State& state,
     state.SetItemsProcessed(state.iterations() * kSampleSize);
 }
 
+void BM_KeyStringValueAssign(benchmark::State& state, BsonValueType bsonType) {
+    // The KeyString version does not matter for this test.
+    const auto version = KeyString::Version::V1;
+    const BsonsAndKeyStrings bsonsAndKeyStrings = generateBsonsAndKeyStrings(bsonType, version);
+
+    // Pre-construct the values.
+    std::vector<KeyString::Value> values;
+    for (size_t i = 0; i < kSampleSize; i++) {
+        KeyString::HeapBuilder builder(version, bsonsAndKeyStrings.bsons[i], ALL_ASCENDING);
+        values.emplace_back(builder.release());
+    }
+
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        KeyString::Value oldValue = values[0];
+        for (size_t i = 1; i < kSampleSize; i++) {
+            oldValue = values[i];
+        }
+    }
+    state.SetBytesProcessed(state.iterations() * bsonsAndKeyStrings.keystringSize);
+    state.SetItemsProcessed(state.iterations() * kSampleSize);
+}
+
+void BM_KeyStringHeapBuilderRelease(benchmark::State& state, BsonValueType bsonType) {
+    // The KeyString version does not matter for this test.
+    const auto version = KeyString::Version::V1;
+    const BsonsAndKeyStrings bsonsAndKeyStrings = generateBsonsAndKeyStrings(bsonType, version);
+
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        for (size_t i = 0; i < kSampleSize; i++) {
+            KeyString::HeapBuilder builder(version, bsonsAndKeyStrings.bsons[i], ALL_ASCENDING);
+            benchmark::DoNotOptimize(builder.release());
+        }
+    }
+    state.SetBytesProcessed(state.iterations() * bsonsAndKeyStrings.bsonSize);
+    state.SetItemsProcessed(state.iterations() * kSampleSize);
+}
+
+void BM_KeyStringStackBuilderCopy(benchmark::State& state, BsonValueType bsonType) {
+    // The KeyString version does not matter for this test.
+    const auto version = KeyString::Version::V1;
+    const BsonsAndKeyStrings bsonsAndKeyStrings = generateBsonsAndKeyStrings(bsonType, version);
+
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        for (size_t i = 0; i < kSampleSize; i++) {
+            KeyString::Builder builder(version, bsonsAndKeyStrings.bsons[i], ALL_ASCENDING);
+            benchmark::DoNotOptimize(builder.getValueCopy());
+        }
+    }
+    state.SetBytesProcessed(state.iterations() * bsonsAndKeyStrings.bsonSize);
+    state.SetItemsProcessed(state.iterations() * kSampleSize);
+}
+
+BENCHMARK_CAPTURE(BM_KeyStringValueAssign, Int, INT);
+BENCHMARK_CAPTURE(BM_KeyStringValueAssign, Double, DOUBLE);
+BENCHMARK_CAPTURE(BM_KeyStringValueAssign, Decimal, DECIMAL);
+BENCHMARK_CAPTURE(BM_KeyStringValueAssign, String, STRING);
+BENCHMARK_CAPTURE(BM_KeyStringValueAssign, Array, ARRAY);
+
+BENCHMARK_CAPTURE(BM_KeyStringHeapBuilderRelease, Int, INT);
+BENCHMARK_CAPTURE(BM_KeyStringHeapBuilderRelease, Double, DOUBLE);
+BENCHMARK_CAPTURE(BM_KeyStringHeapBuilderRelease, Decimal, DECIMAL);
+BENCHMARK_CAPTURE(BM_KeyStringHeapBuilderRelease, String, STRING);
+BENCHMARK_CAPTURE(BM_KeyStringHeapBuilderRelease, Array, ARRAY);
+
+BENCHMARK_CAPTURE(BM_KeyStringStackBuilderCopy, Int, INT);
+BENCHMARK_CAPTURE(BM_KeyStringStackBuilderCopy, Double, DOUBLE);
+BENCHMARK_CAPTURE(BM_KeyStringStackBuilderCopy, Decimal, DECIMAL);
+BENCHMARK_CAPTURE(BM_KeyStringStackBuilderCopy, String, STRING);
+BENCHMARK_CAPTURE(BM_KeyStringStackBuilderCopy, Array, ARRAY);
+
 BENCHMARK_CAPTURE(BM_BSONToKeyString, V0_Int, KeyString::Version::V0, INT);
 BENCHMARK_CAPTURE(BM_BSONToKeyString, V1_Int, KeyString::Version::V1, INT);
 BENCHMARK_CAPTURE(BM_BSONToKeyString, V0_Double, KeyString::Version::V0, DOUBLE);
@@ -172,5 +245,6 @@ BENCHMARK_CAPTURE(BM_KeyStringToBSON, V0_String, KeyString::Version::V0, STRING)
 BENCHMARK_CAPTURE(BM_KeyStringToBSON, V1_String, KeyString::Version::V1, STRING);
 BENCHMARK_CAPTURE(BM_KeyStringToBSON, V0_Array, KeyString::Version::V0, ARRAY);
 BENCHMARK_CAPTURE(BM_KeyStringToBSON, V1_Array, KeyString::Version::V1, ARRAY);
+
 }  // namespace
 }  // namespace mongo
