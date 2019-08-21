@@ -31,6 +31,8 @@
 
 namespace mongo {
 
+std::unique_ptr<ConditionVariableActions> ConditionVariable::_conditionVariableActions;
+
 void ConditionVariable::notify_one() noexcept {
     _condvar.notify_one();
 }

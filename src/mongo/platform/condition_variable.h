@@ -87,7 +87,7 @@ private:
     const Seconds _conditionVariableTimeout = Seconds(604800);
     stdx::condition_variable_any _condvar;
 
-    inline static std::unique_ptr<ConditionVariableActions> _conditionVariableActions;
+    static std::unique_ptr<ConditionVariableActions> _conditionVariableActions;
 
     template <class Lock, class Duration>
     auto _wait(Lock& lock, const Duration& rel_time) {
