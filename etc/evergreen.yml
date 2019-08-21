@@ -6771,6 +6771,16 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *task_template
+  name: concurrency_replication_wiredtiger_eviction_debug
+  tags: ["concurrency", "repl", "debug_only"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=concurrency_replication_wiredtiger_eviction_debug --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
+
+- <<: *task_template
   name: concurrency_sharded_replication
   tags: ["concurrency", "common", "read_concern_maj"]
   commands:
@@ -6928,6 +6938,16 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=concurrency_simultaneous_replication_wiredtiger_cursor_sweeps --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
+
+- <<: *task_template
+  name: concurrency_simultaneous_replication_wiredtiger_eviction_debug
+  tags: ["concurrency", "repl", "debug_only"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=concurrency_simultaneous_replication_wiredtiger_eviction_debug --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -9689,7 +9709,7 @@ buildvariants:
   - name: .causally_consistent !.sharding
   - name: .change_streams !.secondary_reads
   - name: .misc_js
-  - name: .concurrency !.ubsan !.no_txns
+  - name: .concurrency !.ubsan !.no_txns !.debug_only
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: initial_sync_fuzzer_gen
@@ -10297,8 +10317,8 @@ buildvariants:
   - name: .causally_consistent !.sharding
   - name: .change_streams
   - name: .misc_js
-  - name: .concurrency !.large !.ubsan !.no_txns
-  - name: .concurrency .large !.ubsan !.no_txns
+  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
+  - name: .concurrency .large !.ubsan !.no_txns !.debug_only
     distros:
     - rhel62-large
   - name: disk_wiredtiger
@@ -10538,8 +10558,8 @@ buildvariants:
   - name: .causally_consistent !.wo_snapshot
   - name: .change_streams
   - name: .misc_js
-  - name: .concurrency !.ubsan !.no_txns !.large
-  - name: .concurrency !.ubsan !.no_txns .large
+  - name: .concurrency !.ubsan !.no_txns !.debug_only !.large
+  - name: .concurrency !.ubsan !.no_txns !.debug_only .large
     distros:
     - rhel62-large
   - name: disk_wiredtiger
@@ -10606,7 +10626,7 @@ buildvariants:
   - name: compile_TG
     distros:
     - rhel62-large
-  - name: .concurrency !.large !.ubsan !.no_txns
+  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
   - name: .jscore .common
   - name: .jstestfuzz
   - name: noPassthrough_gen
@@ -11790,7 +11810,7 @@ buildvariants:
   - name: .causally_consistent !.wo_snapshot
   - name: .change_streams !.secondary_reads
   - name: .misc_js
-  - name: .concurrency !.ubsan !.no_txns
+  - name: .concurrency !.ubsan !.no_txns !.debug_only
     distros:
     - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
   - name: initial_sync_fuzzer_gen

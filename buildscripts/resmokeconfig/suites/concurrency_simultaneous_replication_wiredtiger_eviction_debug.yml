@@ -1,0 +1,77 @@
+test_kind: parallel_fsm_workload_test
+
+selector:
+  roots:
+  - jstests/concurrency/fsm_workloads/**/*.js
+  exclude_files:
+  # These workloads implicitly assume that their tid ranges are [0, $config.threadCount). This
+  # isn't guaranteed to be true when they are run in parallel with other workloads.
+  - jstests/concurrency/fsm_workloads/findAndModify_inc_pipeline.js
+  - jstests/concurrency/fsm_workloads/list_indexes.js
+  - jstests/concurrency/fsm_workloads/update_inc_capped.js
+  - jstests/concurrency/fsm_workloads/update_inc_pipeline.js
+
+  # These workloads uses >100MB of data, which can overwhelm test hosts.
+  - jstests/concurrency/fsm_workloads/agg_group_external.js
+  - jstests/concurrency/fsm_workloads/agg_sort_external.js
+  # The findAndModify_update_grow.js workload can cause OOM kills on test hosts.
+  - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
+
+  # convertToCapped requires a global lock and any background operations on the database causes it
+  # to fail due to not finishing quickly enough.
+  - jstests/concurrency/fsm_workloads/convert_to_capped_collection.js
+  - jstests/concurrency/fsm_workloads/convert_to_capped_collection_index.js
+
+  # This workload kills random cursors which takes a collection lock.
+  # TODO: SERVER-35567.
+  - jstests/concurrency/fsm_workloads/snapshot_read_kill_operations.js
+
+  # This workload kills random sessions and a different FSM workload wouldn't be able to handle
+  # the error response from the op being killed.
+  - jstests/concurrency/fsm_workloads/multi_statement_transaction_kill_sessions_atomicity_isolation.js
+  - jstests/concurrency/fsm_workloads/multi_statement_transaction_simple_kill_sessions.js
+
+  # This workload may restart running transactions on a different client, causing deadlock if
+  # there is a concurrent dropDatabase waiting for the global X lock.
+  # TODO: SERVER-37876
+  - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
+
+  # This workload assumes no locks are taken outside of the workload.
+  - jstests/concurrency/fsm_workloads/access_collection_in_transaction_after_catalog_changes.js
+  exclude_with_any_tags:
+  - requires_sharding
+
+  group_size: 10
+  group_count_multiplier: 1.0
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHashInBackground
+      - CheckReplDBHash
+      - ValidateCollections
+    tests: true
+  config:
+    shell_options:
+      readMode: commands
+      global_vars:
+        TestData:
+          skipDropDatabaseOnDatabaseDropPending: true
+      setShellParameter: skipShellCursorFinalize=true
+  hooks:
+  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+  # validating the entire contents of the collection.
+  - class: CheckReplDBHashInBackground
+  - class: CheckReplDBHash
+  - class: ValidateCollections
+  - class: CleanupConcurrencyWorkloads
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      oplogSize: 1024
+      set_parameters:
+        enableTestCommands: 1
+        # Enable aggressive WiredTiger eviction.
+        wiredTigerEvictionDebugMode: true
+    num_nodes: 3

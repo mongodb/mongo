@@ -599,9 +599,15 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
             ss << "verbose=[recovery_progress,checkpoint_progress,compact_progress],";
         }
 
-        // Enable debug write-ahead logging for all tables under debug build.
         if (kDebugBuild) {
-            ss << "debug_mode=(table_logging=true),";
+            // Enable debug write-ahead logging for all tables under debug build.
+            ss << "debug_mode=(table_logging=true,";
+            // For select debug builds, support enabling WiredTiger eviction debug mode. This uses
+            // more aggressive eviction tactics, but may have a negative performance impact.
+            if (gWiredTigerEvictionDebugMode) {
+                ss << "eviction=true,";
+            }
+            ss << "),";
         }
     }
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
