@@ -34,7 +34,8 @@ load("jstests/free_mon/libs/free_mon.js");
 
     // Explicitly disabled.
     admin.disableFreeMonitoring();
-    sleep(2);  // Give the async command time to run.
+
+    WaitForFreeMonServerStatusState(mongod, "disabled");
 
     const disabled = freeMonStats();
     assert.eq(disabled.state, 'disabled');

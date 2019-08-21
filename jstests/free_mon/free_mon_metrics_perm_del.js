@@ -21,9 +21,13 @@ load("jstests/free_mon/libs/free_mon.js");
     mock_web.waitMetrics(4);
 
     // Make sure the registration document gets removed
-    const reg = FreeMonGetRegistration(conn);
-    print(tojson(reg));
-    assert.eq(reg, undefined);
+    assert.soon(
+        function() {
+            const reg = FreeMonGetRegistration(conn);
+            return reg === undefined;
+        },
+        "Failed to wait for free mon document to be removed: " + FreeMonGetRegistration(conn),
+        20 * 1000);
 
     MongoRunner.stopMongod(conn);
 

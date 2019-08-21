@@ -72,8 +72,8 @@ load("jstests/free_mon/libs/free_mon.js");
     WaitForUnRegistration(rst.getPrimary());
     WaitForUnRegistration(rst.getSecondary());
 
-    assert.eq(FreeMonGetServerStatus(rst.getPrimary()).state, 'disabled');
-    assert.eq(FreeMonGetServerStatus(rst.getSecondary()).state, 'disabled');
+    WaitForFreeMonServerStatusState(rst.getPrimary(), 'disabled');
+    WaitForFreeMonServerStatusState(rst.getSecondary(), 'disabled');
 
     // Restart the secondary with it disabled
     var s1 = rst._slaves[0];
@@ -85,8 +85,8 @@ load("jstests/free_mon/libs/free_mon.js");
     rst.restart(s1Id);
 
     // Make sure it is disabled
-    assert.eq(FreeMonGetServerStatus(rst.getPrimary()).state, 'disabled');
-    assert.eq(FreeMonGetServerStatus(rst.getSecondary()).state, 'disabled');
+    WaitForFreeMonServerStatusState(rst.getPrimary(), 'disabled');
+    WaitForFreeMonServerStatusState(rst.getSecondary(), 'disabled');
 
     rst.stopSet();
 

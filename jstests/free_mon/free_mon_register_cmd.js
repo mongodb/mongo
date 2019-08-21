@@ -28,6 +28,8 @@ load("jstests/free_mon/libs/free_mon.js");
 
     assert.commandWorked(conn.adminCommand({setFreeMonitoring: 1, action: "enable"}));
 
+    WaitForFreeMonServerStatusState(conn, 'enabled');
+
     // The command should either timeout or suceed after registration is complete
     const retStatus1 = conn.adminCommand({getFreeMonitoringStatus: 1});
     assert.commandWorked(retStatus1);

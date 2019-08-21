@@ -21,8 +21,10 @@ load("jstests/free_mon/libs/free_mon.js");
 
     mock_web.waitRegisters(3);
 
-    const freeMonStats = assert.commandWorked(admin.runCommand({serverStatus: 1})).freeMonitoring;
-    assert.gte(freeMonStats.registerErrors, 3);
+    assert.soon(function() {
+        const freeMonStats = FreeMonGetServerStatus(conn);
+        return freeMonStats.registerErrors >= 3;
+    }, "Failed to wait for 3 register errors: " + FreeMonGetServerStatus(conn), 20 * 1000);
 
     MongoRunner.stopMongod(conn);
 

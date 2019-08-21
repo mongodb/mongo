@@ -293,3 +293,23 @@ function FreeMonGetStatus(conn) {
     const admin = conn.getDB("admin");
     return assert.commandWorked(admin.runCommand({getFreeMonitoringStatus: 1}));
 }
+
+/**
+ * Wait for server status state
+ *
+ * @param {object} conn
+ * @param {string} state
+ */
+function WaitForFreeMonServerStatusState(conn, state) {
+    'use strict';
+
+    // Wait for registration to occur
+    assert.soon(
+        function() {
+            let status = FreeMonGetServerStatus(conn).state;
+            return status === state;
+        },
+        "Failed to find expected server status state: expected: '" + state + "', actual: " +
+            tojson(FreeMonGetServerStatus(conn)),
+        20 * 1000);
+}

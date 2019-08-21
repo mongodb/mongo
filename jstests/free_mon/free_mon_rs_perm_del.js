@@ -33,9 +33,8 @@ load("jstests/free_mon/libs/free_mon.js");
     sleep(20 * 1000);
 
     // Make sure we are back to the initial state.
-    assert.eq(FreeMonGetServerStatus(rst.getPrimary()).state, 'undecided');
-
-    assert.eq(FreeMonGetServerStatus(rst.getSecondary()).state, 'undecided');
+    WaitForFreeMonServerStatusState(rst.getPrimary(), 'undecided');
+    WaitForFreeMonServerStatusState(rst.getSecondary(), 'undecided');
 
     // Disable the fault so we can re-enable again
     mock_web.disableFaults();
@@ -47,8 +46,8 @@ load("jstests/free_mon/libs/free_mon.js");
 
     sleep(20 * 1000);
 
-    assert.eq(FreeMonGetServerStatus(rst.getPrimary()).state, 'enabled');
-    assert.eq(FreeMonGetServerStatus(rst.getSecondary()).state, 'enabled');
+    WaitForFreeMonServerStatusState(rst.getPrimary(), 'enabled');
+    WaitForFreeMonServerStatusState(rst.getSecondary(), 'enabled');
 
     rst.stopSet();
 
