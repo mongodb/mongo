@@ -123,6 +123,14 @@ public:
 
     static Timestamp getLatestOplogTimestamp(const Pipeline* pipeline);
 
+    /**
+     * Resolves the collator to either the user-specified collation or, if none was specified, to
+     * the collection-default collation.
+     */
+    static std::unique_ptr<CollatorInterface> resolveCollator(OperationContext* opCtx,
+                                                              BSONObj userCollation,
+                                                              const Collection* collection);
+
 private:
     PipelineD();  // does not exist:  prevent instantiation
 

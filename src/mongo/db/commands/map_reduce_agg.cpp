@@ -34,12 +34,13 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/map_reduce_agg.h"
 #include "mongo/db/commands/map_reduce_gen.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/getmore_request.h"
+#include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/query/mr_response_formatter.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 
@@ -50,8 +51,40 @@ std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
     return uassertStatusOK(Pipeline::create({}, expCtx));
 }
 
-boost::intrusive_ptr<ExpressionContext> makeExpressionContext() {
-    return nullptr;
+auto makeExpressionContext(OperationContext* opCtx, const MapReduce& parsedMr) {
+    // AutoGetCollectionForReadCommand will throw if the sharding version for this connection is out
+    // of date.
+    AutoGetCollectionForReadCommand ctx(
+        opCtx, parsedMr.getNamespace(), AutoGetCollection::ViewMode::kViewsPermitted);
+    uassert(ErrorCodes::CommandNotSupportedOnView,
+            "mapReduce on a view is not yet supported",
+            !ctx.getView());
+
+    auto resolvedCollator = PipelineD::resolveCollator(
+        opCtx, parsedMr.getCollation().get_value_or(BSONObj()), ctx.getCollection());
+
+    // The UUID of the collection for the execution namespace of this aggregation.
+    auto uuid =
+        ctx.getCollection() ? boost::make_optional(ctx.getCollection()->uuid()) : boost::none;
+
+    // Manually build an ExpressionContext with the desired options for the translated aggregation.
+    // The one option worth noting here is allowDiskUse, which is required to allow the $group stage
+    // of the translated pipeline to spill to disk.
+    return make_intrusive<ExpressionContext>(
+        opCtx,
+        boost::none,    // explain
+        std::string{},  // comment
+        false,          // fromMongos
+        false,          // needsmerge
+        true,           // allowDiskUse
+        parsedMr.getBypassDocumentValidation().get_value_or(false),
+        parsedMr.getNamespace(),
+        parsedMr.getCollation().get_value_or(BSONObj()),
+        boost::none,  // runtimeConstants
+        std::move(resolvedCollator),
+        MongoProcessInterface::create(opCtx),
+        StringMap<ExpressionContext::ResolvedNamespace>{},  // resolvedNamespaces
+        uuid);
 }
 
 }  // namespace
@@ -62,17 +95,8 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                              const BSONObj& cmd,
                              std::string& errmsg,
                              BSONObjBuilder& result) {
-    auto mrRequest = MapReduce::parse(IDLParserErrorContext("MapReduce"), cmd);
-    [[maybe_unused]] bool inMemory =
-        mrRequest.getOutOptions().getOutputType() == OutputType::InMemory;
-
-    [[maybe_unused]] auto pipe = translateFromMR(mrRequest, makeExpressionContext());
-
-    // MapReduceResponseFormatter(
-    //     std::move(completeCursor),
-    //     boost::make_optional(!inMemory, NamespaceString(std::move(outDb), std::move(outColl))),
-    //     boost::get_optional_value_or(mrRequest.getVerbose(), false))
-    //     .appendAsMapReduceResponse(&result);
+    auto parsedMr = MapReduce::parse(IDLParserErrorContext("MapReduce"), cmd);
+    [[maybe_unused]] auto pipe = translateFromMR(parsedMr, makeExpressionContext(opCtx, parsedMr));
     return true;
 }
 

@@ -395,6 +395,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/exec/stagedebug_cmd',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/db/query/mr_response_formatter',
+        '$BUILD_DIR/mongo/db/pipeline/mongo_process_interface',
+        '$BUILD_DIR/mongo/db/pipeline/pipeline',
         '$BUILD_DIR/mongo/db/repl/dbcheck',
         '$BUILD_DIR/mongo/db/repl/oplog',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',

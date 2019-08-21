@@ -67,6 +67,7 @@
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -877,6 +878,19 @@ void PipelineD::getPlanSummaryStats(const Pipeline* pipeline, PlanSummaryStats* 
     }
     statsOut->hasSortStage = hasSortStage;
     statsOut->usedDisk = usedDisk;
+}
+
+std::unique_ptr<CollatorInterface> PipelineD::resolveCollator(OperationContext* opCtx,
+                                                              BSONObj userCollation,
+                                                              const Collection* collection) {
+    if (!userCollation.isEmpty()) {
+        return uassertStatusOK(
+            CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(userCollation));
+    }
+
+    return (collection && collection->getDefaultCollator()
+                ? collection->getDefaultCollator()->clone()
+                : nullptr);
 }
 
 }  // namespace mongo
