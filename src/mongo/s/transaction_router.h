@@ -266,6 +266,10 @@ public:
                           BSONObjBuilder* builder,
                           bool sessionIsActive) const;
 
+        // Reports the 'transaction' state of this transaction for currentOp using the provided
+        // builder.
+        void _reportTransactionState(OperationContext* opCtx, BSONObjBuilder* builder) const;
+
         // Returns true if the atClusterTime has been changed from the default uninitialized value.
         bool _atClusterTimeHasBeenSet() const;
 

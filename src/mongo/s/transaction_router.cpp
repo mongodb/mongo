@@ -303,37 +303,45 @@ void TransactionRouter::Observer::_reportState(OperationContext* opCtx,
         return;
     }
 
-    // Append relevant client metadata.
+    // Append relevant client metadata for transactions with inactive sessions. For those with
+    // active sessions, these fields will already be in the output.
 
-    builder->append("type", sessionIsActive ? "activeSession" : "idleSession");
-    builder->append("host", getHostNameCachedAndPort());
-    builder->append("desc", sessionIsActive ? "active transaction" : "inactive transaction");
+    if (!sessionIsActive) {
+        builder->append("type", "idleSession");
+        builder->append("host", getHostNameCachedAndPort());
+        builder->append("desc", "inactive transaction");
 
-    const auto& lastClientInfo = o().lastClientInfo;
-    builder->append("client", lastClientInfo.clientHostAndPort);
-    builder->append("connectionId", lastClientInfo.connectionId);
-    builder->append("appName", lastClientInfo.appName);
-    builder->append("clientMetadata", lastClientInfo.clientMetadata);
+        const auto& lastClientInfo = o().lastClientInfo;
+        builder->append("client", lastClientInfo.clientHostAndPort);
+        builder->append("connectionId", lastClientInfo.connectionId);
+        builder->append("appName", lastClientInfo.appName);
+        builder->append("clientMetadata", lastClientInfo.clientMetadata);
 
-    // Append session and transaction metadata.
+        {
+            BSONObjBuilder lsid(builder->subobjStart("lsid"));
+            _sessionId().serialize(&lsid);
+        }
 
-    {
-        BSONObjBuilder lsid(builder->subobjStart("lsid"));
-        _sessionId().serialize(&lsid);
+        builder->append("active", sessionIsActive);
     }
 
-    BSONObjBuilder transactionBuilder(builder->subobjStart("transaction"));
+    // Append current transaction info.
 
+    BSONObjBuilder transactionBuilder;
+    _reportTransactionState(opCtx, &transactionBuilder);
+    builder->append("transaction", transactionBuilder.obj());
+}
+
+void TransactionRouter::Observer::_reportTransactionState(OperationContext* opCtx,
+                                                          BSONObjBuilder* builder) const {
     {
-        BSONObjBuilder parametersBuilder(transactionBuilder.subobjStart("parameters"));
+        BSONObjBuilder parametersBuilder(builder->subobjStart("parameters"));
         parametersBuilder.append("txnNumber", o().txnNumber);
         parametersBuilder.append("autocommit", false);
         if (!o().readConcernArgs.isEmpty()) {
             o().readConcernArgs.appendInfo(&parametersBuilder);
         }
     }
-
-    // Append current transaction info.
 
     if (_atClusterTimeHasBeenSet()) {
         builder->append("globalReadTimestamp", o().atClusterTime->getTime().asTimestamp());
@@ -380,21 +388,17 @@ void TransactionRouter::Observer::_reportState(OperationContext* opCtx,
             participantsArrayBuilder.append(participantBuilder.obj());
         }
 
-        transactionBuilder.appendArray("participants", participantsArrayBuilder.obj());
+        builder->appendArray("participants", participantsArrayBuilder.obj());
     }
 
     if (o().commitType != CommitType::kNotInitiated) {
-        transactionBuilder.append("commitStartWallClockTime",
-                                  dateToISOStringLocal(timingStats.commitStartWallClockTime));
-        transactionBuilder.append("commitType", commitTypeToString(o().commitType));
+        builder->append("commitStartWallClockTime",
+                        dateToISOStringLocal(timingStats.commitStartWallClockTime));
+        builder->append("commitType", commitTypeToString(o().commitType));
     }
 
-    transactionBuilder.append("numReadOnlyParticipants", numReadOnlyParticipants);
-    transactionBuilder.append("numNonReadOnlyParticipants", numNonReadOnlyParticipants);
-
-    transactionBuilder.done();
-
-    builder->append("active", sessionIsActive);
+    builder->append("numReadOnlyParticipants", numReadOnlyParticipants);
+    builder->append("numNonReadOnlyParticipants", numNonReadOnlyParticipants);
 }
 
 bool TransactionRouter::Observer::_atClusterTimeHasBeenSet() const {

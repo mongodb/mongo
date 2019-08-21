@@ -77,20 +77,19 @@ var $config = extendWorkload($config, function($config, $super) {
 
     $config.states.runCurrentOp = function runCurrentOp(db, collName) {
         const admin = db.getSiblingDB("admin");
-        const mongosSessionsWithTransactions =
-            admin
-                .aggregate([
-                    {
-                        $currentOp: {
-                            allUsers: true,
-                            idleSessions: true,
-                            idleConnections: true,
-                            localOps: true
-                        }
-                    },
-                    {$match: {$or: [{type: 'idleSession'}, {type: 'activeSession'}]}}
-                ])
-                .toArray();
+        const mongosSessionsWithTransactions = admin
+                                                   .aggregate([
+                                                       {
+                                                           $currentOp: {
+                                                               allUsers: true,
+                                                               idleSessions: true,
+                                                               idleConnections: true,
+                                                               localOps: true
+                                                           }
+                                                       },
+                                                       {$match: {transaction: {$exists: true}}}
+                                                   ])
+                                                   .toArray();
 
         this.verifyMongosSessionsWithTxns(mongosSessionsWithTransactions);
     };
