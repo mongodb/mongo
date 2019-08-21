@@ -323,8 +323,7 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
 }
 
 TransactionCoordinator::~TransactionCoordinator() {
-    invariant(_completionPromisesFired);
-    invariant(_completionPromises.empty());
+    invariant(_completionPromise.getFuture().isReady());
 }
 
 void TransactionCoordinator::runCommit(std::vector<ShardId> participants) {
@@ -352,15 +351,8 @@ SharedSemiFuture<CommitDecision> TransactionCoordinator::getDecision() const {
     return _decisionPromise.getFuture();
 }
 
-Future<void> TransactionCoordinator::onCompletion() {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
-    if (_completionPromisesFired)
-        return Future<void>::makeReady();
-
-    auto completionPF = makePromiseFuture<void>();
-    _completionPromises.emplace_back(std::move(completionPF.promise));
-
-    return std::move(completionPF.future);
+SharedSemiFuture<txn::CommitDecision> TransactionCoordinator::onCompletion() {
+    return _completionPromise.getFuture();
 }
 
 void TransactionCoordinator::cancelIfCommitNotYetStarted() {
@@ -412,22 +404,11 @@ void TransactionCoordinator::_done(Status status) {
         _logSlowTwoPhaseCommit(*_decision);
     }
 
-    _completionPromisesFired = true;
-
-    if (!_decisionDurable) {
-        ul.unlock();
-        _decisionPromise.setError(status);
-        ul.lock();
-    }
-
-    // Trigger the onCompletion promises outside of a lock, because the future handlers indicate to
-    // the potential lifetime controller that the object can be destroyed
-    auto promisesToTrigger = std::move(_completionPromises);
     ul.unlock();
-
-    for (auto&& promise : promisesToTrigger) {
-        promise.emplaceValue();
+    if (!_decisionDurable) {
+        _decisionPromise.setError(status);
     }
+    _completionPromise.setFrom(_decisionPromise.getFuture().getNoThrow());
 }
 
 void TransactionCoordinator::_logSlowTwoPhaseCommit(

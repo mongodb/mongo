@@ -105,7 +105,7 @@ public:
      * this coordinator has completed. It will always eventually be set and once set it is safe to
      * dispose of the TransactionCoordinator object.
      */
-    Future<void> onCompletion();
+    SharedSemiFuture<txn::CommitDecision> onCompletion();
 
     /**
      * If runCommit has not yet been called, this will transition this coordinator object to
@@ -188,10 +188,7 @@ private:
 
     // A list of all promises corresponding to futures that were returned to callers of
     // onCompletion.
-    //
-    // TODO (SERVER-38346): Remove this when SharedSemiFuture supports continuations.
-    bool _completionPromisesFired{false};
-    std::vector<Promise<void>> _completionPromises;
+    SharedPromise<txn::CommitDecision> _completionPromise;
 
     // Store as unique_ptr to avoid a circular dependency between the TransactionCoordinator and the
     // TransactionCoordinatorMetricsObserver.
