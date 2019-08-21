@@ -573,7 +573,7 @@ Status MultiIndexBlock::insert(OperationContext* opCtx, const BSONObj& doc, cons
         }
 
         InsertResult result;
-        Status idxStatus(ErrorCodes::InternalError, "");
+        Status idxStatus = Status::OK();
         if (_indexes[i].bulk) {
             idxStatus = _indexes[i].bulk->insert(opCtx, doc, loc, _indexes[i].options);
         } else {
