@@ -142,7 +142,7 @@ public:
         return !_data.empty();
     }
     Data next() {
-        Data out = _data.front();
+        Data out = std::move(_data.front());
         _data.pop_front();
         return out;
     }
