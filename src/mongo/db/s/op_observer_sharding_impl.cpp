@@ -59,9 +59,11 @@ void assertIntersectingChunkHasNotMoved(OperationContext* opCtx,
     if (!metadata->isSharded())
         return;
 
+    auto chunkManager = metadata->getChunkManager();
+    auto shardKey = chunkManager->getShardKeyPattern().extractShardKeyFromDoc(doc);
+
     // We can assume the simple collation because shard keys do not support non-simple collations.
-    auto chunk = metadata->getChunkManager()->findIntersectingChunkWithSimpleCollation(
-        metadata->extractDocumentKey(doc));
+    auto chunk = chunkManager->findIntersectingChunkWithSimpleCollation(shardKey);
 
     // Throws if the chunk has moved since the timestamp of the running transaction's atClusterTime
     // read concern parameter.

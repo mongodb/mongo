@@ -394,8 +394,8 @@ BSONObj computeSHA256Block(const BSONObj& a, void* data) {
  * > sh.shardCollection("mydb.mycollection", { x: "hashed" })
  * > // And a sample object like so:
  * > var obj = { x: "Whatever key", y: 2, z: 10.0 }
- * > // The hashed value of the shard key can be acquired from the shard key-value pair like so:
- * > convertShardKeyToHashed({x: "Whatever key"})
+ * > // The hashed value of the shard key can be acquired by passing in the shard key value:
+ * > convertShardKeyToHashed("Whatever key")
  */
 BSONObj convertShardKeyToHashed(const BSONObj& a, void* data) {
     const auto& objEl = a[0];
