@@ -6153,6 +6153,93 @@ TEST(ExpressionMetaTest, ExpressionMetaSearchHighlights) {
     Value val = expressionMeta->evaluate(doc.freeze(), &expCtx->variables);
     ASSERT_DOCUMENT_EQ(val.getDocument(), highlights);
 }
+
+TEST(ExpressionMetaTest, ExpressionMetaGeoNearDistance) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    BSONObj expr = fromjson("{$meta: \"geoNearDistance\"}");
+    auto expressionMeta =
+        ExpressionMeta::parse(expCtx, expr.firstElement(), expCtx->variablesParseState);
+
+    MutableDocument doc;
+    doc.metadata().setGeoNearDistance(1.23);
+    Value val = expressionMeta->evaluate(doc.freeze(), &expCtx->variables);
+    ASSERT_EQ(val.getDouble(), 1.23);
+}
+
+TEST(ExpressionMetaTest, ExpressionMetaGeoNearPoint) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    BSONObj expr = fromjson("{$meta: \"geoNearPoint\"}");
+    auto expressionMeta =
+        ExpressionMeta::parse(expCtx, expr.firstElement(), expCtx->variablesParseState);
+
+    MutableDocument doc;
+    Document pointDoc = Document{fromjson("{some: 'document'}")};
+    doc.metadata().setGeoNearPoint(Value(pointDoc));
+    Value val = expressionMeta->evaluate(doc.freeze(), &expCtx->variables);
+    ASSERT_DOCUMENT_EQ(val.getDocument(), pointDoc);
+}
+
+TEST(ExpressionMetaTest, ExpressionMetaIndexKey) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    BSONObj expr = fromjson("{$meta: \"indexKey\"}");
+    auto expressionMeta =
+        ExpressionMeta::parse(expCtx, expr.firstElement(), expCtx->variablesParseState);
+
+    MutableDocument doc;
+    BSONObj ixKey = fromjson("{'': 1, '': 'string'}");
+    doc.metadata().setIndexKey(ixKey);
+    Value val = expressionMeta->evaluate(doc.freeze(), &expCtx->variables);
+    ASSERT_DOCUMENT_EQ(val.getDocument(), Document(ixKey));
+}
+
+TEST(ExpressionMetaTest, ExpressionMetaRecordId) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    BSONObj expr = fromjson("{$meta: \"recordId\"}");
+    auto expressionMeta =
+        ExpressionMeta::parse(expCtx, expr.firstElement(), expCtx->variablesParseState);
+
+    MutableDocument doc;
+    doc.metadata().setRecordId(RecordId(123LL));
+    Value val = expressionMeta->evaluate(doc.freeze(), &expCtx->variables);
+    ASSERT_EQ(val.getLong(), 123LL);
+}
+
+TEST(ExpressionMetaTest, ExpressionMetaRandVal) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    BSONObj expr = fromjson("{$meta: \"randVal\"}");
+    auto expressionMeta =
+        ExpressionMeta::parse(expCtx, expr.firstElement(), expCtx->variablesParseState);
+
+    MutableDocument doc;
+    doc.metadata().setRandVal(1.23);
+    Value val = expressionMeta->evaluate(doc.freeze(), &expCtx->variables);
+    ASSERT_EQ(val.getDouble(), 1.23);
+}
+
+TEST(ExpressionMetaTest, ExpressionMetaSortKey) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    BSONObj expr = fromjson("{$meta: \"sortKey\"}");
+    auto expressionMeta =
+        ExpressionMeta::parse(expCtx, expr.firstElement(), expCtx->variablesParseState);
+
+    MutableDocument doc;
+    BSONObj sortKey = BSON("" << 1 << "" << 2);
+    doc.metadata().setSortKey(sortKey);
+    Value val = expressionMeta->evaluate(doc.freeze(), &expCtx->variables);
+    ASSERT_DOCUMENT_EQ(val.getDocument(), Document(sortKey));
+}
+
+TEST(ExpressionMetaTest, ExpressionMetaTextScore) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    BSONObj expr = fromjson("{$meta: \"textScore\"}");
+    auto expressionMeta =
+        ExpressionMeta::parse(expCtx, expr.firstElement(), expCtx->variablesParseState);
+
+    MutableDocument doc;
+    doc.metadata().setTextScore(1.23);
+    Value val = expressionMeta->evaluate(doc.freeze(), &expCtx->variables);
+    ASSERT_EQ(val.getDouble(), 1.23);
+}
 }  // namespace expression_meta_test
 
 namespace ExpressionRegexTest {

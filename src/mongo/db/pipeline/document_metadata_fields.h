@@ -33,6 +33,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 
@@ -54,17 +55,18 @@ namespace mongo {
 class DocumentMetadataFields {
 public:
     enum MetaType : char {
-        TEXT_SCORE,
-        RAND_VAL,
-        SORT_KEY,
-        GEONEAR_DIST,
-        GEONEAR_POINT,
-        SEARCH_SCORE,
-        SEARCH_HIGHLIGHTS,
-        INDEX_KEY,
+        kGeoNearDist,
+        kGeoNearPoint,
+        kIndexKey,
+        kRandVal,
+        kRecordId,
+        kSearchHighlights,
+        kSearchScore,
+        kSortKey,
+        kTextScore,
 
-        // New fields must be added before the NUM_FIELDS sentinel.
-        NUM_FIELDS
+        // New fields must be added before the kNumFields sentinel.
+        kNumFields
     };
 
     /**
@@ -115,7 +117,7 @@ public:
     }
 
     bool hasTextScore() const {
-        return _holder && _holder->metaFields.test(MetaType::TEXT_SCORE);
+        return _holder && _holder->metaFields.test(MetaType::kTextScore);
     }
 
     double getTextScore() const {
@@ -128,12 +130,12 @@ public:
             _holder = std::make_unique<MetadataHolder>();
         }
 
-        _holder->metaFields.set(MetaType::TEXT_SCORE);
+        _holder->metaFields.set(MetaType::kTextScore);
         _holder->textScore = score;
     }
 
     bool hasRandVal() const {
-        return _holder && _holder->metaFields.test(MetaType::RAND_VAL);
+        return _holder && _holder->metaFields.test(MetaType::kRandVal);
     }
 
     double getRandVal() const {
@@ -146,12 +148,12 @@ public:
             _holder = std::make_unique<MetadataHolder>();
         }
 
-        _holder->metaFields.set(MetaType::RAND_VAL);
+        _holder->metaFields.set(MetaType::kRandVal);
         _holder->randVal = val;
     }
 
     bool hasSortKey() const {
-        return _holder && _holder->metaFields.test(MetaType::SORT_KEY);
+        return _holder && _holder->metaFields.test(MetaType::kSortKey);
     }
 
     BSONObj getSortKey() const {
@@ -164,12 +166,12 @@ public:
             _holder = std::make_unique<MetadataHolder>();
         }
 
-        _holder->metaFields.set(MetaType::SORT_KEY);
+        _holder->metaFields.set(MetaType::kSortKey);
         _holder->sortKey = sortKey.getOwned();
     }
 
     bool hasGeoNearDistance() const {
-        return _holder && _holder->metaFields.test(MetaType::GEONEAR_DIST);
+        return _holder && _holder->metaFields.test(MetaType::kGeoNearDist);
     }
 
     double getGeoNearDistance() const {
@@ -182,12 +184,12 @@ public:
             _holder = std::make_unique<MetadataHolder>();
         }
 
-        _holder->metaFields.set(MetaType::GEONEAR_DIST);
+        _holder->metaFields.set(MetaType::kGeoNearDist);
         _holder->geoNearDistance = dist;
     }
 
     bool hasGeoNearPoint() const {
-        return _holder && _holder->metaFields.test(MetaType::GEONEAR_POINT);
+        return _holder && _holder->metaFields.test(MetaType::kGeoNearPoint);
     }
 
     Value getGeoNearPoint() const {
@@ -200,12 +202,12 @@ public:
             _holder = std::make_unique<MetadataHolder>();
         }
 
-        _holder->metaFields.set(MetaType::GEONEAR_POINT);
+        _holder->metaFields.set(MetaType::kGeoNearPoint);
         _holder->geoNearPoint = std::move(point);
     }
 
     bool hasSearchScore() const {
-        return _holder && _holder->metaFields.test(MetaType::SEARCH_SCORE);
+        return _holder && _holder->metaFields.test(MetaType::kSearchScore);
     }
 
     double getSearchScore() const {
@@ -218,12 +220,12 @@ public:
             _holder = std::make_unique<MetadataHolder>();
         }
 
-        _holder->metaFields.set(MetaType::SEARCH_SCORE);
+        _holder->metaFields.set(MetaType::kSearchScore);
         _holder->searchScore = score;
     }
 
     bool hasSearchHighlights() const {
-        return _holder && _holder->metaFields.test(MetaType::SEARCH_HIGHLIGHTS);
+        return _holder && _holder->metaFields.test(MetaType::kSearchHighlights);
     }
 
     Value getSearchHighlights() const {
@@ -236,12 +238,12 @@ public:
             _holder = std::make_unique<MetadataHolder>();
         }
 
-        _holder->metaFields.set(MetaType::SEARCH_HIGHLIGHTS);
+        _holder->metaFields.set(MetaType::kSearchHighlights);
         _holder->searchHighlights = highlights;
     }
 
     bool hasIndexKey() const {
-        return _holder && _holder->metaFields.test(MetaType::INDEX_KEY);
+        return _holder && _holder->metaFields.test(MetaType::kIndexKey);
     }
 
     BSONObj getIndexKey() const {
@@ -254,8 +256,26 @@ public:
             _holder = std::make_unique<MetadataHolder>();
         }
 
-        _holder->metaFields.set(MetaType::INDEX_KEY);
+        _holder->metaFields.set(MetaType::kIndexKey);
         _holder->indexKey = indexKey.getOwned();
+    }
+
+    bool hasRecordId() const {
+        return _holder && _holder->metaFields.test(MetaType::kRecordId);
+    }
+
+    RecordId getRecordId() const {
+        invariant(hasRecordId());
+        return _holder->recordId;
+    }
+
+    void setRecordId(RecordId rid) {
+        if (!_holder) {
+            _holder = std::make_unique<MetadataHolder>();
+        }
+
+        _holder->metaFields.set(MetaType::kRecordId);
+        _holder->recordId = rid;
     }
 
     void serializeForSorter(BufBuilder& buf) const;
@@ -263,7 +283,7 @@ public:
 private:
     // A simple data struct housing all possible metadata fields.
     struct MetadataHolder {
-        std::bitset<MetaType::NUM_FIELDS> metaFields;
+        std::bitset<MetaType::kNumFields> metaFields;
         double textScore{0.0};
         double randVal{0.0};
         BSONObj sortKey;
@@ -272,6 +292,7 @@ private:
         double searchScore{0.0};
         Value searchHighlights;
         BSONObj indexKey;
+        RecordId recordId;
     };
 
     // Null until the first setter is called, at which point a MetadataHolder struct is allocated.

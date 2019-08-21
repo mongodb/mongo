@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -2524,19 +2523,54 @@ Expression::ComputedPaths ExpressionMap::getComputedPaths(const std::string& exp
 /* ------------------------- ExpressionMeta ----------------------------- */
 
 REGISTER_EXPRESSION(meta, ExpressionMeta::parse);
+
+namespace {
+const std::string textScoreName = "textScore";
+const std::string randValName = "randVal";
+const std::string searchScoreName = "searchScore";
+const std::string searchHighlightsName = "searchHighlights";
+const std::string geoNearDistanceName = "geoNearDistance";
+const std::string geoNearPointName = "geoNearPoint";
+const std::string recordIdName = "recordId";
+const std::string indexKeyName = "indexKey";
+const std::string sortKeyName = "sortKey";
+
+using MetaType = DocumentMetadataFields::MetaType;
+const StringMap<DocumentMetadataFields::MetaType> kMetaNameToMetaType = {
+    {geoNearDistanceName, MetaType::kGeoNearDist},
+    {geoNearPointName, MetaType::kGeoNearPoint},
+    {indexKeyName, MetaType::kIndexKey},
+    {randValName, MetaType::kRandVal},
+    {recordIdName, MetaType::kRecordId},
+    {searchHighlightsName, MetaType::kSearchHighlights},
+    {searchScoreName, MetaType::kSearchScore},
+    {sortKeyName, MetaType::kSortKey},
+    {textScoreName, MetaType::kTextScore},
+};
+
+const stdx::unordered_map<DocumentMetadataFields::MetaType, StringData> kMetaTypeToMetaName = {
+    {MetaType::kGeoNearDist, geoNearDistanceName},
+    {MetaType::kGeoNearPoint, geoNearPointName},
+    {MetaType::kIndexKey, indexKeyName},
+    {MetaType::kRandVal, randValName},
+    {MetaType::kRecordId, recordIdName},
+    {MetaType::kSearchHighlights, searchHighlightsName},
+    {MetaType::kSearchScore, searchScoreName},
+    {MetaType::kSortKey, sortKeyName},
+    {MetaType::kTextScore, textScoreName},
+};
+
+}  // namespace
+
 intrusive_ptr<Expression> ExpressionMeta::parse(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     BSONElement expr,
     const VariablesParseState& vpsIn) {
     uassert(17307, "$meta only supports string arguments", expr.type() == String);
-    if (expr.valueStringData() == "textScore") {
-        return new ExpressionMeta(expCtx, MetaType::TEXT_SCORE);
-    } else if (expr.valueStringData() == "randVal") {
-        return new ExpressionMeta(expCtx, MetaType::RAND_VAL);
-    } else if (expr.valueStringData() == "searchScore") {
-        return new ExpressionMeta(expCtx, MetaType::SEARCH_SCORE);
-    } else if (expr.valueStringData() == "searchHighlights") {
-        return new ExpressionMeta(expCtx, MetaType::SEARCH_HIGHLIGHTS);
+
+    const auto iter = kMetaNameToMetaType.find(expr.valueStringData());
+    if (iter != kMetaNameToMetaType.end()) {
+        return new ExpressionMeta(expCtx, iter->second);
     } else {
         uasserted(17308, "Unsupported argument to $meta: " + expr.String());
     }
@@ -2547,44 +2581,59 @@ ExpressionMeta::ExpressionMeta(const boost::intrusive_ptr<ExpressionContext>& ex
     : Expression(expCtx), _metaType(metaType) {}
 
 Value ExpressionMeta::serialize(bool explain) const {
-    switch (_metaType) {
-        case MetaType::TEXT_SCORE:
-            return Value(DOC("$meta"
-                             << "textScore"_sd));
-        case MetaType::RAND_VAL:
-            return Value(DOC("$meta"
-                             << "randVal"_sd));
-        case MetaType::SEARCH_SCORE:
-            return Value(DOC("$meta"
-                             << "searchScore"_sd));
-        case MetaType::SEARCH_HIGHLIGHTS:
-            return Value(DOC("$meta"
-                             << "searchHighlights"_sd));
-    }
-    MONGO_UNREACHABLE;
+    const auto nameIter = kMetaTypeToMetaName.find(_metaType);
+    invariant(nameIter != kMetaTypeToMetaName.end());
+    return Value(DOC("$meta" << nameIter->second));
 }
 
 Value ExpressionMeta::evaluate(const Document& root, Variables* variables) const {
     const auto& metadata = root.metadata();
     switch (_metaType) {
-        case MetaType::TEXT_SCORE:
+        case MetaType::kTextScore:
             return metadata.hasTextScore() ? Value(metadata.getTextScore()) : Value();
-        case MetaType::RAND_VAL:
+        case MetaType::kRandVal:
             return metadata.hasRandVal() ? Value(metadata.getRandVal()) : Value();
-        case MetaType::SEARCH_SCORE:
+        case MetaType::kSearchScore:
             return metadata.hasSearchScore() ? Value(metadata.getSearchScore()) : Value();
-        case MetaType::SEARCH_HIGHLIGHTS:
+        case MetaType::kSearchHighlights:
             return metadata.hasSearchHighlights() ? Value(metadata.getSearchHighlights()) : Value();
+        case MetaType::kGeoNearDist:
+            return metadata.hasGeoNearDistance() ? Value(metadata.getGeoNearDistance()) : Value();
+        case MetaType::kGeoNearPoint:
+            return metadata.hasGeoNearPoint() ? Value(metadata.getGeoNearPoint()) : Value();
+        case MetaType::kRecordId:
+            // Be sure that a RecordId can be represented by a long long.
+            static_assert(RecordId::kMinRepr >= std::numeric_limits<long long>::min());
+            static_assert(RecordId::kMaxRepr <= std::numeric_limits<long long>::max());
+            return metadata.hasRecordId()
+                ? Value{static_cast<long long>(metadata.getRecordId().repr())}
+                : Value();
+        case MetaType::kIndexKey:
+            return metadata.hasIndexKey() ? Value(metadata.getIndexKey()) : Value();
+        case MetaType::kSortKey:
+            return metadata.hasSortKey() ? Value(metadata.getSortKey()) : Value();
+        default:
+            MONGO_UNREACHABLE;
     }
     MONGO_UNREACHABLE;
 }
 
 void ExpressionMeta::_doAddDependencies(DepsTracker* deps) const {
-    if (_metaType == MetaType::TEXT_SCORE) {
+    if (_metaType == MetaType::kTextScore) {
         deps->setNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE, true);
 
         // We do not add the dependencies for SEARCH_SCORE or SEARCH_HIGHLIGHTS because those values
         // are not stored in the collection (or in mongod at all).
+    } else if (_metaType == MetaType::kGeoNearDist) {
+        deps->setNeedsMetadata(DepsTracker::MetadataType::GEO_NEAR_DISTANCE, true);
+    } else if (_metaType == MetaType::kGeoNearPoint) {
+        deps->setNeedsMetadata(DepsTracker::MetadataType::GEO_NEAR_POINT, true);
+    } else if (_metaType == MetaType::kRecordId) {
+        // TODO: SERVER-42560 handle passing of metadata between PlanStage and DS layers.
+    } else if (_metaType == MetaType::kIndexKey) {
+        // TODO: SERVER-42560 handle passing of metadata between PlanStage and DS layers.
+    } else if (_metaType == MetaType::kSortKey) {
+        deps->setNeedsMetadata(DepsTracker::MetadataType::SORT_KEY, true);
     }
 }
 

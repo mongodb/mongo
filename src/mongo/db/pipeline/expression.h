@@ -1642,13 +1642,6 @@ private:
 
 class ExpressionMeta final : public Expression {
 public:
-    enum MetaType {
-        TEXT_SCORE,
-        RAND_VAL,
-        SEARCH_SCORE,
-        SEARCH_HIGHLIGHTS,
-    };
-
     Value serialize(bool explain) const final;
     Value evaluate(const Document& root, Variables* variables) const final;
 
@@ -1661,7 +1654,7 @@ public:
         return visitor->visit(this);
     }
 
-    MetaType getMetaType() {
+    DocumentMetadataFields::MetaType getMetaType() {
         return _metaType;
     }
 
@@ -1669,9 +1662,10 @@ protected:
     void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
-    ExpressionMeta(const boost::intrusive_ptr<ExpressionContext>& expCtx, MetaType metaType);
+    ExpressionMeta(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                   DocumentMetadataFields::MetaType metaType);
 
-    MetaType _metaType;
+    DocumentMetadataFields::MetaType _metaType;
 };
 
 class ExpressionMillisecond final : public DateExpressionAcceptingTimeZone<ExpressionMillisecond> {

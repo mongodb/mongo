@@ -135,11 +135,11 @@ StatusWith<BSONObj> SortKeyGenerator::getSortKeyFromDocument(const BSONObj& obj,
         }
         invariant(part.expression);
         switch (part.expression->getMetaType()) {
-            case ExpressionMeta::MetaType::TEXT_SCORE: {
+            case DocumentMetadataFields::MetaType::kTextScore: {
                 mergedKeyBob.append("", metadata->textScore);
                 continue;
             }
-            case ExpressionMeta::MetaType::RAND_VAL: {
+            case DocumentMetadataFields::MetaType::kRandVal: {
                 mergedKeyBob.append("", metadata->randVal);
                 continue;
             }

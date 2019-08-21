@@ -746,7 +746,7 @@ TEST(MetaFields, BadSerialization) {
     // Signal there are 0 fields.
     bb.appendNum(0);
     // This would specify a meta field with an invalid type.
-    bb.appendNum(char(DocumentMetadataFields::MetaType::NUM_FIELDS) + 1);
+    bb.appendNum(char(DocumentMetadataFields::MetaType::kNumFields) + 1);
     // Signals end of input.
     bb.appendNum(char(0));
     BufReader reader(bb.buf(), bb.len());
