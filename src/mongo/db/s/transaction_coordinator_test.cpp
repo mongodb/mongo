@@ -1004,8 +1004,9 @@ TEST_F(TransactionCoordinatorTest,
 
     ASSERT_THROWS_CODE(
         commitDecisionFuture.get(), AssertionException, ErrorCodes::ReadConcernMajorityNotEnabled);
-
-    coordinator.onCompletion().get();
+    ASSERT_THROWS_CODE(coordinator.onCompletion().get(),
+                       AssertionException,
+                       ErrorCodes::ReadConcernMajorityNotEnabled);
 }
 
 
@@ -1711,7 +1712,8 @@ TEST_F(TransactionCoordinatorMetricsTest, CoordinatorIsCanceledWhileInactive) {
     expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
 
     coordinator.cancelIfCommitNotYetStarted();
-    coordinator.onCompletion().get();
+    ASSERT_THROWS_CODE(
+        coordinator.onCompletion().get(), DBException, ErrorCodes::NoSuchTransaction);
 
     checkStats(stats, expectedStats);
     checkMetrics(expectedMetrics);
@@ -1753,7 +1755,8 @@ TEST_F(TransactionCoordinatorMetricsTest, CoordinatorsAWSIsShutDownWhileCoordina
     expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
 
     awsPtr->shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "dummy"});
-    coordinator.onCompletion().get();
+    ASSERT_THROWS_CODE(
+        coordinator.onCompletion().get(), DBException, ErrorCodes::InterruptedDueToReplStateChange);
 
     checkStats(stats, expectedStats);
     checkMetrics(expectedMetrics);
@@ -1813,7 +1816,8 @@ TEST_F(TransactionCoordinatorMetricsTest,
     expectedMetrics.currentWritingParticipantList--;
 
     killClientOpCtx(getServiceContext(), "hangBeforeWaitingForParticipantListWriteConcern");
-    coordinator.onCompletion().get();
+    ASSERT_THROWS_CODE(
+        coordinator.onCompletion().get(), DBException, ErrorCodes::InterruptedAtShutdown);
 
     checkStats(stats, expectedStats);
     checkMetrics(expectedMetrics);
@@ -1876,7 +1880,9 @@ TEST_F(TransactionCoordinatorMetricsTest,
     network()->enterNetwork();
     network()->runReadyNetworkOperations();
     network()->exitNetwork();
-    coordinator.onCompletion().get();
+
+    ASSERT_THROWS_CODE(
+        coordinator.onCompletion().get(), DBException, ErrorCodes::InterruptedDueToReplStateChange);
 
     checkStats(stats, expectedStats);
     checkMetrics(expectedMetrics);
@@ -1941,7 +1947,9 @@ TEST_F(TransactionCoordinatorMetricsTest,
     expectedMetrics.currentWritingDecision--;
 
     killClientOpCtx(getServiceContext(), "hangBeforeWaitingForDecisionWriteConcern");
-    coordinator.onCompletion().get();
+    ASSERT_THROWS_CODE(
+        coordinator.onCompletion().get(), DBException, ErrorCodes::InterruptedAtShutdown);
+
 
     checkStats(stats, expectedStats);
     checkMetrics(expectedMetrics);

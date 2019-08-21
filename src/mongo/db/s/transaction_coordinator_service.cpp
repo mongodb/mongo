@@ -122,11 +122,11 @@ void TransactionCoordinatorService::reportCoordinators(OperationContext* opCtx,
     catalog.filter(predicate, reporter);
 }
 
-boost::optional<Future<txn::CommitDecision>> TransactionCoordinatorService::coordinateCommit(
-    OperationContext* opCtx,
-    LogicalSessionId lsid,
-    TxnNumber txnNumber,
-    const std::set<ShardId>& participantList) {
+boost::optional<SharedSemiFuture<txn::CommitDecision>>
+TransactionCoordinatorService::coordinateCommit(OperationContext* opCtx,
+                                                LogicalSessionId lsid,
+                                                TxnNumber txnNumber,
+                                                const std::set<ShardId>& participantList) {
     auto cas = _getCatalogAndScheduler(opCtx);
     auto& catalog = cas->catalog;
 
@@ -138,8 +138,7 @@ boost::optional<Future<txn::CommitDecision>> TransactionCoordinatorService::coor
     coordinator->runCommit(opCtx,
                            std::vector<ShardId>{participantList.begin(), participantList.end()});
 
-    return coordinator->onCompletion().then(
-        [coordinator] { return coordinator->getDecision().get(); });
+    return coordinator->onCompletion();
 
     // TODO (SERVER-37364): Re-enable the coordinator returning the decision as soon as the decision
     // is made durable. Currently the coordinator waits to hear acks because participants in prepare
@@ -147,7 +146,7 @@ boost::optional<Future<txn::CommitDecision>> TransactionCoordinatorService::coor
     // return coordinator->getDecision();
 }
 
-boost::optional<Future<txn::CommitDecision>> TransactionCoordinatorService::recoverCommit(
+boost::optional<SharedSemiFuture<txn::CommitDecision>> TransactionCoordinatorService::recoverCommit(
     OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNumber) {
     auto cas = _getCatalogAndScheduler(opCtx);
     auto& catalog = cas->catalog;
@@ -161,8 +160,7 @@ boost::optional<Future<txn::CommitDecision>> TransactionCoordinatorService::reco
     // the coordinator.
     coordinator->cancelIfCommitNotYetStarted();
 
-    return coordinator->onCompletion().then(
-        [coordinator] { return coordinator->getDecision().get(); });
+    return coordinator->onCompletion();
 
     // TODO (SERVER-37364): Re-enable the coordinator returning the decision as soon as the decision
     // is made durable. Currently the coordinator waits to hear acks because participants in prepare

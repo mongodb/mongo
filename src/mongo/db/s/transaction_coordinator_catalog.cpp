@@ -33,6 +33,7 @@
 
 #include "mongo/db/s/transaction_coordinator_catalog.h"
 
+#include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -104,8 +105,10 @@ void TransactionCoordinatorCatalog::insert(OperationContext* opCtx,
     // recursively acquire the mutex.
     ul.unlock();
 
-    coordinator->onCompletion().getAsync(
-        [this, lsid, txnNumber](Status) { _remove(lsid, txnNumber); });
+    coordinator->onCompletion()
+        .thenRunOn(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor())
+        .ignoreValue()
+        .getAsync([this, lsid, txnNumber](Status) { _remove(lsid, txnNumber); });
 }
 
 std::shared_ptr<TransactionCoordinator> TransactionCoordinatorCatalog::get(

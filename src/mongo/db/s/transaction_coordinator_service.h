@@ -71,7 +71,7 @@ public:
      *
      * If no coordinator for the (lsid, txnNumber) exists, returns boost::none.
      */
-    boost::optional<Future<txn::CommitDecision>> coordinateCommit(
+    boost::optional<SharedSemiFuture<txn::CommitDecision>> coordinateCommit(
         OperationContext* opCtx,
         LogicalSessionId lsid,
         TxnNumber txnNumber,
@@ -83,9 +83,9 @@ public:
      *
      * If no coordinator for the (lsid, txnNumber) exists, returns boost::none.
      */
-    boost::optional<Future<txn::CommitDecision>> recoverCommit(OperationContext* opCtx,
-                                                               LogicalSessionId lsid,
-                                                               TxnNumber txnNumber);
+    boost::optional<SharedSemiFuture<txn::CommitDecision>> recoverCommit(OperationContext* opCtx,
+                                                                         LogicalSessionId lsid,
+                                                                         TxnNumber txnNumber);
 
     /**
      * Marks the coordinator catalog as stepping up, which blocks all incoming requests for

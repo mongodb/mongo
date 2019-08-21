@@ -236,18 +236,14 @@ public:
             const auto& cmd = request();
             const auto tcs = TransactionCoordinatorService::get(opCtx);
 
-            boost::optional<Future<txn::CommitDecision>> coordinatorDecisionFuture;
-
-            if (!cmd.getParticipants().empty()) {
-                coordinatorDecisionFuture =
-                    tcs->coordinateCommit(opCtx,
-                                          *opCtx->getLogicalSessionId(),
-                                          *opCtx->getTxnNumber(),
-                                          validateParticipants(opCtx, cmd.getParticipants()));
-            } else {
-                coordinatorDecisionFuture = tcs->recoverCommit(
-                    opCtx, *opCtx->getLogicalSessionId(), *opCtx->getTxnNumber());
-            }
+            // Coordinate the commit, or recover the commit decision from disk if this command was
+            // sent without a participant list.
+            auto coordinatorDecisionFuture = cmd.getParticipants().empty()
+                ? tcs->recoverCommit(opCtx, *opCtx->getLogicalSessionId(), *opCtx->getTxnNumber())
+                : tcs->coordinateCommit(opCtx,
+                                        *opCtx->getLogicalSessionId(),
+                                        *opCtx->getTxnNumber(),
+                                        validateParticipants(opCtx, cmd.getParticipants()));
 
             if (MONGO_FAIL_POINT(hangAfterStartingCoordinateCommit)) {
                 LOG(0) << "Hit hangAfterStartingCoordinateCommit failpoint";

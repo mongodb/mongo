@@ -142,6 +142,10 @@ TEST_F(TransactionCoordinatorCatalogTest, CoordinatorsRemoveThemselvesFromCatalo
     coordinator->cancelIfCommitNotYetStarted();
     coordinator->onCompletion().wait();
 
+    // Wait for the coordinator to be removed before attempting to call getLatestOnSession() since
+    // the coordinator is removed from the catalog asynchronously.
+    _coordinatorCatalog->join();
+
     auto latestTxnNumAndCoordinator =
         _coordinatorCatalog->getLatestOnSession(operationContext(), lsid);
     ASSERT_FALSE(latestTxnNumAndCoordinator);
