@@ -7,6 +7,7 @@
  * thread does an insert on each iteration. The first insert done by each
  * thread is marked with an extra field. At the end, we assert that the first
  * doc inserted by each thread is no longer in the collection.
+ * @tags: [uses_ttl]
  */
 var $config = (function() {
     var states = {
