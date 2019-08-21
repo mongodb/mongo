@@ -1478,6 +1478,10 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
         // We wait only on primaries, because on secondaries, other mechanisms assure that the
         // last applied optime is always hole-free, and waiting for all earlier writes to be visible
         // can deadlock against secondary command application.
+        //
+        // Note that oplog queries by secondary nodes depend on this behavior to wait for
+        // all oplog holes to be filled in, despite providing an afterClusterTime field
+        // with Timestamp(0,1).
         _storage->waitForAllEarlierOplogWritesToBeVisible(opCtx, /* primaryOnly =*/true);
     }
 

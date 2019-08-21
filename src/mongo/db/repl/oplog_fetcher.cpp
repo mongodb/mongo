@@ -350,9 +350,9 @@ BSONObj OplogFetcher::_makeFindCommandObject(const NamespaceString& nss,
         cmdBob.append("term", term);
     }
 
-    // This ensures that the sync source never returns an empty batch of documents for the first set
-    // of results.
-    cmdBob.append("readConcern", BSON("afterClusterTime" << lastOpTimeFetched.getTimestamp()));
+    // This ensures that the sync source waits for all earlier oplog writes to be visible.
+    // Since Timestamp(0, 0) isn't allowed, Timestamp(0, 1) is the minimal we can use.
+    cmdBob.append("readConcern", BSON("afterClusterTime" << Timestamp(0, 1)));
 
     return cmdBob.obj();
 }
