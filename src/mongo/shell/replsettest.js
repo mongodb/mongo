@@ -1824,93 +1824,6 @@ var ReplSetTest = function(opts) {
             return inAOnly.concat(inBOnly);
         }
 
-        function printCollectionInfo(connName, conn, dbName, collName) {
-            var ns = dbName + '.' + collName;
-            var hostColl = `${conn.host}--${ns}`;
-            var alreadyPrinted = collectionPrinted.has(hostColl);
-
-            // Extract basic collection info.
-            var coll = conn.getDB(dbName).getCollection(collName);
-            var res = conn.getDB(dbName).runCommand({listCollections: 1, filter: {name: collName}});
-            var collInfo = null;
-            if (res.ok === 1 && res.cursor.firstBatch.length !== 0) {
-                collInfo = {
-                    ns: ns,
-                    host: conn.host,
-                    UUID: res.cursor.firstBatch[0].info.uuid,
-                    count: coll.find().itcount()
-                };
-            }
-            var infoPrefix = `${connName}(${conn.host}) info for ${ns} : `;
-            if (collInfo !== null) {
-                if (alreadyPrinted) {
-                    print(`${connName} info for ${ns} already printed. Search for ` +
-                          `'${infoPrefix}'`);
-                } else {
-                    print(infoPrefix + tojsononeline(collInfo));
-                }
-            } else {
-                print(infoPrefix + 'collection does not exist');
-            }
-
-            var collStats = conn.getDB(dbName).runCommand({collStats: collName});
-            var statsPrefix = `${connName}(${conn.host}) collStats for ${ns}: `;
-            if (collStats.ok === 1) {
-                if (alreadyPrinted) {
-                    print(`${connName} collStats for ${ns} already printed. Search for ` +
-                          `'${statsPrefix}'`);
-                } else {
-                    print(statsPrefix + tojsononeline(collStats));
-                }
-            } else {
-                print(`${statsPrefix}  error: ${tojsononeline(collStats)}`);
-            }
-
-            collectionPrinted.add(hostColl);
-
-            // Return true if collInfo & collStats can be retrieved for conn.
-            return collInfo !== null && collStats.ok === 1;
-        }
-
-        function dumpCollectionDiff(primary, secondary, dbName, collName) {
-            var ns = dbName + '.' + collName;
-            print('Dumping collection: ' + ns);
-
-            var primaryExists = printCollectionInfo('primary', primary, dbName, collName);
-            var secondaryExists = printCollectionInfo('secondary', secondary, dbName, collName);
-
-            if (!primaryExists || !secondaryExists) {
-                print(`Skipping checking collection differences for ${ns} since it does not ` +
-                      'exist on primary and secondary');
-                return;
-            }
-
-            const primarySession = primary.getDB('test').getSession();
-            const secondarySession = secondary.getDB('test').getSession();
-            const diff = self.getCollectionDiffUsingSessions(
-                primarySession, secondarySession, dbName, collName);
-
-            for (let {
-                     primary: primaryDoc,
-                     secondary: secondaryDoc,
-                 } of diff.docsWithDifferentContents) {
-                print(`Mismatching documents between the primary ${primary.host}` +
-                      ` and the secondary ${secondary.host}:`);
-                print('    primary:   ' + tojsononeline(primaryDoc));
-                print('    secondary: ' + tojsononeline(secondaryDoc));
-            }
-
-            if (diff.docsMissingOnPrimary.length > 0) {
-                print(`The following documents are missing on the primary ${primary.host}:`);
-                print(diff.docsMissingOnPrimary.map(doc => tojsononeline(doc)).join('\n'));
-            }
-
-            if (diff.docsMissingOnSecondary.length > 0) {
-                print(`The following documents are missing on the secondary ${secondary.host}:`);
-                print(diff.docsMissingOnSecondary.map(doc => tojsononeline(doc)).join('\n'));
-            }
-        }
-
         function checkDBHashesForReplSet(rst, dbBlacklist = [], slaves, msgPrefix, ignoreUUIDs) {
             // We don't expect the local database to match because some of its
             // collections are not replicated.
@@ -1935,33 +1848,25 @@ var ReplSetTest = function(opts) {
                     continue;
                 }
 
-                try {
-                    var dbHashes = rst.getHashes(dbName, slaves);
-                    var primaryDBHash = dbHashes.master;
-                    var primaryCollections = Object.keys(primaryDBHash.collections);
-                    assert.commandWorked(primaryDBHash);
+                const dbHashes = rst.getHashes(dbName, slaves);
+                const primaryDBHash = dbHashes.master;
+                const primaryCollections = Object.keys(primaryDBHash.collections);
+                assert.commandWorked(primaryDBHash);
 
-                    // Filter only collections that were retrieved by the dbhash. listCollections
-                    // may include non-replicated collections like system.profile.
-                    var primaryCollInfo =
-                        primary.getDB(dbName).getCollectionInfos({name: {$in: primaryCollections}});
-
-                } catch (e) {
-                    if (jsTest.options().skipValidationOnInvalidViewDefinitions) {
-                        assert.commandFailedWithCode(e, ErrorCodes.InvalidViewDefinition);
-                        print('Skipping dbhash check on ' + dbName +
-                              ' because of invalid views in system.views');
-                        continue;
-                    } else {
-                        throw e;
-                    }
-                }
+                // Filter only collections that were retrieved by the dbhash. listCollections
+                // may include non-replicated collections like system.profile.
+                const primaryCollInfos = new CollInfos(primary, 'primary', dbName);
+                primaryCollInfos.filter(primaryCollections);
 
                 dbHashes.slaves.forEach(secondaryDBHash => {
                     assert.commandWorked(secondaryDBHash);
 
                     var secondary = secondaryDBHash._mongo;
                     var secondaryCollections = Object.keys(secondaryDBHash.collections);
+                    // Check that collection information is consistent on the primary and
+                    // secondaries.
+                    const secondaryCollInfos = new CollInfos(secondary, 'secondary', dbName);
+                    secondaryCollInfos.filter(secondaryCollections);
 
                     if (primaryCollections.length !== secondaryCollections.length) {
                         print(
@@ -1970,13 +1875,16 @@ var ReplSetTest = function(opts) {
                             tojson(dbHashes));
                         for (var diffColl of arraySymmetricDifference(primaryCollections,
                                                                       secondaryCollections)) {
-                            dumpCollectionDiff(primary, secondary, dbName, diffColl);
+                            DataConsistencyChecker.dumpCollectionDiff(this,
+                                                                      collectionPrinted,
+                                                                      primaryCollInfos,
+                                                                      secondaryCollInfos,
+                                                                      diffColl);
                         }
                         success = false;
                     }
 
-                    var nonCappedCollNames = primaryCollections.filter(
-                        collName => !primary.getDB(dbName).getCollection(collName).isCapped());
+                    const nonCappedCollNames = primaryCollInfos.getNonCappedCollNames();
                     // Only compare the dbhashes of non-capped collections because capped
                     // collections are not necessarily truncated at the same points
                     // across replica set members.
@@ -1987,18 +1895,17 @@ var ReplSetTest = function(opts) {
                                   ', the primary and secondary have a different hash for the' +
                                   ' collection ' + dbName + '.' + collName + ': ' +
                                   tojson(dbHashes));
-                            dumpCollectionDiff(primary, secondary, dbName, collName);
+                            DataConsistencyChecker.dumpCollectionDiff(this,
+                                                                      collectionPrinted,
+                                                                      primaryCollInfos,
+                                                                      secondaryCollInfos,
+                                                                      collName);
                             success = false;
                         }
                     });
 
-                    // Check that collection information is consistent on the primary and
-                    // secondaries.
-                    var secondaryCollInfo = secondary.getDB(dbName).getCollectionInfos(
-                        {name: {$in: secondaryCollections}});
-
-                    secondaryCollInfo.forEach(secondaryInfo => {
-                        primaryCollInfo.forEach(primaryInfo => {
+                    secondaryCollInfos.collInfosRes.forEach(secondaryInfo => {
+                        primaryCollInfos.collInfosRes.forEach(primaryInfo => {
                             if (secondaryInfo.name === primaryInfo.name &&
                                 secondaryInfo.type === primaryInfo.type) {
                                 if (ignoreUUIDs) {
@@ -2024,8 +1931,11 @@ var ReplSetTest = function(opts) {
                                           ', the primary and secondary have different ' +
                                           'attributes for the collection or view ' + dbName + '.' +
                                           secondaryInfo.name);
-                                    dumpCollectionDiff(
-                                        primary, secondary, dbName, secondaryInfo.name);
+                                    DataConsistencyChecker.dumpCollectionDiff(this,
+                                                                              collectionPrinted,
+                                                                              primaryCollInfos,
+                                                                              secondaryCollInfos,
+                                                                              secondaryInfo.name);
                                     success = false;
                                 }
                             }
@@ -2046,8 +1956,8 @@ var ReplSetTest = function(opts) {
                             secondary.getDB(dbName).runCommand({collStats: collName});
 
                         if (primaryCollStats.ok !== 1 || secondaryCollStats.ok !== 1) {
-                            printCollectionInfo('primary', primary, dbName, collName);
-                            printCollectionInfo('secondary', secondary, dbName, collName);
+                            primaryCollInfos.print(collectionPrinted, collName);
+                            secondaryCollInfos.print(collectionPrinted, collName);
                             success = false;
                         } else if (primaryCollStats.capped !== secondaryCollStats.capped ||
                                    (hasSecondaryIndexes &&
@@ -2056,7 +1966,11 @@ var ReplSetTest = function(opts) {
                             print(msgPrefix +
                                   ', the primary and secondary have different stats for the ' +
                                   'collection ' + dbName + '.' + collName);
-                            dumpCollectionDiff(primary, secondary, dbName, collName);
+                            DataConsistencyChecker.dumpCollectionDiff(this,
+                                                                      collectionPrinted,
+                                                                      primaryCollInfos,
+                                                                      secondaryCollInfos,
+                                                                      collName);
                             success = false;
                         }
                     });

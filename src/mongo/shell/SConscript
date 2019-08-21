@@ -55,8 +55,7 @@ js_header = env.JSHeader(
 
 env.Alias('generated-sources', js_header)
 
-# Files added here need to be added in shell/shell_utils.cpp and buildscripts/vcxproj.header as
-# well.
+# Files added here need to be added in shell/shell_utils.cpp as well.
 env.JSHeader(
     target="mongo-server.cpp",
     source=[
@@ -64,6 +63,7 @@ env.JSHeader(
         "shardingtest.js",
         "servers_misc.js",
         "replsettest.js",
+        "data_consistency_checker.js",
         "bridge.js",
         "keyvault.js",
     ],
