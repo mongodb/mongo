@@ -83,8 +83,9 @@ public:
                                                           "refineCollectionShardKey",
                                                           DistLockManager::kDefaultLockTimeout)));
 
-            // Validate the given namespace is (i) sharded and (ii) has the same epoch as the router
-            // that received refineCollectionShardKey had in its routing table cache.
+            // Validate the given namespace is (i) sharded, (ii) doesn't already have the proposed
+            // key, and (iii) has the same epoch as the router that received
+            // refineCollectionShardKey had in its routing table cache.
             const auto collStatus =
                 catalogClient->getCollection(opCtx, nss, repl::ReadConcernLevel::kLocalReadConcern);
 
@@ -94,17 +95,7 @@ public:
                     collStatus != ErrorCodes::NamespaceNotFound);
 
             const auto collType = uassertStatusOK(collStatus).value;
-
-            uassert(ErrorCodes::StaleEpoch,
-                    str::stream()
-                        << "refineCollectionShardKey namespace " << nss.toString()
-                        << " has a different epoch than mongos had in its routing table cache",
-                    request().getEpoch() == collType.getEpoch());
-
             const auto oldShardKeyPattern = ShardKeyPattern(collType.getKeyPattern());
-
-            // Validate the given shard key (i) extends the current shard key, (ii) has a "useful"
-            // index, and (iii) the index in question has no null entries.
             const auto proposedKey = request().getKey().getOwned();
 
             if (SimpleBSONObjComparator::kInstance.evaluate(oldShardKeyPattern.toBSON() ==
@@ -114,6 +105,14 @@ public:
                 return;
             }
 
+            uassert(ErrorCodes::StaleEpoch,
+                    str::stream()
+                        << "refineCollectionShardKey namespace " << nss.toString()
+                        << " has a different epoch than mongos had in its routing table cache",
+                    request().getEpoch() == collType.getEpoch());
+
+            // Validate the given shard key (i) extends the current shard key, (ii) has a "useful"
+            // index, and (iii) the index in question has no null entries.
             const auto newShardKeyPattern = ShardKeyPattern(proposedKey);
 
             uassert(ErrorCodes::InvalidOptions,
