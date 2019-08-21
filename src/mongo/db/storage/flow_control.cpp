@@ -324,15 +324,21 @@ int FlowControl::getNumTickets() {
 
     int ret = 0;
     const auto thresholdLagMillis = getThresholdLagMillis();
-    const bool isHealthy =
-        getLagMillis(myLastApplied.wallTime, lastCommitted.wallTime) < thresholdLagMillis ||
-        // _approximateOpsBetween will return -1 if the input timestamps are in the same "bucket".
-        // This is an indication that there are very few ops between the two timestamps.
-        //
-        // Don't let the no-op writer on idle systems fool the sophisticated "is the replica set
-        // lagged" classifier.
-        _approximateOpsBetween(lastCommitted.opTime.getTimestamp(),
-                               myLastApplied.opTime.getTimestamp()) == -1;
+
+    // Successive lastCommitted and lastApplied wall clock time recordings are not guaranteed to be
+    // monotonically increasing. Recordings that satisfy the following check result in a negative
+    // value for lag, so ignore them.
+    const bool ignoreWallTimes = lastCommitted.wallTime > myLastApplied.wallTime;
+
+    // _approximateOpsBetween will return -1 if the input timestamps are in the same "bucket".
+    // This is an indication that there are very few ops between the two timestamps.
+    //
+    // Don't let the no-op writer on idle systems fool the sophisticated "is the replica set
+    // lagged" classifier.
+    const bool isHealthy = !ignoreWallTimes &&
+        (getLagMillis(myLastApplied.wallTime, lastCommitted.wallTime) < thresholdLagMillis ||
+         _approximateOpsBetween(lastCommitted.opTime.getTimestamp(),
+                                myLastApplied.opTime.getTimestamp()) == -1);
 
     if (isHealthy) {
         // The add/multiply technique is used to ensure ticket allocation can ramp up quickly,
@@ -347,7 +353,7 @@ int FlowControl::getNumTickets() {
             auto waitTime = curTimeMicros64() - _startWaitTime;
             _isLaggedTimeMicros.fetchAndAddRelaxed(waitTime);
         }
-    } else if (sustainerAdvanced(_prevMemberData, _currMemberData)) {
+    } else if (!ignoreWallTimes && sustainerAdvanced(_prevMemberData, _currMemberData)) {
         // Expected case where flow control has meaningful data from the last period to make a new
         // calculation.
         ret =
@@ -364,7 +370,7 @@ int FlowControl::getNumTickets() {
         }
     } else {
         // Unexpected case where consecutive readings from the topology state don't meet some basic
-        // expectations.
+        // expectations, or where the lag measure is nonsensical.
         ret = _lastTargetTicketsPermitted.load();
         _lastTimeSustainerAdvanced = Date_t::now();
         // Since this case does not give conclusive evidence that isLagged could have meaningfully
