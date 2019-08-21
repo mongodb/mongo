@@ -10,19 +10,17 @@
 
 /*
  * __wt_yield --
- *	Yield the thread of control.
+ *     Yield the thread of control.
  */
 void
-__wt_yield(void)
-    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
+__wt_yield(void) WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
-	/*
-	 * Yielding the processor isn't documented as a memory barrier, and it's
-	 * a reasonable expectation to have. There's no reason not to explicitly
-	 * include a barrier since we're giving up the CPU, and ensures callers
-	 * aren't ever surprised.
-	 */
-	WT_FULL_BARRIER();
+    /*
+     * Yielding the processor isn't documented as a memory barrier, and it's a reasonable
+     * expectation to have. There's no reason not to explicitly include a barrier since we're giving
+     * up the CPU, and ensures callers aren't ever surprised.
+     */
+    WT_FULL_BARRIER();
 
-	sched_yield();
+    sched_yield();
 }

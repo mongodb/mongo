@@ -2,7 +2,7 @@
 
 # Generate WiredTiger function prototypes.
 import fnmatch, re
-from dist import compare_srcfile, source_files
+from dist import compare_srcfile, format_srcfile, source_files
 
 # Build function prototypes from a list of files.
 def prototypes(list, name):
@@ -47,6 +47,7 @@ def output(p, f):
     for e in sorted(list(set(p))):
         tfile.write(e)
     tfile.close()
+    format_srcfile(tmp_file)
     compare_srcfile(tmp_file, f)
 
 # Update generic function prototypes.

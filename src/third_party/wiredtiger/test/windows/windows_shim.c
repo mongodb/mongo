@@ -31,102 +31,100 @@
 int
 sleep(int seconds)
 {
-	Sleep(seconds * 1000);
-	return (0);
+    Sleep(seconds * 1000);
+    return (0);
 }
 
 int
 usleep(useconds_t useconds)
 {
-	uint32_t milli;
-	milli = useconds / 1000;
+    uint32_t milli;
+    milli = useconds / 1000;
 
-	if (milli == 0)
-		milli++;
+    if (milli == 0)
+        milli++;
 
-	Sleep(milli);
+    Sleep(milli);
 
-	return (0);
+    return (0);
 }
 
 int
-gettimeofday(struct timeval* tp, void* tzp)
+gettimeofday(struct timeval *tp, void *tzp)
 {
-	FILETIME time;
-	uint64_t ns100;
+    FILETIME time;
+    uint64_t ns100;
 
-	tzp = tzp;
+    tzp = tzp;
 
-	GetSystemTimeAsFileTime(&time);
+    GetSystemTimeAsFileTime(&time);
 
-	ns100 = (((int64_t)time.dwHighDateTime << 32) + time.dwLowDateTime)
-	    - 116444736000000000LL;
-	tp->tv_sec = ns100 / 10000000;
-	tp->tv_usec = (long)((ns100 % 10000000) / 10);
+    ns100 = (((int64_t)time.dwHighDateTime << 32) + time.dwLowDateTime) - 116444736000000000LL;
+    tp->tv_sec = ns100 / 10000000;
+    tp->tv_usec = (long)((ns100 % 10000000) / 10);
 
-	return (0);
+    return (0);
 }
 
 int
 pthread_rwlock_destroy(pthread_rwlock_t *lock)
 {
-	lock = lock;				/* Unused variable. */
-	return (0);
+    lock = lock; /* Unused variable. */
+    return (0);
 }
 
 int
-pthread_rwlock_init(pthread_rwlock_t *rwlock,
-    const pthread_rwlockattr_t *ignored)
+pthread_rwlock_init(pthread_rwlock_t *rwlock, const pthread_rwlockattr_t *ignored)
 {
-	ignored = ignored;			/* Unused variable. */
-	InitializeSRWLock(&rwlock->rwlock);
-	rwlock->exclusive_locked = 0;
+    ignored = ignored; /* Unused variable. */
+    InitializeSRWLock(&rwlock->rwlock);
+    rwlock->exclusive_locked = 0;
 
-	return (0);
+    return (0);
 }
 
 int
 pthread_rwlock_unlock(pthread_rwlock_t *rwlock)
 {
-	if (rwlock->exclusive_locked != 0) {
-		rwlock->exclusive_locked = 0;
-		ReleaseSRWLockExclusive(&rwlock->rwlock);
-	} else
-		ReleaseSRWLockShared(&rwlock->rwlock);
+    if (rwlock->exclusive_locked != 0) {
+        rwlock->exclusive_locked = 0;
+        ReleaseSRWLockExclusive(&rwlock->rwlock);
+    } else
+        ReleaseSRWLockShared(&rwlock->rwlock);
 
-	return (0);
+    return (0);
 }
 
 int
 pthread_rwlock_tryrdlock(pthread_rwlock_t *rwlock)
 {
-	return (TryAcquireSRWLockShared(&rwlock->rwlock) ? 0 : EBUSY);
+    return (TryAcquireSRWLockShared(&rwlock->rwlock) ? 0 : EBUSY);
 }
 
 int
 pthread_rwlock_rdlock(pthread_rwlock_t *rwlock)
 {
-	AcquireSRWLockShared(&rwlock->rwlock);
-	return (0);
+    AcquireSRWLockShared(&rwlock->rwlock);
+    return (0);
 }
 
 int
 pthread_rwlock_trywrlock(pthread_rwlock_t *rwlock)
 {
-	if (TryAcquireSRWLockExclusive(&rwlock->rwlock)) {
-		rwlock->exclusive_locked = GetCurrentThreadId();
-		return (0);
-	}
+    if (TryAcquireSRWLockExclusive(&rwlock->rwlock)) {
+        rwlock->exclusive_locked = GetCurrentThreadId();
+        return (0);
+    }
 
-	return (EBUSY);
+    return (EBUSY);
 }
 
 int
 pthread_rwlock_wrlock(pthread_rwlock_t *rwlock)
 {
-	AcquireSRWLockExclusive(&rwlock->rwlock);
+    AcquireSRWLockExclusive(&rwlock->rwlock);
 
-	rwlock->exclusive_locked = GetCurrentThreadId();
+    rwlock->exclusive_locked = GetCurrentThreadId();
 
-	return (0);
+    return (0);
 }

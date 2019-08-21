@@ -411,6 +411,7 @@ VALGRIND
 VARCHAR
 VLDB
 VMSG
+VPM
 VR
 VRFY
 VX
@@ -1362,6 +1363,7 @@ versa
 vfprintf
 vm
 vpack
+vpmsum
 vprintf
 vrfy
 vsize

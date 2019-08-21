@@ -21,11 +21,11 @@ build() {
 	l=`ls ../src/include/*.[hi] ../src/include/*.in |
 	    sed -e '/wiredtiger.*/d' -e '/queue.h/d'`
 	egrep -h \
-	    '^[	 ]*(((struct|union)[	 ].*__wt_.*{)|WT_PACKED_STRUCT_BEGIN)' \
+	    '^\s*(((struct|union)\s.*__wt_.*{)|WT_PACKED_STRUCT_BEGIN)' \
 	    $l |
 	    sed -e 's/WT_PACKED_STRUCT_BEGIN(\(.*\))/struct \1 {/' \
 	        -e 's/WT_COMPILER_TYPE_ALIGN(.*)[ ]*//' \
-	        -e 's/^[	 ]*//' -e 's/[	 ]*{.*//' | sort -u | \
+	        -e 's/^[ ]*//' -e 's/[ ]*{.*//' | sort -u | \
 	while read t n; do
 		upper=`echo $n | sed -e 's/^__//' | tr [a-z] [A-Z]`
 		echo "$t $n;"
@@ -42,6 +42,7 @@ build() {
 	    -e 'p' \
 	    -e '}' \
 	    -e 'd' < $f) > $t
+	./s_clang-format "${PWD}/$t"
 	cmp $t $f > /dev/null 2>&1 ||
 	    (echo "Building $f" && rm -f $f && cp $t $f)
 }

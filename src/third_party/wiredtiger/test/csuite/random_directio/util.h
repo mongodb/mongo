@@ -31,5 +31,4 @@
  * 	Utility functions for test that simulates system crashes.
  */
 
-extern void
-copy_directory(const char *, const char *, bool);
+extern void copy_directory(const char *, const char *, bool);

@@ -13,13 +13,13 @@
 
 /* Boilerplate for function entry points */
 #define WT_CRC32_ENTRY(name) \
-.globl name;        \
-.align 4, 0x90;     \
+    .globl name;             \
+    .align 4, 0x90;          \
 name:
 
 /* Macros to generate vector instruction byte code */
 
-#define REG_NUM_INVALID	       255
+#define REG_NUM_INVALID 255
 
 /* GR_NUM - Retrieve general-purpose register number
  *
@@ -82,7 +82,7 @@ name:
 .endm
 
 /* VX_R() - Macro to encode the VX_NUM into the instruction */
-#define VX_R(v)		(v & 0x0F)
+#define VX_R(v) (v & 0x0F)
 
 /* VX_NUM - Retrieve vector register number
  *
@@ -477,4 +477,4 @@ name:
 	MRXBOPC	0, 0x7D, v1, v2, v3
 .endm
 
-#endif	/* __ASM_S390_VX_INSN_H */
+#endif /* __ASM_S390_VX_INSN_H */

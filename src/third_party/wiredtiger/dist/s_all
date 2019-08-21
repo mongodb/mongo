@@ -78,10 +78,11 @@ run "python flags.py"
 run "python log.py"
 run "python stat.py"
 run "python java_doc.py"
-run "python prototypes.py"
-run "sh ./s_typedef -b"
 run "sh ./s_copyright"
 run "sh ./s_style"
+run "./s_clang-format"
+run "python prototypes.py"
+run "sh ./s_typedef -b"
 
 COMMANDS="
 2>&1 ./s_define > ${t_pfx}s_define

@@ -6,23 +6,23 @@
  * See the file LICENSE for redistribution information.
  */
 
-#define	WT_PTRDIFFT_FMT	"td"			/* ptrdiff_t format string */
-#define	WT_SIZET_FMT	"zu"			/* size_t format string */
+#define WT_PTRDIFFT_FMT "td" /* ptrdiff_t format string */
+#define WT_SIZET_FMT "zu"    /* size_t format string */
 
 /* GCC-specific attributes. */
-#define	WT_PACKED_STRUCT_BEGIN(name)					\
-	/* NOLINTNEXTLINE(misc-macro-parentheses) */	\
-	struct __attribute__ ((__packed__)) name {
-#define	WT_PACKED_STRUCT_END						\
-	};
+#define WT_PACKED_STRUCT_BEGIN(name)             \
+    /* NOLINTNEXTLINE(misc-macro-parentheses) */ \
+    struct __attribute__((__packed__)) name {
+#define WT_PACKED_STRUCT_END \
+    }                        \
+    ;
 
 /*
- * Attribute are only permitted on function declarations, not definitions.
- * This macro is a marker for function definitions that is rewritten by
- * dist/s_prototypes to create extern.h.
+ * Attribute are only permitted on function declarations, not definitions. This macro is a marker
+ * for function definitions that is rewritten by dist/s_prototypes to create extern.h.
  */
-#define	WT_GCC_FUNC_ATTRIBUTE(x)
-#define	WT_GCC_FUNC_DECL_ATTRIBUTE(x)	__attribute__(x)
+#define WT_GCC_FUNC_ATTRIBUTE(x)
+#define WT_GCC_FUNC_DECL_ATTRIBUTE(x) __attribute__(x)
 
 /*
  * Atomic writes:
@@ -90,67 +90,56 @@
  */
 
 /*
- * We've hit optimization bugs with Clang 3.5 in the past when using the atomic
- * builtins. See http://llvm.org/bugs/show_bug.cgi?id=21499 for details.
+ * We've hit optimization bugs with Clang 3.5 in the past when using the atomic builtins. See
+ * http://llvm.org/bugs/show_bug.cgi?id=21499 for details.
  */
-#if defined(__clang__) && \
-	defined(__clang_major__) && defined(__clang_minor__) && \
-	(((__clang_major__ == 3) && (__clang_minor__ <= 5)) || \
-	 (__clang_major__ < 3))
+#if defined(__clang__) && defined(__clang_major__) && defined(__clang_minor__) && \
+  (((__clang_major__ == 3) && (__clang_minor__ <= 5)) || (__clang_major__ < 3))
 #error "Clang versions 3.5 and earlier are unsupported by WiredTiger"
 #endif
 
-#define	WT_ATOMIC_CAS(ptr, oldp, new)					\
-	__atomic_compare_exchange_n(					\
-	    ptr, oldp, new, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
-#define	WT_ATOMIC_CAS_FUNC(name, vp_arg, old_arg, new_arg)		\
-static inline bool							\
-__wt_atomic_cas##name(vp_arg, old_arg, new_arg)				\
-{									\
-	return (WT_ATOMIC_CAS(vp, &old, new));				\
-}
+#define WT_ATOMIC_CAS(ptr, oldp, new) \
+    __atomic_compare_exchange_n(ptr, oldp, new, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
+#define WT_ATOMIC_CAS_FUNC(name, vp_arg, old_arg, new_arg)             \
+    static inline bool __wt_atomic_cas##name(vp_arg, old_arg, new_arg) \
+    {                                                                  \
+        return (WT_ATOMIC_CAS(vp, &old, new));                         \
+    }
 WT_ATOMIC_CAS_FUNC(8, uint8_t *vp, uint8_t old, uint8_t new)
 WT_ATOMIC_CAS_FUNC(16, uint16_t *vp, uint16_t old, uint16_t new)
 WT_ATOMIC_CAS_FUNC(32, uint32_t *vp, uint32_t old, uint32_t new)
-WT_ATOMIC_CAS_FUNC(v32,							\
-    volatile uint32_t *vp, uint32_t old, volatile uint32_t new)
+WT_ATOMIC_CAS_FUNC(v32, volatile uint32_t *vp, uint32_t old, volatile uint32_t new)
 WT_ATOMIC_CAS_FUNC(i32, int32_t *vp, int32_t old, int32_t new)
-WT_ATOMIC_CAS_FUNC(iv32,						\
-    volatile int32_t *vp, int32_t old, volatile int32_t new)
+WT_ATOMIC_CAS_FUNC(iv32, volatile int32_t *vp, int32_t old, volatile int32_t new)
 WT_ATOMIC_CAS_FUNC(64, uint64_t *vp, uint64_t old, uint64_t new)
-WT_ATOMIC_CAS_FUNC(v64,							\
-    volatile uint64_t *vp, uint64_t old, volatile uint64_t new)
+WT_ATOMIC_CAS_FUNC(v64, volatile uint64_t *vp, uint64_t old, volatile uint64_t new)
 WT_ATOMIC_CAS_FUNC(i64, int64_t *vp, int64_t old, int64_t new)
-WT_ATOMIC_CAS_FUNC(iv64,						\
-    volatile int64_t *vp, int64_t old, volatile int64_t new)
+WT_ATOMIC_CAS_FUNC(iv64, volatile int64_t *vp, int64_t old, volatile int64_t new)
 WT_ATOMIC_CAS_FUNC(size, size_t *vp, size_t old, size_t new)
 
 /*
  * __wt_atomic_cas_ptr --
- *	Pointer compare and swap.
+ *     Pointer compare and swap.
  */
 static inline bool
 __wt_atomic_cas_ptr(void *vp, void *old, void *new)
 {
-	return (WT_ATOMIC_CAS((void **)vp, &old, new));
+    return (WT_ATOMIC_CAS((void **)vp, &old, new));
 }
 
-#define	WT_ATOMIC_FUNC(name, ret, vp_arg, v_arg)			\
-static inline ret							\
-__wt_atomic_add##name(vp_arg, v_arg)					\
-{									\
-	return (__atomic_add_fetch(vp, v, __ATOMIC_SEQ_CST));		\
-}									\
-static inline ret							\
-__wt_atomic_fetch_add##name(vp_arg, v_arg)				\
-{									\
-	return (__atomic_fetch_add(vp, v, __ATOMIC_SEQ_CST));		\
-}									\
-static inline ret							\
-__wt_atomic_sub##name(vp_arg, v_arg)					\
-{									\
-	return (__atomic_sub_fetch(vp, v, __ATOMIC_SEQ_CST));		\
-}
+#define WT_ATOMIC_FUNC(name, ret, vp_arg, v_arg)                 \
+    static inline ret __wt_atomic_add##name(vp_arg, v_arg)       \
+    {                                                            \
+        return (__atomic_add_fetch(vp, v, __ATOMIC_SEQ_CST));    \
+    }                                                            \
+    static inline ret __wt_atomic_fetch_add##name(vp_arg, v_arg) \
+    {                                                            \
+        return (__atomic_fetch_add(vp, v, __ATOMIC_SEQ_CST));    \
+    }                                                            \
+    static inline ret __wt_atomic_sub##name(vp_arg, v_arg)       \
+    {                                                            \
+        return (__atomic_sub_fetch(vp, v, __ATOMIC_SEQ_CST));    \
+    }
 WT_ATOMIC_FUNC(8, uint8_t, uint8_t *vp, uint8_t v)
 WT_ATOMIC_FUNC(16, uint16_t, uint16_t *vp, uint16_t v)
 WT_ATOMIC_FUNC(32, uint32_t, uint32_t *vp, uint32_t v)
@@ -164,83 +153,97 @@ WT_ATOMIC_FUNC(iv64, int64_t, volatile int64_t *vp, volatile int64_t v)
 WT_ATOMIC_FUNC(size, size_t, size_t *vp, size_t v)
 
 /* Compile read-write barrier */
-#define	WT_BARRIER() __asm__ volatile("" ::: "memory")
+#define WT_BARRIER() __asm__ volatile("" ::: "memory")
 
 #if defined(x86_64) || defined(__x86_64__)
 /* Pause instruction to prevent excess processor bus usage */
-#define	WT_PAUSE()	__asm__ volatile("pause\n" ::: "memory")
-#define	WT_FULL_BARRIER() do {						\
-	__asm__ volatile ("mfence" ::: "memory");			\
-} while (0)
-#define	WT_READ_BARRIER() do {						\
-	__asm__ volatile ("lfence" ::: "memory");			\
-} while (0)
-#define	WT_WRITE_BARRIER() do {						\
-	__asm__ volatile ("sfence" ::: "memory");			\
-} while (0)
+#define WT_PAUSE() __asm__ volatile("pause\n" ::: "memory")
+#define WT_FULL_BARRIER()                        \
+    do {                                         \
+        __asm__ volatile("mfence" ::: "memory"); \
+    } while (0)
+#define WT_READ_BARRIER()                        \
+    do {                                         \
+        __asm__ volatile("lfence" ::: "memory"); \
+    } while (0)
+#define WT_WRITE_BARRIER()                       \
+    do {                                         \
+        __asm__ volatile("sfence" ::: "memory"); \
+    } while (0)
 
 #elif defined(i386) || defined(__i386__)
-#define	WT_PAUSE()	__asm__ volatile("pause\n" ::: "memory")
-#define	WT_FULL_BARRIER() do {						\
-	__asm__ volatile ("lock; addl $0, 0(%%esp)" ::: "memory");	\
-} while (0)
-#define	WT_READ_BARRIER()	WT_FULL_BARRIER()
-#define	WT_WRITE_BARRIER()	WT_FULL_BARRIER()
+#define WT_PAUSE() __asm__ volatile("pause\n" ::: "memory")
+#define WT_FULL_BARRIER()                                         \
+    do {                                                          \
+        __asm__ volatile("lock; addl $0, 0(%%esp)" ::: "memory"); \
+    } while (0)
+#define WT_READ_BARRIER() WT_FULL_BARRIER()
+#define WT_WRITE_BARRIER() WT_FULL_BARRIER()
 
 #elif defined(__PPC64__) || defined(PPC64)
 /* ori 0,0,0 is the PPC64 noop instruction */
-#define	WT_PAUSE()	__asm__ volatile("ori 0,0,0" ::: "memory")
-#define	WT_FULL_BARRIER() do {						\
-	__asm__ volatile ("sync" ::: "memory");				\
-} while (0)
+#define WT_PAUSE() __asm__ volatile("ori 0,0,0" ::: "memory")
+#define WT_FULL_BARRIER()                      \
+    do {                                       \
+        __asm__ volatile("sync" ::: "memory"); \
+    } while (0)
 
 /* TODO: ISA 2.07 Elemental Memory Barriers would be better,
    specifically mbll, and mbss, but they are not supported by POWER 8 */
-#define	WT_READ_BARRIER() do {						\
-	__asm__ volatile ("lwsync" ::: "memory");			\
-} while (0)
-#define	WT_WRITE_BARRIER() do {						\
-	__asm__ volatile ("lwsync" ::: "memory");			\
-} while (0)
+#define WT_READ_BARRIER()                        \
+    do {                                         \
+        __asm__ volatile("lwsync" ::: "memory"); \
+    } while (0)
+#define WT_WRITE_BARRIER()                       \
+    do {                                         \
+        __asm__ volatile("lwsync" ::: "memory"); \
+    } while (0)
 
 #elif defined(__aarch64__)
-#define	WT_PAUSE()	__asm__ volatile("yield" ::: "memory")
-#define	WT_FULL_BARRIER() do {						\
-	__asm__ volatile ("dsb sy" ::: "memory");			\
-} while (0)
-#define	WT_READ_BARRIER() do {						\
-	__asm__ volatile ("dsb ld" ::: "memory");			\
-} while (0)
-#define	WT_WRITE_BARRIER() do {						\
-	__asm__ volatile ("dsb st" ::: "memory");			\
-} while (0)
+#define WT_PAUSE() __asm__ volatile("yield" ::: "memory")
+#define WT_FULL_BARRIER()                        \
+    do {                                         \
+        __asm__ volatile("dsb sy" ::: "memory"); \
+    } while (0)
+#define WT_READ_BARRIER()                        \
+    do {                                         \
+        __asm__ volatile("dsb ld" ::: "memory"); \
+    } while (0)
+#define WT_WRITE_BARRIER()                       \
+    do {                                         \
+        __asm__ volatile("dsb st" ::: "memory"); \
+    } while (0)
 
 #elif defined(__s390x__)
-#define	WT_PAUSE()	__asm__ volatile("lr 0,0" ::: "memory")
-#define	WT_FULL_BARRIER() do {						\
-	__asm__ volatile ("bcr 15,0\n" ::: "memory");			\
-} while (0)
-#define	WT_READ_BARRIER()	WT_FULL_BARRIER()
-#define	WT_WRITE_BARRIER()	WT_FULL_BARRIER()
+#define WT_PAUSE() __asm__ volatile("lr 0,0" ::: "memory")
+#define WT_FULL_BARRIER()                            \
+    do {                                             \
+        __asm__ volatile("bcr 15,0\n" ::: "memory"); \
+    } while (0)
+#define WT_READ_BARRIER() WT_FULL_BARRIER()
+#define WT_WRITE_BARRIER() WT_FULL_BARRIER()
 
 #elif defined(__sparc__)
-#define	WT_PAUSE()	__asm__ volatile("rd %%ccr, %%g0" ::: "memory")
+#define WT_PAUSE() __asm__ volatile("rd %%ccr, %%g0" ::: "memory")
 
-#define	WT_FULL_BARRIER() do {						\
-	__asm__ volatile ("membar #StoreLoad" ::: "memory");		\
-} while (0)
+#define WT_FULL_BARRIER()                                   \
+    do {                                                    \
+        __asm__ volatile("membar #StoreLoad" ::: "memory"); \
+    } while (0)
 
 /*
- * On UltraSparc machines, TSO is used, and so there is no need for membar.
- * READ_BARRIER = #LoadLoad, and WRITE_BARRIER = #StoreStore are noop.
+ * On UltraSparc machines, TSO is used, and so there is no need for membar. READ_BARRIER =
+ * #LoadLoad, and WRITE_BARRIER = #StoreStore are noop.
  */
-#define	WT_READ_BARRIER() do {						\
-	__asm__ volatile ("" ::: "memory");				\
-} while (0)
+#define WT_READ_BARRIER()                  \
+    do {                                   \
+        __asm__ volatile("" ::: "memory"); \
+    } while (0)
 
-#define	WT_WRITE_BARRIER() do {						\
-	__asm__ volatile ("" ::: "memory");				\
-} while (0)
+#define WT_WRITE_BARRIER()                 \
+    do {                                   \
+        __asm__ volatile("" ::: "memory"); \
+    } while (0)
 
 #else
 #error "No write barrier implementation for this hardware"

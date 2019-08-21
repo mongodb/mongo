@@ -32,50 +32,47 @@ GLOBAL g;
 
 static void format_die(void);
 static void startup(void);
-static void usage(void)
-    WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 
 extern int __wt_optind;
 extern char *__wt_optarg;
 
 /*
  * signal_handler --
- *	Handle signals.
+ *     Handle signals.
  */
 static void signal_handler(int signo) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void
 signal_handler(int signo)
 {
-	fprintf(stderr,
-	    "format caught signal %d, aborting the process\n", signo);
-	__wt_abort(NULL);
+    fprintf(stderr, "format caught signal %d, aborting the process\n", signo);
+    __wt_abort(NULL);
 }
 
 int
 main(int argc, char *argv[])
 {
-	time_t start;
-	int ch, onerun, reps;
-	const char *config, *home;
+    time_t start;
+    int ch, onerun, reps;
+    const char *config, *home;
 
-	custom_die = format_die;		/* Local death handler. */
+    custom_die = format_die; /* Local death handler. */
 
-	config = NULL;
+    config = NULL;
 
-	(void)testutil_set_progname(argv);
+    (void)testutil_set_progname(argv);
 
-	/*
-	 * Windows and Linux support different sets of signals, be conservative
-	 * about installing handlers.
-	 */
+/*
+ * Windows and Linux support different sets of signals, be conservative about installing handlers.
+ */
 #ifdef SIGALRM
-	(void)signal(SIGALRM, signal_handler);
+    (void)signal(SIGALRM, signal_handler);
 #endif
 #ifdef SIGHUP
-	(void)signal(SIGHUP, signal_handler);
+    (void)signal(SIGHUP, signal_handler);
 #endif
 #ifdef SIGTERM
-	(void)signal(SIGTERM, signal_handler);
+    (void)signal(SIGTERM, signal_handler);
 #endif
 
 #if 0
@@ -87,274 +84,266 @@ main(int argc, char *argv[])
 	(void)setenv("MALLOC_OPTIONS", "AJ", 1);
 #endif
 
-	/* Track progress unless we're re-directing output to a file. */
-	g.c_quiet = isatty(1) ? 0 : 1;
+    /* Track progress unless we're re-directing output to a file. */
+    g.c_quiet = isatty(1) ? 0 : 1;
 
-	/* Set values from the command line. */
-	home = NULL;
-	onerun = 0;
-	while ((ch = __wt_getopt(
-	    progname, argc, argv, "1C:c:h:lqrt:")) != EOF)
-		switch (ch) {
-		case '1':			/* One run */
-			onerun = 1;
-			break;
-		case 'C':			/* wiredtiger_open config */
-			g.config_open = __wt_optarg;
-			break;
-		case 'c':			/* Configuration from a file */
-			config = __wt_optarg;
-			break;
-		case 'h':
-			home = __wt_optarg;
-			break;
-		case 'l':			/* Log operations to a file */
-			g.logging = true;
-			break;
-		case 'q':			/* Quiet */
-			g.c_quiet = 1;
-			break;
-		case 'r':			/* Replay a run */
-			g.replay = true;
-			break;
-		default:
-			usage();
-		}
-	argv += __wt_optind;
+    /* Set values from the command line. */
+    home = NULL;
+    onerun = 0;
+    while ((ch = __wt_getopt(progname, argc, argv, "1C:c:h:lqrt:")) != EOF)
+        switch (ch) {
+        case '1': /* One run */
+            onerun = 1;
+            break;
+        case 'C': /* wiredtiger_open config */
+            g.config_open = __wt_optarg;
+            break;
+        case 'c': /* Configuration from a file */
+            config = __wt_optarg;
+            break;
+        case 'h':
+            home = __wt_optarg;
+            break;
+        case 'l': /* Log operations to a file */
+            g.logging = true;
+            break;
+        case 'q': /* Quiet */
+            g.c_quiet = 1;
+            break;
+        case 'r': /* Replay a run */
+            g.replay = true;
+            break;
+        default:
+            usage();
+        }
+    argv += __wt_optind;
 
-	/* Initialize the global RNG. */
-	__wt_random_init_seed(NULL, &g.rnd);
+    /* Initialize the global RNG. */
+    __wt_random_init_seed(NULL, &g.rnd);
 
-	/* Set up paths. */
-	path_setup(home);
+    /* Set up paths. */
+    path_setup(home);
 
-	/* If it's a replay, use the home directory's CONFIG file. */
-	if (g.replay) {
-		if (config != NULL)
-			testutil_die(EINVAL, "-c incompatible with -r");
-		if (access(g.home_config, R_OK) != 0)
-			testutil_die(ENOENT, "%s", g.home_config);
-		config = g.home_config;
-	}
+    /* If it's a replay, use the home directory's CONFIG file. */
+    if (g.replay) {
+        if (config != NULL)
+            testutil_die(EINVAL, "-c incompatible with -r");
+        if (access(g.home_config, R_OK) != 0)
+            testutil_die(ENOENT, "%s", g.home_config);
+        config = g.home_config;
+    }
 
-	/*
-	 * If we weren't given a configuration file, set values from "CONFIG",
-	 * if it exists.
-	 *
-	 * Small hack to ignore any CONFIG file named ".", that just makes it
-	 * possible to ignore any local CONFIG file, used when running checks.
-	 */
-	if (config == NULL && access("CONFIG", R_OK) == 0)
-		config = "CONFIG";
-	if (config != NULL && strcmp(config, ".") != 0)
-		config_file(config);
+    /*
+     * If we weren't given a configuration file, set values from "CONFIG",
+     * if it exists.
+     *
+     * Small hack to ignore any CONFIG file named ".", that just makes it
+     * possible to ignore any local CONFIG file, used when running checks.
+     */
+    if (config == NULL && access("CONFIG", R_OK) == 0)
+        config = "CONFIG";
+    if (config != NULL && strcmp(config, ".") != 0)
+        config_file(config);
 
-	/*
-	 * The rest of the arguments are individual configurations that modify
-	 * the base configuration.
-	 */
-	for (; *argv != NULL; ++argv)
-		config_single(*argv, true);
+    /*
+     * The rest of the arguments are individual configurations that modify the base configuration.
+     */
+    for (; *argv != NULL; ++argv)
+        config_single(*argv, true);
 
-	/*
-	 * Multithreaded runs can be replayed: it's useful and we'll get the
-	 * configuration correct.  Obviously the order of operations changes,
-	 * warn the user.
-	 */
-	if (g.replay && !SINGLETHREADED)
-		printf("Warning: replaying a threaded run\n");
+    /*
+     * Multithreaded runs can be replayed: it's useful and we'll get the configuration correct.
+     * Obviously the order of operations changes, warn the user.
+     */
+    if (g.replay && !SINGLETHREADED)
+        printf("Warning: replaying a threaded run\n");
 
-	/*
-	 * Single-threaded runs historically exited after a single replay, which
-	 * makes sense when you're debugging, leave that semantic in place.
-	 */
-	if (g.replay && SINGLETHREADED)
-		g.c_runs = 1;
+    /*
+     * Single-threaded runs historically exited after a single replay, which makes sense when you're
+     * debugging, leave that semantic in place.
+     */
+    if (g.replay && SINGLETHREADED)
+        g.c_runs = 1;
 
-	/*
-	 * Let the command line -1 flag override runs configured from other
-	 * sources.
-	 */
-	if (onerun)
-		g.c_runs = 1;
+    /*
+     * Let the command line -1 flag override runs configured from other sources.
+     */
+    if (onerun)
+        g.c_runs = 1;
 
-	/*
-	 * Initialize locks to single-thread named checkpoints and backups, last
-	 * last-record updates, and failures.
-	 */
-	testutil_check(pthread_rwlock_init(&g.append_lock, NULL));
-	testutil_check(pthread_rwlock_init(&g.backup_lock, NULL));
-	testutil_check(pthread_rwlock_init(&g.death_lock, NULL));
-	testutil_check(pthread_rwlock_init(&g.ts_lock, NULL));
+    /*
+     * Initialize locks to single-thread named checkpoints and backups, last last-record updates,
+     * and failures.
+     */
+    testutil_check(pthread_rwlock_init(&g.append_lock, NULL));
+    testutil_check(pthread_rwlock_init(&g.backup_lock, NULL));
+    testutil_check(pthread_rwlock_init(&g.death_lock, NULL));
+    testutil_check(pthread_rwlock_init(&g.ts_lock, NULL));
 
-	printf("%s: process %" PRIdMAX "\n", progname, (intmax_t)getpid());
-	while (++g.run_cnt <= g.c_runs || g.c_runs == 0 ) {
-		startup();			/* Start a run */
+    printf("%s: process %" PRIdMAX "\n", progname, (intmax_t)getpid());
+    while (++g.run_cnt <= g.c_runs || g.c_runs == 0) {
+        startup(); /* Start a run */
 
-		config_setup();			/* Run configuration */
-		config_print(false);		/* Dump run configuration */
-		key_init();			/* Setup keys/values */
-		val_init();
+        config_setup();      /* Run configuration */
+        config_print(false); /* Dump run configuration */
+        key_init();          /* Setup keys/values */
+        val_init();
 
-		start = time(NULL);
-		track("starting up", 0ULL, NULL);
+        start = time(NULL);
+        track("starting up", 0ULL, NULL);
 
-		wts_open(g.home, true, &g.wts_conn);
-		wts_init();
+        wts_open(g.home, true, &g.wts_conn);
+        wts_init();
 
-		wts_load();			/* Load initial records */
-		wts_verify("post-bulk verify");	/* Verify */
+        wts_load();                     /* Load initial records */
+        wts_verify("post-bulk verify"); /* Verify */
 
-		/*
-		 * If we're not doing any operations, scan the bulk-load, copy
-		 * the statistics and we're done. Otherwise, loop reading and
-		 * operations, with a verify after each set.
-		 */
-		if (g.c_timer == 0 && g.c_ops == 0) {
-			wts_read_scan();		/* Read scan */
-			wts_stats();			/* Statistics */
-		} else
-			for (reps = 1; reps <= FORMAT_OPERATION_REPS; ++reps) {
-				wts_read_scan();	/* Read scan */
+        /*
+         * If we're not doing any operations, scan the bulk-load, copy the statistics and we're
+         * done. Otherwise, loop reading and operations, with a verify after each set.
+         */
+        if (g.c_timer == 0 && g.c_ops == 0) {
+            wts_read_scan(); /* Read scan */
+            wts_stats();     /* Statistics */
+        } else
+            for (reps = 1; reps <= FORMAT_OPERATION_REPS; ++reps) {
+                wts_read_scan(); /* Read scan */
 
-							/* Operations */
-				wts_ops(reps == FORMAT_OPERATION_REPS);
+                /* Operations */
+                wts_ops(reps == FORMAT_OPERATION_REPS);
 
-				/*
-				 * Copy out the run's statistics after the last
-				 * set of operations.
-				 *
-				 * XXX
-				 * Verify closes the underlying handle and
-				 * discards the statistics, read them first.
-				 */
-				if (reps == FORMAT_OPERATION_REPS)
-					wts_stats();
+                /*
+                 * Copy out the run's statistics after the last
+                 * set of operations.
+                 *
+                 * XXX
+                 * Verify closes the underlying handle and
+                 * discards the statistics, read them first.
+                 */
+                if (reps == FORMAT_OPERATION_REPS)
+                    wts_stats();
 
-							/* Verify */
-				wts_verify("post-ops verify");
-			}
+                /* Verify */
+                wts_verify("post-ops verify");
+            }
 
-		track("shutting down", 0ULL, NULL);
-		wts_close();
+        track("shutting down", 0ULL, NULL);
+        wts_close();
 
-		/*
-		 * Rebalance testing.
-		 */
-		wts_rebalance();
+        /*
+         * Rebalance testing.
+         */
+        wts_rebalance();
 
-		/*
-		 * Salvage testing.
-		 */
-		wts_salvage();
+        /*
+         * Salvage testing.
+         */
+        wts_salvage();
 
-		/* Overwrite the progress line with a completion line. */
-		if (!g.c_quiet)
-			printf("\r%78s\r", " ");
-		printf("%4" PRIu32 ": %s, %s (%.0f seconds)\n",
-		    g.run_cnt, g.c_data_source,
-		    g.c_file_type, difftime(time(NULL), start));
-		fflush(stdout);
+        /* Overwrite the progress line with a completion line. */
+        if (!g.c_quiet)
+            printf("\r%78s\r", " ");
+        printf("%4" PRIu32 ": %s, %s (%.0f seconds)\n", g.run_cnt, g.c_data_source, g.c_file_type,
+          difftime(time(NULL), start));
+        fflush(stdout);
 
-		val_teardown();			/* Teardown keys/values */
-	}
+        val_teardown(); /* Teardown keys/values */
+    }
 
-	/* Flush/close any logging information. */
-	fclose_and_clear(&g.logfp);
-	fclose_and_clear(&g.randfp);
+    /* Flush/close any logging information. */
+    fclose_and_clear(&g.logfp);
+    fclose_and_clear(&g.randfp);
 
-	config_print(false);
+    config_print(false);
 
-	testutil_check(pthread_rwlock_destroy(&g.append_lock));
-	testutil_check(pthread_rwlock_destroy(&g.backup_lock));
-	testutil_check(pthread_rwlock_destroy(&g.death_lock));
-	testutil_check(pthread_rwlock_destroy(&g.ts_lock));
+    testutil_check(pthread_rwlock_destroy(&g.append_lock));
+    testutil_check(pthread_rwlock_destroy(&g.backup_lock));
+    testutil_check(pthread_rwlock_destroy(&g.death_lock));
+    testutil_check(pthread_rwlock_destroy(&g.ts_lock));
 
-	config_clear();
+    config_clear();
 
-	return (EXIT_SUCCESS);
+    return (EXIT_SUCCESS);
 }
 
 /*
  * startup --
- *	Initialize for a run.
+ *     Initialize for a run.
  */
 static void
 startup(void)
 {
-	WT_DECL_RET;
+    WT_DECL_RET;
 
-	/* Flush/close any logging information. */
-	fclose_and_clear(&g.logfp);
-	fclose_and_clear(&g.randfp);
+    /* Flush/close any logging information. */
+    fclose_and_clear(&g.logfp);
+    fclose_and_clear(&g.randfp);
 
-	/* Create or initialize the home and data-source directories. */
-	if ((ret = system(g.home_init)) != 0)
-		testutil_die(ret, "home directory initialization failed");
+    /* Create or initialize the home and data-source directories. */
+    if ((ret = system(g.home_init)) != 0)
+        testutil_die(ret, "home directory initialization failed");
 
-	/* Open/truncate the logging file. */
-	if (g.logging && (g.logfp = fopen(g.home_log, "w")) == NULL)
-		testutil_die(errno, "fopen: %s", g.home_log);
+    /* Open/truncate the logging file. */
+    if (g.logging && (g.logfp = fopen(g.home_log, "w")) == NULL)
+        testutil_die(errno, "fopen: %s", g.home_log);
 
-	/* Open/truncate the random number logging file. */
-	if ((g.randfp = fopen(g.home_rand, g.replay ? "r" : "w")) == NULL)
-		testutil_die(errno, "%s", g.home_rand);
+    /* Open/truncate the random number logging file. */
+    if ((g.randfp = fopen(g.home_rand, g.replay ? "r" : "w")) == NULL)
+        testutil_die(errno, "%s", g.home_rand);
 }
 
 /*
  * die --
- *	Report an error, dumping the configuration.
+ *     Report an error, dumping the configuration.
  */
 static void
 format_die(void)
 {
 
-	/*
-	 * Turn off tracking and logging so we don't obscure the error message.
-	 * The lock we're about to acquire will act as a barrier to flush the
-	 * writes. This is really a "best effort" more than a guarantee, there's
-	 * too much stuff in flight to be sure.
-	 */
-	g.c_quiet = 1;
-	g.logging = false;
+    /*
+     * Turn off tracking and logging so we don't obscure the error message. The lock we're about to
+     * acquire will act as a barrier to flush the writes. This is really a "best effort" more than a
+     * guarantee, there's too much stuff in flight to be sure.
+     */
+    g.c_quiet = 1;
+    g.logging = false;
 
-	/*
-	 * Single-thread error handling, our caller exits after calling us (we
-	 * never release the lock).
-	 */
-	(void)pthread_rwlock_wrlock(&g.death_lock);
+    /*
+     * Single-thread error handling, our caller exits after calling us (we never release the lock).
+     */
+    (void)pthread_rwlock_wrlock(&g.death_lock);
 
-	/* Flush/close any logging information. */
-	fclose_and_clear(&g.logfp);
-	fclose_and_clear(&g.randfp);
+    /* Flush/close any logging information. */
+    fclose_and_clear(&g.logfp);
+    fclose_and_clear(&g.randfp);
 
-	fprintf(stderr, "\n");
+    fprintf(stderr, "\n");
 
-	/* Display the configuration that failed. */
-	if (g.run_cnt)
-		config_print(true);
+    /* Display the configuration that failed. */
+    if (g.run_cnt)
+        config_print(true);
 }
 
 /*
  * usage --
- *	Display usage statement and exit failure.
+ *     Display usage statement and exit failure.
  */
 static void
 usage(void)
 {
-	fprintf(stderr,
-	    "usage: %s [-1lqr] [-C wiredtiger-config]\n    "
-	    "[-c config-file] [-h home] [name=value ...]\n",
-	    progname);
-	fprintf(stderr, "%s",
-	    "\t-1 run once\n"
-	    "\t-C specify wiredtiger_open configuration arguments\n"
-	    "\t-c read test program configuration from a file\n"
-	    "\t-h home (default 'RUNDIR')\n"
-	    "\t-l log operations to a file\n"
-	    "\t-q run quietly\n"
-	    "\t-r replay the last run\n");
+    fprintf(stderr,
+      "usage: %s [-1lqr] [-C wiredtiger-config]\n    "
+      "[-c config-file] [-h home] [name=value ...]\n",
+      progname);
+    fprintf(stderr, "%s",
+      "\t-1 run once\n"
+      "\t-C specify wiredtiger_open configuration arguments\n"
+      "\t-c read test program configuration from a file\n"
+      "\t-h home (default 'RUNDIR')\n"
+      "\t-l log operations to a file\n"
+      "\t-q run quietly\n"
+      "\t-r replay the last run\n");
 
-	config_error();
-	exit(EXIT_FAILURE);
+    config_error();
+    exit(EXIT_FAILURE);
 }

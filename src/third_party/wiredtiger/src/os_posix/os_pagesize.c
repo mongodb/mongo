@@ -10,10 +10,10 @@
 
 /*
  * __wt_get_vm_pagesize --
- *	Return the default page size of a virtual memory page.
+ *     Return the default page size of a virtual memory page.
  */
 int
 __wt_get_vm_pagesize(void)
 {
-	return (getpagesize());
+    return (getpagesize());
 }

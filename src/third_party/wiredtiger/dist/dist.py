@@ -1,5 +1,5 @@
 from __future__ import print_function
-import filecmp, fnmatch, glob, os, re, shutil
+import filecmp, fnmatch, glob, os, re, shutil, subprocess
 
 # source_files --
 #    Return a list of the WiredTiger source file names.
@@ -60,3 +60,9 @@ def compare_srcfile(tmp, src):
         print(('Updating ' + src))
         shutil.copyfile(tmp, src)
     os.remove(tmp)
+
+# format_srcfile --
+#    Format a source file.
+def format_srcfile(src):
+    src = os.path.abspath(src)
+    subprocess.check_call(['./s_clang-format', src])

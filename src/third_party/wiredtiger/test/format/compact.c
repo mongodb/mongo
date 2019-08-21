@@ -30,50 +30,49 @@
 
 /*
  * compaction --
- *	Periodically do a compaction operation.
+ *     Periodically do a compaction operation.
  */
 WT_THREAD_RET
 compact(void *arg)
 {
-	WT_CONNECTION *conn;
-	WT_DECL_RET;
-	WT_SESSION *session;
-	u_int period;
+    WT_CONNECTION *conn;
+    WT_DECL_RET;
+    WT_SESSION *session;
+    u_int period;
 
-	(void)(arg);
+    (void)(arg);
 
-	/* Open a session. */
-	conn = g.wts_conn;
-	testutil_check(conn->open_session(conn, NULL, NULL, &session));
+    /* Open a session. */
+    conn = g.wts_conn;
+    testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
-	/*
-	 * Perform compaction at somewhere under 15 seconds (so we get at
-	 * least one done), and then at 23 second intervals.
-	 */
-	for (period = mmrand(NULL, 1, 15);; period = 23) {
-		/* Sleep for short periods so we don't make the run wait. */
-		while (period > 0 && !g.workers_finished) {
-			--period;
-			__wt_sleep(1, 0);
-		}
-		if (g.workers_finished)
-			break;
+    /*
+     * Perform compaction at somewhere under 15 seconds (so we get at least one done), and then at
+     * 23 second intervals.
+     */
+    for (period = mmrand(NULL, 1, 15);; period = 23) {
+        /* Sleep for short periods so we don't make the run wait. */
+        while (period > 0 && !g.workers_finished) {
+            --period;
+            __wt_sleep(1, 0);
+        }
+        if (g.workers_finished)
+            break;
 
-		/*
-		 * Compact can return EBUSY if concurrent with alter or if there
-		 * is eviction pressure, or we collide with checkpoints.
-		 *
-		 * Compact returns ETIMEDOUT if the compaction doesn't finish in
-		 * in some number of seconds. We don't configure a timeout and
-		 * occasionally exceed the default of 1200 seconds.
-		 */
-		ret = session->compact(session, g.uri, NULL);
-		if (ret != 0 &&
-		    ret != EBUSY && ret != ETIMEDOUT && ret != WT_ROLLBACK)
-			testutil_die(ret, "session.compact");
-	}
+        /*
+         * Compact can return EBUSY if concurrent with alter or if there
+         * is eviction pressure, or we collide with checkpoints.
+         *
+         * Compact returns ETIMEDOUT if the compaction doesn't finish in
+         * in some number of seconds. We don't configure a timeout and
+         * occasionally exceed the default of 1200 seconds.
+         */
+        ret = session->compact(session, g.uri, NULL);
+        if (ret != 0 && ret != EBUSY && ret != ETIMEDOUT && ret != WT_ROLLBACK)
+            testutil_die(ret, "session.compact");
+    }
 
-	testutil_check(session->close(session, NULL));
+    testutil_check(session->close(session, NULL));
 
-	return (WT_THREAD_RET_VALUE);
+    return (WT_THREAD_RET_VALUE);
 }

@@ -28,99 +28,95 @@
 
 /*
  * read_op --
- *	Perform a read operation, waiting out prepare conflicts.
+ *     Perform a read operation, waiting out prepare conflicts.
  */
 static inline int
 read_op(WT_CURSOR *cursor, read_operation op, int *exactp)
 {
-	WT_DECL_RET;
+    WT_DECL_RET;
 
-	/*
-	 * Read operations wait out prepare-conflicts. (As part of the snapshot
-	 * isolation checks, we repeat reads that succeeded before, they should
-	 * be repeatable.)
-	 */
-	switch (op) {
-	case NEXT:
-		while ((ret = cursor->next(cursor)) == WT_PREPARE_CONFLICT)
-			__wt_yield();
-		break;
-	case PREV:
-		while ((ret = cursor->prev(cursor)) == WT_PREPARE_CONFLICT)
-			__wt_yield();
-		break;
-	case SEARCH:
-		while ((ret = cursor->search(cursor)) == WT_PREPARE_CONFLICT)
-			__wt_yield();
-		break;
-	case SEARCH_NEAR:
-		while ((ret =
-		    cursor->search_near(cursor, exactp)) == WT_PREPARE_CONFLICT)
-			__wt_yield();
-		break;
-	}
-	return (ret);
+    /*
+     * Read operations wait out prepare-conflicts. (As part of the snapshot isolation checks, we
+     * repeat reads that succeeded before, they should be repeatable.)
+     */
+    switch (op) {
+    case NEXT:
+        while ((ret = cursor->next(cursor)) == WT_PREPARE_CONFLICT)
+            __wt_yield();
+        break;
+    case PREV:
+        while ((ret = cursor->prev(cursor)) == WT_PREPARE_CONFLICT)
+            __wt_yield();
+        break;
+    case SEARCH:
+        while ((ret = cursor->search(cursor)) == WT_PREPARE_CONFLICT)
+            __wt_yield();
+        break;
+    case SEARCH_NEAR:
+        while ((ret = cursor->search_near(cursor, exactp)) == WT_PREPARE_CONFLICT)
+            __wt_yield();
+        break;
+    }
+    return (ret);
 }
 
 /*
  * mmrand --
- *	Return a random value between a min/max pair, inclusive.
+ *     Return a random value between a min/max pair, inclusive.
  */
 static inline uint32_t
 mmrand(WT_RAND_STATE *rnd, u_int min, u_int max)
 {
-	uint32_t v;
-	u_int range;
+    uint32_t v;
+    u_int range;
 
-	/*
-	 * Test runs with small row counts can easily pass a max of 0 (for
-	 * example, "g.rows / 20"). Avoid the problem.
-	 */
-	if (max <= min)
-		return (min);
+    /*
+     * Test runs with small row counts can easily pass a max of 0 (for example, "g.rows / 20").
+     * Avoid the problem.
+     */
+    if (max <= min)
+        return (min);
 
-	v = rng(rnd);
-	range = (max - min) + 1;
-	v %= range;
-	v += min;
-	return (v);
+    v = rng(rnd);
+    range = (max - min) + 1;
+    v %= range;
+    v += min;
+    return (v);
 }
 
 static inline void
 random_sleep(WT_RAND_STATE *rnd, u_int max_seconds)
 {
-	uint64_t i, micro_seconds;
+    uint64_t i, micro_seconds;
 
-	/*
-	 * We need a fast way to choose a sleep time. We want to sleep a short
-	 * period most of the time, but occasionally wait longer. Divide the
-	 * maximum period of time into 10 buckets (where bucket 0 doesn't sleep
-	 * at all), and roll dice, advancing to the next bucket 50% of the time.
-	 * That means we'll hit the maximum roughly every 1K calls.
-	 */
-	for (i = 0;;)
-		if (rng(rnd) & 0x1 || ++i > 9)
-			break;
+    /*
+     * We need a fast way to choose a sleep time. We want to sleep a short period most of the time,
+     * but occasionally wait longer. Divide the maximum period of time into 10 buckets (where bucket
+     * 0 doesn't sleep at all), and roll dice, advancing to the next bucket 50% of the time. That
+     * means we'll hit the maximum roughly every 1K calls.
+     */
+    for (i = 0;;)
+        if (rng(rnd) & 0x1 || ++i > 9)
+            break;
 
-	if (i == 0)
-		__wt_yield();
-	else {
-		micro_seconds = (uint64_t)max_seconds * WT_MILLION;
-		__wt_sleep(0, i * (micro_seconds / 10));
-	}
+    if (i == 0)
+        __wt_yield();
+    else {
+        micro_seconds = (uint64_t)max_seconds * WT_MILLION;
+        __wt_sleep(0, i * (micro_seconds / 10));
+    }
 }
 
 static inline void
 wiredtiger_begin_transaction(WT_SESSION *session, const char *config)
 {
-	WT_DECL_RET;
+    WT_DECL_RET;
 
-	/*
-	 * Keep trying to start a new transaction if it's timing out.
-	 * There are no resources pinned, it should succeed eventually.
-	 */
-	while ((ret =
-	    session->begin_transaction(session, config)) == WT_CACHE_FULL)
-		__wt_yield();
-	testutil_check(ret);
+    /*
+     * Keep trying to start a new transaction if it's timing out. There are no resources pinned, it
+     * should succeed eventually.
+     */
+    while ((ret = session->begin_transaction(session, config)) == WT_CACHE_FULL)
+        __wt_yield();
+    testutil_check(ret);
 }

@@ -49,142 +49,126 @@
  * table.
  */
 
-#define	N_RECORDS	10000
+#define N_RECORDS 10000
 
 static void
-get_stat_total(WT_SESSION *session, WT_CURSOR *jcursor, const char *descmatch,
-    uint64_t *pval)
+get_stat_total(WT_SESSION *session, WT_CURSOR *jcursor, const char *descmatch, uint64_t *pval)
 {
-	WT_CURSOR *statcursor;
-	WT_DECL_RET;
-	uint64_t val;
-	char *desc, *valstr;
-	bool match;
+    WT_CURSOR *statcursor;
+    WT_DECL_RET;
+    uint64_t val;
+    char *desc, *valstr;
+    bool match;
 
-	match = false;
-	*pval = 0;
-	testutil_check(session->open_cursor(session, "statistics:join", jcursor,
-	    NULL, &statcursor));
+    match = false;
+    *pval = 0;
+    testutil_check(session->open_cursor(session, "statistics:join", jcursor, NULL, &statcursor));
 
-	while ((ret = statcursor->next(statcursor)) == 0) {
-		testutil_assert(statcursor->get_value(
-		    statcursor, &desc, &valstr, &val) == 0);
+    while ((ret = statcursor->next(statcursor)) == 0) {
+        testutil_assert(statcursor->get_value(statcursor, &desc, &valstr, &val) == 0);
 
-		printf("statistics: %s: %s: %" PRIu64 "\n", desc, valstr, val);
+        printf("statistics: %s: %s: %" PRIu64 "\n", desc, valstr, val);
 
-		if (strstr(desc, descmatch) != NULL) {
-			*pval += val;
-			match = true;
-		}
-	}
-	testutil_assert(ret == WT_NOTFOUND);
-	testutil_check(statcursor->close(statcursor));
-	testutil_assert(match);
+        if (strstr(desc, descmatch) != NULL) {
+            *pval += val;
+            match = true;
+        }
+    }
+    testutil_assert(ret == WT_NOTFOUND);
+    testutil_check(statcursor->close(statcursor));
+    testutil_assert(match);
 }
 
 int
 main(int argc, char *argv[])
 {
-	TEST_OPTS *opts, _opts;
-	WT_CURSOR *cursor1, *cursor2, *jcursor;
-	WT_ITEM d;
-	WT_SESSION *session;
-	uint64_t maincount;
-	int half, i, j;
-	char bloom_cfg[128], index1uri[256], index2uri[256], joinuri[256];
-	const char *tablename;
+    TEST_OPTS *opts, _opts;
+    WT_CURSOR *cursor1, *cursor2, *jcursor;
+    WT_ITEM d;
+    WT_SESSION *session;
+    uint64_t maincount;
+    int half, i, j;
+    char bloom_cfg[128], index1uri[256], index2uri[256], joinuri[256];
+    const char *tablename;
 
-	opts = &_opts;
-	memset(opts, 0, sizeof(*opts));
-	testutil_check(testutil_parse_opts(argc, argv, opts));
-	testutil_make_work_dir(opts->home);
+    opts = &_opts;
+    memset(opts, 0, sizeof(*opts));
+    testutil_check(testutil_parse_opts(argc, argv, opts));
+    testutil_make_work_dir(opts->home);
 
-	tablename = strchr(opts->uri, ':');
-	testutil_assert(tablename != NULL);
-	tablename++;
-	testutil_check(__wt_snprintf(
-	    index1uri, sizeof(index1uri), "index:%s:index1", tablename));
-	testutil_check(__wt_snprintf(
-	    index2uri, sizeof(index2uri), "index:%s:index2", tablename));
-	testutil_check(__wt_snprintf(
-	    joinuri, sizeof(joinuri), "join:%s", opts->uri));
+    tablename = strchr(opts->uri, ':');
+    testutil_assert(tablename != NULL);
+    tablename++;
+    testutil_check(__wt_snprintf(index1uri, sizeof(index1uri), "index:%s:index1", tablename));
+    testutil_check(__wt_snprintf(index2uri, sizeof(index2uri), "index:%s:index2", tablename));
+    testutil_check(__wt_snprintf(joinuri, sizeof(joinuri), "join:%s", opts->uri));
 
-	testutil_check(wiredtiger_open(opts->home, NULL,
-	    "statistics=(all),create", &opts->conn));
-	testutil_check(
-	    opts->conn->open_session(opts->conn, NULL, NULL, &session));
+    testutil_check(wiredtiger_open(opts->home, NULL, "statistics=(all),create", &opts->conn));
+    testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
 
-	testutil_check(session->create(session, opts->uri,
-	    "key_format=i,value_format=iiu,columns=(k,v1,v2,d)"));
-	testutil_check(session->create(session, index1uri, "columns=(v1)"));
-	testutil_check(session->create(session, index2uri, "columns=(v2)"));
+    testutil_check(
+      session->create(session, opts->uri, "key_format=i,value_format=iiu,columns=(k,v1,v2,d)"));
+    testutil_check(session->create(session, index1uri, "columns=(v1)"));
+    testutil_check(session->create(session, index2uri, "columns=(v2)"));
 
-	testutil_check(session->open_cursor(session, opts->uri, NULL, NULL,
-	    &cursor1));
+    testutil_check(session->open_cursor(session, opts->uri, NULL, NULL, &cursor1));
 
-	d.size = 4100;
-	d.data = dmalloc(d.size);
-	memset((char *)d.data, 7, d.size);
+    d.size = 4100;
+    d.data = dmalloc(d.size);
+    memset((char *)d.data, 7, d.size);
 
-	for (i = 0; i < N_RECORDS; ++i)
-	{
-		cursor1->set_key(cursor1, i);
-		cursor1->set_value(cursor1, i, i, &d);
-		testutil_check(cursor1->insert(cursor1));
-	}
+    for (i = 0; i < N_RECORDS; ++i) {
+        cursor1->set_key(cursor1, i);
+        cursor1->set_value(cursor1, i, i, &d);
+        testutil_check(cursor1->insert(cursor1));
+    }
 
-	free((void*)d.data);
+    free((void *)d.data);
 
-	testutil_check(opts->conn->close(opts->conn, NULL));
-	testutil_check(wiredtiger_open(opts->home, NULL,
-	    "statistics=(all),create,cache_size=1GB", &opts->conn));
-	testutil_check(opts->conn->open_session(opts->conn, NULL, NULL,
-	    &session));
+    testutil_check(opts->conn->close(opts->conn, NULL));
+    testutil_check(
+      wiredtiger_open(opts->home, NULL, "statistics=(all),create,cache_size=1GB", &opts->conn));
+    testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
 
-	testutil_check(session->open_cursor(session, index1uri, NULL, NULL,
-	    &cursor1));
-	testutil_check(session->open_cursor(session, index2uri, NULL, NULL,
-	    &cursor2));
+    testutil_check(session->open_cursor(session, index1uri, NULL, NULL, &cursor1));
+    testutil_check(session->open_cursor(session, index2uri, NULL, NULL, &cursor2));
 
-	half = N_RECORDS / 2;
-	cursor1->set_key(cursor1, half);
-	testutil_check(cursor1->search(cursor1));
+    half = N_RECORDS / 2;
+    cursor1->set_key(cursor1, half);
+    testutil_check(cursor1->search(cursor1));
 
-	cursor2->set_key(cursor2, half + 1);
-	testutil_check(cursor2->search(cursor2));
+    cursor2->set_key(cursor2, half + 1);
+    testutil_check(cursor2->search(cursor2));
 
-	testutil_check(__wt_snprintf(bloom_cfg, sizeof(bloom_cfg),
-	    "compare=lt,strategy=bloom,count=%d", half));
+    testutil_check(
+      __wt_snprintf(bloom_cfg, sizeof(bloom_cfg), "compare=lt,strategy=bloom,count=%d", half));
 
-	testutil_check(session->open_cursor(session, joinuri, NULL, NULL,
-	    &jcursor));
-	testutil_check(session->join(session, jcursor, cursor1, "compare=ge"));
-	testutil_check(session->join(session, jcursor, cursor2, bloom_cfg));
+    testutil_check(session->open_cursor(session, joinuri, NULL, NULL, &jcursor));
+    testutil_check(session->join(session, jcursor, cursor1, "compare=ge"));
+    testutil_check(session->join(session, jcursor, cursor2, bloom_cfg));
 
-	/* Expect one value returned */
-	testutil_assert(jcursor->next(jcursor) == 0);
-	i = 0;
-	testutil_assert(jcursor->get_key(jcursor, &i) == 0);
-	testutil_assert(i == (int)half);
-	i = j = 0;
-	memset(&d, 0, sizeof(d));
-	testutil_assert(jcursor->get_value(jcursor, &i, &j, &d) == 0);
-	testutil_assert(i == (int)half);
-	testutil_assert(j == (int)half);
-	testutil_assert(d.size == 4100);
-	for (i = 0; i < 4100; i++)
-		testutil_assert(((char *)d.data)[i] == 7);
+    /* Expect one value returned */
+    testutil_assert(jcursor->next(jcursor) == 0);
+    i = 0;
+    testutil_assert(jcursor->get_key(jcursor, &i) == 0);
+    testutil_assert(i == (int)half);
+    i = j = 0;
+    memset(&d, 0, sizeof(d));
+    testutil_assert(jcursor->get_value(jcursor, &i, &j, &d) == 0);
+    testutil_assert(i == (int)half);
+    testutil_assert(j == (int)half);
+    testutil_assert(d.size == 4100);
+    for (i = 0; i < 4100; i++)
+        testutil_assert(((char *)d.data)[i] == 7);
 
-	testutil_assert(jcursor->next(jcursor) == WT_NOTFOUND);
+    testutil_assert(jcursor->next(jcursor) == WT_NOTFOUND);
 
-	/*
-	 * Make sure there have been 2 accesses to the main table,
-	 * explained in the discussion above.
-	 */
-	get_stat_total(session, jcursor, "accesses to the main table",
-	    &maincount);
-	testutil_assert(maincount == 2);
+    /*
+     * Make sure there have been 2 accesses to the main table, explained in the discussion above.
+     */
+    get_stat_total(session, jcursor, "accesses to the main table", &maincount);
+    testutil_assert(maincount == 2);
 
-	testutil_cleanup(opts);
-	return (EXIT_SUCCESS);
+    testutil_cleanup(opts);
+    return (EXIT_SUCCESS);
 }

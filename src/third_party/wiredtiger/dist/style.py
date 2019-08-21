@@ -16,7 +16,7 @@ def lines_could_join():
 
         for m in match_re.finditer(s):
             if len(m.group(1).expandtabs()) + \
-                len(m.group(2).expandtabs()) < 80:
+                len(m.group(2).expandtabs()) < 100:
                     print(f + ': lines may be combined: ')
                     print('\t' + m.group(1).lstrip() + m.group(2))
                     print()

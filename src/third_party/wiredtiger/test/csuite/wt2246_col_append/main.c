@@ -28,19 +28,17 @@
 #include "test_util.h"
 
 /*
- * JIRA ticket reference: WT-2246
- * Test case description: The column-store search routine used to search the
- * target leaf page even when the cursor is configured with append and we're
- * allocating a record number. That was inefficient, this test case
- * demonstrates the inefficiency.
- * Failure mode: It isn't simple to make this test case failure explicit since
- * it is demonstrating an inefficiency rather than a correctness bug.
+ * JIRA ticket reference: WT-2246 Test case description: The column-store search routine used to
+ * search the target leaf page even when the cursor is configured with append and we're allocating a
+ * record number. That was inefficient, this test case demonstrates the inefficiency. Failure mode:
+ * It isn't simple to make this test case failure explicit since it is demonstrating an inefficiency
+ * rather than a correctness bug.
  */
 
 /* Don't move into shared function there is a cross platform solution */
 #include <signal.h>
 
-#define	MILLION		1000000
+#define MILLION 1000000
 
 /* Needs to be global for signal handling. */
 static TEST_OPTS *opts, _opts;
@@ -48,108 +46,103 @@ static TEST_OPTS *opts, _opts;
 static void
 page_init(uint64_t n)
 {
-	WT_CONNECTION *conn;
-	WT_CURSOR *cursor;
-	WT_SESSION *session;
-	uint64_t recno, vrecno;
-	char buf[64];
+    WT_CONNECTION *conn;
+    WT_CURSOR *cursor;
+    WT_SESSION *session;
+    uint64_t recno, vrecno;
+    char buf[64];
 
-	conn = opts->conn;
+    conn = opts->conn;
 
-	testutil_check(conn->open_session(conn, NULL, NULL, &session));
-	testutil_check(
-	    session->open_cursor(session, opts->uri, NULL, "append", &cursor));
+    testutil_check(conn->open_session(conn, NULL, NULL, &session));
+    testutil_check(session->open_cursor(session, opts->uri, NULL, "append", &cursor));
 
-	vrecno = 0;
-	buf[0] = '\2';
-	for (recno = 1;; ++recno) {
-		if (opts->table_type == TABLE_FIX)
-			cursor->set_value(cursor, buf[0]);
-		else {
-			if (recno % 3 == 0)
-				++vrecno;
-			testutil_check(__wt_snprintf(buf,
-			    sizeof(buf), "%" PRIu64 " VALUE ------", vrecno));
-			cursor->set_value(cursor, buf);
-		}
-		testutil_check(cursor->insert(cursor));
-		testutil_check(cursor->get_key(cursor, &opts->max_inserted_id));
-		if (opts->max_inserted_id >= n)
-			break;
-	}
+    vrecno = 0;
+    buf[0] = '\2';
+    for (recno = 1;; ++recno) {
+        if (opts->table_type == TABLE_FIX)
+            cursor->set_value(cursor, buf[0]);
+        else {
+            if (recno % 3 == 0)
+                ++vrecno;
+            testutil_check(__wt_snprintf(buf, sizeof(buf), "%" PRIu64 " VALUE ------", vrecno));
+            cursor->set_value(cursor, buf);
+        }
+        testutil_check(cursor->insert(cursor));
+        testutil_check(cursor->get_key(cursor, &opts->max_inserted_id));
+        if (opts->max_inserted_id >= n)
+            break;
+    }
 }
 
 static void
 onsig(int signo)
 {
-	WT_UNUSED(signo);
-	opts->running = false;
+    WT_UNUSED(signo);
+    opts->running = false;
 }
 
-#define	N_APPEND_THREADS	6
-#define	N_RECORDS		(20 * WT_MILLION)
+#define N_APPEND_THREADS 6
+#define N_RECORDS (20 * WT_MILLION)
 
 int
 main(int argc, char *argv[])
 {
-	WT_SESSION *session;
-	clock_t ce, cs;
-	pthread_t idlist[100];
-	uint64_t i, id;
-	char buf[100];
+    WT_SESSION *session;
+    clock_t ce, cs;
+    pthread_t idlist[100];
+    uint64_t i, id;
+    char buf[100];
 
-	/* Bypass this test for valgrind */
-	if (testutil_is_flag_set("TESTUTIL_BYPASS_VALGRIND"))
-		return (EXIT_SUCCESS);
+    /* Bypass this test for valgrind */
+    if (testutil_is_flag_set("TESTUTIL_BYPASS_VALGRIND"))
+        return (EXIT_SUCCESS);
 
-	opts = &_opts;
-	memset(opts, 0, sizeof(*opts));
-	opts->table_type = TABLE_ROW;
-	opts->n_append_threads = N_APPEND_THREADS;
-	opts->nrecords = N_RECORDS;
-	testutil_check(testutil_parse_opts(argc, argv, opts));
-	testutil_make_work_dir(opts->home);
+    opts = &_opts;
+    memset(opts, 0, sizeof(*opts));
+    opts->table_type = TABLE_ROW;
+    opts->n_append_threads = N_APPEND_THREADS;
+    opts->nrecords = N_RECORDS;
+    testutil_check(testutil_parse_opts(argc, argv, opts));
+    testutil_make_work_dir(opts->home);
 
-	testutil_check(__wt_snprintf(buf, sizeof(buf),
-	    "create,"
-	    "cache_size=%s,"
-	    "eviction=(threads_max=5),"
-	    "statistics=(fast)",
-	    opts->table_type == TABLE_FIX ? "500MB" : "2GB"));
-	testutil_check(wiredtiger_open(opts->home, NULL, buf, &opts->conn));
-	testutil_check(
-	    opts->conn->open_session(opts->conn, NULL, NULL, &session));
-	testutil_check(__wt_snprintf(buf, sizeof(buf),
-	    "key_format=r,value_format=%s,"
-	    "allocation_size=4K,leaf_page_max=64K",
-	    opts->table_type == TABLE_FIX ? "8t" : "S"));
-	testutil_check(session->create(session, opts->uri, buf));
-	testutil_check(session->close(session, NULL));
+    testutil_check(__wt_snprintf(buf, sizeof(buf),
+      "create,"
+      "cache_size=%s,"
+      "eviction=(threads_max=5),"
+      "statistics=(fast)",
+      opts->table_type == TABLE_FIX ? "500MB" : "2GB"));
+    testutil_check(wiredtiger_open(opts->home, NULL, buf, &opts->conn));
+    testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
+    testutil_check(__wt_snprintf(buf, sizeof(buf),
+      "key_format=r,value_format=%s,"
+      "allocation_size=4K,leaf_page_max=64K",
+      opts->table_type == TABLE_FIX ? "8t" : "S"));
+    testutil_check(session->create(session, opts->uri, buf));
+    testutil_check(session->close(session, NULL));
 
-	page_init(5000);
+    page_init(5000);
 
-	/* Force to disk and re-open. */
-	testutil_check(opts->conn->close(opts->conn, NULL));
-	testutil_check(wiredtiger_open(opts->home, NULL, NULL, &opts->conn));
+    /* Force to disk and re-open. */
+    testutil_check(opts->conn->close(opts->conn, NULL));
+    testutil_check(wiredtiger_open(opts->home, NULL, NULL, &opts->conn));
 
-	(void)signal(SIGINT, onsig);
+    (void)signal(SIGINT, onsig);
 
-	cs = clock();
-	id = 0;
-	for (i = 0; i < opts->n_append_threads; ++i, ++id) {
-		printf("append: %" PRIu64 "\n", id);
-		testutil_check(
-		    pthread_create(&idlist[id], NULL, thread_append, opts));
-	}
+    cs = clock();
+    id = 0;
+    for (i = 0; i < opts->n_append_threads; ++i, ++id) {
+        printf("append: %" PRIu64 "\n", id);
+        testutil_check(pthread_create(&idlist[id], NULL, thread_append, opts));
+    }
 
-	for (i = 0; i < id; ++i)
-		testutil_check(pthread_join(idlist[i], NULL));
+    for (i = 0; i < id; ++i)
+        testutil_check(pthread_join(idlist[i], NULL));
 
-	ce = clock();
-	printf("%" PRIu64 "M records: %.2lf processor seconds\n",
-	    opts->max_inserted_id / MILLION,
-	    (ce - cs) / (double)CLOCKS_PER_SEC);
+    ce = clock();
+    printf("%" PRIu64 "M records: %.2lf processor seconds\n", opts->max_inserted_id / MILLION,
+      (ce - cs) / (double)CLOCKS_PER_SEC);
 
-	testutil_cleanup(opts);
-	return (EXIT_SUCCESS);
+    testutil_cleanup(opts);
+    return (EXIT_SUCCESS);
 }
