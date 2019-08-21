@@ -3139,7 +3139,7 @@ public:
 
         txnParticipant.unstashTransactionResources(_opCtx, "abortTransaction");
 
-        txnParticipant.abortActiveTransaction(_opCtx);
+        txnParticipant.abortTransaction(_opCtx);
 
         txnParticipant.stashTransactionResources(_opCtx);
         {
@@ -3361,7 +3361,7 @@ public:
         }
         txnParticipant.unstashTransactionResources(_opCtx, "abortTransaction");
 
-        txnParticipant.abortActiveTransaction(_opCtx);
+        txnParticipant.abortTransaction(_opCtx);
         assertNoStartOpTime();
 
         txnParticipant.stashTransactionResources(_opCtx);

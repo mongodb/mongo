@@ -252,7 +252,7 @@ bool handleError(OperationContext* opCtx,
         }
         // If we are in a transaction, we must fail the whole batch.
         out->results.emplace_back(ex.toStatus());
-        txnParticipant.abortActiveTransaction(opCtx);
+        txnParticipant.abortTransaction(opCtx);
         return false;
     }
 

@@ -207,7 +207,7 @@ void abortInProgressTransactions(OperationContext* opCtx) {
         auto txnParticipant = TransactionParticipant::get(opCtx);
         LOG(3) << "Aborting transaction sessionId: " << txnRecord.getSessionId().toBSON()
                << " txnNumber " << txnRecord.getTxnNum();
-        txnParticipant.abortTransactionForStepUp(opCtx);
+        txnParticipant.abortTransaction(opCtx);
     }
 }
 }  // namespace
