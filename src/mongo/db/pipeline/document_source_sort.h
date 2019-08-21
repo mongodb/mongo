@@ -165,37 +165,8 @@ private:
      * sorter to eventually be returned. If we will need to later merge the sorted results with
      * other results, this method adds the sort key as metadata onto 'doc' to speed up the merge
      * later.
-     *
-     * Attempts to generate the key using a fast path that does not handle arrays. If an array is
-     * encountered, falls back on extractKeyWithArray().
      */
     std::pair<Value, Document> extractSortKey(Document&& doc) const;
-
-    /**
-     * Returns the sort key for 'doc' based on the SortPattern, or ErrorCodes::InternalError if an
-     * array is encountered during sort key generation.
-     */
-    StatusWith<Value> extractKeyFast(const Document& doc) const;
-
-    /**
-     * Extracts the sort key component described by 'keyPart' from 'doc' and returns it. Returns
-     * ErrorCodes::Internal error if the path for 'keyPart' contains an array in 'doc'.
-     */
-    StatusWith<Value> extractKeyPart(const Document& doc,
-                                     const SortPattern::SortPatternPart& keyPart) const;
-
-    /**
-     * Returns the sort key for 'doc' based on the SortPattern. Note this is in the BSONObj format -
-     * with empty field names.
-     */
-    BSONObj extractKeyWithArray(const Document& doc) const;
-
-    /**
-     * Returns the comparison key used to sort 'val' with the collation of the ExpressionContext.
-     * Note that these comparison keys should always be sorted with the simple (i.e. binary)
-     * collation.
-     */
-    Value getCollationComparisonKey(const Value& val) const;
 
     bool _populated = false;
 

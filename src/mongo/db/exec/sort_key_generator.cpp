@@ -68,7 +68,7 @@ PlanStage::StageState SortKeyGeneratorStage::doWork(WorkingSetID* out) {
     if (stageState == PlanStage::ADVANCED) {
         WorkingSetMember* member = _ws->get(*out);
 
-        auto sortKey = _sortKeyGen.getSortKey(*member);
+        auto sortKey = _sortKeyGen.computeSortKey(*member);
         if (!sortKey.isOK()) {
             *out = WorkingSetCommon::allocateStatusMember(_ws, sortKey.getStatus());
             return PlanStage::FAILURE;

@@ -50,54 +50,6 @@ using std::string;
 using std::unique_ptr;
 using std::vector;
 
-namespace {
-
-Value missingToNull(Value maybeMissing) {
-    return maybeMissing.missing() ? Value(BSONNULL) : maybeMissing;
-}
-
-/**
- * Converts a Value representing an in-memory sort key to a BSONObj representing a serialized sort
- * key. If 'sortPatternSize' is 1, returns a BSON object with 'value' as it's only value - and an
- * empty field name. Otherwise asserts that 'value' is an array of length 'sortPatternSize', and
- * returns a BSONObj with one field for each value in the array, each field using the empty field
- * name.
- */
-BSONObj serializeSortKey(size_t sortPatternSize, Value value) {
-    // Missing values don't serialize correctly in this format, so use nulls instead, since they are
-    // considered equivalent with woCompare().
-    if (sortPatternSize == 1) {
-        return BSON("" << missingToNull(value));
-    }
-    invariant(value.isArray());
-    invariant(value.getArrayLength() == sortPatternSize);
-    BSONObjBuilder bb;
-    for (auto&& val : value.getArray()) {
-        bb << "" << missingToNull(val);
-    }
-    return bb.obj();
-}
-
-/**
- * Converts a BSONObj representing a serialized sort key into a Value, which we use for in-memory
- * comparisons. BSONObj {'': 1, '': [2, 3]} becomes Value [1, [2, 3]].
- */
-Value deserializeSortKey(size_t sortPatternSize, BSONObj bsonSortKey) {
-    vector<Value> keys;
-    keys.reserve(sortPatternSize);
-    for (auto&& elt : bsonSortKey) {
-        keys.push_back(Value{elt});
-    }
-    invariant(keys.size() == sortPatternSize);
-    if (sortPatternSize == 1) {
-        // As a special case for a sort on a single field, we do not put the keys into an array.
-        return keys[0];
-    }
-    return Value{std::move(keys)};
-}
-
-}  // namespace
-
 constexpr StringData DocumentSourceSort::kStageName;
 
 DocumentSourceSort::DocumentSourceSort(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
@@ -263,121 +215,22 @@ bool DocumentSourceSort::usedDisk() {
     return _sortExecutor->wasDiskUsed();
 }
 
-Value DocumentSourceSort::getCollationComparisonKey(const Value& val) const {
-    const auto collator = pExpCtx->getCollator();
-
-    // If the collation is the simple collation, the value itself is the comparison key.
-    if (!collator) {
-        return val;
-    }
-
-    // If 'val' is not a collatable type, there's no need to do any work.
-    if (!CollationIndexKey::isCollatableType(val.getType())) {
-        return val;
-    }
-
-    // If 'val' is a string, directly use the collator to obtain a comparison key.
-    if (val.getType() == BSONType::String) {
-        auto compKey = collator->getComparisonKey(val.getString());
-        return Value(compKey.getKeyData());
-    }
-
-    // Otherwise, for non-string collatable types, take the slow path and round-trip the value
-    // through BSON.
-    BSONObjBuilder input;
-    val.addToBsonObj(&input, ""_sd);
-
-    BSONObjBuilder output;
-    CollationIndexKey::collationAwareIndexKeyAppend(input.obj().firstElement(), collator, &output);
-    return Value(output.obj().firstElement());
-}
-
-StatusWith<Value> DocumentSourceSort::extractKeyPart(
-    const Document& doc, const SortPattern::SortPatternPart& patternPart) const {
-    Value plainKey;
-    if (patternPart.fieldPath) {
-        invariant(!patternPart.expression);
-        auto key =
-            document_path_support::extractElementAlongNonArrayPath(doc, *patternPart.fieldPath);
-        if (!key.isOK()) {
-            return key;
-        }
-        plainKey = key.getValue();
-    } else {
-        invariant(patternPart.expression);
-        plainKey = patternPart.expression->evaluate(doc, &pExpCtx->variables);
-    }
-
-    return getCollationComparisonKey(plainKey);
-}
-
-StatusWith<Value> DocumentSourceSort::extractKeyFast(const Document& doc) const {
-    if (_sortExecutor->sortPattern().size() == 1u) {
-        return extractKeyPart(doc, _sortExecutor->sortPattern()[0]);
-    }
-
-    vector<Value> keys;
-    keys.reserve(_sortExecutor->sortPattern().size());
-    for (auto&& keyPart : _sortExecutor->sortPattern()) {
-        auto extractedKey = extractKeyPart(doc, keyPart);
-        if (!extractedKey.isOK()) {
-            // We can't use the fast path, so bail out.
-            return extractedKey;
-        }
-
-        keys.push_back(std::move(extractedKey.getValue()));
-    }
-    return Value{std::move(keys)};
-}
-
-BSONObj DocumentSourceSort::extractKeyWithArray(const Document& doc) const {
-    SortKeyGenerator::Metadata metadata;
-    if (doc.metadata().hasTextScore()) {
-        metadata.textScore = doc.metadata().getTextScore();
-    }
-    if (doc.metadata().hasRandVal()) {
-        metadata.randVal = doc.metadata().getRandVal();
-    }
-
-    // Convert the Document to a BSONObj, but only do the conversion for the paths we actually need.
-    // Then run the result through the SortKeyGenerator to obtain the final sort key.
-    auto bsonDoc = _sortExecutor->sortPattern().documentToBsonWithSortPaths(doc);
-    return uassertStatusOK(_sortKeyGen->getSortKeyFromDocument(bsonDoc, &metadata));
-}
-
 std::pair<Value, Document> DocumentSourceSort::extractSortKey(Document&& doc) const {
-    boost::optional<BSONObj> serializedSortKey;  // Only populated if we need to merge with other
-                                                 // sorted results later. Serialized in the standard
-                                                 // BSON sort key format with empty field names,
-                                                 // e.g. {'': 1, '': [2, 3]}.
+    Value inMemorySortKey = _sortKeyGen->computeSortKeyFromDocument(doc);
 
-    Value inMemorySortKey;  // The Value we will use for comparisons within the sorter.
-
-    auto fastKey = extractKeyFast(doc);
-    if (fastKey.isOK()) {
-        inMemorySortKey = std::move(fastKey.getValue());
-        if (pExpCtx->needsMerge) {
-            serializedSortKey =
-                serializeSortKey(_sortExecutor->sortPattern().size(), inMemorySortKey);
-        }
-    } else {
-        // We have to do it the slow way - through the sort key generator. This will generate a BSON
-        // sort key, which is an object with empty field names. We then need to convert this BSON
-        // representation into the corresponding array of keys as a Value. BSONObj {'': 1, '': [2,
-        // 3]} becomes Value [1, [2, 3]].
-        serializedSortKey = extractKeyWithArray(doc);
-        inMemorySortKey =
-            deserializeSortKey(_sortExecutor->sortPattern().size(), *serializedSortKey);
-    }
-
-    MutableDocument toBeSorted(std::move(doc));
     if (pExpCtx->needsMerge) {
-        // We need to be merged, so will have to be serialized. Save the sort key here to avoid
-        // re-computing it during the merge.
-        invariant(serializedSortKey);
-        toBeSorted.metadata().setSortKey(*serializedSortKey);
+        // If this sort stage is part of a merged pipeline, make sure that each Document's sort key
+        // gets saved with its metadata.
+        auto serializedSortKey = DocumentMetadataFields::serializeSortKey(
+            _sortKeyGen->isSingleElementKey(), inMemorySortKey);
+
+        MutableDocument toBeSorted(std::move(doc));
+        toBeSorted.metadata().setSortKey(serializedSortKey);
+
+        return std::make_pair(std::move(inMemorySortKey), toBeSorted.freeze());
+    } else {
+        return std::make_pair(std::move(inMemorySortKey), std::move(doc));
     }
-    return {inMemorySortKey, toBeSorted.freeze()};
 }
 
 boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSort::distributedPlanLogic() {

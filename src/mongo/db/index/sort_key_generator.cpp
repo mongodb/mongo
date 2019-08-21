@@ -76,19 +76,24 @@ SortKeyGenerator::SortKeyGenerator(SortPattern sortPattern, const CollatorInterf
                                                        Ordering::make(_sortSpecWithoutMeta));
 }
 
-StatusWith<BSONObj> SortKeyGenerator::getSortKey(const WorkingSetMember& wsm) const {
+// TODO (SERVER-42836): Once WorkingSetMember objects store a Document (SERVER-42181), this function
+// will be able to use the Document overload of computeSortKeyFromDocument, and it will be able to
+// store the text score with the Document instead of in a separate SortKeyGenerator::Metadata
+// object.
+StatusWith<BSONObj> SortKeyGenerator::computeSortKey(const WorkingSetMember& wsm) const {
     if (wsm.hasObj()) {
         SortKeyGenerator::Metadata metadata;
         if (_sortHasMeta && wsm.metadata().hasTextScore()) {
             metadata.textScore = wsm.metadata().getTextScore();
         }
-        return getSortKeyFromDocument(wsm.obj.value(), &metadata);
+        return computeSortKeyFromDocument(wsm.obj.value(), &metadata);
     }
 
-    return getSortKeyFromIndexKey(wsm);
+    return computeSortKeyFromIndexKey(wsm);
 }
 
-StatusWith<BSONObj> SortKeyGenerator::getSortKeyFromIndexKey(const WorkingSetMember& member) const {
+StatusWith<BSONObj> SortKeyGenerator::computeSortKeyFromIndexKey(
+    const WorkingSetMember& member) const {
     invariant(member.getState() == WorkingSetMember::RID_AND_IDX);
     invariant(!_sortHasMeta);
 
@@ -107,13 +112,13 @@ StatusWith<BSONObj> SortKeyGenerator::getSortKeyFromIndexKey(const WorkingSetMem
     return objBuilder.obj();
 }
 
-StatusWith<BSONObj> SortKeyGenerator::getSortKeyFromDocument(const BSONObj& obj,
-                                                             const Metadata* metadata) const {
+StatusWith<BSONObj> SortKeyGenerator::computeSortKeyFromDocument(const BSONObj& obj,
+                                                                 const Metadata* metadata) const {
     if (_sortHasMeta) {
         invariant(metadata);
     }
 
-    auto sortKeyNoMetadata = getSortKeyFromDocumentWithoutMetadata(obj);
+    auto sortKeyNoMetadata = computeSortKeyFromDocumentWithoutMetadata(obj);
     if (!sortKeyNoMetadata.isOK()) {
         return sortKeyNoMetadata;
     }
@@ -153,7 +158,7 @@ StatusWith<BSONObj> SortKeyGenerator::getSortKeyFromDocument(const BSONObj& obj,
     return mergedKeyBob.obj();
 }
 
-StatusWith<BSONObj> SortKeyGenerator::getSortKeyFromDocumentWithoutMetadata(
+StatusWith<BSONObj> SortKeyGenerator::computeSortKeyFromDocumentWithoutMetadata(
     const BSONObj& obj) const {
     // Not sorting by anything in the key, just bail out early.
     if (_sortSpecWithoutMeta.isEmpty()) {
@@ -190,6 +195,101 @@ StatusWith<BSONObj> SortKeyGenerator::getSortKeyFromDocumentWithoutMetadata(
 
     // The sort key is the first index key, ordered according to the pattern '_sortSpecWithoutMeta'.
     return KeyString::toBson(*keys.begin(), Ordering::make(_sortSpecWithoutMeta));
+}
+
+Value SortKeyGenerator::getCollationComparisonKey(const Value& val) const {
+    // If the collation is the simple collation, the value itself is the comparison key.
+    if (!_collator) {
+        return val;
+    }
+
+    // If 'val' is not a collatable type, there's no need to do any work.
+    if (!CollationIndexKey::isCollatableType(val.getType())) {
+        return val;
+    }
+
+    // If 'val' is a string, directly use the collator to obtain a comparison key.
+    if (val.getType() == BSONType::String) {
+        auto compKey = _collator->getComparisonKey(val.getString());
+        return Value(compKey.getKeyData());
+    }
+
+    // Otherwise, for non-string collatable types, take the slow path and round-trip the value
+    // through BSON.
+    BSONObjBuilder input;
+    val.addToBsonObj(&input, ""_sd);
+
+    BSONObjBuilder output;
+    CollationIndexKey::collationAwareIndexKeyAppend(input.obj().firstElement(), _collator, &output);
+    return Value(output.obj().firstElement());
+}
+
+StatusWith<Value> SortKeyGenerator::extractKeyPart(
+    const Document& doc, const SortPattern::SortPatternPart& patternPart) const {
+    Value plainKey;
+    if (patternPart.fieldPath) {
+        invariant(!patternPart.expression);
+        auto key =
+            document_path_support::extractElementAlongNonArrayPath(doc, *patternPart.fieldPath);
+        if (!key.isOK()) {
+            return key;
+        }
+        plainKey = key.getValue();
+    } else {
+        invariant(patternPart.expression);
+        // ExpressionMeta does not use Variables.
+        plainKey = patternPart.expression->evaluate(doc, nullptr /* variables */);
+    }
+
+    return getCollationComparisonKey(plainKey);
+}
+
+StatusWith<Value> SortKeyGenerator::extractKeyFast(const Document& doc) const {
+    if (_sortPattern.isSingleElementKey()) {
+        return extractKeyPart(doc, _sortPattern[0]);
+    }
+
+    std::vector<Value> keys;
+    keys.reserve(_sortPattern.size());
+    for (auto&& keyPart : _sortPattern) {
+        auto extractedKey = extractKeyPart(doc, keyPart);
+        if (!extractedKey.isOK()) {
+            // We can't use the fast path, so bail out.
+            return extractedKey;
+        }
+
+        keys.push_back(std::move(extractedKey.getValue()));
+    }
+    return Value{std::move(keys)};
+}
+
+BSONObj SortKeyGenerator::extractKeyWithArray(const Document& doc) const {
+    SortKeyGenerator::Metadata metadata;
+    if (doc.metadata().hasTextScore()) {
+        metadata.textScore = doc.metadata().getTextScore();
+    }
+    if (doc.metadata().hasRandVal()) {
+        metadata.randVal = doc.metadata().getRandVal();
+    }
+
+    // Convert the Document to a BSONObj, but only do the conversion for the paths we actually need.
+    // Then run the result through the SortKeyGenerator to obtain the final sort key.
+    auto bsonDoc = _sortPattern.documentToBsonWithSortPaths(doc);
+    return uassertStatusOK(computeSortKeyFromDocument(bsonDoc, &metadata));
+}
+
+Value SortKeyGenerator::computeSortKeyFromDocument(const Document& doc) const {
+    // This fast pass directly generates a Value.
+    auto fastKey = extractKeyFast(doc);
+    if (fastKey.isOK()) {
+        return std::move(fastKey.getValue());
+    }
+
+    // Compute the key through the slow path, which generates a serialized BSON sort key (taking a
+    // form like BSONObj {'': 1, '': [2, 3]}) and converts it to a Value (Value [1, [2, 3]] in the
+    // earlier example).
+    return DocumentMetadataFields::deserializeSortKey(_sortPattern.isSingleElementKey(),
+                                                      extractKeyWithArray(doc));
 }
 
 }  // namespace mongo

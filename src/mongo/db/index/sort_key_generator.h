@@ -65,7 +65,7 @@ public:
      * If the sort pattern contains a $meta sort (e.g. sort by "textScore" or "randVal"), then the
      * necessary metadata is obtained from the WorkingSetMember.
      */
-    StatusWith<BSONObj> getSortKey(const WorkingSetMember&) const;
+    StatusWith<BSONObj> computeSortKey(const WorkingSetMember&) const;
 
     /**
      * Returns the key which should be used to sort 'obj', or a non-OK status if no key could be
@@ -75,18 +75,59 @@ public:
      * a $meta sort (i.e. if sortHasMeta() is true). These values are filled in at the corresponding
      * positions in the sort key.
      */
-    StatusWith<BSONObj> getSortKeyFromDocument(const BSONObj& obj, const Metadata*) const;
+    StatusWith<BSONObj> computeSortKeyFromDocument(const BSONObj& obj, const Metadata*) const;
+
+    /**
+     * Returns the sort key for the input 'doc' as a Value. When the sort pattern has multiple
+     * components, the resulting sort key is a an Array-typed Value with one element for each
+     * component. For sort pattern with just one component, the sort key is a Value that represents
+     * the single element to sort on (which may or may not itself be an array).
+     *
+     * The sort key is computed based on the sort pattern, the contents of the document, and if
+     * required by $meta sort specifiers, metadata in the Document. This function throws if it
+     * cannot compute the sort pattern.
+     */
+    Value computeSortKeyFromDocument(const Document& doc) const;
+
+    bool isSingleElementKey() const {
+        return _sortPattern.isSingleElementKey();
+    }
 
 private:
     // Extracts the sort key from a WorkingSetMember which represents an index key. It is illegal to
     // call this if the working set member is not in RID_AND_IDX state. It is also illegal to call
     // this if the sort pattern has any $meta components.
-    StatusWith<BSONObj> getSortKeyFromIndexKey(const WorkingSetMember& member) const;
+    StatusWith<BSONObj> computeSortKeyFromIndexKey(const WorkingSetMember& member) const;
 
     // Extracts the sort key from 'obj', using '_sortSpecWithoutMeta' and thus ignoring any $meta
     // sort components of the sort pattern. The caller is responsible for augmenting this key with
     // the appropriate metadata if '_sortHasMeta' is true.
-    StatusWith<BSONObj> getSortKeyFromDocumentWithoutMetadata(const BSONObj& obj) const;
+    StatusWith<BSONObj> computeSortKeyFromDocumentWithoutMetadata(const BSONObj& obj) const;
+
+    /**
+     * Returns the sort key for 'doc' based on the SortPattern, or ErrorCodes::InternalError if an
+     * array is encountered during sort key generation.
+     */
+    StatusWith<Value> extractKeyFast(const Document& doc) const;
+
+    /**
+     * Extracts the sort key component described by 'keyPart' from 'doc' and returns it. Returns
+     * ErrorCodes::InternalError if the path for 'keyPart' contains an array in 'doc'.
+     */
+    StatusWith<Value> extractKeyPart(const Document& doc,
+                                     const SortPattern::SortPatternPart& keyPart) const;
+
+    /**
+     * Returns the sort key for 'doc' based on the SortPattern. Note this is in the BSONObj format -
+     * with empty field names.
+     */
+    BSONObj extractKeyWithArray(const Document& doc) const;
+
+    /**
+     * Returns the comparison key used to sort 'val' with collation. Note that these comparison keys
+     * should always be sorted with the simple (i.e. binary) collation.
+     */
+    Value getCollationComparisonKey(const Value& val) const;
 
     const CollatorInterface* _collator = nullptr;
 

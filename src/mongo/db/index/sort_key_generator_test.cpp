@@ -52,7 +52,7 @@ std::unique_ptr<SortKeyGenerator> makeSortKeyGen(const BSONObj& sortSpec,
 
 TEST(SortKeyGeneratorTest, ExtractNumberKeyForNonCompoundSortNonNested) {
     auto sortKeyGen = makeSortKeyGen(BSON("a" << 1), nullptr);
-    auto sortKey = sortKeyGen->getSortKeyFromDocument(fromjson("{_id: 0, a: 5}"), nullptr);
+    auto sortKey = sortKeyGen->computeSortKeyFromDocument(fromjson("{_id: 0, a: 5}"), nullptr);
     ASSERT_OK(sortKey.getStatus());
     ASSERT_BSONOBJ_EQ(sortKey.getValue(), BSON("" << 5));
 }
@@ -60,14 +60,14 @@ TEST(SortKeyGeneratorTest, ExtractNumberKeyForNonCompoundSortNonNested) {
 TEST(SortKeyGeneratorTest, ExtractNumberKeyFromDocWithSeveralFields) {
     auto sortKeyGen = makeSortKeyGen(BSON("a" << 1), nullptr);
     auto sortKey =
-        sortKeyGen->getSortKeyFromDocument(fromjson("{_id: 0, z: 10, a: 6, b: 16}"), nullptr);
+        sortKeyGen->computeSortKeyFromDocument(fromjson("{_id: 0, z: 10, a: 6, b: 16}"), nullptr);
     ASSERT_OK(sortKey.getStatus());
     ASSERT_BSONOBJ_EQ(sortKey.getValue(), BSON("" << 6));
 }
 
 TEST(SortKeyGeneratorTest, ExtractStringKeyNonCompoundNonNested) {
     auto sortKeyGen = makeSortKeyGen(BSON("a" << 1), nullptr);
-    auto sortKey = sortKeyGen->getSortKeyFromDocument(
+    auto sortKey = sortKeyGen->computeSortKeyFromDocument(
         fromjson("{_id: 0, z: 'thing1', a: 'thing2', b: 16}"), nullptr);
     ASSERT_OK(sortKey.getStatus());
     ASSERT_BSONOBJ_EQ(sortKey.getValue(),
@@ -77,7 +77,7 @@ TEST(SortKeyGeneratorTest, ExtractStringKeyNonCompoundNonNested) {
 
 TEST(SortKeyGeneratorTest, CompoundSortPattern) {
     auto sortKeyGen = makeSortKeyGen(BSON("a" << 1 << "b" << 1), nullptr);
-    auto sortKey = sortKeyGen->getSortKeyFromDocument(
+    auto sortKey = sortKeyGen->computeSortKeyFromDocument(
         fromjson("{_id: 0, z: 'thing1', a: 99, c: {a: 4}, b: 16}"), nullptr);
     ASSERT_OK(sortKey.getStatus());
     ASSERT_BSONOBJ_EQ(sortKey.getValue(), BSON("" << 99 << "" << 16));
@@ -85,7 +85,7 @@ TEST(SortKeyGeneratorTest, CompoundSortPattern) {
 
 TEST(SortKeyGeneratorTest, CompoundSortPatternWithDottedPath) {
     auto sortKeyGen = makeSortKeyGen(BSON("c.a" << 1 << "b" << 1), nullptr);
-    auto sortKey = sortKeyGen->getSortKeyFromDocument(
+    auto sortKey = sortKeyGen->computeSortKeyFromDocument(
         fromjson("{_id: 0, z: 'thing1', a: 99, c: {a: 4}, b: 16}"), nullptr);
     ASSERT_OK(sortKey.getStatus());
     ASSERT_BSONOBJ_EQ(sortKey.getValue(), BSON("" << 4 << "" << 16));
@@ -93,7 +93,7 @@ TEST(SortKeyGeneratorTest, CompoundSortPatternWithDottedPath) {
 
 TEST(SortKeyGeneratorTest, CompoundPatternLeadingFieldIsArray) {
     auto sortKeyGen = makeSortKeyGen(BSON("c" << 1 << "b" << 1), nullptr);
-    auto sortKey = sortKeyGen->getSortKeyFromDocument(
+    auto sortKey = sortKeyGen->computeSortKeyFromDocument(
         fromjson("{_id: 0, z: 'thing1', a: 99, c: [2, 4, 1], b: 16}"), nullptr);
     ASSERT_OK(sortKey.getStatus());
     ASSERT_BSONOBJ_EQ(sortKey.getValue(), BSON("" << 1 << "" << 16));
@@ -102,7 +102,7 @@ TEST(SortKeyGeneratorTest, CompoundPatternLeadingFieldIsArray) {
 TEST(SortKeyGeneratorTest, ExtractStringSortKeyWithCollatorUsesComparisonKey) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     auto sortKeyGen = makeSortKeyGen(BSON("a" << 1), &collator);
-    auto sortKey = sortKeyGen->getSortKeyFromDocument(
+    auto sortKey = sortKeyGen->computeSortKeyFromDocument(
         fromjson("{_id: 0, z: 'thing1', a: 'thing2', b: 16}"), nullptr);
     ASSERT_OK(sortKey.getStatus());
     ASSERT_BSONOBJ_EQ(sortKey.getValue(),
@@ -114,7 +114,7 @@ TEST(SortKeyGeneratorTest, CollatorHasNoEffectWhenExtractingNonStringSortKey) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     auto sortKeyGen = makeSortKeyGen(BSON("a" << 1), &collator);
     auto sortKey =
-        sortKeyGen->getSortKeyFromDocument(fromjson("{_id: 0, z: 10, a: 6, b: 16}"), nullptr);
+        sortKeyGen->computeSortKeyFromDocument(fromjson("{_id: 0, z: 10, a: 6, b: 16}"), nullptr);
     ASSERT_OK(sortKey.getStatus());
     ASSERT_BSONOBJ_EQ(sortKey.getValue(), BSON("" << 6));
 }
@@ -122,7 +122,7 @@ TEST(SortKeyGeneratorTest, CollatorHasNoEffectWhenExtractingNonStringSortKey) {
 TEST(SortKeyGeneratorTest, SortKeyGenerationForArraysChoosesCorrectKey) {
     auto sortKeyGen = makeSortKeyGen(BSON("a" << -1), nullptr);
     auto sortKey =
-        sortKeyGen->getSortKeyFromDocument(fromjson("{_id: 0, a: [1, 2, 3, 4]}"), nullptr);
+        sortKeyGen->computeSortKeyFromDocument(fromjson("{_id: 0, a: [1, 2, 3, 4]}"), nullptr);
     ASSERT_OK(sortKey.getStatus());
     ASSERT_BSONOBJ_EQ(sortKey.getValue(), BSON("" << 4));
 }
@@ -130,7 +130,7 @@ TEST(SortKeyGeneratorTest, SortKeyGenerationForArraysChoosesCorrectKey) {
 TEST(SortKeyGeneratorTest, EnsureSortKeyGenerationForArraysRespectsCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     auto sortKeyGen = makeSortKeyGen(BSON("a" << 1), &collator);
-    auto sortKey = sortKeyGen->getSortKeyFromDocument(
+    auto sortKey = sortKeyGen->computeSortKeyFromDocument(
         fromjson("{_id: 0, a: ['aaz', 'zza', 'yya', 'zzb']}"), nullptr);
     ASSERT_OK(sortKey.getStatus());
     ASSERT_BSONOBJ_EQ(sortKey.getValue(),
@@ -140,7 +140,7 @@ TEST(SortKeyGeneratorTest, EnsureSortKeyGenerationForArraysRespectsCollation) {
 
 TEST(SortKeyGeneratorTest, SortKeyGenerationForArraysRespectsCompoundOrdering) {
     auto sortKeyGen = makeSortKeyGen(BSON("a.b" << 1 << "a.c" << -1), nullptr);
-    auto sortKey = sortKeyGen->getSortKeyFromDocument(
+    auto sortKey = sortKeyGen->computeSortKeyFromDocument(
         fromjson("{_id: 0, a: [{b: 1, c: 0}, {b: 0, c: 3}, {b: 0, c: 1}]}"), nullptr);
     ASSERT_OK(sortKey.getStatus());
     ASSERT_BSONOBJ_EQ(sortKey.getValue(), BSON("" << 0 << "" << 3));
@@ -214,7 +214,7 @@ DEATH_TEST(SortKeyGeneratorTest,
     auto sortKeyGen = makeSortKeyGen(BSON("a" << BSON("$meta"
                                                       << "textScore")),
                                      nullptr);
-    uassertStatusOK(sortKeyGen->getSortKeyFromDocument(BSONObj{}, nullptr).getStatus());
+    uassertStatusOK(sortKeyGen->computeSortKeyFromDocument(BSONObj{}, nullptr).getStatus());
 }
 
 DEATH_TEST(SortKeyGeneratorTest,
@@ -223,7 +223,7 @@ DEATH_TEST(SortKeyGeneratorTest,
     auto sortKeyGen = makeSortKeyGen(BSON("a" << BSON("$meta"
                                                       << "randVal")),
                                      nullptr);
-    uassertStatusOK(sortKeyGen->getSortKeyFromDocument(BSONObj{}, nullptr).getStatus());
+    uassertStatusOK(sortKeyGen->computeSortKeyFromDocument(BSONObj{}, nullptr).getStatus());
 }
 
 TEST(SortKeyGeneratorTest, CanGenerateKeysForTextScoreMetaSort) {
@@ -232,7 +232,7 @@ TEST(SortKeyGeneratorTest, CanGenerateKeysForTextScoreMetaSort) {
                                      nullptr);
     SortKeyGenerator::Metadata metadata;
     metadata.textScore = 1.5;
-    auto sortKey = sortKeyGen->getSortKeyFromDocument(BSONObj{}, &metadata);
+    auto sortKey = sortKeyGen->computeSortKeyFromDocument(BSONObj{}, &metadata);
     ASSERT_OK(sortKey.getStatus());
     ASSERT_BSONOBJ_EQ(sortKey.getValue(), BSON("" << 1.5));
 }
@@ -243,7 +243,7 @@ TEST(SortKeyGeneratorTest, CanGenerateKeysForRandValMetaSort) {
                                      nullptr);
     SortKeyGenerator::Metadata metadata;
     metadata.randVal = 0.3;
-    auto sortKey = sortKeyGen->getSortKeyFromDocument(BSONObj{}, &metadata);
+    auto sortKey = sortKeyGen->computeSortKeyFromDocument(BSONObj{}, &metadata);
     ASSERT_OK(sortKey.getStatus());
     ASSERT_BSONOBJ_EQ(sortKey.getValue(), BSON("" << 0.3));
 }
@@ -255,7 +255,7 @@ TEST(SortKeyGeneratorTest, CanGenerateKeysForCompoundMetaSort) {
     SortKeyGenerator::Metadata metadata;
     metadata.randVal = 0.3;
     metadata.textScore = 1.5;
-    auto sortKey = sortKeyGen->getSortKeyFromDocument(BSON("a" << 4 << "d" << 5), &metadata);
+    auto sortKey = sortKeyGen->computeSortKeyFromDocument(BSON("a" << 4 << "d" << 5), &metadata);
     ASSERT_OK(sortKey.getStatus());
     ASSERT_BSONOBJ_EQ(sortKey.getValue(),
                       BSON("" << 4 << "" << 0.3 << "" << 1.5 << "" << 5 << "" << 1.5));
@@ -296,7 +296,7 @@ private:
 TEST_F(SortKeyGeneratorWorkingSetTest, CanGetSortKeyFromWorkingSetMemberWithObj) {
     auto sortKeyGen = makeSortKeyGen(BSON("a" << 1), nullptr);
     setRecordIdAndObj(BSON("x" << 1 << "a" << 2 << "y" << 3));
-    auto sortKey = sortKeyGen->getSortKey(member());
+    auto sortKey = sortKeyGen->computeSortKey(member());
     ASSERT_OK(sortKey);
     ASSERT_BSONOBJ_EQ(BSON("" << 2), sortKey.getValue());
 }
@@ -304,7 +304,7 @@ TEST_F(SortKeyGeneratorWorkingSetTest, CanGetSortKeyFromWorkingSetMemberWithObj)
 TEST_F(SortKeyGeneratorWorkingSetTest, CanGetSortKeyFromWorkingSetMemberWithOwnedObj) {
     auto sortKeyGen = makeSortKeyGen(BSON("a" << 1), nullptr);
     setOwnedObj(BSON("x" << 1 << "a" << 2 << "y" << 3));
-    auto sortKey = sortKeyGen->getSortKey(member());
+    auto sortKey = sortKeyGen->computeSortKey(member());
     ASSERT_OK(sortKey);
     ASSERT_BSONOBJ_EQ(BSON("" << 2), sortKey.getValue());
 }
@@ -314,7 +314,7 @@ TEST_F(SortKeyGeneratorWorkingSetTest, CanGenerateKeyFromWSMForTextScoreMetaSort
     auto sortKeyGen = makeSortKeyGen(pattern, nullptr);
     setOwnedObj(BSON("x" << 1 << "a" << 2 << "y" << 3 << "c" << BSON_ARRAY(4 << 5 << 6)));
     member().metadata().setTextScore(9.9);
-    auto sortKey = sortKeyGen->getSortKey(member());
+    auto sortKey = sortKeyGen->computeSortKey(member());
     ASSERT_OK(sortKey);
     ASSERT_BSONOBJ_EQ(BSON("" << 2 << "" << 9.9 << "" << 6), sortKey.getValue());
 }
@@ -322,7 +322,7 @@ TEST_F(SortKeyGeneratorWorkingSetTest, CanGenerateKeyFromWSMForTextScoreMetaSort
 TEST_F(SortKeyGeneratorWorkingSetTest, CanGenerateSortKeyFromWSMInIndexKeyState) {
     auto sortKeyGen = makeSortKeyGen(BSON("a" << 1), nullptr);
     setRecordIdAndIdx(BSON("a" << 1 << "b" << 1), BSON("" << 2 << "" << 3));
-    auto sortKey = sortKeyGen->getSortKey(member());
+    auto sortKey = sortKeyGen->computeSortKey(member());
     ASSERT_OK(sortKey);
     ASSERT_BSONOBJ_EQ(BSON("" << 2), sortKey.getValue());
 }
@@ -335,7 +335,7 @@ TEST_F(SortKeyGeneratorWorkingSetTest, CanGenerateSortKeyFromWSMInIndexKeyStateW
                            << "string1"
                            << ""
                            << "string2"));
-    auto sortKey = sortKeyGen->getSortKey(member());
+    auto sortKey = sortKeyGen->computeSortKey(member());
     ASSERT_OK(sortKey);
     ASSERT_BSONOBJ_EQ(BSON(""
                            << "1gnirts"),
@@ -349,7 +349,7 @@ DEATH_TEST_F(SortKeyGeneratorWorkingSetTest,
     auto sortKeyGen = makeSortKeyGen(pattern, nullptr);
     setRecordIdAndIdx(BSON("a" << 1 << "b" << 1), BSON("" << 2 << "" << 3));
     member().metadata().setTextScore(9.9);
-    MONGO_COMPILER_VARIABLE_UNUSED auto ignored = sortKeyGen->getSortKey(member());
+    MONGO_COMPILER_VARIABLE_UNUSED auto ignored = sortKeyGen->computeSortKey(member());
 }
 
 }  // namespace

@@ -31,7 +31,15 @@
 
 #include "mongo/db/pipeline/document_metadata_fields.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
+
 namespace mongo {
+
+namespace {
+Value missingToNull(Value maybeMissing) {
+    return maybeMissing.missing() ? Value(BSONNULL) : maybeMissing;
+}
+}  // namespace
 
 DocumentMetadataFields::DocumentMetadataFields(const DocumentMetadataFields& other)
     : _holder(other._holder ? std::make_unique<MetadataHolder>(*other._holder) : nullptr) {}
@@ -195,6 +203,33 @@ void DocumentMetadataFields::deserializeForSorter(BufReader& buf, DocumentMetada
             uasserted(28744, "Unrecognized marker, unable to deserialize buffer");
         }
     }
+}
+
+BSONObj DocumentMetadataFields::serializeSortKey(bool isSingleElementKey, const Value& value) {
+    // Missing values don't serialize correctly in this format, so use nulls instead, since they are
+    // considered equivalent with woCompare().
+    if (isSingleElementKey) {
+        return BSON("" << missingToNull(value));
+    }
+    invariant(value.isArray());
+    BSONObjBuilder bb;
+    for (auto&& val : value.getArray()) {
+        bb << "" << missingToNull(val);
+    }
+    return bb.obj();
+}
+
+Value DocumentMetadataFields::deserializeSortKey(bool isSingleElementKey,
+                                                 const BSONObj& bsonSortKey) {
+    std::vector<Value> keys;
+    for (auto&& elt : bsonSortKey) {
+        keys.push_back(Value{elt});
+    }
+    if (isSingleElementKey) {
+        // As a special case for a sort on a single field, we do not put the keys into an array.
+        return keys[0];
+    }
+    return Value{std::move(keys)};
 }
 
 }  // namespace mongo
