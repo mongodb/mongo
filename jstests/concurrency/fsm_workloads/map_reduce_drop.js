@@ -41,8 +41,8 @@ var $config = (function() {
         function dropDB(db, collName) {
             var mapReduceDb = db.getSiblingDB(this.mapReduceDBName);
 
-            var res = mapReduceDb.dropDatabase();
-            assertAlways.commandWorked(res);
+            // Concurrent dropDatabase calls can result in transient errors.
+            mapReduceDb.dropDatabase();
         }
 
         function mapReduce(db, collName) {

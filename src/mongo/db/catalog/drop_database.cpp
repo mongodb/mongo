@@ -143,6 +143,12 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
                           str::stream() << "Not primary while dropping database " << dbName);
         }
 
+        if (db->isDropPending(opCtx)) {
+            return Status(ErrorCodes::DatabaseDropPending,
+                          str::stream()
+                              << "The database is currently being dropped. Database: " << dbName);
+        }
+
         log() << "dropDatabase " << dbName << " - starting";
         db->setDropPending(opCtx, true);
 
