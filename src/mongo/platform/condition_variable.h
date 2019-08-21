@@ -124,7 +124,7 @@ private:
     template <class Lock, class Duration, class Predicate>
     auto _waitWithPredicate(Lock& lock, const Duration& rel_time, Predicate pred) {
         while (!pred()) {
-            if (_wait(lock, rel_time) == std::cv_status::timeout) {
+            if (_wait(lock, rel_time) == stdx::cv_status::timeout) {
                 return pred();
             }
         }
