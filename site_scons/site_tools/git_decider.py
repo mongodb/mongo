@@ -53,9 +53,9 @@ def generate(env, **kwargs):
         result = gitInfoForDep == prev_ni.csig
         return result
 
-    def MongoGitDecider(dependency, target, prev_ni):
+    def MongoGitDecider(dependency, target, prev_ni, node):
         if not is_known_to_git(dependency):
-            return base_decider(dependency, target, prev_ni)
+            return base_decider(dependency, target, prev_ni, node)
         return not git_says_file_is_up_to_date(dependency, prev_ni)
 
     env.Decider(MongoGitDecider)
