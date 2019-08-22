@@ -531,5 +531,5 @@ env.CppUnitTest(
         'pipeline',
         'process_interface_shardsvr',
         'process_interface_standalone',
-    ],
+    ]
 )

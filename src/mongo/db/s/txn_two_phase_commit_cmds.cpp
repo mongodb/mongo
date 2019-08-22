@@ -45,6 +45,7 @@
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(hangAfterStartingCoordinateCommit);
 MONGO_FAIL_POINT_DEFINE(participantReturnNetworkErrorForPrepareAfterExecutingPrepareLogic);
 
 class PrepareTransactionCmd : public TypedCommand<PrepareTransactionCmd> {
@@ -232,6 +233,12 @@ public:
                                         *opCtx->getLogicalSessionId(),
                                         *opCtx->getTxnNumber(),
                                         validateParticipants(opCtx, cmd.getParticipants()));
+
+            if (MONGO_FAIL_POINT(hangAfterStartingCoordinateCommit)) {
+                LOG(0) << "Hit hangAfterStartingCoordinateCommit failpoint";
+                MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
+                                                                hangAfterStartingCoordinateCommit);
+            }
 
             ON_BLOCK_EXIT([opCtx] {
                 // A decision will most likely have been written from a different OperationContext

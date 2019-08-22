@@ -19,6 +19,7 @@ env.Library(
         'sharding_migration_critical_section.cpp',
         'sharding_state.cpp',
         'transaction_coordinator_factory.cpp',
+        'transaction_coordinator_worker_curop_repository.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -132,6 +133,7 @@ env.Library(
         'transaction_coordinator_service.cpp',
         'transaction_coordinator_structures.cpp',
         'transaction_coordinator_util.cpp',
+        'transaction_coordinator_worker_curop_repository_mongod.cpp',
         'transaction_coordinator.cpp',
         'wait_for_majority_service.cpp',
         env.Idlc('transaction_coordinator_document.idl')[0],
