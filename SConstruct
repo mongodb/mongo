@@ -359,8 +359,8 @@ for pack in [
     pretty = name
     if len(pack) == 2:
         pretty = pack[1]
-    add_option(f'use-system-{name}',
-               help=f'use system version of {pretty} library',
+    add_option('use-system-{name}',
+               help='use system version of {pretty} library',
                nargs=0)
 
 add_option('system-boost-lib-search-suffixes',
