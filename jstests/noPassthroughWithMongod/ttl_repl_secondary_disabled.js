@@ -6,20 +6,30 @@
 // command.
 TestData.skipCheckDBHashes = true;
 
-var rt = new ReplSetTest({name: "ttl_repl", nodes: 2});
-
 // setup set
-var nodes = rt.startSet();
+const rt = new ReplSetTest({
+    name: "ttl_repl",
+    nodes: [
+        {},
+        {
+          // Disallow elections on secondary.
+          rsConfig: {
+              priority: 0,
+          },
+        },
+    ]
+});
+const nodes = rt.startSet();
 rt.initiate();
-var master = rt.getPrimary();
+let master = rt.getPrimary();
 rt.awaitSecondaryNodes();
-var slave1 = rt.getSecondary();
+let slave1 = rt.getSecondary();
 
 // shortcuts
-var masterdb = master.getDB('d');
-var slave1db = slave1.getDB('d');
-var mastercol = masterdb['c'];
-var slave1col = slave1db['c'];
+let masterdb = master.getDB('d');
+let slave1db = slave1.getDB('d');
+let mastercol = masterdb['c'];
+let slave1col = slave1db['c'];
 
 // create TTL index, wait for TTL monitor to kick in, then check things
 mastercol.ensureIndex({x: 1}, {expireAfterSeconds: 10});
