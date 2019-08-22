@@ -219,6 +219,7 @@ void ValidateAdaptor::traverseRecordStore(
     const RecordId& firstRecordId,
     const std::unique_ptr<SeekableRecordCursor>& traverseRecordStoreCursor,
     const std::unique_ptr<SeekableRecordCursor>& seekRecordStoreCursor,
+    bool background,
     ValidateResults* results,
     BSONObjBuilder* output) {
     long long nrecords = 0;
@@ -247,8 +248,8 @@ void ValidateAdaptor::traverseRecordStore(
             invariant(prevRecordId < record->id);
         }
 
-        // While some storage engines may use padding, we still require that they return the
-        // unpadded record data.
+        // validatedSize = dataSize is not a general requirement as some storage engines may use
+        // padding, but we still require that they return the unpadded record data.
         if (!status.isOK() || validatedSize != static_cast<size_t>(dataSize)) {
             if (results->valid) {
                 // Only log once.
@@ -262,7 +263,9 @@ void ValidateAdaptor::traverseRecordStore(
         prevRecordId = record->id;
     }
 
-    if (results->valid) {
+    // Do not update the record store stats if we're in the background as we've validated a
+    // checkpoint and it may not have the most up-to-date changes.
+    if (results->valid && !background) {
         recordStore->updateStatsAfterRepair(_opCtx, nrecords, dataSizeTotal);
     }
 

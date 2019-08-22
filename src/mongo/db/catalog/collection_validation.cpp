@@ -53,97 +53,6 @@ namespace {
 using ValidateResultsMap = std::map<string, ValidateResults>;
 
 /**
- * General validation logic for any RecordStore. Performs sanity checks to confirm that each
- * record in the store is valid according to the given ValidateAdaptor and updates
- * record store stats to match.
- */
-void _genericRecordStoreValidate(
-    OperationContext* opCtx,
-    RecordStore* recordStore,
-    ValidateAdaptor* indexValidator,
-    const RecordId& firstRecordId,
-    const std::unique_ptr<SeekableRecordCursor>& traverseRecordStoreCursor,
-    const std::unique_ptr<SeekableRecordCursor>& seekRecordStoreCursor,
-    ValidateResults* results,
-    BSONObjBuilder* output) {
-    long long nrecords = 0;
-    long long dataSizeTotal = 0;
-    long long nInvalid = 0;
-
-    results->valid = true;
-    int interruptInterval = 4096;
-    RecordId prevRecordId;
-
-    for (auto record = traverseRecordStoreCursor->seekExact(firstRecordId); record;
-         record = traverseRecordStoreCursor->next()) {
-        if (!(nrecords % interruptInterval)) {
-            opCtx->checkForInterrupt();
-        }
-        ++nrecords;
-        auto dataSize = record->data.size();
-        dataSizeTotal += dataSize;
-        size_t validatedSize;
-        Status status = indexValidator->validateRecord(
-            record->id, record->data, seekRecordStoreCursor, &validatedSize);
-
-        // Check to ensure isInRecordIdOrder() is being used properly.
-        if (prevRecordId.isValid()) {
-            invariant(prevRecordId < record->id);
-        }
-
-        // ValidatedSize = dataSize is not a general requirement as some storage engines may use
-        // padding, but we still require that they return the unpadded record data.
-        if (!status.isOK() || validatedSize != static_cast<size_t>(dataSize)) {
-            if (results->valid) {
-                // Only log once.
-                results->errors.push_back("detected one or more invalid documents (see logs)");
-            }
-            nInvalid++;
-            results->valid = false;
-            log() << "document at location: " << record->id << " is corrupted";
-        }
-
-        prevRecordId = record->id;
-    }
-
-    if (results->valid) {
-        recordStore->updateStatsAfterRepair(opCtx, nrecords, dataSizeTotal);
-    }
-
-    output->append("nInvalidDocuments", nInvalid);
-    output->appendNumber("nrecords", nrecords);
-}
-
-void _validateRecordStore(OperationContext* opCtx,
-                          RecordStore* recordStore,
-                          ValidateCmdLevel level,
-                          bool background,
-                          ValidateAdaptor* indexValidator,
-                          const RecordId& firstRecordId,
-                          const std::unique_ptr<SeekableRecordCursor>& traverseRecordStoreCursor,
-                          const std::unique_ptr<SeekableRecordCursor>& seekRecordStoreCursor,
-                          ValidateResults* results,
-                          BSONObjBuilder* output) {
-    if (background) {
-        indexValidator->traverseRecordStore(recordStore,
-                                            firstRecordId,
-                                            traverseRecordStoreCursor,
-                                            seekRecordStoreCursor,
-                                            results,
-                                            output);
-    } else {
-        _genericRecordStoreValidate(opCtx,
-                                    recordStore,
-                                    indexValidator,
-                                    firstRecordId,
-                                    traverseRecordStoreCursor,
-                                    seekRecordStoreCursor,
-                                    results,
-                                    output);
-    }
-}
-
-/**
  * Opens a cursor on each index in the given 'indexCatalog'.
  *
  * Returns a map from indexName -> indexCursor.
@@ -502,19 +411,16 @@ Status validate(OperationContext* opCtx,
 
         // Validate the record store.
         log(LogComponent::kIndex) << "validating collection " << coll->ns() << uuidString;
-        // In _validateRecordStore(), the index validator keeps track the records in the record
+        // In traverseRecordStore(), the index validator keeps track the records in the record
         // store so that _validateIndexes() can confirm that the index entries match the records in
         // the collection.
-        _validateRecordStore(opCtx,
-                             coll->getRecordStore(),
-                             level,
-                             background,
-                             &indexValidator,
-                             firstRecordId,
-                             traverseRecordStoreCursor,
-                             seekRecordStoreCursor,
-                             results,
-                             output);
+        indexValidator.traverseRecordStore(coll->getRecordStore(),
+                                           firstRecordId,
+                                           traverseRecordStoreCursor,
+                                           seekRecordStoreCursor,
+                                           background,
+                                           results,
+                                           output);
 
         // Validate in-memory catalog information with persisted info.
         _validateCatalogEntry(opCtx, coll, coll->getValidatorDoc(), results);

@@ -93,6 +93,7 @@ public:
                              const RecordId& firstRecordId,
                              const std::unique_ptr<SeekableRecordCursor>& traverseRecordStoreCursor,
                              const std::unique_ptr<SeekableRecordCursor>& seekRecordStoreCursor,
+                             bool background,
                              ValidateResults* results,
                              BSONObjBuilder* output);
 
