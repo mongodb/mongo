@@ -81,7 +81,12 @@ void MultiIndexBlock::cleanUpAfterBuild(OperationContext* opCtx, Collection* col
         invariant(_collectionUUID.get() == collection->uuid().get());
     }
 
-    if (!_needToCleanup && !_indexes.empty()) {
+    if (_indexes.empty()) {
+        _buildIsCleanedUp = true;
+        return;
+    }
+
+    if (!_needToCleanup) {
         collection->infoCache()->clearQueryCache();
     }
 
@@ -98,7 +103,7 @@ void MultiIndexBlock::cleanUpAfterBuild(OperationContext* opCtx, Collection* col
         collLock.emplace(opCtx, nss, MODE_X);
     }
 
-    if (!_needToCleanup || _indexes.empty()) {
+    if (!_needToCleanup) {
         // The temp tables cannot be dropped in commit() because commit() can be called multiple
         // times on write conflict errors and the drop does not rollback in WUOWs.
         for (auto& index : _indexes) {
