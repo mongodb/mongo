@@ -42,6 +42,9 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
+
+using OperationContextFn = std::function<void(OperationContext*)>;
+
 namespace txn {
 
 /**
@@ -131,7 +134,10 @@ public:
      * completes (with error or not).
      */
     Future<executor::TaskExecutor::ResponseStatus> scheduleRemoteCommand(
-        const ShardId& shardId, const ReadPreferenceSetting& readPref, const BSONObj& commandObj);
+        const ShardId& shardId,
+        const ReadPreferenceSetting& readPref,
+        const BSONObj& commandObj,
+        OperationContextFn operationContextFn = [](OperationContext*) {});
 
     /**
      * Allows sub-tasks on this scheduler to be grouped together and works-around the fact that
@@ -176,7 +182,9 @@ private:
      * Finds the host and port for a shard id, returning it and the shard object used for targeting.
      */
     Future<HostAndShard> _targetHostAsync(const ShardId& shardId,
-                                          const ReadPreferenceSetting& readPref);
+                                          const ReadPreferenceSetting& readPref,
+                                          OperationContextFn operationContextFn =
+                                              [](OperationContext*) {});
 
     /**
      * Returns true when all the registered child schedulers, op contexts and handles have joined.

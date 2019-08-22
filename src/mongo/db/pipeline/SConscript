@@ -672,6 +672,6 @@ env.CppUnitTest(
         'mongo_process_interface',
         'mongos_process_interface',
         'process_interface_shardsvr',
-        'process_interface_standalone'
-        ],
-    )
+        'process_interface_standalone',
+    ]
+)

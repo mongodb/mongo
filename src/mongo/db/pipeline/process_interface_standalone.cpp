@@ -50,6 +50,7 @@
 #include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/transaction_coordinator_worker_curop_info.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/stats/fill_locker_info.h"
@@ -551,6 +552,10 @@ BSONObj MongoInterfaceStandalone::_reportCurrentOpForClient(
         if (auto lockerInfo = clientOpCtx->lockState()->getLockerInfo(
                 CurOp::get(*clientOpCtx)->getLockStatsBase())) {
             fillLockerInfo(*lockerInfo, builder);
+        }
+
+        if (auto tcWorkerRepo = getTransactionCoordinatorWorkerCurOpRepository()) {
+            tcWorkerRepo->reportState(clientOpCtx, &builder);
         }
 
         auto flowControlStats = clientOpCtx->lockState()->getFlowControlStats();
