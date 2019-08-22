@@ -53,7 +53,7 @@ TEST(SortedDataInterface, BuilderAddKey) {
         const std::unique_ptr<SortedDataBuilderInterface> builder(
             sorted->getBulkBuilder(opCtx.get(), true));
 
-        ASSERT_OK(builder->addKey(makeKeyString(sorted, key1, loc1)));
+        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
         builder->commit(false);
     }
 
@@ -111,7 +111,7 @@ TEST(SortedDataInterface, BuilderAddKeyWithReservedRecordId) {
         RecordId reservedLoc(RecordId::ReservedId::kWildcardMultikeyMetadataId);
         ASSERT(reservedLoc.isReserved());
 
-        ASSERT_OK(builder->addKey(makeKeyString(sorted, key1, reservedLoc)));
+        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, reservedLoc)));
         builder->commit(false);
     }
 
@@ -137,7 +137,7 @@ TEST(SortedDataInterface, BuilderAddCompoundKey) {
         const std::unique_ptr<SortedDataBuilderInterface> builder(
             sorted->getBulkBuilder(opCtx.get(), true));
 
-        ASSERT_OK(builder->addKey(makeKeyString(sorted, compoundKey1a, loc1)));
+        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey1a, loc1)));
         builder->commit(false);
     }
 
@@ -165,8 +165,9 @@ TEST(SortedDataInterface, BuilderAddSameKey) {
         const std::unique_ptr<SortedDataBuilderInterface> builder(
             sorted->getBulkBuilder(opCtx.get(), false));
 
-        ASSERT_OK(builder->addKey(makeKeyString(sorted, key1, loc1)));
-        ASSERT_EQUALS(ErrorCodes::DuplicateKey, builder->addKey(makeKeyString(sorted, key1, loc2)));
+        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
+        ASSERT_EQUALS(ErrorCodes::DuplicateKey,
+                      builder->addKey(makeKeyString(sorted.get(), key1, loc2)));
         builder->commit(false);
     }
 
@@ -228,8 +229,8 @@ TEST(SortedDataInterface, BuilderAddSameKeyWithDupsAllowed) {
         const std::unique_ptr<SortedDataBuilderInterface> builder(
             sorted->getBulkBuilder(opCtx.get(), true /* allow duplicates */));
 
-        ASSERT_OK(builder->addKey(makeKeyString(sorted, key1, loc1)));
-        ASSERT_OK(builder->addKey(makeKeyString(sorted, key1, loc2)));
+        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
+        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc2)));
         builder->commit(false);
     }
 
@@ -290,9 +291,9 @@ TEST(SortedDataInterface, BuilderAddMultipleKeys) {
         const std::unique_ptr<SortedDataBuilderInterface> builder(
             sorted->getBulkBuilder(opCtx.get(), true));
 
-        ASSERT_OK(builder->addKey(makeKeyString(sorted, key1, loc1)));
-        ASSERT_OK(builder->addKey(makeKeyString(sorted, key2, loc2)));
-        ASSERT_OK(builder->addKey(makeKeyString(sorted, key3, loc3)));
+        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
+        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key2, loc2)));
+        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key3, loc3)));
         builder->commit(false);
     }
 
@@ -352,11 +353,11 @@ TEST(SortedDataInterface, BuilderAddMultipleCompoundKeys) {
         const std::unique_ptr<SortedDataBuilderInterface> builder(
             sorted->getBulkBuilder(opCtx.get(), true));
 
-        ASSERT_OK(builder->addKey(makeKeyString(sorted, compoundKey1a, loc1)));
-        ASSERT_OK(builder->addKey(makeKeyString(sorted, compoundKey1b, loc2)));
-        ASSERT_OK(builder->addKey(makeKeyString(sorted, compoundKey1c, loc4)));
-        ASSERT_OK(builder->addKey(makeKeyString(sorted, compoundKey2b, loc3)));
-        ASSERT_OK(builder->addKey(makeKeyString(sorted, compoundKey3a, loc5)));
+        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey1a, loc1)));
+        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey1b, loc2)));
+        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey1c, loc4)));
+        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey2b, loc3)));
+        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey3a, loc5)));
         builder->commit(false);
     }
 
