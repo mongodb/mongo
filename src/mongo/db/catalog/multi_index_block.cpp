@@ -119,7 +119,6 @@ void MultiIndexBlock::cleanUpAfterBuild(OperationContext* opCtx, Collection* col
                 _indexes[i].block->deleteTemporaryTables(opCtx);
             }
 
-            auto replCoord = repl::ReplicationCoordinator::get(opCtx);
             // Nodes building an index on behalf of a user (e.g: `createIndexes`, `applyOps`) may
             // fail, removing the existence of the index from the catalog. This update must be
             // timestamped (unless the build is on an unreplicated collection). A failure from
@@ -129,20 +128,10 @@ void MultiIndexBlock::cleanUpAfterBuild(OperationContext* opCtx, Collection* col
                 // We must choose a timestamp to write with, as we don't have one handy in the
                 // recovery unit already.
 
-                // We need to avoid checking replication state if we do not hold the RSTL.  If we do
-                // not hold the RSTL, we must be a build started on a secondary via replication.
-                if (opCtx->lockState()->isRSTLLocked() &&
-                    replCoord->canAcceptWritesForDatabase(opCtx, "admin")) {
-                    opCtx->getServiceContext()->getOpObserver()->onOpMessage(
-                        opCtx,
-                        BSON("msg" << std::string(str::stream()
-                                                  << "Failing index builds. Coll: " << nss)));
-                } else {
-                    // Simply get a timestamp to write with here; we can't write to the oplog.
-                    repl::UnreplicatedWritesBlock uwb(opCtx);
-                    if (!IndexTimestampHelper::setGhostCommitTimestampForCatalogWrite(opCtx, nss)) {
-                        log() << "Did not timestamp index abort write.";
-                    }
+                // Simply get a timestamp to write with here; we can't write to the oplog.
+                repl::UnreplicatedWritesBlock uwb(opCtx);
+                if (!IndexTimestampHelper::setGhostCommitTimestampForCatalogWrite(opCtx, nss)) {
+                    log() << "Did not timestamp index abort write.";
                 }
             }
             wunit.commit();
