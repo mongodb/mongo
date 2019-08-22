@@ -817,60 +817,61 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
          const OplogEntry& entry,
          OplogApplication::Mode mode,
          boost::optional<Timestamp> stableTimestampForRecovery) -> Status {
-         // {
-         //     "commitIndexBuild" : "coll",
-         //     "indexBuildUUID" : <UUID>,
-         //     "indexes" : [
-         //         {
-         //             "key" : {
-         //                 "x" : 1
-         //             },
-         //             "name" : "x_1",
-         //             "v" : 2
-         //         },
-         //         {
-         //             "key" : {
-         //                 "k" : 1
-         //             },
-         //             "name" : "k_1",
-         //             "v" : 2
-         //         }
-         //     ]
-         // }
+          // {
+          //     "commitIndexBuild" : "coll",
+          //     "indexBuildUUID" : <UUID>,
+          //     "indexes" : [
+          //         {
+          //             "key" : {
+          //                 "x" : 1
+          //             },
+          //             "name" : "x_1",
+          //             "v" : 2
+          //         },
+          //         {
+          //             "key" : {
+          //                 "k" : 1
+          //             },
+          //             "name" : "k_1",
+          //             "v" : 2
+          //         }
+          //     ]
+          // }
 
-         if (OplogApplication::Mode::kApplyOpsCmd == mode) {
-             return {ErrorCodes::CommandNotSupported,
-                     "The commitIndexBuild operation is not supported in applyOps mode"};
-         }
+          if (OplogApplication::Mode::kApplyOpsCmd == mode) {
+              return {ErrorCodes::CommandNotSupported,
+                      "The commitIndexBuild operation is not supported in applyOps mode"};
+          }
 
-         const auto& cmd = entry.getObject();
-         // Ensure the collection name is specified
-         BSONElement first = cmd.firstElement();
-         invariant(first.fieldNameStringData() == "commitIndexBuild");
-         uassert(ErrorCodes::InvalidNamespace,
-                 "commitIndexBuild value must be a string",
-                 first.type() == mongo::String);
+          const auto& cmd = entry.getObject();
+          // Ensure the collection name is specified
+          BSONElement first = cmd.firstElement();
+          invariant(first.fieldNameStringData() == "commitIndexBuild");
+          uassert(ErrorCodes::InvalidNamespace,
+                  "commitIndexBuild value must be a string",
+                  first.type() == mongo::String);
 
-         const NamespaceString nss(
-             extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd));
+          const NamespaceString nss(
+              extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd));
 
-         auto buildUUIDElem = cmd.getField("indexBuildUUID");
-         uassert(ErrorCodes::BadValue,
-                 "Error parsing 'commitIndexBuild' oplog entry, missing required field "
-                 "'indexBuildUUID'.",
-                 !buildUUIDElem.eoo());
-         UUID indexBuildUUID = uassertStatusOK(UUID::parse(buildUUIDElem));
+          auto buildUUIDElem = cmd.getField("indexBuildUUID");
+          uassert(ErrorCodes::BadValue,
+                  "Error parsing 'commitIndexBuild' oplog entry, missing required field "
+                  "'indexBuildUUID'.",
+                  !buildUUIDElem.eoo());
+          UUID indexBuildUUID = uassertStatusOK(UUID::parse(buildUUIDElem));
 
-         auto indexesElem = cmd.getField("indexes");
-         uassert(ErrorCodes::BadValue,
-                 "Error parsing 'commitIndexBuild' oplog entry, missing required field 'indexes'.",
-                 !indexesElem.eoo());
-         uassert(ErrorCodes::BadValue,
-                 "Error parsing 'commitIndexBuild' oplog entry, field 'indexes' must be an array.",
-                 indexesElem.type() == Array);
+          auto indexesElem = cmd.getField("indexes");
+          uassert(ErrorCodes::BadValue,
+                  "Error parsing 'commitIndexBuild' oplog entry, missing required field 'indexes'.",
+                  !indexesElem.eoo());
+          uassert(ErrorCodes::BadValue,
+                  "Error parsing 'commitIndexBuild' oplog entry, field 'indexes' must be an array.",
+                  indexesElem.type() == Array);
 
-         return commitIndexBuild(opCtx, nss, indexBuildUUID, indexesElem, mode);
-     }}},
+          return commitIndexBuild(opCtx, nss, indexBuildUUID, indexesElem, mode);
+      },
+      {}}},
     {"abortIndexBuild",
      {[](OperationContext* opCtx,
          const OplogEntry& entry,
