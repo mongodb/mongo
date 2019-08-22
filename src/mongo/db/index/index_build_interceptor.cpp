@@ -58,7 +58,8 @@ MONGO_FAIL_POINT_DEFINE(hangDuringIndexBuildDrainYield);
 IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx, IndexCatalogEntry* entry)
     : _indexCatalogEntry(entry),
       _sideWritesTable(
-          opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(opCtx)) {
+          opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(opCtx)),
+      _sideWritesCounter(std::make_shared<AtomicWord<long long>>()) {
 
     if (entry->descriptor()->unique()) {
         _duplicateKeyTracker = std::make_unique<DuplicateKeyTracker>(opCtx, entry);
@@ -127,7 +128,7 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
     // Force the progress meter to log at the end of every batch. By default, the progress meter
     // only logs after a large number of calls to hit(), but since we use such large batch sizes,
     // progress would rarely be displayed.
-    progress->reset(_sideWritesCounter.load() - appliedAtStart /* total */,
+    progress->reset(_sideWritesCounter->load() - appliedAtStart /* total */,
                     3 /* secondsBetween */,
                     1 /* checkInterval */);
 
@@ -217,7 +218,7 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
         _tryYield(opCtx);
 
         // Account for more writes coming in during a batch.
-        progress->setTotalWhileRunning(_sideWritesCounter.loadRelaxed() - appliedAtStart);
+        progress->setTotalWhileRunning(_sideWritesCounter->loadRelaxed() - appliedAtStart);
         return Status::OK();
     };
 
@@ -338,7 +339,7 @@ bool IndexBuildInterceptor::areAllWritesApplied(OperationContext* opCtx) const {
 
     // The table is empty only when all writes are applied.
     if (!record) {
-        auto writesRecorded = _sideWritesCounter.load();
+        auto writesRecorded = _sideWritesCounter->load();
         if (writesRecorded != _numApplied) {
             const std::string message = str::stream()
                 << "The number of side writes recorded does not match the number "
@@ -414,12 +415,12 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
         }
     }
 
-    _sideWritesCounter.fetchAndAdd(toInsert.size());
+    _sideWritesCounter->fetchAndAdd(toInsert.size());
     // This insert may roll back, but not necessarily from inserting into this table. If other write
     // operations outside this table and in the same transaction are rolled back, this counter also
     // needs to be rolled back.
     opCtx->recoveryUnit()->onRollback(
-        [this, size = toInsert.size()] { _sideWritesCounter.fetchAndSubtract(size); });
+        [this, size = toInsert.size()] { _sideWritesCounter->fetchAndSubtract(size); });
 
     std::vector<Record> records;
     for (auto& doc : toInsert) {
