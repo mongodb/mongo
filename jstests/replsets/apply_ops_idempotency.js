@@ -192,10 +192,14 @@ function testIdempotency(primary, testFun, testName) {
     let expectedInfo = dbInfo(testdbs);
 
     let oplog = mydb.getSiblingDB('local').oplog.rs;
-    let ops =
-        oplog
-            .find({op: {$ne: 'n'}, ns: new RegExp('^' + mydb.getName())}, {ts: 0, t: 0, h: 0, v: 0})
-            .toArray();
+    let ops = oplog
+                  .find({
+                      op: {$ne: 'n'},
+                      ns: new RegExp('^' + mydb.getName()),
+                      'o.commitIndexBuild': {$exists: false},
+                  },
+                        {ts: 0, t: 0, h: 0, v: 0})
+                  .toArray();
     assert.gt(ops.length, 0, 'Could not find any matching ops in the oplog');
     testdbs.forEach((db) => assert.commandWorked(db.dropDatabase()));
 
