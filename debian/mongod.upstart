@@ -1,7 +1,7 @@
 # Ubuntu upstart file at /etc/init/mongod.conf
 
 # Recommended ulimit values for mongod or mongos
-# See http://docs.mongodb.org/manual/reference/ulimit/#recommended-settings
+# See https://docs.mongodb.com/manual/reference/ulimit/#recommended-ulimit-settings
 #
 limit fsize unlimited unlimited
 limit cpu unlimited unlimited
