@@ -212,7 +212,12 @@ public:
 
     virtual MatchCategory getCategory() const = 0;
 
-    // XXX: document
+    /**
+     * This method will perform a clone of the entire match expression tree, but will not clone the
+     * memory pointed to by underlying BSONElements. To perform a "deep clone" use this method and
+     * also ensure that the buffer held by the underlying BSONObj will not be destroyed during the
+     * lifetime of the clone.
+     */
     virtual std::unique_ptr<MatchExpression> shallowClone() const = 0;
 
     // XXX document
