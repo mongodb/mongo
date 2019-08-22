@@ -320,6 +320,22 @@ Status handleOplogCommand(RoleGraph* roleGraph, const BSONObj& cmdObj) {
             return Status::OK();
         }
     }
+    if (cmdName == "commitIndexBuild") {
+        if (cmdObj.firstElement().str() != rolesCollectionNamespace.coll()) {
+            return Status::OK();
+        }
+        for (auto indexSpecElem : cmdObj["indexes"].Array()) {
+            UnorderedFieldsBSONObjComparator instance;
+            auto indexSpec = indexSpecElem.Obj();
+            if (instance.evaluate(
+                    indexSpec ==
+                    (BSON("v" << 2 << "name"
+                              << "role_1_db_1"
+                              << "key" << BSON("role" << 1 << "db" << 1) << "unique" << true)))) {
+                return Status::OK();
+            }
+        }
+    }
 
     if (cmdName == "collMod" && cmdObj.nFields() == 1) {
         // We don't care about empty modifications, even if they are on roles collection.
