@@ -419,8 +419,9 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
     // This insert may roll back, but not necessarily from inserting into this table. If other write
     // operations outside this table and in the same transaction are rolled back, this counter also
     // needs to be rolled back.
-    opCtx->recoveryUnit()->onRollback(
-        [this, size = toInsert.size()] { _sideWritesCounter->fetchAndSubtract(size); });
+    opCtx->recoveryUnit()->onRollback([sharedCounter = _sideWritesCounter, size = toInsert.size()] {
+        sharedCounter->fetchAndSubtract(size);
+    });
 
     std::vector<Record> records;
     for (auto& doc : toInsert) {
