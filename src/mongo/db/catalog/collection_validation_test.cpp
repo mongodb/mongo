@@ -47,7 +47,7 @@ private:
     void setUp() override;
 
 public:
-    void checkValidate(Collection* coll, bool valid, int records, int invalid, int errors);
+    void checkValidate(bool valid, int records, int invalid, int errors);
 
     std::vector<ValidateCmdLevel> levels{kValidateNormal, kValidateFull};
 };
@@ -60,16 +60,12 @@ void CollectionValidationTest::setUp() {
 }
 
 // Call validate with different validation levels and verify the results.
-void CollectionValidationTest::checkValidate(
-    Collection* coll, bool valid, int records, int invalid, int errors) {
-    auto opCtx = operationContext();
-    auto collLock = std::make_unique<Lock::CollectionLock>(opCtx, coll->ns(), MODE_X);
-
+void CollectionValidationTest::checkValidate(bool valid, int records, int invalid, int errors) {
     for (auto level : levels) {
         ValidateResults results;
         BSONObjBuilder output;
-        auto status = CollectionValidation::validate(opCtx, coll, level, false, &results, &output);
-        ASSERT_OK(status);
+        ASSERT_OK(CollectionValidation::validate(
+            operationContext(), kNss, level, false, &results, &output));
         ASSERT_EQ(results.valid, valid);
         ASSERT_EQ(results.errors.size(), (long unsigned int)errors);
 
@@ -82,42 +78,47 @@ void CollectionValidationTest::checkValidate(
 // Verify that calling validate() on an empty collection with different validation levels returns an
 // OK status.
 TEST_F(CollectionValidationTest, ValidateEmpty) {
-    auto opCtx = operationContext();
-    AutoGetCollection agc(opCtx, kNss, MODE_X);
-    Collection* coll = agc.getCollection();
-
-    checkValidate(coll, true, 0, 0, 0);
+    checkValidate(true, 0, 0, 0);
 }
 
 // Verify calling validate() on a nonempty collection with different validation levels.
 TEST_F(CollectionValidationTest, Validate) {
     auto opCtx = operationContext();
-    AutoGetCollection agc(opCtx, kNss, MODE_X);
-    Collection* coll = agc.getCollection();
 
-    std::vector<InsertStatement> inserts;
-    for (int i = 0; i < 5; i++) {
-        auto doc = BSON("_id" << i);
-        inserts.push_back(InsertStatement(doc));
+    int numRecords = 5;
+    {
+        AutoGetCollection autoColl(opCtx, kNss, MODE_X);
+        Collection* coll = autoColl.getCollection();
+
+        std::vector<InsertStatement> inserts;
+        for (int i = 0; i < numRecords; i++) {
+            auto doc = BSON("_id" << i);
+            inserts.push_back(InsertStatement(doc));
+        }
+
+        auto status = coll->insertDocuments(opCtx, inserts.begin(), inserts.end(), nullptr, false);
+        ASSERT_OK(status);
     }
 
-    auto status = coll->insertDocuments(opCtx, inserts.begin(), inserts.end(), nullptr, false);
-    ASSERT_OK(status);
-    checkValidate(coll, true, inserts.size(), 0, 0);
+    checkValidate(true, numRecords, 0, 0);
 }
 
 // Verify calling validate() on a collection with an invalid document.
 TEST_F(CollectionValidationTest, ValidateError) {
     auto opCtx = operationContext();
-    AutoGetCollection agc(opCtx, kNss, MODE_X);
-    Collection* coll = agc.getCollection();
-    RecordStore* rs = coll->getRecordStore();
 
-    auto invalidBson = "\0\0\0\0\0"_sd;
-    auto statusWithId =
-        rs->insertRecord(opCtx, invalidBson.rawData(), invalidBson.size(), Timestamp::min());
-    ASSERT_OK(statusWithId.getStatus());
-    checkValidate(coll, false, 1, 1, 1);
+    {
+        AutoGetCollection autoColl(opCtx, kNss, MODE_X);
+        Collection* coll = autoColl.getCollection();
+        RecordStore* rs = coll->getRecordStore();
+
+        auto invalidBson = "\0\0\0\0\0"_sd;
+        auto statusWithId =
+            rs->insertRecord(opCtx, invalidBson.rawData(), invalidBson.size(), Timestamp::min());
+        ASSERT_OK(statusWithId.getStatus());
+    }
+
+    checkValidate(false, 1, 1, 1);
 }
 
 }  // namespace

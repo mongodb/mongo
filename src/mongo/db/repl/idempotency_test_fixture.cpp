@@ -611,22 +611,28 @@ CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
             ->awaitNoIndexBuildInProgressForCollection(collUUID.get());
     }
 
+    {
+        AutoGetCollectionForReadCommand autoColl(_opCtx.get(), nss);
+        auto collection = autoColl.getCollection();
+
+        if (!collection) {
+            // Return a mostly default initialized CollectionState struct with exists set to false
+            // to indicate an unfound Collection (or a view).
+            return kCollectionDoesNotExist;
+        }
+    }
+
+    {
+        ValidateResults validateResults;
+        BSONObjBuilder bob;
+
+        ASSERT_OK(CollectionValidation::validate(
+            _opCtx.get(), nss, kValidateFull, false, &validateResults, &bob));
+        ASSERT_TRUE(validateResults.valid);
+    }
+
     AutoGetCollectionForReadCommand autoColl(_opCtx.get(), nss);
     auto collection = autoColl.getCollection();
-
-    if (!collection) {
-        // Return a mostly default initialized CollectionState struct with exists set to false to
-        // indicate an unfound Collection (or a view).
-        return kCollectionDoesNotExist;
-    }
-    ValidateResults validateResults;
-    BSONObjBuilder bob;
-
-    Lock::DBLock lk(_opCtx.get(), nss.db(), MODE_IX);
-    auto lock = std::make_unique<Lock::CollectionLock>(_opCtx.get(), nss, MODE_X);
-    ASSERT_OK(CollectionValidation::validate(
-        _opCtx.get(), collection, kValidateFull, false, &validateResults, &bob));
-    ASSERT_TRUE(validateResults.valid);
 
     std::string dataHash = computeDataHash(collection);
 

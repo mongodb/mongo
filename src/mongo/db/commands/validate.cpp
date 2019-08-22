@@ -35,20 +35,14 @@
 #include "mongo/db/catalog/collection_validation.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/db/views/view_catalog.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-
-using std::endl;
-using std::string;
-using std::stringstream;
 
 // Sets the 'valid' result field to false and returns immediately.
 MONGO_FAIL_POINT_DEFINE(validateCmdCollectionNotValid);
@@ -112,7 +106,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         if (MONGO_FAIL_POINT(validateCmdCollectionNotValid)) {
@@ -145,21 +139,6 @@ public:
             LOG(0) << "CMD: validate " << nss.ns();
         }
 
-        AutoGetDb autoDB(opCtx, nss.db(), MODE_IX);
-        Lock::CollectionLock collLock(opCtx, nss, MODE_X);
-
-        Collection* collection =
-            autoDB.getDb() ? autoDB.getDb()->getCollection(opCtx, nss) : nullptr;
-        if (!collection) {
-            if (autoDB.getDb() && ViewCatalog::get(autoDB.getDb())->lookup(opCtx, nss.ns())) {
-                uasserted(ErrorCodes::CommandNotSupportedOnView, "Cannot validate a view");
-            }
-
-            uasserted(ErrorCodes::NamespaceNotFound, "ns not found");
-        }
-
-        result.append("ns", nss.ns());
-
         // Only one validation per collection can be in progress, the rest wait.
         {
             stdx::unique_lock<stdx::mutex> lock(_validationMutex);
@@ -184,34 +163,25 @@ public:
             _validationNotifier.notify_all();
         });
 
-        ValidateResults results;
-        Status status =
-            CollectionValidation::validate(opCtx, collection, level, background, &results, &result);
+        ValidateResults validateResults;
+        Status status = CollectionValidation::validate(
+            opCtx, nss, level, background, &validateResults, &result);
         if (!status.isOK()) {
             return CommandHelpers::appendCommandStatusNoThrow(result, status);
         }
 
-        CollectionOptions opts =
-            DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, collection->ns());
-
-        // All collections must have a UUID.
-        if (!opts.uuid) {
-            results.errors.push_back(str::stream() << "UUID missing on collection " << nss.ns());
-            results.valid = false;
-        }
-
         if (!full) {
-            results.warnings.push_back(
+            validateResults.warnings.push_back(
                 "Some checks omitted for speed. use {full:true} option to do more thorough scan.");
         }
 
-        result.appendBool("valid", results.valid);
-        result.append("warnings", results.warnings);
-        result.append("errors", results.errors);
-        result.append("extraIndexEntries", results.extraIndexEntries);
-        result.append("missingIndexEntries", results.missingIndexEntries);
+        result.appendBool("valid", validateResults.valid);
+        result.append("warnings", validateResults.warnings);
+        result.append("errors", validateResults.errors);
+        result.append("extraIndexEntries", validateResults.extraIndexEntries);
+        result.append("missingIndexEntries", validateResults.missingIndexEntries);
 
-        if (!results.valid) {
+        if (!validateResults.valid) {
             result.append("advice",
                           "A corrupt namespace has been detected. See "
                           "http://dochub.mongodb.org/core/data-recovery for recovery steps.");

@@ -84,15 +84,8 @@ protected:
         ValidateResults results;
         BSONObjBuilder output;
 
-        lockDb(MODE_IX);
-        invariant(_opCtx.lockState()->isDbLockedForMode(_nss.db(), MODE_IX));
-        std::unique_ptr<Lock::CollectionLock> lock =
-            std::make_unique<Lock::CollectionLock>(&_opCtx, _nss, MODE_X);
-        invariant(_opCtx.lockState()->isCollectionLockedForMode(_nss, MODE_X));
-
-        Database* db = _autoDb.get()->getDb();
         ASSERT_OK(CollectionValidation::validate(&_opCtx,
-                                                 db->getCollection(&_opCtx, _nss),
+                                                 _nss,
                                                  _full ? kValidateFull : kValidateNormal,
                                                  _background,
                                                  &results,
@@ -168,7 +161,7 @@ public:
                 &_opCtx, InsertStatement(BSON("_id" << 2)), nullOpDebug, true));
             wunit.commit();
         }
-
+        releaseDb();
         ASSERT_TRUE(checkValid());
 
         lockDb(MODE_X);
@@ -180,7 +173,7 @@ public:
             rs->deleteRecord(&_opCtx, id1);
             wunit.commit();
         }
-
+        releaseDb();
         ASSERT_FALSE(checkValid());
 
         lockDb(MODE_X);
@@ -195,9 +188,8 @@ public:
             }
             wunit.commit();
         }
-
-        ASSERT_FALSE(checkValid());
         releaseDb();
+        ASSERT_FALSE(checkValid());
     }
 };
 
@@ -238,6 +230,7 @@ public:
                                                         << "background" << false));
 
         ASSERT_OK(status);
+        releaseDb();
         ASSERT_TRUE(checkValid());
 
         lockDb(MODE_X);
@@ -249,7 +242,7 @@ public:
             rs->deleteRecord(&_opCtx, id1);
             wunit.commit();
         }
-
+        releaseDb();
         ASSERT_FALSE(checkValid());
 
         lockDb(MODE_X);
@@ -264,9 +257,8 @@ public:
             }
             wunit.commit();
         }
-
-        ASSERT_FALSE(checkValid());
         releaseDb();
+        ASSERT_FALSE(checkValid());
     }
 };
 
@@ -309,6 +301,7 @@ public:
                                                         << "background" << false));
 
         ASSERT_OK(status);
+        releaseDb();
         ASSERT_TRUE(checkValid());
 
         lockDb(MODE_X);
@@ -324,9 +317,8 @@ public:
             ASSERT_OK(updateStatus);
             wunit.commit();
         }
-
-        ASSERT_FALSE(checkValid());
         releaseDb();
+        ASSERT_FALSE(checkValid());
     }
 };
 
@@ -359,7 +351,7 @@ public:
                 &_opCtx, InsertStatement(BSON("_id" << 2)), nullOpDebug, true));
             wunit.commit();
         }
-
+        releaseDb();
         ASSERT_TRUE(checkValid());
 
         lockDb(MODE_X);
@@ -374,7 +366,7 @@ public:
             ASSERT_OK(updateStatus);
             wunit.commit();
         }
-
+        releaseDb();
         ASSERT_FALSE(checkValid());
 
         lockDb(MODE_X);
@@ -387,7 +379,7 @@ public:
             ASSERT_OK(updateStatus);
             wunit.commit();
         }
-
+        releaseDb();
         ASSERT_TRUE(checkValid());
 
         lockDb(MODE_X);
@@ -403,9 +395,8 @@ public:
                 rs->insertRecord(&_opCtx, doc.objdata(), doc.objsize(), Timestamp()).getStatus());
             wunit.commit();
         }
-
-        ASSERT_FALSE(checkValid());
         releaseDb();
+        ASSERT_FALSE(checkValid());
     }
 };
 
@@ -447,7 +438,7 @@ public:
             ASSERT_OK(coll->insertDocument(&_opCtx, InsertStatement(doc3), nullOpDebug, true));
             wunit.commit();
         }
-
+        releaseDb();
         ASSERT_TRUE(checkValid());
 
         lockDb(MODE_X);
@@ -462,6 +453,7 @@ public:
                                                         << "background" << false));
 
         ASSERT_OK(status);
+        releaseDb();
         ASSERT_TRUE(checkValid());
 
         lockDb(MODE_X);
@@ -474,7 +466,7 @@ public:
             ASSERT_OK(updateStatus);
             wunit.commit();
         }
-
+        releaseDb();
         ASSERT_FALSE(checkValid());
 
         lockDb(MODE_X);
@@ -487,9 +479,8 @@ public:
             ASSERT_OK(updateStatus);
             wunit.commit();
         }
-
-        ASSERT_TRUE(checkValid());
         releaseDb();
+        ASSERT_TRUE(checkValid());
     }
 };
 
@@ -536,6 +527,7 @@ public:
                                               << false << "sparse" << true));
 
         ASSERT_OK(status);
+        releaseDb();
         ASSERT_TRUE(checkValid());
 
         lockDb(MODE_X);
@@ -549,9 +541,8 @@ public:
             ASSERT_OK(updateStatus);
             wunit.commit();
         }
-
-        ASSERT_FALSE(checkValid());
         releaseDb();
+        ASSERT_FALSE(checkValid());
     }
 };
 
@@ -604,6 +595,7 @@ public:
                                               << BSON("a" << BSON("$gt" << 1))));
 
         ASSERT_OK(status);
+        releaseDb();
         ASSERT_TRUE(checkValid());
 
         lockDb(MODE_X);
@@ -617,9 +609,8 @@ public:
             ASSERT_OK(updateStatus);
             wunit.commit();
         }
-
-        ASSERT_TRUE(checkValid());
         releaseDb();
+        ASSERT_TRUE(checkValid());
     }
 };
 
@@ -679,8 +670,8 @@ public:
                                               << "background" << false << "partialFilterExpression"
                                               << BSON("a" << BSON("$eq" << 1))));
         ASSERT_OK(status);
-        ASSERT_TRUE(checkValid());
         releaseDb();
+        ASSERT_TRUE(checkValid());
     }
 };
 
@@ -746,6 +737,7 @@ public:
                                                    << "background" << false));
 
         ASSERT_OK(status);
+        releaseDb();
         ASSERT_TRUE(checkValid());
 
         lockDb(MODE_X);
@@ -759,9 +751,8 @@ public:
             ASSERT_OK(updateStatus);
             wunit.commit();
         }
-
-        ASSERT_FALSE(checkValid());
         releaseDb();
+        ASSERT_FALSE(checkValid());
     }
 };
 
@@ -805,6 +796,7 @@ public:
                         << static_cast<int>(kIndexVersion) << "background" << false));
 
         ASSERT_OK(status);
+        releaseDb();
         ASSERT_TRUE(checkValid());
 
         lockDb(MODE_X);
@@ -842,9 +834,8 @@ public:
             ASSERT_OK(insertStatus);
             wunit.commit();
         }
-
-        ASSERT_FALSE(checkValid());
         releaseDb();
+        ASSERT_FALSE(checkValid());
     }
 };
 
@@ -888,6 +879,7 @@ public:
                         << static_cast<int>(kIndexVersion) << "background" << false));
 
         ASSERT_OK(status);
+        releaseDb();
         ASSERT_TRUE(checkValid());
 
         lockDb(MODE_X);
@@ -899,8 +891,8 @@ public:
             const_cast<IndexDescriptor*>(indexCatalog->findIndexByName(&_opCtx, indexName));
         descriptor->setKeyPatternForTest(BSON("a" << -1));
 
-        ASSERT_FALSE(checkValid());
         releaseDb();
+        ASSERT_FALSE(checkValid());
     }
 };
 
@@ -952,6 +944,7 @@ public:
                                      true));
             wunit.commit();
         }
+        releaseDb();
         ASSERT_TRUE(checkValid());
 
         // Insert multikey documents.
@@ -970,6 +963,7 @@ public:
                 true));
             wunit.commit();
         }
+        releaseDb();
         ASSERT_TRUE(checkValid());
 
         // Insert additional multikey path metadata index keys.
@@ -997,6 +991,7 @@ public:
 
         // An index whose set of multikey metadata paths is a superset of collection multikey
         // metadata paths is valid.
+        releaseDb();
         ASSERT_TRUE(checkValid());
 
         // Remove the multikey path metadata index key for a path that exists and is multikey in the
@@ -1017,9 +1012,8 @@ public:
 
         // An index that is missing one or more multikey metadata fields that exist in the
         // collection is not valid.
-        ASSERT_FALSE(checkValid());
-
         releaseDb();
+        ASSERT_FALSE(checkValid());
     }
 };
 
@@ -1088,6 +1082,7 @@ public:
                 true));
             wunit.commit();
         }
+        releaseDb();
         ASSERT_TRUE(checkValid());
 
         lockDb(MODE_X);
@@ -1113,9 +1108,8 @@ public:
             sortedDataInterface->unindex(&_opCtx, indexKey, recordId, true /* dupsAllowed */);
             wunit.commit();
         }
-        ASSERT_FALSE(checkValid());
-
         releaseDb();
+        ASSERT_FALSE(checkValid());
     }
 };
 
@@ -1165,12 +1159,14 @@ public:
             rid = coll->getCursor(&_opCtx)->next()->id;
             wunit.commit();
         }
+        releaseDb();
         ASSERT_TRUE(checkValid());
 
         RecordStore* rs = coll->getRecordStore();
 
         // Updating a document without updating the index entry should cause us to have a missing
         // index entry and an extra index entry.
+        lockDb(MODE_X);
         {
             WriteUnitOfWork wunit(&_opCtx);
             auto doc = BSON("_id" << 1 << "a" << 5);
@@ -1178,22 +1174,14 @@ public:
             ASSERT_OK(updateStatus);
             wunit.commit();
         }
+        releaseDb();
 
         {
             ValidateResults results;
             BSONObjBuilder output;
 
-            lockDb(MODE_IX);
-            std::unique_ptr<Lock::CollectionLock> lock =
-                std::make_unique<Lock::CollectionLock>(&_opCtx, _nss, MODE_X);
-
-            Database* db = _autoDb.get()->getDb();
-            ASSERT_OK(CollectionValidation::validate(&_opCtx,
-                                                     db->getCollection(&_opCtx, _nss),
-                                                     kValidateFull,
-                                                     _background,
-                                                     &results,
-                                                     &output));
+            ASSERT_OK(CollectionValidation::validate(
+                &_opCtx, _nss, kValidateFull, _background, &results, &output));
 
             ASSERT_EQ(false, results.valid);
             ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
@@ -1201,8 +1189,6 @@ public:
             ASSERT_EQ(static_cast<size_t>(1), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(1), results.missingIndexEntries.size());
         }
-
-        releaseDb();
     }
 };
 
@@ -1252,6 +1238,7 @@ public:
             rid = coll->getCursor(&_opCtx)->next()->id;
             wunit.commit();
         }
+        releaseDb();
         ASSERT_TRUE(checkValid());
 
         // Removing an index entry without removing the document should cause us to have a missing
@@ -1284,23 +1271,16 @@ public:
             ASSERT_EQUALS(numDeleted, 1);
             ASSERT_OK(removeStatus);
             wunit.commit();
+
+            releaseDb();
         }
 
         {
             ValidateResults results;
             BSONObjBuilder output;
 
-            lockDb(MODE_IX);
-            std::unique_ptr<Lock::CollectionLock> lock =
-                std::make_unique<Lock::CollectionLock>(&_opCtx, _nss, MODE_X);
-
-            Database* db = _autoDb.get()->getDb();
-            ASSERT_OK(CollectionValidation::validate(&_opCtx,
-                                                     db->getCollection(&_opCtx, _nss),
-                                                     kValidateFull,
-                                                     _background,
-                                                     &results,
-                                                     &output));
+            ASSERT_OK(CollectionValidation::validate(
+                &_opCtx, _nss, kValidateFull, _background, &results, &output));
 
             ASSERT_EQ(false, results.valid);
             ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
@@ -1308,8 +1288,6 @@ public:
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(1), results.missingIndexEntries.size());
         }
-
-        releaseDb();
     }
 };
 
@@ -1359,6 +1337,7 @@ public:
             rid = coll->getCursor(&_opCtx)->next()->id;
             wunit.commit();
         }
+        releaseDb();
         ASSERT_TRUE(checkValid());
 
         // Removing a document without removing the index entries should cause us to have extra
@@ -1370,23 +1349,15 @@ public:
             WriteUnitOfWork wunit(&_opCtx);
             rs->deleteRecord(&_opCtx, rid);
             wunit.commit();
+            releaseDb();
         }
 
         {
             ValidateResults results;
             BSONObjBuilder output;
 
-            lockDb(MODE_IX);
-            std::unique_ptr<Lock::CollectionLock> lock =
-                std::make_unique<Lock::CollectionLock>(&_opCtx, _nss, MODE_X);
-
-            Database* db = _autoDb.get()->getDb();
-            ASSERT_OK(CollectionValidation::validate(&_opCtx,
-                                                     db->getCollection(&_opCtx, _nss),
-                                                     kValidateFull,
-                                                     _background,
-                                                     &results,
-                                                     &output));
+            ASSERT_OK(CollectionValidation::validate(
+                &_opCtx, _nss, kValidateFull, _background, &results, &output));
 
             ASSERT_EQ(false, results.valid);
             ASSERT_EQ(static_cast<size_t>(2), results.errors.size());
@@ -1394,8 +1365,6 @@ public:
             ASSERT_EQ(static_cast<size_t>(2), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
         }
-
-        releaseDb();
     }
 };
 
