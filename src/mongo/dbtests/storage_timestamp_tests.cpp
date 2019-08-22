@@ -776,7 +776,7 @@ public:
 
         repl::OplogEntryBatch groupedInsertBatch(opPtrs.cbegin(), opPtrs.cend());
         ASSERT_OK(repl::SyncTail::syncApply(
-            _opCtx, groupedInsertBatch, repl::OplogApplication::Mode::kSecondary, boost::none));
+            _opCtx, groupedInsertBatch, repl::OplogApplication::Mode::kSecondary));
 
         for (std::int32_t idx = 0; idx < docsToInsert; ++idx) {
             OneOffRead oor(_opCtx, firstInsertTime.addTicks(idx).asTimestamp());

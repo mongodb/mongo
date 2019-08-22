@@ -79,8 +79,7 @@ public:
      */
     static Status syncApply(OperationContext* opCtx,
                             const OplogEntryBatch& batch,
-                            OplogApplication::Mode oplogApplicationMode,
-                            boost::optional<Timestamp> stableTimestampForRecovery);
+                            OplogApplication::Mode oplogApplicationMode);
     /**
      *
      * Constructs a SyncTail.

@@ -360,15 +360,6 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
     OplogApplier::Options options(OplogApplication::Mode::kRecovering);
     options.allowNamespaceNotFoundErrorsOnCrudOps = true;
     options.skipWritesToOplog = true;
-    // During replication recovery, the stableTimestampForRecovery refers to the stable timestamp
-    // from which we replay the oplog.
-    // For startup recovery, this will be the recovery timestamp, which is the stable timestamp that
-    // the storage engine recovered to on startup. For rollback recovery, this will be the last
-    // stable timestamp, returned when we call recoverToStableTimestamp.
-    // We keep track of this for prepared transactions so that when we apply a commitTransaction
-    // oplog entry, we can check if it occurs before or after the stable timestamp and decide
-    // whether the operations would have already been reflected in the data.
-    options.stableTimestampForRecovery = oplogApplicationStartPoint;
     OplogApplierImpl oplogApplier(nullptr,
                                   &oplogBuffer,
                                   &stats,

@@ -222,7 +222,6 @@ namespace repl {
  */
 Status dbCheckOplogCommand(OperationContext* opCtx,
                            const repl::OplogEntry& entry,
-                           OplogApplication::Mode mode,
-                           boost::optional<Timestamp> stableTimestampForRecovery);
+                           OplogApplication::Mode mode);
 }  // namespace repl
 }  // namespace mongo

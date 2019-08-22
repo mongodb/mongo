@@ -214,8 +214,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
  */
 Status applyCommand_inlock(OperationContext* opCtx,
                            const OplogEntry& entry,
-                           OplogApplication::Mode mode,
-                           boost::optional<Timestamp> stableTimestampForRecovery);
+                           OplogApplication::Mode mode);
 
 /**
  * Initializes the global Timestamp with the value from the timestamp of the last oplog entry.

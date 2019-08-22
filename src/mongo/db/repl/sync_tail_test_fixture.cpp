@@ -192,9 +192,8 @@ void SyncTailTest::_testSyncApplyCrudOperation(ErrorCodes::Error expectedError,
     };
     ASSERT_TRUE(_opCtx->writesAreReplicated());
     ASSERT_FALSE(documentValidationDisabled(_opCtx.get()));
-    ASSERT_EQ(
-        SyncTail::syncApply(_opCtx.get(), &op, OplogApplication::Mode::kSecondary, boost::none),
-        expectedError);
+    ASSERT_EQ(SyncTail::syncApply(_opCtx.get(), &op, OplogApplication::Mode::kSecondary),
+              expectedError);
     ASSERT_EQ(applyOpCalled, expectedApplyOpCalled);
 }
 

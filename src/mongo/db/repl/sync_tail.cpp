@@ -276,8 +276,7 @@ LockMode fixLockModeForSystemDotViewsChanges(const NamespaceString& nss, LockMod
 // static
 Status SyncTail::syncApply(OperationContext* opCtx,
                            const OplogEntryBatch& batch,
-                           OplogApplication::Mode oplogApplicationMode,
-                           boost::optional<Timestamp> stableTimestampForRecovery) {
+                           OplogApplication::Mode oplogApplicationMode) {
     auto op = batch.getOp();
     // Count each log op application as a separate operation, for reporting purposes
     CurOp individualOp(opCtx);
@@ -361,8 +360,7 @@ Status SyncTail::syncApply(OperationContext* opCtx,
     } else if (opType == OpTypeEnum::kCommand) {
         return finishApply(writeConflictRetry(opCtx, "syncApply_command", nss.ns(), [&] {
             // A special case apply for commands to avoid implicit database creation.
-            Status status =
-                applyCommand_inlock(opCtx, op, oplogApplicationMode, stableTimestampForRecovery);
+            Status status = applyCommand_inlock(opCtx, op, oplogApplicationMode);
             incrementOpsAppliedStats();
             return status;
         }));
@@ -885,9 +883,7 @@ Status multiSyncApply(OperationContext* opCtx,
 
             // If we didn't create a group, try to apply the op individually.
             try {
-                auto stableTimestampForRecovery = st->getOptions().stableTimestampForRecovery;
-                const Status status = SyncTail::syncApply(
-                    opCtx, &entry, oplogApplicationMode, stableTimestampForRecovery);
+                const Status status = SyncTail::syncApply(opCtx, &entry, oplogApplicationMode);
 
                 if (!status.isOK()) {
                     // Tried to apply an update operation but the document is missing, there must be

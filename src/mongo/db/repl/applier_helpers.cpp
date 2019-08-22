@@ -140,7 +140,7 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(ConstIt
     OplogEntryBatch groupedInsertBatch(it, endOfGroupableOpsIterator);
     try {
         // Apply the group of inserts by passing in groupedInsertBatch.
-        uassertStatusOK(SyncTail::syncApply(_opCtx, groupedInsertBatch, _mode, boost::none));
+        uassertStatusOK(SyncTail::syncApply(_opCtx, groupedInsertBatch, _mode));
         // It succeeded, advance the oplogEntriesIterator to the end of the
         // group of inserts.
         return endOfGroupableOpsIterator - 1;

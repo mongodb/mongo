@@ -192,9 +192,8 @@ auto parseFromOplogEntryArray(const BSONObj& obj, int elem) {
 TEST_F(SyncTailTest, SyncApplyInsertDocumentDatabaseMissing) {
     NamespaceString nss("test.t");
     auto op = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
-    ASSERT_THROWS(
-        SyncTail::syncApply(_opCtx.get(), &op, OplogApplication::Mode::kSecondary, boost::none),
-        ExceptionFor<ErrorCodes::NamespaceNotFound>);
+    ASSERT_THROWS(SyncTail::syncApply(_opCtx.get(), &op, OplogApplication::Mode::kSecondary),
+                  ExceptionFor<ErrorCodes::NamespaceNotFound>);
 }
 
 TEST_F(SyncTailTest, SyncApplyDeleteDocumentDatabaseMissing) {
@@ -208,9 +207,8 @@ TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionLookupByUUIDFails) {
     createDatabase(_opCtx.get(), nss.db());
     NamespaceString otherNss(nss.getSisterNS("othername"));
     auto op = makeOplogEntry(OpTypeEnum::kInsert, otherNss, kUuid);
-    ASSERT_THROWS(
-        SyncTail::syncApply(_opCtx.get(), &op, OplogApplication::Mode::kSecondary, boost::none),
-        ExceptionFor<ErrorCodes::NamespaceNotFound>);
+    ASSERT_THROWS(SyncTail::syncApply(_opCtx.get(), &op, OplogApplication::Mode::kSecondary),
+                  ExceptionFor<ErrorCodes::NamespaceNotFound>);
 }
 
 TEST_F(SyncTailTest, SyncApplyDeleteDocumentCollectionLookupByUUIDFails) {
@@ -228,9 +226,8 @@ TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionMissing) {
     // which in the case of this test just ignores such errors. This tests mostly that we don't
     // implicitly create the collection and lock the database in MODE_X.
     auto op = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
-    ASSERT_THROWS(
-        SyncTail::syncApply(_opCtx.get(), &op, OplogApplication::Mode::kSecondary, boost::none),
-        ExceptionFor<ErrorCodes::NamespaceNotFound>);
+    ASSERT_THROWS(SyncTail::syncApply(_opCtx.get(), &op, OplogApplication::Mode::kSecondary),
+                  ExceptionFor<ErrorCodes::NamespaceNotFound>);
     ASSERT_FALSE(collectionExists(_opCtx.get(), nss));
 }
 
@@ -303,8 +300,7 @@ TEST_F(SyncTailTest, SyncApplyCommand) {
     ASSERT_TRUE(_opCtx->writesAreReplicated());
     ASSERT_FALSE(documentValidationDisabled(_opCtx.get()));
     auto entry = OplogEntry(op);
-    ASSERT_OK(SyncTail::syncApply(
-        _opCtx.get(), &entry, OplogApplication::Mode::kInitialSync, boost::none));
+    ASSERT_OK(SyncTail::syncApply(_opCtx.get(), &entry, OplogApplication::Mode::kInitialSync));
     ASSERT_TRUE(applyCmdCalled);
 }
 
@@ -2255,8 +2251,7 @@ TEST_F(SyncTailTest, LogSlowOpApplicationWhenSuccessful) {
     auto entry = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
 
     startCapturingLogMessages();
-    ASSERT_OK(
-        SyncTail::syncApply(_opCtx.get(), &entry, OplogApplication::Mode::kSecondary, boost::none));
+    ASSERT_OK(SyncTail::syncApply(_opCtx.get(), &entry, OplogApplication::Mode::kSecondary));
 
     // Use a builder for easier escaping. We expect the operation to be logged.
     StringBuilder expected;
@@ -2277,9 +2272,8 @@ TEST_F(SyncTailTest, DoNotLogSlowOpApplicationWhenFailed) {
     auto entry = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
 
     startCapturingLogMessages();
-    ASSERT_THROWS(
-        SyncTail::syncApply(_opCtx.get(), &entry, OplogApplication::Mode::kSecondary, boost::none),
-        ExceptionFor<ErrorCodes::NamespaceNotFound>);
+    ASSERT_THROWS(SyncTail::syncApply(_opCtx.get(), &entry, OplogApplication::Mode::kSecondary),
+                  ExceptionFor<ErrorCodes::NamespaceNotFound>);
 
     // Use a builder for easier escaping. We expect the operation to *not* be logged
     // even thought it was slow, since we couldn't apply it successfully.
@@ -2302,8 +2296,7 @@ TEST_F(SyncTailTest, DoNotLogNonSlowOpApplicationWhenSuccessful) {
     auto entry = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
 
     startCapturingLogMessages();
-    ASSERT_OK(
-        SyncTail::syncApply(_opCtx.get(), &entry, OplogApplication::Mode::kSecondary, boost::none));
+    ASSERT_OK(SyncTail::syncApply(_opCtx.get(), &entry, OplogApplication::Mode::kSecondary));
 
     // Use a builder for easier escaping. We expect the operation to *not* be logged,
     // since it wasn't slow to apply.

@@ -513,8 +513,7 @@ namespace repl {
  */
 Status dbCheckOplogCommand(OperationContext* opCtx,
                            const repl::OplogEntry& entry,
-                           OplogApplication::Mode mode,
-                           boost::optional<Timestamp> stableTimestampForRecovery) {
+                           OplogApplication::Mode mode) {
     const auto& cmd = entry.getObject();
     OpTime opTime;
     if (!opCtx->writesAreReplicated()) {
