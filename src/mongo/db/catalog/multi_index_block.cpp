@@ -49,6 +49,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logger/redaction.h"
@@ -61,6 +62,33 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo {
+
+namespace {
+
+/**
+ * We do not need synchronization with step up and step down. Dropping the RSTL is important because
+ * otherwise if we held the RSTL it would create deadlocks with prepared transactions on step up and
+ * step down.  A deadlock could result if the index build was attempting to acquire a Collection S
+ * or X lock while a prepared transaction held a Collection IX lock, and a step down was waiting to
+ * acquire the RSTL in mode X.
+ * We should only drop the RSTL while in FCV 4.2, as prepared transactions can only
+ * occur in FCV 4.2.
+ */
+void _unlockRSTLForIndexCleanup(OperationContext* opCtx) {
+    if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+        return;
+    }
+
+    if (serverGlobalParams.featureCompatibility.getVersion() !=
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
+        return;
+    }
+
+    opCtx->lockState()->unlockRSTLforPrepare();
+    invariant(!opCtx->lockState()->isRSTLLocked());
+}
+
+}  // namespace
 
 MONGO_FAIL_POINT_DEFINE(hangAfterSettingUpIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuild);
@@ -120,7 +148,13 @@ void MultiIndexBlock::cleanUpAfterBuild(OperationContext* opCtx, Collection* col
 
     if (!opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X)) {
         dbLock.emplace(opCtx, nss.db(), MODE_IX);
+        // Since DBLock implicitly acquires RSTL, we release the RSTL after acquiring the database
+        // lock. Additionally, the RSTL has to be released before acquiring a strong lock (MODE_X)
+        // on the collection to avoid potential deadlocks.
+        _unlockRSTLForIndexCleanup(opCtx);
         collLock.emplace(opCtx, nss, MODE_X);
+    } else {
+        _unlockRSTLForIndexCleanup(opCtx);
     }
 
     while (true) {
