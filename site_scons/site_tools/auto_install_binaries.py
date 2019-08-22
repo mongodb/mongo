@@ -511,6 +511,12 @@ def add_package_name_alias(env, component, role, name):
         raise Exception("No role provided for package name alias")
     env[PACKAGE_ALIAS_MAP][(component, role)] = name
 
+def add_role_dependencies(env, role, dependencies):
+    current = env[ROLE_DEPENDENCIES].get(role, None)
+    if not current:
+        current = env[ROLE_DEPENDENCIES][role] = list()
+    current.extend(dependencies)
+    current = list(set(current))
 
 def suffix_mapping(env, directory=False, default_roles=False):
     """Generate a SuffixMap object from source and target."""
@@ -610,22 +616,22 @@ def generate(env):  # pylint: disable=too-many-statements
     # TODO: make this configurable?
     env[ROLE_DEPENDENCIES] = {
         "debug": [
+            "base",
+
             # TODO: Debug should depend on these when making packages, but shouldn't when building
             # the legacy tarball. Probably fuel for the above configurability fire. For now, make it not
             # depend so that we can get AIB in place for the dist builders.
-
             # "runtime",
-            # "base",
         ],
         "dev": [
-            "runtime",
             "base",
+            "runtime",
         ],
         "meta": [
-            "dev",
-            "runtime",
             "base",
             "debug",
+            "dev",
+            "runtime",
         ],
         "runtime": [
             "base",
@@ -637,6 +643,7 @@ def generate(env):  # pylint: disable=too-many-statements
     env.AddMethod(add_package_name_alias, "AddPackageNameAlias")
     env.AddMethod(auto_install, "AutoInstall")
     env.AddMethod(finalize_install_dependencies, "FinalizeInstallDependencies")
+    env.AddMethod(add_role_dependencies, "AddRoleDependencies")
     env.Tool("install")
 
     # TODO: we should probably expose these as PseudoBuilders and let
