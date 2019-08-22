@@ -34,6 +34,7 @@
 #include "mongo/db/catalog/validate_adaptor.h"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_consistency.h"
 #include "mongo/db/index/index_access_method.h"
@@ -42,7 +43,6 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/key_string.h"
-#include "mongo/db/storage/record_store.h"
 #include "mongo/rpc/object_check.h"
 #include "mongo/util/log.h"
 
@@ -60,6 +60,8 @@ KeyString::Builder makeWildCardMultikeyMetadataKeyString(const BSONObj& indexKey
 }  // namespace
 
 Status ValidateAdaptor::validateRecord(
+    OperationContext* opCtx,
+    Collection* coll,
     const RecordId& recordId,
     const RecordData& record,
     const std::unique_ptr<SeekableRecordCursor>& seekRecordStoreCursor,
@@ -79,17 +81,21 @@ Status ValidateAdaptor::validateRecord(
         return status;
     }
 
-    if (!_indexCatalog->haveAnyIndexes()) {
+    IndexCatalog* indexCatalog = coll->getIndexCatalog();
+    if (!indexCatalog->haveAnyIndexes()) {
         return status;
     }
 
     for (auto& it : _indexConsistency->getIndexInfo()) {
         IndexInfo& indexInfo = it.second;
-        const IndexDescriptor* descriptor = indexInfo.descriptor;
-        const IndexAccessMethod* iam = _indexCatalog->getEntry(descriptor)->accessMethod();
+        const IndexDescriptor* descriptor = indexCatalog->findIndexByName(
+            opCtx, indexInfo.indexName, /*includeUnfinishedIndexes=*/false);
+        invariant(descriptor);
+
+        const IndexAccessMethod* iam = indexCatalog->getEntry(descriptor)->accessMethod();
 
         if (descriptor->isPartial()) {
-            const IndexCatalogEntry* ice = _indexCatalog->getEntry(descriptor);
+            const IndexCatalogEntry* ice = indexCatalog->getEntry(descriptor);
             if (!ice->getFilterExpression()->matchesBSON(recordBson)) {
                 continue;
             }
@@ -215,7 +221,8 @@ void ValidateAdaptor::traverseIndex(int64_t* numTraversedKeys,
 }
 
 void ValidateAdaptor::traverseRecordStore(
-    RecordStore* recordStore,
+    OperationContext* opCtx,
+    Collection* coll,
     const RecordId& firstRecordId,
     const std::unique_ptr<SeekableRecordCursor>& traverseRecordStoreCursor,
     const std::unique_ptr<SeekableRecordCursor>& seekRecordStoreCursor,
@@ -234,14 +241,14 @@ void ValidateAdaptor::traverseRecordStore(
         ++nrecords;
 
         if (!(nrecords % interruptInterval)) {
-            _opCtx->checkForInterrupt();
+            opCtx->checkForInterrupt();
         }
 
         auto dataSize = record->data.size();
         dataSizeTotal += dataSize;
         size_t validatedSize;
-        Status status =
-            validateRecord(record->id, record->data, seekRecordStoreCursor, &validatedSize);
+        Status status = validateRecord(
+            opCtx, coll, record->id, record->data, seekRecordStoreCursor, &validatedSize);
 
         // Checks to ensure isInRecordIdOrder() is being used properly.
         if (prevRecordId.isValid()) {
@@ -266,7 +273,7 @@ void ValidateAdaptor::traverseRecordStore(
     // Do not update the record store stats if we're in the background as we've validated a
     // checkpoint and it may not have the most up-to-date changes.
     if (results->valid && !background) {
-        recordStore->updateStatsAfterRepair(_opCtx, nrecords, dataSizeTotal);
+        coll->getRecordStore()->updateStatsAfterRepair(opCtx, nrecords, dataSizeTotal);
     }
 
     output->append("nInvalidDocuments", nInvalid);

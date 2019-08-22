@@ -34,7 +34,9 @@
 #include "mongo/db/catalog/collection_validation.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_consistency.h"
 #include "mongo/db/catalog/max_validate_mb_per_sec_gen.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/record_store.h"
@@ -190,7 +192,7 @@ void _validateIndexes(
  */
 void _gatherIndexEntryErrors(
     OperationContext* opCtx,
-    IndexCatalog* indexCatalog,
+    Collection* coll,
     IndexConsistency* indexConsistency,
     ValidateAdaptor* indexValidator,
     const RecordId& firstRecordId,
@@ -212,7 +214,8 @@ void _gatherIndexEntryErrors(
         // We can ignore the status of validate as it was already checked during the first phase.
         size_t validatedSize;
         indexValidator
-            ->validateRecord(record->id, record->data, seekRecordStoreCursor, &validatedSize)
+            ->validateRecord(
+                opCtx, coll, record->id, record->data, seekRecordStoreCursor, &validatedSize)
             .ignore();
     }
 
@@ -221,7 +224,8 @@ void _gatherIndexEntryErrors(
 
     // Iterate through all the indexes in the collection and only record the index entry keys that
     // had inconsistencies during the first phase.
-    std::unique_ptr<IndexCatalog::IndexIterator> it = indexCatalog->getIndexIterator(opCtx, false);
+    std::unique_ptr<IndexCatalog::IndexIterator> it =
+        coll->getIndexCatalog()->getIndexIterator(opCtx, false);
     while (it->more()) {
         opCtx->checkForInterrupt();
 
@@ -246,20 +250,19 @@ void _gatherIndexEntryErrors(
 }
 
 void _validateIndexKeyCount(OperationContext* opCtx,
-                            IndexCatalog* indexCatalog,
-                            RecordStore* recordStore,
+                            Collection* coll,
                             ValidateAdaptor* indexValidator,
                             ValidateResultsMap* indexNsResultsMap) {
 
     const std::unique_ptr<IndexCatalog::IndexIterator> indexIterator =
-        indexCatalog->getIndexIterator(opCtx, false);
+        coll->getIndexCatalog()->getIndexIterator(opCtx, false);
     while (indexIterator->more()) {
         const IndexDescriptor* descriptor = indexIterator->next()->descriptor();
         ValidateResults& curIndexResults = (*indexNsResultsMap)[descriptor->indexName()];
 
         if (curIndexResults.valid) {
             indexValidator->validateIndexKeyCount(
-                descriptor, recordStore->numRecords(opCtx), curIndexResults);
+                descriptor, coll->getRecordStore()->numRecords(opCtx), curIndexResults);
         }
     }
 }
@@ -370,9 +373,8 @@ Status validate(OperationContext* opCtx,
 
     ValidateResultsMap indexNsResultsMap;
     BSONObjBuilder keysPerIndex;  // not using subObjStart to be exception safe.
-    IndexConsistency indexConsistency(opCtx, coll, coll->ns(), background);
-    ValidateAdaptor indexValidator = ValidateAdaptor(
-        opCtx, &indexConsistency, level, coll->getIndexCatalog(), &indexNsResultsMap);
+    IndexConsistency indexConsistency(opCtx, coll);
+    ValidateAdaptor indexValidator = ValidateAdaptor(&indexConsistency, level, &indexNsResultsMap);
 
     try {
         std::map<std::string, int64_t> numIndexKeysPerIndex;
@@ -414,7 +416,8 @@ Status validate(OperationContext* opCtx,
         // In traverseRecordStore(), the index validator keeps track the records in the record
         // store so that _validateIndexes() can confirm that the index entries match the records in
         // the collection.
-        indexValidator.traverseRecordStore(coll->getRecordStore(),
+        indexValidator.traverseRecordStore(opCtx,
+                                           coll,
                                            firstRecordId,
                                            traverseRecordStoreCursor,
                                            seekRecordStoreCursor,
@@ -442,7 +445,7 @@ Status validate(OperationContext* opCtx,
                     << "Index inconsistencies were detected on collection " << coll->ns()
                     << ". Starting the second phase of index validation to gather concise errors.";
                 _gatherIndexEntryErrors(opCtx,
-                                        coll->getIndexCatalog(),
+                                        coll,
                                         &indexConsistency,
                                         &indexValidator,
                                         firstRecordId,
@@ -456,11 +459,7 @@ Status validate(OperationContext* opCtx,
 
         // Validate index key count.
         if (results->valid) {
-            _validateIndexKeyCount(opCtx,
-                                   coll->getIndexCatalog(),
-                                   coll->getRecordStore(),
-                                   &indexValidator,
-                                   &indexNsResultsMap);
+            _validateIndexKeyCount(opCtx, coll, &indexValidator, &indexNsResultsMap);
         }
 
         // Report the validation results for the user to see.

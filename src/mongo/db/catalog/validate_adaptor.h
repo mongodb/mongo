@@ -29,16 +29,15 @@
 
 #pragma once
 
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/index_consistency.h"
-#include "mongo/db/index/index_access_method.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/sorted_data_interface.h"
+
 
 namespace mongo {
 
 class IndexConsistency;
+class IndexDescriptor;
+class OperationContext;
 
 enum ValidateCmdLevel : int { kValidateNormal = 0x01, kValidateFull = 0x02 };
 
@@ -54,30 +53,26 @@ using ValidateResultsMap = std::map<std::string, ValidateResults>;
  */
 class ValidateAdaptor {
 public:
-    ValidateAdaptor(OperationContext* opCtx,
-                    IndexConsistency* indexConsistency,
+    ValidateAdaptor(IndexConsistency* indexConsistency,
                     ValidateCmdLevel level,
-                    IndexCatalog* ic,
                     ValidateResultsMap* irm)
 
-        : _opCtx(opCtx),
-          _indexConsistency(indexConsistency),
-          _level(level),
-          _indexCatalog(ic),
-          _indexNsResultsMap(irm) {}
+        : _indexConsistency(indexConsistency), _level(level), _indexNsResultsMap(irm) {}
 
     /**
      * Validates the record data and traverses through its key set to keep track of the
      * index consistency.
      */
     virtual Status validateRecord(
+        OperationContext* opCtx,
+        Collection* coll,
         const RecordId& recordId,
         const RecordData& record,
         const std::unique_ptr<SeekableRecordCursor>& seekRecordStoreCursor,
         size_t* dataSize);
 
     /**
-     * Traverses the index getting index entriess to validate them and keep track of the index keys
+     * Traverses the index getting index entries to validate them and keep track of the index keys
      * for index consistency.
      */
     void traverseIndex(int64_t* numTraversedKeys,
@@ -89,7 +84,8 @@ public:
      * Traverses the record store to retrieve every record and go through its document key
      * set to keep track of the index consistency during a validation.
      */
-    void traverseRecordStore(RecordStore* recordStore,
+    void traverseRecordStore(OperationContext* opCtx,
+                             Collection* coll,
                              const RecordId& firstRecordId,
                              const std::unique_ptr<SeekableRecordCursor>& traverseRecordStoreCursor,
                              const std::unique_ptr<SeekableRecordCursor>& seekRecordStoreCursor,
@@ -105,10 +101,8 @@ public:
                                ValidateResults& results);
 
 private:
-    OperationContext* _opCtx;
     IndexConsistency* _indexConsistency;
     ValidateCmdLevel _level;
-    IndexCatalog* _indexCatalog;
     ValidateResultsMap* _indexNsResultsMap;
 };
 }  // namespace mongo
