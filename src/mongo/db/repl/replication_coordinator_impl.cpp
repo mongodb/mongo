@@ -2216,7 +2216,7 @@ bool ReplicationCoordinatorImpl::canAcceptNonLocalWrites() const {
 
 bool ReplicationCoordinatorImpl::canAcceptWritesFor(OperationContext* opCtx,
                                                     const NamespaceString& ns) {
-    invariant(opCtx->lockState()->isRSTLLocked());
+    invariant(opCtx->lockState()->isRSTLLocked(), ns.ns());
     return canAcceptWritesFor_UNSAFE(opCtx, ns);
 }
 
