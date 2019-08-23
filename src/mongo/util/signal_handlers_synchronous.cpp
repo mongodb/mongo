@@ -46,6 +46,7 @@
 #include "mongo/logger/log_domain.h"
 #include "mongo/logger/logger.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/stdx/exception.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/debug_util.h"
@@ -288,7 +289,7 @@ void abruptQuitWithAddrSignal(int signalNum, siginfo_t* siginfo, void* ucontext_
 }  // namespace
 
 void setupSynchronousSignalHandlers() {
-    std::set_terminate(myTerminate);
+    stdx::set_terminate(myTerminate);
     std::set_new_handler(reportOutOfMemoryErrorAndExit);
 
 #if defined(_WIN32)

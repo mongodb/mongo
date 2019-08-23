@@ -35,6 +35,8 @@
 #include <thread>
 #include <type_traits>
 
+#include "mongo/stdx/exception.h"
+
 namespace mongo {
 namespace stdx {
 
@@ -60,36 +62,43 @@ public:
     using ::std::thread::id;                  // NOLINT
     using ::std::thread::native_handle_type;  // NOLINT
 
-    thread() noexcept : ::std::thread::thread() {}  // NOLINT
+    thread() noexcept = default;
 
+    ~thread() noexcept = default;
     thread(const thread&) = delete;
-
-    thread(thread&& other) noexcept
-        : ::std::thread::thread(static_cast<::std::thread&&>(std::move(other))) {}  // NOLINT
+    thread(thread&& other) noexcept = default;
+    thread& operator=(const thread&) = delete;
+    thread& operator=(thread&& other) noexcept = default;
 
     /**
      * As of C++14, the Function overload for std::thread requires that this constructor only
      * participate in overload resolution if std::decay_t<Function> is not the same type as thread.
      * That prevents this overload from intercepting calls that might generate implicit conversions
      * before binding to other constructors (specifically move/copy constructors).
+     *
+     * NOTE: The `Function f` parameter must be taken by value, not reference or forwarding
+     * reference, as it is used on the far side of the thread launch, and this ctor has to properly
+     * transfer ownership to the far side's thread.
      */
-    template <
-        class Function,
-        class... Args,
-        typename std::enable_if<!std::is_same<thread, typename std::decay<Function>::type>::value,
-                                int>::type = 0>
-    explicit thread(Function&& f, Args&&... args) try:
-        ::std::thread::thread(std::forward<Function>(f), std::forward<Args>(args)...) {}  // NOLINT
-    catch (...) {
-        std::terminate();
+    template <class Function,
+              class... Args,
+              std::enable_if_t<!std::is_same_v<thread, std::decay_t<Function>>, int> = 0>
+    explicit thread(Function f, Args&&... args) noexcept
+        : ::std::thread::thread(  // NOLINT
+              [
+                  f = std::move(f),
+                  pack = std::make_tuple(std::forward<Args>(args)...)
+              ]() mutable noexcept {
+#if defined(_WIN32)
+                  // On Win32 we have to set the terminate handler per thread.
+                  // We set it to our universal terminate handler, which people can register via the
+                  // `stdx::set_terminate` hook.
+                  ::std::set_terminate(  // NOLINT
+                      ::mongo::stdx::TerminateHandlerDetailsInterface::dispatch);
+#endif
+                  return std::apply(std::move(f), std::move(pack));
+              }) {
     }
-
-    thread& operator=(const thread&) = delete;
-
-    thread& operator=(thread&& other) noexcept {
-        return static_cast<thread&>(
-            ::std::thread::operator=(static_cast<::std::thread&&>(std::move(other))));  // NOLINT
-    };
 
     using ::std::thread::get_id;                // NOLINT
     using ::std::thread::hardware_concurrency;  // NOLINT
@@ -100,9 +109,10 @@ public:
     using ::std::thread::join;    // NOLINT
 
     void swap(thread& other) noexcept {
-        ::std::thread::swap(static_cast<::std::thread&>(other));  // NOLINT
+        this->::std::thread::swap(other);  // NOLINT
     }
 };
+
 
 inline void swap(thread& lhs, thread& rhs) noexcept {
     lhs.swap(rhs);
@@ -142,4 +152,7 @@ void sleep_until(const std::chrono::time_point<Clock, Duration>& sleep_time) {  
 }  // namespace this_thread
 
 }  // namespace stdx
+
+static_assert(std::is_move_constructible_v<stdx::thread>);
+static_assert(std::is_move_assignable_v<stdx::thread>);
 }  // namespace mongo
