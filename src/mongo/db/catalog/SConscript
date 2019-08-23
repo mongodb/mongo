@@ -328,6 +328,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'index_build_block',
+        'throttle_cursor',
         '$BUILD_DIR/mongo/db/catalog/collection_catalog_helper',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/index/index_build_interceptor',
@@ -341,13 +342,26 @@ env.Library(
 env.Library(
     target='collection_validation',
     source=[
-	"collection_validation.cpp",
-	"validate_adaptor.cpp",
+        'collection_validation.cpp',
+        'validate_adaptor.cpp',
     ],
     LIBDEPS=[
-	'catalog_impl',
-	'max_validate_mb_per_sec_idl',
+        'catalog_impl',
+    ],
+    LIBDEPS_PRIVATE=[
+        'throttle_cursor',
     ]
+)
+
+env.Library(
+    target='throttle_cursor',
+    source=[
+        'throttle_cursor.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/util/fail_point',
+        'max_validate_mb_per_sec_idl',
+    ],
 )
 
 env.Library(
@@ -417,6 +431,7 @@ env.CppUnitTest(
         'index_spec_validate_test.cpp',
         'multi_index_block_test.cpp',
         'rename_collection_test.cpp',
+        'throttle_cursor_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
@@ -427,6 +442,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/matcher/expressions',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/op_observer',
+        '$BUILD_DIR/mongo/db/query/datetime/date_time_support',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/repl/drop_pending_collection_reaper',
         '$BUILD_DIR/mongo/db/repl/oplog',
@@ -440,6 +456,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/db/storage/kv/kv_prefix',
         '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/mongo/util/fail_point',
         'catalog_control',
         'catalog_helpers',
         'catalog_test_fixture',
@@ -454,6 +471,8 @@ env.CppUnitTest(
         'index_build_entry_idl',
         'index_builds_manager',
         'index_key_validate',
+        'max_validate_mb_per_sec_idl',
         'multi_index_block',
+        'throttle_cursor',
     ],
 )

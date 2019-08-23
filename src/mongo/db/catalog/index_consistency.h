@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/catalog/throttle_cursor.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/record_store.h"
 
@@ -81,10 +82,11 @@ public:
      * For the second phase of validation, keep track of the document keys that hashed to
      * inconsistent hash buckets during the first phase of validation.
      */
-    void addDocKey(const KeyString::Builder& ks,
+    void addDocKey(OperationContext* opCtx,
+                   const KeyString::Builder& ks,
                    IndexInfo* indexInfo,
                    RecordId recordId,
-                   const std::unique_ptr<SeekableRecordCursor>& cursor,
+                   const std::unique_ptr<SeekableRecordThrottleCursor>& cursor,
                    const BSONObj& indexKey);
 
     /**

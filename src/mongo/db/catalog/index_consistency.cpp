@@ -188,11 +188,13 @@ void IndexConsistency::addIndexEntryErrors(ValidateResultsMap* indexNsResultsMap
     results->valid = false;
 }
 
-void IndexConsistency::addDocKey(const KeyString::Builder& ks,
-                                 IndexInfo* indexInfo,
-                                 RecordId recordId,
-                                 const std::unique_ptr<SeekableRecordCursor>& seekRecordStoreCursor,
-                                 const BSONObj& indexKey) {
+void IndexConsistency::addDocKey(
+    OperationContext* opCtx,
+    const KeyString::Builder& ks,
+    IndexInfo* indexInfo,
+    RecordId recordId,
+    const std::unique_ptr<SeekableRecordThrottleCursor>& seekRecordStoreCursor,
+    const BSONObj& indexKey) {
     const uint32_t hash = _hashKeyString(ks, indexInfo->indexNameHash);
 
     if (_firstPhase) {
@@ -204,7 +206,7 @@ void IndexConsistency::addDocKey(const KeyString::Builder& ks,
         // Found a document key for a hash bucket that had mismatches.
 
         // Get the documents _id index key.
-        auto record = seekRecordStoreCursor->seekExact(recordId);
+        auto record = seekRecordStoreCursor->seekExact(opCtx, recordId);
         invariant(record);
 
         BSONObj data = record->data.toBson();

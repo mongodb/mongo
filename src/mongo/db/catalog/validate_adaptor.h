@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/catalog/throttle_cursor.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 
@@ -68,15 +69,16 @@ public:
         Collection* coll,
         const RecordId& recordId,
         const RecordData& record,
-        const std::unique_ptr<SeekableRecordCursor>& seekRecordStoreCursor,
+        const std::unique_ptr<SeekableRecordThrottleCursor>& seekRecordStoreCursor,
         size_t* dataSize);
 
     /**
      * Traverses the index getting index entries to validate them and keep track of the index keys
      * for index consistency.
      */
-    void traverseIndex(int64_t* numTraversedKeys,
-                       const std::unique_ptr<SortedDataInterface::Cursor>& indexCursor,
+    void traverseIndex(OperationContext* opCtx,
+                       int64_t* numTraversedKeys,
+                       const std::unique_ptr<SortedDataInterfaceThrottleCursor>& indexCursor,
                        const IndexDescriptor* descriptor,
                        ValidateResults* results);
 
@@ -84,14 +86,15 @@ public:
      * Traverses the record store to retrieve every record and go through its document key
      * set to keep track of the index consistency during a validation.
      */
-    void traverseRecordStore(OperationContext* opCtx,
-                             Collection* coll,
-                             const RecordId& firstRecordId,
-                             const std::unique_ptr<SeekableRecordCursor>& traverseRecordStoreCursor,
-                             const std::unique_ptr<SeekableRecordCursor>& seekRecordStoreCursor,
-                             bool background,
-                             ValidateResults* results,
-                             BSONObjBuilder* output);
+    void traverseRecordStore(
+        OperationContext* opCtx,
+        Collection* coll,
+        const RecordId& firstRecordId,
+        const std::unique_ptr<SeekableRecordThrottleCursor>& traverseRecordStoreCursor,
+        const std::unique_ptr<SeekableRecordThrottleCursor>& seekRecordStoreCursor,
+        bool background,
+        ValidateResults* results,
+        BSONObjBuilder* output);
 
     /**
      * Validate that the number of document keys matches the number of index keys.
