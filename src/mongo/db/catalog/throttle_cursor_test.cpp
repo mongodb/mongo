@@ -83,9 +83,9 @@ void ThrottleCursorTest::setUp() {
         wuow.commit();
     }
 
-    // Set a default tick rate of 500 milliseconds.
+    // Set a default tick rate of 200 milliseconds.
     std::unique_ptr<ClockSourceMock> clkSource =
-        std::make_unique<AutoAdvancingClockSourceMock>(Milliseconds(500));
+        std::make_unique<AutoAdvancingClockSourceMock>(Milliseconds(200));
 
     // Set the initial time to be 1000 milliseconds.
     clkSource->advance(Milliseconds(999));
