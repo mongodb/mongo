@@ -1,7 +1,7 @@
 /**
  * This test is meant to test that a migration will correctly wait for the majority commit point
  * when there are no transfer mod writes (SERVER-42783).
- * @tags: [requires_find_command]
+ * @tags: [requires_find_command, requires_majority_read_concern]
  */
 
 (function() {
