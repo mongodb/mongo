@@ -1111,7 +1111,7 @@ void receivedKillCursors(OperationContext* opCtx, const Message& m) {
 
     if (n > 2000) {
         (n < 30000 ? warning() : error()) << "receivedKillCursors, n=" << n;
-        verify(n < 30000);
+        uassert(51250, "must kill fewer than 30000 cursors", n < 30000);
     }
 
     uassert(13659, "sent 0 cursors to kill", n != 0);
