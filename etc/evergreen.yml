@@ -10298,10 +10298,6 @@ buildvariants:
     burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff
   tasks:
   - name: compile_all_run_unittests_TG
-    requires:
-    - name: burn_in_tests_gen
-    - name: lint
-    - name: lint_fuzzer_sanity_patch
     distros:
     - rhel62-large
   - name: compile_benchmarks
