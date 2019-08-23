@@ -31,7 +31,9 @@ global:
 
 server_parameters:
     maxValidateMBperSec:
-        description: "Max MB per second that a single validate cmd will process in order to limit I/O and CPU usage. Defaults to 0, which turns off throttling."
+        description: "Max MB per second that a single validate command running with
+                      { background: true } will process in order to limit I/O and CPU usage.
+                      Defaults to 0, which turns off throttling."
         set_at: [ startup, runtime ]
         cpp_varname: gMaxValidateMBperSec
         cpp_vartype: AtomicWord<int>
