@@ -216,7 +216,7 @@ public:
     void onCloseCatalog(OperationContext* opCtx);
 
     /**
-     * Puts the catalog back in open state, removing the pre-close state. See onCloseCatalog.
+     * Puts the catatlog back in open state, removing the pre-close state. See onCloseCatalog.
      *
      * Must be called with the global lock acquired in exclusive mode.
      */
@@ -224,13 +224,6 @@ public:
 
     iterator begin(StringData db) const;
     iterator end() const;
-
-    /**
-     * Returns whether the database contains any collections.
-     */
-    bool empty(StringData db) const {
-        return begin(db) == end();
-    }
 
     /**
      * Lookup the name of a resource by its ResourceId. If there are multiple namespaces mapped to

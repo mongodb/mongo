@@ -53,7 +53,7 @@ namespace {
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 
 void dropDatabase(OperationContext* opCtx, const NamespaceString& nss) {
-    AutoGetDb autoDB(opCtx, nss.db(), MODE_X);
+    Lock::GlobalWrite globalWriteLock(opCtx);
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto db = databaseHolder->getDb(opCtx, nss.db());
 
@@ -394,12 +394,6 @@ public:
                 assertGet(CollectionOptions::parse(BSONObj(), CollectionOptions::parseForCommand));
             ASSERT_OK(ctx.db()->userCreateNS(&opCtx, nss, collectionOptions, defaultIndexes));
             insertRecord(&opCtx, nss, oldDoc);
-
-            // Create an additional collection to prevent the database from closing when the other
-            // collection is dropped.
-            NamespaceString unusedCollectionNSS("unittests.rollback_replace_collection_unused");
-            ASSERT_OK(ctx.db()->userCreateNS(
-                &opCtx, unusedCollectionNSS, collectionOptions, defaultIndexes));
             uow.commit();
         }
         ASSERT(collectionExists(&opCtx, &ctx, nss.ns()));

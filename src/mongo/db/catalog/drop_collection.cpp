@@ -34,7 +34,6 @@
 #include "mongo/db/catalog/drop_collection.h"
 
 #include "mongo/db/background.h"
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -161,7 +160,7 @@ Status dropCollection(OperationContext* opCtx,
         log() << "Hanging drop collection before lock acquisition while fail point is set";
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangDropCollectionBeforeLockAcquisition);
     }
-    Status status = writeConflictRetry(opCtx, "drop", collectionName.ns(), [&] {
+    return writeConflictRetry(opCtx, "drop", collectionName.ns(), [&] {
         AutoGetDb autoDb(opCtx, collectionName.db(), MODE_IX);
         Database* db = autoDb.getDb();
         if (!db) {
@@ -176,29 +175,6 @@ Status dropCollection(OperationContext* opCtx,
                 opCtx, db, collectionName, dropOpTime, systemCollectionMode, result);
         }
     });
-
-    if (!status.isOK()) {
-        return status;
-    }
-
-    // If this dropped the last collection in the database, we should close the database.
-    bool empty = CollectionCatalog::get(opCtx).empty(collectionName.db());
-    if (!empty) {
-        return Status::OK();
-    }
-
-    Lock::DBLock dbLock(opCtx, collectionName.db(), MODE_X);
-
-    // Double check that we're still empty. A new collection could've been created before we got the
-    // exclusive lock.
-    empty = CollectionCatalog::get(opCtx).empty(collectionName.db());
-    if (!empty) {
-        return Status::OK();
-    }
-
-    DatabaseHolder::get(opCtx)->close(opCtx, collectionName.db());
-
-    return Status::OK();
 }
 
 }  // namespace mongo

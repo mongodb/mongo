@@ -59,20 +59,12 @@ static const NamespaceString nss("unittests.PlanExecutorInvalidationTest");
 class PlanExecutorInvalidationTest : public unittest::Test {
 public:
     PlanExecutorInvalidationTest() : _client(&_opCtx) {
-        // Create an additional collection to prevent the database from closing when the other
-        // collection is dropped.
-        ASSERT_TRUE(_client.createCollection("unittests.PlanExecutorInvalidationTestUnused"));
-
         _ctx.reset(new dbtests::WriteContextForTests(&_opCtx, nss.ns()));
         _client.dropCollection(nss.ns());
 
         for (int i = 0; i < N(); ++i) {
             _client.insert(nss.ns(), BSON("foo" << i));
         }
-    }
-
-    ~PlanExecutorInvalidationTest() {
-        _client.dropCollection("unittests.PlanExecutorInvalidationTestUnused");
     }
 
     /**
