@@ -55,9 +55,7 @@
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/idempotency_test_fixture.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/oplog_buffer_blocking_queue.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/sync_tail.h"
@@ -1788,56 +1786,6 @@ TEST_F(SyncTailTest, MultiSyncApplySkipsIndexCreationOnNamespaceNotFoundDuringIn
 
     // 'badNss' collection should not be implicitly created while attempting to create an index.
     ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx.get(), badNss).getCollection());
-}
-
-namespace {
-
-class ReplicationCoordinatorSignalDrainCompleteThrows : public ReplicationCoordinatorMock {
-public:
-    ReplicationCoordinatorSignalDrainCompleteThrows(ServiceContext* service,
-                                                    const ReplSettings& settings)
-        : ReplicationCoordinatorMock(service, settings) {}
-    void signalDrainComplete(OperationContext*, long long) final {
-        uasserted(ErrorCodes::OperationFailed, "failed to signal drain complete");
-    }
-};
-
-}  // namespace
-
-DEATH_TEST_F(SyncTailTest,
-             OplogApplicationLogsExceptionFromSignalDrainCompleteBeforeAborting,
-             "OperationFailed: failed to signal drain complete") {
-    // Leave oplog buffer empty so that SyncTail calls
-    // ReplicationCoordinator::signalDrainComplete() during oplog application.
-    auto oplogBuffer = std::make_unique<OplogBufferBlockingQueue>();
-
-    auto applyOperationFn =
-        [](OperationContext*, MultiApplier::OperationPtrs*, SyncTail*, WorkerMultikeyPathInfo*) {
-            return Status::OK();
-        };
-    auto writerPool = OplogApplier::makeWriterPool();
-    OplogApplier::Options options(OplogApplication::Mode::kSecondary);
-    SyncTail syncTail(nullptr,  // observer. not required by oplogApplication().
-                      _consistencyMarkers.get(),
-                      getStorageInterface(),
-                      applyOperationFn,
-                      writerPool.get(),
-                      options);
-
-    auto service = getServiceContext();
-    auto currentReplCoord = ReplicationCoordinator::get(_opCtx.get());
-    ReplicationCoordinatorSignalDrainCompleteThrows replCoord(service,
-                                                              currentReplCoord->getSettings());
-    ASSERT_OK(replCoord.setFollowerMode(MemberState::RS_PRIMARY));
-
-    // SyncTail::oplogApplication() creates its own OperationContext in the current thread context.
-    _opCtx = {};
-    auto getNextApplierBatchFn =
-        [](OperationContext* opCtx,
-           const OplogApplier::BatchLimits& batchLimits) -> StatusWith<OplogApplier::Operations> {
-        return OplogApplier::Operations();
-    };
-    syncTail.oplogApplication(oplogBuffer.get(), getNextApplierBatchFn, &replCoord);
 }
 
 TEST_F(IdempotencyTest, Geo2dsphereIndexFailedOnUpdate) {

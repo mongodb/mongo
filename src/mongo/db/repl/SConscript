@@ -1288,7 +1288,6 @@ env.CppUnitTest(
         'multiapplier',
         'oplog',
         'oplog_application_interface',
-        'oplog_buffer_blocking_queue',
         'oplog_buffer_collection',
         'oplog_buffer_proxy',
         'oplog_entry',
