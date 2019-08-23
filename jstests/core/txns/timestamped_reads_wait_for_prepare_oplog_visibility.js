@@ -71,13 +71,17 @@ function runTest(prefix, readFunc) {
     // Insert a document for the transaction.
     assert.commandWorked(testColl.insert(TestData.txnDoc));
     // Insert a document untouched by the transaction.
-    assert.commandWorked(testColl.insert(TestData.otherDoc, {writeconcern: {w: "majority"}}));
+    assert.commandWorked(testColl.insert(TestData.otherDoc, {writeConcern: {w: "majority"}}));
 
     // Start a transaction with a single update on the 'txnDoc'.
     const session = db.getMongo().startSession({causalConsistency: false});
     const sessionDB = session.getDatabase(TestData.dbName);
     session.startTransaction({readConcern: {level: 'snapshot'}});
-    assert.commandWorked(sessionDB[collName].update(TestData.txnDoc, {$inc: {x: 1}}));
+    const updateResult =
+        assert.commandWorked(sessionDB[collName].update(TestData.txnDoc, {$inc: {x: 1}}));
+    // Make sure that txnDoc is part of both the snapshot and transaction as an update can still
+    // succeed if it doesn't find any matching documents to modify.
+    assert.eq(updateResult["nModified"], 1);
 
     // We set the log level up to know when 'prepareTransaction' completes.
     db.setLogLevel(1);
