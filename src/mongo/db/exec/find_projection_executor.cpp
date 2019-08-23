@@ -35,6 +35,20 @@ namespace mongo {
 namespace projection_executor {
 namespace {
 /**
+ * Holds various parameters required to apply a $slice projection. Populated from the arguments
+ * to 'applySliceProjection()'.
+ */
+struct SliceParams {
+    const FieldPath& path;
+    const boost::optional<int> skip;
+    const int limit;
+};
+
+Value applySliceProjectionHelper(const Document& input,
+                                 const SliceParams& params,
+                                 size_t fieldPathIndex);
+
+/**
  * Extracts an element from the array 'arr' at position 'elemIndex'. The 'elemIndex' string
  * parameter must hold a value which can be converted to an unsigned integer. If 'elemIndex' is not
  * within array boundaries, an empty Value is returned.
@@ -43,6 +57,107 @@ Value extractArrayElement(const Value& arr, const std::string& elemIndex) {
     auto index = str::parseUnsignedBase10Integer(elemIndex);
     invariant(index);
     return arr[*index];
+}
+
+/**
+ * Returns a portion of the 'array', skipping a number of elements as indicated by the 'skip'
+ * parameter, either from the beginning of the array (if 'skip' is positive), or from the end
+ * of the array (if 'skip' is negative). The 'limit' indicates the number of items to return.
+ * If 'limit' is negative, the last 'limit' number of items in the array are returned.
+ *
+ * If the 'skip' is specified, the 'limit' cannot be negative.
+ */
+Value sliceArray(const std::vector<Value>& array, boost::optional<int> skip, int limit) {
+    auto start = 0ll;
+    auto forward = 0ll;
+    const long long len = array.size();
+
+    if (!skip) {
+        if (limit < 0) {
+            start = std::max(0ll, len + limit);
+            forward = len - start;
+        } else {
+            forward = std::min(len, static_cast<long long>(limit));
+        }
+    } else {
+        // We explicitly disallow a negative limit when skip is specified.
+        invariant(limit >= 0);
+
+        if (*skip < 0) {
+            start = std::max(0ll, len + *skip);
+            forward = std::min(len - start, static_cast<long long>(limit));
+        } else {
+            start = std::min(len, static_cast<long long>(*skip));
+            forward = std::min(len - start, static_cast<long long>(limit));
+        }
+    }
+
+    invariant(start + forward >= 0);
+    invariant(start + forward <= len);
+    return Value{std::vector<Value>(array.cbegin() + start, array.cbegin() + start + forward)};
+}
+
+/**
+ * Applies a $slice projection to the array at the given 'params.path'. For each array element,
+ * recursively calls 'applySliceProjectionHelper' if the element is a Document, storing the result
+ * in the output array, otherwise just stores the element in the output unmodified.
+ *
+ * Note we do not expand arrays within arrays this way. For example, {a: [[{b: 1}]]} has no values
+ * on the path "a.b", but {a: [{b: 1}]} does, so nested arrays are stored within the output array
+ * as regular values.
+ */
+Value applySliceProjectionToArray(const std::vector<Value>& array,
+                                  const SliceParams& params,
+                                  size_t fieldPathIndex) {
+    std::vector<Value> output;
+    output.reserve(array.size());
+
+    for (const auto& elem : array) {
+        output.push_back(
+            elem.getType() == BSONType::Object
+                ? applySliceProjectionHelper(elem.getDocument(), params, fieldPathIndex)
+                : elem);
+    }
+
+    return Value{output};
+}
+
+/**
+ * This is a helper function which implements the $slice projection. The strategy for applying a
+ * $slice projection is as follows:
+ *     * Pick the current path component from the current 'params.path' and store the value from the
+ *       'input' doc at this sub-path in 'val'.
+ *     * If 'val' is an array and we're at the last component in the 'params.path' - slice the array
+ *       and exit recursion, otherwise recursively apply the $slice projection to each element
+ *       in the array, and store the result in 'val'.
+ *     * If the field value is a document, apply the $slice projection to this document, and store
+ *       the result in 'val'.
+ *     * Store the computed 'val' in the 'output' document under the current field name.
+ */
+Value applySliceProjectionHelper(const Document& input,
+                                 const SliceParams& params,
+                                 size_t fieldPathIndex) {
+    invariant(fieldPathIndex < params.path.getPathLength());
+
+    auto fieldName = params.path.getFieldName(fieldPathIndex);
+    Value val{input[fieldName]};
+
+    switch (val.getType()) {
+        case BSONType::Array:
+            val = (fieldPathIndex + 1 == params.path.getPathLength())
+                ? sliceArray(val.getArray(), params.skip, params.limit)
+                : applySliceProjectionToArray(val.getArray(), params, fieldPathIndex + 1);
+            break;
+        case BSONType::Object:
+            val = applySliceProjectionHelper(val.getDocument(), params, fieldPathIndex + 1);
+            break;
+        default:
+            break;
+    }
+
+    MutableDocument output(input);
+    output.setField(fieldName, val);
+    return Value{output.freeze()};
 }
 }  // namespace
 
@@ -130,6 +245,16 @@ void applyElemMatchProjection(const Document& input,
     invariant(!matchingElem.missing());
 
     output->setField(path.fullPath(), Value{std::vector<Value>{matchingElem}});
+}
+
+Document applySliceProjection(const Document& input,
+                              const FieldPath& path,
+                              boost::optional<int> skip,
+                              int limit) {
+    auto params = SliceParams{path, skip, limit};
+    auto val = applySliceProjectionHelper(input, params, 0);
+    invariant(val.getType() == BSONType::Object);
+    return val.getDocument();
 }
 }  // namespace projection_executor
 }  // namespace mongo

@@ -86,6 +86,13 @@ public:
     }
 
     /**
+     * Return the first path component.
+     */
+    StringData front() const {
+        return getFieldName(0);
+    }
+
+    /**
      * Return the last path component.
      */
     StringData back() const {

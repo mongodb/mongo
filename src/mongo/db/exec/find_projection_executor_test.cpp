@@ -33,15 +33,16 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace projection_executor {
 namespace positional_projection_tests {
-Document applyPositional(const BSONObj& match,
-                         const std::string& path,
-                         const Document& input,
-                         const Document& output = {}) {
+auto applyPositional(const BSONObj& match,
+                     const std::string& path,
+                     const Document& input,
+                     const Document& output = {}) {
     MutableDocument doc(output);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(match, expCtx));
@@ -123,10 +124,10 @@ TEST(PositionalProjection, CanMergeWithExistingFieldsInOutputDocument) {
 }  // namespace positional_projection_tests
 
 namespace elem_match_projection_tests {
-Document applyElemMatch(const BSONObj& match,
-                        const std::string& path,
-                        const Document& input,
-                        const Document& output = {}) {
+auto applyElemMatch(const BSONObj& match,
+                    const std::string& path,
+                    const Document& input,
+                    const Document& output = {}) {
     MutableDocument doc(output);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto matchObj = BSON(path << BSON("$elemMatch" << match));
@@ -207,5 +208,95 @@ TEST(ElemMatchProjection, RemovesFieldFromOutputDocumentIfItContainsNumericSubfi
                        applyElemMatch(fromjson("{$gt: 2}"), "foo", doc, doc));
 }
 }  // namespace elem_match_projection_tests
+
+namespace slice_projection_tests {
+DEATH_TEST(SliceProjection,
+           ShouldFailIfNegativeLimitSpecifiedWithPositiveSkip,
+           "Invariant failure limit >= 0") {
+    auto doc = Document{fromjson("{a: [1,2,3,4]}")};
+    applySliceProjection(doc, "a", 1, -1);
+}
+
+DEATH_TEST(SliceProjection,
+           ShouldFailIfNegativeLimitSpecifiedWithNegativeSkip,
+           "Invariant failure limit >= 0") {
+    auto doc = Document{fromjson("{a: [1,2,3,4]}")};
+    applySliceProjection(doc, "a", -1, -1);
+}
+
+TEST(SliceProjection, CorrectlyProjectsSimplePath) {
+    auto doc = Document{fromjson("{a: [1,2,3,4]}")};
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [1,2,3]}")},
+                       applySliceProjection(doc, "a", boost::none, 3));
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [2,3,4]}")},
+                       applySliceProjection(doc, "a", boost::none, -3));
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [2]}")}, applySliceProjection(doc, "a", -3, 1));
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [2,3,4]}")}, applySliceProjection(doc, "a", -3, 4));
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [4]}")}, applySliceProjection(doc, "a", 3, 1));
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [1,2,3,4]}")}, applySliceProjection(doc, "a", -5, 5));
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: []}")}, applySliceProjection(doc, "a", 5, 2));
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [1,2]}")}, applySliceProjection(doc, "a", -5, 2));
+    ASSERT_DOCUMENT_EQ(
+        Document{fromjson("{a: [1,2,3,4]}")},
+        applySliceProjection(doc, "a", boost::none, std::numeric_limits<int>::max()));
+    ASSERT_DOCUMENT_EQ(
+        Document{fromjson("{a: [1,2,3,4]}")},
+        applySliceProjection(doc, "a", boost::none, std::numeric_limits<int>::min()));
+    ASSERT_DOCUMENT_EQ(
+        Document{fromjson("{a: [1,2,3,4]}")},
+        applySliceProjection(
+            doc, "a", std::numeric_limits<int>::min(), std::numeric_limits<int>::max()));
+    ASSERT_DOCUMENT_EQ(
+        Document{fromjson("{a: []}")},
+        applySliceProjection(
+            doc, "a", std::numeric_limits<int>::max(), std::numeric_limits<int>::max()));
+
+    doc = Document{fromjson("{a: [{b: 1, c: 1}, {b: 2, c: 2}, {b: 3, c: 3}], d: 2}")};
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [{b: 1, c: 1}], d: 2}")},
+                       applySliceProjection(doc, "a", boost::none, 1));
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [{b: 3, c: 3}], d: 2}")},
+                       applySliceProjection(doc, "a", boost::none, -1));
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [{b: 2, c: 2}], d: 2}")},
+                       applySliceProjection(doc, "a", 1, 1));
+
+    doc = Document{fromjson("{a: 1}")};
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: 1}")},
+                       applySliceProjection(doc, "a", boost::none, 2));
+}
+
+TEST(SliceProjection, CorrectlyProjectsDottedPath) {
+    auto doc = Document{fromjson("{a: {b: [1,2,3], c: 1}}")};
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: {b: [1,2], c: 1}}")},
+                       applySliceProjection(doc, "a.b", boost::none, 2));
+
+    doc = Document{fromjson("{a: {b: [1,2,3], c: 1}, d: 1}")};
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: {b: [1,2], c: 1}, d: 1}")},
+                       applySliceProjection(doc, "a.b", boost::none, 2));
+
+    doc = Document{fromjson("{a: {b: [[1,2], [3,4], [5,6]]}}")};
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: {b: [[1,2], [3,4]]}}")},
+                       applySliceProjection(doc, "a.b", boost::none, 2));
+
+    doc = Document{fromjson("{a: [{b: {c: [1,2,3,4]}}, {b: {c: [5,6,7,8]}}], d: 1}")};
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [{b: {c: [4]}}, {b: {c: [8]}}], d: 1}")},
+                       applySliceProjection(doc, "a.b.c", -1, 2));
+
+    doc = Document{fromjson("{a: {b: 1}}")};
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: {b: 1}}")},
+                       applySliceProjection(doc, "a.b", boost::none, 2));
+
+    doc = Document{fromjson("{a: [{b: [1,2,3], c: 1}]}")};
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [{b: [3], c: 1}]}")},
+                       applySliceProjection(doc, "a.b", boost::none, -1));
+
+    doc = Document{fromjson("{a: [{b: [1,2,3], c: 4}, {b: [5,6,7], c: 8}]}")};
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [{b: [3], c: 4}, {b: [7], c: 8}]}")},
+                       applySliceProjection(doc, "a.b", boost::none, -1));
+
+    doc = Document{fromjson("{a: [{b: [{x:1, c: [1, 2]}, {y: 1, c: [3, 4]}]}], z: 1}")};
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [{b: [{x:1, c: [1]}, {y: 1, c: [3]}]}], z: 1}")},
+                       applySliceProjection(doc, "a.b.c", boost::none, 1));
+}
+}  // namespace slice_projection_tests
 }  // namespace projection_executor
 }  // namespace mongo

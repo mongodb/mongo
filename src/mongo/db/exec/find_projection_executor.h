@@ -79,5 +79,29 @@ void applyElemMatchProjection(const Document& input,
                               const MatchExpression& matchExpr,
                               const FieldPath& path,
                               MutableDocument* output);
+/**
+ * Applies a $slice projection on the array at the given 'path' on the 'input' document. The applied
+ * projection is returned as a Document. The 'skip' parameter indicates the number of items in the
+ * array to skip and the 'limit' indicates the number of items to return.
+ *
+ * If any of the 'skip' or 'limit' is negative, it is applied to the last items in the array (e.g.,
+ * {$slice: -5} returns the last five items in array, and {$slice: [-20, 10]} returns 10 items,
+ * beginning with the item that is 20th from the last item of the array.
+ *
+ * If the 'skip' is specified, the 'limit' cannot be negative.
+ *
+ * For example, given:
+ *
+ *   - the 'input' document {foo: [{bar: 1}, {bar: 2}, {bar: 3}, {bar: 4}]}
+ *   - the path of 'foo'
+ *   - the 'skip' of -3 and 'limit' of 2
+ *
+ * The resulting document will contain the following element: {foo: [{bar: 2}, {bar: 3}]}.
+ */
+Document applySliceProjection(const Document& input,
+                              const FieldPath& path,
+                              boost::optional<int> skip,
+                              int limit);
+
 }  // namespace projection_executor
 }  // namespace mongo
