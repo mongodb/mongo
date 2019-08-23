@@ -41,18 +41,9 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
 namespace dns {
-namespace detail_dns_host_name {
-using std::begin;
-using std::end;
-using std::rbegin;
-using std::rend;
-
-class HostName;
-bool operator==(const HostName& lhs, const HostName& rhs);
 
 /**
  * A `dns::HostName` represents a DNS Hostname in a form which is suitable for programatic
@@ -139,9 +130,9 @@ public:
         }
 
         if (parserState == kPeriod)
-            fullyQualified = kFullyQualified;
+            _fullyQualified = kFullyQualified;
         else {
-            fullyQualified = kRelativeName;
+            _fullyQualified = kRelativeName;
             _nameComponents.push_back(std::move(name));
         }
 
@@ -149,7 +140,10 @@ public:
             uasserted(ErrorCodes::DNSRecordTypeMismatch,
                       "A Domain Name cannot have zero name elements");
 
-        checkForValidForm();
+        if (isEquivalentToIPv4DottedDecimal()) {
+            uasserted(ErrorCodes::DNSRecordTypeMismatch,
+                      "A Domain Name cannot be equivalent in form to an IPv4 address");
+        }
 
         // Reverse all the names, once we've parsed them all in.
         std::reverse(begin(_nameComponents), end(_nameComponents));
@@ -167,7 +161,7 @@ public:
      * RETURNS: True if this hostname is an FQDN and false otherwise.
      */
     bool isFQDN() const {
-        return fullyQualified;
+        return _fullyQualified;
     }
 
     /**
@@ -181,7 +175,7 @@ public:
      * `qualification`.
      */
     void forceQualification(const Qualification qualification = kFullyQualified) {
-        fullyQualified = qualification;
+        _fullyQualified = qualification;
     }
 
     /**
@@ -196,7 +190,9 @@ public:
      * RETURNS: A `std::string` which represents this DNS Hostname in complete canonical form.
      */
     std::string canonicalName() const {
-        return str::stream() << *this;
+        StringBuilder sb;
+        stream(sb);
+        return sb.str();
     }
 
     /**
@@ -252,29 +248,24 @@ public:
     }
 
     /**
-     * Returns true if the specified `candidate` Hostname would be resolved within `*this` as a
-     * hostname and false otherwise.
+     * Returns true if the specified `candidate` HostName would be resolved within `*this` as a
+     * hostname and false otherwise. That is, HostName can be obtained by applying `.parentDomain()`
+     * to `candidate` at least once.
      *
-     * Two domains can be said to have a "contains" relationship only when when both are Fully
+     * Two domains can be said to have a "contains" relationship only when both are Fully
      * Qualified Domain Names (FQDNs).  When either domain or both domains are unqualified, then it
      * is impossible to know whether one could be resolved within the other correctly.
      *
-     * PRE: This `this->isFQDN() && candidate.isFQDN()` must be true.  Resolving unqualified names
-     * against other unqualified names has some implications on what the `contains` relationship
-     * would indicate.  We sidestep those at this time.
-     *
-     * THROWS: `DBException` with `ErrorCodes::DNSRecordTypeMismatch` as the status value if
-     * `!this->isFQDN() || !candidate.isFQDN()`.
-     *
-     * RETURNS: False when `!candidate.isFQDN() || !this->isFQDN()`.  False when `this->depth() >=
-     * candidate.depth()`.  Otherwise a value equivalent to `[temp = candidate]{ while (temp.depth()
-     * > this->depth()) temp= temp.parentDomain(); return temp; }() == *this;`
+     * THROWS: `DBException` with `ErrorCodes::DNSRecordTypeMismatch` as the status value unless
+     * both this and candidate are fully-qualified.
      */
     bool contains(const HostName& candidate) const {
         if (!this->isFQDN() || !candidate.isFQDN()) {
             uasserted(ErrorCodes::DNSRecordTypeMismatch,
                       "Only FQDNs can be checked for subdomain relationships.");
         }
+        // All of _nameComponents must appear as a prefix of candidate._nameComponents,
+        // and candidate must have name components beyond that prefix.
         return (_nameComponents.size() < candidate._nameComponents.size()) &&
             std::equal(
                    begin(_nameComponents), end(_nameComponents), begin(candidate._nameComponents));
@@ -282,43 +273,31 @@ public:
 
     /**
      * Returns a new `dns::HostName` which represents the larger (possibly canonical) name that
-     * would be used to lookup `*this` within the domain of the specified `rhs`.
+     * would be used to lookup `*this` within the specified `domain`.  The result's
+     * `canonicalName()` is the concatenation of this object's canonical name with the canonical
+     * name of the specified `domain`.
      *
-     * Unqualified DNS Hostnames can be prepended to other DNS Hostnames to provide a DNS string
+     * Unqualified hostnames can be prepended to other hostnames to provide a DNS string
      * which is equivalent to what a resolution of the unqualified name would be in the domain of
      * the second (possibly qualified) name.
      *
-     * PRE: `this->isFQDN() == false`.
-     *
-     * RETURNS: A `dns::HostName` which has a `canonicalName()` equivalent to `this->canonicalName()
-     * + rhs.canonicalName()`.
-     *
-     * THROWS: `DBException` with `ErrorCodes::DNSRecordTypeMismatch` as the status value if
-     * `this->isFQDN() == false`.
+     * Throws an `DBException` with status `ErrorCodes::DNSRecordTypeMismatch` if this HostName is
+     * fully-qualified.
      */
-    HostName resolvedIn(const HostName& rhs) const {
-        if (this->fullyQualified)
+    HostName resolvedIn(const HostName& domain) const {
+        if (this->_fullyQualified)
             uasserted(
                 ErrorCodes::DNSRecordTypeMismatch,
                 "A fully qualified Domain Name cannot be resolved within another domain name.");
-        HostName result = rhs;
+        HostName result = domain;
         result._nameComponents.insert(
             end(result._nameComponents), begin(this->_nameComponents), end(this->_nameComponents));
-
         return result;
     }
 
     /**
-     * Returns an immutable reference to a `std::vector` of `std::string` which indicates the
-     * canonical path of this `dns::HostName`.
-     *
-     * Sometimes it is necessary to iterate over all of the elements of a domain name string.  This
-     * function facilitates such iteration.
-     *
-     * RETURNS: A `const std::vector<std::string>&` which refers to all of the domain name
-     * components of `*this`.
+     * The sequence of domain path components in top-first order (e.g. {"com","mongodb","www"}).
      */
-
     const std::vector<std::string>& nameComponents() const& {
         return this->_nameComponents;
     }
@@ -328,125 +307,76 @@ public:
     }
 
     /**
-     * Compares two `dns::HostName` objects.
+     * Returns true if `lhs` and `rhs` represent the same DNS path.
      *
-     * Two `dns::HostName` objects compare equal when they both represent the same resolution path.
-     * This means that in addition to the lookup sequence (order of sub domains) being the same, the
+     * In addition to the lookup sequence (order of sub domains) being the same, the
      * qualification of both objects must be the same.  For example, `"www.google.com"` would not
      * compare equal to `"www.google.com."` due to the presence of a trailing dot in the second
      * case.
-     *
-     * RETURNS: True if `lhs` and `rhs` represent the same DNS path, and false otherwise.
      */
-    friend bool operator==(const HostName& lhs, const HostName& rhs);
+    friend bool operator==(const HostName& lhs, const HostName& rhs) {
+        auto lens = [](const auto& h) { return std::tie(h._fullyQualified, h._nameComponents); };
+        return lens(lhs) == lens(rhs);
+    }
 
-    /**
-     * Compares two `dns::HostName` objects.
-     *
-     * RETURNS: `!(lhs == rhs)`.
-     */
     friend bool operator!=(const HostName& lhs, const HostName& rhs) {
         return !(lhs == rhs);
     }
 
     /**
      * Streams a representation of the specified `hostName` to the specified `os` formatting stream.
+     * Returns a reference to `os` for chaining.
      *
      * A canonical representation of `hostName` (with a trailing dot, `'.'`, when `hostName.isFQDN()
-     * == true`) will be placed into the formatting stream handled by `os`.
-     *
-     * RETURNS: A reference to the specified output stream `os`.
+     * == true`) will be placed into the formatting stream.
      */
     friend std::ostream& operator<<(std::ostream& os, const HostName& hostName) {
-        if (hostName.fullyQualified) {
-            hostName.streamQualified(os);
-        } else {
-            hostName.streamUnqualified(os);
-        }
-
-        return os;
+        return hostName.stream(os);
     }
 
     friend StringBuilder& operator<<(StringBuilder& os, const HostName& hostName) {
-        if (hostName.fullyQualified) {
-            hostName.streamQualified(os);
-        } else {
-            hostName.streamUnqualified(os);
-        }
-
-        return os;
+        return hostName.stream(os);
     }
 
 private:
-    auto make_equality_lens() const {
-        return std::tie(fullyQualified, _nameComponents);
-    }
-
-    // When printing fully qualified names to a stream, we need to always append a dot.
-    template <typename StreamLike>
-    void streamQualified(StreamLike& os) const {
-        invariant(fullyQualified);
-        streamCore(os);
-        os << '.';
-    }
-
-    // When printing unqualified names to a stream, we omit the trailing dot, even if needed.
-    template <typename StreamLike>
-    void streamUnqualified(StreamLike& os) const {
-        streamCore(os);
-    }
-
     // All streaming functions boil down into this central handler, for both `StringBuilder` and
     // `std::ostream`.
     template <typename StreamLike>
-    void streamCore(StreamLike& os) const {
-        std::for_each(rbegin(_nameComponents),
-                      rend(_nameComponents),
-                      [first = true, &os](const auto& component) mutable {
-                          if (!first)
-                              os << '.';
-                          first = false;
-                          os << component;
-                      });
+    void streamUnqualified(StreamLike& os) const {
+        StringData sep;
+        std::for_each(
+            rbegin(_nameComponents), rend(_nameComponents), [&sep, &os](const auto& component) {
+                os << sep << component;
+                sep = "."_sd;
+            });
     }
 
-    // If there are exactly 4 name components, and they are not fully qualified, then they cannot be
-    // all numbers.  This helper function is used in validating that IPv4 addresses are not passed
-    // to the constructor of this class.
-    void checkForValidForm() const {
-        if (this->_nameComponents.size() != 4)
-            return;
-        if (this->fullyQualified)
-            return;
-
-        for (const auto& name : this->_nameComponents) {
-            // Any letters are good.  A hyphen is okay too.
-            if (end(name) != std::find_if(begin(name), end(name), [](const char ch) {
-                    return std::isalpha(ch) || ch == '-';
-                }))
-                return;
+    // When printing unqualified names to a stream, we omit the trailing dot, even if needed.
+    // Always append a dot when printing fully qualified names.
+    template <typename StreamLike>
+    StreamLike& stream(StreamLike& os) const {
+        streamUnqualified(os);
+        if (_fullyQualified) {
+            os << '.';
         }
-
-        // If we couldn't find any letters or hyphens
-        uasserted(ErrorCodes::DNSRecordTypeMismatch,
-                  "A Domain Name cannot be equivalent in form to an IPv4 address");
+        return os;
     }
 
-    // Hostname components are stored in hierarchy order (reverse order from how a name is read by
-    // humans in text form).
+    // Returns true only if this is not fully qualified, has exactly 4 name components, and
+    // and consists solely of digits.
+    bool isEquivalentToIPv4DottedDecimal() const {
+        return !_fullyQualified && _nameComponents.size() == 4 &&
+            std::all_of(begin(_nameComponents), end(_nameComponents), [](const auto& s) {
+                return std::all_of(begin(s), end(s), [](char c) { return std::isdigit(c); });
+            });
+    }
+
+    // Hostname components are stored top-first (e.g. "com","mongodb","www").
+    // This is the reverse of how a name is read by humans in text form.
     std::vector<std::string> _nameComponents;
 
     // FQDNs and Relative Names are discriminated by this field.
-    Qualification fullyQualified;
+    Qualification _fullyQualified;
 };
-}  // namespace detail_dns_host_name
-
-// The `operator==` function has to be defined out-of-line, because it uses `make_equality_lens`
-// which is an auto-deduced return type function defined later in the class body.
-inline bool detail_dns_host_name::operator==(const HostName& lhs, const HostName& rhs) {
-    return lhs.make_equality_lens() == rhs.make_equality_lens();
-}
-
-using detail_dns_host_name::HostName;
 }  // namespace dns
 }  // namespace mongo
