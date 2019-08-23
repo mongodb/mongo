@@ -176,6 +176,18 @@ public:
         }
 
         /**
+         * If the oplog buffer is exhausted, return the term before we learned that the buffer was
+         * empty.
+         */
+        boost::optional<long long> termWhenExhausted() const {
+            return _termWhenExhausted;
+        }
+        void setTermWhenExhausted(long long term) {
+            invariant(empty());
+            _termWhenExhausted = term;
+        }
+
+        /**
          * Leaves this object in an unspecified state. Only assignment and destruction are valid.
          */
         std::vector<OplogEntry> releaseBatch() {
@@ -186,6 +198,7 @@ public:
         std::vector<OplogEntry> _batch;
         size_t _bytes;
         bool _mustShutdown = false;
+        boost::optional<long long> _termWhenExhausted;
     };
 
     using BatchLimits = OplogApplier::BatchLimits;

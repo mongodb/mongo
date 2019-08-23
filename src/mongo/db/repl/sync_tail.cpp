@@ -583,7 +583,16 @@ public:
 
     OpQueue getNextBatch(Seconds maxWaitTime) {
         stdx::unique_lock<stdx::mutex> lk(_mutex);
-        if (_ops.empty() && !_ops.mustShutdown()) {
+        // _ops can indicate the following cases:
+        // 1. A new batch is ready to consume.
+        // 2. Shutdown.
+        // 3. The batch has (or had) exhausted the buffer in draining mode.
+        // 4. Empty batch since the batch has/had exhausted the buffer but not in draining mode,
+        //    so there could be new oplog entries coming.
+        // 5. Empty batch since the batcher is still running.
+        //
+        // In case (4) and (5), we wait for up to "maxWaitTime".
+        if (_ops.empty() && !_ops.mustShutdown() && !_ops.termWhenExhausted()) {
             // We intentionally don't care about whether this returns due to signaling or timeout
             // since we do the same thing either way: return whatever is in _ops.
             (void)_cv.wait_for(lk, maxWaitTime.toSystemDuration());
@@ -592,7 +601,6 @@ public:
         OpQueue ops = std::move(_ops);
         _ops = OpQueue(0);
         _cv.notify_all();
-
         return ops;
     }
 
@@ -650,20 +658,45 @@ private:
                     if (_syncTail->inShutdown()) {
                         ops.setMustShutdownFlag();
                     } else {
-                        // Block up to 1 second. We still return true in this case because we want
-                        // this op to be the first in a new batch with a new start time.
+                        // Block up to 1 second.
                         _oplogBuffer->waitForData(Seconds(1));
                     }
                 }
             }
 
             if (ops.empty() && !ops.mustShutdown()) {
-                continue;  // Don't emit empty batches.
+                // Check whether we have drained the oplog buffer. The states checked here can be
+                // stale when it's used by the applier. signalDrainComplete() needs to check the
+                // applier is still draining in the same term to make sure these states have not
+                // changed.
+                auto replCoord = ReplicationCoordinator::get(cc().getServiceContext());
+                // Check the term first to detect DRAINING -> RUNNING -> DRAINING when signaling
+                // drain complete.
+                //
+                // Batcher can delay arbitrarily. After stepup, if the batcher drained the buffer
+                // and blocks when it's about to notify the applier to signal drain complete, the
+                // node may step down and fetch new data into the buffer and then step up again.
+                // Now the batcher will resume and let the applier signal drain complete even if
+                // the buffer has new data. Checking the term before and after ensures nothing
+                // changed in between.
+                auto termWhenBufferIsEmpty = replCoord->getTerm();
+                // Draining state guarantees the producer has already been fully stopped and no more
+                // operations will be pushed in to the oplog buffer until the applier state changes.
+                auto isDraining =
+                    replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Draining;
+                // Check the oplog buffer after the applier state to ensure the producer is stopped.
+                if (isDraining && _oplogBuffer->isEmpty()) {
+                    ops.setTermWhenExhausted(termWhenBufferIsEmpty);
+                    log() << "Oplog buffer has been drained in term " << termWhenBufferIsEmpty;
+                } else {
+                    // Don't emit empty batches.
+                    continue;
+                }
             }
 
             stdx::unique_lock<stdx::mutex> lk(_mutex);
             // Block until the previous batch has been taken.
-            _cv.wait(lk, [&] { return _ops.empty(); });
+            _cv.wait(lk, [&] { return _ops.empty() && !_ops.termWhenExhausted(); });
             _ops = std::move(ops);
             _cv.notify_all();
             if (_ops.mustShutdown()) {
@@ -743,7 +776,6 @@ void SyncTail::_oplogApplication(ReplicationCoordinator* replCoord,
         // Transition to SECONDARY state, if possible.
         tryToGoLiveAsASecondary(&opCtx, replCoord, minValid);
 
-        long long termWhenBufferIsEmpty = replCoord->getTerm();
         // Blocks up to a second waiting for a batch to be ready to apply. If one doesn't become
         // ready in time, we'll loop again so we can do the above checks periodically.
         OpQueue ops = batcher->getNextBatch(Seconds(1));
@@ -755,8 +787,14 @@ void SyncTail::_oplogApplication(ReplicationCoordinator* replCoord,
             if (MONGO_FAIL_POINT(rsSyncApplyStop)) {
                 continue;
             }
-            // Signal drain complete if we're in Draining state and the buffer is empty.
-            replCoord->signalDrainComplete(&opCtx, termWhenBufferIsEmpty);
+            if (ops.termWhenExhausted()) {
+                // Signal drain complete if we're in Draining state and the buffer is empty.
+                // Since we check the states of batcher and oplog buffer without synchronization,
+                // they can be stale. We make sure the applier is still draining in the given term
+                // before and after the check, so that if the oplog buffer was exhausted, then
+                // it still will be.
+                replCoord->signalDrainComplete(&opCtx, *ops.termWhenExhausted());
+            }
             continue;  // Try again.
         }
 
