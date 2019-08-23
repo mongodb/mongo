@@ -532,18 +532,10 @@ functions:
       local_file: src/corpus.tgz
 
   "extract corpus": &extract_corpus
-    command: shell.exec
-    type: test
+    command: archive.auto_extract
     params:
-      shell: bash
-      script: |
-        set -o verbose
-        set -o errexit
-
-        target_dir="src/corpus"
-        mkdir -p $target_dir
-
-        tar -xzf corpus.tgz -C $target_dir
+        path: src/corpus.tgz
+        destination: src/corpus
 
   "archive new corpus": &archive_new_corpus
     command: archive.targz_pack
