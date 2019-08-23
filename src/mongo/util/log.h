@@ -55,7 +55,23 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/errno_util.h"
 
+namespace mongo {
+
+namespace logger {
+typedef void (*ExtraLogContextFn)(BufBuilder& builder);
+Status registerExtraLogContextFn(ExtraLogContextFn contextFn);
+
+}  // namespace logger
+
+/*
+ * Although this is a "header" file, it is only supposed to be included in C++ files.  The
+ * definitions of the following objects and functions (in the below anonymous namespace) will
+ * potentially differ by TU.  Therefore these names must remain with internal linkage.  This
+ * particular anoymous namespace in this header, therefore, is not an ODR problem but is instead a
+ * solution to an ODR problem which would arise.
+ */
 namespace {
+
 // Provide log component in global scope so that MONGO_LOG will always have a valid component.
 // Global log component will be kDefault unless overridden by MONGO_LOG_DEFAULT_COMPONENT.
 #if defined(MONGO_LOG_DEFAULT_COMPONENT)
@@ -66,17 +82,6 @@ const ::mongo::logger::LogComponent MongoLogDefaultComponent_component =
     "mongo/util/log.h requires MONGO_LOG_DEFAULT_COMPONENT to be defined. " \
        "Please see http://www.mongodb.org/about/contributors/reference/server-logging-rules/ "
 #endif  // MONGO_LOG_DEFAULT_COMPONENT
-}  // namespace
-
-namespace mongo {
-
-namespace logger {
-typedef void (*ExtraLogContextFn)(BufBuilder& builder);
-Status registerExtraLogContextFn(ExtraLogContextFn contextFn);
-
-}  // namespace logger
-
-namespace {
 
 using logger::LogstreamBuilder;
 using logger::Tee;
@@ -88,7 +93,7 @@ inline LogstreamBuilder severe() {
     return LogstreamBuilder(logger::globalLogDomain(),
                             getThreadName(),
                             logger::LogSeverity::Severe(),
-                            ::MongoLogDefaultComponent_component);
+                            MongoLogDefaultComponent_component);
 }
 
 inline LogstreamBuilder severe(logger::LogComponent component) {
@@ -103,7 +108,7 @@ inline LogstreamBuilder error() {
     return LogstreamBuilder(logger::globalLogDomain(),
                             getThreadName(),
                             logger::LogSeverity::Error(),
-                            ::MongoLogDefaultComponent_component);
+                            MongoLogDefaultComponent_component);
 }
 
 inline LogstreamBuilder error(logger::LogComponent component) {
@@ -118,7 +123,7 @@ inline LogstreamBuilder warning() {
     return LogstreamBuilder(logger::globalLogDomain(),
                             getThreadName(),
                             logger::LogSeverity::Warning(),
-                            ::MongoLogDefaultComponent_component);
+                            MongoLogDefaultComponent_component);
 }
 
 inline LogstreamBuilder warning(logger::LogComponent component) {
@@ -133,7 +138,7 @@ inline LogstreamBuilder log() {
     return LogstreamBuilder(logger::globalLogDomain(),
                             getThreadName(),
                             logger::LogSeverity::Log(),
-                            ::MongoLogDefaultComponent_component);
+                            MongoLogDefaultComponent_component);
 }
 
 /**
@@ -148,7 +153,7 @@ inline LogstreamBuilder logNoCache() {
     return LogstreamBuilder(logger::globalLogDomain(),
                             getThreadName(),
                             logger::LogSeverity::Log(),
-                            ::MongoLogDefaultComponent_component,
+                            MongoLogDefaultComponent_component,
                             false);
 }
 
@@ -170,7 +175,7 @@ inline bool shouldLog(logger::LogComponent logComponent, logger::LogSeverity sev
 }
 
 inline bool shouldLog(logger::LogSeverity severity) {
-    return shouldLog(::MongoLogDefaultComponent_component, severity);
+    return shouldLog(MongoLogDefaultComponent_component, severity);
 }
 
 }  // namespace
