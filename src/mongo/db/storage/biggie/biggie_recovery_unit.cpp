@@ -77,7 +77,8 @@ void RecoveryUnit::commitUnitOfWork() {
         _forked = false;
         _dirty = false;
     } else if (_forked) {
-        DEV invariant(_mergeBase == _workingCopy);
+        if (kDebugBuild)
+            invariant(_mergeBase == _workingCopy);
     }
 
     _setState(State::kCommitting);

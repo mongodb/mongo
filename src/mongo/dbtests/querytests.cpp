@@ -1456,8 +1456,7 @@ public:
         long long slow;
         long long fast;
 
-        int n = 10000;
-        DEV n = 1000;
+        const int n = kDebugBuild ? 1000 : 10000;
         {
             Timer t;
             for (int i = 0; i < n; i++) {

@@ -137,7 +137,8 @@ bool IndexCatalogEntryImpl::isReady(OperationContext* opCtx) const {
         }
     }
 
-    DEV invariant(_isReady == _catalogIsReady(opCtx));
+    if (kDebugBuild)
+        invariant(_isReady == _catalogIsReady(opCtx));
     return _isReady;
 }
 

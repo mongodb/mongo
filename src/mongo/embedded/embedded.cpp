@@ -224,7 +224,8 @@ ServiceContext* initialize(const char* yaml_config) {
         l << (is32bit ? " 32" : " 64") << "-bit" << endl;
     }
 
-    DEV log(LogComponent::kControl) << "DEBUG build (which is slower)" << endl;
+    if (kDebugBuild)
+        log(LogComponent::kControl) << "DEBUG build (which is slower)" << endl;
 
     // The periodic runner is required by the storage engine to be running beforehand.
     auto periodicRunner = std::make_unique<PeriodicRunnerEmbedded>(

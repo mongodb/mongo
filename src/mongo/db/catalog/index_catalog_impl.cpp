@@ -986,7 +986,7 @@ bool IndexCatalogImpl::haveAnyIndexesInProgress() const {
 int IndexCatalogImpl::numIndexesTotal(OperationContext* opCtx) const {
     int count = _readyIndexes.size() + _buildingIndexes.size();
 
-    DEV {
+    if (kDebugBuild) {
         try {
             // Check if the in-memory index count matches the durable catalogs index count on disk.
             // This can throw a WriteConflictException when retries on write conflicts are disabled
@@ -1009,7 +1009,7 @@ int IndexCatalogImpl::numIndexesReady(OperationContext* opCtx) const {
     while (ii->more()) {
         itIndexes.push_back(ii->next()->descriptor());
     }
-    DEV {
+    if (kDebugBuild) {
         std::vector<std::string> completedIndexes;
         durableCatalog->getReadyIndexes(opCtx, _collection->ns(), &completedIndexes);
 

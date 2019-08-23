@@ -401,7 +401,7 @@ public:
         dassert(oldState == SSBState::kWaitingOrHaveChildren ||
                 oldState == SSBState::kHaveCallback);
 
-        DEV {
+        if (kDebugBuild) {
             // If you hit this limit one of two things has probably happened
             //
             // 1. The justForContinuation optimization isn't working.

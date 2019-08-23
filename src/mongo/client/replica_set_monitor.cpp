@@ -355,7 +355,8 @@ void ReplicaSetMonitor::failedHost(const HostAndPort& host, const Status& status
     Node* node = _state->findNode(host);
     if (node)
         node->markFailed(status);
-    DEV _state->checkInvariants();
+    if (kDebugBuild)
+        _state->checkInvariants();
 }
 
 bool ReplicaSetMonitor::isPrimary(const HostAndPort& host) const {
@@ -557,7 +558,8 @@ void Refresher::scheduleNetworkRequests() {
         node->scheduledIsMasterHandle = uassertStatusOK(std::move(swHandle));
     }
 
-    DEV _set->checkInvariants();
+    if (kDebugBuild)
+        _set->checkInvariants();
 }
 
 void Refresher::scheduleIsMaster(const HostAndPort& host) {
@@ -765,7 +767,8 @@ void Refresher::receivedIsMaster(const HostAndPort& from,
     // connectible host that is that claims to be in the set.
     _scan->foundAnyUpNodes = true;
 
-    DEV _set->checkInvariants();
+    if (kDebugBuild)
+        _set->checkInvariants();
 }
 
 void Refresher::failedHost(const HostAndPort& host, const Status& status) {
@@ -1072,7 +1075,8 @@ SetState::SetState(const MongoURI& uri,
         }
     }
 
-    DEV checkInvariants();
+    if (kDebugBuild)
+        checkInvariants();
 }
 
 HostAndPort SetState::getMatchingHost(const ReadPreferenceSetting& criteria) const {

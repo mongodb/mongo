@@ -171,21 +171,25 @@ public:
     }
 
     ~ValueStorage() {
-        DEV verifyRefCountingIfShould();
+        if (kDebugBuild)
+            verifyRefCountingIfShould();
         if (refCounter)
             intrusive_ptr_release(genericRCPtr);
-        DEV memset(bytes, 0xee, sizeof(bytes));
+        if (kDebugBuild)
+            memset(bytes, 0xee, sizeof(bytes));
     }
 
     ValueStorage& operator=(const ValueStorage& rhs) {
         // This is designed to be effectively a no-op on self-assign, without needing an explicit
         // check. This requires that rhs's refcount is incremented before ours is released, and that
         // we use memmove rather than memcpy.
-        DEV rhs.verifyRefCountingIfShould();
+        if (kDebugBuild)
+            rhs.verifyRefCountingIfShould();
         if (rhs.refCounter)
             intrusive_ptr_add_ref(rhs.genericRCPtr);
 
-        DEV verifyRefCountingIfShould();
+        if (kDebugBuild)
+            verifyRefCountingIfShould();
         if (refCounter)
             intrusive_ptr_release(genericRCPtr);
 
@@ -194,7 +198,8 @@ public:
     }
 
     ValueStorage& operator=(ValueStorage&& rhs) noexcept {
-        DEV verifyRefCountingIfShould();
+        if (kDebugBuild)
+            verifyRefCountingIfShould();
         if (refCounter)
             intrusive_ptr_release(genericRCPtr);
 
@@ -213,7 +218,8 @@ public:
 
     /// Call this after memcpying to update ref counts if needed
     void memcpyed() const {
-        DEV verifyRefCountingIfShould();
+        if (kDebugBuild)
+            verifyRefCountingIfShould();
         if (refCounter)
             intrusive_ptr_add_ref(genericRCPtr);
     }
@@ -246,7 +252,8 @@ public:
         if (genericRCPtr) {
             refCounter = true;
         }
-        DEV verifyRefCountingIfShould();
+        if (kDebugBuild)
+            verifyRefCountingIfShould();
     }
 
     StringData getString() const {

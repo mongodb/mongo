@@ -287,7 +287,8 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
             [keysInserted, numInserted] { *keysInserted -= numInserted; });
     } else {
         invariant(opType == Op::kDelete);
-        DEV invariant(strcmp(operation.getStringField("op"), "d") == 0);
+        if (kDebugBuild)
+            invariant(strcmp(operation.getStringField("op"), "d") == 0);
 
         int64_t numDeleted;
         Status s = accessMethod->removeKeys(
@@ -311,7 +312,7 @@ void IndexBuildInterceptor::_tryYield(OperationContext* opCtx) {
     if (opCtx->lockState()->isCollectionLockedForMode(nss, MODE_S)) {
         return;
     }
-    DEV {
+    if (kDebugBuild) {
         invariant(!opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
         invariant(!opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_X));
     }

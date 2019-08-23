@@ -118,7 +118,8 @@ Status storeTestFrameworkOptions(const moe::Environment& params,
         return Status(ErrorCodes::BadValue, sb.str());
     }
 
-    DEV log() << "DEBUG build" << endl;
+    if (kDebugBuild)
+        log() << "DEBUG build" << endl;
 
     string dbpathString = p.string();
     storageGlobalParams.dbpath = dbpathString.c_str();

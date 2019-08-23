@@ -228,7 +228,7 @@ public:
     void drop();
 
     /**
-     * Before unlocking, do DEV checkInvariants();
+     * Before unlocking, do `if (kDebugBuild) checkInvariants();`
      */
     void checkInvariants() const;
 

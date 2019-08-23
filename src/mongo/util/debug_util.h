@@ -40,9 +40,6 @@ constexpr bool kDebugBuild = true;
 constexpr bool kDebugBuild = false;
 #endif
 
-#define MONGO_DEV if (kDebugBuild)
-#define DEV MONGO_DEV
-
 template <unsigned period>
 class SampleEveryNth {
 public:

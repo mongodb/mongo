@@ -302,7 +302,8 @@ ExitCode _initAndListen(int listenPort) {
         l << (is32bit ? " 32" : " 64") << "-bit host=" << getHostNameCached() << endl;
     }
 
-    DEV log(LogComponent::kControl) << "DEBUG build (which is slower)" << endl;
+    if (kDebugBuild)
+        log(LogComponent::kControl) << "DEBUG build (which is slower)" << endl;
 
 #if defined(_WIN32)
     VersionInfoInterface::instance().logTargetMinOS();
