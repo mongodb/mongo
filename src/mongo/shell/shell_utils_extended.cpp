@@ -78,29 +78,27 @@ BSONObj listFiles(const BSONObj& _args, void* data) {
     stringstream ss;
     ss << "listFiles: no such directory: " << rootname;
     string msg = ss.str();
-    uassert(12581, msg.c_str(), boost::filesystem::exists(root));
+    uassert(12581,
+            msg.c_str(),
+            boost::filesystem::exists(root) && boost::filesystem::is_directory(root));
 
-    boost::filesystem::directory_iterator end;
-    boost::filesystem::directory_iterator i(root);
 
-    while (i != end) {
-        boost::filesystem::path p = *i;
-        BSONObjBuilder b;
-        b << "name" << p.generic_string();
-        b << "baseName" << p.filename().generic_string();
-        b.appendBool("isDirectory", is_directory(p));
-        if (!boost::filesystem::is_directory(p)) {
-            try {
+    for (boost::filesystem::directory_iterator i(root), end; i != end; ++i)
+        try {
+            const boost::filesystem::path& p = *i;
+            BSONObjBuilder b;
+            b << "name" << p.generic_string();
+            b << "baseName" << p.filename().generic_string();
+            const bool isDirectory = is_directory(p);
+            b.appendBool("isDirectory", isDirectory);
+            if (!isDirectory) {
                 b.append("size", (double)boost::filesystem::file_size(p));
-            } catch (...) {
-                i++;
-                continue;
             }
-        }
 
-        lst.append(b.obj());
-        i++;
-    }
+            lst.append(b.obj());
+        } catch (const boost::filesystem::filesystem_error&) {
+            continue;  // Filesystem errors cause us to just skip that entry, entirely.
+        }
 
     BSONObjBuilder ret;
     ret.appendArray("", lst.done());
