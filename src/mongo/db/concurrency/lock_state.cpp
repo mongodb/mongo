@@ -760,7 +760,6 @@ bool LockerImpl::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
 
         // We should never have to save and restore metadata locks.
         invariant(RESOURCE_DATABASE == resType || RESOURCE_COLLECTION == resType ||
-                  (RESOURCE_GLOBAL == resType && isSharedLockMode(it->mode)) ||
                   (RESOURCE_PBWM == resType && isSharedLockMode(it->mode)) ||
                   (RESOURCE_RSTL == resType && it->mode == MODE_IX));
 
