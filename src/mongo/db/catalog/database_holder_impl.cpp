@@ -198,9 +198,8 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
 }
 
 void DatabaseHolderImpl::close(OperationContext* opCtx, StringData ns) {
-    invariant(opCtx->lockState()->isW());
-
     const StringData dbName = _todb(ns);
+    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
 
     stdx::lock_guard<SimpleMutex> lk(_m);
 

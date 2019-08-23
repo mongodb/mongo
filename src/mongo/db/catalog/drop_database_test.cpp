@@ -197,7 +197,6 @@ void _createCollection(OperationContext* opCtx, const NamespaceString& nss) {
  * Removes database from catalog, bypassing dropDatabase().
  */
 void _removeDatabaseFromCatalog(OperationContext* opCtx, StringData dbName) {
-    Lock::GlobalWrite lk(opCtx);
     AutoGetDb autoDB(opCtx, dbName, MODE_X);
     auto db = autoDB.getDb();
     // dropDatabase can call awaitReplication more than once, so do not attempt to drop the database
@@ -382,7 +381,7 @@ TEST_F(DropDatabaseTest,
         });
 
     {
-        Lock::GlobalWrite lk(_opCtx.get());
+        Lock::DBLock lk(_opCtx.get(), _nss.db(), MODE_X);
         _testDropDatabase(_opCtx.get(), _opObserver, _nss, true);
     }
 
@@ -410,7 +409,7 @@ TEST_F(DropDatabaseTest,
     _createCollection(_opCtx.get(), dpns);
 
     {
-        Lock::GlobalWrite lk(_opCtx.get());
+        Lock::DBLock lk(_opCtx.get(), _nss.db(), MODE_X);
         ASSERT_OK(dropDatabase(_opCtx.get(), _nss.db().toString()));
     }
 
