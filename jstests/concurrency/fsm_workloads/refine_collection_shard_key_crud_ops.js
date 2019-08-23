@@ -3,7 +3,7 @@
 /**
  * Runs refineCollectionShardKey and CRUD operations concurrently.
  *
- * @tags: [requires_sharding]
+ * @tags: [requires_persistence, requires_sharding]
  */
 
 load('jstests/libs/parallelTester.js');
