@@ -100,6 +100,7 @@ MONGO_FAIL_POINT_DEFINE(rsStopGetMore);
 MONGO_FAIL_POINT_DEFINE(respondWithNotPrimaryInCommandDispatch);
 MONGO_FAIL_POINT_DEFINE(skipCheckingForNotMasterInCommandDispatch);
 MONGO_FAIL_POINT_DEFINE(waitAfterReadCommandFinishesExecution);
+MONGO_FAIL_POINT_DEFINE(sleepMillisAfterCommandExecutionBegins);
 
 // Tracks the number of times a legacy unacknowledged write failed due to
 // not master error resulted in network disconnection.
@@ -662,6 +663,16 @@ void execCommandDatabase(OperationContext* opCtx,
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             CurOp::get(opCtx)->setCommand_inlock(command);
+        }
+
+        MONGO_FAIL_POINT_BLOCK(sleepMillisAfterCommandExecutionBegins, arg) {
+            const BSONObj& data = arg.getData();
+            auto numMillis = data["millis"].numberInt();
+            auto commands = data["commands"].Obj().getFieldNames<std::set<std::string>>();
+            // Only sleep for one of the specified commands.
+            if (commands.find(command->getName()) != commands.end()) {
+                mongo::sleepmillis(numMillis);
+            }
         }
 
         // TODO: move this back to runCommands when mongos supports OperationContext
