@@ -42,17 +42,13 @@ class OperationContext;
 
 enum ValidateCmdLevel : int { kValidateNormal = 0x01, kValidateFull = 0x02 };
 
-namespace {
-
-using ValidateResultsMap = std::map<std::string, ValidateResults>;
-
-}  // namespace
-
 /**
  * The record store validate adaptor is used to keep track of the index consistency during
  * a validation that's running.
  */
 class ValidateAdaptor {
+    using ValidateResultsMap = std::map<std::string, ValidateResults>;
+
 public:
     ValidateAdaptor(IndexConsistency* indexConsistency,
                     ValidateCmdLevel level,

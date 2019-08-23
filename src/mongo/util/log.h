@@ -55,6 +55,7 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/errno_util.h"
 
+namespace {
 // Provide log component in global scope so that MONGO_LOG will always have a valid component.
 // Global log component will be kDefault unless overridden by MONGO_LOG_DEFAULT_COMPONENT.
 #if defined(MONGO_LOG_DEFAULT_COMPONENT)
@@ -65,6 +66,7 @@ const ::mongo::logger::LogComponent MongoLogDefaultComponent_component =
     "mongo/util/log.h requires MONGO_LOG_DEFAULT_COMPONENT to be defined. " \
        "Please see http://www.mongodb.org/about/contributors/reference/server-logging-rules/ "
 #endif  // MONGO_LOG_DEFAULT_COMPONENT
+}  // namespace
 
 namespace mongo {
 

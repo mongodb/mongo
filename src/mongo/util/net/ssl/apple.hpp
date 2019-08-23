@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -41,7 +40,6 @@ namespace asio {
 namespace ssl {
 namespace apple {
 
-namespace {
 template <typename T>
 struct CFReleaser {
     void operator()(T ptr) {
@@ -50,7 +48,6 @@ struct CFReleaser {
         }
     }
 };
-}  // namespace
 
 /**
  * CoreFoundation types are internally refcounted using CFRetain/CFRelease.

@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -41,8 +40,7 @@
 #error "Cannot include mongo/util/version_constants.h"
 #endif
 
-namespace mongo {
-namespace version {
+namespace mongo::version {
 namespace {
 
 constexpr auto kVersion = "@mongo_version@"_sd;
@@ -55,11 +53,10 @@ constexpr auto kGitVersion = "@mongo_git_hash@"_sd;
 constexpr auto kAllocator = "@buildinfo_allocator@"_sd;
 constexpr auto kJsEngine = "@buildinfo_js_engine@"_sd;
 
-// TODO: In C++14, make these constexpr too.
+// TODO: Consider making these constexpr too.
 const std::initializer_list<StringData> kModulesList = @buildinfo_modules@;
 const std::initializer_list<VersionInfoInterface::BuildInfoTuple> kBuildEnvironment =
     @buildinfo_environment_data@;
 
 }  // namespace
-}  // namespace version
-}  // namespace mongo
+}  // namespace mongo::version
