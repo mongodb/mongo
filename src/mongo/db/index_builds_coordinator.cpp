@@ -955,26 +955,19 @@ void IndexBuildsCoordinator::_buildIndex(
         _indexBuildsManager.checkIndexConstraintViolations(opCtx, replState->buildUUID));
 
     auto collectionUUID = replState->collectionUUID;
-    auto onCommitFn = MultiIndexBlock::kNoopOnCommitFn;
-    auto onCreateEachFn = MultiIndexBlock::kNoopOnCreateEachFn;
-    if (IndexBuildProtocol::kTwoPhase == replState->protocol) {
-        // Two-phase index builds write one oplog entry for all indexes that are completed.
-        onCommitFn = [&] {
-            opCtx->getServiceContext()->getOpObserver()->onCommitIndexBuild(
-                opCtx,
-                nss,
-                collectionUUID,
-                replState->buildUUID,
-                replState->indexSpecs,
-                false /* fromMigrate */);
-        };
-    } else {
-        // Single-phase index builds write an oplog entry per index being built.
-        onCreateEachFn = [opCtx, &nss, &collectionUUID](const BSONObj& spec) {
-            opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                opCtx, nss, collectionUUID, spec, false);
-        };
-    }
+
+    // Generate both createIndexes and commitIndexBuild oplog entries.
+    // Secondaries currently interpret commitIndexBuild commands as noops.
+    auto opObserver = opCtx->getServiceContext()->getOpObserver();
+    auto fromMigrate = false;
+    auto onCommitFn = [&] {
+        opObserver->onCommitIndexBuild(
+            opCtx, nss, collectionUUID, replState->buildUUID, replState->indexSpecs, fromMigrate);
+    };
+
+    auto onCreateEachFn = [&](const BSONObj& spec) {
+        opObserver->onCreateIndex(opCtx, nss, collectionUUID, spec, fromMigrate);
+    };
 
     // Commit index build.
     uassertStatusOK(_indexBuildsManager.commitIndexBuild(

@@ -857,7 +857,9 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
 
           return commitIndexBuild(opCtx, nss, indexBuildUUID, indexesElem, mode);
       },
-      {}}},
+      // TODO(SERVER-39239): Remove NamespaceNotFound from acceptable errors for commitIndexBuild.
+      // It should be impossible to commit an index build on a dropped collection.
+      {ErrorCodes::NamespaceNotFound}}},
     {"abortIndexBuild",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
          // {
