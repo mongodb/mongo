@@ -601,15 +601,17 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
         // Get the next datum and add it to the builder.
         BulkBuilder::Sorter::Data data = it->next();
 
-        // Assert that keys are retrieved from the sorter in non-decreasing order.
+        // Assert that keys are retrieved from the sorter in non-decreasing order, but only in
+        // debug builds since this check can be expensive.
         int cmpData;
-        cmpData = data.first.compareWithoutRecordId(previousKey);
-
-        if (cmpData < 0) {
-            severe() << "expected the next key" << data.first.toString()
-                     << " to be greater than or equal to the previous key"
-                     << previousKey.toString();
-            fassertFailedNoTrace(31171);
+        if (kDebugBuild || _descriptor->unique()) {
+            cmpData = data.first.compareWithoutRecordId(previousKey);
+            if (cmpData < 0) {
+                severe() << "expected the next key" << data.first.toString()
+                         << " to be greater than or equal to the previous key"
+                         << previousKey.toString();
+                fassertFailedNoTrace(31171);
+            }
         }
 
         // Before attempting to insert, perform a duplicate key check.
