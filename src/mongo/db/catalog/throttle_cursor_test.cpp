@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/max_validate_mb_per_sec_gen.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -82,6 +83,15 @@ void ThrottleCursorTest::setUp() {
         wuow.commit();
     }
 
+    // Set a default tick rate of 500 milliseconds.
+    std::unique_ptr<ClockSourceMock> clkSource =
+        std::make_unique<AutoAdvancingClockSourceMock>(Milliseconds(500));
+
+    // Set the initial time to be 1000 milliseconds.
+    clkSource->advance(Milliseconds(999));
+
+    operationContext()->getServiceContext()->setFastClockSource(std::move(clkSource));
+
     _dataThrottle = std::make_shared<DataThrottle>();
 }
 
@@ -95,7 +105,7 @@ void ThrottleCursorTest::setMaxMbPerSec(int maxMbPerSec) {
 }
 
 Date_t ThrottleCursorTest::getTime() {
-    return Date_t::now();
+    return operationContext()->getServiceContext()->getFastClockSource()->now();
 }
 
 int64_t ThrottleCursorTest::getDifferenceInMillis(Date_t start, Date_t end) {
@@ -155,8 +165,8 @@ TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOn) {
         SeekableRecordThrottleCursor(opCtx, coll->getRecordStore(), _dataThrottle);
 
     // Using a throttle with a limit of 1MB per second, all operations should take at least 5
-    // seconds to finish and no longer than 5.1 seconds. We have 10 records, each of which is 0.5MB
-    // courtesy of the fail point, so 2 records per second.
+    // seconds to finish. We have 10 records, each of which is 0.5MB courtesy of the fail point, so
+    // 2 records per second.
     {
         setMaxMbPerSec(1);
         Date_t start = getTime();
@@ -172,15 +182,11 @@ TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOn) {
 
         ASSERT_EQ(numRecords, 10);
         ASSERT_TRUE(getDifferenceInMillis(start, end) >= 5000);
-        ASSERT_TRUE(getDifferenceInMillis(start, end) <= 5100);
     }
 
-    // Sleep for a full second to allow the throttle to reset.
-    sleepmillis(1000);
-
     // Using a throttle with a limit of 5MB per second, all operations should take at least 1
-    // second to finish and no longer than 1.1 seconds. We have 10 records, each of which is 0.5MB
-    // courtesy of the fail point, so 10 records per second.
+    // second to finish. We have 10 records, each of which is 0.5MB courtesy of the fail point, so
+    // 10 records per second.
     {
         setMaxMbPerSec(5);
         Date_t start = getTime();
@@ -196,7 +202,6 @@ TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOn) {
 
         ASSERT_EQ(numRecords, 10);
         ASSERT_TRUE(getDifferenceInMillis(start, end) >= 1000);
-        ASSERT_TRUE(getDifferenceInMillis(start, end) <= 1100);
     }
 }
 
@@ -238,8 +243,8 @@ TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOn) {
     SortedDataInterfaceThrottleCursor cursor = getIdIndex(coll);
 
     // Using a throttle with a limit of 1MB per second, all operations should take at least 5
-    // seconds to finish and no longer than 5.1 seconds. We have 10 records, each of which is 0.5MB
-    // courtesy of the fail point, so 2 records per second.
+    // seconds to finish. We have 10 records, each of which is 0.5MB courtesy of the fail point, so
+    // 2 records per second.
     {
         setMaxMbPerSec(1);
         Date_t start = getTime();
@@ -255,15 +260,11 @@ TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOn) {
 
         ASSERT_EQ(numRecords, 10);
         ASSERT_TRUE(getDifferenceInMillis(start, end) >= 5000);
-        ASSERT_TRUE(getDifferenceInMillis(start, end) <= 5100);
     }
 
-    // Sleep for a full second to allow the throttle to reset.
-    sleepmillis(1000);
-
     // Using a throttle with a limit of 5MB per second, all operations should take at least 1
-    // second to finish and no longer than 1.1 seconds. We have 10 records, each of which is 0.5MB
-    // courtesy of the fail point, so 10 records per second.
+    // second to finish. We have 10 records, each of which is 0.5MB courtesy of the fail point, so
+    // 10 records per second.
     {
         setMaxMbPerSec(5);
         Date_t start = getTime();
@@ -279,7 +280,6 @@ TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOn) {
 
         ASSERT_EQ(numRecords, 10);
         ASSERT_TRUE(getDifferenceInMillis(start, end) >= 1000);
-        ASSERT_TRUE(getDifferenceInMillis(start, end) <= 1100);
     }
 }
 
@@ -296,8 +296,10 @@ TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOff) {
 
     SortedDataInterfaceThrottleCursor indexCursor = getIdIndex(coll);
 
-    // With the data throttle off, all operations should finish within a second.
-    setMaxMbPerSec(0);
+    // With the data throttle off, all operations should finish within a second, regardless if
+    // the 'maxValidateMBperSec' server parameter is set.
+    _dataThrottle->turnThrottlingOff();
+    setMaxMbPerSec(10);
     Date_t start = getTime();
 
     ASSERT_TRUE(indexCursor.seek(opCtx, BSONObj()));
@@ -337,8 +339,8 @@ TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOn) {
     SortedDataInterfaceThrottleCursor indexCursor = getIdIndex(coll);
 
     // Using a throttle with a limit of 2MB per second, all operations should take at least 5
-    // seconds to finish and no longer than 5.1 seconds. We have 20 records, each of which is 0.5MB
-    // courtesy of the fail point, so 4 records per second.
+    // seconds to finish. We have 20 records, each of which is 0.5MB courtesy of the fail point, so
+    // 4 records per second.
     {
         setMaxMbPerSec(2);
         Date_t start = getTime();
@@ -356,12 +358,11 @@ TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOn) {
 
         ASSERT_EQ(numRecords, 20);
         ASSERT_TRUE(getDifferenceInMillis(start, end) >= 5000);
-        ASSERT_TRUE(getDifferenceInMillis(start, end) <= 5100);
     }
 
     // Using a throttle with a limit of 5MB per second, all operations should take at least 2
-    // seconds to finish and no longer than 2.1 seconds. We have 20 records, each of which is 0.5MB
-    // courtesy of the fail point, so 10 records per second.
+    // seconds to finish. We have 20 records, each of which is 0.5MB courtesy of the fail point, so
+    // 10 records per second.
     {
         setMaxMbPerSec(5);
         Date_t start = getTime();
@@ -379,7 +380,6 @@ TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOn) {
 
         ASSERT_EQ(numRecords, 20);
         ASSERT_TRUE(getDifferenceInMillis(start, end) >= 2000);
-        ASSERT_TRUE(getDifferenceInMillis(start, end) <= 2100);
     }
 }
 

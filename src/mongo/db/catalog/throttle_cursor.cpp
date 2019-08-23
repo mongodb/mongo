@@ -108,8 +108,8 @@ void DataThrottle::awaitIfNeeded(OperationContext* opCtx, const int64_t dataSize
         return;
     }
 
-    int64_t currentMillis = Date_t::now().toMillisSinceEpoch();
-
+    int64_t currentMillis =
+        opCtx->getServiceContext()->getFastClockSource()->now().toMillisSinceEpoch();
     invariant(_startMillis <= currentMillis);
 
     // Reset the tracked information as the second has rolled over the starting point.
@@ -127,8 +127,14 @@ void DataThrottle::awaitIfNeeded(OperationContext* opCtx, const int64_t dataSize
     }
 
     // Sleep until the second rolls over the starting point.
-    int64_t millisToSleep = 1000 - (currentMillis - _startMillis);
-    opCtx->sleepFor(Milliseconds(millisToSleep));
+    do {
+        int64_t millisToSleep = 1000 - (currentMillis - _startMillis);
+        invariant(millisToSleep >= 0);
+
+        opCtx->sleepFor(Milliseconds(millisToSleep));
+        currentMillis =
+            opCtx->getServiceContext()->getFastClockSource()->now().toMillisSinceEpoch();
+    } while (currentMillis < _startMillis + 1000);
 }
 
 }  // namespace mongo
