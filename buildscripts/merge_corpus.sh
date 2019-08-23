@@ -9,6 +9,11 @@ set -o errexit
 input="build/libfuzzer_tests.txt"
 corpus_dir="corpus"
 
+if [ ! -f $input ] || [ ! -d $corpus_dir ]; then
+    echo "Missing corpus information"
+    exit 0
+fi
+
 # We need to merge the corpus once it has been tested
 while IFS= read -r line
 do

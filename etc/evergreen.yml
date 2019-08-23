@@ -221,6 +221,18 @@ variables:
   - func: "save hang analyzer debugger files"
   - func: "save disk statistics"
   - func: "save system resource information"
+  - command: shell.exec
+    type: setup
+    params:
+      working_dir: src
+      shell: bash
+      script: |
+        set -o verbose
+        set -o errexit
+
+        ./buildscripts/merge_corpus.sh
+  - func: "archive new corpus"
+  - func: "upload new corpus"
   - func: "remove files"
     vars:
       files: >-
@@ -8347,19 +8359,6 @@ task_groups:
   tasks:
   - compile_libfuzzertests
   - libfuzzertests
-  teardown_task:
-  - command: shell.exec
-    type: setup
-    params:
-      working_dir: src
-      shell: bash
-      script: |
-        set -o verbose
-        set -o errexit
-
-        ./buildscripts/merge_corpus.sh
-  - func: "archive new corpus"
-  - func: "upload new corpus"
 - <<: *compile_task_group_template
   name: compile_all_run_unittests_TG
   tasks:
