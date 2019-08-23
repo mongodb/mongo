@@ -46,9 +46,7 @@ var $config = (function() {
 
             // Remove any files associated with the "from" namespace
             // to avoid having too many files open
-            var res = db.getSiblingDB(this.fromDBName).dropDatabase();
-            assertAlways.commandWorked(res);
-            assertAlways.eq(this.fromDBName, res.dropped);
+            assertAlways.commandWorked(db.getSiblingDB(this.fromDBName).dropDatabase());
 
             this.fromDBName = toDBName;
         }

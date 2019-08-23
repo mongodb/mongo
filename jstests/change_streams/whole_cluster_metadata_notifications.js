@@ -18,6 +18,13 @@ const adminDB = db.getSiblingDB("admin");
 assert.commandWorked(testDB1.dropDatabase());
 assert.commandWorked(testDB2.dropDatabase());
 
+// Create additional collections to prevent the databases from being closed when the other
+// collections are dropped.
+assert.commandWorkedOrFailedWithCode(testDB1.createCollection("unused"),
+                                     ErrorCodes.NamespaceExists);
+assert.commandWorkedOrFailedWithCode(testDB2.createCollection("unused"),
+                                     ErrorCodes.NamespaceExists);
+
 // Create one collection on each database.
 let [db1Coll, db2Coll] =
     [testDB1, testDB2].map((testDB) => assertDropAndRecreateCollection(testDB, "test"));

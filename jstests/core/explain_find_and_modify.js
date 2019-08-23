@@ -16,6 +16,11 @@
 var cName = "explain_find_and_modify";
 var t = db.getCollection(cName);
 
+// Create an additional collection to prevent the database from closing when the other collection is
+// dropped.
+assert.commandWorkedOrFailedWithCode(db.createCollection("explain_find_and_modify_unused"),
+                                     ErrorCodes.NamespaceExists);
+
 // Different types of findAndModify explain requests.
 var explainRemove = {explain: {findAndModify: cName, remove: true, query: {_id: 0}}};
 var explainUpdate = {explain: {findAndModify: cName, update: {$inc: {i: 1}}, query: {_id: 0}}};
