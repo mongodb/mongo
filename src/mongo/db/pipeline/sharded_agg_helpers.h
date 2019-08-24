@@ -98,10 +98,10 @@ std::vector<RemoteCursor> establishShardCursors(
     const NamespaceString& nss,
     const LiteParsedPipeline& litePipe,
     boost::optional<CachedCollectionRoutingInfo>& routingInfo,
+    const std::set<ShardId>& shardIds,
     const BSONObj& cmdObj,
     const AggregationRequest& request,
-    const ReadPreferenceSetting& readPref,
-    const BSONObj& shardQuery);
+    const ReadPreferenceSetting& readPref);
 
 BSONObj createCommandForTargetedShards(
     OperationContext* opCtx,
