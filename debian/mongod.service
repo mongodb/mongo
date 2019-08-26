@@ -26,7 +26,7 @@ TasksMax=infinity
 TasksAccounting=false
 
 # Recommended limits for for mongod as specified in
-# http://docs.mongodb.org/manual/reference/ulimit/#recommended-settings
+# https://docs.mongodb.com/manual/reference/ulimit/#recommended-ulimit-settings
 
 [Install]
 WantedBy=multi-user.target

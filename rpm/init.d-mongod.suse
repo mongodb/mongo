@@ -57,7 +57,7 @@ start()
   fi
 
   # Recommended ulimit values for mongod or mongos
-  # See http://docs.mongodb.org/manual/reference/ulimit/#recommended-settings
+  # See https://docs.mongodb.com/manual/reference/ulimit/#recommended-ulimit-settings
   #
   ulimit -f unlimited
   ulimit -t unlimited
