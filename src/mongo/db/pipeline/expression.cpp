@@ -2724,8 +2724,10 @@ Value ExpressionMultiply::evaluate(const Document& root, Variables* variables) c
                 decimalProduct = decimalProduct.multiply(val.coerceToDecimal());
             } else {
                 doubleProduct *= val.coerceToDouble();
-                if (mongoSignedMultiplyOverflow64(longProduct, val.coerceToLong(), &longProduct)) {
-                    // The 'longProduct' would have overflowed, so we're abandoning it.
+                if (!std::isfinite(val.coerceToDouble()) ||
+                    mongoSignedMultiplyOverflow64(longProduct, val.coerceToLong(), &longProduct)) {
+                    // The number is either Infinity or NaN, or the 'longProduct' would have
+                    // overflowed, so we're abandoning it.
                     productType = NumberDouble;
                 }
             }
