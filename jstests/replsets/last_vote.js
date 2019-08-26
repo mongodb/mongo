@@ -20,13 +20,8 @@ var rst = new ReplSetTest({
     nodes: 2,
 });
 rst.startSet();
-
-// Lower the election timeout to make the test run faster since it waits for multiple elections.
-var conf = rst.getReplSetConfig();
-conf.settings = {
-    electionTimeoutMillis: 6000,
-};
-rst.initiate(conf);
+// Initiate the set with a high election timeout so that there aren't any unplanned elections.
+rst.initiateWithHighElectionTimeout();
 
 const lastVoteNS = 'local.replset.election';
 
@@ -71,7 +66,8 @@ for (var i = 0; i < numElections; i++) {
             assertNodeHasLastVote(node, term, primary);
         });
     }
-    assert.commandWorked(primary.adminCommand({replSetStepDown: 60 * 10, force: true}));
+
+    rst.stepUp(secondary);
 
     // Make sure a new primary has been established.
     rst.waitForState(primary, ReplSetTest.State.SECONDARY);
@@ -94,7 +90,7 @@ jsTestLog("Stepping up node 1");
 rst.stepUp(rst.nodes[1]);
 
 jsTestLog("Reconfiguring cluster to make node 0 unelectable so it stays SECONDARY on restart");
-conf = rst.getReplSetConfigFromNode();
+let conf = rst.getReplSetConfigFromNode();
 conf.version++;
 conf.members[0].priority = 0;
 reconfig(rst, conf);
