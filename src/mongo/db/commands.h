@@ -225,12 +225,15 @@ struct CommandHelpers {
      */
     static bool shouldActivateFailCommandFailPoint(const BSONObj& data,
                                                    StringData cmdName,
-                                                   Client* client);
+                                                   Client* client,
+                                                   const NamespaceString& nss);
 
     /**
      * Possibly uasserts according to the "failCommand" fail point.
      */
-    static void evaluateFailCommandFailPoint(OperationContext* opCtx, StringData commandName);
+    static void evaluateFailCommandFailPoint(OperationContext* opCtx,
+                                             StringData commandName,
+                                             const NamespaceString& nss);
 
     /**
      * Handles marking kill on client disconnect.

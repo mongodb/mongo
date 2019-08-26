@@ -472,7 +472,8 @@ MONGO_FAIL_POINT_DEFINE(waitInCommandMarkKillOnClientDisconnect);
 
 bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
                                                         StringData cmdName,
-                                                        Client* client) {
+                                                        Client* client,
+                                                        const NamespaceString& nss) {
     if (cmdName == "configureFailPoint"_sd)  // Banned even if in failCommands.
         return false;
 
@@ -489,6 +490,10 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
         }
     }
 
+    if (data.hasField("namespace") && nss != NamespaceString(data.getStringField("namespace"))) {
+        return false;
+    }
+
     for (auto&& failCommand : data.getObjectField("failCommands")) {
         if (failCommand.type() == String && failCommand.valueStringData() == cmdName) {
             return true;
@@ -498,7 +503,9 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
     return false;
 }
 
-void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx, StringData commandName) {
+void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
+                                                  StringData commandName,
+                                                  const NamespaceString& nss) {
     bool closeConnection, hasErrorCode;
     long long errorCode;
 
@@ -509,7 +516,7 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx, Strin
         hasErrorCode = data.hasField("errorCode") &&
             bsonExtractIntegerField(data, "errorCode", &errorCode).isOK();
 
-        return shouldActivateFailCommandFailPoint(data, commandName, opCtx->getClient()) &&
+        return shouldActivateFailCommandFailPoint(data, commandName, opCtx->getClient(), nss) &&
             (closeConnection || hasErrorCode);
     }) {
         if (closeConnection) {

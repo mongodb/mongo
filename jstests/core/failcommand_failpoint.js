@@ -285,4 +285,47 @@ res = testDB.runCommand({insert: "test", documents: [{a: "something else"}]});
 assert.commandWorkedIgnoringWriteConcernErrors(res);
 assert.eq(res.writeConcernError, {code: 12345, errmsg: "hello"});
 assert.commandWorked(testDB.runCommand({insert: "test", documents: [{b: "or_other"}]}));
+
+//
+// Test that the namespace parameter is obeyed.
+//
+assert.commandWorked(adminDB.runCommand({
+    configureFailPoint: "failCommand",
+    mode: {times: 1},
+    data: {
+        errorCode: ErrorCodes.InternalError,
+        failCommands: ["find"],
+        namespace: testDB.getName() + ".foo",
+        threadName: threadName,
+    }
+}));
+
+// A find against a different namespace should not trigger the failpoint.
+assert.commandWorked(testDB.runCommand({find: "test"}));
+
+// A find against the namespace given to the failpoint should trigger the failpoint.
+assert.commandFailedWithCode(testDB.runCommand({find: "foo"}), ErrorCodes.InternalError);
+
+//
+// Test that the namespace parameter is obeyed for write concern errors.
+//
+assert.commandWorked(adminDB.runCommand({
+    configureFailPoint: "failCommand",
+    mode: {times: 1},
+    data: {
+        failCommands: ["insert"],
+        namespace: testDB.getName() + ".foo",
+        threadName: threadName,
+        writeConcernError: {code: ErrorCodes.InternalError, errmsg: "foo"},
+    }
+}));
+
+// An insert to a different namespace should not trigger the failpoint.
+assert.commandWorked(
+    testDB.runCommand({insert: "test", documents: [{x: "doc_for_namespace_no_wce"}]}));
+
+// An insert to the namespace given to the failpoint should trigger the failpoint.
+res = assert.commandWorkedIgnoringWriteConcernErrors(testDB.runCommand(
+    {insert: "foo", documents: [{x: "doc_for_namespace_case_should_trigger_wce"}]}));
+assert.eq(res.writeConcernError, {code: ErrorCodes.InternalError, errmsg: "foo"});
 }());
