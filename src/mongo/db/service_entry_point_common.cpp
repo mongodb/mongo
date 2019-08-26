@@ -571,7 +571,7 @@ bool runCommandImpl(OperationContext* opCtx,
         auto waitForWriteConcern = [&](auto&& bb) {
             MONGO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
                 return CommandHelpers::shouldActivateFailCommandFailPoint(
-                           data, request.getCommandName(), opCtx->getClient()) &&
+                           data, request.getCommandName(), opCtx->getClient(), invocation->ns()) &&
                     data.hasField("writeConcernError");
             }) {
                 bb.append(data.getData()["writeConcernError"]);
@@ -716,7 +716,7 @@ void execCommandDatabase(OperationContext* opCtx,
             replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet,
             opCtx->getServiceContext()->getStorageEngine()->supportsDocLocking());
 
-        CommandHelpers::evaluateFailCommandFailPoint(opCtx, command->getName());
+        CommandHelpers::evaluateFailCommandFailPoint(opCtx, command->getName(), invocation->ns());
 
         const auto dbname = request.getDatabase().toString();
         uassert(

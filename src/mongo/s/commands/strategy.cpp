@@ -300,7 +300,7 @@ void execCommandClient(OperationContext* opCtx,
 
         MONGO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
             return CommandHelpers::shouldActivateFailCommandFailPoint(
-                       data, request.getCommandName(), opCtx->getClient()) &&
+                       data, request.getCommandName(), opCtx->getClient(), invocation->ns()) &&
                 data.hasField("writeConcernError");
         }) {
             body.append(data.getData()["writeConcernError"]);
@@ -407,7 +407,7 @@ void runCommand(OperationContext* opCtx,
 
     boost::optional<RouterOperationContextSession> routerSession;
     try {
-        CommandHelpers::evaluateFailCommandFailPoint(opCtx, commandName);
+        CommandHelpers::evaluateFailCommandFailPoint(opCtx, commandName, invocation->ns());
         if (osi.getAutocommit()) {
             routerSession.emplace(opCtx);
 
