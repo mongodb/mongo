@@ -65,7 +65,7 @@ struct type_identity {
 };
 
 template <typename T>
-using type_identity_t = stdx::type_identity<T>;
+using type_identity_t = typename type_identity<T>::type;
 
 }  // namespace stdx
 }  // namespace mongo
