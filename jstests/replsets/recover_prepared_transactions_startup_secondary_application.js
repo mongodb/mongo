@@ -12,7 +12,10 @@ load("jstests/core/txns/libs/prepare_helpers.js");
 
 const replTest = new ReplSetTest({nodes: 2});
 const nodes = replTest.startSet();
-replTest.initiate();
+
+// Increase the election timeout to 24 hours so that we do not accidentally trigger an election
+// while the secondary is restarting.
+replTest.initiateWithHighElectionTimeout();
 
 const primary = replTest.getPrimary();
 let secondary = replTest.getSecondary();
