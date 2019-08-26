@@ -1063,6 +1063,51 @@ shellHelper.show = function(what) {
         }
     }
 
+    if (what == "nonGenuineMongoDBCheck") {
+        let matchesKnownImposterSignature = false;
+
+        // A MongoDB emulation service offered by a company
+        // responsible for a certain disk operating system.
+        try {
+            const buildInfo = db.runCommand({buildInfo: 1});
+            if (buildInfo.hasOwnProperty('_t')) {
+                matchesKnownImposterSignature = true;
+            }
+        } catch (e) {
+            // Don't do anything here. Just throw the error away.
+        }
+
+        // A MongoDB emulation service offered by a company named
+        // after some sort of minor river or something.
+        if (!matchesKnownImposterSignature) {
+            try {
+                const cmdLineOpts = db.adminCommand({getCmdLineOpts: 1});
+                if (cmdLineOpts.hasOwnProperty('errmsg') &&
+                    cmdLineOpts.errmsg.indexOf('not supported') !== -1) {
+                    matchesKnownImposterSignature = true;
+                }
+            } catch (e) {
+                // Don't do anything here. Just throw the error away.
+            }
+        }
+
+        if (matchesKnownImposterSignature) {
+            print("\n" + "Warning: Non-Genuine MongoDB Detected\n\n" +
+
+                  "This server or service appears to be an emulation of MongoDB " +
+                  "rather than an official MongoDB product.\n\n" +
+
+                  "Some documented MongoDB features may work differently, " +
+                  "be entirely missing or incomplete, " +
+                  "or have unexpected performance characteristics.\n\n" +
+
+                  "To learn more please visit: " +
+                  "https://dochub.mongodb.org/core/non-genuine-mongodb-server-warning.\n");
+        }
+
+        return "";
+    }
+
     throw Error("don't know how to show [" + what + "]");
 
 };
