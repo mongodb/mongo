@@ -1,6 +1,6 @@
 // Verifies currentOp returns the expected fields for idle and active transactions in basic cases.
 // More cases are covered in unit tests.
-// @tags: [uses_transactions]
+// @tags: [uses_transactions, uses_atclustertime]
 (function() {
 "use strict";
 
