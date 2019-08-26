@@ -65,7 +65,7 @@ try {
             autocommit: false,
             lsid: sessionId
         }),
-                                     ErrorCodes.ExceededTimeLimit);
+                                     ErrorCodes.TransactionExceededLifetimeLimitSeconds);
     }, tojson(session.getSessionId()), txnNumber, dbName, collName);
     workerThread.start();
 

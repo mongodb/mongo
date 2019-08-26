@@ -225,6 +225,12 @@ Status OperationContext::checkForInterruptNoAssert() noexcept {
 
     const auto killStatus = getKillStatus();
     if (killStatus != ErrorCodes::OK) {
+        if (killStatus == ErrorCodes::TransactionExceededLifetimeLimitSeconds)
+            return Status(
+                killStatus,
+                "operation was interrupted because the transaction exceeded the configured "
+                "'transactionLifetimeLimitSeconds'");
+
         return Status(killStatus, "operation was interrupted");
     }
 

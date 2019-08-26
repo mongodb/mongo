@@ -322,6 +322,8 @@ error_codes:
     # Internal only code used by WaitForMajorityService.
     - {code: 289, name: WaitForMajorityServiceEarlierOpTimeAvailable}
 
+    - {code: 290, name: TransactionExceededLifetimeLimitSeconds, categories: [ExceededTimeLimitError]}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

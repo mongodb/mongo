@@ -142,7 +142,7 @@ void killAllExpiredTransactions(OperationContext* opCtx) {
                                }
                            }
                        },
-                       ErrorCodes::ExceededTimeLimit);
+                       ErrorCodes::TransactionExceededLifetimeLimitSeconds);
 }
 
 void killSessionsLocalShutdownAllTransactions(OperationContext* opCtx) {
