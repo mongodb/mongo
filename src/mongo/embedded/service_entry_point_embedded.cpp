@@ -47,16 +47,17 @@ public:
         return false;
     }
 
+    void setPrepareConflictBehaviorForReadConcern(
+        OperationContext* opCtx, const CommandInvocation* invocation) const override {
+        mongo::setPrepareConflictBehaviorForReadConcern(
+            opCtx, repl::ReadConcernArgs::get(opCtx), PrepareConflictBehavior::kEnforce);
+    }
+
     void waitForReadConcern(OperationContext* opCtx,
                             const CommandInvocation* invocation,
                             const OpMsgRequest& request) const override {
-        const auto prepareConflictBehavior = invocation->canIgnorePrepareConflicts()
-            ? PrepareConflictBehavior::kIgnoreConflicts
-            : PrepareConflictBehavior::kEnforce;
-        auto rcStatus = mongo::waitForReadConcern(opCtx,
-                                                  repl::ReadConcernArgs::get(opCtx),
-                                                  invocation->allowsAfterClusterTime(),
-                                                  prepareConflictBehavior);
+        auto rcStatus = mongo::waitForReadConcern(
+            opCtx, repl::ReadConcernArgs::get(opCtx), invocation->allowsAfterClusterTime());
         uassertStatusOK(rcStatus);
     }
 

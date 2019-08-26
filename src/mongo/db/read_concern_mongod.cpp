@@ -205,35 +205,50 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime) {
 }
 
 /**
- * Returns the PrepareConflictBehavior that a command should use given the requested behavior and
- * readConcern options.
+ * Evaluates if it's safe for the command to ignore prepare conflicts.
  */
-PrepareConflictBehavior getPrepareBehaviorForReadConcern(
-    PrepareConflictBehavior requestedBehavior,
-    repl::ReadConcernLevel readConcernLevel,
-    boost::optional<LogicalTime> afterClusterTime,
-    boost::optional<LogicalTime> atClusterTime) {
-
+bool canIgnorePrepareConflicts(const repl::ReadConcernArgs& readConcernArgs) {
+    auto readConcernLevel = readConcernArgs.getLevel();
     // Only these read concern levels are eligible for ignoring prepare conflicts.
     if (readConcernLevel != repl::ReadConcernLevel::kLocalReadConcern &&
         readConcernLevel != repl::ReadConcernLevel::kAvailableReadConcern &&
         readConcernLevel != repl::ReadConcernLevel::kMajorityReadConcern) {
-        return PrepareConflictBehavior::kEnforce;
+        return false;
     }
+
+    auto afterClusterTime = readConcernArgs.getArgsAfterClusterTime();
+    auto atClusterTime = readConcernArgs.getArgsAtClusterTime();
 
     if (afterClusterTime || atClusterTime) {
-        return PrepareConflictBehavior::kEnforce;
+        return false;
     }
 
-    return requestedBehavior;
+    return true;
 }
+
 }  // namespace
 
-MONGO_REGISTER_SHIM(waitForReadConcern)
+MONGO_REGISTER_SHIM(setPrepareConflictBehaviorForReadConcern)
 (OperationContext* opCtx,
  const repl::ReadConcernArgs& readConcernArgs,
- bool allowAfterClusterTime,
  PrepareConflictBehavior prepareConflictBehavior)
+    ->void {
+    // DBDirectClient should inherit whether or not to ignore prepare conflicts from its parent.
+    if (opCtx->getClient()->isInDirectClient()) {
+        return;
+    }
+
+    // Enforce prepare conflict behavior if the command is not eligible to ignore prepare conflicts.
+    if (!(prepareConflictBehavior == PrepareConflictBehavior::kEnforce ||
+          canIgnorePrepareConflicts(readConcernArgs))) {
+        prepareConflictBehavior = PrepareConflictBehavior::kEnforce;
+    }
+
+    opCtx->recoveryUnit()->setPrepareConflictBehavior(prepareConflictBehavior);
+}
+
+MONGO_REGISTER_SHIM(waitForReadConcern)
+(OperationContext* opCtx, const repl::ReadConcernArgs& readConcernArgs, bool allowAfterClusterTime)
     ->Status {
     // If we are in a direct client within a transaction, then we may be holding locks, so it is
     // illegal to wait for read concern. This is fine, since the outer operation should have handled
@@ -363,15 +378,6 @@ MONGO_REGISTER_SHIM(waitForReadConcern)
         LOG(debugLevel) << "Using 'committed' snapshot: " << CurOp::get(opCtx)->opDescription()
                         << " with readTs: " << opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
     }
-
-    // DBDirectClient should inherit whether or not to ignore prepare conflicts from its parent.
-    if (!opCtx->getClient()->isInDirectClient()) {
-        // Set whether this command should ignore prepare conflicts or not.
-        const auto behavior = getPrepareBehaviorForReadConcern(
-            prepareConflictBehavior, readConcernArgs.getLevel(), afterClusterTime, atClusterTime);
-        opCtx->recoveryUnit()->setPrepareConflictBehavior(behavior);
-    }
-
     return Status::OK();
 }
 

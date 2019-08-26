@@ -31,6 +31,7 @@
 
 namespace mongo {
 
+MONGO_DEFINE_SHIM(setPrepareConflictBehaviorForReadConcern);
 MONGO_DEFINE_SHIM(waitForReadConcern);
 MONGO_DEFINE_SHIM(waitForLinearizableReadConcern);
 MONGO_DEFINE_SHIM(waitForSpeculativeMajorityReadConcern);

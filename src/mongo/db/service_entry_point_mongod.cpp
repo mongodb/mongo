@@ -64,17 +64,20 @@ public:
         return mongo::lockedForWriting();
     }
 
-    void waitForReadConcern(OperationContext* opCtx,
-                            const CommandInvocation* invocation,
-                            const OpMsgRequest& request) const override {
+    void setPrepareConflictBehaviorForReadConcern(
+        OperationContext* opCtx, const CommandInvocation* invocation) const override {
         const auto prepareConflictBehavior = invocation->canIgnorePrepareConflicts()
             ? PrepareConflictBehavior::kIgnoreConflicts
             : PrepareConflictBehavior::kEnforce;
+        mongo::setPrepareConflictBehaviorForReadConcern(
+            opCtx, repl::ReadConcernArgs::get(opCtx), prepareConflictBehavior);
+    }
 
-        Status rcStatus = mongo::waitForReadConcern(opCtx,
-                                                    repl::ReadConcernArgs::get(opCtx),
-                                                    invocation->allowsAfterClusterTime(),
-                                                    prepareConflictBehavior);
+    void waitForReadConcern(OperationContext* opCtx,
+                            const CommandInvocation* invocation,
+                            const OpMsgRequest& request) const override {
+        Status rcStatus = mongo::waitForReadConcern(
+            opCtx, repl::ReadConcernArgs::get(opCtx), invocation->allowsAfterClusterTime());
 
         if (!rcStatus.isOK()) {
             if (ErrorCodes::isExceededTimeLimitError(rcStatus.code())) {

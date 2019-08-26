@@ -33,11 +33,14 @@
 
 namespace mongo {
 
-MONGO_REGISTER_SHIM(waitForReadConcern)
+MONGO_REGISTER_SHIM(setPrepareConflictBehaviorForReadConcern)
 (OperationContext* opCtx,
  const repl::ReadConcernArgs& readConcernArgs,
- bool allowAfterClusterTime,
- PrepareConflictBehavior prepareConflictBehavior)
+ PrepareConflictBehavior requestedPrepareConflictBehavior)
+    ->void {}
+
+MONGO_REGISTER_SHIM(waitForReadConcern)
+(OperationContext* opCtx, const repl::ReadConcernArgs& readConcernArgs, bool allowAfterClusterTime)
     ->Status {
     if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kLinearizableReadConcern) {
         return {ErrorCodes::NotImplemented, "linearizable read concern not supported on embedded"};

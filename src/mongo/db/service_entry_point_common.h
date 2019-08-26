@@ -60,6 +60,8 @@ struct ServiceEntryPointCommon {
     public:
         virtual ~Hooks();
         virtual bool lockedForWriting() const = 0;
+        virtual void setPrepareConflictBehaviorForReadConcern(
+            OperationContext* opCtx, const CommandInvocation* invocation) const = 0;
         virtual void waitForReadConcern(OperationContext* opCtx,
                                         const CommandInvocation* invocation,
                                         const OpMsgRequest& request) const = 0;

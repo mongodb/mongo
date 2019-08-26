@@ -892,6 +892,7 @@ void execCommandDatabase(OperationContext* opCtx,
         }
 
         behaviors.waitForReadConcern(opCtx, invocation.get(), request);
+        behaviors.setPrepareConflictBehaviorForReadConcern(opCtx, invocation.get());
 
         try {
             if (!runCommandImpl(opCtx,
