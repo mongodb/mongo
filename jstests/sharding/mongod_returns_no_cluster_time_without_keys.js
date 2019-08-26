@@ -28,18 +28,25 @@ const rUser = {
     username: "r",
     password: "bar"
 };
+const timeoutValidLogicalTimeMs = 20 * 1000;
 
-function assertContainsValidLogicalTime(res) {
-    assert.hasFields(res, ["$clusterTime"]);
-    assert.hasFields(res.$clusterTime, ["signature", "clusterTime"]);
-    // clusterTime must be greater than the uninitialzed value.
-    assert.hasFields(res.$clusterTime.signature, ["hash", "keyId"]);
-    // The signature must have been signed by a key with a valid generation.
-    assert(res.$clusterTime.signature.keyId > NumberLong(0));
+function assertContainsValidLogicalTime(adminConn) {
+    try {
+        const res = adminConn.runCommand({isMaster: 1});
+        assert.hasFields(res, ["$clusterTime"]);
+        assert.hasFields(res.$clusterTime, ["signature", "clusterTime"]);
+        // clusterTime must be greater than the uninitialzed value.
+        assert.hasFields(res.$clusterTime.signature, ["hash", "keyId"]);
+        // The signature must have been signed by a key with a valid generation.
+        assert(res.$clusterTime.signature.keyId > NumberLong(0));
 
-    assert.hasFields(res, ["operationTime"]);
-    assert(Object.prototype.toString.call(res.operationTime) === "[object Timestamp]",
-           "operationTime must be a timestamp");
+        assert.hasFields(res, ["operationTime"]);
+        assert(Object.prototype.toString.call(res.operationTime) === "[object Timestamp]",
+               "operationTime must be a timestamp");
+        return true;
+    } catch (error) {
+        return false;
+    }
 }
 
 let st = new ShardingTest({shards: {rs0: {nodes: 2}}, other: {keyFile: keyFile}});
@@ -54,10 +61,14 @@ assert(st.s.getDB("admin").system.keys.count() >= 2);
 
 let priRSConn = st.rs0.getPrimary().getDB("admin");
 priRSConn.createUser({user: rUser.username, pwd: rUser.password, roles: ["root"]});
-
 priRSConn.auth(rUser.username, rUser.password);
-const resWithKeys = priRSConn.runCommand({isMaster: 1});
-assertContainsValidLogicalTime(resWithKeys);
+
+// use assert.soon since it's possible the shard primary may not have refreshed
+// and loaded the keys into its KeyManager cache.
+assert.soon(function() {
+    return assertContainsValidLogicalTime(priRSConn);
+}, "Failed to assert valid logical time", timeoutValidLogicalTimeMs);
+
 priRSConn.logout();
 
 // Enable the failpoint, remove all keys, and restart the config servers with the failpoint
