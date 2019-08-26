@@ -63,7 +63,7 @@ function CollectionValidator() {
 
             if (!res.ok || !res.valid) {
                 if (jsTest.options().skipValidationOnNamespaceNotFound &&
-                    res.errmsg === 'ns not found') {
+                    res.codeName === "NamespaceNotFound") {
                     // During a 'stopStart' backup/restore on the secondary node, the actual list of
                     // collections can be out of date if ops are still being applied from the oplog.
                     // In this case we skip the collection if the ns was not found at time of
