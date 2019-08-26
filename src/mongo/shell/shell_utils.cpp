@@ -120,6 +120,7 @@ extern const JSFile servers;
 extern const JSFile shardingtest;
 extern const JSFile servers_misc;
 extern const JSFile replsettest;
+extern const JSFile data_consistency_checker;
 extern const JSFile bridge;
 }  // namespace JSFiles
 
@@ -403,6 +404,7 @@ void initScope(Scope& scope) {
     scope.execSetup(JSFiles::shardingtest);
     scope.execSetup(JSFiles::servers_misc);
     scope.execSetup(JSFiles::replsettest);
+    scope.execSetup(JSFiles::data_consistency_checker);
     scope.execSetup(JSFiles::bridge);
 
     initializeEnterpriseScope(scope);
