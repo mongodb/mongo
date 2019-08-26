@@ -785,8 +785,6 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedCommitTest) {
     opCtx()->setWriteUnitOfWork(nullptr);
     opCtx()->lockState()->unsetMaxLockTimeout();
 
-    txnParticipant.transitionToCommittingWithPrepareforTest(opCtx());
-
     {
         Lock::GlobalLock lk(opCtx(), MODE_IX);
         opObserver().onPreparedTransactionCommit(
@@ -1079,7 +1077,6 @@ TEST_F(OpObserverTransactionTest, CommittingPreparedTransactionWritesToTransacti
     opCtx()->setWriteUnitOfWork(nullptr);
     opCtx()->lockState()->unsetMaxLockTimeout();
 
-    txnParticipant.transitionToCommittingWithPrepareforTest(opCtx());
     {
         Lock::GlobalLock lk(opCtx(), MODE_IX);
         opObserver().onPreparedTransactionCommit(
@@ -1768,7 +1765,6 @@ TEST_F(OpObserverMultiEntryTransactionTest, CommitPreparedTest) {
     // commitTimestamp must be greater than the prepareTimestamp.
     auto commitTimestamp = Timestamp(prepareTimestamp.getSecs(), prepareTimestamp.getInc() + 1);
 
-    txnParticipant.transitionToCommittingWithPrepareforTest(opCtx());
     {
         Lock::GlobalLock lk(opCtx(), MODE_IX);
         opObserver().onPreparedTransactionCommit(
@@ -2038,7 +2034,6 @@ TEST_F(OpObserverMultiEntryTransactionTest, CommitPreparedPackingTest) {
     // commitTimestamp must be greater than the prepareTimestamp.
     auto commitTimestamp = Timestamp(prepareTimestamp.getSecs(), prepareTimestamp.getInc() + 1);
 
-    txnParticipant.transitionToCommittingWithPrepareforTest(opCtx());
     opObserver().onPreparedTransactionCommit(
         opCtx(),
         commitSlot,

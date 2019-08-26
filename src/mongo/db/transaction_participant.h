@@ -92,12 +92,10 @@ class TransactionParticipant {
             kNone = 1 << 0,
             kInProgress = 1 << 1,
             kPrepared = 1 << 2,
-            kCommittingWithoutPrepare = 1 << 3,
-            kCommittingWithPrepare = 1 << 4,
-            kCommitted = 1 << 5,
-            kAbortedWithoutPrepare = 1 << 6,
-            kAbortedWithPrepare = 1 << 7,
-            kExecutedRetryableWrite = 1 << 8,
+            kCommitted = 1 << 3,
+            kAbortedWithoutPrepare = 1 << 4,
+            kAbortedWithPrepare = 1 << 5,
+            kExecutedRetryableWrite = 1 << 6,
         };
 
         using StateSet = int;
@@ -128,14 +126,6 @@ class TransactionParticipant {
 
         bool isPrepared() const {
             return _state == kPrepared;
-        }
-
-        bool isCommittingWithoutPrepare() const {
-            return _state == kCommittingWithoutPrepare;
-        }
-
-        bool isCommittingWithPrepare() const {
-            return _state == kCommittingWithPrepare;
         }
 
         bool isCommitted() const {
@@ -630,11 +620,6 @@ public:
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             o(lk).prepareOpTime = prepareOpTime;
             o(lk).txnState.transitionTo(TransactionState::kPrepared);
-        }
-
-        void transitionToCommittingWithPrepareforTest(OperationContext* opCtx) {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
-            o(lk).txnState.transitionTo(TransactionState::kCommittingWithPrepare);
         }
 
         void transitionToAbortedWithoutPrepareforTest(OperationContext* opCtx) {

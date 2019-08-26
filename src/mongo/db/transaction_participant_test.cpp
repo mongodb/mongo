@@ -1193,30 +1193,6 @@ TEST_F(TxnParticipantTest, CannotInsertInPreparedTransaction) {
     ASSERT(_opObserver->transactionPrepared);
 }
 
-DEATH_TEST_F(TxnParticipantTest,
-             AbortIsIllegalDuringCommittingPreparedTransaction,
-             "isCommittingWithPrepare") {
-    auto outerScopedSession = checkOutSession();
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-
-    txnParticipant.unstashTransactionResources(opCtx(), "insert");
-    auto operation = repl::OplogEntry::makeInsertOperation(kNss, _uuid, BSON("TestValue" << 0));
-
-    txnParticipant.addTransactionOperation(opCtx(), operation);
-    auto prepareTimestamp = txnParticipant.prepareTransaction(opCtx(), {});
-
-    _opObserver->onPreparedTransactionCommitFn =
-        [&](OplogSlot commitOplogEntryOpTime,
-            Timestamp commitTimestamp,
-            const std::vector<repl::ReplOperation>& statements) {
-            // Hit an invariant. This should never happen.
-            txnParticipant.abortTransaction(opCtx());
-            ASSERT_FALSE(txnParticipant.transactionIsAborted());
-        };
-
-    txnParticipant.commitPreparedTransaction(opCtx(), prepareTimestamp, {});
-}
-
 TEST_F(TxnParticipantTest, CannotContinueNonExistentTransaction) {
     MongoDOperationContextSession opCtxSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
