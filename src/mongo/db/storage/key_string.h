@@ -803,6 +803,14 @@ size_t getKeySize(const char* buffer, size_t len, Ordering ord, const TypeBits& 
 BSONObj toBson(StringData data, Ordering ord, const TypeBits& types);
 BSONObj toBson(const char* buffer, size_t len, Ordering ord, const TypeBits& types) noexcept;
 BSONObj toBsonSafe(const char* buffer, size_t len, Ordering ord, const TypeBits& types);
+BSONObj toBsonSafeWithDiscriminator(const char* buffer,
+                                    size_t len,
+                                    Ordering ord,
+                                    const TypeBits& typeBits);
+Discriminator decodeDiscriminator(const char* buffer,
+                                  size_t len,
+                                  Ordering ord,
+                                  const TypeBits& typeBits);
 
 template <class T>
 BSONObj toBson(const T& keyString, Ordering ord) noexcept {

@@ -123,10 +123,10 @@ public:
         virtual boost::optional<IndexKeyEntry> seek(const BSONObj& key,
                                                     bool inclusive,
                                                     RequestedInfo parts = kKeyAndLoc) override;
-        virtual boost::optional<IndexKeyEntry> seek(const IndexSeekPoint& seekPoint,
+        virtual boost::optional<IndexKeyEntry> seek(const KeyString::Value& keyString,
                                                     RequestedInfo parts = kKeyAndLoc) override;
-        virtual boost::optional<KeyStringEntry> seek(const KeyString::Value& keyStringValue,
-                                                     bool inclusive) override;
+        virtual boost::optional<KeyStringEntry> seekForKeyString(
+            const KeyString::Value& keyStringValue) override;
         virtual boost::optional<IndexKeyEntry> seekExact(const BSONObj& key,
                                                          RequestedInfo parts = kKeyAndLoc) override;
         virtual boost::optional<KeyStringEntry> seekExact(
@@ -142,9 +142,8 @@ public:
         // This is a helper function to check if the cursor is valid or not.
         bool checkCursorValid();
         // This is a helper function for seek.
-        boost::optional<IndexKeyEntry> seekAfterProcessing(BSONObj finalKey, bool inclusive);
-        boost::optional<KeyStringEntry> seekAfterProcessing(const KeyString::Value& keyString,
-                                                            bool inclusive);
+        boost::optional<IndexKeyEntry> seekAfterProcessing(BSONObj finalKey);
+        boost::optional<KeyStringEntry> seekAfterProcessing(const KeyString::Value& keyString);
         OperationContext* _opCtx;
         // This is the "working copy" of the master "branch" in the git analogy.
         StringStore* _workingCopy;

@@ -324,10 +324,11 @@ public:
             return *_it;
         }
 
-        boost::optional<IndexKeyEntry> seek(const IndexSeekPoint& seekPoint,
-                                            RequestedInfo) override {
-            // Query encodes exclusive case so it can be treated as an inclusive query.
-            const BSONObj query = IndexEntryComparison::makeQueryObject(seekPoint, _forward);
+        boost::optional<IndexKeyEntry> seek(
+            const KeyString::Value& keyString,
+            RequestedInfo parts = RequestedInfo::kKeyAndLoc) override {
+            const BSONObj query = KeyString::toBsonSafeWithDiscriminator(
+                keyString.getBuffer(), keyString.getSize(), _ordering, keyString.getTypeBits());
             locate(query, _forward ? RecordId::min() : RecordId::max());
             _lastMoveWasRestore = false;
             if (_isEOF)
@@ -336,17 +337,12 @@ public:
             return *_it;
         }
 
-        boost::optional<KeyStringEntry> seek(const KeyString::Value& keyStringValue,
-                                             bool inclusive) override {
-            const BSONObj query = KeyString::toBson(keyStringValue.getBuffer(),
-                                                    keyStringValue.getSize(),
-                                                    _ordering,
-                                                    keyStringValue.getTypeBits());
-            auto kv = seek(query, inclusive, kKeyAndLoc);
-            if (kv) {
-                KeyString::Builder ks(KeyString::Version::V1, kv->key, _ordering);
-                ks.appendRecordId(kv->loc);
-                return KeyStringEntry(ks.getValueCopy(), kv->loc);
+        boost::optional<KeyStringEntry> seekForKeyString(const KeyString::Value& keyStringValue) {
+            auto indexKeyEntry = seek(keyStringValue);
+            if (indexKeyEntry) {
+                KeyString::Builder builder(KeyString::Version::V1, indexKeyEntry->key, _ordering);
+                builder.appendRecordId(indexKeyEntry->loc);
+                return KeyStringEntry(builder.getValueCopy(), indexKeyEntry->loc);
             } else {
                 return {};
             }

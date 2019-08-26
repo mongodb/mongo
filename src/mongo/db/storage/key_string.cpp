@@ -2380,6 +2380,94 @@ size_t getKeySize(const char* buffer, size_t len, Ordering ord, const TypeBits& 
     return (len - (remainingBytes - 1));
 }
 
+// Unlike toBsonSafe(), this function will convert the discriminator byte back.
+// This discriminator byte only exists in KeyStrings for queries, not in KeyStrings stored in an
+// index. This function is only used by EphemeralForTest because it uses BSON with discriminator
+// rather than KeyString to compare.
+BSONObj toBsonSafeWithDiscriminator(const char* buffer,
+                                    size_t len,
+                                    Ordering ord,
+                                    const TypeBits& typeBits) {
+    boost::optional<std::string> discriminatorBit;
+    int fieldNo = -1;
+
+    // First pass, get the discriminatorBit if there is any.
+    {
+        BSONObjBuilder builder;
+        BufReader reader(buffer, len);
+        TypeBits::Reader typeBitsReader(typeBits);
+        for (int i = 0; reader.remaining(); i++) {
+            const bool invert = (ord.get(i) == -1);
+            uint8_t ctype = readType<uint8_t>(&reader, invert);
+            if (ctype == kLess || ctype == kGreater) {
+                discriminatorBit = ctype == kLess ? "l" : "r";
+                fieldNo = i - 1;
+                ctype = readType<uint8_t>(&reader, invert);
+                invariant(ctype == kEnd);
+            }
+
+            if (ctype == kEnd) {
+                break;
+            }
+
+            toBsonValue(
+                ctype, &reader, &typeBitsReader, invert, typeBits.version, &(builder << ""), 1);
+        }
+        // Early return if there is no discriminatorBit.
+        if (!discriminatorBit)
+            return builder.obj();
+    }
+
+    // Second pass, add discriminatorBit as the fieldName.
+    {
+        BSONObjBuilder builder;
+        BufReader reader(buffer, len);
+        TypeBits::Reader typeBitsReader(typeBits);
+        for (int i = 0; reader.remaining(); i++) {
+            const bool invert = (ord.get(i) == -1);
+            uint8_t ctype = readType<uint8_t>(&reader, invert);
+            if (ctype == kLess || ctype == kGreater) {
+                ctype = readType<uint8_t>(&reader, invert);
+                invariant(ctype == kEnd);
+            }
+
+            if (ctype == kEnd) {
+                break;
+            }
+
+            auto fn = i == fieldNo ? discriminatorBit.get() : "";
+            toBsonValue(
+                ctype, &reader, &typeBitsReader, invert, typeBits.version, &(builder << fn), 1);
+        }
+        return builder.obj();
+    }
+}
+
+// This discriminator byte only exists in KeyStrings for queries, not in KeyStrings stored in an
+// index. This function is only used by Biggie because it needs to extract the discriminator to do
+// the query.
+Discriminator decodeDiscriminator(const char* buffer,
+                                  size_t len,
+                                  Ordering ord,
+                                  const TypeBits& typeBits) {
+    BSONObjBuilder builder;
+    BufReader reader(buffer, len);
+    TypeBits::Reader typeBitsReader(typeBits);
+    for (int i = 0; reader.remaining(); i++) {
+        const bool invert = (ord.get(i) == -1);
+        uint8_t ctype = readType<uint8_t>(&reader, invert);
+        if (ctype == kLess || ctype == kGreater) {
+            return ctype == kLess ? Discriminator::kExclusiveBefore
+                                  : Discriminator::kExclusiveAfter;
+        }
+
+        if (ctype == kEnd)
+            break;
+        toBsonValue(ctype, &reader, &typeBitsReader, invert, typeBits.version, &(builder << ""), 1);
+    }
+    return Discriminator::kInclusive;
+}
+
 BSONObj toBsonSafe(const char* buffer, size_t len, Ordering ord, const TypeBits& typeBits) {
     BSONObjBuilder builder;
     BufReader reader(buffer, len);

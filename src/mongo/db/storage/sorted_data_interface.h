@@ -283,16 +283,19 @@ public:
                                                     RequestedInfo parts = kKeyAndLoc) = 0;
 
         /**
-         * Seeks to the position described by seekPoint and returns the current position.
-         *
-         * NOTE: most implementations should just pass seekPoint to
-         * IndexEntryComparison::makeQueryObject().
+         * Seeks to the provided keyString and returns the KeyStringEntry.
+         * The provided keyString has discriminator information encoded.
          */
-        virtual boost::optional<IndexKeyEntry> seek(const IndexSeekPoint& seekPoint,
+        virtual boost::optional<KeyStringEntry> seekForKeyString(
+            const KeyString::Value& keyString) = 0;
+
+        /**
+         * Seeks to the provided keyString and returns the IndexKeyEntry.
+         * The provided keyString has discriminator information encoded.
+         */
+        virtual boost::optional<IndexKeyEntry> seek(const KeyString::Value& keyString,
                                                     RequestedInfo parts = kKeyAndLoc) = 0;
 
-        virtual boost::optional<KeyStringEntry> seek(const KeyString::Value& keyString,
-                                                     bool inclusive) = 0;
         /**
          * Seeks to a key with a hint to the implementation that you only want exact matches. If
          * an exact match can't be found, boost::none will be returned and the resulting

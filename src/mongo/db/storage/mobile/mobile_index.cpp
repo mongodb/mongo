@@ -413,29 +413,24 @@ public:
             : KeyString::Discriminator::kExclusiveAfter;
         _startPosition.resetToKey(
             BSONObj::stripFieldNames(key), _index.getOrdering(), discriminator);
-        seek(_startPosition.getValueCopy(), inclusive /* unused by implementation */);
+        seekForKeyString(_startPosition.getValueCopy());
         if (_isEOF) {
             return {};
         }
         return getCurrentEntry(parts);
     }
 
-    boost::optional<IndexKeyEntry> seek(const IndexSeekPoint& seekPoint,
+    boost::optional<IndexKeyEntry> seek(const KeyString::Value& keyString,
                                         RequestedInfo parts) override {
-        BSONObj startKey = IndexEntryComparison::makeQueryObject(seekPoint, _isForward);
-
-        const auto discriminator = _isForward ? KeyString::Discriminator::kExclusiveBefore
-                                              : KeyString::Discriminator::kExclusiveAfter;
-        _startPosition.resetToKey(startKey, _index.getOrdering(), discriminator);
-
-        seek(_startPosition.getValueCopy(), true /* unused by implementation */);
+        seekForKeyString(keyString);
         if (_isEOF) {
             return {};
         }
         return getCurrentEntry(parts);
     }
 
-    boost::optional<KeyStringEntry> seek(const KeyString::Value& keyStringValue, bool) override {
+    boost::optional<KeyStringEntry> seekForKeyString(
+        const KeyString::Value& keyStringValue) override {
         _startPosition.resetFromBuffer(keyStringValue.getBuffer(), keyStringValue.getSize());
         _doSeek();
         _updatePosition();
@@ -484,7 +479,7 @@ public:
     }
 
     boost::optional<KeyStringEntry> seekExact(const KeyString::Value& keyStringValue) override {
-        auto ksEntry = seek(keyStringValue, true);
+        auto ksEntry = seekForKeyString(keyStringValue);
         if (!ksEntry) {
             return {};
         }

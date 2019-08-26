@@ -729,12 +729,11 @@ boost::optional<IndexKeyEntry> SortedDataInterface::Cursor::next(RequestedInfo p
     return keyStringToIndexKeyEntry(_reverseIt->first, _reverseIt->second, _order);
 }
 
-boost::optional<IndexKeyEntry> SortedDataInterface::Cursor::seekAfterProcessing(BSONObj finalKey,
-                                                                                bool inclusive) {
+boost::optional<IndexKeyEntry> SortedDataInterface::Cursor::seekAfterProcessing(BSONObj finalKey) {
     std::string workingCopyBound;
 
     KeyString::Builder ks(KeyString::Version::V1, finalKey, _order);
-    auto ksEntry = seekAfterProcessing(ks.getValueCopy(), inclusive);
+    auto ksEntry = seekAfterProcessing(ks.getValueCopy());
 
     const BSONObj bson = KeyString::toBson(ksEntry->keyString.getBuffer(),
                                            ksEntry->keyString.getSize(),
@@ -744,7 +743,24 @@ boost::optional<IndexKeyEntry> SortedDataInterface::Cursor::seekAfterProcessing(
 }
 
 boost::optional<KeyStringEntry> SortedDataInterface::Cursor::seekAfterProcessing(
-    const KeyString::Value& keyStringVal, bool inclusive) {
+    const KeyString::Value& keyStringVal) {
+
+    KeyString::Discriminator discriminator = KeyString::decodeDiscriminator(
+        keyStringVal.getBuffer(), keyStringVal.getSize(), _order, keyStringVal.getTypeBits());
+
+    bool inclusive;
+    switch (discriminator) {
+        case KeyString::Discriminator::kInclusive:
+            inclusive = true;
+            break;
+        case KeyString::Discriminator::kExclusiveBefore:
+            inclusive = _forward;
+            break;
+        case KeyString::Discriminator::kExclusiveAfter:
+            inclusive = !_forward;
+            break;
+    }
+
     std::string workingCopyBound;
     // Similar to above, if forward and inclusive or reverse and not inclusive, then use min() for
     // recordId. Else, we should use max().
@@ -818,23 +834,15 @@ boost::optional<IndexKeyEntry> SortedDataInterface::Cursor::seek(const BSONObj& 
                                                                  bool inclusive,
                                                                  RequestedInfo) {
     BSONObj finalKey = BSONObj::stripFieldNames(key);
-    KeyString::Builder keyString(KeyString::Version::V1, finalKey, _order);
-    auto ksValue = seek(keyString.getValueCopy(), inclusive);
-    if (ksValue) {
-        BSONObj bson = KeyString::toBson(ksValue->keyString.getBuffer(),
-                                         ksValue->keyString.getSize(),
-                                         _order,
-                                         ksValue->keyString.getTypeBits());
-        return IndexKeyEntry(bson, ksValue->loc);
-    }
-    return boost::none;
+    const auto discriminator = _forward == inclusive ? KeyString::Discriminator::kExclusiveBefore
+                                                     : KeyString::Discriminator::kExclusiveAfter;
+    KeyString::Builder keyString(KeyString::Version::V1, finalKey, _order, discriminator);
+    return seek(keyString.getValueCopy());
 }
 
-boost::optional<IndexKeyEntry> SortedDataInterface::Cursor::seek(const IndexSeekPoint& seekPoint,
+boost::optional<IndexKeyEntry> SortedDataInterface::Cursor::seek(const KeyString::Value& keyString,
                                                                  RequestedInfo parts) {
-    const BSONObj key = IndexEntryComparison::makeQueryObject(seekPoint, _forward);
-    KeyString::Builder keyString(KeyString::Version::V1, key, _order);
-    auto ksValue = seek(keyString.getValueCopy(), true);
+    boost::optional<KeyStringEntry> ksValue = seekForKeyString(keyString);
     if (ksValue) {
         BSONObj bson = KeyString::toBson(ksValue->keyString.getBuffer(),
                                          ksValue->keyString.getSize(),
@@ -845,11 +853,11 @@ boost::optional<IndexKeyEntry> SortedDataInterface::Cursor::seek(const IndexSeek
     return boost::none;
 }
 
-boost::optional<KeyStringEntry> SortedDataInterface::Cursor::seek(
-    const KeyString::Value& keyStringValue, bool inclusive) {
+boost::optional<KeyStringEntry> SortedDataInterface::Cursor::seekForKeyString(
+    const KeyString::Value& keyStringValue) {
     _lastMoveWasRestore = false;
     _atEOF = false;
-    return seekAfterProcessing(keyStringValue, inclusive);
+    return seekAfterProcessing(keyStringValue);
 }
 
 boost::optional<IndexKeyEntry> SortedDataInterface::Cursor::seekExact(const BSONObj& key,
@@ -862,7 +870,7 @@ boost::optional<IndexKeyEntry> SortedDataInterface::Cursor::seekExact(const BSON
                                                ksEntry->keyString.getSize(),
                                                _order,
                                                ksEntry->keyString.getTypeBits());
-        auto kv = seekAfterProcessing(bson, true);
+        auto kv = seekAfterProcessing(bson);
         if (kv) {
             return kv;
         }
@@ -872,7 +880,7 @@ boost::optional<IndexKeyEntry> SortedDataInterface::Cursor::seekExact(const BSON
 
 boost::optional<KeyStringEntry> SortedDataInterface::Cursor::seekExact(
     const KeyString::Value& keyStringValue) {
-    auto ksEntry = seek(keyStringValue, true);
+    auto ksEntry = seekForKeyString(keyStringValue);
     if (!ksEntry) {
         return {};
     }

@@ -546,11 +546,11 @@ TEST(SortedDataInterface, InsertAndSeekKeyString) {
 
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
 
-        auto ksEntry1 = cursor->seek(keyString1WithoutRecordId, true);
+        auto ksEntry1 = cursor->seekForKeyString(keyString1WithoutRecordId);
         ASSERT_EQUALS(ksEntry1->keyString.compare(keyString1), 0);
         ASSERT_EQUALS(ksEntry1->keyString.compare(keyString2), -1);
 
-        auto ksEntry2 = cursor->seek(keyString2WithoutRecordId, true);
+        auto ksEntry2 = cursor->seekForKeyString(keyString2WithoutRecordId);
         ASSERT_EQUALS(ksEntry2->keyString.compare(keyString2), 0);
         ASSERT_EQUALS(ksEntry2->keyString.compare(keyString1), 1);
     }

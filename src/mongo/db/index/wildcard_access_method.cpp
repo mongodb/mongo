@@ -90,51 +90,62 @@ std::set<FieldRef> WildcardAccessMethod::_getMultikeyPathSet(
     OperationContext* opCtx,
     const IndexBounds& indexBounds,
     MultikeyMetadataAccessStats* stats) const {
-    return writeConflictRetry(opCtx,
-                              "wildcard multikey path retrieval",
-                              _descriptor->parentNS().ns(),
-                              [&]() -> std::set<FieldRef> {
-                                  stats->numSeeks = 0;
-                                  stats->keysExamined = 0;
-                                  auto cursor = newCursor(opCtx);
+    return writeConflictRetry(
+        opCtx,
+        "wildcard multikey path retrieval",
+        _descriptor->parentNS().ns(),
+        [&]() -> std::set<FieldRef> {
+            stats->numSeeks = 0;
+            stats->keysExamined = 0;
+            auto cursor = newCursor(opCtx);
 
-                                  constexpr int kForward = 1;
-                                  const auto keyPattern = BSON("" << 1 << "" << 1);
-                                  IndexBoundsChecker checker(&indexBounds, keyPattern, kForward);
-                                  IndexSeekPoint seekPoint;
-                                  if (!checker.getStartSeekPoint(&seekPoint)) {
-                                      return {};
-                                  }
+            constexpr int kForward = 1;
+            const auto keyPattern = BSON("" << 1 << "" << 1);
+            IndexBoundsChecker checker(&indexBounds, keyPattern, kForward);
+            IndexSeekPoint seekPoint;
+            if (!checker.getStartSeekPoint(&seekPoint)) {
+                return {};
+            }
 
-                                  std::set<FieldRef> multikeyPaths{};
-                                  auto entry = cursor->seek(seekPoint);
-                                  ++stats->numSeeks;
-                                  while (entry) {
-                                      ++stats->keysExamined;
+            std::set<FieldRef> multikeyPaths{};
+            auto entry = cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                seekPoint,
+                getSortedDataInterface()->getKeyStringVersion(),
+                getSortedDataInterface()->getOrdering(),
+                kForward));
 
-                                      switch (checker.checkKey(entry->key, &seekPoint)) {
-                                          case IndexBoundsChecker::VALID:
-                                              multikeyPaths.emplace(
-                                                  extractMultikeyPathFromIndexKey(*entry));
-                                              entry = cursor->next();
-                                              break;
 
-                                          case IndexBoundsChecker::MUST_ADVANCE:
-                                              ++stats->numSeeks;
-                                              entry = cursor->seek(seekPoint);
-                                              break;
+            ++stats->numSeeks;
+            while (entry) {
+                ++stats->keysExamined;
 
-                                          case IndexBoundsChecker::DONE:
-                                              entry = boost::none;
-                                              break;
+                switch (checker.checkKey(entry->key, &seekPoint)) {
+                    case IndexBoundsChecker::VALID:
+                        multikeyPaths.emplace(extractMultikeyPathFromIndexKey(*entry));
+                        entry = cursor->next();
+                        break;
 
-                                          default:
-                                              MONGO_UNREACHABLE;
-                                      }
-                                  }
+                    case IndexBoundsChecker::MUST_ADVANCE:
+                        ++stats->numSeeks;
+                        entry = cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                            seekPoint,
+                            getSortedDataInterface()->getKeyStringVersion(),
+                            getSortedDataInterface()->getOrdering(),
+                            kForward));
 
-                                  return multikeyPaths;
-                              });
+                        break;
+
+                    case IndexBoundsChecker::DONE:
+                        entry = boost::none;
+                        break;
+
+                    default:
+                        MONGO_UNREACHABLE;
+                }
+            }
+
+            return multikeyPaths;
+        });
 }
 
 

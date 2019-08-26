@@ -232,6 +232,22 @@ public:
                                isForward ? 1 : -1);
     }
 
+    /**
+     * Encodes the SeekPoint into a Keystring object suitable to pass in to compare().
+     *
+     * A KeyString is used for seeking an iterator to a position in a sorted index. The difference
+     * between a query KeyString and the KeyStrings inserted into indexes is that query KeyString
+     * can be exclusive. This means that the first matching entry in the index is the first key in
+     * the index after the query. The meaning of "after" depends on isForward.
+     *
+     * Returned KeyString are for use in lookups only and should never be inserted into the
+     * database.
+     */
+    static KeyString::Value makeKeyStringForSeekPoint(const IndexSeekPoint& seekPoint,
+                                                      KeyString::Version version,
+                                                      Ordering ord,
+                                                      bool isForward);
+
 private:
     // Ordering is used in comparison() to compare BSONElements
     const Ordering _order;

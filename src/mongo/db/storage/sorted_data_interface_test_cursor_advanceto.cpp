@@ -89,16 +89,24 @@ TEST(SortedDataInterface, AdvanceTo) {
         seekPoint.keyPrefix = key1;
         seekPoint.prefixLen = 1;
         seekPoint.prefixExclusive = false;
-        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), true)),
+                  IndexKeyEntry(key1, loc1));
 
         seekPoint.keyPrefix = key2;
-        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key2, loc4));
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), true)),
+                  IndexKeyEntry(key2, loc4));
 
         seekPoint.keyPrefix = key3;
-        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc5));
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), true)),
+                  IndexKeyEntry(key3, loc5));
 
         seekPoint.keyPrefix = key4;
-        ASSERT_EQ(cursor->seek(seekPoint), boost::none);
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), true)),
+                  boost::none);
     }
 }
 
@@ -145,9 +153,10 @@ TEST(SortedDataInterface, AdvanceToReversed) {
     }
 
     {
+        bool isForward = false;
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
-            sorted->newCursor(opCtx.get(), false));
+            sorted->newCursor(opCtx.get(), isForward));
 
         ASSERT_EQ(cursor->seek(key3, true), IndexKeyEntry(key3, loc5));
 
@@ -155,16 +164,24 @@ TEST(SortedDataInterface, AdvanceToReversed) {
         seekPoint.keyPrefix = key3;
         seekPoint.prefixLen = 1;
         seekPoint.prefixExclusive = false;
-        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc5));
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), isForward)),
+                  IndexKeyEntry(key3, loc5));
 
         seekPoint.keyPrefix = key2;
-        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key2, loc2));
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), isForward)),
+                  IndexKeyEntry(key2, loc2));
 
         seekPoint.keyPrefix = key1;
-        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), isForward)),
+                  IndexKeyEntry(key1, loc1));
 
         seekPoint.keyPrefix = key0;
-        ASSERT_EQ(cursor->seek(seekPoint), boost::none);
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), isForward)),
+                  boost::none);
     }
 }
 
@@ -208,10 +225,14 @@ TEST(SortedDataInterface, AdvanceToKeyBeforeCursorPosition) {
         seekPoint.keyPrefix = key0;
         seekPoint.prefixLen = 1;
         seekPoint.prefixExclusive = false;
-        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), true)),
+                  IndexKeyEntry(key1, loc1));
 
         seekPoint.prefixExclusive = true;
-        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), true)),
+                  IndexKeyEntry(key1, loc1));
     }
 }
 
@@ -246,9 +267,10 @@ TEST(SortedDataInterface, AdvanceToKeyAfterCursorPositionReversed) {
     }
 
     {
+        bool isForward = false;
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
-            sorted->newCursor(opCtx.get(), false));
+            sorted->newCursor(opCtx.get(), isForward));
 
         ASSERT_EQ(cursor->seek(key2, true), IndexKeyEntry(key2, loc2));
 
@@ -256,10 +278,14 @@ TEST(SortedDataInterface, AdvanceToKeyAfterCursorPositionReversed) {
         seekPoint.keyPrefix = key3;
         seekPoint.prefixLen = 1;
         seekPoint.prefixExclusive = false;
-        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key2, loc2));
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), isForward)),
+                  IndexKeyEntry(key2, loc2));
 
         seekPoint.prefixExclusive = true;
-        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key2, loc2));
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), isForward)),
+                  IndexKeyEntry(key2, loc2));
     }
 }
 
@@ -303,10 +329,14 @@ TEST(SortedDataInterface, AdvanceToKeyAtCursorPosition) {
         seekPoint.keyPrefix = key1;
         seekPoint.prefixLen = 1;
         seekPoint.prefixExclusive = false;
-        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), true)),
+                  IndexKeyEntry(key1, loc1));
 
         seekPoint.prefixExclusive = true;
-        ASSERT_EQ(cursor->seek(seekPoint), boost::none);
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), true)),
+                  boost::none);
     }
 }
 
@@ -341,9 +371,10 @@ TEST(SortedDataInterface, AdvanceToKeyAtCursorPositionReversed) {
     }
 
     {
+        bool isForward = false;
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
-            sorted->newCursor(opCtx.get(), false));
+            sorted->newCursor(opCtx.get(), isForward));
 
         ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
 
@@ -351,10 +382,14 @@ TEST(SortedDataInterface, AdvanceToKeyAtCursorPositionReversed) {
         seekPoint.keyPrefix = key1;
         seekPoint.prefixLen = 1;
         seekPoint.prefixExclusive = false;
-        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), isForward)),
+                  IndexKeyEntry(key1, loc1));
 
         seekPoint.prefixExclusive = true;
-        ASSERT_EQ(cursor->seek(seekPoint), boost::none);
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), isForward)),
+                  boost::none);
     }
 }
 
@@ -409,16 +444,24 @@ TEST(SortedDataInterface, AdvanceToExclusive) {
         seekPoint.keyPrefix = key1;
         seekPoint.prefixLen = 1;
         seekPoint.prefixExclusive = true;
-        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key2, loc4));
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), true)),
+                  IndexKeyEntry(key2, loc4));
 
         seekPoint.keyPrefix = key2;
-        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc5));
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), true)),
+                  IndexKeyEntry(key3, loc5));
 
         seekPoint.keyPrefix = key3;
-        ASSERT_EQ(cursor->seek(seekPoint), boost::none);
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), true)),
+                  boost::none);
 
         seekPoint.keyPrefix = key4;
-        ASSERT_EQ(cursor->seek(seekPoint), boost::none);
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), true)),
+                  boost::none);
     }
 }
 
@@ -464,9 +507,10 @@ TEST(SortedDataInterface, AdvanceToExclusiveReversed) {
     }
 
     {
+        bool isForward = false;
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
-            sorted->newCursor(opCtx.get(), false));
+            sorted->newCursor(opCtx.get(), isForward));
 
         ASSERT_EQ(cursor->seek(key3, true), IndexKeyEntry(key3, loc5));
 
@@ -474,16 +518,24 @@ TEST(SortedDataInterface, AdvanceToExclusiveReversed) {
         seekPoint.keyPrefix = key3;
         seekPoint.prefixLen = 1;
         seekPoint.prefixExclusive = true;
-        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key2, loc2));
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), isForward)),
+                  IndexKeyEntry(key2, loc2));
 
         seekPoint.keyPrefix = key2;
-        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), isForward)),
+                  IndexKeyEntry(key1, loc1));
 
         seekPoint.keyPrefix = key1;
-        ASSERT_EQ(cursor->seek(seekPoint), boost::none);
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), isForward)),
+                  boost::none);
 
         seekPoint.keyPrefix = key0;
-        ASSERT_EQ(cursor->seek(seekPoint), boost::none);
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), isForward)),
+                  boost::none);
     }
 }
 
@@ -534,10 +586,14 @@ TEST(SortedDataInterface, AdvanceToIndirect) {
         seekPoint.suffixInclusive = {true};
 
         suffix0 = key2.firstElement();
-        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc2));
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), true)),
+                  IndexKeyEntry(key3, loc2));
 
         suffix0 = key4.firstElement();
-        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key5, loc3));
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), true)),
+                  IndexKeyEntry(key5, loc3));
     }
 }
 
@@ -589,10 +645,14 @@ TEST(SortedDataInterface, AdvanceToIndirectReversed) {
         seekPoint.suffixInclusive = {true};
 
         suffix0 = key4.firstElement();
-        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc2));
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), true)),
+                  IndexKeyEntry(key3, loc2));
 
         suffix0 = key2.firstElement();
-        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), true)),
+                  IndexKeyEntry(key1, loc1));
     }
 }
 
@@ -645,15 +705,21 @@ TEST(SortedDataInterface, AdvanceToIndirectExclusive) {
         seekPoint.suffixInclusive = {false};
 
         suffix0 = key2.firstElement();
-        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc2));
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), true)),
+                  IndexKeyEntry(key3, loc2));
 
         suffix0 = key4.firstElement();
-        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key5, loc3));
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), true)),
+                  IndexKeyEntry(key5, loc3));
 
         ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
 
         suffix0 = key3.firstElement();
-        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key5, loc3));
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), true)),
+                  IndexKeyEntry(key5, loc3));
     }
 }
 
@@ -694,9 +760,10 @@ TEST(SortedDataInterface, AdvanceToIndirectExclusiveReversed) {
     }
 
     {
+        bool isForward = false;
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
-            sorted->newCursor(opCtx.get(), false));
+            sorted->newCursor(opCtx.get(), isForward));
 
         ASSERT_EQ(cursor->seek(key5, true), IndexKeyEntry(key5, loc3));
 
@@ -707,15 +774,21 @@ TEST(SortedDataInterface, AdvanceToIndirectExclusiveReversed) {
         seekPoint.suffixInclusive = {false};
 
         suffix0 = key4.firstElement();
-        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc2));
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), isForward)),
+                  IndexKeyEntry(key3, loc2));
 
         suffix0 = key2.firstElement();
-        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), isForward)),
+                  IndexKeyEntry(key1, loc1));
 
         ASSERT_EQ(cursor->seek(key5, true), IndexKeyEntry(key5, loc3));
 
         suffix0 = key3.firstElement();
-        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                      seekPoint, sorted->getKeyStringVersion(), sorted->getOrdering(), isForward)),
+                  IndexKeyEntry(key1, loc1));
     }
 }
 

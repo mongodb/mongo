@@ -169,6 +169,19 @@ BSONObj IndexEntryComparison::makeQueryObject(const BSONObj& keyPrefix,
     return bb.obj();
 }
 
+KeyString::Value IndexEntryComparison::makeKeyStringForSeekPoint(const IndexSeekPoint& seekPoint,
+                                                                 KeyString::Version version,
+                                                                 Ordering ord,
+                                                                 bool isForward) {
+    BSONObj key = IndexEntryComparison::makeQueryObject(seekPoint, isForward);
+
+    const auto discriminator = isForward ? KeyString::Discriminator::kExclusiveBefore
+                                         : KeyString::Discriminator::kExclusiveAfter;
+
+    KeyString::Builder builder(version, key, ord, discriminator);
+    return builder.getValueCopy();
+}
+
 Status buildDupKeyErrorStatus(const BSONObj& key,
                               const NamespaceString& collectionNamespace,
                               const std::string& indexName,

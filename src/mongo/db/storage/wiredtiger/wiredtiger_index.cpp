@@ -44,6 +44,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
@@ -830,25 +831,18 @@ public:
             ? KeyString::Discriminator::kExclusiveBefore
             : KeyString::Discriminator::kExclusiveAfter;
         _query.resetToKey(finalKey, _idx.getOrdering(), discriminator);
-        seek(_query.getValueCopy(), inclusive /* unused by implementation */);
+        seekForKeyString(_query.getValueCopy());
         return curr(parts);
     }
 
-    boost::optional<IndexKeyEntry> seek(const IndexSeekPoint& seekPoint,
-                                        RequestedInfo parts) override {
-        dassert(_opCtx->lockState()->isReadLocked());
-        // TODO: don't go to a bson obj then to a KeyString, go straight
-        BSONObj key = IndexEntryComparison::makeQueryObject(seekPoint, _forward);
-
-        // makeQueryObject handles the discriminator in the real exclusive cases.
-        const auto discriminator = _forward ? KeyString::Discriminator::kExclusiveBefore
-                                            : KeyString::Discriminator::kExclusiveAfter;
-        _query.resetToKey(key, _idx.getOrdering(), discriminator);
-        seek(_query.getValueCopy(), true /* unused by implementation */);
+    boost::optional<IndexKeyEntry> seek(const KeyString::Value& keyString,
+                                        RequestedInfo parts = kKeyAndLoc) override {
+        seekForKeyString(keyString);
         return curr(parts);
     }
 
-    boost::optional<KeyStringEntry> seek(const KeyString::Value& keyStringValue, bool) override {
+    boost::optional<KeyStringEntry> seekForKeyString(
+        const KeyString::Value& keyStringValue) override {
         dassert(_opCtx->lockState()->isReadLocked());
         seekWTCursor(keyStringValue);
 
@@ -899,7 +893,7 @@ public:
     }
 
     boost::optional<KeyStringEntry> seekExact(const KeyString::Value& keyStringValue) override {
-        auto ksEntry = seek(keyStringValue, true);
+        auto ksEntry = seekForKeyString(keyStringValue);
         if (!ksEntry) {
             return {};
         }

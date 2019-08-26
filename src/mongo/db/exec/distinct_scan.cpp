@@ -79,7 +79,12 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
     try {
         if (!_cursor)
             _cursor = indexAccessMethod()->newCursor(getOpCtx(), _scanDirection == 1);
-        kv = _cursor->seek(_seekPoint);
+        kv = _cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+            _seekPoint,
+            indexAccessMethod()->getSortedDataInterface()->getKeyStringVersion(),
+            indexAccessMethod()->getSortedDataInterface()->getOrdering(),
+            _scanDirection == 1));
+
     } catch (const WriteConflictException&) {
         *out = WorkingSet::INVALID_ID;
         return PlanStage::NEED_YIELD;

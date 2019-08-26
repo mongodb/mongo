@@ -114,8 +114,11 @@ boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
 
             if (!_checker->getStartSeekPoint(&_seekPoint))
                 return boost::none;
-
-            return _indexCursor->seek(_seekPoint);
+            return _indexCursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                _seekPoint,
+                indexAccessMethod()->getSortedDataInterface()->getKeyStringVersion(),
+                indexAccessMethod()->getSortedDataInterface()->getOrdering(),
+                _forward));
         }
     }
 }
@@ -133,7 +136,11 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
                 break;
             case NEED_SEEK:
                 ++_specificStats.seeks;
-                kv = _indexCursor->seek(_seekPoint);
+                kv = _indexCursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                    _seekPoint,
+                    indexAccessMethod()->getSortedDataInterface()->getKeyStringVersion(),
+                    indexAccessMethod()->getSortedDataInterface()->getOrdering(),
+                    _forward));
                 break;
             case HIT_END:
                 return PlanStage::IS_EOF;
