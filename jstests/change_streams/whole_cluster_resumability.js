@@ -8,6 +8,13 @@ load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
 
 // Create two databases, with one collection in each.
 const testDBs = [db.getSiblingDB(jsTestName()), db.getSiblingDB(jsTestName() + "_other")];
+
+// Create additional collections to prevent the databases from being closed when the other
+// collections are dropped.
+testDBs.map((db) => {
+    assert.commandWorkedOrFailedWithCode(db.createCollection("unused"), ErrorCodes.NamespaceExists);
+});
+
 let [db1Coll, db2Coll] = testDBs.map((db) => assertDropAndRecreateCollection(db, "test"));
 const adminDB = db.getSiblingDB("admin");
 
