@@ -434,8 +434,8 @@ Status ReplSetConfig::validate() const {
 
     auto extractHorizonMembers = [](const auto& replMember) {
         std::vector<std::string> rv;
-        std::transform(begin(replMember.getHorizonMappings()),
-                       end(replMember.getHorizonMappings()),
+        std::transform(replMember.getHorizonMappings().begin(),
+                       replMember.getHorizonMappings().end(),
                        back_inserter(rv),
                        [](auto&& mapping) { return mapping.first; });
         std::sort(begin(rv), end(rv));

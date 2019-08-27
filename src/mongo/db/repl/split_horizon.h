@@ -97,7 +97,7 @@ public:
         invariant(!_forwardMapping.empty());
         invariant(!horizon.empty());
         auto found = _forwardMapping.find(horizon);
-        if (found == end(_forwardMapping))
+        if (found == _forwardMapping.end())
             uasserted(ErrorCodes::NoSuchKey, str::stream() << "No horizon named " << horizon);
         return found->second;
     }
