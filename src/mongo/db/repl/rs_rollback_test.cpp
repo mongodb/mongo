@@ -1648,7 +1648,9 @@ TEST_F(RSRollbackTest, RollbackCreateCollectionCommand) {
     {
         Lock::DBLock dbLock(_opCtx.get(), "test", MODE_S);
         auto databaseHolder = DatabaseHolder::get(_opCtx.get());
-        ASSERT_FALSE(databaseHolder->getDb(_opCtx.get(), "test"));
+        auto db = databaseHolder->getDb(_opCtx.get(), "test");
+        ASSERT_TRUE(db);
+        ASSERT_FALSE(db->getCollection(_opCtx.get(), NamespaceString("test.t")));
     }
 }
 

@@ -9,13 +9,8 @@ load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Col
 load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
 load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
 
-const testDB = db.getSiblingDB(jsTestName());
-
-// Create an additional collection to prevent the database from being closed when the other
-// collection is dropped.
-assert.commandWorkedOrFailedWithCode(testDB.createCollection("unused"), ErrorCodes.NamespaceExists);
-
 // Drop and recreate the collections to be used in this set of tests.
+const testDB = db.getSiblingDB(jsTestName());
 let coll = assertDropAndRecreateCollection(testDB, "resume_coll");
 const otherColl = assertDropAndRecreateCollection(testDB, "resume_coll_other");
 

@@ -42,7 +42,6 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/catalog_raii.h"
@@ -1159,20 +1158,14 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
             log() << "This collection does not exist, UUID: " << uuid;
         } else {
             log() << "Dropping collection: " << *nss << ", UUID: " << uuid;
+            AutoGetDb dbLock(opCtx, nss->db(), MODE_X);
 
-            {
-                AutoGetDb dbLock(opCtx, nss->db(), MODE_X);
-
-                Database* db = dbLock.getDb();
-                if (db) {
-                    Collection* collection =
-                        CollectionCatalog::get(opCtx).lookupCollectionByUUID(uuid);
-                    dropCollection(opCtx, *nss, collection, db);
-                    LOG(1) << "Dropped collection: " << *nss << ", UUID: " << uuid;
-                }
+            Database* db = dbLock.getDb();
+            if (db) {
+                Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(uuid);
+                dropCollection(opCtx, *nss, collection, db);
+                LOG(1) << "Dropped collection: " << *nss << ", UUID: " << uuid;
             }
-
-            closeDatabaseIfEmpty(opCtx, nss->db());
         }
     }
 

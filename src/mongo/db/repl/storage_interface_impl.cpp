@@ -49,7 +49,6 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -460,23 +459,18 @@ Status StorageInterfaceImpl::createCollection(OperationContext* opCtx,
 
 Status StorageInterfaceImpl::dropCollection(OperationContext* opCtx, const NamespaceString& nss) {
     return writeConflictRetry(opCtx, "StorageInterfaceImpl::dropCollection", nss.ns(), [&] {
-        {
-            AutoGetDb autoDb(opCtx, nss.db(), MODE_IX);
-            Lock::CollectionLock collLock(opCtx, nss, MODE_X);
-            if (!autoDb.getDb()) {
-                // Database does not exist - nothing to do.
-                return Status::OK();
-            }
-            WriteUnitOfWork wunit(opCtx);
-            const auto status = autoDb.getDb()->dropCollectionEvenIfSystem(opCtx, nss);
-            if (!status.isOK()) {
-                return status;
-            }
-            wunit.commit();
+        AutoGetDb autoDb(opCtx, nss.db(), MODE_IX);
+        Lock::CollectionLock collLock(opCtx, nss, MODE_X);
+        if (!autoDb.getDb()) {
+            // Database does not exist - nothing to do.
+            return Status::OK();
         }
-
-        // If this dropped the last collection in the database, we should close the database.
-        closeDatabaseIfEmpty(opCtx, nss.db());
+        WriteUnitOfWork wunit(opCtx);
+        const auto status = autoDb.getDb()->dropCollectionEvenIfSystem(opCtx, nss);
+        if (!status.isOK()) {
+            return status;
+        }
+        wunit.commit();
         return Status::OK();
     });
 }

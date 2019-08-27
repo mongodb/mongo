@@ -39,12 +39,6 @@ class OpTime;
 }  // namespace repl
 
 /**
- * Closes the specified database if it no longer has any collections remaining. Must be called
- * without any locks acquired on the database.
- */
-void closeDatabaseIfEmpty(OperationContext* opCtx, StringData ns);
-
-/**
  * Drops the collection "collectionName" and populates "result" with statistics about what
  * was removed.
  *

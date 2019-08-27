@@ -64,11 +64,8 @@ public:
 
         auto collection = std::make_unique<CollectionMock>(nss);
         col = collection.get();
-        ASSERT_TRUE(catalog.empty(nss.db()));
-
         // Register dummy collection in catalog.
         catalog.registerCollection(colUUID, std::move(collection));
-        ASSERT_FALSE(catalog.empty(nss.db()));
     }
 
 protected:

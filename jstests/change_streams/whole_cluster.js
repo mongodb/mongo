@@ -11,12 +11,6 @@ db = db.getSiblingDB(jsTestName());
 const adminDB = db.getSiblingDB("admin");
 const otherDB = db.getSiblingDB(jsTestName() + "_other");
 
-// Create additional collections to prevent the databases from being closed when the other
-// collections are dropped.
-assert.commandWorkedOrFailedWithCode(db.createCollection("unused"), ErrorCodes.NamespaceExists);
-assert.commandWorkedOrFailedWithCode(otherDB.createCollection("unused"),
-                                     ErrorCodes.NamespaceExists);
-
 // Drop and recreate the collections to be used in this set of tests.
 assertDropAndRecreateCollection(db, "t1");
 assertDropAndRecreateCollection(otherDB, "t2");
@@ -71,13 +65,12 @@ const validUserDBs = [
     "_config_"
 ];
 validUserDBs.forEach(dbName => {
-    const collName = "test" + Random.srand();
-    assert.commandWorked(db.getSiblingDB(dbName).getCollection(collName).insert({_id: 0, a: 1}));
+    assert.commandWorked(db.getSiblingDB(dbName).test.insert({_id: 0, a: 1}));
     expected = [
         {
             documentKey: {_id: 0},
             fullDocument: {_id: 0, a: 1},
-            ns: {db: dbName, coll: collName},
+            ns: {db: dbName, coll: "test"},
             operationType: "insert",
         },
     ];
@@ -108,9 +101,7 @@ filteredDBs.forEach(dbName => {
     if (FixtureHelpers.isMongos(db) && dbName == "local")
         return;
 
-    const collName = "test" + Random.srand();
-    assert.commandWorked(db.getSiblingDB(dbName).getCollection(collName).insert({_id: 0, a: 1}));
-
+    assert.commandWorked(db.getSiblingDB(dbName).test.insert({_id: 0, a: 1}));
     // Insert to the test collection to ensure that the change stream has something to
     // return.
     assert.commandWorked(db.t1.insert({_id: dbName}));
@@ -125,7 +116,7 @@ filteredDBs.forEach(dbName => {
     cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});
     // Drop the test collection to avoid duplicate key errors if this test is run multiple
     // times.
-    assertDropCollection(db.getSiblingDB(dbName), collName);
+    assertDropCollection(db.getSiblingDB(dbName), "test");
 });
 
 // Dropping a database should generate drop entries for each collection followed by a database
