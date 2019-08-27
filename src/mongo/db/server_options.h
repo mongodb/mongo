@@ -218,17 +218,6 @@ struct ServerGlobalParams {
             return _version.load();
         }
 
-        /**
-         * This unsafe getter for the featureCompatibilityVersion parameter returns the last-stable
-         * featureCompatibilityVersion value if the parameter has not yet been initialized with a
-         * meaningful value. This getter should only be used if the parameter is intentionally read
-         * prior to the creation/parsing of the featureCompatibilityVersion document.
-         */
-        const Version getVersionUnsafe() const {
-            Version v = _version.load();
-            return (v == Version::kUnsetDefault42Behavior) ? Version::kFullyDowngradedTo42 : v;
-        }
-
         void reset() {
             _version.store(Version::kUnsetDefault42Behavior);
         }
