@@ -84,9 +84,8 @@ function testBadDecryptResult(fault) {
 
     runKMS(mock_kms, (shell) => {
         const keyVault = shell.getKeyVault();
-        assert.commandWorked(
-            keyVault.createKey("aws", "arn:aws:kms:us-east-1:fake:fake:fake", ["mongoKey"]));
-        const keyId = keyVault.getKeys("mongoKey").toArray()[0]._id;
+        const keyId =
+            keyVault.createKey("aws", "arn:aws:kms:us-east-1:fake:fake:fake", ["mongoKey"]);
         const str = "mongo";
         assert.throws(() => {
             const encStr = shell.getClientEncryption().encrypt(keyId, str, randomAlgorithm);
@@ -102,8 +101,7 @@ function testBadDecryptKeyResult(fault) {
     runKMS(mock_kms, (shell, cleanCacheShell) => {
         const keyVault = shell.getKeyVault();
 
-        assert.commandWorked(
-            keyVault.createKey("aws", "arn:aws:kms:us-east-1:fake:fake:fake", ["mongoKey"]));
+        keyVault.createKey("aws", "arn:aws:kms:us-east-1:fake:fake:fake", ["mongoKey"]);
         const keyId = keyVault.getKeys("mongoKey").toArray()[0]._id;
         const str = "mongo";
         const encStr = shell.getClientEncryption().encrypt(keyId, str, randomAlgorithm);
@@ -123,8 +121,7 @@ function testBadDecryptError() {
 
     runKMS(mock_kms, (shell) => {
         const keyVault = shell.getKeyVault();
-        assert.commandWorked(
-            keyVault.createKey("aws", "arn:aws:kms:us-east-1:fake:fake:fake", ["mongoKey"]));
+        keyVault.createKey("aws", "arn:aws:kms:us-east-1:fake:fake:fake", ["mongoKey"]);
         const keyId = keyVault.getKeys("mongoKey").toArray()[0]._id;
         const str = "mongo";
         let error = assert.throws(() => {

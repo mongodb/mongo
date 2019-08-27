@@ -51,8 +51,7 @@ const failTestCases = [null, undefined, MinKey(), MaxKey(), DBRef("test", "test"
 for (const encryptionAlgorithm of encryptionAlgorithms) {
     collection.drop();
 
-    assert.commandWorked(
-        keyVault.createKey("aws", "arn:aws:kms:us-east-1:fake:fake:fake", ['mongoKey']));
+    keyVault.createKey("aws", "arn:aws:kms:us-east-1:fake:fake:fake", ['mongoKey']);
     const keyId = keyVault.getKeyByAltName("mongoKey").toArray()[0]._id;
 
     let pass;
