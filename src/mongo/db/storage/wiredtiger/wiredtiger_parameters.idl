@@ -120,3 +120,34 @@ server_parameters:
         data: 'std::pair<double, WiredTigerKVEngine*>'
         override_set: true
       condition: { expr: false }
+
+    wiredTigerFileHandleCloseIdleTime:
+      description: >-
+        The amount of time in seconds a file handle in WiredTiger needs to be idle before attempting
+        to close it.
+      set_at: startup
+      cpp_vartype: 'std::int32_t'
+      cpp_varname: gWiredTigerFileHandleCloseIdleTime
+      default: 100000
+      validator:
+        gte: 1
+
+    wiredTigerFileHandleCloseMinimum:
+      description: >-
+        The number of handles open before the WiredTiger file manager will look for handles to close.
+      set_at: startup
+      cpp_vartype: 'std::int32_t'
+      cpp_varname: gWiredTigerFileHandleCloseMinimum
+      default: 250
+      validator:
+        gte: 1
+
+    wiredTigerFileHandleCloseScanInterval:
+      description: >-
+        The interval in seconds at which WiredTiger checks for inactive files and closes them.
+      set_at: startup
+      cpp_vartype: 'std::int32_t'
+      cpp_varname: gWiredTigerFileHandleCloseScanInterval
+      default: 10
+      validator:
+        gte: 1
