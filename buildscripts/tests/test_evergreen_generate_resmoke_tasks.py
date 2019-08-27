@@ -509,8 +509,8 @@ class MainTest(unittest.TestCase):
 
         main = grt.Main(evg)
         main.options = Mock()
+        main.options.max_sub_suites = 1000
         main.config_options = self.get_mock_options()
-        main.config_options.max_sub_suites = 1000
 
         with patch("os.path.exists") as exists_mock, patch(ns("suitesconfig")) as suitesconfig_mock:
             exists_mock.return_value = True

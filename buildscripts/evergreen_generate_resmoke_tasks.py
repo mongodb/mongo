@@ -21,6 +21,8 @@ import yaml
 
 from evergreen.api import RetryingEvergreenApi
 from shrub.config import Configuration
+from shrub.command import CommandDefinition
+from shrub.operations import CmdTimeoutUpdate
 from shrub.task import TaskDependency
 from shrub.variant import DisplayTaskDefinition
 from shrub.variant import TaskSpec
@@ -125,8 +127,8 @@ def get_config_options(cmd_line_options, config_file):
     fallback_num_sub_suites = int(
         read_config.get_config_value("fallback_num_sub_suites", cmd_line_options, config_file_data,
                                      required=True))
-    max_sub_suites = int(
-        read_config.get_config_value("max_sub_suites", cmd_line_options, config_file_data))
+    max_sub_suites = read_config.get_config_value("max_sub_suites", cmd_line_options,
+                                                  config_file_data)
     project = read_config.get_config_value("project", cmd_line_options, config_file_data,
                                            required=True)
     resmoke_args = read_config.get_config_value("resmoke_args", cmd_line_options, config_file_data,
@@ -603,7 +605,7 @@ class Main(object):
             return self.calculate_fallback_suites()
         self.test_list = [info.test_name for info in tests_runtimes]
         return divide_tests_into_suites(tests_runtimes, execution_time_secs,
-                                        self.config_options.max_sub_suites)
+                                        self.options.max_sub_suites)
 
     def filter_existing_tests(self, tests_runtimes):
         """Filter out tests that do not exist in the filesystem."""
