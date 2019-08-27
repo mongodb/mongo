@@ -4758,7 +4758,7 @@ tasks:
   commands:
     - func: "scons compile"
       vars:
-        targets: install-stitch-support
+        targets: install-stitch-support install-stitch-support-debug
         task_compile_flags: >-
           --install-mode=hygienic
           --dbg=off
@@ -4767,6 +4767,7 @@ tasks:
           --ssl=off
           --enable-http-client=off
           --modules=
+          --separate-debug
           DESTDIR='$BUILD_ROOT/stitch-support-lib-$MONGO_VERSION'
     - command: shell.exec
       params:
@@ -4795,6 +4796,11 @@ tasks:
         task_compile_flags: >-
           --install-mode=hygienic
           --dbg=off
+          --enable-free-mon=off
+          --ssl=off
+          --enable-http-client=off
+          --modules=
+          --separate-debug
           DESTDIR='$BUILD_ROOT/stitch-support-lib-$MONGO_VERSION'
 
 - name: stitch_support_run_tests
