@@ -80,7 +80,7 @@ public:
     }
 
 protected:
-    bool checkValid() {
+    ValidateResults runValidate() {
         ValidateResults results;
         BSONObjBuilder output;
 
@@ -104,7 +104,47 @@ protected:
             ASSERT_EQ(results.valid, allIndexesValid);
         }
 
-        return results.valid;
+        return results;
+    }
+
+    std::string parseValidateResults(const ValidateResults& results) {
+        str::stream ss;
+
+        ss << "ValidateResults:\nValid: " << results.valid << "\n"
+           << "Errors:\n";
+
+        for (const std::string& error : results.errors) {
+            ss << "\t" << error << "\n";
+        }
+
+        ss << "Warnings:\n";
+        for (const std::string& warning : results.warnings) {
+            ss << "\t" << warning << "\n";
+        }
+
+        ss << "Extra index entries:\n";
+        for (const BSONObj& obj : results.extraIndexEntries) {
+            ss << "\t" << obj << "\n";
+        }
+
+        ss << "Missing index entries:\n";
+        for (const BSONObj& obj : results.missingIndexEntries) {
+            ss << "\t" << obj << "\n";
+        }
+
+        return ss;
+    }
+
+    void ensureValidateWorked() {
+        ValidateResults results = runValidate();
+        ASSERT_TRUE(results.valid)
+            << "Validation failed when it should've worked: " << parseValidateResults(results);
+    }
+
+    void ensureValidateFailed() {
+        ValidateResults results = runValidate();
+        ASSERT_FALSE(results.valid)
+            << "Validation worked when it should've failed: " << parseValidateResults(results);
     }
 
     void lockDb(LockMode mode) {
@@ -162,7 +202,7 @@ public:
             wunit.commit();
         }
         releaseDb();
-        ASSERT_TRUE(checkValid());
+        ensureValidateWorked();
 
         lockDb(MODE_X);
         RecordStore* rs = coll->getRecordStore();
@@ -174,7 +214,7 @@ public:
             wunit.commit();
         }
         releaseDb();
-        ASSERT_FALSE(checkValid());
+        ensureValidateFailed();
 
         lockDb(MODE_X);
 
@@ -189,7 +229,7 @@ public:
             wunit.commit();
         }
         releaseDb();
-        ASSERT_FALSE(checkValid());
+        ensureValidateFailed();
     }
 };
 
@@ -231,7 +271,7 @@ public:
 
         ASSERT_OK(status);
         releaseDb();
-        ASSERT_TRUE(checkValid());
+        ensureValidateWorked();
 
         lockDb(MODE_X);
         RecordStore* rs = coll->getRecordStore();
@@ -243,7 +283,7 @@ public:
             wunit.commit();
         }
         releaseDb();
-        ASSERT_FALSE(checkValid());
+        ensureValidateFailed();
 
         lockDb(MODE_X);
 
@@ -258,7 +298,7 @@ public:
             wunit.commit();
         }
         releaseDb();
-        ASSERT_FALSE(checkValid());
+        ensureValidateFailed();
     }
 };
 
@@ -302,7 +342,7 @@ public:
 
         ASSERT_OK(status);
         releaseDb();
-        ASSERT_TRUE(checkValid());
+        ensureValidateWorked();
 
         lockDb(MODE_X);
         RecordStore* rs = coll->getRecordStore();
@@ -318,7 +358,7 @@ public:
             wunit.commit();
         }
         releaseDb();
-        ASSERT_FALSE(checkValid());
+        ensureValidateFailed();
     }
 };
 
@@ -352,7 +392,7 @@ public:
             wunit.commit();
         }
         releaseDb();
-        ASSERT_TRUE(checkValid());
+        ensureValidateWorked();
 
         lockDb(MODE_X);
         RecordStore* rs = coll->getRecordStore();
@@ -367,7 +407,7 @@ public:
             wunit.commit();
         }
         releaseDb();
-        ASSERT_FALSE(checkValid());
+        ensureValidateFailed();
 
         lockDb(MODE_X);
 
@@ -380,7 +420,7 @@ public:
             wunit.commit();
         }
         releaseDb();
-        ASSERT_TRUE(checkValid());
+        ensureValidateWorked();
 
         lockDb(MODE_X);
 
@@ -396,7 +436,7 @@ public:
             wunit.commit();
         }
         releaseDb();
-        ASSERT_FALSE(checkValid());
+        ensureValidateFailed();
     }
 };
 
@@ -439,7 +479,7 @@ public:
             wunit.commit();
         }
         releaseDb();
-        ASSERT_TRUE(checkValid());
+        ensureValidateWorked();
 
         lockDb(MODE_X);
 
@@ -454,7 +494,7 @@ public:
 
         ASSERT_OK(status);
         releaseDb();
-        ASSERT_TRUE(checkValid());
+        ensureValidateWorked();
 
         lockDb(MODE_X);
         RecordStore* rs = coll->getRecordStore();
@@ -467,7 +507,7 @@ public:
             wunit.commit();
         }
         releaseDb();
-        ASSERT_FALSE(checkValid());
+        ensureValidateFailed();
 
         lockDb(MODE_X);
 
@@ -480,7 +520,7 @@ public:
             wunit.commit();
         }
         releaseDb();
-        ASSERT_TRUE(checkValid());
+        ensureValidateWorked();
     }
 };
 
@@ -528,7 +568,7 @@ public:
 
         ASSERT_OK(status);
         releaseDb();
-        ASSERT_TRUE(checkValid());
+        ensureValidateWorked();
 
         lockDb(MODE_X);
         RecordStore* rs = coll->getRecordStore();
@@ -542,7 +582,7 @@ public:
             wunit.commit();
         }
         releaseDb();
-        ASSERT_FALSE(checkValid());
+        ensureValidateFailed();
     }
 };
 
@@ -596,7 +636,7 @@ public:
 
         ASSERT_OK(status);
         releaseDb();
-        ASSERT_TRUE(checkValid());
+        ensureValidateWorked();
 
         lockDb(MODE_X);
         RecordStore* rs = coll->getRecordStore();
@@ -610,7 +650,7 @@ public:
             wunit.commit();
         }
         releaseDb();
-        ASSERT_TRUE(checkValid());
+        ensureValidateWorked();
     }
 };
 
@@ -671,7 +711,7 @@ public:
                                               << BSON("a" << BSON("$eq" << 1))));
         ASSERT_OK(status);
         releaseDb();
-        ASSERT_TRUE(checkValid());
+        ensureValidateWorked();
     }
 };
 
@@ -738,7 +778,7 @@ public:
 
         ASSERT_OK(status);
         releaseDb();
-        ASSERT_TRUE(checkValid());
+        ensureValidateWorked();
 
         lockDb(MODE_X);
         RecordStore* rs = coll->getRecordStore();
@@ -752,7 +792,7 @@ public:
             wunit.commit();
         }
         releaseDb();
-        ASSERT_FALSE(checkValid());
+        ensureValidateFailed();
     }
 };
 
@@ -797,7 +837,7 @@ public:
 
         ASSERT_OK(status);
         releaseDb();
-        ASSERT_TRUE(checkValid());
+        ensureValidateWorked();
 
         lockDb(MODE_X);
 
@@ -835,7 +875,7 @@ public:
             wunit.commit();
         }
         releaseDb();
-        ASSERT_FALSE(checkValid());
+        ensureValidateFailed();
     }
 };
 
@@ -880,7 +920,7 @@ public:
 
         ASSERT_OK(status);
         releaseDb();
-        ASSERT_TRUE(checkValid());
+        ensureValidateWorked();
 
         lockDb(MODE_X);
 
@@ -892,7 +932,7 @@ public:
         descriptor->setKeyPatternForTest(BSON("a" << -1));
 
         releaseDb();
-        ASSERT_FALSE(checkValid());
+        ensureValidateFailed();
     }
 };
 
@@ -945,7 +985,7 @@ public:
             wunit.commit();
         }
         releaseDb();
-        ASSERT_TRUE(checkValid());
+        ensureValidateWorked();
 
         // Insert multikey documents.
         lockDb(MODE_X);
@@ -964,7 +1004,7 @@ public:
             wunit.commit();
         }
         releaseDb();
-        ASSERT_TRUE(checkValid());
+        ensureValidateWorked();
 
         // Insert additional multikey path metadata index keys.
         lockDb(MODE_X);
@@ -992,7 +1032,7 @@ public:
         // An index whose set of multikey metadata paths is a superset of collection multikey
         // metadata paths is valid.
         releaseDb();
-        ASSERT_TRUE(checkValid());
+        ensureValidateWorked();
 
         // Remove the multikey path metadata index key for a path that exists and is multikey in the
         // collection.
@@ -1013,7 +1053,7 @@ public:
         // An index that is missing one or more multikey metadata fields that exist in the
         // collection is not valid.
         releaseDb();
-        ASSERT_FALSE(checkValid());
+        ensureValidateFailed();
     }
 };
 
@@ -1083,7 +1123,7 @@ public:
             wunit.commit();
         }
         releaseDb();
-        ASSERT_TRUE(checkValid());
+        ensureValidateWorked();
 
         lockDb(MODE_X);
         IndexCatalog* indexCatalog = coll->getIndexCatalog();
@@ -1109,7 +1149,7 @@ public:
             wunit.commit();
         }
         releaseDb();
-        ASSERT_FALSE(checkValid());
+        ensureValidateFailed();
     }
 };
 
@@ -1160,7 +1200,7 @@ public:
             wunit.commit();
         }
         releaseDb();
-        ASSERT_TRUE(checkValid());
+        ensureValidateWorked();
 
         RecordStore* rs = coll->getRecordStore();
 
@@ -1239,7 +1279,7 @@ public:
             wunit.commit();
         }
         releaseDb();
-        ASSERT_TRUE(checkValid());
+        ensureValidateWorked();
 
         // Removing an index entry without removing the document should cause us to have a missing
         // index entry.
@@ -1338,7 +1378,7 @@ public:
             wunit.commit();
         }
         releaseDb();
-        ASSERT_TRUE(checkValid());
+        ensureValidateWorked();
 
         // Removing a document without removing the index entries should cause us to have extra
         // index entries.
