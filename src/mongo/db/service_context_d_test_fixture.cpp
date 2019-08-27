@@ -86,14 +86,14 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine, RepairAct
 }
 
 ServiceContextMongoDTest::~ServiceContextMongoDTest() {
+    IndexBuildsCoordinator::get(getServiceContext())->shutdown();
+
     {
         auto opCtx = getClient()->makeOperationContext();
         Lock::GlobalLock glk(opCtx.get(), MODE_X);
         auto databaseHolder = DatabaseHolder::get(opCtx.get());
         databaseHolder->closeAll(opCtx.get());
     }
-
-    IndexBuildsCoordinator::get(getServiceContext())->shutdown();
 
     shutdownGlobalStorageEngineCleanly(getServiceContext());
 
