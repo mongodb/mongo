@@ -49,34 +49,34 @@ namespace {
     } while (false)
 
 #define assertSignedMultiplyNoOverflow(LHS, RHS, EXPECTED) \
-    assertArithOverflow(int64_t, mongoSignedMultiplyOverflow64, LHS, RHS, false, EXPECTED)
+    assertArithOverflow(int64_t, overflow::mul, LHS, RHS, false, EXPECTED)
 #define assertSignedMultiplyWithOverflow(LHS, RHS) \
-    assertArithOverflow(int64_t, mongoSignedMultiplyOverflow64, LHS, RHS, true, 0)
+    assertArithOverflow(int64_t, overflow::mul, LHS, RHS, true, 0)
 
 #define assertUnsignedMultiplyNoOverflow(LHS, RHS, EXPECTED) \
-    assertArithOverflow(uint64_t, mongoUnsignedMultiplyOverflow64, LHS, RHS, false, EXPECTED)
+    assertArithOverflow(uint64_t, overflow::mul, LHS, RHS, false, EXPECTED)
 #define assertUnsignedMultiplyWithOverflow(LHS, RHS) \
-    assertArithOverflow(uint64_t, mongoUnsignedMultiplyOverflow64, LHS, RHS, true, 0)
+    assertArithOverflow(uint64_t, overflow::mul, LHS, RHS, true, 0)
 
 #define assertSignedAddNoOverflow(LHS, RHS, EXPECTED) \
-    assertArithOverflow(int64_t, mongoSignedAddOverflow64, LHS, RHS, false, EXPECTED)
+    assertArithOverflow(int64_t, overflow::add, LHS, RHS, false, EXPECTED)
 #define assertSignedAddWithOverflow(LHS, RHS) \
-    assertArithOverflow(int64_t, mongoSignedAddOverflow64, LHS, RHS, true, 0)
+    assertArithOverflow(int64_t, overflow::add, LHS, RHS, true, 0)
 
 #define assertUnsignedAddNoOverflow(LHS, RHS, EXPECTED) \
-    assertArithOverflow(uint64_t, mongoUnsignedAddOverflow64, LHS, RHS, false, EXPECTED)
+    assertArithOverflow(uint64_t, overflow::add, LHS, RHS, false, EXPECTED)
 #define assertUnsignedAddWithOverflow(LHS, RHS) \
-    assertArithOverflow(uint64_t, mongoUnsignedAddOverflow64, LHS, RHS, true, 0)
+    assertArithOverflow(uint64_t, overflow::add, LHS, RHS, true, 0)
 
 #define assertSignedSubtractNoOverflow(LHS, RHS, EXPECTED) \
-    assertArithOverflow(int64_t, mongoSignedSubtractOverflow64, LHS, RHS, false, EXPECTED)
+    assertArithOverflow(int64_t, overflow::sub, LHS, RHS, false, EXPECTED)
 #define assertSignedSubtractWithOverflow(LHS, RHS) \
-    assertArithOverflow(int64_t, mongoSignedSubtractOverflow64, LHS, RHS, true, 0)
+    assertArithOverflow(int64_t, overflow::sub, LHS, RHS, true, 0)
 
 #define assertUnsignedSubtractNoOverflow(LHS, RHS, EXPECTED) \
-    assertArithOverflow(uint64_t, mongoUnsignedSubtractOverflow64, LHS, RHS, false, EXPECTED)
+    assertArithOverflow(uint64_t, overflow::sub, LHS, RHS, false, EXPECTED)
 #define assertUnsignedSubtractWithOverflow(LHS, RHS) \
-    assertArithOverflow(uint64_t, mongoUnsignedSubtractOverflow64, LHS, RHS, true, 0)
+    assertArithOverflow(uint64_t, overflow::sub, LHS, RHS, true, 0)
 
 TEST(OverflowArithmetic, SignedMultiplicationTests) {
     using limits = std::numeric_limits<int64_t>;

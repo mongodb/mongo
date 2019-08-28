@@ -142,9 +142,9 @@ inline StatusWith<uint64_t> parseMagnitudeFromStringWithBase(uint64_t base,
 
         // This block is (n = (n * base) + digitValue) with overflow checking at each step.
         uint64_t multiplied;
-        if (mongoUnsignedMultiplyOverflow64(n, base, &multiplied))
+        if (overflow::mul(n, base, &multiplied))
             return Status(ErrorCodes::Overflow, "Overflow");
-        if (mongoUnsignedAddOverflow64(multiplied, digitValue, &n))
+        if (overflow::add(multiplied, digitValue, &n))
             return Status(ErrorCodes::Overflow, "Overflow");
         ++charsConsumed;
     }
