@@ -70,9 +70,7 @@ Collection* getCollectionForCompact(OperationContext* opCtx,
 
 }  // namespace
 
-StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
-                                           const NamespaceString& collectionNss,
-                                           const CompactOptions* compactOptions) {
+Status compactCollection(OperationContext* opCtx, const NamespaceString& collectionNss) {
     AutoGetDb autoDb(opCtx, collectionNss.db(), MODE_IX);
     Database* database = autoDb.getDb();
     uassert(ErrorCodes::NamespaceNotFound, "database does not exist", database);
@@ -90,10 +88,9 @@ StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
     OldClientContext ctx(opCtx, collectionNss.ns());
 
     if (!recordStore->compactSupported())
-        return StatusWith<CompactStats>(ErrorCodes::CommandNotSupported,
-                                        str::stream()
-                                            << "cannot compact collection with record store: "
-                                            << recordStore->name());
+        return Status(ErrorCodes::CommandNotSupported,
+                      str::stream() << "cannot compact collection with record store: "
+                                    << recordStore->name());
 
     if (recordStore->supportsOnlineCompaction()) {
         // Storage engines that allow online compaction should do so using an intent lock on the
@@ -105,24 +102,22 @@ StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
         recordStore = collection->getRecordStore();
     }
 
-    log(LogComponent::kCommand) << "compact " << collectionNss
-                                << " begin, options: " << *compactOptions;
+    log(LogComponent::kCommand) << "compact " << collectionNss << " begin";
 
     auto indexCatalog = collection->getIndexCatalog();
 
     if (recordStore->compactsInPlace()) {
-        CompactStats stats;
         Status status = recordStore->compact(opCtx);
         if (!status.isOK())
-            return StatusWith<CompactStats>(status);
+            return status;
 
         // Compact all indexes (not including unfinished indexes)
         status = indexCatalog->compactIndexes(opCtx);
         if (!status.isOK())
-            return StatusWith<CompactStats>(status);
+            return status;
 
         log() << "compact " << collectionNss << " end";
-        return StatusWith<CompactStats>(stats);
+        return status;
     }
 
     invariant(opCtx->lockState()->isCollectionLockedForMode(collectionNss, MODE_X));
@@ -147,9 +142,9 @@ StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
             const Status keyStatus =
                 index_key_validate::validateKeyPattern(key, descriptor->version());
             if (!keyStatus.isOK()) {
-                return StatusWith<CompactStats>(
-                    ErrorCodes::CannotCreateIndex,
-                    str::stream() << "Cannot compact collection due to invalid index " << spec
+                return Status(ErrorCodes::CannotCreateIndex,
+                              str::stream()
+                                  << "Cannot compact collection due to invalid index " << spec
                                   << ": " << keyStatus.reason() << " For more info see"
                                   << " http://dochub.mongodb.org/core/index-validation");
             }
@@ -169,8 +164,6 @@ StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
         wunit.commit();
     }
 
-    CompactStats stats;
-
     MultiIndexBlock indexer;
     indexer.ignoreUniqueConstraint();  // in compact we should be doing no checking
 
@@ -180,16 +173,16 @@ StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
     Status status =
         indexer.init(opCtx, collection, indexSpecs, MultiIndexBlock::kNoopOnInitFn).getStatus();
     if (!status.isOK())
-        return StatusWith<CompactStats>(status);
+        return status;
 
     status = recordStore->compact(opCtx);
     if (!status.isOK())
-        return StatusWith<CompactStats>(status);
+        return status;
 
     log() << "starting index commits";
     status = indexer.dumpInsertsFromBulk(opCtx);
     if (!status.isOK())
-        return StatusWith<CompactStats>(status);
+        return status;
 
     {
         WriteUnitOfWork wunit(opCtx);
@@ -198,13 +191,13 @@ StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
                                 MultiIndexBlock::kNoopOnCreateEachFn,
                                 MultiIndexBlock::kNoopOnCommitFn);
         if (!status.isOK()) {
-            return StatusWith<CompactStats>(status);
+            return status;
         }
         wunit.commit();
     }
 
     log() << "compact " << collectionNss << " end";
-    return StatusWith<CompactStats>(stats);
+    return Status::OK();
 }
 
 }  // namespace mongo

@@ -29,17 +29,14 @@
 
 #pragma once
 
-#include "mongo/base/status_with.h"
+#include "mongo/base/status.h"
 #include "mongo/db/storage/record_store.h"
 
 namespace mongo {
 
 /**
  * Compacts collection.
- * See record_store.h for CompactStats and CompactOptions definitions.
  */
-StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
-                                           const NamespaceString& collectionNss,
-                                           const CompactOptions* options);
+Status compactCollection(OperationContext* opCtx, const NamespaceString& collectionNss);
 
 }  // namespace mongo

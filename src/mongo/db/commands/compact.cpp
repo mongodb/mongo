@@ -105,12 +105,7 @@ public:
             return false;
         }
 
-        CompactOptions compactOptions;
-
-        if (cmdObj.hasElement("validate"))
-            compactOptions.validateDocuments = cmdObj["validate"].trueValue();
-
-        uassertStatusOK(compactCollection(opCtx, nss, &compactOptions));
+        uassertStatusOK(compactCollection(opCtx, nss));
         return true;
     }
 };

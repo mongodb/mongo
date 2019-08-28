@@ -37,10 +37,6 @@
 
 namespace mongo {
 
-std::string CompactOptions::toString() const {
-    return str::stream() << " validateDocuments: " << validateDocuments;
-}
-
 //
 // CappedInsertNotifier
 //

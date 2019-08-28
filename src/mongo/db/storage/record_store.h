@@ -42,8 +42,6 @@ namespace mongo {
 
 class CappedCallback;
 class Collection;
-struct CompactOptions;
-struct CompactStats;
 class MAdvise;
 class OperationContext;
 
@@ -51,15 +49,6 @@ class RecordStore;
 
 struct ValidateResults;
 class ValidateAdaptor;
-
-struct CompactOptions {
-    // other
-    bool validateDocuments = true;
-
-    std::string toString() const;
-};
-
-struct CompactStats {};
 
 /**
  * The data items stored in a RecordStore.
