@@ -23,6 +23,12 @@ selector:
   # SERVER-30644 These tests create/drop/modify views which can deadlock on the ViewCatalog mutex if
   # there's a concurrent operation which acquires a MODE_X lock.
   - jstests/concurrency/fsm_workloads/view_catalog*.js
+
+  # SERVER-43053 These workloads set a failpoint that causes intermittent WriteConflict errors,
+  # which presently can cause other simultaneous workloads to fail.
+  - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
+  - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
+
   exclude_with_any_tags:
   - uses_transactions
   - requires_replication

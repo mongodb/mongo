@@ -156,13 +156,18 @@ public:
         vector<BSONObj> all;
         {
             vector<string> indexNames;
-            DurableCatalog::get(opCtx)->getAllIndexes(opCtx, collection->ns(), &indexNames);
+            writeConflictRetry(opCtx, "listIndexes", toReIndexNss.ns(), [&] {
+                indexNames.clear();
+                DurableCatalog::get(opCtx)->getAllIndexes(opCtx, collection->ns(), &indexNames);
+            });
+
             all.reserve(indexNames.size());
 
             for (size_t i = 0; i < indexNames.size(); i++) {
                 const string& name = indexNames[i];
-                BSONObj spec =
-                    DurableCatalog::get(opCtx)->getIndexSpec(opCtx, collection->ns(), name);
+                BSONObj spec = writeConflictRetry(opCtx, "getIndexSpec", toReIndexNss.ns(), [&] {
+                    return DurableCatalog::get(opCtx)->getIndexSpec(opCtx, collection->ns(), name);
+                });
 
                 {
                     BSONObjBuilder bob;
@@ -204,13 +209,15 @@ public:
         ON_BLOCK_EXIT([&] { indexer->cleanUpAfterBuild(opCtx, collection); });
 
         {
-            WriteUnitOfWork wunit(opCtx);
-            collection->getIndexCatalog()->dropAllIndexes(opCtx, true);
+            writeConflictRetry(opCtx, "dropAllIndexes", toReIndexNss.ns(), [&] {
+                WriteUnitOfWork wunit(opCtx);
+                collection->getIndexCatalog()->dropAllIndexes(opCtx, true);
 
-            swIndexesToRebuild =
-                indexer->init(opCtx, collection, all, MultiIndexBlock::kNoopOnInitFn);
-            uassertStatusOK(swIndexesToRebuild.getStatus());
-            wunit.commit();
+                swIndexesToRebuild =
+                    indexer->init(opCtx, collection, all, MultiIndexBlock::kNoopOnInitFn);
+                uassertStatusOK(swIndexesToRebuild.getStatus());
+                wunit.commit();
+            });
         }
 
         if (MONGO_FAIL_POINT(reIndexCrashAfterDrop)) {
@@ -218,16 +225,21 @@ public:
             quickExit(EXIT_ABRUPT);
         }
 
+        // The following function performs its own WriteConflict handling, so don't wrap it in a
+        // writeConflictRetry loop.
         uassertStatusOK(indexer->insertAllDocumentsInCollection(opCtx, collection));
+
         uassertStatusOK(indexer->checkConstraints(opCtx));
 
         {
-            WriteUnitOfWork wunit(opCtx);
-            uassertStatusOK(indexer->commit(opCtx,
-                                            collection,
-                                            MultiIndexBlock::kNoopOnCreateEachFn,
-                                            MultiIndexBlock::kNoopOnCommitFn));
-            wunit.commit();
+            writeConflictRetry(opCtx, "commitReIndex", toReIndexNss.ns(), [&] {
+                WriteUnitOfWork wunit(opCtx);
+                uassertStatusOK(indexer->commit(opCtx,
+                                                collection,
+                                                MultiIndexBlock::kNoopOnCreateEachFn,
+                                                MultiIndexBlock::kNoopOnCommitFn));
+                wunit.commit();
+            });
         }
 
         // Do not allow majority reads from this collection until all original indexes are visible.

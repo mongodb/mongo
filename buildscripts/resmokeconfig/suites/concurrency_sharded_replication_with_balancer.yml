@@ -80,6 +80,10 @@ selector:
   # reIndex is not supported in mongos.
   - jstests/concurrency/fsm_workloads/reindex.js
   - jstests/concurrency/fsm_workloads/reindex_background.js
+  - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
+
+  # The WTWriteConflictException failpoint is not supported on mongos.
+  - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
 
   # our .remove(query, {justOne: true}) calls lack shard keys
   - jstests/concurrency/fsm_workloads/remove_single_document.js

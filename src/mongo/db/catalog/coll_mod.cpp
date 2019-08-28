@@ -42,6 +42,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/command_generic_argument.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
@@ -236,10 +237,27 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
     return {std::move(cmr)};
 }
 
-/**
- * If uuid is specified, add it to the collection specified by nss. This will error if the
- * collection already has a UUID.
- */
+class CollModResultChange : public RecoveryUnit::Change {
+public:
+    CollModResultChange(const BSONElement& oldExpireSecs,
+                        const BSONElement& newExpireSecs,
+                        BSONObjBuilder* result)
+        : _oldExpireSecs(oldExpireSecs), _newExpireSecs(newExpireSecs), _result(result) {}
+
+    void commit(boost::optional<Timestamp>) override {
+        // add the fields to BSONObjBuilder result
+        _result->appendAs(_oldExpireSecs, "expireAfterSeconds_old");
+        _result->appendAs(_newExpireSecs, "expireAfterSeconds_new");
+    }
+
+    void rollback() override {}
+
+private:
+    const BSONElement _oldExpireSecs;
+    const BSONElement _newExpireSecs;
+    BSONObjBuilder* _result;
+};
+
 Status _collModInternal(OperationContext* opCtx,
                         const NamespaceString& nss,
                         const BSONObj& cmdObj,
@@ -289,92 +307,98 @@ Status _collModInternal(OperationContext* opCtx,
     if (!statusW.isOK()) {
         return statusW.getStatus();
     }
+    auto oplogEntryObj = oplogEntryBuilder.obj();
 
-    CollModRequest cmr = statusW.getValue();
+    // Save both states of the CollModRequest to allow writeConflictRetries.
+    const CollModRequest cmrOld = statusW.getValue();
+    CollModRequest cmrNew = statusW.getValue();
 
-    WriteUnitOfWork wunit(opCtx);
+    return writeConflictRetry(opCtx, "collMod", nss.ns(), [&] {
+        WriteUnitOfWork wunit(opCtx);
 
-    // Handle collMod on a view and return early. The View Catalog handles the creation of oplog
-    // entries for modifications on a view.
-    if (view) {
-        if (!cmr.viewPipeLine.eoo())
-            view->setPipeline(cmr.viewPipeLine);
+        // Handle collMod on a view and return early. The View Catalog handles the creation of oplog
+        // entries for modifications on a view.
+        if (view) {
+            if (!cmrOld.viewPipeLine.eoo())
+                view->setPipeline(cmrOld.viewPipeLine);
 
-        if (!cmr.viewOn.empty())
-            view->setViewOn(NamespaceString(dbName, cmr.viewOn));
+            if (!cmrOld.viewOn.empty())
+                view->setViewOn(NamespaceString(dbName, cmrOld.viewOn));
 
-        ViewCatalog* catalog = ViewCatalog::get(db);
+            ViewCatalog* catalog = ViewCatalog::get(db);
 
-        BSONArrayBuilder pipeline;
-        for (auto& item : view->pipeline()) {
-            pipeline.append(item);
+            BSONArrayBuilder pipeline;
+            for (auto& item : view->pipeline()) {
+                pipeline.append(item);
+            }
+            auto errorStatus =
+                catalog->modifyView(opCtx, nss, view->viewOn(), BSONArray(pipeline.obj()));
+            if (!errorStatus.isOK()) {
+                return errorStatus;
+            }
+
+            wunit.commit();
+            return Status::OK();
         }
-        auto errorStatus =
-            catalog->modifyView(opCtx, nss, view->viewOn(), BSONArray(pipeline.obj()));
-        if (!errorStatus.isOK()) {
-            return errorStatus;
+
+        // In order to facilitate the replication rollback process, which makes a best effort
+        // attempt to "undo" a set of oplog operations, we store a snapshot of the old collection
+        // options to provide to the OpObserver. TTL index updates aren't a part of collection
+        // options so we save the relevant TTL index data in a separate object.
+
+        CollectionOptions oldCollOptions =
+            DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, nss);
+
+        boost::optional<TTLCollModInfo> ttlInfo;
+
+        // Handle collMod operation type appropriately.
+
+        // TTLIndex
+        if (!cmrOld.indexExpireAfterSeconds.eoo()) {
+            BSONElement newExpireSecs = cmrOld.indexExpireAfterSeconds;
+            BSONElement oldExpireSecs = cmrOld.idx->infoObj().getField("expireAfterSeconds");
+
+            if (SimpleBSONElementComparator::kInstance.evaluate(oldExpireSecs != newExpireSecs)) {
+                // Change the value of "expireAfterSeconds" on disk.
+                DurableCatalog::get(opCtx)->updateTTLSetting(
+                    opCtx, coll->ns(), cmrOld.idx->indexName(), newExpireSecs.safeNumberLong());
+
+                // Notify the index catalog that the definition of this index changed. This will
+                // invalidate the idx pointer in cmrOld. On rollback of this WUOW, the idx pointer
+                // in cmrNew will be invalidated and the idx pointer in cmrOld will be valid again.
+                cmrNew.idx = coll->getIndexCatalog()->refreshEntry(opCtx, cmrOld.idx);
+                opCtx->recoveryUnit()->registerChange(
+                    new CollModResultChange(oldExpireSecs, newExpireSecs, result));
+
+                if (MONGO_FAIL_POINT(assertAfterIndexUpdate)) {
+                    log() << "collMod - assertAfterIndexUpdate fail point enabled.";
+                    uasserted(50970, "trigger rollback after the index update");
+                }
+            }
+
+
+            // Save previous TTL index expiration.
+            ttlInfo = TTLCollModInfo{Seconds(newExpireSecs.safeNumberLong()),
+                                     Seconds(oldExpireSecs.safeNumberLong()),
+                                     cmrNew.idx->indexName()};
         }
+
+        // The Validator, ValidationAction and ValidationLevel are already parsed and must be OK.
+        if (!cmrNew.collValidator.eoo())
+            invariant(coll->setValidator(opCtx, cmrNew.collValidator.Obj()));
+        if (!cmrNew.collValidationAction.empty())
+            invariant(coll->setValidationAction(opCtx, cmrNew.collValidationAction));
+        if (!cmrNew.collValidationLevel.empty())
+            invariant(coll->setValidationLevel(opCtx, cmrNew.collValidationLevel));
+
+        // Only observe non-view collMods, as view operations are observed as operations on the
+        // system.views collection.
+        getGlobalServiceContext()->getOpObserver()->onCollMod(
+            opCtx, nss, coll->uuid(), oplogEntryObj, oldCollOptions, ttlInfo);
 
         wunit.commit();
         return Status::OK();
-    }
-
-    // In order to facilitate the replication rollback process, which makes a best effort attempt to
-    // "undo" a set of oplog operations, we store a snapshot of the old collection options to
-    // provide to the OpObserver. TTL index updates aren't a part of collection options so we
-    // save the relevant TTL index data in a separate object.
-
-    CollectionOptions oldCollOptions = DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, nss);
-
-    boost::optional<TTLCollModInfo> ttlInfo;
-
-    // Handle collMod operation type appropriately.
-
-    // TTLIndex
-    if (!cmr.indexExpireAfterSeconds.eoo()) {
-        BSONElement& newExpireSecs = cmr.indexExpireAfterSeconds;
-        BSONElement oldExpireSecs = cmr.idx->infoObj().getField("expireAfterSeconds");
-
-        if (SimpleBSONElementComparator::kInstance.evaluate(oldExpireSecs != newExpireSecs)) {
-            result->appendAs(oldExpireSecs, "expireAfterSeconds_old");
-
-            // Change the value of "expireAfterSeconds" on disk.
-            DurableCatalog::get(opCtx)->updateTTLSetting(
-                opCtx, coll->ns(), cmr.idx->indexName(), newExpireSecs.safeNumberLong());
-
-            // Notify the index catalog that the definition of this index changed.
-            cmr.idx = coll->getIndexCatalog()->refreshEntry(opCtx, cmr.idx);
-            result->appendAs(newExpireSecs, "expireAfterSeconds_new");
-
-            if (MONGO_FAIL_POINT(assertAfterIndexUpdate)) {
-                log() << "collMod - assertAfterIndexUpdate fail point enabled.";
-                uasserted(50970, "trigger rollback after the index update");
-            }
-        }
-
-
-        // Save previous TTL index expiration.
-        ttlInfo = TTLCollModInfo{Seconds(newExpireSecs.safeNumberLong()),
-                                 Seconds(oldExpireSecs.safeNumberLong()),
-                                 cmr.idx->indexName()};
-    }
-
-    // The Validator, ValidationAction and ValidationLevel are already parsed and must be OK.
-    if (!cmr.collValidator.eoo())
-        invariant(coll->setValidator(opCtx, cmr.collValidator.Obj()));
-    if (!cmr.collValidationAction.empty())
-        invariant(coll->setValidationAction(opCtx, cmr.collValidationAction));
-    if (!cmr.collValidationLevel.empty())
-        invariant(coll->setValidationLevel(opCtx, cmr.collValidationLevel));
-
-    // Only observe non-view collMods, as view operations are observed as operations on the
-    // system.views collection.
-    getGlobalServiceContext()->getOpObserver()->onCollMod(
-        opCtx, nss, coll->uuid(), oplogEntryBuilder.obj(), oldCollOptions, ttlInfo);
-
-    wunit.commit();
-
-    return Status::OK();
+    });
 }
 
 }  // namespace

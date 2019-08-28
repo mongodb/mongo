@@ -38,6 +38,12 @@ selector:
 
   # This workload assumes no locks are taken outside of the workload.
   - jstests/concurrency/fsm_workloads/access_collection_in_transaction_after_catalog_changes.js
+
+  # SERVER-43053 These workloads set a failpoint that causes intermittent WriteConflict errors,
+  # which presently can cause other simultaneous workloads to fail.
+  - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
+  - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
+
   exclude_with_any_tags:
   - requires_sharding
 
