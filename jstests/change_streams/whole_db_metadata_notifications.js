@@ -194,54 +194,6 @@ change = cst.getOneChange(aggCursor);
 assert.eq(change.operationType, "insert", tojson(change));
 assert.eq(change.ns, {db: testDB.getName(), coll: coll.getName()});
 
-// Test that renaming a "system" collection *does* return a notification if the target of
-// the rename is a non-system collection.
-assert.commandWorked(testDB.runCommand({create: "view1", viewOn: coll.getName(), pipeline: []}));
-assert.commandWorked(testDB.system.views.renameCollection("non_system_collection"));
-cst.assertNextChangesEqual({
-    cursor: aggCursor,
-    expectedChanges: [{
-        operationType: "rename",
-        ns: {db: testDB.getName(), coll: "system.views"},
-        to: {db: testDB.getName(), coll: "non_system_collection"}
-    }],
-});
-
-// Test that renaming a "system" collection to a different "system" collection does not
-// result in a notification in the change stream.
-aggCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
-assert.commandWorked(testDB.runCommand({create: "view1", viewOn: coll.getName(), pipeline: []}));
-// Note that the target of the rename must be a valid "system" collection.
-assert.commandWorked(testDB.system.views.renameCollection("system.users"));
-// Verify that the change stream filters out the rename above, instead returning the next insert
-// to the test collection.
-assert.commandWorked(coll.insert({_id: 1}));
-change = cst.getOneChange(aggCursor);
-assert.eq(change.operationType, "insert", tojson(change));
-assert.eq(change.ns, {db: testDB.getName(), coll: coll.getName()});
-
-// Test that renaming a user collection to a "system" collection *is* returned in the change
-// stream.
-assert.commandWorked(coll.renameCollection("system.views"));
-cst.assertNextChangesEqual({
-    cursor: aggCursor,
-    expectedChanges: [{
-        operationType: "rename",
-        ns: {db: testDB.getName(), coll: coll.getName()},
-        to: {db: testDB.getName(), coll: "system.views"}
-    }],
-});
-
-// Drop the "system.views" collection to avoid view catalog errors in subsequent tests.
-assertDropCollection(testDB, "system.views");
-assertDropCollection(testDB, "non_system_collection");
-cst.assertNextChangesEqual({
-    cursor: aggCursor,
-    expectedChanges: [
-        {operationType: "drop", ns: {db: testDB.getName(), coll: "non_system_collection"}},
-    ]
-});
-
 // Dropping the database should generate a 'dropDatabase' notification followed by an
 // 'invalidate'.
 assert.commandWorked(testDB.dropDatabase());

@@ -125,7 +125,6 @@ selector:
   - jstests/core/views/view_with_invalid_dbname.js
   - jstests/core/views/views_creation.js
   - jstests/core/views/views_drop.js
-  - jstests/core/views/views_rename.js
 
   # The tests below use applyOps, SERVER-1439.
   - jstests/core/list_collections1.js

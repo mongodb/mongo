@@ -747,6 +747,12 @@ Status renameCollection(OperationContext* opCtx,
                                     << source);
     }
 
+    if (source.isSystemDotViews() || target.isSystemDotViews()) {
+        return Status(
+            ErrorCodes::IllegalOperation,
+            "renaming system.views collection or renaming to system.views is not allowed");
+    }
+
     const std::string dropTargetMsg =
         options.dropTarget ? " and drop " + target.toString() + "." : ".";
     log() << "renameCollectionForCommand: rename " << source << " to " << target << dropTargetMsg;
