@@ -80,7 +80,8 @@ def _update_builder(env, builder, bitcode):
 
         bitcode_file = None
         if env.TargetOSIs('darwin'):
-            debug_file = env.Dir(str(target[0]) + ".dSYM")
+            debug_file = env.Entry(str(target[0]) + ".dSYM")
+            env.Precious(debug_file)
             if bitcode:
                 bitcode_file = env.File(str(target[0]) + ".bcsymbolmap")
         elif env.TargetOSIs('posix'):
