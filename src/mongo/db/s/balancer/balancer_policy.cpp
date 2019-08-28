@@ -33,13 +33,18 @@
 
 #include "mongo/db/s/balancer/balancer_policy.h"
 
+#include <random>
+
 #include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(balancerShouldReturnRandomMigrations);
 
 using std::map;
 using std::numeric_limits;
@@ -287,10 +292,80 @@ ShardId BalancerPolicy::_getMostOverloadedShard(const ShardStatisticsVector& sha
     return worst;
 }
 
+// Returns a random integer in [0, max) using a uniform random distribution.
+int getRandomIndex(int max) {
+    std::default_random_engine gen(time(nullptr));
+    std::uniform_int_distribution<int> dist(0, max - 1);
+
+    return dist(gen);
+}
+
+// Iterates through the shardStats vector starting from index until it finds an element that has > 0
+// chunks. It will wrap around at the end and stop at the starting index. If no shards have chunks,
+// it will return the original index value.
+int getNextShardWithChunks(const ShardStatisticsVector& shardStats,
+                           const DistributionStatus& distribution,
+                           int index) {
+    int retIndex = index;
+
+    while (distribution.numberOfChunksInShard(shardStats[retIndex].shardId) == 0) {
+        retIndex = (retIndex + 1) % shardStats.size();
+
+        if (retIndex == index)
+            return index;
+    }
+
+    return retIndex;
+}
+
+// Returns a randomly chosen pair of source -> destination shards for testing.
+// The random pair is chosen by the following algorithm:
+//  - create an array of indices with values [0, n)
+//  - select a random index from this set
+//  - advance the chosen index until we encounter a shard with chunks to move
+//  - remove the chosen index from the set by swapping it with the last element
+//  - select the destination index from the remaining indices
+MigrateInfo chooseRandomMigration(const ShardStatisticsVector& shardStats,
+                                  const DistributionStatus& distribution) {
+    std::vector<int> indices(shardStats.size());
+
+    int i = 0;
+    std::generate(indices.begin(), indices.end(), [&i] { return i++; });
+
+    int choice = getRandomIndex(indices.size());
+
+    const int sourceIndex = getNextShardWithChunks(shardStats, distribution, indices[choice]);
+    const auto& sourceShardId = shardStats[sourceIndex].shardId;
+    std::swap(indices[sourceIndex], indices[indices.size() - 1]);
+
+    choice = getRandomIndex(indices.size() - 1);
+    const int destIndex = indices[choice];
+    const auto& destShardId = shardStats[destIndex].shardId;
+
+    LOG(1) << "balancerShouldReturnRandomMigrations: source: " << sourceShardId
+           << " dest: " << destShardId;
+
+    const auto& chunks = distribution.getChunks(sourceShardId);
+
+    return {destShardId, chunks[getRandomIndex(chunks.size())]};
+}
+
 vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardStats,
                                             const DistributionStatus& distribution,
                                             std::set<ShardId>* usedShards) {
     vector<MigrateInfo> migrations;
+
+    if (MONGO_FAIL_POINT(balancerShouldReturnRandomMigrations) &&
+        !distribution.nss().isConfigDB()) {
+        LOG(1) << "balancerShouldReturnRandomMigrations failpoint is set";
+
+        if (shardStats.size() < 2)
+            return migrations;
+
+        migrations.push_back(chooseRandomMigration(shardStats, distribution));
+
+        return migrations;
+    }
 
     // 1) Check for shards, which are in draining mode
     {

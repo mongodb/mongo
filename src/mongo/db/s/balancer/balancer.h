@@ -172,13 +172,13 @@ private:
      * Signals the beginning and end of a balancing round.
      */
     void _beginRound(OperationContext* opCtx);
-    void _endRound(OperationContext* opCtx, Seconds waitTimeout);
+    void _endRound(OperationContext* opCtx, Milliseconds waitTimeout);
 
     /**
      * Blocks the caller for the specified timeout or until the balancer condition variable is
      * signaled, whichever comes first.
      */
-    void _sleepFor(OperationContext* opCtx, Seconds waitTimeout);
+    void _sleepFor(OperationContext* opCtx, Milliseconds waitTimeout);
 
     /**
      * Returns true if all the servers listed in configdb as being shards are reachable and are
