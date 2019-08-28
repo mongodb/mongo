@@ -1196,7 +1196,7 @@ TEST_F(DConcurrencyTestFixture, NoThrottlingWhenNotAcquiringTickets) {
     UseGlobalThrottling throttle(opctx1, 1);
 
     // Prevent the enforcement of ticket throttling.
-    opctx1->lockState()->setShouldAcquireTicket(false);
+    opctx1->lockState()->skipAcquireTicket();
 
     // Both locks should be acquired immediately because there is no throttling.
     Lock::GlobalRead R1(opctx1, Date_t::now(), Lock::InterruptBehavior::kThrow);

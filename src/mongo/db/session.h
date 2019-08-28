@@ -92,9 +92,9 @@ public:
         TxnResources& operator=(TxnResources&&) = default;
 
         /**
-         * Returns a const pointer to the stashed lock state, or nullptr if no stashed locks exist.
+         * Returns a pointer to the stashed lock state, or nullptr if no stashed locks exist.
          */
-        const Locker* locker() const {
+        Locker* locker() const {
             return _locker.get();
         }
 

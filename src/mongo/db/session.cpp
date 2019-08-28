@@ -779,6 +779,15 @@ void Session::unstashTransactionResources(OperationContext* opCtx, const std::st
             uassert(ErrorCodes::InvalidOptions,
                     "Only the first command in a transaction may specify a readConcern",
                     readConcernArgs.isEmpty());
+            // On primary, commitTransaction and abortTransaction commands can skip ticketing
+            // mechanism as they don't acquire any new storage resources (except writing to oplog)
+            // but they release any claimed storage resources.
+            if (opCtx->writesAreReplicated() &&
+                (cmdName == "commitTransaction" || cmdName == "abortTransaction")) {
+                auto stashLocker = _txnResourceStash->locker();
+                stashLocker->skipAcquireTicket();
+            }
+
             _txnResourceStash->release(opCtx);
             _txnResourceStash = boost::none;
             // Set the starting active time for this transaction.
