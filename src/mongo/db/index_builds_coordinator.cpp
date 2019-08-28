@@ -259,10 +259,7 @@ void IndexBuildsCoordinator::interruptAllIndexBuildsForShutdown(const std::strin
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _shuttingDown = true;
 
-    // Signal all the index builds to stop.
-    for (auto& buildStateIt : _allIndexBuilds) {
-        _indexBuildsManager.abortIndexBuild(buildStateIt.second->buildUUID, reason);
-    }
+    // All index builds should have been signaled to stop via the ServiceContext.
 
     // Wait for all the index builds to stop.
     for (auto& dbIt : _databaseIndexBuilds) {
