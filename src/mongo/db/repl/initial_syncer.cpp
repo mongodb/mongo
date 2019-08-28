@@ -544,7 +544,7 @@ void InitialSyncer::_chooseSyncSourceCallback(
 
     if (MONGO_FAIL_POINT(failInitialSyncWithBadHost)) {
         status = Status(ErrorCodes::InvalidSyncSource,
-                        "no sync source avail(failInitialSyncWithBadHost failpoint is set).");
+                        "initial sync failed - failInitialSyncWithBadHost failpoint is set.");
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
         return;
     }
