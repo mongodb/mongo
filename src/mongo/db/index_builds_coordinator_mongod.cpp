@@ -77,8 +77,8 @@ void IndexBuildsCoordinatorMongod::shutdown() {
     // Stop new scheduling.
     _threadPool.shutdown();
 
-    // Signal active builds to stop and wait for them to stop.
-    interruptAllIndexBuildsForShutdown("Index build interrupted due to shutdown.");
+    // Wait for all active builds to stop.
+    waitForAllIndexBuildsToStopForShutdown();
 
     // Wait for active threads to finish.
     _threadPool.join();

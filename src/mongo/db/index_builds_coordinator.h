@@ -145,14 +145,14 @@ public:
                                     const UUID& buildUUID) = 0;
 
     /**
-     * Signals all the index builds to stop and then waits for them to finish. Leaves the index
-     * builds in a recoverable state.
+     * Waits for all index builds to stop after they have been interrupted during shutdown.
+     * Leaves the index builds in a recoverable state.
      *
      * This should only be called when certain the server will not start any new index builds --
      * i.e. when the server is not accepting user requests and no internal operations are
      * concurrently starting new index builds.
      */
-    void interruptAllIndexBuildsForShutdown(const std::string& reason);
+    void waitForAllIndexBuildsToStopForShutdown();
 
     /**
      * Signals all of the index builds on the specified collection to abort and then waits until the
@@ -451,7 +451,6 @@ protected:
     IndexBuildsManager _indexBuildsManager;
 
     bool _sleepForTest = false;
-    bool _shuttingDown = false;
 };
 
 /**
