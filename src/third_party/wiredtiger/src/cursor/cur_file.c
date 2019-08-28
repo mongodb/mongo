@@ -617,7 +617,7 @@ __curfile_create(WT_SESSION_IMPL *session, WT_CURSOR *owner, const char *cfg[], 
       __curfile_search,                               /* search */
       __curfile_search_near,                          /* search-near */
       __curfile_insert,                               /* insert */
-      __wt_cursor_modify_notsup,                      /* modify */
+      __wt_cursor_modify_value_format_notsup,         /* modify */
       __curfile_update,                               /* update */
       __curfile_remove,                               /* remove */
       __curfile_reserve,                              /* reserve */

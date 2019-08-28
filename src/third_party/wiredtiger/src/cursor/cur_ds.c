@@ -492,7 +492,7 @@ __wt_curds_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, con
       __curds_search,                                 /* search */
       __curds_search_near,                            /* search-near */
       __curds_insert,                                 /* insert */
-      __wt_cursor_modify_notsup,                      /* modify */
+      __wt_cursor_modify_value_format_notsup,         /* modify */
       __curds_update,                                 /* update */
       __curds_remove,                                 /* remove */
       __curds_reserve,                                /* reserve */

@@ -54,27 +54,34 @@ typedef struct __truncate_queue_entry TRUNCATE_QUEUE_ENTRY;
 #define ZSTD_BLK BLKCMP_PFX "zstd"
 #define ZSTD_EXT EXT_PFX EXTPATH "zstd/.libs/libwiredtiger_zstd.so" EXT_SFX
 
+#define MAX_MODIFY_PCT 10
+#define MAX_MODIFY_NUM 16
+
 typedef struct {
     int64_t threads;   /* Thread count */
     int64_t insert;    /* Insert ratio */
+    int64_t modify;    /* Modify ratio */
     int64_t read;      /* Read ratio */
     int64_t update;    /* Update ratio */
     uint64_t throttle; /* Maximum operations/second */
                        /* Number of operations per transaction. Zero for autocommit */
     int64_t ops_per_txn;
-    int64_t pause;           /* Time between scans */
-    int64_t read_range;      /* Range of reads */
-    int32_t table_index;     /* Table to focus ops on */
-    int64_t truncate;        /* Truncate ratio */
-    uint64_t truncate_pct;   /* Truncate Percent */
-    uint64_t truncate_count; /* Truncate Count */
-    int64_t update_delta;    /* Value size change on update */
+    int64_t pause;            /* Time between scans */
+    int64_t read_range;       /* Range of reads */
+    int32_t table_index;      /* Table to focus ops on */
+    int64_t truncate;         /* Truncate ratio */
+    uint64_t truncate_pct;    /* Truncate Percent */
+    uint64_t truncate_count;  /* Truncate Count */
+    int64_t modify_delta;     /* Value size change on modify */
+    int64_t update_delta;     /* Value size change on update */
+    bool modify_force_update; /* Do force update instead of modify */
 
 #define WORKER_INSERT 1     /* Insert */
 #define WORKER_INSERT_RMW 2 /* Insert with read-modify-write */
-#define WORKER_READ 3       /* Read */
-#define WORKER_TRUNCATE 4   /* Truncate */
-#define WORKER_UPDATE 5     /* Update */
+#define WORKER_MODIFY 3     /* Modify */
+#define WORKER_READ 4       /* Read */
+#define WORKER_TRUNCATE 5   /* Truncate */
+#define WORKER_UPDATE 6     /* Update */
     uint8_t ops[100];       /* Operation schedule */
 } WORKLOAD;
 
@@ -140,6 +147,7 @@ struct __wtperf {         /* Per-database structure */
     uint64_t ckpt_ops;     /* checkpoint operations */
     uint64_t scan_ops;     /* scan operations */
     uint64_t insert_ops;   /* insert operations */
+    uint64_t modify_ops;   /* modify operations */
     uint64_t read_ops;     /* read operations */
     uint64_t truncate_ops; /* truncate operations */
     uint64_t update_ops;   /* update operations */
@@ -242,11 +250,12 @@ struct __wtperf_thread {    /* Per-thread structure */
 
     TRACK ckpt;           /* Checkpoint operations */
     TRACK insert;         /* Insert operations */
+    TRACK modify;         /* Modify operations */
     TRACK read;           /* Read operations */
     TRACK scan;           /* Scan operations */
-    TRACK update;         /* Update operations */
     TRACK truncate;       /* Truncate operations */
     TRACK truncate_sleep; /* Truncate sleep operations */
+    TRACK update;         /* Update operations */
 };
 
 void cleanup_truncate_config(WTPERF *);
@@ -260,6 +269,7 @@ int config_opt_str(WTPERF *, const char *);
 void config_opt_usage(void);
 int config_sanity(WTPERF *);
 void latency_insert(WTPERF *, uint32_t *, uint32_t *, uint32_t *);
+void latency_modify(WTPERF *, uint32_t *, uint32_t *, uint32_t *);
 void latency_print(WTPERF *);
 void latency_read(WTPERF *, uint32_t *, uint32_t *, uint32_t *);
 void latency_update(WTPERF *, uint32_t *, uint32_t *, uint32_t *);
@@ -273,6 +283,7 @@ void worker_throttle(WTPERF_THREAD *);
 uint64_t sum_ckpt_ops(WTPERF *);
 uint64_t sum_scan_ops(WTPERF *);
 uint64_t sum_insert_ops(WTPERF *);
+uint64_t sum_modify_ops(WTPERF *);
 uint64_t sum_pop_ops(WTPERF *);
 uint64_t sum_read_ops(WTPERF *);
 uint64_t sum_truncate_ops(WTPERF *);

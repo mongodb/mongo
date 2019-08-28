@@ -39,7 +39,7 @@ static int execute_workload(WTPERF *);
 static int find_table_count(WTPERF *);
 static WT_THREAD_RET monitor(void *);
 static WT_THREAD_RET populate_thread(void *);
-static void randomize_value(WTPERF_THREAD *, char *);
+static void randomize_value(WTPERF_THREAD *, char *, int64_t);
 static void recreate_dir(const char *);
 static WT_THREAD_RET scan_worker(void *);
 static int start_all_runs(WTPERF *);
@@ -48,7 +48,7 @@ static void start_threads(
   WTPERF *, WORKLOAD *, WTPERF_THREAD *, u_int, WT_THREAD_CALLBACK (*)(void *));
 static void stop_threads(u_int, WTPERF_THREAD *);
 static WT_THREAD_RET thread_run_wtperf(void *);
-static void update_value_delta(WTPERF_THREAD *);
+static void update_value_delta(WTPERF_THREAD *, int64_t);
 static WT_THREAD_RET worker(void *);
 
 static uint64_t wtperf_rand(WTPERF_THREAD *);
@@ -65,10 +65,11 @@ get_next_incr(WTPERF *wtperf)
 
 /*
  * Each time this function is called we will overwrite the first and one other element in the value
- * buffer.
+ * buffer. The delta can be zero for insert operations and may have a value for update or modify
+ * workloads.
  */
 static void
-randomize_value(WTPERF_THREAD *thread, char *value_buf)
+randomize_value(WTPERF_THREAD *thread, char *value_buf, int64_t delta)
 {
     CONFIG_OPTS *opts;
     uint8_t *vb;
@@ -78,13 +79,13 @@ randomize_value(WTPERF_THREAD *thread, char *value_buf)
 
     /*
      * Limit how much of the buffer we validate for length, this means that only threads that do
-     * growing updates will ever make changes to values outside of the initial value size, but
-     * that's a fair trade off for avoiding figuring out how long the value is more accurately in
-     * this performance sensitive function.
+     * growing updates/modifies will ever make changes to values outside of the initial value size,
+     * but that's a fair trade off for avoiding figuring out how long the value is more accurately
+     * in this performance sensitive function.
      */
-    if (thread->workload == NULL || thread->workload->update_delta == 0)
+    if (delta == 0)
         max_range = opts->value_sz;
-    else if (thread->workload->update_delta > 0)
+    else if (delta > 0)
         max_range = opts->value_sz_max;
     else
         max_range = opts->value_sz_min;
@@ -134,21 +135,20 @@ map_key_to_table(CONFIG_OPTS *opts, uint64_t k)
 }
 
 /*
- * Figure out and extend the size of the value string, used for growing updates. We know that the
- * value to be updated is in the threads value scratch buffer.
+ * Figure out and extend the size of the value string, used for growing updates/modifies. Delta is
+ * the value to be updated according to the thread operation.
  */
 static inline void
-update_value_delta(WTPERF_THREAD *thread)
+update_value_delta(WTPERF_THREAD *thread, int64_t delta)
 {
     CONFIG_OPTS *opts;
     WTPERF *wtperf;
     char *value;
-    int64_t delta, len, new_len;
+    int64_t len, new_len;
 
     wtperf = thread->wtperf;
     opts = wtperf->opts;
     value = thread->value_buf;
-    delta = thread->workload->update_delta;
     len = (int64_t)strlen(value);
 
     if (delta == INT64_MAX)
@@ -296,6 +296,8 @@ op_name(uint8_t *op)
         return ("insert");
     case WORKER_INSERT_RMW:
         return ("insert_rmw");
+    case WORKER_MODIFY:
+        return ("modify");
     case WORKER_READ:
         return ("read");
     case WORKER_TRUNCATE:
@@ -385,14 +387,15 @@ worker_async(void *arg)
             goto op_err;
         case WORKER_INSERT:
             if (opts->random_value)
-                randomize_value(thread, value_buf);
+                randomize_value(thread, value_buf, 0);
             asyncop->set_value(asyncop, value_buf);
             if ((ret = asyncop->insert(asyncop)) == 0)
                 break;
             goto op_err;
         case WORKER_UPDATE:
             if (opts->random_value)
-                randomize_value(thread, value_buf);
+                randomize_value(
+                  thread, value_buf, thread->workload ? thread->workload->update_delta : 0);
             asyncop->set_value(asyncop, value_buf);
             if ((ret = asyncop->update(asyncop)) == 0)
                 break;
@@ -504,14 +507,16 @@ worker(void *arg)
     WTPERF_THREAD *thread;
     WT_CONNECTION *conn;
     WT_CURSOR **cursors, *cursor, *log_table_cursor, *tmp_cursor;
+    WT_ITEM newv, oldv;
+    WT_MODIFY entries[MAX_MODIFY_NUM];
     WT_SESSION *session;
-    size_t i;
-    uint32_t total_table_count;
-    int64_t ops, ops_per_txn;
+    size_t i, iter, modify_offset, modify_size, total_modify_size, value_len;
+    int64_t delta, ops, ops_per_txn;
     uint64_t log_id, next_val, usecs;
+    uint32_t rand_val, total_table_count;
     uint8_t *op, *op_end;
-    int measure_latency, ret, truncated;
-    char *value_buf, *key_buf, *value;
+    int measure_latency, nmodify, ret, truncated;
+    char *key_buf, *value, *value_buf;
     char buf[512];
 
     thread = (WTPERF_THREAD *)arg;
@@ -607,12 +612,17 @@ worker(void *arg)
             else
                 next_val = opts->icount + get_next_incr(wtperf);
             break;
+        case WORKER_MODIFY:
+            trk = &thread->modify;
+        /* FALLTHROUGH */
         case WORKER_READ:
-            trk = &thread->read;
+            if (*op == WORKER_READ)
+                trk = &thread->read;
         /* FALLTHROUGH */
         case WORKER_UPDATE:
             if (*op == WORKER_UPDATE)
                 trk = &thread->update;
+
             next_val = wtperf_rand(thread);
 
             /*
@@ -681,7 +691,7 @@ worker(void *arg)
         /* FALLTHROUGH */
         case WORKER_INSERT:
             if (opts->random_value)
-                randomize_value(thread, value_buf);
+                randomize_value(thread, value_buf, 0);
             cursor->set_value(cursor, value_buf);
             if ((ret = cursor->insert(cursor)) == 0)
                 break;
@@ -697,6 +707,7 @@ worker(void *arg)
                 break;
             }
             goto op_err;
+        case WORKER_MODIFY:
         case WORKER_UPDATE:
             if ((ret = cursor->search(cursor)) == 0) {
                 if ((ret = cursor->get_value(cursor, &value)) != 0) {
@@ -707,24 +718,104 @@ worker(void *arg)
                  * Copy as much of the previous value as is safe, and be sure to NUL-terminate.
                  */
                 strncpy(value_buf, value, opts->value_sz_max - 1);
-                if (workload->update_delta != 0)
-                    update_value_delta(thread);
+
+                if (*op == WORKER_MODIFY)
+                    delta = workload->modify_delta;
+                else
+                    delta = workload->update_delta;
+
+                if (delta != 0)
+                    update_value_delta(thread, delta);
                 if (value_buf[0] == 'a')
                     value_buf[0] = 'b';
                 else
                     value_buf[0] = 'a';
                 if (opts->random_value)
-                    randomize_value(thread, value_buf);
-                cursor->set_value(cursor, value_buf);
-                if ((ret = cursor->update(cursor)) == 0)
-                    break;
+                    randomize_value(thread, value_buf, delta);
+
+                if (*op == WORKER_UPDATE) {
+                    cursor->set_value(cursor, value_buf);
+                    if ((ret = cursor->update(cursor)) == 0)
+                        break;
+                    goto op_err;
+                }
+
+                /*
+                 * Distribute the modifications across the whole document. We randomly choose up to
+                 * the maximum number of modifications and modify up to the maximum percent of the
+                 * record size.
+                 */
+                nmodify = MAX_MODIFY_NUM;
+
+                /*
+                 * The maximum that will be modified is a fixed percentage of the total record size.
+                 */
+                value_len = strlen(value);
+                total_modify_size = value_len / MAX_MODIFY_PCT;
+
+                /*
+                 * Randomize the maximum modification size and offset per modify.
+                 */
+                rand_val = __wt_random(&thread->rnd);
+                if ((total_modify_size / (size_t)nmodify) != 0)
+                    modify_size = rand_val % (total_modify_size / (size_t)nmodify);
+                else
+                    modify_size = 0;
+
+                /*
+                 * Offset location difference between modifications
+                 */
+                if ((value_len / (size_t)nmodify) != 0)
+                    modify_offset = (size_t)rand_val % (value_len / (size_t)nmodify);
+                else
+                    modify_offset = 0;
+
+                /*
+                 * Make sure the offset is more than size, otherwise modifications don't spread
+                 * properly.
+                 */
+                if (modify_offset < modify_size)
+                    modify_offset = modify_size + 1;
+
+                for (iter = (size_t)nmodify; iter > 0; iter--)
+                    memmove(&value_buf[(iter * modify_offset) - modify_offset],
+                      &value_buf[(iter * modify_offset) - modify_size], modify_size);
+
+                /*
+                 * Increase the number of modifications, so that normal modify operations succeeded.
+                 */
+                if (!workload->modify_force_update)
+                    nmodify++;
+
+                oldv.data = value;
+                oldv.size = value_len;
+
+                newv.data = value_buf;
+                newv.size = strlen(value_buf);
+
+                /*
+                 * Pass the old and new data to find out the modify vectors, according to the passed
+                 * input. This function may fail when the modifications count reaches the maximum
+                 * number of modifications that are allowed for the modify operation.
+                 */
+                ret = wiredtiger_calc_modify(
+                  session, &oldv, &newv, total_modify_size, entries, &nmodify);
+
+                if (ret == WT_NOTFOUND || workload->modify_force_update) {
+                    cursor->set_value(cursor, value_buf);
+                    if ((ret = cursor->update(cursor)) == 0)
+                        break;
+                } else {
+                    if ((ret = cursor->modify(cursor, entries, nmodify)) == 0)
+                        break;
+                }
                 goto op_err;
             }
 
             /*
              * Reads can fail with WT_NOTFOUND: we may be searching in a random range, or an insert
              * thread might have updated the last record in the table but not yet finished the
-             * actual insert. Count failed search in a random range as a "read".
+             * actual insert. Count a failed search in a random range as a "read".
              */
             if (ret == WT_NOTFOUND)
                 break;
@@ -896,7 +987,7 @@ run_mix_schedule(WTPERF *wtperf, WORKLOAD *workp)
     opts = wtperf->opts;
 
     if (workp->truncate != 0) {
-        if (workp->insert != 0 || workp->read != 0 || workp->update != 0) {
+        if (workp->insert != 0 || workp->modify != 0 || workp->read != 0 || workp->update != 0) {
             lprintf(wtperf, EINVAL, 0, "Can't configure truncate in a mixed workload");
             return (EINVAL);
         }
@@ -904,23 +995,27 @@ run_mix_schedule(WTPERF *wtperf, WORKLOAD *workp)
         return (0);
     }
 
-    /* Confirm reads, inserts and updates cannot all be zero. */
-    if (workp->insert == 0 && workp->read == 0 && workp->update == 0) {
+    /* Confirm inserts, modifies, reads and updates cannot all be zero. */
+    if (workp->insert == 0 && workp->modify == 0 && workp->read == 0 && workp->update == 0) {
         lprintf(wtperf, EINVAL, 0, "no operations scheduled");
         return (EINVAL);
     }
 
     /*
-     * Check for a simple case where the thread is only doing insert or update operations (because
-     * the default operation for a job-mix is read, the subsequent code works fine if only reads are
-     * specified).
+     * Check for a simple case where the thread is only doing insert or modify or update operations
+     * (because the default operation for a job-mix is read, the subsequent code works fine if only
+     * reads are specified).
      */
-    if (workp->insert != 0 && workp->read == 0 && workp->update == 0) {
+    if (workp->insert != 0 && workp->modify == 0 && workp->read == 0 && workp->update == 0) {
         memset(
           workp->ops, opts->insert_rmw ? WORKER_INSERT_RMW : WORKER_INSERT, sizeof(workp->ops));
         return (0);
     }
-    if (workp->insert == 0 && workp->read == 0 && workp->update != 0) {
+    if (workp->insert == 0 && workp->modify != 0 && workp->read == 0 && workp->update == 0) {
+        memset(workp->ops, WORKER_MODIFY, sizeof(workp->ops));
+        return (0);
+    }
+    if (workp->insert == 0 && workp->modify == 0 && workp->read == 0 && workp->update != 0) {
         memset(workp->ops, WORKER_UPDATE, sizeof(workp->ops));
         return (0);
     }
@@ -944,10 +1039,13 @@ run_mix_schedule(WTPERF *wtperf, WORKLOAD *workp)
      */
     memset(workp->ops, WORKER_READ, sizeof(workp->ops));
 
-    pct = (workp->insert * 100) / (workp->insert + workp->read + workp->update);
+    pct = (workp->insert * 100) / (workp->insert + workp->modify + workp->read + workp->update);
     if (pct != 0)
         run_mix_schedule_op(workp, opts->insert_rmw ? WORKER_INSERT_RMW : WORKER_INSERT, pct);
-    pct = (workp->update * 100) / (workp->insert + workp->read + workp->update);
+    pct = (workp->modify * 100) / (workp->insert + workp->modify + workp->read + workp->update);
+    if (pct != 0)
+        run_mix_schedule_op(workp, WORKER_MODIFY, pct);
+    pct = (workp->update * 100) / (workp->insert + workp->modify + workp->read + workp->update);
     if (pct != 0)
         run_mix_schedule_op(workp, WORKER_UPDATE, pct);
     return (0);
@@ -1025,7 +1123,7 @@ populate_thread(void *arg)
             __wt_epoch(NULL, &start);
         cursor->set_key(cursor, key_buf);
         if (opts->random_value)
-            randomize_value(thread, value_buf);
+            randomize_value(thread, value_buf, 0);
         cursor->set_value(cursor, value_buf);
         if ((ret = cursor->insert(cursor)) == WT_ROLLBACK) {
             lprintf(wtperf, ret, 0, "insert retrying");
@@ -1149,7 +1247,7 @@ populate_async(void *arg)
         generate_key(opts, key_buf, op);
         asyncop->set_key(asyncop, key_buf);
         if (opts->random_value)
-            randomize_value(thread, value_buf);
+            randomize_value(thread, value_buf, 0);
         asyncop->set_value(asyncop, value_buf);
         if ((ret = asyncop->insert(asyncop)) != 0) {
             lprintf(wtperf, ret, 0, "Failed inserting");
@@ -1195,13 +1293,15 @@ monitor(void *arg)
     FILE *fp, *jfp;
     WTPERF *wtperf;
     size_t len;
-    uint64_t min_thr, reads, inserts, updates;
-    uint64_t cur_reads, cur_inserts, cur_updates;
-    uint64_t last_reads, last_inserts, last_updates;
-    uint32_t read_avg, read_min, read_max;
-    uint32_t insert_avg, insert_min, insert_max;
-    uint32_t update_avg, update_min, update_max;
+    uint64_t min_thr;
+    uint64_t inserts, modifies, reads, updates;
+    uint64_t cur_inserts, cur_modifies, cur_reads, cur_updates;
+    uint64_t last_inserts, last_modifies, last_reads, last_updates;
     uint32_t latency_max, level;
+    uint32_t insert_avg, insert_max, insert_min;
+    uint32_t modify_avg, modify_max, modify_min;
+    uint32_t read_avg, read_max, read_min;
+    uint32_t update_avg, update_max, update_min;
     u_int i;
     size_t buf_size;
     int msg_err;
@@ -1239,22 +1339,26 @@ monitor(void *arg)
     fprintf(fp,
       "#time,"
       "totalsec,"
-      "read ops per second,"
       "insert ops per second,"
+      "modify ops per second,"
+      "read ops per second,"
       "update ops per second,"
       "checkpoints,"
       "scans,"
-      "read average latency(uS),"
-      "read minimum latency(uS),"
-      "read maximum latency(uS),"
       "insert average latency(uS),"
       "insert min latency(uS),"
       "insert maximum latency(uS),"
+      "modify average latency(uS),"
+      "modify min latency(uS),"
+      "modify maximum latency(uS)"
+      "read average latency(uS),"
+      "read minimum latency(uS),"
+      "read maximum latency(uS),"
       "update average latency(uS),"
       "update min latency(uS),"
       "update maximum latency(uS)"
       "\n");
-    last_reads = last_inserts = last_updates = 0;
+    last_inserts = last_modifies = last_reads = last_updates = 0;
     while (!wtperf->stop) {
         for (i = 0; i < opts->sample_interval; i++) {
             sleep(1);
@@ -1271,15 +1375,15 @@ monitor(void *arg)
         testutil_check(__wt_localtime(NULL, &t.tv_sec, &localt));
         testutil_assert(strftime(buf, sizeof(buf), "%b %d %H:%M:%S", &localt) != 0);
 
-        reads = sum_read_ops(wtperf);
         inserts = sum_insert_ops(wtperf);
+        modifies = sum_modify_ops(wtperf);
+        reads = sum_read_ops(wtperf);
         updates = sum_update_ops(wtperf);
-        latency_read(wtperf, &read_avg, &read_min, &read_max);
         latency_insert(wtperf, &insert_avg, &insert_min, &insert_max);
+        latency_modify(wtperf, &modify_avg, &modify_min, &modify_max);
+        latency_read(wtperf, &read_avg, &read_min, &read_max);
         latency_update(wtperf, &update_avg, &update_min, &update_max);
 
-        cur_reads = (reads - last_reads) / opts->sample_interval;
-        cur_updates = (updates - last_updates) / opts->sample_interval;
         /*
          * For now the only item we need to worry about changing is inserts when we transition from
          * the populate phase to workload phase.
@@ -1289,13 +1393,19 @@ monitor(void *arg)
         else
             cur_inserts = (inserts - last_inserts) / opts->sample_interval;
 
-        (void)fprintf(fp, "%s,%" PRIu32 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64
-                          ",%c,%c"
-                          ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32
-                          ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 "\n",
-          buf, wtperf->totalsec, cur_reads, cur_inserts, cur_updates, wtperf->ckpt ? 'Y' : 'N',
-          wtperf->scan ? 'Y' : 'N', read_avg, read_min, read_max, insert_avg, insert_min,
-          insert_max, update_avg, update_min, update_max);
+        cur_modifies = (modifies - last_modifies) / opts->sample_interval;
+        cur_reads = (reads - last_reads) / opts->sample_interval;
+        cur_updates = (updates - last_updates) / opts->sample_interval;
+
+        (void)fprintf(fp,
+          "%s,%" PRIu32 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64
+          ",%c,%c"
+          ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32
+          ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 "\n",
+          buf, wtperf->totalsec, cur_inserts, cur_modifies, cur_reads, cur_updates,
+          wtperf->ckpt ? 'Y' : 'N', wtperf->scan ? 'Y' : 'N', insert_avg, insert_min, insert_max,
+          modify_avg, modify_min, modify_max, read_avg, read_min, read_max, update_avg, update_min,
+          update_max);
         if (jfp != NULL) {
             buf_size = strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", &localt);
             testutil_assert(buf_size != 0);
@@ -1307,14 +1417,18 @@ monitor(void *arg)
                 first = false;
             }
             (void)fprintf(jfp, "\"localTime\":\"%s\",\"wtperf\":{", buf);
-            /* Note does not have initial comma before "read" */
-            (void)fprintf(jfp, "\"read\":{\"ops per sec\":%" PRIu64 ",\"average latency\":%" PRIu32
-                               ",\"min latency\":%" PRIu32 ",\"max latency\":%" PRIu32 "}",
-              cur_reads, read_avg, read_min, read_max);
+            /* Note does not have initial comma before "insert" */
             (void)fprintf(jfp,
-              ",\"insert\":{\"ops per sec\":%" PRIu64 ",\"average latency\":%" PRIu32
+              "\"insert\":{\"ops per sec\":%" PRIu64 ",\"average latency\":%" PRIu32
               ",\"min latency\":%" PRIu32 ",\"max latency\":%" PRIu32 "}",
               cur_inserts, insert_avg, insert_min, insert_max);
+            (void)fprintf(jfp,
+              ",\"modify\":{\"ops per sec\":%" PRIu64 ",\"average latency\":%" PRIu32
+              ",\"min latency\":%" PRIu32 ",\"max latency\":%" PRIu32 "}",
+              cur_modifies, modify_avg, modify_min, modify_max);
+            (void)fprintf(jfp, ",\"read\":{\"ops per sec\":%" PRIu64 ",\"average latency\":%" PRIu32
+                               ",\"min latency\":%" PRIu32 ",\"max latency\":%" PRIu32 "}",
+              cur_reads, read_avg, read_min, read_max);
             (void)fprintf(jfp,
               ",\"update\":{\"ops per sec\":%" PRIu64 ",\"average latency\":%" PRIu32
               ",\"min latency\":%" PRIu32 ",\"max latency\":%" PRIu32 "}",
@@ -1322,8 +1436,8 @@ monitor(void *arg)
             fprintf(jfp, "}}\n");
         }
 
-        if (latency_max != 0 &&
-          (read_max > latency_max || insert_max > latency_max || update_max > latency_max)) {
+        if (latency_max != 0 && (insert_max > latency_max || modify_max > latency_max ||
+                                  read_max > latency_max || update_max > latency_max)) {
             if (opts->max_latency_fatal) {
                 level = 1;
                 msg_err = WT_PANIC;
@@ -1334,13 +1448,14 @@ monitor(void *arg)
                 str = "WARNING";
             }
             lprintf(wtperf, msg_err, level,
-              "%s: max latency exceeded: threshold %" PRIu32 " read max %" PRIu32
-              " insert max %" PRIu32 " update max %" PRIu32,
-              str, latency_max, read_max, insert_max, update_max);
+              "%s: max latency exceeded: threshold %" PRIu32 " insert max %" PRIu32
+              " modify max %" PRIu32 " read max %" PRIu32 " update max %" PRIu32,
+              str, latency_max, insert_max, modify_max, read_max, update_max);
         }
-        if (min_thr != 0 &&
-          ((cur_reads != 0 && cur_reads < min_thr) || (cur_inserts != 0 && cur_inserts < min_thr) ||
-              (cur_updates != 0 && cur_updates < min_thr))) {
+        if (min_thr != 0 && ((cur_inserts != 0 && cur_inserts < min_thr) ||
+                              (cur_modifies != 0 && cur_modifies < min_thr) ||
+                              (cur_reads != 0 && cur_reads < min_thr) ||
+                              (cur_updates != 0 && cur_updates < min_thr))) {
             if (opts->min_throughput_fatal) {
                 level = 1;
                 msg_err = WT_PANIC;
@@ -1351,12 +1466,13 @@ monitor(void *arg)
                 str = "WARNING";
             }
             lprintf(wtperf, msg_err, level,
-              "%s: minimum throughput not met: threshold %" PRIu64 " reads %" PRIu64
-              " inserts %" PRIu64 " updates %" PRIu64,
-              str, min_thr, cur_reads, cur_inserts, cur_updates);
+              "%s: minimum throughput not met: threshold %" PRIu64 " inserts %" PRIu64
+              " modifies %" PRIu64 " reads %" PRIu64 " updates %" PRIu64,
+              str, min_thr, cur_inserts, cur_modifies, cur_reads, cur_updates);
         }
-        last_reads = reads;
         last_inserts = inserts;
+        last_modifies = modifies;
+        last_reads = reads;
         last_updates = updates;
     }
 
@@ -1742,7 +1858,8 @@ execute_workload(WTPERF *wtperf)
     WT_THREAD_CALLBACK (*pfunc)(void *);
     wt_thread_t idle_table_cycle_thread;
     uint64_t last_ckpts, last_scans;
-    uint64_t last_inserts, last_reads, last_truncates, last_updates;
+    uint64_t last_inserts, last_reads, last_truncates;
+    uint64_t last_modifies, last_updates;
     uint32_t interval, run_ops, run_time;
     u_int i;
     int ret;
@@ -1751,10 +1868,11 @@ execute_workload(WTPERF *wtperf)
 
     wtperf->insert_key = 0;
     wtperf->insert_ops = wtperf->read_ops = wtperf->truncate_ops = 0;
-    wtperf->update_ops = 0;
+    wtperf->modify_ops = wtperf->update_ops = 0;
 
     last_ckpts = last_scans = 0;
-    last_inserts = last_reads = last_truncates = last_updates = 0;
+    last_inserts = last_reads = last_truncates = 0;
+    last_modifies = last_updates = 0;
     ret = 0;
 
     sessions = NULL;
@@ -1787,10 +1905,10 @@ execute_workload(WTPERF *wtperf)
     for (threads = wtperf->workers, i = 0, workp = wtperf->workload; i < wtperf->workload_cnt;
          ++i, ++workp) {
         lprintf(wtperf, 0, 1,
-          "Starting workload #%u: %" PRId64 " threads, inserts=%" PRId64 ", reads=%" PRId64
-          ", updates=%" PRId64 ", truncate=%" PRId64 ", throttle=%" PRIu64,
-          i + 1, workp->threads, workp->insert, workp->read, workp->update, workp->truncate,
-          workp->throttle);
+          "Starting workload #%u: %" PRId64 " threads, inserts=%" PRId64 ", modifies=%" PRId64
+          ", reads=%" PRId64 ", truncate=%" PRId64 ", updates=%" PRId64 ", throttle=%" PRIu64,
+          i + 1, workp->threads, workp->insert, workp->modify, workp->read, workp->truncate,
+          workp->update, workp->throttle);
 
         /* Figure out the workload's schedule. */
         if ((ret = run_mix_schedule(wtperf, workp)) != 0)
@@ -1825,12 +1943,15 @@ execute_workload(WTPERF *wtperf)
         wtperf->ckpt_ops = sum_ckpt_ops(wtperf);
         wtperf->scan_ops = sum_scan_ops(wtperf);
         wtperf->insert_ops = sum_insert_ops(wtperf);
+        wtperf->modify_ops = sum_modify_ops(wtperf);
         wtperf->read_ops = sum_read_ops(wtperf);
         wtperf->update_ops = sum_update_ops(wtperf);
         wtperf->truncate_ops = sum_truncate_ops(wtperf);
 
         /* If we're checking total operations, see if we're done. */
-        if (run_ops != 0 && run_ops <= wtperf->insert_ops + wtperf->read_ops + wtperf->update_ops)
+        if (run_ops != 0 &&
+          run_ops <=
+            wtperf->insert_ops + wtperf->modify_ops + wtperf->read_ops + wtperf->update_ops)
             break;
 
         /* If writing out throughput information, see if it's time. */
@@ -1839,17 +1960,19 @@ execute_workload(WTPERF *wtperf)
         interval = opts->report_interval;
         wtperf->totalsec += opts->report_interval;
 
-        lprintf(wtperf, 0, 1, "%" PRIu64 " reads, %" PRIu64 " inserts, %" PRIu64
-                              " updates, %" PRIu64 " truncates, %" PRIu64 " checkpoints, %" PRIu64
-                              " scans in %" PRIu32 " secs (%" PRIu32 " total secs)",
-          wtperf->read_ops - last_reads, wtperf->insert_ops - last_inserts,
-          wtperf->update_ops - last_updates, wtperf->truncate_ops - last_truncates,
-          wtperf->ckpt_ops - last_ckpts, wtperf->scan_ops - last_scans, opts->report_interval,
-          wtperf->totalsec);
-        last_reads = wtperf->read_ops;
+        lprintf(wtperf, 0, 1,
+          "%" PRIu64 " inserts, %" PRIu64 " modifies, %" PRIu64 " reads, %" PRIu64
+          " truncates, %" PRIu64 "updates, %" PRIu64 " checkpoints, %" PRIu64 " scans in %" PRIu32
+          " secs (%" PRIu32 " total secs)",
+          wtperf->insert_ops - last_inserts, wtperf->modify_ops - last_modifies,
+          wtperf->read_ops - last_reads, wtperf->truncate_ops - last_truncates,
+          wtperf->update_ops - last_updates, wtperf->ckpt_ops - last_ckpts,
+          wtperf->scan_ops - last_scans, opts->report_interval, wtperf->totalsec);
         last_inserts = wtperf->insert_ops;
-        last_updates = wtperf->update_ops;
+        last_modifies = wtperf->modify_ops;
+        last_reads = wtperf->read_ops;
         last_truncates = wtperf->truncate_ops;
+        last_updates = wtperf->update_ops;
         last_ckpts = wtperf->ckpt_ops;
         last_scans = wtperf->scan_ops;
     }
@@ -2304,22 +2427,27 @@ start_run(WTPERF *wtperf)
             goto err;
 
         /* One final summation of the operations we've completed. */
-        wtperf->read_ops = sum_read_ops(wtperf);
         wtperf->insert_ops = sum_insert_ops(wtperf);
+        wtperf->modify_ops = sum_modify_ops(wtperf);
+        wtperf->read_ops = sum_read_ops(wtperf);
         wtperf->truncate_ops = sum_truncate_ops(wtperf);
         wtperf->update_ops = sum_update_ops(wtperf);
         wtperf->ckpt_ops = sum_ckpt_ops(wtperf);
         wtperf->scan_ops = sum_scan_ops(wtperf);
-        total_ops = wtperf->read_ops + wtperf->insert_ops + wtperf->update_ops;
+        total_ops = wtperf->insert_ops + wtperf->modify_ops + wtperf->read_ops + wtperf->update_ops;
 
         run_time = opts->run_time == 0 ? 1 : opts->run_time;
-        lprintf(wtperf, 0, 1,
-          "Executed %" PRIu64 " read operations (%" PRIu64 "%%) %" PRIu64 " ops/sec",
-          wtperf->read_ops, (wtperf->read_ops * 100) / total_ops, wtperf->read_ops / run_time);
         lprintf(wtperf, 0, 1,
           "Executed %" PRIu64 " insert operations (%" PRIu64 "%%) %" PRIu64 " ops/sec",
           wtperf->insert_ops, (wtperf->insert_ops * 100) / total_ops,
           wtperf->insert_ops / run_time);
+        lprintf(wtperf, 0, 1,
+          "Executed %" PRIu64 " modify operations (%" PRIu64 "%%) %" PRIu64 " ops/sec",
+          wtperf->modify_ops, (wtperf->modify_ops * 100) / total_ops,
+          wtperf->modify_ops / run_time);
+        lprintf(wtperf, 0, 1,
+          "Executed %" PRIu64 " read operations (%" PRIu64 "%%) %" PRIu64 " ops/sec",
+          wtperf->read_ops, (wtperf->read_ops * 100) / total_ops, wtperf->read_ops / run_time);
         lprintf(wtperf, 0, 1,
           "Executed %" PRIu64 " truncate operations (%" PRIu64 "%%) %" PRIu64 " ops/sec",
           wtperf->truncate_ops, (wtperf->truncate_ops * 100) / total_ops,
@@ -2706,16 +2834,17 @@ start_threads(WTPERF *wtperf, WORKLOAD *workp, WTPERF_THREAD *base, u_int num,
          */
         memset(thread->value_buf, 'a', opts->value_sz - 1);
         if (opts->random_value)
-            randomize_value(thread, thread->value_buf);
+            randomize_value(thread, thread->value_buf, 0);
 
         /*
          * Every thread gets tracking information and is initialized for latency measurements, for
          * the same reason.
          */
         thread->ckpt.min_latency = thread->scan.min_latency = thread->insert.min_latency =
-          thread->read.min_latency = thread->update.min_latency = UINT32_MAX;
+          thread->modify.min_latency = thread->read.min_latency = thread->update.min_latency =
+            UINT32_MAX;
         thread->ckpt.max_latency = thread->scan.max_latency = thread->insert.max_latency =
-          thread->read.max_latency = thread->update.max_latency = 0;
+          thread->modify.max_latency = thread->read.max_latency = thread->update.max_latency = 0;
     }
 
     /* Start the threads. */

@@ -118,6 +118,11 @@ sum_insert_ops(WTPERF *wtperf)
     return (sum_ops(wtperf, offsetof(WTPERF_THREAD, insert)));
 }
 uint64_t
+sum_modify_ops(WTPERF *wtperf)
+{
+    return (sum_ops(wtperf, offsetof(WTPERF_THREAD, modify)));
+}
+uint64_t
 sum_read_ops(WTPERF *wtperf)
 {
     return (sum_ops(wtperf, offsetof(WTPERF_THREAD, read)));
@@ -185,11 +190,11 @@ latency_op(WTPERF *wtperf, size_t field_offset, uint32_t *avgp, uint32_t *minp, 
     }
 }
 void
-latency_read(WTPERF *wtperf, uint32_t *avgp, uint32_t *minp, uint32_t *maxp)
+latency_insert(WTPERF *wtperf, uint32_t *avgp, uint32_t *minp, uint32_t *maxp)
 {
     static uint32_t last_avg = 0, last_max = 0, last_min = 0;
 
-    latency_op(wtperf, offsetof(WTPERF_THREAD, read), avgp, minp, maxp);
+    latency_op(wtperf, offsetof(WTPERF_THREAD, insert), avgp, minp, maxp);
 
     /*
      * If nothing happened, graph the average, minimum and maximum as they were the last time, it
@@ -206,11 +211,32 @@ latency_read(WTPERF *wtperf, uint32_t *avgp, uint32_t *minp, uint32_t *maxp)
     }
 }
 void
-latency_insert(WTPERF *wtperf, uint32_t *avgp, uint32_t *minp, uint32_t *maxp)
+latency_modify(WTPERF *wtperf, uint32_t *avgp, uint32_t *minp, uint32_t *maxp)
 {
     static uint32_t last_avg = 0, last_max = 0, last_min = 0;
 
-    latency_op(wtperf, offsetof(WTPERF_THREAD, insert), avgp, minp, maxp);
+    latency_op(wtperf, offsetof(WTPERF_THREAD, modify), avgp, minp, maxp);
+
+    /*
+     * If nothing happened, graph the average, minimum and maximum as they were the last time, it
+     * keeps the graphs from having discontinuities.
+     */
+    if (*minp == 0) {
+        *avgp = last_avg;
+        *minp = last_min;
+        *maxp = last_max;
+    } else {
+        last_avg = *avgp;
+        last_min = *minp;
+        last_max = *maxp;
+    }
+}
+void
+latency_read(WTPERF *wtperf, uint32_t *avgp, uint32_t *minp, uint32_t *maxp)
+{
+    static uint32_t last_avg = 0, last_max = 0, last_min = 0;
+
+    latency_op(wtperf, offsetof(WTPERF_THREAD, read), avgp, minp, maxp);
 
     /*
      * If nothing happened, graph the average, minimum and maximum as they were the last time, it
@@ -286,6 +312,11 @@ sum_insert_latency(WTPERF *wtperf, TRACK *total)
     sum_latency(wtperf, offsetof(WTPERF_THREAD, insert), total);
 }
 static void
+sum_modify_latency(WTPERF *wtperf, TRACK *total)
+{
+    sum_latency(wtperf, offsetof(WTPERF_THREAD, modify), total);
+}
+static void
 sum_read_latency(WTPERF *wtperf, TRACK *total)
 {
     sum_latency(wtperf, offsetof(WTPERF_THREAD, read), total);
@@ -344,6 +375,8 @@ latency_print(WTPERF *wtperf)
 
     sum_insert_latency(wtperf, &total);
     latency_print_single(wtperf, &total, "insert");
+    sum_modify_latency(wtperf, &total);
+    latency_print_single(wtperf, &total, "modify");
     sum_read_latency(wtperf, &total);
     latency_print_single(wtperf, &total, "read");
     sum_update_latency(wtperf, &total);

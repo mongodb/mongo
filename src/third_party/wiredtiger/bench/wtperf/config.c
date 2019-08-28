@@ -220,6 +220,33 @@ config_threads(WTPERF *wtperf, const char *config, size_t len)
                     goto err;
                 continue;
             }
+            if (STRING_MATCH("modify", k.str, k.len)) {
+                if ((workp->modify = v.val) < 0)
+                    goto err;
+                continue;
+            }
+            if (STRING_MATCH("modify_delta", k.str, k.len)) {
+                if (v.type == WT_CONFIG_ITEM_ID || v.type == WT_CONFIG_ITEM_STRING) {
+                    if (strncmp(v.str, "rand", 4) != 0)
+                        goto err;
+                    /* Special random value */
+                    workp->modify_delta = INT64_MAX;
+                    F_SET(wtperf, CFG_GROW);
+                } else {
+                    workp->modify_delta = v.val;
+                    if (v.val > 0)
+                        F_SET(wtperf, CFG_GROW);
+                    if (v.val < 0)
+                        F_SET(wtperf, CFG_SHRINK);
+                }
+                continue;
+            }
+            if (STRING_MATCH("modify_force_update", k.str, k.len)) {
+                if (v.type != WT_CONFIG_ITEM_BOOL)
+                    goto err;
+                workp->modify_force_update = v.val;
+                continue;
+            }
             if (STRING_MATCH("ops_per_txn", k.str, k.len)) {
                 if ((workp->ops_per_txn = v.val) < 0)
                     goto err;
@@ -302,7 +329,8 @@ config_threads(WTPERF *wtperf, const char *config, size_t len)
         scan = NULL;
         if (ret != 0)
             goto err;
-        if (workp->insert == 0 && workp->read == 0 && workp->update == 0 && workp->truncate == 0)
+        if (workp->insert == 0 && workp->modify == 0 && workp->read == 0 && workp->truncate == 0 &&
+          workp->update == 0)
             goto err;
         /* Why run with truncate if we don't want any truncation. */
         if (workp->truncate != 0 && workp->truncate_pct == 0 && workp->truncate_count == 0)
@@ -312,7 +340,8 @@ config_threads(WTPERF *wtperf, const char *config, size_t len)
         /* Truncate should have its own exclusive thread. */
         if (workp->truncate != 0 && workp->threads > 1)
             goto err;
-        if (workp->truncate != 0 && (workp->insert > 0 || workp->read > 0 || workp->update > 0))
+        if (workp->truncate != 0 &&
+          (workp->insert > 0 || workp->modify > 0 || workp->read > 0 || workp->update > 0))
             goto err;
         wtperf->workers_cnt += (u_int)workp->threads;
     }
@@ -765,11 +794,11 @@ config_sanity(WTPERF *wtperf)
 
     if (wtperf->workload != NULL)
         for (i = 0, workp = wtperf->workload; i < wtperf->workload_cnt; ++i, ++workp) {
-            if (opts->readonly &&
-              (workp->insert != 0 || workp->update != 0 || workp->truncate != 0)) {
+            if (opts->readonly && (workp->insert != 0 || workp->modify != 0 ||
+                                    workp->truncate != 0 || workp->update != 0)) {
                 fprintf(stderr,
-                  "Invalid workload: insert, update or "
-                  "truncate specified with readonly\n");
+                  "Invalid workload: insert, modify, truncate or update specified with "
+                  "readonly\n");
                 return (EINVAL);
             }
             if (workp->insert != 0 && workp->table_index != INT32_MAX) {
@@ -783,6 +812,12 @@ config_sanity(WTPERF *wtperf)
                 fprintf(stderr,
                   "Workload table index %" PRId32 " is larger than table count %" PRIu32,
                   workp->table_index, opts->table_count);
+                return (EINVAL);
+            }
+            if (workp->modify != 0 && workp->ops_per_txn == 0) {
+                fprintf(stderr,
+                  "Modify operations must be executed with explicit transaction, specify "
+                  "ops_per_txn.");
                 return (EINVAL);
             }
         }

@@ -103,11 +103,38 @@ __wt_cursor_equals_notsup(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp)
 }
 
 /*
+ * Cursor modify operation is supported only in limited cursor types and also the modify
+ * operation is supported only with 'S' and 'u' value formats of the cursors. Because of
+ * the conditional support of cursor modify operation, To provide a better error description
+ * to the application whenever the cursor modify is used based on the cursor types, two
+ * default not supported functions are used.
+ *
+ * __wt_cursor_modify_notsup - Default function for cursor types where the modify operation
+ * is not supported.
+ *
+ * __wt_cursor_modify_value_format_notsup - Default function for cursor types where the modify
+ * operation is supported with specific value formats of the cursor.
+ */
+
+/*
  * __wt_cursor_modify_notsup --
  *     Unsupported cursor modify.
  */
 int
 __wt_cursor_modify_notsup(WT_CURSOR *cursor, WT_MODIFY *entries, int nentries)
+{
+    WT_UNUSED(entries);
+    WT_UNUSED(nentries);
+
+    return (__wt_cursor_notsup(cursor));
+}
+
+/*
+ * __wt_cursor_modify_value_format_notsup --
+ *     Unsupported value format for cursor modify.
+ */
+int
+__wt_cursor_modify_value_format_notsup(WT_CURSOR *cursor, WT_MODIFY *entries, int nentries)
 {
     WT_SESSION_IMPL *session;
 
@@ -1071,7 +1098,7 @@ __wt_cursor_init(
      * initialized (file cursors have a faster implementation).
      */
     if ((WT_STREQ(cursor->value_format, "S") || WT_STREQ(cursor->value_format, "u")) &&
-      cursor->modify == __wt_cursor_modify_notsup)
+      cursor->modify == __wt_cursor_modify_value_format_notsup)
         cursor->modify = __cursor_modify;
 
     /*
