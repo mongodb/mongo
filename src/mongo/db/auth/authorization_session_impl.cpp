@@ -184,17 +184,6 @@ RoleNameIterator AuthorizationSessionImpl::getAuthenticatedRoleNames() {
     return makeRoleNameIterator(_authenticatedRoleNames.begin(), _authenticatedRoleNames.end());
 }
 
-std::string AuthorizationSessionImpl::getAuthenticatedUserNamesToken() {
-    std::string ret;
-    for (UserNameIterator nameIter = getAuthenticatedUserNames(); nameIter.more();
-         nameIter.next()) {
-        ret += '\0';  // Using a NUL byte which isn't valid in usernames to separate them.
-        ret += nameIter->getFullName();
-    }
-
-    return ret;
-}
-
 void AuthorizationSessionImpl::grantInternalAuthorization(Client* client) {
     stdx::lock_guard<Client> lk(*client);
     _authenticatedUsers.add(internalSecurity.user);

@@ -50,6 +50,20 @@ using std::string;
 using std::stringstream;
 using std::unique_ptr;
 
+namespace {
+std::string getAuthenticatedUserNamesToken(Client* client) {
+    StringBuilder sb;
+
+    auto as = AuthorizationSession::get(client);
+    for (auto nameIter = as->getAuthenticatedUserNames(); nameIter.more(); nameIter.next()) {
+        // Using a NUL byte which isn't valid in usernames to separate them.
+        sb << '\0' << nameIter->getUnambiguousName();
+    }
+
+    return sb.str();
+}
+}  // namespace
+
 WhereMatchExpression::WhereMatchExpression(OperationContext* opCtx,
                                            WhereParams params,
                                            StringData dbName)
@@ -61,9 +75,7 @@ WhereMatchExpression::WhereMatchExpression(OperationContext* opCtx,
 
     uassert(ErrorCodes::BadValue, "ns for $where cannot be empty", dbName.size() != 0);
 
-    const string userToken =
-        AuthorizationSession::get(Client::getCurrent())->getAuthenticatedUserNamesToken();
-
+    const auto userToken = getAuthenticatedUserNamesToken(opCtx->getClient());
     _scope = getGlobalScriptEngine()->getPooledScope(_opCtx, _dbName, "where" + userToken);
     const auto guard = makeGuard([&] { _scope->unregisterOperation(); });
 

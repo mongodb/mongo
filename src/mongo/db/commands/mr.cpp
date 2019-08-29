@@ -948,8 +948,6 @@ State::~State() {
  */
 void State::init() {
     // setup js
-    const string userToken =
-        AuthorizationSession::get(Client::getCurrent())->getAuthenticatedUserNamesToken();
     _scope.reset(getGlobalScriptEngine()->newScopeForCurrentThread());
     _scope->requireOwnedObjects();
     _scope->registerOperation(_opCtx);

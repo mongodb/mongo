@@ -166,10 +166,6 @@ public:
     // Gets an iterator over the roles of all authenticated users stored in this manager.
     virtual RoleNameIterator getAuthenticatedRoleNames() = 0;
 
-    // Returns a std::string representing all logged-in users on the current session.
-    // WARNING: this std::string will contain NUL bytes so don't call c_str()!
-    virtual std::string getAuthenticatedUserNamesToken() = 0;
-
     // Removes any authenticated principals whose authorization credentials came from the given
     // database, and revokes any privileges that were granted via that principal. This function
     // modifies state. Synchronizes with the Client lock.

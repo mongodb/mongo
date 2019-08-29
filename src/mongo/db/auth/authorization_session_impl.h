@@ -91,8 +91,6 @@ public:
 
     RoleNameIterator getAuthenticatedRoleNames() override;
 
-    std::string getAuthenticatedUserNamesToken() override;
-
     void logoutDatabase(OperationContext* opCtx, StringData dbname) override;
 
     void grantInternalAuthorization(Client* client) override;

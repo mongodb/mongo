@@ -93,10 +93,6 @@ public:
         UASSERT_NOT_IMPLEMENTED;
     }
 
-    std::string getAuthenticatedUserNamesToken() override {
-        UASSERT_NOT_IMPLEMENTED;
-    }
-
     void grantInternalAuthorization(Client* client) override {
         // Always okay to do something, on embedded.
     }
