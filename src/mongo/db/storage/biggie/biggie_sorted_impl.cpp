@@ -830,16 +830,6 @@ boost::optional<KeyStringEntry> SortedDataInterface::Cursor::seekAfterProcessing
     return keyStringToKeyStringEntry(_reverseIt->first, _reverseIt->second, _order);
 }
 
-boost::optional<IndexKeyEntry> SortedDataInterface::Cursor::seek(const BSONObj& key,
-                                                                 bool inclusive,
-                                                                 RequestedInfo) {
-    BSONObj finalKey = BSONObj::stripFieldNames(key);
-    const auto discriminator = _forward == inclusive ? KeyString::Discriminator::kExclusiveBefore
-                                                     : KeyString::Discriminator::kExclusiveAfter;
-    KeyString::Builder keyString(KeyString::Version::V1, finalKey, _order, discriminator);
-    return seek(keyString.getValueCopy());
-}
-
 boost::optional<IndexKeyEntry> SortedDataInterface::Cursor::seek(const KeyString::Value& keyString,
                                                                  RequestedInfo parts) {
     boost::optional<KeyStringEntry> ksValue = seekForKeyString(keyString);

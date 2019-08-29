@@ -101,7 +101,11 @@ protected:
 
         // Obtain a cursor over the index, and confirm that the keys are present in order.
         auto indexCursor = getIndexCursor(collection, indexName);
-        auto indexKey = indexCursor->seek(kMinBSONKey, true);
+
+        KeyString::Value keyStringForSeek = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
+            kMinBSONKey, KeyString::Version::V1, Ordering::make(BSONObj()), true, true);
+
+        auto indexKey = indexCursor->seek(keyStringForSeek);
         try {
             for (const auto& expectedKey : expectedKeys) {
                 ASSERT(indexKey);

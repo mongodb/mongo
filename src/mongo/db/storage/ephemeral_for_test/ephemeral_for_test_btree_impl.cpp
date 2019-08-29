@@ -302,9 +302,7 @@ public:
             seekEndCursor();
         }
 
-        boost::optional<IndexKeyEntry> seek(const BSONObj& key,
-                                            bool inclusive,
-                                            RequestedInfo) override {
+        boost::optional<IndexKeyEntry> _seek(const BSONObj& key, bool inclusive, RequestedInfo) {
             if (key.isEmpty()) {
                 _it = inclusive ? _data.begin() : _data.end();
                 _isEOF = (_it == _data.end());
@@ -349,7 +347,7 @@ public:
         }
 
         boost::optional<IndexKeyEntry> seekExact(const BSONObj& key, RequestedInfo) {
-            auto kv = seek(key, true, kKeyAndLoc);
+            auto kv = _seek(key, true, kKeyAndLoc);
             if (kv && kv->key.woCompare(key, BSONObj(), /*considerFieldNames*/ false) == 0)
                 return kv;
             return {};

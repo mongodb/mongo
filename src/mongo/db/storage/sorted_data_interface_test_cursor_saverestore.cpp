@@ -74,7 +74,9 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursor) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         int i = 0;
-        for (auto entry = cursor->seek(kMinBSONKey, true); entry; i++, entry = cursor->next()) {
+        for (auto entry = cursor->seek(makeKeyStringForSeek(sorted.get(), kMinBSONKey, true, true));
+             entry;
+             i++, entry = cursor->next()) {
             ASSERT_LT(i, nToInsert);
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << i), RecordId(42, i * 2)));
 
@@ -122,7 +124,10 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorReversed) {
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
             sorted->newCursor(opCtx.get(), false));
         int i = nToInsert - 1;
-        for (auto entry = cursor->seek(kMaxBSONKey, true); entry; i--, entry = cursor->next()) {
+        for (auto entry =
+                 cursor->seek(makeKeyStringForSeek(sorted.get(), kMaxBSONKey, false, true));
+             entry;
+             i--, entry = cursor->next()) {
             ASSERT_GTE(i, 0);
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << i), RecordId(42, i * 2)));
 
@@ -169,7 +174,10 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorOnIdIndex) {
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
             sorted->newCursor(opCtx.get(), false));
         int i = nToInsert - 1;
-        for (auto entry = cursor->seek(kMaxBSONKey, true); entry; i--, entry = cursor->next()) {
+        for (auto entry =
+                 cursor->seek(makeKeyStringForSeek(sorted.get(), kMaxBSONKey, false, true));
+             entry;
+             i--, entry = cursor->next()) {
             ASSERT_GTE(i, 0);
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << i), RecordId(42, i * 2)));
 
@@ -216,7 +224,10 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorReversedOnIdIn
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
             sorted->newCursor(opCtx.get(), false));
         int i = nToInsert - 1;
-        for (auto entry = cursor->seek(kMaxBSONKey, true); entry; i--, entry = cursor->next()) {
+        for (auto entry =
+                 cursor->seek(makeKeyStringForSeek(sorted.get(), kMaxBSONKey, false, true));
+             entry;
+             i--, entry = cursor->next()) {
             ASSERT_GTE(i, 0);
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << i), RecordId(42, i * 2)));
 
@@ -265,7 +276,9 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeys) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         int i = 0;
-        for (auto entry = cursor->seek(kMinBSONKey, true); entry; i++, entry = cursor->next()) {
+        for (auto entry = cursor->seek(makeKeyStringForSeek(sorted.get(), kMinBSONKey, true, true));
+             entry;
+             i++, entry = cursor->next()) {
             ASSERT_LT(i, nToInsert);
             ASSERT_EQ(entry, IndexKeyEntry(key1, RecordId(42, i * 2)));
 
@@ -315,7 +328,10 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeysRev
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
             sorted->newCursor(opCtx.get(), false));
         int i = nToInsert - 1;
-        for (auto entry = cursor->seek(kMaxBSONKey, true); entry; i--, entry = cursor->next()) {
+        for (auto entry =
+                 cursor->seek(makeKeyStringForSeek(sorted.get(), kMaxBSONKey, false, true));
+             entry;
+             i--, entry = cursor->next()) {
             ASSERT_GTE(i, 0);
             ASSERT_EQ(entry, IndexKeyEntry(key1, RecordId(42, i * 2)));
 
@@ -411,7 +427,8 @@ void testSaveAndRestorePositionSeesNewInserts(bool forward, bool unique) {
     auto cursor = sorted->newCursor(opCtx.get(), forward);
     const auto seekPoint = forward ? key1 : key3;
 
-    ASSERT_EQ(cursor->seek(seekPoint, true), IndexKeyEntry(seekPoint, loc1));
+    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), seekPoint, forward, true)),
+              IndexKeyEntry(seekPoint, loc1));
 
     cursor->save();
     insertToIndex(opCtx, sorted, {{key2, loc1}});
@@ -447,7 +464,8 @@ void testSaveAndRestorePositionSeesNewInsertsAfterRemove(bool forward, bool uniq
     auto cursor = sorted->newCursor(opCtx.get(), forward);
     const auto seekPoint = forward ? key1 : key3;
 
-    ASSERT_EQ(cursor->seek(seekPoint, true), IndexKeyEntry(seekPoint, loc1));
+    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), seekPoint, forward, true)),
+              IndexKeyEntry(seekPoint, loc1));
 
     cursor->save();
     removeFromIndex(opCtx, sorted, {{key1, loc1}});
@@ -487,7 +505,8 @@ void testSaveAndRestorePositionSeesNewInsertsAfterEOF(bool forward, bool unique)
 
     auto cursor = sorted->newCursor(opCtx.get(), forward);
 
-    ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
+    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, forward, true)),
+              IndexKeyEntry(key1, loc1));
     // next() would return EOF now.
 
     cursor->save();
@@ -530,7 +549,8 @@ TEST(SortedDataInterface, SaveAndRestorePositionStandardIndexConsidersRecordId_F
 
     auto cursor = sorted->newCursor(opCtx.get());
 
-    ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
+    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
+              IndexKeyEntry(key1, loc1));
 
     cursor->save();
     removeFromIndex(opCtx, sorted, {{key1, loc1}});
@@ -569,7 +589,8 @@ TEST(SortedDataInterface, SaveAndRestorePositionUniqueIndexWontReturnDupKeys_For
 
     auto cursor = sorted->newCursor(opCtx.get());
 
-    ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
+    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
+              IndexKeyEntry(key1, loc1));
 
     cursor->save();
     removeFromIndex(opCtx, sorted, {{key1, loc1}});
@@ -614,7 +635,8 @@ TEST(SortedDataInterface, SaveAndRestorePositionStandardIndexConsidersRecordId_R
 
     auto cursor = sorted->newCursor(opCtx.get(), false);
 
-    ASSERT_EQ(cursor->seek(key2, true), IndexKeyEntry(key2, loc2));
+    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key2, false, true)),
+              IndexKeyEntry(key2, loc2));
 
     cursor->save();
     removeFromIndex(opCtx, sorted, {{key2, loc2}});
@@ -653,7 +675,8 @@ TEST(SortedDataInterface, SaveAndRestorePositionUniqueIndexWontReturnDupKeys_Rev
 
     auto cursor = sorted->newCursor(opCtx.get(), false);
 
-    ASSERT_EQ(cursor->seek(key4, true), IndexKeyEntry(key4, loc2));
+    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key4, false, true)),
+              IndexKeyEntry(key4, loc2));
 
     cursor->save();
     removeFromIndex(opCtx, sorted, {{key4, loc2}});
@@ -698,18 +721,21 @@ TEST(SortedDataInterface, SaveUnpositionedAndRestore) {
 
     auto cursor = sorted->newCursor(opCtx.get());
 
-    ASSERT_EQ(cursor->seek(key2, true), IndexKeyEntry(key2, loc1));
+    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key2, true, true)),
+              IndexKeyEntry(key2, loc1));
 
     cursor->saveUnpositioned();
     removeFromIndex(opCtx, sorted, {{key2, loc1}});
     cursor->restore();
 
-    ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
+    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
+              IndexKeyEntry(key1, loc1));
 
     cursor->saveUnpositioned();
     cursor->restore();
 
-    ASSERT_EQ(cursor->seek(key3, true), IndexKeyEntry(key3, loc1));
+    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key3, true, true)),
+              IndexKeyEntry(key3, loc1));
 }
 
 }  // namespace

@@ -405,21 +405,6 @@ public:
             BSONObj::stripFieldNames(key), _index.getOrdering(), discriminator);
     }
 
-    boost::optional<IndexKeyEntry> seek(const BSONObj& key,
-                                        bool inclusive,
-                                        RequestedInfo parts) override {
-        const auto discriminator = _isForward == inclusive
-            ? KeyString::Discriminator::kExclusiveBefore
-            : KeyString::Discriminator::kExclusiveAfter;
-        _startPosition.resetToKey(
-            BSONObj::stripFieldNames(key), _index.getOrdering(), discriminator);
-        seekForKeyString(_startPosition.getValueCopy());
-        if (_isEOF) {
-            return {};
-        }
-        return getCurrentEntry(parts);
-    }
-
     boost::optional<IndexKeyEntry> seek(const KeyString::Value& keyString,
                                         RequestedInfo parts) override {
         seekForKeyString(keyString);

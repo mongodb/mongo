@@ -108,7 +108,7 @@ std::set<FieldRef> WildcardAccessMethod::_getMultikeyPathSet(
             }
 
             std::set<FieldRef> multikeyPaths{};
-            auto entry = cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+            auto entry = cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
                 seekPoint,
                 getSortedDataInterface()->getKeyStringVersion(),
                 getSortedDataInterface()->getOrdering(),
@@ -127,11 +127,12 @@ std::set<FieldRef> WildcardAccessMethod::_getMultikeyPathSet(
 
                     case IndexBoundsChecker::MUST_ADVANCE:
                         ++stats->numSeeks;
-                        entry = cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
-                            seekPoint,
-                            getSortedDataInterface()->getKeyStringVersion(),
-                            getSortedDataInterface()->getOrdering(),
-                            kForward));
+                        entry =
+                            cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                seekPoint,
+                                getSortedDataInterface()->getKeyStringVersion(),
+                                getSortedDataInterface()->getOrdering(),
+                                kForward));
 
                         break;
 
@@ -237,7 +238,14 @@ std::set<FieldRef> WildcardAccessMethod::getMultikeyPathSet(
 
             constexpr bool inclusive = true;
             cursor->setEndPosition(metadataKeyRangeEnd, inclusive);
-            auto entry = cursor->seek(metadataKeyRangeBegin, inclusive);
+
+            auto keyStringForSeek = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
+                metadataKeyRangeBegin,
+                getSortedDataInterface()->getKeyStringVersion(),
+                getSortedDataInterface()->getOrdering(),
+                true, /* forward */
+                inclusive);
+            auto entry = cursor->seek(keyStringForSeek);
             ++stats->numSeeks;
 
             // Iterate the cursor, copying the multikey paths into an in-memory set.

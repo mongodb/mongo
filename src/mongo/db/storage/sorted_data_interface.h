@@ -271,18 +271,6 @@ public:
         //
 
         /**
-         * Seeks to the provided key and returns current position.
-         *
-         * TODO consider removing once IndexSeekPoint has been cleaned up a bit. In particular,
-         * need a way to specify use whole keyPrefix and nothing else and to support the
-         * combination of empty and exclusive. Should also make it easier to construct for the
-         * common cases.
-         */
-        virtual boost::optional<IndexKeyEntry> seek(const BSONObj& key,
-                                                    bool inclusive,
-                                                    RequestedInfo parts = kKeyAndLoc) = 0;
-
-        /**
          * Seeks to the provided keyString and returns the KeyStringEntry.
          * The provided keyString has discriminator information encoded.
          */

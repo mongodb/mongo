@@ -169,16 +169,28 @@ BSONObj IndexEntryComparison::makeQueryObject(const BSONObj& keyPrefix,
     return bb.obj();
 }
 
-KeyString::Value IndexEntryComparison::makeKeyStringForSeekPoint(const IndexSeekPoint& seekPoint,
-                                                                 KeyString::Version version,
-                                                                 Ordering ord,
-                                                                 bool isForward) {
+KeyString::Value IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+    const IndexSeekPoint& seekPoint, KeyString::Version version, Ordering ord, bool isForward) {
     BSONObj key = IndexEntryComparison::makeQueryObject(seekPoint, isForward);
 
     const auto discriminator = isForward ? KeyString::Discriminator::kExclusiveBefore
                                          : KeyString::Discriminator::kExclusiveAfter;
 
     KeyString::Builder builder(version, key, ord, discriminator);
+    return builder.getValueCopy();
+}
+
+KeyString::Value IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(const BSONObj& bsonKey,
+                                                                       KeyString::Version version,
+                                                                       Ordering ord,
+                                                                       bool isForward,
+                                                                       bool inclusive) {
+    BSONObj finalKey = BSONObj::stripFieldNames(bsonKey);
+    KeyString::Builder builder(version,
+                               finalKey,
+                               ord,
+                               isForward == inclusive ? KeyString::Discriminator::kExclusiveBefore
+                                                      : KeyString::Discriminator::kExclusiveAfter);
     return builder.getValueCopy();
 }
 

@@ -79,7 +79,7 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
     try {
         if (!_cursor)
             _cursor = indexAccessMethod()->newCursor(getOpCtx(), _scanDirection == 1);
-        kv = _cursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+        kv = _cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
             _seekPoint,
             indexAccessMethod()->getSortedDataInterface()->getKeyStringVersion(),
             indexAccessMethod()->getSortedDataInterface()->getOrdering(),

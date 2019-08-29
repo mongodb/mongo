@@ -120,9 +120,6 @@ public:
                std::string KSForIdentEnd);
         virtual void setEndPosition(const BSONObj& key, bool inclusive) override;
         virtual boost::optional<IndexKeyEntry> next(RequestedInfo parts = kKeyAndLoc) override;
-        virtual boost::optional<IndexKeyEntry> seek(const BSONObj& key,
-                                                    bool inclusive,
-                                                    RequestedInfo parts = kKeyAndLoc) override;
         virtual boost::optional<IndexKeyEntry> seek(const KeyString::Value& keyString,
                                                     RequestedInfo parts = kKeyAndLoc) override;
         virtual boost::optional<KeyStringEntry> seekForKeyString(

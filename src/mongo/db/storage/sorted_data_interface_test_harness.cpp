@@ -77,6 +77,19 @@ mongo::KeyString::Value mongo::makeKeyString(SortedDataInterface* sorted,
     return builder.getValueCopy();
 }
 
+mongo::KeyString::Value mongo::makeKeyStringForSeek(SortedDataInterface* sorted,
+                                                    BSONObj bsonKey,
+                                                    bool isForward,
+                                                    bool inclusive) {
+    BSONObj finalKey = BSONObj::stripFieldNames(bsonKey);
+    KeyString::Builder builder(sorted->getKeyStringVersion(),
+                               finalKey,
+                               sorted->getOrdering(),
+                               isForward == inclusive ? KeyString::Discriminator::kExclusiveBefore
+                                                      : KeyString::Discriminator::kExclusiveAfter);
+    return builder.getValueCopy();
+}
+
 namespace mongo {
 namespace {
 
@@ -401,7 +414,9 @@ TEST(SortedDataInterface, CursorIterate1) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         int n = 0;
-        for (auto entry = cursor->seek(BSONObj(), true); entry; entry = cursor->next()) {
+        for (auto entry = cursor->seek(makeKeyStringForSeek(sorted.get(), BSONObj(), true, true));
+             entry;
+             entry = cursor->next()) {
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << n), RecordId(5, n * 2)));
             n++;
         }
@@ -431,7 +446,9 @@ TEST(SortedDataInterface, CursorIterate1WithSaveRestore) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         int n = 0;
-        for (auto entry = cursor->seek(BSONObj(), true); entry; entry = cursor->next()) {
+        for (auto entry = cursor->seek(makeKeyStringForSeek(sorted.get(), BSONObj(), true, true));
+             entry;
+             entry = cursor->next()) {
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << n), RecordId(5, n * 2)));
             n++;
             cursor->save();
@@ -464,7 +481,9 @@ TEST(SortedDataInterface, CursorIterateAllDupKeysWithSaveRestore) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         int n = 0;
-        for (auto entry = cursor->seek(BSONObj(), true); entry; entry = cursor->next()) {
+        for (auto entry = cursor->seek(makeKeyStringForSeek(sorted.get(), BSONObj(), true, true));
+             entry;
+             entry = cursor->next()) {
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << 5), RecordId(5, n * 2)));
             n++;
             cursor->save();
@@ -486,7 +505,7 @@ TEST(SortedDataInterface, Locate1) {
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-        ASSERT(!cursor->seek(key, true));
+        ASSERT(!cursor->seek(makeKeyStringForSeek(sorted.get(), key, true, true)));
     }
 
     {
@@ -502,7 +521,8 @@ TEST(SortedDataInterface, Locate1) {
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-        ASSERT_EQ(cursor->seek(key, true), IndexKeyEntry(key, loc));
+        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key, true, true)),
+                  IndexKeyEntry(key, loc));
     }
 }
 
@@ -535,7 +555,8 @@ TEST(SortedDataInterface, Locate2) {
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-        ASSERT_EQ(cursor->seek(BSON("a" << 2), true), IndexKeyEntry(BSON("" << 2), RecordId(1, 4)));
+        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), BSON("a" << 2), true, true)),
+                  IndexKeyEntry(BSON("" << 2), RecordId(1, 4)));
 
         ASSERT_EQ(cursor->next(), IndexKeyEntry(BSON("" << 3), RecordId(1, 6)));
         ASSERT_EQ(cursor->next(), boost::none);
@@ -571,14 +592,16 @@ TEST(SortedDataInterface, Locate2Empty) {
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-        ASSERT_EQ(cursor->seek(BSONObj(), true), IndexKeyEntry(BSON("" << 1), RecordId(1, 2)));
+        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), BSONObj(), true, true)),
+                  IndexKeyEntry(BSON("" << 1), RecordId(1, 2)));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
             sorted->newCursor(opCtx.get(), false));
-        ASSERT_EQ(cursor->seek(BSONObj(), false), boost::none);
+        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), BSONObj(), false, false)),
+                  boost::none);
     }
 }
 
@@ -605,26 +628,37 @@ TEST(SortedDataInterface, Locate3Descending) {
 
     const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
     std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get(), true));
-    ASSERT_EQ(cursor->seek(BSON("" << 5), true), buildEntry(5));
+    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), BSON("" << 5), true, true)),
+              buildEntry(5));
     ASSERT_EQ(cursor->next(), buildEntry(7));
 
     cursor = sorted->newCursor(opCtx.get(), /*forward*/ false);
-    ASSERT_EQ(cursor->seek(BSON("" << 5), /*inclusive*/ false), buildEntry(4));
+    ASSERT_EQ(
+        cursor->seek(makeKeyStringForSeek(sorted.get(), BSON("" << 5), false, /*inclusive*/ false)),
+        buildEntry(4));
 
     cursor = sorted->newCursor(opCtx.get(), /*forward*/ false);
-    ASSERT_EQ(cursor->seek(BSON("" << 5), /*inclusive*/ true), buildEntry(5));
+    ASSERT_EQ(
+        cursor->seek(makeKeyStringForSeek(sorted.get(), BSON("" << 5), false, /*inclusive*/ true)),
+        buildEntry(5));
     ASSERT_EQ(cursor->next(), buildEntry(4));
 
     cursor = sorted->newCursor(opCtx.get(), /*forward*/ false);
-    ASSERT_EQ(cursor->seek(BSON("" << 5), /*inclusive*/ false), buildEntry(4));
+    ASSERT_EQ(
+        cursor->seek(makeKeyStringForSeek(sorted.get(), BSON("" << 5), false, /*inclusive*/ false)),
+        buildEntry(4));
     ASSERT_EQ(cursor->next(), buildEntry(3));
 
     cursor = sorted->newCursor(opCtx.get(), /*forward*/ false);
-    ASSERT_EQ(cursor->seek(BSON("" << 6), /*inclusive*/ true), buildEntry(5));
+    ASSERT_EQ(
+        cursor->seek(makeKeyStringForSeek(sorted.get(), BSON("" << 6), false, /*inclusive*/ true)),
+        buildEntry(5));
     ASSERT_EQ(cursor->next(), buildEntry(4));
 
     cursor = sorted->newCursor(opCtx.get(), /*forward*/ false);
-    ASSERT_EQ(cursor->seek(BSON("" << 500), /*inclusive*/ true), buildEntry(9));
+    ASSERT_EQ(cursor->seek(
+                  makeKeyStringForSeek(sorted.get(), BSON("" << 500), false, /*inclusive*/ true)),
+              buildEntry(9));
     ASSERT_EQ(cursor->next(), buildEntry(8));
 }
 
@@ -642,7 +676,8 @@ TEST(SortedDataInterface, Locate4) {
     {
         auto opCtx = harnessHelper->newOperationContext();
         auto cursor = sorted->newCursor(opCtx.get());
-        ASSERT_EQ(cursor->seek(BSON("a" << 1), true), IndexKeyEntry(BSON("" << 1), RecordId(1, 2)));
+        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), BSON("a" << 1), true, true)),
+                  IndexKeyEntry(BSON("" << 1), RecordId(1, 2)));
 
         ASSERT_EQ(cursor->next(), IndexKeyEntry(BSON("" << 1), RecordId(1, 4)));
         ASSERT_EQ(cursor->next(), IndexKeyEntry(BSON("" << 1), RecordId(1, 6)));
@@ -653,7 +688,8 @@ TEST(SortedDataInterface, Locate4) {
     {
         auto opCtx = harnessHelper->newOperationContext();
         auto cursor = sorted->newCursor(opCtx.get(), false);
-        ASSERT_EQ(cursor->seek(BSON("a" << 1), true), IndexKeyEntry(BSON("" << 1), RecordId(1, 6)));
+        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), BSON("a" << 1), false, true)),
+                  IndexKeyEntry(BSON("" << 1), RecordId(1, 6)));
 
         ASSERT_EQ(cursor->next(), IndexKeyEntry(BSON("" << 1), RecordId(1, 4)));
         ASSERT_EQ(cursor->next(), IndexKeyEntry(BSON("" << 1), RecordId(1, 2)));

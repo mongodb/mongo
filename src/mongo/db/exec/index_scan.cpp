@@ -100,7 +100,14 @@ boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
         _startKey = _bounds.startKey;
         _endKey = _bounds.endKey;
         _indexCursor->setEndPosition(_endKey, _endKeyInclusive);
-        return _indexCursor->seek(_startKey, _startKeyInclusive);
+
+        KeyString::Value keyStringForSeek = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
+            _startKey,
+            indexAccessMethod()->getSortedDataInterface()->getKeyStringVersion(),
+            indexAccessMethod()->getSortedDataInterface()->getOrdering(),
+            _forward,
+            _startKeyInclusive);
+        return _indexCursor->seek(keyStringForSeek);
     } else {
         // For single intervals, we can use an optimized scan which checks against the position
         // of an end cursor.  For all other index scans, we fall back on using
@@ -108,13 +115,20 @@ boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
         if (IndexBoundsBuilder::isSingleInterval(
                 _bounds, &_startKey, &_startKeyInclusive, &_endKey, &_endKeyInclusive)) {
             _indexCursor->setEndPosition(_endKey, _endKeyInclusive);
-            return _indexCursor->seek(_startKey, _startKeyInclusive);
+
+            auto keyStringForSeek = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
+                _startKey,
+                indexAccessMethod()->getSortedDataInterface()->getKeyStringVersion(),
+                indexAccessMethod()->getSortedDataInterface()->getOrdering(),
+                _forward,
+                _startKeyInclusive);
+            return _indexCursor->seek(keyStringForSeek);
         } else {
             _checker.reset(new IndexBoundsChecker(&_bounds, _keyPattern, _direction));
 
             if (!_checker->getStartSeekPoint(&_seekPoint))
                 return boost::none;
-            return _indexCursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+            return _indexCursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
                 _seekPoint,
                 indexAccessMethod()->getSortedDataInterface()->getKeyStringVersion(),
                 indexAccessMethod()->getSortedDataInterface()->getOrdering(),
@@ -136,7 +150,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
                 break;
             case NEED_SEEK:
                 ++_specificStats.seeks;
-                kv = _indexCursor->seek(IndexEntryComparison::makeKeyStringForSeekPoint(
+                kv = _indexCursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
                     _seekPoint,
                     indexAccessMethod()->getSortedDataInterface()->getKeyStringVersion(),
                     indexAccessMethod()->getSortedDataInterface()->getOrdering(),

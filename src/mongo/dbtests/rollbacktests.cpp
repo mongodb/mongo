@@ -136,8 +136,14 @@ size_t getNumIndexEntries(OperationContext* opCtx,
 
     if (desc) {
         auto cursor = catalog->getEntry(desc)->accessMethod()->newCursor(opCtx);
-
-        for (auto kv = cursor->seek(kMinBSONKey, true); kv; kv = cursor->next()) {
+        KeyString::Builder keyString(
+            catalog->getEntry(desc)
+                ->accessMethod()
+                ->getSortedDataInterface()
+                ->getKeyStringVersion(),
+            kMinBSONKey,
+            catalog->getEntry(desc)->accessMethod()->getSortedDataInterface()->getOrdering());
+        for (auto kv = cursor->seek(keyString.getValueCopy()); kv; kv = cursor->next()) {
             numEntries++;
         }
     }

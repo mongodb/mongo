@@ -55,7 +55,7 @@ TEST(SortedDataInterface, CursorIsEOFWhenEmpty) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
 
-        ASSERT(!cursor->seek(kMinBSONKey, true));
+        ASSERT(!cursor->seek(makeKeyStringForSeek(sorted.get(), kMinBSONKey, true, true)));
 
         // Cursor at EOF should remain at EOF when advanced
         ASSERT(!cursor->next());
@@ -78,7 +78,7 @@ TEST(SortedDataInterface, CursorIsEOFWhenEmptyReversed) {
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
             sorted->newCursor(opCtx.get(), false));
 
-        ASSERT(!cursor->seek(kMaxBSONKey, true));
+        ASSERT(!cursor->seek(makeKeyStringForSeek(sorted.get(), kMaxBSONKey, false, true)));
 
         // Cursor at EOF should remain at EOF when advanced
         ASSERT(!cursor->next());
@@ -119,7 +119,9 @@ TEST(SortedDataInterface, ExhaustCursor) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         for (int i = 0; i < nToInsert; i++) {
-            auto entry = i == 0 ? cursor->seek(kMinBSONKey, true) : cursor->next();
+            auto entry = i == 0
+                ? cursor->seek(makeKeyStringForSeek(sorted.get(), kMinBSONKey, true, true))
+                : cursor->next();
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << i), RecordId(42, i * 2)));
         }
         ASSERT(!cursor->next());
@@ -164,7 +166,9 @@ TEST(SortedDataInterface, ExhaustCursorReversed) {
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
             sorted->newCursor(opCtx.get(), false));
         for (int i = nToInsert - 1; i >= 0; i--) {
-            auto entry = (i == nToInsert - 1) ? cursor->seek(kMaxBSONKey, true) : cursor->next();
+            auto entry = (i == nToInsert - 1)
+                ? cursor->seek(makeKeyStringForSeek(sorted.get(), kMaxBSONKey, false, true))
+                : cursor->next();
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << i), RecordId(42, i * 2)));
         }
         ASSERT(!cursor->next());
@@ -203,7 +207,7 @@ void testBoundaries(bool unique, bool forward, bool inclusive) {
         auto endKey = BSON("" << endVal);
         cursor->setEndPosition(endKey, inclusive);
 
-        auto entry = cursor->seek(startKey, inclusive);
+        auto entry = cursor->seek(makeKeyStringForSeek(sorted.get(), startKey, forward, inclusive));
 
         // Check that the cursor returns the expected values in range.
         int step = forward ? 1 : -1;

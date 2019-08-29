@@ -115,7 +115,13 @@ PlanStage::StageState CountScan::doWork(WorkingSetID* out) {
             _cursor = indexAccessMethod()->newCursor(getOpCtx());
             _cursor->setEndPosition(_endKey, _endKeyInclusive);
 
-            entry = _cursor->seek(_startKey, _startKeyInclusive, kWantLoc);
+            auto keyStringForSeek = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
+                _startKey,
+                indexAccessMethod()->getSortedDataInterface()->getKeyStringVersion(),
+                indexAccessMethod()->getSortedDataInterface()->getOrdering(),
+                true, /* forward */
+                _startKeyInclusive);
+            entry = _cursor->seek(keyStringForSeek);
         } else {
             entry = _cursor->next(kWantLoc);
         }

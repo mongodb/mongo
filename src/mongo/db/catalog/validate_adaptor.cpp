@@ -177,8 +177,10 @@ void ValidateAdaptor::traverseIndex(
 
     int interruptInterval = 4096;
 
-    // Seeking to BSONObj() is equivalent to seeking to the first entry of an index.
-    for (auto indexEntry = indexCursor->seek(opCtx, BSONObj()); indexEntry;
+    KeyString::Builder firstKeyString(
+        version, BSONObj(), ord, KeyString::Discriminator::kExclusiveBefore);
+
+    for (auto indexEntry = indexCursor->seek(opCtx, firstKeyString.getValueCopy()); indexEntry;
          indexEntry = indexCursor->next(opCtx)) {
         if (!(numKeys % interruptInterval)) {
             opCtx->checkForInterrupt();

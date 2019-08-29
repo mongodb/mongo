@@ -106,6 +106,11 @@ KeyString::Value makeKeyString(SortedDataInterface* sorted,
                                BSONObj bsonKey,
                                boost::optional<RecordId> rid = boost::none);
 
+KeyString::Value makeKeyStringForSeek(SortedDataInterface* sorted,
+                                      BSONObj bsonKey,
+                                      bool isForward,
+                                      bool inclusive);
+
 /**
  * Inserts all entries in toInsert into index.
  * ASSERT_OKs the inserts.

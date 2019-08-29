@@ -308,7 +308,16 @@ void WiredTigerIndex::fullValidate(OperationContext* opCtx,
     TRACE_INDEX << " fullValidate";
 
     const auto requestedInfo = TRACING_ENABLED ? Cursor::kKeyAndLoc : Cursor::kJustExistance;
-    for (auto kv = cursor->seek(BSONObj(), true, requestedInfo); kv; kv = cursor->next()) {
+
+    KeyString::Value keyStringForSeek =
+        IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(BSONObj(),
+                                                              getKeyStringVersion(),
+                                                              getOrdering(),
+                                                              true, /* forward */
+                                                              true  /* inclusive */
+        );
+
+    for (auto kv = cursor->seek(keyStringForSeek, requestedInfo); kv; kv = cursor->next()) {
         TRACE_INDEX << "\t" << kv->key << ' ' << kv->loc;
         count++;
     }
@@ -371,11 +380,17 @@ Status WiredTigerIndex::dupKeyCheck(OperationContext* opCtx, const KeyString::Va
 
 bool WiredTigerIndex::isEmpty(OperationContext* opCtx) {
     if (_prefix != KVPrefix::kNotPrefixed) {
-        const bool forward = true;
-        auto cursor = newCursor(opCtx, forward);
-        const bool inclusive = false;
-        return cursor->seek(kMinBSONKey, inclusive, Cursor::RequestedInfo::kJustExistance) ==
-            boost::none;
+        auto cursor = newCursor(opCtx, true /* forward */);
+
+        KeyString::Value keyStringForSeek =
+            IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(kMinBSONKey,
+                                                                  getKeyStringVersion(),
+                                                                  getOrdering(),
+                                                                  true /* forward */,
+                                                                  false /* inclusive */
+            );
+
+        return cursor->seek(keyStringForSeek, Cursor::RequestedInfo::kJustExistance) == boost::none;
     }
 
     WiredTigerCursor curwrap(_uri, _tableId, false, opCtx);
@@ -820,19 +835,6 @@ public:
             : KeyString::Discriminator::kExclusiveBefore;
         _endPosition = std::make_unique<KeyString::Builder>(_idx.getKeyStringVersion());
         _endPosition->resetToKey(BSONObj::stripFieldNames(key), _idx.getOrdering(), discriminator);
-    }
-
-    boost::optional<IndexKeyEntry> seek(const BSONObj& key,
-                                        bool inclusive,
-                                        RequestedInfo parts) override {
-        dassert(_opCtx->lockState()->isReadLocked());
-        const BSONObj finalKey = BSONObj::stripFieldNames(key);
-        const auto discriminator = _forward == inclusive
-            ? KeyString::Discriminator::kExclusiveBefore
-            : KeyString::Discriminator::kExclusiveAfter;
-        _query.resetToKey(finalKey, _idx.getOrdering(), discriminator);
-        seekForKeyString(_query.getValueCopy());
-        return curr(parts);
     }
 
     boost::optional<IndexKeyEntry> seek(const KeyString::Value& keyString,

@@ -72,7 +72,7 @@ public:
                                       const IndexAccessMethod* iam,
                                       std::shared_ptr<DataThrottle> dataThrottle);
 
-    boost::optional<IndexKeyEntry> seek(OperationContext* opCtx, const BSONObj& key);
+    boost::optional<IndexKeyEntry> seek(OperationContext* opCtx, const KeyString::Value& key);
 
     boost::optional<IndexKeyEntry> next(OperationContext* opCtx);
 

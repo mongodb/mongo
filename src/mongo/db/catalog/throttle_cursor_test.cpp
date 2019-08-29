@@ -46,6 +46,7 @@ namespace mongo {
 namespace {
 
 const NamespaceString kNss = NamespaceString("test.throttleCursor");
+const KeyString::Value kMinKeyString = KeyString::Value();
 
 class ThrottleCursorTest : public CatalogTestFixture {
 private:
@@ -219,7 +220,7 @@ TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOff) {
     setMaxMbPerSec(0);
     Date_t start = getTime();
 
-    ASSERT_TRUE(cursor.seek(opCtx, BSONObj()));
+    ASSERT_TRUE(cursor.seek(opCtx, kMinKeyString));
     int numRecords = 1;
 
     while (cursor.next(opCtx)) {
@@ -249,7 +250,7 @@ TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOn) {
         setMaxMbPerSec(1);
         Date_t start = getTime();
 
-        ASSERT_TRUE(cursor.seek(opCtx, BSONObj()));
+        ASSERT_TRUE(cursor.seek(opCtx, kMinKeyString));
         int numRecords = 1;
 
         while (cursor.next(opCtx)) {
@@ -269,7 +270,7 @@ TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOn) {
         setMaxMbPerSec(5);
         Date_t start = getTime();
 
-        ASSERT_TRUE(cursor.seek(opCtx, BSONObj()));
+        ASSERT_TRUE(cursor.seek(opCtx, kMinKeyString));
         int numRecords = 1;
 
         while (cursor.next(opCtx)) {
@@ -302,7 +303,7 @@ TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOff) {
     setMaxMbPerSec(10);
     Date_t start = getTime();
 
-    ASSERT_TRUE(indexCursor.seek(opCtx, BSONObj()));
+    ASSERT_TRUE(indexCursor.seek(opCtx, kMinKeyString));
     int numRecords = 1;
 
     while (indexCursor.next(opCtx)) {
@@ -345,7 +346,7 @@ TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOn) {
         setMaxMbPerSec(2);
         Date_t start = getTime();
 
-        ASSERT_TRUE(indexCursor.seek(opCtx, BSONObj()));
+        ASSERT_TRUE(indexCursor.seek(opCtx, kMinKeyString));
         ASSERT_TRUE(recordCursor.seekExact(opCtx, RecordId(1)));
         int numRecords = 2;
 
@@ -367,7 +368,7 @@ TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOn) {
         setMaxMbPerSec(5);
         Date_t start = getTime();
 
-        ASSERT_TRUE(indexCursor.seek(opCtx, BSONObj()));
+        ASSERT_TRUE(indexCursor.seek(opCtx, kMinKeyString));
         ASSERT_TRUE(recordCursor.seekExact(opCtx, RecordId(1)));
         int numRecords = 2;
 

@@ -64,7 +64,8 @@ TEST(SortedDataInterface, Insert) {
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
 
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-        ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
+                  IndexKeyEntry(key1, loc1));
     }
 }
 
@@ -95,7 +96,8 @@ TEST(SortedDataInterface, InsertKeyString) {
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
 
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-        ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
+                  IndexKeyEntry(key1, loc1));
     }
 }
 
@@ -251,7 +253,8 @@ TEST(SortedDataInterface, InsertSameKey) {
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
 
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-        ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
+                  IndexKeyEntry(key1, loc1));
     }
 
     {
@@ -269,7 +272,8 @@ TEST(SortedDataInterface, InsertSameKey) {
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
 
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-        ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
+                  IndexKeyEntry(key1, loc1));
     }
 }
 
@@ -307,7 +311,8 @@ TEST(SortedDataInterface, InsertSameKeyString) {
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
 
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-        ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
+                  IndexKeyEntry(key1, loc1));
     }
 
     {
@@ -324,7 +329,8 @@ TEST(SortedDataInterface, InsertSameKeyString) {
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
 
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-        ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
+                  IndexKeyEntry(key1, loc1));
     }
 }
 
@@ -383,7 +389,8 @@ void _testInsertSameKeyWithDupsAllowed(const RecordId locs[3]) {
 
             const std::unique_ptr<SortedDataInterface::Cursor> cursor(
                 sorted->newCursor(opCtx.get()));
-            ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, locs[keeper]));
+            ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
+                      IndexKeyEntry(key1, locs[keeper]));
         }
     }
 }
@@ -429,8 +436,10 @@ TEST(SortedDataInterface, InsertMultiple) {
         ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
 
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-        ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
-        ASSERT_EQ(cursor->seek(key2, true), IndexKeyEntry(key2, loc2));
+        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
+                  IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key2, true, true)),
+                  IndexKeyEntry(key2, loc2));
     }
 
     {
@@ -448,9 +457,12 @@ TEST(SortedDataInterface, InsertMultiple) {
         ASSERT_EQUALS(3, sorted->numEntries(opCtx.get()));
 
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-        ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
-        ASSERT_EQ(cursor->seek(key2, true), IndexKeyEntry(key2, loc2));
-        ASSERT_EQ(cursor->seek(key3, true), IndexKeyEntry(key3, loc3));
+        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
+                  IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key2, true, true)),
+                  IndexKeyEntry(key2, loc2));
+        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key3, true, true)),
+                  IndexKeyEntry(key3, loc3));
     }
 }
 
@@ -487,8 +499,10 @@ TEST(SortedDataInterface, InsertMultipleKeyStrings) {
         ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
 
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-        ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
-        ASSERT_EQ(cursor->seek(key2, true), IndexKeyEntry(key2, loc2));
+        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
+                  IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key2, true, true)),
+                  IndexKeyEntry(key2, loc2));
     }
 
     {
@@ -505,9 +519,12 @@ TEST(SortedDataInterface, InsertMultipleKeyStrings) {
         ASSERT_EQUALS(3, sorted->numEntries(opCtx.get()));
 
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-        ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
-        ASSERT_EQ(cursor->seek(key2, true), IndexKeyEntry(key2, loc2));
-        ASSERT_EQ(cursor->seek(key3, true), IndexKeyEntry(key3, loc3));
+        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
+                  IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key2, true, true)),
+                  IndexKeyEntry(key2, loc2));
+        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key3, true, true)),
+                  IndexKeyEntry(key3, loc3));
     }
 }
 

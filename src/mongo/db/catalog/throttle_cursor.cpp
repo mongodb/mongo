@@ -76,9 +76,9 @@ SortedDataInterfaceThrottleCursor::SortedDataInterfaceThrottleCursor(
     _dataThrottle = dataThrottle;
 }
 
-boost::optional<IndexKeyEntry> SortedDataInterfaceThrottleCursor::seek(OperationContext* opCtx,
-                                                                       const BSONObj& key) {
-    boost::optional<IndexKeyEntry> entry = _cursor->seek(key, /*inclusive=*/true);
+boost::optional<IndexKeyEntry> SortedDataInterfaceThrottleCursor::seek(
+    OperationContext* opCtx, const KeyString::Value& key) {
+    boost::optional<IndexKeyEntry> entry = _cursor->seek(key);
     if (entry) {
         const int64_t dataSize = entry->key.objsize() + sizeof(entry->loc.repr());
         _dataThrottle->awaitIfNeeded(opCtx, dataSize);
