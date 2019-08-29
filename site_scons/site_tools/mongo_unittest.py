@@ -11,6 +11,19 @@ def exists(env):
 _unittests = []
 def register_unit_test(env, test):
     _unittests.append(test.path)
+
+    hygienic = env.GetOption('install-mode') == 'hygienic'
+    if hygienic and getattr(test.attributes, "AIB_INSTALL_ACTIONS", []):
+        installed = getattr(test.attributes, "AIB_INSTALL_ACTIONS")
+    else:
+        installed = [test]
+
+    env.Command(
+        target="#@{}".format(os.path.basename(installed[0].get_path())),
+        source=installed,
+        action="${SOURCES[0]}"
+    )
+
     env.Alias('$UNITTEST_ALIAS', test)
 
 def unit_test_list_builder_action(env, target, source):
@@ -41,22 +54,6 @@ def build_cpp_unit_test(env, target, source, **kwargs):
 
     result = env.Program(target, source, **kwargs)
     env.RegisterUnitTest(result[0])
-
-    hygienic = env.GetOption('install-mode') == 'hygienic'
-    if not hygienic:
-        installed_test = env.Install('#/build/unittests/', result[0])
-        env.Command(
-            target="#@{}".format(os.path.basename(installed_test[0].path)),
-            source=installed_test,
-            action="${SOURCES[0]}"
-        )
-    else:
-        test_bin_name = os.path.basename(result[0].path)
-        env.Command(
-            target="#@{}".format(test_bin_name),
-            source=["$PREFIX_BINDIR/{}".format(test_bin_name)],
-            action="${SOURCES[0]}"
-        )
 
     return result
 
