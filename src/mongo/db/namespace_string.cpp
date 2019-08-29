@@ -34,6 +34,7 @@
 #include <ostream>
 
 #include "mongo/base/parse_number.h"
+#include "mongo/db/server_options.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -139,6 +140,25 @@ std::string NamespaceString::getSisterNS(StringData local) const {
 
 bool NamespaceString::isDropPendingNamespace() const {
     return coll().startsWith(dropPendingNSPrefix);
+}
+
+bool NamespaceString::checkLengthForFCV() const {
+    // Prior to longer collection names, the limit in older versions was 120 characters.
+    const size_t previousMaxNSLength = 120U;
+    if (size() <= previousMaxNSLength) {
+        return true;
+    }
+
+    if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+        return false;
+    }
+
+    if (serverGlobalParams.featureCompatibility.getVersion() ==
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+        return true;
+    }
+
+    return false;
 }
 
 NamespaceString NamespaceString::makeDropPendingNamespace(const repl::OpTime& opTime) const {

@@ -50,6 +50,7 @@
 #include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
@@ -559,6 +560,13 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
             str::stream() << "Cannot create collection " << nss
                           << " - database is in the process of being dropped.",
             !_dropPending.load());
+
+    uassert(ErrorCodes::IncompatibleServerVersion,
+            str::stream() << "Cannot create collection with a long name " << nss
+                          << " - upgrade to feature compatibility version "
+                          << FeatureCompatibilityVersionParser::kVersion44
+                          << " to be able to do so.",
+            nss.checkLengthForFCV());
 }
 
 Status DatabaseImpl::createView(OperationContext* opCtx,

@@ -284,6 +284,11 @@ public:
     bool isDropPendingNamespace() const;
 
     /**
+     * Returns true if the namespace length is valid based on the FCV setting.
+     */
+    bool checkLengthForFCV() const;
+
+    /**
      * Returns the drop-pending namespace name for this namespace, provided the given optime.
      *
      * Example:

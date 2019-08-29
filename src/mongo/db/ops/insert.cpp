@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/bson/bson_depth.h"
+#include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/views/durable_view_catalog.h"
@@ -202,7 +203,14 @@ Status userAllowedCreateNS(StringData db, StringData coll) {
     if (!NamespaceString::validCollectionName(coll))
         return Status(ErrorCodes::InvalidNamespace, "invalid collection name");
 
-    // check spceial areas
+    if (!NamespaceString(db, coll).checkLengthForFCV())
+        return Status(ErrorCodes::IncompatibleServerVersion,
+                      str::stream() << "Cannot create collection with a long name " << db << "."
+                                    << coll << " - upgrade to feature compatibility version "
+                                    << FeatureCompatibilityVersionParser::kVersion44
+                                    << " to be able to do so.");
+
+    // check special areas
 
     if (db == "system")
         return Status(ErrorCodes::InvalidNamespace, "cannot use 'system' database");

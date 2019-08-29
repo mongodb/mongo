@@ -183,6 +183,9 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/repl/optime',
     ],
+    LIBDEPS_PRIVATE=[
+        'server_options_core',
+    ],
 )
 
 env.Library(
