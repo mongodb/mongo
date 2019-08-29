@@ -805,6 +805,16 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
+- name: create_big_index
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "create_big_index"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
 - name: create_index
   priority: 5
   commands:
@@ -982,6 +992,7 @@ buildvariants:
     - name: insert_big_docs
     - name: insert_remove
     - name: big_update
+    - name: create_big_index
     - name: create_index
 
 - name: linux-standalone
