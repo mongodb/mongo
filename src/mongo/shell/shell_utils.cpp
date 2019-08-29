@@ -69,9 +69,9 @@ namespace mongo::shell_utils {
 namespace {
 boost::filesystem::path getUserDir() {
 #ifdef _WIN32
-    auto envp = getenv("USERPROFILE");
-    if (envp)
-        return envp;
+    auto wenvp = _wgetenv(L"USERPROFILE");
+    if (wenvp)
+        return toUtf8String(wenvp);
 
     return "./";
 #else
