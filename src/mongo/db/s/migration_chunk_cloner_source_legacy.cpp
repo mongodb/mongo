@@ -163,10 +163,15 @@ void LogTransactionOperationsForShardingHandler::commit(boost::optional<Timestam
         const auto& nss = stmt.getNss();
 
         auto csr = CollectionShardingRuntime::get_UNSAFE(_svcCtx, nss);
-        auto msm = MigrationSourceManager::get_UNSAFE(csr);
+
+        auto opCtx = cc().getOperationContext();
+        auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
+
+        auto msm = MigrationSourceManager::get(csr, csrLock);
         if (!msm) {
             continue;
         }
+
         auto cloner = dynamic_cast<MigrationChunkClonerSourceLegacy*>(msm->getCloner().get());
 
         auto opType = stmt.getOpType();
