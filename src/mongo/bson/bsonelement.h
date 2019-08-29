@@ -467,23 +467,7 @@ public:
         return ConstDataView(value() + 4).read<LittleEndian<int>>();
     }
 
-    /** Get the scope SavedContext of a CodeWScope data element.
-     *
-     *  This function is DEPRECATED, since it can error if there are
-     *  null chars in the codeWScopeCode. However, some existing indexes
-     *  may be based on an incorrect ordering derived from this function,
-     *  so it may still need to be used in certain cases.
-     *   */
-    const char* codeWScopeScopeDataUnsafe() const {
-        // This can error if there are null chars in the codeWScopeCode
-        return codeWScopeCode() + strlen(codeWScopeCode()) + 1;
-    }
-
     /* Get the scope SavedContext of a CodeWScope data element.
-     *
-     * This is the corrected version of codeWScopeScopeDataUnsafe(),
-     * but note that existing uses might rely on the behavior of
-     * that function so be careful in choosing which version to use.
      */
     const char* codeWScopeScopeData() const {
         return codeWScopeCode() + codeWScopeCodeLen();
