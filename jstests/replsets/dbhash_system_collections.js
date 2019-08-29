@@ -32,6 +32,7 @@ function checkDbHash(mongo) {
 
     var replicatedAdminSystemCollections = [
         'system.backup_users',
+        'system.keys',
         'system.new_users',
         'system.roles',
         'system.version',

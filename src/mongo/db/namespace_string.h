@@ -251,6 +251,12 @@ public:
      * Returns whether a namespace is replicated, based only on its string value. One notable
      * omission is that map reduce `tmp.mr` collections may or may not be replicated. Callers must
      * decide how to handle that case separately.
+     *
+     * Note: This function considers "replicated" to be any namespace that should be timestamped.
+     * Not all collections that are timestamped are replicated explicitly through the oplog.
+     * Drop-pending collections are a notable example. Please use
+     * ReplicationCoordinator::isOplogDisabledForNS to determine if a namespace gets logged in the
+     * oplog.
      */
     bool isReplicated() const;
 

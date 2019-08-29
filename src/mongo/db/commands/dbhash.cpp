@@ -212,15 +212,6 @@ public:
         md5_state_t globalState;
         md5_init(&globalState);
 
-        // A set of 'system' collections that are replicated, and therefore included in the db hash.
-        const std::set<StringData> replicatedSystemCollections{"system.backup_users",
-                                                               "system.js",
-                                                               "system.new_users",
-                                                               "system.roles",
-                                                               "system.users",
-                                                               "system.version",
-                                                               "system.views"};
-
         std::map<std::string, std::string> collectionToHashMap;
         std::map<std::string, OptionalCollectionUUID> collectionToUUIDMap;
         std::set<std::string> cappedCollectionSet;
@@ -235,11 +226,9 @@ public:
                 return false;
             }
 
-            // Only include 'system' collections that are replicated.
-            bool isReplicatedSystemColl =
-                (replicatedSystemCollections.count(collNss.coll().toString()) > 0);
-            if (collNss.isSystem() && !isReplicatedSystemColl)
+            if (repl::ReplicationCoordinator::isOplogDisabledForNS(collNss)) {
                 return true;
+            }
 
             if (collNss.coll().startsWith("tmp.mr.")) {
                 // We skip any incremental map reduce collections as they also aren't

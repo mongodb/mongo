@@ -66,7 +66,7 @@ void ReplicationCoordinator::set(ServiceContext* service,
 }
 
 bool ReplicationCoordinator::isOplogDisabledFor(OperationContext* opCtx,
-                                                const NamespaceString& nss) {
+                                                const NamespaceString& nss) const {
     if (getReplicationMode() == ReplicationCoordinator::modeNone) {
         return true;
     }
@@ -75,7 +75,17 @@ bool ReplicationCoordinator::isOplogDisabledFor(OperationContext* opCtx,
         return true;
     }
 
-    if (nss.db() == "local") {
+    if (ReplicationCoordinator::isOplogDisabledForNS(nss)) {
+        return true;
+    }
+
+    fassert(28626, opCtx->recoveryUnit());
+
+    return false;
+}
+
+bool ReplicationCoordinator::isOplogDisabledForNS(const NamespaceString& nss) {
+    if (nss.isLocal()) {
         return true;
     }
 
@@ -86,8 +96,6 @@ bool ReplicationCoordinator::isOplogDisabledFor(OperationContext* opCtx,
     if (nss.isDropPendingNamespace()) {
         return true;
     }
-
-    fassert(28626, opCtx->recoveryUnit());
 
     return false;
 }
