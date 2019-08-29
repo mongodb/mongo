@@ -78,3 +78,14 @@ server_parameters:
     set_at: [startup, runtime]
     cpp_class: ClusterMemberDNOverride
 
+  tlsX509ExpirationWarningThresholdDays:
+    description: >-
+        If a client connects to the server using an X509 certificate expiring in less
+        than the configured number of days, a warning will be emitted to the server logs.
+        Set this value to 0 to disable the warning.
+    set_at: startup
+    cpp_vartype: std::int32_t
+    cpp_varname: "tlsX509ExpirationWarningThresholdDays"
+    default: 30
+    validator:
+        gte: 0

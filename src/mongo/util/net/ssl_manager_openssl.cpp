@@ -59,6 +59,7 @@
 #include "mongo/util/net/private/ssl_expiration.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/ssl_options.h"
+#include "mongo/util/net/ssl_parameters_gen.h"
 #include "mongo/util/net/ssl_types.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
@@ -240,9 +241,20 @@ IMPLEMENT_ASN1_ENCODE_FUNCTIONS_const_fname(ASN1_SEQUENCE_ANY, ASN1_SET_ANY, ASN
 const STACK_OF(X509_EXTENSION) * X509_get0_extensions(const X509* peerCert) {
     return peerCert->cert_info->extensions;
 }
+
+inline ASN1_TIME* X509_get0_notAfter(const X509* cert) {
+    return X509_get_notAfter(cert);
+}
+
 inline int X509_NAME_ENTRY_set(const X509_NAME_ENTRY* ne) {
     return ne->set;
 }
+
+#if OPENSSL_VESION_NUMBER < 0x10002000L
+inline bool ASN1_TIME_diff(int*, int*, const ASN1_TIME*, const ASN1_TIME*) {
+    return false;
+}
+#endif
 
 int DH_set0_pqg(DH* dh, BIGNUM* p, BIGNUM* q, BIGNUM* g) {
     dh->p = p;
@@ -1531,21 +1543,38 @@ StatusWith<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
     auto peerSubject = getCertificateSubjectX509Name(peerCert);
     LOG(2) << "Accepted TLS connection from peer: " << peerSubject;
 
-    // If this is a server and client and server certificate are the same, log a warning.
-    if (remoteHost.empty() && _sslConfiguration.serverSubjectName() == peerSubject) {
-        warning() << "Client connecting with server's own TLS certificate";
-    }
-
     StatusWith<stdx::unordered_set<RoleName>> swPeerCertificateRoles = _parsePeerRoles(peerCert);
     if (!swPeerCertificateRoles.isOK()) {
         return swPeerCertificateRoles.getStatus();
     }
 
-    // If this is an SSL client context (on a MongoDB server or client)
-    // perform hostname validation of the remote server
+    // Server side.
     if (remoteHost.empty()) {
+        const auto exprThreshold = tlsX509ExpirationWarningThresholdDays;
+        if (exprThreshold > 0) {
+            const auto expiration = X509_get0_notAfter(peerCert);
+            time_t threshold = (Date_t::now() + Days(exprThreshold)).toTimeT();
+
+            if (X509_cmp_time(expiration, &threshold) < 0) {
+                int days = 0, secs = 0;
+                if (!ASN1_TIME_diff(&days, &secs, nullptr /* now */, expiration)) {
+                    tlsEmitWarningExpiringClientCertificate(peerSubject);
+                } else {
+                    tlsEmitWarningExpiringClientCertificate(peerSubject, Days(days));
+                }
+            }
+        }
+
+        // If client and server certificate are the same, log a warning.
+        if (_sslConfiguration.serverSubjectName() == peerSubject) {
+            warning() << "Client connecting with server's own TLS certificate";
+        }
+
         return SSLPeerInfo(peerSubject, sniName, std::move(swPeerCertificateRoles.getValue()));
     }
+
+    // If this is an SSL client context (on a MongoDB server or client)
+    // perform hostname validation of the remote server.
 
     // This is to standardize the IPAddress format for comparison.
     auto swCIDRRemoteHost = CIDR::parse(remoteHost);

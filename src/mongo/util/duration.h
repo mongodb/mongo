@@ -55,6 +55,7 @@ using Milliseconds = Duration<std::milli>;
 using Seconds = Duration<std::ratio<1>>;
 using Minutes = Duration<std::ratio<60>>;
 using Hours = Duration<std::ratio<3600>>;
+using Days = Duration<std::ratio<86400>>;
 
 //
 // Streaming output operators for common duration types. Writes the numerical value followed by
@@ -70,6 +71,7 @@ std::ostream& operator<<(std::ostream& os, Milliseconds ms);
 std::ostream& operator<<(std::ostream& os, Seconds s);
 std::ostream& operator<<(std::ostream& os, Minutes m);
 std::ostream& operator<<(std::ostream& os, Hours h);
+std::ostream& operator<<(std::ostream& os, Days h);
 
 template <typename Allocator>
 StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Nanoseconds ns);
@@ -88,6 +90,9 @@ StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Minut
 
 template <typename Allocator>
 StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Hours h);
+
+template <typename Allocator>
+StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Days h);
 
 
 template <typename Duration1, typename Duration2>

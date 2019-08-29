@@ -67,6 +67,11 @@ Stream& streamPut(Stream& os, Hours hrs) {
     return os << hrs.count() << "hr";
 }
 
+template <typename Stream>
+Stream& streamPut(Stream& os, Days days) {
+    return os << days.count() << "d";
+}
+
 }  // namespace
 
 std::ostream& operator<<(std::ostream& os, Nanoseconds ns) {
@@ -90,6 +95,10 @@ std::ostream& operator<<(std::ostream& os, Minutes m) {
 
 std::ostream& operator<<(std::ostream& os, Hours h) {
     return streamPut(os, h);
+}
+
+std::ostream& operator<<(std::ostream& os, Days d) {
+    return streamPut(os, d);
 }
 
 template <typename Allocator>
@@ -120,6 +129,11 @@ StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Minut
 template <typename Allocator>
 StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Hours h) {
     return streamPut(os, h);
+}
+
+template <typename Allocator>
+StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Days d) {
+    return streamPut(os, d);
 }
 
 template StringBuilderImpl<StackAllocator>& operator<<(StringBuilderImpl<StackAllocator>&,

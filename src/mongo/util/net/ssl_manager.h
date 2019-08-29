@@ -320,6 +320,11 @@ StatusWith<TLSVersion> mapTLSVersion(SSLConnectionType conn);
  */
 void recordTLSVersion(TLSVersion version, const HostAndPort& hostForLogging);
 
+/**
+ * Emit a warning() explaining that a client certificate is about to expire.
+ */
+void tlsEmitWarningExpiringClientCertificate(const SSLX509Name& peer);
+void tlsEmitWarningExpiringClientCertificate(const SSLX509Name& peer, Days days);
 
 }  // namespace mongo
 #endif  // #ifdef MONGO_CONFIG_SSL

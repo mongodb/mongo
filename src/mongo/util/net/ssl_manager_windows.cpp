@@ -58,6 +58,7 @@
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/ssl.hpp"
 #include "mongo/util/net/ssl_options.h"
+#include "mongo/util/net/ssl_parameters_gen.h"
 #include "mongo/util/net/ssl_types.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
@@ -1429,7 +1430,7 @@ unsigned long long FiletimeToEpocMillis(FILETIME ft) {
 
     uint64_t ns100 = ((static_cast<int64_t>(ft.dwHighDateTime) << 32) + ft.dwLowDateTime) -
         kOneHundredNanosecondsSinceEpoch;
-    return ns100 / 1000;
+    return ns100 / 10000;
 }
 
 // MongoDB wants RFC 2253 (LDAP) formatted DN names for auth purposes
@@ -1678,6 +1679,20 @@ Status validatePeerCertificate(const std::string& remoteHost,
     }
     invariant(peerSubjectName);
     *peerSubjectName = swSubjectName.getValue();
+
+    if (remoteHost.empty()) {
+        const auto exprThreshold = tlsX509ExpirationWarningThresholdDays;
+        if (exprThreshold > 0) {
+            const auto now = Date_t::now();
+            const auto expiration =
+                Date_t::fromMillisSinceEpoch(FiletimeToEpocMillis(cert->pCertInfo->NotAfter));
+
+            if ((now + Days(exprThreshold)) > expiration) {
+                tlsEmitWarningExpiringClientCertificate(*peerSubjectName,
+                                                        duration_cast<Days>(expiration - now));
+            }
+        }
+    }
 
     // This means the certificate chain is not valid.
     // Ignore CRYPT_E_NO_REVOCATION_CHECK since most CAs lack revocation information especially test

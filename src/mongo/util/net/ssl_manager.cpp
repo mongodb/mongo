@@ -1171,4 +1171,12 @@ bool hostNameMatchForX509Certificates(std::string nameToMatch, std::string certH
     }
 }
 
+void tlsEmitWarningExpiringClientCertificate(const SSLX509Name& peer) {
+    warning() << "Peer certificate '" << peer << "' expires soon";
+}
+
+void tlsEmitWarningExpiringClientCertificate(const SSLX509Name& peer, Days days) {
+    warning() << "Peer certificate '" << peer << "' expires in " << days;
+}
+
 }  // namespace mongo
