@@ -1232,12 +1232,15 @@ functions:
           if command -V cygpath; then
             # Sad note: We have to use the Windows path instead of the posix path here.
             # Otherwise, virtualenv may mistakenly resolve paths relative to c:\cygdrive.
+            # Creating a virtualenv in cygwin with 'python -m venv', will not work correctly
+            # since the paths will be wrong.  We need to use virtualenv and specify the
+            # python path as 'C:\python\python_version'
             python_loc=$(cygpath -w $python_loc)
             venv_dir="$(cygpath -w "$venv_dir")"
+            "$virtualenv_loc" --python "$python_loc" --system-site-packages "$venv_dir"
+          else
+            "$python_loc" -m venv --system-site-packages "$venv_dir"
           fi
-
-          # Set up virtualenvs in ${workdir}
-          "$virtualenv_loc" --python "$python_loc" --system-site-packages "$venv_dir"
 
           export VIRTUAL_ENV_DISABLE_PROMPT=yes
 
