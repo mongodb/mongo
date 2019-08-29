@@ -250,7 +250,7 @@ inline int X509_NAME_ENTRY_set(const X509_NAME_ENTRY* ne) {
     return ne->set;
 }
 
-#if OPENSSL_VESION_NUMBER < 0x10002000L
+#if OPENSSL_VERSION_NUMBER < 0x10002000L
 inline bool ASN1_TIME_diff(int*, int*, const ASN1_TIME*, const ASN1_TIME*) {
     return false;
 }
