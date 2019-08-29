@@ -42,20 +42,20 @@ namespace mongo {
  */
 class WorkingSetMatchableDocument : public MatchableDocument {
 public:
-    WorkingSetMatchableDocument(WorkingSetMember* wsm) : _wsm(wsm) {}
+    WorkingSetMatchableDocument(WorkingSetMember* wsm)
+        : _wsm(wsm), _obj(_wsm->doc.value().toBson()) {}
 
     // This is only called by a $where query.  The query system must be smart enough to realize
     // that it should do a fetch beforehand.
     BSONObj toBSON() const {
-        invariant(_wsm->hasObj());
-        return _wsm->obj.value();
+        return _obj;
     }
 
     ElementIterator* allocateIterator(const ElementPath* path) const final {
         // BSONElementIterator does some interesting things with arrays that I don't think
         // SimpleArrayElementIterator does.
         if (_wsm->hasObj()) {
-            return new BSONElementIterator(path, _wsm->obj.value());
+            return new BSONElementIterator(path, _obj);
         }
 
         // NOTE: This (kind of) duplicates code in WorkingSetMember::getFieldDotted.
@@ -95,6 +95,7 @@ public:
 
 private:
     WorkingSetMember* _wsm;
+    BSONObj _obj;
 };
 
 class IndexKeyMatchableDocument : public MatchableDocument {

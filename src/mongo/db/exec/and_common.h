@@ -64,7 +64,7 @@ public:
             invariant(src.getState() == WorkingSetMember::RID_AND_OBJ);
 
             // 'src' has the full document but 'dest' doesn't so we need to copy it over.
-            dest->obj = src.obj;
+            dest->doc = src.doc;
             dest->makeObjOwnedIfNeeded();
 
             // We have an object so we don't need key data.

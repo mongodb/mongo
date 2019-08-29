@@ -264,7 +264,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanDeleteUpcomingObject) {
         if (PlanStage::ADVANCED == state) {
             WorkingSetMember* member = ws.get(id);
             ASSERT_EQUALS(coll->docFor(&_opCtx, recordIds[count]).value()["foo"].numberInt(),
-                          member->obj.value()["foo"].numberInt());
+                          member->doc.value()["foo"].getInt());
             ++count;
         }
     }
@@ -284,7 +284,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanDeleteUpcomingObject) {
         if (PlanStage::ADVANCED == state) {
             WorkingSetMember* member = ws.get(id);
             ASSERT_EQUALS(coll->docFor(&_opCtx, recordIds[count]).value()["foo"].numberInt(),
-                          member->obj.value()["foo"].numberInt());
+                          member->doc.value()["foo"].getInt());
             ++count;
         }
     }
@@ -317,7 +317,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanDeleteUpcomingObjectBackw
         if (PlanStage::ADVANCED == state) {
             WorkingSetMember* member = ws.get(id);
             ASSERT_EQUALS(coll->docFor(&_opCtx, recordIds[count]).value()["foo"].numberInt(),
-                          member->obj.value()["foo"].numberInt());
+                          member->doc.value()["foo"].getInt());
             ++count;
         }
     }
@@ -337,7 +337,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanDeleteUpcomingObjectBackw
         if (PlanStage::ADVANCED == state) {
             WorkingSetMember* member = ws.get(id);
             ASSERT_EQUALS(coll->docFor(&_opCtx, recordIds[count]).value()["foo"].numberInt(),
-                          member->obj.value()["foo"].numberInt());
+                          member->doc.value()["foo"].getInt());
             ++count;
         }
     }

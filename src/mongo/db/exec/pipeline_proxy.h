@@ -91,7 +91,7 @@ protected:
                        WorkingSet* ws,
                        const char* stageTypeName);
 
-    virtual boost::optional<BSONObj> getNextBson();
+    virtual boost::optional<Document> getNext();
     void doDispose() final;
 
     // Items in the _stash should be returned before pulling items from _pipeline.
@@ -99,7 +99,7 @@ protected:
     const bool _includeMetaData;
 
 private:
-    std::vector<BSONObj> _stash;
+    std::vector<Document> _stash;
     WorkingSet* _ws;
 };
 

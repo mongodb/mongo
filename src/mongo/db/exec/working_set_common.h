@@ -90,12 +90,11 @@ public:
     static bool isValidStatusMemberObject(const BSONObj& obj);
 
     /**
-     * Returns object in working set member created with allocateStatusMember().
-     * Does not assume isValidStatusMemberObject.
-     * If the WSID is invalid or the working set member is created by
-     * allocateStatusMember, objOut will not be updated.
+     * If the working set member represents an error status, returns it as a Document (which can
+     * subsequently be converted to Status). Otherwise returns boost::none.
      */
-    static void getStatusMemberObject(const WorkingSet& ws, WorkingSetID wsid, BSONObj* objOut);
+    static boost::optional<Document> getStatusMemberDocument(const WorkingSet& ws,
+                                                             WorkingSetID wsid);
 
     /**
      * Returns status from working set member object.

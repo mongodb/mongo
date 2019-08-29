@@ -59,7 +59,7 @@ protected:
             }
             const auto id = _ws.allocate();
             auto* member = _ws.get(id);
-            member->obj.setValue(result.getOwned());
+            member->doc.setValue(Document{result});
             _ws.transitionToOwnedObj(id);
             queuedData->pushBack(id);
         }
@@ -73,7 +73,7 @@ protected:
             state = trialStage->work(&id);
             if (state == PlanStage::ADVANCED) {
                 auto* member = _ws.get(id);
-                return member->obj.value();
+                return member->doc.value().toBson();
             }
         } while (state == PlanStage::NEED_TIME);
 

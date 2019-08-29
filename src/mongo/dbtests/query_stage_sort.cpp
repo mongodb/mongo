@@ -98,7 +98,8 @@ public:
             WorkingSetID id = ws->allocate();
             WorkingSetMember* member = ws->get(id);
             member->recordId = *it;
-            member->obj = coll->docFor(&_opCtx, *it);
+            auto snapshotBson = coll->docFor(&_opCtx, *it);
+            member->doc = {snapshotBson.snapshotId(), Document{snapshotBson.value()}};
             ws->transitionToRecordIdAndObj(id);
             ms->pushBack(id);
         }
@@ -403,10 +404,10 @@ public:
             }
             WorkingSetMember* member = exec->getWorkingSet()->get(id);
             ASSERT(member->hasObj());
-            if (member->obj.value().getField("_id").OID() == updatedId) {
-                ASSERT(idBeforeUpdate == member->obj.snapshotId());
+            if (member->doc.value().getField("_id").getOid() == updatedId) {
+                ASSERT(idBeforeUpdate == member->doc.snapshotId());
             }
-            thisVal = member->obj.value().getField("foo").Int();
+            thisVal = member->doc.value().getField("foo").getInt();
             ASSERT_LTE(lastVal, thisVal);
             // Expect docs in range [0, limit)
             ASSERT_LTE(0, thisVal);
@@ -541,15 +542,16 @@ public:
             {
                 WorkingSetID id = ws->allocate();
                 WorkingSetMember* member = ws->get(id);
-                member->obj = Snapshotted<BSONObj>(
-                    SnapshotId(), fromjson("{a: [1,2,3], b:[1,2,3], c:[1,2,3], d:[1,2,3,4]}"));
+                member->doc = {
+                    SnapshotId(),
+                    Document{fromjson("{a: [1,2,3], b:[1,2,3], c:[1,2,3], d:[1,2,3,4]}")}};
                 member->transitionToOwnedObj();
                 queuedDataStage->pushBack(id);
             }
             {
                 WorkingSetID id = ws->allocate();
                 WorkingSetMember* member = ws->get(id);
-                member->obj = Snapshotted<BSONObj>(SnapshotId(), fromjson("{a:1, b:1, c:1}"));
+                member->doc = {SnapshotId(), Document{fromjson("{a:1, b:1, c:1}")}};
                 member->transitionToOwnedObj();
                 queuedDataStage->pushBack(id);
             }

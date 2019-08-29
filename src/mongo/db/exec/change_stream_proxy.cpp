@@ -50,15 +50,15 @@ ChangeStreamProxyStage::ChangeStreamProxyStage(OperationContext* opCtx,
     _latestOplogTimestamp = ResumeToken::parse(_postBatchResumeToken).getData().clusterTime;
 }
 
-boost::optional<BSONObj> ChangeStreamProxyStage::getNextBson() {
+boost::optional<Document> ChangeStreamProxyStage::getNext() {
     if (auto next = _pipeline->getNext()) {
         // While we have more results to return, we track both the timestamp and the resume token of
         // the latest event observed in the oplog, the latter via its sort key metadata field.
-        auto nextBSON = _validateAndConvertToBSON(*next);
+        _validateResumeToken(*next);
         _latestOplogTimestamp = PipelineD::getLatestOplogTimestamp(_pipeline.get());
         _postBatchResumeToken = next->metadata().getSortKey();
         _setSpeculativeReadTimestamp();
-        return nextBSON;
+        return next;
     }
 
     // We ran out of results to return. Check whether the oplog cursor has moved forward since the
@@ -76,10 +76,10 @@ boost::optional<BSONObj> ChangeStreamProxyStage::getNextBson() {
     return boost::none;
 }
 
-BSONObj ChangeStreamProxyStage::_validateAndConvertToBSON(const Document& event) const {
+void ChangeStreamProxyStage::_validateResumeToken(const Document& event) const {
     // If we are producing output to be merged on mongoS, then no stages can have modified the _id.
     if (_includeMetaData) {
-        return event.toBsonWithMetaData();
+        return;
     }
     // Confirm that the document _id field matches the original resume token in the sort key field.
     auto eventBSON = event.toBson();
@@ -95,7 +95,6 @@ BSONObj ChangeStreamProxyStage::_validateAndConvertToBSON(const Document& event)
                           << BSON("_id" << resumeToken) << " but found: "
                           << (eventBSON["_id"] ? BSON("_id" << eventBSON["_id"]) : BSONObj()),
             idField.binaryEqual(resumeToken));
-    return eventBSON;
 }
 
 void ChangeStreamProxyStage::_setSpeculativeReadTimestamp() {

@@ -74,9 +74,10 @@ DocumentSource::GetNextResult DocumentSourceCursor::doGetNext() {
 }
 
 Document DocumentSourceCursor::transformBSONObjToDocument(const BSONObj& obj) const {
-    return _dependencies
-        ? _dependencies->extractFields(obj)
-        : (_inputHasMetadata ? Document::fromBsonWithMetaData(obj) : Document(obj));
+    // Aggregation assumes ownership of underlying BSON.
+    return _dependencies ? _dependencies->extractFields(obj)
+                         : (_inputHasMetadata ? Document::fromBsonWithMetaData(obj.getOwned())
+                                              : Document(obj.getOwned()));
 }
 
 void DocumentSourceCursor::loadBatch() {

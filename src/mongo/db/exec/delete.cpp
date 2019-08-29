@@ -183,12 +183,11 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     if (_params->returnDeleted) {
         // Save a copy of the document that is about to get deleted, but keep it in the RID_AND_OBJ
         // state in case we need to retry deleting it.
-        BSONObj deletedDoc = member->obj.value();
-        member->obj.setValue(deletedDoc.getOwned());
+        member->makeObjOwnedIfNeeded();
     }
 
     if (_params->removeSaver) {
-        uassertStatusOK(_params->removeSaver->goingToDelete(member->obj.value()));
+        uassertStatusOK(_params->removeSaver->goingToDelete(member->doc.value().toBson()));
     }
 
     // TODO: Do we want to buffer docs and delete them in a group rather than saving/restoring state

@@ -151,7 +151,7 @@ static StatusWith<double> computeGeoNearDistance(const GeoNearParams& nearParams
 
     // Extract all the geometries out of this document for the near query
     std::vector<std::unique_ptr<StoredGeometry>> geometries;
-    extractGeometries(member->obj.value(), nearParams.nearQuery->field, &geometries);
+    extractGeometries(member->doc.value().toBson(), nearParams.nearQuery->field, &geometries);
 
     // Compute the minimum distance of all the geometries in the document
     double minDistance = -1;

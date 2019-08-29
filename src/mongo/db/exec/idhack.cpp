@@ -131,7 +131,7 @@ PlanStage::StageState IDHackStage::advance(WorkingSetID id,
     invariant(member->hasObj());
 
     if (_addKeyMetadata) {
-        BSONObj ownedKeyObj = member->obj.value()["_id"].wrap().getOwned();
+        BSONObj ownedKeyObj = member->doc.value().toBson()["_id"].wrap().getOwned();
         member->metadata().setIndexKey(IndexKeyEntry::rehydrateKey(_key, ownedKeyObj));
     }
 

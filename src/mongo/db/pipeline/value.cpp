@@ -151,7 +151,8 @@ Document ValueStorage::getDocument() const {
 }
 
 // not in header because document is fwd declared
-Value::Value(const BSONObj& obj) : _storage(Object, Document(obj)) {}
+Value::Value(const BSONObj& obj) : _storage(Object, Document(obj.getOwned())) {}
+Value::Value(const Document& doc) : _storage(Object, doc.isOwned() ? doc : doc.getOwned()) {}
 
 Value::Value(const BSONElement& elem) : _storage(elem.type()) {
     switch (elem.type()) {
@@ -174,7 +175,7 @@ Value::Value(const BSONElement& elem) : _storage(elem.type()) {
             break;
 
         case Object: {
-            _storage.putDocument(Document(elem.embeddedObject()));
+            _storage.putDocument(Document(elem.embeddedObject().getOwned()));
             break;
         }
 

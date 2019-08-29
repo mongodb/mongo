@@ -122,7 +122,7 @@ public:
             // Add all documents from the lastInterval into the QueuedDataStage.
             const WorkingSetID id = workingSet->allocate();
             WorkingSetMember* member = workingSet->get(id);
-            member->obj = Snapshotted<BSONObj>(SnapshotId(), interval.data[i]);
+            member->doc = {SnapshotId(), Document{interval.data[i]}};
             workingSet->transitionToOwnedObj(id);
             queuedStage->pushBack(id);
         }
@@ -134,7 +134,7 @@ public:
 
     StatusWith<double> computeDistance(WorkingSetMember* member) final {
         ASSERT(member->hasObj());
-        return StatusWith<double>(member->obj.value()["distance"].numberDouble());
+        return StatusWith<double>(member->doc.value()["distance"].getDouble());
     }
 
     virtual StageState initialize(OperationContext* opCtx,
@@ -156,7 +156,7 @@ static vector<BSONObj> advanceStage(PlanStage* stage, WorkingSet* workingSet) {
 
     while (PlanStage::NEED_TIME == state) {
         while (PlanStage::ADVANCED == (state = stage->work(&nextMemberID))) {
-            results.push_back(workingSet->get(nextMemberID)->obj.value());
+            results.push_back(workingSet->get(nextMemberID)->doc.value().toBson());
         }
     }
 

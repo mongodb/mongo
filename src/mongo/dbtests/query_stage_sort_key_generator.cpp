@@ -72,7 +72,7 @@ BSONObj extractSortKey(const char* sortSpec, const char* doc, const CollatorInte
     auto mockStage = std::make_unique<QueuedDataStage>(opCtx.get(), &workingSet);
     auto wsid = workingSet.allocate();
     auto wsm = workingSet.get(wsid);
-    wsm->obj = Snapshotted<BSONObj>(SnapshotId(), fromjson(doc));
+    wsm->doc = {SnapshotId(), Document{fromjson(doc)}};
     wsm->transitionToOwnedObj();
     mockStage->pushBack(wsid);
 

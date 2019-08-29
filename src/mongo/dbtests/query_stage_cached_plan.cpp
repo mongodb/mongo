@@ -135,8 +135,8 @@ public:
             ASSERT_NE(state, PlanStage::FAILURE);
 
             if (state == PlanStage::ADVANCED) {
-                WorkingSetMember* member = ws.get(id);
-                ASSERT(cq->root()->matchesBSON(member->obj.value()));
+                auto member = ws.get(id);
+                ASSERT(cq->root()->matchesBSON(member->doc.value().toBson()));
                 numResults++;
             }
         }

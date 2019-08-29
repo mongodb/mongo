@@ -92,7 +92,7 @@ public:
             // Insert obj from input array into working set.
             WorkingSetID id = ws.allocate();
             WorkingSetMember* wsm = ws.get(id);
-            wsm->obj = Snapshotted<BSONObj>(SnapshotId(), obj);
+            wsm->doc = {SnapshotId(), Document{obj}};
             wsm->transitionToOwnedObj();
             queuedDataStage->pushBack(id);
         }
@@ -130,7 +130,7 @@ public:
         BSONArrayBuilder arr(bob.subarrayStart("output"));
         while (state == PlanStage::ADVANCED) {
             WorkingSetMember* member = ws.get(id);
-            const BSONObj& obj = member->obj.value();
+            BSONObj obj = member->doc.value().toBson();
             arr.append(obj);
             state = sort.work(&id);
         }

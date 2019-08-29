@@ -546,7 +546,11 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<BSONObj>* obj
                         *objOut = Snapshotted<BSONObj>(SnapshotId(), member->keyData[0].keyData);
                     }
                 } else if (member->hasObj()) {
-                    *objOut = member->obj;
+                    *objOut =
+                        Snapshotted<BSONObj>(member->doc.snapshotId(),
+                                             member->metadata() && member->doc.value().metadata()
+                                                 ? member->doc.value().toBsonWithMetaData()
+                                                 : member->doc.value().toBson());
                 } else {
                     _workingSet->free(id);
                     hasRequestedData = false;
@@ -603,9 +607,9 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<BSONObj>* obj
             invariant(PlanStage::FAILURE == code);
 
             if (nullptr != objOut) {
-                BSONObj statusObj;
                 invariant(WorkingSet::INVALID_ID != id);
-                WorkingSetCommon::getStatusMemberObject(*_workingSet, id, &statusObj);
+                BSONObj statusObj =
+                    WorkingSetCommon::getStatusMemberDocument(*_workingSet, id)->toBson();
                 *objOut = Snapshotted<BSONObj>(SnapshotId(), statusObj);
             }
 

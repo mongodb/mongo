@@ -86,7 +86,7 @@ StatusWith<BSONObj> SortKeyGenerator::computeSortKey(const WorkingSetMember& wsm
         if (_sortHasMeta && wsm.metadata().hasTextScore()) {
             metadata.textScore = wsm.metadata().getTextScore();
         }
-        return computeSortKeyFromDocument(wsm.obj.value(), &metadata);
+        return computeSortKeyFromDocument(wsm.doc.value().toBson(), &metadata);
     }
 
     return computeSortKeyFromIndexKey(wsm);

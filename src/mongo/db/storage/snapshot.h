@@ -82,6 +82,11 @@ public:
     SnapshotId snapshotId() const {
         return _id;
     }
+
+    void setSnapshotId(SnapshotId id) {
+        _id = id;
+    }
+
     const T& value() const {
         return _value;
     }

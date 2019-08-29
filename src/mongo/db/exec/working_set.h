@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_metadata_fields.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/snapshot.h"
@@ -44,101 +45,6 @@ class IndexAccessMethod;
 class WorkingSetMember;
 
 typedef size_t WorkingSetID;
-
-/**
- * All data in use by a query.  Data is passed through the stage tree by referencing the ID of
- * an element of the working set.  Stages can add elements to the working set, delete elements
- * from the working set, or mutate elements in the working set.
- */
-class WorkingSet {
-    WorkingSet(const WorkingSet&) = delete;
-    WorkingSet& operator=(const WorkingSet&) = delete;
-
-public:
-    static const WorkingSetID INVALID_ID = WorkingSetID(-1);
-
-    WorkingSet();
-    ~WorkingSet();
-
-    /**
-     * Allocate a new query result and return the ID used to get and free it.
-     */
-    WorkingSetID allocate();
-
-    /**
-     * Get the i-th mutable query result. The pointer will be valid for this id until freed.
-     * Do not delete the returned pointer as the WorkingSet retains ownership. Call free() to
-     * release it.
-     */
-    WorkingSetMember* get(WorkingSetID i) const {
-        dassert(i < _data.size());              // ID has been allocated.
-        dassert(_data[i].nextFreeOrSelf == i);  // ID currently in use.
-        return _data[i].member;
-    }
-
-    /**
-     * Returns true if WorkingSetMember with id 'i' is free.
-     */
-    bool isFree(WorkingSetID i) const {
-        return _data[i].nextFreeOrSelf != i;
-    }
-
-    /**
-     * Deallocate the i-th query result and release its resources.
-     */
-    void free(WorkingSetID i);
-
-    /**
-     * Removes and deallocates all members of this working set.
-     */
-    void clear();
-
-    //
-    // WorkingSetMember state transitions
-    //
-
-    void transitionToRecordIdAndIdx(WorkingSetID id);
-    void transitionToRecordIdAndObj(WorkingSetID id);
-    void transitionToOwnedObj(WorkingSetID id);
-
-    /**
-     * Returns the list of working set ids that have transitioned into the RID_AND_IDX state since
-     * the last yield. The members corresponding to these ids may have since transitioned to a
-     * different state or been freed, so these cases must be handled by the caller. The list may
-     * also contain duplicates.
-     *
-     * Execution stages are *not* responsible for managing this list, as working set ids are added
-     * to the set automatically by WorkingSet::transitionToRecordIdAndIdx().
-     *
-     * As a side effect, calling this method clears the list of flagged yield sensitive ids kept by
-     * the working set.
-     */
-    std::vector<WorkingSetID> getAndClearYieldSensitiveIds();
-
-private:
-    struct MemberHolder {
-        MemberHolder();
-        ~MemberHolder();
-
-        // Free list link if freed. Points to self if in use.
-        WorkingSetID nextFreeOrSelf;
-
-        // Owning pointer
-        WorkingSetMember* member;
-    };
-
-    // All WorkingSetIDs are indexes into this, except for INVALID_ID.
-    // Elements are added to _freeList rather than removed when freed.
-    std::vector<MemberHolder> _data;
-
-    // Index into _data, forming a linked-list using MemberHolder::nextFreeOrSelf as the next
-    // link. INVALID_ID is the list terminator since 0 is a valid index.
-    // If _freeList == INVALID_ID, the free list is empty and all elements in _data are in use.
-    WorkingSetID _freeList;
-
-    // Contains ids of WSMs that may need to be adjusted when we next yield.
-    std::vector<WorkingSetID> _yieldSensitiveIds;
-};
 
 /**
  * The key data extracted from an index.  Keeps track of both the key (currently a BSONObj) and
@@ -191,13 +97,7 @@ struct IndexKeyDatum {
  * A WorkingSetMember may have any of the data above.
  */
 class WorkingSetMember {
-    WorkingSetMember(const WorkingSetMember&) = delete;
-    WorkingSetMember& operator=(const WorkingSetMember&) = delete;
-
 public:
-    WorkingSetMember();
-    ~WorkingSetMember();
-
     /**
      * Reset to an "empty" state.
      */
@@ -233,7 +133,7 @@ public:
     //
 
     RecordId recordId;
-    Snapshotted<BSONObj> obj;
+    Snapshotted<Document> doc;
     std::vector<IndexKeyDatum> keyData;
 
     // True if this WSM has survived a yield in RID_AND_IDX state.
@@ -302,12 +202,116 @@ public:
         _metadata = std::move(metadata);
     }
 
+    /**
+     * Resets the underlying BSONObj in the doc field. This avoids unnecessary allocation/
+     * deallocation of Document/DocumentStorage objects.
+     */
+    void resetDocument(SnapshotId snapshot, const BSONObj& obj);
+
 private:
     friend class WorkingSet;
 
     MemberState _state = WorkingSetMember::INVALID;
 
     DocumentMetadataFields _metadata;
+};
+
+/**
+ * All data in use by a query.  Data is passed through the stage tree by referencing the ID of
+ * an element of the working set.  Stages can add elements to the working set, delete elements
+ * from the working set, or mutate elements in the working set.
+ */
+class WorkingSet {
+    WorkingSet(const WorkingSet&) = delete;
+    WorkingSet& operator=(const WorkingSet&) = delete;
+
+public:
+    static const WorkingSetID INVALID_ID = WorkingSetID(-1);
+
+    WorkingSet();
+
+    ~WorkingSet() = default;
+
+    /**
+     * Allocate a new query result and return the ID used to get and free it.
+     */
+    WorkingSetID allocate();
+
+    /**
+     * Get the i-th mutable query result. The pointer will be valid for this id until freed.
+     * Do not delete the returned pointer as the WorkingSet retains ownership. Call free() to
+     * release it.
+     */
+    WorkingSetMember* get(WorkingSetID i) {
+        dassert(i < _data.size());              // ID has been allocated.
+        dassert(_data[i].nextFreeOrSelf == i);  // ID currently in use.
+        return &_data[i].member;
+    }
+
+    const WorkingSetMember* get(WorkingSetID i) const {
+        dassert(i < _data.size());              // ID has been allocated.
+        dassert(_data[i].nextFreeOrSelf == i);  // ID currently in use.
+        return &_data[i].member;
+    }
+
+    /**
+     * Returns true if WorkingSetMember with id 'i' is free.
+     */
+    bool isFree(WorkingSetID i) const {
+        return _data[i].nextFreeOrSelf != i;
+    }
+
+    /**
+     * Deallocate the i-th query result and release its resources.
+     */
+    void free(WorkingSetID i);
+
+    /**
+     * Removes and deallocates all members of this working set.
+     */
+    void clear();
+
+    //
+    // WorkingSetMember state transitions
+    //
+
+    void transitionToRecordIdAndIdx(WorkingSetID id);
+    void transitionToRecordIdAndObj(WorkingSetID id);
+    void transitionToOwnedObj(WorkingSetID id);
+
+    /**
+     * Returns the list of working set ids that have transitioned into the RID_AND_IDX state since
+     * the last yield. The members corresponding to these ids may have since transitioned to a
+     * different state or been freed, so these cases must be handled by the caller. The list may
+     * also contain duplicates.
+     *
+     * Execution stages are *not* responsible for managing this list, as working set ids are added
+     * to the set automatically by WorkingSet::transitionToRecordIdAndIdx().
+     *
+     * As a side effect, calling this method clears the list of flagged yield sensitive ids kept by
+     * the working set.
+     */
+    std::vector<WorkingSetID> getAndClearYieldSensitiveIds();
+
+private:
+    struct MemberHolder {
+        // Free list link if freed. Points to self if in use.
+        WorkingSetID nextFreeOrSelf;
+
+        WorkingSetMember member;
+    };
+
+    // All WorkingSetIDs are indexes into this, except for INVALID_ID.
+    // Elements are added to _freeList rather than removed when freed.
+    std::vector<MemberHolder> _data;
+
+    // Index into _data, forming a linked-list using MemberHolder::nextFreeOrSelf as the next
+    // link. INVALID_ID is the list terminator since 0 is a valid index.
+    // If _freeList == INVALID_ID, the free list is empty and all elements in _data are in use.
+    WorkingSetID _freeList;
+
+    // Contains ids of WSMs that may need to be adjusted when we next yield.
+    std::vector<WorkingSetID> _yieldSensitiveIds;
 };
 
 }  // namespace mongo

@@ -77,13 +77,13 @@ public:
     }
 
 protected:
-    boost::optional<BSONObj> getNextBson() final;
+    boost::optional<Document> getNext() final;
 
 private:
     /**
-     * Verifies that the docs's resume token has not been modified, then converts the doc to BSON.
+     * Verifies that the docs's resume token has not been modified.
      */
-    BSONObj _validateAndConvertToBSON(const Document& event) const;
+    void _validateResumeToken(const Document& event) const;
 
     /**
      * Set the speculative majority read timestamp if we have scanned up to a certain oplog

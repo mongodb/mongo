@@ -208,7 +208,7 @@ public:
         WorkingSetMember* member = ws->get(id);
         member->recordId = recordIds[targetDocIndex];
         const BSONObj oldDoc = BSON("_id" << targetDocIndex << "foo" << targetDocIndex);
-        member->obj = Snapshotted<BSONObj>(SnapshotId(), oldDoc);
+        member->doc = {SnapshotId(), Document{oldDoc}};
         ws->transitionToRecordIdAndObj(id);
         qds->pushBack(id);
 
@@ -236,10 +236,10 @@ public:
         ASSERT_TRUE(resultMember->hasOwnedObj());
         ASSERT_FALSE(resultMember->hasRecordId());
         ASSERT_EQUALS(resultMember->getState(), WorkingSetMember::OWNED_OBJ);
-        ASSERT_TRUE(resultMember->obj.value().isOwned());
+        ASSERT_TRUE(resultMember->doc.value().isOwned());
 
         // Should be the old value.
-        ASSERT_BSONOBJ_EQ(resultMember->obj.value(), oldDoc);
+        ASSERT_BSONOBJ_EQ(resultMember->doc.value().toBson(), oldDoc);
 
         // Should have done the delete.
         ASSERT_EQUALS(stats->docsDeleted, 1U);

@@ -91,8 +91,9 @@ PlanStage::StageState ShardFilterStage::doWork(WorkingSetID* out) {
 
                     // Skip this working set member with a warning - no shard key should not be
                     // possible unless manually inserting data into a shard
-                    warning() << "no shard key found in document " << redact(member->obj.value())
-                              << " for shard key pattern " << _shardFilterer.getKeyPattern() << ", "
+                    warning() << "no shard key found in document "
+                              << redact(member->doc.value().toBson()) << " for shard key pattern "
+                              << _shardFilterer.getKeyPattern() << ", "
                               << "document may have been inserted manually into shard";
                 } else {
                     invariant(res == ShardFilterer::DocumentBelongsResult::kDoesNotBelong);

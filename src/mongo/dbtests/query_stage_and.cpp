@@ -148,7 +148,7 @@ public:
 
             WorkingSetMember* member = ws->get(id);
             ASSERT(member->hasObj());
-            return member->obj.value();
+            return member->doc.value().toBson();
         }
 
         // We failed to produce a result.
@@ -818,7 +818,7 @@ public:
                 WorkingSetID id = ws.allocate();
                 WorkingSetMember* wsm = ws.get(id);
                 wsm->recordId = RecordId(1);
-                wsm->obj = Snapshotted<BSONObj>(SnapshotId(), dataObj);
+                wsm->doc = {SnapshotId(), Document{dataObj}};
                 ws.transitionToRecordIdAndObj(id);
                 childStage1->pushBack(id);
             }
@@ -852,7 +852,7 @@ public:
                 WorkingSetID id = ws.allocate();
                 WorkingSetMember* wsm = ws.get(id);
                 wsm->recordId = RecordId(1);
-                wsm->obj = Snapshotted<BSONObj>(SnapshotId(), dataObj);
+                wsm->doc = {SnapshotId(), Document{dataObj}};
                 ws.transitionToRecordIdAndObj(id);
                 childStage1->pushBack(id);
             }
@@ -863,7 +863,7 @@ public:
                 WorkingSetID id = ws.allocate();
                 WorkingSetMember* wsm = ws.get(id);
                 wsm->recordId = RecordId(2);
-                wsm->obj = Snapshotted<BSONObj>(SnapshotId(), dataObj);
+                wsm->doc = {SnapshotId(), Document{dataObj}};
                 ws.transitionToRecordIdAndObj(id);
                 childStage2->pushBack(id);
             }
@@ -892,7 +892,7 @@ public:
                 WorkingSetID id = ws.allocate();
                 WorkingSetMember* wsm = ws.get(id);
                 wsm->recordId = RecordId(1);
-                wsm->obj = Snapshotted<BSONObj>(SnapshotId(), dataObj);
+                wsm->doc = {SnapshotId(), Document{dataObj}};
                 ws.transitionToRecordIdAndObj(id);
                 childStage1->pushBack(id);
             }
@@ -902,7 +902,7 @@ public:
                 WorkingSetID id = ws.allocate();
                 WorkingSetMember* wsm = ws.get(id);
                 wsm->recordId = RecordId(2);
-                wsm->obj = Snapshotted<BSONObj>(SnapshotId(), dataObj);
+                wsm->doc = {SnapshotId(), Document{dataObj}};
                 ws.transitionToRecordIdAndObj(id);
                 childStage2->pushBack(id);
             }

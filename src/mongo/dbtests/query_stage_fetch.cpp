@@ -122,7 +122,8 @@ public:
             WorkingSetID id = ws.allocate();
             WorkingSetMember* mockMember = ws.get(id);
             mockMember->recordId = *recordIds.begin();
-            mockMember->obj = coll->docFor(&_opCtx, mockMember->recordId);
+            auto snapshotBson = coll->docFor(&_opCtx, mockMember->recordId);
+            mockMember->doc = {snapshotBson.snapshotId(), Document{snapshotBson.value()}};
             ws.transitionToRecordIdAndObj(id);
             // Points into our DB.
             mockStage->pushBack(id);
@@ -131,9 +132,9 @@ public:
             WorkingSetID id = ws.allocate();
             WorkingSetMember* mockMember = ws.get(id);
             mockMember->recordId = RecordId();
-            mockMember->obj = Snapshotted<BSONObj>(SnapshotId(), BSON("foo" << 6));
+            mockMember->doc = {SnapshotId(), Document{BSON("foo" << 6)}};
             mockMember->transitionToOwnedObj();
-            ASSERT_TRUE(mockMember->obj.value().isOwned());
+            ASSERT_TRUE(mockMember->doc.value().isOwned());
             mockStage->pushBack(id);
         }
 

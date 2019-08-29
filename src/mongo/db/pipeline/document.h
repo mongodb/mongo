@@ -271,8 +271,24 @@ public:
     int memUsageForSorter() const {
         return getApproximateSize();
     }
-    Document getOwned() const {
-        return *this;
+
+    /**
+     * Returns a document that owns the underlying BSONObj.
+     */
+    Document getOwned() const;
+
+    /**
+     * Returns true if the underlying BSONObj is owned.
+     */
+    bool isOwned() const {
+        return _storage ? _storage->isOwned() : true;
+    }
+
+    /**
+     * Returns true if the document has been modified (i.e. it differs from the underlying BSONObj).
+     */
+    auto isModified() const {
+        return _storage ? _storage->isModified() : false;
     }
 
     /// only for testing
@@ -574,6 +590,20 @@ public:
 
     size_t getApproximateSize() {
         return peek().getApproximateSize();
+    }
+
+    /**
+     * Returns true if the underlying BSONObj is owned.
+     */
+    bool isOwned() {
+        return storage().isOwned();
+    }
+
+    /**
+     * Takes the ownership of the underlying BSONObj if it is not owned.
+     */
+    void makeOwned() {
+        storage().makeOwned();
     }
 
     /** Create a new document storage with the BSON object.

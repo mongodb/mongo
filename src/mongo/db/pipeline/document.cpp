@@ -341,7 +341,7 @@ DocumentStorage::~DocumentStorage() {
 }
 
 void DocumentStorage::reset(const BSONObj& bson, bool stripMetadata) {
-    _bson = bson.getOwned();
+    _bson = bson;
     _bsonIt = BSONObjIterator(_bson);
     _stripMetadata = stripMetadata;
     _modified = false;
@@ -483,6 +483,16 @@ Document Document::fromBsonWithMetaData(const BSONObj& bson) {
     md.newStorageWithBson(bson, true);
 
     return md.freeze();
+}
+
+Document Document::getOwned() const {
+    if (isOwned()) {
+        return *this;
+    } else {
+        MutableDocument md(*this);
+        md.makeOwned();
+        return md.freeze();
+    }
 }
 
 MutableDocument::MutableDocument(size_t expectedFields)

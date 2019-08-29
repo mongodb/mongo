@@ -73,7 +73,7 @@ public:
             // Insert obj from input array into working set.
             WorkingSetID id = ws.allocate();
             WorkingSetMember* wsm = ws.get(id);
-            wsm->obj = Snapshotted<BSONObj>(SnapshotId(), obj);
+            wsm->doc = {SnapshotId(), Document{obj}};
             wsm->transitionToOwnedObj();
             queuedDataStage->pushBack(id);
         }
@@ -100,7 +100,7 @@ public:
             ASSERT_NE(state, PlanStage::FAILURE);
             if (state == PlanStage::ADVANCED) {
                 WorkingSetMember* member = ws.get(id);
-                const BSONObj& obj = member->obj.value();
+                auto obj = member->doc.value().toBson();
                 arr.append(obj);
             }
         }

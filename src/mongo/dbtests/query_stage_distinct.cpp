@@ -82,7 +82,7 @@ public:
         WorkingSetID invalid = WorkingSet::INVALID_ID;
         ASSERT_NOT_EQUALS(invalid, wsid);
 
-        WorkingSetMember* member = ws.get(wsid);
+        auto member = ws.get(wsid);
 
         // Distinct hack execution is always covered.
         // Key value is retrieved from working set key data

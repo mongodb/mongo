@@ -54,7 +54,6 @@ void WorkingSetCommon::prepareForSnapshotChange(WorkingSet* workingSet) {
     }
 }
 
-// static
 bool WorkingSetCommon::fetch(OperationContext* opCtx,
                              WorkingSet* workingSet,
                              WorkingSetID id,
@@ -65,13 +64,12 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
     // state appropriately.
     invariant(member->hasRecordId());
 
-    member->obj.reset();
     auto record = cursor->seekExact(member->recordId);
     if (!record) {
         return false;
     }
 
-    member->obj = {opCtx->recoveryUnit()->getSnapshotId(), record->data.releaseToBson()};
+    member->resetDocument(opCtx->recoveryUnit()->getSnapshotId(), record->data.releaseToBson());
 
     if (member->isSuspicious) {
         // Make sure that all of the keyData is still valid for this copy of the document.
@@ -86,7 +84,7 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
             KeyStringSet* multikeyMetadataKeys = nullptr;
             MultikeyPaths* multikeyPaths = nullptr;
             auto* iam = member->keyData[i].index;
-            iam->getKeys(member->obj.value(),
+            iam->getKeys(member->doc.value().toBson(),
                          IndexAccessMethod::GetKeysMode::kEnforceConstraints,
                          &keys,
                          multikeyMetadataKeys,
@@ -110,7 +108,6 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
     return true;
 }
 
-// static
 BSONObj WorkingSetCommon::buildMemberStatusObject(const Status& status) {
     BSONObjBuilder bob;
     bob.append("ok", status.isOK() ? 1.0 : 0.0);
@@ -123,45 +120,37 @@ BSONObj WorkingSetCommon::buildMemberStatusObject(const Status& status) {
     return bob.obj();
 }
 
-// static
 WorkingSetID WorkingSetCommon::allocateStatusMember(WorkingSet* ws, const Status& status) {
     invariant(ws);
 
     WorkingSetID wsid = ws->allocate();
     WorkingSetMember* member = ws->get(wsid);
-    member->obj = Snapshotted<BSONObj>(SnapshotId(), buildMemberStatusObject(status));
+    member->resetDocument(SnapshotId(), buildMemberStatusObject(status));
     member->transitionToOwnedObj();
 
     return wsid;
 }
 
-// static
 bool WorkingSetCommon::isValidStatusMemberObject(const BSONObj& obj) {
     return obj.hasField("ok") && obj["code"].type() == NumberInt && obj["errmsg"].type() == String;
 }
 
-// static
-void WorkingSetCommon::getStatusMemberObject(const WorkingSet& ws,
-                                             WorkingSetID wsid,
-                                             BSONObj* objOut) {
-    invariant(objOut);
-
-    // Validate ID and working set member.
+boost::optional<Document> WorkingSetCommon::getStatusMemberDocument(const WorkingSet& ws,
+                                                                    WorkingSetID wsid) {
     if (WorkingSet::INVALID_ID == wsid) {
-        return;
+        return boost::none;
     }
-    WorkingSetMember* member = ws.get(wsid);
+    auto member = ws.get(wsid);
     if (!member->hasOwnedObj()) {
-        return;
+        return boost::none;
     }
-    BSONObj obj = member->obj.value();
+    BSONObj obj = member->doc.value().toBson();
     if (!isValidStatusMemberObject(obj)) {
-        return;
+        return boost::none;
     }
-    *objOut = obj;
+    return member->doc.value();
 }
 
-// static
 Status WorkingSetCommon::getMemberObjectStatus(const BSONObj& memberObj) {
     invariant(WorkingSetCommon::isValidStatusMemberObject(memberObj));
     return Status(ErrorCodes::Error(memberObj["code"].numberInt()),
@@ -169,13 +158,11 @@ Status WorkingSetCommon::getMemberObjectStatus(const BSONObj& memberObj) {
                   memberObj);
 }
 
-// static
 Status WorkingSetCommon::getMemberStatus(const WorkingSetMember& member) {
     invariant(member.hasObj());
-    return getMemberObjectStatus(member.obj.value());
+    return getMemberObjectStatus(member.doc.value().toBson());
 }
 
-// static
 std::string WorkingSetCommon::toStatusString(const BSONObj& obj) {
     if (!isValidStatusMemberObject(obj)) {
         Status unknownStatus(ErrorCodes::UnknownError, "no details available");

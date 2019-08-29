@@ -435,7 +435,7 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     // Check the document returned by the query.
     ASSERT(member->hasObj());
     BSONObj expectedDoc = BSON("_id" << 1 << "a" << 1 << "b" << 1);
-    ASSERT(expectedDoc.woCompare(member->obj.value()) == 0);
+    ASSERT_BSONOBJ_EQ(expectedDoc, member->doc.value().toBson());
 
     // The blocking plan became unblocked, so we should no longer have a backup plan,
     // and the winning plan should still be the index intersection one.
@@ -459,7 +459,7 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
 void addMember(QueuedDataStage* qds, WorkingSet* ws, BSONObj dataObj) {
     WorkingSetID id = ws->allocate();
     WorkingSetMember* wsm = ws->get(id);
-    wsm->obj = Snapshotted<BSONObj>(SnapshotId(), BSON("x" << 1));
+    wsm->doc = {SnapshotId(), Document{BSON("x" << 1)}};
     wsm->transitionToOwnedObj();
     qds->pushBack(id);
 }

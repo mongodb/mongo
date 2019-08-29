@@ -72,16 +72,22 @@ PlanStage::StageState PipelineProxyStage::doWork(WorkingSetID* out) {
     if (!_stash.empty()) {
         *out = _ws->allocate();
         WorkingSetMember* member = _ws->get(*out);
-        member->obj = Snapshotted<BSONObj>(SnapshotId(), _stash.back());
+        if (_includeMetaData && _stash.back().metadata()) {
+            member->metadata() = _stash.back().metadata();
+        }
+        member->doc = {SnapshotId(), std::move(_stash.back())};
         _stash.pop_back();
         member->transitionToOwnedObj();
         return PlanStage::ADVANCED;
     }
 
-    if (boost::optional<BSONObj> next = getNextBson()) {
+    if (auto next = getNext()) {
         *out = _ws->allocate();
         WorkingSetMember* member = _ws->get(*out);
-        member->obj = Snapshotted<BSONObj>(SnapshotId(), *next);
+        if (_includeMetaData && next->metadata()) {
+            member->metadata() = next->metadata();
+        }
+        member->doc = {SnapshotId(), std::move(*next)};
         member->transitionToOwnedObj();
         return PlanStage::ADVANCED;
     }
@@ -93,8 +99,8 @@ bool PipelineProxyStage::isEOF() {
     if (!_stash.empty())
         return false;
 
-    if (boost::optional<BSONObj> next = getNextBson()) {
-        _stash.push_back(*next);
+    if (auto next = getNext()) {
+        _stash.emplace_back(*next);
         return false;
     }
 
@@ -120,16 +126,8 @@ unique_ptr<PlanStageStats> PipelineProxyStage::getStats() {
     return ret;
 }
 
-boost::optional<BSONObj> PipelineProxyStage::getNextBson() {
-    if (auto next = _pipeline->getNext()) {
-        if (_includeMetaData) {
-            return next->toBsonWithMetaData();
-        } else {
-            return next->toBson();
-        }
-    }
-
-    return boost::none;
+boost::optional<Document> PipelineProxyStage::getNext() {
+    return _pipeline->getNext();
 }
 
 std::string PipelineProxyStage::getPlanSummaryStr() const {

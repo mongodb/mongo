@@ -74,7 +74,8 @@ PlanStage::StageState MultiIteratorStage::doWork(WorkingSetID* out) {
     *out = _ws->allocate();
     WorkingSetMember* member = _ws->get(*out);
     member->recordId = record->id;
-    member->obj = {getOpCtx()->recoveryUnit()->getSnapshotId(), record->data.releaseToBson()};
+    member->resetDocument(getOpCtx()->recoveryUnit()->getSnapshotId(),
+                          record->data.releaseToBson());
     _ws->transitionToRecordIdAndObj(*out);
     return PlanStage::ADVANCED;
 }

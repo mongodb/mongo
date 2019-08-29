@@ -39,16 +39,7 @@ using std::string;
 
 namespace dps = ::mongo::dotted_path_support;
 
-WorkingSet::MemberHolder::MemberHolder() : member(nullptr) {}
-WorkingSet::MemberHolder::~MemberHolder() {}
-
 WorkingSet::WorkingSet() : _freeList(INVALID_ID) {}
-
-WorkingSet::~WorkingSet() {
-    for (size_t i = 0; i < _data.size(); i++) {
-        delete _data[i].member;
-    }
-}
 
 WorkingSetID WorkingSet::allocate() {
     if (_freeList == INVALID_ID) {
@@ -58,7 +49,6 @@ WorkingSetID WorkingSet::allocate() {
         WorkingSetID id = _data.size();
         _data.resize(_data.size() + 1);
         _data.back().nextFreeOrSelf = id;
-        _data.back().member = new WorkingSetMember();
         return id;
     }
 
@@ -75,15 +65,12 @@ void WorkingSet::free(WorkingSetID i) {
     verify(holder.nextFreeOrSelf == i);  // ID currently in use.
 
     // Free resources and push this WSM to the head of the freelist.
-    holder.member->clear();
+    holder.member.clear();
     holder.nextFreeOrSelf = _freeList;
     _freeList = i;
 }
 
 void WorkingSet::clear() {
-    for (size_t i = 0; i < _data.size(); i++) {
-        delete _data[i].member;
-    }
     _data.clear();
 
     // Since working set is now empty, the free list pointer should
@@ -120,14 +107,10 @@ std::vector<WorkingSetID> WorkingSet::getAndClearYieldSensitiveIds() {
 // WorkingSetMember
 //
 
-WorkingSetMember::WorkingSetMember() {}
-
-WorkingSetMember::~WorkingSetMember() {}
-
 void WorkingSetMember::clear() {
     _metadata = DocumentMetadataFields{};
     keyData.clear();
-    obj.reset();
+    doc = {SnapshotId(), Document()};
     _state = WorkingSetMember::INVALID;
 }
 
@@ -136,7 +119,7 @@ WorkingSetMember::MemberState WorkingSetMember::getState() const {
 }
 
 void WorkingSetMember::transitionToOwnedObj() {
-    invariant(obj.value().isOwned());
+    invariant(doc.value().isOwned());
     _state = OWNED_OBJ;
 }
 
@@ -150,19 +133,23 @@ bool WorkingSetMember::hasObj() const {
 }
 
 bool WorkingSetMember::hasOwnedObj() const {
-    return _state == OWNED_OBJ || (_state == RID_AND_OBJ && obj.value().isOwned());
+    return _state == OWNED_OBJ || _state == RID_AND_OBJ;
 }
 
 void WorkingSetMember::makeObjOwnedIfNeeded() {
-    if (_state == RID_AND_OBJ && !obj.value().isOwned()) {
-        obj.setValue(obj.value().getOwned());
+    if (_state == RID_AND_OBJ && !doc.value().isOwned()) {
+        doc.value() = doc.value().getOwned();
     }
 }
 
 bool WorkingSetMember::getFieldDotted(const string& field, BSONElement* out) const {
     // If our state is such that we have an object, use it.
     if (hasObj()) {
-        *out = dps::extractElementAtPath(obj.value(), field);
+        // The document must not be modified. Otherwise toBson() call would create a temporary BSON
+        // that would get destroyed at the end of this function. *out would then point to dangling
+        // memory.
+        invariant(!doc.value().isModified());
+        *out = dps::extractElementAtPath(doc.value().toBson(), field);
         return true;
     }
 
@@ -182,10 +169,8 @@ size_t WorkingSetMember::getMemUsage() const {
         memUsage += sizeof(RecordId);
     }
 
-    // XXX: Unowned objects count towards current size.
-    //      See SERVER-12579
     if (hasObj()) {
-        memUsage += obj.value().objsize();
+        memUsage += doc.value().getApproximateSize();
     }
 
     for (size_t i = 0; i < keyData.size(); ++i) {
@@ -196,4 +181,10 @@ size_t WorkingSetMember::getMemUsage() const {
     return memUsage;
 }
 
+void WorkingSetMember::resetDocument(SnapshotId snapshot, const BSONObj& obj) {
+    doc.setSnapshotId(snapshot);
+    MutableDocument md(std::move(doc.value()));
+    md.reset(obj, false);
+    doc.value() = md.freeze();
+}
 }  // namespace mongo

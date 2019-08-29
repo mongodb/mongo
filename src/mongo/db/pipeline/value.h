@@ -101,7 +101,7 @@ public:
     explicit Value(const OID& value) : _storage(jstOID, value) {}
     explicit Value(StringData value) : _storage(String, value) {}
     explicit Value(const std::string& value) : _storage(String, StringData(value)) {}
-    explicit Value(const Document& doc) : _storage(Object, doc) {}
+    explicit Value(const Document& doc);
     explicit Value(const BSONObj& obj);
     explicit Value(const BSONArray& arr);
     explicit Value(const std::vector<BSONObj>& vec);

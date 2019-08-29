@@ -65,7 +65,7 @@ QueuedDataStage* getMS(OperationContext* opCtx, WorkingSet* ws) {
 
         WorkingSetID id = ws->allocate();
         WorkingSetMember* wsm = ws->get(id);
-        wsm->obj = Snapshotted<BSONObj>(SnapshotId(), BSON("x" << i));
+        wsm->doc = {SnapshotId(), Document{BSON("x" << i)}};
         wsm->transitionToOwnedObj();
         ms->pushBack(id);
 

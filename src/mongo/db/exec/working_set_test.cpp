@@ -77,9 +77,9 @@ TEST_F(WorkingSetFixture, noFieldToGet) {
     ASSERT_TRUE(member->getFieldDotted("foo", &elt));
 
     WorkingSetMember* member = ws->get(id);
-    member->obj = {SnapshotId(),
-                   BSON("fake"
-                        << "obj")};
+    member->doc = {SnapshotId(),
+                   Document{BSON("fake"
+                                 << "obj")}};
     ws->transitionToOwnedObj(id);
     ASSERT_TRUE(member->getFieldDotted("foo", &elt));
 }
@@ -90,9 +90,9 @@ TEST_F(WorkingSetFixture, getFieldUnowned) {
     BSONObj obj = BSON(fieldName << 5);
     // Not truthful since the RecordId is bogus, but the RecordId isn't accessed anyway...
     ws->transitionToRecordIdAndObj(id);
-    member->obj = Snapshotted<BSONObj>(SnapshotId(), BSONObj(obj.objdata()));
+    member->doc = {SnapshotId(), Document{BSONObj(obj.objdata())}};
     ASSERT_TRUE(obj.isOwned());
-    ASSERT_FALSE(member->obj.value().isOwned());
+    ASSERT_FALSE(member->doc.value().isOwned());
 
     // Get out the field we put in.
     BSONElement elt;
@@ -104,8 +104,8 @@ TEST_F(WorkingSetFixture, getFieldOwned) {
     string fieldName = "x";
 
     BSONObj obj = BSON(fieldName << 5);
-    member->obj = Snapshotted<BSONObj>(SnapshotId(), obj);
-    ASSERT_TRUE(member->obj.value().isOwned());
+    member->doc = {SnapshotId(), Document{obj}};
+    ASSERT_TRUE(member->doc.value().isOwned());
     ws->transitionToOwnedObj(id);
     BSONElement elt;
     ASSERT_TRUE(member->getFieldDotted(fieldName, &elt));

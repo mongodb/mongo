@@ -52,7 +52,7 @@ bool ensureStillMatches(const Collection* collection,
     // document we are planning to delete may have already been deleted or updated during yield.
     WorkingSetMember* member = ws->get(id);
     if (!supportsDocLocking() ||
-        opCtx->recoveryUnit()->getSnapshotId() != member->obj.snapshotId()) {
+        opCtx->recoveryUnit()->getSnapshotId() != member->doc.snapshotId()) {
         std::unique_ptr<SeekableRecordCursor> cursor(collection->getCursor(opCtx));
 
         if (!WorkingSetCommon::fetch(opCtx, ws, id, cursor)) {
@@ -61,7 +61,7 @@ bool ensureStillMatches(const Collection* collection,
         }
 
         // Make sure the re-fetched doc still matches the predicate.
-        if (cq && !cq->root()->matchesBSON(member->obj.value(), nullptr)) {
+        if (cq && !cq->root()->matchesBSON(member->doc.value().toBson(), nullptr)) {
             // No longer matches.
             return false;
         }

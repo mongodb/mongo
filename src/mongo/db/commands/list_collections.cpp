@@ -131,7 +131,7 @@ void _addWorkingSetMember(OperationContext* opCtx,
     WorkingSetMember* member = ws->get(id);
     member->keyData.clear();
     member->recordId = RecordId();
-    member->obj = Snapshotted<BSONObj>(SnapshotId(), maybe);
+    member->resetDocument(SnapshotId(), maybe);
     member->transitionToOwnedObj();
     root->pushBack(id);
 }

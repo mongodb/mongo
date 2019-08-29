@@ -143,8 +143,8 @@ PlanStage::StageState TrialStage::_workTrialPlan(WorkingSetID* out) {
             return NEED_TIME;
         case PlanStage::FAILURE:
             // Either of these cause us to immediately end the trial phase and switch to the backup.
-            BSONObj statusObj;
-            WorkingSetCommon::getStatusMemberObject(*_ws, *out, &statusObj);
+            auto statusDoc = WorkingSetCommon::getStatusMemberDocument(*_ws, *out);
+            BSONObj statusObj = statusDoc ? statusDoc->toBson() : BSONObj();
             LOG(1) << "Trial plan failed; switching to backup plan. Status: " << redact(statusObj);
             _specificStats.trialCompleted = true;
             _replaceCurrentPlan(_backupPlan);

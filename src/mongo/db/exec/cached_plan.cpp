@@ -139,8 +139,7 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         } else if (PlanStage::FAILURE == state) {
             // On failure, fall back to replanning the whole query. We neither evict the
             // existing cache entry nor cache the result of replanning.
-            BSONObj statusObj;
-            WorkingSetCommon::getStatusMemberObject(*_ws, id, &statusObj);
+            BSONObj statusObj = WorkingSetCommon::getStatusMemberDocument(*_ws, id)->toBson();
 
             LOG(1) << "Execution of cached plan failed, falling back to replan."
                    << " query: " << redact(_canonicalQuery->toStringShort())

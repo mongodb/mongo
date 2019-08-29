@@ -139,7 +139,7 @@ public:
             if (PlanStage::ADVANCED == state) {
                 WorkingSetMember* member = ws.get(id);
                 verify(member->hasObj());
-                out->push_back(member->obj.value().getOwned());
+                out->push_back(member->doc.value().toBson());
             }
         }
     }
@@ -416,7 +416,7 @@ public:
         WorkingSetMember* member = ws->get(id);
         member->recordId = recordIds[targetDocIndex];
         const BSONObj oldDoc = BSON("_id" << targetDocIndex << "foo" << targetDocIndex);
-        member->obj = Snapshotted<BSONObj>(SnapshotId(), oldDoc);
+        member->doc = {SnapshotId(), Document{oldDoc}};
         ws->transitionToRecordIdAndObj(id);
         qds->pushBack(id);
 
@@ -441,10 +441,10 @@ public:
         ASSERT_TRUE(resultMember->hasOwnedObj());
         ASSERT_FALSE(resultMember->hasRecordId());
         ASSERT_EQUALS(resultMember->getState(), WorkingSetMember::OWNED_OBJ);
-        ASSERT_TRUE(resultMember->obj.value().isOwned());
+        ASSERT_TRUE(resultMember->doc.value().isOwned());
 
         // Should be the old value.
-        ASSERT_BSONOBJ_EQ(resultMember->obj.value(), oldDoc);
+        ASSERT_BSONOBJ_EQ(resultMember->doc.value().toBson(), oldDoc);
 
         // Should have done the update.
         BSONObj newDoc = BSON("_id" << targetDocIndex << "foo" << targetDocIndex << "x" << 0);
@@ -508,7 +508,7 @@ public:
         WorkingSetMember* member = ws->get(id);
         member->recordId = recordIds[targetDocIndex];
         const BSONObj oldDoc = BSON("_id" << targetDocIndex << "foo" << targetDocIndex);
-        member->obj = Snapshotted<BSONObj>(SnapshotId(), oldDoc);
+        member->doc = {SnapshotId(), Document{oldDoc}};
         ws->transitionToRecordIdAndObj(id);
         qds->pushBack(id);
 
@@ -533,11 +533,11 @@ public:
         ASSERT_TRUE(resultMember->hasOwnedObj());
         ASSERT_FALSE(resultMember->hasRecordId());
         ASSERT_EQUALS(resultMember->getState(), WorkingSetMember::OWNED_OBJ);
-        ASSERT_TRUE(resultMember->obj.value().isOwned());
+        ASSERT_TRUE(resultMember->doc.value().isOwned());
 
         // Should be the new value.
         BSONObj newDoc = BSON("_id" << targetDocIndex << "foo" << targetDocIndex << "x" << 0);
-        ASSERT_BSONOBJ_EQ(resultMember->obj.value(), newDoc);
+        ASSERT_BSONOBJ_EQ(resultMember->doc.value().toBson(), newDoc);
 
         // Should have done the update.
         vector<BSONObj> objs;

@@ -269,12 +269,12 @@ public:
         : _wsid(_workingSet.allocate()), _member(_workingSet.get(_wsid)) {}
 
     void setRecordIdAndObj(BSONObj obj) {
-        _member->obj = {SnapshotId(), std::move(obj)};
+        _member->doc = {SnapshotId(), Document{obj}};
         _workingSet.transitionToRecordIdAndObj(_wsid);
     }
 
     void setOwnedObj(BSONObj obj) {
-        _member->obj = {SnapshotId(), std::move(obj)};
+        _member->doc = {SnapshotId(), Document{obj}};
         _workingSet.transitionToOwnedObj(_wsid);
     }
 

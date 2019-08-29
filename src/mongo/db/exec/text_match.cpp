@@ -88,7 +88,7 @@ PlanStage::StageState TextMatchStage::doWork(WorkingSetID* out) {
         WorkingSetMember* wsm = _ws->get(*out);
 
         // Filter for phrases and negated terms.
-        if (!_ftsMatcher.matches(wsm->obj.value())) {
+        if (!_ftsMatcher.matches(wsm->doc.value().toBson())) {
             _ws->free(*out);
             *out = WorkingSet::INVALID_ID;
             ++_specificStats.docsRejected;
