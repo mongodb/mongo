@@ -85,7 +85,6 @@ const kNonRetryableCommands = new Set([
     "appendOplogNote",
     "applyOps",
     "captrunc",
-    "cleanupOrphaned",
     "clone",
     "cloneCollectionAsCapped",
     "collMod",

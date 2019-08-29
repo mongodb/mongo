@@ -231,6 +231,22 @@ var Cluster = function(options) {
                 replSets.push(rs);
             }
 
+            if (options.sharded.enableBalancer === true) {
+                st._configServers.forEach((conn) => {
+                    const configDb = conn.getDB('admin');
+
+                    configDb.adminCommand({
+                        configureFailPoint: 'balancerShouldReturnRandomMigrations',
+                        mode: 'alwaysOn'
+                    });
+                    configDb.adminCommand({
+                        configureFailPoint: 'overrideBalanceRoundInterval',
+                        mode: 'alwaysOn',
+                        data: {intervalMs: 100}
+                    });
+                });
+            }
+
         } else if (options.replication.enabled) {
             rst = new ReplSetTest(db.getMongo().host);
 

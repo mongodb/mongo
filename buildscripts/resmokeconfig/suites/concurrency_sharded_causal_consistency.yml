@@ -110,6 +110,7 @@ selector:
 
   exclude_with_any_tags:
   - does_not_support_causal_consistency
+  - assumes_balancer_on
   # This suite uses secondary read preference, which isn't currently compatible with transactions.
   - uses_transactions
   - requires_replication

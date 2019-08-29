@@ -118,6 +118,7 @@ selector:
 
   exclude_with_any_tags:
   - requires_replication
+  - assumes_balancer_on
 
 executor:
   archive:
