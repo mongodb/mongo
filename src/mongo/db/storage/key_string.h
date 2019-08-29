@@ -347,6 +347,31 @@ public:
      */
     std::string toString() const;
 
+    // Serializes this Value into a storable format with TypeBits information. The serialized
+    // format takes the following form:
+    //   [keystring size][keystring encoding][typebits encoding]
+    void serialize(BufBuilder& buf) const {
+        buf.appendNum(_ksSize);                  // Serialize size of Keystring
+        buf.appendBuf(_buffer.get(), _bufSize);  // Serialize Keystring + Typebits
+    }
+
+    // Deserialize the Value from a serialized format.
+    static Value deserialize(BufReader& buf, KeyString::Version version) {
+        const int32_t sizeOfKeystring = buf.read<LittleEndian<int32_t>>();
+        const void* keystringPtr = buf.skip(sizeOfKeystring);
+
+        BufBuilder newBuf;
+        newBuf.appendBuf(keystringPtr, sizeOfKeystring);
+
+        auto typeBits = TypeBits::fromBuffer(version, &buf);  // advances the buf
+        if (typeBits.isAllZeros()) {
+            newBuf.appendChar(0);
+        } else {
+            newBuf.appendBuf(typeBits.getBuffer(), typeBits.getSize());
+        }
+        return {version, sizeOfKeystring, newBuf.len(), newBuf.release()};
+    }
+
     /// Members for Sorter
     struct SorterDeserializeSettings {
         SorterDeserializeSettings(Version version) : keyStringVersion(version) {}
@@ -354,25 +379,11 @@ public:
     };
 
     void serializeForSorter(BufBuilder& buf) const {
-        buf.appendNum(_ksSize);                                      // Serialize size of Keystring
-        buf.appendBuf(_buffer.get(), _ksSize);                       // Serialize Keystring
-        buf.appendBuf(_buffer.get() + _ksSize, _bufSize - _ksSize);  // Serialize Typebits
+        serialize(buf);
     }
 
     static Value deserializeForSorter(BufReader& buf, const SorterDeserializeSettings& settings) {
-        const int32_t sizeOfKeystring = buf.read<LittleEndian<int32_t>>();
-        const void* keystringPtr = buf.skip(sizeOfKeystring);
-
-        BufBuilder newBuf;
-        newBuf.appendBuf(keystringPtr, sizeOfKeystring);
-
-        auto typeBits = TypeBits::fromBuffer(settings.keyStringVersion, &buf);  // advances the buf
-        if (typeBits.isAllZeros()) {
-            newBuf.appendChar(0);
-        } else {
-            newBuf.appendBuf(typeBits.getBuffer(), typeBits.getSize());
-        }
-        return {settings.keyStringVersion, sizeOfKeystring, newBuf.len(), newBuf.release()};
+        return deserialize(buf, settings.keyStringVersion);
     }
 
     int memUsageForSorter() const {

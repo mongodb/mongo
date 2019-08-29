@@ -247,17 +247,20 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
                                           const InsertDeleteOptions& options,
                                           int64_t* const keysInserted,
                                           int64_t* const keysDeleted) {
-    const BSONObj key = operation["key"].Obj();
-    const RecordId opRecordId = RecordId(operation["recordId"].Long());
+    // Deserialize the encoded KeyString::Value.
+    int keyLen;
+    const char* binKey = operation["key"].binData(keyLen);
+    BufReader reader(binKey, keyLen);
+    const KeyString::Value keyString = KeyString::Value::deserialize(
+        reader,
+        _indexCatalogEntry->accessMethod()->getSortedDataInterface()->getKeyStringVersion());
+
     const Op opType =
         (strcmp(operation.getStringField("op"), "i") == 0) ? Op::kInsert : Op::kDelete;
 
-    KeyString::HeapBuilder keyString(
-        _indexCatalogEntry->accessMethod()->getSortedDataInterface()->getKeyStringVersion(),
-        key,
-        _indexCatalogEntry->ordering(),
-        opRecordId);
-    const KeyStringSet keySet{keyString.release()};
+    const KeyStringSet keySet{keyString};
+    const RecordId opRecordId =
+        KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
 
     auto accessMethod = _indexCatalogEntry->accessMethod();
     if (opType == Op::kInsert) {
@@ -398,6 +401,8 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
         return Status::OK();
     }
 
+    // Reuse the same builder to avoid an allocation per key.
+    BufBuilder builder;
     std::vector<BSONObj> toInsert;
     for (const auto& keyString : keys) {
         // Documents inserted into this table must be consumed in insert-order.
@@ -405,9 +410,14 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
         // other writes making up this operation are given. When index builds can cope with
         // replication rollbacks, side table writes associated with a CUD operation should
         // remain/rollback along with the corresponding oplog entry.
-        auto key = KeyString::toBson(keyString, _indexCatalogEntry->ordering());
-        toInsert.emplace_back(BSON("op" << (op == Op::kInsert ? "i" : "d") << "key" << key
-                                        << "recordId" << loc.repr()));
+
+        // Serialize the KeyString::Value into a binary format for storage. Since the
+        // KeyString::Value also contains TypeBits information, it is not sufficient to just read
+        // from getBuffer().
+        builder.reset();
+        keyString.serialize(builder);
+        BSONBinData binData(builder.buf(), builder.getSize(), BinDataGeneral);
+        toInsert.emplace_back(BSON("op" << (op == Op::kInsert ? "i" : "d") << "key" << binData));
     }
 
     if (op == Op::kInsert) {
@@ -415,12 +425,12 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
         // document, to the index itself. Multikey information is never deleted, so we only need
         // to add this data on the insert path.
         for (const auto& keyString : multikeyMetadataKeys) {
-            auto key = KeyString::toBson(keyString, _indexCatalogEntry->ordering());
+            builder.reset();
+            keyString.serialize(builder);
+            BSONBinData binData(builder.buf(), builder.getSize(), BinDataGeneral);
             toInsert.emplace_back(BSON("op"
                                        << "i"
-                                       << "key" << key << "recordId"
-                                       << static_cast<int64_t>(
-                                              RecordId::ReservedId::kWildcardMultikeyMetadataId)));
+                                       << "key" << binData));
         }
     }
 
