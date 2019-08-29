@@ -191,46 +191,6 @@ for (let collToInvalidate of [db1Coll, db2Coll]) {
         assert.writeOK(collToInvalidate.insert({_id: 2}));
         assert.eq(cst.getOneChange(aggCursor).operationType, "insert");
 
-        // Test that renaming a "system" collection to a user collection *does* return a rename
-        // notification.
-        assert.commandWorked(
-            testDB.runCommand({create: "view1", viewOn: collToInvalidate.getName(), pipeline: []}));
-        assert.writeOK(testDB.system.views.renameCollection("non_system_collection"));
-        cst.assertNextChangesEqual({
-            cursor: aggCursor,
-            expectedChanges: [{
-                operationType: "rename",
-                ns: {db: testDB.getName(), coll: "system.views"},
-                to: {db: testDB.getName(), coll: "non_system_collection"}
-            }],
-        });
-
-        // Test that renaming a "system" collection to a different "system" collection does not
-        // result in a notification in the change stream.
-        aggCursor = cst.startWatchingAllChangesForCluster();
-        assert.commandWorked(
-            testDB.runCommand({create: "view1", viewOn: collToInvalidate.getName(), pipeline: []}));
-        // Note that the target of the rename must be a valid "system" collection.
-        assert.writeOK(testDB.system.views.renameCollection("system.users"));
-        // Verify that the change stream filters out the rename above, instead returning the
-        // next insert to the test collection.
-        assert.writeOK(collToInvalidate.insert({_id: 1}));
-        change = cst.getOneChange(aggCursor);
-        assert.eq(change.operationType, "insert", tojson(change));
-        assert.eq(change.ns, {db: testDB.getName(), coll: collToInvalidate.getName()});
-
-        // Test that renaming a user collection to a "system" collection *does* return a rename
-        // notification.
-        assert.writeOK(collToInvalidate.renameCollection("system.views"));
-        cst.assertNextChangesEqual({
-            cursor: aggCursor,
-            expectedChanges: [{
-                operationType: "rename",
-                ns: {db: testDB.getName(), coll: collToInvalidate.getName()},
-                to: {db: testDB.getName(), coll: "system.views"}
-            }],
-        });
-
         // Drop the "system.views" collection to avoid view catalog errors in subsequent tests.
         assertDropCollection(testDB, "system.views");
 
