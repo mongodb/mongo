@@ -426,6 +426,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/index_timestamp_helper',
+        '$BUILD_DIR/mongo/db/server_options_core',
     ],
 )
 
