@@ -376,7 +376,8 @@ public:
     }
 
     int memUsageForSorter() const {
-        return sizeof(Value) + _bufSize;
+        // Use buffer capacity as a more accurate measure of memory usage.
+        return sizeof(Value) + _buffer.capacity();
     }
     /// Members for Sorter
 

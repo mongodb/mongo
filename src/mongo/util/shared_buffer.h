@@ -212,6 +212,10 @@ public:
         return _buffer.isShared();
     }
 
+    size_t capacity() const {
+        return _buffer.capacity();
+    }
+
     /**
      * Converts to a mutable SharedBuffer.
      * This is only legal to call if you have exclusive access to the underlying buffer.
