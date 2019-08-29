@@ -242,7 +242,6 @@ void signalOplogWaiters();
 void createIndexForApplyOps(OperationContext* opCtx,
                             const BSONObj& indexSpec,
                             const NamespaceString& indexNss,
-                            IncrementOpsAppliedStatsFn incrementOpsAppliedStats,
                             OplogApplication::Mode mode);
 
 /**

@@ -763,7 +763,7 @@ void rollbackDropIndexes(OperationContext* opCtx,
         log() << "Creating index in rollback for collection: " << *nss << ", UUID: " << uuid
               << ", index: " << indexName;
 
-        createIndexForApplyOps(opCtx, indexSpec, *nss, {}, OplogApplication::Mode::kRecovering);
+        createIndexForApplyOps(opCtx, indexSpec, *nss, OplogApplication::Mode::kRecovering);
 
         LOG(1) << "Created index in rollback for collection: " << *nss << ", UUID: " << uuid
                << ", index: " << indexName;

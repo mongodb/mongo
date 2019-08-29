@@ -227,7 +227,6 @@ Status abortIndexBuild(OperationContext* opCtx,
 void createIndexForApplyOps(OperationContext* opCtx,
                             const BSONObj& indexSpec,
                             const NamespaceString& indexNss,
-                            IncrementOpsAppliedStatsFn incrementOpsAppliedStats,
                             OplogApplication::Mode mode) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(indexNss, MODE_X));
 
@@ -285,10 +284,6 @@ void createIndexForApplyOps(OperationContext* opCtx,
     }
 
     opCtx->recoveryUnit()->abandonSnapshot();
-
-    if (incrementOpsAppliedStats) {
-        incrementOpsAppliedStats();
-    }
 }
 
 /* we write to local.oplog.rs:
@@ -745,7 +740,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           BSONObj indexSpec = cmd.removeField("createIndexes");
           Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
           Lock::CollectionLock collLock(opCtx, nss, MODE_X);
-          createIndexForApplyOps(opCtx, indexSpec, nss, {}, mode);
+          createIndexForApplyOps(opCtx, indexSpec, nss, mode);
           return Status::OK();
       },
       {ErrorCodes::IndexAlreadyExists,
