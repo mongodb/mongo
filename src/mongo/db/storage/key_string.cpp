@@ -2388,10 +2388,10 @@ BSONObj toBsonSafeWithDiscriminator(const char* buffer,
                                     size_t len,
                                     Ordering ord,
                                     const TypeBits& typeBits) {
-    boost::optional<std::string> discriminatorBit;
-    int fieldNo = -1;
+    boost::optional<std::string> discriminatorFieldName;
+    int fieldNo = -1;  // Record which field should add the discriminator field name.
 
-    // First pass, get the discriminatorBit if there is any.
+    // First pass, get the discriminator byte if there is any.
     {
         BSONObjBuilder builder;
         BufReader reader(buffer, len);
@@ -2400,9 +2400,13 @@ BSONObj toBsonSafeWithDiscriminator(const char* buffer,
             const bool invert = (ord.get(i) == -1);
             uint8_t ctype = readType<uint8_t>(&reader, invert);
             if (ctype == kLess || ctype == kGreater) {
-                discriminatorBit = ctype == kLess ? "l" : "r";
+                // Discriminator byte should not be inverted. It's possible when `ord` has more
+                // fields than keystring and `invert` got mistakenly applied to discriminator byte.
+                if (invert)
+                    ctype = ~ctype;  // Invert it back.
+                discriminatorFieldName = ctype == kLess ? "l" : "g";
                 fieldNo = i - 1;
-                ctype = readType<uint8_t>(&reader, invert);
+                ctype = readType<uint8_t>(&reader, false);
                 invariant(ctype == kEnd);
             }
 
@@ -2413,12 +2417,12 @@ BSONObj toBsonSafeWithDiscriminator(const char* buffer,
             toBsonValue(
                 ctype, &reader, &typeBitsReader, invert, typeBits.version, &(builder << ""), 1);
         }
-        // Early return if there is no discriminatorBit.
-        if (!discriminatorBit)
+        // Early return if there is no discriminator byte.
+        if (!discriminatorFieldName)
             return builder.obj();
     }
 
-    // Second pass, add discriminatorBit as the fieldName.
+    // Second pass, add discriminator byte as the fieldName.
     {
         BSONObjBuilder builder;
         BufReader reader(buffer, len);
@@ -2427,7 +2431,10 @@ BSONObj toBsonSafeWithDiscriminator(const char* buffer,
             const bool invert = (ord.get(i) == -1);
             uint8_t ctype = readType<uint8_t>(&reader, invert);
             if (ctype == kLess || ctype == kGreater) {
-                ctype = readType<uint8_t>(&reader, invert);
+                // Invert it back if discriminator byte got mistakenly inverted.
+                if (invert)
+                    ctype = ~ctype;
+                ctype = readType<uint8_t>(&reader, false);
                 invariant(ctype == kEnd);
             }
 
@@ -2435,7 +2442,7 @@ BSONObj toBsonSafeWithDiscriminator(const char* buffer,
                 break;
             }
 
-            auto fn = i == fieldNo ? discriminatorBit.get() : "";
+            auto fn = i == fieldNo ? discriminatorFieldName.get() : "";
             toBsonValue(
                 ctype, &reader, &typeBitsReader, invert, typeBits.version, &(builder << fn), 1);
         }
@@ -2457,6 +2464,9 @@ Discriminator decodeDiscriminator(const char* buffer,
         const bool invert = (ord.get(i) == -1);
         uint8_t ctype = readType<uint8_t>(&reader, invert);
         if (ctype == kLess || ctype == kGreater) {
+            // Invert it back if discriminator byte got mistakenly inverted.
+            if (invert)
+                ctype = ~ctype;
             return ctype == kLess ? Discriminator::kExclusiveBefore
                                   : Discriminator::kExclusiveAfter;
         }
