@@ -327,6 +327,19 @@ public:
             RequestedInfo parts = RequestedInfo::kKeyAndLoc) override {
             const BSONObj query = KeyString::toBsonSafeWithDiscriminator(
                 keyString.getBuffer(), keyString.getSize(), _ordering, keyString.getTypeBits());
+            if (query.isEmpty()) {
+                KeyString::Discriminator discriminator = KeyString::decodeDiscriminator(
+                    keyString.getBuffer(), keyString.getSize(), _ordering, keyString.getTypeBits());
+                // Deduce `inclusive` based on `discriminator` and `_forward`.
+                bool inclusive = (discriminator == KeyString::Discriminator::kInclusive) ||
+                    (_forward ^ (discriminator == KeyString::Discriminator::kExclusiveAfter));
+                _it = inclusive ? _data.begin() : _data.end();
+                _isEOF = (_it == _data.end());
+                if (_isEOF) {
+                    return {};
+                }
+                return *_it;
+            }
             locate(query, _forward ? RecordId::min() : RecordId::max());
             _lastMoveWasRestore = false;
             if (_isEOF)
