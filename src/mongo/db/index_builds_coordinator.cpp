@@ -727,29 +727,10 @@ void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
 void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
                                                  std::shared_ptr<ReplIndexBuildState> replState,
                                                  const IndexBuildOptions& indexBuildOptions) {
+    const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
     // 'status' should always be set to something else before this function exits.
     Status status{ErrorCodes::InternalError,
                   "Uninitialized status value in IndexBuildsCoordinator"};
-    boost::optional<NamespaceString> nss =
-        CollectionCatalog::get(opCtx).lookupNSSByUUID(replState->collectionUUID);
-
-    invariant(nss,
-              str::stream() << "Collection '" << replState->collectionUUID
-                            << "' should exist because an index build is in progress: "
-                            << replState->buildUUID);
-
-    boost::optional<AutoGetDb> autoDb;
-
-    // Do not use AutoGetCollection since the lock will be in various modes throughout the index
-    // build.
-    boost::optional<Lock::CollectionLock> collLock;
-
-    auto collection =
-        CollectionCatalog::get(opCtx).lookupCollectionByUUID(replState->collectionUUID);
-    invariant(collection,
-              str::stream() << "Collection " << *nss
-                            << " should exist because an index build is in progress: "
-                            << replState->buildUUID);
 
     // TODO(SERVER-39484): Since 'replSetAndNotPrimary' is derived from the replication state at the
     // start of the index build, this value is not resilient to member state changes like
@@ -757,9 +738,14 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
     auto replSetAndNotPrimary = indexBuildOptions.replSetAndNotPrimary;
 
     try {
-        // Acquire locks here to ensure that we clean up the index build.
-        autoDb.emplace(opCtx, nss->db(), MODE_IX);
-        collLock.emplace(opCtx, *nss, MODE_X);
+        // Lock acquisition might throw, and we would still need to clean up the index build state,
+        // so do it in the try-catch block
+        AutoGetDb autoDb(opCtx, replState->dbName, MODE_IX);
+
+        // Do not use AutoGetCollection since the lock will be reacquired in various modes
+        // throughout the index build. Lock by UUID to protect against concurrent collection rename.
+        boost::optional<Lock::CollectionLock> collLock;
+        collLock.emplace(opCtx, dbAndUUID, MODE_X);
 
         if (replSetAndNotPrimary) {
             // This index build can only be interrupted at shutdown. For the duration of the
@@ -779,10 +765,15 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
             const bool unlocked = opCtx->lockState()->unlockRSTLforPrepare();
             invariant(unlocked);
             opCtx->runWithoutInterruptionExceptAtGlobalShutdown(
-                [&, this] { _buildIndex(opCtx, collection, *nss, replState, &collLock); });
+                [&, this] { _buildIndex(opCtx, dbAndUUID, replState, &collLock); });
         } else {
-            _buildIndex(opCtx, collection, *nss, replState, &collLock);
+            _buildIndex(opCtx, dbAndUUID, replState, &collLock);
         }
+        // If _buildIndex returned normally, then we should have the collection X lock. It is not
+        // required to safely access the collection, though, because an index build is registerd.
+        auto collection =
+            CollectionCatalog::get(opCtx).lookupCollectionByUUID(replState->collectionUUID);
+        invariant(collection);
         replState->stats.numIndexesAfter = _getNumIndexesTotal(opCtx, collection);
         status = Status::OK();
     } catch (const DBException& ex) {
@@ -820,10 +811,25 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
         */
     }
 
-    _indexBuildsManager.tearDownIndexBuild(opCtx, collection, replState->buildUUID);
+    NamespaceString nss;
+    {
+        // We do not hold a collection lock here, but we are protected against the collection being
+        // dropped while the index build is still registered for the collection -- until
+        // tearDownIndexBuild is called. The collection can be renamed, but it is OK for the name to
+        // be stale just for logging purposes.
+        auto collection =
+            CollectionCatalog::get(opCtx).lookupCollectionByUUID(replState->collectionUUID);
+        invariant(collection,
+                  str::stream() << "Collection with UUID " << replState->collectionUUID
+                                << " should exist because an index build is in progress: "
+                                << replState->buildUUID);
+        nss = collection->ns();
+
+        _indexBuildsManager.tearDownIndexBuild(opCtx, collection, replState->buildUUID);
+    }
 
     if (!status.isOK()) {
-        logFailure(status, *nss, replState);
+        logFailure(status, nss, replState);
 
         // Failed index builds should abort secondary oplog application.
         if (replSetAndNotPrimary) {
@@ -836,7 +842,7 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
         MONGO_UNREACHABLE;
     }
 
-    log() << "Index build completed successfully: " << replState->buildUUID << ": " << *nss << " ( "
+    log() << "Index build completed successfully: " << replState->buildUUID << ": " << nss << " ( "
           << replState->collectionUUID << " ). Index specs built: " << replState->indexSpecs.size()
           << ". Indexes in catalog before build: " << replState->stats.numIndexesBefore
           << ". Indexes in catalog after build: " << replState->stats.numIndexesAfter;
@@ -844,15 +850,19 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
 
 void IndexBuildsCoordinator::_buildIndex(
     OperationContext* opCtx,
-    Collection* collection,
-    const NamespaceString& nss,
+    const NamespaceStringOrUUID& dbAndUUID,
     std::shared_ptr<ReplIndexBuildState> replState,
     boost::optional<Lock::CollectionLock>* exclusiveCollectionLock) {
-    invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
-    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
 
-    // Set up the thread's currentOp information to display createIndexes cmd information.
-    _updateCurOpOpDescription(opCtx, nss, replState->indexSpecs);
+    {
+        auto nss = CollectionCatalog::get(opCtx).lookupNSSByUUID(replState->collectionUUID);
+        invariant(nss);
+        invariant(opCtx->lockState()->isDbLockedForMode(replState->dbName, MODE_IX));
+        invariant(opCtx->lockState()->isCollectionLockedForMode(*nss, MODE_X));
+
+        // Set up the thread's currentOp information to display createIndexes cmd information.
+        _updateCurOpOpDescription(opCtx, *nss, replState->indexSpecs);
+    }
 
     // Rebuilding system indexes during startup using the IndexBuildsCoordinator is done by all
     // storage engines if they're missing. This includes the mobile storage engine which builds
@@ -870,7 +880,13 @@ void IndexBuildsCoordinator::_buildIndex(
     // background.
     exclusiveCollectionLock->reset();
     {
-        Lock::CollectionLock colLock(opCtx, nss, MODE_IS);
+        Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_IS);
+
+        // The collection object should always exist while an index build is registered.
+        auto collection =
+            CollectionCatalog::get(opCtx).lookupCollectionByUUID(replState->collectionUUID);
+        invariant(collection);
+
         uassertStatusOK(
             _indexBuildsManager.startBuildingIndex(opCtx, collection, replState->buildUUID));
     }
@@ -883,7 +899,7 @@ void IndexBuildsCoordinator::_buildIndex(
     // Perform the first drain while holding an intent lock.
     {
         opCtx->recoveryUnit()->abandonSnapshot();
-        Lock::CollectionLock colLock(opCtx, nss, MODE_IS);
+        Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_IS);
 
         uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
             opCtx, replState->buildUUID, RecoveryUnit::ReadSource::kUnset));
@@ -897,7 +913,7 @@ void IndexBuildsCoordinator::_buildIndex(
     // Perform the second drain while stopping writes on the collection.
     {
         opCtx->recoveryUnit()->abandonSnapshot();
-        Lock::CollectionLock colLock(opCtx, nss, MODE_S);
+        Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_S);
 
         uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
             opCtx, replState->buildUUID, RecoveryUnit::ReadSource::kUnset));
@@ -910,26 +926,21 @@ void IndexBuildsCoordinator::_buildIndex(
 
     // Need to return the collection lock back to exclusive mode, to complete the index build.
     opCtx->recoveryUnit()->abandonSnapshot();
-    exclusiveCollectionLock->emplace(opCtx, nss, MODE_X);
+    exclusiveCollectionLock->emplace(opCtx, dbAndUUID, MODE_X);
 
-    // We hold the database MODE_IX lock throughout the index build.
-    auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, nss.db());
+    // The collection object should always exist while an index build is registered.
+    auto collection =
+        CollectionCatalog::get(opCtx).lookupCollectionByUUID(replState->collectionUUID);
+    invariant(collection,
+              str::stream() << "Collection not found after relocking. Index build: "
+                            << replState->buildUUID
+                            << ", collection UUID: " << replState->collectionUUID);
 
     {
-        auto dss = DatabaseShardingState::get(opCtx, nss.db());
+        auto dss = DatabaseShardingState::get(opCtx, replState->dbName);
         auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
         dss->checkDbVersion(opCtx, dssLock);
     }
-
-    invariant(db,
-              str::stream() << "Database not found after relocking. Index build: "
-                            << replState->buildUUID << ": " << nss << " ("
-                            << replState->collectionUUID << ")");
-
-    invariant(db->getCollection(opCtx, nss),
-              str::stream() << "Collection not found after relocking. Index build: "
-                            << replState->buildUUID << ": " << nss << " ("
-                            << replState->collectionUUID << ")");
 
     // Perform the third and final drain after releasing a shared lock and reacquiring an
     // exclusive lock on the database.
@@ -940,24 +951,27 @@ void IndexBuildsCoordinator::_buildIndex(
     uassertStatusOK(
         _indexBuildsManager.checkIndexConstraintViolations(opCtx, replState->buildUUID));
 
-    auto collectionUUID = replState->collectionUUID;
-
     // Generate both createIndexes and commitIndexBuild oplog entries.
     // Secondaries currently interpret commitIndexBuild commands as noops.
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     auto fromMigrate = false;
     auto onCommitFn = [&] {
-        opObserver->onCommitIndexBuild(
-            opCtx, nss, collectionUUID, replState->buildUUID, replState->indexSpecs, fromMigrate);
+        opObserver->onCommitIndexBuild(opCtx,
+                                       collection->ns(),
+                                       replState->collectionUUID,
+                                       replState->buildUUID,
+                                       replState->indexSpecs,
+                                       fromMigrate);
     };
 
     auto onCreateEachFn = [&](const BSONObj& spec) {
-        opObserver->onCreateIndex(opCtx, nss, collectionUUID, spec, fromMigrate);
+        opObserver->onCreateIndex(
+            opCtx, collection->ns(), replState->collectionUUID, spec, fromMigrate);
     };
 
     // Commit index build.
     uassertStatusOK(_indexBuildsManager.commitIndexBuild(
-        opCtx, collection, nss, replState->buildUUID, onCreateEachFn, onCommitFn));
+        opCtx, collection, collection->ns(), replState->buildUUID, onCreateEachFn, onCommitFn));
 
     return;
 }

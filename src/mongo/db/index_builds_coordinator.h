@@ -367,8 +367,7 @@ protected:
      * Modularizes the _indexBuildsManager calls part of _runIndexBuildInner. Throws on error.
      */
     void _buildIndex(OperationContext* opCtx,
-                     Collection* collection,
-                     const NamespaceString& nss,
+                     const NamespaceStringOrUUID& dbAndUUID,
                      std::shared_ptr<ReplIndexBuildState> replState,
                      boost::optional<Lock::CollectionLock>* collLock);
     /**
