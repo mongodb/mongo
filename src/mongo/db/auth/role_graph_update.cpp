@@ -320,7 +320,7 @@ Status handleOplogCommand(RoleGraph* roleGraph, const BSONObj& cmdObj) {
             return Status::OK();
         }
     }
-    if (cmdName == "commitIndexBuild") {
+    if (cmdName == "startIndexBuild" || cmdName == "commitIndexBuild") {
         if (cmdObj.firstElement().str() != rolesCollectionNamespace.coll()) {
             return Status::OK();
         }
