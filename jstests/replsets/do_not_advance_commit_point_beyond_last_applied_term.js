@@ -105,7 +105,7 @@
     jsTest.log("Reconnect the set. Node E must roll back successfully.");
     nodeE.reconnect([nodeA, nodeC, nodeD]);
     nodeB.reconnect([nodeA, nodeC, nodeD]);
-    rst.awaitReplication();
+    rst.awaitReplication(undefined, undefined, [nodeB, nodeE]);
     assert.eq(1, nodeE.getDB(dbName)[collName].find({term: 1}).itcount());
     assert.eq(0, nodeE.getDB(dbName)[collName].find({term: 2}).itcount());
     assert.eq(1, nodeE.getDB(dbName)[collName].find({term: 3}).itcount());
