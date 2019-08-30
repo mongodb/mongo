@@ -48,9 +48,6 @@ class RecordStore;
  * When a new feature is enabled on a collection or index in the data files, a bit is set in one of
  * the fields of the document. Older versions won't recognize this bit and will fail to start up as
  * a result.
- *
- * The inserted document serves a similar purpose to the DataFileVersion class used with the MMAPv1
- * storage engine.
  */
 class DurableCatalogImpl::FeatureTracker {
 public:

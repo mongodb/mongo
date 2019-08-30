@@ -255,18 +255,6 @@ TEST(StorageEngineMetadataTest, StorageEngineForPath_NoDataFilesExist) {
     ASSERT_FALSE(storageEngine);
 }
 
-// Override the active storage engine with "mmapv1" when the metadata file specifies "mmapv1".
-TEST(StorageEngineMetadataTest, StorageEngineForPath_MetadataFile_mmapv1) {
-    TempDir tempDir("StorageEngineMetadataTest_StorageEngineForPath_MetadataFile_mmapv1");
-    {
-        StorageEngineMetadata metadata(tempDir.path());
-        metadata.setStorageEngine("mmapv1");
-        ASSERT_OK(metadata.write());
-    }
-    ASSERT_EQUALS(std::string("mmapv1"),
-                  StorageEngineMetadata::getStorageEngineForPath(tempDir.path()));
-}
-
 // Override the active storage engine whatever the metadata file specifies.
 TEST(StorageEngineMetadataTest, StorageEngineForPath_MetadataFile_someEngine) {
     TempDir tempDir("StorageEngineMetadataTest_StorageEngineForPath_MetadataFile_someEngine");

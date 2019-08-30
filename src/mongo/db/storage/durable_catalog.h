@@ -131,9 +131,8 @@ public:
                                   StringData idxName,
                                   long long newExpireSeconds) = 0;
 
-    /**
-     * Compare the UUID argument to the UUID obtained from the metadata. Return true if they
-     * are equal, false otherwise. uuid can become a CollectionUUID once MMAPv1 is removed.
+    /** Compares the UUID argument to the UUID obtained from the metadata. Returns true if they are
+     * equal, false otherwise.
      */
     virtual bool isEqualToMetadataUUID(OperationContext* opCtx,
                                        NamespaceString ns,
