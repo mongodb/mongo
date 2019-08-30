@@ -43,6 +43,7 @@ void RecoveryUnit::registerChange(Change* change) {
 void RecoveryUnit::commitRegisteredChanges(boost::optional<Timestamp> commitTimestamp) {
     for (auto& change : _changes) {
         try {
+            LOG(2) << "CUSTOM COMMIT " << redact(demangleName(typeid(*change)));
             change->commit(commitTimestamp);
         } catch (...) {
             std::terminate();
