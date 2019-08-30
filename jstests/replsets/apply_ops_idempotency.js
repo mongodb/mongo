@@ -93,6 +93,18 @@ var tests = {
         assert.commandWorked(z.insert({_id: 1}));
         assert.commandWorked(z.insert({_id: 2, z: 2}));
     },
+    arrayAndSubdocumentFields: (mydb) => {
+        let [x, y] = getCollections(mydb, ['x', 'y']);
+        // Array field.
+        assert.commandWorked(x.insert({_id: 1, x: 1, y: [0]}));
+        assert.commandWorked(x.update({_id: 1}, {$set: {x: 2, 'y.0': 2}}));
+        assert.commandWorked(x.update({_id: 1}, {$set: {y: 3}}));
+
+        // Subdocument field.
+        assert.commandWorked(y.insert({_id: 1, x: 1, y: {field: 0}}));
+        assert.commandWorked(y.update({_id: 1}, {$set: {x: 2, 'y.field': 2}}));
+        assert.commandWorked(y.update({_id: 1}, {$set: {y: 3}}));
+    },
     renameCollectionWithinDatabase: (mydb) => {
         let [x, y, z] = getCollections(mydb, ['x', 'y', 'z']);
         assert.commandWorked(x.insert({_id: 1, x: 1}));
@@ -183,6 +195,7 @@ var tests = {
  *  additional databases, it should return an array with all databases to check.
  */
 function testIdempotency(primary, testFun, testName) {
+    jsTestLog(`Execute ${testName}`);
     // Create a new database name, so it's easier to filter out our oplog records later.
     let dbname = (new Date()).toISOString().match(/[-0-9T]/g).join('');  // 2017-05-30T155055713
     let mydb = primary.getDB(dbname);

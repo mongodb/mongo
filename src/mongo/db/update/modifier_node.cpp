@@ -222,10 +222,10 @@ UpdateExecutor::ApplyResult ModifierNode::applyToNonexistentElement(
         auto statusWithFirstCreatedElem = pathsupport::createPathAt(
             *(updateNodeApplyParams.pathToCreate), 0, applyParams.element, newElement);
         if (!statusWithFirstCreatedElem.isOK()) {
-            // $set operaions on non-viable paths are ignored when the update came from replication.
-            // We do not error because idempotency requires that any other update modifiers must
-            // still be applied. For example, consider applying the following updates twice to an
-            // initially empty document:
+            // $set operations on non-viable paths are ignored when the update came from
+            // replication. We do not error because idempotency requires that any other update
+            // modifiers must still be applied. For example, consider applying the following updates
+            // twice to an initially empty document:
             // {$set: {c: 0}}
             // {$set: {'a.b': 0, c: 1}}
             // {$set: {a: 0}}

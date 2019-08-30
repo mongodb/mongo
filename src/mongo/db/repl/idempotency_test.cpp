@@ -197,6 +197,21 @@ TEST_F(RandomizedIdempotencyTest, CheckUpdateSequencesAreIdempotent) {
     runIdempotencyTestCase();
 }
 
+TEST_F(IdempotencyTest, UpdateTwoFields) {
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
+
+    ASSERT_OK(runOpInitialSync(createCollection(kUuid)));
+    ASSERT_OK(runOpInitialSync(insert(fromjson("{_id: 1, y: [0]}"))));
+
+    auto updateOp1 = update(1, fromjson("{$set: {x: 1}}"));
+    auto updateOp2 = update(1, fromjson("{$set: {x: 2, 'y.0': 2}}"));
+    auto updateOp3 = update(1, fromjson("{$set: {y: 3}}"));
+
+    auto ops = {updateOp1, updateOp2, updateOp3};
+    testOpsAreIdempotent(ops);
+}
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

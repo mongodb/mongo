@@ -94,7 +94,7 @@ MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeCreatingOplog);
 // Failpoint which stops the applier.
 MONGO_FAIL_POINT_DEFINE(rsSyncApplyStop);
 
-// Failpoint which causes the initial sync function to hang afte cloning all databases.
+// Failpoint which causes the initial sync function to hang after cloning all databases.
 MONGO_FAIL_POINT_DEFINE(initialSyncHangAfterDataCloning);
 
 // Failpoint which skips clearing _initialSyncState after a successful initial sync attempt.
