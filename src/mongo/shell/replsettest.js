@@ -93,7 +93,6 @@ var ReplSetTest = function(opts) {
     var _allocatePortForBridge;
 
     var _causalConsistency;
-    var _isMultiVersion = false;
 
     // Some code still references kDefaultTimeoutMS as a (non-static) member variable, so make sure
     // it's still accessible that way.
@@ -1584,12 +1583,8 @@ var ReplSetTest = function(opts) {
                 // unreplicated "tmp.mr." collection may be left behind. We remove it from the
                 // dbHash command response to avoid an already known case of a mismatch.
                 // TODO SERVER-27147: Stop filtering out "tmp.mr." collections.
-                //
-                // TODO SERVER-43072: Stop filtering out 'system.keys' once 'last-stable' servers
-                // return 'system.keys' collections in dbhash responses (when 'last-stable' is 4.4).
                 if (cappedCollections.has(collName) ||
-                    (filterMapReduce && collName.startsWith("tmp.mr.") ||
-                     (_isMultiVersion && collName === "system.keys"))) {
+                    (filterMapReduce && collName.startsWith("tmp.mr."))) {
                     delete res.collections[collName];
                     // The "uuids" field in the dbHash command response is new as of MongoDB 4.0.
                     if (res.hasOwnProperty("uuids")) {
@@ -1984,11 +1979,7 @@ var ReplSetTest = function(opts) {
                         // If the primary and secondary have the same hashes for all the
                         // collections in the database and there aren't any capped collections,
                         // then the hashes for the whole database should match.
-
-                        // TODO SERVER-43072: Remove isMultiVersion exemption once 'last-stable'
-                        // servers return 'system.keys' collections in dbhash responses (when
-                        // 'last-stable' is 4.4).
-                        if (!_isMultiVersion && (primaryDBHash.md5 !== secondaryDBHash.md5)) {
+                        if (primaryDBHash.md5 !== secondaryDBHash.md5) {
                             print(msgPrefix +
                                   ', the primary and secondary have a different hash for ' +
                                   'the ' + dbName + ' database: ' + tojson(dbHashes));
@@ -2333,10 +2324,6 @@ var ReplSetTest = function(opts) {
         var conn = MongoRunner.runMongod(options);
         if (!conn) {
             throw new Error("Failed to start node " + n);
-        }
-
-        if (options.binVersion) {
-            _isMultiVersion = true;
         }
 
         // Make sure to call _addPath, otherwise folders won't be cleaned.
