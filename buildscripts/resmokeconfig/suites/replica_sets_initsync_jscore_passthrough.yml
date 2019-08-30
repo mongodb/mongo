@@ -13,7 +13,6 @@ selector:
   # may insert unexpected operations into the profile collection.
   - jstests/core/profile_list_collections.js
   - jstests/core/profile_list_indexes.js
-  - jstests/core/profile_repair_cursor.js
   - jstests/core/recursion.js
   - jstests/core/system_profile.js
   - jstests/core/temp_cleanup.js

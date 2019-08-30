@@ -208,7 +208,6 @@ env.Library(
         'record_store_test_randomiter.cpp',
         'record_store_test_recorditer.cpp',
         'record_store_test_recordstore.cpp',
-        'record_store_test_repairiter.cpp',
         'record_store_test_storagesize.cpp',
         'record_store_test_touch.cpp',
         'record_store_test_truncate.cpp',

@@ -408,7 +408,6 @@ let viewsCommandTests = {
             skipSharded: true,
         }
     ],
-    repairCursor: {command: {repairCursor: "view"}, expectFailure: true},
     repairDatabase: {skip: isUnrelated},
     replSetAbortPrimaryCatchUp: {skip: isUnrelated},
     replSetFreeze: {skip: isUnrelated},

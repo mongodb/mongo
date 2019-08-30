@@ -363,15 +363,6 @@ public:
                                                             bool forward = true) const = 0;
 
     /**
-     * Constructs a cursor over a potentially corrupted store, which can be used to salvage
-     * damaged records. The iterator might return every record in the store if all of them
-     * are reachable and not corrupted.  Returns NULL if not supported.
-     */
-    virtual std::unique_ptr<RecordCursor> getCursorForRepair(OperationContext* opCtx) const {
-        return {};
-    }
-
-    /**
      * Constructs a cursor over a record store that returns documents in a randomized order, and
      * allows storage engines to provide a more efficient way of random sampling of a record store
      * than MongoDB's default sampling methods, which is used when this method returns {}.

@@ -20,11 +20,10 @@ const kCommandsSupportingReadPreference = new Set([
 ]);
 const kDatabasesOnConfigServers = new Set(["config", "admin"]);
 
-// This list of cursor-generating commands is incomplete. For example, "listCollections",
-// "listIndexes", and "repairCursor" are all missing from this list.
-// If we ever add tests that attempt to run getMore or killCursors on cursors generated from
-// those commands, then we should update the contents of this list and also handle any
-// differences in the server's response format.
+// This list of cursor-generating commands is incomplete. For example, both "listCollections" and
+// "listIndexes" are missing from this list. If we ever add tests that attempt to run getMore or
+// killCursors on cursors generated from those commands, then we should update the contents of
+// this list and also handle any differences in the server's response format.
 const kCursorGeneratingCommands = new Set(["aggregate", "find"]);
 
 const CursorTracker = (function() {
