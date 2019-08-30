@@ -78,6 +78,15 @@ configs:
             gte: 0.0
             lte: { expr: 'StorageGlobalParams::kMaxSyncdelaySecs' }
 
+    'storage.journal.commitIntervalMs':
+        description: 'how often to group/batch commit (ms)'
+        short_name: 'journalCommitInterval'
+        arg_vartype: Int
+        default: 100
+        validator:
+            gte: 1
+            lte: { expr: 'StorageGlobalParams::kMaxJournalCommitIntervalMs' }
+
     'storage.indexBuildRetry':
         description: "Do not retry any index builds that were interrupted by shutdown"
         arg_vartype: Switch
@@ -112,4 +121,3 @@ configs:
         deprecated_short_name: nodur
         arg_vartype: Switch
         source: [ cli, ini ]
-
