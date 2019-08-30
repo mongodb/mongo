@@ -43,7 +43,6 @@ namespace {
 // We use that value to represent the largest number of path components we could ever possibly
 // expect to see in an indexed field.
 const size_t kMaxKeyPatternPathLength = 2048;
-char multikeyPathsEncodedAsBytes[kMaxKeyPatternPathLength];
 
 /**
  * Encodes 'multikeyPaths' as binary data and appends it to 'bob'.
@@ -55,6 +54,8 @@ char multikeyPathsEncodedAsBytes[kMaxKeyPatternPathLength];
 void appendMultikeyPathsAsBytes(BSONObj keyPattern,
                                 const MultikeyPaths& multikeyPaths,
                                 BSONObjBuilder* bob) {
+    char multikeyPathsEncodedAsBytes[kMaxKeyPatternPathLength];
+
     size_t i = 0;
     for (const auto keyElem : keyPattern) {
         StringData keyName = keyElem.fieldNameStringData();
