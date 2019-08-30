@@ -425,8 +425,9 @@ void scheduleWritesToOplog(OperationContext* opCtx,
             for (size_t i = begin; i < end; i++) {
                 // Add as unowned BSON to avoid unnecessary ref-count bumps.
                 // 'ops' will outlive 'docs' so the BSON lifetime will be guaranteed.
-                docs.emplace_back(InsertStatement{
-                    ops[i].raw, ops[i].getOpTime().getTimestamp(), ops[i].getOpTime().getTerm()});
+                docs.emplace_back(InsertStatement{ops[i].getRaw(),
+                                                  ops[i].getOpTime().getTimestamp(),
+                                                  ops[i].getOpTime().getTerm()});
             }
 
             fassert(40141,
@@ -647,7 +648,7 @@ private:
                 auto oplogEntries =
                     fassertNoTrace(31004, _getNextApplierBatchFn(opCtx.get(), batchLimits));
                 for (const auto& oplogEntry : oplogEntries) {
-                    ops.emplace_back(oplogEntry.raw);
+                    ops.emplace_back(oplogEntry.getRaw());
                 }
 
                 // If we don't have anything in the queue, wait a bit for something to appear.
@@ -1052,7 +1053,7 @@ Status multiSyncApply(OperationContext* opCtx,
             try {
                 auto stableTimestampForRecovery = st->getOptions().stableTimestampForRecovery;
                 const Status status = SyncTail::syncApply(
-                    opCtx, entry.raw, oplogApplicationMode, stableTimestampForRecovery);
+                    opCtx, entry.getRaw(), oplogApplicationMode, stableTimestampForRecovery);
 
                 if (!status.isOK()) {
                     // In initial sync, update operations can cause documents to be missed during

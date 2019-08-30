@@ -124,7 +124,7 @@ void OplogApplier::enqueue(OperationContext* opCtx,
                            Operations::const_iterator end) {
     OplogBuffer::Batch batch;
     for (auto i = begin; i != end; ++i) {
-        batch.push_back(i->raw);
+        batch.push_back(i->getRaw());
     }
     enqueue(opCtx, batch.cbegin(), batch.cend());
 }

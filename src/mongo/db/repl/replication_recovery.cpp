@@ -81,7 +81,7 @@ public:
                 i++;
                 LOG_FOR_RECOVERY(kRecoveryOperationLogLevel)
                     << "Applying op " << i << " of " << batch.size() << " (in batch " << _numBatches
-                    << ") during replication recovery: " << redact(entry.raw);
+                    << ") during replication recovery: " << redact(entry.getRaw());
             }
         }
     }

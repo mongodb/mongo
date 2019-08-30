@@ -66,11 +66,58 @@ private:
 };
 
 /**
- * A parsed oplog entry that inherits from the OplogEntryBase parsed by the IDL.
- * This class is immutable.
+ * A parsed oplog entry that privately inherits from the OplogEntryBase parsed by the IDL.
+ * This class is immutable. All setters are hidden.
  */
-class OplogEntry : public OplogEntryBase {
+class OplogEntry : private OplogEntryBase {
 public:
+    // Make field names accessible.
+    using OplogEntryBase::k_idFieldName;
+    using OplogEntryBase::kDurableReplOperationFieldName;
+    using OplogEntryBase::kFromMigrateFieldName;
+    using OplogEntryBase::kHashFieldName;
+    using OplogEntryBase::kNssFieldName;
+    using OplogEntryBase::kObject2FieldName;
+    using OplogEntryBase::kObjectFieldName;
+    using OplogEntryBase::kOperationSessionInfoFieldName;
+    using OplogEntryBase::kOpTypeFieldName;
+    using OplogEntryBase::kPostImageOpTimeFieldName;
+    using OplogEntryBase::kPreImageOpTimeFieldName;
+    using OplogEntryBase::kPrevWriteOpTimeInTransactionFieldName;
+    using OplogEntryBase::kSessionIdFieldName;
+    using OplogEntryBase::kStatementIdFieldName;
+    using OplogEntryBase::kTermFieldName;
+    using OplogEntryBase::kTimestampFieldName;
+    using OplogEntryBase::kTxnNumberFieldName;
+    using OplogEntryBase::kUpsertFieldName;
+    using OplogEntryBase::kUuidFieldName;
+    using OplogEntryBase::kVersionFieldName;
+    using OplogEntryBase::kWallClockTimeFieldName;
+    // Make serialize(), toBSON() and getters accessible.
+    using OplogEntryBase::get_id;
+    using OplogEntryBase::getDurableReplOperation;
+    using OplogEntryBase::getFromMigrate;
+    using OplogEntryBase::getHash;
+    using OplogEntryBase::getNss;
+    using OplogEntryBase::getObject;
+    using OplogEntryBase::getObject2;
+    using OplogEntryBase::getOperationSessionInfo;
+    using OplogEntryBase::getOpType;
+    using OplogEntryBase::getPostImageOpTime;
+    using OplogEntryBase::getPreImageOpTime;
+    using OplogEntryBase::getPrevWriteOpTimeInTransaction;
+    using OplogEntryBase::getSessionId;
+    using OplogEntryBase::getStatementId;
+    using OplogEntryBase::getTerm;
+    using OplogEntryBase::getTimestamp;
+    using OplogEntryBase::getTxnNumber;
+    using OplogEntryBase::getUpsert;
+    using OplogEntryBase::getUuid;
+    using OplogEntryBase::getVersion;
+    using OplogEntryBase::getWallClockTime;
+    using OplogEntryBase::serialize;
+    using OplogEntryBase::toBSON;
+
     enum class CommandType {
         kNotCommand,
         kCreate,
@@ -197,6 +244,13 @@ public:
     int getRawObjSizeBytes() const;
 
     /**
+     * Returns the original document used to create this OplogEntry.
+     */
+    const BSONObj& getRaw() const {
+        return _raw;
+    }
+
+    /**
      * Returns the OpTime of the oplog entry.
      */
     OpTime getOpTime() const;
@@ -206,17 +260,15 @@ public:
      */
     std::string toString() const;
 
-    // TODO (SERVER-29200): make `raw` private. Do not add more direct uses of `raw`.
-    BSONObj raw;  // Owned.
-
 private:
+    BSONObj _raw;  // Owned.
     CommandType _commandType = CommandType::kNotCommand;
 };
 
 std::ostream& operator<<(std::ostream& s, const OplogEntry& o);
 
 inline bool operator==(const OplogEntry& lhs, const OplogEntry& rhs) {
-    return SimpleBSONObjComparator::kInstance.evaluate(lhs.raw == rhs.raw);
+    return SimpleBSONObjComparator::kInstance.evaluate(lhs.getRaw() == rhs.getRaw());
 }
 
 std::ostream& operator<<(std::ostream& s, const ReplOperation& o);
