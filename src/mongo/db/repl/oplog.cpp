@@ -798,7 +798,12 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                   ui);
           auto collUUID = ui.get();
 
-          return startIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexesElem, mode);
+          LOG(3) << "startIndexBuild: " << indexBuildUUID << ": collection: " << nss << " ("
+                 << collUUID << "): " << redact(cmd);
+
+          // TODO(SERVER-39239): Revisit when we are ready to implement commitIndexBuild.
+          // return startIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexesElem, mode);
+          return Status::OK();
       },
       {}}},
     {"commitIndexBuild",
