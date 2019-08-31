@@ -51,6 +51,6 @@ applyOps([{ns: coll.getFullName(), op: "u", o2: {_id: 1}, o: {$set: {'a.field': 
 assert.eq({_id: 1, a: null, b: 1}, coll.findOne());
 
 // Same, but set 'b' to 2.
-applyOps([{ns: coll.getFullName(), op: "u", o2: {_id: 1}, o: {$set: {'a.field': 2}, b: 2}}]);
+applyOps([{ns: coll.getFullName(), op: "u", o2: {_id: 1}, o: {$set: {'a.field': 2, b: 2}}}]);
 assert.eq({_id: 1, a: null, b: 2}, coll.findOne());
 }());
