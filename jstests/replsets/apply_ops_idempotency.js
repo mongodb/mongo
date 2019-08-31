@@ -209,6 +209,7 @@ function testIdempotency(primary, testFun, testName) {
                   .find({
                       op: {$ne: 'n'},
                       ns: new RegExp('^' + mydb.getName()),
+                      'o.startIndexBuild': {$exists: false},
                       'o.commitIndexBuild': {$exists: false},
                   },
                         {ts: 0, t: 0, h: 0, v: 0})
