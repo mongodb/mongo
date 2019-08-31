@@ -448,7 +448,8 @@ function RollbackTest(name = "RollbackTest", replSet) {
                         curSecondary.adminCommand({"replSetFreeze": kForeverSecs}));
                     return true;
                 } catch (e) {
-                    if (e.code === ErrorCodes.NotSecondary) {
+                    if (e.code === ErrorCodes.NotSecondary ||
+                        e.code === ErrorCodes.NotYetInitialized) {
                         return false;
                     }
                     throw e;
