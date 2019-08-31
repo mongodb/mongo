@@ -748,58 +748,59 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
        ErrorCodes::NamespaceNotFound}}},
     {"startIndexBuild",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
-         // {
-         //     "startIndexBuild" : "coll",
-         //     "indexBuildUUID" : <UUID>,
-         //     "indexes" : [
-         //         {
-         //             "key" : {
-         //                 "x" : 1
-         //             },
-         //             "name" : "x_1",
-         //             "v" : 2
-         //         },
-         //         {
-         //             "key" : {
-         //                 "k" : 1
-         //             },
-         //             "name" : "k_1",
-         //             "v" : 2
-         //         }
-         //     ]
-         // }
+          // {
+          //     "startIndexBuild" : "coll",
+          //     "indexBuildUUID" : <UUID>,
+          //     "indexes" : [
+          //         {
+          //             "key" : {
+          //                 "x" : 1
+          //             },
+          //             "name" : "x_1",
+          //             "v" : 2
+          //         },
+          //         {
+          //             "key" : {
+          //                 "k" : 1
+          //             },
+          //             "name" : "k_1",
+          //             "v" : 2
+          //         }
+          //     ]
+          // }
 
-         if (OplogApplication::Mode::kApplyOpsCmd == mode) {
-             return {ErrorCodes::CommandNotSupported,
-                     "The startIndexBuild operation is not supported in applyOps mode"};
-         }
+          if (OplogApplication::Mode::kApplyOpsCmd == mode) {
+              return {ErrorCodes::CommandNotSupported,
+                      "The startIndexBuild operation is not supported in applyOps mode"};
+          }
 
-         const auto& ui = entry.getUuid();
-         const auto& cmd = entry.getObject();
-         const NamespaceString nss(extractNsFromUUIDorNs(opCtx, entry.getNss(), ui, cmd));
+          const auto& ui = entry.getUuid();
+          const auto& cmd = entry.getObject();
+          const NamespaceString nss(extractNsFromUUIDorNs(opCtx, entry.getNss(), ui, cmd));
 
-         auto buildUUIDElem = cmd.getField("indexBuildUUID");
-         uassert(ErrorCodes::BadValue,
-                 "Error parsing 'startIndexBuild' oplog entry, missing required field "
-                 "'indexBuildUUID'.",
-                 !buildUUIDElem.eoo());
-         UUID indexBuildUUID = uassertStatusOK(UUID::parse(buildUUIDElem));
+          auto buildUUIDElem = cmd.getField("indexBuildUUID");
+          uassert(ErrorCodes::BadValue,
+                  "Error parsing 'startIndexBuild' oplog entry, missing required field "
+                  "'indexBuildUUID'.",
+                  !buildUUIDElem.eoo());
+          UUID indexBuildUUID = uassertStatusOK(UUID::parse(buildUUIDElem));
 
-         auto indexesElem = cmd.getField("indexes");
-         uassert(ErrorCodes::BadValue,
-                 "Error parsing 'startIndexBuild' oplog entry, missing required field 'indexes'.",
-                 !indexesElem.eoo());
-         uassert(ErrorCodes::BadValue,
-                 "Error parsing 'startIndexBuild' oplog entry, field 'indexes' must be an array.",
-                 indexesElem.type() == Array);
+          auto indexesElem = cmd.getField("indexes");
+          uassert(ErrorCodes::BadValue,
+                  "Error parsing 'startIndexBuild' oplog entry, missing required field 'indexes'.",
+                  !indexesElem.eoo());
+          uassert(ErrorCodes::BadValue,
+                  "Error parsing 'startIndexBuild' oplog entry, field 'indexes' must be an array.",
+                  indexesElem.type() == Array);
 
-         uassert(ErrorCodes::BadValue,
-                 "Error parsing 'startIndexBuild' oplog entry, missing required field 'uuid'.",
-                 ui);
-         auto collUUID = ui.get();
+          uassert(ErrorCodes::BadValue,
+                  "Error parsing 'startIndexBuild' oplog entry, missing required field 'uuid'.",
+                  ui);
+          auto collUUID = ui.get();
 
-         return startIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexesElem, mode);
-     }}},
+          return startIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexesElem, mode);
+      },
+      {}}},
     {"commitIndexBuild",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
           // {
