@@ -459,6 +459,9 @@ function RollbackTest(name = "RollbackTest", replSet) {
                     if (e.code === ErrorCodes.NotSecondary) {
                         return false;
                     }
+                    if (e.code === ErrorCodes.NotYetInitialized) {
+                        return false;
+                    }
                     throw e;
                 }
             }, `Failed to run replSetFreeze cmd on ${curSecondary.host}`);
