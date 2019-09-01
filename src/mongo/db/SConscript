@@ -766,6 +766,7 @@ env.Library(
         'catalog/database_holder',
         'db_raii',
         'index_build_entry_helpers',
+        'server_options_core',
         '$BUILD_DIR/mongo/db/catalog/index_build_entry_idl',
         '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',

@@ -805,7 +805,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           // return startIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexesElem, mode);
           return Status::OK();
       },
-      {}}},
+      {ErrorCodes::NamespaceNotFound}}},
     {"commitIndexBuild",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
           // {

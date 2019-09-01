@@ -2139,7 +2139,10 @@ public:
         }
 
         const Timestamp indexCreateInitTs = queryOplog(BSON("op"
-                                                            << "n"))["ts"]
+                                                            << "c"
+                                                            << "o.startIndexBuild" << nss.coll()
+                                                            << "o.indexes.0.name"
+                                                            << "a_1"))["ts"]
                                                 .timestamp();
 
         const Timestamp indexAComplete = queryOplog(BSON("op"

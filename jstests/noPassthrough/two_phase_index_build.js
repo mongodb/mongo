@@ -61,8 +61,6 @@ assert.eq(1, ops.length, 'incorrect number of createIndexes oplog entries: ' + t
 replSet.waitForAllIndexBuildsToFinish(testDB.getName(), collName);
 IndexBuildTest.assertIndexes(secondaryColl, 2, ["_id_", "a_1"]);
 
-// Use index build coordinator for a single-phase index build through the createIndexes
-// command.
 assert.commandWorked(
     testDB.runCommand({createIndexes: coll.getName(), indexes: [{key: {b: 1}, name: 'b_1'}]}));
 
@@ -70,9 +68,9 @@ IndexBuildTest.assertIndexes(coll, 3, ["_id_", "a_1", "b_1"]);
 assert.eq(numDocs, coll.find({a: {$gte: 0}}).hint({b: 1}).itcount());
 
 // Check oplog entries written by the single-phase index build. We expect to see entries for
-// commitIndexBuild and createIndexes, but not startIndexBuild.
+// startIndexBuild, commitIndexBuild, and createIndexes.
 ops = replSet.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.startIndexBuild': collName});
-assert.eq(1, ops.length, 'incorrect number of startIndexBuild oplog entries: ' + tojson(ops));
+assert.eq(2, ops.length, 'incorrect number of startIndexBuild oplog entries: ' + tojson(ops));
 ops = replSet.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.commitIndexBuild': collName});
 assert.eq(2, ops.length, 'incorrect number of commitIndexBuild oplog entries: ' + tojson(ops));
 ops = replSet.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.createIndexes': collName});

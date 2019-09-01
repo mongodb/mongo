@@ -48,6 +48,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -587,7 +588,9 @@ IndexBuildsCoordinator::_registerAndSetUpIndexBuild(
     MultiIndexBlock::OnInitFn onInitFn;
     // Two-phase index builds write a different oplog entry than the default behavior which
     // writes a no-op just to generate an optime.
-    if (IndexBuildProtocol::kTwoPhase == replIndexBuildState->protocol) {
+    using FCV = ServerGlobalParams::FeatureCompatibility::Version;
+    const auto currentFCV = serverGlobalParams.featureCompatibility.getVersion();
+    if (currentFCV == FCV::kFullyUpgradedTo44) {
         onInitFn = [&](std::vector<BSONObj>& specs) {
             // TODO (SERVER-40807): disabling the following code for the v4.2 release so it does not
             // have downstream impact.
