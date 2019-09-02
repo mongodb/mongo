@@ -1426,7 +1426,10 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
             auto waitStatus =
                 opCtx->waitForConditionOrInterruptNoAssert(_currentCommittedSnapshotCond, lock);
             if (!waitStatus.isOK()) {
-                return waitStatus;
+                return waitStatus.withContext(
+                    str::stream() << "Error waiting for snapshot not less than "
+                                  << targetOpTime.toString() << ", current relevant optime is "
+                                  << getCurrentOpTime().toString() << ".");
             }
             if (!_currentCommittedSnapshot) {
                 // It is possible for the thread to be awoken due to a spurious wakeup, meaning
@@ -1451,17 +1454,21 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
         if (deadline) {
             auto waitUntilStatus =
                 opCtx->waitForConditionOrInterruptNoAssertUntil(condVar, lock, *deadline);
-            if (!waitUntilStatus.isOK()) {
-                waitStatus = waitUntilStatus.getStatus();
-            }
-            // If deadline is set no need to wait until the targetTime time is reached.
-            return waitStatus;
+            waitStatus = waitUntilStatus.getStatus();
         } else {
             waitStatus = opCtx->waitForConditionOrInterruptNoAssert(condVar, lock);
         }
 
         if (!waitStatus.isOK()) {
-            return waitStatus;
+            return waitStatus.withContext(str::stream()
+                                          << "Error waiting for optime " << targetOpTime.toString()
+                                          << ", current relevant optime is "
+                                          << getCurrentOpTime().toString() << ".");
+        }
+
+        // If deadline is set no need to wait until the targetTime time is reached.
+        if (deadline) {
+            return Status::OK();
         }
     }
 
