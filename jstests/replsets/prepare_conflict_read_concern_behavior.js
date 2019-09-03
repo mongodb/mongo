@@ -150,15 +150,6 @@ function runTest() {
     assert.commandFailedWithCode(read({level: 'linearizable'}, failureTimeout, testDB, collName),
                                  ErrorCodes.MaxTimeMSExpired);
 
-    // TODO SERVER-36953: uncomment this test
-    // jsTestLog("Test afterClusterTime read before prepareTimestamp doesn't block on a " +
-    //           "prepared transaction.");
-    // assert.commandWorked(read({level: 'local', afterClusterTime: clusterTimeBeforePrepare},
-    //                           successTimeout,
-    //                           testDB,
-    //                           collName,
-    //                           2));
-
     jsTestLog("Test afterClusterTime read after prepareTimestamp blocks on a prepared " +
               "transaction.");
     assert.commandFailedWithCode(read({level: 'local', afterClusterTime: clusterTimeAfterPrepare},
