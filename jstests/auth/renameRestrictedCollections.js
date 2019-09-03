@@ -70,6 +70,19 @@
     assert.eq(null, adminDB.system.users.findOne({user: backdoorUserDoc.user}));
     assert.neq(null, adminDB.system.users.findOne({user: 'userAdmin'}));
 
+    adminDB.auth('rootier', 'password');
+
+    // Test permissions against the configDB and localDB
+
+    // Start with test against inserting to and renaming collections in config and local
+    // as __system.
+    assert.commandWorked(configDB.test.insert({'a': 1}));
+    assert.commandWorked(configDB.test.renameCollection('test2'));
+
+    assert.commandWorked(localDB.test.insert({'a': 1}));
+    assert.commandWorked(localDB.test.renameCollection('test2'));
+    adminDB.logout();
+
     // Test renaming collection in config with readWriteAnyDatabase
     assert(adminDB.auth('readWriteAdmin', 'password'));
     res = configDB.test2.insert({'b': 2});
@@ -85,25 +98,12 @@
     assert.eq(0, res.ok);
     assert.eq(CodeUnauthorized, res.code);
 
-    adminDB.auth('rootier', 'password');
-
+    // Test renaming system.users collection with __system
+    assert(adminDB.auth('rootier', 'password'));
     jsTestLog("Test that with __system you CAN rename to/from system.users");
     res = adminDB.system.users.renameCollection("users", true);
     assert.eq(1, res.ok, tojson(res));
-
-    // Test permissions against the configDB and localDB
-
-    // Start with test against inserting to and renaming collections in config and local
-    // as userAdminAnyDatabase.
-    assert.writeOK(configDB.test.insert({'a': 1}));
-    assert.commandWorked(configDB.test.renameCollection('test2'));
-
-    assert.writeOK(localDB.test.insert({'a': 1}));
-    assert.commandWorked(localDB.test.renameCollection('test2'));
-    adminDB.logout();
-
     // At this point, all the user documents are gone, so further activity may be unauthorized,
     // depending on cluster configuration.  So, this is the end of the test.
     MongoRunner.stopMongod(conn, {user: 'userAdmin', pwd: 'password'});
-
 })();
