@@ -42,10 +42,14 @@ const indexTypes = [
         indexName: "BTreeIndex",
         // This function is called to create documents, which are then inserted into the
         // collection.
-        createDoc: i => ({a: i}),
+        createDoc: i => ({
+            a: i,
+            b: {x: i, y: i + 1},
+            c: [i, i + 1],
+        }),
         // the options given to the .createIndex method
         // i.e. collection.createIndex(creationOptions)
-        creationOptions: {a: 1},
+        creationOptions: {a: 1, b: 1, c: -1},
         // This optional parameter specifies extra options to give to createIndex.
         // In the code, collection.createIndexes(creationOptions, createIndexOptions)
         // is called.
@@ -54,7 +58,10 @@ const indexTypes = [
     {indexName: "2d", createDoc: i => ({loc: [i, i]}), creationOptions: {loc: "2d"}},
     {
         indexName: "hayStack",
-        createDoc: i => ({loc: {lng: (i / 2.0) * (i / 2.0), lat: (i / 2.0)}, a: i}),
+        createDoc: i => ({
+            loc: {lng: (i / 2.0) * (i / 2.0), lat: (i / 2.0)},
+            a: {x: i, y: i + 1, z: [i, i + 1]},
+        }),
         creationOptions: {loc: "geoHaystack", a: 1},
         createIndexOptions: {bucketSize: 1}
     },
@@ -66,15 +73,34 @@ const indexTypes = [
                     "loc": {
                         "type": "Polygon",
                         "coordinates": [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]]
-                    }
+                    },
+                    b: {x: i, y: i + 1},
+                    c: [i, i + 1],
                 };
             else
-                return ({loc: {type: "Point", coordinates: [(i / 10.0) * (i / 10.0), (i / 10.0)]}});
+                return ({
+                    loc: {type: "Point", coordinates: [(i / 10.0) * (i / 10.0), (i / 10.0)]},
+                    b: {x: i, y: i + 1},
+                    c: [i, i + 1],
+                });
         },
-        creationOptions: {loc: "2dsphere"}
+        creationOptions: {loc: "2dsphere", b: 1, c: -1}
     },
-    {indexName: "text", createDoc: i => ({a: "a".repeat(i + 1)}), creationOptions: {a: "text"}},
-    {indexName: "hashed", createDoc: i => ({a: i}), creationOptions: {a: "hashed"}},
+    {
+        indexName: "text",
+        createDoc: i => ({
+            a: "a".repeat(i + 1),
+            b: {x: i, y: i + 1, z: [i, i + 1]},
+        }),
+        creationOptions: {a: "text", b: 1}
+    },
+    {
+        indexName: "hashed",
+        createDoc: i => ({
+            a: {x: i, y: i + 1, z: [i, i + 1]},
+        }),
+        creationOptions: {a: "hashed"}
+    },
     {
         indexName: "wildCard",
         createDoc: i => {
@@ -84,10 +110,12 @@ const indexTypes = [
                 return {a: null};
             else if (i == 2)
                 return {a: {}};
-            else if (i % 2 == 0)
-                return {a: {b: i}};
             else
-                return {a: [i]};
+                return {
+                    a: i,
+                    b: {x: i, y: i + 1},
+                    c: [i, i + 1],
+                };
         },
         creationOptions: {"$**": 1}
     }
@@ -97,19 +125,21 @@ const indexTypes = [
 const dbpath = MongoRunner.dataPath + 'keystring_index';
 resetDbpath(dbpath);
 
-const defaultOptions = {dbpath};
-
-const version42 = {
-    binVersion: '4.2',
-    testCollection: 'testdb'
+const defaultOptions = {
+    dbpath: dbpath,
+    noCleanData: true
 };
-let mongodOptions42 = Object.extend({binVersion: version42.binVersion}, defaultOptions);
+
+const testCollection = 'testColl';
+
+let mongodOptions42 = Object.extend({binVersion: '4.2'}, defaultOptions);
 let mongodOptionsCurrent = Object.extend({binVersion: 'latest'}, defaultOptions);
 
 // We will first start up an old binary version database, populate the database,
 // then upgrade and validate.
 
 // Start up an old binary version mongod.
+jsTestLog("Starting version: 4.2");
 let conn = MongoRunner.runMongod(mongodOptions42);
 
 assert.neq(null, conn, 'mongod was unable able to start with version ' + tojson(mongodOptions42));
@@ -120,13 +150,18 @@ assert.neq(null, testDb, 'testDb not found. conn.getDB(\'test\') returned null')
 populateDb(testDb);
 MongoRunner.stopMongod(conn);
 
+jsTestLog("Starting version: latest");
+
 // Restart the mongod with the latest binary version on the old version's data files.
 conn = MongoRunner.runMongod(mongodOptionsCurrent);
 assert.neq(null, conn, 'mongod was unable to start with the latest version');
 testDb = conn.getDB('test');
+assert.neq(null, testDb, 'testDb not found');
+
+jsTestLog("Validating: 4.2 indexes with latest");
 
 // Validate all the indexes.
-validateCollections(testDb, {full: true});
+assert.commandWorked(validateCollections(testDb, {full: true}));
 
 // Next, we will repopulate the database with the latest version then downgrade and run
 // validate.
@@ -140,7 +175,9 @@ assert.neq(null, conn, 'mongod was unable able to start with version ' + tojson(
 testDb = conn.getDB('test');
 assert.neq(null, testDb, 'testDb not found. conn.getDB(\'test\') returned null');
 
-validateCollections(testDb, {full: true});
+jsTestLog("Validating: latest indexes with 4.2");
+
+assert.commandWorked(validateCollections(testDb, {full: true}));
 MongoRunner.stopMongod(conn);
 
 // ----------------- Utilities
@@ -164,7 +201,7 @@ function populateDb(testDb) {
 
                 indexName += unique == true ? "Unique" : "NotUnique";
                 indexName += `Version${indexVersion}`;
-                let collectionName = version42.testCollection + indexName;
+                let collectionName = testCollection + '_' + indexName;
                 print(`${indexName}: Creating Collection`);
                 assert.commandWorked(testDb.createCollection(collectionName));
 
