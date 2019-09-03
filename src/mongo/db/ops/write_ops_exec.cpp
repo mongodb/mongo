@@ -244,7 +244,7 @@ bool handleError(OperationContext* opCtx,
     }
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
-    if (txnParticipant && txnParticipant.inActiveOrKilledMultiDocumentTransaction()) {
+    if (txnParticipant && opCtx->inMultiDocumentTransaction()) {
         if (isTransientTransactionError(
                 ex.code(), false /* hasWriteConcernError */, false /* isCommitTransaction */)) {
             // Tell the client to try the whole txn again, by returning ok: 0 with errorLabels.
@@ -396,7 +396,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
     try {
         acquireCollection();
         auto txnParticipant = TransactionParticipant::get(opCtx);
-        auto inTxn = txnParticipant && txnParticipant.inActiveOrKilledMultiDocumentTransaction();
+        auto inTxn = txnParticipant && opCtx->inMultiDocumentTransaction();
         if (!collection->getCollection()->isCapped() && !inTxn && batch.size() > 1) {
             // First try doing it all together. If all goes well, this is all we need to do.
             // See Collection::_insertDocuments for why we do all capped inserts one-at-a-time.
@@ -487,7 +487,7 @@ WriteResult performInserts(OperationContext* opCtx,
     // transaction.
     auto txnParticipant = TransactionParticipant::get(opCtx);
     invariant(!opCtx->lockState()->inAWriteUnitOfWork() ||
-              (txnParticipant && txnParticipant.inActiveOrKilledMultiDocumentTransaction()));
+              (txnParticipant && opCtx->inMultiDocumentTransaction()));
     auto& curOp = *CurOp::get(opCtx);
     ON_BLOCK_EXIT([&] {
         // This is the only part of finishCurOp we need to do for inserts because they reuse the
@@ -749,7 +749,7 @@ WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& who
     // transaction.
     auto txnParticipant = TransactionParticipant::get(opCtx);
     invariant(!opCtx->lockState()->inAWriteUnitOfWork() ||
-              (txnParticipant && txnParticipant.inActiveOrKilledMultiDocumentTransaction()));
+              (txnParticipant && opCtx->inMultiDocumentTransaction()));
     uassertStatusOK(userAllowedWriteNS(wholeOp.getNamespace()));
 
     DisableDocumentValidationIfTrue docValidationDisabler(
@@ -900,7 +900,7 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
     // transaction.
     auto txnParticipant = TransactionParticipant::get(opCtx);
     invariant(!opCtx->lockState()->inAWriteUnitOfWork() ||
-              (txnParticipant && txnParticipant.inActiveOrKilledMultiDocumentTransaction()));
+              (txnParticipant && opCtx->inMultiDocumentTransaction()));
     uassertStatusOK(userAllowedWriteNS(wholeOp.getNamespace()));
 
     DisableDocumentValidationIfTrue docValidationDisabler(
