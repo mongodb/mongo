@@ -4,11 +4,15 @@
 (function() {
 "use strict";
 
+load("jstests/libs/parallelTester.js");  // for Thread.
 load("jstests/sharding/libs/sharded_transactions_helpers.js");
 
 // Verifies the transaction server status response has the fields that we expect.
 function verifyServerStatusFields(res) {
     const expectedFields = [
+        "currentOpen",
+        "currentActive",
+        "currentInactive",
         "totalStarted",
         "totalAborted",
         "abortCause",
@@ -82,6 +86,9 @@ class ExpectedAbortCause {
 
 class ExpectedTransactionServerStatus {
     constructor() {
+        this.currentOpen = 0;
+        this.currentActive = 0;
+        this.currentInactive = 0;
         this.totalStarted = 0;
         this.totalAborted = 0;
         this.abortCause = new ExpectedAbortCause();
@@ -106,6 +113,15 @@ function verifyServerStatusValues(st, expectedStats) {
     verifyServerStatusFields(res);
 
     const stats = res.transactions;
+    assert.eq(expectedStats.currentOpen,
+              stats.currentOpen,
+              "unexpected currentOpen, res: " + tojson(stats));
+    assert.eq(expectedStats.currentActive,
+              stats.currentActive,
+              "unexpected currentActive, res: " + tojson(stats));
+    assert.eq(expectedStats.currentInactive,
+              stats.currentInactive,
+              "unexpected currentInactive, res: " + tojson(stats));
     assert.eq(expectedStats.totalStarted,
               stats.totalStarted,
               "unexpected totalStarted, res: " + tojson(stats));
@@ -190,17 +206,23 @@ const otherRouterSessionDB = otherRouterSession.getDatabase(dbName);
 
 // Set up two chunks: [-inf, 0), [0, inf) one on each shard, with one document in each.
 
-assert.commandWorked(sessionDB[collName].insert({_id: -1}));
-assert.commandWorked(sessionDB[collName].insert({_id: 1}));
+assert.commandWorked(sessionDB[collName].createIndex({skey: 1}));
+assert.commandWorked(sessionDB[collName].insert({skey: -1}));
+assert.commandWorked(sessionDB[collName].insert({skey: 1}));
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard0.shardName);
-assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
-assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 1}, to: st.shard1.shardName}));
+assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {skey: 1}}));
+assert.commandWorked(st.s.adminCommand({split: ns, middle: {skey: 0}}));
+assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {skey: 1}, to: st.shard1.shardName}));
 flushRoutersAndRefreshShardMetadata(st, {ns});
 
 let expectedStats = new ExpectedTransactionServerStatus();
+
+let nextSkey = 0;
+const uniqueSkey = function uniqueSkey() {
+    return nextSkey++;
+};
 
 //
 // Helpers for setting up transactions that will trigger the various commit paths.
@@ -210,14 +232,18 @@ function startNoShardsTransaction() {
     session.startTransaction();
     assert.commandWorked(session.getDatabase("doesntExist").runCommand({find: collName}));
 
+    expectedStats.currentOpen += 1;
+    expectedStats.currentInactive += 1;
     expectedStats.totalStarted += 1;
     verifyServerStatusValues(st, expectedStats);
 }
 
 function startSingleShardTransaction() {
     session.startTransaction();
-    assert.commandWorked(sessionDB[collName].insert({x: 1}));
+    assert.commandWorked(sessionDB[collName].insert({skey: uniqueSkey(), x: 1}));
 
+    expectedStats.currentOpen += 1;
+    expectedStats.currentInactive += 1;
     expectedStats.totalStarted += 1;
     expectedStats.totalContactedParticipants += 1;
     expectedStats.totalRequestsTargeted += 1;
@@ -226,8 +252,10 @@ function startSingleShardTransaction() {
 
 function startSingleWriteShardTransaction() {
     session.startTransaction();
-    assert.commandWorked(sessionDB[collName].insert({x: 1}));
+    assert.commandWorked(sessionDB[collName].insert({skey: uniqueSkey(), x: 1}));
 
+    expectedStats.currentOpen += 1;
+    expectedStats.currentInactive += 1;
     expectedStats.totalStarted += 1;
     expectedStats.totalContactedParticipants += 1;
     expectedStats.totalRequestsTargeted += 1;
@@ -244,6 +272,8 @@ function startReadOnlyTransaction() {
     session.startTransaction();
     assert.commandWorked(sessionDB.runCommand({find: collName}));
 
+    expectedStats.currentOpen += 1;
+    expectedStats.currentInactive += 1;
     expectedStats.totalStarted += 1;
     expectedStats.totalContactedParticipants += 2;
     expectedStats.totalRequestsTargeted += 2;
@@ -252,14 +282,16 @@ function startReadOnlyTransaction() {
 
 function startTwoPhaseCommitTransaction() {
     session.startTransaction();
-    assert.commandWorked(sessionDB[collName].insert({_id: -5}));
+    assert.commandWorked(sessionDB[collName].insert({skey: -5}));
 
+    expectedStats.currentOpen += 1;
+    expectedStats.currentInactive += 1;
     expectedStats.totalStarted += 1;
     expectedStats.totalContactedParticipants += 1;
     expectedStats.totalRequestsTargeted += 1;
     verifyServerStatusValues(st, expectedStats);
 
-    assert.commandWorked(sessionDB[collName].insert({_id: 5}));
+    assert.commandWorked(sessionDB[collName].insert({skey: 5}));
 
     expectedStats.totalContactedParticipants += 1;
     expectedStats.totalRequestsTargeted += 1;
@@ -268,8 +300,8 @@ function startTwoPhaseCommitTransaction() {
 
 function setUpTransactionToRecoverCommit({shouldCommit}) {
     otherRouterSession.startTransaction();
-    let resWithRecoveryToken = assert.commandWorked(
-        otherRouterSessionDB.runCommand({insert: collName, documents: [{x: 5}]}));
+    let resWithRecoveryToken = assert.commandWorked(otherRouterSessionDB.runCommand(
+        {insert: collName, documents: [{skey: uniqueSkey(), x: 5}]}));
     if (shouldCommit) {
         assert.commandWorked(otherRouterSession.commitTransaction_forTesting());
     } else {
@@ -298,6 +330,8 @@ jsTest.log("Committed no shards transaction.");
 
     assert.commandWorked(session.commitTransaction_forTesting());
 
+    expectedStats.currentOpen -= 1;
+    expectedStats.currentInactive -= 1;
     expectedStats.totalCommitted += 1;
     expectedStats.commitTypes.noShards.initiated += 1;
     expectedStats.commitTypes.noShards.successful += 1;
@@ -310,6 +344,8 @@ jsTest.log("Successful single shard transaction.");
 
     assert.commandWorked(session.commitTransaction_forTesting());
 
+    expectedStats.currentOpen -= 1;
+    expectedStats.currentInactive -= 1;
     expectedStats.totalCommitted += 1;
     expectedStats.commitTypes.singleShard.initiated += 1;
     expectedStats.commitTypes.singleShard.successful += 1;
@@ -326,6 +362,8 @@ jsTest.log("Failed single shard transaction.");
     assert.commandFailedWithCode(session.commitTransaction_forTesting(),
                                  ErrorCodes.NoSuchTransaction);
 
+    expectedStats.currentOpen -= 1;
+    expectedStats.currentInactive -= 1;
     expectedStats.totalAborted += 1;
     expectedStats.abortCause["NoSuchTransaction"] = 1;
     expectedStats.commitTypes.singleShard.initiated += 1;
@@ -341,6 +379,8 @@ jsTest.log("Successful single write shard transaction.");
 
     assert.commandWorked(session.commitTransaction_forTesting());
 
+    expectedStats.currentOpen -= 1;
+    expectedStats.currentInactive -= 1;
     expectedStats.totalCommitted += 1;
     expectedStats.commitTypes.singleWriteShard.initiated += 1;
     expectedStats.commitTypes.singleWriteShard.successful += 1;
@@ -357,6 +397,8 @@ jsTest.log("Failed single write shard transaction.");
     assert.commandFailedWithCode(session.commitTransaction_forTesting(),
                                  ErrorCodes.NoSuchTransaction);
 
+    expectedStats.currentOpen -= 1;
+    expectedStats.currentInactive -= 1;
     expectedStats.totalAborted += 1;
     expectedStats.abortCause["NoSuchTransaction"] += 1;
     expectedStats.commitTypes.singleWriteShard.initiated += 1;
@@ -374,6 +416,8 @@ jsTest.log("Successful read only transaction.");
 
     assert.commandWorked(session.commitTransaction_forTesting());
 
+    expectedStats.currentOpen -= 1;
+    expectedStats.currentInactive -= 1;
     expectedStats.totalCommitted += 1;
     expectedStats.commitTypes.readOnly.initiated += 1;
     expectedStats.commitTypes.readOnly.successful += 1;
@@ -390,6 +434,8 @@ jsTest.log("Failed read only transaction.");
     assert.commandFailedWithCode(session.commitTransaction_forTesting(),
                                  ErrorCodes.NoSuchTransaction);
 
+    expectedStats.currentOpen -= 1;
+    expectedStats.currentInactive -= 1;
     expectedStats.totalAborted += 1;
     expectedStats.abortCause["NoSuchTransaction"] += 1;
     expectedStats.commitTypes.readOnly.initiated += 1;
@@ -405,6 +451,8 @@ jsTest.log("Successful two phase commit transaction.");
 
     assert.commandWorked(session.commitTransaction_forTesting());
 
+    expectedStats.currentOpen -= 1;
+    expectedStats.currentInactive -= 1;
     expectedStats.totalCommitted += 1;
     expectedStats.commitTypes.twoPhaseCommit.initiated += 1;
     expectedStats.commitTypes.twoPhaseCommit.successful += 1;
@@ -413,7 +461,7 @@ jsTest.log("Successful two phase commit transaction.");
     verifyServerStatusValues(st, expectedStats);
 
     // Remove the inserted documents.
-    assert.commandWorked(sessionDB[collName].remove({_id: {$in: [-5, 5]}}));
+    assert.commandWorked(sessionDB[collName].remove({skey: {$in: [-5, 5]}}));
 })();
 
 jsTest.log("Failed two phase commit transaction.");
@@ -424,6 +472,8 @@ jsTest.log("Failed two phase commit transaction.");
     assert.commandFailedWithCode(session.commitTransaction_forTesting(),
                                  ErrorCodes.NoSuchTransaction);
 
+    expectedStats.currentOpen -= 1;
+    expectedStats.currentInactive -= 1;
     expectedStats.totalAborted += 1;
     expectedStats.abortCause["NoSuchTransaction"] += 1;
     expectedStats.commitTypes.twoPhaseCommit.initiated += 1;
@@ -445,6 +495,7 @@ jsTest.log("Recover successful commit result.");
         recoveryToken
     }));
 
+    // Note that current open and inactive aren't incremented by setUpTransactionToRecoverCommit.
     expectedStats.totalStarted += 1;
     expectedStats.totalCommitted += 1;
     expectedStats.commitTypes.recoverWithToken.initiated += 1;
@@ -467,6 +518,7 @@ jsTest.log("Recover failed commit result.");
     }),
                                  ErrorCodes.NoSuchTransaction);
 
+    // Note that current open and inactive aren't incremented by setUpTransactionToRecoverCommit.
     expectedStats.totalStarted += 1;
     expectedStats.totalAborted += 1;
     expectedStats.abortCause["NoSuchTransaction"] += 1;
@@ -497,6 +549,8 @@ jsTest.log("Empty recovery token.");
     }),
                                  ErrorCodes.NoSuchTransaction);
 
+    expectedStats.currentOpen += 1;
+    expectedStats.currentInactive += 1;
     expectedStats.totalStarted += 1;
     expectedStats.commitTypes.recoverWithToken.initiated += 1;
     // No requests are targeted and the decision isn't learned, so total committed/aborted and
@@ -507,8 +561,10 @@ jsTest.log("Empty recovery token.");
 jsTest.log("Explicitly aborted transaction.");
 (() => {
     session.startTransaction();
-    assert.commandWorked(sessionDB[collName].insert({x: 2}));
+    assert.commandWorked(sessionDB[collName].insert({skey: uniqueSkey(), x: 2}));
 
+    expectedStats.currentOpen += 1;
+    expectedStats.currentInactive += 1;
     expectedStats.totalStarted += 1;
     expectedStats.totalContactedParticipants += 1;
     expectedStats.totalRequestsTargeted += 1;
@@ -516,6 +572,8 @@ jsTest.log("Explicitly aborted transaction.");
 
     assert.commandWorked(session.abortTransaction_forTesting());
 
+    expectedStats.currentOpen -= 1;
+    expectedStats.currentInactive -= 1;
     expectedStats.totalAborted += 1;
     expectedStats.abortCause["abort"] = 1;
     expectedStats.totalRequestsTargeted += 1;
@@ -524,8 +582,11 @@ jsTest.log("Explicitly aborted transaction.");
 
 jsTest.log("Implicitly aborted transaction.");
 (() => {
+    assert.commandWorked(sessionDB[collName].insert({_id: 1, skey: 1}));
+
     session.startTransaction();
-    assert.commandFailedWithCode(sessionDB[collName].insert({_id: 1}), ErrorCodes.DuplicateKey);
+    assert.commandFailedWithCode(sessionDB[collName].insert({_id: 1, skey: 1}),
+                                 ErrorCodes.DuplicateKey);
 
     expectedStats.totalStarted += 1;
     expectedStats.totalAborted += 1;
@@ -545,16 +606,20 @@ jsTest.log("Implicitly aborted transaction.");
 jsTest.log("Abandoned transaction.");
 (() => {
     session.startTransaction();
-    assert.commandWorked(sessionDB[collName].insert({_id: -15}));
+    assert.commandWorked(sessionDB[collName].insert({skey: -15}));
 
+    expectedStats.currentOpen += 1;
+    expectedStats.currentInactive += 1;
     expectedStats.totalStarted += 1;
     expectedStats.totalContactedParticipants += 1;
     expectedStats.totalRequestsTargeted += 1;
     verifyServerStatusValues(st, expectedStats);
 
     session.startTransaction_forTesting({}, {ignoreActiveTxn: true});
-    assert.commandWorked(sessionDB[collName].insert({_id: -15}));
+    assert.commandWorked(sessionDB[collName].insert({skey: -15}));
 
+    // Note that overwriting a transaction will end the previous transaction from a diagnostics
+    // perspective.
     expectedStats.totalStarted += 1;
     expectedStats.totalContactedParticipants += 1;
     expectedStats.totalRequestsTargeted += 1;
@@ -565,9 +630,96 @@ jsTest.log("Abandoned transaction.");
     // Abort to clear the shell's session state.
     assert.commandWorked(session.abortTransaction_forTesting());
 
+    expectedStats.currentOpen -= 1;
+    expectedStats.currentInactive -= 1;
     expectedStats.totalAborted += 1;
     expectedStats.abortCause["abort"] += 1;
     expectedStats.totalRequestsTargeted += 1;
+    verifyServerStatusValues(st, expectedStats);
+})();
+
+jsTest.log("Active transaction.");
+(() => {
+    assert.commandWorked(st.rs0.getPrimary().adminCommand(
+        {configureFailPoint: "waitInFindBeforeMakingBatch", mode: "alwaysOn"}));
+
+    const txnThread = new Thread(function(host, dbName, collName) {
+        const mongosConn = new Mongo(host);
+        const threadSession = mongosConn.startSession();
+
+        threadSession.startTransaction();
+        assert.commandWorked(
+            threadSession.getDatabase(dbName).runCommand({find: collName, filter: {}}));
+        assert.commandWorked(threadSession.abortTransaction_forTesting());
+        threadSession.endSession();
+    }, st.s.host, dbName, collName);
+    txnThread.start();
+
+    // Wait until we know the failpoint has been reached.
+    assert.soon(function() {
+        const filter = {"msg": "waitInFindBeforeMakingBatch"};
+        return assert.commandWorked(st.rs0.getPrimary().getDB("admin").currentOp(filter))
+                   .inprog.length === 1;
+    });
+
+    expectedStats.currentOpen += 1;
+    expectedStats.currentActive += 1;
+    expectedStats.totalStarted += 1;
+    expectedStats.totalContactedParticipants += 2;
+    expectedStats.totalRequestsTargeted += 2;
+    verifyServerStatusValues(st, expectedStats);
+
+    assert.commandWorked(st.rs0.getPrimary().adminCommand(
+        {configureFailPoint: "waitInFindBeforeMakingBatch", mode: "off"}));
+    txnThread.join();
+
+    expectedStats.currentOpen -= 1;
+    expectedStats.currentActive -= 1;
+    expectedStats.totalAborted += 1;
+    expectedStats.abortCause["abort"] += 1;
+    expectedStats.totalRequestsTargeted += 2;
+    verifyServerStatusValues(st, expectedStats);
+})();
+
+const retrySession = st.s.startSession({retryWrites: true});
+const retrySessionDB = retrySession.getDatabase(dbName);
+
+jsTest.log("Change shard key with retryable write - findAndModify.");
+(() => {
+    // Insert document to be updated.
+    assert.commandWorked(retrySessionDB[collName].insert({skey: -10}));
+
+    // Retryable write findAndModify that would change the shard key. Uses a txn internally. Throws
+    // on error.
+    retrySessionDB[collName].findAndModify({query: {skey: -10}, update: {$set: {skey: 10}}});
+
+    expectedStats.totalStarted += 1;
+    expectedStats.totalCommitted += 1;
+    expectedStats.commitTypes.twoPhaseCommit.initiated += 1;
+    expectedStats.commitTypes.twoPhaseCommit.successful += 1;
+    expectedStats.totalContactedParticipants += 2;
+    expectedStats.totalParticipantsAtCommit += 2;
+    expectedStats.totalRequestsTargeted += 4;
+
+    verifyServerStatusValues(st, expectedStats);
+})();
+
+jsTest.log("Change shard key with retryable write - batch write command.");
+(() => {
+    // Insert document to be updated.
+    assert.commandWorked(retrySessionDB[collName].insert({skey: -15}));
+
+    // Retryable write update that would change the shard key. Uses a txn internally.
+    assert.commandWorked(retrySessionDB[collName].update({skey: -15}, {$set: {skey: 15}}));
+
+    expectedStats.totalStarted += 1;
+    expectedStats.totalCommitted += 1;
+    expectedStats.commitTypes.twoPhaseCommit.initiated += 1;
+    expectedStats.commitTypes.twoPhaseCommit.successful += 1;
+    expectedStats.totalContactedParticipants += 2;
+    expectedStats.totalParticipantsAtCommit += 2;
+    expectedStats.totalRequestsTargeted += 4;
+
     verifyServerStatusValues(st, expectedStats);
 })();
 

@@ -146,22 +146,6 @@ public:
          */
         Microseconds getTimeInactiveMicros(TickSource* tickSource, TickSource::Tick curTicks) const;
 
-        /**
-         * Marks the transaction as active and sets the start of the transaction's active time and
-         * overall start time the first time it is called.
-         *
-         * This method is a no-op if the transaction is currently active or has already ended.
-         */
-        void trySetActive(OperationContext* opCtx, TickSource::Tick curTicks);
-
-        /**
-         * Marks the transaction as inactive and sets the total active time of the transaction. The
-         * total active time will only be set if the transaction was active prior to this call.
-         *
-         * This method is a no-op if the transaction is not currently active or has already ended.
-         */
-        void trySetInactive(TickSource* tickSource, TickSource::Tick curTicks);
-
         // The start time of the transaction in millisecond resolution. Used only for diagnostics
         // reporting.
         Date_t startWallClockTime;
@@ -195,6 +179,83 @@ public:
     enum class TerminationCause {
         kCommitted,
         kAborted,
+    };
+
+    /**
+     * Helper class responsible for updating per transaction and router wide transaction metrics on
+     * certain transaction events.
+     */
+    class MetricsTracker {
+    public:
+        MetricsTracker(ServiceContext* service) : _service(service) {}
+        MetricsTracker(const MetricsTracker&) = delete;
+        MetricsTracker& operator=(const MetricsTracker&) = delete;
+        MetricsTracker(MetricsTracker&&) = delete;
+        MetricsTracker& operator=(MetricsTracker&&) = delete;
+        ~MetricsTracker();
+
+        bool isTrackingOver() const {
+            return timingStats.endTime != 0;
+        }
+
+        bool hasStarted() const {
+            return timingStats.startTime != 0;
+        }
+
+        bool isActive() const {
+            return timingStats.lastTimeActiveStart != 0;
+        }
+
+        bool commitHasStarted() const {
+            return timingStats.commitStartTime != 0;
+        }
+
+        const auto& getTimingStats() const {
+            return timingStats;
+        }
+
+        /**
+         * Marks the transaction as active and sets the start of the transaction's active time and
+         * overall start time the first time it is called.
+         *
+         * This method is a no-op if the transaction is not currently inactive or has already ended.
+         */
+        void trySetActive(TickSource* tickSource, TickSource::Tick curTicks);
+
+        /**
+         * Marks the transaction as inactive, sets the total active time of the transaction, and
+         * updates relevant server status counters.
+         *
+         * This method is a no-op if the transaction is not currently active or has already ended.
+         */
+        void trySetInactive(TickSource* tickSource, TickSource::Tick curTicks);
+
+        /**
+         * Marks the transaction as having begun commit, updating relevent stats. Assumes the
+         * transaction is currently active.
+         */
+        void startCommit(TickSource* tickSource,
+                         TickSource::Tick curTicks,
+                         TransactionRouter::CommitType commitType,
+                         std::size_t numParticipantsAtCommit);
+
+        /**
+         * Marks the transaction as over, updating stats based on the termination cause, which is
+         * either commit or abort.
+         */
+        void endTransaction(TickSource* tickSource,
+                            TickSource::Tick curTicks,
+                            TransactionRouter::TerminationCause terminationCause,
+                            TransactionRouter::CommitType commitType,
+                            StringData abortCause);
+
+    private:
+        // Pointer to the service context used to get the tick source and router wide transaction
+        // metrics decorations.
+        ServiceContext* const _service;
+
+        // Stats used for calculating durations for the active transaction.
+        TransactionRouter::TimingStats timingStats;
     };
 
     /**
@@ -253,6 +314,13 @@ public:
         void reportState(OperationContext* opCtx,
                          BSONObjBuilder* builder,
                          bool sessionIsActive) const;
+
+        /**
+         * Returns if the router has received at least one request for a transaction.
+         */
+        auto isInitialized() {
+            return o().txnNumber != kUninitializedTxnNumber;
+        }
 
     protected:
         explicit Observer(TransactionRouter* tr) : _tr(tr) {}
@@ -453,8 +521,9 @@ public:
         /**
          * Returns a copy of the timing stats of the transaction router's active transaction.
          */
-        const TimingStats& getTimingStats() const {
-            return o().timingStats;
+        const auto& getTimingStats_forTest() const {
+            invariant(o().metricsTracker);
+            return o().metricsTracker->getTimingStats();
         }
 
     private:
@@ -523,17 +592,6 @@ public:
         void _setReadOnlyForParticipant(OperationContext* opCtx,
                                         const ShardId& shard,
                                         const Participant::ReadOnly readOnly);
-
-        /**
-         * Updates relevant metrics when a new transaction is begun.
-         */
-        void _onNewTransaction(OperationContext* opCtx);
-
-        /**
-         * Updates relevant metrics when a router receives commit for a higher txnNumber than it has
-         * seen so far.
-         */
-        void _onBeginRecoveringDecision(OperationContext* opCtx);
 
         /**
          * Updates relevant metrics when the router receives an explicit abort from the client.
@@ -659,12 +717,14 @@ private:
         // code that led to an implicit abort or "abort" if the client sent abortTransaction.
         std::string abortCause;
 
-        // Stats used for calculating durations for the active transaction.
-        TimingStats timingStats;
-
         // Information about the last client to run a transaction operation on this transaction
         // router.
         SingleTransactionStats::LastClientInfo lastClientInfo;
+
+        // Class responsible for updating per transaction and router wide transaction metrics on
+        // certain transaction events. Unset until the transaction router has processed at least one
+        // transaction command.
+        boost::optional<MetricsTracker> metricsTracker;
     } _o;
 
     /**

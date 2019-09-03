@@ -61,25 +61,37 @@ public:
     static RouterTransactionsMetrics* get(ServiceContext* service);
     static RouterTransactionsMetrics* get(OperationContext* opCtx);
 
-    std::int64_t getTotalStarted();
+    std::int64_t getCurrentOpen() const;
+    void incrementCurrentOpen();
+    void decrementCurrentOpen();
+
+    std::int64_t getCurrentActive() const;
+    void incrementCurrentActive();
+    void decrementCurrentActive();
+
+    std::int64_t getCurrentInactive() const;
+    void incrementCurrentInactive();
+    void decrementCurrentInactive();
+
+    std::int64_t getTotalStarted() const;
     void incrementTotalStarted();
 
-    std::int64_t getTotalAborted();
+    std::int64_t getTotalAborted() const;
     void incrementTotalAborted();
 
-    std::int64_t getTotalCommitted();
+    std::int64_t getTotalCommitted() const;
     void incrementTotalCommitted();
 
-    std::int64_t getTotalContactedParticipants();
+    std::int64_t getTotalContactedParticipants() const;
     void incrementTotalContactedParticipants();
 
-    std::int64_t getTotalParticipantsAtCommit();
+    std::int64_t getTotalParticipantsAtCommit() const;
     void addToTotalParticipantsAtCommit(std::int64_t inc);
 
-    std::int64_t getTotalRequestsTargeted();
+    std::int64_t getTotalRequestsTargeted() const;
     void incrementTotalRequestsTargeted();
 
-    const CommitStats& getCommitTypeStats_forTest(TransactionRouter::CommitType commitType);
+    const CommitStats& getCommitTypeStats_forTest(TransactionRouter::CommitType commitType) const;
     void incrementCommitInitiated(TransactionRouter::CommitType commitType);
     void incrementCommitSuccessful(TransactionRouter::CommitType commitType,
                                    Microseconds durationMicros);
@@ -97,6 +109,15 @@ private:
      * RouterTransactionsStats class.
      */
     CommitTypeStats _constructCommitTypeStats(const CommitStats& stats);
+
+    // Total number of currently open transactions.
+    AtomicWord<std::int64_t> _currentOpen{0};
+
+    // Total number of currently active transactions.
+    AtomicWord<std::int64_t> _currentActive{0};
+
+    // Total number of currently inactive transactions.
+    AtomicWord<std::int64_t> _currentInactive{0};
 
     // The total number of multi-document transactions started since the last server startup.
     AtomicWord<std::int64_t> _totalStarted{0};

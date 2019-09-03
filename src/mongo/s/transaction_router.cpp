@@ -347,7 +347,7 @@ void TransactionRouter::Observer::_reportTransactionState(OperationContext* opCt
         builder->append("globalReadTimestamp", o().atClusterTime->getTime().asTimestamp());
     }
 
-    const auto& timingStats = o().timingStats;
+    const auto& timingStats = o().metricsTracker->getTimingStats();
 
     builder->append("startWallClockTime", dateToISOStringLocal(timingStats.startWallClockTime));
 
@@ -391,7 +391,7 @@ void TransactionRouter::Observer::_reportTransactionState(OperationContext* opCt
         builder->appendArray("participants", participantsArrayBuilder.obj());
     }
 
-    if (o().commitType != CommitType::kNotInitiated) {
+    if (o().metricsTracker->commitHasStarted()) {
         builder->append("commitStartWallClockTime",
                         dateToISOStringLocal(timingStats.commitStartWallClockTime));
         builder->append("commitType", commitTypeToString(o().commitType));
@@ -892,7 +892,6 @@ void TransactionRouter::Router::beginOrContinueTxn(OperationContext* opCtx,
                     o(lk).atClusterTime.emplace();
                 }
 
-                _onNewTransaction(opCtx);
                 LOG(3) << txnIdToString() << " New transaction started";
                 break;
             }
@@ -908,7 +907,6 @@ void TransactionRouter::Router::beginOrContinueTxn(OperationContext* opCtx,
                 // means that the client is attempting to recover a commit decision.
                 p().isRecoveringCommit = true;
 
-                _onBeginRecoveringDecision(opCtx);
                 LOG(3) << txnIdToString() << " Commit recovery started";
                 break;
             }
@@ -919,9 +917,13 @@ void TransactionRouter::Router::beginOrContinueTxn(OperationContext* opCtx,
 }
 
 void TransactionRouter::Router::stash(OperationContext* opCtx) {
+    if (!isInitialized()) {
+        return;
+    }
+
     auto tickSource = opCtx->getServiceContext()->getTickSource();
     stdx::lock_guard<Client> lk(*opCtx->getClient());
-    o(lk).timingStats.trySetInactive(tickSource, tickSource->getTicks());
+    o(lk).metricsTracker->trySetInactive(tickSource, tickSource->getTicks());
 }
 
 BSONObj TransactionRouter::Router::_handOffCommitToCoordinator(OperationContext* opCtx) {
@@ -962,6 +964,8 @@ BSONObj TransactionRouter::Router::_handOffCommitToCoordinator(OperationContext*
 
 BSONObj TransactionRouter::Router::commitTransaction(
     OperationContext* opCtx, const boost::optional<TxnRecoveryToken>& recoveryToken) {
+    invariant(isInitialized());
+
     p().terminationInitiated = true;
 
     auto commitRes = _commitTransaction(opCtx, recoveryToken);
@@ -1096,6 +1100,8 @@ BSONObj TransactionRouter::Router::_commitTransaction(
 }
 
 BSONObj TransactionRouter::Router::abortTransaction(OperationContext* opCtx) {
+    invariant(isInitialized());
+
     // Update stats on scope exit so the transaction is considered "active" while waiting on abort
     // responses.
     auto updateStatsGuard = makeGuard([&] { _onExplicitAbort(opCtx); });
@@ -1150,6 +1156,8 @@ BSONObj TransactionRouter::Router::abortTransaction(OperationContext* opCtx) {
 
 void TransactionRouter::Router::implicitlyAbortTransaction(OperationContext* opCtx,
                                                            const Status& errorStatus) {
+    invariant(isInitialized());
+
     if (o().commitType == CommitType::kTwoPhaseCommit ||
         o().commitType == CommitType::kRecoverWithToken) {
         LOG(3) << txnIdToString()
@@ -1224,12 +1232,11 @@ void TransactionRouter::Router::_resetRouterState(OperationContext* opCtx,
     o(lk).readConcernArgs = {};
     o(lk).atClusterTime.reset();
     o(lk).abortCause = std::string();
-    o(lk).timingStats = TimingStats();
+    o(lk).metricsTracker.emplace(opCtx->getServiceContext());
     p().terminationInitiated = false;
 
     auto tickSource = opCtx->getServiceContext()->getTickSource();
-    auto curTicks = tickSource->getTicks();
-    o(lk).timingStats.trySetActive(opCtx, curTicks);
+    o(lk).metricsTracker->trySetActive(tickSource, tickSource->getTicks());
 
     // TODO SERVER-37115: Parse statement ids from the client and remember the statement id
     // of the command that started the transaction, if one was included.
@@ -1302,7 +1309,7 @@ std::string TransactionRouter::Router::_transactionInfoForLog(
     }
 
     if (o().commitType == CommitType::kTwoPhaseCommit) {
-        invariant(o().coordinatorId);
+        dassert(o().coordinatorId);
         sb << " coordinator:" << *o().coordinatorId << ",";
     }
 
@@ -1312,51 +1319,44 @@ std::string TransactionRouter::Router::_transactionInfoForLog(
     if (terminationCause == TerminationCause::kCommitted) {
         sb << " terminationCause:committed,";
 
-        invariant(o().commitType != CommitType::kNotInitiated);
-        invariant(o().abortCause.empty());
+        dassert(o().metricsTracker->commitHasStarted());
+        dassert(o().commitType != CommitType::kNotInitiated);
+        dassert(o().abortCause.empty());
     } else {
         sb << " terminationCause:aborted,";
 
-        invariant(!o().abortCause.empty());
+        dassert(!o().abortCause.empty());
         sb << " abortCause:" << o().abortCause << ",";
     }
 
-    if (o().commitType != CommitType::kNotInitiated) {
+    const auto& timingStats = o().metricsTracker->getTimingStats();
+
+    if (o().metricsTracker->commitHasStarted()) {
+        dassert(o().commitType != CommitType::kNotInitiated);
         sb << " commitType:" << commitTypeToString(o().commitType) << ",";
 
         sb << " commitDurationMicros:"
-           << durationCount<Microseconds>(o().timingStats.getCommitDuration(tickSource, curTicks))
+           << durationCount<Microseconds>(timingStats.getCommitDuration(tickSource, curTicks))
            << ",";
     }
 
     sb << " timeActiveMicros:"
-       << durationCount<Microseconds>(o().timingStats.getTimeActiveMicros(tickSource, curTicks))
-       << ",";
+       << durationCount<Microseconds>(timingStats.getTimeActiveMicros(tickSource, curTicks)) << ",";
 
     sb << " timeInactiveMicros:"
-       << durationCount<Microseconds>(o().timingStats.getTimeInactiveMicros(tickSource, curTicks))
+       << durationCount<Microseconds>(timingStats.getTimeInactiveMicros(tickSource, curTicks))
        << ",";
 
     // Total duration of the transaction. Logged at the end of the line for consistency with slow
     // command logging.
-    sb << " " << duration_cast<Milliseconds>(o().timingStats.getDuration(tickSource, curTicks));
+    sb << " " << duration_cast<Milliseconds>(timingStats.getDuration(tickSource, curTicks));
 
     return sb.str();
 }
 
-void TransactionRouter::Router::_onNewTransaction(OperationContext* opCtx) {
-    auto routerTxnMetrics = RouterTransactionsMetrics::get(opCtx);
-    routerTxnMetrics->incrementTotalStarted();
-}
-
-void TransactionRouter::Router::_onBeginRecoveringDecision(OperationContext* opCtx) {
-    auto routerTxnMetrics = RouterTransactionsMetrics::get(opCtx);
-    routerTxnMetrics->incrementTotalStarted();
-}
-
 void TransactionRouter::Router::_onImplicitAbort(OperationContext* opCtx,
                                                  const Status& errorStatus) {
-    if (o().commitType != CommitType::kNotInitiated && o().timingStats.endTime == 0) {
+    if (o().metricsTracker->commitHasStarted() && !o().metricsTracker->isTrackingOver()) {
         // If commit was started but an end time wasn't set, then we don't know the commit result
         // and can't consider the transaction over until the client retries commit and definitively
         // learns the result. Note that this behavior may lead to no logging in some cases, but
@@ -1389,23 +1389,13 @@ void TransactionRouter::Router::_onExplicitAbort(OperationContext* opCtx) {
 void TransactionRouter::Router::_onStartCommit(WithLock wl, OperationContext* opCtx) {
     invariant(o().commitType != CommitType::kNotInitiated);
 
-    if (o().timingStats.commitStartTime != 0) {
+    if (o().metricsTracker->commitHasStarted() || o().metricsTracker->isTrackingOver()) {
         return;
     }
 
     auto tickSource = opCtx->getServiceContext()->getTickSource();
-    {
-        o(wl).timingStats.commitStartTime = tickSource->getTicks();
-        o(wl).timingStats.commitStartWallClockTime =
-            opCtx->getServiceContext()->getPreciseClockSource()->now();
-    }
-
-    auto routerTxnMetrics = RouterTransactionsMetrics::get(opCtx);
-    routerTxnMetrics->incrementCommitInitiated(o().commitType);
-    if (o().commitType != CommitType::kRecoverWithToken) {
-        // We only know the participant list if we're not recovering a decision.
-        routerTxnMetrics->addToTotalParticipantsAtCommit(o().participants.size());
-    }
+    o(wl).metricsTracker->startCommit(
+        tickSource, tickSource->getTicks(), o().commitType, o().participants.size());
 }
 
 void TransactionRouter::Router::_onNonRetryableCommitError(OperationContext* opCtx,
@@ -1423,7 +1413,7 @@ void TransactionRouter::Router::_onContinue(OperationContext* opCtx) {
     auto tickSource = opCtx->getServiceContext()->getTickSource();
 
     stdx::lock_guard<Client> lk(*opCtx->getClient());
-    o(lk).timingStats.trySetActive(opCtx, tickSource->getTicks());
+    o(lk).metricsTracker->trySetActive(tickSource, tickSource->getTicks());
 }
 
 void TransactionRouter::Router::_onSuccessfulCommit(OperationContext* opCtx) {
@@ -1432,7 +1422,7 @@ void TransactionRouter::Router::_onSuccessfulCommit(OperationContext* opCtx) {
 
 void TransactionRouter::Router::_endTransactionTrackingIfNecessary(
     OperationContext* opCtx, TerminationCause terminationCause) {
-    if (o().timingStats.endTime != 0) {
+    if (o().metricsTracker->isTrackingOver()) {
         // If the transaction was already ended, don't end it again.
         return;
     }
@@ -1446,26 +1436,16 @@ void TransactionRouter::Router::_endTransactionTrackingIfNecessary(
         // In some error contexts, the transaction may not have been started yet, so try setting the
         // transaction's timing stats to active before ending it below. This is a no-op for already
         // active transactions.
-        o(lk).timingStats.trySetActive(opCtx, curTicks);
+        o(lk).metricsTracker->trySetActive(tickSource, curTicks);
 
-        o(lk).timingStats.trySetInactive(tickSource, curTicks);
-        o(lk).timingStats.endTime = curTicks;
+        o(lk).metricsTracker->endTransaction(
+            tickSource, curTicks, terminationCause, o().commitType, o().abortCause);
     }
 
+    const auto& timingStats = o().metricsTracker->getTimingStats();
     if (shouldLog(logger::LogComponent::kTransaction, logger::LogSeverity::Debug(1)) ||
-        o().timingStats.getDuration(tickSource, curTicks) >
-            Milliseconds(serverGlobalParams.slowMS)) {
+        timingStats.getDuration(tickSource, curTicks) > Milliseconds(serverGlobalParams.slowMS)) {
         _logSlowTransaction(opCtx, terminationCause);
-    }
-
-    auto routerTxnMetrics = RouterTransactionsMetrics::get(opCtx);
-    if (terminationCause == TerminationCause::kAborted) {
-        routerTxnMetrics->incrementTotalAborted();
-        routerTxnMetrics->incrementAbortCauseMap(o().abortCause);
-    } else {
-        routerTxnMetrics->incrementTotalCommitted();
-        routerTxnMetrics->incrementCommitSuccessful(
-            o().commitType, o().timingStats.getCommitDuration(tickSource, curTicks));
     }
 }
 
@@ -1476,7 +1456,7 @@ void TransactionRouter::Router::_updateLastClientInfo(Client* client) {
 
 Microseconds TransactionRouter::TimingStats::getDuration(TickSource* tickSource,
                                                          TickSource::Tick curTicks) const {
-    invariant(startTime > 0);
+    dassert(startTime > 0);
 
     // If the transaction hasn't ended, return how long it has been running for.
     if (endTime == 0) {
@@ -1487,7 +1467,7 @@ Microseconds TransactionRouter::TimingStats::getDuration(TickSource* tickSource,
 
 Microseconds TransactionRouter::TimingStats::getCommitDuration(TickSource* tickSource,
                                                                TickSource::Tick curTicks) const {
-    invariant(commitStartTime > 0);
+    dassert(commitStartTime > 0);
 
     // If the transaction hasn't ended, return how long commit has been running for.
     if (endTime == 0) {
@@ -1498,7 +1478,7 @@ Microseconds TransactionRouter::TimingStats::getCommitDuration(TickSource* tickS
 
 Microseconds TransactionRouter::TimingStats::getTimeActiveMicros(TickSource* tickSource,
                                                                  TickSource::Tick curTicks) const {
-    invariant(startTime > 0);
+    dassert(startTime > 0);
 
     if (lastTimeActiveStart != 0) {
         // The transaction is currently active, so return the active time so far plus the time since
@@ -1510,7 +1490,7 @@ Microseconds TransactionRouter::TimingStats::getTimeActiveMicros(TickSource* tic
 
 Microseconds TransactionRouter::TimingStats::getTimeInactiveMicros(
     TickSource* tickSource, TickSource::Tick curTicks) const {
-    invariant(startTime > 0);
+    dassert(startTime > 0);
 
     auto micros = getDuration(tickSource, curTicks) - getTimeActiveMicros(tickSource, curTicks);
     dassert(micros >= Microseconds(0),
@@ -1518,33 +1498,111 @@ Microseconds TransactionRouter::TimingStats::getTimeInactiveMicros(
     return micros;
 }
 
-void TransactionRouter::TimingStats::trySetActive(OperationContext* opCtx,
-                                                  TickSource::Tick curTicks) {
-    if (endTime != 0 || lastTimeActiveStart != 0) {
+TransactionRouter::MetricsTracker::~MetricsTracker() {
+    // If there was an in-progress transaction, clean up its stats. This may happen if a transaction
+    // is overriden by a higher txnNumber or its session is reaped.
+
+    if (hasStarted() && !isTrackingOver()) {
+        // A transaction was started but not ended, so clean up the appropriate stats for it.
+        auto routerTxnMetrics = RouterTransactionsMetrics::get(_service);
+        routerTxnMetrics->decrementCurrentOpen();
+
+        if (!isActive()) {
+            routerTxnMetrics->decrementCurrentInactive();
+        } else {
+            routerTxnMetrics->decrementCurrentActive();
+        }
+    }
+}
+
+void TransactionRouter::MetricsTracker::trySetActive(TickSource* tickSource,
+                                                     TickSource::Tick curTicks) {
+    if (isTrackingOver() || isActive()) {
         // A transaction can't become active if it has already ended or is already active.
         return;
     }
 
-    if (startTime == 0) {
+    auto routerTxnMetrics = RouterTransactionsMetrics::get(_service);
+    if (!hasStarted()) {
         // If the transaction is becoming active for the first time, also set the transaction's
         // start time.
-        startTime = curTicks;
-        startWallClockTime = opCtx->getServiceContext()->getPreciseClockSource()->now();
+        timingStats.startTime = curTicks;
+        timingStats.startWallClockTime = _service->getPreciseClockSource()->now();
+
+        routerTxnMetrics->incrementCurrentOpen();
+        routerTxnMetrics->incrementTotalStarted();
+    } else {
+        // The transaction was already open, so it must have been inactive.
+        routerTxnMetrics->decrementCurrentInactive();
     }
-    lastTimeActiveStart = curTicks;
+
+    timingStats.lastTimeActiveStart = curTicks;
+    routerTxnMetrics->incrementCurrentActive();
 }
 
-void TransactionRouter::TimingStats::trySetInactive(TickSource* tickSource,
-                                                    TickSource::Tick curTicks) {
-    if (endTime != 0 || lastTimeActiveStart == 0) {
+void TransactionRouter::MetricsTracker::trySetInactive(TickSource* tickSource,
+                                                       TickSource::Tick curTicks) {
+    if (isTrackingOver() || !isActive()) {
         // If the transaction is already over or the router has already been stashed, the relevant
         // stats should have been updated earlier. In certain error scenarios, it's possible for a
         // transaction to be stashed twice in a row.
         return;
     }
 
-    timeActiveMicros += tickSource->ticksTo<Microseconds>(curTicks - lastTimeActiveStart);
-    lastTimeActiveStart = 0;
+    timingStats.timeActiveMicros +=
+        tickSource->ticksTo<Microseconds>(curTicks - timingStats.lastTimeActiveStart);
+    timingStats.lastTimeActiveStart = 0;
+
+    auto routerTxnMetrics = RouterTransactionsMetrics::get(_service);
+    routerTxnMetrics->decrementCurrentActive();
+    routerTxnMetrics->incrementCurrentInactive();
+}
+
+void TransactionRouter::MetricsTracker::startCommit(TickSource* tickSource,
+                                                    TickSource::Tick curTicks,
+                                                    TransactionRouter::CommitType commitType,
+                                                    std::size_t numParticipantsAtCommit) {
+    dassert(isActive());
+
+    timingStats.commitStartTime = tickSource->getTicks();
+    timingStats.commitStartWallClockTime = _service->getPreciseClockSource()->now();
+
+    auto routerTxnMetrics = RouterTransactionsMetrics::get(_service);
+    routerTxnMetrics->incrementCommitInitiated(commitType);
+    if (commitType != CommitType::kRecoverWithToken) {
+        // We only know the participant list if we're not recovering a decision.
+        routerTxnMetrics->addToTotalParticipantsAtCommit(numParticipantsAtCommit);
+    }
+}
+
+void TransactionRouter::MetricsTracker::endTransaction(
+    TickSource* tickSource,
+    TickSource::Tick curTicks,
+    TransactionRouter::TerminationCause terminationCause,
+    TransactionRouter::CommitType commitType,
+    StringData abortCause) {
+    dassert(isActive());
+
+    timingStats.timeActiveMicros +=
+        tickSource->ticksTo<Microseconds>(curTicks - timingStats.lastTimeActiveStart);
+    timingStats.lastTimeActiveStart = 0;
+
+    timingStats.endTime = curTicks;
+
+    auto routerTxnMetrics = RouterTransactionsMetrics::get(_service);
+    routerTxnMetrics->decrementCurrentOpen();
+    routerTxnMetrics->decrementCurrentActive();
+
+    if (terminationCause == TerminationCause::kAborted) {
+        dassert(!abortCause.empty());
+        routerTxnMetrics->incrementTotalAborted();
+        routerTxnMetrics->incrementAbortCauseMap(abortCause.toString());
+    } else {
+        dassert(commitType != CommitType::kNotInitiated);
+        routerTxnMetrics->incrementTotalCommitted();
+        routerTxnMetrics->incrementCommitSuccessful(
+            commitType, timingStats.getCommitDuration(tickSource, curTicks));
+    }
 }
 
 }  // namespace mongo

@@ -72,6 +72,15 @@ structs:
                   command on mongos with information about sharded transactions"
     strict: true
     fields:
+      currentOpen:
+        type: long
+        default: 0
+      currentActive:
+        type: long
+        default: 0
+      currentInactive:
+        type: long
+        default: 0
       totalStarted:
         type: long
         default: 0
