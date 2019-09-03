@@ -107,8 +107,8 @@ Status SessionsCollectionConfigServer::setupSessionsCollection(OperationContext*
 
         res = _generateIndexesIfNeeded(opCtx);
         if (!res.isOK()) {
-            log() << "Failed to generate TTL index for config.system.sessions on all shards, "
-                  << "will try again on the next refresh interval";
+            log() << "Failed to generate TTL index for config.system.sessions on all shards: "
+                  << res.reason() << ", will try again on the next refresh interval";
         }
 
         return res;
