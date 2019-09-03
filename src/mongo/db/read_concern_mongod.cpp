@@ -207,8 +207,14 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime) {
 /**
  * Evaluates if it's safe for the command to ignore prepare conflicts.
  */
-bool canIgnorePrepareConflicts(const repl::ReadConcernArgs& readConcernArgs) {
+bool canIgnorePrepareConflicts(OperationContext* opCtx,
+                               const repl::ReadConcernArgs& readConcernArgs) {
+    if (opCtx->inMultiDocumentTransaction()) {
+        return false;
+    }
+
     auto readConcernLevel = readConcernArgs.getLevel();
+
     // Only these read concern levels are eligible for ignoring prepare conflicts.
     if (readConcernLevel != repl::ReadConcernLevel::kLocalReadConcern &&
         readConcernLevel != repl::ReadConcernLevel::kAvailableReadConcern &&
@@ -240,7 +246,7 @@ MONGO_REGISTER_SHIM(setPrepareConflictBehaviorForReadConcern)
 
     // Enforce prepare conflict behavior if the command is not eligible to ignore prepare conflicts.
     if (!(prepareConflictBehavior == PrepareConflictBehavior::kEnforce ||
-          canIgnorePrepareConflicts(readConcernArgs))) {
+          canIgnorePrepareConflicts(opCtx, readConcernArgs))) {
         prepareConflictBehavior = PrepareConflictBehavior::kEnforce;
     }
 

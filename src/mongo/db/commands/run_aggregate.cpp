@@ -499,19 +499,15 @@ Status runAggregate(OperationContext* opCtx,
     {
         const LiteParsedPipeline liteParsedPipeline(request);
 
-        try {
-            // Check whether the parsed pipeline supports the given read concern.
-            liteParsedPipeline.assertSupportsReadConcern(
-                opCtx, request.getExplain(), serverGlobalParams.enableMajorityReadConcern);
-        } catch (const DBException& ex) {
-            // If we are in a multi-document transaction, we intercept the 'readConcern'
-            // assertion in order to provide a more descriptive error message and code.
-            if (opCtx->inMultiDocumentTransaction()) {
-                return {ErrorCodes::OperationNotSupportedInTransaction,
-                        ex.toStatus("Operation not permitted in transaction").reason()};
-            }
-            return ex.toStatus();
+        // If we are in a transaction, check whether the parsed pipeline supports
+        // being in a transaction.
+        if (opCtx->inMultiDocumentTransaction()) {
+            liteParsedPipeline.assertSupportsMultiDocumentTransaction(request.getExplain());
         }
+
+        // Check whether the parsed pipeline supports the given read concern.
+        liteParsedPipeline.assertSupportsReadConcern(
+            opCtx, request.getExplain(), serverGlobalParams.enableMajorityReadConcern);
 
         const auto& pipelineInvolvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
 

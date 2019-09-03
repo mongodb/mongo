@@ -131,9 +131,11 @@ void validateTxnNumber(OperationContext* opCtx,
 void applyCursorReadConcern(OperationContext* opCtx, repl::ReadConcernArgs rcArgs) {
     const auto replicationMode = repl::ReplicationCoordinator::get(opCtx)->getReplicationMode();
 
-    // Select the appropriate read source.
+    // Select the appropriate read source. If we are in a transaction with read concern majority,
+    // this will already be set to kNoTimestamp, so don't set it again.
     if (replicationMode == repl::ReplicationCoordinator::modeReplSet &&
-        rcArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
+        rcArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern &&
+        !opCtx->inMultiDocumentTransaction()) {
         switch (rcArgs.getMajorityReadMechanism()) {
             case repl::ReadConcernArgs::MajorityReadMechanism::kMajoritySnapshot: {
                 // Make sure we read from the majority snapshot.

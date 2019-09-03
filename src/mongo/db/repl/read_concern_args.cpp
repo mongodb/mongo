@@ -105,17 +105,8 @@ ReadConcernLevel ReadConcernArgs::getLevel() const {
     return _level.value_or(ReadConcernLevel::kLocalReadConcern);
 }
 
-ReadConcernLevel ReadConcernArgs::getOriginalLevel() const {
-    // If no read concern specified, default to "local"
-    return _originalLevel.value_or(ReadConcernLevel::kLocalReadConcern);
-}
-
 bool ReadConcernArgs::hasLevel() const {
     return _level.is_initialized();
-}
-
-bool ReadConcernArgs::hasOriginalLevel() const {
-    return _originalLevel.is_initialized();
 }
 
 boost::optional<OpTime> ReadConcernArgs::getArgsOpTime() const {
@@ -198,7 +189,6 @@ Status ReadConcernArgs::initialize(const BSONElement& readConcernElem) {
                                             << " must be either 'local', 'majority', "
                                                "'linearizable', 'available', or 'snapshot'");
             }
-            _originalLevel = _level;
         } else {
             return Status(ErrorCodes::InvalidOptions,
                           str::stream() << "Unrecognized option in " << kReadConcernFieldName
@@ -271,26 +261,6 @@ ReadConcernArgs::MajorityReadMechanism ReadConcernArgs::getMajorityReadMechanism
 bool ReadConcernArgs::isSpeculativeMajority() const {
     return _level && *_level == ReadConcernLevel::kMajorityReadConcern &&
         _majorityReadMechanism == MajorityReadMechanism::kSpeculative;
-}
-
-Status ReadConcernArgs::upconvertReadConcernLevelToSnapshot() {
-    if (_level && *_level != ReadConcernLevel::kSnapshotReadConcern &&
-        *_level != ReadConcernLevel::kMajorityReadConcern &&
-        *_level != ReadConcernLevel::kLocalReadConcern) {
-        return Status(ErrorCodes::InvalidOptions,
-                      "The readConcern level must be either 'local' or 'majority' in order to "
-                      "upconvert the readConcern level to 'snapshot'");
-    }
-
-    if (_opTime) {
-        return Status(ErrorCodes::InvalidOptions,
-                      str::stream() << "Cannot upconvert the readConcern level to 'snapshot' when '"
-                                    << kAfterOpTimeFieldName << "' is provided");
-    }
-
-    _originalLevel = _level;
-    _level = ReadConcernLevel::kSnapshotReadConcern;
-    return Status::OK();
 }
 
 void ReadConcernArgs::appendInfo(BSONObjBuilder* builder) const {

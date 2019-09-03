@@ -10,9 +10,6 @@ selector:
   # No featureCompatibilityVersion parameter on mongos.
   - jstests/core/txns/abort_unprepared_transactions_on_FCV_downgrade.js
 
-  # Mongos doesn't upconvert from local or majority level readConcern to snapshot.
-  - jstests/core/txns/upconvert_read_concern.js
-
   # Implicitly creates a database through a collection rename, which does not work in a sharded
   # cluster.
   - jstests/core/txns/transactions_block_ddl.js

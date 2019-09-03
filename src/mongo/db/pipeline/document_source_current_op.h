@@ -80,11 +80,11 @@ public:
         }
 
         void assertSupportsReadConcern(const repl::ReadConcernArgs& readConcern) const {
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "Aggregation stage " << kStageName << " cannot run with a "
-                                  << "readConcern other than 'local', or in a multi-document "
-                                  << "transaction. Current readConcern: " << readConcern.toString(),
-                    readConcern.getLevel() == repl::ReadConcernLevel::kLocalReadConcern);
+            onlyReadConcernLocalSupported(kStageName, readConcern);
+        }
+
+        void assertSupportsMultiDocumentTransaction() const {
+            transactionNotSupported(kStageName);
         }
 
     private:

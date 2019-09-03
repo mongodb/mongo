@@ -1,11 +1,12 @@
-// Test that the readConcern specified on a multi-statement transaction is upconverted to have level
-// 'snapshot'.
-// @tags: [uses_transactions]
+// Test that no matter the readConcern specified on a multi-statement transaction, it has snapshot
+// isolation. Also test that readConcern linearizable and available are not allowed with a
+// transaction.
+// @tags: [uses_transactions, requires_majority_read_concern]
 (function() {
 "use strict";
 
 const dbName = "test";
-const collName = "upconvert_read_concern";
+const collName = "read_concern";
 const testDB = db.getSiblingDB(dbName);
 const testColl = testDB[collName];
 
@@ -19,8 +20,10 @@ const sessionOptions = {
 const session = db.getMongo().startSession(sessionOptions);
 const sessionDb = session.getDatabase(dbName);
 
-function testUpconvertReadConcern(readConcern) {
-    jsTest.log("Test that the following readConcern is upconverted: " + tojson(readConcern));
+function testReadConcernMaintainsSnapshotIsolationInTransaction(readConcern) {
+    jsTest.log(
+        "Test that the following multi-document transaction has snapshot isolation with readConcern: " +
+        tojson(readConcern));
     assert.commandWorked(testColl.remove({}, {writeConcern: {w: "majority"}}));
 
     // Start a new transaction with the given readConcern.
@@ -42,14 +45,16 @@ function testUpconvertReadConcern(readConcern) {
     assert.commandWorked(session.commitTransaction_forTesting());
 }
 
-testUpconvertReadConcern(null);
-testUpconvertReadConcern({});
-testUpconvertReadConcern({level: "local"});
-testUpconvertReadConcern({level: "majority"});
-testUpconvertReadConcern({level: "snapshot"});
+testReadConcernMaintainsSnapshotIsolationInTransaction(null);
+testReadConcernMaintainsSnapshotIsolationInTransaction({});
+testReadConcernMaintainsSnapshotIsolationInTransaction({level: "local"});
+testReadConcernMaintainsSnapshotIsolationInTransaction({level: "majority"});
+testReadConcernMaintainsSnapshotIsolationInTransaction({level: "snapshot"});
 
-function testCannotUpconvertReadConcern(readConcern) {
-    jsTest.log("Test that the following readConcern cannot be upconverted: " + readConcern);
+function testReadConcernNotSupportedInTransaction(readConcern) {
+    jsTest.log(
+        "Test that the following readConcern is not supported in a multi-document transaction: " +
+        readConcern);
 
     // Start a new transaction with the given readConcern.
     session.startTransaction();
@@ -63,8 +68,8 @@ function testCannotUpconvertReadConcern(readConcern) {
                                  ErrorCodes.NoSuchTransaction);
 }
 
-testCannotUpconvertReadConcern({level: "available"});
-testCannotUpconvertReadConcern({level: "linearizable"});
+testReadConcernNotSupportedInTransaction({level: "available"});
+testReadConcernNotSupportedInTransaction({level: "linearizable"});
 
 jsTest.log("Test starting a transaction with an invalid readConcern");
 
@@ -86,6 +91,20 @@ assert.commandWorked(sessionDb.runCommand({find: collName, readConcern: {level: 
 // The second statement cannot specify a readConcern.
 assert.commandFailedWithCode(
     sessionDb.runCommand({find: collName, readConcern: {level: "snapshot"}}),
+    ErrorCodes.InvalidOptions);
+
+// The transaction is still active and can be committed.
+assert.commandWorked(session.commitTransaction_forTesting());
+
+jsTest.log("Test specifying non-snapshot readConcern on the second statement in a transaction");
+
+// Start a new transaction with majority readConcern.
+session.startTransaction();
+assert.commandWorked(sessionDb.runCommand({find: collName, readConcern: {level: "majority"}}));
+
+// The second statement cannot specify a readConcern.
+assert.commandFailedWithCode(
+    sessionDb.runCommand({find: collName, readConcern: {level: "majority"}}),
     ErrorCodes.InvalidOptions);
 
 // The transaction is still active and can be committed.

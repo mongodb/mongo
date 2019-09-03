@@ -93,7 +93,7 @@ public:
     bool supportsReadConcern(const std::string& dbName,
                              const BSONObj& cmdObj,
                              repl::ReadConcernLevel level) const override {
-        return level != repl::ReadConcernLevel::kSnapshotReadConcern;
+        return true;
     }
 
     ReadWriteType getReadWriteType() const override {

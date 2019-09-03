@@ -403,10 +403,6 @@ void runCommand(OperationContext* opCtx,
 
     if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
         uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "read concern snapshot is not supported on mongos for the command "
-                              << commandName,
-                invocation->supportsReadConcern(readConcernArgs.getLevel()));
-        uassert(ErrorCodes::InvalidOptions,
                 "read concern snapshot is not supported with atClusterTime on mongos",
                 !readConcernArgs.getArgsAtClusterTime());
     }

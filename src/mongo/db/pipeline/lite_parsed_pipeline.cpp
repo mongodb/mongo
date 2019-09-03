@@ -38,7 +38,7 @@ namespace mongo {
 void LiteParsedPipeline::assertSupportsReadConcern(
     OperationContext* opCtx,
     boost::optional<ExplainOptions::Verbosity> explain,
-    bool enableMajorityReadConcern) const try {
+    bool enableMajorityReadConcern) const {
     auto readConcern = repl::ReadConcernArgs::get(opCtx);
 
     // Reject non change stream aggregation queries that try to use "majority" read concern when
@@ -53,26 +53,24 @@ void LiteParsedPipeline::assertSupportsReadConcern(
 
     uassert(ErrorCodes::InvalidOptions,
             str::stream() << "Explain for the aggregate command cannot run with a readConcern "
-                          << "other than 'local', or in a multi-document transaction. Current "
-                          << "readConcern: " << readConcern.toString(),
+                          << "other than 'local'. Current readConcern: " << readConcern.toString(),
             !explain || readConcern.getLevel() == repl::ReadConcernLevel::kLocalReadConcern);
 
     for (auto&& spec : _stageSpecs) {
         spec->assertSupportsReadConcern(readConcern);
     }
-} catch (const DBException& ex) {
-    using namespace std::string_literals;
-    // If we are in a multi-document transaction, we intercept the 'readConcern'
-    // assertion in order to provide a more descriptive error message and code.
+}
+
+void LiteParsedPipeline::assertSupportsMultiDocumentTransaction(
+    boost::optional<ExplainOptions::Verbosity> explain) const {
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
-            "Operation not permitted in transaction"s
-            " :: caused by :: "s +
-                ex.reason(),
-            // This will be true for retryable writes in addition to the intended case of an in-
-            // process transaction. However the retryable write code path should not call this
-            // function.
-            !opCtx->getTxnNumber());
-    throw;
+            "Operation not permitted in transaction :: caused by :: Explain for the aggregate "
+            "command cannot run within a multi-document transaction",
+            !explain);
+
+    for (auto&& spec : _stageSpecs) {
+        spec->assertSupportsMultiDocumentTransaction();
+    }
 }
 
 bool LiteParsedPipeline::verifyIsSupported(
@@ -80,6 +78,10 @@ bool LiteParsedPipeline::verifyIsSupported(
     const std::function<bool(OperationContext*, const NamespaceString&)> isSharded,
     const boost::optional<ExplainOptions::Verbosity> explain,
     bool enableMajorityReadConcern) const {
+    // Verify litePipe can be run in a transaction.
+    if (opCtx->inMultiDocumentTransaction()) {
+        assertSupportsMultiDocumentTransaction(explain);
+    }
     // Verify litePipe can be run at the given read concern.
     assertSupportsReadConcern(opCtx, explain, enableMajorityReadConcern);
     // Verify that no involved namespace is sharded unless allowed by the pipeline.

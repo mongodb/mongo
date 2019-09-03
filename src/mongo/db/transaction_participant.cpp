@@ -586,7 +586,7 @@ void TransactionParticipant::Participant::_setReadSnapshot(OperationContext* opC
 
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).transactionMetricsObserver.onChooseReadTimestamp(readTimestamp);
-    } else if (readConcernArgs.getOriginalLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
+    } else if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
         // For transactions with read concern level specified as 'snapshot', we will use
         // 'kAllDurableSnapshot' which ensures a snapshot with no 'holes'; that is, it is a state
         // of the system that could be reconstructed from the oplog.

@@ -35,6 +35,7 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
+#include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/write_concern_options.h"
 
@@ -88,6 +89,10 @@ void validateSessionOptions(const OperationSessionInfoFromClient& sessionOptions
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 "Cannot run killCursors as the first operation in a multi-document transaction.",
                 cmdName != "killCursors");
+
+        uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                "Cannot start a transaction with a prepare",
+                cmdName != PrepareTransaction::kCommandName);
 
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 "Cannot start a transaction with a commit",

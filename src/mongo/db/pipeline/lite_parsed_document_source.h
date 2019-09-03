@@ -134,6 +134,31 @@ public:
      * UserException if not compatible.
      */
     virtual void assertSupportsReadConcern(const repl::ReadConcernArgs& readConcern) const {}
+
+    /**
+     * Verifies that this stage is allowed to run in a multi-document transaction. Throws a
+     * UserException if not compatible. This should only be called if the caller has determined the
+     * current operation is part of a transaction.
+     */
+    virtual void assertSupportsMultiDocumentTransaction() const {}
+
+protected:
+    void transactionNotSupported(StringData stageName) const {
+        uasserted(ErrorCodes::OperationNotSupportedInTransaction,
+                  str::stream() << "Operation not permitted in transaction :: caused by :: "
+                                << "Aggregation stage " << stageName << " cannot run within a "
+                                << "multi-document transaction.");
+    }
+
+    void onlyReadConcernLocalSupported(StringData stageName,
+                                       const repl::ReadConcernArgs& readConcern) const {
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream()
+                    << "Aggregation stage " << stageName
+                    << " cannot run with a readConcern other than 'local'. Current readConcern: "
+                    << readConcern.toString(),
+                readConcern.getLevel() == repl::ReadConcernLevel::kLocalReadConcern);
+    }
 };
 
 class LiteParsedDocumentSourceDefault final : public LiteParsedDocumentSource {

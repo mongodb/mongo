@@ -104,12 +104,6 @@ public:
     Status initialize(const BSONElement& readConcernElem);
 
     /**
-     * Upconverts the readConcern level to 'snapshot', or returns a non-ok status if this
-     * readConcern cannot be upconverted.
-     */
-    Status upconvertReadConcernLevelToSnapshot();
-
-    /**
      * Sets the mechanism we should use to satisfy 'majority' reads.
      *
      * Invalid to call unless the read concern level is 'kMajorityReadConcern'.
@@ -143,21 +137,10 @@ public:
      *  Returns default kLocalReadConcern if _level is not set.
      */
     ReadConcernLevel getLevel() const;
-
-    /**
-     *  Returns readConcernLevel before upconverting, or same as getLevel() if not upconverted.
-     */
-    ReadConcernLevel getOriginalLevel() const;
-
     /**
      * Checks whether _level is explicitly set.
      */
     bool hasLevel() const;
-
-    /**
-     * Checks whether _originalLevel is explicitly set.
-     */
-    bool hasOriginalLevel() const;
 
     /**
      * Returns the opTime. Deprecated: will be replaced with getArgsAfterClusterTime.
@@ -185,11 +168,6 @@ private:
      */
     boost::optional<LogicalTime> _atClusterTime;
     boost::optional<ReadConcernLevel> _level;
-
-    /**
-     * If the read concern was upconverted, the original read concern level.
-     */
-    boost::optional<ReadConcernLevel> _originalLevel;
 
     /**
      * The mechanism to use for satisfying 'majority' reads. Only meaningful if the read concern

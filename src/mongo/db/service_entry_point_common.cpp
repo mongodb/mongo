@@ -227,7 +227,7 @@ private:
  */
 StatusWith<repl::ReadConcernArgs> _extractReadConcern(const CommandInvocation* invocation,
                                                       const BSONObj& cmdObj,
-                                                      bool upconvertToSnapshot) {
+                                                      bool startTransaction) {
     repl::ReadConcernArgs readConcernArgs;
 
     auto readConcernParseStatus = readConcernArgs.initialize(cmdObj);
@@ -235,26 +235,31 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(const CommandInvocation* i
         return readConcernParseStatus;
     }
 
-    if (upconvertToSnapshot) {
-        auto upconvertToSnapshotStatus = readConcernArgs.upconvertReadConcernLevelToSnapshot();
-        if (!upconvertToSnapshotStatus.isOK()) {
-            return upconvertToSnapshotStatus;
-        }
+    auto readConcernLevel = readConcernArgs.getLevel();
+    if (startTransaction && readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern &&
+        readConcernLevel != repl::ReadConcernLevel::kMajorityReadConcern &&
+        readConcernLevel != repl::ReadConcernLevel::kLocalReadConcern) {
+        return Status(
+            ErrorCodes::InvalidOptions,
+            "The readConcern level must be either 'local' (default), 'majority' or 'snapshot' in "
+            "order to run in a transaction");
     }
 
-    if (!invocation->supportsReadConcern(readConcernArgs.getLevel())) {
-        // We must be in a transaction if the readConcern level was upconverted to snapshot and the
-        // command must support readConcern level snapshot in order to be supported in transactions.
-        if (upconvertToSnapshot) {
-            return {
-                ErrorCodes::OperationNotSupportedInTransaction,
-                str::stream() << "Command is not supported as the first command in a transaction"};
-        }
+    if (startTransaction && readConcernArgs.getArgsOpTime()) {
+        return Status(ErrorCodes::InvalidOptions,
+                      str::stream()
+                          << "The readConcern cannot specify '"
+                          << repl::ReadConcernArgs::kAfterOpTimeFieldName << "' in a transaction");
+    }
+
+    // There is no need to check if the command supports the read concern while in a transaction
+    // because all commands that are allowed to run in a transaction must support all the read
+    // concerns that can be used with a transaction.
+    if (!startTransaction && !invocation->supportsReadConcern(readConcernLevel)) {
         return {ErrorCodes::InvalidOptions,
                 str::stream() << "Command does not support read concern "
                               << readConcernArgs.toString()};
     }
-
 
     // If this command invocation asked for 'majority' read concern, supports blocking majority
     // reads, and storage engine support for majority reads is disabled, then we set the majority
@@ -820,11 +825,10 @@ void execCommandDatabase(OperationContext* opCtx,
         // If the parent operation runs in a transaction, we don't override the read concern.
         auto skipReadConcern =
             opCtx->getClient()->isInDirectClient() && opCtx->inMultiDocumentTransaction();
+        bool startTransaction = static_cast<bool>(sessionOptions.getStartTransaction());
         if (!skipReadConcern) {
-            // If "startTransaction" is present, it must be true due to the parsing above.
-            const bool upconvertToSnapshot(sessionOptions.getStartTransaction());
             auto newReadConcernArgs = uassertStatusOK(
-                _extractReadConcern(invocation.get(), request.body, upconvertToSnapshot));
+                _extractReadConcern(invocation.get(), request.body, startTransaction));
             {
                 // We must obtain the client lock to set the ReadConcernArgs on the operation
                 // context as it may be concurrently read by CurrentOp.
@@ -833,17 +837,12 @@ void execCommandDatabase(OperationContext* opCtx,
             }
         }
 
-        if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
-            uassert(ErrorCodes::InvalidOptions,
-                    "readConcern level snapshot is only valid for the first transaction operation",
-                    opCtx->getClient()->isInDirectClient() || sessionOptions.getStartTransaction());
-            uassert(ErrorCodes::InvalidOptions,
-                    "readConcern level snapshot requires a session ID",
-                    opCtx->getLogicalSessionId());
-            uassert(ErrorCodes::InvalidOptions,
-                    "readConcern level snapshot requires a txnNumber",
-                    opCtx->getTxnNumber());
+        uassert(ErrorCodes::InvalidOptions,
+                "read concern level snapshot is only valid in a transaction",
+                opCtx->inMultiDocumentTransaction() ||
+                    readConcernArgs.getLevel() != repl::ReadConcernLevel::kSnapshotReadConcern);
 
+        if (startTransaction) {
             opCtx->lockState()->setSharedLocksShouldTwoPhaseLock(true);
             opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
         }

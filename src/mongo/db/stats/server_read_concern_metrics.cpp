@@ -51,12 +51,12 @@ ServerReadConcernMetrics* ServerReadConcernMetrics::get(OperationContext* opCtx)
 }
 
 void ServerReadConcernMetrics::recordReadConcern(const repl::ReadConcernArgs& readConcernArgs) {
-    if (!readConcernArgs.hasOriginalLevel()) {
+    if (!readConcernArgs.hasLevel()) {
         _noLevelCount.fetchAndAdd(1);
         return;
     }
 
-    switch (readConcernArgs.getOriginalLevel()) {
+    switch (readConcernArgs.getLevel()) {
         case repl::ReadConcernLevel::kAvailableReadConcern:
             _levelAvailableCount.fetchAndAdd(1);
             break;

@@ -220,13 +220,6 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
-    bool supportsReadConcern(const std::string& dbName,
-                             const BSONObj& cmdObj,
-                             repl::ReadConcernLevel level) const final {
-        return level == repl::ReadConcernLevel::kLocalReadConcern ||
-            level == repl::ReadConcernLevel::kSnapshotReadConcern;
-    }
-
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }

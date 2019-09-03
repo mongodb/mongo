@@ -82,13 +82,17 @@ public:
 
         void assertSupportsReadConcern(const repl::ReadConcernArgs& readConcern) const {
             // Only "majority" is allowed for change streams.
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "$changeStream cannot run with a readConcern other than "
-                                  << "'majority', or in a multi-document transaction. Current "
-                                     "readConcern: "
-                                  << readConcern.toString(),
-                    !readConcern.hasLevel() ||
-                        readConcern.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern);
+            uassert(
+                ErrorCodes::InvalidOptions,
+                str::stream()
+                    << "$changeStream cannot run with a readConcern other than 'majority'. Current "
+                    << "readConcern: " << readConcern.toString(),
+                !readConcern.hasLevel() ||
+                    readConcern.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern);
+        }
+
+        void assertSupportsMultiDocumentTransaction() const {
+            transactionNotSupported(kStageName);
         }
 
     private:

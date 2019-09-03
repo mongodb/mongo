@@ -242,11 +242,6 @@ private:
         }
     }
 
-    bool supportsReadConcern(repl::ReadConcernLevel level) const final {
-        return level == repl::ReadConcernLevel::kLocalReadConcern ||
-            level == repl::ReadConcernLevel::kSnapshotReadConcern;
-    }
-
     bool supportsWriteConcern() const final {
         return true;
     }

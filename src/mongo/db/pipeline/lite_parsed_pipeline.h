@@ -130,6 +130,14 @@ public:
                                    bool enableMajorityReadConcern) const;
 
     /**
+     * Verifies that this pipeline is allowed to run in a multi-document transaction. This ensures
+     * that each stage is compatible, and throws a UserException if not. This should only be called
+     * if the caller has determined the current operation is part of a transaction.
+     */
+    void assertSupportsMultiDocumentTransaction(
+        boost::optional<ExplainOptions::Verbosity> explain) const;
+
+    /**
      * Perform checks that verify that the LitePipe is valid. Note that this function must be called
      * before forwarding an aggregation command on an unsharded collection, in order to verify that
      * the involved namespaces are allowed to be sharded. Returns true if any involved namespace is

@@ -472,16 +472,9 @@ public:
     virtual bool supportsWriteConcern() const = 0;
 
     /**
-     * Returns true if this Command supports the given readConcern level. Takes the command object
-     * and the name of the database on which it was invoked as arguments, so that readConcern can be
-     * conditionally rejected based on the command's parameters and/or namespace.
-     *
-     * If a readConcern level argument is sent to a command that returns false the command processor
-     * will reject the command, returning an appropriate error message.
-     *
-     * Note that this is never called on mongos. Sharded commands are responsible for forwarding
-     * the option to the shards as needed. We rely on the shards to fail the commands in the
-     * cases where it isn't supported.
+     * Returns true if this command invocation supports the given readConcern level. This only
+     * applies when running outside transactions because all commands that are allowed to run in a
+     * transaction must support all the read concerns that can be used in a transaction.
      */
     virtual bool supportsReadConcern(repl::ReadConcernLevel level) const {
         return level == repl::ReadConcernLevel::kLocalReadConcern;
@@ -622,6 +615,10 @@ public:
      *
      * If a readConcern level argument is sent to a command that returns false the command processor
      * will reject the command, returning an appropriate error message.
+     *
+     * This only applies when running outside transactions because all commands that are allowed to
+     * run in a transaction must support all the read concerns that can be used in a
+     * transaction.
      *
      * Note that this is never called on mongos. Sharded commands are responsible for forwarding
      * the option to the shards as needed. We rely on the shards to fail the commands in the

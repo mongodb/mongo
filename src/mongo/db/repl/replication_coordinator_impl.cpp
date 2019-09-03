@@ -1510,7 +1510,7 @@ Status ReplicationCoordinatorImpl::_waitUntilClusterTimeForRead(OperationContext
     auto targetOpTime = OpTime(clusterTime.asTimestamp(), OpTime::kUninitializedTerm);
     invariant(!readConcern.getArgsOpTime());
 
-    // We don't set isMajorityCommittedRead for kSnapshotReadConcern because snapshots are always
+    // We don't set isMajorityCommittedRead for transactions because snapshots are always
     // speculative; we wait for majority when the transaction commits.
     //
     // Speculative majority reads do not need to wait for the commit point to advance to satisfy
@@ -1520,7 +1520,7 @@ Status ReplicationCoordinatorImpl::_waitUntilClusterTimeForRead(OperationContext
     // durability guarantee.
     const bool isMajorityCommittedRead =
         readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern &&
-        !readConcern.isSpeculativeMajority();
+        !readConcern.isSpeculativeMajority() && !opCtx->inMultiDocumentTransaction();
 
     return _waitUntilOpTime(opCtx, isMajorityCommittedRead, targetOpTime, deadline);
 }
