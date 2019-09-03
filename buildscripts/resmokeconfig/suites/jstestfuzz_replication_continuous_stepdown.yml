@@ -12,6 +12,9 @@ executor:
   config:
     shell_options:
       readMode: commands
+      global_vars:
+        TestData:
+          ignoreCommandsIncompatibleWithRollback: true
   hooks:
   - class: ContinuousStepdown
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
