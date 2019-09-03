@@ -93,6 +93,12 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     }
     _listener->onTransitionToRollback();
 
+    if (MONGO_FAIL_POINT(rollbackHangAfterTransitionToRollback)) {
+        log() << "rollbackHangAfterTransitionToRollback fail point enabled. Blocking until fail "
+                 "point is disabled (rollback_impl).";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(rollbackHangAfterTransitionToRollback);
+    }
+
     auto commonPointSW = _findCommonPoint();
     if (!commonPointSW.isOK()) {
         return commonPointSW.getStatus();

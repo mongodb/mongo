@@ -687,3 +687,13 @@ assert.gleErrorRegex = function(dbOrGLEDoc, regex, msg) {
                  " :" + msg);
     }
 };
+
+assert.includes = function(haystack, needle, msg) {
+    if (!haystack.includes(needle)) {
+        var assertMsg = "string [" + haystack + "] does not include [" + needle + "]";
+        if (msg) {
+            assertMsg += ", " + msg;
+        }
+        doassert(assertMsg);
+    }
+};

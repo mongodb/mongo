@@ -240,11 +240,11 @@ public:
             return appendCommandStatus(result, qrStatus.getStatus());
         }
 
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         auto& qr = qrStatus.getValue();
 
         // Validate term before acquiring locks, if provided.
         if (auto term = qr->getReplicationTerm()) {
-            auto replCoord = repl::ReplicationCoordinator::get(opCtx);
             Status status = replCoord->updateTerm(opCtx, *term);
             // Note: updateTerm returns ok if term stayed the same.
             if (!status.isOK()) {
@@ -257,6 +257,10 @@ public:
         Lock::DBLock dbSLock(opCtx, dbname, MODE_IS);
         const NamespaceString nss(parseNsOrUUID(opCtx, dbname, cmdObj));
         qr->refreshNSS(opCtx);
+
+        // Check whether we are allowed to read from this node after acquiring our locks.
+        uassertStatusOK(replCoord->checkCanServeReadsFor(
+            opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
 
         // Fill out curop information.
         //

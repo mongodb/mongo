@@ -51,6 +51,8 @@ MONGO_FP_DECLARE(rollbackHangBeforeFinish);
 // Failpoint which causes rollback to hang and then fail after minValid is written.
 MONGO_FP_DECLARE(rollbackHangThenFailAfterWritingMinValid);
 
+// This is needed by rs_rollback and rollback_impl.
+MONGO_FP_DECLARE(rollbackHangAfterTransitionToRollback);
 
 namespace {
 

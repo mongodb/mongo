@@ -51,6 +51,9 @@ namespace repl {
 MONGO_FP_FORWARD_DECLARE(rollbackHangBeforeFinish);
 MONGO_FP_FORWARD_DECLARE(rollbackHangThenFailAfterWritingMinValid);
 
+// This is needed by rs_rollback and rollback_impl.
+MONGO_FP_FORWARD_DECLARE(rollbackHangAfterTransitionToRollback);
+
 class RollBackLocalOperations {
     MONGO_DISALLOW_COPYING(RollBackLocalOperations);
 
