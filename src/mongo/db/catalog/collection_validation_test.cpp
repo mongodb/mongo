@@ -42,85 +42,204 @@ namespace {
 
 const NamespaceString kNss = NamespaceString("test.t");
 
+/**
+ * Test fixture for collection validation with the ephemeralForTest storage engine.
+ * Validation with {background:true} is not supported by the ephemeralForTest storage engine.
+ */
 class CollectionValidationTest : public CatalogTestFixture {
-private:
-    void setUp() override;
-
 public:
-    void checkValidate(bool valid, int records, int invalid, int errors);
+    CollectionValidationTest() : CollectionValidationTest("ephemeralForTest") {}
 
-    std::vector<ValidateCmdLevel> levels{kValidateNormal, kValidateFull};
+protected:
+    /**
+     * Allow inheriting classes to select a storage engine with which to run unit tests.
+     */
+    explicit CollectionValidationTest(std::string engine) : CatalogTestFixture(std::move(engine)) {}
+
+private:
+    void setUp() override {
+        CatalogTestFixture::setUp();
+
+        // Create collection kNss for unit tests to use. It will possess a default _id index.
+        CollectionOptions defaultCollectionOptions;
+        ASSERT_OK(storageInterface()->createCollection(
+            operationContext(), kNss, defaultCollectionOptions));
+    };
 };
 
-void CollectionValidationTest::setUp() {
-    CatalogTestFixture::setUp();
-    CollectionOptions defaultCollectionOptions;
-    ASSERT_OK(
-        storageInterface()->createCollection(operationContext(), kNss, defaultCollectionOptions));
-}
+/**
+ * Test fixture for testing background collection validation on the wiredTiger engine, which is
+ * currently the only storage engine that supports background collection validation.
+ *
+ * Collection kNss will be created for each unit test, curtesy of inheritance from
+ * CollectionValidationTest.
+ */
+class BackgroundCollectionValidationTest : public CollectionValidationTest {
+public:
+    /**
+     * Sets up the wiredTiger storage engine that supports data checkpointing.
+     *
+     * Background validation runs on a checkpoint, and therefore only on storage engines that
+     * support checkpoints.
+     */
+    BackgroundCollectionValidationTest() : CollectionValidationTest("wiredTiger") {}
+};
 
-// Call validate with different validation levels and verify the results.
-void CollectionValidationTest::checkValidate(bool valid, int records, int invalid, int errors) {
+/**
+ * Calls validate on collection kNss with both kValidateFull and kValidateNormal validation levels
+ * and verifies the results.
+ */
+void foregroundValidate(
+    OperationContext* opCtx, bool valid, int numRecords, int numInvalidDocuments, int numErrors) {
+    std::vector<ValidateCmdLevel> levels{kValidateNormal, kValidateFull};
     for (auto level : levels) {
-        ValidateResults results;
+        ValidateResults validateResults;
         BSONObjBuilder output;
-        ASSERT_OK(CollectionValidation::validate(
-            operationContext(), kNss, level, false, &results, &output));
-        ASSERT_EQ(results.valid, valid);
-        ASSERT_EQ(results.errors.size(), (long unsigned int)errors);
+        ASSERT_OK(
+            CollectionValidation::validate(opCtx, kNss, level, false, &validateResults, &output));
+        ASSERT_EQ(validateResults.valid, valid);
+        ASSERT_EQ(validateResults.errors.size(), static_cast<long unsigned int>(numErrors));
 
         BSONObj obj = output.obj();
-        ASSERT_EQ(obj.getIntField("nrecords"), records);
-        ASSERT_EQ(obj.getIntField("nInvalidDocuments"), invalid);
+        ASSERT_EQ(obj.getIntField("nrecords"), numRecords);
+        ASSERT_EQ(obj.getIntField("nInvalidDocuments"), numInvalidDocuments);
     }
 }
+
+/**
+ * Calls validate on collection kNss with {background:true} and verifies the results.
+ * If 'runForegroundAsWell' is set, then foregroundValidate() above will be run in addition.
+ */
+void backgroundValidate(OperationContext* opCtx,
+                        bool valid,
+                        int numRecords,
+                        int numInvalidDocuments,
+                        int numErrors,
+                        bool runForegroundAsWell) {
+    if (runForegroundAsWell) {
+        foregroundValidate(opCtx, valid, numRecords, numInvalidDocuments, numErrors);
+    }
+
+    ValidateResults validateResults;
+    BSONObjBuilder output;
+    ASSERT_OK(CollectionValidation::validate(opCtx,
+                                             kNss,
+                                             ValidateCmdLevel::kValidateNormal,
+                                             /*background*/ true,
+                                             &validateResults,
+                                             &output));
+    BSONObj obj = output.obj();
+
+    ASSERT_EQ(validateResults.valid, valid);
+    ASSERT_EQ(validateResults.errors.size(), static_cast<long unsigned int>(numErrors));
+
+    ASSERT_EQ(obj.getIntField("nrecords"), numRecords);
+    ASSERT_EQ(obj.getIntField("nInvalidDocuments"), numInvalidDocuments);
+}
+
+/**
+ * Inserts a few documents into the kNss collection and then returns that count.
+ */
+int setUpValidData(OperationContext* opCtx) {
+    AutoGetCollection autoColl(opCtx, kNss, MODE_X);
+    Collection* coll = autoColl.getCollection();
+
+    std::vector<InsertStatement> inserts;
+    int numRecords = 5;
+    for (int i = 0; i < numRecords; i++) {
+        auto doc = BSON("_id" << i);
+        inserts.push_back(InsertStatement(doc));
+    }
+
+    {
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_OK(coll->insertDocuments(opCtx, inserts.begin(), inserts.end(), nullptr, false));
+        wuow.commit();
+    }
+    return numRecords;
+}
+
+/**
+ * Inserts a single invalid document into the kNss collection and then returns that count.
+ */
+int setUpInvalidData(OperationContext* opCtx) {
+    AutoGetCollection autoColl(opCtx, kNss, MODE_X);
+    Collection* coll = autoColl.getCollection();
+    RecordStore* rs = coll->getRecordStore();
+
+    {
+        WriteUnitOfWork wuow(opCtx);
+        auto invalidBson = "\0\0\0\0\0"_sd;
+        ASSERT_OK(
+            rs->insertRecord(opCtx, invalidBson.rawData(), invalidBson.size(), Timestamp::min())
+                .getStatus());
+        wuow.commit();
+    }
+
+    return 1;
+}
+
+// TODO (SERVER-42223): right now background validation is mostly identical to foreground, except
+// that background runs with an IX lock instead of a X lock. SERVER-42223 will set up real
+// background validation.
 
 // Verify that calling validate() on an empty collection with different validation levels returns an
 // OK status.
 TEST_F(CollectionValidationTest, ValidateEmpty) {
-    checkValidate(true, 0, 0, 0);
+    // Running on the ephemeralForTest storage engine.
+    foregroundValidate(operationContext(),
+                       /*valid*/ true,
+                       /*numRecords*/ 0,
+                       /*numInvalidDocuments*/ 0,
+                       /*numErrors*/ 0);
+}
+TEST_F(BackgroundCollectionValidationTest, BackgroundValidateEmpty) {
+    // Running on the WT storage engine.
+    backgroundValidate(operationContext(),
+                       /*valid*/ true,
+                       /*numRecords*/ 0,
+                       /*numInvalidDocuments*/ 0,
+                       /*numErrors*/ 0,
+                       /*runForegroundAsWell*/ true);
 }
 
 // Verify calling validate() on a nonempty collection with different validation levels.
 TEST_F(CollectionValidationTest, Validate) {
     auto opCtx = operationContext();
-
-    int numRecords = 5;
-    {
-        AutoGetCollection autoColl(opCtx, kNss, MODE_X);
-        Collection* coll = autoColl.getCollection();
-
-        std::vector<InsertStatement> inserts;
-        for (int i = 0; i < numRecords; i++) {
-            auto doc = BSON("_id" << i);
-            inserts.push_back(InsertStatement(doc));
-        }
-
-        auto status = coll->insertDocuments(opCtx, inserts.begin(), inserts.end(), nullptr, false);
-        ASSERT_OK(status);
-    }
-
-    checkValidate(true, numRecords, 0, 0);
+    foregroundValidate(opCtx,
+                       /*valid*/ true,
+                       /*numRecords*/ setUpValidData(opCtx),
+                       /*numInvalidDocuments*/ 0,
+                       /*numErrors*/ 0);
+}
+TEST_F(BackgroundCollectionValidationTest, BackgroundValidate) {
+    auto opCtx = operationContext();
+    backgroundValidate(opCtx,
+                       /*valid*/ true,
+                       /*numRecords*/ setUpValidData(opCtx),
+                       /*numInvalidDocuments*/ 0,
+                       /*numErrors*/ 0,
+                       /*runForegroundAsWell*/ true);
 }
 
 // Verify calling validate() on a collection with an invalid document.
 TEST_F(CollectionValidationTest, ValidateError) {
     auto opCtx = operationContext();
-
-    {
-        AutoGetCollection autoColl(opCtx, kNss, MODE_X);
-        Collection* coll = autoColl.getCollection();
-        RecordStore* rs = coll->getRecordStore();
-
-        auto invalidBson = "\0\0\0\0\0"_sd;
-        auto statusWithId =
-            rs->insertRecord(opCtx, invalidBson.rawData(), invalidBson.size(), Timestamp::min());
-        ASSERT_OK(statusWithId.getStatus());
-    }
-
-    checkValidate(false, 1, 1, 1);
+    foregroundValidate(opCtx,
+                       /*valid*/ false,
+                       /*numRecords*/ setUpInvalidData(opCtx),
+                       /*numInvalidDocuments*/ 1,
+                       /*numErrors*/ 1);
+}
+TEST_F(BackgroundCollectionValidationTest, BackgroundValidateError) {
+    auto opCtx = operationContext();
+    backgroundValidate(opCtx,
+                       /*valid*/ false,
+                       /*numRecords*/ setUpInvalidData(opCtx),
+                       /*numInvalidDocuments*/ 1,
+                       /*numErrors*/ 1,
+                       /*runForegroundAsWell*/ true);
 }
 
 }  // namespace
-
 }  // namespace mongo

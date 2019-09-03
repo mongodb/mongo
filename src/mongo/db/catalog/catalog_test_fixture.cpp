@@ -44,14 +44,18 @@ void CatalogTestFixture::setUp() {
     ServiceContextMongoDTest::setUp();
 
     auto service = getServiceContext();
+    _storage = std::make_unique<repl::StorageInterfaceImpl>();
+    _opCtx = cc().makeOperationContext();
 
     // Set up ReplicationCoordinator and ensure that we are primary.
     auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service);
     ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
     repl::ReplicationCoordinator::set(service, std::move(replCoord));
 
-    _storage = std::make_unique<repl::StorageInterfaceImpl>();
-    _opCtx = cc().makeOperationContext();
+    // Set up oplog collection. If the WT storage engine is used, the oplog collection is expected
+    // to exist when fetching the next opTime (LocalOplogInfo::getNextOpTimes) to use for a write.
+    repl::setOplogCollectionName(service);
+    repl::createOplog(_opCtx.get());
 }
 
 void CatalogTestFixture::tearDown() {
