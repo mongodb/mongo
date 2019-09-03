@@ -8,18 +8,18 @@
     "use strict";
     var rst = new ReplSetTest({nodes: 1});
 
-    rst.startSet();
-    rst.initiate();
+    // Start as stand-alone node so that local.oplog.rs collection won't be created. In order to
+    // make 'copydb' cmd to fail with 'ErrorCodes.InvalidNamespace`, it is necessary that local db
+    // should not contain oplog collection.
+    rst.start(0, {noReplSet: true});
 
-    var conn = rst.getPrimary();               // Waits for PRIMARY state.
-    conn = rst.restart(0, {noReplSet: true});  // Restart as a standalone node.
-    assert.neq(null, conn, "failed to restart");
-
-    // Must drop the oplog in order to induce the correct error below.
-    conn.getDB("local").oplog.rs.drop();
+    var conn = rst.getPrimary();  // Waits for PRIMARY state.
 
     var db1 = conn.getDB("local");
     var db2 = conn.getDB("db2");
+
+    // Create system.replset collection manually.
+    assert.commandWorked(db1.runCommand({create: 'system.replset'}));
 
     var res = db1.adminCommand({copydb: 1, fromdb: db1._name, todb: db2._name});
 
