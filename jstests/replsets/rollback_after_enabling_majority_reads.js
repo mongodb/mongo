@@ -11,6 +11,7 @@
 "use strict";
 
 load("jstests/replsets/libs/rollback_test.js");
+load("jstests/libs/write_concern_util.js");
 
 TestData.rollbackShutdowns = true;
 const name = "rollback_after_enabling_majority_reads";
@@ -27,7 +28,7 @@ config.settings = {
     chainingAllowed: false
 };
 replTest.initiate(config);
-const rollbackTest = new RollbackTest(name, replTest);
+let rollbackTest = new RollbackTest(name, replTest);
 
 jsTest.log("Ensure the stable timestamp is ahead of the common point on the rollback node.");
 const rollbackNode = rollbackTest.transitionToRollbackOperations();
@@ -71,6 +72,22 @@ assert.eq(1, rollbackNode.getDB(dbName)[collName].find({_id: "steady state op"})
 
 jsTest.log("Restart the rollback node with enableMajorityReadConcern=true.");
 rollbackTest.restartNode(0, 15, {enableMajorityReadConcern: "true"});
+
+// Make sure node 0 is the primary.
+let node = replTest.nodes[0];
+jsTestLog("Waiting for node " + node.host + " to become primary.");
+replTest.awaitNodesAgreeOnPrimary();
+assert.commandWorked(node.adminCommand({replSetStepUp: 1}));
+replTest.waitForState(node, ReplSetTest.State.PRIMARY);
+assert.eq(replTest.getPrimary(), node, node.host + " was not primary after step up.");
+
+// Restart replication on the tiebreaker node before constructing a new RollbackTest.
+restartServerReplication(replTest.nodes[2]);
+
+// Create a new RollbackTest fixture to execute the final rollback. This will guarantee that the
+// final rollback occurs on the current primary, which should be node 0.
+jsTestLog("Creating a new RollbackTest fixture to execute a final rollback.");
+rollbackTest = new RollbackTest(name, replTest);
 
 jsTest.log("Rollback should succeed since the common point is at least the stable timestamp.");
 rollbackTest.transitionToRollbackOperations();
