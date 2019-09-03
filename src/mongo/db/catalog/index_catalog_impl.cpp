@@ -788,11 +788,6 @@ void IndexCatalogImpl::dropAllIndexes(OperationContext* opCtx,
             str::stream() << "cannot perform operation: an index build is currently running",
             !haveAnyIndexesInProgress());
 
-    // make sure nothing in progress
-    massert(17348,
-            "cannot dropAllIndexes when index builds in progress",
-            numIndexesTotal(opCtx) == numIndexesReady(opCtx));
-
     bool haveIdIndex = false;
 
     invariant(_buildingIndexes.size() == 0);
