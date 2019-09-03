@@ -42,19 +42,24 @@
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/views/view_catalog.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
+using logger::LogComponent;
 using std::string;
 
-using logger::LogComponent;
+MONGO_FAIL_POINT_DEFINE(pauseCollectionValidationWithLock);
 
 namespace CollectionValidation {
 
 namespace {
 
 using ValidateResultsMap = std::map<string, ValidateResults>;
+
+// Indicates whether the failpoint turned on by testing has been reached.
+AtomicWord<bool> _validationIsPausedForTest{false};
 
 /**
  * Opens a cursor on each index in the given 'indexCatalog'.
@@ -159,6 +164,9 @@ void _validateIndexes(
         // of the index). Check if this is consistent with 'numTraversedKeys' from traverseIndex
         // above.
         if (level == kValidateFull) {
+            invariant(
+                opCtx->lockState()->isCollectionLockedForMode(descriptor->parentNS(), MODE_X));
+
             // Ensure that this index was validated in _validateIndexesInternalStructure.
             const auto numIndexKeysIt = numIndexKeysPerIndex.find(descriptor->indexName());
             invariant(numIndexKeysIt != numIndexKeysPerIndex.end());
@@ -171,7 +179,6 @@ void _validateIndexes(
             // comprised (which was set in _validateIndexesInternalStructure). If the index is
             // corrupted, there is no use in checking if the traversal yielded the same key count.
             if (curIndexResults.valid) {
-
                 if (numIndexKeys != numTraversedKeys) {
                     curIndexResults.valid = false;
                     string msg = str::stream()
@@ -276,21 +283,21 @@ void _validateIndexKeyCount(OperationContext* opCtx,
 }
 
 void _reportValidationResults(OperationContext* opCtx,
-                              IndexCatalog* indexCatalog,
+                              Collection* collection,
                               ValidateResultsMap* indexNsResultsMap,
                               BSONObjBuilder* keysPerIndex,
                               ValidateCmdLevel level,
                               ValidateResults* results,
                               BSONObjBuilder* output) {
-
     std::unique_ptr<BSONObjBuilder> indexDetails;
     if (level == kValidateFull) {
+        invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X));
         indexDetails = std::make_unique<BSONObjBuilder>();
     }
 
     // Report index validation results.
     for (const auto& it : *indexNsResultsMap) {
-        const string indexNs = it.first;
+        const string indexName = it.first;
         const ValidateResults& vr = it.second;
 
         if (!vr.valid) {
@@ -298,7 +305,7 @@ void _reportValidationResults(OperationContext* opCtx,
         }
 
         if (indexDetails) {
-            BSONObjBuilder bob(indexDetails->subobjStart(indexNs));
+            BSONObjBuilder bob(indexDetails->subobjStart(indexName));
             bob.appendBool("valid", vr.valid);
 
             if (!vr.warnings.empty()) {
@@ -314,7 +321,7 @@ void _reportValidationResults(OperationContext* opCtx,
         results->errors.insert(results->errors.end(), vr.errors.begin(), vr.errors.end());
     }
 
-    output->append("nIndexes", indexCatalog->numIndexesReady(opCtx));
+    output->append("nIndexes", collection->getIndexCatalog()->numIndexesReady(opCtx));
     output->append("keysPerIndex", keysPerIndex->done());
     if (indexDetails) {
         output->append("indexDetails", indexDetails->done());
@@ -414,8 +421,11 @@ Status validate(OperationContext* opCtx,
         // Full validation code is executed before we open cursors because it may close
         // and/or invalidate all open cursors.
         if (level == kValidateFull) {
+            invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
+
             // For full validation we use the storage engine's validation functionality.
             collection->getRecordStore()->validate(opCtx, results, output);
+
             // For full validation, we validate the internal structure of each index and save the
             // number of keys in the index to compare against _validateIndexes()'s count results.
             numIndexKeysPerIndex = _validateIndexesInternalStructure(
@@ -431,6 +441,20 @@ Status validate(OperationContext* opCtx,
             dataThrottle->turnThrottlingOff();
         }
 
+        // Background validation will read from the last stable checkpoint instead of the latest
+        // data. This allows concurrent writes to go ahead without interfering with validation's
+        // view of the data.
+        // The checkpoint lock must be taken around cursor creation to ensure all cursors
+        // point at the same checkpoint, i.e. a consistent view of the collection data.
+        std::unique_ptr<StorageEngine::CheckpointLock> checkpointCursorsLock;
+        if (background) {
+            auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+            invariant(storageEngine->supportsCheckpoints());
+            opCtx->recoveryUnit()->abandonSnapshot();
+            opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kCheckpoint);
+            checkpointCursorsLock = storageEngine->getCheckpointLock(opCtx);
+        }
+
         // Open all cursors at once before running non-full validation code so that all steps of
         // validation during background validation use the same view of the data.
         const std::map<std::string, std::unique_ptr<SortedDataInterfaceThrottleCursor>>
@@ -441,6 +465,8 @@ Status validate(OperationContext* opCtx,
         const std::unique_ptr<SeekableRecordThrottleCursor> seekRecordStoreCursor =
             std::make_unique<SeekableRecordThrottleCursor>(
                 opCtx, collection->getRecordStore(), dataThrottle);
+
+        checkpointCursorsLock.reset();
 
         // Because SeekableRecordCursors don't have a method to reset to the start, we save and then
         // use a seek to the first RecordId to reset the cursor (and reuse it) as needed. When
@@ -470,6 +496,23 @@ Status validate(OperationContext* opCtx,
 
         // Validate in-memory catalog information with persisted info.
         _validateCatalogEntry(opCtx, collection, collection->getValidatorDoc(), results);
+
+        // Pause collection validation while a lock is held and between collection and index data
+        // valiation.
+        //
+        // The IndexConsistency object saves document key information during collection data
+        // validation and then compares against that key information during index data validation.
+        // This fail point is placed in between them, in an attempt to catch any inconsistencies
+        // that concurrent CRUD ops might cause if we were to have a bug.
+        //
+        // Only useful for background validation because we hold an intent lock instead of an
+        // exclusive lock, and thus allow concurrent operations.
+        if (MONGO_FAIL_POINT(pauseCollectionValidationWithLock)) {
+            invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_IX));
+            _validationIsPausedForTest.store(true);
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET(pauseCollectionValidationWithLock);
+            _validationIsPausedForTest.store(false);
+        }
 
         // Validate indexes and check for mismatches.
         if (results->valid) {
@@ -506,13 +549,8 @@ Status validate(OperationContext* opCtx,
         }
 
         // Report the validation results for the user to see.
-        _reportValidationResults(opCtx,
-                                 collection->getIndexCatalog(),
-                                 &indexNsResultsMap,
-                                 &keysPerIndex,
-                                 level,
-                                 results,
-                                 output);
+        _reportValidationResults(
+            opCtx, collection, &indexNsResultsMap, &keysPerIndex, level, results, output);
 
         if (!results->valid) {
             log(LogComponent::kIndex) << "Validation complete for collection " << collection->ns()
@@ -532,5 +570,10 @@ Status validate(OperationContext* opCtx,
 
     return Status::OK();
 }
+
+bool getIsValidationPausedForTest() {
+    return _validationIsPausedForTest.load();
+}
+
 }  // namespace CollectionValidation
 }  // namespace mongo

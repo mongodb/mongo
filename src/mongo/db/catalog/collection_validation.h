@@ -58,5 +58,10 @@ Status validate(OperationContext* opCtx,
                 ValidateResults* results,
                 BSONObjBuilder* output);
 
+/**
+ * Checks whether a failpoint has been hit in the above validate() code..
+ */
+bool getIsValidationPausedForTest();
+
 }  // namespace CollectionValidation
 }  // namespace mongo

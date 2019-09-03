@@ -34,7 +34,9 @@
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
 
@@ -95,8 +97,8 @@ void foregroundValidate(
     for (auto level : levels) {
         ValidateResults validateResults;
         BSONObjBuilder output;
-        ASSERT_OK(
-            CollectionValidation::validate(opCtx, kNss, level, false, &validateResults, &output));
+        ASSERT_OK(CollectionValidation::validate(
+            opCtx, kNss, level, /*background*/ false, &validateResults, &output));
         ASSERT_EQ(validateResults.valid, valid);
         ASSERT_EQ(validateResults.errors.size(), static_cast<long unsigned int>(numErrors));
 
@@ -120,6 +122,10 @@ void backgroundValidate(OperationContext* opCtx,
         foregroundValidate(opCtx, valid, numRecords, numInvalidDocuments, numErrors);
     }
 
+    // This function will force a checkpoint, so background validation can then read from that
+    // checkpoint.
+    opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx);
+
     ValidateResults validateResults;
     BSONObjBuilder output;
     ASSERT_OK(CollectionValidation::validate(opCtx,
@@ -138,15 +144,20 @@ void backgroundValidate(OperationContext* opCtx,
 }
 
 /**
- * Inserts a few documents into the kNss collection and then returns that count.
+ * Inserts a range of documents into the kNss collection and then returns that count.
+ * The range is defined by [startIDNum, endIDNum), not inclusive of endIDNum, using the numbers as
+ * values for '_id' of the document being inserted.
  */
-int setUpValidData(OperationContext* opCtx) {
-    AutoGetCollection autoColl(opCtx, kNss, MODE_X);
-    Collection* coll = autoColl.getCollection();
+int insertDataRange(OperationContext* opCtx, int startIDNum, int endIDNum) {
+    invariant(startIDNum < endIDNum,
+              str::stream() << "attempted to insert invalid data range from " << startIDNum
+                            << " to " << endIDNum);
 
+
+    AutoGetCollection autoColl(opCtx, kNss, MODE_IX);
+    Collection* coll = autoColl.getCollection();
     std::vector<InsertStatement> inserts;
-    int numRecords = 5;
-    for (int i = 0; i < numRecords; i++) {
+    for (int i = startIDNum; i < endIDNum; ++i) {
         auto doc = BSON("_id" << i);
         inserts.push_back(InsertStatement(doc));
     }
@@ -156,14 +167,14 @@ int setUpValidData(OperationContext* opCtx) {
         ASSERT_OK(coll->insertDocuments(opCtx, inserts.begin(), inserts.end(), nullptr, false));
         wuow.commit();
     }
-    return numRecords;
+    return endIDNum - startIDNum;
 }
 
 /**
  * Inserts a single invalid document into the kNss collection and then returns that count.
  */
 int setUpInvalidData(OperationContext* opCtx) {
-    AutoGetCollection autoColl(opCtx, kNss, MODE_X);
+    AutoGetCollection autoColl(opCtx, kNss, MODE_IX);
     Collection* coll = autoColl.getCollection();
     RecordStore* rs = coll->getRecordStore();
 
@@ -178,10 +189,6 @@ int setUpInvalidData(OperationContext* opCtx) {
 
     return 1;
 }
-
-// TODO (SERVER-42223): right now background validation is mostly identical to foreground, except
-// that background runs with an IX lock instead of a X lock. SERVER-42223 will set up real
-// background validation.
 
 // Verify that calling validate() on an empty collection with different validation levels returns an
 // OK status.
@@ -208,7 +215,7 @@ TEST_F(CollectionValidationTest, Validate) {
     auto opCtx = operationContext();
     foregroundValidate(opCtx,
                        /*valid*/ true,
-                       /*numRecords*/ setUpValidData(opCtx),
+                       /*numRecords*/ insertDataRange(opCtx, 0, 5),
                        /*numInvalidDocuments*/ 0,
                        /*numErrors*/ 0);
 }
@@ -216,7 +223,7 @@ TEST_F(BackgroundCollectionValidationTest, BackgroundValidate) {
     auto opCtx = operationContext();
     backgroundValidate(opCtx,
                        /*valid*/ true,
-                       /*numRecords*/ setUpValidData(opCtx),
+                       /*numRecords*/ insertDataRange(opCtx, 0, 5),
                        /*numInvalidDocuments*/ 0,
                        /*numErrors*/ 0,
                        /*runForegroundAsWell*/ true);
@@ -239,6 +246,52 @@ TEST_F(BackgroundCollectionValidationTest, BackgroundValidateError) {
                        /*numInvalidDocuments*/ 1,
                        /*numErrors*/ 1,
                        /*runForegroundAsWell*/ true);
+}
+
+/**
+ * Waits for a parallel running collection validation operation to start and then hang at a
+ * failpoint.
+ *
+ * A failpoint in the validate() code should have been set prior to calling this function.
+ */
+void waitUntilValidateFailpointHasBeenReached() {
+    while (!CollectionValidation::getIsValidationPausedForTest()) {
+        sleepmillis(100);  // a fairly arbitrary sleep period.
+    }
+    ASSERT(CollectionValidation::getIsValidationPausedForTest());
+}
+
+TEST_F(BackgroundCollectionValidationTest, BackgroundValidateRunsConcurrentlyWithWrites) {
+    auto opCtx = operationContext();
+    auto serviceContext = opCtx->getServiceContext();
+
+    // Set up some data in the collection so that we can validate it.
+    int numRecords = insertDataRange(opCtx, 0, 5);
+
+    stdx::thread runBackgroundValidate;
+    int numRecords2;
+    {
+        // Set a failpoint in the collection validation code and then start a parallel operation to
+        // run background validation in parallel.
+        FailPointEnableBlock failPoint("pauseCollectionValidationWithLock");
+        runBackgroundValidate = stdx::thread([&serviceContext, &numRecords] {
+            ThreadClient tc("BackgroundValidateConcurrentWithCRUD-thread", serviceContext);
+            auto threadOpCtx = tc->makeOperationContext();
+            backgroundValidate(
+                threadOpCtx.get(), true, numRecords, 0, 0, /*runForegroundAsWell*/ false);
+        });
+
+        // Wait until validate starts and hangs mid-way on a failpoint, then do concurrent writes,
+        // which should succeed and not affect the background validation.
+        waitUntilValidateFailpointHasBeenReached();
+        numRecords2 = insertDataRange(opCtx, 5, 15);
+    }
+
+    // Make sure the background validation finishes successfully.
+    runBackgroundValidate.join();
+
+    // Run regular foreground collection validation to make sure everything is OK.
+    foregroundValidate(opCtx, /*valid*/ true, /*numRecords*/ numRecords + numRecords2, 0, 0);
 }
 
 }  // namespace
