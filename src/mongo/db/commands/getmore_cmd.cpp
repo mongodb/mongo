@@ -69,6 +69,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(rsStopGetMoreCmd);
+MONGO_FAIL_POINT_DEFINE(GetMoreHangBeforeReadLock);
 
 MONGO_FAIL_POINT_DEFINE(waitWithPinnedCursorDuringGetMoreBatch);
 
@@ -266,6 +267,12 @@ public:
                                      dbProfilingLevel);
             }
         } else {
+            if (MONGO_FAIL_POINT(GetMoreHangBeforeReadLock)) {
+                log() << "GetMoreHangBeforeReadLock fail point enabled. Blocking until fail "
+                         "point is disabled.";
+                MONGO_FAIL_POINT_PAUSE_WHILE_SET(GetMoreHangBeforeReadLock);
+            }
+
             readLock.emplace(opCtx, request.nss);
             const int doNotChangeProfilingLevel = 0;
             statsTracker.emplace(opCtx,
@@ -274,6 +281,10 @@ public:
                                  AutoStatsTracker::LogMode::kUpdateTopAndCurop,
                                  readLock->getDb() ? readLock->getDb()->getProfilingLevel()
                                                    : doNotChangeProfilingLevel);
+
+            // Check whether we are allowed to read from this node after acquiring our locks.
+            uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->checkCanServeReadsFor(
+                opCtx, request.nss, true));
 
             Collection* collection = readLock->getCollection();
             if (!collection) {

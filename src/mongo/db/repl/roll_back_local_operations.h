@@ -52,6 +52,9 @@ namespace repl {
 MONGO_FAIL_POINT_DECLARE(rollbackHangBeforeFinish);
 MONGO_FAIL_POINT_DECLARE(rollbackHangThenFailAfterWritingMinValid);
 
+// This is needed by rs_rollback and rollback_impl.
+MONGO_FAIL_POINT_DECLARE(rollbackHangAfterTransitionToRollback);
+
 class RollBackLocalOperations {
     MONGO_DISALLOW_COPYING(RollBackLocalOperations);
 
