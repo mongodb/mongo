@@ -41,7 +41,9 @@ MONGO_FAIL_POINT_DEFINE(skipWriteConflictRetries);
 AtomicWord<bool> WriteConflictException::trace(false);
 
 WriteConflictException::WriteConflictException()
-    : DBException(Status(ErrorCodes::WriteConflict, "WriteConflict")) {
+    : DBException(Status(ErrorCodes::WriteConflict,
+                         "WriteConflict error: this operation conflicted with another operation. "
+                         "Please retry your operation or multi-document transaction.")) {
     if (trace.load()) {
         printStackTrace();
     }
