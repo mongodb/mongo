@@ -1839,7 +1839,11 @@ var ReplSetTest = function(opts) {
             var combinedDBs = new Set(primary.getDBNames());
             const replSetConfig = rst.getReplSetConfigFromNode();
 
+            print("checkDBHashesForReplSet checking data hashes against primary: " + primary.host);
+
             slaves.forEach(secondary => {
+                print("checkDBHashesForReplSet going to check data hashes on secondary: " +
+                      secondary.host);
                 secondary.getDBNames().forEach(dbName => combinedDBs.add(dbName));
             });
 
@@ -1989,6 +1993,7 @@ var ReplSetTest = function(opts) {
 
                     if (!success) {
                         if (!hasDumpedOplog) {
+                            print("checkDBHashesForReplSet dumping oplogs from all nodes");
                             this.dumpOplog(primary, {}, 100);
                             rst.getSecondaries().forEach(secondary =>
                                                              this.dumpOplog(secondary, {}, 100));
@@ -2097,6 +2102,7 @@ var ReplSetTest = function(opts) {
             }
         }
 
+        print("checkOplogs starting oplog checks.");
         if (slaves.length >= 1) {
             let readers = [];
             let smallestTS = new Timestamp(Math.pow(2, 32) - 1, Math.pow(2, 32) - 1);
@@ -2106,14 +2112,17 @@ var ReplSetTest = function(opts) {
                 const node = nodes[i];
 
                 if (rst._master !== node && !slaves.includes(node)) {
+                    print("checkOplogs skipping oplog of node: " + node.host);
                     continue;
                 }
 
                 // Arbiters have no documents in the oplog.
                 if (isNodeArbiter(node)) {
+                    jsTestLog("checkOplogs skipping oplog of arbiter: " + node.host);
                     continue;
                 }
 
+                print("checkOplogs going to check oplog of node: " + node.host);
                 readers[i] = new OplogReader(node);
                 const currTS = readers[i].getFirstDoc().ts;
                 // Find the reader which has the smallestTS. This reader should have the most
@@ -2154,6 +2163,7 @@ var ReplSetTest = function(opts) {
                 prevOplogEntry = oplogEntry;
             }
         }
+        print("checkOplogs oplog checks complete.");
     }
 
     /**
@@ -2474,18 +2484,27 @@ var ReplSetTest = function(opts) {
     this.stopSet = function(signal, forRestart, opts) {
         // Check to make sure data is the same on all nodes.
         if (!jsTest.options().skipCheckDBHashes) {
+            print("ReplSetTest stopSet going to run data consistency checks.");
             // To skip this check add TestData.skipCheckDBHashes = true;
             // Reasons to skip this test include:
             // - the primary goes down and none can be elected (so fsync lock/unlock commands fail)
             // - the replica set is in an unrecoverable inconsistent state. E.g. the replica set
             //   is partitioned.
             //
-            if (_callIsMaster() && this._liveNodes.length > 1) {  // skip for sets with 1 live node
+            let master = _callIsMaster();
+            if (master && this._liveNodes.length > 1) {  // skip for sets with 1 live node
                 // Auth only on live nodes because authutil.assertAuthenticate
                 // refuses to log in live connections if some secondaries are down.
+                print("ReplSetTest stopSet checking oplogs.");
                 asCluster(this._liveNodes, () => this.checkOplogs());
+                print("ReplSetTest stopSet checking replicated data hashes.");
                 asCluster(this._liveNodes, () => this.checkReplicatedDataHashes());
+            } else {
+                print(
+                    "ReplSetTest stopSet skipped data consistency checks. Number of _liveNodes: " +
+                    this._liveNodes.length + ", _callIsMaster response: " + master);
             }
+            print("ReplSetTest stopSet finished data consistency checks.");
         }
 
         // Make shutdown faster in tests, especially when election handoff has no viable candidate.
@@ -2494,6 +2513,9 @@ var ReplSetTest = function(opts) {
             asCluster(this._liveNodes, () => {
                 for (let node of this._liveNodes) {
                     try {
+                        print(
+                            "ReplSetTest stopSet disabling 'waitForStepDownOnNonCommandShutdown' on " +
+                            node.host);
                         assert.commandWorked(node.adminCommand({
                             setParameter: 1,
                             waitForStepDownOnNonCommandShutdown: false,
@@ -2506,19 +2528,24 @@ var ReplSetTest = function(opts) {
             });
         }
 
+        print("ReplSetTest stopSet stopping all replica set nodes.");
         for (var i = 0; i < this.ports.length; i++) {
             this.stop(i, signal, opts);
         }
+        print("ReplSetTest stopSet stopped all replica set nodes.");
 
         if (forRestart) {
+            print("ReplSetTest stopSet returning since forRestart=true.");
             return;
         }
 
         if ((!opts || !opts.noCleanData) && _alldbpaths) {
             print("ReplSetTest stopSet deleting all dbpaths");
             for (var i = 0; i < _alldbpaths.length; i++) {
+                print("ReplSetTest stopSet deleting dbpath: " + _alldbpaths[i]);
                 resetDbpath(_alldbpaths[i]);
             }
+            print("ReplSetTest stopSet deleted all dbpaths");
         }
 
         _forgetReplSet(this.name);
