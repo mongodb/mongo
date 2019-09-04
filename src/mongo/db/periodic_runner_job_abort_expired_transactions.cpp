@@ -88,7 +88,7 @@ void PeriodicThreadToAbortExpiredTransactions::_init(ServiceContext* serviceCont
     auto periodicRunner = serviceContext->getPeriodicRunner();
     invariant(periodicRunner);
 
-    PeriodicRunner::PeriodicJob job("startPeriodicThreadToAbortExpiredTransactions",
+    PeriodicRunner::PeriodicJob job("abortExpiredTransactions",
                                     [](Client* client) {
                                         // The opCtx destructor handles unsetting itself from the
                                         // Client. (The PeriodicRunner's Client must be reset before

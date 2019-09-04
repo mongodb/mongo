@@ -72,7 +72,7 @@ void PeriodicThreadToDecreaseSnapshotHistoryCachePressure::_init(ServiceContext*
     invariant(periodicRunner);
 
     PeriodicRunner::PeriodicJob job(
-        "startPeriodicThreadToDecreaseSnapshotHistoryCachePressure",
+        "decreaseSnapshotHistoryCachePressure",
         [](Client* client) {
             try {
                 // The opCtx destructor handles unsetting itself from the Client.
