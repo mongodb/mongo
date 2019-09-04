@@ -337,12 +337,13 @@ void CollectionCloner::_countCallback(
         }
     }
 
+    // The count command may return a negative value after an unclean shutdown,
+    // so we set it to zero here to avoid aborting the collection clone.
+    // Note that this count value is only used for reporting purposes.
     if (count < 0) {
-        _finishCallback({ErrorCodes::BadValue,
-                         str::stream() << "Count call on collection " << _sourceNss.ns() << " from "
-                                       << _source.toString()
-                                       << " returned negative document count: " << count});
-        return;
+        warning() << "Count command returned negative value. Updating to 0 to allow progress "
+                     "meter to function properly. ";
+        count = 0;
     }
 
     {

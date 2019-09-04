@@ -483,15 +483,16 @@ TEST_F(CollectionClonerTest, CollectionClonerReturnsNoSuchKeyOnMissingDocumentCo
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, getStatus());
 }
 
-TEST_F(CollectionClonerTest, CollectionClonerReturnsBadValueOnNegativeDocumentCount) {
+TEST_F(CollectionClonerTest, CollectionClonerDoesNotAbortOnNegativeDocumentCount) {
     ASSERT_OK(collectionCloner->startup());
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
         processNetworkResponse(createCountResponse(-1));
     }
+    getExecutor().shutdown();
     collectionCloner->join();
-    ASSERT_EQUALS(ErrorCodes::BadValue, getStatus());
+    ASSERT_EQUALS(0U, collectionCloner->getStats().documentToCopy);
 }
 
 class TaskExecutorWithFailureInScheduleRemoteCommand : public unittest::TaskExecutorProxy {
