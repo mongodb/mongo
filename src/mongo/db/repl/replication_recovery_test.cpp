@@ -227,7 +227,7 @@ repl::OplogEntry _makeOplogEntry(repl::OpTime opTime,
                                  BSONObj object,
                                  boost::optional<BSONObj> object2 = boost::none,
                                  OperationSessionInfo sessionInfo = {},
-                                 boost::optional<Date_t> wallTime = boost::none) {
+                                 Date_t wallTime = Date_t()) {
     return repl::OplogEntry(opTime,                           // optime
                             boost::none,                      // hash
                             opType,                           // opType

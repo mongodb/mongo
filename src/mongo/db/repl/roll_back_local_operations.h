@@ -72,20 +72,20 @@ public:
             return _opTime;
         }
 
-        boost::optional<Date_t> getWallClockTime() const {
+        Date_t getWallClockTime() const {
             return _wallClockTime;
         }
 
-        boost::optional<Date_t> getFirstOpWallClockTimeAfterCommonPoint() {
+        Date_t getFirstOpWallClockTimeAfterCommonPoint() {
             return _firstWallClockTimeAfterCommonPoint;
         }
 
     private:
         RecordId _recordId;
         OpTime _opTime;
-        boost::optional<Date_t> _wallClockTime;
+        Date_t _wallClockTime;
         // The wall clock time of the first operation after the common point if it exists.
-        boost::optional<Date_t> _firstWallClockTimeAfterCommonPoint;
+        Date_t _firstWallClockTimeAfterCommonPoint;
     };
 
     /**

@@ -1888,7 +1888,7 @@ TEST_F(InitialSyncerTest,
     ASSERT_OK(_lastApplied.getStatus());
     auto dummyEntry = makeOplogEntry(1);
     ASSERT_EQUALS(dummyEntry.getOpTime(), _lastApplied.getValue().opTime);
-    ASSERT_EQUALS(dummyEntry.getWallClockTime().get(), _lastApplied.getValue().wallTime);
+    ASSERT_EQUALS(dummyEntry.getWallClockTime(), _lastApplied.getValue().wallTime);
 }
 
 TEST_F(
@@ -1954,7 +1954,7 @@ TEST_F(
     ASSERT_OK(_lastApplied.getStatus());
     auto dummyEntry = makeOplogEntry(3);
     ASSERT_EQUALS(dummyEntry.getOpTime(), _lastApplied.getValue().opTime);
-    ASSERT_EQUALS(dummyEntry.getWallClockTime().get(), _lastApplied.getValue().wallTime);
+    ASSERT_EQUALS(dummyEntry.getWallClockTime(), _lastApplied.getValue().wallTime);
 }
 
 TEST_F(
@@ -3222,7 +3222,7 @@ TEST_F(InitialSyncerTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfter
     initialSyncer->join();
     ASSERT_OK(_lastApplied.getStatus());
     ASSERT_EQUALS(oplogEntry.getOpTime(), _lastApplied.getValue().opTime);
-    ASSERT_EQUALS(oplogEntry.getWallClockTime().get(), _lastApplied.getValue().wallTime);
+    ASSERT_EQUALS(oplogEntry.getWallClockTime(), _lastApplied.getValue().wallTime);
     ASSERT_FALSE(_replicationProcess->getConsistencyMarkers()->getInitialSyncFlag(opCtx.get()));
 }
 
@@ -3823,7 +3823,7 @@ void InitialSyncerTest::doSuccessfulInitialSyncWithOneBatch() {
     serverGlobalParams.featureCompatibility.reset();
     ASSERT_OK(_lastApplied.getStatus());
     ASSERT_EQUALS(lastOp.getOpTime(), _lastApplied.getValue().opTime);
-    ASSERT_EQUALS(lastOp.getWallClockTime().get(), _lastApplied.getValue().wallTime);
+    ASSERT_EQUALS(lastOp.getWallClockTime(), _lastApplied.getValue().wallTime);
 
     ASSERT_EQUALS(lastOp.getOpTime().getTimestamp(), _storageInterface->getInitialDataTimestamp());
 }
@@ -3945,7 +3945,7 @@ TEST_F(InitialSyncerTest,
     initialSyncer->join();
     ASSERT_OK(_lastApplied.getStatus());
     ASSERT_EQUALS(lastOp.getOpTime(), _lastApplied.getValue().opTime);
-    ASSERT_EQUALS(lastOp.getWallClockTime().get(), _lastApplied.getValue().wallTime);
+    ASSERT_EQUALS(lastOp.getWallClockTime(), _lastApplied.getValue().wallTime);
 }
 
 TEST_F(InitialSyncerTest,
@@ -4270,7 +4270,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     ASSERT_OK(_lastApplied.getStatus());
     auto dummyEntry = makeOplogEntry(7);
     ASSERT_EQUALS(dummyEntry.getOpTime(), _lastApplied.getValue().opTime);
-    ASSERT_EQUALS(dummyEntry.getWallClockTime().get(), _lastApplied.getValue().wallTime);
+    ASSERT_EQUALS(dummyEntry.getWallClockTime(), _lastApplied.getValue().wallTime);
 
     progress = initialSyncer->getInitialSyncProgress();
     log() << "Progress at end: " << progress;

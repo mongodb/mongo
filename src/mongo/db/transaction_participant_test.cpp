@@ -72,7 +72,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 repl::OpTypeEnum opType,
                                 BSONObj object,
                                 OperationSessionInfo sessionInfo,
-                                boost::optional<Date_t> wallClockTime,
+                                Date_t wallClockTime,
                                 boost::optional<StmtId> stmtId,
                                 boost::optional<repl::OpTime> prevWriteOpTimeInTransaction) {
     return repl::OplogEntry(

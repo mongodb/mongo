@@ -712,13 +712,14 @@ public:
                                    << "v" << 2 << "op"
                                    << "i"
                                    << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid()
-                                   << "o" << BSON("_id" << idx))
+                                   << "wall" << Date_t() << "o" << BSON("_id" << idx))
                          << BSON("ts" << firstInsertTime.addTicks(idx).asTimestamp() << "t" << 1LL
                                       << "op"
                                       << "c"
                                       << "ns"
                                       << "test.$cmd"
-                                      << "o" << BSON("applyOps" << BSONArrayBuilder().obj())))),
+                                      << "wall" << Date_t() << "o"
+                                      << BSON("applyOps" << BSONArrayBuilder().obj())))),
                 repl::OplogApplication::Mode::kApplyOpsCmd,
                 &result));
         }
@@ -752,7 +753,8 @@ public:
         BSONObjBuilder oplogCommonBuilder;
         oplogCommonBuilder << "v" << 2 << "op"
                            << "i"
-                           << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid();
+                           << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid() << "wall"
+                           << Date_t();
         auto oplogCommon = oplogCommonBuilder.done();
 
         std::vector<repl::OplogEntry> oplogEntries;
@@ -767,6 +769,8 @@ public:
             oplogEntryBuilders[idx] << "t" << 1LL;
             // Populate the "o" field.
             oplogEntryBuilders[idx] << "o" << o;
+            // Populate the "wall" field
+            oplogEntryBuilders[idx] << "wall" << Date_t();
             // Populate the other common fields.
             oplogEntryBuilders[idx].appendElementsUnique(oplogCommon);
             // Insert ops to be applied.
@@ -824,7 +828,7 @@ public:
                                      << "v" << 2 << "op"
                                      << "d"
                                      << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid()
-                                     << "o" << BSON("_id" << num))})
+                                     << "wall" << Date_t() << "o" << BSON("_id" << num))})
                           .getStatus());
         }
 
@@ -883,7 +887,8 @@ public:
                                      << "v" << 2 << "op"
                                      << "u"
                                      << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid()
-                                     << "o2" << BSON("_id" << 0) << "o" << updates[idx].first)})
+                                     << "wall" << Date_t() << "o2" << BSON("_id" << 0) << "o"
+                                     << updates[idx].first)})
                           .getStatus());
         }
 
@@ -921,12 +926,12 @@ public:
             nss.db().toString(),
             {BSON("ts" << insertTime.asTimestamp() << "t" << 1LL << "op"
                        << "i"
-                       << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid() << "o"
-                       << BSON("_id" << 0 << "field" << 0)),
+                       << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid() << "wall"
+                       << Date_t() << "o" << BSON("_id" << 0 << "field" << 0)),
              BSON("ts" << insertTime.addTicks(1).asTimestamp() << "t" << 1LL << "op"
                        << "i"
-                       << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid() << "o"
-                       << BSON("_id" << 0))}));
+                       << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid() << "wall"
+                       << Date_t() << "o" << BSON("_id" << 0))}));
 
         ASSERT_EQ(2, result.getIntField("applied"));
         ASSERT(result["results"].Array()[0].Bool());
@@ -1068,8 +1073,8 @@ public:
             {
                 BSON("ts" << presentTs << "t" << 1LL << "op"
                           << "c"
-                          << "ui" << UUID::gen() << "ns" << nss.getCommandNS().ns() << "o"
-                          << BSON("create" << nss.coll())),
+                          << "ui" << UUID::gen() << "ns" << nss.getCommandNS().ns() << "wall"
+                          << Date_t() << "o" << BSON("create" << nss.coll())),
             });
         ASSERT_OK(swResult);
 
@@ -1106,12 +1111,12 @@ public:
             {
                 BSON("ts" << presentTs << "t" << 1LL << "op"
                           << "c"
-                          << "ui" << UUID::gen() << "ns" << nss1.getCommandNS().ns() << "o"
-                          << BSON("create" << nss1.coll())),
+                          << "ui" << UUID::gen() << "ns" << nss1.getCommandNS().ns() << "wall"
+                          << Date_t() << "o" << BSON("create" << nss1.coll())),
                 BSON("ts" << futureTs << "t" << 1LL << "op"
                           << "c"
-                          << "ui" << UUID::gen() << "ns" << nss2.getCommandNS().ns() << "o"
-                          << BSON("create" << nss2.coll())),
+                          << "ui" << UUID::gen() << "ns" << nss2.getCommandNS().ns() << "wall"
+                          << Date_t() << "o" << BSON("create" << nss2.coll())),
             });
         ASSERT_OK(swResult);
 
@@ -1166,14 +1171,15 @@ public:
                     BSON("ts" << presentTs << "t" << 1LL << "op"
                               << "i"
                               << "ns" << nss1.ns() << "ui" << autoColl.getCollection()->uuid()
-                              << "o" << doc1),
+                              << "wall" << Date_t() << "o" << doc1),
                     BSON("ts" << futureTs << "t" << 1LL << "op"
                               << "c"
-                              << "ui" << uuid2 << "ns" << nss2.getCommandNS().ns() << "o"
-                              << BSON("create" << nss2.coll())),
+                              << "ui" << uuid2 << "ns" << nss2.getCommandNS().ns() << "wall"
+                              << Date_t() << "o" << BSON("create" << nss2.coll())),
                     BSON("ts" << insert2Ts << "t" << 1LL << "op"
                               << "i"
-                              << "ns" << nss2.ns() << "ui" << uuid2 << "o" << doc2),
+                              << "ns" << nss2.ns() << "ui" << uuid2 << "wall" << Date_t() << "o"
+                              << doc2),
                 });
             ASSERT_OK(swResult);
         }
@@ -1224,8 +1230,8 @@ public:
             {
                 BSON("ts" << presentTs << "t" << 1LL << "op"
                           << "c"
-                          << "ui" << UUID::gen() << "ns" << nss.getCommandNS().ns() << "o"
-                          << BSON("create" << nss.coll())),
+                          << "ui" << UUID::gen() << "ns" << nss.getCommandNS().ns() << "wall"
+                          << Date_t() << "o" << BSON("create" << nss.coll())),
             });
         ASSERT_OK(swResult);
 
@@ -1278,18 +1284,18 @@ public:
         BSONObj doc0 = BSON("_id" << 0 << "a" << 3);
         BSONObj doc1 = BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2));
         BSONObj doc2 = BSON("_id" << 2 << "a" << BSON_ARRAY(1 << 2));
-        auto op0 = repl::OplogEntry(BSON("ts" << insertTime0.asTimestamp() << "t" << 1LL << "v" << 2
-                                              << "op"
-                                              << "i"
-                                              << "ns" << nss.ns() << "ui" << uuid << "o" << doc0));
-        auto op1 = repl::OplogEntry(BSON("ts" << insertTime1.asTimestamp() << "t" << 1LL << "v" << 2
-                                              << "op"
-                                              << "i"
-                                              << "ns" << nss.ns() << "ui" << uuid << "o" << doc1));
-        auto op2 = repl::OplogEntry(BSON("ts" << insertTime2.asTimestamp() << "t" << 1LL << "v" << 2
-                                              << "op"
-                                              << "i"
-                                              << "ns" << nss.ns() << "ui" << uuid << "o" << doc2));
+        auto op0 = repl::OplogEntry(
+            BSON("ts" << insertTime0.asTimestamp() << "t" << 1LL << "v" << 2 << "op"
+                      << "i"
+                      << "ns" << nss.ns() << "ui" << uuid << "wall" << Date_t() << "o" << doc0));
+        auto op1 = repl::OplogEntry(
+            BSON("ts" << insertTime1.asTimestamp() << "t" << 1LL << "v" << 2 << "op"
+                      << "i"
+                      << "ns" << nss.ns() << "ui" << uuid << "wall" << Date_t() << "o" << doc1));
+        auto op2 = repl::OplogEntry(
+            BSON("ts" << insertTime2.asTimestamp() << "t" << 1LL << "v" << 2 << "op"
+                      << "i"
+                      << "ns" << nss.ns() << "ui" << uuid << "wall" << Date_t() << "o" << doc2));
         std::vector<repl::OplogEntry> ops = {op0, op1, op2};
 
         DoNothingOplogApplierObserver observer;
@@ -1349,18 +1355,18 @@ public:
         BSONObj doc0 = BSON("_id" << 0 << "a" << 3);
         BSONObj doc1 = BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2));
         BSONObj doc2 = BSON("_id" << 2 << "a" << BSON_ARRAY(1 << 2));
-        auto op0 = repl::OplogEntry(BSON("ts" << insertTime0.asTimestamp() << "t" << 1LL << "v" << 2
-                                              << "op"
-                                              << "i"
-                                              << "ns" << nss.ns() << "ui" << uuid << "o" << doc0));
-        auto op1 = repl::OplogEntry(BSON("ts" << insertTime1.asTimestamp() << "t" << 1LL << "v" << 2
-                                              << "op"
-                                              << "i"
-                                              << "ns" << nss.ns() << "ui" << uuid << "o" << doc1));
-        auto op2 = repl::OplogEntry(BSON("ts" << insertTime2.asTimestamp() << "t" << 1LL << "v" << 2
-                                              << "op"
-                                              << "i"
-                                              << "ns" << nss.ns() << "ui" << uuid << "o" << doc2));
+        auto op0 = repl::OplogEntry(
+            BSON("ts" << insertTime0.asTimestamp() << "t" << 1LL << "v" << 2 << "op"
+                      << "i"
+                      << "ns" << nss.ns() << "ui" << uuid << "wall" << Date_t() << "o" << doc0));
+        auto op1 = repl::OplogEntry(
+            BSON("ts" << insertTime1.asTimestamp() << "t" << 1LL << "v" << 2 << "op"
+                      << "i"
+                      << "ns" << nss.ns() << "ui" << uuid << "wall" << Date_t() << "o" << doc1));
+        auto op2 = repl::OplogEntry(
+            BSON("ts" << insertTime2.asTimestamp() << "t" << 1LL << "v" << 2 << "op"
+                      << "i"
+                      << "ns" << nss.ns() << "ui" << uuid << "wall" << Date_t() << "o" << doc2));
         auto indexSpec2 =
             BSON("createIndexes" << nss.coll() << "v" << static_cast<int>(kIndexVersion) << "key"
                                  << BSON("b" << 1) << "name"
@@ -1368,7 +1374,8 @@ public:
         auto createIndexOp = repl::OplogEntry(
             BSON("ts" << indexBuildTime.asTimestamp() << "t" << 1LL << "v" << 2 << "op"
                       << "c"
-                      << "ns" << nss.getCommandNS().ns() << "ui" << uuid << "o" << indexSpec2));
+                      << "ns" << nss.getCommandNS().ns() << "ui" << uuid << "wall" << Date_t()
+                      << "o" << indexSpec2));
 
         // We add in an index creation op to test that we restart tracking multikey path info
         // after bulk index builds.
@@ -2435,10 +2442,10 @@ public:
 
         // Make a simple insert operation.
         BSONObj doc0 = BSON("_id" << 0 << "a" << 0);
-        auto insertOp =
-            repl::OplogEntry(BSON("ts" << futureTs << "t" << 1LL << "v" << 2 << "op"
-                                       << "i"
-                                       << "ns" << ns.ns() << "ui" << uuid << "o" << doc0));
+        auto insertOp = repl::OplogEntry(BSON("ts" << futureTs << "t" << 1LL << "v" << 2 << "op"
+                                                   << "i"
+                                                   << "ns" << ns.ns() << "ui" << uuid << "wall"
+                                                   << Date_t() << "o" << doc0));
 
         // Apply the operation.
         auto storageInterface = repl::StorageInterface::get(_opCtx);
@@ -2528,7 +2535,7 @@ public:
             auto createIndexOp = BSON("ts" << startBuildTs << "t" << 1LL << "v" << 2 << "op"
                                            << "c"
                                            << "ns" << nss.getCommandNS().ns() << "ui" << collUUID
-                                           << "o" << indexSpec);
+                                           << "wall" << Date_t() << "o" << indexSpec);
 
             ASSERT_OK(doAtomicApplyOps(nss.db().toString(), {createIndexOp}));
 

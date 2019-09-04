@@ -86,14 +86,13 @@ boost::optional<repl::OplogEntry> createMatchingTransactionTableUpdate(
     }
 
     invariant(sessionInfo.getSessionId());
-    invariant(entry.getWallClockTime());
 
     const auto updateBSON = [&] {
         SessionTxnRecord newTxnRecord;
         newTxnRecord.setSessionId(*sessionInfo.getSessionId());
         newTxnRecord.setTxnNum(*sessionInfo.getTxnNumber());
         newTxnRecord.setLastWriteOpTime(entry.getOpTime());
-        newTxnRecord.setLastWriteDate(*entry.getWallClockTime());
+        newTxnRecord.setLastWriteDate(entry.getWallClockTime());
 
         return newTxnRecord.toBSON();
     }();
@@ -102,7 +101,7 @@ boost::optional<repl::OplogEntry> createMatchingTransactionTableUpdate(
         entry.getOpTime(),
         updateBSON,
         BSON(SessionTxnRecord::kSessionIdFieldName << sessionInfo.getSessionId()->toBSON()),
-        *entry.getWallClockTime());
+        entry.getWallClockTime());
 }
 
 /**
@@ -263,14 +262,13 @@ boost::optional<OplogEntry> SessionUpdateTracker::_createTransactionTableUpdateF
         return boost::none;
     }
     invariant(sessionInfo.getSessionId());
-    invariant(entry.getWallClockTime());
 
     const auto updateBSON = [&] {
         SessionTxnRecord newTxnRecord;
         newTxnRecord.setSessionId(*sessionInfo.getSessionId());
         newTxnRecord.setTxnNum(*sessionInfo.getTxnNumber());
         newTxnRecord.setLastWriteOpTime(entry.getOpTime());
-        newTxnRecord.setLastWriteDate(*entry.getWallClockTime());
+        newTxnRecord.setLastWriteDate(entry.getWallClockTime());
 
         if (entry.isPartialTransaction()) {
             invariant(entry.getPrevWriteOpTimeInTransaction()->isNull());
@@ -310,7 +308,7 @@ boost::optional<OplogEntry> SessionUpdateTracker::_createTransactionTableUpdateF
         entry.getOpTime(),
         updateBSON,
         BSON(SessionTxnRecord::kSessionIdFieldName << sessionInfo.getSessionId()->toBSON()),
-        *entry.getWallClockTime());
+        entry.getWallClockTime());
 }
 
 }  // namespace repl

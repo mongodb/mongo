@@ -64,7 +64,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 repl::OpTypeEnum opType,
                                 BSONObj object,
                                 OperationSessionInfo sessionInfo,
-                                boost::optional<Date_t> wallClockTime,
+                                Date_t wallClockTime,
                                 boost::optional<StmtId> stmtId,
                                 boost::optional<repl::OpTime> prevWriteOpTimeInTransaction) {
     return repl::OplogEntry(
@@ -554,7 +554,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, IncompleteHistoryDueToOpLogTru
             sessionRecord.setSessionId(sessionId);
             sessionRecord.setTxnNum(txnNum);
             sessionRecord.setLastWriteOpTime(entry2.getOpTime());
-            sessionRecord.setLastWriteDate(*entry2.getWallClockTime());
+            sessionRecord.setLastWriteDate(entry2.getWallClockTime());
             return sessionRecord.toBSON();
         }());
     }

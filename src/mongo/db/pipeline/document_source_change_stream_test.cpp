@@ -346,7 +346,7 @@ public:
                                 object2,                            // o2
                                 sessionInfo,                        // sessionInfo
                                 boost::none,                        // upsert
-                                boost::none,                        // wall clock time
+                                Date_t(),                           // wall clock time
                                 boost::none,                        // statement id
                                 prevOpTime,    // optime of previous write within same transaction
                                 boost::none,   // pre-image optime
@@ -1030,7 +1030,7 @@ TEST_F(ChangeStreamStageTest, CommitCommandReturnsOperationsFromPreparedTransact
                          boost::none,                      // o2
                          sessionInfo,                      // sessionInfo
                          boost::none,                      // upsert
-                         boost::none,                      // wall clock time
+                         Date_t(),                         // wall clock time
                          boost::none,                      // statement id
                          applyOpsOpTime,  // optime of previous write within same transaction
                          boost::none,     // pre-image optime
@@ -1227,7 +1227,7 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionWithMultipleOplogEntries) {
                          boost::none,                      // o2
                          sessionInfo,                      // sessionInfo
                          boost::none,                      // upsert
-                         boost::none,                      // wall clock time
+                         Date_t(),                         // wall clock time
                          boost::none,                      // statement id
                          applyOpsOpTime2,  // optime of previous write within same transaction
                          boost::none,      // pre-image optime

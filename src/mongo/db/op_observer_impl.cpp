@@ -186,7 +186,7 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& 
     // oplogLink could have been changed to include pre/postImageOpTime by the previous no-op write.
     repl::appendRetryableWriteInfo(opCtx, &oplogEntry, &oplogLink, args.updateArgs.stmtId);
     opTimes.writeOpTime = logOperation(opCtx, &oplogEntry);
-    opTimes.wallClockTime = oplogEntry.getWallClockTime().get();
+    opTimes.wallClockTime = oplogEntry.getWallClockTime();
     return opTimes;
 }
 
@@ -223,7 +223,7 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
     // oplogLink could have been changed to include preImageOpTime by the previous no-op write.
     repl::appendRetryableWriteInfo(opCtx, &oplogEntry, &oplogLink, stmtId);
     opTimes.writeOpTime = logOperation(opCtx, &oplogEntry);
-    opTimes.wallClockTime = oplogEntry.getWallClockTime().get();
+    opTimes.wallClockTime = oplogEntry.getWallClockTime();
     return opTimes;
 }
 
@@ -808,7 +808,7 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
     try {
         OpTimeBundle times;
         times.writeOpTime = logOperation(opCtx, oplogEntry);
-        times.wallClockTime = oplogEntry->getWallClockTime().get();
+        times.wallClockTime = oplogEntry->getWallClockTime();
         if (updateTxnTable) {
             SessionTxnRecord sessionTxnRecord;
             sessionTxnRecord.setLastWriteOpTime(times.writeOpTime);
@@ -971,7 +971,7 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
 
             SessionTxnRecord sessionTxnRecord;
             sessionTxnRecord.setLastWriteOpTime(oplogOpTime);
-            sessionTxnRecord.setLastWriteDate(oplogEntry->getWallClockTime().get());
+            sessionTxnRecord.setLastWriteDate(oplogEntry->getWallClockTime());
             sessionTxnRecord.setState(durableState);
             onWriteOpCompleted(opCtx, {}, sessionTxnRecord);
             wuow.commit();

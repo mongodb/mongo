@@ -346,7 +346,7 @@ OplogEntry makeOplogEntry(OpTypeEnum opType, const BSONObj& oField) {
                       boost::none,                 // o2
                       {},                          // sessionInfo
                       boost::none,                 // upsert
-                      boost::none,                 // wall clock time
+                      Date_t(),                    // wall clock time
                       boost::none,                 // statement id
                       boost::none,   // optime of previous write within same transaction
                       boost::none,   // pre-image optime

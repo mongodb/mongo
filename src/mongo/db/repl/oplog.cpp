@@ -405,7 +405,6 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
 
     auto oplog = oplogInfo->getCollection();
     auto wallClockTime = oplogEntry->getWallClockTime();
-    invariant(wallClockTime);
 
     auto bsonOplogEntry = oplogEntry->toBSON();
     // The storage engine will assign the RecordId based on the "ts" field of the oplog entry, see
@@ -413,7 +412,7 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
     std::vector<Record> records{
         {RecordId(), RecordData(bsonOplogEntry.objdata(), bsonOplogEntry.objsize())}};
     std::vector<Timestamp> timestamps{slot.getTimestamp()};
-    _logOpsInner(opCtx, oplogEntry->getNss(), &records, timestamps, oplog, slot, *wallClockTime);
+    _logOpsInner(opCtx, oplogEntry->getNss(), &records, timestamps, oplog, slot, wallClockTime);
     wuow.commit();
     return slot;
 }
@@ -491,8 +490,7 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
     invariant(!lastOpTime.isNull());
     auto oplog = oplogInfo->getCollection();
     auto wallClockTime = oplogEntryTemplate->getWallClockTime();
-    invariant(wallClockTime);
-    _logOpsInner(opCtx, nss, &records, timestamps, oplog, lastOpTime, *wallClockTime);
+    _logOpsInner(opCtx, nss, &records, timestamps, oplog, lastOpTime, wallClockTime);
     wuow.commit();
     return opTimes;
 }

@@ -74,7 +74,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 BSONObj object,
                                 boost::optional<BSONObj> object2 = boost::none,
                                 OperationSessionInfo sessionInfo = {},
-                                boost::optional<Date_t> wallClockTime = boost::none,
+                                Date_t wallClockTime = Date_t(),
                                 boost::optional<StmtId> stmtId = boost::none,
                                 boost::optional<UUID> uuid = boost::none,
                                 boost::optional<OpTime> prevOpTime = boost::none) {
@@ -215,7 +215,7 @@ OplogEntry makeCommandOplogEntry(OpTime opTime,
                           command,
                           boost::none /* o2 */,
                           {} /* sessionInfo */,
-                          boost::none /* wallClockTime*/,
+                          Date_t() /* wallClockTime*/,
                           boost::none /* stmtId */,
                           uuid);
 }

@@ -761,9 +761,8 @@ void SyncTail::_oplogApplication(ReplicationCoordinator* replCoord,
         auto consistency = (lastOpTimeInBatch >= minValid)
             ? ReplicationCoordinator::DataConsistency::Consistent
             : ReplicationCoordinator::DataConsistency::Inconsistent;
-        // Wall clock time is non-optional post 3.6.
-        invariant(lastWallTimeInBatch);
-        finalizer->record({lastOpTimeInBatch, lastWallTimeInBatch.get()}, consistency);
+
+        finalizer->record({lastOpTimeInBatch, lastWallTimeInBatch}, consistency);
     }
 }
 

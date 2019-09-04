@@ -160,6 +160,7 @@ std::pair<BSONObj, RecordId> RollbackTest::makeCRUDOp(OpTypeEnum opType,
     if (o2) {
         bob.append("o2", *o2);
     }
+    bob.append("wall", Date_t());
 
     return std::make_pair(bob.obj(), RecordId(recordId));
 }
@@ -183,6 +184,7 @@ std::pair<BSONObj, RecordId> RollbackTest::makeCommandOp(Timestamp ts,
     if (o2) {
         bob.append("o2", *o2);
     }
+    bob.append("wall", Date_t());
 
     return std::make_pair(bob.obj(), RecordId(recordId));
 }
@@ -297,7 +299,7 @@ void RollbackResyncsCollectionOptionsTest::resyncCollectionOptionsTest(
                                   << "n"
                                   << "o" << BSONObj() << "ns"
                                   << "rollback_test.test"
-                                  << "ui" << commonOpUuid);
+                                  << "wall" << Date_t() << "ui" << commonOpUuid);
 
     auto commonOperation = std::make_pair(commonOpBson, RecordId(1));
 

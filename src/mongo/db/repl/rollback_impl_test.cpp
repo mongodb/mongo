@@ -69,21 +69,21 @@ std::string kGenericUUIDStr = "b4c66a44-c1ca-4d86-8d25-12e82fa2de5b";
 BSONObj makeInsertOplogEntry(long long time, BSONObj obj, StringData ns, UUID uuid) {
     return BSON("ts" << Timestamp(time, time) << "t" << time << "op"
                      << "i"
-                     << "o" << obj << "ns" << ns << "ui" << uuid);
+                     << "o" << obj << "ns" << ns << "ui" << uuid << "wall" << Date_t());
 }
 
 BSONObj makeUpdateOplogEntry(
     long long time, BSONObj query, BSONObj update, StringData ns, UUID uuid) {
     return BSON("ts" << Timestamp(time, time) << "t" << time << "op"
                      << "u"
-                     << "ns" << ns << "ui" << uuid << "o2" << query << "o"
-                     << BSON("$set" << update));
+                     << "ns" << ns << "ui" << uuid << "o2" << query << "o" << BSON("$set" << update)
+                     << "wall" << Date_t());
 }
 
 BSONObj makeDeleteOplogEntry(long long time, BSONObj id, StringData ns, UUID uuid) {
     return BSON("ts" << Timestamp(time, time) << "t" << time << "op"
                      << "d"
-                     << "ns" << ns << "ui" << uuid << "o" << id);
+                     << "ns" << ns << "ui" << uuid << "o" << id << "wall" << Date_t());
 }
 
 class RollbackImplForTest final : public RollbackImpl {
@@ -364,7 +364,8 @@ BSONObj makeOp(OpTime time) {
     auto kGenericUUID = unittest::assertGet(UUID::parse(kGenericUUIDStr));
     return BSON("ts" << time.getTimestamp() << "t" << time.getTerm() << "op"
                      << "n"
-                     << "o" << BSONObj() << "ns" << nss.ns() << "ui" << kGenericUUID);
+                     << "o" << BSONObj() << "ns" << nss.ns() << "ui" << kGenericUUID << "wall"
+                     << Date_t());
 }
 
 BSONObj makeOp(int count) {
@@ -929,10 +930,10 @@ TEST_F(RollbackImplTest, RollbackDoesNotWriteRollbackFilesIfNoInsertsOrUpdatesAf
     const auto uuid = UUID::gen();
     const auto nss = NamespaceString("db.coll");
     const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
-    const auto oplogEntry =
-        BSON("ts" << Timestamp(3, 3) << "t" << 3LL << "op"
-                  << "c"
-                  << "o" << BSON("create" << nss.coll()) << "ns" << nss.ns() << "ui" << uuid);
+    const auto oplogEntry = BSON("ts" << Timestamp(3, 3) << "t" << 3LL << "op"
+                                      << "c"
+                                      << "wall" << Date_t() << "o" << BSON("create" << nss.coll())
+                                      << "ns" << nss.ns() << "ui" << uuid);
     ASSERT_OK(_insertOplogEntry(oplogEntry));
 
     ASSERT_OK(_rollback->runRollback(_opCtx.get()));
@@ -1154,7 +1155,8 @@ TEST_F(RollbackImplTest, RollbackProperlySavesFilesWhenInsertsAndDropOfCollectio
     const auto oplogEntry =
         BSON("ts" << dropOpTime.getTimestamp() << "t" << dropOpTime.getTerm() << "op"
                   << "c"
-                  << "o" << BSON("drop" << nss.coll()) << "ns" << nss.ns() << "ui" << uuid);
+                  << "wall" << Date_t() << "o" << BSON("drop" << nss.coll()) << "ns" << nss.ns()
+                  << "ui" << uuid);
     ASSERT_OK(_insertOplogEntry(oplogEntry));
 
     ASSERT_OK(_rollback->runRollback(_opCtx.get()));
@@ -1179,10 +1181,10 @@ TEST_F(RollbackImplTest, RollbackProperlySavesFilesWhenCreateCollAndInsertsAreRo
     const auto nss = NamespaceString("db.people");
     const auto uuid = UUID::gen();
     const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
-    const auto oplogEntry =
-        BSON("ts" << Timestamp(3, 3) << "t" << 3LL << "op"
-                  << "c"
-                  << "o" << BSON("create" << nss.coll()) << "ns" << nss.ns() << "ui" << uuid);
+    const auto oplogEntry = BSON("ts" << Timestamp(3, 3) << "t" << 3LL << "op"
+                                      << "c"
+                                      << "wall" << Date_t() << "o" << BSON("create" << nss.coll())
+                                      << "ns" << nss.ns() << "ui" << uuid);
     ASSERT_OK(_insertOplogEntry(oplogEntry));
 
     // Insert documents into the collection.
@@ -1429,7 +1431,7 @@ RollbackImplTest::_setUpUnpreparedTransactionForCountTest(UUID collId) {
                                          boost::none,                // o2Field
                                          sessionInfo,                // sessionInfo
                                          boost::none,                // isUpsert
-                                         boost::none,                // wallClockTime
+                                         Date_t(),                   // wallClockTime
                                          boost::none,                // statementId
                                          OpTime(),                   // prevWriteOpTimeInTransaction
                                          boost::none,                // preImageOpTime
@@ -1454,7 +1456,7 @@ RollbackImplTest::_setUpUnpreparedTransactionForCountTest(UUID collId) {
                                         boost::none,                // o2Field
                                         sessionInfo,                // sessionInfo
                                         boost::none,                // isUpsert
-                                        boost::none,                // wallClockTime
+                                        Date_t(),                   // wallClockTime
                                         boost::none,                // statementId
                                         partialApplyOpsOpTime,      // prevWriteOpTimeInTransaction
                                         boost::none,                // preImageOpTime
@@ -1536,6 +1538,7 @@ public:
         collId.appendToBuilder(&bob, "ui");
         bob.append("ns", nss.ns());
         bob.append("o", doc);
+        bob.append("wall", Date_t());
         bob.append("lsid",
                    BSON("id" << sessionId << "uid"
                              << BSONBinData(std::string(32, 'x').data(), 32, BinDataGeneral)));

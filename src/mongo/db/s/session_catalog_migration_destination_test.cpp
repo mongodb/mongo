@@ -87,7 +87,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 BSONObj object,
                                 boost::optional<BSONObj> object2,
                                 OperationSessionInfo sessionInfo,
-                                boost::optional<Date_t> wallClockTime,
+                                Date_t wallClockTime,
                                 boost::optional<StmtId> stmtId,
                                 boost::optional<repl::OpTime> preImageOpTime = boost::none,
                                 boost::optional<repl::OpTime> postImageOpTime = boost::none) {
@@ -596,7 +596,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldNotNestAlreadyNestedOplog) 
                                           BSON("x" << 100),              // o
                                           boost::none,                   // o2
                                           sessionInfo,                   // session info
-                                          boost::none,                   // wall clock time
+                                          Date_t(),                      // wall clock time
                                           23);                           // statement id
 
     auto origInnerOplog2 = makeOplogEntry(OpTime(Timestamp(80, 2), 1),  // optime
@@ -604,7 +604,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldNotNestAlreadyNestedOplog) 
                                           BSON("x" << 80),              // o
                                           boost::none,                  // o2
                                           sessionInfo,                  // session info
-                                          boost::none,                  // wall clock time
+                                          Date_t(),                     // wall clock time
                                           45);                          // statement id
 
     auto oplog1 = makeOplogEntry(OpTime(Timestamp(1100, 2), 1),  // optime

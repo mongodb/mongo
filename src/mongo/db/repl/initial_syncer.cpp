@@ -1182,8 +1182,7 @@ void InitialSyncer::_getNextApplierBatchCallback(
             return _oplogApplier->multiApply(opCtx, std::move(ops));
         };
         OpTime lastApplied = ops.back().getOpTime();
-        invariant(ops.back().getWallClockTime());
-        Date_t lastAppliedWall = ops.back().getWallClockTime().get();
+        Date_t lastAppliedWall = ops.back().getWallClockTime();
 
         auto numApplied = ops.size();
         MultiApplier::CallbackFn onCompletionFn = [=](const Status& s) {

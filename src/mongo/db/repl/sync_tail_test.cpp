@@ -92,7 +92,7 @@ OplogEntry makeOplogEntry(OpTypeEnum opType, NamespaceString nss, OptionalCollec
                       boost::none,                 // o2
                       {},                          // sessionInfo
                       boost::none,                 // upsert
-                      boost::none,                 // wall clock time
+                      Date_t(),                    // wall clock time
                       boost::none,                 // statement id
                       boost::none,   // optime of previous write within same transaction
                       boost::none,   // pre-image optime
@@ -278,10 +278,11 @@ TEST_F(SyncTailTest, SyncApplyDeleteDocumentCollectionLockedByUUID) {
 
 TEST_F(SyncTailTest, SyncApplyCommand) {
     NamespaceString nss("test.t");
-    auto op = BSON("op"
-                   << "c"
-                   << "ns" << nss.getCommandNS().ns() << "o" << BSON("create" << nss.coll()) << "ts"
-                   << Timestamp(1, 1) << "ui" << UUID::gen());
+    auto op =
+        BSON("op"
+             << "c"
+             << "ns" << nss.getCommandNS().ns() << "wall" << Date_t() << "o"
+             << BSON("create" << nss.coll()) << "ts" << Timestamp(1, 1) << "ui" << UUID::gen());
     bool applyCmdCalled = false;
     _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
                                             Collection*,
@@ -508,7 +509,7 @@ TEST_F(MultiOplogEntrySyncTailTest, MultiApplyUnpreparedTransactionSeparate) {
     checkTxnTable(_lsid,
                   _txnNum,
                   _insertOp1->getOpTime(),
-                  *_insertOp1->getWallClockTime(),
+                  _insertOp1->getWallClockTime(),
                   expectedStartOpTime,
                   DurableTxnStateEnum::kInProgress);
 
@@ -525,7 +526,7 @@ TEST_F(MultiOplogEntrySyncTailTest, MultiApplyUnpreparedTransactionSeparate) {
     checkTxnTable(_lsid,
                   _txnNum,
                   _insertOp1->getOpTime(),
-                  *_insertOp1->getWallClockTime(),
+                  _insertOp1->getWallClockTime(),
                   expectedStartOpTime,
                   DurableTxnStateEnum::kInProgress);
 
@@ -539,7 +540,7 @@ TEST_F(MultiOplogEntrySyncTailTest, MultiApplyUnpreparedTransactionSeparate) {
     checkTxnTable(_lsid,
                   _txnNum,
                   _commitOp->getOpTime(),
-                  *_commitOp->getWallClockTime(),
+                  _commitOp->getWallClockTime(),
                   boost::none,
                   DurableTxnStateEnum::kCommitted);
 }
@@ -563,7 +564,7 @@ TEST_F(MultiOplogEntrySyncTailTest, MultiApplyUnpreparedTransactionAllAtOnce) {
     checkTxnTable(_lsid,
                   _txnNum,
                   _commitOp->getOpTime(),
-                  *_commitOp->getWallClockTime(),
+                  _commitOp->getWallClockTime(),
                   boost::none,
                   DurableTxnStateEnum::kCommitted);
 }
@@ -617,7 +618,7 @@ TEST_F(MultiOplogEntrySyncTailTest, MultiApplyUnpreparedTransactionTwoBatches) {
     checkTxnTable(_lsid,
                   _txnNum,
                   insertOps[0].getOpTime(),
-                  *insertOps[0].getWallClockTime(),
+                  insertOps[0].getWallClockTime(),
                   expectedStartOpTime,
                   DurableTxnStateEnum::kInProgress);
 
@@ -631,7 +632,7 @@ TEST_F(MultiOplogEntrySyncTailTest, MultiApplyUnpreparedTransactionTwoBatches) {
     checkTxnTable(_lsid,
                   _txnNum,
                   commitOp.getOpTime(),
-                  *commitOp.getWallClockTime(),
+                  commitOp.getWallClockTime(),
                   boost::none,
                   DurableTxnStateEnum::kCommitted);
 
@@ -738,7 +739,7 @@ TEST_F(MultiOplogEntrySyncTailTest, MultiApplyTwoTransactionsOneBatch) {
     checkTxnTable(_lsid,
                   txnNum2,
                   commitOp2.getOpTime(),
-                  *commitOp2.getWallClockTime(),
+                  commitOp2.getWallClockTime(),
                   boost::none,
                   DurableTxnStateEnum::kCommitted);
 
@@ -843,7 +844,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionStea
     checkTxnTable(_lsid,
                   _txnNum,
                   _insertOp1->getOpTime(),
-                  *_insertOp1->getWallClockTime(),
+                  _insertOp1->getWallClockTime(),
                   expectedStartOpTime,
                   DurableTxnStateEnum::kInProgress);
 
@@ -858,7 +859,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionStea
     checkTxnTable(_lsid,
                   _txnNum,
                   _prepareWithPrevOp->getOpTime(),
-                  *_prepareWithPrevOp->getWallClockTime(),
+                  _prepareWithPrevOp->getWallClockTime(),
                   expectedStartOpTime,
                   DurableTxnStateEnum::kPrepared);
 
@@ -871,7 +872,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionStea
     checkTxnTable(_lsid,
                   _txnNum,
                   _commitPrepareWithPrevOp->getOpTime(),
-                  *_commitPrepareWithPrevOp->getWallClockTime(),
+                  _commitPrepareWithPrevOp->getWallClockTime(),
                   boost::none,
                   DurableTxnStateEnum::kCommitted);
 }
@@ -892,7 +893,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyAbortPreparedTransactio
     checkTxnTable(_lsid,
                   _txnNum,
                   _insertOp1->getOpTime(),
-                  *_insertOp1->getWallClockTime(),
+                  _insertOp1->getWallClockTime(),
                   expectedStartOpTime,
                   DurableTxnStateEnum::kInProgress);
 
@@ -903,7 +904,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyAbortPreparedTransactio
     checkTxnTable(_lsid,
                   _txnNum,
                   _prepareWithPrevOp->getOpTime(),
-                  *_prepareWithPrevOp->getWallClockTime(),
+                  _prepareWithPrevOp->getWallClockTime(),
                   expectedStartOpTime,
                   DurableTxnStateEnum::kPrepared);
 
@@ -916,7 +917,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyAbortPreparedTransactio
     checkTxnTable(_lsid,
                   _txnNum,
                   _abortPrepareWithPrevOp->getOpTime(),
-                  *_abortPrepareWithPrevOp->getWallClockTime(),
+                  _abortPrepareWithPrevOp->getWallClockTime(),
                   boost::none,
                   DurableTxnStateEnum::kAborted);
 }
@@ -942,7 +943,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionInit
     checkTxnTable(_lsid,
                   _txnNum,
                   _insertOp1->getOpTime(),
-                  *_insertOp1->getWallClockTime(),
+                  _insertOp1->getWallClockTime(),
                   expectedStartOpTime,
                   DurableTxnStateEnum::kInProgress);
 
@@ -956,7 +957,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionInit
     checkTxnTable(_lsid,
                   _txnNum,
                   _prepareWithPrevOp->getOpTime(),
-                  *_prepareWithPrevOp->getWallClockTime(),
+                  _prepareWithPrevOp->getWallClockTime(),
                   expectedStartOpTime,
                   DurableTxnStateEnum::kPrepared);
 
@@ -969,7 +970,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionInit
     checkTxnTable(_lsid,
                   _txnNum,
                   _commitPrepareWithPrevOp->getOpTime(),
-                  *_commitPrepareWithPrevOp->getWallClockTime(),
+                  _commitPrepareWithPrevOp->getWallClockTime(),
                   boost::none,
                   DurableTxnStateEnum::kCommitted);
 }
@@ -1004,7 +1005,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionReco
     checkTxnTable(_lsid,
                   _txnNum,
                   _insertOp1->getOpTime(),
-                  *_insertOp1->getWallClockTime(),
+                  _insertOp1->getWallClockTime(),
                   expectedStartOpTime,
                   DurableTxnStateEnum::kInProgress);
 
@@ -1017,7 +1018,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionReco
     checkTxnTable(_lsid,
                   _txnNum,
                   _prepareWithPrevOp->getOpTime(),
-                  *_prepareWithPrevOp->getWallClockTime(),
+                  _prepareWithPrevOp->getWallClockTime(),
                   expectedStartOpTime,
                   DurableTxnStateEnum::kPrepared);
 
@@ -1030,7 +1031,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionReco
     checkTxnTable(_lsid,
                   _txnNum,
                   _commitPrepareWithPrevOp->getOpTime(),
-                  *_commitPrepareWithPrevOp->getWallClockTime(),
+                  _commitPrepareWithPrevOp->getWallClockTime(),
                   boost::none,
                   DurableTxnStateEnum::kCommitted);
 }
@@ -1054,7 +1055,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplySingleApplyOpsPreparedT
     checkTxnTable(_lsid,
                   _txnNum,
                   _singlePrepareApplyOp->getOpTime(),
-                  *_singlePrepareApplyOp->getWallClockTime(),
+                  _singlePrepareApplyOp->getWallClockTime(),
                   expectedStartOpTime,
                   DurableTxnStateEnum::kPrepared);
 
@@ -1067,7 +1068,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplySingleApplyOpsPreparedT
     checkTxnTable(_lsid,
                   _txnNum,
                   _commitSinglePrepareApplyOp->getOpTime(),
-                  *_commitSinglePrepareApplyOp->getWallClockTime(),
+                  _commitSinglePrepareApplyOp->getWallClockTime(),
                   boost::none,
                   DurableTxnStateEnum::kCommitted);
 }
@@ -1099,7 +1100,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyEmptyApplyOpsPreparedTr
     checkTxnTable(_lsid,
                   _txnNum,
                   emptyPrepareApplyOp.getOpTime(),
-                  *emptyPrepareApplyOp.getWallClockTime(),
+                  emptyPrepareApplyOp.getWallClockTime(),
                   expectedStartOpTime,
                   DurableTxnStateEnum::kPrepared);
 
@@ -1112,7 +1113,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyEmptyApplyOpsPreparedTr
     checkTxnTable(_lsid,
                   _txnNum,
                   _commitSinglePrepareApplyOp->getOpTime(),
-                  *_commitSinglePrepareApplyOp->getWallClockTime(),
+                  _commitSinglePrepareApplyOp->getWallClockTime(),
                   boost::none,
                   DurableTxnStateEnum::kCommitted);
 }
@@ -1132,7 +1133,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyAbortSingleApplyOpsPrep
     checkTxnTable(_lsid,
                   _txnNum,
                   _singlePrepareApplyOp->getOpTime(),
-                  *_singlePrepareApplyOp->getWallClockTime(),
+                  _singlePrepareApplyOp->getWallClockTime(),
                   expectedStartOpTime,
                   DurableTxnStateEnum::kPrepared);
 
@@ -1145,7 +1146,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyAbortSingleApplyOpsPrep
     checkTxnTable(_lsid,
                   _txnNum,
                   _abortSinglePrepareApplyOp->getOpTime(),
-                  *_abortSinglePrepareApplyOp->getWallClockTime(),
+                  _abortSinglePrepareApplyOp->getWallClockTime(),
                   boost::none,
                   DurableTxnStateEnum::kAborted);
 }
@@ -1171,7 +1172,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest,
     checkTxnTable(_lsid,
                   _txnNum,
                   _singlePrepareApplyOp->getOpTime(),
-                  *_singlePrepareApplyOp->getWallClockTime(),
+                  _singlePrepareApplyOp->getWallClockTime(),
                   expectedStartOpTime,
                   DurableTxnStateEnum::kPrepared);
 
@@ -1184,7 +1185,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest,
     checkTxnTable(_lsid,
                   _txnNum,
                   _commitSinglePrepareApplyOp->getOpTime(),
-                  *_commitSinglePrepareApplyOp->getWallClockTime(),
+                  _commitSinglePrepareApplyOp->getWallClockTime(),
                   boost::none,
                   DurableTxnStateEnum::kCommitted);
 }
@@ -1220,7 +1221,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest,
     checkTxnTable(_lsid,
                   _txnNum,
                   _singlePrepareApplyOp->getOpTime(),
-                  *_singlePrepareApplyOp->getWallClockTime(),
+                  _singlePrepareApplyOp->getWallClockTime(),
                   expectedStartOpTime,
                   DurableTxnStateEnum::kPrepared);
 
@@ -1233,7 +1234,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest,
     checkTxnTable(_lsid,
                   _txnNum,
                   _commitSinglePrepareApplyOp->getOpTime(),
-                  *_commitSinglePrepareApplyOp->getWallClockTime(),
+                  _commitSinglePrepareApplyOp->getWallClockTime(),
                   boost::none,
                   DurableTxnStateEnum::kCommitted);
 }
@@ -2202,7 +2203,8 @@ TEST_F(SyncTailTest, LogSlowOpApplicationWhenSuccessful) {
 
     // Use a builder for easier escaping. We expect the operation to be logged.
     StringBuilder expected;
-    expected << "applied op: CRUD { ts: Timestamp(1, 1), t: 1, v: 2, op: \"i\", ns: \"test.t\", o: "
+    expected << "applied op: CRUD { ts: Timestamp(1, 1), t: 1, v: 2, op: \"i\", ns: \"test.t\", "
+                "wall: new Date(0), o: "
                 "{ _id: 0 } }, took "
              << applyDuration << "ms";
     ASSERT_EQUALS(1, countLogLinesContaining(expected.str()));
@@ -2554,7 +2556,7 @@ TEST_F(SyncTailTxnTableTest, RetryableWriteThenMultiStatementTxnWriteOnSameSessi
                         *sessionInfo.getSessionId(),
                         *sessionInfo.getTxnNumber(),
                         txnCommitOpTime,
-                        *txnCommitOp.getWallClockTime(),
+                        txnCommitOp.getWallClockTime(),
                         boost::none,
                         DurableTxnStateEnum::kCommitted);
 }
@@ -2619,7 +2621,7 @@ TEST_F(SyncTailTxnTableTest, MultiStatementTxnWriteThenRetryableWriteOnSameSessi
                         *sessionInfo.getSessionId(),
                         *sessionInfo.getTxnNumber(),
                         retryableInsertOpTime,
-                        *retryableInsertOp.getWallClockTime(),
+                        retryableInsertOp.getWallClockTime(),
                         boost::none,
                         boost::none);
 }
@@ -2879,7 +2881,7 @@ TEST_F(IdempotencyTestTxns, CommitUnpreparedTransaction) {
                         lsid,
                         txnNum,
                         commitOp.getOpTime(),
-                        *commitOp.getWallClockTime(),
+                        commitOp.getWallClockTime(),
                         boost::none,
                         DurableTxnStateEnum::kCommitted);
     ASSERT_TRUE(docExists(_opCtx.get(), nss, doc));
@@ -2917,7 +2919,7 @@ TEST_F(IdempotencyTestTxns, CommitUnpreparedTransactionDataPartiallyApplied) {
                         lsid,
                         txnNum,
                         commitOp.getOpTime(),
-                        *commitOp.getWallClockTime(),
+                        commitOp.getWallClockTime(),
                         boost::none,
                         DurableTxnStateEnum::kCommitted);
     ASSERT_TRUE(docExists(_opCtx.get(), nss, doc));
@@ -2943,7 +2945,7 @@ TEST_F(IdempotencyTestTxns, CommitPreparedTransaction) {
                         lsid,
                         txnNum,
                         commitOp.getOpTime(),
-                        *commitOp.getWallClockTime(),
+                        commitOp.getWallClockTime(),
                         boost::none,
                         DurableTxnStateEnum::kCommitted);
     ASSERT_TRUE(docExists(_opCtx.get(), nss, doc));
@@ -2983,7 +2985,7 @@ TEST_F(IdempotencyTestTxns, CommitPreparedTransactionDataPartiallyApplied) {
                         lsid,
                         txnNum,
                         commitOp.getOpTime(),
-                        *commitOp.getWallClockTime(),
+                        commitOp.getWallClockTime(),
                         boost::none,
                         DurableTxnStateEnum::kCommitted);
     ASSERT_TRUE(docExists(_opCtx.get(), nss, doc));
@@ -3008,7 +3010,7 @@ TEST_F(IdempotencyTestTxns, AbortPreparedTransaction) {
                         lsid,
                         txnNum,
                         abortOp.getOpTime(),
-                        *abortOp.getWallClockTime(),
+                        abortOp.getWallClockTime(),
                         boost::none,
                         DurableTxnStateEnum::kAborted);
     ASSERT_FALSE(docExists(_opCtx.get(), nss, doc));
@@ -3032,7 +3034,7 @@ TEST_F(IdempotencyTestTxns, SinglePartialTxnOp) {
                         lsid,
                         txnNum,
                         partialOp.getOpTime(),
-                        *partialOp.getWallClockTime(),
+                        partialOp.getWallClockTime(),
                         expectedStartOpTime,
                         DurableTxnStateEnum::kInProgress);
 
@@ -3062,7 +3064,7 @@ TEST_F(IdempotencyTestTxns, MultiplePartialTxnOps) {
                         lsid,
                         txnNum,
                         partialOp1.getOpTime(),
-                        *partialOp1.getWallClockTime(),
+                        partialOp1.getWallClockTime(),
                         expectedStartOpTime,
                         DurableTxnStateEnum::kInProgress);
     // Document should not be visible yet.
@@ -3093,7 +3095,7 @@ TEST_F(IdempotencyTestTxns, CommitUnpreparedTransactionWithPartialTxnOps) {
                         lsid,
                         txnNum,
                         commitOp.getOpTime(),
-                        *commitOp.getWallClockTime(),
+                        commitOp.getWallClockTime(),
                         boost::none,
                         DurableTxnStateEnum::kCommitted);
     ASSERT_TRUE(docExists(_opCtx.get(), nss, doc));
@@ -3132,7 +3134,7 @@ TEST_F(IdempotencyTestTxns, CommitTwoUnpreparedTransactionsWithPartialTxnOpsAtOn
                         lsid,
                         txnNum2,
                         commitOp2.getOpTime(),
-                        *commitOp2.getWallClockTime(),
+                        commitOp2.getWallClockTime(),
                         boost::none,
                         DurableTxnStateEnum::kCommitted);
     ASSERT_TRUE(docExists(_opCtx.get(), nss, doc));
@@ -3170,7 +3172,7 @@ TEST_F(IdempotencyTestTxns, CommitAndAbortTwoTransactionsWithPartialTxnOpsAtOnce
                         lsid,
                         txnNum2,
                         commitOp2.getOpTime(),
-                        *commitOp2.getWallClockTime(),
+                        commitOp2.getWallClockTime(),
                         boost::none,
                         DurableTxnStateEnum::kCommitted);
     ASSERT_FALSE(docExists(_opCtx.get(), nss, doc));
@@ -3209,7 +3211,7 @@ TEST_F(IdempotencyTestTxns, CommitUnpreparedTransactionWithPartialTxnOpsAndDataP
                         lsid,
                         txnNum,
                         commitOp.getOpTime(),
-                        *commitOp.getWallClockTime(),
+                        commitOp.getWallClockTime(),
                         boost::none,
                         DurableTxnStateEnum::kCommitted);
     ASSERT_TRUE(docExists(_opCtx.get(), nss, doc));
@@ -3238,7 +3240,7 @@ TEST_F(IdempotencyTestTxns, PrepareTransactionWithPartialTxnOps) {
                         lsid,
                         txnNum,
                         prepareOp.getOpTime(),
-                        *prepareOp.getWallClockTime(),
+                        prepareOp.getWallClockTime(),
                         partialOp.getOpTime(),
                         DurableTxnStateEnum::kPrepared);
     // Document should not be visible yet.
@@ -3261,7 +3263,7 @@ TEST_F(IdempotencyTestTxns, EmptyPrepareTransaction) {
                         lsid,
                         txnNum,
                         prepareOp.getOpTime(),
-                        *prepareOp.getWallClockTime(),
+                        prepareOp.getWallClockTime(),
                         prepareOp.getOpTime(),
                         DurableTxnStateEnum::kPrepared);
 }
@@ -3289,7 +3291,7 @@ TEST_F(IdempotencyTestTxns, CommitPreparedTransactionWithPartialTxnOps) {
                         lsid,
                         txnNum,
                         commitOp.getOpTime(),
-                        *commitOp.getWallClockTime(),
+                        commitOp.getWallClockTime(),
                         boost::none,
                         DurableTxnStateEnum::kCommitted);
     ASSERT_TRUE(docExists(_opCtx.get(), nss, doc));
@@ -3328,7 +3330,7 @@ TEST_F(IdempotencyTestTxns, CommitTwoPreparedTransactionsWithPartialTxnOpsAtOnce
                         lsid,
                         txnNum2,
                         commitOp2.getOpTime(),
-                        *commitOp2.getWallClockTime(),
+                        commitOp2.getWallClockTime(),
                         boost::none,
                         DurableTxnStateEnum::kCommitted);
     ASSERT_TRUE(docExists(_opCtx.get(), nss, doc));
@@ -3367,7 +3369,7 @@ TEST_F(IdempotencyTestTxns, CommitPreparedTransactionWithPartialTxnOpsAndDataPar
                         lsid,
                         txnNum,
                         commitOp.getOpTime(),
-                        *commitOp.getWallClockTime(),
+                        commitOp.getWallClockTime(),
                         boost::none,
                         DurableTxnStateEnum::kCommitted);
     ASSERT_TRUE(docExists(_opCtx.get(), nss, doc));
@@ -3397,7 +3399,7 @@ TEST_F(IdempotencyTestTxns, AbortPreparedTransactionWithPartialTxnOps) {
                         lsid,
                         txnNum,
                         abortOp.getOpTime(),
-                        *abortOp.getWallClockTime(),
+                        abortOp.getWallClockTime(),
                         boost::none,
                         DurableTxnStateEnum::kAborted);
     ASSERT_FALSE(docExists(_opCtx.get(), nss, doc));
@@ -3422,7 +3424,7 @@ TEST_F(IdempotencyTestTxns, AbortInProgressTransaction) {
                         lsid,
                         txnNum,
                         abortOp.getOpTime(),
-                        *abortOp.getWallClockTime(),
+                        abortOp.getWallClockTime(),
                         boost::none,
                         DurableTxnStateEnum::kAborted);
     ASSERT_FALSE(docExists(_opCtx.get(), nss, doc));

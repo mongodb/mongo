@@ -59,7 +59,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 NamespaceString nss,
                                 BSONObj object,
                                 boost::optional<BSONObj> object2,
-                                boost::optional<Date_t> wallClockTime,
+                                Date_t wallClockTime,
                                 StmtId stmtId,
                                 repl::OpTime prevWriteOpTimeInTransaction,
                                 boost::optional<repl::OpTime> preImageOpTime,
@@ -87,7 +87,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 repl::OpTypeEnum opType,
                                 BSONObj object,
                                 boost::optional<BSONObj> object2,
-                                boost::optional<Date_t> wallClockTime,
+                                Date_t wallClockTime,
                                 StmtId stmtId,
                                 repl::OpTime prevWriteOpTimeInTransaction,
                                 boost::optional<repl::OpTime> preImageOpTime = boost::none,
@@ -135,7 +135,7 @@ TEST_F(SessionCatalogMigrationSourceTest, OneSessionWithTwoWrites) {
     sessionRecord.setSessionId(makeLogicalSessionIdForTest());
     sessionRecord.setTxnNum(1);
     sessionRecord.setLastWriteOpTime(entry2.getOpTime());
-    sessionRecord.setLastWriteDate(*entry2.getWallClockTime());
+    sessionRecord.setLastWriteDate(entry2.getWallClockTime());
 
     DBDirectClient client(opCtx());
     client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), sessionRecord.toBSON());
@@ -187,7 +187,7 @@ TEST_F(SessionCatalogMigrationSourceTest, TwoSessionWithTwoWrites) {
     sessionRecord1.setSessionId(makeLogicalSessionIdForTest());
     sessionRecord1.setTxnNum(1);
     sessionRecord1.setLastWriteOpTime(entry1b.getOpTime());
-    sessionRecord1.setLastWriteDate(*entry1b.getWallClockTime());
+    sessionRecord1.setLastWriteDate(entry1b.getWallClockTime());
 
     DBDirectClient client(opCtx());
     client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(),
@@ -215,7 +215,7 @@ TEST_F(SessionCatalogMigrationSourceTest, TwoSessionWithTwoWrites) {
     sessionRecord2.setSessionId(makeLogicalSessionIdForTest());
     sessionRecord2.setTxnNum(1);
     sessionRecord2.setLastWriteOpTime(entry2b.getOpTime());
-    sessionRecord2.setLastWriteDate(*entry2b.getWallClockTime());
+    sessionRecord2.setLastWriteDate(entry2b.getWallClockTime());
 
     client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(),
                   sessionRecord2.toBSON());
@@ -316,7 +316,7 @@ TEST_F(SessionCatalogMigrationSourceTest, OneSessionWithFindAndModifyPreImageAnd
     sessionRecord.setSessionId(makeLogicalSessionIdForTest());
     sessionRecord.setTxnNum(1);
     sessionRecord.setLastWriteOpTime(entry4.getOpTime());
-    sessionRecord.setLastWriteDate(*entry4.getWallClockTime());
+    sessionRecord.setLastWriteDate(entry4.getWallClockTime());
 
     DBDirectClient client(opCtx());
     client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), sessionRecord.toBSON());
@@ -353,7 +353,7 @@ TEST_F(SessionCatalogMigrationSourceTest, OplogWithOtherNsShouldBeIgnored) {
     sessionRecord1.setSessionId(makeLogicalSessionIdForTest());
     sessionRecord1.setTxnNum(1);
     sessionRecord1.setLastWriteOpTime(entry1.getOpTime());
-    sessionRecord1.setLastWriteDate(*entry1.getWallClockTime());
+    sessionRecord1.setLastWriteDate(entry1.getWallClockTime());
 
     DBDirectClient client(opCtx());
     client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(),
@@ -377,7 +377,7 @@ TEST_F(SessionCatalogMigrationSourceTest, OplogWithOtherNsShouldBeIgnored) {
     sessionRecord2.setSessionId(makeLogicalSessionIdForTest());
     sessionRecord2.setTxnNum(1);
     sessionRecord2.setLastWriteOpTime(entry2.getOpTime());
-    sessionRecord2.setLastWriteDate(*entry2.getWallClockTime());
+    sessionRecord2.setLastWriteDate(entry2.getWallClockTime());
 
     client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(),
                   sessionRecord2.toBSON());
@@ -411,7 +411,7 @@ TEST_F(SessionCatalogMigrationSourceTest, SessionDumpWithMultipleNewWrites) {
     sessionRecord1.setSessionId(makeLogicalSessionIdForTest());
     sessionRecord1.setTxnNum(1);
     sessionRecord1.setLastWriteOpTime(entry1.getOpTime());
-    sessionRecord1.setLastWriteDate(*entry1.getWallClockTime());
+    sessionRecord1.setLastWriteDate(entry1.getWallClockTime());
 
     DBDirectClient client(opCtx());
     client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(),
@@ -579,7 +579,7 @@ TEST_F(SessionCatalogMigrationSourceTest, ReturnsDeadEndSentinelForIncompleteHis
     sessionRecord.setSessionId(sessionId);
     sessionRecord.setTxnNum(31);
     sessionRecord.setLastWriteOpTime(entry.getOpTime());
-    sessionRecord.setLastWriteDate(*entry.getWallClockTime());
+    sessionRecord.setLastWriteDate(entry.getWallClockTime());
 
     DBDirectClient client(opCtx());
     client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), sessionRecord.toBSON());
@@ -606,8 +606,7 @@ TEST_F(SessionCatalogMigrationSourceTest, ReturnsDeadEndSentinelForIncompleteHis
         ASSERT_BSONOBJ_EQ(TransactionParticipant::kDeadEndSentinel, *oplog.getObject2());
         ASSERT_TRUE(oplog.getStatementId());
         ASSERT_EQ(kIncompleteHistoryStmtId, *oplog.getStatementId());
-        ASSERT_TRUE(oplog.getWallClockTime());
-        ASSERT_NE(Date_t{}, *oplog.getWallClockTime());
+        ASSERT_NE(Date_t{}, oplog.getWallClockTime());
 
         auto sessionInfo = oplog.getOperationSessionInfo();
         ASSERT_TRUE(sessionInfo.getSessionId());
@@ -637,7 +636,7 @@ TEST_F(SessionCatalogMigrationSourceTest, ShouldAssertWhenRollbackDetected) {
     sessionRecord.setSessionId(sessionId);
     sessionRecord.setTxnNum(31);
     sessionRecord.setLastWriteOpTime(entry.getOpTime());
-    sessionRecord.setLastWriteDate(*entry.getWallClockTime());
+    sessionRecord.setLastWriteDate(entry.getWallClockTime());
 
     DBDirectClient client(opCtx());
     client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), sessionRecord.toBSON());
@@ -762,7 +761,7 @@ TEST_F(SessionCatalogMigrationSourceTest,
     retryableWriteRecord.setSessionId(makeLogicalSessionIdForTest());
     retryableWriteRecord.setTxnNum(1);
     retryableWriteRecord.setLastWriteOpTime(insertOplog.getOpTime());
-    retryableWriteRecord.setLastWriteDate(*insertOplog.getWallClockTime());
+    retryableWriteRecord.setLastWriteDate(insertOplog.getWallClockTime());
 
     // Create a config.transaction entry pointing to an imaginary commitTransaction entry.
     SessionTxnRecord txnRecord;
@@ -847,7 +846,7 @@ TEST_F(SessionCatalogMigrationSourceTest, FindAndModifyDeleteNotTouchingChunkIsI
     sessionRecord.setSessionId(makeLogicalSessionIdForTest());
     sessionRecord.setTxnNum(1);
     sessionRecord.setLastWriteOpTime(entry2.getOpTime());
-    sessionRecord.setLastWriteDate(*entry2.getWallClockTime());
+    sessionRecord.setLastWriteDate(entry2.getWallClockTime());
 
     DBDirectClient client(opCtx());
     client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), sessionRecord.toBSON());
@@ -882,7 +881,7 @@ TEST_F(SessionCatalogMigrationSourceTest, FindAndModifyUpdatePrePostNotTouchingC
     sessionRecord.setSessionId(makeLogicalSessionIdForTest());
     sessionRecord.setTxnNum(1);
     sessionRecord.setLastWriteOpTime(entry2.getOpTime());
-    sessionRecord.setLastWriteDate(*entry2.getWallClockTime());
+    sessionRecord.setLastWriteDate(entry2.getWallClockTime());
 
     DBDirectClient client(opCtx());
     client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), sessionRecord.toBSON());
@@ -919,7 +918,7 @@ TEST_F(SessionCatalogMigrationSourceTest,
     sessionRecord.setSessionId(makeLogicalSessionIdForTest());
     sessionRecord.setTxnNum(1);
     sessionRecord.setLastWriteOpTime(entry2.getOpTime());
-    sessionRecord.setLastWriteDate(*entry2.getWallClockTime());
+    sessionRecord.setLastWriteDate(entry2.getWallClockTime());
 
     DBDirectClient client(opCtx());
     client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), sessionRecord.toBSON());
@@ -969,7 +968,7 @@ TEST_F(SessionCatalogMigrationSourceTest,
     sessionRecord.setSessionId(makeLogicalSessionIdForTest());
     sessionRecord.setTxnNum(1);
     sessionRecord.setLastWriteOpTime(entry2.getOpTime());
-    sessionRecord.setLastWriteDate(*entry2.getWallClockTime());
+    sessionRecord.setLastWriteDate(entry2.getWallClockTime());
 
     DBDirectClient client(opCtx());
     client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), sessionRecord.toBSON());
@@ -1005,7 +1004,7 @@ TEST_F(SessionCatalogMigrationSourceTest, FindAndModifyUpdateNotTouchingChunkSho
     sessionRecord.setSessionId(makeLogicalSessionIdForTest());
     sessionRecord.setTxnNum(1);
     sessionRecord.setLastWriteOpTime(entry2.getOpTime());
-    sessionRecord.setLastWriteDate(*entry2.getWallClockTime());
+    sessionRecord.setLastWriteDate(entry2.getWallClockTime());
 
     DBDirectClient client(opCtx());
     client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), sessionRecord.toBSON());
@@ -1044,7 +1043,7 @@ TEST_F(SessionCatalogMigrationSourceTest, TwoSessionWithTwoWritesContainingWrite
     sessionRecord1.setSessionId(higherSessionId);
     sessionRecord1.setTxnNum(1);
     sessionRecord1.setLastWriteOpTime(entry1b.getOpTime());
-    sessionRecord1.setLastWriteDate(*entry1b.getWallClockTime());
+    sessionRecord1.setLastWriteDate(entry1b.getWallClockTime());
 
     DBDirectClient client(opCtx());
     client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(),
@@ -1072,7 +1071,7 @@ TEST_F(SessionCatalogMigrationSourceTest, TwoSessionWithTwoWritesContainingWrite
     sessionRecord2.setSessionId(lowerSessionId);
     sessionRecord2.setTxnNum(1);
     sessionRecord2.setLastWriteOpTime(entry2b.getOpTime());
-    sessionRecord2.setLastWriteDate(*entry2b.getWallClockTime());
+    sessionRecord2.setLastWriteDate(entry2b.getWallClockTime());
 
     client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(),
                   sessionRecord2.toBSON());

@@ -234,11 +234,16 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
     // and populate them with dummy values before parsing ourObj as an oplog entry.
     BSONObjBuilder bob;
     if (isNestedApplyOpsCommand) {
-        if (!ourObj.hasField("ts")) {
-            bob.appendTimestamp("ts");
+        if (!ourObj.hasField(OplogEntry::kTimestampFieldName)) {
+            bob.appendTimestamp(OplogEntry::kTimestampFieldName);
+        }
+        if (!ourObj.hasField(OplogEntry::kWallClockTimeFieldName)) {
+            bob.append(OplogEntry::kWallClockTimeFieldName, Date_t());
         }
     }
+
     bob.appendElements(ourObj);
+
     BSONObj fixedObj = bob.obj();
 
     // Parse the oplog entry.

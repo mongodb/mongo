@@ -70,7 +70,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                             o2Field,                          // o2
                             {},                               // sessionInfo
                             boost::none,                      // upsert
-                            boost::none,                      // wall clock time
+                            Date_t(),                         // wall clock time
                             boost::none,                      // statement id
                             boost::none,       // optime of previous write within same transaction
                             preImageOpTime,    // pre-image optime
@@ -83,7 +83,8 @@ TEST_F(WriteOpsRetryability, ParseOplogEntryForUpdate) {
                   << "u"
                   << "ns"
                   << "a.b"
-                  << "o" << BSON("_id" << 1 << "x" << 5) << "o2" << BSON("_id" << 1))));
+                  << "wall" << Date_t() << "o" << BSON("_id" << 1 << "x" << 5) << "o2"
+                  << BSON("_id" << 1))));
 
     auto res = parseOplogEntryForUpdate(entry);
 
@@ -112,12 +113,12 @@ TEST_F(WriteOpsRetryability, ParseOplogEntryForNestedUpdate) {
 }
 
 TEST_F(WriteOpsRetryability, ParseOplogEntryForUpsert) {
-    const auto entry =
-        assertGet(repl::OplogEntry::parse(BSON("ts" << Timestamp(50, 10) << "t" << 1LL << "op"
-                                                    << "i"
-                                                    << "ns"
-                                                    << "a.b"
-                                                    << "o" << BSON("_id" << 1 << "x" << 5))));
+    const auto entry = assertGet(repl::OplogEntry::parse(
+        BSON("ts" << Timestamp(50, 10) << "t" << 1LL << "op"
+                  << "i"
+                  << "ns"
+                  << "a.b"
+                  << "wall" << Date_t() << "o" << BSON("_id" << 1 << "x" << 5))));
 
     auto res = parseOplogEntryForUpdate(entry);
 

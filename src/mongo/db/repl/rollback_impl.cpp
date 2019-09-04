@@ -970,42 +970,33 @@ Status RollbackImpl::_checkAgainstTimeLimit(
 
     _rollbackStats.lastLocalOptime = topOfOplog.getOpTime();
 
-    auto topOfOplogWallOpt = topOfOplog.getWallClockTime();
+    auto topOfOplogWallTime = topOfOplog.getWallClockTime();
     // We check the difference between the top of the oplog and the first oplog entry after the
     // common point when computing the rollback time limit.
-    auto firstOpWallClockTimeAfterCommonPointOpt =
+    auto firstOpWallClockTimeAfterCommonPoint =
         commonPoint.getFirstOpWallClockTimeAfterCommonPoint();
 
+    if (topOfOplogWallTime >= firstOpWallClockTimeAfterCommonPoint) {
 
-    // Only compute the difference if both the top of the oplog and the first oplog entry after the
-    // common point have wall clock times.
-    if (firstOpWallClockTimeAfterCommonPointOpt && topOfOplogWallOpt) {
-        auto topOfOplogWallTime = topOfOplogWallOpt.get();
-        auto firstOpWallClockTimeAfterCommonPoint = firstOpWallClockTimeAfterCommonPointOpt.get();
+        unsigned long long diff = durationCount<Seconds>(
+            Milliseconds(topOfOplogWallTime - firstOpWallClockTimeAfterCommonPoint));
 
-        if (topOfOplogWallTime >= firstOpWallClockTimeAfterCommonPoint) {
+        _rollbackStats.lastLocalWallClockTime = topOfOplogWallTime;
+        _rollbackStats.firstOpWallClockTimeAfterCommonPoint = firstOpWallClockTimeAfterCommonPoint;
 
-            unsigned long long diff = durationCount<Seconds>(
-                Milliseconds(topOfOplogWallTime - firstOpWallClockTimeAfterCommonPoint));
-
-            _rollbackStats.lastLocalWallClockTime = topOfOplogWallTime;
-            _rollbackStats.firstOpWallClockTimeAfterCommonPoint =
-                firstOpWallClockTimeAfterCommonPoint;
-
-            auto timeLimit = static_cast<unsigned long long>(gRollbackTimeLimitSecs.loadRelaxed());
-            if (diff > timeLimit) {
-                return Status(ErrorCodes::UnrecoverableRollbackError,
-                              str::stream() << "not willing to roll back more than " << timeLimit
-                                            << " seconds of data. Have: " << diff << " seconds.");
-            }
-
-        } else {
-            warning()
-                << "Wall clock times on oplog entries not monotonically increasing. This "
-                   "might indicate a backward clock skew. Time at first oplog after common point: "
-                << firstOpWallClockTimeAfterCommonPoint
-                << ". Time at top of oplog: " << topOfOplogWallTime;
+        auto timeLimit = static_cast<unsigned long long>(gRollbackTimeLimitSecs.loadRelaxed());
+        if (diff > timeLimit) {
+            return Status(ErrorCodes::UnrecoverableRollbackError,
+                          str::stream() << "not willing to roll back more than " << timeLimit
+                                        << " seconds of data. Have: " << diff << " seconds.");
         }
+
+    } else {
+        warning()
+            << "Wall clock times on oplog entries not monotonically increasing. This "
+               "might indicate a backward clock skew. Time at first oplog after common point: "
+            << firstOpWallClockTimeAfterCommonPoint
+            << ". Time at top of oplog: " << topOfOplogWallTime;
     }
 
     return Status::OK();

@@ -100,7 +100,7 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
                           const boost::optional<BSONObj>& o2Field,
                           const OperationSessionInfo& sessionInfo,
                           const boost::optional<bool>& isUpsert,
-                          const boost::optional<mongo::Date_t>& wallClockTime,
+                          const mongo::Date_t& wallClockTime,
                           const boost::optional<StmtId>& statementId,
                           const boost::optional<OpTime>& prevWriteOpTimeInTransaction,
                           const boost::optional<OpTime>& preImageOpTime,
@@ -112,6 +112,7 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
     builder.append(OplogEntryBase::kVersionFieldName, version);
     builder.append(OplogEntryBase::kOpTypeFieldName, OpType_serializer(opType));
     builder.append(OplogEntryBase::kNssFieldName, nss.toString());
+    builder.append(OplogEntryBase::kWallClockTimeFieldName, wallClockTime);
     if (hash) {
         builder.append(OplogEntryBase::kHashFieldName, hash.get());
     }
@@ -128,9 +129,6 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
     if (isUpsert) {
         invariant(o2Field);
         builder.append(OplogEntryBase::kUpsertFieldName, isUpsert.get());
-    }
-    if (wallClockTime) {
-        builder.append(OplogEntryBase::kWallClockTimeFieldName, wallClockTime.get());
     }
     if (statementId) {
         builder.append(OplogEntryBase::kStatementIdFieldName, statementId.get());
@@ -251,7 +249,7 @@ OplogEntry::OplogEntry(OpTime opTime,
                        const boost::optional<BSONObj>& o2Field,
                        const OperationSessionInfo& sessionInfo,
                        const boost::optional<bool>& isUpsert,
-                       const boost::optional<mongo::Date_t>& wallClockTime,
+                       const mongo::Date_t& wallClockTime,
                        const boost::optional<StmtId>& statementId,
                        const boost::optional<OpTime>& prevWriteOpTimeInTransaction,
                        const boost::optional<OpTime>& preImageOpTime,

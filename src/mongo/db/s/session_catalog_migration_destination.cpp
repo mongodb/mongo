@@ -126,10 +126,6 @@ void setPrePostImageTs(const ProcessOplogResult& lastResult, repl::MutableOplogE
 repl::MutableOplogEntry parseOplog(const BSONObj& oplogBSON) {
     auto oplogEntry = uassertStatusOK(repl::MutableOplogEntry::parse(oplogBSON));
 
-    // Session oplog entries must always contain wall clock time, because we will not be
-    // transferring anything from a previous version of the server
-    invariant(oplogEntry.getWallClockTime());
-
     const auto& sessionInfo = oplogEntry.getOperationSessionInfo();
 
     uassert(ErrorCodes::UnsupportedFormat,
@@ -292,7 +288,7 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
                 sessionTxnRecord.setSessionId(result.sessionId);
                 sessionTxnRecord.setTxnNum(result.txnNum);
                 sessionTxnRecord.setLastWriteOpTime(oplogOpTime);
-                sessionTxnRecord.setLastWriteDate(*oplogEntry.getWallClockTime());
+                sessionTxnRecord.setLastWriteDate(oplogEntry.getWallClockTime());
                 // We do not migrate transaction oplog entries so don't set the txn state.
                 txnParticipant.onMigrateCompletedOnPrimary(opCtx, {stmtId}, sessionTxnRecord);
             }

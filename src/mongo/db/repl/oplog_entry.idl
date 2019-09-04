@@ -121,7 +121,6 @@ structs:
             wall:
                 cpp_name: wallClockTime
                 type: date
-                optional: true # Optional for older than 3.6 releases
                 description: "A wallclock time with MS resolution"
             stmtId:
                 cpp_name: statementId
