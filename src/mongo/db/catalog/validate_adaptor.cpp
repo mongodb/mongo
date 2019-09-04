@@ -267,13 +267,25 @@ void ValidateAdaptor::traverseRecordStore(
         // validatedSize = dataSize is not a general requirement as some storage engines may use
         // padding, but we still require that they return the unpadded record data.
         if (!status.isOK() || validatedSize != static_cast<size_t>(dataSize)) {
+            str::stream ss;
+            ss << "Document with RecordId " << record->id << " is corrupted. ";
+            if (!status.isOK() && validatedSize != static_cast<size_t>(dataSize)) {
+                ss << "Reasons: (1) " << status << "; (2) Validated size of " << validatedSize
+                   << " bytes does not equal the record size of " << dataSize << " bytes";
+            } else if (!status.isOK()) {
+                ss << "Reason: " << status;
+            } else {
+                ss << "Reason: Validated size of " << validatedSize
+                   << " bytes does not equal the record size of " << dataSize << " bytes";
+            }
+            log() << std::string(ss);
+
+            // Only log once
             if (results->valid) {
-                // Only log once.
-                results->errors.push_back("detected one or more invalid documents (see logs)");
+                results->errors.push_back("Detected one or more invalid documents. See logs.");
+                results->valid = false;
             }
             nInvalid++;
-            results->valid = false;
-            log() << "document at location: " << record->id << " is corrupted";
         }
 
         prevRecordId = record->id;
@@ -285,7 +297,7 @@ void ValidateAdaptor::traverseRecordStore(
         coll->getRecordStore()->updateStatsAfterRepair(opCtx, nrecords, dataSizeTotal);
     }
 
-    output->append("nInvalidDocuments", nInvalid);
+    output->appendNumber("nInvalidDocuments", nInvalid);
     output->appendNumber("nrecords", nrecords);
 }
 
