@@ -73,14 +73,6 @@ public:
                              WorkerMultikeyPathInfo* workerMultikeyPathInfo)>;
 
     /**
-     * Applies the operations that is in param ops.
-     * Functions for applying operations/commands and increment server status counters may
-     * be overridden for testing.
-     */
-    static Status syncApply(OperationContext* opCtx,
-                            const OplogEntryBatch& batch,
-                            OplogApplication::Mode oplogApplicationMode);
-    /**
      *
      * Constructs a SyncTail.
      * During steady state replication, oplogApplication() obtains batches of operations to apply
@@ -264,10 +256,19 @@ private:
     bool _inShutdown = false;
 };
 
-// This free function is used by the thread pool workers to write ops to the db.
-// This consumes the passed in OperationPtrs and callers should not make any assumptions about the
-// state of the container after calling. However, this function cannot modify the pointed-to
-// operations because the OperationPtrs container contains const pointers.
+/**
+ * Applies a batch of operations.
+ */
+Status syncApply(OperationContext* opCtx,
+                 const OplogEntryBatch& batch,
+                 OplogApplication::Mode oplogApplicationMode);
+
+/**
+ * This free function is used by the thread pool workers to write ops to the db.
+ * This consumes the passed in OperationPtrs and callers should not make any assumptions about the
+ * state of the container after calling. However, this function cannot modify the pointed-to
+ * operations because the OperationPtrs container contains const pointers.
+ */
 Status multiSyncApply(OperationContext* opCtx,
                       MultiApplier::OperationPtrs* ops,
                       SyncTail* st,

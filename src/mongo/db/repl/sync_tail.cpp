@@ -60,10 +60,10 @@
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/repl/applier_helpers.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/initial_syncer.h"
+#include "mongo/db/repl/insert_group.h"
 #include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
@@ -272,98 +272,6 @@ LockMode fixLockModeForSystemDotViewsChanges(const NamespaceString& nss, LockMod
 }
 
 }  // namespace
-
-// static
-Status SyncTail::syncApply(OperationContext* opCtx,
-                           const OplogEntryBatch& batch,
-                           OplogApplication::Mode oplogApplicationMode) {
-    auto op = batch.getOp();
-    // Count each log op application as a separate operation, for reporting purposes
-    CurOp individualOp(opCtx);
-
-    const NamespaceString nss(op.getNss());
-
-    auto incrementOpsAppliedStats = [] { opsAppliedStats.increment(1); };
-
-    auto applyOp = [&](Database* db) {
-        // For non-initial-sync, we convert updates to upserts
-        // to suppress errors when replaying oplog entries.
-        UnreplicatedWritesBlock uwb(opCtx);
-        DisableDocumentValidation validationDisabler(opCtx);
-
-        // We convert updates to upserts when not in initial sync because after rollback and during
-        // startup we may replay an update after a delete and crash since we do not ignore
-        // errors. In initial sync we simply ignore these update errors so there is no reason to
-        // upsert.
-        //
-        // TODO (SERVER-21700): Never upsert during oplog application unless an external applyOps
-        // wants to. We should ignore these errors intelligently while in RECOVERING and STARTUP
-        // mode (similar to initial sync) instead so we do not accidentally ignore real errors.
-        bool shouldAlwaysUpsert = (oplogApplicationMode != OplogApplication::Mode::kInitialSync);
-        Status status = applyOperation_inlock(
-            opCtx, db, batch, shouldAlwaysUpsert, oplogApplicationMode, incrementOpsAppliedStats);
-        if (!status.isOK() && status.code() == ErrorCodes::WriteConflict) {
-            throw WriteConflictException();
-        }
-        return status;
-    };
-
-    auto clockSource = opCtx->getServiceContext()->getFastClockSource();
-    auto applyStartTime = clockSource->now();
-
-    if (MONGO_FAIL_POINT(hangAfterRecordingOpApplicationStartTime)) {
-        log() << "syncApply - fail point hangAfterRecordingOpApplicationStartTime enabled. "
-              << "Blocking until fail point is disabled. ";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterRecordingOpApplicationStartTime);
-    }
-
-    auto opType = op.getOpType();
-
-    auto finishApply = [&](Status status) {
-        return finishAndLogApply(clockSource, status, applyStartTime, batch);
-    };
-
-    if (opType == OpTypeEnum::kNoop) {
-        incrementOpsAppliedStats();
-        return Status::OK();
-    } else if (OplogEntry::isCrudOpType(opType)) {
-        return finishApply(writeConflictRetry(opCtx, "syncApply_CRUD", nss.ns(), [&] {
-            // Need to throw instead of returning a status for it to be properly ignored.
-            try {
-                AutoGetCollection autoColl(
-                    opCtx, getNsOrUUID(nss, op), fixLockModeForSystemDotViewsChanges(nss, MODE_IX));
-                auto db = autoColl.getDb();
-                uassert(ErrorCodes::NamespaceNotFound,
-                        str::stream() << "missing database (" << nss.db() << ")",
-                        db);
-                OldClientContext ctx(opCtx, autoColl.getNss().ns(), db);
-                return applyOp(ctx.db());
-            } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
-                // Delete operations on non-existent namespaces can be treated as successful for
-                // idempotency reasons.
-                // During RECOVERING mode, we ignore NamespaceNotFound for all CRUD ops since
-                // storage does not wait for drops to be checkpointed (SERVER-33161).
-                if (opType == OpTypeEnum::kDelete ||
-                    oplogApplicationMode == OplogApplication::Mode::kRecovering) {
-                    return Status::OK();
-                }
-
-                ex.addContext(str::stream()
-                              << "Failed to apply operation: " << redact(batch.toBSON()));
-                throw;
-            }
-        }));
-    } else if (opType == OpTypeEnum::kCommand) {
-        return finishApply(writeConflictRetry(opCtx, "syncApply_command", nss.ns(), [&] {
-            // A special case apply for commands to avoid implicit database creation.
-            Status status = applyCommand_inlock(opCtx, op, oplogApplicationMode);
-            incrementOpsAppliedStats();
-            return status;
-        }));
-    }
-
-    MONGO_UNREACHABLE;
-}
 
 SyncTail::SyncTail(OplogApplier::Observer* observer,
                    ReplicationConsistencyMarkers* consistencyMarkers,
@@ -627,9 +535,9 @@ private:
             batchLimits.slaveDelayLatestTimestamp = _calculateSlaveDelayLatestTimestamp();
 
             // Check the limits once per batch since users can change them at runtime.
-            batchLimits.ops = OplogApplier::getBatchLimitOperations();
-            batchLimits.bytes = OplogApplier::calculateBatchLimitBytes(
-                cc().makeOperationContext().get(), _storageInterface);
+            batchLimits.ops = getBatchLimitOplogEntries();
+            batchLimits.bytes =
+                getBatchLimitOplogBytes(cc().makeOperationContext().get(), _storageInterface);
 
             OpQueue ops(batchLimits.ops);
             {
@@ -869,6 +777,107 @@ bool SyncTail::inShutdown() const {
     return _inShutdown;
 }
 
+Status syncApply(OperationContext* opCtx,
+                 const OplogEntryBatch& batch,
+                 OplogApplication::Mode oplogApplicationMode) {
+    auto op = batch.getOp();
+    // Count each log op application as a separate operation, for reporting purposes
+    CurOp individualOp(opCtx);
+
+    const NamespaceString nss(op.getNss());
+
+    auto incrementOpsAppliedStats = [] { opsAppliedStats.increment(1); };
+
+    auto applyOp = [&](Database* db) {
+        // For non-initial-sync, we convert updates to upserts
+        // to suppress errors when replaying oplog entries.
+        UnreplicatedWritesBlock uwb(opCtx);
+        DisableDocumentValidation validationDisabler(opCtx);
+
+        // We convert updates to upserts when not in initial sync because after rollback and during
+        // startup we may replay an update after a delete and crash since we do not ignore
+        // errors. In initial sync we simply ignore these update errors so there is no reason to
+        // upsert.
+        //
+        // TODO (SERVER-21700): Never upsert during oplog application unless an external applyOps
+        // wants to. We should ignore these errors intelligently while in RECOVERING and STARTUP
+        // mode (similar to initial sync) instead so we do not accidentally ignore real errors.
+        bool shouldAlwaysUpsert = (oplogApplicationMode != OplogApplication::Mode::kInitialSync);
+        Status status = applyOperation_inlock(
+            opCtx, db, batch, shouldAlwaysUpsert, oplogApplicationMode, incrementOpsAppliedStats);
+        if (!status.isOK() && status.code() == ErrorCodes::WriteConflict) {
+            throw WriteConflictException();
+        }
+        return status;
+    };
+
+    auto clockSource = opCtx->getServiceContext()->getFastClockSource();
+    auto applyStartTime = clockSource->now();
+
+    if (MONGO_FAIL_POINT(hangAfterRecordingOpApplicationStartTime)) {
+        log() << "syncApply - fail point hangAfterRecordingOpApplicationStartTime enabled. "
+              << "Blocking until fail point is disabled. ";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterRecordingOpApplicationStartTime);
+    }
+
+    auto opType = op.getOpType();
+
+    auto finishApply = [&](Status status) {
+        return finishAndLogApply(clockSource, status, applyStartTime, batch);
+    };
+
+    if (opType == OpTypeEnum::kNoop) {
+        incrementOpsAppliedStats();
+        return Status::OK();
+    } else if (OplogEntry::isCrudOpType(opType)) {
+        return finishApply(writeConflictRetry(opCtx, "syncApply_CRUD", nss.ns(), [&] {
+            // Need to throw instead of returning a status for it to be properly ignored.
+            try {
+                AutoGetCollection autoColl(
+                    opCtx, getNsOrUUID(nss, op), fixLockModeForSystemDotViewsChanges(nss, MODE_IX));
+                auto db = autoColl.getDb();
+                uassert(ErrorCodes::NamespaceNotFound,
+                        str::stream() << "missing database (" << nss.db() << ")",
+                        db);
+                OldClientContext ctx(opCtx, autoColl.getNss().ns(), db);
+                return applyOp(ctx.db());
+            } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
+                // Delete operations on non-existent namespaces can be treated as successful for
+                // idempotency reasons.
+                // During RECOVERING mode, we ignore NamespaceNotFound for all CRUD ops since
+                // storage does not wait for drops to be checkpointed (SERVER-33161).
+                if (opType == OpTypeEnum::kDelete ||
+                    oplogApplicationMode == OplogApplication::Mode::kRecovering) {
+                    return Status::OK();
+                }
+
+                ex.addContext(str::stream()
+                              << "Failed to apply operation: " << redact(batch.toBSON()));
+                throw;
+            }
+        }));
+    } else if (opType == OpTypeEnum::kCommand) {
+        return finishApply(writeConflictRetry(opCtx, "syncApply_command", nss.ns(), [&] {
+            // A special case apply for commands to avoid implicit database creation.
+            Status status = applyCommand_inlock(opCtx, op, oplogApplicationMode);
+            incrementOpsAppliedStats();
+            return status;
+        }));
+    }
+
+    MONGO_UNREACHABLE;
+}
+
+void stableSortByNamespace(MultiApplier::OperationPtrs* oplogEntryPointers) {
+    if (oplogEntryPointers->size() < 1U) {
+        return;
+    }
+    auto nssComparator = [](const OplogEntry* l, const OplogEntry* r) {
+        return l->getNss() < r->getNss();
+    };
+    std::stable_sort(oplogEntryPointers->begin(), oplogEntryPointers->end(), nssComparator);
+}
+
 // This free function is used by the writer threads to apply each op
 Status multiSyncApply(OperationContext* opCtx,
                       MultiApplier::OperationPtrs* ops,
@@ -894,11 +903,11 @@ Status multiSyncApply(OperationContext* opCtx,
     opCtx->recoveryUnit()->setPrepareConflictBehavior(
         PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
 
-    ApplierHelpers::stableSortByNamespace(ops);
+    stableSortByNamespace(ops);
 
     const auto oplogApplicationMode = st->getOptions().mode;
 
-    ApplierHelpers::InsertGroup insertGroup(ops, opCtx, oplogApplicationMode);
+    InsertGroup insertGroup(ops, opCtx, oplogApplicationMode);
 
     {  // Ensure that the MultikeyPathTracker stops tracking paths.
         ON_BLOCK_EXIT([opCtx] { MultikeyPathTracker::get(opCtx).stopTrackingMultikeyPathInfo(); });
@@ -917,7 +926,7 @@ Status multiSyncApply(OperationContext* opCtx,
 
             // If we didn't create a group, try to apply the op individually.
             try {
-                const Status status = SyncTail::syncApply(opCtx, &entry, oplogApplicationMode);
+                const Status status = syncApply(opCtx, &entry, oplogApplicationMode);
 
                 if (!status.isOK()) {
                     // Tried to apply an update operation but the document is missing, there must be

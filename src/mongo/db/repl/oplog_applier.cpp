@@ -48,40 +48,6 @@ NoopOplogApplierObserver noopOplogApplierObserver;
 
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 
-// static
-std::unique_ptr<ThreadPool> OplogApplier::makeWriterPool() {
-    return makeWriterPool(replWriterThreadCount);
-}
-
-// static
-std::unique_ptr<ThreadPool> OplogApplier::makeWriterPool(int threadCount) {
-    ThreadPool::Options options;
-    options.threadNamePrefix = "repl-writer-worker-";
-    options.poolName = "repl writer worker Pool";
-    options.maxThreads = options.minThreads = static_cast<size_t>(threadCount);
-    options.onCreateThread = [](const std::string&) {
-        Client::initThread(getThreadName());
-        AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
-    };
-    auto pool = std::make_unique<ThreadPool>(options);
-    pool->startup();
-    return pool;
-}
-
-// static
-std::size_t OplogApplier::getBatchLimitOperations() {
-    return std::size_t(replBatchLimitOperations.load());
-}
-
-// static
-std::size_t OplogApplier::calculateBatchLimitBytes(OperationContext* opCtx,
-                                                   StorageInterface* storageInterface) {
-    auto oplogMaxSizeResult =
-        storageInterface->getOplogMaxSize(opCtx, NamespaceString::kRsOplogNamespace);
-    auto oplogMaxSize = fassert(40301, oplogMaxSizeResult);
-    return std::min(oplogMaxSize / 10, std::size_t(replBatchLimitBytes.load()));
-}
-
 OplogApplier::OplogApplier(executor::TaskExecutor* executor,
                            OplogBuffer* oplogBuffer,
                            Observer* observer,
@@ -308,6 +274,35 @@ void OplogApplier::_consume(OperationContext* opCtx, OplogBuffer* oplogBuffer) {
     // successfully.
     BSONObj opToPopAndDiscard;
     invariant(oplogBuffer->tryPop(opCtx, &opToPopAndDiscard) || inShutdown());
+}
+
+std::unique_ptr<ThreadPool> makeReplWriterPool() {
+    return makeReplWriterPool(replWriterThreadCount);
+}
+
+std::unique_ptr<ThreadPool> makeReplWriterPool(int threadCount) {
+    ThreadPool::Options options;
+    options.threadNamePrefix = "repl-writer-worker-";
+    options.poolName = "repl writer worker Pool";
+    options.maxThreads = options.minThreads = static_cast<size_t>(threadCount);
+    options.onCreateThread = [](const std::string&) {
+        Client::initThread(getThreadName());
+        AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
+    };
+    auto pool = std::make_unique<ThreadPool>(options);
+    pool->startup();
+    return pool;
+}
+
+std::size_t getBatchLimitOplogEntries() {
+    return std::size_t(replBatchLimitOperations.load());
+}
+
+std::size_t getBatchLimitOplogBytes(OperationContext* opCtx, StorageInterface* storageInterface) {
+    auto oplogMaxSizeResult =
+        storageInterface->getOplogMaxSize(opCtx, NamespaceString::kRsOplogNamespace);
+    auto oplogMaxSize = fassert(40301, oplogMaxSizeResult);
+    return std::min(oplogMaxSize / 10, std::size_t(replBatchLimitBytes.load()));
 }
 
 }  // namespace repl

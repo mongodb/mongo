@@ -31,7 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/applier_helpers.h"
+#include "mongo/db/repl/insert_group.h"
 
 #include <algorithm>
 #include <iterator>
@@ -56,20 +56,7 @@ constexpr auto kInsertGroupMaxBatchCount = 64;
 
 }  // namespace
 
-// static
-void ApplierHelpers::stableSortByNamespace(MultiApplier::OperationPtrs* oplogEntryPointers) {
-    if (oplogEntryPointers->size() < 1U) {
-        return;
-    }
-    auto nssComparator = [](const OplogEntry* l, const OplogEntry* r) {
-        return l->getNss() < r->getNss();
-    };
-    std::stable_sort(oplogEntryPointers->begin(), oplogEntryPointers->end(), nssComparator);
-}
-
-using InsertGroup = ApplierHelpers::InsertGroup;
-
-InsertGroup::InsertGroup(ApplierHelpers::OperationPtrs* ops,
+InsertGroup::InsertGroup(MultiApplier::OperationPtrs* ops,
                          OperationContext* opCtx,
                          InsertGroup::Mode mode)
     : _doNotGroupBeforePoint(ops->cbegin()), _end(ops->cend()), _opCtx(opCtx), _mode(mode) {}
@@ -99,7 +86,7 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(ConstIt
 
     // Make sure to include the first op in the batch size.
     size_t batchSize = entry.getObject().objsize();
-    auto batchCount = OperationPtrs::size_type(1);
+    auto batchCount = MultiApplier::OperationPtrs::size_type(1);
     auto batchNamespace = entry.getNss();
 
     /**
@@ -140,7 +127,7 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(ConstIt
     OplogEntryBatch groupedInsertBatch(it, endOfGroupableOpsIterator);
     try {
         // Apply the group of inserts by passing in groupedInsertBatch.
-        uassertStatusOK(SyncTail::syncApply(_opCtx, groupedInsertBatch, _mode));
+        uassertStatusOK(syncApply(_opCtx, groupedInsertBatch, _mode));
         // It succeeded, advance the oplogEntriesIterator to the end of the
         // group of inserts.
         return endOfGroupableOpsIterator - 1;

@@ -775,8 +775,8 @@ public:
         }
 
         repl::OplogEntryBatch groupedInsertBatch(opPtrs.cbegin(), opPtrs.cend());
-        ASSERT_OK(repl::SyncTail::syncApply(
-            _opCtx, groupedInsertBatch, repl::OplogApplication::Mode::kSecondary));
+        ASSERT_OK(
+            repl::syncApply(_opCtx, groupedInsertBatch, repl::OplogApplication::Mode::kSecondary));
 
         for (std::int32_t idx = 0; idx < docsToInsert; ++idx) {
             OneOffRead oor(_opCtx, firstInsertTime.addTicks(idx).asTimestamp());
@@ -1294,7 +1294,7 @@ public:
 
         DoNothingOplogApplierObserver observer;
         auto storageInterface = repl::StorageInterface::get(_opCtx);
-        auto writerPool = repl::OplogApplier::makeWriterPool();
+        auto writerPool = repl::makeReplWriterPool();
         repl::OplogApplierImpl oplogApplier(
             nullptr,  // task executor. not required for multiApply().
             nullptr,  // oplog buffer. not required for multiApply().
@@ -1376,7 +1376,7 @@ public:
 
         DoNothingOplogApplierObserver observer;
         auto storageInterface = repl::StorageInterface::get(_opCtx);
-        auto writerPool = repl::OplogApplier::makeWriterPool();
+        auto writerPool = repl::makeReplWriterPool();
 
         repl::OplogApplierImpl oplogApplier(
             nullptr,  // task executor. not required for multiApply().
@@ -2442,7 +2442,7 @@ public:
 
         // Apply the operation.
         auto storageInterface = repl::StorageInterface::get(_opCtx);
-        auto writerPool = repl::OplogApplier::makeWriterPool(1);
+        auto writerPool = repl::makeReplWriterPool(1);
         repl::SyncTail syncTail(
             nullptr,
             _consistencyMarkers,

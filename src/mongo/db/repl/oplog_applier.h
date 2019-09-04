@@ -109,25 +109,6 @@ public:
         OperationContext* opCtx, const BatchLimits& batchLimits)>;
 
     /**
-     * Creates thread pool for writer tasks.
-     */
-    static std::unique_ptr<ThreadPool> makeWriterPool();
-    static std::unique_ptr<ThreadPool> makeWriterPool(int threadCount);
-
-    /**
-     * Returns maximum number of operations in each batch that can be applied using multiApply().
-     */
-    static std::size_t getBatchLimitOperations();
-
-    /**
-     * Calculates batch limit size (in bytes) using the maximum capped collection size of the oplog
-     * size.
-     * Batches are limited to 10% of the oplog.
-     */
-    static std::size_t calculateBatchLimitBytes(OperationContext* opCtx,
-                                                StorageInterface* storageInterface);
-
-    /**
      * Constructs this OplogApplier with specific options.
      * Obtains batches of operations from the OplogBuffer to apply.
      * Reports oplog application progress using the Observer.
@@ -276,6 +257,24 @@ public:
 };
 
 extern NoopOplogApplierObserver noopOplogApplierObserver;
+
+/**
+ * Creates thread pool for writer tasks.
+ */
+std::unique_ptr<ThreadPool> makeReplWriterPool();
+std::unique_ptr<ThreadPool> makeReplWriterPool(int threadCount);
+
+/**
+ * Returns maximum number of operations in each batch that can be applied using multiApply().
+ */
+std::size_t getBatchLimitOplogEntries();
+
+/**
+ * Calculates batch limit size (in bytes) using the maximum capped collection size of the oplog
+ * size.
+ * Batches are limited to 10% of the oplog.
+ */
+std::size_t getBatchLimitOplogBytes(OperationContext* opCtx, StorageInterface* storageInterface);
 
 }  // namespace repl
 }  // namespace mongo

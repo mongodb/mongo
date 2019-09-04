@@ -38,36 +38,20 @@ namespace mongo {
 namespace repl {
 
 /**
- * Collection of helper functions and classes for oplog application.
- */
-class ApplierHelpers {
-public:
-    using OperationPtrs = MultiApplier::OperationPtrs;
-
-    /**
-     * Sorts the oplog entries by namespace, so that entries from the same namespace will be next to
-     * each other in the list.
-     */
-    static void stableSortByNamespace(OperationPtrs* oplogEntryPointers);
-
-    class InsertGroup;
-};
-
-/**
  * Groups consecutive insert operations on the same namespace and applies the combined operation
  * as a single oplog entry.
  * Advances the the MultiApplier::OperationPtrs iterator if the grouped insert is applied
  * successfully.
  */
-class ApplierHelpers::InsertGroup {
+class InsertGroup {
     InsertGroup(const InsertGroup&) = delete;
     InsertGroup& operator=(const InsertGroup&) = delete;
 
 public:
-    using ConstIterator = OperationPtrs::const_iterator;
+    using ConstIterator = MultiApplier::OperationPtrs::const_iterator;
     using Mode = OplogApplication::Mode;
 
-    InsertGroup(OperationPtrs* ops, OperationContext* opCtx, Mode mode);
+    InsertGroup(MultiApplier::OperationPtrs* ops, OperationContext* opCtx, Mode mode);
 
     /**
      * Attempts to group insert operations starting at 'iter'.

@@ -45,7 +45,7 @@ assert.throws(function() {
 
 /**
  * Part 2: Issue a slow op and make sure that we *do* log it.
- * We use a failpoint in SyncTail::syncApply which blocks after we read the time at the start
+ * We use a failpoint in syncApply which blocks after we read the time at the start
  * of the application of the op, and we wait there to simulate slowness.
  */
 

@@ -356,7 +356,7 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
 
     RecoveryOplogApplierStats stats;
 
-    auto writerPool = OplogApplier::makeWriterPool();
+    auto writerPool = makeReplWriterPool();
     OplogApplierImpl oplogApplier(nullptr,
                                   &oplogBuffer,
                                   &stats,
@@ -367,8 +367,8 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
                                   writerPool.get());
 
     OplogApplier::BatchLimits batchLimits;
-    batchLimits.bytes = OplogApplier::calculateBatchLimitBytes(opCtx, _storageInterface);
-    batchLimits.ops = OplogApplier::getBatchLimitOperations();
+    batchLimits.bytes = getBatchLimitOplogBytes(opCtx, _storageInterface);
+    batchLimits.ops = getBatchLimitOplogEntries();
 
     OpTime applyThroughOpTime;
     OplogApplier::Operations batch;

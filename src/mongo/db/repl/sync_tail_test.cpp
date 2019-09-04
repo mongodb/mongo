@@ -191,7 +191,7 @@ auto parseFromOplogEntryArray(const BSONObj& obj, int elem) {
 TEST_F(SyncTailTest, SyncApplyInsertDocumentDatabaseMissing) {
     NamespaceString nss("test.t");
     auto op = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
-    ASSERT_THROWS(SyncTail::syncApply(_opCtx.get(), &op, OplogApplication::Mode::kSecondary),
+    ASSERT_THROWS(syncApply(_opCtx.get(), &op, OplogApplication::Mode::kSecondary),
                   ExceptionFor<ErrorCodes::NamespaceNotFound>);
 }
 
@@ -206,7 +206,7 @@ TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionLookupByUUIDFails) {
     createDatabase(_opCtx.get(), nss.db());
     NamespaceString otherNss(nss.getSisterNS("othername"));
     auto op = makeOplogEntry(OpTypeEnum::kInsert, otherNss, kUuid);
-    ASSERT_THROWS(SyncTail::syncApply(_opCtx.get(), &op, OplogApplication::Mode::kSecondary),
+    ASSERT_THROWS(syncApply(_opCtx.get(), &op, OplogApplication::Mode::kSecondary),
                   ExceptionFor<ErrorCodes::NamespaceNotFound>);
 }
 
@@ -225,7 +225,7 @@ TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionMissing) {
     // which in the case of this test just ignores such errors. This tests mostly that we don't
     // implicitly create the collection and lock the database in MODE_X.
     auto op = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
-    ASSERT_THROWS(SyncTail::syncApply(_opCtx.get(), &op, OplogApplication::Mode::kSecondary),
+    ASSERT_THROWS(syncApply(_opCtx.get(), &op, OplogApplication::Mode::kSecondary),
                   ExceptionFor<ErrorCodes::NamespaceNotFound>);
     ASSERT_FALSE(collectionExists(_opCtx.get(), nss));
 }
@@ -299,12 +299,12 @@ TEST_F(SyncTailTest, SyncApplyCommand) {
     ASSERT_TRUE(_opCtx->writesAreReplicated());
     ASSERT_FALSE(documentValidationDisabled(_opCtx.get()));
     auto entry = OplogEntry(op);
-    ASSERT_OK(SyncTail::syncApply(_opCtx.get(), &entry, OplogApplication::Mode::kInitialSync));
+    ASSERT_OK(syncApply(_opCtx.get(), &entry, OplogApplication::Mode::kInitialSync));
     ASSERT_TRUE(applyCmdCalled);
 }
 
 DEATH_TEST_F(SyncTailTest, MultiApplyAbortsWhenNoOperationsAreGiven, "!ops.empty()") {
-    auto writerPool = OplogApplier::makeWriterPool();
+    auto writerPool = makeReplWriterPool();
     SyncTail syncTail(nullptr,
                       getConsistencyMarkers(),
                       getStorageInterface(),
@@ -319,7 +319,7 @@ bool _testOplogEntryIsForCappedCollection(OperationContext* opCtx,
                                           StorageInterface* const storageInterface,
                                           const NamespaceString& nss,
                                           const CollectionOptions& options) {
-    auto writerPool = OplogApplier::makeWriterPool();
+    auto writerPool = makeReplWriterPool();
     MultiApplier::Operations operationsApplied;
     auto applyOperationFn = [&operationsApplied](OperationContext* opCtx,
                                                  MultiApplier::OperationPtrs* operationsToApply,
@@ -382,7 +382,7 @@ TEST_F(SyncTailTest, MultiSyncApplyUsesSyncApplyToApplyOperation) {
                       nullptr,
                       OplogApplier::Options(OplogApplication::Mode::kSecondary));
     ASSERT_OK(multiSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
-    // Collection should be created after SyncTail::syncApply() processes operation.
+    // Collection should be created after syncApply() processes operation.
     ASSERT_TRUE(AutoGetCollectionForReadCommand(_opCtx.get(), nss).getCollection());
 }
 
@@ -446,7 +446,7 @@ protected:
                     FAIL("Unexpected insert") << " into " << nss << " first doc: " << docs.front();
             };
 
-        _writerPool = OplogApplier::makeWriterPool();
+        _writerPool = makeReplWriterPool();
     }
 
     void tearDown() override {
@@ -2198,7 +2198,7 @@ TEST_F(SyncTailTest, LogSlowOpApplicationWhenSuccessful) {
     auto entry = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
 
     startCapturingLogMessages();
-    ASSERT_OK(SyncTail::syncApply(_opCtx.get(), &entry, OplogApplication::Mode::kSecondary));
+    ASSERT_OK(syncApply(_opCtx.get(), &entry, OplogApplication::Mode::kSecondary));
 
     // Use a builder for easier escaping. We expect the operation to be logged.
     StringBuilder expected;
@@ -2219,7 +2219,7 @@ TEST_F(SyncTailTest, DoNotLogSlowOpApplicationWhenFailed) {
     auto entry = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
 
     startCapturingLogMessages();
-    ASSERT_THROWS(SyncTail::syncApply(_opCtx.get(), &entry, OplogApplication::Mode::kSecondary),
+    ASSERT_THROWS(syncApply(_opCtx.get(), &entry, OplogApplication::Mode::kSecondary),
                   ExceptionFor<ErrorCodes::NamespaceNotFound>);
 
     // Use a builder for easier escaping. We expect the operation to *not* be logged
@@ -2243,7 +2243,7 @@ TEST_F(SyncTailTest, DoNotLogNonSlowOpApplicationWhenSuccessful) {
     auto entry = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
 
     startCapturingLogMessages();
-    ASSERT_OK(SyncTail::syncApply(_opCtx.get(), &entry, OplogApplication::Mode::kSecondary));
+    ASSERT_OK(syncApply(_opCtx.get(), &entry, OplogApplication::Mode::kSecondary));
 
     // Use a builder for easier escaping. We expect the operation to *not* be logged,
     // since it wasn't slow to apply.
@@ -2362,7 +2362,7 @@ TEST_F(SyncTailTxnTableTest, SimpleWriteWithTxn) {
                                    sessionInfo,
                                    date);
 
-    auto writerPool = OplogApplier::makeWriterPool();
+    auto writerPool = makeReplWriterPool();
     SyncTail syncTail(nullptr,
                       getConsistencyMarkers(),
                       getStorageInterface(),
@@ -2397,7 +2397,7 @@ TEST_F(SyncTailTxnTableTest, WriteWithTxnMixedWithDirectWriteToTxnTable) {
                                    {},
                                    Date_t::now());
 
-    auto writerPool = OplogApplier::makeWriterPool();
+    auto writerPool = makeReplWriterPool();
     SyncTail syncTail(nullptr,
                       getConsistencyMarkers(),
                       getStorageInterface(),
@@ -2445,7 +2445,7 @@ TEST_F(SyncTailTxnTableTest, InterleavedWriteWithTxnMixedWithDirectDeleteToTxnTa
                                     sessionInfo,
                                     date);
 
-    auto writerPool = OplogApplier::makeWriterPool();
+    auto writerPool = makeReplWriterPool();
     SyncTail syncTail(nullptr,
                       getConsistencyMarkers(),
                       getStorageInterface(),
@@ -2481,7 +2481,7 @@ TEST_F(SyncTailTxnTableTest, InterleavedWriteWithTxnMixedWithDirectUpdateToTxnTa
                                    {},
                                    Date_t::now());
 
-    auto writerPool = OplogApplier::makeWriterPool();
+    auto writerPool = makeReplWriterPool();
     SyncTail syncTail(nullptr,
                       getConsistencyMarkers(),
                       getStorageInterface(),
@@ -2540,7 +2540,7 @@ TEST_F(SyncTailTxnTableTest, RetryableWriteThenMultiStatementTxnWriteOnSameSessi
                                                       StmtId(1),
                                                       txnInsertOpTime);
 
-    auto writerPool = OplogApplier::makeWriterPool();
+    auto writerPool = makeReplWriterPool();
     SyncTail syncTail(nullptr,
                       getConsistencyMarkers(),
                       getStorageInterface(),
@@ -2605,7 +2605,7 @@ TEST_F(SyncTailTxnTableTest, MultiStatementTxnWriteThenRetryableWriteOnSameSessi
                                             sessionInfo,
                                             date);
 
-    auto writerPool = OplogApplier::makeWriterPool();
+    auto writerPool = makeReplWriterPool();
     SyncTail syncTail(nullptr,
                       getConsistencyMarkers(),
                       getStorageInterface(),
@@ -2673,7 +2673,7 @@ TEST_F(SyncTailTxnTableTest, MultiApplyUpdatesTheTransactionTable) {
     auto opNoTxn = makeInsertDocumentOplogEntryWithSessionInfo(
         {Timestamp(Seconds(7), 0), 1LL}, ns3, BSON("_id" << 0), info);
 
-    auto writerPool = OplogApplier::makeWriterPool();
+    auto writerPool = makeReplWriterPool();
     SyncTail syncTail(nullptr,
                       getConsistencyMarkers(),
                       getStorageInterface(),
@@ -2751,7 +2751,7 @@ TEST_F(SyncTailTxnTableTest, SessionMigrationNoOpEntriesShouldUpdateTxnTable) {
                                                 insertSessionInfo,
                                                 outerInsertDate);
 
-    auto writerPool = OplogApplier::makeWriterPool();
+    auto writerPool = makeReplWriterPool();
     SyncTail syncTail(nullptr,
                       getConsistencyMarkers(),
                       getStorageInterface(),
@@ -2778,7 +2778,7 @@ TEST_F(SyncTailTxnTableTest, PreImageNoOpEntriesShouldNotUpdateTxnTable) {
                                                   preImageSessionInfo,
                                                   preImageDate);
 
-    auto writerPool = OplogApplier::makeWriterPool();
+    auto writerPool = makeReplWriterPool();
     SyncTail syncTail(nullptr,
                       getConsistencyMarkers(),
                       getStorageInterface(),
@@ -2807,7 +2807,7 @@ TEST_F(SyncTailTxnTableTest, NonMigrateNoOpEntriesShouldNotUpdateTxnTable) {
                                 sessionInfo,
                                 Date_t::now());
 
-    auto writerPool = OplogApplier::makeWriterPool();
+    auto writerPool = makeReplWriterPool();
     SyncTail syncTail(nullptr,
                       getConsistencyMarkers(),
                       getStorageInterface(),

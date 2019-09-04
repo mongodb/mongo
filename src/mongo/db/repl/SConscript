@@ -508,7 +508,7 @@ env.Library(
 env.Library(
     target='oplog_application',
     source=[
-        'applier_helpers.cpp',
+        'insert_group.cpp',
         'oplog_applier_impl.cpp',
         'session_update_tracker.cpp',
         'sync_tail.cpp',
