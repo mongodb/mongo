@@ -46,9 +46,7 @@ OplogApplierImpl::OplogApplierImpl(executor::TaskExecutor* executor,
       _replCoord(replCoord),
       _syncTail(
           observer, consistencyMarkers, storageInterface, multiSyncApply, writerPool, options),
-      _beginApplyingOpTime(options.beginApplyingOpTime) {
-    invariant(!options.relaxUniqueIndexConstraints);
-}
+      _beginApplyingOpTime(options.beginApplyingOpTime) {}
 
 void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
     auto getNextApplierBatchFn = [this](OperationContext* opCtx, const BatchLimits& batchLimits) {

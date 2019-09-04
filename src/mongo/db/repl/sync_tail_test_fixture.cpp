@@ -90,20 +90,6 @@ void SyncTailOpObserver::onCreateCollection(OperationContext* opCtx,
     onCreateCollectionFn(opCtx, coll, collectionName, options, idIndex);
 }
 
-// static
-OplogApplier::Options SyncTailTest::makeInitialSyncOptions() {
-    OplogApplier::Options options(OplogApplication::Mode::kInitialSync);
-    options.allowNamespaceNotFoundErrorsOnCrudOps = true;
-    return options;
-}
-
-OplogApplier::Options SyncTailTest::makeRecoveryOptions() {
-    OplogApplier::Options options(OplogApplication::Mode::kRecovering);
-    options.allowNamespaceNotFoundErrorsOnCrudOps = true;
-    options.skipWritesToOplog = true;
-    return options;
-}
-
 void SyncTailTest::setUp() {
     ServiceContextMongoDTest::setUp();
 
@@ -228,13 +214,12 @@ Status SyncTailTest::runOpInitialSync(const OplogEntry& op) {
 }
 
 Status SyncTailTest::runOpsInitialSync(std::vector<OplogEntry> ops) {
-    auto options = makeInitialSyncOptions();
     SyncTail syncTail(nullptr,
                       getConsistencyMarkers(),
                       getStorageInterface(),
                       SyncTail::MultiSyncApplyFunc(),
                       nullptr,
-                      options);
+                      repl::OplogApplier::Options(repl::OplogApplication::Mode::kInitialSync));
     // Apply each operation in a batch of one because 'ops' may contain a mix of commands and CRUD
     // operations provided by idempotency tests.
     for (auto& op : ops) {
@@ -250,13 +235,12 @@ Status SyncTailTest::runOpsInitialSync(std::vector<OplogEntry> ops) {
 }
 
 Status SyncTailTest::runOpPtrsInitialSync(MultiApplier::OperationPtrs ops) {
-    auto options = makeInitialSyncOptions();
     SyncTail syncTail(nullptr,
                       getConsistencyMarkers(),
                       getStorageInterface(),
                       SyncTail::MultiSyncApplyFunc(),
                       nullptr,
-                      options);
+                      repl::OplogApplier::Options(repl::OplogApplication::Mode::kInitialSync));
     // Apply each operation in a batch of one because 'ops' may contain a mix of commands and CRUD
     // operations provided by idempotency tests.
     for (auto& op : ops) {

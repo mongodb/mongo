@@ -883,7 +883,6 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
     // Create oplog applier.
     auto consistencyMarkers = _replicationProcess->getConsistencyMarkers();
     OplogApplier::Options options(OplogApplication::Mode::kInitialSync);
-    options.allowNamespaceNotFoundErrorsOnCrudOps = true;
     options.beginApplyingOpTime = lastOpTime;
     _oplogApplier = _dataReplicatorExternalState->makeOplogApplier(_oplogBuffer.get(),
                                                                    &noopOplogApplierObserver,

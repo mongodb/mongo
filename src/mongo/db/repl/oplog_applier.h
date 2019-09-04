@@ -64,18 +64,20 @@ public:
     class Options {
     public:
         Options() = delete;
-        explicit Options(OplogApplication::Mode inputMode) : mode(inputMode) {}
-
-        // TODO (SERVER-42039): Remove fields here that are redundant with the mode.
-        bool allowNamespaceNotFoundErrorsOnCrudOps = false;
-        bool relaxUniqueIndexConstraints = false;
-        bool skipWritesToOplog = false;
+        explicit Options(OplogApplication::Mode inputMode)
+            : mode(inputMode),
+              allowNamespaceNotFoundErrorsOnCrudOps(
+                  inputMode == OplogApplication::Mode::kInitialSync ||
+                  inputMode == OplogApplication::Mode::kRecovering),
+              skipWritesToOplog(inputMode == OplogApplication::Mode::kRecovering) {}
 
         // Used to determine which operations should be applied. Only initial sync will set this to
         // be something other than the null optime.
         OpTime beginApplyingOpTime = OpTime();
 
         const OplogApplication::Mode mode;
+        const bool allowNamespaceNotFoundErrorsOnCrudOps;
+        const bool skipWritesToOplog;
     };
 
     /**

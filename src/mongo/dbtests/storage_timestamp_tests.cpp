@@ -1377,8 +1377,6 @@ public:
         DoNothingOplogApplierObserver observer;
         auto storageInterface = repl::StorageInterface::get(_opCtx);
         auto writerPool = repl::OplogApplier::makeWriterPool();
-        repl::OplogApplier::Options options(repl::OplogApplication::Mode::kInitialSync);
-        options.allowNamespaceNotFoundErrorsOnCrudOps = true;
 
         repl::OplogApplierImpl oplogApplier(
             nullptr,  // task executor. not required for multiApply().
@@ -1387,7 +1385,7 @@ public:
             nullptr,  // replication coordinator. not required for multiApply().
             _consistencyMarkers,
             storageInterface,
-            options,
+            repl::OplogApplier::Options(repl::OplogApplication::Mode::kInitialSync),
             writerPool.get());
         auto lastTime = unittest::assertGet(oplogApplier.multiApply(_opCtx, ops));
         ASSERT_EQ(lastTime.getTimestamp(), insertTime2.asTimestamp());

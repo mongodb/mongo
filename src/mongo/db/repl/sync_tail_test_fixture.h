@@ -103,16 +103,6 @@ public:
 };
 
 class SyncTailTest : public ServiceContextMongoDTest {
-public:
-    /**
-     * Creates OplogApplier::Options for initial sync.
-     */
-    static OplogApplier::Options makeInitialSyncOptions();
-    /**
-     * Creates OplogApplier::Options for recovery.
-     */
-    static OplogApplier::Options makeRecoveryOptions();
-
 protected:
     void _testSyncApplyCrudOperation(ErrorCodes::Error expectedError,
                                      const OplogEntry& op,

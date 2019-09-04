@@ -55,6 +55,7 @@
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/idempotency_test_fixture.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -112,7 +113,7 @@ SyncTailForTest::SyncTailForTest()
                nullptr,  // storage interface
                SyncTail::MultiSyncApplyFunc(),
                nullptr,  // writer pool
-               SyncTailTest::makeInitialSyncOptions()) {}
+               repl::OplogApplier::Options(repl::OplogApplication::Mode::kInitialSync)) {}
 
 /**
  * Creates collection options suitable for oplog.
@@ -546,14 +547,12 @@ TEST_F(MultiOplogEntrySyncTailTest, MultiApplyUnpreparedTransactionSeparate) {
 TEST_F(MultiOplogEntrySyncTailTest, MultiApplyUnpreparedTransactionAllAtOnce) {
     // Skipping writes to oplog proves we're testing the code path which does not rely on reading
     // the oplog.
-    OplogApplier::Options applierOpts(OplogApplication::Mode::kSecondary);
-    applierOpts.skipWritesToOplog = true;
     SyncTail syncTail(nullptr,
                       getConsistencyMarkers(),
                       getStorageInterface(),
                       multiSyncApply,
                       _writerPool.get(),
-                      applierOpts);
+                      OplogApplier::Options(OplogApplication::Mode::kRecovering));
 
     // Apply both inserts and the commit in a single batch.  We expect no oplog entries to
     // be inserted (because we've set skipWritesToOplog), and both entries to be committed.
@@ -928,7 +927,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionInit
                       getStorageInterface(),
                       multiSyncApply,
                       _writerPool.get(),
-                      SyncTailTest::makeInitialSyncOptions());
+                      repl::OplogApplier::Options(repl::OplogApplication::Mode::kInitialSync));
 
     // Apply a batch with the insert operations.  This should result in the oplog entries
     // being put in the oplog and updating the transaction table, but not actually being applied
@@ -993,7 +992,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionReco
                       getStorageInterface(),
                       multiSyncApply,
                       _writerPool.get(),
-                      SyncTailTest::makeRecoveryOptions());
+                      OplogApplier::Options(OplogApplication::Mode::kRecovering));
 
     // Apply a batch with the insert operations.  This should have no effect, because this is
     // recovery.
@@ -1158,7 +1157,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest,
                       getStorageInterface(),
                       multiSyncApply,
                       _writerPool.get(),
-                      SyncTailTest::makeInitialSyncOptions());
+                      repl::OplogApplier::Options(repl::OplogApplication::Mode::kInitialSync));
 
     const auto expectedStartOpTime = _singlePrepareApplyOp->getOpTime();
 
@@ -1208,7 +1207,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest,
                       getStorageInterface(),
                       multiSyncApply,
                       _writerPool.get(),
-                      SyncTailTest::makeRecoveryOptions());
+                      OplogApplier::Options(OplogApplication::Mode::kRecovering));
 
     const auto expectedStartOpTime = _singlePrepareApplyOp->getOpTime();
 

@@ -339,10 +339,6 @@ Status SyncTail::syncApply(OperationContext* opCtx,
                 OldClientContext ctx(opCtx, autoColl.getNss().ns(), db);
                 return applyOp(ctx.db());
             } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
-                if (oplogApplicationMode == OplogApplication::Mode::kRecovering) {
-                    return Status::OK();
-                }
-
                 // Delete operations on non-existent namespaces can be treated as successful for
                 // idempotency reasons.
                 // During RECOVERING mode, we ignore NamespaceNotFound for all CRUD ops since
