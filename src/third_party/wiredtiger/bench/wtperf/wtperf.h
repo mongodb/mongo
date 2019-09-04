@@ -65,16 +65,18 @@ typedef struct {
     int64_t update;    /* Update ratio */
     uint64_t throttle; /* Maximum operations/second */
                        /* Number of operations per transaction. Zero for autocommit */
-    int64_t ops_per_txn;
-    int64_t pause;            /* Time between scans */
-    int64_t read_range;       /* Range of reads */
-    int32_t table_index;      /* Table to focus ops on */
-    int64_t truncate;         /* Truncate ratio */
-    uint64_t truncate_pct;    /* Truncate Percent */
-    uint64_t truncate_count;  /* Truncate Count */
-    int64_t modify_delta;     /* Value size change on modify */
-    int64_t update_delta;     /* Value size change on update */
+
+    int64_t modify_delta;   /* Value size change on modify */
+    bool modify_distribute; /* Distribute the change of modifications across the whole new record */
     bool modify_force_update; /* Do force update instead of modify */
+    int64_t ops_per_txn;
+    int64_t pause;           /* Time between scans */
+    int64_t read_range;      /* Range of reads */
+    int32_t table_index;     /* Table to focus ops on */
+    int64_t truncate;        /* Truncate ratio */
+    uint64_t truncate_pct;   /* Truncate Percent */
+    uint64_t truncate_count; /* Truncate Count */
+    int64_t update_delta;    /* Value size change on update */
 
 #define WORKER_INSERT 1     /* Insert */
 #define WORKER_INSERT_RMW 2 /* Insert with read-modify-write */

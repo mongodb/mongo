@@ -241,6 +241,12 @@ config_threads(WTPERF *wtperf, const char *config, size_t len)
                 }
                 continue;
             }
+            if (STRING_MATCH("modify_distribute", k.str, k.len)) {
+                if (v.type != WT_CONFIG_ITEM_BOOL)
+                    goto err;
+                workp->modify_distribute = v.val;
+                continue;
+            }
             if (STRING_MATCH("modify_force_update", k.str, k.len)) {
                 if (v.type != WT_CONFIG_ITEM_BOOL)
                     goto err;

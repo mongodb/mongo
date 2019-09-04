@@ -196,8 +196,7 @@ __wt_txn_resolve_prepared_op(
     /* If we haven't found anything then there's an error. */
     if (upd == NULL) {
         WT_ERR_ASSERT(session, upd != NULL, WT_NOTFOUND,
-          "Unable to"
-          " locate update associated with a prepared operation.");
+          "Unable to locate update associated with a prepared operation.");
     }
 
     for (; upd != NULL; upd = upd->next) {

@@ -136,6 +136,9 @@ __wt_row_leaf_key_work(
     WT_IKEY *ikey;
     WT_ROW *rip, *jump_rip;
     size_t size;
+#ifdef HAVE_DIAGNOSTIC
+    uint32_t current, start;
+#endif
     u_int last_prefix;
     int jump_slot_offset, slot_offset;
     void *copy;
@@ -160,6 +163,9 @@ __wt_row_leaf_key_work(
     size = 0; /* -Werror=maybe-uninitialized */
 
     direction = BACKWARD;
+#ifdef HAVE_DIAGNOSTIC
+    __wt_seconds32(session, &start);
+#endif
     for (slot_offset = 0;;) {
         if (0) {
         switch_and_jump:
@@ -172,6 +178,20 @@ __wt_row_leaf_key_work(
             slot_offset = jump_slot_offset;
         }
         copy = WT_ROW_KEY_COPY(rip);
+#ifdef HAVE_DIAGNOSTIC
+        /*
+         * Debugging added to detect and gather information for rare hang. Detect and abort if the
+         * current operation takes too long.
+         */
+        __wt_seconds32(session, &current);
+        WT_ERR_ASSERT(session, (current - start) < WT_MINUTE * 5, EINVAL,
+          "Current function call taking too long: current %" PRIu32 " func started %" PRIu32,
+          current, start);
+        WT_ERR_ASSERT(session,
+          session->op_start == 0 || ((current - session->op_start) < WT_MINUTE * 5), EINVAL,
+          "Operation taking too long: current %" PRIu32 " started %" PRIu32, current,
+          session->op_start);
+#endif
 
         /*
          * Figure out what the key looks like.

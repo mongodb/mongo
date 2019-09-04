@@ -1739,8 +1739,8 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
     if (conn->is_new) {
         if (F_ISSET(conn, WT_CONN_READONLY))
             WT_ERR_MSG(session, EINVAL,
-              "Creating a new database is incompatible with "
-              "read-only configuration");
+              "The database directory is empty or needs recovery, cannot continue with a"
+              " read only connection");
         WT_ERR(__wt_snprintf_len_set(
           buf, sizeof(buf), &len, "%s\n%s\n", WT_WIREDTIGER, WIREDTIGER_VERSION_STRING));
         WT_ERR(__wt_write(session, fh, (wt_off_t)0, len, buf));

@@ -726,12 +726,72 @@ worker(void *arg)
 
                 if (delta != 0)
                     update_value_delta(thread, delta);
-                if (value_buf[0] == 'a')
-                    value_buf[0] = 'b';
-                else
-                    value_buf[0] = 'a';
-                if (opts->random_value)
-                    randomize_value(thread, value_buf, delta);
+
+                value_len = strlen(value);
+                nmodify = MAX_MODIFY_NUM;
+
+                /*
+                 * Distribute the modifications across the whole document. We randomly choose up to
+                 * the maximum number of modifications and modify up to the maximum percent of the
+                 * record size.
+                 */
+                if (workload->modify_distribute) {
+                    /*
+                     * The maximum that will be modified is a fixed percentage of the total record
+                     * size.
+                     */
+                    total_modify_size = value_len / MAX_MODIFY_PCT;
+
+                    /*
+                     * Randomize the maximum modification size and offset per modify.
+                     */
+                    if (opts->random_value) {
+                        rand_val = __wt_random(&thread->rnd);
+                        if ((total_modify_size / (size_t)nmodify) != 0)
+                            modify_size = rand_val % (total_modify_size / (size_t)nmodify);
+                        else
+                            modify_size = 0;
+
+                        /*
+                         * Offset location difference between modifications
+                         */
+                        if ((value_len / (size_t)nmodify) != 0)
+                            modify_offset = (size_t)rand_val % (value_len / (size_t)nmodify);
+                        else
+                            modify_offset = 0;
+                    } else {
+                        modify_size = total_modify_size / (size_t)nmodify;
+                        modify_offset = value_len / (size_t)nmodify;
+                    }
+
+                    /*
+                     * Make sure the offset is more than size, otherwise modifications don't spread
+                     * properly.
+                     */
+                    if (modify_offset < modify_size)
+                        modify_offset = modify_size + 1;
+
+                    for (iter = (size_t)nmodify; iter > 0; iter--) {
+                        if (opts->random_value)
+                            memmove(&value_buf[(iter * modify_offset) - modify_offset],
+                              &value_buf[(iter * modify_offset) - modify_size], modify_size);
+                        else {
+                            if (value_buf[(iter * modify_offset) - modify_offset] == 'a')
+                                memset(&value_buf[(iter * modify_offset) - modify_offset], 'b',
+                                  modify_size);
+                            else
+                                memset(&value_buf[(iter * modify_offset) - modify_offset], 'a',
+                                  modify_size);
+                        }
+                    }
+                } else {
+                    if (value_buf[0] == 'a')
+                        value_buf[0] = 'b';
+                    else
+                        value_buf[0] = 'a';
+                    if (opts->random_value)
+                        randomize_value(thread, value_buf, delta);
+                }
 
                 if (*op == WORKER_UPDATE) {
                     cursor->set_value(cursor, value_buf);
@@ -739,53 +799,6 @@ worker(void *arg)
                         break;
                     goto op_err;
                 }
-
-                /*
-                 * Distribute the modifications across the whole document. We randomly choose up to
-                 * the maximum number of modifications and modify up to the maximum percent of the
-                 * record size.
-                 */
-                nmodify = MAX_MODIFY_NUM;
-
-                /*
-                 * The maximum that will be modified is a fixed percentage of the total record size.
-                 */
-                value_len = strlen(value);
-                total_modify_size = value_len / MAX_MODIFY_PCT;
-
-                /*
-                 * Randomize the maximum modification size and offset per modify.
-                 */
-                rand_val = __wt_random(&thread->rnd);
-                if ((total_modify_size / (size_t)nmodify) != 0)
-                    modify_size = rand_val % (total_modify_size / (size_t)nmodify);
-                else
-                    modify_size = 0;
-
-                /*
-                 * Offset location difference between modifications
-                 */
-                if ((value_len / (size_t)nmodify) != 0)
-                    modify_offset = (size_t)rand_val % (value_len / (size_t)nmodify);
-                else
-                    modify_offset = 0;
-
-                /*
-                 * Make sure the offset is more than size, otherwise modifications don't spread
-                 * properly.
-                 */
-                if (modify_offset < modify_size)
-                    modify_offset = modify_size + 1;
-
-                for (iter = (size_t)nmodify; iter > 0; iter--)
-                    memmove(&value_buf[(iter * modify_offset) - modify_offset],
-                      &value_buf[(iter * modify_offset) - modify_size], modify_size);
-
-                /*
-                 * Increase the number of modifications, so that normal modify operations succeeded.
-                 */
-                if (!workload->modify_force_update)
-                    nmodify++;
 
                 oldv.data = value;
                 oldv.size = value_len;
@@ -798,8 +811,7 @@ worker(void *arg)
                  * input. This function may fail when the modifications count reaches the maximum
                  * number of modifications that are allowed for the modify operation.
                  */
-                ret = wiredtiger_calc_modify(
-                  session, &oldv, &newv, total_modify_size, entries, &nmodify);
+                ret = wiredtiger_calc_modify(session, &oldv, &newv, value_len, entries, &nmodify);
 
                 if (ret == WT_NOTFOUND || workload->modify_force_update) {
                     cursor->set_value(cursor, value_buf);
@@ -1962,7 +1974,7 @@ execute_workload(WTPERF *wtperf)
 
         lprintf(wtperf, 0, 1,
           "%" PRIu64 " inserts, %" PRIu64 " modifies, %" PRIu64 " reads, %" PRIu64
-          " truncates, %" PRIu64 "updates, %" PRIu64 " checkpoints, %" PRIu64 " scans in %" PRIu32
+          " truncates, %" PRIu64 " updates, %" PRIu64 " checkpoints, %" PRIu64 " scans in %" PRIu32
           " secs (%" PRIu32 " total secs)",
           wtperf->insert_ops - last_inserts, wtperf->modify_ops - last_modifies,
           wtperf->read_ops - last_reads, wtperf->truncate_ops - last_truncates,

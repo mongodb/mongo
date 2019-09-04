@@ -968,9 +968,8 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
         __wt_txn_op_free(session, op);
     }
     WT_ERR_ASSERT(session, skip_update_assert || resolved_update_count == visited_update_count,
-      EINVAL, "Number of resolved prepared updates: %" PRId64
-              " does not match"
-              " number visited: %" PRId64,
+      EINVAL,
+      "Number of resolved prepared updates: %" PRId64 " does not match number visited: %" PRId64,
       resolved_update_count, visited_update_count);
     WT_STAT_CONN_INCRV(session, txn_prepared_updates_resolved, resolved_update_count);
 

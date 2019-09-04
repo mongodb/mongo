@@ -73,6 +73,23 @@ __wt_seconds(WT_SESSION_IMPL *session, uint64_t *secondsp)
 }
 
 /*
+ * __wt_seconds32 --
+ *     Return the seconds since the Epoch in 32 bits.
+ */
+void
+__wt_seconds32(WT_SESSION_IMPL *session, uint32_t *secondsp)
+{
+    struct timespec t;
+
+    __wt_epoch(session, &t);
+
+    /*
+     * This won't work in 2038. But for now allow it.
+     */
+    *secondsp = (uint32_t)t.tv_sec;
+}
+
+/*
  * __wt_clock_to_nsec --
  *     Convert from clock ticks to nanoseconds.
  */

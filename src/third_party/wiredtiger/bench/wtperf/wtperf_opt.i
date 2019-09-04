@@ -153,7 +153,7 @@ DEF_OPT_AS_BOOL(
   reopen_connection, 1, "close and reopen the connection between populate and workload phases")
 DEF_OPT_AS_UINT32(
   report_interval, 2, "output throughput information every interval seconds, 0 to disable")
-DEF_OPT_AS_UINT32(run_ops, 0, "total read, insert and update workload operations")
+DEF_OPT_AS_UINT32(run_ops, 0, "total insert, modify, read and update workload operations")
 DEF_OPT_AS_UINT32(run_time, 0, "total workload seconds")
 DEF_OPT_AS_UINT32(sample_interval, 0, "performance logging every interval seconds, 0 to disable")
 DEF_OPT_AS_UINT32(sample_rate, 50,
@@ -183,8 +183,8 @@ DEF_OPT_AS_UINT32(
   table_count_idle, 0, "number of tables to create, that won't be populated. Default 0.")
 DEF_OPT_AS_STRING(threads, "",
   "workload configuration: each 'count' "
-  "entry is the total number of threads, and the 'insert', 'read' and "
-  "'update' entries are the ratios of insert, read and update operations "
+  "entry is the total number of threads, and the 'insert', 'modify', 'read' and "
+  "'update' entries are the ratios of insert, modify, read and update operations "
   "done by each worker thread; If a throttle value is provided each thread "
   "will do a maximum of that number of operations per second; multiple "
   "workload configurations may be specified per threads configuration; "
@@ -192,8 +192,9 @@ DEF_OPT_AS_STRING(threads, "",
   "'threads=((count=2,reads=1)(count=8,reads=1,inserts=2,updates=1))' "
   "which would create 2 threads doing nothing but reads and 8 threads "
   "each doing 50% inserts and 25% reads and updates.  Allowed configuration "
-  "values are 'count', 'throttle', 'update_delta', 'reads', 'read_range', "
-  "'inserts', 'updates', 'truncate', 'truncate_pct' and 'truncate_count'. "
+  "values are 'count', 'throttle', 'inserts', 'reads', 'read_range', 'modify', "
+  "'modify_delta', 'modify_distribute', 'modify_force_update', 'updates', 'update_delta', "
+  "'truncate', 'truncate_pct' and 'truncate_count'. "
   "There are also behavior modifiers, supported modifiers are "
   "'ops_per_txn'")
 DEF_OPT_AS_CONFIG_STRING(transaction_config, "",
@@ -202,10 +203,10 @@ DEF_OPT_AS_CONFIG_STRING(transaction_config, "",
 DEF_OPT_AS_STRING(table_name, "test", "table name")
 DEF_OPT_AS_BOOL(
   truncate_single_ops, 0, "Implement truncate via cursor remove instead of session API")
-DEF_OPT_AS_UINT32(
-  value_sz_max, 1000, "maximum value size when delta updates are present. Default disabled")
-DEF_OPT_AS_UINT32(
-  value_sz_min, 1, "minimum value size when delta updates are present. Default disabled")
+DEF_OPT_AS_UINT32(value_sz_max, 1000,
+  "maximum value size when delta updates/modify operations are present. Default disabled")
+DEF_OPT_AS_UINT32(value_sz_min, 1,
+  "minimum value size when delta updates/modify operations are present. Default disabled")
 DEF_OPT_AS_UINT32(value_sz, 100, "value size")
 DEF_OPT_AS_UINT32(verbose, 1, "verbosity")
 DEF_OPT_AS_UINT32(warmup, 0, "How long to run the workload phase before starting measurements")

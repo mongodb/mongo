@@ -1,5 +1,5 @@
 # wtperf options file: btree with updates. The goal here is to have a workload
-# of large documents that uses a lot of transaction IDs for modify operations
+# of large documents that uses a lot of transaction IDs for update operations
 conn_config="cache_size=20G"
 sess_config="isolation=snapshot"
 table_config="type=file"
@@ -9,4 +9,4 @@ icount=500000
 report_interval=5
 run_time=120
 populate_threads=1
-threads=((count=1,modify=1,ops_per_txn=1,modify_distribute=true))
+threads=((count=1,updates=1,ops_per_txn=1,modify_distribute=true))

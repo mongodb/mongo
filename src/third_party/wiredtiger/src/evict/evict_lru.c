@@ -280,6 +280,7 @@ __wt_evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
     /*
      * The thread group code calls us repeatedly. So each call is one pass through eviction.
      */
+    WT_TRACK_TIME(session);
     if (conn->evict_server_running && __wt_spin_trylock(session, &cache->evict_pass_lock) == 0) {
         /*
          * Cannot use WT_WITH_PASS_LOCK because this is a try lock. Fix when that is supported. We
@@ -2294,6 +2295,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, d
     if (timer)
         time_start = __wt_clock(session);
 
+    WT_TRACK_TIME(session);
     for (initial_progress = cache->eviction_progress;; ret = 0) {
         /*
          * A pathological case: if we're the oldest transaction in the

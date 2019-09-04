@@ -61,6 +61,7 @@ struct __wt_session_impl {
     const char *name;   /* Name */
     const char *lastop; /* Last operation */
     uint32_t id;        /* UID, offset in session array */
+    uint32_t op_start;  /* DEBUGGING: Operation start time (seconds) */
 
     WT_EVENT_HANDLER *event_handler; /* Application's event handlers */
 
