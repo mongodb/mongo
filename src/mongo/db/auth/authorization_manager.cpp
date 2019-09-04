@@ -672,8 +672,14 @@ bool loggedCommandOperatesOnAuthzData(const char* ns, const BSONObj& cmdObj) {
     } else if (cmdName == "dropDatabase") {
         return true;
     } else if (cmdName == "renameCollection") {
-        return isAuthzCollection(cmdObj.firstElement().str()) ||
-            isAuthzCollection(cmdObj["to"].str());
+        const NamespaceString fromNamespace(cmdObj.firstElement().str());
+        const NamespaceString toNamespace(cmdObj["to"].str());
+        if (fromNamespace.db() == "admin" || toNamespace.db() == "admin") {
+            return isAuthzCollection(fromNamespace.coll().toString()) ||
+                isAuthzCollection(toNamespace.coll().toString());
+        } else {
+            return false;
+        }
     } else if (cmdName == "dropIndexes" || cmdName == "deleteIndexes") {
         return false;
     } else if (cmdName == "create") {

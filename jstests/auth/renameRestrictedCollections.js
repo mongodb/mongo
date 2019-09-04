@@ -72,39 +72,38 @@
 
     adminDB.auth('rootier', 'password');
 
-    jsTestLog("Test that with __system you CAN rename to/from system.users");
-    res = adminDB.system.users.renameCollection("users", true);
-    assert.eq(1, res.ok, tojson(res));
-
     // Test permissions against the configDB and localDB
 
     // Start with test against inserting to and renaming collections in config and local
-    // as userAdminAnyDatabase.
+    // as __system.
     assert.writeOK(configDB.test.insert({'a': 1}));
     assert.commandWorked(configDB.test.renameCollection('test2'));
 
-    assert.writeOK(localDB.test.insert({'a': 1}));
+    assert.writeOK(localDB.test.insert({'b': 2}));
     assert.commandWorked(localDB.test.renameCollection('test2'));
-    adminDB.createUser({user: 'readWriteAdmin', pwd: 'password', roles: ['readWriteAnyDatabase']});
     adminDB.logout();
 
     // Test renaming collection in config with readWriteAnyDatabase
     assert(adminDB.auth('readWriteAdmin', 'password'));
-    res = configDB.test2.insert({'b': 2});
+    res = configDB.test2.insert({'c': 3});
     assert.writeError(res, 13, "not authorized on config to execute command");
     res = configDB.test2.renameCollection('test');
     assert.eq(0, res.ok);
     assert.eq(CodeUnauthorized, res.code);
 
     // Test renaming collection in local with readWriteAnyDatabase
-    res = localDB.test2.insert({'b': 2});
+    res = localDB.test2.insert({'d': 4});
     assert.writeError(res, 13, "not authorized on config to execute command");
     res = localDB.test2.renameCollection('test');
     assert.eq(0, res.ok);
     assert.eq(CodeUnauthorized, res.code);
 
+    // Test renaming system.users collection with __system
+    assert(adminDB.auth('rootier', 'password'));
+    jsTestLog("Test that with __system you CAN rename to/from system.users");
+    res = adminDB.system.users.renameCollection("users", true);
+    assert.eq(1, res.ok, tojson(res));
     // At this point, all the user documents are gone, so further activity may be unauthorized,
     // depending on cluster configuration.  So, this is the end of the test.
     MongoRunner.stopMongod(conn, {user: 'userAdmin', pwd: 'password'});
-
 })();
