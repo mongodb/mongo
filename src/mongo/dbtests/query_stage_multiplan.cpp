@@ -148,10 +148,8 @@ unique_ptr<PlanStage> getIxScanPlan(OperationContext* opCtx,
     ixparams.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
     ixparams.direction = 1;
 
-    IndexScan* ix = new IndexScan(opCtx, ixparams, sharedWs, nullptr);
-    unique_ptr<PlanStage> root(new FetchStage(opCtx, sharedWs, ix, nullptr, coll));
-
-    return root;
+    auto ixscan = std::make_unique<IndexScan>(opCtx, ixparams, sharedWs, nullptr);
+    return std::make_unique<FetchStage>(opCtx, sharedWs, std::move(ixscan), nullptr, coll);
 }
 
 unique_ptr<MatchExpression> makeMatchExpressionFromFilter(OperationContext* opCtx,
@@ -197,8 +195,8 @@ std::unique_ptr<MultiPlanStage> runMultiPlanner(OperationContext* opCtx,
     auto cq = makeCanonicalQuery(opCtx, nss, BSON("foo" << desiredFooValue));
 
     unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(opCtx, coll, cq.get());
-    mps->addPlan(createQuerySolution(), ixScanRoot.release(), sharedWs.get());
-    mps->addPlan(createQuerySolution(), collScanRoot.release(), sharedWs.get());
+    mps->addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
+    mps->addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
     // Plan 0 aka the first plan aka the index scan should be the best.
     PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD,
@@ -245,8 +243,8 @@ TEST_F(QueryStageMultiPlanTest, MPSCollectionScanVsHighlySelectiveIXScan) {
 
     unique_ptr<MultiPlanStage> mps =
         std::make_unique<MultiPlanStage>(_opCtx.get(), ctx.getCollection(), cq.get());
-    mps->addPlan(createQuerySolution(), ixScanRoot.release(), sharedWs.get());
-    mps->addPlan(createQuerySolution(), collScanRoot.release(), sharedWs.get());
+    mps->addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
+    mps->addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
     // Plan 0 aka the first plan aka the index scan should be the best.
     PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD, _clock);
@@ -403,10 +401,8 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     unique_ptr<WorkingSet> ws(new WorkingSet());
     // Put each solution from the planner into the MPR.
     for (size_t i = 0; i < solutions.size(); ++i) {
-        PlanStage* root;
-        ASSERT(StageBuilder::build(_opCtx.get(), collection, *cq, *solutions[i], ws.get(), &root));
-        // Takes ownership of 'root'.
-        mps->addPlan(std::move(solutions[i]), root, ws.get());
+        auto root = StageBuilder::build(_opCtx.get(), collection, *cq, *solutions[i], ws.get());
+        mps->addPlan(std::move(solutions[i]), std::move(root), ws.get());
     }
 
     // This sets a backup plan.
@@ -492,8 +488,8 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
         std::make_unique<MultiPlanStage>(_opCtx.get(), ctx.getCollection(), cq.get());
 
     // Put each plan into the MultiPlanStage. Takes ownership of 'firstPlan' and 'secondPlan'.
-    mps->addPlan(std::make_unique<QuerySolution>(), firstPlan.release(), ws.get());
-    mps->addPlan(std::make_unique<QuerySolution>(), secondPlan.release(), ws.get());
+    mps->addPlan(std::make_unique<QuerySolution>(), std::move(firstPlan), ws.get());
+    mps->addPlan(std::make_unique<QuerySolution>(), std::move(secondPlan), ws.get());
 
     // Making a PlanExecutor chooses the best plan.
     auto exec = uassertStatusOK(PlanExecutor::make(
@@ -595,8 +591,8 @@ TEST_F(QueryStageMultiPlanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlannin
                                   ctx.getCollection(),
                                   canonicalQuery.get(),
                                   MultiPlanStage::CachingMode::NeverCache);
-    multiPlanStage.addPlan(createQuerySolution(), ixScanRoot.release(), sharedWs.get());
-    multiPlanStage.addPlan(createQuerySolution(), collScanRoot.release(), sharedWs.get());
+    multiPlanStage.addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
+    multiPlanStage.addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
     AlwaysTimeOutYieldPolicy alwaysTimeOutPolicy(serviceContext()->getFastClockSource());
     ASSERT_EQ(ErrorCodes::ExceededTimeLimit, multiPlanStage.pickBestPlan(&alwaysTimeOutPolicy));
@@ -635,8 +631,8 @@ TEST_F(QueryStageMultiPlanTest, ShouldReportErrorIfKilledDuringPlanning) {
                                   ctx.getCollection(),
                                   canonicalQuery.get(),
                                   MultiPlanStage::CachingMode::NeverCache);
-    multiPlanStage.addPlan(createQuerySolution(), ixScanRoot.release(), sharedWs.get());
-    multiPlanStage.addPlan(createQuerySolution(), collScanRoot.release(), sharedWs.get());
+    multiPlanStage.addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
+    multiPlanStage.addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
     AlwaysPlanKilledYieldPolicy alwaysPlanKilledYieldPolicy(serviceContext()->getFastClockSource());
     ASSERT_EQ(ErrorCodes::QueryPlanKilled,

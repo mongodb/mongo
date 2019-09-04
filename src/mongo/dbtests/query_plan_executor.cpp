@@ -151,8 +151,9 @@ public:
         const Collection* coll = db->getCollection(&_opCtx, nss);
 
         unique_ptr<WorkingSet> ws(new WorkingSet());
-        IndexScan* ix = new IndexScan(&_opCtx, ixparams, ws.get(), nullptr);
-        unique_ptr<PlanStage> root(new FetchStage(&_opCtx, ws.get(), ix, nullptr, coll));
+        auto ixscan = std::make_unique<IndexScan>(&_opCtx, ixparams, ws.get(), nullptr);
+        unique_ptr<PlanStage> root =
+            std::make_unique<FetchStage>(&_opCtx, ws.get(), std::move(ixscan), nullptr, coll);
 
         auto qr = std::make_unique<QueryRequest>(nss);
         auto statusWithCQ = CanonicalQuery::canonicalize(&_opCtx, std::move(qr));

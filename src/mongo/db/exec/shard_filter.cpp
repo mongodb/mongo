@@ -53,9 +53,9 @@ const char* ShardFilterStage::kStageType = "SHARDING_FILTER";
 ShardFilterStage::ShardFilterStage(OperationContext* opCtx,
                                    ScopedCollectionMetadata metadata,
                                    WorkingSet* ws,
-                                   PlanStage* child)
+                                   std::unique_ptr<PlanStage> child)
     : PlanStage(kStageType, opCtx), _ws(ws), _shardFilterer(std::move(metadata)) {
-    _children.emplace_back(child);
+    _children.emplace_back(std::move(child));
 }
 
 ShardFilterStage::~ShardFilterStage() {}

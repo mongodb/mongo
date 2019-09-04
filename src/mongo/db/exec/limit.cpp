@@ -43,10 +43,13 @@ using std::vector;
 // static
 const char* LimitStage::kStageType = "LIMIT";
 
-LimitStage::LimitStage(OperationContext* opCtx, long long limit, WorkingSet* ws, PlanStage* child)
+LimitStage::LimitStage(OperationContext* opCtx,
+                       long long limit,
+                       WorkingSet* ws,
+                       std::unique_ptr<PlanStage> child)
     : PlanStage(kStageType, opCtx), _ws(ws), _numToReturn(limit) {
     _specificStats.limit = _numToReturn;
-    _children.emplace_back(child);
+    _children.emplace_back(std::move(child));
 }
 
 LimitStage::~LimitStage() {}

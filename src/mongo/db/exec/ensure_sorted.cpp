@@ -45,9 +45,9 @@ const char* EnsureSortedStage::kStageType = "ENSURE_SORTED";
 EnsureSortedStage::EnsureSortedStage(OperationContext* opCtx,
                                      BSONObj pattern,
                                      WorkingSet* ws,
-                                     PlanStage* child)
+                                     std::unique_ptr<PlanStage> child)
     : PlanStage(kStageType, opCtx), _ws(ws) {
-    _children.emplace_back(child);
+    _children.emplace_back(std::move(child));
     _pattern = FindCommon::transformSortSpec(pattern);
 }
 

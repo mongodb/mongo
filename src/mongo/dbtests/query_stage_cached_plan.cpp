@@ -158,7 +158,7 @@ public:
         }
 
         CachedPlanStage cachedPlanStage(
-            &_opCtx, collection, &_ws, cq, plannerParams, decisionWorks, mockChild.release());
+            &_opCtx, collection, &_ws, cq, plannerParams, decisionWorks, std::move(mockChild));
 
         // This should succeed after triggering a replan.
         PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD,
@@ -205,7 +205,7 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanFailure) {
     // High enough so that we shouldn't trigger a replan based on works.
     const size_t decisionWorks = 50;
     CachedPlanStage cachedPlanStage(
-        &_opCtx, collection, &_ws, cq.get(), plannerParams, decisionWorks, mockChild.release());
+        &_opCtx, collection, &_ws, cq.get(), plannerParams, decisionWorks, std::move(mockChild));
 
     // This should succeed after triggering a replan.
     PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD,
@@ -255,7 +255,7 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanHitMaxWorks) {
     }
 
     CachedPlanStage cachedPlanStage(
-        &_opCtx, collection, &_ws, cq.get(), plannerParams, decisionWorks, mockChild.release());
+        &_opCtx, collection, &_ws, cq.get(), plannerParams, decisionWorks, std::move(mockChild));
 
     // This should succeed after triggering a replan.
     PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD,
@@ -459,7 +459,7 @@ TEST_F(QueryStageCachedPlan, ThrowsOnYieldRecoveryWhenIndexIsDroppedBeforePlanSe
                                     cq.get(),
                                     plannerParams,
                                     decisionWorks,
-                                    new QueuedDataStage(&_opCtx, &_ws));
+                                    std::make_unique<QueuedDataStage>(&_opCtx, &_ws));
 
     // Drop an index while the CachedPlanStage is in a saved state. Restoring should fail, since we
     // may still need the dropped index for plan selection.
@@ -501,7 +501,7 @@ TEST_F(QueryStageCachedPlan, DoesNotThrowOnYieldRecoveryWhenIndexIsDroppedAferPl
                                     cq.get(),
                                     plannerParams,
                                     decisionWorks,
-                                    new QueuedDataStage(&_opCtx, &_ws));
+                                    std::make_unique<QueuedDataStage>(&_opCtx, &_ws));
 
     PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL,
                                 _opCtx.getServiceContext()->getFastClockSource());

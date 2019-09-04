@@ -51,7 +51,7 @@ class WorkingSetMember;
 class SortKeyGeneratorStage final : public PlanStage {
 public:
     SortKeyGeneratorStage(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                          PlanStage* child,
+                          std::unique_ptr<PlanStage> child,
                           WorkingSet* ws,
                           const BSONObj& sortSpecObj);
 

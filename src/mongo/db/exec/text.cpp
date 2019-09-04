@@ -140,7 +140,7 @@ unique_ptr<PlanStage> TextStage::buildTextTree(OperationContext* opCtx,
         // WorkingSetMember inputs have fetched data.
         const MatchExpression* emptyFilter = nullptr;
         auto fetchStage = std::make_unique<FetchStage>(
-            opCtx, ws, textSearcher.release(), emptyFilter, collection);
+            opCtx, ws, std::move(textSearcher), emptyFilter, collection);
 
         textMatchStage = std::make_unique<TextMatchStage>(
             opCtx, std::move(fetchStage), _params.query, _params.spec, ws);

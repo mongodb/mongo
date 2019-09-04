@@ -74,7 +74,7 @@ public:
     ShardFilterStage(OperationContext* opCtx,
                      ScopedCollectionMetadata metadata,
                      WorkingSet* ws,
-                     PlanStage* child);
+                     std::unique_ptr<PlanStage> child);
     ~ShardFilterStage();
 
     bool isEOF() final;

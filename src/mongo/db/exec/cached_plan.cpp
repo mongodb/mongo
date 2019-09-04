@@ -63,13 +63,13 @@ CachedPlanStage::CachedPlanStage(OperationContext* opCtx,
                                  CanonicalQuery* cq,
                                  const QueryPlannerParams& params,
                                  size_t decisionWorks,
-                                 PlanStage* root)
+                                 std::unique_ptr<PlanStage> root)
     : RequiresAllIndicesStage(kStageType, opCtx, collection),
       _ws(ws),
       _canonicalQuery(cq),
       _plannerParams(params),
       _decisionWorks(decisionWorks) {
-    _children.emplace_back(root);
+    _children.emplace_back(std::move(root));
 }
 
 Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
@@ -215,11 +215,10 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
     }
 
     if (1 == solutions.size()) {
-        PlanStage* newRoot;
         // Only one possible plan. Build the stages from the solution.
-        verify(StageBuilder::build(
-            getOpCtx(), collection(), *_canonicalQuery, *solutions[0], _ws, &newRoot));
-        _children.emplace_back(newRoot);
+        auto newRoot =
+            StageBuilder::build(getOpCtx(), collection(), *_canonicalQuery, *solutions[0], _ws);
+        _children.emplace_back(std::move(newRoot));
         _replannedQs = std::move(solutions.back());
         solutions.pop_back();
 
@@ -244,12 +243,10 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
             solutions[ix]->cacheData->indexFilterApplied = _plannerParams.indexFiltersApplied;
         }
 
-        PlanStage* nextPlanRoot;
-        verify(StageBuilder::build(
-            getOpCtx(), collection(), *_canonicalQuery, *solutions[ix], _ws, &nextPlanRoot));
+        auto nextPlanRoot =
+            StageBuilder::build(getOpCtx(), collection(), *_canonicalQuery, *solutions[ix], _ws);
 
-        // Takes ownership of 'nextPlanRoot'.
-        multiPlanStage->addPlan(std::move(solutions[ix]), nextPlanRoot, _ws);
+        multiPlanStage->addPlan(std::move(solutions[ix]), std::move(nextPlanRoot), _ws);
     }
 
     // Delegate to the MultiPlanStage's plan selection facility.

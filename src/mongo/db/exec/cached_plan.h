@@ -62,7 +62,7 @@ public:
                     CanonicalQuery* cq,
                     const QueryPlannerParams& params,
                     size_t decisionWorks,
-                    PlanStage* root);
+                    std::unique_ptr<PlanStage> root);
 
     bool isEOF() final;
 

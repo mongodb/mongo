@@ -75,10 +75,10 @@ MultiPlanStage::MultiPlanStage(OperationContext* opCtx,
       _statusMemberId(WorkingSet::INVALID_ID) {}
 
 void MultiPlanStage::addPlan(std::unique_ptr<QuerySolution> solution,
-                             PlanStage* root,
+                             std::unique_ptr<PlanStage> root,
                              WorkingSet* ws) {
-    _candidates.push_back(CandidatePlan(std::move(solution), root, ws));
-    _children.emplace_back(root);
+    _children.emplace_back(std::move(root));
+    _candidates.push_back(CandidatePlan(std::move(solution), _children.back().get(), ws));
 }
 
 bool MultiPlanStage::isEOF() {

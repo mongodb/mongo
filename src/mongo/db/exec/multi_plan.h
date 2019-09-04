@@ -95,9 +95,11 @@ public:
     const SpecificStats* getSpecificStats() const final;
 
     /**
-     * Takes ownership of PlanStage. Does not take ownership of WorkingSet.
+     * Adsd a new candidate plan to be considered for selection by the MultiPlanStage trial period.
      */
-    void addPlan(std::unique_ptr<QuerySolution> solution, PlanStage* root, WorkingSet* sharedWs);
+    void addPlan(std::unique_ptr<QuerySolution> solution,
+                 std::unique_ptr<PlanStage> root,
+                 WorkingSet* sharedWs);
 
     /**
      * Runs all plans added by addPlan, ranks them, and picks a best.

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/near.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
@@ -84,6 +85,33 @@ protected:
                                      WorkingSetID* out) final;
 
 private:
+    class DensityEstimator {
+    public:
+        DensityEstimator(PlanStage::Children* children,
+                         BSONObj infoObj,
+                         const GeoNearParams* nearParams,
+                         const R2Annulus& fullBounds);
+
+        PlanStage::StageState work(OperationContext* opCtx,
+                                   WorkingSet* workingSet,
+                                   const IndexDescriptor* twoDIndex,
+                                   WorkingSetID* out,
+                                   double* estimatedDistance);
+
+    private:
+        void buildIndexScan(OperationContext* opCtx,
+                            WorkingSet* workingSet,
+                            const IndexDescriptor* twoDIndex);
+
+        PlanStage::Children* _children;    // Points to PlanStage::_children in the NearStage.
+        const GeoNearParams* _nearParams;  // Not owned here.
+        const R2Annulus& _fullBounds;
+        IndexScan* _indexScan = nullptr;  // Owned in PlanStage::_children.
+        std::unique_ptr<GeoHashConverter> _converter;
+        GeoHash _centroidCell;
+        unsigned _currentLevel;
+    };
+
     const GeoNearParams _nearParams;
 
     // The total search annulus
@@ -98,7 +126,6 @@ private:
     // Keeps track of the region that has already been scanned
     R2CellUnion _scannedCells;
 
-    class DensityEstimator;
     std::unique_ptr<DensityEstimator> _densityEstimator;
 };
 
@@ -126,6 +153,35 @@ protected:
                                      WorkingSetID* out) final;
 
 private:
+    // Estimate the density of data by search the nearest cells level by level around center.
+    class DensityEstimator {
+    public:
+        DensityEstimator(PlanStage::Children* children,
+                         const GeoNearParams* nearParams,
+                         const S2IndexingParams& indexParams,
+                         const R2Annulus& fullBounds);
+
+        // Search for a document in neighbors at current level.
+        // Return IS_EOF is such document exists and set the estimated distance to the nearest doc.
+        PlanStage::StageState work(OperationContext* opCtx,
+                                   WorkingSet* workingSet,
+                                   const IndexDescriptor* s2Index,
+                                   WorkingSetID* out,
+                                   double* estimatedDistance);
+
+    private:
+        void buildIndexScan(OperationContext* opCtx,
+                            WorkingSet* workingSet,
+                            const IndexDescriptor* s2Index);
+
+        PlanStage::Children* _children;    // Points to PlanStage::_children in the NearStage.
+        const GeoNearParams* _nearParams;  // Not owned here.
+        const S2IndexingParams _indexParams;
+        const R2Annulus& _fullBounds;
+        int _currentLevel;
+        IndexScan* _indexScan = nullptr;  // Owned in PlanStage::_children.
+    };
+
     const GeoNearParams _nearParams;
 
     S2IndexingParams _indexParams;
@@ -142,7 +198,6 @@ private:
     // Keeps track of the region that has already been scanned
     S2CellUnion _scannedCells;
 
-    class DensityEstimator;
     std::unique_ptr<DensityEstimator> _densityEstimator;
 };
 

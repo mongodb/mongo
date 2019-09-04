@@ -43,21 +43,17 @@ class OperationContext;
 class StageBuilder {
 public:
     /**
-     * Turns 'solution' into an executable tree of PlanStage(s).
+     * Turns 'solution' into an executable tree of PlanStage(s). Returns a pointer to the root of
+     * the plan stage tree.
      *
-     * 'cq' must be the CanonicalQuery from which 'solution' is derived.
-     *
-     * Returns true if the PlanStage tree was built successfully.  The root of the tree is in
-     * *rootOut and the WorkingSet that the tree uses is in wsIn.
-     *
-     * Returns false otherwise.  *rootOut and *wsOut are invalid.
+     * 'cq' must be the CanonicalQuery from which 'solution' is derived. Illegal to call if 'wsIn'
+     * is nullptr, or if 'solution.root' is nullptr.
      */
-    static bool build(OperationContext* opCtx,
-                      const Collection* collection,
-                      const CanonicalQuery& cq,
-                      const QuerySolution& solution,
-                      WorkingSet* wsIn,
-                      PlanStage** rootOut);
+    static std::unique_ptr<PlanStage> build(OperationContext* opCtx,
+                                            const Collection* collection,
+                                            const CanonicalQuery& cq,
+                                            const QuerySolution& solution,
+                                            WorkingSet* wsIn);
 };
 
 }  // namespace mongo

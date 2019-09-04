@@ -47,8 +47,8 @@ const char* OrStage::kStageType = "OR";
 OrStage::OrStage(OperationContext* opCtx, WorkingSet* ws, bool dedup, const MatchExpression* filter)
     : PlanStage(kStageType, opCtx), _ws(ws), _filter(filter), _currentChild(0), _dedup(dedup) {}
 
-void OrStage::addChild(PlanStage* child) {
-    _children.emplace_back(child);
+void OrStage::addChild(std::unique_ptr<PlanStage> child) {
+    _children.emplace_back(std::move(child));
 }
 
 void OrStage::addChildren(Children childrenToAdd) {

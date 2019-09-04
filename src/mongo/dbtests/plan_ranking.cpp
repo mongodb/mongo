@@ -130,10 +130,8 @@ public:
         unique_ptr<WorkingSet> ws(new WorkingSet());
         // Put each solution from the planner into the MPR.
         for (size_t i = 0; i < solutions.size(); ++i) {
-            PlanStage* root;
-            ASSERT(StageBuilder::build(&_opCtx, collection, *cq, *solutions[i], ws.get(), &root));
-            // Takes ownership of 'root'.
-            _mps->addPlan(std::move(solutions[i]), root, ws.get());
+            auto root = StageBuilder::build(&_opCtx, collection, *cq, *solutions[i], ws.get());
+            _mps->addPlan(std::move(solutions[i]), std::move(root), ws.get());
         }
         // This is what sets a backup plan, should we test for it.
         PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD,

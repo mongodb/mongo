@@ -49,7 +49,7 @@ class AndSortedStage final : public PlanStage {
 public:
     AndSortedStage(OperationContext* opCtx, WorkingSet* ws);
 
-    void addChild(PlanStage* child);
+    void addChild(std::unique_ptr<PlanStage> child);
 
     StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;

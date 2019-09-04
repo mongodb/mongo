@@ -174,8 +174,8 @@ void TrialStage::_assessTrialAndBuildFinalPlan() {
     // final plan which UNIONs across the QueuedDataStage and the trial plan.
     std::unique_ptr<PlanStage> unionPlan =
         std::make_unique<OrStage>(getOpCtx(), _ws, false, nullptr);
-    static_cast<OrStage*>(unionPlan.get())->addChild(_queuedData.release());
-    static_cast<OrStage*>(unionPlan.get())->addChild(_children.front().release());
+    static_cast<OrStage*>(unionPlan.get())->addChild(std::move(_queuedData));
+    static_cast<OrStage*>(unionPlan.get())->addChild(std::move(_children.front()));
     _replaceCurrentPlan(unionPlan);
 }
 

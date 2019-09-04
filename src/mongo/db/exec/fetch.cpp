@@ -51,14 +51,14 @@ const char* FetchStage::kStageType = "FETCH";
 
 FetchStage::FetchStage(OperationContext* opCtx,
                        WorkingSet* ws,
-                       PlanStage* child,
+                       std::unique_ptr<PlanStage> child,
                        const MatchExpression* filter,
                        const Collection* collection)
     : RequiresCollectionStage(kStageType, opCtx, collection),
       _ws(ws),
       _filter(filter),
       _idRetrying(WorkingSet::INVALID_ID) {
-    _children.emplace_back(child);
+    _children.emplace_back(std::move(child));
 }
 
 FetchStage::~FetchStage() {}

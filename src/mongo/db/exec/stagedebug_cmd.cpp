@@ -170,13 +170,13 @@ public:
         std::vector<std::unique_ptr<MatchExpression>> exprs;
         unique_ptr<WorkingSet> ws(new WorkingSet());
 
-        PlanStage* userRoot = parseQuery(opCtx, collection, planObj, ws.get(), &exprs);
+        std::unique_ptr<PlanStage> userRoot{
+            parseQuery(opCtx, collection, planObj, ws.get(), &exprs)};
         uassert(16911, "Couldn't parse plan from " + cmdObj.toString(), nullptr != userRoot);
 
         // Add a fetch at the top for the user so we can get obj back for sure.
-        // TODO: Do we want to do this for the user?  I think so.
         unique_ptr<PlanStage> rootFetch =
-            std::make_unique<FetchStage>(opCtx, ws.get(), userRoot, nullptr, collection);
+            std::make_unique<FetchStage>(opCtx, ws.get(), std::move(userRoot), nullptr, collection);
 
         auto statusWithPlanExecutor = PlanExecutor::make(
             opCtx, std::move(ws), std::move(rootFetch), collection, PlanExecutor::YIELD_AUTO);
@@ -307,12 +307,12 @@ public:
                 BSONElement e = it.next();
                 uassert(16922, "node of AND isn't an obj?: " + e.toString(), e.isABSONObj());
 
-                PlanStage* subNode = parseQuery(opCtx, collection, e.Obj(), workingSet, exprs);
+                std::unique_ptr<PlanStage> subNode{
+                    parseQuery(opCtx, collection, e.Obj(), workingSet, exprs)};
                 uassert(16923,
                         "Can't parse sub-node of AND: " + e.Obj().toString(),
                         nullptr != subNode);
-                // takes ownership
-                andStage->addChild(subNode);
+                andStage->addChild(std::move(subNode));
                 ++nodesAdded;
             }
 
@@ -331,12 +331,12 @@ public:
                 BSONElement e = it.next();
                 uassert(16925, "node of AND isn't an obj?: " + e.toString(), e.isABSONObj());
 
-                PlanStage* subNode = parseQuery(opCtx, collection, e.Obj(), workingSet, exprs);
+                std::unique_ptr<PlanStage> subNode{
+                    parseQuery(opCtx, collection, e.Obj(), workingSet, exprs)};
                 uassert(16926,
                         "Can't parse sub-node of AND: " + e.Obj().toString(),
                         nullptr != subNode);
-                // takes ownership
-                andStage->addChild(subNode);
+                andStage->addChild(std::move(subNode));
                 ++nodesAdded;
             }
 
@@ -355,23 +355,23 @@ public:
                 if (!e.isABSONObj()) {
                     return nullptr;
                 }
-                PlanStage* subNode = parseQuery(opCtx, collection, e.Obj(), workingSet, exprs);
+                std::unique_ptr<PlanStage> subNode{
+                    parseQuery(opCtx, collection, e.Obj(), workingSet, exprs)};
                 uassert(
                     16936, "Can't parse sub-node of OR: " + e.Obj().toString(), nullptr != subNode);
-                // takes ownership
-                orStage->addChild(subNode);
+                orStage->addChild(std::move(subNode));
             }
 
             return orStage.release();
         } else if ("fetch" == nodeName) {
             uassert(
                 16929, "Node argument must be provided to fetch", nodeArgs["node"].isABSONObj());
-            PlanStage* subNode =
-                parseQuery(opCtx, collection, nodeArgs["node"].Obj(), workingSet, exprs);
+            std::unique_ptr<PlanStage> subNode{
+                parseQuery(opCtx, collection, nodeArgs["node"].Obj(), workingSet, exprs)};
             uassert(28731,
                     "Can't parse sub-node of FETCH: " + nodeArgs["node"].Obj().toString(),
                     nullptr != subNode);
-            return new FetchStage(opCtx, workingSet, subNode, matcher, collection);
+            return new FetchStage(opCtx, workingSet, std::move(subNode), matcher, collection);
         } else if ("limit" == nodeName) {
             uassert(16937,
                     "Limit stage doesn't have a filter (put it on the child)",
@@ -379,24 +379,26 @@ public:
             uassert(
                 16930, "Node argument must be provided to limit", nodeArgs["node"].isABSONObj());
             uassert(16931, "Num argument must be provided to limit", nodeArgs["num"].isNumber());
-            PlanStage* subNode =
-                parseQuery(opCtx, collection, nodeArgs["node"].Obj(), workingSet, exprs);
+            std::unique_ptr<PlanStage> subNode{
+                parseQuery(opCtx, collection, nodeArgs["node"].Obj(), workingSet, exprs)};
             uassert(28732,
                     "Can't parse sub-node of LIMIT: " + nodeArgs["node"].Obj().toString(),
                     nullptr != subNode);
-            return new LimitStage(opCtx, nodeArgs["num"].numberInt(), workingSet, subNode);
+            return new LimitStage(
+                opCtx, nodeArgs["num"].numberInt(), workingSet, std ::move(subNode));
         } else if ("skip" == nodeName) {
             uassert(16938,
                     "Skip stage doesn't have a filter (put it on the child)",
                     nullptr == matcher);
             uassert(16932, "Node argument must be provided to skip", nodeArgs["node"].isABSONObj());
             uassert(16933, "Num argument must be provided to skip", nodeArgs["num"].isNumber());
-            PlanStage* subNode =
-                parseQuery(opCtx, collection, nodeArgs["node"].Obj(), workingSet, exprs);
+            std::unique_ptr<PlanStage> subNode{
+                parseQuery(opCtx, collection, nodeArgs["node"].Obj(), workingSet, exprs)};
             uassert(28733,
                     "Can't parse sub-node of SKIP: " + nodeArgs["node"].Obj().toString(),
                     nullptr != subNode);
-            return new SkipStage(opCtx, nodeArgs["num"].numberInt(), workingSet, subNode);
+            return new SkipStage(
+                opCtx, nodeArgs["num"].numberInt(), workingSet, std::move(subNode));
         } else if ("cscan" == nodeName) {
             CollectionScanParams params;
 
@@ -429,12 +431,12 @@ public:
                 BSONElement e = it.next();
                 uassert(16973, "node of mergeSort isn't an obj?: " + e.toString(), e.isABSONObj());
 
-                PlanStage* subNode = parseQuery(opCtx, collection, e.Obj(), workingSet, exprs);
+                std::unique_ptr<PlanStage> subNode{
+                    parseQuery(opCtx, collection, e.Obj(), workingSet, exprs)};
                 uassert(16974,
                         "Can't parse sub-node of mergeSort: " + e.Obj().toString(),
                         nullptr != subNode);
-                // takes ownership
-                mergeStage->addChild(subNode);
+                mergeStage->addChild(std::move(subNode));
             }
             return mergeStage.release();
         } else if ("text" == nodeName) {

@@ -271,16 +271,14 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
 
             // Dump all the solutions into the MPS.
             for (size_t ix = 0; ix < branchResult->solutions.size(); ++ix) {
-                PlanStage* nextPlanRoot;
-                invariant(StageBuilder::build(getOpCtx(),
-                                              collection(),
-                                              *branchResult->canonicalQuery,
-                                              *branchResult->solutions[ix],
-                                              _ws,
-                                              &nextPlanRoot));
+                auto nextPlanRoot = StageBuilder::build(getOpCtx(),
+                                                        collection(),
+                                                        *branchResult->canonicalQuery,
+                                                        *branchResult->solutions[ix],
+                                                        _ws);
 
-                // Takes ownership of 'nextPlanRoot'.
-                multiPlanStage->addPlan(std::move(branchResult->solutions[ix]), nextPlanRoot, _ws);
+                multiPlanStage->addPlan(
+                    std::move(branchResult->solutions[ix]), std::move(nextPlanRoot), _ws);
             }
 
             Status planSelectStat = multiPlanStage->pickBestPlan(yieldPolicy);
@@ -340,7 +338,6 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
 
     LOG(5) << "Subplanner: fully tagged tree is " << redact(solnRoot->toString());
 
-    // Takes ownership of 'solnRoot'
     _compositeSolution =
         QueryPlannerAnalysis::analyzeDataAccess(*_query, _plannerParams, std::move(solnRoot));
 
@@ -355,11 +352,10 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
     // Use the index tags from planning each branch to construct the composite solution,
     // and set that solution as our child stage.
     _ws->clear();
-    PlanStage* root;
-    invariant(StageBuilder::build(
-        getOpCtx(), collection(), *_query, *_compositeSolution.get(), _ws, &root));
+    auto root =
+        StageBuilder::build(getOpCtx(), collection(), *_query, *_compositeSolution.get(), _ws);
     invariant(_children.empty());
-    _children.emplace_back(root);
+    _children.emplace_back(std::move(root));
 
     return Status::OK();
 }
@@ -387,11 +383,10 @@ Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
     }
 
     if (1 == solutions.size()) {
-        PlanStage* root;
         // Only one possible plan.  Run it.  Build the stages from the solution.
-        verify(StageBuilder::build(getOpCtx(), collection(), *_query, *solutions[0], _ws, &root));
+        auto root = StageBuilder::build(getOpCtx(), collection(), *_query, *solutions[0], _ws);
         invariant(_children.empty());
-        _children.emplace_back(root);
+        _children.emplace_back(std::move(root));
 
         // This SubplanStage takes ownership of the query solution.
         _compositeSolution = std::move(solutions.back());
@@ -410,13 +405,10 @@ Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
                 solutions[ix]->cacheData->indexFilterApplied = _plannerParams.indexFiltersApplied;
             }
 
-            // version of StageBuild::build when WorkingSet is shared
-            PlanStage* nextPlanRoot;
-            verify(StageBuilder::build(
-                getOpCtx(), collection(), *_query, *solutions[ix], _ws, &nextPlanRoot));
+            auto nextPlanRoot =
+                StageBuilder::build(getOpCtx(), collection(), *_query, *solutions[ix], _ws);
 
-            // Takes ownership of 'nextPlanRoot'.
-            multiPlanStage->addPlan(std::move(solutions[ix]), nextPlanRoot, _ws);
+            multiPlanStage->addPlan(std::move(solutions[ix]), std::move(nextPlanRoot), _ws);
         }
 
         // Delegate the the MultiPlanStage's plan selection facility.

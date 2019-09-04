@@ -55,7 +55,7 @@ public:
      */
     AndHashStage(OperationContext* opCtx, WorkingSet* ws, size_t maxMemUsage);
 
-    void addChild(PlanStage* child);
+    void addChild(std::unique_ptr<PlanStage> child);
 
     /**
      * Returns memory usage.

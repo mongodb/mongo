@@ -72,7 +72,7 @@ public:
     SortStage(OperationContext* opCtx,
               const SortStageParams& params,
               WorkingSet* ws,
-              PlanStage* child);
+              std::unique_ptr<PlanStage> child);
     ~SortStage();
 
     bool isEOF() final;

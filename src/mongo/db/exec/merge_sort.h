@@ -59,7 +59,7 @@ class MergeSortStage final : public PlanStage {
 public:
     MergeSortStage(OperationContext* opCtx, const MergeSortStageParams& params, WorkingSet* ws);
 
-    void addChild(PlanStage* child);
+    void addChild(std::unique_ptr<PlanStage> child);
 
     bool isEOF() final;
     StageState doWork(WorkingSetID* out) final;

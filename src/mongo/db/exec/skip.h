@@ -44,7 +44,10 @@ namespace mongo {
  */
 class SkipStage final : public PlanStage {
 public:
-    SkipStage(OperationContext* opCtx, long long toSkip, WorkingSet* ws, PlanStage* child);
+    SkipStage(OperationContext* opCtx,
+              long long toSkip,
+              WorkingSet* ws,
+              std::unique_ptr<PlanStage> child);
     ~SkipStage();
 
     bool isEOF() final;

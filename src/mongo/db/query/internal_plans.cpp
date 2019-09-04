@@ -217,7 +217,7 @@ std::unique_ptr<PlanStage> InternalPlanner::_indexScan(OperationContext* opCtx,
         std::make_unique<IndexScan>(opCtx, std::move(params), ws, nullptr);
 
     if (InternalPlanner::IXSCAN_FETCH & options) {
-        root = std::make_unique<FetchStage>(opCtx, ws, root.release(), nullptr, collection);
+        root = std::make_unique<FetchStage>(opCtx, ws, std::move(root), nullptr, collection);
     }
 
     return root;

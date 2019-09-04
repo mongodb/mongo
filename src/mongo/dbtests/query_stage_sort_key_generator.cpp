@@ -78,7 +78,7 @@ BSONObj extractSortKey(const char* sortSpec, const char* doc, const CollatorInte
 
     BSONObj sortPattern = fromjson(sortSpec);
     SortKeyGeneratorStage sortKeyGen{
-        pExpCtx, mockStage.release(), &workingSet, std::move(sortPattern)};
+        pExpCtx, std::move(mockStage), &workingSet, std::move(sortPattern)};
     return extractKeyFromKeyGenStage(&sortKeyGen, &workingSet);
 }
 
@@ -107,7 +107,7 @@ BSONObj extractSortKeyCovered(const char* sortSpec,
 
     BSONObj sortPattern = fromjson(sortSpec);
     SortKeyGeneratorStage sortKeyGen{
-        pExpCtx, mockStage.release(), &workingSet, std::move(sortPattern)};
+        pExpCtx, std::move(mockStage), &workingSet, std::move(sortPattern)};
     return extractKeyFromKeyGenStage(&sortKeyGen, &workingSet);
 }
 

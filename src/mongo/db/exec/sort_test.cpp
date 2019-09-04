@@ -108,9 +108,9 @@ public:
             new ExpressionContext(getOpCtx(), collator));
 
         auto sortKeyGen = std::make_unique<SortKeyGeneratorStage>(
-            pExpCtx, queuedDataStage.release(), &ws, params.pattern);
+            pExpCtx, std::move(queuedDataStage), &ws, params.pattern);
 
-        SortStage sort(getOpCtx(), params, &ws, sortKeyGen.release());
+        SortStage sort(getOpCtx(), params, &ws, std::move(sortKeyGen));
 
         WorkingSetID id = WorkingSet::INVALID_ID;
         PlanStage::StageState state = PlanStage::NEED_TIME;
@@ -167,10 +167,10 @@ TEST_F(SortStageTest, SortEmptyWorkingSet) {
 
     // QueuedDataStage will be owned by SortStage.
     auto queuedDataStage = std::make_unique<QueuedDataStage>(getOpCtx(), &ws);
-    auto sortKeyGen =
-        std::make_unique<SortKeyGeneratorStage>(pExpCtx, queuedDataStage.release(), &ws, BSONObj());
+    auto sortKeyGen = std::make_unique<SortKeyGeneratorStage>(
+        pExpCtx, std::move(queuedDataStage), &ws, BSONObj());
     SortStageParams params;
-    SortStage sort(getOpCtx(), params, &ws, sortKeyGen.release());
+    SortStage sort(getOpCtx(), params, &ws, std::move(sortKeyGen));
 
     // Check initial EOF state.
     ASSERT_FALSE(sort.isEOF());
