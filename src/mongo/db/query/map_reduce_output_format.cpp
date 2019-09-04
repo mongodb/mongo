@@ -76,15 +76,15 @@ void appendInlineResponse(BSONArray&& documents,
     appendMetadataFields(verbose, inMongos, resultBuilder);
 }
 
-void appendOutResponse(NamespaceString outCollNss,
+void appendOutResponse(boost::optional<std::string> outDb,
+                       std::string outColl,
                        bool verbose,
                        bool inMongos,
                        BSONObjBuilder* resultBuilder) {
-    if (outCollNss.db().empty())
-        resultBuilder->append("result", outCollNss.coll());
+    if (!outDb)
+        resultBuilder->append("result", outColl);
     else
-        resultBuilder->append("result",
-                              BSON("db" << outCollNss.db() << "collection" << outCollNss.coll()));
+        resultBuilder->append("result", BSON("db" << *outDb << "collection" << outColl));
     appendMetadataFields(verbose, inMongos, resultBuilder);
 }
 }  // namespace mongo::map_reduce_output_format

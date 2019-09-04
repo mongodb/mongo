@@ -36,6 +36,8 @@
 #include "mongo/db/query/map_reduce_output_format.h"
 #include "mongo/unittest/unittest.h"
 
+using namespace std::literals::string_literals;
+
 namespace mongo {
 namespace {
 
@@ -65,7 +67,7 @@ TEST(MapReduceOutputFormat, FormatEmptyInlineMapReduceResponse) {
 
 TEST(MapReduceOutputFormat, FormatNonInlineMapReduceResponseWithoutDb) {
     BSONObjBuilder builder;
-    map_reduce_output_format::appendOutResponse(NamespaceString("", "c"), false, false, &builder);
+    map_reduce_output_format::appendOutResponse(boost::none, "c", false, false, &builder);
     ASSERT_BSONOBJ_EQ(fromjson("{result: \"c\","
                                "timeMillis: 0,"
                                "counts: {input: 0, emit: 0, reduce: 0, output: 0},"
@@ -75,7 +77,7 @@ TEST(MapReduceOutputFormat, FormatNonInlineMapReduceResponseWithoutDb) {
 
 TEST(MapReduceOutputFormat, FormatNonInlineMapReduceResponseWithDb) {
     BSONObjBuilder builder;
-    map_reduce_output_format::appendOutResponse(NamespaceString("db", "c"), false, false, &builder);
+    map_reduce_output_format::appendOutResponse("db"s, "c", false, false, &builder);
     ASSERT_BSONOBJ_EQ(fromjson("{result: {db: \"db\", collection: \"c\"},"
                                "timeMillis: 0,"
                                "counts: {input: 0, emit: 0, reduce: 0, output: 0},"
@@ -85,7 +87,7 @@ TEST(MapReduceOutputFormat, FormatNonInlineMapReduceResponseWithDb) {
 
 TEST(MapReduceOutputFormat, FormatVerboseMapReduceResponse) {
     BSONObjBuilder builder;
-    map_reduce_output_format::appendOutResponse(NamespaceString("", "c"), true, false, &builder);
+    map_reduce_output_format::appendOutResponse(boost::none, "c", true, false, &builder);
     ASSERT_BSONOBJ_EQ(fromjson("{result: \"c\","
                                "timeMillis: 0,"
                                "timing: {mapTime: 0, emitLoop: 0, reduceTime: 0, total: 0},"
@@ -128,7 +130,7 @@ TEST(MapReduceOutputFormat, FormatEmptyInlineClusterMapReduceResponse) {
 
 TEST(MapReduceOutputFormat, FormatNonInlineClusterMapReduceResponseWithoutDb) {
     BSONObjBuilder builder;
-    map_reduce_output_format::appendOutResponse(NamespaceString("", "c"), false, true, &builder);
+    map_reduce_output_format::appendOutResponse(boost::none, "c", false, true, &builder);
     ASSERT_BSONOBJ_EQ(fromjson("{result: \"c\","
                                "counts: {input: 0, emit: 0, reduce: 0, output: 0},"
                                "timeMillis: 0,"
@@ -142,7 +144,7 @@ TEST(MapReduceOutputFormat, FormatNonInlineClusterMapReduceResponseWithoutDb) {
 
 TEST(MapReduceOutputFormat, FormatNonInlineClusterMapReduceResponseWithDb) {
     BSONObjBuilder builder;
-    map_reduce_output_format::appendOutResponse(NamespaceString("db", "c"), false, true, &builder);
+    map_reduce_output_format::appendOutResponse("db"s, "c", false, true, &builder);
     ASSERT_BSONOBJ_EQ(fromjson("{result: {db: \"db\", collection: \"c\"},"
                                "counts: {input: 0, emit: 0, reduce: 0, output: 0},"
                                "timeMillis: 0,"
@@ -156,7 +158,7 @@ TEST(MapReduceOutputFormat, FormatNonInlineClusterMapReduceResponseWithDb) {
 
 TEST(MapReduceOutputFormat, FormatVerboseClusterMapReduceResponse) {
     BSONObjBuilder builder;
-    map_reduce_output_format::appendOutResponse(NamespaceString("", "c"), true, true, &builder);
+    map_reduce_output_format::appendOutResponse(boost::none, "c", true, true, &builder);
     ASSERT_BSONOBJ_EQ(fromjson("{result: \"c\","
                                "counts: {input: 0, emit: 0, reduce: 0, output: 0},"
                                "timeMillis: 0,"

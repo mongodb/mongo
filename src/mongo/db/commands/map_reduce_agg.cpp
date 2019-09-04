@@ -115,8 +115,8 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                                                        &result);
     else
         map_reduce_output_format::appendOutResponse(
-            NamespaceString(parsedMr.getOutOptions().getDatabaseName(),
-                            parsedMr.getOutOptions().getCollectionName()),
+            parsedMr.getOutOptions().getDatabaseName(),
+            parsedMr.getOutOptions().getCollectionName(),
             boost::get_optional_value_or(parsedMr.getVerbose(), false),
             false,
             &result);

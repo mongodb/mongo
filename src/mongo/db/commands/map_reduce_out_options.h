@@ -52,7 +52,7 @@ public:
     static MapReduceOutOptions parseFromBSON(const BSONElement& element);
 
     MapReduceOutOptions() = default;
-    MapReduceOutOptions(std::string databaseName,
+    MapReduceOutOptions(boost::optional<std::string> databaseName,
                         std::string collectionName,
                         const OutputType outputType,
                         bool sharded)
@@ -76,8 +76,8 @@ public:
             case OutputType::Reduce:
                 sub.append("reduce", _collectionName);
         }
-        if (_databaseName != "")
-            sub.append("db", _databaseName);
+        if (_databaseName)
+            sub.append("db", _databaseName.get());
         if (_sharded)
             sub.append("sharded", true);
     }
@@ -90,12 +90,12 @@ public:
         return _collectionName;
     }
 
-    const std::string& getDatabaseName() const {
+    const boost::optional<std::string>& getDatabaseName() const {
         return _databaseName;
     }
 
 private:
-    std::string _databaseName;
+    boost::optional<std::string> _databaseName;
     std::string _collectionName;
     OutputType _outputType;
     bool _sharded;

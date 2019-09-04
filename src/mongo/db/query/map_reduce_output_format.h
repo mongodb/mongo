@@ -50,12 +50,13 @@ void appendInlineResponse(BSONArray&& documents,
 
 /**
  * Appends fields to 'resultBuilder' to formulate a response that would be given if the mapReduce
- * command had written output to the collection named by 'outCollNss'. 'verbose' causes extra fields
- * to be appended to the response in accordance with the verbose option on the mapReduce command.
- * 'inMongos' indicates that we are using the format that was historically sent from mongos. If it
- * isn't set, we will use the mongod format.
+ * command had written output to the collection named by 'outColl' in output database 'outDb'.
+ * 'verbose' causes extra fields to be appended to the response in accordance with the verbose
+ * option on the mapReduce command. 'inMongos' indicates that we are using the format that was
+ * historically sent from mongos. If it isn't set, we will use the mongod format.
  */
-void appendOutResponse(NamespaceString outCollNss,
+void appendOutResponse(boost::optional<std::string> outDb,
+                       std::string outColl,
                        bool verbose,
                        bool inMongos,
                        BSONObjBuilder* resultBuilder);

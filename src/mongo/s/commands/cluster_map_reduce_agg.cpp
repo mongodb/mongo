@@ -75,7 +75,6 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     auto mrRequest = MapReduce::parse(IDLParserErrorContext("MapReduce"), cmd);
     bool inMemory = mrRequest.getOutOptions().getOutputType() == OutputType::InMemory;
     std::string outColl = mrRequest.getOutOptions().getCollectionName();
-    std::string outDb = mrRequest.getOutOptions().getDatabaseName();
     // Either inline response specified or we have an output collection.
     invariant(inMemory ^ !outColl.empty());
 

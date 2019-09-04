@@ -38,7 +38,7 @@ using namespace std::string_literals;
 
 MapReduceOutOptions MapReduceOutOptions::parseFromBSON(const BSONElement& element) {
     if (element.type() == BSONType::String) {
-        return MapReduceOutOptions("", element.str(), OutputType::Replace, false);
+        return MapReduceOutOptions(boost::none, element.str(), OutputType::Replace, false);
     } else if (element.type() == BSONType::Object) {
         const auto obj = element.embeddedObject();
         // The inline option is allowed alone.
@@ -47,7 +47,7 @@ MapReduceOutOptions MapReduceOutOptions::parseFromBSON(const BSONElement& elemen
             uassert(
                 ErrorCodes::BadValue, "'inline' takes only numeric '1'", inMemory.number() == 1.0);
 
-            return MapReduceOutOptions("", "", OutputType::InMemory, false);
+            return MapReduceOutOptions(boost::none, "", OutputType::InMemory, false);
         }
 
         int allowedNFields = 3;
@@ -64,15 +64,15 @@ MapReduceOutOptions MapReduceOutOptions::parseFromBSON(const BSONElement& elemen
             }
         }();
 
-        const auto databaseName = [&]() {
+        const auto databaseName = [&]() -> boost::optional<std::string> {
             if (const auto db = obj["db"]) {
                 uassert(ErrorCodes::BadValue,
                         "db field value must be string",
                         db.type() == BSONType::String);
-                return db.str();
+                return boost::make_optional(db.str());
             } else {
                 --allowedNFields;
-                return ""s;
+                return boost::none;
             }
         }();
 
