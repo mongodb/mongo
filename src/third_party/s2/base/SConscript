@@ -11,11 +11,10 @@ env.Library(
     [ 
 	"int128.cc",
 	"logging.cc",
-	"logging_mongo.cc",
 	"stringprintf.cc",
 	"strtoint.cc",
     ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
     ],
 )

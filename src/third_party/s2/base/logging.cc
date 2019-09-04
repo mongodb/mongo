@@ -17,19 +17,32 @@
 
 #include <utility>
 
-namespace s2_env {
+#include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
+#include "mongo/util/str.h"
 
-LoggingEnv::~LoggingEnv() = default;
+using ::mongo::logger::LogstreamBuilder;
 
-LogMessageSink::~LogMessageSink() = default;
+LogMessageBase::LogMessageBase(LogstreamBuilder builder, const char* file, int line) :
+    _lsb(std::move(builder)) {
+    _lsb.setBaseMessage(::mongo::str::stream() << file << ':' << line << ": ");
+}
 
-LogMessage::LogMessage(int verbosity)
-  : _sink(globalLoggingEnv().makeSink(verbosity)) { }
-LogMessage::LogMessage(Severity severity)
-  : _sink(globalLoggingEnv().makeSink(severity)) { }
-LogMessage::LogMessage(Severity severity, const char* file, int line)
-  : _sink(globalLoggingEnv().makeSink(severity, file, line)) { }
+LogMessageBase::LogMessageBase(LogstreamBuilder builder) : _lsb(std::move(builder)) { }
 
-LogMessage::~LogMessage() = default;
+LogMessageInfo::LogMessageInfo() : LogMessageBase(mongo::log()) { }
 
-}  // namespace s2_env
+LogMessageWarning::LogMessageWarning(const char* file, int line) :
+        LogMessageBase(mongo::warning(), file, line) { }
+
+LogMessageFatal::LogMessageFatal(const char* file, int line) :
+        LogMessageBase(mongo::severe(), file, line) { }
+
+#pragma warning(push)
+// C4722: 'LogMessageFatal::~LogMessageFatal': destructor never returns, potential memory leak
+#pragma warning(disable : 4722)
+LogMessageFatal::~LogMessageFatal() {
+    _lsb.~LogstreamBuilder();
+    fassertFailed(40048);
+}
+#pragma warning(pop)

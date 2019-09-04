@@ -18,6 +18,9 @@ using std::vector;
 #include "s2latlng.h"
 #include "s2edgeutil.h"
 
+#include "mongo/util/str.h"
+using mongo::str::stream;
+
 static const unsigned char kCurrentEncodingVersionNumber = 1;
 
 S2Polyline::S2Polyline()
@@ -77,7 +80,7 @@ bool S2Polyline::IsValid(vector<S2Point> const& v, string* err) {
     if (!S2::IsUnitLength(v[i])) {
       S2LOG(INFO) << "Vertex " << i << " is not unit length";
       if (err) {
-        *err = s2_env::StringStream() << "Vertex " << i << " is not unit length";
+        *err = stream() << "Vertex " << i << " is not unit length";
       }
       return false;
     }
@@ -89,7 +92,7 @@ bool S2Polyline::IsValid(vector<S2Point> const& v, string* err) {
       S2LOG(INFO) << "Vertices " << (i - 1) << " and " << i
                 << " are identical or antipodal";
       if (err) {
-        *err = s2_env::StringStream() << "Vertices " << (i - 1) << " and " << i
+        *err = stream() << "Vertices " << (i - 1) << " and " << i
                         << " are identical or antipodal";
       }
       return false;
