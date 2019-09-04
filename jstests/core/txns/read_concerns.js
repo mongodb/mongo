@@ -1,6 +1,6 @@
 // Verifies which read concern levels transactions support, with and without afterClusterTime.
 //
-// @tags: [uses_transactions, uses_snapshot_read_concern]
+// @tags: [uses_transactions, uses_snapshot_read_concern, requires_majority_read_concern]
 (function() {
 "use strict";
 

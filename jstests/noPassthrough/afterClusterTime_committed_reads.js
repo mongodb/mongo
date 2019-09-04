@@ -1,6 +1,6 @@
 // Test that causally consistent majority-committed read-only transactions will wait for the
 // majority commit point to move past 'afterClusterTime' before they can commit.
-// @tags: [uses_transactions]
+// @tags: [uses_transactions, requires_majority_read_concern]
 (function() {
 "use strict";
 

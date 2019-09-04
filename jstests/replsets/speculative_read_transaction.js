@@ -2,7 +2,7 @@
  * Test that read-only transactions are executed speculatively, and that once they are committed
  * with a majority write concern, the data read is indeed majority-committed.
  *
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, requires_majority_read_concern]
  */
 (function() {
 "use strict";

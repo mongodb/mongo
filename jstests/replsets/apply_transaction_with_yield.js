@@ -4,7 +4,7 @@
  * large transaction. There should be no yields that trigger an invariant failure. This test
  * specifically attempts to trigger the failure referenced in SERVER-41589.
  *
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, requires_majority_read_concern]
  */
 (function() {
 "use strict";

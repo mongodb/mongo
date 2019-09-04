@@ -1,5 +1,5 @@
 // Tests snapshot isolation on readConcern level snapshot read.
-// @tags: [uses_transactions]
+// @tags: [uses_transactions, requires_majority_read_concern]
 (function() {
 "use strict";
 

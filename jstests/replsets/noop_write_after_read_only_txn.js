@@ -2,7 +2,7 @@
 // transaction, there is a noop write at the end, and confirm that commitTransaction awaits
 // writeConcern majority.
 //
-// @tags: [uses_transactions]
+// @tags: [uses_transactions, requires_majority_read_concern]
 (function() {
 "use strict";
 load('jstests/libs/write_concern_util.js');
