@@ -303,7 +303,7 @@ void CanonicalQuery::sortTree(MatchExpression* tree) {
     }
     std::vector<MatchExpression*>* children = tree->getChildVector();
     if (nullptr != children) {
-        std::sort(children->begin(), children->end(), matchExpressionLessThan);
+        std::stable_sort(children->begin(), children->end(), matchExpressionLessThan);
     }
 }
 

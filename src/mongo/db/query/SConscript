@@ -255,6 +255,7 @@ env.CppUnitTest(
         "parsed_projection_test.cpp",
         "plan_cache_indexability_test.cpp",
         "plan_cache_test.cpp",
+        "planner_access_test.cpp",
         "planner_analysis_test.cpp",
         "planner_ixselect_test.cpp",
         "projection_ast_test.cpp",

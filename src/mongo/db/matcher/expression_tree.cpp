@@ -217,7 +217,13 @@ bool AndMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails
 
 void AndMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
-    debug << "$and\n";
+    debug << "$and";
+    MatchExpression::TagData* td = getTag();
+    if (td) {
+        debug << " ";
+        td->debugString(&debug);
+    }
+    debug << "\n";
     _debugList(debug, indentationLevel);
 }
 
@@ -260,7 +266,13 @@ bool OrMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails*
 
 void OrMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
-    debug << "$or\n";
+    debug << "$or";
+    MatchExpression::TagData* td = getTag();
+    if (td) {
+        debug << " ";
+        td->debugString(&debug);
+    }
+    debug << "\n";
     _debugList(debug, indentationLevel);
 }
 

@@ -43,7 +43,9 @@ using TagType = MatchExpression::TagData::Type;
 
 namespace {
 
-bool TagComparison(const MatchExpression* lhs, const MatchExpression* rhs) {
+// Compares 'lhs' for 'rhs', using the tag-based ordering expected by the access planner. Returns a
+// negative number if 'lhs' is smaller than 'rhs', 0 if they are equal, and 1 if 'lhs' is larger.
+int tagComparison(const MatchExpression* lhs, const MatchExpression* rhs) {
     IndexTag* lhsTag = static_cast<IndexTag*>(lhs->getTag());
     size_t lhsValue = (nullptr == lhsTag) ? IndexTag::kNoIndex : lhsTag->index;
     size_t lhsPos = (nullptr == lhsTag) ? IndexTag::kNoIndex : lhsTag->pos;
@@ -55,36 +57,54 @@ bool TagComparison(const MatchExpression* lhs, const MatchExpression* rhs) {
     // First, order on indices.
     if (lhsValue != rhsValue) {
         // This relies on kNoIndex being larger than every other possible index.
-        return lhsValue < rhsValue;
+        return lhsValue < rhsValue ? -1 : 1;
     }
 
     // Next, order so that if there's a GEO_NEAR it's first.
     if (MatchExpression::GEO_NEAR == lhs->matchType()) {
-        return true;
+        return -1;
     } else if (MatchExpression::GEO_NEAR == rhs->matchType()) {
-        return false;
+        return 1;
     }
 
     // Ditto text.
     if (MatchExpression::TEXT == lhs->matchType()) {
-        return true;
+        return -1;
     } else if (MatchExpression::TEXT == rhs->matchType()) {
-        return false;
+        return 1;
     }
 
     // Next, order so that the first field of a compound index appears first.
     if (lhsPos != rhsPos) {
-        return lhsPos < rhsPos;
+        return lhsPos < rhsPos ? -1 : 1;
     }
 
     // Next, order on fields.
     int cmp = lhs->path().compare(rhs->path());
     if (0 != cmp) {
-        return 0;
+        return cmp;
     }
 
-    // Finally, order on expression type.
-    return lhs->matchType() < rhs->matchType();
+    // Next, order on expression type.
+    if (lhs->matchType() != rhs->matchType()) {
+        return lhs->matchType() < rhs->matchType() ? -1 : 1;
+    }
+
+    // The 'lhs' and 'rhs' are equal. Break ties by comparing child nodes.
+    const size_t numChildren = std::min(lhs->numChildren(), rhs->numChildren());
+    for (size_t childIdx = 0; childIdx < numChildren; ++childIdx) {
+        int childCompare = tagComparison(lhs->getChild(childIdx), rhs->getChild(childIdx));
+        if (childCompare != 0) {
+            return childCompare;
+        }
+    }
+
+    // If all else is equal, sort whichever node has fewer children first.
+    if (lhs->numChildren() != rhs->numChildren()) {
+        return lhs->numChildren() < rhs->numChildren() ? -1 : 1;
+    }
+
+    return 0;
 }
 
 // Sorts the tree using its IndexTag(s). Nodes that use the same index will sort so that they are
@@ -95,7 +115,11 @@ void sortUsingTags(MatchExpression* tree) {
     }
     std::vector<MatchExpression*>* children = tree->getChildVector();
     if (nullptr != children) {
-        std::sort(children->begin(), children->end(), TagComparison);
+        std::stable_sort(children->begin(),
+                         children->end(),
+                         [](const MatchExpression* lhs, const MatchExpression* rhs) {
+                             return tagComparison(lhs, rhs) < 0;
+                         });
     }
 }
 
