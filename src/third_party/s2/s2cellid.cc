@@ -15,6 +15,8 @@ using std::reverse;
 #include <iomanip>
 using std::setprecision;
 
+#include <mutex>
+
 #include <vector>
 using std::vector;
 
@@ -26,8 +28,6 @@ using std::vector;
 #include "s2latlng.h"
 #include "util/math/mathutil.h"
 #include "util/math/vector2-inl.h"
-
-#include "mongo/base/init.h"
 
 // The following lookup tables are used to convert efficiently between an
 // (i,j) cell index and the corresponding position along the Hilbert curve.
@@ -88,16 +88,16 @@ static void InitLookupCell(int level, int i, int j, int orig_orientation,
   }
 }
 
-static void Init() {
-  InitLookupCell(0, 0, 0, 0, 0, 0);
-  InitLookupCell(0, 0, 0, kSwapMask, 0, kSwapMask);
-  InitLookupCell(0, 0, 0, kInvertMask, 0, kInvertMask);
-  InitLookupCell(0, 0, 0, kSwapMask|kInvertMask, 0, kSwapMask|kInvertMask);
-}
-
-MONGO_INITIALIZER(S2CellIdInit)(mongo::InitializerContext *context) {
-    Init();
-    return mongo::Status::OK();
+// Modern s2geometry does this with std::call_once, so we will copy that technique.
+// https://github.com/google/s2geometry/blob/bec06921d7/src/s2/s2cell_id.cc#L102
+static std::once_flag flag;
+static void MaybeInit() {
+  std::call_once(flag, []{
+    InitLookupCell(0, 0, 0, 0, 0, 0);
+    InitLookupCell(0, 0, 0, kSwapMask, 0, kSwapMask);
+    InitLookupCell(0, 0, 0, kInvertMask, 0, kInvertMask);
+    InitLookupCell(0, 0, 0, kSwapMask|kInvertMask, 0, kSwapMask|kInvertMask);
+  });
 }
 
 int S2CellId::level() const {
@@ -211,6 +211,8 @@ inline int S2CellId::STtoIJ(double s) {
 
 
 S2CellId S2CellId::FromFaceIJ(int face, int i, int j) {
+  MaybeInit();
+
   // Optimization notes:
   //  - Non-overlapping bit fields can be combined with either "+" or "|".
   //    Generally "+" seems to produce better code, but not always.
@@ -270,6 +272,8 @@ S2CellId S2CellId::FromLatLng(S2LatLng const& ll) {
 }
 
 int S2CellId::ToFaceIJOrientation(int* pi, int* pj, int* orientation) const {
+  MaybeInit();
+
   int i = 0, j = 0;
   int face = this->face();
   int bits = (face & kSwapMask);

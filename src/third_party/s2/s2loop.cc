@@ -29,19 +29,16 @@ using std::make_pair;
 #include "s2cell.h"
 #include "s2edgeindex.h"
 
-#include "mongo/util/str.h"
-using mongo::str::stream;
-
 static const unsigned char kCurrentEncodingVersionNumber = 1;
 
 namespace {
-  stream& operator<<(stream& strStream, const S1Angle& angle) {
+  s2_env::StringStream& operator<<(s2_env::StringStream& strStream, const S1Angle& angle) {
     std::stringstream ss;
     ss << angle;
     return strStream << ss.str();
   }
   // Reverse the output order of Lat/Lng to Lng/Lat
-  stream& operator<<(stream& strStream, const S2LatLng& ll) {
+  s2_env::StringStream& operator<<(s2_env::StringStream& strStream, const S2LatLng& ll) {
       return strStream << "[" << ll.lng() << ", " << ll.lat() << "]";
   }
 }
@@ -118,7 +115,7 @@ bool S2Loop::IsValid(string* err) const {
   for (int i = 0; i < num_vertices(); ++i) {
     if (!S2::IsUnitLength(vertex(i))) {
       VLOG(2) << "Vertex " << i << " is not unit length";
-      if (err) *err = stream() << "Vertex " << i << " is not unit length";
+      if (err) *err = s2_env::StringStream() << "Vertex " << i << " is not unit length";
       return false;
     }
   }
@@ -127,7 +124,8 @@ bool S2Loop::IsValid(string* err) const {
   for (int i = 0; i < num_vertices(); ++i) {
     if (!vmap.insert(make_pair(vertex(i), i)).second) {
       VLOG(2) << "Duplicate vertices: " << vmap[vertex(i)] << " and " << i;
-      if (err) *err = stream() << "Duplicate vertices: " << vmap[vertex(i)] << " and " << i;
+      if (err) *err = s2_env::StringStream() << "Duplicate vertices: " << vmap[vertex(i)]
+          << " and " << i;
       return false;
     }
   }
@@ -152,14 +150,14 @@ bool S2Loop::IsValid(string* err) const {
         if (crosses) {
           VLOG(2) << "Edges " << i << " and " << ai << " cross";
           // additional debugging information, reverse Lat/Lng order.
-          string errDetail = stream()
+          string errDetail = s2_env::StringStream()
              << "Edge locations in degrees: "
              << S2LatLng(vertex(i)) << "-" << S2LatLng(vertex(i + 1))
              << " and "
              << S2LatLng(vertex(ai)) << "-" << S2LatLng(vertex(ai + 1));
           VLOG(2) << errDetail;
           if (NULL != err) {
-            *err = stream()
+            *err = s2_env::StringStream()
                << "Edges " << i << " and " << ai << " cross. " << errDetail;
           }
           break;

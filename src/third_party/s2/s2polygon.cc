@@ -29,9 +29,6 @@ using std::vector;
 #include "s2polygonbuilder.h"
 #include "s2polyline.h"
 
-#include "mongo/util/str.h"
-using mongo::str::stream;
-
 static const unsigned char kCurrentEncodingVersionNumber = 1;
 
 typedef pair<S2Point, S2Point> S2Edge;
@@ -134,7 +131,7 @@ bool S2Polygon::IsValid(const vector<S2Loop*>& loops, string* err) {
         VLOG(2) << "Duplicate edge: loop " << i << ", edge " << j
                  << " and loop " << other.first << ", edge " << other.second;
         if (err) {
-            *err = stream() << "Duplicate edge: loop " << i << ", edge " << j
+            *err = s2_env::StringStream() << "Duplicate edge: loop " << i << ", edge " << j
                             << " and loop " << other.first << ", edge " << other.second;
         }
         return false;
@@ -147,7 +144,7 @@ bool S2Polygon::IsValid(const vector<S2Loop*>& loops, string* err) {
   for (size_t i = 0; i < loops.size(); ++i) {
     if (!loops[i]->IsNormalized()) {
       VLOG(2) << "Loop " << i << " encloses more than half the sphere";
-      if (err) *err = stream() << "Loop " << i << " encloses more than half the sphere";
+      if (err) *err = s2_env::StringStream() << "Loop " << i << " encloses more than half the sphere";
       return false;
     }
     for (size_t j = i + 1; j < loops.size(); ++j) {
@@ -155,7 +152,7 @@ bool S2Polygon::IsValid(const vector<S2Loop*>& loops, string* err) {
       // cases where the two boundaries cross at a shared vertex.
       if (loops[i]->ContainsOrCrosses(loops[j]) < 0) {
         VLOG(2) << "Loop " << i << " crosses loop " << j;
-        if (err) *err = stream() << "Loop " << i << " crosses loop " << j;
+        if (err) *err = s2_env::StringStream() << "Loop " << i << " crosses loop " << j;
         return false;
       }
     }
@@ -1108,7 +1105,7 @@ bool S2Polygon::IsNormalized(string* err) const {
     }
     if (count > 1) {
       if (err) {
-        *err = stream() << "Loop " << i << " shares more than one vertex"
+        *err = s2_env::StringStream() << "Loop " << i << " shares more than one vertex"
                         << " with its parent loop " << GetParent(i);
       }
       return false;
