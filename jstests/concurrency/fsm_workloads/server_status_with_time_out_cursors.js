@@ -35,9 +35,8 @@ var $config = (function() {
 
                 const c = curs.itcount();
             } catch (e) {
-                assert.commandFailedWithCode(e, [
-                    ErrorCodes.MaxTimeMSExpired,
-                ]);
+                assert.commandFailedWithCode(
+                    e, [ErrorCodes.MaxTimeMSExpired, ErrorCodes.NetworkInterfaceExceededTimeLimit]);
             }
         },
 
