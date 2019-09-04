@@ -176,7 +176,7 @@ TEST(OverflowArithmetic, UnsignedSubtractionTests) {
 TEST(OverflowArithmetic, HeterogeneousArguments) {
     {
         int r;
-        ASSERT_FALSE(overflow::mul(long{1}, (unsigned long long){2}, &r));
+        ASSERT_FALSE(overflow::mul(1L, 2ULL, &r));
         ASSERT_EQ(r, 2);
     }
     {
