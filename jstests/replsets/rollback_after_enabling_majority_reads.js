@@ -24,7 +24,7 @@
     let config = replTest.getReplSetConfig();
     config.members[2].arbiterOnly = true;
     replTest.initiate(config);
-    const rollbackTest = new RollbackTest(name, replTest);
+    let rollbackTest = new RollbackTest(name, replTest);
 
     let rollbackNode = rollbackTest.transitionToRollbackOperations();
     assert.commandWorked(rollbackNode.getDB(dbName)[collName].insert({_id: "rollback op"}));
@@ -65,12 +65,23 @@
     jsTest.log(
         "Test that rollback succeeds with enableMajorityReadConcern=true once we have set a stable timestamp.");
     rollbackTest.restartNode(0, 15, {enableMajorityReadConcern: "true"});
-    // Restart the other node to ensure node 0 is primary and will be the rollback node. This is the
-    // only way to switch primaries and have the RollbackTest update its notion of primary.
-    rollbackTest.restartNode(1, 15);
-    assert.commandWorked(rollbackTest.getPrimary().getDB(dbName)[collName].insert(
+
+    // Make sure node 0 is the primary.
+    let node = replTest.nodes[0];
+    jsTestLog("Waiting for node " + node.host + " to become primary.");
+    replTest.awaitNodesAgreeOnPrimary();
+    assert.commandWorked(node.adminCommand({replSetStepUp: 1}));
+    replTest.waitForState(node, ReplSetTest.State.PRIMARY);
+    assert.eq(replTest.getPrimary(), node, node.host + " was not primary after step up.");
+
+    assert.commandWorked(replTest.getPrimary().getDB(dbName)[collName].insert(
         {_id: "advance stable timestamp"}, {writeConcern: {w: "majority"}}));
     replTest.awaitLastOpCommitted();
+
+    // Create a new RollbackTest fixture to execute the final rollback. This will guarantee that the
+    // final rollback occurs on the current primary, which should be node 0.
+    jsTestLog("Creating a new RollbackTest fixture to execute a final rollback.");
+    rollbackTest = new RollbackTest(name, replTest);
     rollbackNode = rollbackTest.transitionToRollbackOperations();
     assert.eq(replTest.nodes[0], rollbackNode);
     rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
