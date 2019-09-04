@@ -141,7 +141,7 @@ size_t getNumIndexEntries(OperationContext* opCtx,
                 ->accessMethod()
                 ->getSortedDataInterface()
                 ->getKeyStringVersion(),
-            kMinBSONKey,
+            BSONObj(),
             catalog->getEntry(desc)->accessMethod()->getSortedDataInterface()->getOrdering());
         for (auto kv = cursor->seek(keyString.getValueCopy()); kv; kv = cursor->next()) {
             numEntries++;

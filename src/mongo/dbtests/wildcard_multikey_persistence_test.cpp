@@ -103,7 +103,7 @@ protected:
         auto indexCursor = getIndexCursor(collection, indexName);
 
         KeyString::Value keyStringForSeek = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
-            kMinBSONKey, KeyString::Version::V1, Ordering::make(BSONObj()), true, true);
+            BSONObj(), KeyString::Version::V1, Ordering::make(BSONObj()), true, true);
 
         auto indexKey = indexCursor->seek(keyStringForSeek);
         try {

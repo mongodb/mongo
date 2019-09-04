@@ -54,8 +54,7 @@ TEST(SortedDataInterface, CursorIsEOFWhenEmpty) {
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-
-        ASSERT(!cursor->seek(makeKeyStringForSeek(sorted.get(), kMinBSONKey, true, true)));
+        ASSERT(!cursor->seek(makeKeyStringForSeek(sorted.get(), BSONObj(), true, true)));
 
         // Cursor at EOF should remain at EOF when advanced
         ASSERT(!cursor->next());
@@ -120,7 +119,7 @@ TEST(SortedDataInterface, ExhaustCursor) {
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         for (int i = 0; i < nToInsert; i++) {
             auto entry = i == 0
-                ? cursor->seek(makeKeyStringForSeek(sorted.get(), kMinBSONKey, true, true))
+                ? cursor->seek(makeKeyStringForSeek(sorted.get(), BSONObj(), true, true))
                 : cursor->next();
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << i), RecordId(42, i * 2)));
         }

@@ -74,7 +74,7 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursor) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         int i = 0;
-        for (auto entry = cursor->seek(makeKeyStringForSeek(sorted.get(), kMinBSONKey, true, true));
+        for (auto entry = cursor->seek(makeKeyStringForSeek(sorted.get(), BSONObj(), true, true));
              entry;
              i++, entry = cursor->next()) {
             ASSERT_LT(i, nToInsert);
@@ -276,7 +276,7 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeys) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         int i = 0;
-        for (auto entry = cursor->seek(makeKeyStringForSeek(sorted.get(), kMinBSONKey, true, true));
+        for (auto entry = cursor->seek(makeKeyStringForSeek(sorted.get(), BSONObj(), true, true));
              entry;
              i++, entry = cursor->next()) {
             ASSERT_LT(i, nToInsert);
