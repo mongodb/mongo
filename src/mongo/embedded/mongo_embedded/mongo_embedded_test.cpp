@@ -620,7 +620,6 @@ TEST_F(MongodbCAPITest, RunListCommands) {
         "sleep",
         "startSession",
         "trimMemory",
-        "twoPhaseCreateIndexes",
         "update",
         "validate",
     };

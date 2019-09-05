@@ -74,7 +74,6 @@ constexpr auto kIndexesFieldName = "indexes"_sd;
 constexpr auto kCommandName = "createIndexes"_sd;
 constexpr auto kCommitQuorumFieldName = "commitQuorum"_sd;
 constexpr auto kIgnoreUnknownIndexOptionsName = "ignoreUnknownIndexOptions"_sd;
-constexpr auto kTwoPhaseCommandName = "twoPhaseCreateIndexes"_sd;
 constexpr auto kCreateCollectionAutomaticallyFieldName = "createdCollectionAutomatically"_sd;
 constexpr auto kNumIndexesBeforeFieldName = "numIndexesBefore"_sd;
 constexpr auto kNumIndexesAfterFieldName = "numIndexesAfter"_sd;
@@ -160,7 +159,6 @@ StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
 
             hasIndexesField = true;
         } else if (kCommandName == cmdElemFieldName || kCommitQuorumFieldName == cmdElemFieldName ||
-                   kTwoPhaseCommandName == cmdElemFieldName ||
                    kIgnoreUnknownIndexOptionsName == cmdElemFieldName ||
                    isGenericArgument(cmdElemFieldName)) {
             continue;
@@ -852,50 +850,6 @@ public:
     }
 
 } cmdCreateIndex;
-
-/**
- * A temporary duplicate of the createIndexes command that runs two phase index builds for gradual
- * testing purposes. Otherwise, all of the necessary replication changes for the Simultaneous Index
- * Builds project would have to be turned on all at once because so much testing already exists that
- * would break with incremental changes.
- *
- * {twoPhaseCreateIndexes : "bar",
- *  indexes : [ { ns : "test.bar", key : { x : 1 }, name: "x_1" } ],
- *  commitQuorum: "majority" }
- */
-class CmdTwoPhaseCreateIndex : public ErrmsgCommandDeprecated {
-public:
-    CmdTwoPhaseCreateIndex() : ErrmsgCommandDeprecated(kTwoPhaseCommandName) {}
-
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
-    }
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kNever;
-    }
-
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override {
-        ActionSet actions;
-        actions.addAction(ActionType::createIndex);
-        Privilege p(parseResourcePattern(dbname, cmdObj), actions);
-        if (AuthorizationSession::get(client)->isAuthorizedForPrivilege(p))
-            return Status::OK();
-        return Status(ErrorCodes::Unauthorized, "Unauthorized");
-    }
-
-    bool errmsgRun(OperationContext* opCtx,
-                   const std::string& dbname,
-                   const BSONObj& cmdObj,
-                   std::string& errmsg,
-                   BSONObjBuilder& result) override {
-        return runCreateIndexesWithCoordinator(
-            opCtx, dbname, cmdObj, errmsg, result, true /*two phase build*/);
-    }
-
-} cmdTwoPhaseCreateIndex;
 
 }  // namespace
 }  // namespace mongo
