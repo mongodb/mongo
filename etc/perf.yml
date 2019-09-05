@@ -53,6 +53,13 @@ modules:
 - name: genny
   repo: git@github.com:mongodb/genny.git
   branch: master
+- name: dsi
+  repo: git@github.com:10gen/dsi.git
+  branch: master
+
+- name: mongo-perf
+  repo: git@github.com:mongodb/mongo-perf.git
+  branch: master
 
 functions:
   "git get project": &git_get_project
@@ -62,24 +69,9 @@ functions:
       revisions:  # for each module include revision as <module_name> : ${<module_name>_rev}
         enterprise: ${enterprise_rev}
         genny: ${genny_rev}
-
-  "download analysis scripts":
-    - command: shell.exec
-      params:
-        script: |
-          set -v
-          rm -rf ./dsi
-          mkdir -p ./src
-          git clone git@github.com:10gen/dsi.git
-    # get the mongo source, note the s3.get calls put the
-    # exe files in their respective make locations.
-    - *git_get_project
+        dsi: ${dsi_rev}
+        mongo-perf: ${mongo-perf_rev}
   "start server":
-    - command: shell.exec
-      params:
-        script: |
-          rm -rf ./*
-          mkdir src
     - command: s3.get
       params:
         aws_key: ${aws_key}
@@ -102,9 +94,6 @@ functions:
           set -v
           chmod +x mongod
           chmod +x mongo
-          git clone git@github.com:mongodb/mongo-perf.git perf
-          cd perf
-          git describe --abbrev=7 --tags
     - command: shell.exec
       params:
         background: true
@@ -149,13 +138,6 @@ functions:
       params:
         working_dir: src
         script: |
-          set -e
-          set -v
-          ../dsi/run-dsi setup
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
           cat > bootstrap.yml <<EOF
           infrastructure_provisioning: ${cluster}
           platform: ${platform}
@@ -171,7 +153,7 @@ functions:
           task_id: ${task_id}
           EOF
 
-          cp ../dsi/configurations/analysis/analysis.common.yml  analysis.yml
+          cp ./dsi/configurations/analysis/analysis.common.yml  analysis.yml
     - command: shell.exec
       params:
         working_dir: src
@@ -186,8 +168,7 @@ functions:
       params:
         working_dir: src
         script: |
-          set -v
-          ../dsi/run-dsi detect-changes
+          ./dsi/run-dsi detect-changes
     - command: shell.exec
       type: test
       params:
@@ -195,7 +176,7 @@ functions:
         script: |
           set -o errexit
           set -o verbose
-          source ./venv/bin/activate
+          source ./dsi/dsi_venv/bin/activate
 
           # Any tasks that want the analysis scripts to analyze mongod.log files should pass in
           # `reports_analysis: true` as a var to this function. The following line will select the
@@ -203,8 +184,8 @@ functions:
           reports_analysis_flags="--reports-analysis . --perf-file perf/perf.json"
           cmd_flags=$([ "${reports_analysis}" = "true" ] && echo "$reports_analysis_flags" || echo "")
           REFTAG="3.6.5-Baseline"
-          OVERRIDE="../dsi/analysis/${branch_name}/perf_override.json"
-          python ../dsi/analysis/perf_regression_check.py $cmd_flags --rev ${revision} --refTag $REFTAG --overrideFile $OVERRIDE --variant ${build_variant} --task ${task_name} --threshold 0.075 --threadThreshold 0.12
+          OVERRIDE="./dsi/analysis/${branch_name}/perf_override.json"
+          python ./dsi/analysis/perf_regression_check.py $cmd_flags --rev ${revision} --refTag $REFTAG --overrideFile $OVERRIDE --variant ${build_variant} --task ${task_name} --threshold 0.075 --threadThreshold 0.12
 
   # Params:
   #   workload: the path relative to genny/src/workloads to run e.g.
@@ -251,10 +232,11 @@ functions:
           set -e
           set -v
           source ./venv/bin/activate
-          cd perf
+          cd mongo-perf
+          mkdir -p ../perf
           #  give mongod a few seconds to start up so that we can connect.
           sleep 5
-          ${perf_exec_wrapper} python benchrun.py --shell ../mongo -t ${threads} --trialCount 5 -f testcases/*.js --readCmd ${readCmd} --includeFilter ${includeFilter1}  --includeFilter ${includeFilter2} --excludeFilter ${excludeFilter} --out perf.json --exclude-testbed --username admin --password password
+          ${perf_exec_wrapper} python benchrun.py --shell ../mongo -t ${threads} --trialCount 5 -f testcases/*.js --readCmd ${readCmd} --includeFilter ${includeFilter1}  --includeFilter ${includeFilter2} --excludeFilter ${excludeFilter} --out ../perf/perf.json --exclude-testbed --username admin --password password
           echo "Oplog size at end of tests..."
           ../mongo --username admin --password password --eval "db.getSiblingDB('local').oplog.rs.totalSize()/1024/1024" admin
     - command: "json.send"
@@ -350,6 +332,7 @@ tasks:
   - variant: linux-wt-standalone
     name: compile
   commands:
+    - func: "git get project"
     - func: "start server"
     - func: "run perf tests"
       vars:
@@ -358,7 +341,6 @@ tasks:
         excludeFilter: "single_threaded"
         threads: "1 2 4 8"
         readCmd: false
-    - func: "download analysis scripts"
     - func: "analyze"
       vars:
         reports_analysis: true
@@ -367,6 +349,7 @@ tasks:
   - variant: linux-wt-standalone
     name: compile
   commands:
+    - func: "git get project"
     - func: "start server"
     - func: "run perf tests"
       vars:
@@ -375,7 +358,6 @@ tasks:
         excludeFilter: "single_threaded"
         threads: "1 2 4 8"
         readCmd: true
-    - func: "download analysis scripts"
     - func: "analyze"
       vars:
         reports_analysis: true
@@ -384,6 +366,7 @@ tasks:
   - variant: linux-wt-standalone
     name: compile
   commands:
+    - func: "git get project"
     - func: "start server"
     - func: "run perf tests"
       vars:
@@ -392,7 +375,6 @@ tasks:
         excludeFilter: "none"
         threads: "1"
         readCmd: true
-    - func: "download analysis scripts"
     - func: "analyze"
       vars:
         report_analysis: true
@@ -401,6 +383,7 @@ tasks:
   - variant: linux-wt-standalone
     name: compile
   commands:
+    - func: "git get project"
     - func: "start server"
     - func: "run perf tests"
       vars:
@@ -409,7 +392,6 @@ tasks:
         excludeFilter: "single_threaded"
         threads: "1 2 4 8"
         readCmd: false
-    - func: "download analysis scripts"
     - func: "analyze"
       vars:
         reports_analysis: true
@@ -418,6 +400,7 @@ tasks:
   - variant: linux-wt-standalone
     name: compile
   commands:
+    - func: "git get project"
     - func: "start server"
     - func: "run perf tests"
       vars:
@@ -426,7 +409,6 @@ tasks:
         excludeFilter: "single_threaded"
         threads: "1 2 4 8"
         readCmd: false
-    - func: "download analysis scripts"
     - func: "analyze"
       vars:
         reports_analysis: true
@@ -435,6 +417,7 @@ tasks:
   - variant: linux-wt-standalone
     name: compile
   commands:
+    - func: "git get project"
     - func: "start server"
     - func: "run perf tests"
       vars:
@@ -443,7 +426,6 @@ tasks:
         excludeFilter: "single_threaded"
         threads: "1 2 4 8"
         readCmd: false
-    - func: "download analysis scripts"
     - func: "analyze"
       vars:
         reports_analysis: true
@@ -452,6 +434,7 @@ tasks:
   - variant: linux-wt-standalone
     name: compile
   commands:
+    - func: "git get project"
     - func: "start server"
     - func: "run perf tests"
       vars:
@@ -460,7 +443,6 @@ tasks:
         excludeFilter: "single_threaded"
         threads: "1 2 4 8"
         readCmd: false
-    - func: "download analysis scripts"
     - func: "analyze"
       vars:
         reports_analysis: true
@@ -469,6 +451,7 @@ tasks:
   - variant: linux-wt-standalone
     name: compile
   commands:
+    - func: "git get project"
     - func: "start server"
     - func: "run perf tests"
       vars:
@@ -477,7 +460,6 @@ tasks:
         excludeFilter: "single_threaded"
         threads: "1 2 4 8"
         readCmd: false
-    - func: "download analysis scripts"
     - func: "analyze"
       vars:
         reports_analysis: true
@@ -486,6 +468,7 @@ tasks:
   - variant: linux-wt-standalone
     name: compile
   commands:
+    - func: "git get project"
     - func: "start server"
     - func: "run perf tests"
       vars:
@@ -494,7 +477,6 @@ tasks:
         excludeFilter: "single_threaded"
         threads: "1 2 4 8"
         readCmd: false
-    - func: "download analysis scripts"
     - func: "analyze"
       vars:
         reports_analysis: true
@@ -503,6 +485,7 @@ tasks:
   - variant: linux-wt-standalone
     name: compile
   commands:
+    - func: "git get project"
     - func: "start server"
     - func: "run perf tests"
       vars:
@@ -511,7 +494,6 @@ tasks:
         excludeFilter: "single_threaded"
         threads: "1 2 4 8"
         readCmd: false
-    - func: "download analysis scripts"
     - func: "analyze"
       vars:
         reports_analysis: true
@@ -520,6 +502,7 @@ tasks:
   - variant: linux-wt-standalone
     name: compile
   commands:
+    - func: "git get project"
     - func: "start server"
     - func: "run perf tests"
       vars:
@@ -528,7 +511,6 @@ tasks:
         excludeFilter: "none"
         threads: "1"
         readCmd: false
-    - func: "download analysis scripts"
     - func: "analyze"
       vars:
         reports_analysis: true
@@ -537,6 +519,7 @@ tasks:
   - variant: linux-wt-standalone
     name: compile
   commands:
+    - func: "git get project"
     - func: "start server"
     - func: "run perf tests"
       vars:
@@ -545,7 +528,6 @@ tasks:
         excludeFilter: "none"
         threads: "1"
         readCmd: false
-    - func: "download analysis scripts"
     - func: "analyze"
       vars:
         report_analysis: true
@@ -554,6 +536,7 @@ tasks:
   - variant: linux-wt-standalone
     name: compile
   commands:
+    - func: "git get project"
     - func: "start server"
     - func: "run perf tests"
       vars:
@@ -562,7 +545,6 @@ tasks:
         excludeFilter: "single_threaded"
         threads: "1 2 4 8"
         readCmd: false
-    - func: "download analysis scripts"
     - func: "analyze"
       vars:
         reports_analysis: true
@@ -571,6 +553,7 @@ tasks:
   - variant: linux-wt-standalone
     name: compile
   commands:
+    - func: "git get project"
     - func: "start server"
     - func: "run perf tests"
       vars:
@@ -579,7 +562,6 @@ tasks:
         excludeFilter: "none"
         threads: "1 2 4 8"
         readCmd: true
-    - func: "download analysis scripts"
     - func: "analyze"
       vars:
         reports_analysis: true
@@ -591,6 +573,8 @@ buildvariants:
   modules:
     - enterprise
     - genny
+    - dsi
+    - mongo-perf
   expansions:
     # We are explicitly tracking the rhel62 variant compile options from evergreen.yml for
     # microbenchmarks, since they run on the centos6 boxes.  If we can get proper artifacts directly
@@ -639,6 +623,8 @@ buildvariants:
   batchtime: 90  # 1.5 hours
   modules:
     - genny
+    - dsi
+    - mongo-perf
   expansions:
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
