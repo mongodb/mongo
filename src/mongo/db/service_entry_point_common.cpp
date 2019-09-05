@@ -101,6 +101,7 @@ MONGO_FAIL_POINT_DEFINE(respondWithNotPrimaryInCommandDispatch);
 MONGO_FAIL_POINT_DEFINE(skipCheckingForNotMasterInCommandDispatch);
 MONGO_FAIL_POINT_DEFINE(waitAfterReadCommandFinishesExecution);
 MONGO_FAIL_POINT_DEFINE(sleepMillisAfterCommandExecutionBegins);
+MONGO_FAIL_POINT_DEFINE(waitAfterNewStatementBlocksBehindPrepare);
 
 // Tracks the number of times a legacy unacknowledged write failed due to
 // not master error resulted in network disconnection.
@@ -414,10 +415,31 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
     auto txnParticipant = TransactionParticipant::get(opCtx);
 
     if (!opCtx->getClient()->isInDirectClient()) {
-        txnParticipant.beginOrContinue(opCtx,
-                                       *sessionOptions.getTxnNumber(),
-                                       sessionOptions.getAutocommit(),
-                                       sessionOptions.getStartTransaction());
+        bool beganOrContinuedTxn{false};
+        // This loop allows new transactions on a session to block behind a previous prepared
+        // transaction on that session.
+        while (!beganOrContinuedTxn) {
+            try {
+                txnParticipant.beginOrContinue(opCtx,
+                                               *sessionOptions.getTxnNumber(),
+                                               sessionOptions.getAutocommit(),
+                                               sessionOptions.getStartTransaction());
+                beganOrContinuedTxn = true;
+            } catch (const ExceptionFor<ErrorCodes::PreparedTransactionInProgress>&) {
+                auto prepareCompleted = txnParticipant.onExitPrepare();
+
+                CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                    &waitAfterNewStatementBlocksBehindPrepare,
+                    opCtx,
+                    "waitAfterNewStatementBlocksBehindPrepare");
+
+                // Check the session back in and wait for ongoing prepared transaction to complete.
+                MongoDOperationContextSession::checkIn(opCtx);
+                prepareCompleted.wait(opCtx);
+                MongoDOperationContextSession::checkOut(opCtx);
+            }
+        }
+
         // Create coordinator if needed. If "startTransaction" is present, it must be true.
         if (sessionOptions.getStartTransaction()) {
             // If this shard has been selected as the coordinator, set up the coordinator state
