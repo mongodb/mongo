@@ -67,6 +67,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/run_op_kill_cursors.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
@@ -101,6 +102,7 @@ MONGO_FAIL_POINT_DEFINE(respondWithNotPrimaryInCommandDispatch);
 MONGO_FAIL_POINT_DEFINE(skipCheckingForNotMasterInCommandDispatch);
 MONGO_FAIL_POINT_DEFINE(sleepMillisAfterCommandExecutionBegins);
 MONGO_FAIL_POINT_DEFINE(waitAfterCommandFinishesExecution);
+MONGO_FAIL_POINT_DEFINE(waitAfterNewStatementBlocksBehindPrepare);
 
 // Tracks the number of times a legacy unacknowledged write failed due to
 // not master error resulted in network disconnection.
@@ -403,10 +405,36 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
     auto txnParticipant = TransactionParticipant::get(opCtx);
 
     if (!opCtx->getClient()->isInDirectClient()) {
-        txnParticipant.beginOrContinue(opCtx,
-                                       *sessionOptions.getTxnNumber(),
-                                       sessionOptions.getAutocommit(),
-                                       sessionOptions.getStartTransaction());
+        bool beganOrContinuedTxn{false};
+        // This loop allows new transactions on a session to block behind a previous prepared
+        // transaction on that session.
+        while (!beganOrContinuedTxn) {
+            try {
+                txnParticipant.beginOrContinue(opCtx,
+                                               *sessionOptions.getTxnNumber(),
+                                               sessionOptions.getAutocommit(),
+                                               sessionOptions.getStartTransaction());
+                beganOrContinuedTxn = true;
+            } catch (const ExceptionFor<ErrorCodes::PreparedTransactionInProgress>&) {
+                auto prepareCompleted = txnParticipant.onExitPrepare();
+
+                CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                    &waitAfterNewStatementBlocksBehindPrepare,
+                    opCtx,
+                    "waitAfterNewStatementBlocksBehindPrepare");
+
+                // Check the session back in and wait for ongoing prepared transaction to complete.
+                MongoDOperationContextSession::checkIn(opCtx);
+                prepareCompleted.wait(opCtx);
+                // Wait for the prepared commit or abort oplog entry to be visible in the oplog.
+                // This will prevent a new transaction from missing the transaction table update for
+                // the previous prepared commit or abort due to an oplog hole.
+                auto storageInterface = repl::StorageInterface::get(opCtx);
+                storageInterface->waitForAllEarlierOplogWritesToBeVisible(opCtx);
+                MongoDOperationContextSession::checkOut(opCtx);
+            }
+        }
+
         // Create coordinator if needed. If "startTransaction" is present, it must be true.
         if (sessionOptions.getStartTransaction()) {
             // If this shard has been selected as the coordinator, set up the coordinator state

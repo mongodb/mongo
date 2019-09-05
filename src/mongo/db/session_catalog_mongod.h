@@ -96,10 +96,9 @@ public:
     static void checkIn(OperationContext* opCtx);
 
     /**
-     * May only be called if the session is not checked out already. 'cmdType' is used to validate
-     * that the expected transaction flow control is being obeyed.
+     * May only be called if the session is not checked out already.
      */
-    static void checkOut(OperationContext* opCtx, const std::string& cmdName);
+    static void checkOut(OperationContext* opCtx);
 
 private:
     OperationContextSession _operationContextSession;

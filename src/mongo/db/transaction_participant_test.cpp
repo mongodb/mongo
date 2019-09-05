@@ -747,6 +747,7 @@ TEST_F(TxnParticipantTest, KillOpBeforeCommittingPreparedTransaction) {
     }
 
     // Check the session back in.
+    txnParticipant.stashTransactionResources(opCtx());
     sessionCheckout->checkIn(opCtx());
 
     // The transaction state should have been unaffected.
@@ -788,6 +789,7 @@ TEST_F(TxnParticipantTest, KillOpBeforeAbortingPreparedTransaction) {
     }
 
     // Check the session back in.
+    txnParticipant.stashTransactionResources(opCtx());
     sessionCheckout->checkIn(opCtx());
 
     // The transaction state should have been unaffected.
