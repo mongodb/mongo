@@ -112,6 +112,12 @@ public:
         return _singleTransactionCoordinatorStats;
     }
 
+
+    /**
+     * Save information about the last client that interacted with this transaction.
+     */
+    void updateLastClientInfo(Client* client);
+
 private:
     /**
      * Decrements the current active in 'step'.

@@ -78,14 +78,47 @@ void TransactionCoordinatorService::createCoordinator(OperationContext* opCtx,
         latestCoordinator->cancelIfCommitNotYetStarted();
     }
 
-    catalog.insert(opCtx,
-                   lsid,
-                   txnNumber,
-                   std::make_shared<TransactionCoordinator>(opCtx->getServiceContext(),
-                                                            lsid,
-                                                            txnNumber,
-                                                            scheduler.makeChildScheduler(),
-                                                            commitDeadline));
+    auto coordinator = std::make_shared<TransactionCoordinator>(
+        opCtx, lsid, txnNumber, scheduler.makeChildScheduler(), commitDeadline);
+
+    catalog.insert(opCtx, lsid, txnNumber, coordinator);
+}
+
+
+void TransactionCoordinatorService::reportCoordinators(OperationContext* opCtx,
+                                                       bool includeIdle,
+                                                       std::vector<BSONObj>* ops) {
+    std::shared_ptr<CatalogAndScheduler> cas;
+    try {
+        cas = _getCatalogAndScheduler(opCtx);
+    } catch (ExceptionFor<ErrorCodes::NotMaster>&) {
+        // If we are not master, don't include any output for transaction coordinators in
+        // the curOp command.
+        return;
+    }
+
+    auto& catalog = cas->catalog;
+
+    auto predicate =
+        [includeIdle](const LogicalSessionId lsid,
+                      const TxnNumber txnNumber,
+                      const std::shared_ptr<TransactionCoordinator> transactionCoordinator) {
+            TransactionCoordinator::Step step = transactionCoordinator->getStep();
+            if (includeIdle || step > TransactionCoordinator::Step::kInactive) {
+                return true;
+            }
+            return false;
+        };
+
+    auto reporter = [ops](const LogicalSessionId lsid,
+                          const TxnNumber txnNumber,
+                          const std::shared_ptr<TransactionCoordinator> transactionCoordinator) {
+        BSONObjBuilder doc;
+        transactionCoordinator->reportState(doc);
+        ops->push_back(doc.obj());
+    };
+
+    catalog.filter(predicate, reporter);
 }
 
 boost::optional<Future<txn::CommitDecision>> TransactionCoordinatorService::coordinateCommit(
@@ -101,7 +134,8 @@ boost::optional<Future<txn::CommitDecision>> TransactionCoordinatorService::coor
         return boost::none;
     }
 
-    coordinator->runCommit(std::vector<ShardId>{participantList.begin(), participantList.end()});
+    coordinator->runCommit(opCtx,
+                           std::vector<ShardId>{participantList.begin(), participantList.end()});
 
     return coordinator->onCompletion().then(
         [coordinator] { return coordinator->getDecision().get(); });
@@ -182,7 +216,7 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
                         const auto txnNumber = *doc.getId().getTxnNumber();
 
                         auto coordinator = std::make_shared<TransactionCoordinator>(
-                            service,
+                            opCtx,
                             lsid,
                             txnNumber,
                             scheduler.makeChildScheduler(),

@@ -195,4 +195,7 @@ void TransactionCoordinatorMetricsObserver::_decrementLastStep(
     }
 }
 
+void TransactionCoordinatorMetricsObserver::updateLastClientInfo(Client* client) {
+    _singleTransactionCoordinatorStats.updateLastClientInfo(client);
+}
 }  // namespace mongo

@@ -57,7 +57,7 @@ protected:
                                     LogicalSessionId lsid,
                                     TxnNumber txnNumber) {
         auto newCoordinator = std::make_shared<TransactionCoordinator>(
-            getServiceContext(),
+            operationContext(),
             lsid,
             txnNumber,
             std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
@@ -168,7 +168,7 @@ TEST_F(TransactionCoordinatorCatalogTest, StepDownBeforeCoordinatorInsertedIntoC
     TransactionCoordinatorCatalog catalog;
     catalog.exitStepUp(Status::OK());
 
-    auto coordinator = std::make_shared<TransactionCoordinator>(getServiceContext(),
+    auto coordinator = std::make_shared<TransactionCoordinator>(operationContext(),
                                                                 lsid,
                                                                 txnNumber,
                                                                 aws.makeChildScheduler(),

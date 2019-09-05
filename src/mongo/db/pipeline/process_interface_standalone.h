@@ -154,6 +154,9 @@ protected:
                                           CurrentOpUserMode userMode,
                                           std::vector<BSONObj>* ops) const final;
 
+    void _reportCurrentOpsForTransactionCoordinators(OperationContext* opCtx,
+                                                     bool includeIdle,
+                                                     std::vector<BSONObj>* ops) const final;
     /**
      * Builds an ordered insert op on namespace 'nss' and documents to be written 'objs'.
      */

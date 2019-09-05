@@ -71,7 +71,7 @@ public:
      * cause the coordinator to be put in a cancelled state, if runCommit is not eventually
      * received.
      */
-    TransactionCoordinator(ServiceContext* serviceContext,
+    TransactionCoordinator(OperationContext* operationContext,
                            const LogicalSessionId& lsid,
                            TxnNumber txnNumber,
                            std::unique_ptr<txn::AsyncWorkScheduler> scheduler,
@@ -85,7 +85,7 @@ public:
      *
      * Subsequent calls will not re-run the commit process.
      */
-    void runCommit(std::vector<ShardId> participantShards);
+    void runCommit(OperationContext* opCtx, std::vector<ShardId> participantShards);
 
     /**
      * To be used to continue coordinating a transaction on step up.
@@ -124,7 +124,15 @@ public:
         return *_transactionCoordinatorMetricsObserver;
     }
 
+    void reportState(BSONObjBuilder& parent) const;
+    std::string toString(Step step) const;
+
+    Step getStep() const;
+
+
 private:
+    void _updateAssociatedClient(Client* client);
+
     bool _reserveKickOffCommitPromise();
 
     /**
@@ -193,9 +201,12 @@ private:
     bool _completionPromisesFired{false};
     std::vector<Promise<void>> _completionPromises;
 
-    // Store as unique_ptr to avoid a circular dependency between the TransactionCoordinator and the
-    // TransactionCoordinatorMetricsObserver.
+    // Store as unique_ptr to avoid a circular dependency between the TransactionCoordinator and
+    // the TransactionCoordinatorMetricsObserver.
     std::unique_ptr<TransactionCoordinatorMetricsObserver> _transactionCoordinatorMetricsObserver;
+
+    // The deadline for the TransactionCoordinator to reach a decision
+    Date_t _deadline;
 };
 
 }  // namespace mongo

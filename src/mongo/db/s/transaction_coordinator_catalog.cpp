@@ -215,4 +215,20 @@ std::string TransactionCoordinatorCatalog::_toString(WithLock wl) const {
     return ss.str();
 }
 
+void TransactionCoordinatorCatalog::filter(FilterPredicate predicate, FilterVisitor visitor) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    for (auto sessionIt = _coordinatorsBySession.begin(); sessionIt != _coordinatorsBySession.end();
+         ++sessionIt) {
+        auto& lsid = sessionIt->first;
+        auto& coordinatorsByTxnNumber = sessionIt->second;
+        for (auto txnIt = coordinatorsByTxnNumber.begin(); txnIt != coordinatorsByTxnNumber.end();
+             ++txnIt) {
+            auto txnNumber = txnIt->first;
+            auto& transactionCoordinator = txnIt->second;
+            if (predicate(lsid, txnNumber, transactionCoordinator)) {
+                visitor(lsid, txnNumber, transactionCoordinator);
+            }
+        }
+    }
+}
 }  // namespace mongo

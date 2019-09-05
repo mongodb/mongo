@@ -66,6 +66,13 @@ protected:
      */
     void advanceClockAndExecuteScheduledTasks();
 
+
+    /**
+     * Associates metatadata with the provided client. Metadata fields have appName prepended to
+     * thier value.
+     */
+    static void associateClientMetadata(Client* client, std::string appName);
+
     const std::vector<ShardId> kTwoShardIdList{{"s1"}, {"s2"}};
     const std::set<ShardId> kTwoShardIdSet{{"s1"}, {"s2"}};
     const std::vector<ShardId> kThreeShardIdList{{"s1"}, {"s2"}, {"s3"}};

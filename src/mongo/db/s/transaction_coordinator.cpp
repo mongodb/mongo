@@ -86,18 +86,19 @@ ExecutorFuture<void> waitForMajorityWithHangFailpoint(ServiceContext* service,
 
 }  // namespace
 
-TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
+TransactionCoordinator::TransactionCoordinator(OperationContext* operationContext,
                                                const LogicalSessionId& lsid,
                                                TxnNumber txnNumber,
                                                std::unique_ptr<txn::AsyncWorkScheduler> scheduler,
                                                Date_t deadline)
-    : _serviceContext(serviceContext),
+    : _serviceContext(operationContext->getServiceContext()),
       _lsid(lsid),
       _txnNumber(txnNumber),
       _scheduler(std::move(scheduler)),
       _sendPrepareScheduler(_scheduler->makeChildScheduler()),
       _transactionCoordinatorMetricsObserver(
-          stdx::make_unique<TransactionCoordinatorMetricsObserver>()) {
+          std::make_unique<TransactionCoordinatorMetricsObserver>()),
+      _deadline(deadline) {
 
     auto kickOffCommitPF = makePromiseFuture<void>();
     _kickOffCommitPromise = std::move(kickOffCommitPF.promise);
@@ -123,6 +124,7 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
             });
 
     // TODO: The duration will be meaningless after failover.
+    _updateAssociatedClient(operationContext->getClient());
     _transactionCoordinatorMetricsObserver->onCreate(
         ServerTransactionCoordinatorsMetrics::get(_serviceContext),
         _serviceContext->getTickSource(),
@@ -327,10 +329,11 @@ TransactionCoordinator::~TransactionCoordinator() {
     invariant(_completionPromises.empty());
 }
 
-void TransactionCoordinator::runCommit(std::vector<ShardId> participants) {
+void TransactionCoordinator::runCommit(OperationContext* opCtx, std::vector<ShardId> participants) {
     if (!_reserveKickOffCommitPromise())
         return;
-
+    invariant(opCtx != nullptr && opCtx->getClient() != nullptr);
+    _updateAssociatedClient(opCtx->getClient());
     _participants = std::move(participants);
     _kickOffCommitPromise.emplaceValue();
 }
@@ -503,6 +506,67 @@ std::string TransactionCoordinator::_twoPhaseCommitInfoForLog(
              singleTransactionCoordinatorStats.getTwoPhaseCommitDuration(tickSource, curTick));
 
     return s.str();
+}
+
+TransactionCoordinator::Step TransactionCoordinator::getStep() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _step;
+}
+
+void TransactionCoordinator::reportState(BSONObjBuilder& parent) const {
+    BSONObjBuilder doc;
+    TickSource* tickSource = _serviceContext->getTickSource();
+    TickSource::Tick currentTick = tickSource->getTicks();
+
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+    BSONObjBuilder lsidBuilder(doc.subobjStart("lsid"));
+    _lsid.serialize(&lsidBuilder);
+    lsidBuilder.doneFast();
+    doc.append("txnNumber", _txnNumber);
+
+    if (_participants) {
+        doc.append("numParticipants", static_cast<long long>(_participants->size()));
+    }
+
+    doc.append("state", toString(_step));
+
+    const auto& singleStats =
+        _transactionCoordinatorMetricsObserver->getSingleTransactionCoordinatorStats();
+    singleStats.reportMetrics(doc, tickSource, currentTick);
+    singleStats.reportLastClient(parent);
+
+    if (_decision)
+        doc.append("decision", _decision->toBSON());
+
+    doc.append("deadline", _deadline);
+
+    parent.append("desc", "transaction coordinator");
+    parent.append("twoPhaseCommitCoordinator", doc.obj());
+}
+
+std::string TransactionCoordinator::toString(Step step) const {
+    switch (step) {
+        case Step::kInactive:
+            return "inactive";
+        case Step::kWritingParticipantList:
+            return "writingParticipantList";
+        case Step::kWaitingForVotes:
+            return "waitingForVotes";
+        case Step::kWritingDecision:
+            return "writingDecision";
+        case Step::kWaitingForDecisionAcks:
+            return "waitingForDecisionAck";
+        case Step::kDeletingCoordinatorDoc:
+            return "deletingCoordinatorDoc";
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+void TransactionCoordinator::_updateAssociatedClient(Client* client) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _transactionCoordinatorMetricsObserver->updateLastClientInfo(client);
 }
 
 }  // namespace mongo

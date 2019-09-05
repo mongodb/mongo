@@ -104,6 +104,17 @@ public:
      */
     std::string toString() const;
 
+    using FilterPredicate =
+        std::function<bool(const LogicalSessionId lsid,
+                           const TxnNumber txnNumber,
+                           const std::shared_ptr<TransactionCoordinator> transactionCoordinator)>;
+    using FilterVisitor =
+        std::function<void(const LogicalSessionId lsid,
+                           const TxnNumber txnNumber,
+                           const std::shared_ptr<TransactionCoordinator> transactionCoordinator)>;
+
+    void filter(FilterPredicate predicate, FilterVisitor visitor);
+
 private:
     // Map of transaction coordinators, ordered in decreasing transaction number with the most
     // recent transaction at the front
