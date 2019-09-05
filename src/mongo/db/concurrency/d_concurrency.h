@@ -188,8 +188,6 @@ public:
      */
     class GlobalLock {
     public:
-        class EnqueueOnly {};
-
         /**
          * A GlobalLock without a deadline defaults to Date_t::max() and an InterruptBehavior of
          * kThrow.
@@ -206,18 +204,6 @@ public:
                    InterruptBehavior behavior);
 
         GlobalLock(GlobalLock&&);
-
-        /**
-         * Enqueues lock but does not block on lock acquisition.
-         * Call waitForLockUntil() to complete locking process.
-         *
-         * Does not set Locker::setGlobalLockTakenInMode(). Call waitForLockUntil to do so.
-         */
-        GlobalLock(OperationContext* opCtx,
-                   LockMode lockMode,
-                   Date_t deadline,
-                   InterruptBehavior behavior,
-                   EnqueueOnly enqueueOnly);
 
         ~GlobalLock() {
             // Preserve the original lock result which will be overridden by unlock().
@@ -238,17 +224,11 @@ public:
             }
         }
 
-        /**
-         * Waits for lock to be granted. Sets Locker::setGlobalLockTakenInMode().
-         */
-        void waitForLockUntil(Date_t deadline);
-
         bool isLocked() const {
             return _result == LOCK_OK;
         }
 
     private:
-        void _enqueue(LockMode lockMode, Date_t deadline);
         void _unlock();
 
         OperationContext* const _opCtx;

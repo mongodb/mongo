@@ -141,34 +141,11 @@ Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
                              LockMode lockMode,
                              Date_t deadline,
                              InterruptBehavior behavior)
-    : GlobalLock(opCtx, lockMode, deadline, behavior, EnqueueOnly()) {
-    waitForLockUntil(deadline);
-}
-
-Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
-                             LockMode lockMode,
-                             Date_t deadline,
-                             InterruptBehavior behavior,
-                             EnqueueOnly enqueueOnly)
     : _opCtx(opCtx),
       _result(LOCK_INVALID),
       _pbwm(opCtx->lockState(), resourceIdParallelBatchWriterMode),
       _interruptBehavior(behavior),
       _isOutermostLock(!opCtx->lockState()->isLocked()) {
-    _enqueue(lockMode, deadline);
-}
-
-Lock::GlobalLock::GlobalLock(GlobalLock&& otherLock)
-    : _opCtx(otherLock._opCtx),
-      _result(otherLock._result),
-      _pbwm(std::move(otherLock._pbwm)),
-      _interruptBehavior(otherLock._interruptBehavior),
-      _isOutermostLock(otherLock._isOutermostLock) {
-    // Mark as moved so the destructor doesn't invalidate the newly-constructed lock.
-    otherLock._result = LOCK_INVALID;
-}
-
-void Lock::GlobalLock::_enqueue(LockMode lockMode, Date_t deadline) {
     _opCtx->lockState()->getFlowControlTicket(_opCtx, lockMode);
 
     try {
@@ -188,7 +165,8 @@ void Lock::GlobalLock::_enqueue(LockMode lockMode, Date_t deadline) {
             [this] { _opCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock); });
 
         _result = LOCK_INVALID;
-        _result = _opCtx->lockState()->lockGlobalBegin(_opCtx, lockMode, deadline);
+        _opCtx->lockState()->lockGlobal(_opCtx, lockMode, deadline);
+        _result = LOCK_OK;
 
         unlockRSTL.dismiss();
         unlockPBWM.dismiss();
@@ -197,27 +175,18 @@ void Lock::GlobalLock::_enqueue(LockMode lockMode, Date_t deadline) {
         if (_interruptBehavior == InterruptBehavior::kThrow)
             throw;
     }
+    auto acquiredLockMode = _opCtx->lockState()->getLockMode(resourceIdGlobal);
+    _opCtx->lockState()->setGlobalLockTakenInMode(acquiredLockMode);
 }
 
-void Lock::GlobalLock::waitForLockUntil(Date_t deadline) {
-    try {
-        if (_result == LOCK_WAITING) {
-            _result = LOCK_INVALID;
-            _opCtx->lockState()->lockGlobalComplete(_opCtx, deadline);
-            _result = LOCK_OK;
-        }
-    } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
-        _opCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock);
-        if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
-            _pbwm.unlock();
-        }
-        // The kLeaveUnlocked behavior suppresses this exception.
-        if (_interruptBehavior == InterruptBehavior::kThrow)
-            throw;
-    }
-
-    auto lockMode = _opCtx->lockState()->getLockMode(resourceIdGlobal);
-    _opCtx->lockState()->setGlobalLockTakenInMode(lockMode);
+Lock::GlobalLock::GlobalLock(GlobalLock&& otherLock)
+    : _opCtx(otherLock._opCtx),
+      _result(otherLock._result),
+      _pbwm(std::move(otherLock._pbwm)),
+      _interruptBehavior(otherLock._interruptBehavior),
+      _isOutermostLock(otherLock._isOutermostLock) {
+    // Mark as moved so the destructor doesn't invalidate the newly-constructed lock.
+    otherLock._result = LOCK_INVALID;
 }
 
 void Lock::GlobalLock::_unlock() {

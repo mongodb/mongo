@@ -1023,18 +1023,11 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 
     // We should always be able to acquire the global lock at shutdown.
     //
-    // TODO: This call chain uses the locker directly, because we do not want to start an
-    // operation context, which also instantiates a recovery unit. Also, using the
-    // lockGlobalBegin/lockGlobalComplete sequence, we avoid taking the flush lock.
-    //
     // For a Windows service, dbexit does not call exit(), so we must leak the lock outside
     // of this function to prevent any operations from running that need a lock.
     //
     LockerImpl* globalLocker = new LockerImpl();
-    LockResult result = globalLocker->lockGlobalBegin(MODE_X, Date_t::max());
-    if (result == LOCK_WAITING) {
-        globalLocker->lockGlobalComplete(Date_t::max());
-    }
+    globalLocker->lockGlobal(MODE_X);
 
     // Global storage engine may not be started in all cases before we exit
     if (serviceContext->getStorageEngine()) {

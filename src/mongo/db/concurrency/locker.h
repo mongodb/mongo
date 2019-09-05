@@ -153,36 +153,16 @@ public:
      * @param opCtx OperationContext used to interrupt the lock waiting, if provided.
      * @param mode Mode in which the global lock should be acquired. Also indicates the intent
      *              of the operation.
+     * @param deadline indicates the absolute time point when this lock acquisition will time out,
+     * if not yet granted. Deadline will be also used for TicketHolder, if there is one.
      *
-     * It may throw an exception if it is interrupted.
+     * It may throw an exception if it is interrupted. The ticket acquisition phase can also be
+     * interrupted by killOp or time out, thus throwing an exception.
      */
-    virtual void lockGlobal(OperationContext* opCtx, LockMode mode) = 0;
-    virtual void lockGlobal(LockMode mode) = 0;
-
-    /**
-     * Requests the global lock to be acquired in the specified mode.
-     *
-     * See the comments for lockBegin/Complete for more information on the semantics. The deadline
-     * indicates the absolute time point when this lock acquisition will time out, if not yet
-     * granted. The lockGlobalBegin method has a deadline for use with the TicketHolder, if there is
-     * one.
-     *
-     * Returns LOCK_OK if the global lock is successfully acquired,
-     *      or LOCK_WAITING if the global lock is currently held by someone else.
-     *
-     * The ticket acquisition phase can be interrupted or time out, thus throwing an exception.
-     */
-    virtual LockResult lockGlobalBegin(OperationContext* opCtx, LockMode mode, Date_t deadline) = 0;
-    virtual LockResult lockGlobalBegin(LockMode mode, Date_t deadline) = 0;
-
-    /**
-     * Calling lockGlobalComplete without an OperationContext does not allow the lock acquisition
-     * to be interrupted.
-     *
-     * It may throw an exception if it is interrupted.
-     */
-    virtual void lockGlobalComplete(OperationContext* opCtx, Date_t deadline) = 0;
-    virtual void lockGlobalComplete(Date_t deadline) = 0;
+    virtual void lockGlobal(OperationContext* opCtx,
+                            LockMode mode,
+                            Date_t deadline = Date_t::max()) = 0;
+    virtual void lockGlobal(LockMode mode, Date_t deadline = Date_t::max()) = 0;
 
     /**
      * Decrements the reference count on the global lock.  If the reference count on the
@@ -201,7 +181,7 @@ public:
      * Requests the RSTL to be acquired in the requested mode (typically mode X) . This should only
      * be called inside ReplicationStateTransitionLockGuard.
      *
-     * See the comments for lockBegin/Complete for more information on the semantics.
+     * See the comments for _lockBegin/Complete for more information on the semantics.
      */
     virtual LockResult lockRSTLBegin(OperationContext* opCtx, LockMode mode) = 0;
 

@@ -850,7 +850,7 @@ TEST_F(DConcurrencyTestFixture,
     result.get();
 }
 
-TEST_F(DConcurrencyTestFixture, GlobalLockEnqueueOnlyNotInterruptedWithLeaveUnlockedBehavior) {
+TEST_F(DConcurrencyTestFixture, GlobalLockNotInterruptedWithLeaveUnlockedBehavior) {
     auto clients = makeKClientsWithLockers(2);
     auto opCtx1 = clients[0].second.get();
 
@@ -860,38 +860,8 @@ TEST_F(DConcurrencyTestFixture, GlobalLockEnqueueOnlyNotInterruptedWithLeaveUnlo
         opCtx1->markKilled();
     }
     // This should not throw or acquire the lock.
-    Lock::GlobalLock g1(opCtx1,
-                        MODE_S,
-                        Date_t::max(),
-                        Lock::InterruptBehavior::kLeaveUnlocked,
-                        Lock::GlobalLock::EnqueueOnly());
+    Lock::GlobalLock g1(opCtx1, MODE_S, Date_t::max(), Lock::InterruptBehavior::kLeaveUnlocked);
     ASSERT(!g1.isLocked());
-}
-
-TEST_F(DConcurrencyTestFixture, GlobalLockWaitForLockUntilNotInterruptedWithLeaveUnlockedBehavior) {
-    auto clients = makeKClientsWithLockers(2);
-    auto opCtx1 = clients[0].second.get();
-    auto opCtx2 = clients[1].second.get();
-
-    // The main thread takes an exclusive lock, causing the spawned thread to wait when it attempts
-    // to acquire a conflicting lock.
-    Lock::GlobalLock g1(opCtx1, MODE_X);
-    // Enqueue now so waitForLockUntil can be interrupted.
-    Lock::GlobalLock g2(opCtx2,
-                        MODE_S,
-                        Date_t::max(),
-                        Lock::InterruptBehavior::kLeaveUnlocked,
-                        Lock::GlobalLock::EnqueueOnly());
-
-    ASSERT(g1.isLocked());
-    ASSERT(!g2.isLocked());
-
-    // Killing the lock wait should not interrupt it, but rather leave it lock unlocked.
-    auto result = runTaskAndKill(opCtx2, [&]() { g2.waitForLockUntil(Date_t::max()); });
-
-    ASSERT(!g2.isLocked());
-    // Should not throw an exception.
-    result.get();
 }
 
 TEST_F(DConcurrencyTestFixture, SetMaxLockTimeoutMillisAndDoNotUsingWithInterruptBehavior) {
@@ -1075,16 +1045,16 @@ TEST_F(DConcurrencyTestFixture, LockCompleteInterruptedWhenUncontested) {
     auto opCtx1 = clientOpctxPairs[0].second.get();
     auto opCtx2 = clientOpctxPairs[1].second.get();
 
-    boost::optional<Lock::GlobalLock> globalWrite;
-    globalWrite.emplace(opCtx1, MODE_IX);
-    ASSERT(globalWrite->isLocked());
+    boost::optional<repl::ReplicationStateTransitionLockGuard> lockXGranted;
+    lockXGranted.emplace(opCtx1, MODE_IX, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());
+    ASSERT(lockXGranted->isLocked());
 
     // Attempt to take a conflicting lock, which will fail.
-    LockResult result = opCtx2->lockState()->lockGlobalBegin(opCtx2, MODE_X, Date_t::max());
+    LockResult result = opCtx2->lockState()->lockRSTLBegin(opCtx2, MODE_X);
     ASSERT_EQ(result, LOCK_WAITING);
 
     // Release the conflicting lock.
-    globalWrite.reset();
+    lockXGranted.reset();
 
     {
         stdx::lock_guard<Client> clientLock(*opCtx2->getClient());
@@ -1093,7 +1063,7 @@ TEST_F(DConcurrencyTestFixture, LockCompleteInterruptedWhenUncontested) {
 
     // After the operation has been killed, the lockComplete request should fail, even though the
     // lock is uncontested.
-    ASSERT_THROWS_CODE(opCtx2->lockState()->lockGlobalComplete(opCtx2, Date_t::max()),
+    ASSERT_THROWS_CODE(opCtx2->lockState()->lockRSTLComplete(opCtx2, MODE_X, Date_t::max()),
                        AssertionException,
                        ErrorCodes::Interrupted);
 }
@@ -1841,23 +1811,25 @@ TEST_F(DConcurrencyTestFixture, CollectionLockTimeout) {
 }
 
 TEST_F(DConcurrencyTestFixture, CompatibleFirstWithSXIS) {
+    // Currently, we are allowed to acquire IX and X lock modes for RSTL. To overcome it,
+    // this fail point will allow the test to acquire RSTL in any lock modes.
+    FailPointEnableBlock enableTestOnlyFlag("enableTestOnlyFlagforRSTL");
+
     auto clientOpctxPairs = makeKClientsWithLockers(3);
     auto opctx1 = clientOpctxPairs[0].second.get();
     auto opctx2 = clientOpctxPairs[1].second.get();
     auto opctx3 = clientOpctxPairs[2].second.get();
 
     // Build a queue of MODE_S <- MODE_X <- MODE_IS, with MODE_S granted.
-    Lock::GlobalRead lockS(opctx1);
+    repl::ReplicationStateTransitionLockGuard lockS(opctx1, MODE_S);
     ASSERT(lockS.isLocked());
-    Lock::GlobalLock lockX(opctx2,
-                           MODE_X,
-                           Date_t::max(),
-                           Lock::InterruptBehavior::kThrow,
-                           Lock::GlobalLock::EnqueueOnly());
+
+    repl::ReplicationStateTransitionLockGuard lockX(
+        opctx2, MODE_X, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());
     ASSERT(!lockX.isLocked());
 
     // A MODE_IS should be granted due to compatibleFirst policy.
-    Lock::GlobalLock lockIS(opctx3, MODE_IS, Date_t::now(), Lock::InterruptBehavior::kThrow);
+    repl::ReplicationStateTransitionLockGuard lockIS(opctx3, MODE_IS);
     ASSERT(lockIS.isLocked());
 
     ASSERT_THROWS_CODE(
@@ -1867,6 +1839,10 @@ TEST_F(DConcurrencyTestFixture, CompatibleFirstWithSXIS) {
 
 
 TEST_F(DConcurrencyTestFixture, CompatibleFirstWithXSIXIS) {
+    // Currently, we are allowed to acquire IX and X lock modes for RSTL. To overcome it,
+    // this fail point will allow the test to acquire RSTL in any lock modes.
+    FailPointEnableBlock enableTestOnlyFlag("enableTestOnlyFlagforRSTL");
+
     auto clientOpctxPairs = makeKClientsWithLockers(4);
     auto opctx1 = clientOpctxPairs[0].second.get();
     auto opctx2 = clientOpctxPairs[1].second.get();
@@ -1874,27 +1850,17 @@ TEST_F(DConcurrencyTestFixture, CompatibleFirstWithXSIXIS) {
     auto opctx4 = clientOpctxPairs[3].second.get();
 
     // Build a queue of MODE_X <- MODE_S <- MODE_IX <- MODE_IS, with MODE_X granted.
-    boost::optional<Lock::GlobalWrite> lockX;
-    lockX.emplace(opctx1);
+    boost::optional<repl::ReplicationStateTransitionLockGuard> lockX;
+    lockX.emplace(opctx1, MODE_X);
     ASSERT(lockX->isLocked());
-    boost::optional<Lock::GlobalLock> lockS;
-    lockS.emplace(opctx2,
-                  MODE_S,
-                  Date_t::max(),
-                  Lock::InterruptBehavior::kThrow,
-                  Lock::GlobalLock::EnqueueOnly());
+    boost::optional<repl::ReplicationStateTransitionLockGuard> lockS;
+    lockS.emplace(opctx2, MODE_S, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());
     ASSERT(!lockS->isLocked());
-    Lock::GlobalLock lockIX(opctx3,
-                            MODE_IX,
-                            Date_t::max(),
-                            Lock::InterruptBehavior::kThrow,
-                            Lock::GlobalLock::EnqueueOnly());
+    repl::ReplicationStateTransitionLockGuard lockIX(
+        opctx3, MODE_IX, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());
     ASSERT(!lockIX.isLocked());
-    Lock::GlobalLock lockIS(opctx4,
-                            MODE_IS,
-                            Date_t::max(),
-                            Lock::InterruptBehavior::kThrow,
-                            Lock::GlobalLock::EnqueueOnly());
+    repl::ReplicationStateTransitionLockGuard lockIS(
+        opctx4, MODE_IS, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());
     ASSERT(!lockIS.isLocked());
 
 
@@ -1913,6 +1879,10 @@ TEST_F(DConcurrencyTestFixture, CompatibleFirstWithXSIXIS) {
 }
 
 TEST_F(DConcurrencyTestFixture, CompatibleFirstWithXSXIXIS) {
+    // Currently, we are allowed to acquire IX and X lock modes for RSTL. To overcome it,
+    // this fail point will allow the test to acquire RSTL in any lock modes.
+    FailPointEnableBlock enableTestOnlyFlag("enableTestOnlyFlagforRSTL");
+
     auto clientOpctxPairs = makeKClientsWithLockers(5);
     auto opctx1 = clientOpctxPairs[0].second.get();
     auto opctx2 = clientOpctxPairs[1].second.get();
@@ -1922,38 +1892,24 @@ TEST_F(DConcurrencyTestFixture, CompatibleFirstWithXSXIXIS) {
 
     // Build a queue of MODE_X <- MODE_S <- MODE_X <- MODE_IX <- MODE_IS, with the first MODE_X
     // granted and check that releasing it will result in the MODE_IS being granted.
-    boost::optional<Lock::GlobalWrite> lockXgranted;
-    lockXgranted.emplace(opctx1);
+    boost::optional<repl::ReplicationStateTransitionLockGuard> lockXgranted;
+    lockXgranted.emplace(opctx1, MODE_X);
     ASSERT(lockXgranted->isLocked());
 
-    boost::optional<Lock::GlobalLock> lockX;
-    lockX.emplace(opctx3,
-                  MODE_X,
-                  Date_t::max(),
-                  Lock::InterruptBehavior::kThrow,
-                  Lock::GlobalLock::EnqueueOnly());
+    boost::optional<repl::ReplicationStateTransitionLockGuard> lockX;
+    lockX.emplace(opctx3, MODE_X, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());
     ASSERT(!lockX->isLocked());
 
     // Now request MODE_S: it will be first in the pending list due to EnqueueAtFront policy.
-    boost::optional<Lock::GlobalLock> lockS;
-    lockS.emplace(opctx2,
-                  MODE_S,
-                  Date_t::max(),
-                  Lock::InterruptBehavior::kThrow,
-                  Lock::GlobalLock::EnqueueOnly());
+    boost::optional<repl::ReplicationStateTransitionLockGuard> lockS;
+    lockS.emplace(opctx2, MODE_S, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());
     ASSERT(!lockS->isLocked());
 
-    Lock::GlobalLock lockIX(opctx4,
-                            MODE_IX,
-                            Date_t::max(),
-                            Lock::InterruptBehavior::kThrow,
-                            Lock::GlobalLock::EnqueueOnly());
+    repl::ReplicationStateTransitionLockGuard lockIX(
+        opctx4, MODE_IX, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());
     ASSERT(!lockIX.isLocked());
-    Lock::GlobalLock lockIS(opctx5,
-                            MODE_IS,
-                            Date_t::max(),
-                            Lock::InterruptBehavior::kThrow,
-                            Lock::GlobalLock::EnqueueOnly());
+    repl::ReplicationStateTransitionLockGuard lockIS(
+        opctx5, MODE_IS, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());
     ASSERT(!lockIS.isLocked());
 
 
@@ -2039,13 +1995,11 @@ TEST_F(DConcurrencyTestFixture, CompatibleFirstStress) {
                         lock.emplace(opCtx,
                                      iters % 20 ? MODE_IS : MODE_S,
                                      Date_t::now(),
-                                     Lock::InterruptBehavior::kLeaveUnlocked,
-                                     Lock::GlobalLock::EnqueueOnly());
+                                     Lock::InterruptBehavior::kLeaveUnlocked);
                         // If thread 0 is holding the MODE_S lock while we tried to acquire a
                         // MODE_IS or MODE_S lock, the CompatibleFirst policy guarantees success.
                         auto newInterval = readOnlyInterval.load();
                         invariant(!interval || interval != newInterval || lock->isLocked());
-                        lock->waitForLockUntil(Date_t::now());
                         break;
                     }
                     case 5:

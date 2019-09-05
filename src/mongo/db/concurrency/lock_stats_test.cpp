@@ -69,10 +69,10 @@ TEST_F(LockStatsTest, Wait) {
     {
         // This will block
         LockerForTests lockerConflict(MODE_IX);
-        ASSERT_EQUALS(LOCK_WAITING, lockerConflict.lockBegin(opCtx.get(), resId, MODE_S));
+        ASSERT_EQUALS(LOCK_WAITING, lockerConflict.lockBeginForTest(opCtx.get(), resId, MODE_S));
 
         // Sleep 1 millisecond so the wait time passes
-        ASSERT_THROWS_CODE(lockerConflict.lockComplete(
+        ASSERT_THROWS_CODE(lockerConflict.lockCompleteForTest(
                                opCtx.get(), resId, MODE_S, Date_t::now() + Milliseconds(5)),
                            AssertionException,
                            ErrorCodes::LockTimeout);

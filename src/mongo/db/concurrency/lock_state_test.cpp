@@ -992,7 +992,8 @@ TEST_F(LockerImplTest, GetLockerInfoShouldReportPendingLocks) {
     LockerImpl conflictingLocker;
     conflictingLocker.lockGlobal(MODE_IS);
     conflictingLocker.lock(dbId, MODE_IS);
-    ASSERT_EQ(LOCK_WAITING, conflictingLocker.lockBegin(nullptr, collectionId, MODE_IS));
+    ASSERT_EQ(LOCK_WAITING,
+              conflictingLocker.lockBeginForTest(nullptr /* opCtx */, collectionId, MODE_IS));
 
     // Assert the held locks show up in the output of getLockerInfo().
     Locker::LockerInfo lockerInfo;
@@ -1010,7 +1011,8 @@ TEST_F(LockerImplTest, GetLockerInfoShouldReportPendingLocks) {
     ASSERT(successfulLocker.unlock(dbId));
     ASSERT(successfulLocker.unlockGlobal());
 
-    conflictingLocker.lockComplete(collectionId, MODE_IS, Date_t::now());
+    conflictingLocker.lockCompleteForTest(
+        nullptr /* opCtx */, collectionId, MODE_IS, Date_t::now());
 
     conflictingLocker.getLockerInfo(&lockerInfo, boost::none);
     ASSERT_FALSE(lockerInfo.waitingResource.isValid());

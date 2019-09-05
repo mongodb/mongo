@@ -82,27 +82,11 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    virtual void lockGlobal(OperationContext* opCtx, LockMode mode) {
+    virtual void lockGlobal(OperationContext* opCtx, LockMode mode, Date_t deadline) {
         MONGO_UNREACHABLE;
     }
 
-    virtual void lockGlobal(LockMode mode) {
-        MONGO_UNREACHABLE;
-    }
-
-    virtual LockResult lockGlobalBegin(OperationContext* opCtx, LockMode mode, Date_t deadline) {
-        MONGO_UNREACHABLE;
-    }
-
-    virtual LockResult lockGlobalBegin(LockMode mode, Date_t deadline) {
-        MONGO_UNREACHABLE;
-    }
-
-    virtual void lockGlobalComplete(OperationContext* opCtx, Date_t deadline) {
-        MONGO_UNREACHABLE;
-    }
-
-    virtual void lockGlobalComplete(Date_t deadline) {
+    virtual void lockGlobal(LockMode mode, Date_t deadline) {
         MONGO_UNREACHABLE;
     }
 
