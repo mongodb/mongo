@@ -187,14 +187,12 @@ public:
 
     virtual Status insert(OperationContext* opCtx,
                           const KeyString::Value& keyString,
-                          const RecordId& loc,
                           bool dupsAllowed) {
         return Status::OK();
     }
 
     virtual void unindex(OperationContext* opCtx,
                          const KeyString::Value& keyString,
-                         const RecordId& loc,
                          bool dupsAllowed) {}
 
     virtual Status dupKeyCheck(OperationContext* opCtx, const KeyString::Value& keyString) {

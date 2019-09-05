@@ -61,9 +61,8 @@ MobileIndex::MobileIndex(OperationContext* opCtx,
 
 Status MobileIndex::insert(OperationContext* opCtx,
                            const KeyString::Value& keyString,
-                           const RecordId& recId,
                            bool dupsAllowed) {
-    return _insert(opCtx, keyString, recId, dupsAllowed);
+    return _insert(opCtx, keyString, dupsAllowed);
 }
 
 template <typename ValueType>
@@ -107,10 +106,8 @@ Status MobileIndex::doInsert(OperationContext* opCtx,
 
 void MobileIndex::unindex(OperationContext* opCtx,
                           const KeyString::Value& keyString,
-                          const RecordId& recId,
                           bool dupsAllowed) {
-    invariant(recId.isValid());
-    _unindex(opCtx, keyString, recId, dupsAllowed);
+    _unindex(opCtx, keyString, dupsAllowed);
 }
 
 void MobileIndex::_doDelete(OperationContext* opCtx,
@@ -326,9 +323,8 @@ public:
 
 protected:
     Status _addKey(const KeyString::Value& keyString) override {
-        dassert(
-            KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()).isValid());
         RecordId recId = KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
+        invariant(recId.isValid());
 
         KeyString::Builder value(_index->getKeyStringVersion(), recId);
         KeyString::TypeBits typeBits = keyString.getTypeBits();
@@ -703,10 +699,9 @@ std::unique_ptr<SortedDataInterface::Cursor> MobileIndexStandard::newCursor(Oper
 
 Status MobileIndexStandard::_insert(OperationContext* opCtx,
                                     const KeyString::Value& keyString,
-                                    const RecordId& recId,
                                     bool dupsAllowed) {
     invariant(dupsAllowed);
-    dassert(recId == KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
+    dassert(KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()).isValid());
 
     const KeyString::TypeBits typeBits = keyString.getTypeBits();
     return doInsert(opCtx, keyString.getBuffer(), keyString.getSize(), typeBits, typeBits);
@@ -714,9 +709,9 @@ Status MobileIndexStandard::_insert(OperationContext* opCtx,
 
 void MobileIndexStandard::_unindex(OperationContext* opCtx,
                                    const KeyString::Value& keyString,
-                                   const RecordId&,
                                    bool dupsAllowed) {
     invariant(dupsAllowed);
+    dassert(KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()).isValid());
 
     _doDelete(opCtx, keyString.getBuffer(), keyString.getSize());
 }
@@ -741,13 +736,12 @@ std::unique_ptr<SortedDataInterface::Cursor> MobileIndexUnique::newCursor(Operat
 
 Status MobileIndexUnique::_insert(OperationContext* opCtx,
                                   const KeyString::Value& keyString,
-                                  const RecordId& recId,
                                   bool dupsAllowed) {
     // Replication is not supported so dups are not allowed.
     invariant(!dupsAllowed);
 
+    RecordId recId = KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
     invariant(recId.isValid());
-    dassert(recId == KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
 
     KeyString::Builder value(_keyStringVersion, recId);
     KeyString::TypeBits typeBits = keyString.getTypeBits();
@@ -763,7 +757,6 @@ Status MobileIndexUnique::_insert(OperationContext* opCtx,
 
 void MobileIndexUnique::_unindex(OperationContext* opCtx,
                                  const KeyString::Value& keyString,
-                                 const RecordId& recId,
                                  bool dupsAllowed) {
     // Replication is not supported so dups are not allowed.
     invariant(!dupsAllowed);
@@ -773,9 +766,8 @@ void MobileIndexUnique::_unindex(OperationContext* opCtx,
     auto sizeWithoutRecordId =
         KeyString::sizeWithoutRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
     if (_isPartial) {
+        RecordId recId = KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
         invariant(recId.isValid());
-        dassert(recId ==
-                KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
 
         KeyString::Builder value(_keyStringVersion, recId);
         KeyString::TypeBits typeBits = keyString.getTypeBits();

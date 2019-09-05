@@ -103,8 +103,7 @@ TEST(SortedDataInterface, ExhaustCursor) {
             WriteUnitOfWork uow(opCtx.get());
             BSONObj key = BSON("" << i);
             RecordId loc(42, i * 2);
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), loc, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), true));
             uow.commit();
         }
     }
@@ -149,8 +148,7 @@ TEST(SortedDataInterface, ExhaustCursorReversed) {
             WriteUnitOfWork uow(opCtx.get());
             BSONObj key = BSON("" << i);
             RecordId loc(42, i * 2);
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), loc, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), true));
             uow.commit();
         }
     }
@@ -190,7 +188,7 @@ void testBoundaries(bool unique, bool forward, bool inclusive) {
         WriteUnitOfWork uow(opCtx.get());
         BSONObj key = BSON("" << i);
         RecordId loc(42 + i * 2);
-        ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), loc, true));
+        ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), true));
         uow.commit();
     }
 

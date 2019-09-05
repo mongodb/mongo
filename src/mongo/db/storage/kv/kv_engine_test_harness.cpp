@@ -185,7 +185,7 @@ TEST(KVEngineTestHarness, SimpleSorted1) {
             KeyString::HeapBuilder(
                 sorted->getKeyStringVersion(), BSON("" << 5), sorted->getOrdering(), recordId)
                 .release();
-        ASSERT_OK(sorted->insert(&opCtx, keyString, recordId, true));
+        ASSERT_OK(sorted->insert(&opCtx, keyString, true));
         uow.commit();
     }
 

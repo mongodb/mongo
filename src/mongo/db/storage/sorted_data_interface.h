@@ -78,7 +78,8 @@ public:
                                                        bool dupsAllowed) = 0;
 
     /**
-     * Insert an entry into the index with the specified KeyString and RecordId.
+     * Insert an entry into the index with the specified KeyString, which must have a RecordId
+     * appended to the end.
      *
      * @param opCtx the transaction under which the insert takes place
      * @param dupsAllowed true if duplicate keys are allowed, and false
@@ -91,11 +92,11 @@ public:
      */
     virtual Status insert(OperationContext* opCtx,
                           const KeyString::Value& keyString,
-                          const RecordId& loc,
                           bool dupsAllowed) = 0;
 
     /**
-     * Remove the entry from the index with the specified KeyString and RecordId.
+     * Remove the entry from the index with the specified KeyString, which must have a RecordId
+     * appended to the end.
      *
      * @param opCtx the transaction under which the remove takes place
      * @param dupsAllowed true if duplicate keys are allowed, and false
@@ -103,7 +104,6 @@ public:
      */
     virtual void unindex(OperationContext* opCtx,
                          const KeyString::Value& keyString,
-                         const RecordId& loc,
                          bool dupsAllowed) = 0;
 
     /**

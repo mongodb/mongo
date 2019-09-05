@@ -320,9 +320,8 @@ SortedDataInterface::SortedDataInterface(const Ordering& ordering, bool isUnique
 
 Status SortedDataInterface::insert(OperationContext* opCtx,
                                    const KeyString::Value& keyString,
-                                   const RecordId& loc,
                                    bool dupsAllowed) {
-    dassert(loc == KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
+    RecordId loc = KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
 
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     auto sizeWithoutRecordId =
@@ -387,9 +386,8 @@ Status SortedDataInterface::insert(OperationContext* opCtx,
 
 void SortedDataInterface::unindex(OperationContext* opCtx,
                                   const KeyString::Value& keyString,
-                                  const RecordId& loc,
                                   bool dupsAllowed) {
-    dassert(loc == KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
+    RecordId loc = KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
 
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     std::string removeKeyString;

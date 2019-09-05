@@ -184,9 +184,8 @@ public:
 
     virtual Status insert(OperationContext* opCtx,
                           const KeyString::Value& keyString,
-                          const RecordId& loc,
                           bool dupsAllowed) {
-        dassert(loc == KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
+        RecordId loc = KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
 
         auto key = KeyString::toBson(keyString, _ordering);
 
@@ -211,9 +210,8 @@ public:
 
     virtual void unindex(OperationContext* opCtx,
                          const KeyString::Value& keyString,
-                         const RecordId& loc,
                          bool dupsAllowed) {
-        dassert(loc == KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
+        RecordId loc = KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
 
         auto key = KeyString::toBson(keyString, _ordering);
 

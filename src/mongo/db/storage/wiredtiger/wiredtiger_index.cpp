@@ -247,10 +247,9 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
 
 Status WiredTigerIndex::insert(OperationContext* opCtx,
                                const KeyString::Value& keyString,
-                               const RecordId& id,
                                bool dupsAllowed) {
     dassert(opCtx->lockState()->isWriteLocked());
-    dassert(id == KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
+    dassert(KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()).isValid());
 
     TRACE_INDEX << " KeyString: " << keyString;
 
@@ -258,23 +257,21 @@ Status WiredTigerIndex::insert(OperationContext* opCtx,
     curwrap.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
 
-    return _insert(opCtx, c, keyString, id, dupsAllowed);
+    return _insert(opCtx, c, keyString, dupsAllowed);
 }
 
 void WiredTigerIndex::unindex(OperationContext* opCtx,
                               const KeyString::Value& keyString,
-                              const RecordId& id,
                               bool dupsAllowed) {
-    invariant(id.isValid());
     dassert(opCtx->lockState()->isWriteLocked());
-    dassert(id == KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
+    dassert(KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()).isValid());
 
     WiredTigerCursor curwrap(_uri, _tableId, false, opCtx);
     curwrap.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
     invariant(c);
 
-    _unindex(opCtx, c, keyString, id, dupsAllowed);
+    _unindex(opCtx, c, keyString, dupsAllowed);
 }
 
 void WiredTigerIndex::fullValidate(OperationContext* opCtx,
@@ -1406,19 +1403,18 @@ bool WiredTigerIndexUnique::isDup(OperationContext* opCtx,
 Status WiredTigerIndexUnique::_insert(OperationContext* opCtx,
                                       WT_CURSOR* c,
                                       const KeyString::Value& keyString,
-                                      const RecordId& id,
                                       bool dupsAllowed) {
     if (isTimestampSafeUniqueIdx()) {
         return _insertTimestampSafe(opCtx, c, keyString, dupsAllowed);
     }
-    return _insertTimestampUnsafe(opCtx, c, keyString, id, dupsAllowed);
+    return _insertTimestampUnsafe(opCtx, c, keyString, dupsAllowed);
 }
 
 Status WiredTigerIndexUnique::_insertTimestampUnsafe(OperationContext* opCtx,
                                                      WT_CURSOR* c,
                                                      const KeyString::Value& keyString,
-                                                     const RecordId& id,
                                                      bool dupsAllowed) {
+    const RecordId id = KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
     invariant(id.isValid());
 
     auto sizeWithoutRecordId =
@@ -1560,19 +1556,18 @@ Status WiredTigerIndexUnique::_insertTimestampSafe(OperationContext* opCtx,
 void WiredTigerIndexUnique::_unindex(OperationContext* opCtx,
                                      WT_CURSOR* c,
                                      const KeyString::Value& keyString,
-                                     const RecordId& id,
                                      bool dupsAllowed) {
     if (isTimestampSafeUniqueIdx()) {
         return _unindexTimestampSafe(opCtx, c, keyString, dupsAllowed);
     }
-    return _unindexTimestampUnsafe(opCtx, c, keyString, id, dupsAllowed);
+    return _unindexTimestampUnsafe(opCtx, c, keyString, dupsAllowed);
 }
 
 void WiredTigerIndexUnique::_unindexTimestampUnsafe(OperationContext* opCtx,
                                                     WT_CURSOR* c,
                                                     const KeyString::Value& keyString,
-                                                    const RecordId& id,
                                                     bool dupsAllowed) {
+    const RecordId id = KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
     invariant(id.isValid());
 
     auto sizeWithoutRecordId =
@@ -1738,7 +1733,6 @@ SortedDataBuilderInterface* WiredTigerIndexStandard::getBulkBuilder(OperationCon
 Status WiredTigerIndexStandard::_insert(OperationContext* opCtx,
                                         WT_CURSOR* c,
                                         const KeyString::Value& keyString,
-                                        const RecordId& id,
                                         bool dupsAllowed) {
     invariant(dupsAllowed);
 
@@ -1765,7 +1759,6 @@ Status WiredTigerIndexStandard::_insert(OperationContext* opCtx,
 void WiredTigerIndexStandard::_unindex(OperationContext* opCtx,
                                        WT_CURSOR* c,
                                        const KeyString::Value& keyString,
-                                       const RecordId&,
                                        bool dupsAllowed) {
     invariant(dupsAllowed);
     WiredTigerItem item(keyString.getBuffer(), keyString.getSize());

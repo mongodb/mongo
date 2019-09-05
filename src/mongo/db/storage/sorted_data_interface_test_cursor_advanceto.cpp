@@ -56,20 +56,13 @@ TEST(SortedDataInterface, AdvanceTo) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), loc1, true));
-            ASSERT_OK(sorted->insert(opCtx.get(),
-                                     makeKeyString(sorted.get(), key1, loc2),
-                                     loc2,
-                                     true /* allow duplicates */));
-            ASSERT_OK(sorted->insert(opCtx.get(),
-                                     makeKeyString(sorted.get(), key1, loc3),
-                                     loc3,
-                                     true /* allow duplicates */));
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc4), loc4, true));
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc5), loc5, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
+            ASSERT_OK(sorted->insert(
+                opCtx.get(), makeKeyString(sorted.get(), key1, loc2), true /* allow duplicates */));
+            ASSERT_OK(sorted->insert(
+                opCtx.get(), makeKeyString(sorted.get(), key1, loc3), true /* allow duplicates */));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc4), true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc5), true));
             uow.commit();
         }
     }
@@ -130,20 +123,13 @@ TEST(SortedDataInterface, AdvanceToReversed) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), loc1, true));
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), loc2, true));
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc3), loc3, true));
-            ASSERT_OK(sorted->insert(opCtx.get(),
-                                     makeKeyString(sorted.get(), key3, loc4),
-                                     loc4,
-                                     true /* allow duplicates */));
-            ASSERT_OK(sorted->insert(opCtx.get(),
-                                     makeKeyString(sorted.get(), key3, loc5),
-                                     loc5,
-                                     true /* allow duplicates */));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc3), true));
+            ASSERT_OK(sorted->insert(
+                opCtx.get(), makeKeyString(sorted.get(), key3, loc4), true /* allow duplicates */));
+            ASSERT_OK(sorted->insert(
+                opCtx.get(), makeKeyString(sorted.get(), key3, loc5), true /* allow duplicates */));
             uow.commit();
         }
     }
@@ -204,10 +190,8 @@ TEST(SortedDataInterface, AdvanceToKeyBeforeCursorPosition) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), loc1, true));
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), loc2, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), true));
             uow.commit();
         }
     }
@@ -256,10 +240,8 @@ TEST(SortedDataInterface, AdvanceToKeyAfterCursorPositionReversed) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), loc1, true));
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), loc2, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), true));
             uow.commit();
         }
     }
@@ -312,8 +294,7 @@ TEST(SortedDataInterface, AdvanceToKeyAtCursorPosition) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), loc1, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
             uow.commit();
         }
     }
@@ -364,8 +345,7 @@ TEST(SortedDataInterface, AdvanceToKeyAtCursorPositionReversed) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), loc1, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
             uow.commit();
         }
     }
@@ -417,20 +397,13 @@ TEST(SortedDataInterface, AdvanceToExclusive) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), loc1, true));
-            ASSERT_OK(sorted->insert(opCtx.get(),
-                                     makeKeyString(sorted.get(), key1, loc2),
-                                     loc2,
-                                     true /* allow duplicates */));
-            ASSERT_OK(sorted->insert(opCtx.get(),
-                                     makeKeyString(sorted.get(), key1, loc3),
-                                     loc3,
-                                     true /* allow duplicates */));
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc4), loc4, true));
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc5), loc5, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
+            ASSERT_OK(sorted->insert(
+                opCtx.get(), makeKeyString(sorted.get(), key1, loc2), true /* allow duplicates */));
+            ASSERT_OK(sorted->insert(
+                opCtx.get(), makeKeyString(sorted.get(), key1, loc3), true /* allow duplicates */));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc4), true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc5), true));
             uow.commit();
         }
     }
@@ -490,20 +463,13 @@ TEST(SortedDataInterface, AdvanceToExclusiveReversed) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), loc1, true));
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), loc2, true));
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc3), loc3, true));
-            ASSERT_OK(sorted->insert(opCtx.get(),
-                                     makeKeyString(sorted.get(), key3, loc4),
-                                     loc4,
-                                     true /* allow duplicates */));
-            ASSERT_OK(sorted->insert(opCtx.get(),
-                                     makeKeyString(sorted.get(), key3, loc5),
-                                     loc5,
-                                     true /* allow duplicates */));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc3), true));
+            ASSERT_OK(sorted->insert(
+                opCtx.get(), makeKeyString(sorted.get(), key3, loc4), true /* allow duplicates */));
+            ASSERT_OK(sorted->insert(
+                opCtx.get(), makeKeyString(sorted.get(), key3, loc5), true /* allow duplicates */));
             uow.commit();
         }
     }
@@ -566,12 +532,9 @@ TEST(SortedDataInterface, AdvanceToIndirect) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), loc1, true));
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc2), loc2, true));
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key5, loc3), loc3, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc2), true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key5, loc3), true));
             uow.commit();
         }
     }
@@ -625,12 +588,9 @@ TEST(SortedDataInterface, AdvanceToIndirectReversed) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), loc1, true));
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc2), loc2, true));
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key5, loc3), loc3, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc2), true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key5, loc3), true));
             uow.commit();
         }
     }
@@ -687,12 +647,9 @@ TEST(SortedDataInterface, AdvanceToIndirectExclusive) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), loc1, true));
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc2), loc2, true));
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key5, loc3), loc3, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc2), true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key5, loc3), true));
             uow.commit();
         }
     }
@@ -756,12 +713,9 @@ TEST(SortedDataInterface, AdvanceToIndirectExclusiveReversed) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), loc1, true));
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc2), loc2, true));
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key5, loc3), loc3, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc2), true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key5, loc3), true));
             uow.commit();
         }
     }

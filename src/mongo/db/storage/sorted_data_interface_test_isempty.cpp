@@ -54,8 +54,9 @@ TEST(SortedDataInterface, IsEmpty) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), loc1, false));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), false));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), false));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc3), false));
             uow.commit();
         }
     }
@@ -69,7 +70,9 @@ TEST(SortedDataInterface, IsEmpty) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), loc1, false);
+            sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), false);
+            sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), false);
+            sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key3, loc3), false);
             ASSERT(sorted->isEmpty(opCtx.get()));
             uow.commit();
         }

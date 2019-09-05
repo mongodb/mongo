@@ -153,17 +153,15 @@ Status AbstractIndexAccessMethod::insertKeys(OperationContext* opCtx,
     // over the data keys, each of them should point to the doc's RecordId. When iterating over
     // the multikey metadata keys, they should point to the reserved 'kMultikeyMetadataKeyId'.
     for (const auto keyVec : {&keys, &multikeyMetadataKeys}) {
-        const auto& recordId = (keyVec == &keys ? loc : kMultikeyMetadataKeyId);
         for (const auto& keyString : *keyVec) {
             bool unique = _descriptor->unique();
-            Status status =
-                _newInterface->insert(opCtx, keyString, recordId, !unique /* dupsAllowed */);
+            Status status = _newInterface->insert(opCtx, keyString, !unique /* dupsAllowed */);
 
             // When duplicates are encountered and allowed, retry with dupsAllowed. Add the
             // key to the output vector so callers know which duplicate keys were inserted.
             if (ErrorCodes::DuplicateKey == status.code() && options.dupsAllowed) {
                 invariant(unique);
-                status = _newInterface->insert(opCtx, keyString, recordId, true /* dupsAllowed */);
+                status = _newInterface->insert(opCtx, keyString, true /* dupsAllowed */);
 
                 if (status.isOK() && result) {
                     auto key =
@@ -193,7 +191,7 @@ void AbstractIndexAccessMethod::removeOneKey(OperationContext* opCtx,
                                              bool dupsAllowed) {
 
     try {
-        _newInterface->unindex(opCtx, keyString, loc, dupsAllowed);
+        _newInterface->unindex(opCtx, keyString, dupsAllowed);
     } catch (AssertionException& e) {
         log() << "Assertion failure: _unindex failed on: " << _descriptor->parentNS()
               << " for index: " << _descriptor->indexName();
@@ -414,7 +412,7 @@ Status AbstractIndexAccessMethod::update(OperationContext* opCtx,
     }
 
     for (const auto& remKey : ticket.removed) {
-        _newInterface->unindex(opCtx, remKey, ticket.loc, ticket.dupsAllowed);
+        _newInterface->unindex(opCtx, remKey, ticket.dupsAllowed);
     }
 
     // Add all new data keys, and all new multikey metadata keys, into the index. When iterating
@@ -422,9 +420,8 @@ Status AbstractIndexAccessMethod::update(OperationContext* opCtx,
     // the multikey metadata keys, they should point to the reserved 'kMultikeyMetadataKeyId'.
     const auto newMultikeyMetadataKeys = asVector(ticket.newMultikeyMetadataKeys);
     for (const auto keySet : {&ticket.added, &newMultikeyMetadataKeys}) {
-        const auto& recordId = (keySet == &ticket.added ? ticket.loc : kMultikeyMetadataKeyId);
         for (const auto& keyString : *keySet) {
-            Status status = _newInterface->insert(opCtx, keyString, recordId, ticket.dupsAllowed);
+            Status status = _newInterface->insert(opCtx, keyString, ticket.dupsAllowed);
             if (isFatalError(opCtx, status, keyString)) {
                 return status;
             }

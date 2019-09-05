@@ -52,8 +52,7 @@ void unindex(bool partial) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), loc1, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
             uow.commit();
         }
     }
@@ -67,7 +66,7 @@ void unindex(bool partial) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), loc1, true);
+            sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true);
             ASSERT(sorted->isEmpty(opCtx.get()));
             uow.commit();
         }
@@ -106,7 +105,7 @@ void unindexKeyString(bool partial) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(opCtx.get(), keyString1, loc1, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), keyString1, true));
             uow.commit();
         }
     }
@@ -120,7 +119,7 @@ void unindexKeyString(bool partial) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->unindex(opCtx.get(), keyString1, loc1, true);
+            sorted->unindex(opCtx.get(), keyString1, true);
             ASSERT(sorted->isEmpty(opCtx.get()));
             uow.commit();
         }
@@ -156,7 +155,7 @@ void unindexCompoundKey(bool partial) {
         {
             WriteUnitOfWork uow(opCtx.get());
             ASSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), compoundKey1a, loc1), loc1, true));
+                opCtx.get(), makeKeyString(sorted.get(), compoundKey1a, loc1), true));
             uow.commit();
         }
     }
@@ -170,8 +169,7 @@ void unindexCompoundKey(bool partial) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->unindex(
-                opCtx.get(), makeKeyString(sorted.get(), compoundKey1a, loc1), loc1, true);
+            sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), compoundKey1a, loc1), true);
             ASSERT(sorted->isEmpty(opCtx.get()));
             uow.commit();
         }
@@ -206,10 +204,8 @@ void unindexMultipleDistinct(bool partial) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), loc1, true));
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), loc2, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), true));
             uow.commit();
         }
     }
@@ -223,7 +219,7 @@ void unindexMultipleDistinct(bool partial) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), loc2, true);
+            sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), true);
             ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
             uow.commit();
         }
@@ -238,8 +234,7 @@ void unindexMultipleDistinct(bool partial) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc3), loc3, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc3), true));
             uow.commit();
         }
     }
@@ -253,9 +248,9 @@ void unindexMultipleDistinct(bool partial) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), loc1, true);
+            sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true);
             ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
-            sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key3, loc3), loc3, true);
+            sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key3, loc3), true);
             ASSERT(sorted->isEmpty(opCtx.get()));
             uow.commit();
         }
@@ -290,12 +285,9 @@ void unindexMultipleSameKey(bool partial) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), loc1, true));
-            ASSERT_OK(sorted->insert(opCtx.get(),
-                                     makeKeyString(sorted.get(), key1, loc2),
-                                     loc2,
-                                     true /* allow duplicates */));
+            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
+            ASSERT_OK(sorted->insert(
+                opCtx.get(), makeKeyString(sorted.get(), key1, loc2), true /* allow duplicates */));
             uow.commit();
         }
     }
@@ -309,7 +301,7 @@ void unindexMultipleSameKey(bool partial) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key1, loc2), loc2, true);
+            sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key1, loc2), true);
             ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
             uow.commit();
         }
@@ -324,10 +316,8 @@ void unindexMultipleSameKey(bool partial) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(opCtx.get(),
-                                     makeKeyString(sorted.get(), key1, loc3),
-                                     loc3,
-                                     true /* allow duplicates */));
+            ASSERT_OK(sorted->insert(
+                opCtx.get(), makeKeyString(sorted.get(), key1, loc3), true /* allow duplicates */));
             uow.commit();
         }
     }
@@ -341,9 +331,9 @@ void unindexMultipleSameKey(bool partial) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), loc1, true);
+            sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true);
             ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
-            sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key1, loc3), loc3, true);
+            sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key1, loc3), true);
             ASSERT(sorted->isEmpty(opCtx.get()));
             uow.commit();
         }
@@ -385,9 +375,8 @@ void unindexMultipleSameKeyString(bool partial) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(opCtx.get(), keyStringLoc1, loc1, true));
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), keyStringLoc2, loc2, true /* allow duplicates */));
+            ASSERT_OK(sorted->insert(opCtx.get(), keyStringLoc1, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), keyStringLoc2, true /* allow duplicates */));
             uow.commit();
         }
     }
@@ -401,7 +390,7 @@ void unindexMultipleSameKeyString(bool partial) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->unindex(opCtx.get(), keyStringLoc2, loc2, true);
+            sorted->unindex(opCtx.get(), keyStringLoc2, true);
             ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
             uow.commit();
         }
@@ -416,8 +405,7 @@ void unindexMultipleSameKeyString(bool partial) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(
-                sorted->insert(opCtx.get(), keyStringLoc3, loc3, true /* allow duplicates */));
+            ASSERT_OK(sorted->insert(opCtx.get(), keyStringLoc3, true /* allow duplicates */));
             uow.commit();
         }
     }
@@ -431,9 +419,9 @@ void unindexMultipleSameKeyString(bool partial) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->unindex(opCtx.get(), keyStringLoc1, loc1, true);
+            sorted->unindex(opCtx.get(), keyStringLoc1, true);
             ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
-            sorted->unindex(opCtx.get(), keyStringLoc3, loc3, true);
+            sorted->unindex(opCtx.get(), keyStringLoc3, true);
             ASSERT(sorted->isEmpty(opCtx.get()));
             uow.commit();
         }
@@ -469,7 +457,7 @@ void unindexEmpty(bool partial) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), loc1, true);
+            sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true);
             ASSERT(sorted->isEmpty(opCtx.get()));
             uow.commit();
         }
@@ -500,8 +488,8 @@ TEST(SortedDataInterface, PartialIndex) {
         {
             {
                 WriteUnitOfWork uow(opCtx.get());
-                ASSERT_OK(sorted->insert(
-                    opCtx.get(), makeKeyString(sorted.get(), key1, loc1), loc1, true));
+                ASSERT_OK(
+                    sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
                 // Assume key1 with loc2 was never indexed due to the partial index.
                 ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
                 uow.commit();
@@ -510,14 +498,14 @@ TEST(SortedDataInterface, PartialIndex) {
             {
                 WriteUnitOfWork uow(opCtx.get());
                 // Shouldn't unindex anything as key1 with loc2 wasn't indexed in the first place.
-                sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key1, loc2), loc2, true);
+                sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key1, loc2), true);
                 ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
                 uow.commit();
             }
 
             {
                 WriteUnitOfWork uow(opCtx.get());
-                sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), loc1, true);
+                sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true);
                 ASSERT(sorted->isEmpty(opCtx.get()));
                 uow.commit();
             }

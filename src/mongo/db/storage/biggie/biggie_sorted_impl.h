@@ -82,11 +82,9 @@ public:
                                                        bool dupsAllowed) override;
     virtual Status insert(OperationContext* opCtx,
                           const KeyString::Value& keyString,
-                          const RecordId& loc,
                           bool dupsAllowed) override;
     virtual void unindex(OperationContext* opCtx,
                          const KeyString::Value& keyString,
-                         const RecordId& loc,
                          bool dupsAllowed) override;
     virtual Status dupKeyCheck(OperationContext* opCtx, const KeyString::Value& keyString) override;
     virtual void fullValidate(OperationContext* opCtx,

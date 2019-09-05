@@ -1063,7 +1063,7 @@ public:
                                        recordId)
                     .release();
             auto insertStatus =
-                sortedDataInterface->insert(&_opCtx, indexKey, recordId, true /* dupsAllowed */);
+                sortedDataInterface->insert(&_opCtx, indexKey, true /* dupsAllowed */);
             ASSERT_OK(insertStatus);
             wunit.commit();
         }
@@ -1085,7 +1085,7 @@ public:
                                        sortedDataInterface->getOrdering(),
                                        recordId)
                     .release();
-            sortedDataInterface->unindex(&_opCtx, indexKey, recordId, true /* dupsAllowed */);
+            sortedDataInterface->unindex(&_opCtx, indexKey, true /* dupsAllowed */);
             wunit.commit();
         }
 
@@ -1186,7 +1186,7 @@ public:
                                        sortedDataInterface->getOrdering(),
                                        recordId)
                     .release();
-            sortedDataInterface->unindex(&_opCtx, indexKey, recordId, true /* dupsAllowed */);
+            sortedDataInterface->unindex(&_opCtx, indexKey, true /* dupsAllowed */);
             wunit.commit();
         }
         releaseDb();
