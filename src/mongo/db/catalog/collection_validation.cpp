@@ -390,6 +390,12 @@ Status validate(OperationContext* opCtx,
     invariant(!opCtx->lockState()->isLocked());
     invariant(!(background && (level == kValidateFull)));
 
+    if (background) {
+        // Force a checkpoint to ensure background validation has a checkpoint on which to run.
+        // TODO (SERVER-43134): to sort out how to do this properly.
+        opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx);
+    }
+
     AutoGetDb autoDB(opCtx, nss.db(), MODE_IX);
     boost::optional<Lock::CollectionLock> collLock;
     if (background) {
@@ -510,6 +516,7 @@ Status validate(OperationContext* opCtx,
         if (MONGO_FAIL_POINT(pauseCollectionValidationWithLock)) {
             invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_IX));
             _validationIsPausedForTest.store(true);
+            log() << "Failpoint 'pauseCollectionValidationWithLock' activated.";
             MONGO_FAIL_POINT_PAUSE_WHILE_SET(pauseCollectionValidationWithLock);
             _validationIsPausedForTest.store(false);
         }
