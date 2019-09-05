@@ -56,8 +56,6 @@ Status ParsedProjection::make(OperationContext* opCtx,
     IncludeExclude includeExclude = IncludeExclude::kUninitialized;
 
     bool requiresDocument = false;
-    bool hasIndexKeyProjection = false;
-
     bool wantTextScore = false;
     bool wantGeoNearPoint = false;
     bool wantGeoNearDistance = false;
@@ -161,7 +159,6 @@ Status ParsedProjection::make(OperationContext* opCtx,
 
                 if (e2.valuestr() != QueryRequest::metaTextScore &&
                     e2.valuestr() != QueryRequest::metaRecordId &&
-                    e2.valuestr() != QueryRequest::metaIndexKey &&
                     e2.valuestr() != QueryRequest::metaGeoNearDistance &&
                     e2.valuestr() != QueryRequest::metaGeoNearPoint &&
                     e2.valuestr() != QueryRequest::metaSortKey) {
@@ -171,8 +168,6 @@ Status ParsedProjection::make(OperationContext* opCtx,
                 // This clobbers everything else.
                 if (e2.valuestr() == QueryRequest::metaTextScore) {
                     wantTextScore = true;
-                } else if (e2.valuestr() == QueryRequest::metaIndexKey) {
-                    hasIndexKeyProjection = true;
                 } else if (e2.valuestr() == QueryRequest::metaGeoNearDistance) {
                     wantGeoNearDistance = true;
                 } else if (e2.valuestr() == QueryRequest::metaGeoNearPoint) {
@@ -268,7 +263,6 @@ Status ParsedProjection::make(OperationContext* opCtx,
     // Save the raw spec.  It should be owned by the QueryRequest.
     verify(spec.isOwned());
     pp->_source = spec;
-    pp->_returnKey = hasIndexKeyProjection;
     pp->_requiresDocument = requiresDocument;
 
     // Add meta-projections.
@@ -306,11 +300,6 @@ Status ParsedProjection::make(OperationContext* opCtx,
                 pp->_requiredFields.push_back(elt.fieldName());
             }
         }
-    }
-
-    // returnKey clobbers everything except for sortKey meta-projection.
-    if (hasIndexKeyProjection && !wantSortKey) {
-        pp->_requiresDocument = false;
     }
 
     *out = pp.release();

@@ -80,14 +80,6 @@ public:
     ~ProjectionExec();
 
     /**
-     * Indicates whether this is a returnKey projection which should be performed via
-     * 'computeReturnKeyProjection()'.
-     */
-    bool returnKey() const {
-        return _hasReturnKey;
-    }
-
-    /**
      * Indicates whether 'sortKey' must be provided for 'computeReturnKeyProjection()' or
      * 'project()'.
      */
@@ -122,12 +114,6 @@ public:
     bool hasMetaFields() const {
         return !_meta.empty();
     }
-
-    /**
-     * Performs a returnKey projection and provides index keys rather than projection results.
-     */
-    StatusWith<BSONObj> computeReturnKeyProjection(const BSONObj& indexKey,
-                                                   const BSONObj& sortKey) const;
 
     /**
      * Performs a projection given a BSONObj source. Meta fields must be provided if necessary.
@@ -259,20 +245,12 @@ private:
     // Projections that aren't sourced from the document or index keys.
     MetaMap _meta;
 
-    // Do we have a returnKey projection?  If so we *only* output the index key metadata, and
-    // possibly the sort key for mongos to use.  If it's not found we output nothing.
-    bool _hasReturnKey = false;
-
     // After parsing in the constructor, these fields will indicate the neccesity of metadata
     // for $meta projection.
     bool _needsSortKey = false;
     bool _needsGeoNearDistance = false;
     bool _needsGeoNearPoint = false;
     bool _needsTextScore = false;
-
-    // The field names associated with any sortKey meta-projection(s). Empty if there is no sortKey
-    // meta-projection.
-    std::vector<StringData> _sortKeyMetaFields;
 
     // The collator this projection should use to compare strings. Needed for projection operators
     // that perform matching (e.g. elemMatch projection). If null, the collation is a simple binary

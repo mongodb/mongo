@@ -135,7 +135,6 @@ public:
     // Names of the $meta projection values.
     static const std::string metaGeoNearDistance;
     static const std::string metaGeoNearPoint;
-    static const std::string metaIndexKey;
     static const std::string metaRecordId;
     static const std::string metaSortKey;
     static const std::string metaTextScore;
@@ -453,11 +452,6 @@ private:
                 bool fromQueryMessage);
 
     Status initFullQuery(const BSONObj& top);
-
-    /**
-     * Updates the projection object with a $meta projection for the returnKey option.
-     */
-    void addReturnKeyMetaProj();
 
     /**
      * Updates the projection object with a $meta projection for the showRecordId option.

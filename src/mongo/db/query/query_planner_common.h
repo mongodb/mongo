@@ -82,6 +82,14 @@ public:
      * the scan direction and index bounds.
      */
     static void reverseScans(QuerySolutionNode* node);
+
+    /**
+     * Extracts all field names for the sortKey meta-projection and stores them in the returned
+     * array. Returns an empty array if there were no sortKey meta-projection specified in the
+     * given projection 'proj'. For example, given a projection {a:1, b: {$meta: "sortKey"},
+     * c: {$meta: "sortKey"}}, the returned vector will contain two elements ["b", "c"].
+     */
+    static std::vector<std::string> extractSortKeyMetaFieldsFromProjection(const BSONObj& proj);
 };
 
 }  // namespace mongo

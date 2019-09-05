@@ -75,4 +75,32 @@ void QueryPlannerCommon::reverseScans(QuerySolutionNode* node) {
     }
 }
 
+// TODO SERVER-42422: reimplement by walking a projection AST rather than raw bson.
+std::vector<std::string> QueryPlannerCommon::extractSortKeyMetaFieldsFromProjection(
+    const BSONObj& proj) {
+    std::vector<std::string> sortKeyMetaFields;
+
+    for (auto&& elem : proj) {
+        if (elem.type() == BSONType::Object) {
+            BSONObj obj = elem.embeddedObject();
+            // The caller must have already validated the projection, so we expect
+            // to see only one element.
+            invariant(1 == obj.nFields());
+
+            BSONElement firstSubElem = obj.firstElement();
+            if (firstSubElem.fieldNameStringData() == "$meta") {
+                invariant(firstSubElem.type() == BSONType::String);
+                if (firstSubElem.valueStringData() == QueryRequest::metaSortKey) {
+                    invariant(std::find(sortKeyMetaFields.begin(),
+                                        sortKeyMetaFields.end(),
+                                        elem.fieldName()) == sortKeyMetaFields.end());
+                    sortKeyMetaFields.push_back(elem.fieldName());
+                }
+            }
+        }
+    }
+
+    return sortKeyMetaFields;
+}
+
 }  // namespace mongo

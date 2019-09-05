@@ -58,7 +58,6 @@ const char QueryRequest::queryOptionMaxTimeMS[] = "$maxTimeMS";
 
 const string QueryRequest::metaGeoNearDistance("geoNearDistance");
 const string QueryRequest::metaGeoNearPoint("geoNearPoint");
-const string QueryRequest::metaIndexKey("indexKey");
 const string QueryRequest::metaRecordId("recordId");
 const string QueryRequest::metaSortKey("sortKey");
 const string QueryRequest::metaTextScore("textScore");
@@ -592,16 +591,6 @@ void QueryRequest::asFindCommandInternal(BSONObjBuilder* cmdBuilder) const {
     }
 }
 
-void QueryRequest::addReturnKeyMetaProj() {
-    BSONObjBuilder projBob;
-    projBob.appendElements(_proj);
-    // We use $$ because it's never going to show up in a user's projection.
-    // The exact text doesn't matter.
-    BSONObj indexKey = BSON("$$" << BSON("$meta" << QueryRequest::metaIndexKey));
-    projBob.append(indexKey.firstElement());
-    _proj = projBob.obj();
-}
-
 void QueryRequest::addShowRecordIdMetaProj() {
     BSONObjBuilder projBob;
     projBob.appendElements(_proj);
@@ -937,7 +926,6 @@ Status QueryRequest::initFullQuery(const BSONObj& top) {
                 // Won't throw.
                 if (e.trueValue()) {
                     _returnKey = true;
-                    addReturnKeyMetaProj();
                 }
             } else if (name == "showDiskLoc") {
                 // Won't throw.
@@ -1004,11 +992,6 @@ void QueryRequest::initFromInt(int options) {
 }
 
 void QueryRequest::addMetaProjection() {
-    // We might need to update the projection object with a $meta projection.
-    if (returnKey()) {
-        addReturnKeyMetaProj();
-    }
-
     if (showRecordId()) {
         addShowRecordIdMetaProj();
     }

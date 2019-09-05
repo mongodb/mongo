@@ -447,6 +447,16 @@ struct IDHackStats : public SpecificStats {
     size_t docsExamined;
 };
 
+struct ReturnKeyStats : public SpecificStats {
+    SpecificStats* clone() const final {
+        return new ReturnKeyStats(*this);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const {
+        return sizeof(*this);
+    }
+};
+
 struct IndexScanStats : public SpecificStats {
     IndexScanStats()
         : indexVersion(0),

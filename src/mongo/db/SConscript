@@ -991,6 +991,7 @@ env.Library(
         'exec/requires_all_indices_stage.cpp',
         'exec/requires_collection_stage.cpp',
         'exec/requires_index_stage.cpp',
+        'exec/return_key.cpp',
         'exec/shard_filter.cpp',
         'exec/shard_filterer_impl.cpp',
         'exec/skip.cpp',

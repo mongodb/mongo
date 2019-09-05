@@ -234,7 +234,6 @@ TEST(ParsedProjectionTest, ParsedProjectionDefaults) {
     ASSERT_FALSE(parsedProjection->requiresMatchDetails());
     ASSERT_FALSE(parsedProjection->wantGeoNearDistance());
     ASSERT_FALSE(parsedProjection->wantGeoNearPoint());
-    ASSERT_FALSE(parsedProjection->wantIndexKey());
 }
 
 TEST(ParsedProjectionTest, SortKeyMetaProjection) {
@@ -247,7 +246,6 @@ TEST(ParsedProjectionTest, SortKeyMetaProjection) {
     ASSERT_FALSE(parsedProjection->requiresMatchDetails());
     ASSERT_FALSE(parsedProjection->wantGeoNearDistance());
     ASSERT_FALSE(parsedProjection->wantGeoNearPoint());
-    ASSERT_FALSE(parsedProjection->wantIndexKey());
 }
 
 TEST(ParsedProjectionTest, SortKeyMetaProjectionCovered) {
@@ -261,7 +259,6 @@ TEST(ParsedProjectionTest, SortKeyMetaProjectionCovered) {
     ASSERT_FALSE(parsedProjection->requiresMatchDetails());
     ASSERT_FALSE(parsedProjection->wantGeoNearDistance());
     ASSERT_FALSE(parsedProjection->wantGeoNearPoint());
-    ASSERT_FALSE(parsedProjection->wantIndexKey());
 }
 
 TEST(ParsedProjectionTest, SortKeyMetaAndSlice) {
@@ -276,7 +273,6 @@ TEST(ParsedProjectionTest, SortKeyMetaAndSlice) {
     ASSERT_FALSE(parsedProjection->requiresMatchDetails());
     ASSERT_FALSE(parsedProjection->wantGeoNearDistance());
     ASSERT_FALSE(parsedProjection->wantGeoNearPoint());
-    ASSERT_FALSE(parsedProjection->wantIndexKey());
 }
 
 TEST(ParsedProjectionTest, SortKeyMetaAndElemMatch) {
@@ -291,7 +287,6 @@ TEST(ParsedProjectionTest, SortKeyMetaAndElemMatch) {
     ASSERT_FALSE(parsedProjection->requiresMatchDetails());
     ASSERT_FALSE(parsedProjection->wantGeoNearDistance());
     ASSERT_FALSE(parsedProjection->wantGeoNearPoint());
-    ASSERT_FALSE(parsedProjection->wantIndexKey());
 }
 
 TEST(ParsedProjectionTest, SortKeyMetaAndExclusion) {
@@ -305,7 +300,6 @@ TEST(ParsedProjectionTest, SortKeyMetaAndExclusion) {
     ASSERT_FALSE(parsedProjection->requiresMatchDetails());
     ASSERT_FALSE(parsedProjection->wantGeoNearDistance());
     ASSERT_FALSE(parsedProjection->wantGeoNearPoint());
-    ASSERT_FALSE(parsedProjection->wantIndexKey());
 }
 
 //

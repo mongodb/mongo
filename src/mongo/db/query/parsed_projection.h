@@ -100,10 +100,6 @@ public:
         return _wantGeoNearPoint;
     }
 
-    bool wantIndexKey() const {
-        return _returnKey;
-    }
-
     bool wantSortKey() const {
         return _wantSortKey;
     }
@@ -192,8 +188,6 @@ private:
     bool _wantGeoNearDistance = false;
 
     bool _wantGeoNearPoint = false;
-
-    bool _returnKey = false;
 
     // Whether this projection includes a sortKey meta-projection.
     bool _wantSortKey = false;

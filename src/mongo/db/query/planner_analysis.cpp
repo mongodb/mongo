@@ -306,8 +306,8 @@ auto isCoveredOrAlreadyFetched(const vector<StringData>& fields,
  * Checks all properties that exclude a projection from being simple.
  */
 auto isSimpleProjection(const CanonicalQuery& query) {
-    return !query.getProj()->wantIndexKey() && !query.getProj()->wantSortKey() &&
-        !query.getProj()->hasDottedFieldPath() && !query.getProj()->requiresDocument();
+    return !query.getProj()->wantSortKey() && !query.getProj()->hasDottedFieldPath() &&
+        !query.getProj()->requiresDocument();
 }
 
 /**
@@ -332,6 +332,21 @@ auto produceCoveredKeyObj(QuerySolutionNode* solnRoot) {
 }
 
 /**
+ * Adds a stage to generate the sort key metadata if there's no sort stage but we have a sortKey
+ * meta-projection.
+ */
+std::unique_ptr<QuerySolutionNode> addSortKeyGeneratorStageIfNeeded(
+    const CanonicalQuery& query, bool hasSortStage, std::unique_ptr<QuerySolutionNode> solnRoot) {
+    if (!hasSortStage && query.getProj() && query.getProj()->wantSortKey()) {
+        auto keyGenNode = std::make_unique<SortKeyGeneratorNode>();
+        keyGenNode->sortSpec = query.getQueryRequest().getSort();
+        keyGenNode->children.push_back(solnRoot.release());
+        return keyGenNode;
+    }
+    return solnRoot;
+}
+
+/**
  * When projection needs to be added to the solution tree, this function chooses between the default
  * implementation and one of the fast paths.
  */
@@ -340,24 +355,12 @@ std::unique_ptr<ProjectionNode> analyzeProjection(const CanonicalQuery& query,
                                                   const bool hasSortStage) {
     const QueryRequest& qr = query.getQueryRequest();
 
-    // If there's no sort stage but we have a sortKey meta-projection, we need to add a stage to
-    // generate the sort key metadata.
-    auto addSortKeyGeneratorStageIfNeeded = [&]() {
-        if (!hasSortStage && query.getProj()->wantSortKey()) {
-            auto keyGenNode = std::make_unique<SortKeyGeneratorNode>();
-            keyGenNode->sortSpec = qr.getSort();
-            keyGenNode->children.push_back(solnRoot.release());
-            solnRoot = std::move(keyGenNode);
-        }
-    };
-
     LOG(5) << "PROJECTION: Current plan is:\n" << redact(solnRoot->toString());
 
     // If the projection requires the entire document we add a fetch stage if not present. Otherwise
-    // we add a fetch stage if we are not covered and not returnKey.
+    // we add a fetch stage if we are not covered.
     if ((query.getProj()->requiresDocument() && !solnRoot->fetched()) ||
-        (!isCoveredOrAlreadyFetched(query.getProj()->getRequiredFields(), *solnRoot) &&
-         !query.getProj()->wantIndexKey())) {
+        (!isCoveredOrAlreadyFetched(query.getProj()->getRequiredFields(), *solnRoot))) {
         auto fetch = std::make_unique<FetchNode>();
         fetch->children.push_back(solnRoot.release());
         solnRoot = std::move(fetch);
@@ -372,30 +375,33 @@ std::unique_ptr<ProjectionNode> analyzeProjection(const CanonicalQuery& query,
     if (isSimpleProjection(query)) {
         // If the projection is simple, but not covered, use 'ProjectionNodeSimple'.
         if (solnRoot->fetched()) {
-            addSortKeyGeneratorStageIfNeeded();
             return std::make_unique<ProjectionNodeSimple>(
-                std::move(solnRoot), *query.root(), qr.getProj(), *query.getProj());
+                addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot)),
+                *query.root(),
+                qr.getProj(),
+                *query.getProj());
         } else {
             // If we're here we're not fetched so we're covered. Let's see if we can get out of
             // using the default projType. If 'solnRoot' is an index scan we can use the faster
             // covered impl.
             BSONObj coveredKeyObj = produceCoveredKeyObj(solnRoot.get());
             if (!coveredKeyObj.isEmpty()) {
-                addSortKeyGeneratorStageIfNeeded();
-                return std::make_unique<ProjectionNodeCovered>(std::move(solnRoot),
-                                                               *query.root(),
-                                                               qr.getProj(),
-                                                               *query.getProj(),
-                                                               std::move(coveredKeyObj));
+                return std::make_unique<ProjectionNodeCovered>(
+                    addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot)),
+                    *query.root(),
+                    qr.getProj(),
+                    *query.getProj(),
+                    std::move(coveredKeyObj));
             }
         }
     }
 
-    addSortKeyGeneratorStageIfNeeded();
     return std::make_unique<ProjectionNodeDefault>(
-        std::move(solnRoot), *query.root(), qr.getProj(), *query.getProj());
+        addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot)),
+        *query.root(),
+        qr.getProj(),
+        *query.getProj());
 }
-
 }  // namespace
 
 // static
@@ -797,7 +803,13 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
     }
 
     // Project the results.
-    if (query.getProj()) {
+    if (qr.returnKey()) {
+        // We don't need a projection stage if returnKey was requested since the intended behavior
+        // is that the projection is ignored when returnKey is specified.
+        solnRoot = std::make_unique<ReturnKeyNode>(
+            addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot)),
+            QueryPlannerCommon::extractSortKeyMetaFieldsFromProjection(qr.getProj()));
+    } else if (query.getProj()) {
         solnRoot = analyzeProjection(query, std::move(solnRoot), hasSortStage);
         // If we don't have a covered project, and we're not allowed to put an uncovered one in,
         // bail out.

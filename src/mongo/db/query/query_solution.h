@@ -540,6 +540,35 @@ struct IndexScanNode : public QuerySolutionNode {
     std::set<StringData> multikeyFields;
 };
 
+struct ReturnKeyNode : public QuerySolutionNode {
+    ReturnKeyNode(std::unique_ptr<QuerySolutionNode> child,
+                  std::vector<std::string> sortKeyMetaFields)
+        : QuerySolutionNode(std::move(child)), sortKeyMetaFields(std::move(sortKeyMetaFields)) {}
+
+    StageType getType() const final {
+        return STAGE_RETURN_KEY;
+    }
+
+    void appendToString(str::stream* ss, int indent) const final;
+
+    bool fetched() const final {
+        return children[0]->fetched();
+    }
+    bool hasField(const std::string& field) const final {
+        return false;
+    }
+    bool sortedByDiskLoc() const final {
+        return children[0]->sortedByDiskLoc();
+    }
+    const BSONObjSet& getSort() const final {
+        return children[0]->getSort();
+    }
+
+    QuerySolutionNode* clone() const final;
+
+    std::vector<std::string> sortKeyMetaFields;
+};
+
 /**
  * We have a few implementations of the projection functionality. They are chosen by constructing
  * a type derived from this abstract struct. The most general implementation 'ProjectionNodeDefault'

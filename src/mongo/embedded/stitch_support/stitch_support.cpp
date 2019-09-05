@@ -204,9 +204,9 @@ struct stitch_support_v1_projection {
                 "Projections with a positional operator require a matcher",
                 matcher || !projectionExec.projectRequiresQueryExpression());
         uassert(51051,
-                "$textScore, $sortKey, $recordId, $geoNear and $returnKey are not allowed in this "
+                "$textScore, $sortKey, $recordId and $geoNear are not allowed in this "
                 "context",
-                !projectionExec.hasMetaFields() && !projectionExec.returnKey());
+                !projectionExec.hasMetaFields());
     }
 
     mongo::ServiceContext::UniqueClient client;

@@ -205,19 +205,7 @@ Status ProjectionStageDefault::transform(WorkingSetMember* member) const {
         return Status(ErrorCodes::InternalError,
                       "sortKey meta-projection requested but no data available");
 
-    if (_exec.returnKey()) {
-        auto keys = _exec.computeReturnKeyProjection(
-            member->metadata().hasIndexKey() ? indexKey(*member) : BSONObj(),
-            _exec.needsSortKey() ? sortKey(*member) : BSONObj());
-        if (!keys.isOK())
-            return keys.getStatus();
-
-        transitionMemberToOwnedObj(keys.getValue(), member);
-        return Status::OK();
-    }
-
     auto projected = provideMetaFieldsAndPerformExec(_exec, *member);
-
     if (!projected.isOK())
         return projected.getStatus();
 

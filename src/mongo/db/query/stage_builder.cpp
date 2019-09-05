@@ -52,6 +52,7 @@
 #include "mongo/db/exec/merge_sort.h"
 #include "mongo/db/exec/or.h"
 #include "mongo/db/exec/projection.h"
+#include "mongo/db/exec/return_key.h"
 #include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/exec/skip.h"
 #include "mongo/db/exec/sort.h"
@@ -132,6 +133,13 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
             auto childStage = buildStages(opCtx, collection, cq, qsol, keyGenNode->children[0], ws);
             return std::make_unique<SortKeyGeneratorStage>(
                 cq.getExpCtx(), std::move(childStage), ws, keyGenNode->sortSpec);
+        }
+        case STAGE_RETURN_KEY: {
+            auto returnKeyNode = static_cast<const ReturnKeyNode*>(root);
+            auto childStage =
+                buildStages(opCtx, collection, cq, qsol, returnKeyNode->children[0], ws);
+            return std::make_unique<ReturnKeyStage>(
+                opCtx, std::move(returnKeyNode->sortKeyMetaFields), ws, std::move(childStage));
         }
         case STAGE_PROJECTION_DEFAULT: {
             auto pn = static_cast<const ProjectionNodeDefault*>(root);

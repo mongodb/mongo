@@ -106,8 +106,7 @@ ProjectionExec::ProjectionExec(OperationContext* opCtx,
                     _meta[e.fieldName()] = META_TEXT_SCORE;
                     _needsTextScore = true;
                 } else if (e2.valuestr() == QueryRequest::metaSortKey) {
-                    _sortKeyMetaFields.push_back(e.fieldName());
-                    _meta[_sortKeyMetaFields.back()] = META_SORT_KEY;
+                    _meta[e.fieldName()] = META_SORT_KEY;
                     _needsSortKey = true;
                 } else if (e2.valuestr() == QueryRequest::metaRecordId) {
                     _meta[e.fieldName()] = META_RECORDID;
@@ -117,8 +116,6 @@ ProjectionExec::ProjectionExec(OperationContext* opCtx,
                 } else if (e2.valuestr() == QueryRequest::metaGeoNearDistance) {
                     _meta[e.fieldName()] = META_GEONEAR_DIST;
                     _needsGeoNearDistance = true;
-                } else if (e2.valuestr() == QueryRequest::metaIndexKey) {
-                    _hasReturnKey = true;
                 } else {
                     // This shouldn't happen, should be caught by parsing.
                     MONGO_UNREACHABLE;
@@ -199,22 +196,6 @@ void ProjectionExec::add(const string& field, int skip, int limit) {
 //
 // Execution
 //
-
-StatusWith<BSONObj> ProjectionExec::computeReturnKeyProjection(const BSONObj& indexKey,
-                                                               const BSONObj& sortKey) const {
-    BSONObjBuilder bob;
-
-    if (!indexKey.isEmpty()) {
-        bob.appendElements(indexKey);
-    }
-
-    // Must be possible to do both returnKey meta-projection and sortKey meta-projection so that
-    // mongos can support returnKey.
-    for (auto fieldName : _sortKeyMetaFields)
-        bob.append(fieldName, sortKey);
-
-    return bob.obj();
-}
 
 StatusWith<BSONObj> ProjectionExec::project(const BSONObj& in,
                                             const boost::optional<const double> geoDistance,
