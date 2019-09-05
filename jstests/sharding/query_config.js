@@ -88,6 +88,9 @@ var testListConfigCollections = function(st) {
     configDB.createCollection(userAddedColl.getName());
     configCollList.push(userAddedColl.getName());
 
+    // wait for config.mongos to be created by ShardingUptimeReporter
+    assert.soon(() => configDB.mongos.exists());
+
     cursor = getListCollectionsCursor(configDB);
     cursorArray = cursorGetCollectionNames(cursor);
     for (var i = 0; i < configCollList.length; i++) {
