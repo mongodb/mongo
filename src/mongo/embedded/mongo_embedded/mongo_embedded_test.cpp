@@ -52,6 +52,7 @@
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/signal_handlers_synchronous.h"
+#include "mongo/util/text.h"
 
 namespace moe = mongo::optionenvironment;
 
@@ -661,8 +662,8 @@ TEST_F(MongodbCAPITest, RunListCommands) {
         std::cout << cmd << "\n";
     }
 
-    ASSERT(missing.empty());
-    ASSERT(unsupported.empty());
+    ASSERT(missing.empty()) << mongo::StringSplitter::join(missing, ", ");
+    ASSERT(unsupported.empty()) << mongo::StringSplitter::join(unsupported, ", ");
 }
 
 // This test is temporary to make sure that only one database can be created
