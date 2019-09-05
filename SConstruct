@@ -3228,12 +3228,12 @@ def doConfigure(myenv):
     if ssl_provider == 'native':
         if conf.env.TargetOSIs('windows'):
             ssl_provider = 'windows'
-            env.SetConfigHeaderDefine("MONGO_CONFIG_SSL_PROVIDER", "MONGO_CONFIG_SSL_PROVIDER_WINDOWS")
+            conf.env.SetConfigHeaderDefine("MONGO_CONFIG_SSL_PROVIDER", "MONGO_CONFIG_SSL_PROVIDER_WINDOWS")
             conf.env.Append( MONGO_CRYPTO=["windows"] )
 
         elif conf.env.TargetOSIs('darwin', 'macOS'):
             ssl_provider = 'apple'
-            env.SetConfigHeaderDefine("MONGO_CONFIG_SSL_PROVIDER", "MONGO_CONFIG_SSL_PROVIDER_APPLE")
+            conf.env.SetConfigHeaderDefine("MONGO_CONFIG_SSL_PROVIDER", "MONGO_CONFIG_SSL_PROVIDER_APPLE")
             conf.env.Append( MONGO_CRYPTO=["apple"] )
             conf.env.AppendUnique(FRAMEWORKS=[
                 'CoreFoundation',
@@ -3247,7 +3247,7 @@ def doConfigure(myenv):
         if require_ssl:
             checkOpenSSL(conf)
             # Working OpenSSL available, use it.
-            env.SetConfigHeaderDefine("MONGO_CONFIG_SSL_PROVIDER", "MONGO_CONFIG_SSL_PROVIDER_OPENSSL")
+            conf.env.SetConfigHeaderDefine("MONGO_CONFIG_SSL_PROVIDER", "MONGO_CONFIG_SSL_PROVIDER_OPENSSL")
 
             conf.env.Append( MONGO_CRYPTO=["openssl"] )
         else:
@@ -3593,7 +3593,7 @@ def doConfigure(myenv):
 
     # Resolve --enable-free-mon
     if free_monitoring == "auto":
-        if 'enterprise' not in env['MONGO_MODULES']:
+        if 'enterprise' not in conf.env['MONGO_MODULES']:
             free_monitoring = "on"
         else:
             free_monitoring = "off"
