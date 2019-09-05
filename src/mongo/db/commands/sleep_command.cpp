@@ -86,39 +86,71 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         log() << "test only command sleep invoked";
-        long long millis = 0;
+        long long msToSleep = 0;
 
-        if (cmdObj["secs"] || cmdObj["millis"]) {
-            if (cmdObj["secs"]) {
-                uassert(34344, "'secs' must be a number.", cmdObj["secs"].isNumber());
-                millis += cmdObj["secs"].numberLong() * 1000;
+        if (cmdObj["secs"] || cmdObj["seconds"] || cmdObj["millis"]) {
+            uassert(51153,
+                    "Only one of 'secs' and 'seconds' may be specified",
+                    !(cmdObj["secs"] && cmdObj["seconds"]));
+
+            if (auto secsElem = cmdObj["secs"]) {
+                uassert(34344, "'secs' must be a number.", secsElem.isNumber());
+                msToSleep += secsElem.numberLong() * 1000;
+            } else if (auto secondsElem = cmdObj["seconds"]) {
+                uassert(51154, "'seconds' must be a number.", secondsElem.isNumber());
+                msToSleep += secondsElem.numberLong() * 1000;
             }
-            if (cmdObj["millis"]) {
-                uassert(34345, "'millis' must be a number.", cmdObj["millis"].isNumber());
-                millis += cmdObj["millis"].numberLong();
+
+            if (auto millisElem = cmdObj["millis"]) {
+                uassert(34345, "'millis' must be a number.", millisElem.isNumber());
+                msToSleep += millisElem.numberLong();
             }
         } else {
-            millis = 10 * 1000;
+            msToSleep = 10 * 1000;
         }
 
-        if (!cmdObj["lock"]) {
-            // Legacy implementation
-            if (cmdObj.getBoolField("w")) {
-                _sleepInWriteLock(opCtx, millis);
-            } else {
-                _sleepInReadLock(opCtx, millis);
-            }
-        } else {
-            uassert(34346, "Only one of 'w' and 'lock' may be set.", !cmdObj["w"]);
+        auto now = opCtx->getServiceContext()->getFastClockSource()->now();
+        auto deadline = now + Milliseconds(msToSleep);
 
-            std::string lock(cmdObj.getStringField("lock"));
-            if (lock == "none") {
-                opCtx->sleepFor(Milliseconds(millis));
-            } else if (lock == "w") {
-                _sleepInWriteLock(opCtx, millis);
+        // Note that if the system clock moves _backwards_ (which has been known to happen), this
+        // could result in a much longer sleep than requested. Since this command is only used for
+        // testing, we're okay with this imprecision.
+        while (deadline > now) {
+            Milliseconds msRemaining = deadline - now;
+
+            // If the clock moves back by an absurd amount then uassert.
+            Milliseconds threshold(10000);
+            uassert(31173,
+                    str::stream() << "Clock must have moved backwards by at least " << threshold
+                                  << " ms during sleep command",
+                    msRemaining.count() < msToSleep + threshold.count());
+
+            ON_BLOCK_EXIT(
+                [&now, opCtx] { now = opCtx->getServiceContext()->getFastClockSource()->now(); });
+
+            StringData lockTarget;
+            if (cmdObj["lockTarget"]) {
+                lockTarget = cmdObj["lockTarget"].checkAndGetStringData();
+            }
+            if (!cmdObj["lock"]) {
+                // Legacy implementation
+                if (cmdObj.getBoolField("w")) {
+                    _sleepInWriteLock(opCtx, msRemaining.count());
+                } else {
+                    _sleepInReadLock(opCtx, msRemaining.count());
+                }
             } else {
-                uassert(34347, "'lock' must be one of 'r', 'w', 'none'.", lock == "r");
-                _sleepInReadLock(opCtx, millis);
+                uassert(34346, "Only one of 'w' and 'lock' may be set.", !cmdObj["w"]);
+
+                std::string lock(cmdObj.getStringField("lock"));
+                if (lock == "none") {
+                    opCtx->sleepFor(msRemaining);
+                } else if (lock == "w") {
+                    _sleepInWriteLock(opCtx, msRemaining.count());
+                } else {
+                    uassert(34347, "'lock' must be one of 'r', 'w', 'none'.", lock == "r");
+                    _sleepInReadLock(opCtx, msRemaining.count());
+                }
             }
         }
 
@@ -130,4 +162,4 @@ public:
 };
 
 MONGO_REGISTER_TEST_COMMAND(CmdSleep);
-}  // namespace
+}  // namespace mongo
