@@ -187,24 +187,10 @@ else
 	fi
 
 	tr -cd '[:alnum:][:space:][:punct:]' < $f |
-	unexpand |
-	sed -e 's/){/) {/' \
-	    -e 's/\([	 ]\)for(/\1for (/' \
-	    -e 's/\([	 ]\)if(/\1if (/' \
-	    -e 's/\([	 ]\)index(/\1strchr(/' \
-	    -e 's/\([	 ]\)return(/\1return (/' \
-	    -e 's/\([	 ]\)return \([^()]*\);/\1return (\2);/' \
-	    -e 's/\([	 ]\)rindex(/\1strrchr(/' \
-	    -e 's/\([	 ]\)sizeof (/\1sizeof(/g' \
-	    -e 's/\([	 ]\)switch(/\1switch (/' \
-	    -e 's/\([	 ]\)while(/\1while (/' \
-	    -e 's/\([|&=+-]\)  *\([^*]\)/\1 \2/' \
-	    -e 's/[	 ](void) \([a-zA-Z_]\)/(void)\1/' \
-	    -e '/for /!s/;;$/;/' \
+	sed -e '/for /!s/;;$/;/' \
 	    -e 's/(EOPNOTSUPP)/(ENOTSUP)/' \
 	    -e 's/(unsigned)/(u_int)/' \
-	    -e 's/hazard reference/hazard pointer/' \
-	    -e 's/^#define /#define	/' >$t
+	    -e 's/hazard reference/hazard pointer/' >$t
 
 	cmp $t $f > /dev/null 2>&1 || (echo "modifying $f" && cp $t $f)
 fi

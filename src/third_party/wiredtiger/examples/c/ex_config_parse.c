@@ -34,97 +34,93 @@
 int
 main(int argc, char *argv[])
 {
-	int ret;
+    int ret;
 
-	(void)argc;					/* Unused variable */
-	(void)testutil_set_progname(argv);
+    (void)argc; /* Unused variable */
+    (void)testutil_set_progname(argv);
 
-	{
-	/*! [Create a configuration parser] */
-	WT_CONFIG_ITEM k, v;
-	WT_CONFIG_PARSER *parser;
-	const char *config_string =
-	    "path=/dev/loop,page_size=1024,log=(archive=true,file_max=20MB)";
+    {
+        /*! [Create a configuration parser] */
+        WT_CONFIG_ITEM k, v;
+        WT_CONFIG_PARSER *parser;
+        const char *config_string =
+          "path=/dev/loop,page_size=1024,log=(archive=true,file_max=20MB)";
 
-	error_check(wiredtiger_config_parser_open(
-	    NULL, config_string, strlen(config_string), &parser));
-	error_check(parser->close(parser));
-	/*! [Create a configuration parser] */
+        error_check(
+          wiredtiger_config_parser_open(NULL, config_string, strlen(config_string), &parser));
+        error_check(parser->close(parser));
+        /*! [Create a configuration parser] */
 
-	error_check(wiredtiger_config_parser_open(
-	    NULL, config_string, strlen(config_string), &parser));
+        error_check(
+          wiredtiger_config_parser_open(NULL, config_string, strlen(config_string), &parser));
 
-	{
-	/*! [get] */
-	int64_t my_page_size;
-	/*
-	 * Retrieve the value of the integer configuration string "page_size".
-	 */
-	error_check(parser->get(parser, "page_size", &v));
-	my_page_size = v.val;
-	/*! [get] */
+        {
+            /*! [get] */
+            int64_t my_page_size;
+            /*
+             * Retrieve the value of the integer configuration string "page_size".
+             */
+            error_check(parser->get(parser, "page_size", &v));
+            my_page_size = v.val;
+            /*! [get] */
 
-	error_check(parser->close(parser));
-	(void)my_page_size;				/* Unused variable */
-	}
+            error_check(parser->close(parser));
+            (void)my_page_size; /* Unused variable */
+        }
 
-	{
-	error_check(wiredtiger_config_parser_open(
-	    NULL, config_string, strlen(config_string), &parser));
-	/*! [next] */
-	/*
-	 * Retrieve and print the values of the configuration strings.
-	 */
-	while ((ret = parser->next(parser, &k, &v)) == 0) {
-		printf("%.*s:", (int)k.len, k.str);
-		if (v.type == WT_CONFIG_ITEM_NUM)
-			printf("%" PRId64 "\n", v.val);
-		else
-			printf("%.*s\n", (int)v.len, v.str);
-	}
-	scan_end_check(ret == WT_NOTFOUND);
-	/*! [next] */
-	error_check(parser->close(parser));
-	}
+        {
+            error_check(
+              wiredtiger_config_parser_open(NULL, config_string, strlen(config_string), &parser));
+            /*! [next] */
+            /*
+             * Retrieve and print the values of the configuration strings.
+             */
+            while ((ret = parser->next(parser, &k, &v)) == 0) {
+                printf("%.*s:", (int)k.len, k.str);
+                if (v.type == WT_CONFIG_ITEM_NUM)
+                    printf("%" PRId64 "\n", v.val);
+                else
+                    printf("%.*s\n", (int)v.len, v.str);
+            }
+            scan_end_check(ret == WT_NOTFOUND);
+            /*! [next] */
+            error_check(parser->close(parser));
+        }
 
-	error_check(wiredtiger_config_parser_open(
-	    NULL, config_string, strlen(config_string), &parser));
+        error_check(
+          wiredtiger_config_parser_open(NULL, config_string, strlen(config_string), &parser));
 
-	/*! [nested get] */
-	/*
-	 * Retrieve the value of the nested log file_max configuration string
-	 * using dot shorthand. Utilize the configuration parsing automatic
-	 * conversion of value strings into an integer.
-	 */
-	v.type = WT_CONFIG_ITEM_NUM;
-	error_check(parser->get(parser, "log.file_max", &v));
-	printf("log file max: %" PRId64 "\n", v.val);
-	/*! [nested get] */
-	error_check(parser->close(parser));
+        /*! [nested get] */
+        /*
+         * Retrieve the value of the nested log file_max configuration string using dot shorthand.
+         * Utilize the configuration parsing automatic conversion of value strings into an integer.
+         */
+        v.type = WT_CONFIG_ITEM_NUM;
+        error_check(parser->get(parser, "log.file_max", &v));
+        printf("log file max: %" PRId64 "\n", v.val);
+        /*! [nested get] */
+        error_check(parser->close(parser));
 
-	error_check(wiredtiger_config_parser_open(
-	    NULL, config_string, strlen(config_string), &parser));
-	/*! [nested traverse] */
-	{
-	WT_CONFIG_PARSER *sub_parser;
-	while ((ret = parser->next(parser, &k, &v)) == 0) {
-		if (v.type == WT_CONFIG_ITEM_STRUCT) {
-			printf("Found nested configuration: %.*s\n",
-			    (int)k.len, k.str);
-			error_check(wiredtiger_config_parser_open(
-			    NULL, v.str, v.len, &sub_parser));
-			while ((ret =
-			    sub_parser->next(sub_parser, &k, &v)) == 0)
-				printf("\t%.*s\n", (int)k.len, k.str);
-			scan_end_check(ret == WT_NOTFOUND);
-			error_check(sub_parser->close(sub_parser));
-		}
-	}
-	scan_end_check(ret == WT_NOTFOUND);
-	/*! [nested traverse] */
-	error_check(parser->close(parser));
-	}
-	}
+        error_check(
+          wiredtiger_config_parser_open(NULL, config_string, strlen(config_string), &parser));
+        /*! [nested traverse] */
+        {
+            WT_CONFIG_PARSER *sub_parser;
+            while ((ret = parser->next(parser, &k, &v)) == 0) {
+                if (v.type == WT_CONFIG_ITEM_STRUCT) {
+                    printf("Found nested configuration: %.*s\n", (int)k.len, k.str);
+                    error_check(wiredtiger_config_parser_open(NULL, v.str, v.len, &sub_parser));
+                    while ((ret = sub_parser->next(sub_parser, &k, &v)) == 0)
+                        printf("\t%.*s\n", (int)k.len, k.str);
+                    scan_end_check(ret == WT_NOTFOUND);
+                    error_check(sub_parser->close(sub_parser));
+                }
+            }
+            scan_end_check(ret == WT_NOTFOUND);
+            /*! [nested traverse] */
+            error_check(parser->close(parser));
+        }
+    }
 
-	return (EXIT_SUCCESS);
+    return (EXIT_SUCCESS);
 }

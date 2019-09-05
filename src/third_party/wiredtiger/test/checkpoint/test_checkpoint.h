@@ -30,46 +30,46 @@
 
 #include <signal.h>
 
-#define	URI_BASE	"table:__wt"		/* File name */
+#define URI_BASE "table:__wt" /* File name */
 
-#define	ERR_KEY_MISMATCH	0x200001
-#define	ERR_DATA_MISMATCH	0x200002
+#define ERR_KEY_MISMATCH 0x200001
+#define ERR_DATA_MISMATCH 0x200002
 
 /*
- * There are three different table types in the test, and a 'special' type
- * of mixed (i.e a mixture of the other three types.
+ * There are three different table types in the test, and a 'special' type of mixed (i.e a mixture
+ * of the other three types.
  */
-#define	MAX_TABLE_TYPE	3
-typedef enum { MIX = 0, COL, LSM, ROW } table_type;	/* File type */
+#define MAX_TABLE_TYPE 3
+typedef enum { MIX = 0, COL, LSM, ROW } table_type; /* File type */
 
 /*
  * Per-table cookie structure.
  */
 typedef struct {
-	int id;
-	table_type type;			/* Type for table. */
-	char uri[128];
+    int id;
+    table_type type; /* Type for table. */
+    char uri[128];
 } COOKIE;
 
 typedef struct {
-	char *home;				/* Home directory */
-	const char *checkpoint_name;		/* Checkpoint name */
-	WT_CONNECTION *conn;			/* WiredTiger connection */
-	u_int nkeys;				/* Keys to load */
-	u_int nops;				/* Operations per thread */
-	FILE *logfp;				/* Message log file. */
-	int nworkers;				/* Number workers configured */
-	int ntables;				/* Number tables configured */
-	int ntables_created;			/* Number tables opened */
-	int running;				/* Whether to stop */
-	int status;				/* Exit status */
-	COOKIE *cookies;			/* Per-thread info */
-	wt_thread_t checkpoint_thread;		/* Checkpoint thread */
+    char *home;                    /* Home directory */
+    const char *checkpoint_name;   /* Checkpoint name */
+    WT_CONNECTION *conn;           /* WiredTiger connection */
+    u_int nkeys;                   /* Keys to load */
+    u_int nops;                    /* Operations per thread */
+    FILE *logfp;                   /* Message log file. */
+    int nworkers;                  /* Number workers configured */
+    int ntables;                   /* Number tables configured */
+    int ntables_created;           /* Number tables opened */
+    int running;                   /* Whether to stop */
+    int status;                    /* Exit status */
+    COOKIE *cookies;               /* Per-thread info */
+    wt_thread_t checkpoint_thread; /* Checkpoint thread */
 } GLOBAL;
 extern GLOBAL g;
 
-void	end_checkpoints(void);
-int	log_print_err(const char *, int, int);
-void	start_checkpoints(void);
-int	start_workers(table_type);
+void end_checkpoints(void);
+int log_print_err(const char *, int, int);
+void start_checkpoints(void);
+int start_workers(table_type);
 const char *type_to_string(table_type);

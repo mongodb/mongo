@@ -51,31 +51,45 @@ values:
 @endif
 
 @par <code>WT_ROLLBACK</code>
-This error is generated when an operation cannot be completed due to a conflict with concurrent operations. The operation may be retried; if a transaction is in progress, it should be rolled back and the operation retried in a new transaction.
+This error is generated when an operation cannot be completed due to a conflict with concurrent
+operations. The operation may be retried; if a transaction is in progress, it should be rolled back
+and the operation retried in a new transaction.
 
 @par <code>WT_DUPLICATE_KEY</code>
-This error is generated when the application attempts to insert a record with the same key as an existing record without the 'overwrite' configuration to WT_SESSION::open_cursor.
+This error is generated when the application attempts to insert a record with the same key as an
+existing record without the 'overwrite' configuration to WT_SESSION::open_cursor.
 
 @par <code>WT_ERROR</code>
 This error is returned when an error is not covered by a specific error return.
 
 @par <code>WT_NOTFOUND</code>
-This error indicates an operation did not find a value to return. This includes cursor search and other operations where no record matched the cursor's search key such as WT_CURSOR::update or WT_CURSOR::remove.
+This error indicates an operation did not find a value to return. This includes cursor search and
+other operations where no record matched the cursor's search key such as WT_CURSOR::update or
+WT_CURSOR::remove.
 
 @par <code>WT_PANIC</code>
-This error indicates an underlying problem that requires a database restart. The application may exit immediately, no further WiredTiger calls are required (and further calls will themselves immediately fail).
+This error indicates an underlying problem that requires a database restart. The application may
+exit immediately, no further WiredTiger calls are required (and further calls will themselves
+immediately fail).
 
 @par <code>WT_RUN_RECOVERY</code>
-This error is generated when wiredtiger_open is configured to return an error if recovery is required to use the database.
+This error is generated when wiredtiger_open is configured to return an error if recovery is
+required to use the database.
 
 @par <code>WT_CACHE_FULL</code>
-This error is only generated when wiredtiger_open is configured to run in-memory, and an insert or update operation requires more than the configured cache size to complete. The operation may be retried; if a transaction is in progress, it should be rolled back and the operation retried in a new transaction.
+This error is only generated when wiredtiger_open is configured to run in-memory, and an insert or
+update operation requires more than the configured cache size to complete. The operation may be
+retried; if a transaction is in progress, it should be rolled back and the operation retried in a
+new transaction.
 
 @par <code>WT_PREPARE_CONFLICT</code>
-This error is generated when the application attempts to update an already updated record which is in prepared state. An updated record will be in prepared state, when the transaction that performed the update is in prepared state.
+This error is generated when the application attempts to update an already updated record which is
+in prepared state. An updated record will be in prepared state, when the transaction that performed
+the update is in prepared state.
 
 @par <code>WT_TRY_SALVAGE</code>
-This error is generated when corruption is detected in an on-disk file. The application may choose to salvage the file or retry wiredtiger_open with the 'salvage=true' configuration setting.
+This error is generated when corruption is detected in an on-disk file. The application may choose
+to salvage the file or retry wiredtiger_open with the 'salvage=true' configuration setting.
 
 @if IGNORE_BUILT_BY_API_ERR_END
 @endif

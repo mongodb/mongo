@@ -31,50 +31,47 @@
 int
 main(void)
 {
-	uint64_t ncalls, r, r2, s;
-	uint8_t *p;
-	uint8_t buf[WT_INTPACK64_MAXSIZE + 8];	/* -Werror=array-bounds */
-	const uint8_t *cp;
-	size_t used_len;
-	int i;
+    uint64_t ncalls, r, r2, s;
+    uint8_t *p;
+    uint8_t buf[WT_INTPACK64_MAXSIZE + 8]; /* -Werror=array-bounds */
+    const uint8_t *cp;
+    size_t used_len;
+    int i;
 
-	memset(buf, 0xff, sizeof(buf));	/* -Werror=maybe-uninitialized */
+    memset(buf, 0xff, sizeof(buf)); /* -Werror=maybe-uninitialized */
 
-	/*
-	 * Required on some systems to pull in parts of the library
-	 * for which we have data references.
-	 */
-	testutil_check(__wt_library_init());
+    /*
+     * Required on some systems to pull in parts of the library for which we have data references.
+     */
+    testutil_check(__wt_library_init());
 
-	for (ncalls = 0, i = 0; i < 10000000; i++) {
-		for (s = 0; s < 50; s += 5) {
-			++ncalls;
-			r = 1ULL << s;
+    for (ncalls = 0, i = 0; i < 10000000; i++) {
+        for (s = 0; s < 50; s += 5) {
+            ++ncalls;
+            r = 1ULL << s;
 
 #if 1
-			p = buf;
-			testutil_check(__wt_vpack_uint(&p, sizeof(buf), r));
-			used_len = (size_t)(p - buf);
-			testutil_assert(used_len <= WT_INTPACK64_MAXSIZE);
-			cp = buf;
-			testutil_check(
-			    __wt_vunpack_uint(&cp, sizeof(buf), &r2));
+            p = buf;
+            testutil_check(__wt_vpack_uint(&p, sizeof(buf), r));
+            used_len = (size_t)(p - buf);
+            testutil_assert(used_len <= WT_INTPACK64_MAXSIZE);
+            cp = buf;
+            testutil_check(__wt_vunpack_uint(&cp, sizeof(buf), &r2));
 #else
-			/*
-			 * Note: use memmove for comparison because GCC does
-			 * aggressive optimization of memcpy and it's difficult
-			 * to measure anything.
-			 */
-			p = buf;
-			memmove(p, &r, sizeof(r));
-			cp = buf;
-			memmove(&r2, cp, sizeof(r2));
+            /*
+             * Note: use memmove for comparison because GCC does aggressive optimization of memcpy
+             * and it's difficult to measure anything.
+             */
+            p = buf;
+            memmove(p, &r, sizeof(r));
+            cp = buf;
+            memmove(&r2, cp, sizeof(r2));
 #endif
-			testutil_assert(r == r2);
-		}
-	}
+            testutil_assert(r == r2);
+        }
+    }
 
-	printf("Number of calls: %" PRIu64 "\n", ncalls);
+    printf("Number of calls: %" PRIu64 "\n", ncalls);
 
-	return (0);
+    return (0);
 }

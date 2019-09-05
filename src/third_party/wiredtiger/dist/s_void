@@ -150,7 +150,6 @@ for f in `find bench ext src test -name '*.[ci]'`; do
 	    -e '/WT_CURSOR_NEEDKEY(/d' \
 	    -e '/WT_CURSOR_NEEDVALUE(/d' \
 	    -e '/WT_ERR[A-Z_]*(/d' \
-	    -e '/WT_ILLEGAL_VALUE[A-Z_]*(/d' \
 	    -e '/WT_PANIC[A-Z_]*(/d' \
 	    -e '/WT_RET[A-Z_]*(/d' \
 	    -e '/WT_SIZE_CHECK_PACK(/d' \
@@ -179,7 +178,6 @@ for f in `find bench ext src test -name '*.[ci]'`; do
 	    -e '/WT_CURSOR_NEEDKEY/d' \
 	    -e '/WT_CURSOR_NEEDVALUE/d' \
 	    -e '/WT_ERR/d' \
-	    -e '/WT_ILLEGAL_VALUE_ERR/d' \
 	    -e '/WT_SYSCALL.*ret/d' \
 	    -e '/WT_TRET/d' \
 	    -e 's/^\([^(]*\).*/\1/' \

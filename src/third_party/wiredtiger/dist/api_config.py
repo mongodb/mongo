@@ -2,7 +2,7 @@
 
 import os, re, sys, textwrap
 import api_data
-from dist import compare_srcfile
+from dist import compare_srcfile, format_srcfile
 
 # Temporary file.
 tmp_file = '__tmp'
@@ -124,7 +124,7 @@ for line in open(f, 'r'):
     tfile.write(prefix + '@configstart{' + config_name +
             ', see dist/api_data.py}\n')
 
-    w = textwrap.TextWrapper(width=80-len(prefix.expandtabs()),
+    w = textwrap.TextWrapper(width=100-len(prefix.expandtabs()),
             break_on_hyphens=False,
             replace_whitespace=False,
             fix_sentence_endings=True)
@@ -337,6 +337,7 @@ __wt_conn_config_match(const char *method)
 ''')
 
 tfile.close()
+format_srcfile(tmp_file)
 compare_srcfile(tmp_file, f)
 
 # Update the config.h file with the #defines for the configuration entries.
@@ -354,4 +355,5 @@ for line in open('../src/include/config.h', 'r'):
         tfile.write(' */\n')
         tfile.write(config_defines)
 tfile.close()
+format_srcfile(tmp_file)
 compare_srcfile(tmp_file, '../src/include/config.h')

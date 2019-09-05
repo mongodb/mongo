@@ -34,35 +34,33 @@
 
 static const char *home;
 
-#define	NUM_THREADS	10
+#define NUM_THREADS 10
 
 /*! [thread scan] */
 static WT_THREAD_RET
 scan_thread(void *conn_arg)
 {
-	WT_CONNECTION *conn;
-	WT_CURSOR *cursor;
-	WT_SESSION *session;
-	int ret;
-	const char *key, *value;
+    WT_CONNECTION *conn;
+    WT_CURSOR *cursor;
+    WT_SESSION *session;
+    int ret;
+    const char *key, *value;
 
-	conn = conn_arg;
-	error_check(conn->open_session(conn, NULL, NULL, &session));
-	error_check(session->open_cursor(
-	    session, "table:access", NULL, NULL, &cursor));
+    conn = conn_arg;
+    error_check(conn->open_session(conn, NULL, NULL, &session));
+    error_check(session->open_cursor(session, "table:access", NULL, NULL, &cursor));
 
-	/* Show all records. */
-	while ((ret = cursor->next(cursor)) == 0) {
-		error_check(cursor->get_key(cursor, &key));
-		error_check(cursor->get_value(cursor, &value));
+    /* Show all records. */
+    while ((ret = cursor->next(cursor)) == 0) {
+        error_check(cursor->get_key(cursor, &key));
+        error_check(cursor->get_value(cursor, &value));
 
-		printf("Got record: %s : %s\n", key, value);
-	}
-	if (ret != WT_NOTFOUND)
-		fprintf(stderr,
-		    "WT_CURSOR.next: %s\n", session->strerror(session, ret));
+        printf("Got record: %s : %s\n", key, value);
+    }
+    if (ret != WT_NOTFOUND)
+        fprintf(stderr, "WT_CURSOR.next: %s\n", session->strerror(session, ret));
 
-	return (WT_THREAD_RET_VALUE);
+    return (WT_THREAD_RET_VALUE);
 }
 /*! [thread scan] */
 
@@ -70,35 +68,32 @@ scan_thread(void *conn_arg)
 int
 main(int argc, char *argv[])
 {
-	WT_CONNECTION *conn;
-	WT_SESSION *session;
-	WT_CURSOR *cursor;
-	wt_thread_t threads[NUM_THREADS];
-	int i;
+    WT_CONNECTION *conn;
+    WT_SESSION *session;
+    WT_CURSOR *cursor;
+    wt_thread_t threads[NUM_THREADS];
+    int i;
 
-	home = example_setup(argc, argv);
+    home = example_setup(argc, argv);
 
-	error_check(wiredtiger_open(home, NULL, "create", &conn));
+    error_check(wiredtiger_open(home, NULL, "create", &conn));
 
-	error_check(conn->open_session(conn, NULL, NULL, &session));
-	error_check(session->create(session, "table:access",
-	    "key_format=S,value_format=S"));
-	error_check(session->open_cursor(
-	    session, "table:access", NULL, "overwrite", &cursor));
-	cursor->set_key(cursor, "key1");
-	cursor->set_value(cursor, "value1");
-	error_check(cursor->insert(cursor));
-	error_check(session->close(session, NULL));
+    error_check(conn->open_session(conn, NULL, NULL, &session));
+    error_check(session->create(session, "table:access", "key_format=S,value_format=S"));
+    error_check(session->open_cursor(session, "table:access", NULL, "overwrite", &cursor));
+    cursor->set_key(cursor, "key1");
+    cursor->set_value(cursor, "value1");
+    error_check(cursor->insert(cursor));
+    error_check(session->close(session, NULL));
 
-	for (i = 0; i < NUM_THREADS; i++)
-		error_check(
-		    __wt_thread_create(NULL, &threads[i], scan_thread, conn));
+    for (i = 0; i < NUM_THREADS; i++)
+        error_check(__wt_thread_create(NULL, &threads[i], scan_thread, conn));
 
-	for (i = 0; i < NUM_THREADS; i++)
-		error_check(__wt_thread_join(NULL, &threads[i]));
+    for (i = 0; i < NUM_THREADS; i++)
+        error_check(__wt_thread_join(NULL, &threads[i]));
 
-	error_check(conn->close(conn, NULL));
+    error_check(conn->close(conn, NULL));
 
-	return (EXIT_SUCCESS);
+    return (EXIT_SUCCESS);
 }
 /*! [thread main] */

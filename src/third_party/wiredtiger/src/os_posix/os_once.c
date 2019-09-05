@@ -10,12 +10,12 @@
 
 /*
  * __wt_once --
- *	One-time initialization per process.
+ *     One-time initialization per process.
  */
 int
 __wt_once(void (*init_routine)(void))
 {
-	static pthread_once_t once_control = PTHREAD_ONCE_INIT;
+    static pthread_once_t once_control = PTHREAD_ONCE_INIT;
 
-	return (pthread_once(&once_control, init_routine));
+    return (pthread_once(&once_control, init_routine));
 }

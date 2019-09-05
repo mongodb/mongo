@@ -37,8 +37,8 @@ def timestamp_str(t):
 # Smoke tests to ensure lookaside tables are working.
 class test_las01(wttest.WiredTigerTestCase):
     # Force a small cache.
-    def conn_config(self):
-        return 'cache_size=50MB'
+    conn_config = 'cache_size=50MB'
+    session_config = 'isolation=snapshot'
 
     def large_updates(self, session, uri, value, ds, nrows, timestamp=False):
         # Update a large number of records, we'll hang if the lookaside table

@@ -60,22 +60,21 @@
  *
  * Bits 5-8 are cell "types".
  */
-#define	WT_CELL_KEY_SHORT	0x01		/* Short key */
-#define	WT_CELL_KEY_SHORT_PFX	0x02		/* Short key with prefix byte */
-#define	WT_CELL_VALUE_SHORT	0x03		/* Short data */
-#define	WT_CELL_SHORT_TYPE(v)	((v) & 0x03U)
+#define WT_CELL_KEY_SHORT 0x01     /* Short key */
+#define WT_CELL_KEY_SHORT_PFX 0x02 /* Short key with prefix byte */
+#define WT_CELL_VALUE_SHORT 0x03   /* Short data */
+#define WT_CELL_SHORT_TYPE(v) ((v)&0x03U)
 
-#define	WT_CELL_SHORT_MAX	63		/* Maximum short key/value */
-#define	WT_CELL_SHORT_SHIFT	2		/* Shift for short key/value */
+#define WT_CELL_SHORT_MAX 63  /* Maximum short key/value */
+#define WT_CELL_SHORT_SHIFT 2 /* Shift for short key/value */
 
-#define	WT_CELL_64V		0x04		/* Associated value */
+#define WT_CELL_64V 0x04 /* Associated value */
 
 /*
- * We could use bit 4 as a single bit (similar to bit 3), or as a type bit in a
- * backward compatible way by adding bit 4 to the type mask and adding new types
- * that incorporate it.
+ * We could use bit 4 as a single bit (similar to bit 3), or as a type bit in a backward compatible
+ * way by adding bit 4 to the type mask and adding new types that incorporate it.
  */
-#define	WT_CELL_UNUSED_BIT4	0x08		/* Unused */
+#define WT_CELL_UNUSED_BIT4 0x08 /* Unused */
 
 /*
  * WT_CELL_ADDR_INT is an internal block location, WT_CELL_ADDR_LEAF is a leaf
@@ -90,48 +89,47 @@
  * value dictionaries: if the two values are the same, we only store them once
  * and have the second and subsequent use reference the original.
  */
-#define	WT_CELL_ADDR_DEL	 (0)		/* Address: deleted */
-#define	WT_CELL_ADDR_INT	 (1 << 4)	/* Address: internal  */
-#define	WT_CELL_ADDR_LEAF	 (2 << 4)	/* Address: leaf */
-#define	WT_CELL_ADDR_LEAF_NO	 (3 << 4)	/* Address: leaf no overflow */
-#define	WT_CELL_DEL		 (4 << 4)	/* Deleted value */
-#define	WT_CELL_KEY		 (5 << 4)	/* Key */
-#define	WT_CELL_KEY_OVFL	 (6 << 4)	/* Overflow key */
-#define	WT_CELL_KEY_OVFL_RM	(12 << 4)	/* Overflow key (removed) */
-#define	WT_CELL_KEY_PFX		 (7 << 4)	/* Key with prefix byte */
-#define	WT_CELL_VALUE		 (8 << 4)	/* Value */
-#define	WT_CELL_VALUE_COPY	 (9 << 4)	/* Value copy */
-#define	WT_CELL_VALUE_OVFL	(10 << 4)	/* Overflow value */
-#define	WT_CELL_VALUE_OVFL_RM	(11 << 4)	/* Overflow value (removed) */
+#define WT_CELL_ADDR_DEL (0)            /* Address: deleted */
+#define WT_CELL_ADDR_INT (1 << 4)       /* Address: internal  */
+#define WT_CELL_ADDR_LEAF (2 << 4)      /* Address: leaf */
+#define WT_CELL_ADDR_LEAF_NO (3 << 4)   /* Address: leaf no overflow */
+#define WT_CELL_DEL (4 << 4)            /* Deleted value */
+#define WT_CELL_KEY (5 << 4)            /* Key */
+#define WT_CELL_KEY_OVFL (6 << 4)       /* Overflow key */
+#define WT_CELL_KEY_OVFL_RM (12 << 4)   /* Overflow key (removed) */
+#define WT_CELL_KEY_PFX (7 << 4)        /* Key with prefix byte */
+#define WT_CELL_VALUE (8 << 4)          /* Value */
+#define WT_CELL_VALUE_COPY (9 << 4)     /* Value copy */
+#define WT_CELL_VALUE_OVFL (10 << 4)    /* Overflow value */
+#define WT_CELL_VALUE_OVFL_RM (11 << 4) /* Overflow value (removed) */
 
-#define	WT_CELL_TYPE_MASK	(0x0fU << 4)	/* Maximum 16 cell types */
-#define	WT_CELL_TYPE(v)		((v) & WT_CELL_TYPE_MASK)
+#define WT_CELL_TYPE_MASK (0x0fU << 4) /* Maximum 16 cell types */
+#define WT_CELL_TYPE(v) ((v)&WT_CELL_TYPE_MASK)
 
 /*
- * When we aren't able to create a short key or value (and, in the case of a
- * value, there's no associated RLE), the key or value is at least 64B, else
- * we'd have been able to store it as a short cell.  Decrement/Increment the
- * size before storing it, in the hopes that relatively small key/value sizes
- * will pack into a single byte instead of two bytes.
+ * When we aren't able to create a short key or value (and, in the case of a value, there's no
+ * associated RLE), the key or value is at least 64B, else we'd have been able to store it as a
+ * short cell. Decrement/Increment the size before storing it, in the hopes that relatively small
+ * key/value sizes will pack into a single byte instead of two bytes.
  */
-#define	WT_CELL_SIZE_ADJUST	64
+#define WT_CELL_SIZE_ADJUST 64
 
 /*
  * WT_CELL --
  *	Variable-length, on-page cell header.
  */
 struct __wt_cell {
-	/*
-	 * Maximum of 16 bytes:
-	 * 1: cell descriptor byte
-	 * 1: prefix compression count
-	 * 9: associated 64-bit value	(uint64_t encoding, max 9 bytes)
-	 * 5: data length		(uint32_t encoding, max 5 bytes)
-	 *
-	 * This calculation is pessimistic: the prefix compression count and
-	 * 64V value overlap, the 64V value and data length are optional.
-	 */
-	uint8_t __chunk[1 + 1 + WT_INTPACK64_MAXSIZE + WT_INTPACK32_MAXSIZE];
+    /*
+     * Maximum of 16 bytes:
+     * 1: cell descriptor byte
+     * 1: prefix compression count
+     * 9: associated 64-bit value	(uint64_t encoding, max 9 bytes)
+     * 5: data length		(uint32_t encoding, max 5 bytes)
+     *
+     * This calculation is pessimistic: the prefix compression count and
+     * 64V value overlap, the 64V value and data length are optional.
+     */
+    uint8_t __chunk[1 + 1 + WT_INTPACK64_MAXSIZE + WT_INTPACK32_MAXSIZE];
 };
 
 /*
@@ -139,24 +137,24 @@ struct __wt_cell {
  *	Unpacked cell.
  */
 struct __wt_cell_unpack {
-	WT_CELL *cell;			/* Cell's disk image address */
+    WT_CELL *cell; /* Cell's disk image address */
 
-	uint64_t v;			/* RLE count or recno */
+    uint64_t v; /* RLE count or recno */
 
-	/*
-	 * !!!
-	 * The size and __len fields are reasonably type size_t; don't change
-	 * the type, performance drops significantly if they're type size_t.
-	 */
-	const void *data;		/* Data */
-	uint32_t    size;		/* Data size */
+    /*
+     * !!!
+     * The size and __len fields are reasonably type size_t; don't change
+     * the type, performance drops significantly if they're type size_t.
+     */
+    const void *data; /* Data */
+    uint32_t size;    /* Data size */
 
-	uint32_t __len;			/* Cell + data length (usually) */
+    uint32_t __len; /* Cell + data length (usually) */
 
-	uint8_t prefix;			/* Cell prefix length */
+    uint8_t prefix; /* Cell prefix length */
 
-	uint8_t raw;			/* Raw cell type (include "shorts") */
-	uint8_t type;			/* Cell type */
+    uint8_t raw;  /* Raw cell type (include "shorts") */
+    uint8_t type; /* Cell type */
 
-	uint8_t ovfl;			/* boolean: cell is an overflow */
+    uint8_t ovfl; /* boolean: cell is an overflow */
 };

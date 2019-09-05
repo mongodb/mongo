@@ -24,9 +24,16 @@ def missing_comment():
 def function_args_alpha(text):
         s = text.strip()
         s = re.sub("[*]","", s)
-        s = re.sub("^const ","", s)
-        s = re.sub("^static ","", s)
-        s = re.sub("^volatile ","", s)
+        s = s.split()
+        def merge_specifier(words, specifier):
+            if len(words) > 2 and words[0] == specifier:
+                words[1] += specifier
+                words = words[1:]
+            return words
+        s = merge_specifier(s, 'const')
+        s = merge_specifier(s, 'static')
+        s = merge_specifier(s, 'volatile')
+        s = ' '.join(s)
         return s
 
 # List of illegal types.
@@ -90,9 +97,14 @@ def function_args(name, line):
     line = re.sub("^static ", "", line)
     line = re.sub("^volatile ", "", line)
 
-    # Let WT_UNUSED terminate the parse. It often appears at the beginning
-    # of the function and looks like a WT_XXX variable declaration.
+    # Let WT_ASSERT, WT_UNUSED and WT_RET terminate the parse. They often appear
+    # at the beginning of the function and looks like a WT_XXX variable
+    # declaration.
+    if re.search('^WT_ASSERT', line):
+        return False,0
     if re.search('^WT_UNUSED', line):
+        return False,0
+    if re.search('^WT_RET', line):
         return False,0
 
     # Let lines not terminated with a semicolon terminate the parse, it means
@@ -141,7 +153,7 @@ def function_declaration():
                 found,n = function_args(name, line)
                 if found:
                     # List statics first.
-                    if re.search("^\sstatic", line):
+                    if re.search("^\s+static", line):
                         static_list[n].append(line)
                         continue
 

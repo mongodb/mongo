@@ -22,7 +22,7 @@ tfile.write('''/* DO NOT EDIT: automatically built by dist/java_doc.py. */
 ''')
 
 cclass_re = re.compile('^struct __([a-z_]*) {')
-cfunc_re = re.compile('\t.*? __F\(([a-z_]*)\)')
+cfunc_re = re.compile('\s+.*? __F\(([a-z_]*)\)')
 
 curr_class = ""
 for line in open(f, 'r'):

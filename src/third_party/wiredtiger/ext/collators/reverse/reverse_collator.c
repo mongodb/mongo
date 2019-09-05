@@ -32,44 +32,43 @@
 
 /*
  * collate_reverse --
- *	WiredTiger reverse collation.
+ *     WiredTiger reverse collation.
  */
 static int
-collate_reverse(WT_COLLATOR *collator,
-    WT_SESSION *session, const WT_ITEM *k1, const WT_ITEM *k2, int *ret)
+collate_reverse(
+  WT_COLLATOR *collator, WT_SESSION *session, const WT_ITEM *k1, const WT_ITEM *k2, int *ret)
 {
-	size_t len;
-	int cmp;
+    size_t len;
+    int cmp;
 
-	(void)collator;					/* Unused */
-	(void)session;
+    (void)collator; /* Unused */
+    (void)session;
 
-	len = (k1->size < k2->size) ? k1->size : k2->size;
-	cmp = memcmp(k1->data, k2->data, len);
-	if (cmp < 0)
-		*ret = 1;
-	else if (cmp > 0)
-		*ret = -1;
-	else if (k1->size < k2->size)
-		*ret = 1;
-	else if (k1->size > k2->size)
-		*ret = -1;
-	else
-		*ret = 0;
-	return (0);
+    len = (k1->size < k2->size) ? k1->size : k2->size;
+    cmp = memcmp(k1->data, k2->data, len);
+    if (cmp < 0)
+        *ret = 1;
+    else if (cmp > 0)
+        *ret = -1;
+    else if (k1->size < k2->size)
+        *ret = 1;
+    else if (k1->size > k2->size)
+        *ret = -1;
+    else
+        *ret = 0;
+    return (0);
 }
 
-static WT_COLLATOR reverse_collator = { collate_reverse, NULL, NULL };
+static WT_COLLATOR reverse_collator = {collate_reverse, NULL, NULL};
 
 /*
  * wiredtiger_extension_init --
- *	WiredTiger reverse collation extension.
+ *     WiredTiger reverse collation extension.
  */
 int
 wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
-	(void)config;				/* Unused parameters */
+    (void)config; /* Unused parameters */
 
-	return (connection->add_collator(
-	    connection, "reverse", &reverse_collator, NULL));
+    return (connection->add_collator(connection, "reverse", &reverse_collator, NULL));
 }

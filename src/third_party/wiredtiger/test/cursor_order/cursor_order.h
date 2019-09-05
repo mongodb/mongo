@@ -30,22 +30,22 @@
 
 #include "test_util.h"
 
-#define	FNAME		"file:cursor_order.%03d"	/* File name */
+#define FNAME "file:cursor_order.%03d" /* File name */
 
-typedef enum { FIX, ROW, VAR } __ftype;		/* File type */
+typedef enum { FIX, ROW, VAR } __ftype; /* File type */
 
 typedef struct {
-	uint64_t append_inserters;		/* Number of append threads */
-	WT_CONNECTION *conn;			/* WiredTiger connection */
-	__ftype ftype;
-	uint64_t key_range;			/* Current key range */
-	uint64_t max_nops;			/* Operations per thread */
-	bool      multiple_files;		/* File per thread */
-	uint64_t nkeys;			/* Keys to load */
-	uint64_t reverse_scanners;		/* Number of scan threads */
-	uint64_t reverse_scan_ops;		/* Keys to visit per scan */
-	bool      thread_finish;		/* Signal to finish run. */
-	bool      vary_nops;			/* Operations per thread */
+    uint64_t append_inserters; /* Number of append threads */
+    WT_CONNECTION *conn;       /* WiredTiger connection */
+    __ftype ftype;
+    uint64_t key_range;        /* Current key range */
+    uint64_t max_nops;         /* Operations per thread */
+    bool multiple_files;       /* File per thread */
+    uint64_t nkeys;            /* Keys to load */
+    uint64_t reverse_scanners; /* Number of scan threads */
+    uint64_t reverse_scan_ops; /* Keys to visit per scan */
+    bool thread_finish;        /* Signal to finish run. */
+    bool vary_nops;            /* Operations per thread */
 
 } SHARED_CONFIG;
 

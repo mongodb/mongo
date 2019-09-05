@@ -30,20 +30,20 @@
 
 #include <signal.h>
 
-#define	FNAME		"file:wt.%03d"		/* File name */
-#define	FNAME_STAT	"__stats"		/* File name for statistics */
+#define FNAME "file:wt.%03d" /* File name */
+#define FNAME_STAT "__stats" /* File name for statistics */
 
-extern WT_CONNECTION *conn;			/* WiredTiger connection */
+extern WT_CONNECTION *conn; /* WiredTiger connection */
 
-typedef enum { FIX, ROW, VAR } __ftype;		/* File type */
+typedef enum { FIX, ROW, VAR } __ftype; /* File type */
 extern __ftype ftype;
 
-extern int   log_print;				/* Log print per operation */
-extern int   multiple_files;			/* File per thread */
-extern u_int nkeys;				/* Keys to load */
-extern u_int max_nops;				/* Operations per thread */
-extern int   vary_nops;				/* Operations per thread */
-extern int   session_per_op;			/* New session per operation */
+extern int log_print;      /* Log print per operation */
+extern int multiple_files; /* File per thread */
+extern u_int nkeys;        /* Keys to load */
+extern u_int max_nops;     /* Operations per thread */
+extern int vary_nops;      /* Operations per thread */
+extern int session_per_op; /* New session per operation */
 
 void load(const char *);
 void rw_start(u_int, u_int);

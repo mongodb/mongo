@@ -64,58 +64,55 @@
 #if defined(_M_AMD64) && !defined(HAVE_NO_CRC32_HARDWARE)
 /*
  * __checksum_alt --
- *	Return a checksum for a chunk of memory, computed in hardware
- *	using 8 byte steps.
+ *     Return a checksum for a chunk of memory, computed in hardware using 8 byte steps.
  */
 static uint32_t
 __checksum_alt(const void *chunk, size_t len)
 {
-	uint32_t crc;
-	size_t nqwords;
-	const uint8_t *p;
-	const uint64_t *p64;
+    uint32_t crc;
+    size_t nqwords;
+    const uint8_t *p;
+    const uint64_t *p64;
 
-	crc = 0xffffffff;
+    crc = 0xffffffff;
 
-	/* Checksum one byte at a time to the first 4B boundary. */
-	for (p = chunk;
-	    ((uintptr_t)p & (sizeof(uint32_t) - 1)) != 0 &&
-	    len > 0; ++p, --len) {
-		crc = _mm_crc32_u8(crc, *p);
-	}
+    /* Checksum one byte at a time to the first 4B boundary. */
+    for (p = chunk; ((uintptr_t)p & (sizeof(uint32_t) - 1)) != 0 && len > 0; ++p, --len) {
+        crc = _mm_crc32_u8(crc, *p);
+    }
 
-	p64 = (const uint64_t *)p;
-	/* Checksum in 8B chunks. */
-	for (nqwords = len / sizeof(uint64_t); nqwords; nqwords--) {
-		crc = (uint32_t)_mm_crc32_u64(crc, *p64);
-		p64++;
-	}
+    p64 = (const uint64_t *)p;
+    /* Checksum in 8B chunks. */
+    for (nqwords = len / sizeof(uint64_t); nqwords; nqwords--) {
+        crc = (uint32_t)_mm_crc32_u64(crc, *p64);
+        p64++;
+    }
 
-	/* Checksum trailing bytes one byte at a time. */
-	p = (const uint8_t *)p64;
-	for (len &= 0x7; len > 0; ++p, len--) {
-		crc = _mm_crc32_u8(crc, *p);
-	}
+    /* Checksum trailing bytes one byte at a time. */
+    p = (const uint8_t *)p64;
+    for (len &= 0x7; len > 0; ++p, len--) {
+        crc = _mm_crc32_u8(crc, *p);
+    }
 
-	return (~crc);
+    return (~crc);
 }
 
 /*
  * __wt_checksum_alt_match --
- *	Return if a checksum matches the alternate calculation.
+ *     Return if a checksum matches the alternate calculation.
  */
 bool
 __wt_checksum_alt_match(const void *chunk, size_t len, uint32_t v)
 {
-	int cpuInfo[4];
+    int cpuInfo[4];
 
-	__cpuid(cpuInfo, 1);
+    __cpuid(cpuInfo, 1);
 
- #define	CPUID_ECX_HAS_SSE42	(1 << 20)
-	if (cpuInfo[2] & CPUID_ECX_HAS_SSE42)
-		return (__checksum_alt(chunk, len) == v);
+#define CPUID_ECX_HAS_SSE42 (1 << 20)
+    if (cpuInfo[2] & CPUID_ECX_HAS_SSE42)
+        return (__checksum_alt(chunk, len) == v);
 
-	return (false);
+    return (false);
 }
 
 #endif

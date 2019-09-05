@@ -60,6 +60,7 @@ EOF
 	for i in $l; do
 		proto ../$i
 	done) > $t
+	./s_clang-format "${PWD}/$t"
 	cmp $t $f > /dev/null 2>&1 ||
 	    (echo "Building $f" && rm -f $f && cp $t $f)
 }
@@ -67,13 +68,13 @@ EOF
 f=../src/include/extern_win.h
 l=`sed \
     -e '/os_win/!d' \
-    -e 's/[	 ].*$//' filelist`
+    -e 's/[ ].*$//' filelist`
 externs
 
 f=../src/include/extern_posix.h
 l=`sed \
     -e '/os_posix/!d' \
-    -e 's/[	 ].*$//' filelist`
+    -e 's/[ ].*$//' filelist`
 externs
 
 f=../src/include/extern.h
@@ -84,7 +85,7 @@ l=`sed \
     -e '/\/checksum\/zseries/d' \
     -e '/os_posix/d' \
     -e '/os_win/d' \
-    -e 's/[	 ].*$//' filelist`
+    -e 's/[ ].*$//' filelist`
 externs
 
 exit 0

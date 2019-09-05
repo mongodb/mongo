@@ -31,39 +31,37 @@
 int
 main(void)
 {
-	size_t used_len;
-	int64_t i;
-	uint8_t *end, *p;
-	uint8_t buf[WT_INTPACK64_MAXSIZE + 8];	/* -Werror=array-bounds */
+    size_t used_len;
+    int64_t i;
+    uint8_t *end, *p;
+    uint8_t buf[WT_INTPACK64_MAXSIZE + 8]; /* -Werror=array-bounds */
 
-	memset(buf, 0xff, sizeof(buf));	/* -Werror=maybe-uninitialized */
+    memset(buf, 0xff, sizeof(buf)); /* -Werror=maybe-uninitialized */
 
-	/*
-	 * Required on some systems to pull in parts of the library
-	 * for which we have data references.
-	 */
-	testutil_check(__wt_library_init());
+    /*
+     * Required on some systems to pull in parts of the library for which we have data references.
+     */
+    testutil_check(__wt_library_init());
 
-	for (i = 1; i < 1LL << 60; i <<= 1) {
-		end = buf;
-		testutil_check(
-		    __wt_vpack_uint(&end, sizeof(buf), (uint64_t)i));
-		used_len = (size_t)(end - buf);
-		testutil_assert(used_len <= WT_INTPACK64_MAXSIZE);
-		printf("%" PRId64 " ", i);
-		for (p = buf; p < end; p++)
-			printf("%02x", *p);
-		printf("\n");
+    for (i = 1; i < 1LL << 60; i <<= 1) {
+        end = buf;
+        testutil_check(__wt_vpack_uint(&end, sizeof(buf), (uint64_t)i));
+        used_len = (size_t)(end - buf);
+        testutil_assert(used_len <= WT_INTPACK64_MAXSIZE);
+        printf("%" PRId64 " ", i);
+        for (p = buf; p < end; p++)
+            printf("%02x", *p);
+        printf("\n");
 
-		end = buf;
-		testutil_check(__wt_vpack_int(&end, sizeof(buf), -i));
-		used_len = (size_t)(end - buf);
-		testutil_assert(used_len <= WT_INTPACK64_MAXSIZE);
-		printf("%" PRId64 " ", -i);
-		for (p = buf; p < end; p++)
-			printf("%02x", *p);
-		printf("\n");
-	}
+        end = buf;
+        testutil_check(__wt_vpack_int(&end, sizeof(buf), -i));
+        used_len = (size_t)(end - buf);
+        testutil_assert(used_len <= WT_INTPACK64_MAXSIZE);
+        printf("%" PRId64 " ", -i);
+        for (p = buf; p < end; p++)
+            printf("%02x", *p);
+        printf("\n");
+    }
 
-	return (0);
+    return (0);
 }

@@ -69,18 +69,18 @@
  */
 
 /*
- * This program does not run on Windows.  The non-portable aspects at minimum
- * are fork/exec the use of environment variables (used by fail_fs), and file
- * name and build locations of dynamically loaded libraries.
+ * This program does not run on Windows. The non-portable aspects at minimum are fork/exec the use
+ * of environment variables (used by fail_fs), and file name and build locations of dynamically
+ * loaded libraries.
  */
-#define	BIG_SIZE			(1024 * 10)
-#define	BIG_CONTENTS			"<Big String Contents>"
-#define	MAX_ARGS			20
-#define	MAX_OP_RANGE			1000
-#define	STDERR_FILE			"stderr.txt"
-#define	STDOUT_FILE			"stdout.txt"
-#define	TESTS_PER_OP_VALUE		3
-#define	VERBOSE_PRINT			10000
+#define BIG_SIZE (1024 * 10)
+#define BIG_CONTENTS "<Big String Contents>"
+#define MAX_ARGS 20
+#define MAX_OP_RANGE 1000
+#define STDERR_FILE "stderr.txt"
+#define STDOUT_FILE "stdout.txt"
+#define TESTS_PER_OP_VALUE 3
+#define VERBOSE_PRINT 10000
 
 static int check_results(TEST_OPTS *, uint64_t *);
 static void check_values(WT_CURSOR *, int, int, int, char *);
@@ -89,360 +89,334 @@ static void cursor_count_items(WT_CURSOR *, uint64_t *);
 static void disable_failures(void);
 static void enable_failures(uint64_t, uint64_t);
 static void generate_key(uint64_t, int *);
-static void generate_value(uint32_t, uint64_t, char *, int *, int *, int *,
-    char **);
-static void run_check_subtest(TEST_OPTS *, const char *, uint64_t, bool,
-    uint64_t *);
+static void generate_value(uint32_t, uint64_t, char *, int *, int *, int *, char **);
+static void run_check_subtest(TEST_OPTS *, const char *, uint64_t, bool, uint64_t *);
 static void run_check_subtest_range(TEST_OPTS *, const char *, bool);
 static int run_process(TEST_OPTS *, const char *, char *[], int *);
 static void subtest_main(int, char *[], bool);
 static void subtest_populate(TEST_OPTS *, bool);
 
-extern int   __wt_optind;
+extern int __wt_optind;
 
-#define	WT_FAIL_FS_LIB	"../../ext/test/fail_fs/.libs/libwiredtiger_fail_fs.so"
+#define WT_FAIL_FS_LIB "../../ext/test/fail_fs/.libs/libwiredtiger_fail_fs.so"
 
 /*
  * check_results --
- *	Check all the tables and verify the results.
+ *     Check all the tables and verify the results.
  */
 static int
 check_results(TEST_OPTS *opts, uint64_t *foundp)
 {
-	WT_CURSOR *maincur, *maincur2, *v0cur, *v1cur, *v2cur;
-	WT_SESSION *session;
-	uint64_t count, idxcount, nrecords;
-	uint32_t rndint;
-	int key, key_got, ret, v0, v1, v2;
-	char *big, *bigref;
+    WT_CURSOR *maincur, *maincur2, *v0cur, *v1cur, *v2cur;
+    WT_SESSION *session;
+    uint64_t count, idxcount, nrecords;
+    uint32_t rndint;
+    int key, key_got, ret, v0, v1, v2;
+    char *big, *bigref;
 
-	testutil_check(create_big_string(&bigref));
-	nrecords = opts->nrecords;
-	testutil_check(wiredtiger_open(opts->home, NULL,
-	    "create,log=(enabled)", &opts->conn));
-	testutil_check(
-	    opts->conn->open_session(opts->conn, NULL, NULL, &session));
+    testutil_check(create_big_string(&bigref));
+    nrecords = opts->nrecords;
+    testutil_check(wiredtiger_open(opts->home, NULL, "create,log=(enabled)", &opts->conn));
+    testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
 
-	testutil_check(session->open_cursor(session, "table:subtest", NULL,
-	    NULL, &maincur));
-	testutil_check(session->open_cursor(session, "table:subtest2", NULL,
-	    NULL, &maincur2));
-	testutil_check(session->open_cursor(session, "index:subtest:v0", NULL,
-	    NULL, &v0cur));
-	testutil_check(session->open_cursor(session, "index:subtest:v1", NULL,
-	    NULL, &v1cur));
-	testutil_check(session->open_cursor(session, "index:subtest:v2", NULL,
-	    NULL, &v2cur));
+    testutil_check(session->open_cursor(session, "table:subtest", NULL, NULL, &maincur));
+    testutil_check(session->open_cursor(session, "table:subtest2", NULL, NULL, &maincur2));
+    testutil_check(session->open_cursor(session, "index:subtest:v0", NULL, NULL, &v0cur));
+    testutil_check(session->open_cursor(session, "index:subtest:v1", NULL, NULL, &v1cur));
+    testutil_check(session->open_cursor(session, "index:subtest:v2", NULL, NULL, &v2cur));
 
-	count = 0;
-	while ((ret = maincur->next(maincur)) == 0) {
-		testutil_check(maincur2->next(maincur2));
-		testutil_check(maincur2->get_key(maincur2, &key_got));
-		testutil_check(maincur2->get_value(maincur2, &rndint));
+    count = 0;
+    while ((ret = maincur->next(maincur)) == 0) {
+        testutil_check(maincur2->next(maincur2));
+        testutil_check(maincur2->get_key(maincur2, &key_got));
+        testutil_check(maincur2->get_value(maincur2, &rndint));
 
-		generate_key(count, &key);
-		generate_value(rndint, count, bigref, &v0, &v1, &v2, &big);
-		testutil_assert(key == key_got);
+        generate_key(count, &key);
+        generate_value(rndint, count, bigref, &v0, &v1, &v2, &big);
+        testutil_assert(key == key_got);
 
-		/* Check the key/values in main table. */
-		testutil_check(maincur->get_key(maincur, &key_got));
-		testutil_assert(key == key_got);
-		check_values(maincur, v0, v1, v2, big);
+        /* Check the key/values in main table. */
+        testutil_check(maincur->get_key(maincur, &key_got));
+        testutil_assert(key == key_got);
+        check_values(maincur, v0, v1, v2, big);
 
-		/* Check the values in the indices. */
-		v0cur->set_key(v0cur, v0);
-		testutil_check(v0cur->search(v0cur));
-		check_values(v0cur, v0, v1, v2, big);
-		v1cur->set_key(v1cur, v1);
-		testutil_check(v1cur->search(v1cur));
-		check_values(v1cur, v0, v1, v2, big);
-		v2cur->set_key(v2cur, v2);
-		testutil_check(v2cur->search(v2cur));
-		check_values(v2cur, v0, v1, v2, big);
+        /* Check the values in the indices. */
+        v0cur->set_key(v0cur, v0);
+        testutil_check(v0cur->search(v0cur));
+        check_values(v0cur, v0, v1, v2, big);
+        v1cur->set_key(v1cur, v1);
+        testutil_check(v1cur->search(v1cur));
+        check_values(v1cur, v0, v1, v2, big);
+        v2cur->set_key(v2cur, v2);
+        testutil_check(v2cur->search(v2cur));
+        check_values(v2cur, v0, v1, v2, big);
 
-		count++;
-		if (count % VERBOSE_PRINT == 0 && opts->verbose)
-			printf("checked %" PRIu64 "/%" PRIu64 "\n", count,
-			    nrecords);
-	}
-	if (count % VERBOSE_PRINT != 0 && opts->verbose)
-		printf("checked %" PRIu64 "/%" PRIu64 "\n", count, nrecords);
+        count++;
+        if (count % VERBOSE_PRINT == 0 && opts->verbose)
+            printf("checked %" PRIu64 "/%" PRIu64 "\n", count, nrecords);
+    }
+    if (count % VERBOSE_PRINT != 0 && opts->verbose)
+        printf("checked %" PRIu64 "/%" PRIu64 "\n", count, nrecords);
 
-	/*
-	 * Always expect at least one entry, as populate does a
-	 * checkpoint after the first insert.
-	 */
-	testutil_assert(count > 0);
-	testutil_assert(ret == WT_NOTFOUND);
-	testutil_assert(maincur2->next(maincur2) == WT_NOTFOUND);
-	cursor_count_items(v0cur, &idxcount);
-	testutil_assert(count == idxcount);
-	cursor_count_items(v1cur, &idxcount);
-	testutil_assert(count == idxcount);
-	cursor_count_items(v2cur, &idxcount);
-	testutil_assert(count == idxcount);
+    /*
+     * Always expect at least one entry, as populate does a checkpoint after the first insert.
+     */
+    testutil_assert(count > 0);
+    testutil_assert(ret == WT_NOTFOUND);
+    testutil_assert(maincur2->next(maincur2) == WT_NOTFOUND);
+    cursor_count_items(v0cur, &idxcount);
+    testutil_assert(count == idxcount);
+    cursor_count_items(v1cur, &idxcount);
+    testutil_assert(count == idxcount);
+    cursor_count_items(v2cur, &idxcount);
+    testutil_assert(count == idxcount);
 
-	testutil_check(opts->conn->close(opts->conn, NULL));
-	opts->conn = NULL;
+    testutil_check(opts->conn->close(opts->conn, NULL));
+    opts->conn = NULL;
 
-	free(bigref);
-	*foundp = count;
-	return (0);
+    free(bigref);
+    *foundp = count;
+    return (0);
 }
 
 /*
  * check_values --
- *	Check that the values in the cursor match the given values.
+ *     Check that the values in the cursor match the given values.
  */
 static void
 check_values(WT_CURSOR *cursor, int v0, int v1, int v2, char *big)
 {
-	int v0_got, v1_got, v2_got;
-	char *big_got;
+    int v0_got, v1_got, v2_got;
+    char *big_got;
 
-	testutil_check(cursor->get_value(cursor, &v0_got, &v1_got, &v2_got,
-	    &big_got));
-	testutil_assert(v0 == v0_got);
-	testutil_assert(v1 == v1_got);
-	testutil_assert(v2 == v2_got);
-	testutil_assert(strcmp(big, big_got) == 0);
+    testutil_check(cursor->get_value(cursor, &v0_got, &v1_got, &v2_got, &big_got));
+    testutil_assert(v0 == v0_got);
+    testutil_assert(v1 == v1_got);
+    testutil_assert(v2 == v2_got);
+    testutil_assert(strcmp(big, big_got) == 0);
 }
 
 /*
  * create_big_string --
- *	Create and fill the "reference" big array.
+ *     Create and fill the "reference" big array.
  */
 static int
 create_big_string(char **bigp)
 {
-	size_t i, mod;
-	char *big;
+    size_t i, mod;
+    char *big;
 
-	if ((big = malloc(BIG_SIZE + 1)) == NULL)
-		return (ENOMEM);
-	mod = strlen(BIG_CONTENTS);
-	for (i = 0; i < BIG_SIZE; i++) {
-		big[i] = BIG_CONTENTS[i % mod];
-	}
-	big[BIG_SIZE] = '\0';
-	*bigp = big;
-	return (0);
+    if ((big = malloc(BIG_SIZE + 1)) == NULL)
+        return (ENOMEM);
+    mod = strlen(BIG_CONTENTS);
+    for (i = 0; i < BIG_SIZE; i++) {
+        big[i] = BIG_CONTENTS[i % mod];
+    }
+    big[BIG_SIZE] = '\0';
+    *bigp = big;
+    return (0);
 }
 
 /*
  * cursor_count_items --
- *	Count the number of items in the table by traversing
- *	through the cursor.
+ *     Count the number of items in the table by traversing through the cursor.
  */
 static void
 cursor_count_items(WT_CURSOR *cursor, uint64_t *countp)
 {
-	WT_DECL_RET;
+    WT_DECL_RET;
 
-	*countp = 0;
+    *countp = 0;
 
-	testutil_check(cursor->reset(cursor));
-	while ((ret = cursor->next(cursor)) == 0)
-		(*countp)++;
-	testutil_assert(ret == WT_NOTFOUND);
+    testutil_check(cursor->reset(cursor));
+    while ((ret = cursor->next(cursor)) == 0)
+        (*countp)++;
+    testutil_assert(ret == WT_NOTFOUND);
 }
 
 /*
  * disable_failures --
- *	Disable failures in the fail file system.
+ *     Disable failures in the fail file system.
  */
 static void
 disable_failures(void)
 {
-	testutil_check(setenv("WT_FAIL_FS_ENABLE", "0", 1));
+    testutil_check(setenv("WT_FAIL_FS_ENABLE", "0", 1));
 }
 
 /*
  * enable_failures --
- *	Enable failures in the fail file system.
+ *     Enable failures in the fail file system.
  */
 static void
 enable_failures(uint64_t allow_writes, uint64_t allow_reads)
 {
-	char value[100];
+    char value[100];
 
-	testutil_check(setenv("WT_FAIL_FS_ENABLE", "1", 1));
-	testutil_check(__wt_snprintf(
-	    value, sizeof(value), "%" PRIu64, allow_writes));
-	testutil_check(setenv("WT_FAIL_FS_WRITE_ALLOW", value, 1));
-	testutil_check(__wt_snprintf(
-	    value, sizeof(value), "%" PRIu64, allow_reads));
-	testutil_check(setenv("WT_FAIL_FS_READ_ALLOW", value, 1));
+    testutil_check(setenv("WT_FAIL_FS_ENABLE", "1", 1));
+    testutil_check(__wt_snprintf(value, sizeof(value), "%" PRIu64, allow_writes));
+    testutil_check(setenv("WT_FAIL_FS_WRITE_ALLOW", value, 1));
+    testutil_check(__wt_snprintf(value, sizeof(value), "%" PRIu64, allow_reads));
+    testutil_check(setenv("WT_FAIL_FS_READ_ALLOW", value, 1));
 }
 
 /*
  * generate_key --
- *	Generate a key used by the "subtest" and "subtest2" tables.
+ *     Generate a key used by the "subtest" and "subtest2" tables.
  */
 static void
 generate_key(uint64_t i, int *keyp)
 {
-	*keyp = (int)i;
+    *keyp = (int)i;
 }
 
 /*
  * generate_value --
- *	Generate values for the "subtest" table.
+ *     Generate values for the "subtest" table.
  */
 static void
-generate_value(uint32_t rndint, uint64_t i, char *bigref,
-    int *v0p, int *v1p, int *v2p, char **bigp)
+generate_value(uint32_t rndint, uint64_t i, char *bigref, int *v0p, int *v1p, int *v2p, char **bigp)
 {
-	*v0p = (int)(i * 7);
-	*v1p = (int)(i * 10007);
-	*v2p = (int)(i * 100000007);
-	*bigp = &bigref[rndint % BIG_SIZE];
+    *v0p = (int)(i * 7);
+    *v1p = (int)(i * 10007);
+    *v2p = (int)(i * 100000007);
+    *bigp = &bigref[rndint % BIG_SIZE];
 }
 
 /*
  * run_check_subtest --
- *	Run the subtest with the given parameters and check the results.
+ *     Run the subtest with the given parameters and check the results.
  */
 static void
-run_check_subtest(TEST_OPTS *opts, const char *debugger, uint64_t nops,
-    bool close_test, uint64_t *nresultsp)
+run_check_subtest(
+  TEST_OPTS *opts, const char *debugger, uint64_t nops, bool close_test, uint64_t *nresultsp)
 {
-	int estatus, narg;
-	char rarg[20], sarg[20], *subtest_args[MAX_ARGS];
+    int estatus, narg;
+    char rarg[20], sarg[20], *subtest_args[MAX_ARGS];
 
-	narg = 0;
-	if (debugger != NULL) {
-		subtest_args[narg++] = (char *)debugger;
-		subtest_args[narg++] = (char *)"--";
-	}
+    narg = 0;
+    if (debugger != NULL) {
+        subtest_args[narg++] = (char *)debugger;
+        subtest_args[narg++] = (char *)"--";
+    }
 
-	subtest_args[narg++] = (char *)opts->progname;
-	/* "subtest" must appear before arguments */
-	if (close_test)
-		subtest_args[narg++] = (char *)"subtest_close";
-	else
-		subtest_args[narg++] = (char *)"subtest";
-	subtest_args[narg++] = (char *)"-h";
-	subtest_args[narg++] = opts->home;
-	subtest_args[narg++] = (char *)"-v";	/* subtest is always verbose */
-	subtest_args[narg++] = (char *)"-p";
-	subtest_args[narg++] = (char *)"-o";
-	testutil_check(__wt_snprintf(sarg, sizeof(sarg), "%" PRIu64, nops));
-	subtest_args[narg++] = sarg;		/* number of operations */
-	subtest_args[narg++] = (char *)"-n";
-	testutil_check(__wt_snprintf(
-	    rarg, sizeof(rarg), "%" PRIu64, opts->nrecords));
-	subtest_args[narg++] = rarg;		/* number of records */
-	subtest_args[narg++] = NULL;
-	testutil_assert(narg <= MAX_ARGS);
-	if (opts->verbose)
-		printf("running a separate process with %" PRIu64
-		    " operations until fail...\n", nops);
-	testutil_clean_work_dir(opts->home);
-	testutil_check(run_process(
-	    opts, debugger != NULL ? debugger : opts->progname,
-	    subtest_args, &estatus));
-	if (opts->verbose)
-		printf("process exited %d\n", estatus);
+    subtest_args[narg++] = (char *)opts->progname;
+    /* "subtest" must appear before arguments */
+    if (close_test)
+        subtest_args[narg++] = (char *)"subtest_close";
+    else
+        subtest_args[narg++] = (char *)"subtest";
+    subtest_args[narg++] = (char *)"-h";
+    subtest_args[narg++] = opts->home;
+    subtest_args[narg++] = (char *)"-v"; /* subtest is always verbose */
+    subtest_args[narg++] = (char *)"-p";
+    subtest_args[narg++] = (char *)"-o";
+    testutil_check(__wt_snprintf(sarg, sizeof(sarg), "%" PRIu64, nops));
+    subtest_args[narg++] = sarg; /* number of operations */
+    subtest_args[narg++] = (char *)"-n";
+    testutil_check(__wt_snprintf(rarg, sizeof(rarg), "%" PRIu64, opts->nrecords));
+    subtest_args[narg++] = rarg; /* number of records */
+    subtest_args[narg++] = NULL;
+    testutil_assert(narg <= MAX_ARGS);
+    if (opts->verbose)
+        printf("running a separate process with %" PRIu64 " operations until fail...\n", nops);
+    testutil_clean_work_dir(opts->home);
+    testutil_check(
+      run_process(opts, debugger != NULL ? debugger : opts->progname, subtest_args, &estatus));
+    if (opts->verbose)
+        printf("process exited %d\n", estatus);
 
-	/*
-	 * Verify results in parent process.
-	 */
-	testutil_check(check_results(opts, nresultsp));
+    /*
+     * Verify results in parent process.
+     */
+    testutil_check(check_results(opts, nresultsp));
 }
 
 /*
  * run_check_subtest_range --
- *
- * Run successive tests via binary search that determines the approximate
- * crossover point between when data is recoverable or not. Once that is
- * determined, run the subtest in a range near that crossover point.
- *
- * The theory is that running at the crossover point will tend to trigger
- * "interesting" failures at the borderline when the checkpoint is about to,
- * or has, succeeded.  If any of those failures creates a WT home directory
- * that cannot be recovered, the top level test will fail.
+ *     Run successive tests via binary search that determines the approximate crossover point
+ *     between when data is recoverable or not. Once that is determined, run the subtest in a range
+ *     near that crossover point. The theory is that running at the crossover point will tend to
+ *     trigger "interesting" failures at the borderline when the checkpoint is about to, or has,
+ *     succeeded. If any of those failures creates a WT home directory that cannot be recovered, the
+ *     top level test will fail.
  */
 static void
 run_check_subtest_range(TEST_OPTS *opts, const char *debugger, bool close_test)
 {
-	uint64_t cutoff, high, low, mid, nops, nresults;
-	int i;
-	bool got_failure, got_success;
+    uint64_t cutoff, high, low, mid, nops, nresults;
+    int i;
+    bool got_failure, got_success;
 
-	if (opts->verbose)
-		printf("Determining best range of operations until failure, "
-		    "with close_test %s.\n",
-		    (close_test ? "enabled" : "disabled"));
+    if (opts->verbose)
+        printf(
+          "Determining best range of operations until failure, "
+          "with close_test %s.\n",
+          (close_test ? "enabled" : "disabled"));
 
-	run_check_subtest(opts, debugger, 1, close_test, &cutoff);
-	low = 0;
-	high = MAX_OP_RANGE;
-	mid = (low + high) / 2;
-	while (low < mid - 5 || high > mid + 5) {
-		run_check_subtest(opts, debugger, mid, close_test,
-		    &nresults);
-		if (nresults > cutoff)
-			high = mid;
-		else
-			low = mid;
-		mid = (low + high) / 2;
-	}
-	/*
-	 * mid is the number of ops that is the crossover point.
-	 * Run some tests near that point to try to trigger weird
-	 * failures.  If mid is too low or too high, it indicates
-	 * there is a fundamental problem with the test.
-	 */
-	testutil_assert(mid > 1 && mid < MAX_OP_RANGE - 1);
-	if (opts->verbose)
-		printf("Retesting around %" PRIu64 " operations.\n",
-		    mid);
+    run_check_subtest(opts, debugger, 1, close_test, &cutoff);
+    low = 0;
+    high = MAX_OP_RANGE;
+    mid = (low + high) / 2;
+    while (low < mid - 5 || high > mid + 5) {
+        run_check_subtest(opts, debugger, mid, close_test, &nresults);
+        if (nresults > cutoff)
+            high = mid;
+        else
+            low = mid;
+        mid = (low + high) / 2;
+    }
+    /*
+     * mid is the number of ops that is the crossover point. Run some tests near that point to try
+     * to trigger weird failures. If mid is too low or too high, it indicates there is a fundamental
+     * problem with the test.
+     */
+    testutil_assert(mid > 1 && mid < MAX_OP_RANGE - 1);
+    if (opts->verbose)
+        printf("Retesting around %" PRIu64 " operations.\n", mid);
 
-	got_failure = false;
-	got_success = false;
-	for (i = 0;
-	    i < TESTS_PER_OP_VALUE && (!got_failure || !got_success); i++)
-		for (nops = mid - 10; nops < mid + 10; nops++) {
-			run_check_subtest(opts, debugger, nops,
-			    close_test, &nresults);
-			if (nresults > cutoff)
-				got_failure = true;
-			else
-				got_success = true;
-		}
+    got_failure = false;
+    got_success = false;
+    for (i = 0; i < TESTS_PER_OP_VALUE && (!got_failure || !got_success); i++)
+        for (nops = mid - 10; nops < mid + 10; nops++) {
+            run_check_subtest(opts, debugger, nops, close_test, &nresults);
+            if (nresults > cutoff)
+                got_failure = true;
+            else
+                got_success = true;
+        }
 
-	/*
-	 * Check that it really ran with a crossover point.
-	 */
-	testutil_assert(got_failure);
-	testutil_assert(got_success);
+    /*
+     * Check that it really ran with a crossover point.
+     */
+    testutil_assert(got_failure);
+    testutil_assert(got_success);
 }
 
 /*
  * run_process --
- *	Run a program with arguments, wait until it completes.
+ *     Run a program with arguments, wait until it completes.
  */
 static int
 run_process(TEST_OPTS *opts, const char *prog, char *argv[], int *status)
 {
-	int pid;
-	char **arg;
+    int pid;
+    char **arg;
 
-	if (opts->verbose) {
-		printf("running: ");
-		for (arg = argv; *arg != NULL; arg++)
-			printf("%s ", *arg);
-		printf("\n");
-	}
-	if ((pid = fork()) == 0) {
-		(void)execv(prog, argv);
-		testutil_die(errno, "%s", prog);
-	} else if (pid < 0)
-		return (errno);
+    if (opts->verbose) {
+        printf("running: ");
+        for (arg = argv; *arg != NULL; arg++)
+            printf("%s ", *arg);
+        printf("\n");
+    }
+    if ((pid = fork()) == 0) {
+        (void)execv(prog, argv);
+        testutil_die(errno, "%s", prog);
+    } else if (pid < 0)
+        return (errno);
 
-	(void)waitpid(pid, status, 0);
-	return (0);
+    (void)waitpid(pid, status, 0);
+    return (0);
 }
 
 /*
@@ -450,243 +424,222 @@ run_process(TEST_OPTS *opts, const char *prog, char *argv[], int *status)
  *     Error event handler.
  */
 static int
-subtest_error_handler(WT_EVENT_HANDLER *handler,
-    WT_SESSION *session, int error, const char *message)
+subtest_error_handler(
+  WT_EVENT_HANDLER *handler, WT_SESSION *session, int error, const char *message)
 {
-	(void)(handler);
-	(void)(session);
-	(void)(message);
+    (void)(handler);
+    (void)(session);
+    (void)(message);
 
-	/* Exit on panic, there's no checking to be done. */
-	if (error == WT_PANIC)
-		exit (1);
-	return (0);
+    /* Exit on panic, there's no checking to be done. */
+    if (error == WT_PANIC)
+        exit(1);
+    return (0);
 }
 
 static WT_EVENT_HANDLER event_handler = {
-	subtest_error_handler,
-	NULL,   /* Message handler */
-	NULL,   /* Progress handler */
-	NULL    /* Close handler */
+  subtest_error_handler, NULL, /* Message handler */
+  NULL,                        /* Progress handler */
+  NULL                         /* Close handler */
 };
 
 /*
  * subtest_main --
- *	The main program for the subtest
+ *     The main program for the subtest
  */
 static void
 subtest_main(int argc, char *argv[], bool close_test)
 {
-	struct rlimit rlim;
-	TEST_OPTS *opts, _opts;
-	WT_SESSION *session;
-	char config[1024], filename[1024];
+    struct rlimit rlim;
+    TEST_OPTS *opts, _opts;
+    WT_SESSION *session;
+    char config[1024], filename[1024];
 
-	opts = &_opts;
-	memset(opts, 0, sizeof(*opts));
-	memset(&rlim, 0, sizeof(rlim));
+    opts = &_opts;
+    memset(opts, 0, sizeof(*opts));
+    memset(&rlim, 0, sizeof(rlim));
 
-	/* No core files during fault injection tests. */
-	testutil_check(setrlimit(RLIMIT_CORE, &rlim));
-	testutil_check(testutil_parse_opts(argc, argv, opts));
-	testutil_make_work_dir(opts->home);
+    /* No core files during fault injection tests. */
+    testutil_check(setrlimit(RLIMIT_CORE, &rlim));
+    testutil_check(testutil_parse_opts(argc, argv, opts));
+    testutil_make_work_dir(opts->home);
 
-	/* Redirect stderr, stdout. */
-	testutil_check(__wt_snprintf(
-	    filename, sizeof(filename), "%s/%s", opts->home, STDERR_FILE));
-	testutil_assert(freopen(filename, "a", stderr) != NULL);
-	testutil_check(__wt_snprintf(
-	    filename, sizeof(filename), "%s/%s", opts->home, STDOUT_FILE));
-	testutil_assert(freopen(filename, "a", stdout) != NULL);
-	testutil_check(__wt_snprintf(config, sizeof(config),
-	    "create,cache_size=250M,log=(enabled),"
-	    "transaction_sync=(enabled,method=none),extensions=("
-	    WT_FAIL_FS_LIB
-	    "=(early_load,config={environment=true,verbose=true})]"));
+    /* Redirect stderr, stdout. */
+    testutil_check(__wt_snprintf(filename, sizeof(filename), "%s/%s", opts->home, STDERR_FILE));
+    testutil_assert(freopen(filename, "a", stderr) != NULL);
+    testutil_check(__wt_snprintf(filename, sizeof(filename), "%s/%s", opts->home, STDOUT_FILE));
+    testutil_assert(freopen(filename, "a", stdout) != NULL);
+    testutil_check(__wt_snprintf(config, sizeof(config),
+      "create,cache_size=250M,log=(enabled),"
+      "transaction_sync=(enabled,method=none),extensions=(" WT_FAIL_FS_LIB
+      "=(early_load,config={environment=true,verbose=true})]"));
 
-	testutil_check(
-	    wiredtiger_open(opts->home, &event_handler, config, &opts->conn));
-	testutil_check(
-	    opts->conn->open_session(opts->conn, NULL, NULL, &session));
+    testutil_check(wiredtiger_open(opts->home, &event_handler, config, &opts->conn));
+    testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
 
-	testutil_check(session->create(session, "table:subtest",
-	    "key_format=i,value_format=iiiS,"
-	    "columns=(id,v0,v1,v2,big)"));
+    testutil_check(session->create(session, "table:subtest",
+      "key_format=i,value_format=iiiS,"
+      "columns=(id,v0,v1,v2,big)"));
 
-	testutil_check(session->create(session, "table:subtest2",
-	    "key_format=i,value_format=i"));
+    testutil_check(session->create(session, "table:subtest2", "key_format=i,value_format=i"));
 
-	testutil_check(session->create(session, "index:subtest:v0",
-	    "columns=(v0)"));
-	testutil_check(session->create(session, "index:subtest:v1",
-	    "columns=(v1)"));
-	testutil_check(session->create(session, "index:subtest:v2",
-	    "columns=(v2)"));
+    testutil_check(session->create(session, "index:subtest:v0", "columns=(v0)"));
+    testutil_check(session->create(session, "index:subtest:v1", "columns=(v1)"));
+    testutil_check(session->create(session, "index:subtest:v2", "columns=(v2)"));
 
-	testutil_check(session->close(session, NULL));
+    testutil_check(session->close(session, NULL));
 
-	subtest_populate(opts, close_test);
+    subtest_populate(opts, close_test);
 
-	testutil_cleanup(opts);
+    testutil_cleanup(opts);
 }
 
 /*
- * This macro is used as a substitute for testutil_check, except that it is
- * aware of when a failure may be expected due to the effects of the fail_fs.
- * This macro is used only in subtest_populate(), it uses local variables.
+ * This macro is used as a substitute for testutil_check, except that it is aware of when a failure
+ * may be expected due to the effects of the fail_fs. This macro is used only in subtest_populate(),
+ * it uses local variables.
  */
-#define	CHECK(expr, failmode) {						\
-	int _ret;							\
-	_ret = expr;							\
-	if (_ret != 0) {						\
-		if (!failmode ||					\
-		    (_ret != WT_RUN_RECOVERY && _ret != EIO)) {		\
-			fprintf(stderr, "  BAD RETURN %d for \"%s\"\n", \
-			    _ret, #expr);				\
-			testutil_check(_ret);				\
-		} else							\
-			failed = true;					\
-	}								\
-}
+#define CHECK(expr, failmode)                                                 \
+    {                                                                         \
+        int _ret;                                                             \
+        _ret = expr;                                                          \
+        if (_ret != 0) {                                                      \
+            if (!failmode || (_ret != WT_RUN_RECOVERY && _ret != EIO)) {      \
+                fprintf(stderr, "  BAD RETURN %d for \"%s\"\n", _ret, #expr); \
+                testutil_check(_ret);                                         \
+            } else                                                            \
+                failed = true;                                                \
+        }                                                                     \
+    }
 
 /*
  * subtest_populate --
- *	Populate the tables.
+ *     Populate the tables.
  */
 static void
 subtest_populate(TEST_OPTS *opts, bool close_test)
 {
-	WT_CURSOR *maincur, *maincur2;
-	WT_RAND_STATE rnd;
-	WT_SESSION *session;
-	uint64_t i, nrecords;
-	uint32_t rndint;
-	int key, v0, v1, v2;
-	char *big, *bigref;
-	bool failed;
+    WT_CURSOR *maincur, *maincur2;
+    WT_RAND_STATE rnd;
+    WT_SESSION *session;
+    uint64_t i, nrecords;
+    uint32_t rndint;
+    int key, v0, v1, v2;
+    char *big, *bigref;
+    bool failed;
 
-	failed = false;
-	__wt_random_init_seed(NULL, &rnd);
-	CHECK(create_big_string(&bigref), false);
-	nrecords = opts->nrecords;
+    failed = false;
+    __wt_random_init_seed(NULL, &rnd);
+    CHECK(create_big_string(&bigref), false);
+    nrecords = opts->nrecords;
 
-	CHECK(opts->conn->open_session(
-	    opts->conn, NULL, NULL, &session), false);
+    CHECK(opts->conn->open_session(opts->conn, NULL, NULL, &session), false);
 
-	CHECK(session->open_cursor(session, "table:subtest", NULL,
-	    NULL, &maincur), false);
+    CHECK(session->open_cursor(session, "table:subtest", NULL, NULL, &maincur), false);
 
-	CHECK(session->open_cursor(session, "table:subtest2", NULL,
-	    NULL, &maincur2), false);
+    CHECK(session->open_cursor(session, "table:subtest2", NULL, NULL, &maincur2), false);
 
-	for (i = 0; i < nrecords && !failed; i++) {
-		rndint = __wt_random(&rnd);
-		generate_key(i, &key);
-		generate_value(rndint, i, bigref, &v0, &v1, &v2, &big);
-		CHECK(session->begin_transaction(session, NULL), false);
-		maincur->set_key(maincur, key);
-		maincur->set_value(maincur, v0, v1, v2, big);
-		CHECK(maincur->insert(maincur), false);
+    for (i = 0; i < nrecords && !failed; i++) {
+        rndint = __wt_random(&rnd);
+        generate_key(i, &key);
+        generate_value(rndint, i, bigref, &v0, &v1, &v2, &big);
+        CHECK(session->begin_transaction(session, NULL), false);
+        maincur->set_key(maincur, key);
+        maincur->set_value(maincur, v0, v1, v2, big);
+        CHECK(maincur->insert(maincur), false);
 
-		maincur2->set_key(maincur2, key);
-		maincur2->set_value(maincur2, rndint);
-		CHECK(maincur2->insert(maincur2), false);
-		CHECK(session->commit_transaction(session, NULL), false);
+        maincur2->set_key(maincur2, key);
+        maincur2->set_value(maincur2, rndint);
+        CHECK(maincur2->insert(maincur2), false);
+        CHECK(session->commit_transaction(session, NULL), false);
 
-		if (i == 0)
-			/*
-			 * Force an initial checkpoint, that helps to
-			 * distinguish a clear failure from just not running
-			 * long enough.
-			 */
-			CHECK(session->checkpoint(session, NULL), false);
+        if (i == 0)
+            /*
+             * Force an initial checkpoint, that helps to distinguish a clear failure from just not
+             * running long enough.
+             */
+            CHECK(session->checkpoint(session, NULL), false);
 
-		if ((i + 1) % VERBOSE_PRINT == 0 && opts->verbose)
-			printf("  %" PRIu64 "/%" PRIu64 "\n",
-			    (i + 1), nrecords);
-		/* Attempt to isolate the failures to checkpointing. */
-		if (i == (nrecords/100)) {
-			enable_failures(opts->nops, 1000000);
-			/* CHECK should expect failures. */
-			CHECK(session->checkpoint(session, NULL), true);
-			disable_failures();
-			if (failed && opts->verbose)
-				printf("checkpoint failed (expected).\n");
-		}
-	}
+        if ((i + 1) % VERBOSE_PRINT == 0 && opts->verbose)
+            printf("  %" PRIu64 "/%" PRIu64 "\n", (i + 1), nrecords);
+        /* Attempt to isolate the failures to checkpointing. */
+        if (i == (nrecords / 100)) {
+            enable_failures(opts->nops, 1000000);
+            /* CHECK should expect failures. */
+            CHECK(session->checkpoint(session, NULL), true);
+            disable_failures();
+            if (failed && opts->verbose)
+                printf("checkpoint failed (expected).\n");
+        }
+    }
 
-	/*
-	 * Closing handles after an extreme fail is likely to cause
-	 * cascading failures (or crashes), so recommended practice is
-	 * to immediately exit. We're interested in testing both with
-	 * and without the recommended practice.
-	 */
-	if (failed) {
-		if (!close_test) {
-			fprintf(stderr, "exit early.\n");
-			exit(0);
-		} else
-			fprintf(stderr, "closing after failure.\n");
-	}
+    /*
+     * Closing handles after an extreme fail is likely to cause cascading failures (or crashes), so
+     * recommended practice is to immediately exit. We're interested in testing both with and
+     * without the recommended practice.
+     */
+    if (failed) {
+        if (!close_test) {
+            fprintf(stderr, "exit early.\n");
+            exit(0);
+        } else
+            fprintf(stderr, "closing after failure.\n");
+    }
 
-	free(bigref);
-	CHECK(maincur->close(maincur), false);
-	CHECK(maincur2->close(maincur2), false);
-	CHECK(session->close(session, NULL), false);
+    free(bigref);
+    CHECK(maincur->close(maincur), false);
+    CHECK(maincur2->close(maincur2), false);
+    CHECK(session->close(session, NULL), false);
 }
 
 /*
  * main --
- *	The main program for the test. When invoked with "subtest"
- *	argument, run the subtest. Otherwise, run a separate process
- *	for each needed subtest, and check the results.
+ *     The main program for the test. When invoked with "subtest" argument, run the subtest.
+ *     Otherwise, run a separate process for each needed subtest, and check the results.
  */
 int
 main(int argc, char *argv[])
 {
-	TEST_OPTS *opts, _opts;
-	uint64_t nresults;
-	const char *debugger;
+    TEST_OPTS *opts, _opts;
+    uint64_t nresults;
+    const char *debugger;
 
-	opts = &_opts;
-	memset(opts, 0, sizeof(*opts));
-	debugger = NULL;
+    opts = &_opts;
+    memset(opts, 0, sizeof(*opts));
+    debugger = NULL;
 
-	testutil_check(testutil_parse_opts(argc, argv, opts));
-	argc -= __wt_optind;
-	argv += __wt_optind;
-	if (opts->nrecords == 0)
-		opts->nrecords = 50000;
+    testutil_check(testutil_parse_opts(argc, argv, opts));
+    argc -= __wt_optind;
+    argv += __wt_optind;
+    if (opts->nrecords == 0)
+        opts->nrecords = 50000;
 
-	while (argc > 0) {
-		if (strcmp(argv[0], "subtest") == 0) {
-			subtest_main(argc, argv, false);
-			return (0);
-		} else if (strcmp(argv[0], "subtest_close") == 0) {
-			subtest_main(argc, argv, true);
-			return (0);
-		} else if (strcmp(argv[0], "gdb") == 0)
-			debugger = "/usr/bin/gdb";
-		else
-			testutil_assert(false);
-		argc--;
-		argv++;
-	}
-	if (opts->verbose) {
-		printf("Number of operations until failure: %" PRIu64
-		    "  (change with -o N)\n", opts->nops);
-		printf("Number of records: %" PRIu64
-		    "  (change with -n N)\n", opts->nrecords);
-	}
-	if (opts->nops == 0) {
-		run_check_subtest_range(opts, debugger, false);
-		run_check_subtest_range(opts, debugger, true);
-	} else
-		run_check_subtest(opts, debugger, opts->nops,
-		    opts->nrecords, &nresults);
+    while (argc > 0) {
+        if (strcmp(argv[0], "subtest") == 0) {
+            subtest_main(argc, argv, false);
+            return (0);
+        } else if (strcmp(argv[0], "subtest_close") == 0) {
+            subtest_main(argc, argv, true);
+            return (0);
+        } else if (strcmp(argv[0], "gdb") == 0)
+            debugger = "/usr/bin/gdb";
+        else
+            testutil_assert(false);
+        argc--;
+        argv++;
+    }
+    if (opts->verbose) {
+        printf("Number of operations until failure: %" PRIu64 "  (change with -o N)\n", opts->nops);
+        printf("Number of records: %" PRIu64 "  (change with -n N)\n", opts->nrecords);
+    }
+    if (opts->nops == 0) {
+        run_check_subtest_range(opts, debugger, false);
+        run_check_subtest_range(opts, debugger, true);
+    } else
+        run_check_subtest(opts, debugger, opts->nops, opts->nrecords, &nresults);
 
-	testutil_clean_work_dir(opts->home);
-	testutil_cleanup(opts);
+    testutil_clean_work_dir(opts->home);
+    testutil_cleanup(opts);
 
-	return (0);
+    return (0);
 }

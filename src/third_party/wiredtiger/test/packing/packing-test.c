@@ -31,47 +31,45 @@
 static void
 check(const char *fmt, ...)
 {
-	size_t len;
-	char buf[200], *end, *p;
-	va_list ap;
+    size_t len;
+    char buf[200], *end, *p;
+    va_list ap;
 
-	len = 0;			/* -Werror=maybe-uninitialized */
+    len = 0; /* -Werror=maybe-uninitialized */
 
-	va_start(ap, fmt);
-	testutil_check(__wt_struct_sizev(NULL, &len, fmt, ap));
-	va_end(ap);
+    va_start(ap, fmt);
+    testutil_check(__wt_struct_sizev(NULL, &len, fmt, ap));
+    va_end(ap);
 
-	if (len < 1 || len >= sizeof(buf))
-		testutil_die(EINVAL,
-		    "Unexpected length from __wt_struct_sizev");
+    if (len < 1 || len >= sizeof(buf))
+        testutil_die(EINVAL, "Unexpected length from __wt_struct_sizev");
 
-	va_start(ap, fmt);
-	testutil_check(__wt_struct_packv(NULL, buf, sizeof(buf), fmt, ap));
-	va_end(ap);
+    va_start(ap, fmt);
+    testutil_check(__wt_struct_packv(NULL, buf, sizeof(buf), fmt, ap));
+    va_end(ap);
 
-	printf("%s ", fmt);
-	for (p = buf, end = p + len; p < end; p++)
-		printf("%02x", (u_char)*p & 0xff);
-	printf("\n");
+    printf("%s ", fmt);
+    for (p = buf, end = p + len; p < end; p++)
+        printf("%02x", (u_char)*p & 0xff);
+    printf("\n");
 }
 
 int
 main(void)
 {
-	/*
-	 * Required on some systems to pull in parts of the library
-	 * for which we have data references.
-	 */
-	testutil_check(__wt_library_init());
+    /*
+     * Required on some systems to pull in parts of the library for which we have data references.
+     */
+    testutil_check(__wt_library_init());
 
-	check("iii", 0, 101, -99);
-	check("3i", 0, 101, -99);
-	check("iS", 42, "forty two");
-	check("s", "a big string");
+    check("iii", 0, 101, -99);
+    check("3i", 0, 101, -99);
+    check("iS", 42, "forty two");
+    check("s", "a big string");
 #if 0
 	/* TODO: need a WT_ITEM */
 	check("u", r"\x42" * 20)
 	check("uu", r"\x42" * 10, r"\x42" * 10)
 #endif
-	return (0);
+    return (0);
 }

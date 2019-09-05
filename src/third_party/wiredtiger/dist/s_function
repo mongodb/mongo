@@ -23,7 +23,7 @@ file_parse()
 # where there's a jump to the error label after the error label.
 for f in `find bench examples ext src test -name '*.[ci]'`; do
 	file_parse $f |
-	egrep '(WT_ERR[_A-Z]*|WT_ILLEGAL_VALUE_ERR)\(.*(WT_ILLEGAL_VALUE|WT_RET[_A-Z]*)\(.*err:|[^a-z_]err:.*(WT_ERR|WT_ILLEGAL_VALUE_ERR)\(' |
+	egrep '(WT_ERR[_A-Z]*)\(.*(WT_RET[_A-Z]*)\(.*err:|[^a-z_]err:.*(WT_ERR)\(' |
 	sed 's/:.*//' > $t
 
 	test -s $t && {
@@ -37,7 +37,7 @@ done
 for f in `find bench examples ext src test -name '*.[ci]'`; do
 	file_parse $f | sed "s=^=$f:="
 done | python dist/s_function_loop.py |
-    egrep '\{@[^@]*(WT_ILLEGAL_VALUE|WT_RET[_A-Z]*)\([^@]*(WT_ERR[_A-Z]*|WT_ILLEGAL_VALUE_ERR)\(.*err:' |
+    egrep '\{@[^@]*(WT_RET[_A-Z]*)\([^@]*(WT_ERR[_A-Z]*)\(.*err:' |
     sed -e 's/^\([^:]*\): *\([^:]*\):.*/\1:\2: mix of returns and jump to the error label within a loop/'
 
 # Return of 0 in functions after a jump to the error label.
@@ -59,7 +59,7 @@ for f in `find bench examples ext src test -name '*.[ci]'`; do
 	egrep 'va_start.*(WT_RET|goto).*va_end' |
 	sed 's/:.*//' > $t
 	file_parse $f |
-	egrep -v 'va_start.*WT_ERR.*[^a-z_]err:	va_end' |
+	egrep -v 'va_start.*WT_ERR.*[^a-z_]err:.*va_end' |
 	egrep 'va_start.*WT_ERR.*va_end' |
 	sed 's/:.*//' >> $t
 

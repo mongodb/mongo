@@ -34,84 +34,77 @@
 void
 setup_throttle(WTPERF_THREAD *thread)
 {
-	THROTTLE_CONFIG *throttle_cfg;
+    THROTTLE_CONFIG *throttle_cfg;
 
-	throttle_cfg = &thread->throttle_cfg;
+    throttle_cfg = &thread->throttle_cfg;
 
-	/*
-	 * Setup how the number of operations to run each interval in order to
-	 * meet our desired max throughput.
-	 * - If we have a very small number of them we can do one op
-	 *   on a larger increment. Given there is overhead in throttle logic
-	 *   we want to avoid running the throttle check regularly.
-	 * - For most workloads, we aim to do 100 ops per interval and adjust
-	 *   the sleep period accordingly.
-	 * - For high throughput workloads, we aim to do many ops in 100us
-	 *   increments.
-	 */
+    /*
+     * Setup how the number of operations to run each interval in order to
+     * meet our desired max throughput.
+     * - If we have a very small number of them we can do one op
+     *   on a larger increment. Given there is overhead in throttle logic
+     *   we want to avoid running the throttle check regularly.
+     * - For most workloads, we aim to do 100 ops per interval and adjust
+     *   the sleep period accordingly.
+     * - For high throughput workloads, we aim to do many ops in 100us
+     *   increments.
+     */
 
-	if (thread->workload->throttle < THROTTLE_OPS) {
-		/* If the interval is very small, we do one operation */
-		throttle_cfg->usecs_increment =
-		    USEC_PER_SEC / thread->workload->throttle;
-		throttle_cfg->ops_per_increment = 1;
-	} else if (thread->workload->throttle < USEC_PER_SEC / THROTTLE_OPS) {
-		throttle_cfg->usecs_increment =
-		    USEC_PER_SEC / thread->workload->throttle * THROTTLE_OPS;
-		throttle_cfg->ops_per_increment = THROTTLE_OPS;
-	} else {
-		/* If the interval is large, we do more ops per interval */
-		throttle_cfg->usecs_increment = USEC_PER_SEC / THROTTLE_OPS;
-		throttle_cfg->ops_per_increment =
-		    thread->workload->throttle / THROTTLE_OPS;
-	}
+    if (thread->workload->throttle < THROTTLE_OPS) {
+        /* If the interval is very small, we do one operation */
+        throttle_cfg->usecs_increment = USEC_PER_SEC / thread->workload->throttle;
+        throttle_cfg->ops_per_increment = 1;
+    } else if (thread->workload->throttle < USEC_PER_SEC / THROTTLE_OPS) {
+        throttle_cfg->usecs_increment = USEC_PER_SEC / thread->workload->throttle * THROTTLE_OPS;
+        throttle_cfg->ops_per_increment = THROTTLE_OPS;
+    } else {
+        /* If the interval is large, we do more ops per interval */
+        throttle_cfg->usecs_increment = USEC_PER_SEC / THROTTLE_OPS;
+        throttle_cfg->ops_per_increment = thread->workload->throttle / THROTTLE_OPS;
+    }
 
-	/* Give the queue some initial operations to work with */
-	throttle_cfg->ops_count = throttle_cfg->ops_per_increment;
+    /* Give the queue some initial operations to work with */
+    throttle_cfg->ops_count = throttle_cfg->ops_per_increment;
 
-	/* Set the first timestamp of when we incremented */
-	__wt_epoch(NULL, &throttle_cfg->last_increment);
+    /* Set the first timestamp of when we incremented */
+    __wt_epoch(NULL, &throttle_cfg->last_increment);
 }
 
 /*
- * Run the throttle function.  We will sleep if needed and then reload the
- * counter to perform more operations.
+ * Run the throttle function. We will sleep if needed and then reload the counter to perform more
+ * operations.
  */
 void
 worker_throttle(WTPERF_THREAD *thread)
 {
-	THROTTLE_CONFIG *throttle_cfg;
-	struct timespec now;
-	uint64_t usecs_delta;
+    THROTTLE_CONFIG *throttle_cfg;
+    struct timespec now;
+    uint64_t usecs_delta;
 
-	throttle_cfg = &thread->throttle_cfg;
+    throttle_cfg = &thread->throttle_cfg;
 
-	__wt_epoch(NULL, &now);
+    __wt_epoch(NULL, &now);
 
-	/*
-	 * If we did enough operations in the current interval, sleep for
-	 * the rest of the interval. Then add more operations to the queue.
-	 */
-	usecs_delta = WT_TIMEDIFF_US(now, throttle_cfg->last_increment);
-	if (usecs_delta < throttle_cfg->usecs_increment) {
-		(void)usleep(
-		    (useconds_t)(throttle_cfg->usecs_increment - usecs_delta));
-		throttle_cfg->ops_count =
-		     throttle_cfg->ops_per_increment;
-		/*
-		 * After sleeping, set the interval to the current time.
-		 */
-		__wt_epoch(NULL, &throttle_cfg->last_increment);
-	} else {
-		throttle_cfg->ops_count = (usecs_delta *
-		    throttle_cfg->ops_per_increment) /
-		    throttle_cfg->usecs_increment;
-		throttle_cfg->last_increment = now;
-	}
+    /*
+     * If we did enough operations in the current interval, sleep for the rest of the interval. Then
+     * add more operations to the queue.
+     */
+    usecs_delta = WT_TIMEDIFF_US(now, throttle_cfg->last_increment);
+    if (usecs_delta < throttle_cfg->usecs_increment) {
+        (void)usleep((useconds_t)(throttle_cfg->usecs_increment - usecs_delta));
+        throttle_cfg->ops_count = throttle_cfg->ops_per_increment;
+        /*
+         * After sleeping, set the interval to the current time.
+         */
+        __wt_epoch(NULL, &throttle_cfg->last_increment);
+    } else {
+        throttle_cfg->ops_count =
+          (usecs_delta * throttle_cfg->ops_per_increment) / throttle_cfg->usecs_increment;
+        throttle_cfg->last_increment = now;
+    }
 
-	/*
-	 * Take the minimum so we don't overfill the queue.
-	 */
-	throttle_cfg->ops_count =
-	    WT_MIN(throttle_cfg->ops_count, thread->workload->throttle);
+    /*
+     * Take the minimum so we don't overfill the queue.
+     */
+    throttle_cfg->ops_count = WT_MIN(throttle_cfg->ops_count, thread->workload->throttle);
 }
