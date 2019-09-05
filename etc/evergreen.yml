@@ -21,6 +21,7 @@
 
 stepback: true
 command_type: system
+pre_error_fails_task: true
 
 # Files that match an ignore-list pattern will not trigger a build, if they're the only modified
 # files in the patch.
@@ -2244,6 +2245,7 @@ functions:
         set -o verbose
 
         rm -rf src /data/db/* mongo-diskstats* mongo-*.tgz ~/.aws ~/.boto venv
+        exit 0
 
   "kill processes":
     command: shell.exec
