@@ -98,6 +98,11 @@ void OpMsg::replaceFlags(Message* message, uint32_t flags) {
 uint32_t OpMsg::getChecksum(const Message& message) {
     invariant(message.operation() == dbMsg);
     invariant(isFlagSet(message, kChecksumPresent));
+    uassert(51252,
+            "Invalid message size for an OpMsg containing a checksum",
+            // Check that the message size is at least the size of a crc-32 checksum and
+            // the 32-bit flags section.
+            message.dataSize() > static_cast<int>(kCrc32Size + sizeof(uint32_t)));
     return BufReader(message.singleData().view2ptr() + message.size() - kCrc32Size, kCrc32Size)
         .read<LittleEndian<uint32_t>>();
 }
@@ -133,12 +138,18 @@ OpMsg OpMsg::parse(const Message& message) try {
                           << std::bitset<32>(flags).to_string(),
             !containsUnknownRequiredFlags(flags));
 
-    const bool haveChecksum = flags & kChecksumPresent;
-    const int checksumSize = haveChecksum ? kCrc32Size : 0;
+    auto dataSize = message.dataSize() - sizeof(flags);
+    boost::optional<uint32_t> checksum;
+    if (flags & kChecksumPresent) {
+        checksum = getChecksum(message);
+        uassert(51251,
+                "Invalid message size for an OpMsg containing a checksum",
+                dataSize > kCrc32Size);
+        dataSize -= kCrc32Size;
+    }
 
     // The sections begin after the flags and before the checksum (if present).
-    BufReader sectionsBuf(message.singleData().data() + sizeof(flags),
-                          message.dataSize() - sizeof(flags) - checksumSize);
+    BufReader sectionsBuf(message.singleData().data() + sizeof(flags), dataSize);
 
     // TODO some validation may make more sense in the IDL parser. I've tagged them with comments.
     bool haveBody = false;
@@ -198,10 +209,10 @@ OpMsg OpMsg::parse(const Message& message) try {
     }
 
 #ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
-    if (haveChecksum) {
+    if (checksum) {
         uassert(ErrorCodes::ChecksumMismatch,
                 "OP_MSG checksum does not match contents",
-                OpMsg::getChecksum(message) == calculateChecksum(message));
+                *checksum == calculateChecksum(message));
     }
 #endif
 

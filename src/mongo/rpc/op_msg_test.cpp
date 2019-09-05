@@ -930,5 +930,14 @@ TEST(OpMsgTest, ChecksumResizesMessage) {
     // The checksum is correct.
     OpMsg::parse(msg);
 }
+
+TEST(OpMsgTest, EmptyMessageWithChecksumFlag) {
+    // Checks that an empty message that would normally be invalid because it's
+    // missing a body, is invalid because a checksum was specified in the flag
+    // but no checksum was included.
+    auto msg = OpMsgBytes{OpMsg::kChecksumPresent};
+    ASSERT_THROWS_CODE(msg.parse(), AssertionException, 51252);
+}
+
 }  // namespace
 }  // namespace mongo
