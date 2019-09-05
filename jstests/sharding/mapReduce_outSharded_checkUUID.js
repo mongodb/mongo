@@ -2,148 +2,167 @@
 "use strict";
 load("jstests/libs/uuid_util.js");
 
-var verifyOutput = function(out, output) {
-    printjson(out);
-    assert.eq(out.counts.input, 51200, "input count is wrong");
-    assert.eq(out.counts.emit, 51200, "emit count is wrong");
-    assert.gt(out.counts.reduce, 99, "reduce count is wrong");
-    assert.eq(out.counts.output, output, "output count is wrong");
-};
-
-var assertCollectionNotOnShard = function(db, coll) {
-    var listCollsRes = db.runCommand({listCollections: 1, filter: {name: coll}});
+function assertCollectionNotOnShard(db, coll) {
+    const listCollsRes = db.runCommand({listCollections: 1, filter: {name: coll}});
     assert.commandWorked(listCollsRes);
     assert.neq(undefined, listCollsRes.cursor);
     assert.neq(undefined, listCollsRes.cursor.firstBatch);
     assert.eq(0, listCollsRes.cursor.firstBatch.length);
-};
+}
 
-var st = new ShardingTest({shards: 2, verbose: 1, mongos: 1, other: {chunkSize: 1}});
+const st = new ShardingTest({shards: 2, mongos: 1, other: {chunkSize: 1}});
+const testDB = st.s0.getDB("mrShard");
+const inputColl = testDB.srcSharded;
 
-var admin = st.s0.getDB('admin');
+st.adminCommand({enableSharding: testDB.getName()});
+st.ensurePrimaryShard(testDB.getName(), st.shard1.shardName);
+st.adminCommand({shardCollection: inputColl.getFullName(), key: {_id: 1}});
 
-assert.commandWorked(admin.runCommand({enablesharding: "mrShard"}));
-st.ensurePrimaryShard('mrShard', st.shard1.shardName);
-assert.commandWorked(admin.runCommand({shardcollection: "mrShard.srcSharded", key: {"_id": 1}}));
+const nDistinctKeys = 512;
+const nValuesPerKey = 100;
+const nTotalDocs = nDistinctKeys * nValuesPerKey;
 
-var db = st.s0.getDB("mrShard");
-
-var bulk = db.srcSharded.initializeUnorderedBulkOp();
-for (var j = 0; j < 100; j++) {
-    for (var i = 0; i < 512; i++) {
-        bulk.insert({j: j, i: i});
+const bulk = inputColl.initializeUnorderedBulkOp();
+for (let key = 0; key < nDistinctKeys; key++) {
+    for (let value = 0; value < nValuesPerKey; value++) {
+        bulk.insert({key: key, value: value});
     }
 }
 assert.commandWorked(bulk.execute());
 
-function map() {
-    emit(this.i, 1);
+function verifyOutput(mrOutput, expectedNOutputDocs) {
+    assert.commandWorked(mrOutput);
+    assert.eq(mrOutput.counts.input, nTotalDocs, `input count is wrong: ${tojson(mrOutput)}`);
+    assert.eq(mrOutput.counts.emit, nTotalDocs, `emit count is wrong: ${tojson(mrOutput)}`);
+    assert.gt(
+        mrOutput.counts.reduce, nValuesPerKey - 1, `reduce count is wrong: ${tojson(mrOutput)}`);
+    assert.eq(
+        mrOutput.counts.output, expectedNOutputDocs, `output count is wrong: ${tojson(mrOutput)}`);
 }
-function reduce(key, values) {
+
+function mapFn() {
+    emit(this.key, 1);
+}
+function reduceFn(key, values) {
     return Array.sum(values);
 }
 
-// sharded src sharded dst
-var suffix = "InShardedOutSharded";
+(function testShardedOutput() {
+    // Check that merge to an existing empty sharded collection works and creates a new UUID after
+    // M/R
+    const outputColl = testDB[inputColl.getName() + "Out"];
+    st.adminCommand({shardCollection: outputColl.getFullName(), key: {_id: 1}});
+    let origUUID = getUUIDFromConfigCollections(st.s, outputColl.getFullName());
+    let out = testDB.srcSharded.mapReduce(
+        mapFn, reduceFn, {out: {merge: outputColl.getName(), sharded: true}});
+    verifyOutput(out, nDistinctKeys);
+    let newUUID = getUUIDFromConfigCollections(st.s, outputColl.getFullName());
+    assert.neq(origUUID, newUUID);
 
-// Check that merge to an existing empty sharded collection works and creates a new UUID after
-// M/R
-st.adminCommand({shardcollection: "mrShard.outSharded", key: {"_id": 1}});
-var origUUID = getUUIDFromConfigCollections(st.s, "mrShard.outSharded");
-var out = db.srcSharded.mapReduce(map, reduce, {out: {merge: "outSharded", sharded: true}});
-verifyOutput(out, 512);
-var newUUID = getUUIDFromConfigCollections(st.s, "mrShard.outSharded");
-assert.neq(origUUID, newUUID);
+    // Shard1 is the primary shard and only one chunk should have been written, so the chunk with
+    // the new UUID should have been written to it.
+    assert.eq(newUUID,
+              getUUIDFromListCollections(st.shard1.getDB(testDB.getName()), outputColl.getName()));
 
-// Shard1 is the primary shard and only one chunk should have been written, so the chunk with
-// the new UUID should have been written to it.
-assert.eq(newUUID, getUUIDFromListCollections(st.shard1.getDB("mrShard"), "outSharded"));
+    // Shard0 should not have any chunks from the output collection because all shards should have
+    // returned an empty split point list in the first phase of the mapReduce, since the reduced
+    // data size is far less than the chunk size setting of 1MB.
+    assertCollectionNotOnShard(st.shard0.getDB(testDB.getName()), outputColl.getName());
 
-// Shard0 should not have any chunks from the output collection because all shards should have
-// returned an empty split point list in the first phase of the mapReduce, since the reduced
-// data size is far less than the chunk size setting of 1MB.
-assertCollectionNotOnShard(st.shard0.getDB("mrShard"), "outSharded");
+    // Check that merge to an existing sharded collection that has data on all shards works and that
+    // the collection uses the same UUID after M/R
+    st.adminCommand({split: outputColl.getFullName(), middle: {"_id": 2000}});
+    st.adminCommand(
+        {moveChunk: outputColl.getFullName(), find: {"_id": 2000}, to: st.shard0.shardName});
+    assert.commandWorked(outputColl.insert([{_id: 1000}, {_id: 2001}]));
+    origUUID = getUUIDFromConfigCollections(st.s, outputColl.getFullName());
 
-// Check that merge to an existing sharded collection that has data on all shards works and that
-// the collection uses the same UUID after M/R
-assert.commandWorked(admin.runCommand({split: "mrShard.outSharded", middle: {"_id": 2000}}));
-assert.commandWorked(admin.runCommand(
-    {moveChunk: "mrShard.outSharded", find: {"_id": 2000}, to: st.shard0.shardName}));
-assert.commandWorked(st.s.getCollection("mrShard.outSharded").insert({_id: 1000}));
-assert.commandWorked(st.s.getCollection("mrShard.outSharded").insert({_id: 2001}));
-origUUID = getUUIDFromConfigCollections(st.s, "mrShard.outSharded");
+    out = testDB.srcSharded.mapReduce(
+        mapFn, reduceFn, {out: {merge: outputColl.getName(), sharded: true}});
+    verifyOutput(out, nDistinctKeys + 2);
 
-out = db.srcSharded.mapReduce(map, reduce, {out: {merge: "outSharded", sharded: true}});
-verifyOutput(out, 514);
+    newUUID = getUUIDFromConfigCollections(st.s, outputColl.getFullName());
+    assert.eq(origUUID, newUUID);
+    assert.eq(newUUID,
+              getUUIDFromListCollections(st.shard0.getDB(testDB.getName()), outputColl.getName()));
+    assert.eq(newUUID,
+              getUUIDFromListCollections(st.shard1.getDB(testDB.getName()), outputColl.getName()));
 
-newUUID = getUUIDFromConfigCollections(st.s, "mrShard.outSharded");
-assert.eq(origUUID, newUUID);
-assert.eq(newUUID, getUUIDFromListCollections(st.shard0.getDB("mrShard"), "outSharded"));
-assert.eq(newUUID, getUUIDFromListCollections(st.shard1.getDB("mrShard"), "outSharded"));
+    // Check that replace to an existing sharded collection has data on all shards works and that
+    // the collection creates a new UUID after M/R.
+    origUUID = getUUIDFromConfigCollections(st.s, outputColl.getFullName());
+    out = testDB.srcSharded.mapReduce(
+        mapFn, reduceFn, {out: {replace: outputColl.getName(), sharded: true}});
+    verifyOutput(out, nDistinctKeys);
 
-// Check that replace to an existing sharded collection has data on all shards works and that
-// the collection creates a new UUID after M/R.
-origUUID = getUUIDFromConfigCollections(st.s, "mrShard.outSharded");
-out = db.srcSharded.mapReduce(map, reduce, {out: {replace: "outSharded", sharded: true}});
-verifyOutput(out, 512);
+    newUUID = getUUIDFromConfigCollections(st.s, outputColl.getFullName());
+    assert.neq(origUUID, newUUID);
 
-newUUID = getUUIDFromConfigCollections(st.s, "mrShard.outSharded");
-assert.neq(origUUID, newUUID);
+    // Shard1 is the primary shard and only one chunk should have been written, so the chunk with
+    // the new UUID should have been written to it.
+    assert.eq(newUUID,
+              getUUIDFromListCollections(st.shard1.getDB(testDB.getName()), outputColl.getName()));
 
-// Shard1 is the primary shard and only one chunk should have been written, so the chunk with
-// the new UUID should have been written to it.
-assert.eq(newUUID, getUUIDFromListCollections(st.shard1.getDB("mrShard"), "outSharded"));
+    // Shard0 should not have any chunks from the output collection because all shards should have
+    // returned an empty split point list in the first phase of the mapReduce, since the reduced
+    // data size is far less than the chunk size setting of 1MB.
+    assertCollectionNotOnShard(st.shard0.getDB(testDB.getName()), outputColl.getName());
+}());
 
-// Shard0 should not have any chunks from the output collection because all shards should have
-// returned an empty split point list in the first phase of the mapReduce, since the reduced
-// data size is far less than the chunk size setting of 1MB.
-assertCollectionNotOnShard(st.shard0.getDB("mrShard"), "outSharded");
+(function testUnshardedOutputColl() {
+    // Check that reduce to an existing unsharded collection fails when `sharded: true`.
+    const reduceOutput = testDB.reduceUnsharded;
+    assert.commandWorked(testDB.runCommand({create: reduceOutput.getName()}));
+    assert.commandFailed(testDB.runCommand({
+        mapReduce: inputColl.getName(),
+        map: mapFn,
+        reduce: reduceFn,
+        out: {reduce: reduceOutput.getName(), sharded: true}
+    }));
 
-// Check that reduce to an existing unsharded collection fails when `sharded: true`.
-assert.commandWorked(db.runCommand({create: "reduceUnsharded"}));
-assert.commandFailed(db.runCommand({
-    mapReduce: "srcSharded",
-    map: map,
-    reduce: reduce,
-    out: {reduce: "reduceUnsharded", sharded: true}
-}));
+    assert.commandWorked(testDB.reduceUnsharded.insert({x: 1}));
+    assert.commandFailed(testDB.runCommand({
+        mapReduce: inputColl.getName(),
+        map: mapFn,
+        reduce: reduceFn,
+        out: {reduce: reduceOutput.getName(), sharded: true}
+    }));
 
-assert.commandWorked(db.reduceUnsharded.insert({x: 1}));
-assert.commandFailed(db.runCommand({
-    mapReduce: "srcSharded",
-    map: map,
-    reduce: reduce,
-    out: {reduce: "reduceUnsharded", sharded: true}
-}));
+    // Check that replace to an existing unsharded collection works when `sharded: true`.
+    const replaceOutput = testDB.replaceUnsharded;
+    assert.commandWorked(testDB.runCommand({create: replaceOutput.getName()}));
+    let origUUID =
+        getUUIDFromListCollections(st.s.getDB(testDB.getName()), replaceOutput.getName());
 
-// Check that replace to an existing unsharded collection works when `sharded: true`.
-assert.commandWorked(db.runCommand({create: "replaceUnsharded"}));
-origUUID = getUUIDFromListCollections(st.s.getDB("mrShard"), "replaceUnsharded");
+    assert.commandWorked(testDB.runCommand({
+        mapReduce: inputColl.getName(),
+        map: mapFn,
+        reduce: reduceFn,
+        out: {replace: replaceOutput.getName(), sharded: true}
+    }));
 
-assert.commandWorked(db.runCommand({
-    mapReduce: "srcSharded",
-    map: map,
-    reduce: reduce,
-    out: {replace: "replaceUnsharded", sharded: true}
-}));
+    let newUUID = getUUIDFromConfigCollections(st.s, replaceOutput.getFullName());
+    assert.neq(origUUID, newUUID);
+    assert.eq(
+        newUUID,
+        getUUIDFromListCollections(st.shard1.getDB(testDB.getName()), replaceOutput.getName()));
 
-newUUID = getUUIDFromConfigCollections(st.s, "mrShard.replaceUnsharded");
-assert.neq(origUUID, newUUID);
-assert.eq(newUUID, getUUIDFromListCollections(st.shard1.getDB("mrShard"), "replaceUnsharded"));
+    assert.commandWorked(testDB.replaceUnsharded.insert({x: 1}));
+    origUUID = getUUIDFromListCollections(st.s.getDB(testDB.getName()), replaceOutput.getName());
 
-assert.commandWorked(db.replaceUnsharded.insert({x: 1}));
-origUUID = getUUIDFromListCollections(st.s.getDB("mrShard"), "replaceUnsharded");
+    assert.commandWorked(testDB.runCommand({
+        mapReduce: inputColl.getName(),
+        map: mapFn,
+        reduce: reduceFn,
+        out: {replace: replaceOutput.getName(), sharded: true}
+    }));
 
-assert.commandWorked(db.runCommand({
-    mapReduce: "srcSharded",
-    map: map,
-    reduce: reduce,
-    out: {replace: "replaceUnsharded", sharded: true}
-}));
-
-newUUID = getUUIDFromConfigCollections(st.s, "mrShard.replaceUnsharded");
-assert.neq(origUUID, newUUID);
-assert.eq(newUUID, getUUIDFromListCollections(st.shard1.getDB("mrShard"), "replaceUnsharded"));
+    newUUID = getUUIDFromConfigCollections(st.s, replaceOutput.getFullName());
+    assert.neq(origUUID, newUUID);
+    assert.eq(
+        newUUID,
+        getUUIDFromListCollections(st.shard1.getDB(testDB.getName()), replaceOutput.getName()));
+}());
 
 st.stop();
 })();

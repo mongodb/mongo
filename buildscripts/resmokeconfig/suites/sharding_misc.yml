@@ -89,13 +89,11 @@ selector:
   - jstests/sharding/autosplit_with_balancer.js
   - jstests/sharding/migrateBig_balancer.js
   - jstests/sharding/lagged_config_secondary.js
-  - jstests/sharding/mapReduce_inSharded.js
   - jstests/sharding/auto_rebalance_parallel.js
   - jstests/sharding/index1.js
   - jstests/sharding/shard_aware_primary_failover.js
   - jstests/sharding/shards_and_config_return_last_committed_optime.js
   - jstests/sharding/migrateBig.js
-  - jstests/sharding/mapReduce_inSharded_outSharded.js
   - jstests/sharding/change_stream_chunk_migration.js
   - jstests/sharding/large_chunk.js
   - jstests/sharding/auth_slaveok_routing.js
@@ -120,7 +118,6 @@ selector:
   - jstests/sharding/max_time_ms_sharded.js
   - jstests/sharding/change_stream_read_preference.js
   - jstests/sharding/features1.js
-  - jstests/sharding/mapReduce_nonSharded.js
   - jstests/sharding/read_committed_lookup.js
   - jstests/sharding/zero_shard_version.js
   - jstests/sharding/migration_move_chunk_after_receive.js
@@ -138,7 +135,6 @@ selector:
   - jstests/sharding/view_rewrite.js
   - jstests/sharding/lookup_change_stream_post_image_hashed_shard_key.js
   - jstests/sharding/coll_epoch_test1.js
-  - jstests/sharding/mapReduce_outSharded.js
   - jstests/sharding/hash_shard_num_chunks.js
   - jstests/sharding/basic_sharding_params.js
   - jstests/sharding/migration_ignore_interrupts_3.js
