@@ -432,6 +432,10 @@ Status validate(OperationContext* opCtx,
                 opCtx, collection->getIndexCatalog(), &indexNsResultsMap, results);
         }
 
+        // Validate in-memory catalog information with persisted info prior to setting the read
+        // source to kCheckpoint otherwise we'd use a checkpointed MDB catalog file.
+        _validateCatalogEntry(opCtx, collection, collection->getValidatorDoc(), results);
+
         // We want to share the same data throttle instance across all the cursors used during this
         // validation. Validations started on other collections will not share the same data
         // throttle instance.
@@ -493,9 +497,6 @@ Status validate(OperationContext* opCtx,
                                            background,
                                            results,
                                            output);
-
-        // Validate in-memory catalog information with persisted info.
-        _validateCatalogEntry(opCtx, collection, collection->getValidatorDoc(), results);
 
         // Pause collection validation while a lock is held and between collection and index data
         // valiation.
