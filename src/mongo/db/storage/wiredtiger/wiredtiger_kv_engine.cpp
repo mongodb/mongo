@@ -1567,12 +1567,26 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationCont
     if (!_checkpointThread->canRecoverToStableTimestamp()) {
         Timestamp stableTS = Timestamp(_checkpointThread->getStableTimestamp());
         Timestamp initialDataTS = Timestamp(_checkpointThread->getInitialDataTimestamp());
+
+        // It is possible to end up in a situation where we need to roll back data but we have no
+        // stable checkpoint for the rollbackToTimestamp algorithm to use. We cannot obtain one
+        // until we commit a new majority write, which in turn requires that we have already
+        // completed the rollback. The only way to resolve this is to instead roll back using
+        // rollbackViaRefetch, which requires downgrading the binary version to 3.6.
+        auto extraInfo = "";
+        if (serverGlobalParams.featureCompatibility.getVersion() ==
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36) {
+            extraInfo =
+                "You must downgrade the binary version to v3.6 to allow rollback to "
+                "finish. You may upgrade to v4.0 again after the rollback completes. ";
+        }
+
         return Status(ErrorCodes::UnrecoverableRollbackError,
-                      str::stream()
-                          << "No stable timestamp available to recover to. Initial data timestamp: "
-                          << initialDataTS.toString()
-                          << ", Stable timestamp: "
-                          << stableTS.toString());
+                      str::stream() << "No stable timestamp available to recover to. " << extraInfo
+                                    << "Initial data timestamp: "
+                                    << initialDataTS.toString()
+                                    << ", Stable timestamp: "
+                                    << stableTS.toString());
     }
 
     LOG_FOR_ROLLBACK(2) << "WiredTiger::RecoverToStableTimestamp syncing size storer to disk.";
