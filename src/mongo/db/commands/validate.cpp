@@ -116,23 +116,28 @@ public:
 
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
 
-        const bool full = cmdObj["full"].trueValue();
-
-        ValidateCmdLevel level = kValidateNormal;
-        if (full) {
-            level = kValidateFull;
-        }
-
-        // TODO (SERVER-30357): Add support for background validation.
-        const bool background = false;
+        const bool background = cmdObj["background"].trueValue();
 
         // Background validation requires the storage engine to support checkpoints because it
         // performs the validation on a checkpoint using checkpoint cursors.
         if (background && !opCtx->getServiceContext()->getStorageEngine()->supportsCheckpoints()) {
-            uasserted(ErrorCodes::CommandFailed,
+            uasserted(ErrorCodes::CommandNotSupported,
                       str::stream() << "Running validate on collection " << nss
                                     << " with { background: true } is not supported on the "
                                     << storageGlobalParams.engine << " storage engine");
+        }
+
+        const bool full = cmdObj["full"].trueValue();
+
+        if (background && full) {
+            uasserted(ErrorCodes::CommandNotSupported,
+                      str::stream() << "Running the validate command with both { background: true }"
+                                    << " and { full: true } is not supported.");
+        }
+
+        ValidateCmdLevel level = kValidateNormal;
+        if (full) {
+            level = kValidateFull;
         }
 
         if (!serverGlobalParams.quiet.load()) {

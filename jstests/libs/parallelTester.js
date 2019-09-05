@@ -190,6 +190,12 @@ if (typeof _threadInject != "undefined") {
             // Assumes that other tests are not creating cursors.
             "kill_cursors.js",
 
+            // This test takes an IX global lock on an async thread, then runs CRUD ops needing IX
+            // locks. If a concurrent JS test queues a global X lock after the async thread takes
+            // the IX lock, and before the CRUD ops get IX locks, then there's a deadlock: the async
+            // thread will not release the acquired IX lock until the CRUD ops have finished.
+            "background_validation.js",
+
             // Views tests
             "views/invalid_system_views.js",      // Puts invalid view definitions in system.views.
             "views/views_all_commands.js",        // Drops test DB.
