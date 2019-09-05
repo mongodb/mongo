@@ -517,7 +517,7 @@ public:
     }
 
     void save() final {
-        if (_cursor && !wt_keeptxnopen()) {
+        if (_cursor) {
             try {
                 _cursor->reset(_cursor);
             } catch (const WriteConflictException&) {

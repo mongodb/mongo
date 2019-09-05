@@ -46,10 +46,6 @@ class WiredTigerConfigParser;
 class WiredTigerKVEngine;
 class WiredTigerSession;
 
-inline bool wt_keeptxnopen() {
-    return false;
-}
-
 Status wtRCToStatus_slow(int retCode, const char* prefix);
 
 /**
