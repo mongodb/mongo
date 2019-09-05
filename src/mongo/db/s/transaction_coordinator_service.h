@@ -58,6 +58,12 @@ public:
                            Date_t commitDeadline);
 
     /**
+     * Outputs a vector of BSON documents to the ops out-param containing information about active
+     * and idle coordinators in the system.
+     */
+    void reportCoordinators(OperationContext* opCtx, bool includeIdle, std::vector<BSONObj>* ops);
+
+    /**
      * If a coordinator for the (lsid, txnNumber) exists, delivers the participant list to the
      * coordinator, which will cause the coordinator to start coordinating the commit if the
      * coordinator had not yet received a list, and returns a Future that will contain the decision

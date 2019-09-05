@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/db/client.h"
+#include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
 
@@ -42,6 +44,25 @@ namespace mongo {
 class SingleTransactionCoordinatorStats {
 public:
     SingleTransactionCoordinatorStats() = default;
+
+    struct LastClientInfo {
+        std::string clientHostAndPort;
+        long long connectionId;
+        BSONObj clientMetadata;
+        std::string appName;
+
+        void update(Client* client) {
+            if (client->hasRemote()) {
+                clientHostAndPort = client->getRemote().toString();
+            }
+            connectionId = client->getConnectionId();
+            if (const auto& metadata =
+                    ClientMetadataIsMasterState::get(client).getClientMetadata()) {
+                clientMetadata = metadata.get().getDocument();
+                appName = metadata.get().getApplicationName().toString();
+            }
+        }
+    };
 
     //
     // Setters
@@ -238,6 +259,29 @@ public:
     Microseconds getDeletingCoordinatorDocDuration(TickSource* tickSource,
                                                    TickSource::Tick curTick) const;
 
+    /**
+     * Reports the time duration for each step in the two-phase commit and stores them as a
+     * sub-document of the provided parent BSONObjBuilder. The metrics are stored under key
+     * "stepDurations" in the parent document.
+     */
+    void reportMetrics(BSONObjBuilder& parent,
+                       TickSource* tickSource,
+                       TickSource::Tick curTick) const;
+
+    /**
+     * Reports information about the last client to interact with this transaction.
+     */
+    void reportLastClient(BSONObjBuilder& parent) const;
+
+    /**
+     * Updates the LastClientInfo object stored in this SingleTransactionStats instance with the
+     * given Client's information.
+     */
+    void updateLastClientInfo(Client* client) {
+        invariant(client);
+        _lastClientInfo.update(client);
+    }
+
 private:
     Date_t _createWallClockTime;
     TickSource::Tick _createTime{0};
@@ -261,6 +305,8 @@ private:
 
     Date_t _endWallClockTime;
     TickSource::Tick _endTime{0};
+
+    LastClientInfo _lastClientInfo;
 };
 
 }  // namespace mongo

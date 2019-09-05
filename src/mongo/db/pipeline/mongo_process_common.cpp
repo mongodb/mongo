@@ -111,6 +111,12 @@ std::vector<BSONObj> MongoProcessCommon::getCurrentOps(
         _reportCurrentOpsForIdleSessions(opCtx, userMode, &ops);
     }
 
+    if (!ctxAuth->getAuthorizationManager().isAuthEnabled() ||
+        userMode == CurrentOpUserMode::kIncludeAll) {
+        _reportCurrentOpsForTransactionCoordinators(
+            opCtx, sessionMode == MongoProcessInterface::CurrentOpSessionsMode::kIncludeIdle, &ops);
+    }
+
     return ops;
 }
 

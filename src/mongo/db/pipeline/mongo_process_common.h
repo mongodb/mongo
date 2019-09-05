@@ -93,6 +93,15 @@ protected:
                                                   CurrentOpUserMode userMode,
                                                   std::vector<BSONObj>* ops) const = 0;
 
+
+    /**
+     * Report information about transaction coordinators by iterating through all
+     * TransactionCoordinators in the TransactionCoordinatorCatalog.
+     */
+    virtual void _reportCurrentOpsForTransactionCoordinators(OperationContext* opCtx,
+                                                             bool includeIdle,
+                                                             std::vector<BSONObj>* ops) const = 0;
+
     /**
      * Converts an array of field names into a set of FieldPath. Throws if 'fields' contains
      * duplicate elements.

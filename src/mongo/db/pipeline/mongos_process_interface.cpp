@@ -289,6 +289,9 @@ void MongoSInterface::_reportCurrentOpsForIdleSessions(OperationContext* opCtx,
     });
 }
 
+void MongoSInterface::_reportCurrentOpsForTransactionCoordinators(
+    OperationContext* opCtx, bool includeIdle, std::vector<BSONObj>* ops) const {};
+
 std::vector<GenericCursor> MongoSInterface::getIdleCursors(
     const intrusive_ptr<ExpressionContext>& expCtx, CurrentOpUserMode userMode) const {
     invariant(hasGlobalServiceContext());
