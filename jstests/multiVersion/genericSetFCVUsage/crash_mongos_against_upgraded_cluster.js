@@ -28,6 +28,13 @@ assert(!lastStableMongos);
 // Assert that a mongos using the 'last-stable' binary version will successfully connect to a
 // cluster running on the 'latest' binary version with the 'last-stable' FCV.
 assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+
+// wait until all config server nodes are downgraded
+// awaitReplication waits for all slaves to replicate primary's latest opTime which will
+// guarantee propagation of the write to the admin.system.version collection which triggers the
+// change FCV.
+st.configRS.awaitReplication();
+
 lastStableMongos = MongoRunner.runMongos({configdb: st.configRS.getURL(), binVersion: lastStable});
 assert.neq(null,
            lastStableMongos,
