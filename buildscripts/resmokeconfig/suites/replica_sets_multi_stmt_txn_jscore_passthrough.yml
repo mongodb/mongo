@@ -234,7 +234,6 @@ selector:
 
   # Parallel Shell - we do not signal the override to end a txn when a parallel shell closes.
   - jstests/core/awaitdata_getmore_cmd.js
-  - jstests/core/background_validation.js
   - jstests/core/compact_keeps_indexes.js
   - jstests/core/count10.js
   - jstests/core/count_plan_summary.js
