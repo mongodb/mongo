@@ -1717,6 +1717,16 @@ public:
     }
 };
 
+class WhatsMySni : public CollectionBase {
+public:
+    WhatsMySni() : CollectionBase("whatsmysni") {}
+    void run() {
+        BSONObj result;
+        _client.runCommand("admin", BSON("whatsmysni" << 1), result);
+        ASSERT_EQUALS("", result["sni"].str());
+    }
+};
+
 class QueryByUuid : public CollectionBase {
 public:
     QueryByUuid() : CollectionBase("QueryByUuid") {}
@@ -1912,6 +1922,7 @@ public:
         add<QueryReadsAll>();
         add<queryobjecttests::names1>();
         add<OrderingTest>();
+        add<WhatsMySni>();
     }
 };
 

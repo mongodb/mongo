@@ -16,6 +16,7 @@
 #endif  // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
 #include "asio/detail/config.hpp"
+#include "asio/ip/address.hpp"
 
 #include "asio/detail/throw_error.hpp"
 #include "asio/error.hpp"
@@ -211,9 +212,15 @@ int engine::do_accept(void*, std::size_t) {
 
 int engine::do_connect(void*, std::size_t) {
     if (!_remoteHostName.empty()) {
-        int ret = ::SSL_set_tlsext_host_name(ssl_, _remoteHostName.c_str());
-        if (ret != 1)
-            return ret;
+        error_code ec;
+        ip::make_address(_remoteHostName, ec);
+        // only have TLS advertise _remoteHostName as an SNI if it is not an IP address
+        if (ec) {
+            int ret = ::SSL_set_tlsext_host_name(ssl_, _remoteHostName.c_str());
+            if (ret != 1) {
+                return ret;
+            }
+        }
 
         _remoteHostName.clear();
     }

@@ -526,7 +526,8 @@ let viewsCommandTests = {
     voteCommitIndexBuild: {skip: isUnrelated},
     voteCommitTransaction: {skip: isUnrelated},
     voteAbortTransaction: {skip: isUnrelated},
-    whatsmyuri: {skip: isUnrelated}
+    whatsmyuri: {skip: isUnrelated},
+    whatsmysni: {skip: isUnrelated}
 };
 
 /**

@@ -1133,7 +1133,7 @@ var ShardingTest = function(params) {
     }
 
     var keyFile = otherParams.keyFile;
-    var hostName = getHostName();
+    var hostName = otherParams.host === undefined ? getHostName() : otherParams.host;
 
     this._testName = testName;
     this._otherParams = otherParams;
@@ -1265,6 +1265,7 @@ var ShardingTest = function(params) {
             var rs = new ReplSetTest({
                 name: setName,
                 nodes: numReplicas,
+                host: hostName,
                 useHostName: otherParams.useHostname,
                 useBridge: otherParams.useBridge,
                 bridgeOptions: otherParams.bridgeOptions,
@@ -1394,6 +1395,7 @@ var ShardingTest = function(params) {
     // Using replica set for config servers
     var rstOptions = {
         useHostName: otherParams.useHostname,
+        host: hostName,
         useBridge: otherParams.useBridge,
         bridgeOptions: otherParams.bridgeOptions,
         keyFile: keyFile,

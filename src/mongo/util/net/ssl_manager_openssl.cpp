@@ -68,6 +68,7 @@
 #ifndef _WIN32
 #include <netinet/in.h>
 #endif
+#include <arpa/inet.h>
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
 #include <openssl/dh.h>
@@ -1441,9 +1442,17 @@ SSLConnectionInterface* SSLManagerOpenSSL::connect(Socket* socket) {
         _clientContext.get(), socket, (const char*)nullptr, 0);
 
     const auto undotted = removeFQDNRoot(socket->remoteAddr().hostOrIp());
-    int ret = ::SSL_set_tlsext_host_name(sslConn->ssl, undotted.c_str());
-    if (ret != 1)
-        _handleSSLError(sslConn.get(), ret);
+
+    // only have TLS advertise host name if it is not an IP address
+    int ret;
+    std::array<uint8_t, INET6_ADDRSTRLEN> unusedBuf;
+    if ((inet_pton(AF_INET, undotted.c_str(), unusedBuf.data()) == 0) &&
+        (inet_pton(AF_INET6, undotted.c_str(), unusedBuf.data()) == 0)) {
+        ret = ::SSL_set_tlsext_host_name(sslConn->ssl, undotted.c_str());
+        if (ret != 1) {
+            _handleSSLError(sslConn.get(), ret);
+        }
+    }
 
     do {
         ret = ::SSL_connect(sslConn->ssl);
