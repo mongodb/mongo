@@ -2026,7 +2026,8 @@ std::unique_ptr<SeekableRecordCursor> StandardWiredTigerRecordStore::getCursor(
         // If we already have a snapshot we don't know what it can see, unless we know no one
         // else could be writing (because we hold an exclusive lock).
         invariant(!wru->inActiveTxn() ||
-                  opCtx->lockState()->isCollectionLockedForMode(NamespaceString(_ns), MODE_X));
+                  opCtx->lockState()->isCollectionLockedForMode(NamespaceString(_ns), MODE_X) ||
+                  wru->getIsOplogReader());
         wru->setIsOplogReader();
     }
 
@@ -2077,7 +2078,8 @@ std::unique_ptr<SeekableRecordCursor> PrefixedWiredTigerRecordStore::getCursor(
         // If we already have a snapshot we don't know what it can see, unless we know no one
         // else could be writing (because we hold an exclusive lock).
         invariant(!wru->inActiveTxn() ||
-                  opCtx->lockState()->isCollectionLockedForMode(NamespaceString(_ns), MODE_X));
+                  opCtx->lockState()->isCollectionLockedForMode(NamespaceString(_ns), MODE_X) ||
+                  wru->getIsOplogReader());
         wru->setIsOplogReader();
     }
 

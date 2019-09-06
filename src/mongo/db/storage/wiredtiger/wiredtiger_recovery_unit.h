@@ -171,6 +171,10 @@ public:
         _isOplogReader = true;
     }
 
+    bool getIsOplogReader() const {
+        return _isOplogReader;
+    }
+
     /**
      * Enter a period of wait or computation during which there are no WT calls.
      * Any non-relevant cached handles can be closed.
