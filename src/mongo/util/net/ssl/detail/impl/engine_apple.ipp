@@ -189,7 +189,7 @@ bool engine::_initSSL(stream_base::handshake_type type, asio::error_code& ec) {
         status = ::SSLSetSessionOption(_ssl.get(), ::kSSLSessionOptionBreakOnClientAuth, true);
     }
 
-    if (!_remoteHostName.empty() && (status == ::errSecSuccess) {
+    if (!_remoteHostName.empty() && (status == ::errSecSuccess)) {
         error_code ec;
         ip::make_address(_remoteHostName, ec);
         if (ec) {
