@@ -125,6 +125,7 @@ selector:
   - jstests/concurrency/fsm_workloads/reindex.js
   - jstests/concurrency/fsm_workloads/reindex_background.js
   - jstests/concurrency/fsm_workloads/remove_multiple_documents.js
+  - jstests/concurrency/fsm_workloads/server_status_with_time_out_cursors.js
   - jstests/concurrency/fsm_workloads/touch_base.js
   - jstests/concurrency/fsm_workloads/touch_data.js
   - jstests/concurrency/fsm_workloads/touch_index.js
