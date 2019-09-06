@@ -281,6 +281,10 @@ public:
         invariant(client);
         _lastClientInfo.update(client);
     }
+    /*
+     * Marks this transaction coordinator has having recovered from failure.
+     */
+    void setRecoveredFromFailover();
 
 private:
     Date_t _createWallClockTime;
@@ -307,6 +311,7 @@ private:
     TickSource::Tick _endTime{0};
 
     LastClientInfo _lastClientInfo;
+    bool _hasRecoveredFromFailover = false;
 };
 
 }  // namespace mongo

@@ -2324,6 +2324,39 @@ TEST_F(TransactionCoordinatorMetricsTest,
     checkServerStatus();
 }
 
+TEST_F(TransactionCoordinatorMetricsTest, RecoveryFromFailureIndicatedInReportState) {
+    TransactionCoordinator coordinator(
+        operationContext(),
+        _lsid,
+        _txnNumber,
+        std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
+        Date_t::max());
+
+    const auto assertRecoveryFlag = [&coordinator](bool expectedFlagValue) {
+        BSONObjBuilder builder;
+        coordinator.reportState(builder);
+        auto reportDoc = builder.obj();
+        auto coordinatorDoc = reportDoc.getObjectField("twoPhaseCommitCoordinator");
+        ASSERT_EQ(coordinatorDoc.getBoolField("hasRecoveredFromFailover"), expectedFlagValue);
+    };
+
+    assertRecoveryFlag(false);
+
+    TransactionCoordinatorDocument coordinatorDoc;
+    coordinatorDoc.setParticipants(kTwoShardIdList);
+    coordinator.continueCommit(coordinatorDoc);
+
+    assertRecoveryFlag(true);
+
+    assertPrepareSentAndRespondWithSuccess();
+    assertPrepareSentAndRespondWithSuccess();
+
+    assertCommitSentAndRespondWithSuccess();
+    assertCommitSentAndRespondWithSuccess();
+
+    coordinator.onCompletion().get();
+}
+
 TEST_F(TransactionCoordinatorMetricsTest, ClientInformationIncludedInReportState) {
     const auto expectedAppName = std::string("Foo");
     associateClientMetadata(getClient(), expectedAppName);

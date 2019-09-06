@@ -50,6 +50,11 @@ public:
                   Date_t curWallClockTime);
 
     /**
+     * Called when the transaction coordinator has recovered and continues the commit.
+     */
+    void onRecoveryFromFailover();
+
+    /**
      * Updates relevant metrics when a transaction coordinator is about to write the participant
      * list.
      */
