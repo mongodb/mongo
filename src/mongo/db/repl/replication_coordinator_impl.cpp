@@ -578,9 +578,11 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
         myIndex = StatusWith<int>(-1);
     }
 
-    if (serverGlobalParams.enableMajorityReadConcern && localConfig.containsArbiter()) {
+    if (serverGlobalParams.enableMajorityReadConcern && localConfig.getNumMembers() == 3 &&
+        localConfig.getNumDataBearingMembers() == 2) {
         log() << startupWarningsLog;
-        log() << "** WARNING: This replica set uses arbiters, but readConcern:majority is enabled "
+        log() << "** WARNING: This replica set has a Primary-Secondary-Arbiter architecture, but "
+                 "readConcern:majority is enabled "
               << startupWarningsLog;
         log() << "**          for this node. This is not a recommended configuration. Please see "
               << startupWarningsLog;
