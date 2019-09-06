@@ -145,7 +145,6 @@ TransactionCoordinator::TransactionCoordinator(OperationContext* operationContex
 
                 _step = Step::kWritingParticipantList;
 
-                // TODO: The duration will be meaningless after failover.
                 _transactionCoordinatorMetricsObserver->onStartWritingParticipantList(
                     ServerTransactionCoordinatorsMetrics::get(_serviceContext),
                     _serviceContext->getTickSource(),
@@ -184,7 +183,6 @@ TransactionCoordinator::TransactionCoordinator(OperationContext* operationContex
 
                 _step = Step::kWaitingForVotes;
 
-                // TODO: The duration will be meaningless after failover.
                 _transactionCoordinatorMetricsObserver->onStartWaitingForVotes(
                     ServerTransactionCoordinatorsMetrics::get(_serviceContext),
                     _serviceContext->getTickSource(),
@@ -226,7 +224,6 @@ TransactionCoordinator::TransactionCoordinator(OperationContext* operationContex
 
                 _step = Step::kWritingDecision;
 
-                // TODO: The duration will be meaningless after failover.
                 _transactionCoordinatorMetricsObserver->onStartWritingDecision(
                     ServerTransactionCoordinatorsMetrics::get(_serviceContext),
                     _serviceContext->getTickSource(),
@@ -259,7 +256,6 @@ TransactionCoordinator::TransactionCoordinator(OperationContext* operationContex
 
                 _step = Step::kWaitingForDecisionAcks;
 
-                // TODO: The duration will be meaningless after failover.
                 _transactionCoordinatorMetricsObserver->onStartWaitingForDecisionAcks(
                     ServerTransactionCoordinatorsMetrics::get(_serviceContext),
                     _serviceContext->getTickSource(),
@@ -340,6 +336,8 @@ void TransactionCoordinator::runCommit(OperationContext* opCtx, std::vector<Shar
 void TransactionCoordinator::continueCommit(const TransactionCoordinatorDocument& doc) {
     if (!_reserveKickOffCommitPromise())
         return;
+
+    _transactionCoordinatorMetricsObserver->onRecoveryFromFailover();
 
     _participants = std::move(doc.getParticipants());
     if (doc.getDecision()) {

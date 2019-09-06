@@ -96,6 +96,10 @@ void SingleTransactionCoordinatorStats::setDeletingCoordinatorDocStartTime(
     _deletingCoordinatorDocStartWallClockTime = curWallClockTime;
 }
 
+void SingleTransactionCoordinatorStats::setRecoveredFromFailover() {
+    _hasRecoveredFromFailover = true;
+}
+
 Microseconds SingleTransactionCoordinatorStats::getDurationSinceCreation(
     TickSource* tickSource, TickSource::Tick curTick) const {
     invariant(_createTime);
@@ -198,6 +202,7 @@ void SingleTransactionCoordinatorStats::reportMetrics(BSONObjBuilder& parent,
 
     invariant(_createTime);
     parent.append("commitStartTime", _createWallClockTime);
+    parent.append("hasRecoveredFromFailover", _hasRecoveredFromFailover);
 
     if (_writingParticipantListStartTime) {
         const auto statValue = getWritingParticipantListDuration(tickSource, curTick);
@@ -243,5 +248,4 @@ void SingleTransactionCoordinatorStats::reportLastClient(BSONObjBuilder& parent)
     parent.append("appName", _lastClientInfo.appName);
     parent.append("clientMetadata", _lastClientInfo.clientMetadata);
 }
-
 }  // namespace mongo

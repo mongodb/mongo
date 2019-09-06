@@ -100,6 +100,7 @@ function assertCuropFields(coordinator,
 
     let twoPhaseCommitCoordinatorDoc = result.twoPhaseCommitCoordinator;
     assert.eq(expectedState, twoPhaseCommitCoordinatorDoc.state);
+    assert.eq(false, twoPhaseCommitCoordinatorDoc.hasRecoveredFromFailover);
     if (expectedNumParticipants) {
         assert.eq(expectedNumParticipants, twoPhaseCommitCoordinatorDoc.numParticipants);
     }

@@ -51,6 +51,12 @@ void TransactionCoordinatorMetricsObserver::onCreate(
     serverTransactionCoordinatorsMetrics->incrementTotalCreated();
 }
 
+
+void TransactionCoordinatorMetricsObserver::onRecoveryFromFailover() {
+    _singleTransactionCoordinatorStats.setRecoveredFromFailover();
+}
+
+
 void TransactionCoordinatorMetricsObserver::onStartWritingParticipantList(
     ServerTransactionCoordinatorsMetrics* serverTransactionCoordinatorsMetrics,
     TickSource* tickSource,
