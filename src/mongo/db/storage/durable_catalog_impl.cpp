@@ -601,21 +601,6 @@ void DurableCatalogImpl::putMetaData(OperationContext* opCtx,
             const auto index = md.indexes[i];
             string name = index.name();
 
-            // It is illegal for multikey paths to exist without the multikey flag set on the index,
-            // but it may be possible for multikey to be set on the index while having no multikey
-            // paths. If any of the paths are multikey, then the entire index should also be marked
-            // multikey.
-            const bool hasMultiKeyPaths =
-                std::any_of(index.multikeyPaths.begin(),
-                            index.multikeyPaths.end(),
-                            [](auto& pathSet) { return pathSet.size() > 0; });
-            invariant(!hasMultiKeyPaths || index.multikey,
-                      fmt::format("The 'multikey' field for index {} was false with non-empty "
-                                  "'multikeyPaths'. New metadata: {}, catalog document: {}",
-                                  name,
-                                  md.toBSON().toString(),
-                                  obj.toString()));
-
             // fix ident map
             BSONElement e = oldIdentMap[name];
             if (e.type() == String) {
