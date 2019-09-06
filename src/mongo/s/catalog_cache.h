@@ -228,6 +228,12 @@ public:
     void invalidateShardedCollection(const NamespaceString& nss);
 
     /**
+     * Non-blocking method, which invalidates all namespaces which contain data on the specified
+     * shard and all databases which have the shard listed as their primary shard.
+     */
+    void invalidateEntriesThatReferenceShard(const ShardId& shardId);
+
+    /**
      * Non-blocking method, which removes the entire specified collection from the cache (resulting
      * in full refresh on subsequent access)
      */

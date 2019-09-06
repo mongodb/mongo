@@ -426,16 +426,34 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
     globalConnPool.addHook(new ShardingConnectionHook(false, makeEgressHooksList(service)));
     shardConnectionPool.addHook(new ShardingConnectionHook(true, makeEgressHooksList(service)));
 
-    uassertStatusOK(initializeGlobalShardingState(
-        opCtx,
-        configCS,
-        distLockProcessId,
-        std::move(shardFactory),
-        std::make_unique<CatalogCache>(CatalogCacheLoader::get(opCtx)),
-        [service] { return makeEgressHooksList(service); },
-        // We only need one task executor here because sharding task executors aren't used for user
-        // queries in mongod.
-        1));
+    auto catalogCache = std::make_unique<CatalogCache>(CatalogCacheLoader::get(opCtx));
+
+    // List of hooks which will be called by the ShardRegistry when it discovers a shard has been
+    // removed.
+    std::vector<ShardRegistry::ShardRemovalHook> shardRemovalHooks = {
+        // Invalidate appropriate entries in the CatalogCache when a shard is removed. It's safe to
+        // capture the CatalogCache pointer since the Grid (and therefore CatalogCache and
+        // ShardRegistry) are never destroyed.
+        [catCache = catalogCache.get()](const ShardId& removedShard) {
+            catCache->invalidateEntriesThatReferenceShard(removedShard);
+        }};
+
+    uassert(ErrorCodes::BadValue,
+            "Unrecognized connection string.",
+            configCS.type() != ConnectionString::INVALID);
+
+    auto shardRegistry = std::make_unique<ShardRegistry>(
+        std::move(shardFactory), configCS, std::move(shardRemovalHooks));
+
+    uassertStatusOK(
+        initializeGlobalShardingState(opCtx,
+                                      distLockProcessId,
+                                      std::move(catalogCache),
+                                      std::move(shardRegistry),
+                                      [service] { return makeEgressHooksList(service); },
+                                      // We only need one task executor here because sharding task
+                                      // executors aren't used for user queries in mongod.
+                                      1));
 
     auto const replCoord = repl::ReplicationCoordinator::get(service);
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&

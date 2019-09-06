@@ -35,6 +35,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
+#include "mongo/s/client/shard_registry.h"
 
 namespace mongo {
 
@@ -72,14 +73,12 @@ std::unique_ptr<executor::TaskExecutor> makeShardingTaskExecutor(
     std::unique_ptr<executor::NetworkInterface> net);
 
 /**
- * Takes in the connection string for reaching the config servers and initializes the global
- * ShardingCatalogClient, ShardingCatalogManager, ShardRegistry, and Grid objects.
+ * Initializes the global ShardingCatalogClient, ShardingCatalogManager, and Grid objects.
  */
 Status initializeGlobalShardingState(OperationContext* opCtx,
-                                     const ConnectionString& configCS,
                                      StringData distLockProcessId,
-                                     std::unique_ptr<ShardFactory> shardFactory,
                                      std::unique_ptr<CatalogCache> catalogCache,
+                                     std::unique_ptr<ShardRegistry> shardRegistry,
                                      rpc::ShardingEgressMetadataHookBuilder hookBuilder,
                                      boost::optional<size_t> taskExecutorPoolSize);
 

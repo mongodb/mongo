@@ -420,6 +420,46 @@ void CatalogCache::invalidateShardedCollection(const NamespaceString& nss) {
     itDb->second[nss.ns()]->needsRefresh = true;
 }
 
+void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+
+    log() << "Starting to invalidate databases and collections with data on shard: " << shardId;
+
+    // Invalidate databases with this shard as their primary.
+    for (const auto& [dbNs, dbInfoEntry] : _databases) {
+        LOG(3) << "Checking if database " << dbNs << "has primary shard: " << shardId;
+        if (!dbInfoEntry->needsRefresh && dbInfoEntry->dbt->getPrimary() == shardId) {
+            LOG(3) << "Database " << dbNs << "has primary shard " << shardId
+                   << ", invalidating cache entry";
+            dbInfoEntry->needsRefresh = true;
+        }
+    }
+
+    // Invalidate collections which contain data on this shard.
+    for (const auto& [db, collInfoMap] : _collectionsByDb) {
+        for (const auto& [collNs, collRoutingInfoEntry] : collInfoMap) {
+
+            LOG(3) << "Checking if " << collNs << "has data on shard: " << shardId;
+
+            if (!collRoutingInfoEntry->needsRefresh) {
+                // The set of shards on which this collection contains chunks.
+                std::set<ShardId> shardsOwningDataForCollection;
+                collRoutingInfoEntry->routingInfo->getAllShardIds(&shardsOwningDataForCollection);
+
+                if (shardsOwningDataForCollection.find(shardId) !=
+                    shardsOwningDataForCollection.end()) {
+                    LOG(3) << collNs << "has data on shard " << shardId
+                           << ", invalidating cache entry";
+
+                    collRoutingInfoEntry->needsRefresh = true;
+                }
+            }
+        }
+    }
+
+    log() << "Finished invalidating databases and collections with data on shard: " << shardId;
+}
+
 void CatalogCache::purgeCollection(const NamespaceString& nss) {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
 
