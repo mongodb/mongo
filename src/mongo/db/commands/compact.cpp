@@ -105,7 +105,10 @@ public:
             return false;
         }
 
-        uassertStatusOK(compactCollection(opCtx, nss));
+        StatusWith<int64_t> status = compactCollection(opCtx, nss);
+        uassertStatusOK(status.getStatus());
+        result.appendNumber("bytesFreed", static_cast<long long>(status.getValue()));
+
         return true;
     }
 };

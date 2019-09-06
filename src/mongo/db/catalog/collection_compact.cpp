@@ -70,7 +70,8 @@ Collection* getCollectionForCompact(OperationContext* opCtx,
 
 }  // namespace
 
-Status compactCollection(OperationContext* opCtx, const NamespaceString& collectionNss) {
+StatusWith<int64_t> compactCollection(OperationContext* opCtx,
+                                      const NamespaceString& collectionNss) {
     AutoGetDb autoDb(opCtx, collectionNss.db(), MODE_IX);
     Database* database = autoDb.getDb();
     uassert(ErrorCodes::NamespaceNotFound, "database does not exist", database);
@@ -104,6 +105,7 @@ Status compactCollection(OperationContext* opCtx, const NamespaceString& collect
 
     log(LogComponent::kCommand) << "compact " << collectionNss << " begin";
 
+    auto oldTotalSize = recordStore->storageSize(opCtx) + collection->getIndexSize(opCtx);
     auto indexCatalog = collection->getIndexCatalog();
 
     if (recordStore->compactsInPlace()) {
@@ -116,8 +118,11 @@ Status compactCollection(OperationContext* opCtx, const NamespaceString& collect
         if (!status.isOK())
             return status;
 
+        auto totalSizeDiff =
+            oldTotalSize - recordStore->storageSize(opCtx) - collection->getIndexSize(opCtx);
+        log() << "compact " << collectionNss << " bytes freed: " << totalSizeDiff;
         log() << "compact " << collectionNss << " end";
-        return status;
+        return totalSizeDiff;
     }
 
     invariant(opCtx->lockState()->isCollectionLockedForMode(collectionNss, MODE_X));
@@ -196,8 +201,11 @@ Status compactCollection(OperationContext* opCtx, const NamespaceString& collect
         wunit.commit();
     }
 
+    auto totalSizeDiff =
+        oldTotalSize - recordStore->storageSize(opCtx) - collection->getIndexSize(opCtx);
+    log() << "compact " << collectionNss << " bytes freed: " << totalSizeDiff;
     log() << "compact " << collectionNss << " end";
-    return Status::OK();
+    return totalSizeDiff;
 }
 
 }  // namespace mongo
