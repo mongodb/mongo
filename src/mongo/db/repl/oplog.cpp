@@ -903,7 +903,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
          uassert(ErrorCodes::BadValue,
                  "Error parsing 'abortIndexBuild' oplog entry, missing required field "
                  "'indexBuildUUID'.",
-                 buildUUIDElem.eoo());
+                 !buildUUIDElem.eoo());
          UUID indexBuildUUID = uassertStatusOK(UUID::parse(buildUUIDElem));
 
          // We require the indexes field to ensure that rollback via refetch knows the appropriate
@@ -911,7 +911,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
          auto indexesElem = cmd.getField("indexes");
          uassert(ErrorCodes::BadValue,
                  "Error parsing 'abortIndexBuild' oplog entry, missing required field 'indexes'.",
-                 indexesElem.eoo());
+                 !indexesElem.eoo());
          uassert(ErrorCodes::BadValue,
                  "Error parsing 'abortIndexBuild' oplog entry, field 'indexes' must be an array of "
                  "index names.",
