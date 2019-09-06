@@ -161,6 +161,11 @@ public:
     }
 
     /**
+     * Gets the number of data-bearing members in this configuration.
+     */
+    int getNumDataBearingMembers() const;
+
+    /**
      * Access a MemberConfig element by index.
      */
     const MemberConfig& getMemberAt(size_t i) const;
