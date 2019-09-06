@@ -316,6 +316,8 @@ public:
 
     virtual size_t getNumUncommittedSnapshots() override;
 
+    virtual void createWMajorityWriteAvailabilityDateWaiter(OpTime opTime) override;
+
     virtual WriteConcernOptions populateUnsetWriteConcernOptionsSyncMode(
         WriteConcernOptions wc) override;
 
@@ -733,6 +735,13 @@ private:
     void _resetMyLastOpTimes(WithLock lk);
 
     /**
+     * Returns a new WriteConcernOptions based on "wc" but with UNSET syncMode reset to JOURNAL or
+     * NONE based on our rsConfig.
+     */
+    WriteConcernOptions _populateUnsetWriteConcernOptionsSyncMode(WithLock lk,
+                                                                  WriteConcernOptions wc);
+
+    /**
      * Returns the _writeConcernMajorityJournalDefault of our current _rsConfig.
      */
     bool getWriteConcernMajorityShouldJournal_inlock() const;
@@ -773,7 +782,7 @@ private:
     /**
      * Helper to wake waiters in _replicationWaiterList that are doneWaitingForReplication.
      */
-    void _wakeReadyWaiters_inlock();
+    void _wakeReadyWaiters(WithLock lk);
 
     /**
      * Scheduled to cause the ReplicationCoordinator to reconsider any state that might
@@ -1195,7 +1204,7 @@ private:
      *
      * Returns true if the value was updated to `newCommittedSnapshot`.
      */
-    bool _updateCommittedSnapshot_inlock(const OpTimeAndWallTime& newCommittedSnapshot);
+    bool _updateCommittedSnapshot(WithLock lk, const OpTimeAndWallTime& newCommittedSnapshot);
 
     /**
      * A helper method that returns the current stable optime based on the current commit point and
@@ -1390,6 +1399,9 @@ private:
     // list of information about clients waiting for a particular opTime.
     // Does *not* own the WaiterInfos.
     WaiterList _opTimeWaiterList;  // (M)
+
+    // Waiter waiting on w:majority write availability.
+    std::unique_ptr<CallbackWaiter> _wMajorityWriteAvailabilityWaiter;  // (M)
 
     // Set to true when we are in the process of shutting down replication.
     bool _inShutdown;  // (M)

@@ -853,6 +853,12 @@ public:
     virtual size_t getNumUncommittedSnapshots() = 0;
 
     /**
+     * Creates a CallbackWaiter that waits for w:majority write concern to be satisfied up to opTime
+     * before setting the 'wMajorityWriteAvailabilityDate' election candidate metric.
+     */
+    virtual void createWMajorityWriteAvailabilityDateWaiter(OpTime opTime) = 0;
+
+    /**
      * Returns a new WriteConcernOptions based on "wc" but with UNSET syncMode reset to JOURNAL or
      * NONE based on our rsConfig.
      */

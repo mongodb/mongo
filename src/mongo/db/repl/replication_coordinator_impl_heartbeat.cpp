@@ -411,6 +411,7 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
 
     // Clear the node's election candidate metrics since it is no longer primary.
     ReplicationMetrics::get(opCtx.get()).clearElectionCandidateMetrics();
+    _wMajorityWriteAvailabilityWaiter.reset();
 
     _topCoord->finishUnconditionalStepDown();
 
@@ -637,6 +638,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
 
             // Clear the node's election candidate metrics since it is no longer primary.
             ReplicationMetrics::get(opCtx.get()).clearElectionCandidateMetrics();
+            _wMajorityWriteAvailabilityWaiter.reset();
         } else {
             // Release the rstl lock as the node might have stepped down due to
             // other unconditional step down code paths like learning new term via heartbeat &

@@ -283,6 +283,11 @@ void ReplicationMetrics::setNewTermStartDate(Date_t newTermStartDate) {
     _electionCandidateMetrics.setNewTermStartDate(newTermStartDate);
 }
 
+void ReplicationMetrics::setWMajorityWriteAvailabilityDate(Date_t wMajorityWriteAvailabilityDate) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _electionCandidateMetrics.setWMajorityWriteAvailabilityDate(wMajorityWriteAvailabilityDate);
+}
+
 boost::optional<OpTime> ReplicationMetrics::getTargetCatchupOpTime_forTesting() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _electionCandidateMetrics.getTargetCatchupOpTime();
@@ -306,6 +311,7 @@ void ReplicationMetrics::clearElectionCandidateMetrics() {
     _electionCandidateMetrics.setTargetCatchupOpTime(boost::none);
     _electionCandidateMetrics.setNumCatchUpOps(boost::none);
     _electionCandidateMetrics.setNewTermStartDate(boost::none);
+    _electionCandidateMetrics.setWMajorityWriteAvailabilityDate(boost::none);
     _nodeIsCandidateOrPrimary = false;
 }
 
