@@ -147,9 +147,6 @@ selector:
   # failing the workload.
   - jstests/concurrency/fsm_workloads/agg_out.js
 
-  # Expects DocumentValidationFailure which causes transaction to abort and retry indefinitely.
-  - jstests/concurrency/fsm_workloads/schema_validator_with_expr_variables.js
-
   exclude_with_any_tags:
   - assumes_balancer_off
   - does_not_support_causal_consistency
@@ -167,6 +164,9 @@ selector:
   - state_functions_share_transaction
   # Are meant to test transactions with snapshot read concern.
   - assumes_snapshot_transactions
+  # Tests which expect commands to fail and catch the error can cause transactions to abort and
+  # retry indefinitely.
+  - catches_command_failures
 
 executor:
   archive:

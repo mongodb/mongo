@@ -1,7 +1,8 @@
 /**
  * Test to verify that the schema validator works correctly in a multi-threaded environment, when
  * $expr uses expressions which mutate variable values while executing ($let, $map etc).
- * @tags: [requires_non_retryable_writes]
+ *
+ * @tags: [requires_non_retryable_writes, catches_command_failures]
  */
 
 "use strict";
