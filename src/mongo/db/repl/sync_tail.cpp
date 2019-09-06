@@ -536,8 +536,6 @@ private:
 
             // Check the limits once per batch since users can change them at runtime.
             batchLimits.ops = getBatchLimitOplogEntries();
-            batchLimits.bytes =
-                getBatchLimitOplogBytes(cc().makeOperationContext().get(), _storageInterface);
 
             OpQueue ops(batchLimits.ops);
             {
@@ -550,6 +548,9 @@ private:
                 // interruption would be shutdown, and the ReplBatcher thread has its own shutdown
                 // handling.
                 UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+
+                // Locks the oplog to check its max size, do this in the UninterruptibleLockGuard.
+                batchLimits.bytes = getBatchLimitOplogBytes(opCtx.get(), _storageInterface);
 
                 auto oplogEntries =
                     fassertNoTrace(31004, _getNextApplierBatchFn(opCtx.get(), batchLimits));
