@@ -239,11 +239,7 @@ Status AbstractIndexAccessMethod::touch(OperationContext* opCtx, const BSONObj& 
 
     std::unique_ptr<SortedDataInterface::Cursor> cursor(_newInterface->newCursor(opCtx));
     for (const auto& keyString : keys) {
-        auto key = KeyString::toBson(keyString.getBuffer(),
-                                     keyString.getSize(),
-                                     getSortedDataInterface()->getOrdering(),
-                                     keyString.getTypeBits());
-        cursor->seekExact(key);
+        cursor->seekExact(keyString);
     }
 
     return Status::OK();
@@ -257,37 +253,40 @@ Status AbstractIndexAccessMethod::touch(OperationContext* opCtx) const {
 RecordId AbstractIndexAccessMethod::findSingle(OperationContext* opCtx,
                                                const BSONObj& requestedKey) const {
     // Generate the key for this index.
-    boost::optional<KeyString::Value> actualKey;
-    if (_btreeState->getCollator()) {
-        // For performance, call get keys only if there is a non-simple collation.
-        KeyStringSet keys;
-        KeyStringSet* multikeyMetadataKeys = nullptr;
-        MultikeyPaths* multikeyPaths = nullptr;
-        getKeys(requestedKey,
-                GetKeysMode::kEnforceConstraints,
-                &keys,
-                multikeyMetadataKeys,
-                multikeyPaths);
-        invariant(keys.size() == 1);
-        actualKey.emplace(std::move(*keys.begin()));
-    } else {
-        KeyString::HeapBuilder requestedKeyString(getSortedDataInterface()->getKeyStringVersion(),
-                                                  BSONObj::stripFieldNames(requestedKey),
-                                                  getSortedDataInterface()->getOrdering());
-        actualKey.emplace(requestedKeyString.release());
-    }
+    KeyString::Value actualKey = [&]() {
+        if (_btreeState->getCollator()) {
+            // For performance, call get keys only if there is a non-simple collation.
+            KeyStringSet keys;
+            KeyStringSet* multikeyMetadataKeys = nullptr;
+            MultikeyPaths* multikeyPaths = nullptr;
+            getKeys(requestedKey,
+                    GetKeysMode::kEnforceConstraints,
+                    &keys,
+                    multikeyMetadataKeys,
+                    multikeyPaths);
+            invariant(keys.size() == 1);
+            return *keys.begin();
+        } else {
+            KeyString::HeapBuilder requestedKeyString(
+                getSortedDataInterface()->getKeyStringVersion(),
+                BSONObj::stripFieldNames(requestedKey),
+                getSortedDataInterface()->getOrdering());
+            return requestedKeyString.release();
+        }
+    }();
 
     std::unique_ptr<SortedDataInterface::Cursor> cursor(_newInterface->newCursor(opCtx));
     const auto requestedInfo = kDebugBuild ? SortedDataInterface::Cursor::kKeyAndLoc
                                            : SortedDataInterface::Cursor::kWantLoc;
-    auto key = KeyString::toBson(actualKey->getBuffer(),
-                                 actualKey->getSize(),
-                                 getSortedDataInterface()->getOrdering(),
-                                 actualKey->getTypeBits());
-    if (auto kv = cursor->seekExact(key, requestedInfo)) {
+    if (auto kv = cursor->seekExact(actualKey, requestedInfo)) {
         // StorageEngine should guarantee these.
         dassert(!kv->loc.isNull());
-        dassert(kv->key.woCompare(key, /*order*/ BSONObj(), /*considerFieldNames*/ false) == 0);
+        dassert(kv->key.woCompare(KeyString::toBson(actualKey.getBuffer(),
+                                                    actualKey.getSize(),
+                                                    getSortedDataInterface()->getOrdering(),
+                                                    actualKey.getTypeBits()),
+                                  /*order*/ BSONObj(),
+                                  /*considerFieldNames*/ false) == 0);
 
         return kv->loc;
     }

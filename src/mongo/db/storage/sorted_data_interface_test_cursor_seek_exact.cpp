@@ -50,7 +50,12 @@ void testSeekExact_Hit(bool unique, bool forward) {
 
     auto cursor = sorted->newCursor(opCtx.get(), forward);
 
-    ASSERT_EQ(cursor->seekExact(key2), IndexKeyEntry(key2, loc1));
+    ASSERT_EQ(cursor->seekExact(makeKeyString(sorted.get(), key2)), IndexKeyEntry(key2, loc1));
+
+    // Only return the requested RecordId.
+    ASSERT_EQ(
+        cursor->seekExact(makeKeyString(sorted.get(), key2), SortedDataInterface::Cursor::kWantLoc),
+        IndexKeyEntry({}, loc1));
 
     // Make sure iterating works. We may consider loosening this requirement if it is a hardship
     // for some storage engines.
@@ -84,11 +89,11 @@ void testSeekExact_Miss(bool unique, bool forward) {
 
     auto cursor = sorted->newCursor(opCtx.get(), forward);
 
-    ASSERT_EQ(cursor->seekExact(key2), boost::none);
+    ASSERT_EQ(cursor->seekExact(makeKeyString(sorted.get(), key2)), boost::none);
 
     // Not testing iteration since the cursors position following a failed seekExact is
     // undefined. However, you must be able to seek somewhere else.
-    ASSERT_EQ(cursor->seekExact(key1), IndexKeyEntry(key1, loc1));
+    ASSERT_EQ(cursor->seekExact(makeKeyString(sorted.get(), key1)), IndexKeyEntry(key1, loc1));
 }
 TEST(SortedDataInterface, SeekExact_Miss_Unique_Forward) {
     testSeekExact_Miss(true, true);
@@ -120,7 +125,7 @@ TEST(SortedDataInterface, SeekExact_HitWithDups_Forward) {
 
     auto cursor = sorted->newCursor(opCtx.get());
 
-    ASSERT_EQ(cursor->seekExact(key2), IndexKeyEntry(key2, loc1));
+    ASSERT_EQ(cursor->seekExact(makeKeyString(sorted.get(), key2)), IndexKeyEntry(key2, loc1));
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key2, loc2));
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key3, loc1));
     ASSERT_EQ(cursor->next(), boost::none);
@@ -143,7 +148,7 @@ TEST(SortedDataInterface, SeekExact_HitWithDups_Reverse) {
 
     auto cursor = sorted->newCursor(opCtx.get(), false);
 
-    ASSERT_EQ(cursor->seekExact(key2), IndexKeyEntry(key2, loc2));
+    ASSERT_EQ(cursor->seekExact(makeKeyString(sorted.get(), key2)), IndexKeyEntry(key2, loc2));
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key2, loc1));
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key1, loc1));
     ASSERT_EQ(cursor->next(), boost::none);

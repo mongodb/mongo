@@ -557,6 +557,11 @@ public:
     void appendSetAsArray(const BSONElementSet& set, const StringTransformFn& f = nullptr);
 
     /**
+     * Appends a Discriminator byte and kEnd byte to a key string.
+     */
+    void appendDiscriminator(const Discriminator discriminator);
+
+    /**
      * Resets to an empty state.
      * Equivalent to but faster than *this = Builder(ord, discriminator)
      */
@@ -664,7 +669,6 @@ private:
     void _appendDoubleWithoutTypeBits(const double num, DecimalContinuationMarker dcm, bool invert);
     void _appendHugeDecimalWithoutTypeBits(const Decimal128 dec, bool invert);
     void _appendTinyDecimalWithoutTypeBits(const Decimal128 dec, const double bin, bool invert);
-    void _appendDiscriminator(const Discriminator discriminator);
     void _appendEnd();
 
     template <typename T>
@@ -676,7 +680,7 @@ private:
 
     void _doneAppending() {
         if (_state == BuildState::kAppendingBSONElements) {
-            _appendDiscriminator(_discriminator);
+            appendDiscriminator(_discriminator);
         }
     }
 
@@ -697,7 +701,7 @@ private:
 
         switch (_state) {
             case BuildState::kEmpty:
-                invariant(to == BuildState::kAppendingBSONElements ||
+                invariant(to == BuildState::kAppendingBSONElements || to == BuildState::kEndAdded ||
                           to == BuildState::kAppendedRecordID);
                 break;
             case BuildState::kAppendingBSONElements:

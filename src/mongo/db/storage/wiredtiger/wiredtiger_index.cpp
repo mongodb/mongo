@@ -801,7 +801,6 @@ public:
           _key(idx.getKeyStringVersion()),
           _typeBits(idx.getKeyStringVersion()),
           _query(idx.getKeyStringVersion()),
-          _queryWithoutDiscriminator(idx.getKeyStringVersion()),
           _prefix(prefix) {
         _cursor.emplace(_idx.uri(), _idx.tableId(), false, _opCtx);
     }
@@ -867,55 +866,50 @@ public:
         return KeyStringEntry(_key.getValueCopy(), _id);
     }
 
-    boost::optional<IndexKeyEntry> seekExact(const BSONObj& key, RequestedInfo) override {
-        // Create a separate KeyString that doesn't have a discriminator so that
-        // we can do a comparison with the retrieved KeyString.
-        if (!_forward) {
-            _queryWithoutDiscriminator.resetToKey(BSONObj::stripFieldNames(key),
-                                                  _idx.getOrdering(),
-                                                  KeyString::Discriminator::kInclusive);
-        }
-        // If it's a reverse cursor, a kExclusiveAfter discriminator is included to ensure that
-        // the KeyString we construct will always be greater than the KeyString that we retrieve
-        // (as it might have a RecordId). So if our cursor lands on the exact match,
-        // it does not advance to the next key (in the reverse direction)
-        const auto discriminator = _forward ? KeyString::Discriminator::kInclusive
-                                            : KeyString::Discriminator::kExclusiveAfter;
-        _query.resetToKey(BSONObj::stripFieldNames(key), _idx.getOrdering(), discriminator);
-        auto ksEntry = seekExact(_query.getValueCopy());
-        if (ksEntry) {
-            auto kv = curr(kKeyAndLoc);
-            invariant(kv);
-            return kv;
-        }
-        return {};
-    }
+    boost::optional<KeyStringEntry> seekExactForKeyString(const KeyString::Value& key) override {
+        dassert(KeyString::decodeDiscriminator(
+                    key.getBuffer(), key.getSize(), _idx.getOrdering(), key.getTypeBits()) ==
+                KeyString::Discriminator::kInclusive);
 
-    boost::optional<KeyStringEntry> seekExact(const KeyString::Value& keyStringValue) override {
-        auto ksEntry = seekForKeyString(keyStringValue);
+        auto ksEntry = [&]() {
+            if (_forward) {
+                return seekForKeyString(key);
+            }
+
+            // Append a kExclusiveAfter discriminator if it's a reverse cursor to ensure that the
+            // KeyString we construct will always be greater than the KeyString that we retrieve
+            // (even when it has a RecordId).
+            KeyString::Builder keyCopy(_idx.getKeyStringVersion(), _idx.getOrdering());
+
+            // Reset by copying all but the last byte, the kEnd byte.
+            keyCopy.resetFromBuffer(key.getBuffer(), key.getSize() - 1);
+
+            // Append a different discriminator and new end byte.
+            keyCopy.appendDiscriminator(KeyString::Discriminator::kExclusiveAfter);
+            return seekForKeyString(keyCopy.getValueCopy());
+        }();
+
         if (!ksEntry) {
             return {};
         }
 
-        // If it's a reverse cursor, we compare the KeyString we retrieved with the KeyString that
-        // doesn't have a discriminator.
-        if (!_forward) {
-            if (KeyString::compare(
-                    ksEntry->keyString.getBuffer(),
-                    _queryWithoutDiscriminator.getBuffer(),
-                    KeyString::sizeWithoutRecordIdAtEnd(ksEntry->keyString.getBuffer(),
-                                                        ksEntry->keyString.getSize()),
-                    _queryWithoutDiscriminator.getSize()) == 0) {
-                return KeyStringEntry(ksEntry->keyString, ksEntry->loc);
-            }
-            return {};
-        }
         if (KeyString::compare(ksEntry->keyString.getBuffer(),
-                               keyStringValue.getBuffer(),
+                               key.getBuffer(),
                                KeyString::sizeWithoutRecordIdAtEnd(ksEntry->keyString.getBuffer(),
                                                                    ksEntry->keyString.getSize()),
-                               keyStringValue.getSize()) == 0) {
+                               key.getSize()) == 0) {
             return KeyStringEntry(ksEntry->keyString, ksEntry->loc);
+        }
+        return {};
+    }
+
+    boost::optional<IndexKeyEntry> seekExact(const KeyString::Value& keyStringValue,
+                                             RequestedInfo parts) override {
+        auto ksEntry = seekExactForKeyString(keyStringValue);
+        if (ksEntry) {
+            auto kv = curr(parts);
+            invariant(kv);
+            return kv;
         }
         return {};
     }
@@ -1183,7 +1177,6 @@ protected:
     bool _lastMoveSkippedKey = false;
 
     KeyString::Builder _query;
-    KeyString::Builder _queryWithoutDiscriminator;
     KVPrefix _prefix;
 
     std::unique_ptr<KeyString::Builder> _endPosition;

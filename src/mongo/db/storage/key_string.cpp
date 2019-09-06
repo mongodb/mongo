@@ -398,7 +398,7 @@ void BuilderBase<BufferT>::appendSetAsArray(const BSONElementSet& set, const Str
 }
 
 template <class BufferT>
-void BuilderBase<BufferT>::_appendDiscriminator(const Discriminator discriminator) {
+void BuilderBase<BufferT>::appendDiscriminator(const Discriminator discriminator) {
     // The discriminator forces this KeyString to compare Less/Greater than any KeyString with
     // the same prefix of keys. As an example, this can be used to land on the first key in the
     // index with the value "a" regardless of the RecordId. In compound indexes it can use a
@@ -414,8 +414,8 @@ void BuilderBase<BufferT>::_appendDiscriminator(const Discriminator discriminato
             break;  // No discriminator byte.
     }
 
-    // TODO consider omitting kEnd when using a discriminator byte. It is not a storage format
-    // change since keystrings with discriminators are not allowed to be stored.
+    // TODO (SERVER-43178): consider omitting kEnd when using a discriminator byte. It is not a
+    // storage format change since keystrings with discriminators are not allowed to be stored.
     _appendEnd();
 }
 // ----------------------------------------------------------------------
@@ -449,7 +449,7 @@ void BuilderBase<BufferT>::_appendAllElementsForIndexing(const BSONObj& obj,
             invariant(!it.more());
         }
     }
-    _appendDiscriminator(discriminator);
+    appendDiscriminator(discriminator);
 }
 
 template <class BufferT>
@@ -2451,13 +2451,11 @@ BSONObj toBsonSafeWithDiscriminator(const char* buffer,
 }
 
 // This discriminator byte only exists in KeyStrings for queries, not in KeyStrings stored in an
-// index. This function is only used by Biggie because it needs to extract the discriminator to do
-// the query.
+// index.
 Discriminator decodeDiscriminator(const char* buffer,
                                   size_t len,
                                   Ordering ord,
                                   const TypeBits& typeBits) {
-    BSONObjBuilder builder;
     BufReader reader(buffer, len);
     TypeBits::Reader typeBitsReader(typeBits);
     for (int i = 0; reader.remaining(); i++) {
@@ -2473,7 +2471,7 @@ Discriminator decodeDiscriminator(const char* buffer,
 
         if (ctype == kEnd)
             break;
-        toBsonValue(ctype, &reader, &typeBitsReader, invert, typeBits.version, &(builder << ""), 1);
+        filterKeyFromKeyString(ctype, &reader, invert, typeBits.version);
     }
     return Discriminator::kInclusive;
 }

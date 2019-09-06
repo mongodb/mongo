@@ -122,10 +122,10 @@ public:
                                                     RequestedInfo parts = kKeyAndLoc) override;
         virtual boost::optional<KeyStringEntry> seekForKeyString(
             const KeyString::Value& keyStringValue) override;
-        virtual boost::optional<IndexKeyEntry> seekExact(const BSONObj& key,
-                                                         RequestedInfo parts = kKeyAndLoc) override;
-        virtual boost::optional<KeyStringEntry> seekExact(
+        virtual boost::optional<KeyStringEntry> seekExactForKeyString(
             const KeyString::Value& keyStringValue) override;
+        virtual boost::optional<IndexKeyEntry> seekExact(const KeyString::Value& keyStringValue,
+                                                         RequestedInfo) override;
         virtual void save() override;
         virtual void restore() override;
         virtual void detachFromOperationContext() override;

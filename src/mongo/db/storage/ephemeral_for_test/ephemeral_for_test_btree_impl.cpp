@@ -357,27 +357,41 @@ public:
             }
         }
 
-        boost::optional<IndexKeyEntry> seekExact(const BSONObj& key, RequestedInfo) {
-            auto kv = _seek(key, true, kKeyAndLoc);
-            if (kv && kv->key.woCompare(key, BSONObj(), /*considerFieldNames*/ false) == 0)
+        boost::optional<IndexKeyEntry> _seekExact(const BSONObj& key, RequestedInfo parts) {
+            auto kv = _seek(key, true, parts);
+            if (!kv || kv->key.woCompare(key, BSONObj(), /*considerFieldNames*/ false) != 0)
+                return {};
+
+            if (parts & SortedDataInterface::Cursor::kWantKey) {
                 return kv;
-            return {};
+            }
+            return IndexKeyEntry{{}, kv->loc};
         }
 
-        boost::optional<KeyStringEntry> seekExact(const KeyString::Value& keyStringValue) {
+        boost::optional<KeyStringEntry> seekExactForKeyString(
+            const KeyString::Value& keyStringValue) override {
             const BSONObj query = KeyString::toBson(keyStringValue.getBuffer(),
                                                     keyStringValue.getSize(),
                                                     _ordering,
                                                     keyStringValue.getTypeBits());
-            auto kv = seekExact(query, kKeyAndLoc);
+            auto kv = _seekExact(query, kKeyAndLoc);
             if (kv) {
-                // We have retrived a valid result from seekExact(). Convert to KeyString
+                // We have retrived a valid result from _seekExact(). Convert to KeyString
                 // and return
                 KeyString::Builder ks(KeyString::Version::V1, kv->key, _ordering);
                 ks.appendRecordId(kv->loc);
                 return KeyStringEntry(ks.getValueCopy(), kv->loc);
             }
             return {};
+        }
+
+        boost::optional<IndexKeyEntry> seekExact(const KeyString::Value& keyStringValue,
+                                                 RequestedInfo parts) override {
+            const BSONObj query = KeyString::toBson(keyStringValue.getBuffer(),
+                                                    keyStringValue.getSize(),
+                                                    _ordering,
+                                                    keyStringValue.getTypeBits());
+            return _seekExact(query, parts);
         }
 
         void save() override {

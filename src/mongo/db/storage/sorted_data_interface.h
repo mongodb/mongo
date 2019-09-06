@@ -288,11 +288,26 @@ public:
          * Seeks to a key with a hint to the implementation that you only want exact matches. If
          * an exact match can't be found, boost::none will be returned and the resulting
          * position of the cursor is unspecified.
+         *
+         * This will not accept a KeyString with a Discriminator other than kInclusive. Since
+         * keys are not stored with Discriminators, an exact match would never be found.
          */
-        virtual boost::optional<IndexKeyEntry> seekExact(const BSONObj& key,
-                                                         RequestedInfo parts = kKeyAndLoc) = 0;
+        virtual boost::optional<KeyStringEntry> seekExactForKeyString(
+            const KeyString::Value& keyString) = 0;
 
-        virtual boost::optional<KeyStringEntry> seekExact(const KeyString::Value& keyString) = 0;
+        /**
+         * Seeks to a key with a hint to the implementation that you only want exact matches. If
+         * an exact match can't be found, boost::none will be returned and the resulting
+         * position of the cursor is unspecified.
+         *
+         * This will not accept a KeyString with a Discriminator other than kInclusive. Since
+         * keys are not stored with Discriminators, an exact match would never be found.
+         *
+         * Unlike the previous method, this one will return IndexKeyEntry if an exact match is
+         * found.
+         */
+        virtual boost::optional<IndexKeyEntry> seekExact(const KeyString::Value& keyString,
+                                                         RequestedInfo parts = kKeyAndLoc) = 0;
 
         //
         // Saving and restoring state

@@ -848,26 +848,13 @@ boost::optional<KeyStringEntry> SortedDataInterface::Cursor::seekForKeyString(
     return seekAfterProcessing(keyStringValue);
 }
 
-boost::optional<IndexKeyEntry> SortedDataInterface::Cursor::seekExact(const BSONObj& key,
-                                                                      RequestedInfo) {
-    BSONObj finalKey = BSONObj::stripFieldNames(key);
-    KeyString::Builder keyString(KeyString::Version::V1, finalKey, _order);
-    auto ksEntry = seekExact(keyString.getValueCopy());
-    if (ksEntry) {
-        const BSONObj bson = KeyString::toBson(ksEntry->keyString.getBuffer(),
-                                               ksEntry->keyString.getSize(),
-                                               _order,
-                                               ksEntry->keyString.getTypeBits());
-        auto kv = seekAfterProcessing(bson);
-        if (kv) {
-            return kv;
-        }
-    }
-    return {};
-}
-
-boost::optional<KeyStringEntry> SortedDataInterface::Cursor::seekExact(
+boost::optional<KeyStringEntry> SortedDataInterface::Cursor::seekExactForKeyString(
     const KeyString::Value& keyStringValue) {
+    dassert(KeyString::decodeDiscriminator(keyStringValue.getBuffer(),
+                                           keyStringValue.getSize(),
+                                           _order,
+                                           keyStringValue.getTypeBits()) ==
+            KeyString::Discriminator::kInclusive);
     auto ksEntry = seekForKeyString(keyStringValue);
     if (!ksEntry) {
         return {};
@@ -880,6 +867,23 @@ boost::optional<KeyStringEntry> SortedDataInterface::Cursor::seekExact(
         return KeyStringEntry(ksEntry->keyString, ksEntry->loc);
     }
     return {};
+}
+
+boost::optional<IndexKeyEntry> SortedDataInterface::Cursor::seekExact(
+    const KeyString::Value& keyStringValue, RequestedInfo parts) {
+    auto ksEntry = seekExactForKeyString(keyStringValue);
+    if (!ksEntry) {
+        return {};
+    }
+
+    BSONObj bson;
+    if (parts & SortedDataInterface::Cursor::kWantKey) {
+        bson = KeyString::toBson(ksEntry->keyString.getBuffer(),
+                                 ksEntry->keyString.getSize(),
+                                 _order,
+                                 ksEntry->keyString.getTypeBits());
+    }
+    return IndexKeyEntry(std::move(bson), ksEntry->loc);
 }
 
 void SortedDataInterface::Cursor::save() {
