@@ -91,6 +91,7 @@ selector:
   - jstests/sharding/restart_transactions.js
   - jstests/sharding/shard7.js
   - jstests/sharding/shard_config_db_collections.js
+  - jstests/sharding/shard_removal_triggers_catalog_cache_invalidation.js
   - jstests/sharding/unsharded_collection_targetting.js
   - jstests/sharding/array_shard_key.js
   - jstests/sharding/update_immutable_fields.js

@@ -87,8 +87,11 @@ const Seconds kRefreshPeriod(30);
 const ShardId ShardRegistry::kConfigServerShardId = ShardId("config");
 
 ShardRegistry::ShardRegistry(std::unique_ptr<ShardFactory> shardFactory,
-                             const ConnectionString& configServerCS)
-    : _shardFactory(std::move(shardFactory)), _initConfigServerCS(configServerCS) {}
+                             const ConnectionString& configServerCS,
+                             std::vector<ShardRemovalHook> shardRemovalHooks)
+    : _shardFactory(std::move(shardFactory)),
+      _initConfigServerCS(configServerCS),
+      _shardRemovalHooks(std::move(shardRemovalHooks)) {}
 
 ShardRegistry::~ShardRegistry() {
     shutdown();
@@ -334,6 +337,11 @@ bool ShardRegistry::reload(OperationContext* opCtx) {
 
         auto name = shard->getConnString().getSetName();
         ReplicaSetMonitor::remove(name);
+        for (auto& callback : _shardRemovalHooks) {
+            // Run callbacks asynchronously.
+            ExecutorFuture<void>(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor())
+                .getAsync([=](const Status&) { callback(shardId); });
+        }
     }
 
     nextReloadState = ReloadState::Idle;

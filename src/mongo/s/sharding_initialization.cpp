@@ -58,7 +58,6 @@
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_factory.h"
-#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/sharding_network_connection_hook.h"
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/grid.h"
@@ -163,16 +162,11 @@ std::string generateDistLockProcessId(OperationContext* opCtx) {
 }
 
 Status initializeGlobalShardingState(OperationContext* opCtx,
-                                     const ConnectionString& configCS,
                                      StringData distLockProcessId,
-                                     std::unique_ptr<ShardFactory> shardFactory,
                                      std::unique_ptr<CatalogCache> catalogCache,
+                                     std::unique_ptr<ShardRegistry> shardRegistry,
                                      rpc::ShardingEgressMetadataHookBuilder hookBuilder,
                                      boost::optional<size_t> taskExecutorPoolSize) {
-    if (configCS.type() == ConnectionString::INVALID) {
-        return {ErrorCodes::BadValue, "Unrecognized connection string."};
-    }
-
     ConnectionPool::Options connPoolOptions;
     connPoolOptions.controllerFactory = []() noexcept {
         return std::make_shared<ShardingTaskExecutorPoolController>();
@@ -190,7 +184,7 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
 
     grid->init(makeCatalogClient(service, distLockProcessId),
                std::move(catalogCache),
-               stdx::make_unique<ShardRegistry>(std::move(shardFactory), configCS),
+               std::move(shardRegistry),
                stdx::make_unique<ClusterCursorManager>(service->getPreciseClockSource()),
                stdx::make_unique<BalancerConfiguration>(),
                std::move(executorPool),

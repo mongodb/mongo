@@ -147,13 +147,22 @@ public:
     static const ShardId kConfigServerShardId;
 
     /**
+     * A callback type for functions that can be called on shard removal.
+     */
+    using ShardRemovalHook = std::function<void(const ShardId&)>;
+
+    /**
      * Instantiates a new shard registry.
      *
-     * @param shardFactory Makes shards
-     * @param configServerCS ConnectionString used for communicating with the config servers
+     * @param shardFactory      Makes shards
+     * @param configServerCS    ConnectionString used for communicating with the config servers
+     * @param shardRemovalHooks A list of hooks that will be called when a shard is removed. The
+     *                          hook is expected not to throw. If it does throw, the process will be
+     *                          terminated.
      */
     ShardRegistry(std::unique_ptr<ShardFactory> shardFactory,
-                  const ConnectionString& configServerCS);
+                  const ConnectionString& configServerCS,
+                  std::vector<ShardRemovalHook> shardRemovalHooks = {});
 
     ~ShardRegistry();
     /**
@@ -282,6 +291,13 @@ private:
      * shard
      */
     ConnectionString _initConfigServerCS;
+
+    /**
+     * A list of callbacks to be called asynchronously when it has been discovered that a shard was
+     * removed.
+     */
+    std::vector<ShardRemovalHook> _shardRemovalHooks;
+
     void _internalReload(const executor::TaskExecutor::CallbackArgs& cbArgs);
     ShardRegistryData _data;
 
