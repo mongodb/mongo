@@ -216,6 +216,37 @@ class DivideTestsIntoSuitesByMaxtimeTest(unittest.TestCase):
             total_tests += suite.get_test_count()
         self.assertEqual(total_tests, len(tests_runtimes))
 
+    def test_max_tests_per_suites_is_one(self):
+        max_time = 5
+        num_tests = 10
+        tests_runtimes = [(f"tests_{i}", i) for i in range(num_tests)]
+
+        suites = under_test.divide_tests_into_suites(tests_runtimes, max_time,
+                                                     max_tests_per_suite=1)
+
+        self.assertEqual(len(suites), num_tests)
+
+    def test_max_tests_per_suites_is_less_than_number_of_tests(self):
+        max_time = 100
+        num_tests = 10
+        tests_runtimes = [(f"tests_{i}", 1) for i in range(num_tests)]
+
+        suites = under_test.divide_tests_into_suites(tests_runtimes, max_time,
+                                                     max_tests_per_suite=2)
+
+        self.assertEqual(len(suites), num_tests // 2)
+
+    def test_max_suites_overrides_max_tests_per_suite(self):
+        max_time = 100
+        num_tests = 10
+        max_suites = 2
+        tests_runtimes = [(f"tests_{i}", 1) for i in range(num_tests)]
+
+        suites = under_test.divide_tests_into_suites(tests_runtimes, max_time,
+                                                     max_suites=max_suites, max_tests_per_suite=2)
+
+        self.assertEqual(len(suites), max_suites)
+
 
 class SuiteTest(unittest.TestCase):
     def test_adding_tests_increases_count_and_runtime(self):
@@ -579,6 +610,7 @@ class GenerateSubSuitesTest(unittest.TestCase):
         options = Mock()
         options.target_resmoke_time = 10
         options.fallback_num_sub_suites = 2
+        options.max_tests_per_suite = None
         return options
 
     @staticmethod
