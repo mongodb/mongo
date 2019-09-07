@@ -47,13 +47,8 @@ function getSNISharded(params) {
         host: params.bind_ip,
         other: {configOptions: params, mongosOptions: params, shardOptions: params}
     });
-    let db = s.getDB("admin");
-
-    // sort of have to fish out the value from deep within the output of multicast...
-    const multicastData =
-        assert.commandWorked(db.runCommand({multicast: {whatsmysni: 1}}))["hosts"];
-    const hostName = Object.keys(multicastData)[0];
-    const sni = multicastData[hostName]["data"]["sni"];
+    let db = s.shard0.getDB("admin");
+    const sni = db.runCommand({whatsmysni: 1})['sni'];
 
     s.stop();
 
