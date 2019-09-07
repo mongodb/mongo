@@ -1079,6 +1079,11 @@ boost::optional<std::string> getRawSNIServerName(::SSLContextRef _ssl) {
         return boost::none;
     }
     ret.resize(len);
+
+    while (!ret.empty() && ret.back() == '\0') {
+        ret.pop_back();
+    }
+
     return ret;
 }
 
