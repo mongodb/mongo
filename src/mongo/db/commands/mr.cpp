@@ -612,18 +612,42 @@ void State::prepTempCollection() {
         auto const tempColl =
             db->createCollection(_opCtx, _config.tempNamespace, options, buildIdIndex);
 
-        for (const auto& indexToInsert : indexesToInsert) {
-            try {
-                uassertStatusOK(tempColl->getIndexCatalog()->createIndexOnEmptyCollection(
-                    _opCtx, indexToInsert));
-            } catch (const ExceptionFor<ErrorCodes::IndexAlreadyExists>&) {
-                continue;
+        if (!indexesToInsert.empty()) {
+            // Emit startIndexBuild and commitIndexBuild oplog entries if supported by the
+            // current FCV.
+            auto opObserver = _opCtx->getServiceContext()->getOpObserver();
+            const auto& tmpName = _config.tempNamespace;
+            auto fromMigrate = false;
+            auto buildUUID = serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+                    serverGlobalParams.featureCompatibility.getVersion() ==
+                        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44
+                ? boost::make_optional(UUID::gen())
+                : boost::none;
+
+            if (buildUUID) {
+                opObserver->onStartIndexBuild(
+                    _opCtx, tmpName, tempColl->uuid(), *buildUUID, indexesToInsert, fromMigrate);
             }
 
-            // Log the createIndex operation.
-            _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                _opCtx, _config.tempNamespace, tempColl->uuid(), indexToInsert, false);
+            for (const auto& indexToInsert : indexesToInsert) {
+                try {
+                    uassertStatusOK(tempColl->getIndexCatalog()->createIndexOnEmptyCollection(
+                        _opCtx, indexToInsert));
+                } catch (const ExceptionFor<ErrorCodes::IndexAlreadyExists>&) {
+                    continue;
+                }
+
+                // Log the createIndex operation.
+                opObserver->onCreateIndex(
+                    _opCtx, tmpName, tempColl->uuid(), indexToInsert, fromMigrate);
+            }
+
+            if (buildUUID) {
+                opObserver->onCommitIndexBuild(
+                    _opCtx, tmpName, tempColl->uuid(), *buildUUID, indexesToInsert, fromMigrate);
+            }
         }
+
         wuow.commit();
 
         CollectionShardingRuntime::get(_opCtx, _config.tempNamespace)
