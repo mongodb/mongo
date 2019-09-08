@@ -2242,31 +2242,28 @@ public:
             BSON("renameCollection" << nss.ns() << "to" << renamedNss.ns() << "dropTarget" << true),
             renameResult);
 
-        const auto createIndexesDocument =
-            queryOplog(BSON("ns" << renamedNss.db() + ".$cmd"
-                                 << "o.createIndexes" << BSON("$exists" << true)));
+        const auto commitIndexBuildDocument = queryOplog(
+            BSON("ns" << renamedNss.db() + ".$cmd"
+                      << "o.commitIndexBuild" << BSON("$exists" << true) << "o.indexes.0.name"
+                      << "a_1"
+                      << "o.indexes.1.name"
+                      << "b_1"));
 
         // Find index creation timestamps.
-        const auto createIndexesString =
-            createIndexesDocument["o"].embeddedObject()["createIndexes"].toString();
-        const std::string filterString = "createIndexes: \"";
+        const auto commitIndexBuildString =
+            commitIndexBuildDocument["o"].embeddedObject()["commitIndexBuild"].toString();
+        const std::string filterString = "commitIndexBuild: \"";
         const NamespaceString tmpName(
             renamedNss.db(),
-            createIndexesString.substr(filterString.size(),
-                                       createIndexesString.size() - filterString.size() - 1));
+            commitIndexBuildString.substr(filterString.size(),
+                                          commitIndexBuildString.size() - filterString.size() - 1));
 
         const Timestamp indexCreateInitTs = queryOplog(BSON("op"
                                                             << "c"
                                                             << "o.create" << tmpName.coll()))["ts"]
                                                 .timestamp();
 
-        const Timestamp indexAComplete = createIndexesDocument["ts"].timestamp();
-        const Timestamp indexBComplete = queryOplog(BSON("op"
-                                                         << "c"
-                                                         << "o.createIndexes" << tmpName.coll()
-                                                         << "o.name"
-                                                         << "b_1"))["ts"]
-                                             .timestamp();
+        const Timestamp indexCommitTs = commitIndexBuildDocument["ts"].timestamp();
 
         // We expect one new collection ident and one new index ident (the _id index) during this
         // rename.
@@ -2277,21 +2274,14 @@ public:
         // after this rename. The a_1 and b_1 index idents are created and persisted with the
         // "ready: true" write.
         assertRenamedCollectionIdentsAtTimestamp(
-            durableCatalog, origIdents, /*expectedNewIndexIdents*/ 3, indexBComplete);
+            durableCatalog, origIdents, /*expectedNewIndexIdents*/ 3, indexCommitTs);
 
-        // Assert the `a_1` index becomes ready at the next oplog entry time.
+        // Assert the 'a_1' and `b_1` indexes becomes ready at the last oplog entry time.
         ASSERT_TRUE(
-            getIndexMetaData(getMetaDataAtTime(durableCatalog, renamedNss, indexAComplete), "a_1")
-                .ready);
-        assertIndexMetaDataMissing(getMetaDataAtTime(durableCatalog, renamedNss, indexAComplete),
-                                   "b_1");
-
-        // Assert the `b_1` index becomes ready at the last oplog entry time.
-        ASSERT_TRUE(
-            getIndexMetaData(getMetaDataAtTime(durableCatalog, renamedNss, indexBComplete), "a_1")
+            getIndexMetaData(getMetaDataAtTime(durableCatalog, renamedNss, indexCommitTs), "a_1")
                 .ready);
         ASSERT_TRUE(
-            getIndexMetaData(getMetaDataAtTime(durableCatalog, renamedNss, indexBComplete), "b_1")
+            getIndexMetaData(getMetaDataAtTime(durableCatalog, renamedNss, indexCommitTs), "b_1")
                 .ready);
     }
 };
