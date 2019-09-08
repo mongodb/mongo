@@ -14,17 +14,14 @@
 #ifndef BASE_LOGGING_H
 #define BASE_LOGGING_H
 
-#include <iosfwd>
-
-#include "mongo/logger/log_severity.h"
-#include "mongo/logger/logger.h"
-#include "mongo/logger/logstream_builder.h"
-#include "mongo/util/concurrency/thread_name.h"
+#include <iostream>
+#include <sstream>
+#include <memory>
 
 #include "macros.h"
 
 // Always-on checking
-#define CHECK(x)	if(x){}else LogMessageFatal(__FILE__, __LINE__).stream() << "Check failed: " #x
+#define CHECK(x)	if(x){}else FATAL << "Check failed: " #x
 #define CHECK_LT(x, y)	CHECK((x) < (y))
 #define CHECK_GT(x, y)	CHECK((x) > (y))
 #define CHECK_LE(x, y)	CHECK((x) <= (y))
@@ -43,7 +40,7 @@
 #define DCHECK_GE(val1, val2) CHECK_GE(val1, val2)
 #define DCHECK_GT(val1, val2) CHECK_GT(val1, val2)
 #else
-#define DCHECK(x) if(x){}else LogMessageWarning(__FILE__, __LINE__).stream() << "Check failed: " #x
+#define DCHECK(x) if(x){}else WARN << "Check failed: " #x
 #define DCHECK_LT(x, y)  DCHECK((x) < (y))
 #define DCHECK_GT(x, y)  DCHECK((x) > (y))
 #define DCHECK_LE(x, y)  DCHECK((x) <= (y))
@@ -53,56 +50,76 @@
 #endif
 
 #include "base/port.h"
-#define INFO LogMessageInfo().stream()
-#define WARN LogMessageWarning(__FILE__, __LINE__).stream()
-#define FATAL LogMessageFatal(__FILE__, __LINE__).stream()
-#define DFATAL LogMessageFatal(__FILE__, __LINE__).stream()
+#define INFO s2_env::LogMessage(s2_env::LogMessage::Severity::kInfo).stream()
+#define WARN s2_env::LogMessage(s2_env::LogMessage::Severity::kWarning, __FILE__, __LINE__).stream()
+#define FATAL s2_env::LogMessage(s2_env::LogMessage::Severity::kFatal, __FILE__, __LINE__).stream()
+#define DFATAL s2_env::LogMessage(s2_env::LogMessage::Severity::kFatal, __FILE__, __LINE__).stream()
 
-// VLOG messages will be logged at debug level 5 with the S2 log component.
 #define S2LOG(x) x
-// Expansion of MONGO_LOG_COMPONENT defined in mongo/util/log.h
 #define VLOG(x) \
-    if (!(::mongo::logger::globalLogDomain())->shouldLog(::mongo::logger::LogComponent::kGeo, ::mongo::logger::LogSeverity::Debug(5))) {} \
-    else ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(), ::mongo::getThreadName(), ::mongo::logger::LogSeverity::Debug(5), ::mongo::logger::LogComponent::kGeo)
+  if (!s2_env::globalLoggingEnv().shouldVLog((int)x)) { \
+  } else s2_env::LogMessage(int(x)).stream()
 
-class LogMessageBase {
+namespace s2_env {
+
+class LogMessageSink {
 public:
-    LogMessageBase(::mongo::logger::LogstreamBuilder builder);
-    LogMessageBase(::mongo::logger::LogstreamBuilder builder, const char* file, int line);
-    virtual ~LogMessageBase() { };
-    std::ostream& stream() { return _lsb.stream(); }
+  virtual ~LogMessageSink();
+  virtual std::ostream& stream() = 0;
+};
+
+class LogMessage {
+public:
+  enum class Severity {
+    kInfo,
+    kWarning,
+    kFatal,
+  };
+
+  explicit LogMessage(int verbosity);
+  explicit LogMessage(Severity severity);
+  explicit LogMessage(Severity severity, const char* file, int line);
+
+  virtual ~LogMessage();
+
+  std::ostream& stream() {
+    return _sink->stream();
+  }
+
 protected:
-    // Fatal message will deconstruct it before abort to flush final message.
-    mongo::logger::LogstreamBuilder _lsb;
-private:
-    DISALLOW_COPY_AND_ASSIGN(LogMessageBase);
+  std::unique_ptr<LogMessageSink> _sink;
 };
 
-class LogMessageInfo : public LogMessageBase {
+class StringStream {
 public:
-    LogMessageInfo();
-    virtual ~LogMessageInfo() { };
+  StringStream() = default;
+
+  template <typename T>
+  StringStream& operator<<(T&& t) {
+    _s << std::forward<T>(t);
+    return *this;
+  }
+
+  operator std::string() const {
+    return _s.str();
+  }
 
 private:
-    DISALLOW_COPY_AND_ASSIGN(LogMessageInfo);
+  std::ostringstream _s;
 };
 
-class LogMessageWarning : public LogMessageBase {
+class LoggingEnv {
 public:
-    LogMessageWarning(const char* file, int line);
-    virtual ~LogMessageWarning() { };
-
-private:
-    DISALLOW_COPY_AND_ASSIGN(LogMessageWarning);
+  virtual ~LoggingEnv();
+  virtual bool shouldVLog(int verbosity) = 0;
+  virtual std::unique_ptr<LogMessageSink> makeSink(int verbosity) = 0;
+  virtual std::unique_ptr<LogMessageSink> makeSink(LogMessage::Severity severity) = 0;
+  virtual std::unique_ptr<LogMessageSink> makeSink(LogMessage::Severity severity,
+                                                   const char* file, int line) = 0;
 };
 
-class LogMessageFatal : public LogMessageBase {
-public:
-    LogMessageFatal(const char* file, int line);
-    virtual ~LogMessageFatal();
+// provided by logging_mongo.cc
+LoggingEnv& globalLoggingEnv();
 
-private:
-    DISALLOW_COPY_AND_ASSIGN(LogMessageFatal);
-};
-
+}  // namespace s2_env
 #endif  // BASE_LOGGING_H
