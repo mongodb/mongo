@@ -894,17 +894,21 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
             opCtx = uniqueOpCtx.get();
         }
 
-        try {
-            // For faster tests, we allow a short wait time with setParameter.
-            auto waitTime = repl::waitForStepDownOnNonCommandShutdown.load()
-                ? Milliseconds(Seconds(10))
-                : Milliseconds(100);
-
-            replCoord->stepDown(opCtx, false /* force */, waitTime, Seconds(120));
-        } catch (const ExceptionFor<ErrorCodes::NotMaster>&) {
-            // ignore not master errors
-        } catch (const DBException& e) {
-            log() << "Failed to stepDown in non-command initiated shutdown path " << e.toString();
+        // If this is a single node replica set, then we don't have to wait
+        // for any secondaries. Ignore stepdown.
+        if (repl::ReplicationCoordinator::get(serviceContext)->getConfig().getNumMembers() != 1) {
+            try {
+                // For faster tests, we allow a short wait time with setParameter.
+                auto waitTime = repl::waitForStepDownOnNonCommandShutdown.load()
+                    ? Milliseconds(Seconds(10))
+                    : Milliseconds(100);
+                replCoord->stepDown(opCtx, false /* force */, waitTime, Seconds(120));
+            } catch (const ExceptionFor<ErrorCodes::NotMaster>&) {
+                // ignore not master errors
+            } catch (const DBException& e) {
+                log() << "Failed to stepDown in non-command initiated shutdown path "
+                      << e.toString();
+            }
         }
     }
 
