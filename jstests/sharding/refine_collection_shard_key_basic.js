@@ -55,10 +55,12 @@ function validateConfigCollections(keyDoc, oldEpoch) {
 }
 
 function validateConfigChangelog(count) {
-    assert.eq(count,
-              mongos.getCollection(kConfigChangelog)
-                  .find({what: 'refineCollectionShardKey.start', ns: kNsName})
-                  .itcount());
+    // We allow for more than one entry in the changelog for the 'start' message, because a config
+    // server stepdown can cause the command to be retried and the changelog entry to be rewritten.
+    assert.gte(count,
+               mongos.getCollection(kConfigChangelog)
+                   .find({what: 'refineCollectionShardKey.start', ns: kNsName})
+                   .itcount());
     assert.eq(count,
               mongos.getCollection(kConfigChangelog)
                   .find({what: 'refineCollectionShardKey.end', ns: kNsName})
