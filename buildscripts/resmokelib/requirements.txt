@@ -2,6 +2,6 @@ mock == 2.0.0 ; python_version < "3"
 pymongo >= 3.0
 pypiwin32 == 219 ; sys_platform == "win32" and python_version < "3"
 pypiwin32 == 223 ; sys_platform == "win32" and python_version > "3"
-PyYAML == 3.11
+PyYAML == 5.1
 requests >= 2.16.1
 subprocess32 >= 3.2.7 ; os_name == "posix" and python_version < "3"

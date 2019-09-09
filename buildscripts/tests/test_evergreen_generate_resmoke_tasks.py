@@ -10,11 +10,9 @@ import unittest
 import requests
 import yaml
 
-from mock import patch, mock_open, call, Mock
+from mock import patch, mock_open, call, MagicMock
 
-from buildscripts import evergreen_generate_resmoke_tasks as grt
-from buildscripts.evergreen_generate_resmoke_tasks import render_suite, render_misc_suite, \
-    prepare_directory_for_suite
+from buildscripts import evergreen_generate_resmoke_tasks as under_test
 
 # pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access
 
@@ -35,7 +33,7 @@ class TestTestStats(unittest.TestCase):
             self._make_evg_result("dir/test2.js", 1, 30),
             self._make_evg_result("dir/test1.js", 2, 25),
         ]
-        test_stats = grt.TestStats(evg_results)
+        test_stats = under_test.TestStats(evg_results)
         expected_runtimes = [
             ("dir/test2.js", 30),
             ("dir/test1.js", 20),
@@ -51,7 +49,7 @@ class TestTestStats(unittest.TestCase):
             self._make_evg_result("test3:CleanEveryN", 10, 30),
             self._make_evg_result("test3:CheckReplDBHash", 10, 35),
         ]
-        test_stats = grt.TestStats(evg_results)
+        test_stats = under_test.TestStats(evg_results)
         expected_runtimes = [
             ("dir/test3.js", 75),
             ("dir/test2.js", 30),
@@ -59,18 +57,100 @@ class TestTestStats(unittest.TestCase):
         ]
         self.assertEqual(expected_runtimes, test_stats.get_tests_runtimes())
 
+    def test_zero_runs(self):
+        evg_results = [
+            self._make_evg_result("dir/test1.js", 0, 0),
+            self._make_evg_result("dir/test1.js", 0, 0),
+        ]
+        test_stats = under_test.TestStats(evg_results)
+        expected_runtimes = [
+            ("dir/test1.js", 0),
+        ]
+        self.assertEqual(expected_runtimes, test_stats.get_tests_runtimes())
+
     @staticmethod
     def _make_evg_result(test_file="dir/test1.js", num_pass=0, duration=0):
-        return {
-            "test_file": test_file,
-            "task_name": "task1",
-            "variant": "variant1",
-            "distro": "distro1",
-            "date": _DATE,
-            "num_pass": num_pass,
-            "num_fail": 0,
-            "avg_duration_pass": duration,
-        }
+        mock = MagicMock()
+        mock.test_file = test_file
+        mock.task_name = "task1"
+        mock.variant = "variant1"
+        mock.distro = "distro1"
+        mock.date = _DATE
+        mock.num_pass = num_pass
+        mock.num_fail = 0
+        mock.avg_duration_pass = duration
+        return mock
+
+
+class TestConfigOptions(unittest.TestCase):
+    def test_lookup_missing_required_key_throws_exception(self):
+        config = {}
+        required_keys = {"key1"}
+
+        config_options = under_test.ConfigOptions(config, required_keys=required_keys)
+
+        with self.assertRaises(KeyError):
+            config_options.key1  # pylint: disable=pointless-statement
+
+    def test_default_options_use_default_value(self):
+        config = {}
+        defaults = {"key1": "value1"}
+
+        config_options = under_test.ConfigOptions(config, defaults=defaults)
+
+        self.assertEqual(defaults["key1"], config_options.key1)
+
+    def test_unknown_values_return_none(self):
+        config = {}
+
+        config_options = under_test.ConfigOptions(config)
+
+        self.assertIsNone(config_options.key1)
+
+    def test_set_values_are_used(self):
+        config = {"key1": "not_the_default_value"}
+        defaults = {"key1": "value1"}
+
+        config_options = under_test.ConfigOptions(config, defaults=defaults)
+
+        self.assertEqual(config["key1"], config_options.key1)
+
+    def test_depends_on_splits_values(self):
+        config = {"depends_on": "value1,value2,value3"}
+
+        config_options = under_test.ConfigOptions(config)
+
+        self.assertEqual(3, len(config_options.depends_on))
+
+    def test_suite_uses_task_value_if_no_suite(self):
+        config = {"task": "task_value"}
+
+        config_options = under_test.ConfigOptions(config)
+
+        self.assertEqual(config["task"], config_options.suite)
+
+    def test_suite_uses_suite_if_provided(self):
+        config = {"task": "task_value", "suite": "suite_value"}
+
+        config_options = under_test.ConfigOptions(config)
+
+        self.assertEqual(config["suite"], config_options.suite)
+
+    def test_task_uses_task_name(self):
+        config = {"task_name": "task_value"}
+
+        config_options = under_test.ConfigOptions(config)
+
+        self.assertEqual(config["task_name"], config_options.task)
+
+    def test_item_with_format_function_works(self):
+        config = {"number": "1"}
+        formats = {"number": int}
+
+        config_options = under_test.ConfigOptions(config, formats=formats)
+
+        self.assertEqual(1, config_options.number)
+        self.assertIsInstance(config_options.number, int)
 
 
 class DivideRemainingTestsAmongSuitesTest(unittest.TestCase):
@@ -85,19 +165,19 @@ class DivideRemainingTestsAmongSuitesTest(unittest.TestCase):
         return tests_runtimes
 
     def test_each_suite_gets_one_test(self):
-        suites = [grt.Suite(), grt.Suite(), grt.Suite()]
+        suites = [under_test.Suite(), under_test.Suite(), under_test.Suite()]
         tests_runtimes = self.generate_tests_runtimes(3)
 
-        grt.divide_remaining_tests_among_suites(tests_runtimes, suites)
+        under_test.divide_remaining_tests_among_suites(tests_runtimes, suites)
 
         for suite in suites:
             self.assertEqual(suite.get_test_count(), 1)
 
     def test_each_suite_gets_at_least_one_test(self):
-        suites = [grt.Suite(), grt.Suite(), grt.Suite()]
+        suites = [under_test.Suite(), under_test.Suite(), under_test.Suite()]
         tests_runtimes = self.generate_tests_runtimes(5)
 
-        grt.divide_remaining_tests_among_suites(tests_runtimes, suites)
+        under_test.divide_remaining_tests_among_suites(tests_runtimes, suites)
 
         total_tests = 0
         for suite in suites:
@@ -116,7 +196,7 @@ class DivideTestsIntoSuitesByMaxtimeTest(unittest.TestCase):
             ("test3", 3),
         ]
 
-        suites = grt.divide_tests_into_suites(tests_runtimes, max_time)
+        suites = under_test.divide_tests_into_suites(tests_runtimes, max_time)
         self.assertEqual(len(suites), 1)
         self.assertEqual(suites[0].get_test_count(), 3)
         self.assertEqual(suites[0].get_runtime(), 12)
@@ -129,7 +209,7 @@ class DivideTestsIntoSuitesByMaxtimeTest(unittest.TestCase):
             ("test3", 3),
         ]
 
-        suites = grt.divide_tests_into_suites(tests_runtimes, max_time)
+        suites = under_test.divide_tests_into_suites(tests_runtimes, max_time)
         self.assertEqual(len(suites), 3)
 
     def test_if_test_is_greater_than_max_it_goes_alone(self):
@@ -140,7 +220,7 @@ class DivideTestsIntoSuitesByMaxtimeTest(unittest.TestCase):
             ("test3", 3),
         ]
 
-        suites = grt.divide_tests_into_suites(tests_runtimes, max_time)
+        suites = under_test.divide_tests_into_suites(tests_runtimes, max_time)
         self.assertEqual(len(suites), 2)
         self.assertEqual(suites[0].get_test_count(), 1)
         self.assertEqual(suites[0].get_runtime(), 15)
@@ -156,7 +236,8 @@ class DivideTestsIntoSuitesByMaxtimeTest(unittest.TestCase):
             ("test5", 3),
         ]
 
-        suites = grt.divide_tests_into_suites(tests_runtimes, max_time, max_suites=max_suites)
+        suites = under_test.divide_tests_into_suites(tests_runtimes, max_time,
+                                                     max_suites=max_suites)
         self.assertEqual(len(suites), max_suites)
         total_tests = 0
         for suite in suites:
@@ -166,7 +247,7 @@ class DivideTestsIntoSuitesByMaxtimeTest(unittest.TestCase):
 
 class SuiteTest(unittest.TestCase):
     def test_adding_tests_increases_count_and_runtime(self):
-        suite = grt.Suite()
+        suite = under_test.Suite()
         suite.add_test("test1", 10)
         suite.add_test("test2", 12)
         suite.add_test("test3", 7)
@@ -176,7 +257,7 @@ class SuiteTest(unittest.TestCase):
         self.assertTrue(suite.should_overwrite_timeout())
 
     def test_suites_without_full_runtime_history_should_not_be_overridden(self):
-        suite = grt.Suite()
+        suite = under_test.Suite()
         suite.add_test("test1", 10)
         suite.add_test("test2", 0)
         suite.add_test("test3", 7)
@@ -186,7 +267,7 @@ class SuiteTest(unittest.TestCase):
 
 def create_suite(count=3, start=0):
     """ Create a suite with count tests."""
-    suite = grt.Suite()
+    suite = under_test.Suite()
     for i in range(start, start + count):
         suite.add_test("test{}".format(i), 1)
     return suite
@@ -196,25 +277,25 @@ class UpdateSuiteConfigTest(unittest.TestCase):
     def test_roots_are_updated(self):
         config = {"selector": {}}
 
-        updated_config = grt.update_suite_config(config, "root value")
+        updated_config = under_test.update_suite_config(config, "root value")
         self.assertEqual("root value", updated_config["selector"]["roots"])
 
     def test_excluded_files_not_included_if_not_specified(self):
         config = {"selector": {"excluded_files": "files to exclude"}}
 
-        updated_config = grt.update_suite_config(config, excludes=None)
+        updated_config = under_test.update_suite_config(config, excludes=None)
         self.assertNotIn("exclude_files", updated_config["selector"])
 
     def test_excluded_files_added_to_misc(self):
         config = {"selector": {}}
 
-        updated_config = grt.update_suite_config(config, excludes="files to exclude")
+        updated_config = under_test.update_suite_config(config, excludes="files to exclude")
         self.assertEqual("files to exclude", updated_config["selector"]["exclude_files"])
 
     def test_excluded_files_extended_in_misc(self):
         config = {"selector": {"exclude_files": ["file 0", "file 1"]}}
 
-        updated_config = grt.update_suite_config(config, excludes=["file 2", "file 3"])
+        updated_config = under_test.update_suite_config(config, excludes=["file 2", "file 3"])
         self.assertEqual(4, len(updated_config["selector"]["exclude_files"]))
         for exclude in ["file 0", "file 1", "file 2", "file 3"]:
             self.assertIn(exclude, updated_config["selector"]["exclude_files"])
@@ -239,18 +320,18 @@ class RenderSuites(unittest.TestCase):
 
         m = mock_open(read_data=yaml.dump({"selector": {"roots": [], "excludes": ["fixed"]}}))
         with patch(ns("open"), m, create=True):
-            render_suite(suites, "suite_name")
+            under_test.render_suite(suites, "suite_name")
         handle = m()
 
         # The other writes are for the headers.
         self.assertEquals(len(suites) * 2, handle.write.call_count)
         handle.write.assert_has_calls([call(e) for e in expected], any_order=True)
         calls = [
-            call(os.path.join(grt.TEST_SUITE_DIR, "suite_name.yml"), "r")
+            call(os.path.join(under_test.TEST_SUITE_DIR, "suite_name.yml"), "r")
             for _ in range(len(suites))
         ]
         m.assert_has_calls(calls, any_order=True)
-        filename = os.path.join(grt.CONFIG_DIR, "suite_name_{{:0{}}}.yml".format(
+        filename = os.path.join(under_test.CONFIG_DIR, "suite_name_{{:0{}}}.yml".format(
             int(math.ceil(math.log10(size)))))
         calls = [call(filename.format(i), "w") for i in range(size)]
         m.assert_has_calls(calls, any_order=True)
@@ -271,7 +352,7 @@ class RenderMiscSuites(unittest.TestCase):
         test_list = ["test{}".format(i) for i in range(10)]
         m = mock_open(read_data=yaml.dump({"selector": {"roots": []}}))
         with patch(ns("open"), m, create=True):
-            render_misc_suite(test_list, "suite_name")
+            under_test.render_misc_suite(test_list, "suite_name")
         handle = m()
 
         # The other writes are for the headers.
@@ -290,9 +371,9 @@ class RenderMiscSuites(unittest.TestCase):
   - test9
   roots: []
 """)
-        calls = [call(os.path.join(grt.TEST_SUITE_DIR, "suite_name.yml"), "r")]
+        calls = [call(os.path.join(under_test.TEST_SUITE_DIR, "suite_name.yml"), "r")]
         m.assert_has_calls(calls, any_order=True)
-        filename = os.path.join(grt.CONFIG_DIR, "suite_name_misc.yml")
+        filename = os.path.join(under_test.CONFIG_DIR, "suite_name_misc.yml")
         calls = [call(filename, "w")]
         m.assert_has_calls(calls, any_order=True)
 
@@ -301,25 +382,25 @@ class PrepareDirectoryForSuite(unittest.TestCase):
     def test_no_directory(self):
         with patch(ns("os")) as mock_os:
             mock_os.path.exists.return_value = False
-            prepare_directory_for_suite("tmp")
+            under_test.prepare_directory_for_suite("tmp")
 
         mock_os.makedirs.assert_called_once_with("tmp")
 
 
 class CalculateTimeoutTest(unittest.TestCase):
     def test_min_timeout(self):
-        self.assertEqual(grt.MIN_TIMEOUT_SECONDS, grt.calculate_timeout(15, 1))
+        self.assertEqual(under_test.MIN_TIMEOUT_SECONDS, under_test.calculate_timeout(15, 1))
 
     def test_over_timeout_by_one_minute(self):
-        self.assertEqual(360, grt.calculate_timeout(301, 1))
+        self.assertEqual(360, under_test.calculate_timeout(301, 1))
 
     def test_float_runtimes(self):
-        self.assertEqual(360, grt.calculate_timeout(300.14, 1))
+        self.assertEqual(360, under_test.calculate_timeout(300.14, 1))
 
     def test_scaling_factor(self):
         scaling_factor = 10
-        self.assertEqual(grt.MIN_TIMEOUT_SECONDS * scaling_factor,
-                         grt.calculate_timeout(30, scaling_factor))
+        self.assertEqual(under_test.MIN_TIMEOUT_SECONDS * scaling_factor,
+                         under_test.calculate_timeout(30, scaling_factor))
 
 
 class EvergreenConfigGeneratorTest(unittest.TestCase):
@@ -327,7 +408,7 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
     def generate_mock_suites(count):
         suites = []
         for idx in range(count):
-            suite = Mock()
+            suite = MagicMock()
             suite.name = "suite {0}".format(idx)
             suite.max_runtime = 5.28
             suite.get_runtime = lambda: 100.874
@@ -337,7 +418,7 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
 
     @staticmethod
     def generate_mock_options():
-        options = Mock()
+        options = MagicMock()
         options.resmoke_args = "resmoke_args"
         options.run_multiple_jobs = "true"
         options.variant = "buildvariant"
@@ -351,11 +432,18 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
 
         return options
 
+    @staticmethod
+    def mock_task(display_name):
+        mock = MagicMock()
+        mock.display_name = display_name
+        return mock
+
     def test_evg_config_is_created(self):
         options = self.generate_mock_options()
         suites = self.generate_mock_suites(3)
 
-        config = grt.EvergreenConfigGenerator(suites, options, Mock()).generate_config().to_map()
+        config = under_test.EvergreenConfigGenerator(suites, options,
+                                                     MagicMock()).generate_config().to_map()
 
         self.assertEqual(len(config["tasks"]), len(suites) + 1)
         command1 = config["tasks"][0]["commands"][2]
@@ -368,7 +456,8 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
         options.task = "task"
         suites = self.generate_mock_suites(3)
 
-        config = grt.EvergreenConfigGenerator(suites, options, Mock()).generate_config().to_map()
+        config = under_test.EvergreenConfigGenerator(suites, options,
+                                                     MagicMock()).generate_config().to_map()
 
         self.assertEqual(len(config["tasks"]), len(suites) + 1)
         display_task = config["buildvariants"][0]["display_tasks"][0]
@@ -389,14 +478,15 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
 
         suites = self.generate_mock_suites(3)
 
-        config = grt.EvergreenConfigGenerator(suites, options, Mock()).generate_config().to_map()
+        config = under_test.EvergreenConfigGenerator(suites, options,
+                                                     MagicMock()).generate_config().to_map()
 
         self.assertEqual(len(config["tasks"]), len(suites) + 1)
         self.assertEqual(options.large_distro_name,
                          config["buildvariants"][0]["tasks"][0]["distros"][0])
 
     def test_selecting_tasks(self):
-        is_task_dependency = grt.EvergreenConfigGenerator._is_task_dependency
+        is_task_dependency = under_test.EvergreenConfigGenerator._is_task_dependency
         self.assertFalse(is_task_dependency("sharding", "sharding"))
         self.assertFalse(is_task_dependency("sharding", "other_task"))
         self.assertFalse(is_task_dependency("sharding", "sharding_gen"))
@@ -409,15 +499,15 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
         options = self.generate_mock_options()
         suites = self.generate_mock_suites(3)
 
-        cfg_generator = grt.EvergreenConfigGenerator(suites, options, Mock())
+        cfg_generator = under_test.EvergreenConfigGenerator(suites, options, MagicMock())
         cfg_generator.build_tasks = [
-            {"display_name": "sharding_gen"},
-            {"display_name": "sharding_0"},
-            {"display_name": "other_task"},
-            {"display_name": "other_task_2"},
-            {"display_name": "sharding_1"},
-            {"display_name": "compile"},
-            {"display_name": "sharding_misc"},
+            self.mock_task("sharding_gen"),
+            self.mock_task("sharding_0"),
+            self.mock_task("other_task"),
+            self.mock_task("other_task_2"),
+            self.mock_task("sharding_1"),
+            self.mock_task("compile"),
+            self.mock_task("sharding_misc"),
         ]
 
         dependent_tasks = cfg_generator._get_tasks_for_depends_on("sharding")
@@ -432,18 +522,18 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
         options.is_patch = False
         suites = self.generate_mock_suites(3)
 
-        cfg_generator = grt.EvergreenConfigGenerator(suites, options, Mock())
+        cfg_generator = under_test.EvergreenConfigGenerator(suites, options, MagicMock())
         cfg_generator.build_tasks = [
-            {"display_name": "sharding_gen"},
-            {"display_name": "sharding_0"},
-            {"display_name": "other_task"},
-            {"display_name": "other_task_2"},
-            {"display_name": "sharding_1"},
-            {"display_name": "compile"},
-            {"display_name": "sharding_misc"},
+            self.mock_task("sharding_gen"),
+            self.mock_task("sharding_0"),
+            self.mock_task("other_task"),
+            self.mock_task("other_task_2"),
+            self.mock_task("sharding_1"),
+            self.mock_task("compile"),
+            self.mock_task("sharding_misc"),
         ]
 
-        cfg_mock = Mock()
+        cfg_mock = MagicMock()
         cfg_generator._add_dependencies(cfg_mock)
         self.assertEqual(4, cfg_mock.dependency.call_count)
 
@@ -452,7 +542,8 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
         options.repeat_suites = 5
         suites = self.generate_mock_suites(3)
 
-        config = grt.EvergreenConfigGenerator(suites, options, Mock()).generate_config().to_map()
+        config = under_test.EvergreenConfigGenerator(suites, options,
+                                                     MagicMock()).generate_config().to_map()
 
         self.assertEqual(len(config["tasks"]), len(suites) + 1)
         command1 = config["tasks"][0]["commands"][2]
@@ -460,10 +551,32 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
         self.assertIn(options.resmoke_args, command1["vars"]["resmoke_args"])
         timeout_cmd = config["tasks"][0]["commands"][0]
         self.assertEqual("timeout.update", timeout_cmd["command"])
-        expected_timeout = grt.calculate_timeout(suites[0].max_runtime, 3) * 5
+        expected_timeout = under_test.calculate_timeout(suites[0].max_runtime, 3) * 5
         self.assertEqual(expected_timeout, timeout_cmd["params"]["timeout_secs"])
-        expected_exec_timeout = grt.calculate_timeout(suites[0].get_runtime(), 3) * 5
+        expected_exec_timeout = under_test.calculate_timeout(suites[0].get_runtime(), 3) * 5
         self.assertEqual(expected_exec_timeout, timeout_cmd["params"]["exec_timeout_secs"])
+
+    def test_evg_config_does_not_overwrite_repeatSuites_resmoke_arg_with_repeatSuites_default(self):
+        options = self.generate_mock_options()
+        options.resmoke_args = "resmoke_args --repeatSuites=5"
+        suites = self.generate_mock_suites(1)
+
+        config = under_test.EvergreenConfigGenerator(suites, options,
+                                                     MagicMock()).generate_config().to_map()
+        command1 = config["tasks"][0]["commands"][2]
+        self.assertIn("--repeatSuites=5", command1["vars"]["resmoke_args"])
+        self.assertNotIn("--repeatSuites=1", command1["vars"]["resmoke_args"])
+
+    def test_evg_config_does_not_overwrite_repeat_resmoke_arg_with_repeatSuites_default(self):
+        options = self.generate_mock_options()
+        options.resmoke_args = "resmoke_args --repeat=5"
+        suites = self.generate_mock_suites(1)
+
+        config = under_test.EvergreenConfigGenerator(suites, options,
+                                                     MagicMock()).generate_config().to_map()
+        command1 = config["tasks"][0]["commands"][2]
+        self.assertIn("--repeat=5", command1["vars"]["resmoke_args"])
+        self.assertNotIn("--repeatSuites=1", command1["vars"]["resmoke_args"])
 
     def test_suites_without_enough_info_should_not_include_timeouts(self):
         suite_without_timing_info = 1
@@ -471,7 +584,8 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
         suites = self.generate_mock_suites(3)
         suites[suite_without_timing_info].should_overwrite_timeout.return_value = False
 
-        config = grt.EvergreenConfigGenerator(suites, options, Mock()).generate_config().to_map()
+        config = under_test.EvergreenConfigGenerator(suites, options,
+                                                     MagicMock()).generate_config().to_map()
 
         timeout_cmd = config["tasks"][suite_without_timing_info]["commands"][0]
         self.assertNotIn("command", timeout_cmd)
@@ -483,7 +597,8 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
         suites = self.generate_mock_suites(3)
         options.use_default_timeouts = True
 
-        config = grt.EvergreenConfigGenerator(suites, options, Mock()).generate_config().to_map()
+        config = under_test.EvergreenConfigGenerator(suites, options,
+                                                     MagicMock()).generate_config().to_map()
 
         timeout_cmd = config["tasks"][suite_without_timing_info]["commands"][0]
         self.assertNotIn("command", timeout_cmd)
@@ -492,35 +607,46 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
 
 class NormalizeTestNameTest(unittest.TestCase):
     def test_unix_names(self):
-        self.assertEqual("/home/user/test.js", grt.normalize_test_name("/home/user/test.js"))
+        self.assertEqual("/home/user/test.js", under_test.normalize_test_name("/home/user/test.js"))
 
     def test_windows_names(self):
-        self.assertEqual("/home/user/test.js", grt.normalize_test_name("\\home\\user\\test.js"))
+        self.assertEqual("/home/user/test.js",
+                         under_test.normalize_test_name("\\home\\user\\test.js"))
 
 
-class MainTest(unittest.TestCase):
+class GenerateSubSuitesTest(unittest.TestCase):
     @staticmethod
     def get_mock_options():
-        options = Mock()
+        options = MagicMock()
         options.target_resmoke_time = 10
         options.fallback_num_sub_suites = 2
         return options
 
-    def test_calculate_suites(self):
-        evg = Mock()
-        evg.test_stats.return_value = [{
-            "test_file": "test{}.js".format(i), "avg_duration_pass": 60, "num_pass": 1
-        } for i in range(100)]
+    @staticmethod
+    def get_test_list(n_tests):
+        return ["test{i}.js".format(i=i) for i in range(n_tests)]
 
-        main = grt.Main(evg)
-        main.options = Mock()
-        main.config_options = self.get_mock_options()
+    @staticmethod
+    def history_mock(i):
+        mock = MagicMock()
+        mock.test_file = "test{}.js".format(i)
+        mock.avg_duration_pass = 60
+        mock.num_pass = 1
+        return mock
+
+    def test_calculate_suites(self):
+        evg = MagicMock()
+        evg.test_stats_by_project.return_value = [self.history_mock(i) for i in range(100)]
+        config_options = self.get_mock_options()
+        config_options.max_sub_suites = 1000
+
+        gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
 
         with patch("os.path.exists") as exists_mock, patch(ns("suitesconfig")) as suitesconfig_mock:
             exists_mock.return_value = True
             suitesconfig_mock.get_suite.return_value.tests = \
-                [stat["test_file"] for stat in evg.test_stats.return_value]
-            suites = main.calculate_suites(_DATE, _DATE)
+                [stat.test_file for stat in evg.test_stats_by_project.return_value]
+            suites = gen_sub_suites.calculate_suites(_DATE, _DATE)
 
             # There are 100 tests taking 1 minute, with a target of 10 min we expect 10 suites.
             self.assertEqual(10, len(suites))
@@ -529,77 +655,72 @@ class MainTest(unittest.TestCase):
 
     def test_calculate_suites_fallback(self):
         n_tests = 100
-        response = Mock()
+        response = MagicMock()
         response.status_code = requests.codes.SERVICE_UNAVAILABLE
-        evg = Mock()
-        evg.test_stats.side_effect = requests.HTTPError(response=response)
+        evg = MagicMock()
+        evg.test_stats_by_project.side_effect = requests.HTTPError(response=response)
+        config_options = self.get_mock_options()
 
-        main = grt.Main(evg)
-        main.options = Mock()
-        main.options.execution_time_minutes = 10
-        main.config_options = self.get_mock_options()
-        main.list_tests = Mock(return_value=["test{}.js".format(i) for i in range(n_tests)])
+        gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
+        gen_sub_suites.list_tests = MagicMock(return_value=self.get_test_list(n_tests))
 
-        suites = main.calculate_suites(_DATE, _DATE)
+        suites = gen_sub_suites.calculate_suites(_DATE, _DATE)
 
-        self.assertEqual(main.config_options.fallback_num_sub_suites, len(suites))
+        self.assertEqual(gen_sub_suites.config_options.fallback_num_sub_suites, len(suites))
         for suite in suites:
             self.assertEqual(50, len(suite.tests))
 
-        self.assertEqual(n_tests, len(main.test_list))
+        self.assertEqual(n_tests, len(gen_sub_suites.test_list))
 
     def test_calculate_suites_uses_fallback_for_no_results(self):
         n_tests = 100
-        evg = Mock()
-        evg.test_stats.return_value = []
+        evg = MagicMock()
+        evg.test_stats_by_project.return_value = []
+        config_options = self.get_mock_options()
 
-        main = grt.Main(evg)
-        main.options = Mock()
-        main.config_options = self.get_mock_options()
-        main.list_tests = Mock(return_value=["test{}.js".format(i) for i in range(n_tests)])
-        suites = main.calculate_suites(_DATE, _DATE)
+        gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
+        gen_sub_suites.list_tests = MagicMock(return_value=self.get_test_list(n_tests))
+        suites = gen_sub_suites.calculate_suites(_DATE, _DATE)
 
-        self.assertEqual(main.config_options.fallback_num_sub_suites, len(suites))
+        self.assertEqual(gen_sub_suites.config_options.fallback_num_sub_suites, len(suites))
         for suite in suites:
             self.assertEqual(50, len(suite.tests))
 
-        self.assertEqual(n_tests, len(main.test_list))
+        self.assertEqual(n_tests, len(gen_sub_suites.test_list))
 
     def test_calculate_suites_uses_fallback_if_only_results_are_filtered(self):
         n_tests = 100
-        evg = Mock()
-        evg.test_stats.return_value = [{
-            "test_file": "test{}.js".format(i), "avg_duration_pass": 60, "num_pass": 1
-        } for i in range(100)]
+        evg = MagicMock()
+        evg.test_stats_by_project.return_value = [
+            MagicMock(test_file="test{}.js".format(i), avg_duration_pass=60, num_pass=1)
+            for i in range(100)
+        ]
+        config_options = self.get_mock_options()
 
-        main = grt.Main(evg)
-        main.options = Mock()
-        main.config_options = self.get_mock_options()
-        main.list_tests = Mock(return_value=["test{}.js".format(i) for i in range(n_tests)])
+        gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
+        gen_sub_suites.list_tests = MagicMock(return_value=self.get_test_list(n_tests))
         with patch("os.path.exists") as exists_mock:
             exists_mock.return_value = False
-            suites = main.calculate_suites(_DATE, _DATE)
+            suites = gen_sub_suites.calculate_suites(_DATE, _DATE)
 
-            self.assertEqual(main.config_options.fallback_num_sub_suites, len(suites))
+            self.assertEqual(gen_sub_suites.config_options.fallback_num_sub_suites, len(suites))
             for suite in suites:
                 self.assertEqual(50, len(suite.tests))
 
-            self.assertEqual(n_tests, len(main.test_list))
+            self.assertEqual(n_tests, len(gen_sub_suites.test_list))
 
     def test_calculate_suites_error(self):
-        response = Mock()
+        response = MagicMock()
         response.status_code = requests.codes.INTERNAL_SERVER_ERROR
-        evg = Mock()
-        evg.test_stats.side_effect = requests.HTTPError(response=response)
+        evg = MagicMock()
+        evg.test_stats_by_project.side_effect = requests.HTTPError(response=response)
+        config_options = self.get_mock_options()
 
-        main = grt.Main(evg)
-        main.options = Mock()
-        main.options.execution_time_minutes = 10
-        main.config_options = self.get_mock_options()
-        main.list_tests = Mock(return_value=["test{}.js".format(i) for i in range(100)])
+        gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
+        gen_sub_suites.list_tests = MagicMock(return_value=self.get_test_list(100))
 
         with self.assertRaises(requests.HTTPError):
-            main.calculate_suites(_DATE, _DATE)
+            gen_sub_suites.calculate_suites(_DATE, _DATE)
 
     def test_filter_missing_files(self):
         tests_runtimes = [
@@ -610,13 +731,13 @@ class MainTest(unittest.TestCase):
 
         with patch("os.path.exists") as exists_mock, patch(ns("suitesconfig")) as suitesconfig_mock:
             exists_mock.side_effect = [False, True, True]
-            evg = Mock()
+            evg = MagicMock()
             suitesconfig_mock.get_suite.return_value.tests = \
                 [runtime[0] for runtime in tests_runtimes]
-            main = grt.Main(evg)
-            main.config_options = Mock()
-            main.config_options.suite = "suite"
-            filtered_list = main.filter_existing_tests(tests_runtimes)
+            config_options = MagicMock(suite="suite")
+
+            gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
+            filtered_list = gen_sub_suites.filter_existing_tests(tests_runtimes)
 
             self.assertEqual(2, len(filtered_list))
             self.assertNotIn(tests_runtimes[0], filtered_list)
@@ -634,13 +755,13 @@ class MainTest(unittest.TestCase):
 
         with patch("os.path.exists") as exists_mock, patch(ns("suitesconfig")) as suitesconfig_mock:
             exists_mock.return_value = True
-            evg = Mock()
+            evg = MagicMock()
             suitesconfig_mock.get_suite.return_value.tests = \
                 [runtime[0] for runtime in tests_runtimes if runtime[0] != blacklisted_test]
-            main = grt.Main(evg)
-            main.config_options = Mock()
-            main.config_options.suite = "suite"
-            filtered_list = main.filter_existing_tests(tests_runtimes)
+            config_options = MagicMock(suite="suite")
+
+            gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
+            filtered_list = gen_sub_suites.filter_existing_tests(tests_runtimes)
 
             self.assertEqual(2, len(filtered_list))
             self.assertNotIn(blacklisted_test, filtered_list)
@@ -658,15 +779,15 @@ class MainTest(unittest.TestCase):
 
         with patch("os.path.exists") as exists_mock, patch(ns("suitesconfig")) as suitesconfig_mock:
             exists_mock.return_value = True
-            evg = Mock()
+            evg = MagicMock()
             suitesconfig_mock.get_suite.return_value.tests = [
                 runtime[0].replace("/", "\\") for runtime in tests_runtimes
                 if runtime[0] != blacklisted_test
             ]
-            main = grt.Main(evg)
-            main.config_options = Mock()
-            main.config_options.suite = "suite"
-            filtered_list = main.filter_existing_tests(tests_runtimes)
+            config_options = MagicMock(suite="suite")
+
+            gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
+            filtered_list = gen_sub_suites.filter_existing_tests(tests_runtimes)
 
             self.assertNotIn(blacklisted_test, filtered_list)
             self.assertIn(tests_runtimes[2], filtered_list)
