@@ -95,14 +95,15 @@ Chunk ChunkManager::findIntersectingChunk(const BSONObj& shardKey, const BSONObj
         for (BSONElement elt : shardKey) {
             uassert(ErrorCodes::ShardKeyNotFound,
                     str::stream() << "Cannot target single shard due to collation of key "
-                                  << elt.fieldNameStringData(),
+                                  << elt.fieldNameStringData() << " for namespace " << getns(),
                     !CollationIndexKey::isCollatableType(elt.type()));
         }
     }
 
     const auto it = _rt->getChunkMap().upper_bound(_rt->_extractKeyString(shardKey));
     uassert(ErrorCodes::ShardKeyNotFound,
-            str::stream() << "Cannot target single shard using key " << shardKey,
+            str::stream() << "Cannot target single shard using key " << shardKey
+                          << " for namespace " << getns(),
             it != _rt->getChunkMap().end() && it->second->containsKey(shardKey));
 
     return Chunk(*(it->second), _clusterTime);
