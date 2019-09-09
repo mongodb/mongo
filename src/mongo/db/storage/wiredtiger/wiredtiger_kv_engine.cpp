@@ -832,7 +832,7 @@ void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::str
     ret = wiredtiger_open(path.c_str(), wtEventHandler, configStr.c_str(), &_conn);
     if (!ret) {
         StorageRepairObserver::get(getGlobalServiceContext())
-            ->onModification("WiredTiger metadata salvaged");
+            ->invalidatingModification("WiredTiger metadata salvaged");
         return;
     }
 
