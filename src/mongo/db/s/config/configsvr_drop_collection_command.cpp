@@ -144,7 +144,45 @@ private:
             catalogClient->getCollection(opCtx, nss, repl::ReadConcernArgs::get(opCtx).getLevel());
         if (collStatus == ErrorCodes::NamespaceNotFound) {
             // We checked the sharding catalog and found that this collection doesn't exist. This
-            // may be because it never existed, or because a drop command was sent previously.
+            // may be because it never existed, or because a drop command was sent previously. This
+            // data might not be majority committed though, so we will set the client's last optime
+            // to the system's last optime to ensure the client waits for the writeConcern to be
+            // satisfied.
+            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+
+            // If the DB isn't in the sharding catalog either, consider the drop a success.
+            auto dbStatus = catalogClient->getDatabase(
+                opCtx, nss.db().toString(), repl::ReadConcernArgs::get(opCtx).getLevel());
+            if (dbStatus == ErrorCodes::NamespaceNotFound) {
+                return;
+            }
+            uassertStatusOK(dbStatus);
+
+            // If we found the DB but not the collection, and the primary shard for the database is
+            // the config server, run the drop only against the config server unless the collection
+            // is config.system.sessions, since no other collections whose primary shard is the
+            // config server can have been sharded.
+            const auto primaryShard = dbStatus.getValue().value.getPrimary();
+            if (primaryShard == "config" && nss != NamespaceString::kLogicalSessionsNamespace) {
+                auto cmdDropResult =
+                    uassertStatusOK(Grid::get(opCtx)
+                                        ->shardRegistry()
+                                        ->getConfigShard()
+                                        ->runCommandWithFixedRetryAttempts(
+                                            opCtx,
+                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                            nss.db().toString(),
+                                            BSON("drop" << nss.coll()),
+                                            Shard::RetryPolicy::kIdempotent));
+
+                // If the collection doesn't exist, consider the drop a success.
+                if (cmdDropResult.commandStatus == ErrorCodes::NamespaceNotFound) {
+                    return;
+                }
+                uassertStatusOK(cmdDropResult.commandStatus);
+                return;
+            }
+
             ShardingCatalogManager::get(opCtx)->ensureDropCollectionCompleted(opCtx, nss);
         } else {
             uassertStatusOK(collStatus);

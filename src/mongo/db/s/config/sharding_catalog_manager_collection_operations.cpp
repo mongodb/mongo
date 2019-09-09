@@ -333,12 +333,6 @@ void ShardingCatalogManager::ensureDropCollectionCompleted(OperationContext* opC
 
     LOG(1) << "Ensuring config entries for " << nss.ns()
            << " from previous dropCollection are cleared";
-
-    // If there was a drop command already sent for this command, the command may not be majority
-    // committed. We will set the client's last optime to the system's last optime to ensure the
-    // client waits for the writeConcern to be satisfied.
-    repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
-
     sendDropCollectionToAllShards(opCtx, nss);
     removeChunksAndTagsForDroppedCollection(opCtx, nss);
     sendSSVAndUnsetShardingToAllShards(opCtx, nss);
