@@ -392,6 +392,7 @@ def format_func(clang_format):
 def format_my_func(clang_format, origin_branch):
     """My Format files command entry point."""
     files = git.get_my_files_to_check(is_interesting_file, origin_branch)
+    files = [f for f in files if os.path.exists(f)]
 
     _format_files(clang_format, files)
 
