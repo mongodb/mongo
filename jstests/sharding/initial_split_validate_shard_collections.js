@@ -3,7 +3,6 @@
  * which spreads the collection across all available shards.
  */
 
-load("jstests/libs/feature_compatibility_version.js");
 load("jstests/libs/uuid_util.js");
 
 (function() {

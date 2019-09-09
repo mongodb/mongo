@@ -1,8 +1,6 @@
 // Tests that mongos can autodiscover a config server replica set when the only node it knows about
 // is not the primary.
 
-load('jstests/libs/feature_compatibility_version.js');
-
 (function() {
 'use strict';
 

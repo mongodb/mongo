@@ -4,7 +4,6 @@
  */
 (function() {
 'use strict';
-load('jstests/libs/feature_compatibility_version.js');
 
 let rst = new ReplSetTest({nodes: 2});
 rst.startSet();

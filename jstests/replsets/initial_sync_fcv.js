@@ -7,7 +7,6 @@
 (function() {
 'use strict';
 
-load("jstests/libs/feature_compatibility_version.js");
 load('jstests/libs/check_log.js');
 
 const rst = new ReplSetTest({nodes: 2});

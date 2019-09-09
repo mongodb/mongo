@@ -1,7 +1,5 @@
 // Tests that mongos will wait for CSRS replica set to initiate.
 
-load("jstests/libs/feature_compatibility_version.js");
-
 var configRS = new ReplSetTest({name: "configRS", nodes: 1, useHostName: true});
 configRS.startSet({configsvr: '', journal: "", storageEngine: 'wiredTiger'});
 var replConfig = configRS.getReplSetConfig();

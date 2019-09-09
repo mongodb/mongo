@@ -123,6 +123,7 @@ extern const JSFile servers_misc;
 extern const JSFile replsettest;
 extern const JSFile data_consistency_checker;
 extern const JSFile bridge;
+extern const JSFile feature_compatibility_version;
 }  // namespace JSFiles
 
 MONGO_REGISTER_SHIM(BenchRunConfig::createConnectionImpl)
@@ -519,6 +520,7 @@ void initScope(Scope& scope) {
     scope.execSetup(JSFiles::replsettest);
     scope.execSetup(JSFiles::data_consistency_checker);
     scope.execSetup(JSFiles::bridge);
+    scope.execSetup(JSFiles::feature_compatibility_version);
 
     initializeEnterpriseScope(scope);
 

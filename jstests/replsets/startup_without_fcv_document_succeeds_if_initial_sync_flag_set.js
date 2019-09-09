@@ -5,7 +5,6 @@
 
 (function() {
 load("jstests/libs/check_log.js");
-load("jstests/libs/feature_compatibility_version.js");
 
 rst = new ReplSetTest({nodes: 1});
 rst.startSet();

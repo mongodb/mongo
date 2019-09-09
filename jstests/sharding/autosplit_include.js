@@ -1,4 +1,3 @@
-load("jstests/libs/feature_compatibility_version.js");
 /**
  * Waits for all ongoing chunk splits, but only if FCV is latest
  */

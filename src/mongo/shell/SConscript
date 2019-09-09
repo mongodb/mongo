@@ -66,6 +66,7 @@ env.JSHeader(
         "data_consistency_checker.js",
         "bridge.js",
         "keyvault.js",
+        "feature_compatibility_version.js",
     ],
 )
 

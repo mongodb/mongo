@@ -1,6 +1,5 @@
 (function() {
 "use strict";
-load("jstests/libs/feature_compatibility_version.js");
 var standalone = MongoRunner.runMongod();
 var adminDB = standalone.getDB("admin");
 

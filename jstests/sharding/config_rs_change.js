@@ -2,7 +2,6 @@
 // match the replset config on the config servers, and that it can successfully update it's view
 // of the config replset config during startup.
 
-load("jstests/libs/feature_compatibility_version.js");
 var configRS = new ReplSetTest({name: "configRS", nodes: 1, useHostName: true});
 configRS.startSet({configsvr: '', journal: "", storageEngine: 'wiredTiger'});
 var replConfig = configRS.getReplSetConfig();

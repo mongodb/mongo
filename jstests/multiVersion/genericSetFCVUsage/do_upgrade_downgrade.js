@@ -4,7 +4,6 @@
 "use strict";
 
 load("jstests/replsets/rslib.js");
-load("jstests/libs/feature_compatibility_version.js");
 load("jstests/libs/get_index_helpers.js");
 load("jstests/libs/check_uuids.js");
 load("jstests/libs/check_unique_indexes.js");

@@ -3,7 +3,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/feature_compatibility_version.js");
 load("jstests/libs/write_concern_util.js");
 
 const latest = "latest";

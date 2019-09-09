@@ -5,7 +5,6 @@
 
 'use strict';
 
-load("./jstests/libs/feature_compatibility_version.js");
 load("./jstests/multiVersion/libs/initial_sync.js");
 
 var testName = "multiversion_initial_sync_latest_from_last_stable";

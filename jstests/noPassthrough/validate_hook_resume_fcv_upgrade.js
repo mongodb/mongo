@@ -9,8 +9,6 @@ var db;
 (function() {
 "use strict";
 
-load("jstests/libs/feature_compatibility_version.js");
-
 // We skip doing the data consistency checks while terminating the cluster because they conflict
 // with the counts of the number of times the "validate" command is run.
 TestData.skipCollectionAndIndexValidation = true;

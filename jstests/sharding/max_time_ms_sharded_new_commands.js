@@ -1,7 +1,7 @@
 // Make sure the setFeatureCompatibilityVersion command respects maxTimeMs.
 (function() {
 'use strict';
-load("./jstests/libs/feature_compatibility_version.js");
+
 var st = new ShardingTest({shards: 2});
 
 var mongos = st.s0;

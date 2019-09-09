@@ -5,7 +5,6 @@
 //
 (function() {
 "use strict";
-load('./jstests/libs/feature_compatibility_version.js');
 
 const adminDB = db.getSiblingDB("admin");
 const isMasterCommand = {

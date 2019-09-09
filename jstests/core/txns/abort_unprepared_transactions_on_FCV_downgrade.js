@@ -6,7 +6,6 @@
  */
 (function() {
 "use strict";
-load("jstests/libs/feature_compatibility_version.js");
 
 const dbName = "test";
 const collName = "abort_unprepared_transactions_on_FCV_downgrade";

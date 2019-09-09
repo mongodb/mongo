@@ -6,7 +6,6 @@
  */
 (function() {
 "use strict";
-load("jstests/libs/feature_compatibility_version.js");
 load("jstests/core/txns/libs/prepare_helpers.js");
 
 const dbName = "test";

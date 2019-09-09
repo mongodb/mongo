@@ -9,8 +9,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/feature_compatibility_version.js");
-
 const testName = "view_definition_feature_compatibility_version_multiversion";
 const dbpath = MongoRunner.dataPath + testName;
 

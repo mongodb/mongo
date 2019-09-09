@@ -6,8 +6,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/feature_compatibility_version.js");
-
 var NUM_NODES = 3;
 
 /**

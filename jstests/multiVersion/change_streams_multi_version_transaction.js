@@ -6,7 +6,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/feature_compatibility_version.js");
 load('jstests/multiVersion/libs/multi_rs.js');  // For upgradeSet.
 load("jstests/replsets/rslib.js");              // For startSetIfSupportsReadMajority.
 

@@ -6,8 +6,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/feature_compatibility_version.js");
-
 let dbpath = MongoRunner.dataPath + "feature_compatibility_version";
 resetDbpath(dbpath);
 let connection;

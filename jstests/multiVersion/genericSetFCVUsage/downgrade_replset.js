@@ -3,7 +3,6 @@
 
 load('./jstests/multiVersion/libs/multi_rs.js');
 load('./jstests/libs/test_background_ops.js');
-load('./jstests/libs/feature_compatibility_version.js');
 
 let newVersion = "latest";
 let oldVersion = "last-stable";

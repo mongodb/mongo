@@ -6,7 +6,6 @@
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
 // For supportsMajorityReadConcern().
 load("jstests/multiVersion/libs/causal_consistency_helpers.js");
-load("jstests/libs/feature_compatibility_version.js");  // For checkFCV.
 
 // Skip this test if running with --nojournal and WiredTiger.
 if (jsTest.options().noJournal &&

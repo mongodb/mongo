@@ -3,7 +3,6 @@
  */
 (function() {
 "use strict";
-load("jstests/libs/feature_compatibility_version.js");
 load("jstests/libs/parallel_shell_helpers.js");
 
 const rst = new ReplSetTest({nodes: 2});

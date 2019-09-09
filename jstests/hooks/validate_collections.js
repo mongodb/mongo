@@ -2,7 +2,6 @@
 'use strict';
 
 function CollectionValidator() {
-    load('jstests/libs/feature_compatibility_version.js');
     load('jstests/libs/parallelTester.js');
 
     if (!(this instanceof CollectionValidator)) {
@@ -87,8 +86,6 @@ function CollectionValidator() {
     // Run a separate thread to validate collections on each server in parallel.
     const validateCollectionsThread = function(validatorFunc, host) {
         try {
-            load('jstests/libs/feature_compatibility_version.js');
-
             print('Running validate() on ' + host);
             const conn = new Mongo(host);
             conn.setSlaveOk();

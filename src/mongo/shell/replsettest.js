@@ -68,8 +68,6 @@
  *  nodes {Array.<Mongo>} - connection to replica set members
  */
 
-load("jstests/libs/feature_compatibility_version.js");
-
 var ReplSetTest = function(opts) {
     'use strict';
 

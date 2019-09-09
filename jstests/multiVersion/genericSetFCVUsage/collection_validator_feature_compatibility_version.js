@@ -9,8 +9,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/feature_compatibility_version.js");
-
 const testName = "collection_validator_feature_compatibility_version";
 const dbpath = MongoRunner.dataPath + testName;
 

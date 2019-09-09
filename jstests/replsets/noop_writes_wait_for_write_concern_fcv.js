@@ -4,9 +4,8 @@
 (function() {
 "use strict";
 
-load("jstests/libs/write_concern_util.js");             // assertWriteConcernError
-load("jstests/replsets/rslib.js");                      // reconfig
-load("jstests/libs/feature_compatibility_version.js");  // latestFCV/lastStableFCV
+load("jstests/libs/write_concern_util.js");  // assertWriteConcernError
+load("jstests/replsets/rslib.js");           // reconfig
 
 // Start a two node replica set and set its FCV to the given version, then take down one
 // node so majority write concern can no longer be satisfied and verify that a noop setFCV

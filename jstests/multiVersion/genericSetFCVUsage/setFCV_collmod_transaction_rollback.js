@@ -5,8 +5,6 @@
 (function() {
 'use strict';
 
-load("jstests/libs/feature_compatibility_version.js");
-
 let dbpath = MongoRunner.dataPath + "setFCV_collmod_transaction_rollback";
 resetDbpath(dbpath);
 

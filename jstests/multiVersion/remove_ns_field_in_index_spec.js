@@ -7,7 +7,6 @@
  */
 (function() {
 'use strict';
-load('jstests/libs/feature_compatibility_version.js');
 
 const dbName = 'test';
 const collName = 'coll';

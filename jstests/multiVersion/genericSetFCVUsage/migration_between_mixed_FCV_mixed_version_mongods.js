@@ -6,8 +6,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/feature_compatibility_version.js");
-
 let st = new ShardingTest({
     shards: [{binVersion: "latest"}, {binVersion: "last-stable"}],
     mongos: {binVersion: "latest"},

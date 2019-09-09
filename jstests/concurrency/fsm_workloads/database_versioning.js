@@ -7,8 +7,6 @@
  * @tags: [requires_sharding]
  */
 
-load("jstests/libs/feature_compatibility_version.js");  // For lastStableFCV and latestFCV.
-
 var $config = (function() {
     var states = (function() {
         function init(db, collName) {

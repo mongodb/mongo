@@ -10,8 +10,6 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 (function() {
 "use strict";
 
-load("jstests/libs/feature_compatibility_version.js");
-
 const lastStable = "last-stable";
 
 let st = new ShardingTest({mongos: 1, shards: 1});

@@ -5,7 +5,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/feature_compatibility_version.js");
 load("jstests/replsets/libs/rollback_test.js");
 
 TestData.rollbackShutdowns = true;
