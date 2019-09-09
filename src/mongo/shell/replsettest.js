@@ -68,6 +68,8 @@
  *  nodes {Array.<Mongo>} - connection to replica set members
  */
 
+load("jstests/libs/feature_compatibility_version.js");
+
 var ReplSetTest = function(opts) {
     'use strict';
 
@@ -984,6 +986,17 @@ var ReplSetTest = function(opts) {
         // error when interrupted. We try several times, to reduce the chance of failing this way.
         replSetCommandWithRetry(master, cmd);
         this.getPrimary();  // Blocks until there is a primary.
+
+        // Initiating a replica set with a single node will use "latest" FCV. This will
+        // cause IncompatibleServerVersion errors if additional "last-stable" binary version
+        // nodes are subsequently added to the set, since such nodes cannot set their FCV to
+        // "latest". Therefore, we make sure the primary is "last-stable" FCV before adding in
+        // nodes of different binary versions to the replica set.
+        if (jsTest.options().randomBinVersions) {
+            assert.commandWorked(
+                self.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+            checkFCV(self.getPrimary().getDB("admin"), lastStableFCV);
+        }
 
         // Reconfigure the set to contain the correct number of nodes (if necessary).
         if (originalMembers) {

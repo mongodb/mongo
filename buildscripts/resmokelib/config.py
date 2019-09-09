@@ -94,6 +94,7 @@ DEFAULTS = {
     "storage_engine_cache_size_gb": None,
     "tag_file": None,
     "transport_layer": None,
+    "mixed_bin_versions": None,
 
     # Evergreen options.
     "build_id": None,
@@ -378,6 +379,9 @@ STAGGER_JOBS = None
 
 # If set to true, it enables read concern majority. Else, read concern majority is disabled.
 MAJORITY_READ_CONCERN = None
+
+# Specifies the binary versions of each node we should run for a replica set.
+MIXED_BIN_VERSIONS = None
 
 # If set to "on", it enables flow control. If set to "off", it disables flow control. If left as
 # None, the server's default will determine whether flow control is enabled.

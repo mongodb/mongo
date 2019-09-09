@@ -244,6 +244,7 @@ def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,to
         test_name = None
     shortcut_opts = {
         "enableMajorityReadConcern": (config.MAJORITY_READ_CONCERN, True),
+        "mixedBinVersions": (config.MIXED_BIN_VERSIONS, ""),
         "noJournal": (config.NO_JOURNAL, False),
         "serviceExecutor": (config.SERVICE_EXECUTOR, ""),
         "storageEngine": (config.STORAGE_ENGINE, ""),

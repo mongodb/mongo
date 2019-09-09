@@ -281,6 +281,12 @@ def _make_parser():  # pylint: disable=too-many-statements
         help="OBSOLETE: Superceded by --suites; specify --suites=SUITE path/to/test"
         " to run a particular test under a particular suite configuration.")
 
+    parser.add_option(
+        "--mixedBinVersions", type="string", dest="mixed_bin_versions",
+        metavar="version1-version2-..-versionN", help="Runs the test with the provided replica set"
+        " binary version configuration. Specify 'old-new' to configure a replica set with a"
+        " 'last-stable' version primary and 'latest' version secondary.")
+
     evergreen_options = optparse.OptionGroup(
         parser, title=_EVERGREEN_OPTIONS_TITLE,
         description=("Options used to propagate information about the Evergreen task running this"
@@ -524,6 +530,12 @@ def _validate_config(parser):
     if _config.REPEAT_TESTS > 1 and _config.REPEAT_TESTS_SECS:
         parser.error("Cannot specify --repeatTests and --repeatTestsSecs")
 
+    if _config.MIXED_BIN_VERSIONS is not None:
+        for version in _config.MIXED_BIN_VERSIONS:
+            if version not in set(['old', 'new']):
+                parser.error("Must specify binary versions as 'old' or 'new' in format"
+                             " 'version1-version2'")
+
 
 def validate_benchmark_options():
     """Error out early if any options are incompatible with benchmark test suites.
@@ -579,6 +591,9 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements
     _config.GENNY_EXECUTABLE = _expand_user(config.pop("genny_executable"))
     _config.JOBS = config.pop("jobs")
     _config.MAJORITY_READ_CONCERN = config.pop("majority_read_concern") == "on"
+    _config.MIXED_BIN_VERSIONS = config.pop("mixed_bin_versions")
+    if _config.MIXED_BIN_VERSIONS is not None:
+        _config.MIXED_BIN_VERSIONS = _config.MIXED_BIN_VERSIONS.split("-")
     _config.MONGO_EXECUTABLE = _expand_user(config.pop("mongo_executable"))
     _config.MONGOD_EXECUTABLE = _expand_user(config.pop("mongod_executable"))
     _config.MONGOD_SET_PARAMETERS = config.pop("mongod_set_parameters")

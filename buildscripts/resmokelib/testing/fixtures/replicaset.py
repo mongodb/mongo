@@ -22,17 +22,21 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
     # Error response codes copied from mongo/base/error_codes.err.
     _NODE_NOT_FOUND = 74
 
+    _LAST_STABLE_FCV = "4.2"
+    _LATEST_FCV = "4.4"
+
+    _LAST_STABLE_BIN_VERSION = "4.2"
+
     def __init__(  # pylint: disable=too-many-arguments, too-many-locals
-            self, logger, job_num, mongod_executable=None, mongod_options=None, dbpath_prefix=None,
-            preserve_dbpath=False, num_nodes=2, start_initial_sync_node=False,
-            write_concern_majority_journal_default=None, auth_options=None,
-            replset_config_options=None, voting_secondaries=None, all_nodes_electable=False,
-            use_replica_set_connection_string=None, linear_chain=False):
+            self, logger, job_num, mongod_options=None, dbpath_prefix=None, preserve_dbpath=False,
+            num_nodes=2, start_initial_sync_node=False, write_concern_majority_journal_default=None,
+            auth_options=None, replset_config_options=None, voting_secondaries=None,
+            all_nodes_electable=False, use_replica_set_connection_string=None, linear_chain=False,
+            mixed_bin_versions=None):
         """Initialize ReplicaSetFixture."""
 
         interface.ReplFixture.__init__(self, logger, job_num, dbpath_prefix=dbpath_prefix)
 
-        self.mongod_executable = mongod_executable
         self.mongod_options = utils.default_if_none(mongod_options, {})
         self.preserve_dbpath = preserve_dbpath
         self.num_nodes = num_nodes
@@ -44,6 +48,22 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         self.all_nodes_electable = all_nodes_electable
         self.use_replica_set_connection_string = use_replica_set_connection_string
         self.linear_chain = linear_chain
+        self.mixed_bin_versions = utils.default_if_none(mixed_bin_versions,
+                                                        config.MIXED_BIN_VERSIONS)
+        if self.mixed_bin_versions is not None:
+            mongod_executable = utils.default_if_none(config.MONGOD_EXECUTABLE,
+                                                      config.DEFAULT_MONGOD_EXECUTABLE)
+            latest_mongod = mongod_executable
+            last_stable_mongod = mongod_executable + "-" \
+                                + ReplicaSetFixture._LAST_STABLE_BIN_VERSION
+            self.mixed_bin_versions = [
+                latest_mongod if x == "new" else last_stable_mongod for x in self.mixed_bin_versions
+            ]
+            num_versions = len(self.mixed_bin_versions)
+            if num_versions != num_nodes:
+                msg = (("The number of binary versions: {} do not match the number of nodes: "\
+                        "{}.")).format(num_versions, num_nodes)
+                raise errors.ServerFailure(msg)
 
         # If voting_secondaries has not been set, set a default. By default, secondaries have zero
         # votes unless they are also nodes capable of being elected primary.
@@ -74,7 +94,6 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
     def setup(self):  # pylint: disable=too-many-branches,too-many-statements
         """Set up the replica set."""
         self.replset_name = self.mongod_options.get("replSet", "rs")
-
         if not self.nodes:
             for i in range(self.num_nodes):
                 node = self._new_mongod(i, self.replset_name)
@@ -158,6 +177,24 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         self.logger.info("Issuing replSetInitiate command: %s", repl_config)
         self._configure_repl_set(client, {"replSetInitiate": repl_config})
         self._await_primary()
+
+        if self.mixed_bin_versions is not None:
+            if self.mixed_bin_versions[0] == "new":
+                fcv_response = client.admin.command(
+                    {"getParameter": 1, "featureCompatibilityVersion": 1})
+                fcv = fcv_response["featureCompatibilityVersion"]["version"]
+                if fcv != ReplicaSetFixture._LATEST_FCV:
+                    msg = (("Server returned FCV{} when we expected FCV{}.").format(
+                        fcv, ReplicaSetFixture._LATEST_FCV))
+                    raise errors.ServerFailure(msg)
+
+            # Initiating a replica set with a single node will use "latest" FCV. This will
+            # cause IncompatibleServerVersion errors if additional "last-stable" binary version
+            # nodes are subsequently added to the set, since such nodes cannot set their FCV to
+            # "latest". Therefore, we make sure the primary is "last-stable" FCV before adding in
+            # nodes of different binary versions to the replica set.
+            client.admin.command(
+                {"setFeatureCompatibilityVersion": ReplicaSetFixture._LAST_STABLE_FCV})
 
         if self.nodes[1:]:
             # Wait to connect to each of the secondaries before running the replSetReconfig
@@ -429,12 +466,13 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         return [node for node in self.nodes if node.port != primary.port]
 
     def get_initial_sync_node(self):
-        """Return initila sync node from the replica set."""
+        """Return initial sync node from the replica set."""
         return self.initial_sync_node
 
     def _new_mongod(self, index, replset_name):
         """Return a standalone.MongoDFixture configured to be used as replica-set member."""
-
+        mongod_executable = None if self.mixed_bin_versions is None else self.mixed_bin_versions[
+            index]
         mongod_logger = self._get_logger_for_mongod(index)
         mongod_options = self.mongod_options.copy()
         mongod_options["replSet"] = replset_name
@@ -442,7 +480,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         mongod_options["set_parameters"] = mongod_options.get("set_parameters", {}).copy()
 
         return standalone.MongoDFixture(
-            mongod_logger, self.job_num, mongod_executable=self.mongod_executable,
+            mongod_logger, self.job_num, mongod_executable=mongod_executable,
             mongod_options=mongod_options, preserve_dbpath=self.preserve_dbpath)
 
     def _get_logger_for_mongod(self, index):
