@@ -27,119 +27,116 @@
  */
 #include "test_util.h"
 
-extern char *__wt_optarg;		/* argument associated with option */
+extern char *__wt_optarg; /* argument associated with option */
 
 /*
  * testutil_parse_opts --
- *    Parse command line options for a test case.
+ *     Parse command line options for a test case.
  */
 int
-testutil_parse_opts(int argc, char * const *argv, TEST_OPTS *opts)
+testutil_parse_opts(int argc, char *const *argv, TEST_OPTS *opts)
 {
-	size_t len;
-	int ch;
+    size_t len;
+    int ch;
 
-	opts->do_data_ops = false;
-	opts->preserve = false;
-	opts->running = true;
-	opts->verbose = false;
+    opts->do_data_ops = false;
+    opts->preserve = false;
+    opts->running = true;
+    opts->verbose = false;
 
-	opts->argv0 = argv[0];
-	opts->progname = testutil_set_progname(argv);
+    opts->argv0 = argv[0];
+    opts->progname = testutil_set_progname(argv);
 
-	testutil_print_command_line(argc, argv);
+    testutil_print_command_line(argc, argv);
 
-	while ((ch = __wt_getopt(opts->progname,
-		argc, argv, "A:dh:n:o:pR:T:t:vW:")) != EOF)
-		switch (ch) {
-		case 'A': /* Number of append threads */
-			opts->n_append_threads = (uint64_t)atoll(__wt_optarg);
-			break;
-		case 'd': /* Use data in multi-threaded test programs */
-			opts->do_data_ops = true;
-			break;
-		case 'h': /* Home directory */
-			opts->home = dstrdup(__wt_optarg);
-			break;
-		case 'n': /* Number of records */
-			opts->nrecords = (uint64_t)atoll(__wt_optarg);
-			break;
-		case 'o': /* Number of operations */
-			opts->nops = (uint64_t)atoll(__wt_optarg);
-			break;
-		case 'p': /* Preserve directory contents */
-			opts->preserve = true;
-			break;
-		case 'R': /* Number of reader threads */
-			opts->n_read_threads = (uint64_t)atoll(__wt_optarg);
-			break;
-		case 'T': /* Number of threads */
-			opts->nthreads = (uint64_t)atoll(__wt_optarg);
-			break;
-		case 't': /* Table type */
-			switch (__wt_optarg[0]) {
-			case 'C':
-			case 'c':
-				opts->table_type = TABLE_COL;
-				break;
-			case 'F':
-			case 'f':
-				opts->table_type = TABLE_FIX;
-				break;
-			case 'R':
-			case 'r':
-				opts->table_type = TABLE_ROW;
-				break;
-			}
-			break;
-		case 'v':
-			opts->verbose = true;
-			break;
-		case 'W': /* Number of writer threads */
-			opts->n_write_threads = (uint64_t)atoll(__wt_optarg);
-			break;
-		case '?':
-		default:
-			(void)fprintf(stderr, "usage: %s "
-			    "[-A append thread count] "
-			    "[-d add data] "
-			    "[-h home] "
-			    "[-n record count] "
-			    "[-o op count] "
-			    "[-p] "
-			    "[-R read thread count] "
-			    "[-T thread count] "
-			    "[-t c|f|r table type] "
-			    "[-v] "
-			    "[-W write thread count] ",
-			    opts->progname);
-			return (1);
-		}
+    while ((ch = __wt_getopt(opts->progname, argc, argv, "A:dh:n:o:pR:T:t:vW:")) != EOF)
+        switch (ch) {
+        case 'A': /* Number of append threads */
+            opts->n_append_threads = (uint64_t)atoll(__wt_optarg);
+            break;
+        case 'd': /* Use data in multi-threaded test programs */
+            opts->do_data_ops = true;
+            break;
+        case 'h': /* Home directory */
+            opts->home = dstrdup(__wt_optarg);
+            break;
+        case 'n': /* Number of records */
+            opts->nrecords = (uint64_t)atoll(__wt_optarg);
+            break;
+        case 'o': /* Number of operations */
+            opts->nops = (uint64_t)atoll(__wt_optarg);
+            break;
+        case 'p': /* Preserve directory contents */
+            opts->preserve = true;
+            break;
+        case 'R': /* Number of reader threads */
+            opts->n_read_threads = (uint64_t)atoll(__wt_optarg);
+            break;
+        case 'T': /* Number of threads */
+            opts->nthreads = (uint64_t)atoll(__wt_optarg);
+            break;
+        case 't': /* Table type */
+            switch (__wt_optarg[0]) {
+            case 'C':
+            case 'c':
+                opts->table_type = TABLE_COL;
+                break;
+            case 'F':
+            case 'f':
+                opts->table_type = TABLE_FIX;
+                break;
+            case 'R':
+            case 'r':
+                opts->table_type = TABLE_ROW;
+                break;
+            }
+            break;
+        case 'v':
+            opts->verbose = true;
+            break;
+        case 'W': /* Number of writer threads */
+            opts->n_write_threads = (uint64_t)atoll(__wt_optarg);
+            break;
+        case '?':
+        default:
+            (void)fprintf(stderr,
+              "usage: %s "
+              "[-A append thread count] "
+              "[-d add data] "
+              "[-h home] "
+              "[-n record count] "
+              "[-o op count] "
+              "[-p] "
+              "[-R read thread count] "
+              "[-T thread count] "
+              "[-t c|f|r table type] "
+              "[-v] "
+              "[-W write thread count] ",
+              opts->progname);
+            return (1);
+        }
 
-	/*
-	 * Setup the home directory if not explicitly specified. It needs to be
-	 * unique for every test or the auto make parallel tester gets upset.
-	 */
-	if (opts->home == NULL) {
-		len = strlen("WT_TEST.")  + strlen(opts->progname) + 10;
-		opts->home = dmalloc(len);
-		testutil_check(__wt_snprintf(
-		    opts->home, len, "WT_TEST.%s", opts->progname));
-	}
+    /*
+     * Setup the home directory if not explicitly specified. It needs to be unique for every test or
+     * the auto make parallel tester gets upset.
+     */
+    if (opts->home == NULL) {
+        len = strlen("WT_TEST.") + strlen(opts->progname) + 10;
+        opts->home = dmalloc(len);
+        testutil_check(__wt_snprintf(opts->home, len, "WT_TEST.%s", opts->progname));
+    }
 
-	/*
-	 * Setup the progress file name.
-	 */
-	len = strlen(opts->home) + 20;
-	opts->progress_file_name = dmalloc(len);
-	testutil_check(__wt_snprintf(opts->progress_file_name, len,
-	    "%s/progress.txt", opts->home));
+    /*
+     * Setup the progress file name.
+     */
+    len = strlen(opts->home) + 20;
+    opts->progress_file_name = dmalloc(len);
+    testutil_check(__wt_snprintf(opts->progress_file_name, len, "%s/progress.txt", opts->home));
 
-	/* Setup the default URI string */
-	len = strlen("table:") + strlen(opts->progname) + 10;
-	opts->uri = dmalloc(len);
-	testutil_check(__wt_snprintf(
-	    opts->uri, len, "table:%s", opts->progname));
+    /* Setup the default URI string */
+    len = strlen("table:") + strlen(opts->progname) + 10;
+    opts->uri = dmalloc(len);
+    testutil_check(__wt_snprintf(opts->uri, len, "table:%s", opts->progname));
 
-	return (0);
+    return (0);
 }

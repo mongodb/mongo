@@ -6,49 +6,45 @@
  * See the file LICENSE for redistribution information.
  */
 
-#define	WT_PTRDIFFT_FMT	"td"			/* ptrdiff_t format string */
-#define	WT_SIZET_FMT	"zu"			/* size_t format string */
+#define WT_PTRDIFFT_FMT "td" /* ptrdiff_t format string */
+#define WT_SIZET_FMT "zu"    /* size_t format string */
 
 /* Lint-specific attributes. */
-#define	WT_PACKED_STRUCT_BEGIN(name)					\
-	struct name {
-#define	WT_PACKED_STRUCT_END						\
-	};
+#define WT_PACKED_STRUCT_BEGIN(name) struct name {
+#define WT_PACKED_STRUCT_END \
+    }                        \
+    ;
 
-#define	WT_GCC_FUNC_ATTRIBUTE(x)
-#define	WT_GCC_FUNC_DECL_ATTRIBUTE(x)
+#define WT_GCC_FUNC_ATTRIBUTE(x)
+#define WT_GCC_FUNC_DECL_ATTRIBUTE(x)
 
-#define	WT_ATOMIC_FUNC(name, ret, type)					\
-static inline ret							\
-__wt_atomic_add##name(type *vp, type v)					\
-{									\
-	*vp += v;							\
-	return (*vp);							\
-}									\
-static inline ret							\
-__wt_atomic_fetch_add##name(type *vp, type v)				\
-{									\
-	type orig;							\
-									\
-	orig = *vp;							\
-	*vp += v;							\
-	return (orig);							\
-}									\
-static inline ret							\
-__wt_atomic_sub##name(type *vp, type v)					\
-{									\
-	*vp -= v;							\
-	return (*vp);							\
-}									\
-static inline bool							\
-__wt_atomic_cas##name(type *vp, type orig, type new)			\
-{									\
-	if (*vp == orig) {						\
-		*vp = new;						\
-		return (true);						\
-	}								\
-	return (false);							\
-}
+#define WT_ATOMIC_FUNC(name, ret, type)                                     \
+    static inline ret __wt_atomic_add##name(type *vp, type v)               \
+    {                                                                       \
+        *vp += v;                                                           \
+        return (*vp);                                                       \
+    }                                                                       \
+    static inline ret __wt_atomic_fetch_add##name(type *vp, type v)         \
+    {                                                                       \
+        type orig;                                                          \
+                                                                            \
+        orig = *vp;                                                         \
+        *vp += v;                                                           \
+        return (orig);                                                      \
+    }                                                                       \
+    static inline ret __wt_atomic_sub##name(type *vp, type v)               \
+    {                                                                       \
+        *vp -= v;                                                           \
+        return (*vp);                                                       \
+    }                                                                       \
+    static inline bool __wt_atomic_cas##name(type *vp, type orig, type new) \
+    {                                                                       \
+        if (*vp == orig) {                                                  \
+            *vp = new;                                                      \
+            return (true);                                                  \
+        }                                                                   \
+        return (false);                                                     \
+    }
 
 WT_ATOMIC_FUNC(8, uint8_t, uint8_t)
 WT_ATOMIC_FUNC(16, uint16_t, uint16_t)
@@ -64,19 +60,59 @@ WT_ATOMIC_FUNC(size, size_t, size_t)
 
 /*
  * __wt_atomic_cas_ptr --
- *	Pointer compare and swap.
+ *     Pointer compare and swap.
  */
 static inline bool
-__wt_atomic_cas_ptr(void *vp, void *orig, void *new) {
-	if (*(void **)vp == orig) {
-		*(void **)vp = new;
-		return (true);
-	}
-	return (false);
+__wt_atomic_cas_ptr(void *vp, void *orig, void *new)
+{
+    if (*(void **)vp == orig) {
+        *(void **)vp = new;
+        return (true);
+    }
+    return (false);
 }
 
-static inline void WT_BARRIER(void) {}
-static inline void WT_FULL_BARRIER(void) {}
-static inline void WT_PAUSE(void) {}
-static inline void WT_READ_BARRIER(void) {}
-static inline void WT_WRITE_BARRIER(void) {}
+/*
+ * WT_BARRIER --
+ *	No-op implementation of WT_BARRIER.
+ */
+static inline void
+WT_BARRIER(void)
+{
+}
+
+/*
+ * WT_FULL_BARRIER --
+ *	No-op implementation of WT_FULL_BARRIER.
+ */
+static inline void
+WT_FULL_BARRIER(void)
+{
+}
+
+/*
+ * WT_PAUSE --
+ *	No-op implementation of WT_PAUSE.
+ */
+static inline void
+WT_PAUSE(void)
+{
+}
+
+/*
+ * WT_READ_BARRIER --
+ *	No-op implementation of WT_READ_BARRIER.
+ */
+static inline void
+WT_READ_BARRIER(void)
+{
+}
+
+/*
+ * WT_WRITE_BARRIER --
+ *	No-op implementation of WT_WRITE_BARRIER.
+ */
+static inline void
+WT_WRITE_BARRIER(void)
+{
+}

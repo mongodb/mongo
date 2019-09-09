@@ -59,7 +59,7 @@ for f in `find bench examples ext src test -name '*.[ci]'`; do
 	egrep 'va_start.*(WT_RET|goto).*va_end' |
 	sed 's/:.*//' > $t
 	file_parse $f |
-	egrep -v 'va_start.*WT_ERR.*[^a-z_]err:	va_end' |
+	egrep -v 'va_start.*WT_ERR.*[^a-z_]err:.*va_end' |
 	egrep 'va_start.*WT_ERR.*va_end' |
 	sed 's/:.*//' >> $t
 

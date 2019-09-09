@@ -64,7 +64,8 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
     # Compare the original and backed-up files using the wt dump command.
     def compare(self, uri):
         self.runWt(['dump', uri], outfilename='orig')
-        self.runWt(['-h', self.dir, 'dump', uri], outfilename='backup')
+        # Pass -R flag as we need to run recovery on the backup dir before calling dump.
+        self.runWt(['-h', self.dir, '-R', 'dump', uri], outfilename='backup')
         self.assertEqual(True, compare_files(self, 'orig', 'backup'))
 
     # Test simple backup cursor open/close.
@@ -88,7 +89,8 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Make sure all the files were copied.
         self.runWt(['list'], outfilename='outfile.orig')
-        self.runWt(['-h', self.dir, 'list'], outfilename='outfile.backup')
+        # Pass -R flag as we need to run recovery on the backup dir before calling list.
+        self.runWt(['-h', self.dir, '-R', 'list'], outfilename='outfile.backup')
         self.assertEqual(
             True, compare_files(self, 'outfile.orig', 'outfile.backup'))
 

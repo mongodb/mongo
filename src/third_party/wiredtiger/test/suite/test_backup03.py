@@ -95,7 +95,8 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
     # Compare the original and backed-up files using the wt dump command.
     def compare(self, uri):
         self.runWt(['dump', uri], outfilename='orig')
-        self.runWt(['-h', self.dir, 'dump', uri], outfilename='backup')
+        # Pass -R flag as we need to run recovery on the backup dir before calling dump.
+        self.runWt(['-h', self.dir, '-R', 'dump', uri], outfilename='backup')
         self.assertEqual(True, compare_files(self, 'orig', 'backup'))
 
     # Check that a URI doesn't exist, both the meta-data and the file names.

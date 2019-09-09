@@ -29,8 +29,8 @@
 
 #include <signal.h>
 
-#define	MAXKEY		10000
-#define	PERIOD		60
+#define MAXKEY 10000
+#define PERIOD 60
 
 static WT_CONNECTION *conn;
 static uint64_t worker, worker_busy, verify, verify_busy;
@@ -42,353 +42,323 @@ static char *uri_list[750];
 static void
 uri_init(void)
 {
-	WT_CURSOR *cursor;
-	WT_SESSION *session;
-	u_int i, key;
-	char buf[128];
+    WT_CURSOR *cursor;
+    WT_SESSION *session;
+    u_int i, key;
+    char buf[128];
 
-	for (i = 0; i < uris; ++i)
-		if (uri_list[i] == NULL) {
-			testutil_check(
-			    __wt_snprintf(buf, sizeof(buf), "table:%u", i));
-			uri_list[i] = dstrdup(buf);
-		}
+    for (i = 0; i < uris; ++i)
+        if (uri_list[i] == NULL) {
+            testutil_check(__wt_snprintf(buf, sizeof(buf), "table:%u", i));
+            uri_list[i] = dstrdup(buf);
+        }
 
-	testutil_check(conn->open_session(conn, NULL, NULL, &session));
+    testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
-	/* Initialize the file contents. */
-	for (i = 0; i < uris; ++i) {
-		testutil_check(__wt_snprintf(buf, sizeof(buf),
-		    "key_format=S,value_format=S,"
-		    "allocation_size=4K,leaf_page_max=32KB,"));
-		testutil_check(session->create(session, uri_list[i], buf));
-		testutil_check(session->open_cursor(
-		    session, uri_list[i], NULL, NULL, &cursor));
-		for (key = 1; key < MAXKEY; ++key) {
-			testutil_check(__wt_snprintf(
-			    buf, sizeof(buf), "key:%020u", key));
-			cursor->set_key(cursor, buf);
-			cursor->set_value(cursor, buf);
-			testutil_check(cursor->insert(cursor));
-		}
-		testutil_check(cursor->close(cursor));
-	}
+    /* Initialize the file contents. */
+    for (i = 0; i < uris; ++i) {
+        testutil_check(__wt_snprintf(buf, sizeof(buf),
+          "key_format=S,value_format=S,"
+          "allocation_size=4K,leaf_page_max=32KB,"));
+        testutil_check(session->create(session, uri_list[i], buf));
+        testutil_check(session->open_cursor(session, uri_list[i], NULL, NULL, &cursor));
+        for (key = 1; key < MAXKEY; ++key) {
+            testutil_check(__wt_snprintf(buf, sizeof(buf), "key:%020u", key));
+            cursor->set_key(cursor, buf);
+            cursor->set_value(cursor, buf);
+            testutil_check(cursor->insert(cursor));
+        }
+        testutil_check(cursor->close(cursor));
+    }
 
-	/* Create a checkpoint we can use for readonly handles. */
-	testutil_check(session->checkpoint(session, NULL));
+    /* Create a checkpoint we can use for readonly handles. */
+    testutil_check(session->checkpoint(session, NULL));
 
-	testutil_check(session->close(session, NULL));
+    testutil_check(session->close(session, NULL));
 }
 
 static void
 uri_teardown(void)
 {
-	u_int i;
+    u_int i;
 
-	for (i = 0; i < WT_ELEMENTS(uri_list); ++i)
-		free(uri_list[i]);
+    for (i = 0; i < WT_ELEMENTS(uri_list); ++i)
+        free(uri_list[i]);
 }
 
 static void
 op(WT_SESSION *session, WT_RAND_STATE *rnd, WT_CURSOR **cpp)
 {
-	WT_CURSOR *cursor;
-	WT_DECL_RET;
-	u_int i, key;
-	char buf[128];
-	bool readonly;
+    WT_CURSOR *cursor;
+    WT_DECL_RET;
+    u_int i, key;
+    char buf[128];
+    bool readonly;
 
-	/* Close any open cursor in the slot we're about to reuse. */
-	if (*cpp != NULL) {
-		testutil_check((*cpp)->close(*cpp));
-		*cpp = NULL;
-	}
+    /* Close any open cursor in the slot we're about to reuse. */
+    if (*cpp != NULL) {
+        testutil_check((*cpp)->close(*cpp));
+        *cpp = NULL;
+    }
 
-	cursor = NULL;
-	readonly = __wt_random(rnd) % 2 == 0;
+    cursor = NULL;
+    readonly = __wt_random(rnd) % 2 == 0;
 
-	/* Loop to open an object handle. */
-	for (i = __wt_random(rnd) % uris; !done; __wt_yield()) {
-		/* Use a checkpoint handle for 50% of reads. */
-		ret = session->open_cursor(session, uri_list[i], NULL,
-		    readonly && (i % 2 == 0) ?
-		    "checkpoint=WiredTigerCheckpoint" : NULL, &cursor);
-		if (ret != EBUSY) {
-			testutil_check(ret);
-			break;
-		}
-		(void)__wt_atomic_add64(&worker_busy, 1);
-	}
-	if (cursor == NULL)
-		return;
+    /* Loop to open an object handle. */
+    for (i = __wt_random(rnd) % uris; !done; __wt_yield()) {
+        /* Use a checkpoint handle for 50% of reads. */
+        ret = session->open_cursor(session, uri_list[i], NULL,
+          readonly && (i % 2 == 0) ? "checkpoint=WiredTigerCheckpoint" : NULL, &cursor);
+        if (ret != EBUSY) {
+            testutil_check(ret);
+            break;
+        }
+        (void)__wt_atomic_add64(&worker_busy, 1);
+    }
+    if (cursor == NULL)
+        return;
 
-	/* Operate on some number of key/value pairs. */
-	for (key = 1;
-	    !done && key < MAXKEY; key += __wt_random(rnd) % 37, __wt_yield()) {
-		testutil_check(
-		    __wt_snprintf(buf, sizeof(buf), "key:%020u", key));
-		cursor->set_key(cursor, buf);
-		if (readonly)
-			testutil_check(cursor->search(cursor));
-		else {
-			cursor->set_value(cursor, buf);
-			testutil_check(cursor->insert(cursor));
-		}
-	}
+    /* Operate on some number of key/value pairs. */
+    for (key = 1; !done && key < MAXKEY; key += __wt_random(rnd) % 37, __wt_yield()) {
+        testutil_check(__wt_snprintf(buf, sizeof(buf), "key:%020u", key));
+        cursor->set_key(cursor, buf);
+        if (readonly)
+            testutil_check(cursor->search(cursor));
+        else {
+            cursor->set_value(cursor, buf);
+            testutil_check(cursor->insert(cursor));
+        }
+    }
 
-	/* Close the cursor half the time, otherwise cache it. */
-	if (__wt_random(rnd) % 2 == 0)
-		testutil_check(cursor->close(cursor));
-	else {
-		testutil_check(cursor->reset(cursor));
-		*cpp = cursor;
-	}
+    /* Close the cursor half the time, otherwise cache it. */
+    if (__wt_random(rnd) % 2 == 0)
+        testutil_check(cursor->close(cursor));
+    else {
+        testutil_check(cursor->reset(cursor));
+        *cpp = cursor;
+    }
 
-	(void)__wt_atomic_add64(&worker, 1);
+    (void)__wt_atomic_add64(&worker, 1);
 }
 
 static void *
 wthread(void *arg)
 {
-	WT_CURSOR *cursor_list[10];
-	WT_RAND_STATE rnd;
-	WT_SESSION *session;
-	u_int next;
+    WT_CURSOR *cursor_list[10];
+    WT_RAND_STATE rnd;
+    WT_SESSION *session;
+    u_int next;
 
-	(void)arg;
+    (void)arg;
 
-	memset(cursor_list, 0, sizeof(cursor_list));
+    memset(cursor_list, 0, sizeof(cursor_list));
 
-	testutil_check(conn->open_session(conn, NULL, NULL, &session));
-	__wt_random_init_seed((WT_SESSION_IMPL *)session, &rnd);
+    testutil_check(conn->open_session(conn, NULL, NULL, &session));
+    __wt_random_init_seed((WT_SESSION_IMPL *)session, &rnd);
 
-	for (next = 0; !done;) {
-		if (++next == WT_ELEMENTS(cursor_list))
-			next = 0;
-		op(session, &rnd, &cursor_list[next]);
-	}
+    for (next = 0; !done;) {
+        if (++next == WT_ELEMENTS(cursor_list))
+            next = 0;
+        op(session, &rnd, &cursor_list[next]);
+    }
 
-	return (NULL);
+    return (NULL);
 }
 
 static void *
 vthread(void *arg)
 {
-	WT_CURSOR *cursor_list[10];
-	WT_DECL_RET;
-	WT_RAND_STATE rnd;
-	WT_SESSION *session;
-	u_int i, next;
+    WT_CURSOR *cursor_list[10];
+    WT_DECL_RET;
+    WT_RAND_STATE rnd;
+    WT_SESSION *session;
+    u_int i, next;
 
-	(void)arg;
+    (void)arg;
 
-	memset(cursor_list, 0, sizeof(cursor_list));
+    memset(cursor_list, 0, sizeof(cursor_list));
 
-	testutil_check(conn->open_session(conn, NULL, NULL, &session));
-	__wt_random_init_seed((WT_SESSION_IMPL *)session, &rnd);
+    testutil_check(conn->open_session(conn, NULL, NULL, &session));
+    __wt_random_init_seed((WT_SESSION_IMPL *)session, &rnd);
 
-	for (next = 0; !done;) {
-		if (++next == WT_ELEMENTS(cursor_list))
-			next = 0;
-		op(session, &rnd, &cursor_list[next]);
+    for (next = 0; !done;) {
+        if (++next == WT_ELEMENTS(cursor_list))
+            next = 0;
+        op(session, &rnd, &cursor_list[next]);
 
-		while (!done) {
-			i = __wt_random(&rnd) % uris;
-			ret = session->verify(session, uri_list[i], NULL);
-			if (ret == EBUSY) {
-				(void)__wt_atomic_add64(&verify_busy, 1);
-				continue;
-			}
+        while (!done) {
+            i = __wt_random(&rnd) % uris;
+            ret = session->verify(session, uri_list[i], NULL);
+            if (ret == EBUSY) {
+                (void)__wt_atomic_add64(&verify_busy, 1);
+                continue;
+            }
 
-			testutil_check(ret);
-			(void)__wt_atomic_add64(&verify, 1);
-			break;
-		}
-	}
+            testutil_check(ret);
+            (void)__wt_atomic_add64(&verify, 1);
+            break;
+        }
+    }
 
-	return (NULL);
+    return (NULL);
 }
 
 static void
 on_alarm(int signo)
 {
-	(void)signo;				/* Unused parameter */
+    (void)signo; /* Unused parameter */
 
-	done = true;
+    done = true;
 }
 
 static void
 sweep_stats(void)
 {
-	static const int list[] = {
-		WT_STAT_CONN_CURSOR_SWEEP_BUCKETS,
-		WT_STAT_CONN_CURSOR_SWEEP_CLOSED,
-		WT_STAT_CONN_CURSOR_SWEEP_EXAMINED,
-		WT_STAT_CONN_CURSOR_SWEEP,
-		WT_STAT_CONN_DH_SWEEP_REF,
-		WT_STAT_CONN_DH_SWEEP_CLOSE,
-		WT_STAT_CONN_DH_SWEEP_REMOVE,
-		WT_STAT_CONN_DH_SWEEP_TOD,
-		WT_STAT_CONN_DH_SWEEPS,
-		WT_STAT_CONN_DH_SESSION_SWEEPS,
-		-1
-	};
-	WT_SESSION *session;
-	WT_CURSOR *cursor;
-	uint64_t value;
-	int i;
-	const char *desc, *pvalue;
+    static const int list[] = {WT_STAT_CONN_CURSOR_SWEEP_BUCKETS, WT_STAT_CONN_CURSOR_SWEEP_CLOSED,
+      WT_STAT_CONN_CURSOR_SWEEP_EXAMINED, WT_STAT_CONN_CURSOR_SWEEP, WT_STAT_CONN_DH_SWEEP_REF,
+      WT_STAT_CONN_DH_SWEEP_CLOSE, WT_STAT_CONN_DH_SWEEP_REMOVE, WT_STAT_CONN_DH_SWEEP_TOD,
+      WT_STAT_CONN_DH_SWEEPS, WT_STAT_CONN_DH_SESSION_SWEEPS, -1};
+    WT_SESSION *session;
+    WT_CURSOR *cursor;
+    uint64_t value;
+    int i;
+    const char *desc, *pvalue;
 
-	testutil_check(conn->open_session(conn, NULL, NULL, &session));
-	testutil_check(session->open_cursor(
-	    session, "statistics:", NULL, NULL, &cursor));
-	for (i = 0;; ++i) {
-		if (list[i] == -1)
-			break;
-		cursor->set_key(cursor, list[i]);
-		testutil_check(cursor->search(cursor));
-		testutil_check(
-		    cursor->get_value(cursor, &desc, &pvalue, &value));
-		printf("\t" "%s=%s\n", desc, pvalue);
-	}
+    testutil_check(conn->open_session(conn, NULL, NULL, &session));
+    testutil_check(session->open_cursor(session, "statistics:", NULL, NULL, &cursor));
+    for (i = 0;; ++i) {
+        if (list[i] == -1)
+            break;
+        cursor->set_key(cursor, list[i]);
+        testutil_check(cursor->search(cursor));
+        testutil_check(cursor->get_value(cursor, &desc, &pvalue, &value));
+        printf(
+          "\t"
+          "%s=%s\n",
+          desc, pvalue);
+    }
 }
 
 static void
 runone(bool config_cache)
 {
-	pthread_t idlist[1000];
-	u_int i, j;
-	char buf[256], home[256];
+    pthread_t idlist[1000];
+    u_int i, j;
+    char buf[256], home[256];
 
-	done = false;
+    done = false;
 
-	testutil_work_dir_from_path(
-	    home, sizeof(home), "WT_TEST.wt4333_handle_locks");
-	testutil_make_work_dir(home);
+    testutil_work_dir_from_path(home, sizeof(home), "WT_TEST.wt4333_handle_locks");
+    testutil_make_work_dir(home);
 
-	testutil_check(__wt_snprintf(buf, sizeof(buf),
-	    "create"
-	    ", cache_cursors=%s"
-	    ", cache_size=5GB"
-	    ", checkpoint_sync=true"
-	    ", eviction=(threads_max=5)"
-	    ", file_manager=("
-	    "close_handle_minimum=1,close_idle_time=1,close_scan_interval=1)"
-	    ", mmap=true"
-	    ", session_max=%u"
-	    ", statistics=(all)",
-	    config_cache ? "true" : "false",
-	    workers + 100));
-	testutil_check(wiredtiger_open(home, NULL, buf, &conn));
+    testutil_check(__wt_snprintf(buf, sizeof(buf),
+      "create"
+      ", cache_cursors=%s"
+      ", cache_size=5GB"
+      ", checkpoint_sync=true"
+      ", eviction=(threads_max=5)"
+      ", file_manager=("
+      "close_handle_minimum=1,close_idle_time=1,close_scan_interval=1)"
+      ", mmap=true"
+      ", session_max=%u"
+      ", statistics=(all)",
+      config_cache ? "true" : "false", workers + 100));
+    testutil_check(wiredtiger_open(home, NULL, buf, &conn));
 
-	printf("%s: %d seconds, cache_cursors=%s, %u workers, %u files\n",
-	    progname, PERIOD, config_cache ? "true" : "false", workers,  uris);
+    printf("%s: %d seconds, cache_cursors=%s, %u workers, %u files\n", progname, PERIOD,
+      config_cache ? "true" : "false", workers, uris);
 
-	uri_init();
+    uri_init();
 
-	/* 75% readers, 25% writers. */
-	for (i = 0; i < workers; ++i)
-		testutil_check(pthread_create(&idlist[i], NULL, wthread, NULL));
-	testutil_check(pthread_create(&idlist[i], NULL, vthread, NULL));
-	++i;
+    /* 75% readers, 25% writers. */
+    for (i = 0; i < workers; ++i)
+        testutil_check(pthread_create(&idlist[i], NULL, wthread, NULL));
+    testutil_check(pthread_create(&idlist[i], NULL, vthread, NULL));
+    ++i;
 
-	(void)alarm(PERIOD);
+    (void)alarm(PERIOD);
 
-	for (j = 0; j < i; ++j)
-		testutil_check(pthread_join(idlist[j], NULL));
+    for (j = 0; j < i; ++j)
+        testutil_check(pthread_join(idlist[j], NULL));
 
-	printf(
-	    "\t" "worker %" PRIu64
-	    ", worker_busy %" PRIu64
-	    ", verify %" PRIu64
-	    ", verify_busy %" PRIu64
-	    "\n",
-	    worker, worker_busy, verify, verify_busy);
+    printf(
+      "\t"
+      "worker %" PRIu64 ", worker_busy %" PRIu64 ", verify %" PRIu64 ", verify_busy %" PRIu64 "\n",
+      worker, worker_busy, verify, verify_busy);
 
-	if (verbose)
-		sweep_stats();
+    if (verbose)
+        sweep_stats();
 
-	testutil_check(conn->close(conn, NULL));
+    testutil_check(conn->close(conn, NULL));
 }
 
 static int
 run(int argc, char *argv[])
 {
-	static const struct {
-		u_int workers;
-		u_int uris;
-		bool  cache_cursors;
-	} runs[] = {
-		{  1,   1, false},
-		{  1,   1, true},
-		{  8,   1, false},
-		{  8,   1, true},
-		{ 16,   1, false},
-		{ 16,   1, true},
-		{ 16,   WT_ELEMENTS(uri_list), false},
-		{ 16,   WT_ELEMENTS(uri_list), true},
-		{200, 100, false},
-		{200, 100, true},
-		{200, WT_ELEMENTS(uri_list), false},
-		{200, WT_ELEMENTS(uri_list), true},
-		{300, 100, false},
-		{300, 100, true},
-		{600, WT_ELEMENTS(uri_list), false},
-		{600, WT_ELEMENTS(uri_list), true},
-	};
-	WT_RAND_STATE rnd;
-	u_int i, n;
-	int ch;
+    static const struct {
+        u_int workers;
+        u_int uris;
+        bool cache_cursors;
+    } runs[] = {
+      {1, 1, false}, {1, 1, true}, {8, 1, false}, {8, 1, true}, {16, 1, false}, {16, 1, true},
+      {16, WT_ELEMENTS(uri_list), false}, {16, WT_ELEMENTS(uri_list), true}, {200, 100, false},
+      {200, 100, true}, {200, WT_ELEMENTS(uri_list), false}, {200, WT_ELEMENTS(uri_list), true},
+      {300, 100, false}, {300, 100, true}, {600, WT_ELEMENTS(uri_list), false},
+      {600, WT_ELEMENTS(uri_list), true},
+    };
+    WT_RAND_STATE rnd;
+    u_int i, n;
+    int ch;
 
-	(void)testutil_set_progname(argv);
-	__wt_random_init_seed(NULL, &rnd);
+    (void)testutil_set_progname(argv);
+    __wt_random_init_seed(NULL, &rnd);
 
-	while ((ch = __wt_getopt(argv[0], argc, argv, "v")) != EOF) {
-		switch (ch) {
-		case 'v':
-			verbose = true;
-			break;
-		default:
-			fprintf(stderr, "usage: %s [-v]\n", argv[0]);
-			return (EXIT_FAILURE);
-		}
-	}
+    while ((ch = __wt_getopt(argv[0], argc, argv, "v")) != EOF) {
+        switch (ch) {
+        case 'v':
+            verbose = true;
+            break;
+        default:
+            fprintf(stderr, "usage: %s [-v]\n", argv[0]);
+            return (EXIT_FAILURE);
+        }
+    }
 
-	(void)signal(SIGALRM, on_alarm);
+    (void)signal(SIGALRM, on_alarm);
 
-	/* Each test in the table runs for a minute, run 5 tests at random. */
-	for (i = 0; i < 5; ++i) {
-		n = __wt_random(&rnd) % WT_ELEMENTS(runs);
-		workers = runs[n].workers;
-		uris = runs[n].uris;
-		runone(runs[n].cache_cursors);
-	}
+    /* Each test in the table runs for a minute, run 5 tests at random. */
+    for (i = 0; i < 5; ++i) {
+        n = __wt_random(&rnd) % WT_ELEMENTS(runs);
+        workers = runs[n].workers;
+        uris = runs[n].uris;
+        runone(runs[n].cache_cursors);
+    }
 
-	uri_teardown();
+    uri_teardown();
 
-	return (EXIT_SUCCESS);
+    return (EXIT_SUCCESS);
 }
 
 int
 main(int argc, char *argv[])
 {
-	bool skip;
+    bool skip;
 
-	skip = false;
+    skip = false;
 
-	/*
-	 * Bypass this test for valgrind. It has a fairly low thread limit.
-	 */
-	if (testutil_is_flag_set("TESTUTIL_BYPASS_VALGRIND"))
-		skip = true;
+    /*
+     * Bypass this test for valgrind. It has a fairly low thread limit.
+     */
+    if (testutil_is_flag_set("TESTUTIL_BYPASS_VALGRIND"))
+        skip = true;
 
-	/*
-	 * Bypass this test for OS X. We periodically see it hang without error,
-	 * leaving a zombie process that never exits (WT-4613, BUILD-7616).
-	 */
+/*
+ * Bypass this test for OS X. We periodically see it hang without error, leaving a zombie process
+ * that never exits (WT-4613, BUILD-7616).
+ */
 #if defined(__APPLE__)
-	skip = true;
+    skip = true;
 #endif
 
-	return (skip ? EXIT_SUCCESS : run(argc, argv));
+    return (skip ? EXIT_SUCCESS : run(argc, argv));
 }

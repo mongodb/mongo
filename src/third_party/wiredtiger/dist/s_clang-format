@@ -1,24 +1,37 @@
-#! /bin/sh
+#! /bin/bash
 
-# Installation of the clang development package isn't standard, list a
-# couple of the places we're using.
-export PATH=$PATH:/usr/local/clang60/bin:/usr/local/llvm-devel/bin
+set -o pipefail
+
+download_clang_format() {
+	if [ `uname` = "Linux" ]; then
+		curl https://s3.amazonaws.com/boxes.10gen.com/build/clang-format-3.8-rhel55.tar.gz -o dist/clang-format.tar.gz
+		tar --strip=2 -C dist/ -xf dist/clang-format.tar.gz build/bin/clang-format && rm dist/clang-format.tar.gz
+	elif [ `uname` = "Darwin" ]; then
+		curl https://s3.amazonaws.com/boxes.10gen.com/build/clang%2Bllvm-3.8.0-x86_64-apple-darwin.tar.xz -o dist/clang-format.tar.gz
+		tar --strip=2 -C dist/ -xf dist/clang-format.tar.gz clang+llvm-3.8.0-x86_64-apple-darwin/bin/clang-format && rm dist/clang-format.tar.gz
+	else
+		echo "$0: unsupported environment $(uname)"
+		exit 1
+	fi
+}
 
 # Find the top-level WiredTiger directory and move to there.
 cd `git rev-parse --show-toplevel` || exit 1
 
+# Override existing Clang Format versions in the PATH.
+export PATH="${PWD}/dist":$PATH
+
 # Ensure that we have the correct version of clang-format.
-clang_format_version="6.0.0"
+clang_format_version="3.8.0"
 clang-format --version | grep "version $clang_format_version" >/dev/null 2>&1
 if test $? -ne 0; then
-	echo "$0: found incorrect version of clang-format ($clang_format_version required)"
-	exit 1
+	download_clang_format
 fi
 
 case $# in
 0)
 	# Get all source files that aren't in s_clang-format.list.
-	search=`find src -name '*.[chi]'`
+	search=`find bench examples ext src test -name '*.[chi]'`
 	for f in `cat dist/s_clang-format.list`; do
 		search=`echo "$search" | sed "\#$f#d"`
 	done;;
@@ -29,5 +42,19 @@ case $# in
 	exit 1;;
 esac
 
-# Format each file inplace.
-clang-format -i --fallback-style=none $search
+# Don't format inplace with -i flag.
+# We want to be able to detect modifications.
+for f in $search; do
+	tempfile=$(mktemp)
+	cat "$f" | \
+            clang-format --fallback-style=none | \
+            python dist/s_goto.py | \
+            python dist/s_comment.py > "$tempfile" || exit 1
+	cmp --silent "$f" "$tempfile"
+	if test $? -ne 0; then
+		if test $# -eq 0 ; then
+			echo "Modifying $f"
+		fi
+		mv "$tempfile" "$f"
+	fi
+done

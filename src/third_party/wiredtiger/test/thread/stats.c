@@ -35,47 +35,44 @@
 void
 stats(void)
 {
-	FILE *fp;
-	WT_CURSOR *cursor;
-	WT_SESSION *session;
-	uint64_t v;
-	int ret;
-	const char *desc, *pval;
-	char name[64];
+    FILE *fp;
+    WT_CURSOR *cursor;
+    WT_SESSION *session;
+    uint64_t v;
+    int ret;
+    char name[64];
+    const char *desc, *pval;
 
-	testutil_check(conn->open_session(conn, NULL, NULL, &session));
+    testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
-	if ((fp = fopen(FNAME_STAT, "w")) == NULL)
-		testutil_die(errno, "fopen " FNAME_STAT);
+    if ((fp = fopen(FNAME_STAT, "w")) == NULL)
+        testutil_die(errno, "fopen " FNAME_STAT);
 
-	/* Connection statistics. */
-	testutil_check(session->open_cursor(
-	    session, "statistics:", NULL, NULL, &cursor));
+    /* Connection statistics. */
+    testutil_check(session->open_cursor(session, "statistics:", NULL, NULL, &cursor));
 
-	while ((ret = cursor->next(cursor)) == 0 &&
-	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
-		(void)fprintf(fp, "%s=%s\n", desc, pval);
+    while (
+      (ret = cursor->next(cursor)) == 0 && (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
+        (void)fprintf(fp, "%s=%s\n", desc, pval);
 
-	if (ret != WT_NOTFOUND)
-		testutil_die(ret, "cursor.next");
-	testutil_check(cursor->close(cursor));
+    if (ret != WT_NOTFOUND)
+        testutil_die(ret, "cursor.next");
+    testutil_check(cursor->close(cursor));
 
-	/* File statistics. */
-	if (!multiple_files) {
-		testutil_check(__wt_snprintf(
-		    name, sizeof(name), "statistics:" FNAME, 0));
-		testutil_check(session->open_cursor(
-		    session, name, NULL, NULL, &cursor));
+    /* File statistics. */
+    if (!multiple_files) {
+        testutil_check(__wt_snprintf(name, sizeof(name), "statistics:" FNAME, 0));
+        testutil_check(session->open_cursor(session, name, NULL, NULL, &cursor));
 
-		while ((ret = cursor->next(cursor)) == 0 &&
-		    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
-			(void)fprintf(fp, "%s=%s\n", desc, pval);
+        while ((ret = cursor->next(cursor)) == 0 &&
+          (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
+            (void)fprintf(fp, "%s=%s\n", desc, pval);
 
-		if (ret != WT_NOTFOUND)
-			testutil_die(ret, "cursor.next");
-		testutil_check(cursor->close(cursor));
+        if (ret != WT_NOTFOUND)
+            testutil_die(ret, "cursor.next");
+        testutil_check(cursor->close(cursor));
 
-		testutil_check(session->close(session, NULL));
-	}
-	(void)fclose(fp);
+        testutil_check(session->close(session, NULL));
+    }
+    (void)fclose(fp);
 }

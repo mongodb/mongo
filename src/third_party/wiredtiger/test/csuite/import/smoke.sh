@@ -1,6 +1,11 @@
 #! /bin/sh
-
 set -e
+
+# XXX - The following line should not be necessary. But without it, the immediate
+# test and exit reveals a bug and memory leak in /bin/bash when run with valgrind.
+# That leak is reported in https://bugzilla.redhat.com/show_bug.cgi?id=1746101
+# When that bug is fixed, this script can remove this line.
+date > /dev/null
 
 # Bypass this test for slow machines, valgrind
 test "$TESTUTIL_SLOW_MACHINE" = "1" && exit 0

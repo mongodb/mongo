@@ -29,154 +29,140 @@
 #include "wtperf.h"
 
 static int
-check_timing(WTPERF *wtperf,
-    const char *name, struct timespec start, struct timespec *stop)
+check_timing(WTPERF *wtperf, const char *name, struct timespec start, struct timespec *stop)
 {
-	CONFIG_OPTS *opts;
-	uint64_t last_interval;
+    CONFIG_OPTS *opts;
+    uint64_t last_interval;
 
-	opts = wtperf->opts;
+    opts = wtperf->opts;
 
-	__wt_epoch(NULL, stop);
+    __wt_epoch(NULL, stop);
 
-	last_interval = (uint64_t)(WT_TIMEDIFF_SEC(*stop, start));
+    last_interval = (uint64_t)(WT_TIMEDIFF_SEC(*stop, start));
 
-	if (last_interval > opts->idle_table_cycle) {
-		lprintf(wtperf, ETIMEDOUT, 0,
-		    "Cycling idle table failed because %s took %" PRIu64
-		    " seconds which is longer than configured acceptable"
-		    " maximum of %" PRIu32 ".",
-		    name, last_interval, opts->idle_table_cycle);
-		wtperf->error = true;
-		return (ETIMEDOUT);
-	}
-	return (0);
+    if (last_interval > opts->idle_table_cycle) {
+        lprintf(wtperf, ETIMEDOUT, 0, "Cycling idle table failed because %s took %" PRIu64
+                                      " seconds which is longer than configured acceptable"
+                                      " maximum of %" PRIu32 ".",
+          name, last_interval, opts->idle_table_cycle);
+        wtperf->error = true;
+        return (ETIMEDOUT);
+    }
+    return (0);
 }
 /*
- * Regularly create, open a cursor and drop a table.
- * Measure how long each step takes, and flag an error if it exceeds the
- * configured maximum.
+ * Regularly create, open a cursor and drop a table. Measure how long each step takes, and flag an
+ * error if it exceeds the configured maximum.
  */
 static WT_THREAD_RET
 cycle_idle_tables(void *arg)
 {
-	struct timespec start, stop;
-	CONFIG_OPTS *opts;
-	WTPERF *wtperf;
-	WT_CURSOR *cursor;
-	WT_SESSION *session;
-	int cycle_count, ret;
-	char uri[512];
+    struct timespec start, stop;
+    CONFIG_OPTS *opts;
+    WTPERF *wtperf;
+    WT_CURSOR *cursor;
+    WT_SESSION *session;
+    int cycle_count, ret;
+    char uri[512];
 
-	wtperf = (WTPERF *)arg;
-	opts = wtperf->opts;
-	cycle_count = 0;
+    wtperf = (WTPERF *)arg;
+    opts = wtperf->opts;
+    cycle_count = 0;
 
-	if ((ret = wtperf->conn->open_session(
-	    wtperf->conn, NULL, opts->sess_config, &session)) != 0) {
-		lprintf(wtperf, ret, 0,
-		    "Error opening a session on %s", wtperf->home);
-		return (WT_THREAD_RET_VALUE);
-	}
+    if ((ret = wtperf->conn->open_session(wtperf->conn, NULL, opts->sess_config, &session)) != 0) {
+        lprintf(wtperf, ret, 0, "Error opening a session on %s", wtperf->home);
+        return (WT_THREAD_RET_VALUE);
+    }
 
-	for (cycle_count = 0; wtperf->idle_cycle_run; ++cycle_count) {
-		testutil_check(__wt_snprintf(uri, sizeof(uri),
-		    "%s_cycle%07d", wtperf->uris[0], cycle_count));
-		/* Don't busy cycle in this loop. */
-		__wt_sleep(1, 0);
+    for (cycle_count = 0; wtperf->idle_cycle_run; ++cycle_count) {
+        testutil_check(
+          __wt_snprintf(uri, sizeof(uri), "%s_cycle%07d", wtperf->uris[0], cycle_count));
+        /* Don't busy cycle in this loop. */
+        __wt_sleep(1, 0);
 
-		/* Setup a start timer. */
-		__wt_epoch(NULL, &start);
+        /* Setup a start timer. */
+        __wt_epoch(NULL, &start);
 
-		/* Create a table. */
-		if ((ret = session->create(
-		    session, uri, opts->table_config)) != 0) {
-			if (ret == EBUSY)
-				continue;
-			lprintf(wtperf, ret, 0,
-			     "Table create failed in cycle_idle_tables.");
-			wtperf->error = true;
-			return (WT_THREAD_RET_VALUE);
-		}
-		if (check_timing(wtperf, "create", start, &stop) != 0)
-			return (WT_THREAD_RET_VALUE);
-		start = stop;
+        /* Create a table. */
+        if ((ret = session->create(session, uri, opts->table_config)) != 0) {
+            if (ret == EBUSY)
+                continue;
+            lprintf(wtperf, ret, 0, "Table create failed in cycle_idle_tables.");
+            wtperf->error = true;
+            return (WT_THREAD_RET_VALUE);
+        }
+        if (check_timing(wtperf, "create", start, &stop) != 0)
+            return (WT_THREAD_RET_VALUE);
+        start = stop;
 
-		/* Open and close cursor. */
-		if ((ret = session->open_cursor(
-		    session, uri, NULL, NULL, &cursor)) != 0) {
-			lprintf(wtperf, ret, 0,
-			     "Cursor open failed in cycle_idle_tables.");
-			wtperf->error = true;
-			return (WT_THREAD_RET_VALUE);
-		}
-		if ((ret = cursor->close(cursor)) != 0) {
-			lprintf(wtperf, ret, 0,
-			     "Cursor close failed in cycle_idle_tables.");
-			wtperf->error = true;
-			return (WT_THREAD_RET_VALUE);
-		}
-		if (check_timing(wtperf, "cursor", start, &stop) != 0)
-			return (WT_THREAD_RET_VALUE);
-		start = stop;
+        /* Open and close cursor. */
+        if ((ret = session->open_cursor(session, uri, NULL, NULL, &cursor)) != 0) {
+            lprintf(wtperf, ret, 0, "Cursor open failed in cycle_idle_tables.");
+            wtperf->error = true;
+            return (WT_THREAD_RET_VALUE);
+        }
+        if ((ret = cursor->close(cursor)) != 0) {
+            lprintf(wtperf, ret, 0, "Cursor close failed in cycle_idle_tables.");
+            wtperf->error = true;
+            return (WT_THREAD_RET_VALUE);
+        }
+        if (check_timing(wtperf, "cursor", start, &stop) != 0)
+            return (WT_THREAD_RET_VALUE);
+        start = stop;
 
 #if 1
-		/*
-		 * Drop the table. Keep retrying on EBUSY failure - it is an
-		 * expected return when checkpoints are happening.
-		 */
-		while ((ret = session->drop(
-		    session, uri, "force,checkpoint_wait=false")) == EBUSY)
-			__wt_sleep(1, 0);
+        /*
+         * Drop the table. Keep retrying on EBUSY failure - it is an expected return when
+         * checkpoints are happening.
+         */
+        while ((ret = session->drop(session, uri, "force,checkpoint_wait=false")) == EBUSY)
+            __wt_sleep(1, 0);
 
-		if (ret != 0) {
-			lprintf(wtperf, ret, 0,
-			     "Table drop failed in cycle_idle_tables.");
-			wtperf->error = true;
-			return (WT_THREAD_RET_VALUE);
-		}
-		if (check_timing(wtperf, "drop", start, &stop) != 0)
-			return (WT_THREAD_RET_VALUE);
+        if (ret != 0) {
+            lprintf(wtperf, ret, 0, "Table drop failed in cycle_idle_tables.");
+            wtperf->error = true;
+            return (WT_THREAD_RET_VALUE);
+        }
+        if (check_timing(wtperf, "drop", start, &stop) != 0)
+            return (WT_THREAD_RET_VALUE);
 #endif
-	}
+    }
 
-	return (WT_THREAD_RET_VALUE);
+    return (WT_THREAD_RET_VALUE);
 }
 
 /*
- * Start a thread the creates and drops tables regularly.
- * TODO: Currently accepts a pthread_t as a parameter, since it is not
- * possible to portably statically initialize it in the global configuration
- * structure. Should reshuffle the configuration structure so explicit static
+ * Start a thread the creates and drops tables regularly. TODO: Currently accepts a pthread_t as a
+ * parameter, since it is not possible to portably statically initialize it in the global
+ * configuration structure. Should reshuffle the configuration structure so explicit static
  * initialization isn't necessary.
  */
 void
 start_idle_table_cycle(WTPERF *wtperf, wt_thread_t *idle_table_cycle_thread)
 {
-	CONFIG_OPTS *opts;
-	wt_thread_t thread_id;
+    CONFIG_OPTS *opts;
+    wt_thread_t thread_id;
 
-	opts = wtperf->opts;
+    opts = wtperf->opts;
 
-	if (opts->idle_table_cycle == 0)
-		return;
+    if (opts->idle_table_cycle == 0)
+        return;
 
-	wtperf->idle_cycle_run = true;
-	testutil_check(__wt_thread_create(
-	    NULL, &thread_id, cycle_idle_tables, wtperf));
-	*idle_table_cycle_thread = thread_id;
+    wtperf->idle_cycle_run = true;
+    testutil_check(__wt_thread_create(NULL, &thread_id, cycle_idle_tables, wtperf));
+    *idle_table_cycle_thread = thread_id;
 }
 
 void
 stop_idle_table_cycle(WTPERF *wtperf, wt_thread_t idle_table_cycle_thread)
 {
-	CONFIG_OPTS *opts;
+    CONFIG_OPTS *opts;
 
-	opts = wtperf->opts;
+    opts = wtperf->opts;
 
-	if (opts->idle_table_cycle == 0 || !wtperf->idle_cycle_run)
-		return;
+    if (opts->idle_table_cycle == 0 || !wtperf->idle_cycle_run)
+        return;
 
-	wtperf->idle_cycle_run = false;
-	testutil_check(__wt_thread_join(NULL, &idle_table_cycle_thread));
+    wtperf->idle_cycle_run = false;
+    testutil_check(__wt_thread_join(NULL, &idle_table_cycle_thread));
 }

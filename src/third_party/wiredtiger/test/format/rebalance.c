@@ -31,52 +31,46 @@
 void
 wts_rebalance(void)
 {
-	WT_CONNECTION *conn;
-	WT_SESSION *session;
-	char cmd[1024];
+    WT_CONNECTION *conn;
+    WT_SESSION *session;
+    char cmd[1024];
 
-	if (g.c_rebalance == 0)
-		return;
+    if (g.c_rebalance == 0)
+        return;
 
-	track("rebalance", 0ULL, NULL);
+    track("rebalance", 0ULL, NULL);
 
-	/* Dump the current object. */
-	testutil_check(__wt_snprintf(cmd, sizeof(cmd),
-	    ".." DIR_DELIM_STR ".." DIR_DELIM_STR "wt"
-	    " -h %s dump -f %s/rebalance.orig %s",
-	    g.home, g.home, g.uri));
-	testutil_checkfmt(system(cmd), "command failed: %s", cmd);
+    /* Dump the current object. Pass -R flag to avoid readonly check while logging statistics */
+    testutil_check(__wt_snprintf(cmd, sizeof(cmd), ".." DIR_DELIM_STR ".." DIR_DELIM_STR "wt"
+                                                   " -R -h %s dump -f %s/rebalance.orig %s",
+      g.home, g.home, g.uri));
+    testutil_checkfmt(system(cmd), "command failed: %s", cmd);
 
-	/* Rebalance, then verify the object. */
-	wts_reopen();
-	conn = g.wts_conn;
-	testutil_check(conn->open_session(conn, NULL, NULL, &session));
-	logop(session, "%s", "=============== rebalance start");
+    /* Rebalance, then verify the object. */
+    wts_reopen();
+    conn = g.wts_conn;
+    testutil_check(conn->open_session(conn, NULL, NULL, &session));
+    logop(session, "%s", "=============== rebalance start");
 
-	testutil_checkfmt(
-	    session->rebalance(session, g.uri, NULL), "%s", g.uri);
+    testutil_checkfmt(session->rebalance(session, g.uri, NULL), "%s", g.uri);
 
-	logop(session, "%s", "=============== rebalance stop");
-	testutil_check(session->close(session, NULL));
+    logop(session, "%s", "=============== rebalance stop");
+    testutil_check(session->close(session, NULL));
 
-	wts_verify("post-rebalance verify");
-	wts_close();
+    wts_verify("post-rebalance verify");
+    wts_close();
+    testutil_check(__wt_snprintf(cmd, sizeof(cmd), ".." DIR_DELIM_STR ".." DIR_DELIM_STR "wt"
+                                                   " -R -h %s dump -f %s/rebalance.new %s",
+      g.home, g.home, g.uri));
+    testutil_checkfmt(system(cmd), "command failed: %s", cmd);
 
-	testutil_check(__wt_snprintf(cmd, sizeof(cmd),
-	    ".." DIR_DELIM_STR ".." DIR_DELIM_STR "wt"
-	    " -h %s dump -f %s/rebalance.new %s",
-	    g.home, g.home, g.uri));
-	testutil_checkfmt(system(cmd), "command failed: %s", cmd);
-
-	/* Compare the old/new versions of the object. */
+/* Compare the old/new versions of the object. */
 #ifdef _WIN32
-	testutil_check(__wt_snprintf(cmd, sizeof(cmd),
-	    "fc /b %s\\rebalance.orig %s\\rebalance.new > NUL",
-	    g.home, g.home));
+    testutil_check(__wt_snprintf(
+      cmd, sizeof(cmd), "fc /b %s\\rebalance.orig %s\\rebalance.new > NUL", g.home, g.home));
 #else
-	testutil_check(__wt_snprintf(cmd, sizeof(cmd),
-	    "cmp %s/rebalance.orig %s/rebalance.new > /dev/null",
-	    g.home, g.home));
+    testutil_check(__wt_snprintf(
+      cmd, sizeof(cmd), "cmp %s/rebalance.orig %s/rebalance.new > /dev/null", g.home, g.home));
 #endif
-	testutil_checkfmt(system(cmd), "command failed: %s", cmd);
+    testutil_checkfmt(system(cmd), "command failed: %s", cmd);
 }

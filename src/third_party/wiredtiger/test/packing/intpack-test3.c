@@ -34,102 +34,93 @@ void test_spread(int64_t, int64_t, int64_t);
 void
 test_value(int64_t val)
 {
-	const uint8_t *cp;
-	uint8_t buf[WT_INTPACK64_MAXSIZE + 8];	/* -Werror=array-bounds */
-	uint8_t *p;
-	int64_t sinput, soutput;
-	uint64_t uinput, uoutput;
-	size_t used_len;
+    const uint8_t *cp;
+    uint8_t buf[WT_INTPACK64_MAXSIZE + 8]; /* -Werror=array-bounds */
+    uint8_t *p;
+    int64_t sinput, soutput;
+    uint64_t uinput, uoutput;
+    size_t used_len;
 
-	memset(buf, 0xff, sizeof(buf));	/* -Werror=maybe-uninitialized */
-	sinput = val;
-	soutput = 0;	/* -Werror=maybe-uninitialized */
+    memset(buf, 0xff, sizeof(buf)); /* -Werror=maybe-uninitialized */
+    sinput = val;
+    soutput = 0; /* -Werror=maybe-uninitialized */
 
-	/*
-	 * Required on some systems to pull in parts of the library
-	 * for which we have data references.
-	 */
-	testutil_check(__wt_library_init());
+    /*
+     * Required on some systems to pull in parts of the library for which we have data references.
+     */
+    testutil_check(__wt_library_init());
 
-	p = buf;
-	testutil_check(__wt_vpack_int(&p, sizeof(buf), sinput));
-	used_len = (size_t)(p - buf);
-	testutil_assert(used_len <= WT_INTPACK64_MAXSIZE);
-	cp = buf;
-	testutil_check(__wt_vunpack_int(&cp, used_len, &soutput));
-	/* Ensure we got the correct value back */
-	if (sinput != soutput) {
-		fprintf(stderr,
-		    "mismatch %" PRId64 ", %" PRId64 "\n", sinput, soutput);
-		abort();
-	}
-	/* Ensure that decoding used the correct amount of buffer */
-	if (cp != p) {
-		fprintf(stderr,
-		    "Unpack consumed wrong size for %" PRId64
-		    ", expected %" WT_SIZET_FMT ", got %" WT_SIZET_FMT "\n",
-		    sinput, used_len, cp > p ?
-		    used_len + (size_t)(cp - p) : /* More than buf used */
-		    used_len - (size_t)(p - cp)); /* Less than buf used */
-		abort();
-	}
+    p = buf;
+    testutil_check(__wt_vpack_int(&p, sizeof(buf), sinput));
+    used_len = (size_t)(p - buf);
+    testutil_assert(used_len <= WT_INTPACK64_MAXSIZE);
+    cp = buf;
+    testutil_check(__wt_vunpack_int(&cp, used_len, &soutput));
+    /* Ensure we got the correct value back */
+    if (sinput != soutput) {
+        fprintf(stderr, "mismatch %" PRId64 ", %" PRId64 "\n", sinput, soutput);
+        abort();
+    }
+    /* Ensure that decoding used the correct amount of buffer */
+    if (cp != p) {
+        fprintf(stderr, "Unpack consumed wrong size for %" PRId64 ", expected %" WT_SIZET_FMT
+                        ", got %" WT_SIZET_FMT "\n",
+          sinput, used_len, cp > p ? used_len + (size_t)(cp - p) : /* More than buf used */
+            used_len - (size_t)(p - cp));                          /* Less than buf used */
+        abort();
+    }
 
-	/* Test unsigned, convert negative into bigger positive values */
-	uinput = (uint64_t)val;
+    /* Test unsigned, convert negative into bigger positive values */
+    uinput = (uint64_t)val;
 
-	p = buf;
-	testutil_check(__wt_vpack_uint(&p, sizeof(buf), uinput));
-	used_len = (size_t)(p - buf);
-	testutil_assert(used_len <= WT_INTPACK64_MAXSIZE);
-	cp = buf;
-	testutil_check(__wt_vunpack_uint(&cp, sizeof(buf), &uoutput));
-	/* Ensure we got the correct value back */
-	if (sinput != soutput) {
-		fprintf(stderr,
-		    "mismatch %" PRId64 ", %" PRId64 "\n", sinput, soutput);
-		abort();
-	}
-	/* Ensure that decoding used the correct amount of buffer */
-	if (cp != p) {
-		fprintf(stderr,
-		    "Unpack consumed wrong size for %" PRId64
-		    ", expected %" WT_SIZET_FMT ", got %" WT_SIZET_FMT "\n",
-		    sinput, used_len, cp > p ?
-		    used_len + (size_t)(cp - p) :
-		    used_len - (size_t)(p - cp));
-		abort();
-	}
+    p = buf;
+    testutil_check(__wt_vpack_uint(&p, sizeof(buf), uinput));
+    used_len = (size_t)(p - buf);
+    testutil_assert(used_len <= WT_INTPACK64_MAXSIZE);
+    cp = buf;
+    testutil_check(__wt_vunpack_uint(&cp, sizeof(buf), &uoutput));
+    /* Ensure we got the correct value back */
+    if (sinput != soutput) {
+        fprintf(stderr, "mismatch %" PRId64 ", %" PRId64 "\n", sinput, soutput);
+        abort();
+    }
+    /* Ensure that decoding used the correct amount of buffer */
+    if (cp != p) {
+        fprintf(stderr, "Unpack consumed wrong size for %" PRId64 ", expected %" WT_SIZET_FMT
+                        ", got %" WT_SIZET_FMT "\n",
+          sinput, used_len, cp > p ? used_len + (size_t)(cp - p) : used_len - (size_t)(p - cp));
+        abort();
+    }
 }
 
 void
 test_spread(int64_t start, int64_t before, int64_t after)
 {
-	int64_t i;
+    int64_t i;
 
-	printf(
-	    "Testing range: %" PRId64 " to %" PRId64 ". Spread: % " PRId64 "\n",
-	    start - before, start + after, before + after);
-	for (i = start - before; i < start + after; i++)
-		test_value(i);
+    printf("Testing range: %" PRId64 " to %" PRId64 ". Spread: % " PRId64 "\n", start - before,
+      start + after, before + after);
+    for (i = start - before; i < start + after; i++)
+        test_value(i);
 }
 
 int
 main(void)
 {
-	int64_t i;
+    int64_t i;
 
-	/*
-	 * Test all values in a range, to ensure pack/unpack of small numbers
-	 * (which most actively use different numbers of bits) works.
-	 */
-	test_spread(0, 100000, 100000);
-	test_spread(INT16_MAX, 1025, 1025);
-	test_spread(INT32_MAX, 1025, 1025);
-	test_spread(INT64_MAX, 1025, 1025);
-	/* Test bigger numbers */
-	for (i = INT64_MAX; i > 0; i = i / 2)
-		test_spread(i, 1025, 1025);
-	printf("\n");
+    /*
+     * Test all values in a range, to ensure pack/unpack of small numbers
+     * (which most actively use different numbers of bits) works.
+     */
+    test_spread(0, 100000, 100000);
+    test_spread(INT16_MAX, 1025, 1025);
+    test_spread(INT32_MAX, 1025, 1025);
+    test_spread(INT64_MAX, 1025, 1025);
+    /* Test bigger numbers */
+    for (i = INT64_MAX; i > 0; i = i / 2)
+        test_spread(i, 1025, 1025);
+    printf("\n");
 
-	return (0);
+    return (0);
 }

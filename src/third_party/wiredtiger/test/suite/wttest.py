@@ -95,6 +95,8 @@ class CapturedFd(object):
         file.  If there is, raise it as a test failure.
         This is generally called after 'release' is called.
         """
+        if WiredTigerTestCase._ignoreStdout:
+            return
         if self.file != None:
             self.file.flush()
         filesize = os.path.getsize(self.filename)
@@ -184,7 +186,7 @@ class WiredTigerTestCase(unittest.TestCase):
     @staticmethod
     def globalSetup(preserveFiles = False, useTimestamp = False,
                     gdbSub = False, lldbSub = False, verbose = 1, builddir = None, dirarg = None,
-                    longtest = False):
+                    longtest = False, ignoreStdout = False):
         WiredTigerTestCase._preserveFiles = preserveFiles
         d = 'WT_TEST' if dirarg == None else dirarg
         if useTimestamp:
@@ -200,6 +202,7 @@ class WiredTigerTestCase(unittest.TestCase):
         WiredTigerTestCase._lldbSubprocess = lldbSub
         WiredTigerTestCase._longtest = longtest
         WiredTigerTestCase._verbose = verbose
+        WiredTigerTestCase._ignoreStdout = ignoreStdout
         WiredTigerTestCase._dupout = os.dup(sys.stdout.fileno())
         WiredTigerTestCase._stdout = sys.stdout
         WiredTigerTestCase._stderr = sys.stderr

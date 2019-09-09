@@ -123,6 +123,7 @@ Options:\n\
   -s N    | --scenario N         use scenario N (N can be number or symbolic)\n\
   -t      | --timestamp          name WT_TEST according to timestamp\n\
   -v N    | --verbose N          set verboseness to N (0<=N<=3, default=1)\n\
+  -i      | --ignore-stdout      dont fail on unexpected stdout or stderr\n\
 \n\
 Tests:\n\
   may be a file name in test/suite: (e.g. test_base01.py)\n\
@@ -269,7 +270,7 @@ if __name__ == '__main__':
     tests = unittest.TestSuite()
 
     # Turn numbers and ranges into test module names
-    preserve = timestamp = debug = dryRun = gdbSub = lldbSub = longtest = False
+    preserve = timestamp = debug = dryRun = gdbSub = lldbSub = longtest = ignoreStdout = False
     parallel = 0
     random_sample = 0
     configfile = None
@@ -347,6 +348,9 @@ if __name__ == '__main__':
                 if verbose < 0:
                         verbose = 0
                 continue
+            if option == '--ignore-stdout' or option == 'i':
+                ignoreStdout = True
+                continue
             if option == '-config' or option == 'c':
                 if configfile != None or len(args) == 0:
                     usage()
@@ -369,7 +373,7 @@ if __name__ == '__main__':
     # That way, verbose printing can be done at the class definition level.
     wttest.WiredTigerTestCase.globalSetup(preserve, timestamp, gdbSub, lldbSub,
                                           verbose, wt_builddir, dirarg,
-                                          longtest)
+                                          longtest, ignoreStdout)
 
     # Without any tests listed as arguments, do discovery
     if len(testargs) == 0:

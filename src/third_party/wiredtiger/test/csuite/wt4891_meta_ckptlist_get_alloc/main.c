@@ -26,66 +26,58 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 #include "test_util.h"
-#define	CHECKPOINT_COUNT 10
+#define CHECKPOINT_COUNT 10
 
 /*
- * JIRA ticket reference: WT-4891
- * Test case description: Test wt_meta_ckptlist_get by creating a number of
- * checkpoints and then running __wt_verify.
- * Failure mode: If the bug still exists then this test will cause an
- * error in address sanitized builds.
+ * JIRA ticket reference: WT-4891 Test case description: Test wt_meta_ckptlist_get by creating a
+ * number of checkpoints and then running __wt_verify. Failure mode: If the bug still exists then
+ * this test will cause an error in address sanitized builds.
  */
 
 int
 main(int argc, char *argv[])
 {
-	TEST_OPTS *opts, _opts;
-	WT_CURSOR *cursor, *cursor_ckpt;
-	WT_SESSION *session;
-	int i;
+    TEST_OPTS *opts, _opts;
+    WT_CURSOR *cursor, *cursor_ckpt;
+    WT_SESSION *session;
+    int i;
 
-	opts = &_opts;
-	memset(opts, 0, sizeof(*opts));
-	testutil_check(testutil_parse_opts(argc, argv, opts));
+    opts = &_opts;
+    memset(opts, 0, sizeof(*opts));
+    testutil_check(testutil_parse_opts(argc, argv, opts));
 
-	testutil_make_work_dir(opts->home);
+    testutil_make_work_dir(opts->home);
 
-	testutil_check(wiredtiger_open(
-	    opts->home, NULL, "create", &opts->conn));
+    testutil_check(wiredtiger_open(opts->home, NULL, "create", &opts->conn));
 
-	testutil_check(
-	    opts->conn->open_session(opts->conn, NULL, NULL, &session));
+    testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
 
-	testutil_check(
-	    session->create(session, opts->uri, "key_format=S,value_format=i"));
+    testutil_check(session->create(session, opts->uri, "key_format=S,value_format=i"));
 
-	testutil_check(
-	    session->open_cursor(session, opts->uri, NULL, NULL, &cursor));
+    testutil_check(session->open_cursor(session, opts->uri, NULL, NULL, &cursor));
 
-	/*
-	 * Create checkpoints and keep them active by around by opening a
-	 * checkpoint cursor for each one.
-	 */
-	for (i = 0; i < CHECKPOINT_COUNT; ++i) {
-		testutil_check(
-		    session->begin_transaction(session, "isolation=snapshot"));
-		cursor->set_key(cursor, "key1");
-		cursor->set_value(cursor, i);
-		testutil_check(cursor->update(cursor));
-		testutil_check(session->commit_transaction(session, NULL));
-		testutil_check(session->checkpoint(session, NULL));
-		testutil_check(session->open_cursor(session, opts->uri, NULL,
-		    "checkpoint=WiredTigerCheckpoint", &cursor_ckpt));
-	}
+    /*
+     * Create checkpoints and keep them active by around by opening a checkpoint cursor for each
+     * one.
+     */
+    for (i = 0; i < CHECKPOINT_COUNT; ++i) {
+        testutil_check(session->begin_transaction(session, "isolation=snapshot"));
+        cursor->set_key(cursor, "key1");
+        cursor->set_value(cursor, i);
+        testutil_check(cursor->update(cursor));
+        testutil_check(session->commit_transaction(session, NULL));
+        testutil_check(session->checkpoint(session, NULL));
+        testutil_check(session->open_cursor(
+          session, opts->uri, NULL, "checkpoint=WiredTigerCheckpoint", &cursor_ckpt));
+    }
 
-	testutil_check(session->close(session, NULL));
+    testutil_check(session->close(session, NULL));
 
-	testutil_check(
-	    opts->conn->open_session(opts->conn, NULL, NULL, &session));
+    testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
 
-	testutil_check(session->verify(session, opts->uri, NULL));
+    testutil_check(session->verify(session, opts->uri, NULL));
 
-	testutil_cleanup(opts);
+    testutil_cleanup(opts);
 
-	return (0);
+    return (0);
 }

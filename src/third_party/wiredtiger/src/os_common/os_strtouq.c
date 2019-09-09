@@ -10,17 +10,17 @@
 
 /*
  * __wt_strtouq --
- *	Convert a string to an unsigned quad integer.
+ *     Convert a string to an unsigned quad integer.
  */
 uint64_t
 __wt_strtouq(const char *nptr, char **endptr, int base)
-    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
+  WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 #if defined(HAVE_STRTOUQ)
-	return (strtouq(nptr, endptr, base));
+    return (strtouq(nptr, endptr, base));
 #else
-	WT_STATIC_ASSERT(sizeof(uint64_t) == sizeof(unsigned long long));
+    WT_STATIC_ASSERT(sizeof(uint64_t) == sizeof(unsigned long long));
 
-	return (strtoull(nptr, endptr, base));
+    return (strtoull(nptr, endptr, base));
 #endif
 }

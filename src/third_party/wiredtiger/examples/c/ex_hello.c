@@ -36,21 +36,21 @@ static const char *home;
 int
 main(int argc, char *argv[])
 {
-	WT_CONNECTION *conn;
-	WT_SESSION *session;
+    WT_CONNECTION *conn;
+    WT_SESSION *session;
 
-	home = example_setup(argc, argv);
+    home = example_setup(argc, argv);
 
-	/* Open a connection to the database, creating it if necessary. */
-	error_check(wiredtiger_open(home, NULL, "create", &conn));
+    /* Open a connection to the database, creating it if necessary. */
+    error_check(wiredtiger_open(home, NULL, "create", &conn));
 
-	/* Open a session for the current thread's work. */
-	error_check(conn->open_session(conn, NULL, NULL, &session));
+    /* Open a session for the current thread's work. */
+    error_check(conn->open_session(conn, NULL, NULL, &session));
 
-	/* Do some work... */
+    /* Do some work... */
 
-	/* Note: closing the connection implicitly closes open session(s). */
-	error_check(conn->close(conn, NULL));
+    /* Note: closing the connection implicitly closes open session(s). */
+    error_check(conn->close(conn, NULL));
 
-	return (EXIT_SUCCESS);
+    return (EXIT_SUCCESS);
 }

@@ -28,67 +28,66 @@
 #include "test_util.h"
 
 /*
- * JIRA ticket reference: WT-4117
- * Test case description: Smoke-test the CRC32C external API.
+ * JIRA ticket reference: WT-4117 Test case description: Smoke-test the CRC32C external API.
  */
 
 static inline void
 check(uint32_t crc32c, uint32_t expected, size_t len, const char *msg)
 {
-	testutil_checkfmt(crc32c == expected ? 0 : 1,
-	    "%s checksum mismatch of %" WT_SIZET_FMT " bytes: %#08x != %#08x\n",
-	    msg, len, crc32c, expected);
+    testutil_checkfmt(crc32c == expected ? 0 : 1,
+      "%s checksum mismatch of %" WT_SIZET_FMT " bytes: %#08x != %#08x\n", msg, len, crc32c,
+      expected);
 }
 
 static void
 run(void)
 {
-	size_t len;
-	uint32_t crc32c, (*func)(const void *, size_t);
-	uint8_t *data;
+    size_t len;
+    uint32_t crc32c, (*func)(const void *, size_t);
+    uint8_t *data;
 
-	/* Allocate aligned memory for the data. */
-	data = dcalloc(100, sizeof(uint8_t));
+    /* Allocate aligned memory for the data. */
+    data = dcalloc(100, sizeof(uint8_t));
 
-	/* Get a pointer to the CRC32C function. */
-	func = wiredtiger_crc32c_func();
+    /* Get a pointer to the CRC32C function. */
+    func = wiredtiger_crc32c_func();
 
-	/*
-	 * Some simple known checksums.
-	 */
-	len = 1;
-	crc32c = func(data, len);
-	check(crc32c, (uint32_t)0x527d5351, len, "nul x1");
+    /*
+     * Some simple known checksums.
+     */
+    len = 1;
+    crc32c = func(data, len);
+    check(crc32c, (uint32_t)0x527d5351, len, "nul x1");
 
-	len = 2;
-	crc32c = func(data, len);
-	check(crc32c, (uint32_t)0xf16177d2, len, "nul x2");
+    len = 2;
+    crc32c = func(data, len);
+    check(crc32c, (uint32_t)0xf16177d2, len, "nul x2");
 
-	len = 3;
-	crc32c = func(data, len);
-	check(crc32c, (uint32_t)0x6064a37a, len, "nul x3");
+    len = 3;
+    crc32c = func(data, len);
+    check(crc32c, (uint32_t)0x6064a37a, len, "nul x3");
 
-	len = 4;
-	crc32c = func(data, len);
-	check(crc32c, (uint32_t)0x48674bc7, len, "nul x4");
+    len = 4;
+    crc32c = func(data, len);
+    check(crc32c, (uint32_t)0x48674bc7, len, "nul x4");
 
-	len = strlen("123456789");
-	memcpy(data, "123456789", len);
-	crc32c = func(data, len);
-	check(crc32c, (uint32_t)0xe3069283, len, "known string #1");
+    len = strlen("123456789");
+    memcpy(data, "123456789", len);
+    crc32c = func(data, len);
+    check(crc32c, (uint32_t)0xe3069283, len, "known string #1");
 
-	len = strlen("The quick brown fox jumps over the lazy dog");
-	memcpy(data, "The quick brown fox jumps over the lazy dog", len);
-	crc32c = func(data, len);
-	check(crc32c, (uint32_t)0x22620404, len, "known string #2");
+    len = strlen("The quick brown fox jumps over the lazy dog");
+    memcpy(data, "The quick brown fox jumps over the lazy dog", len);
+    crc32c = func(data, len);
+    check(crc32c, (uint32_t)0x22620404, len, "known string #2");
 
-	free(data);
+    free(data);
 }
 
 int
 main(void)
 {
-	run();
+    run();
 
-	return (EXIT_SUCCESS);
+    return (EXIT_SUCCESS);
 }
