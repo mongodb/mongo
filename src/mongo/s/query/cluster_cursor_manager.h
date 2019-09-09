@@ -544,8 +544,13 @@ private:
         bool isKillPending() const {
             // A cursor is kill pending if it's checked out by an OperationContext that was
             // interrupted.
-            return _operationUsingCursor &&
-                !_operationUsingCursor->checkForInterruptNoAssert().isOK();
+            if (!_operationUsingCursor) {
+                return false;
+            }
+
+            // Must hold the Client lock when calling isKillPending().
+            stdx::unique_lock<Client> lk(*_operationUsingCursor->getClient());
+            return _operationUsingCursor->isKillPending();
         }
 
         CursorType getCursorType() const {
