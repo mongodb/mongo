@@ -240,10 +240,7 @@ protected:
 
     void _reportCurrentOpsForIdleSessions(OperationContext* opCtx,
                                           CurrentOpUserMode userMode,
-                                          std::vector<BSONObj>* ops) const final {
-        // This implementation is a no-op, since mongoS does not maintain a SessionCatalog or
-        // hold stashed locks for idle sessions.
-    }
+                                          std::vector<BSONObj>* ops) const final;
 };
 
 }  // namespace mongo

@@ -353,7 +353,10 @@ env.Library(
         '$BUILD_DIR/mongo/s/query/cluster_query',
         'mongo_process_common',
         'sharded_agg_helpers',
-    ]
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/session_catalog',
+    ],
 )
 
 env.Library(

@@ -36,6 +36,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session_catalog.h"
+#include "mongo/db/stats/single_transaction_stats.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/shard_id.h"
@@ -133,9 +134,17 @@ public:
          */
         Microseconds getCommitDuration(TickSource* tickSource, TickSource::Tick curTicks) const;
 
+        // The start time of the transaction in millisecond resolution. Used only for diagnostics
+        // reporting.
+        Date_t startWallClockTime;
+
         // The start time of the transaction. Note that tick values should only ever be used to
         // measure distance from other tick values, not for reporting absolute wall clock time.
         TickSource::Tick startTime{0};
+
+        // The start time of the transaction commit in millisecond resolution. Used only for
+        // diagnostics reporting.
+        Date_t commitStartWallClockTime;
 
         // When commit was started.
         TickSource::Tick commitStartTime{0};
@@ -197,12 +206,35 @@ public:
     public:
         explicit Observer(const ObservableSession& session);
 
+        /**
+         * Report the current state of an session. The sessionIsActive boolean indicates whether
+         * the session and transaction are currently active.
+         *
+         * The Client lock for the given OperationContext must be held when calling this method in
+         * the case where sessionIsActive is true.
+         */
+        BSONObj reportState(OperationContext* opCtx, bool sessionIsActive) const;
+        void reportState(OperationContext* opCtx,
+                         BSONObjBuilder* builder,
+                         bool sessionIsActive) const;
+
     protected:
         explicit Observer(TransactionRouter* tr) : _tr(tr) {}
 
         const TransactionRouter::ObservableState& o() const {
             return _tr->_o;
         }
+
+        // Reports the current state of the session using the provided builder.
+        void _reportState(OperationContext* opCtx,
+                          BSONObjBuilder* builder,
+                          bool sessionIsActive) const;
+
+        // Returns true if the atClusterTime has been changed from the default uninitialized value.
+        bool _atClusterTimeHasBeenSet() const;
+
+        // Shortcut to obtain the id of the session under which this transaction router runs
+        const LogicalSessionId& _sessionId() const;
 
         TransactionRouter* _tr;
     };  // class Observer
@@ -408,11 +440,6 @@ public:
         BSONObj _handOffCommitToCoordinator(OperationContext* opCtx);
 
         /**
-         * Returns true if the atClusterTime has been changed from the default uninitialized value.
-         */
-        bool _atClusterTimeHasBeenSet() const;
-
-        /**
          * Sets the given logical time as the atClusterTime for the transaction to be the greater of
          * the given time and the user's afterClusterTime, if one was provided.
          */
@@ -515,8 +542,15 @@ public:
         std::string _transactionInfoForLog(OperationContext* opCtx,
                                            TerminationCause terminationCause) const;
 
-        // Shortcut to obtain the id of the session under which this transaction router runs
-        const LogicalSessionId& _sessionId() const;
+        /**
+         * Returns the LastClientInfo object.
+         */
+        const SingleTransactionStats::LastClientInfo& _getLastClientInfo() const;
+
+        /**
+         * Updates the LastClientInfo object with the given Client's information.
+         */
+        void _updateLastClientInfo(Client* client);
 
         TransactionRouter::PrivateState& p() {
             return _tr->_p;
@@ -577,6 +611,10 @@ private:
 
         // Stats used for calculating durations for the active transaction.
         TimingStats timingStats;
+
+        // Information about the last client to run a transaction operation on this transaction
+        // router.
+        SingleTransactionStats::LastClientInfo lastClientInfo;
     } _o;
 
     /**

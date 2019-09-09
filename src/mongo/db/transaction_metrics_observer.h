@@ -31,7 +31,7 @@
 
 #include "mongo/db/curop.h"
 #include "mongo/db/server_transactions_metrics.h"
-#include "mongo/db/single_transaction_stats.h"
+#include "mongo/db/stats/single_transaction_stats.h"
 #include "mongo/db/stats/top.h"
 
 namespace mongo {

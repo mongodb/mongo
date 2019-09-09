@@ -183,6 +183,8 @@ selector:
   exclude_with_any_tags:
   - requires_replication
   - requires_non_retryable_writes
+  # Curop requires readConcern local.
+  - uses_curop_agg_stage
 
 executor:
   archive:

@@ -158,6 +158,7 @@ void SessionCatalog::scanSessions(const SessionKiller::Matcher& matcher,
             if (matcher.match(it->first)) {
                 auto& sri = it->second;
                 ObservableSession osession(lg, sri->session);
+
                 workerFn(osession);
 
                 if (osession._markedForReap && !osession._killed() &&

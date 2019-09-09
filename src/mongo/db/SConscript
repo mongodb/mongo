@@ -733,7 +733,6 @@ env.Library(
         'retryable_writes_stats.cpp',
         'server_transactions_metrics.cpp',
         'session_catalog_mongod.cpp',
-        'single_transaction_stats.cpp',
         'transaction_history_iterator.cpp',
         'transaction_metrics_observer.cpp',
         'transaction_participant.cpp',
@@ -761,6 +760,7 @@ env.Library(
         'query_exec',
         'stats/fill_locker_info',
         'stats/top',
+        'stats/transaction_stats',
         'update/update_driver',
     ]
 )
@@ -2100,6 +2100,7 @@ env.CppUnitTest(
         'service_liaison_mock',
         'sessions_collection_mock',
         'sessions_collection',
+        'stats/transaction_stats',
         'transaction',
         'write_ops',
     ],
