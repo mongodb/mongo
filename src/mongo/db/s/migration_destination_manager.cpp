@@ -54,6 +54,7 @@
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/start_chunk_clone_request.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/remove_saver.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -668,12 +669,26 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationCont
         if (!indexSpecs.empty()) {
             WriteUnitOfWork wunit(opCtx);
 
+            // Emit startIndexBuild and commitIndexBuild oplog entries if supported by the
+            // current FCV.
+            auto opObserver = serviceContext->getOpObserver();
+            auto fromMigrate = true;
+            auto buildUUID = serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+                    serverGlobalParams.featureCompatibility.getVersion() ==
+                        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44
+                ? boost::make_optional(UUID::gen())
+                : boost::none;
+
+            if (buildUUID) {
+                opObserver->onStartIndexBuild(
+                    opCtx, nss, collection->uuid(), *buildUUID, indexSpecs, fromMigrate);
+            }
+
             for (const auto& spec : indexSpecs) {
                 // Make sure to create index on secondaries as well. Oplog entry must be written
                 // before the index is added to the index catalog for correct rollback operation.
                 // See SERVER-35780 and SERVER-35070.
-                serviceContext->getOpObserver()->onCreateIndex(
-                    opCtx, collection->ns(), collection->uuid(), spec, true /* fromMigrate */);
+                opObserver->onCreateIndex(opCtx, nss, collection->uuid(), spec, fromMigrate);
 
                 // Since the collection is empty, we can add and commit the index catalog entry
                 // within a single WUOW.
@@ -682,6 +697,11 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationCont
                                            str::stream()
                                                << "failed to create index before migrating data: "
                                                << redact(spec));
+            }
+
+            if (buildUUID) {
+                opObserver->onCommitIndexBuild(
+                    opCtx, nss, collection->uuid(), *buildUUID, indexSpecs, fromMigrate);
             }
 
             wunit.commit();
