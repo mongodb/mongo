@@ -23,11 +23,12 @@ selector:
   # once a transaction in the thread is started because it'll keep reading from the same snapshot.
   - jstests/concurrency/fsm_workloads/create_index_background.js
 
-  # Expects DocumentValidationFailure which causes transaction to abort and retry indefinitely.
-  - jstests/concurrency/fsm_workloads/schema_validator_with_expr_variables.js
-
   exclude_with_any_tags:
   - requires_sharding
+
+  # Tests which expect commands to fail and catch the error can cause transactions to abort and
+  # retry indefinitely.
+  - catches_command_failures
 
 executor:
   archive:
