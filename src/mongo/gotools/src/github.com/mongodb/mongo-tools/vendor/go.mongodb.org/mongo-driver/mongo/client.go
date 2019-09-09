@@ -42,6 +42,7 @@ type Client struct {
 	connString      connstring.ConnString
 	localThreshold  time.Duration
 	retryWrites     bool
+	retryReads      bool
 	clock           *session.ClusterClock
 	readPreference  *readpref.ReadPref
 	readConcern     *readconcern.ReadConcern
@@ -143,7 +144,7 @@ func (c *Client) Ping(ctx context.Context, rp *readpref.ReadPref) error {
 	db := c.Database("admin")
 	res := db.RunCommand(ctx, bson.D{
 		{"ping", 1},
-	})
+	}, options.RunCmd().SetReadPreference(rp))
 
 	return replaceErrors(res.Err())
 }
@@ -182,6 +183,7 @@ func (c *Client) StartSession(opts ...*options.SessionOptions) (Session, error) 
 	}
 
 	sess.RetryWrite = c.retryWrites
+	sess.RetryRead = c.retryReads
 
 	return &sessionImpl{
 		clientSession: sess,
@@ -346,6 +348,7 @@ func (c *Client) configure(opts *options.ClientOptions) error {
 		func(...string) []string { return hosts },
 	))
 	// LocalThreshold
+	c.localThreshold = defaultLocalThreshold
 	if opts.LocalThreshold != nil {
 		c.localThreshold = *opts.LocalThreshold
 	}
@@ -359,8 +362,21 @@ func (c *Client) configure(opts *options.ClientOptions) error {
 	if opts.MaxPoolSize != nil {
 		serverOpts = append(
 			serverOpts,
-			topology.WithMaxConnections(func(uint16) uint16 { return *opts.MaxPoolSize }),
-			topology.WithMaxIdleConnections(func(uint16) uint16 { return *opts.MaxPoolSize }),
+			topology.WithMaxConnections(func(uint64) uint64 { return *opts.MaxPoolSize }),
+		)
+	}
+	// MinPoolSize
+	if opts.MinPoolSize != nil {
+		serverOpts = append(
+			serverOpts,
+			topology.WithMinConnections(func(uint64) uint64 { return *opts.MinPoolSize }),
+		)
+	}
+	// PoolMonitor
+	if opts.PoolMonitor != nil {
+		serverOpts = append(
+			serverOpts,
+			topology.WithConnectionPoolMonitor(func(*event.PoolMonitor) *event.PoolMonitor { return opts.PoolMonitor }),
 		)
 	}
 	// Monitor
@@ -395,6 +411,10 @@ func (c *Client) configure(opts *options.ClientOptions) error {
 	c.retryWrites = true // retry writes on by default
 	if opts.RetryWrites != nil {
 		c.retryWrites = *opts.RetryWrites
+	}
+	c.retryReads = true
+	if opts.RetryReads != nil {
+		c.retryReads = *opts.RetryReads
 	}
 	// ServerSelectionTimeout
 	if opts.ServerSelectionTimeout != nil {
@@ -490,6 +510,11 @@ func (c *Client) ListDatabases(ctx context.Context, filter interface{}, opts ...
 	if ldo.NameOnly != nil {
 		op = op.NameOnly(*ldo.NameOnly)
 	}
+	retry := driver.RetryNone
+	if c.retryReads {
+		retry = driver.RetryOncePerCommand
+	}
+	op.Retry(retry)
 
 	err = op.Execute(ctx)
 	if err != nil {

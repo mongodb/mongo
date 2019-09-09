@@ -1,0 +1,36 @@
+version: 1
+style: unit
+description: must throw error if checkOut is called on a closed pool
+operations:
+  - name: checkOut
+    label: conn1
+  - name: checkIn
+    connection: conn1
+  - name: close
+  - name: checkOut
+error:
+  type: PoolClosedError
+  message: Attempted to check out a connection from closed connection pool
+events:
+  - type: ConnectionPoolCreated
+    address: 42
+    options: 42
+  - type: ConnectionCheckOutStarted
+    address: 42
+  - type: ConnectionCheckedOut
+    address: 42
+    connectionId: 42
+  - type: ConnectionCheckedIn
+    address: 42
+    connectionId: 42
+  - type: ConnectionPoolClosed
+    address: 42
+  - type: ConnectionCheckOutStarted
+    address: 42
+  - type: ConnectionCheckOutFailed
+    address: 42
+    reason: poolClosed
+ignore:
+  - ConnectionCreated
+  - ConnectionReady
+  - ConnectionClosed

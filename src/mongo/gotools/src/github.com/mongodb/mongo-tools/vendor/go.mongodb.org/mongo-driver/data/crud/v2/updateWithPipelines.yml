@@ -1,0 +1,92 @@
+runOn:
+    -
+        minServerVersion: "4.1.11"
+
+data:
+    - { _id: 1, x: 1, y: 1, t: {u: {v: 1}} }
+    - { _id: 2, x: 2, y: 1 }
+
+collection_name: &collection_name "test"
+database_name: &database_name "crud-tests"
+
+tests:
+  -
+    description: "UpdateOne using pipelines"
+    operations:
+      -
+        name: "updateOne"
+        arguments:
+            filter: { _id: 1 }
+            update: [ { $replaceRoot: { newRoot: "$t" } }, { $addFields: { foo: 1 } } ]
+        result:
+          matchedCount: 1
+          modifiedCount: 1
+          upsertedCount: 0
+    expectations:
+      -
+        command_started_event:
+          command:
+            update: *collection_name
+            updates:
+              -
+                q: { _id: 1 }
+                u: [ { $replaceRoot: { newRoot: "$t" } }, { $addFields: { foo: 1 } } ]
+          command_name: update
+          database_name: *database_name
+    outcome:
+      collection:
+        data:
+          - { _id: 1, u: {v: 1}, foo: 1 }
+          - { _id: 2, x: 2, y: 1 }
+  -
+    description: "UpdateMany using pipelines"
+    operations:
+      -
+        name: "updateMany"
+        arguments:
+            filter: {}
+            update: [ { $project: { x: 1 } }, { $addFields: { foo: 1 } } ]
+        result:
+          matchedCount: 2
+          modifiedCount: 2
+          upsertedCount: 0
+    expectations:
+      -
+        command_started_event:
+          command:
+            update: *collection_name
+            updates:
+              -
+                q: { }
+                u: [ { $project: { x: 1 } }, { $addFields: { foo: 1 } } ]
+                multi: true
+          command_name: update
+          database_name: *database_name
+    outcome:
+      collection:
+        data:
+          - { _id: 1, x: 1, foo: 1 }
+          - { _id: 2, x: 2, foo: 1 }
+  -
+    description: "FindOneAndUpdate using pipelines"
+    operations:
+      -
+        name: "findOneAndUpdate"
+        arguments:
+            filter: { _id: 1 }
+            update: [ { $project: { x: 1 } }, { $addFields: { foo: 1 } } ]
+    expectations:
+      -
+        command_started_event:
+          command:
+            findAndModify: *collection_name
+            update:
+              - $project: { x: 1 }
+              - $addFields: { foo: 1 }
+          command_name: findAndModify
+          database_name: *database_name
+    outcome:
+      collection:
+        data:
+          - { _id: 1, x: 1, foo: 1 }
+          - { _id: 2, x: 2, y: 1 }

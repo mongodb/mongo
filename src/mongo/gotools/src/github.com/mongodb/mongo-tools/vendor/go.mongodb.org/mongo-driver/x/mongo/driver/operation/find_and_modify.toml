@@ -27,7 +27,7 @@ type = "boolean"
 documentation = "Remove specifies that the matched document should be removed. Defaults to false."
 
 [request.update]
-type = "document"
+type = "value"
 documentation = "Update specifies the update document to perform on the matched document."
 
 [request.newDocument]

@@ -156,6 +156,7 @@ func (c *Cursor) Close(ctx context.Context) error {
 // All iterates the cursor and decodes each document into results.
 // The results parameter must be a pointer to a slice. The slice pointed to by results will be completely overwritten.
 // If the cursor has been iterated, any previously iterated documents will not be included in results.
+// The cursor will be closed after the method has returned.
 func (c *Cursor) All(ctx context.Context, results interface{}) error {
 	resultsVal := reflect.ValueOf(results)
 	if resultsVal.Kind() != reflect.Ptr {
@@ -166,6 +167,8 @@ func (c *Cursor) All(ctx context.Context, results interface{}) error {
 	elementType := sliceVal.Type().Elem()
 	var index int
 	var err error
+
+	defer c.Close(ctx)
 
 	batch := c.batch // exhaust the current batch before iterating the batch cursor
 	for {

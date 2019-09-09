@@ -1,9 +1,12 @@
-data:
-  - { _id: 1, x: 11 }
-  - { _id: 2, x: 22 }
-  - { _id: 3, x: 33 }
+runOn:
+    -
+        minServerVersion: "4.1.0"
+        topology: ["replicaset", "sharded"]
 
-minServerVersion: '4.1'
+data:
+    - { _id: 1, x: 11 }
+    - { _id: 2, x: 22 }
+    - { _id: 3, x: 33 }
 
 collection_name: &collection_name 'test_aggregate_out_readconcern'
 

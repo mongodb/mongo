@@ -1,0 +1,21 @@
+version: 1
+style: unit
+description: must be able to start a pool with various options set
+poolOptions:
+  maxPoolSize: 50
+  minPoolSize: 5
+  maxIdleTimeMS: 100
+operations:
+  - name: waitForEvent
+    event: ConnectionPoolCreated
+    count: 1
+events:
+  - type: ConnectionPoolCreated
+    address: 42
+    options:
+      maxPoolSize: 50
+      minPoolSize: 5
+      maxIdleTimeMS: 100
+ignore:
+  - ConnectionCreated
+  - ConnectionReady

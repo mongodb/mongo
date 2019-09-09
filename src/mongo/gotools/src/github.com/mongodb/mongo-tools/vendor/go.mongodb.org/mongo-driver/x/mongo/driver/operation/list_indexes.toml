@@ -5,6 +5,7 @@ response.type = "batch cursor"
 
 [properties]
 legacy = "listIndexes"
+retryable = {mode = "once per command", type = "reads"}
 
 [command]
 name = "listIndexes"

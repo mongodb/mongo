@@ -6,6 +6,7 @@ response.type = "list collections batch cursor"
 [properties]
 enabled = ["read preference"]
 disabled = ["collection"]
+retryable = {mode = "once per command", type = "reads"}
 legacy = "listCollections"
 
 [command]

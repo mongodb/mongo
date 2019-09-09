@@ -32,6 +32,7 @@ type ListDatabases struct {
 	database       string
 	deployment     driver.Deployment
 	readPreference *readpref.ReadPref
+	retry          *driver.RetryMode
 	selector       description.ServerSelector
 
 	result ListDatabasesResult
@@ -164,6 +165,8 @@ func (ld *ListDatabases) Execute(ctx context.Context) error {
 		Database:       ld.database,
 		Deployment:     ld.deployment,
 		ReadPreference: ld.readPreference,
+		RetryMode:      ld.retry,
+		Type:           driver.Read,
 		Selector:       ld.selector,
 	}.Execute(ctx, nil)
 
@@ -270,5 +273,16 @@ func (ld *ListDatabases) ServerSelector(selector description.ServerSelector) *Li
 	}
 
 	ld.selector = selector
+	return ld
+}
+
+// Retry enables retryable mode for this operation. Retries are handled automatically in driver.Operation.Execute based
+// on how the operation is set.
+func (ld *ListDatabases) Retry(retry driver.RetryMode) *ListDatabases {
+	if ld == nil {
+		ld = new(ListDatabases)
+	}
+
+	ld.retry = &retry
 	return ld
 }

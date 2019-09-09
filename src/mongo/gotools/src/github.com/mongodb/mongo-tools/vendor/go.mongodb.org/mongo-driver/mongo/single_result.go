@@ -48,11 +48,11 @@ func (sr *SingleResult) Decode(v interface{}) error {
 
 // DecodeBytes will return a copy of the document as a bson.Raw. If there was an
 // error from the operation that created this SingleResult then the error
-// will be returned. If there were no returned documents, ErrNoDocuments is
+// will be returned along with the result. If there were no returned documents, ErrNoDocuments is
 // returned.
 func (sr *SingleResult) DecodeBytes() (bson.Raw, error) {
 	if sr.err != nil {
-		return nil, sr.err
+		return sr.rdr, sr.err
 	}
 
 	if sr.err = sr.setRdrContents(); sr.err != nil {

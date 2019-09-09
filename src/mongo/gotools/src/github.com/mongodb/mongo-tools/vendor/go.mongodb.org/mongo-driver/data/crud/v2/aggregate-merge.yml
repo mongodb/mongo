@@ -1,9 +1,11 @@
-data:
-  - { _id: 1, x: 11 }
-  - { _id: 2, x: 22 }
-  - { _id: 3, x: 33 }
+runOn:
+    -
+        minServerVersion: "4.2.0"
 
-minServerVersion: '4.2.0'
+data:
+    - { _id: 1, x: 11 }
+    - { _id: 2, x: 22 }
+    - { _id: 3, x: 33 }
 
 collection_name: &collection_name 'test_aggregate_merge'
 

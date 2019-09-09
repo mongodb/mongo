@@ -1,0 +1,144 @@
+runOn:
+    -
+        minServerVersion: "4.0"
+        topology: ["single", "replicaset"]
+    -
+        minServerVersion: "4.1.7"
+        topology: ["sharded"]
+
+database_name: &database_name "retryable-reads-tests"
+collection_name: &collection_name "coll"
+
+data: []
+
+tests:
+    -
+        description: "ListCollectionObjects succeeds after InterruptedAtShutdown"
+        failPoint: &failCommand_failPoint
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data: { failCommands: [listCollections], errorCode: 11600 }
+        operations:
+            - &retryable_operation
+                name: listCollectionObjects
+                object: database
+        expectations:
+            -  &retryable_command_started_event
+                command_started_event:
+                    command:
+                        listCollections: 1
+            - *retryable_command_started_event
+    -
+        description: "ListCollectionObjects succeeds after InterruptedDueToReplStateChange"
+        failPoint:
+            <<: *failCommand_failPoint
+            data: { failCommands: [listCollections], errorCode: 11602 }
+        operations: [*retryable_operation]
+        expectations:
+             - *retryable_command_started_event
+             - *retryable_command_started_event
+    -
+        description: "ListCollectionObjects succeeds after NotMaster"
+        failPoint:
+            <<: *failCommand_failPoint
+            data: { failCommands: [listCollections], errorCode: 10107 }
+        operations: [*retryable_operation]
+        expectations:
+             - *retryable_command_started_event
+             - *retryable_command_started_event
+    -
+        description: "ListCollectionObjects succeeds after NotMasterNoSlaveOk"
+        failPoint:
+            <<: *failCommand_failPoint
+            data: { failCommands: [listCollections], errorCode: 13435 }
+        operations: [*retryable_operation]
+        expectations:
+             - *retryable_command_started_event
+             - *retryable_command_started_event
+    -
+        description: "ListCollectionObjects succeeds after NotMasterOrSecondary"
+        failPoint:
+            <<: *failCommand_failPoint
+            data: { failCommands: [listCollections], errorCode: 13436 }
+        operations: [*retryable_operation]
+        expectations:
+             - *retryable_command_started_event
+             - *retryable_command_started_event
+    -
+        description: "ListCollectionObjects succeeds after PrimarySteppedDown"
+        failPoint:
+            <<: *failCommand_failPoint
+            data: { failCommands: [listCollections], errorCode: 189 }
+        operations: [*retryable_operation]
+        expectations:
+             - *retryable_command_started_event
+             - *retryable_command_started_event
+    -
+        description: "ListCollectionObjects succeeds after ShutdownInProgress"
+        failPoint:
+            <<: *failCommand_failPoint
+            data: { failCommands: [listCollections], errorCode: 91 }
+        operations: [*retryable_operation]
+        expectations:
+             - *retryable_command_started_event
+             - *retryable_command_started_event
+    -
+        description: "ListCollectionObjects succeeds after HostNotFound"
+        failPoint:
+            <<: *failCommand_failPoint
+            data: { failCommands: [listCollections], errorCode: 7 }
+        operations: [*retryable_operation]
+        expectations:
+             - *retryable_command_started_event
+             - *retryable_command_started_event
+    -
+        description: "ListCollectionObjects succeeds after HostUnreachable"
+        failPoint:
+            <<: *failCommand_failPoint
+            data: { failCommands: [listCollections], errorCode: 6 }
+        operations: [*retryable_operation]
+        expectations:
+             - *retryable_command_started_event
+             - *retryable_command_started_event
+    -
+        description: "ListCollectionObjects succeeds after NetworkTimeout"
+        failPoint:
+            <<: *failCommand_failPoint
+            data: { failCommands: [listCollections], errorCode: 89 }
+        operations: [*retryable_operation]
+        expectations:
+             - *retryable_command_started_event
+             - *retryable_command_started_event
+    -
+        description: "ListCollectionObjects succeeds after SocketException"
+        failPoint:
+            <<: *failCommand_failPoint
+            data: { failCommands: [listCollections], errorCode: 9001 }
+        operations: [*retryable_operation]
+        expectations:
+             - *retryable_command_started_event
+             - *retryable_command_started_event
+    -
+        description: "ListCollectionObjects fails after two NotMaster errors"
+        failPoint:
+            <<: *failCommand_failPoint
+            mode: { times: 2 }
+            data: { failCommands: [listCollections], errorCode: 10107 }
+        operations:
+            - &retryable_operation_fails
+                <<: *retryable_operation
+                error: true
+        expectations:
+             - *retryable_command_started_event
+             - *retryable_command_started_event
+    -
+        description: "ListCollectionObjects fails after NotMaster when retryReads is false"
+        clientOptions:
+            retryReads: false
+        failPoint:
+            <<: *failCommand_failPoint
+            data: { failCommands: [listCollections], errorCode: 10107 }
+        operations: [*retryable_operation_fails]
+        expectations:
+             - *retryable_command_started_event
+

@@ -66,7 +66,7 @@ func (im *IsMaster) Deployment(d driver.Deployment) *IsMaster {
 	return im
 }
 
-// Result returns the result of executing this operaiton.
+// Result returns the result of executing this operation.
 func (im *IsMaster) Result(addr address.Address) description.Server {
 	desc := description.Server{Addr: addr, CanonicalAddr: addr, LastUpdateTime: time.Now().UTC()}
 	elements, err := im.res.Elements()
@@ -132,13 +132,21 @@ func (im *IsMaster) Result(addr address.Address) description.Server {
 				desc.LastError = fmt.Errorf("expected 'isreplicaset' to be a boolean but it's a BSON %s", element.Value().Type)
 				return desc
 			}
-		case "lastWriteDate":
-			dt, ok := element.Value().DateTimeOK()
+		case "lastWrite":
+			lastWrite, ok := element.Value().DocumentOK()
 			if !ok {
-				desc.LastError = fmt.Errorf("expected 'lastWriteDate' to be a datetime but it's a BSON %s", element.Value().Type)
+				desc.LastError = fmt.Errorf("expected 'lastWrite' to be a document but it's a BSON %s", element.Value().Type)
 				return desc
 			}
-			desc.LastWriteTime = time.Unix(dt/1000, dt%1000*1000000).UTC()
+			dateTime, err := lastWrite.LookupErr("lastWriteDate")
+			if err == nil {
+				dt, ok := dateTime.DateTimeOK()
+				if !ok {
+					desc.LastError = fmt.Errorf("expected 'lastWriteDate' to be a datetime but it's a BSON %s", dateTime.Type)
+					return desc
+				}
+				desc.LastWriteTime = time.Unix(dt/1000, dt%1000*1000000).UTC()
+			}
 		case "logicalSessionTimeoutMinutes":
 			i64, ok := element.Value().AsInt64OK()
 			if !ok {

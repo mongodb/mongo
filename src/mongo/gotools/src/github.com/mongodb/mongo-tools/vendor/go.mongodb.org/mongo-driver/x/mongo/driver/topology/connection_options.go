@@ -105,7 +105,7 @@ func WithCompressors(fn func([]string) []string) ConnectionOption {
 }
 
 // WithConnectTimeout configures the maximum amount of time a dial will wait for a
-// connect to complete. The default is 30 seconds.
+// Connect to complete. The default is 30 seconds.
 func WithConnectTimeout(fn func(time.Duration) time.Duration) ConnectionOption {
 	return func(c *connectionConfig) error {
 		c.connectTimeout = fn(c.connectTimeout)

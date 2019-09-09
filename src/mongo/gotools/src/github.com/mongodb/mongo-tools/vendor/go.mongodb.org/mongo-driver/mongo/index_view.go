@@ -94,6 +94,11 @@ func (iv IndexView) List(ctx context.Context, opts ...*options.ListIndexesOption
 	if lio.MaxTime != nil {
 		op = op.MaxTimeMS(int64(*lio.MaxTime / time.Millisecond))
 	}
+	retry := driver.RetryNone
+	if iv.coll.client.retryReads {
+		retry = driver.RetryOncePerCommand
+	}
+	op.Retry(retry)
 
 	err = op.Execute(ctx)
 	if err != nil {

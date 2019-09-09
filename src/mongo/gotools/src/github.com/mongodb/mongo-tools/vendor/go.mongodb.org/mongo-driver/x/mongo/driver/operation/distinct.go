@@ -36,6 +36,7 @@ type Distinct struct {
 	readConcern    *readconcern.ReadConcern
 	readPreference *readpref.ReadPref
 	selector       description.ServerSelector
+	retry          *driver.RetryMode
 	result         DistinctResult
 }
 
@@ -85,6 +86,8 @@ func (d *Distinct) Execute(ctx context.Context) error {
 	return driver.Operation{
 		CommandFn:         d.command,
 		ProcessResponseFn: d.processResponse,
+		RetryMode:         d.retry,
+		Type:              driver.Read,
 		Client:            d.session,
 		Clock:             d.clock,
 		CommandMonitor:    d.monitor,
@@ -244,5 +247,16 @@ func (d *Distinct) ServerSelector(selector description.ServerSelector) *Distinct
 	}
 
 	d.selector = selector
+	return d
+}
+
+// Retry enables retryable mode for this operation. Retries are handled automatically in driver.Operation.Execute based
+// on how the operation is set.
+func (d *Distinct) Retry(retry driver.RetryMode) *Distinct {
+	if d == nil {
+		d = new(Distinct)
+	}
+
+	d.retry = &retry
 	return d
 }

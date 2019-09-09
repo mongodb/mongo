@@ -5,6 +5,7 @@ response.type = "batch cursor"
 
 [properties]
 enabled = ["read concern", "read preference", "write concern"]
+retryable = {mode = "once per command", type = "reads"}
 MinimumWriteConcernWireVersion = 5
 
 [command]

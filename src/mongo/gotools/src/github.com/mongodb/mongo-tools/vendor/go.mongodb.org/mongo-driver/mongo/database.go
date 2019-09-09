@@ -107,6 +107,7 @@ func (db *Database) Aggregate(ctx context.Context, pipeline interface{},
 		registry:       db.registry,
 		readConcern:    db.readConcern,
 		writeConcern:   db.writeConcern,
+		retryRead:      db.client.retryReads,
 		db:             db.name,
 		readSelector:   db.readSelector,
 		writeSelector:  db.writeSelector,
@@ -282,6 +283,11 @@ func (db *Database) ListCollections(ctx context.Context, filter interface{}, opt
 	if lco.NameOnly != nil {
 		op = op.NameOnly(*lco.NameOnly)
 	}
+	retry := driver.RetryNone
+	if db.client.retryReads {
+		retry = driver.RetryOncePerCommand
+	}
+	op = op.Retry(retry)
 
 	err = op.Execute(ctx)
 	if err != nil {

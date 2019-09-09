@@ -1,0 +1,39 @@
+runOn:
+  -
+    minServerVersion: "4.2.0"
+
+database_name: &database_name "retryable-reads-tests"
+collection_name: &collection_name "coll"
+
+data:
+  - {_id: 1, x: 11}
+  - {_id: 2, x: 22}
+  - {_id: 3, x: 33}
+
+tests:
+  -
+    description: "Aggregate with $merge does not retry"
+    failPoint:
+      configureFailPoint: failCommand
+      mode: { times: 1 }
+      data:
+        failCommands: [aggregate]
+        closeConnection: true
+    operations:
+      -
+        object: collection
+        name: aggregate
+        arguments:
+          pipeline: &pipeline
+            - $match: {_id: {$gt: 1}}
+            - $sort: {x: 1}
+            - $merge: { into: "output-collection" }
+        error: true
+    expectations:
+      -
+        command_started_event:
+          command:
+            aggregate: *collection_name
+            pipeline: *pipeline
+          command_name: aggregate
+          database_name: *database_name

@@ -50,7 +50,7 @@ type Meta struct {
 // future if we change the db.Oplog.Object to bson.Raw, so the API is designed
 // with failure as a possibility.
 func NewMeta(op db.Oplog) (Meta, error) {
-	if op.LSID == nil {
+	if op.LSID == nil || op.TxnNumber == nil || op.Operation != "c" {
 		return Meta{}, nil
 	}
 
@@ -64,17 +64,28 @@ func NewMeta(op db.Oplog) (Meta, error) {
 		m.prevOpTime = string(op.PrevOpTime)
 	}
 
+	// Inspect command to confirm a transaction command and identify parameters.
+	var isRealTxn bool
 	for _, e := range op.Object {
 		switch e.Key {
+		case "applyOps":
+			isRealTxn = true
 		case "commitTransaction":
+			isRealTxn = true
 			m.commit = true
 		case "abortTransaction":
+			isRealTxn = true
 			m.abort = true
 		case "partialTxn":
 			m.partial = true
 		case "prepare":
 			m.prepare = true
 		}
+	}
+
+	// Defensive, in case some other op command ever includes lsid+txnNumber
+	if !isRealTxn {
+		return Meta{}, nil
 	}
 
 	return m, nil

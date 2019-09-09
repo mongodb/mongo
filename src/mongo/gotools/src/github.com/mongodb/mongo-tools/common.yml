@@ -22,7 +22,6 @@ mongo_tools_variables:
       - name: qa-tests-3.6
       - name: qa-tests-4.0
       - name: qa-tests-4.2
-      - name: qa-tests-unstable
       - name: qa-dump-restore-with-gzip-current
       - name: qa-dump-restore-with-archiving-current
       - name: unit
@@ -38,7 +37,6 @@ mongo_tools_variables:
       - name: dist
       - name: qa-tests-4.0
       - name: qa-tests-4.2
-      - name: qa-tests-unstable
       - name: native-cert-ssl-current
       - name: unit
       - name: replay-dist
@@ -57,7 +55,6 @@ mongo_tools_variables:
       - name: qa-tests-3.6
       - name: qa-tests-4.0
       - name: qa-tests-4.2
-      - name: qa-tests-unstable
       - name: qa-dump-restore-with-gzip-current
       - name: qa-dump-restore-with-archiving-current
       - name: unit
@@ -78,7 +75,6 @@ mongo_tools_variables:
       - name: integration-4.2-auth
       - name: qa-tests-4.0
       - name: qa-tests-4.2
-      - name: qa-tests-unstable
       - name: native-cert-ssl-current
       - name: replay-dist
     rhel_x86_64_enterprise_task_list: &rhel_x86_64_enterprise_tasks
@@ -91,7 +87,6 @@ mongo_tools_variables:
       # - name: kerberos
       - name: qa-tests-4.0
       - name: qa-tests-4.2
-      - name: qa-tests-unstable
       - name: native-cert-ssl-current
       - name: replay-dist
       - name: replay-sanity_check-4.2
@@ -115,7 +110,6 @@ mongo_tools_variables:
       - name: qa-tests-3.6
       - name: qa-tests-4.0
       - name: qa-tests-4.2
-      - name: qa-tests-unstable
       - name: qa-dump-restore-with-gzip-current
       - name: qa-dump-restore-with-archiving-current
       - name: unit
@@ -136,7 +130,6 @@ mongo_tools_variables:
       - name: integration-4.2-auth
       - name: qa-tests-4.0
       - name: qa-tests-4.2
-      - name: qa-tests-unstable
       - name: native-cert-ssl-current
       - name: replay-dist
     ubuntu_x86_64_enterprise_task_list: &ubuntu_x86_64_enterprise_tasks
@@ -148,7 +141,6 @@ mongo_tools_variables:
       - name: kerberos
       - name: qa-tests-4.0
       - name: qa-tests-4.2
-      - name: qa-tests-unstable
       - name: native-cert-ssl-current
       - name: replay-dist
       - name: replay-sanity_check-4.2
@@ -204,7 +196,6 @@ mongo_tools_variables:
       - name: qa-dump-restore-with-gzip-current
         distros:
         - windows-64-vs2017-test
-      - name: qa-tests-unstable
       - name: unit
     windows_64_ssl_task_list: &windows_64_ssl_tasks
       - name: dist
@@ -214,7 +205,6 @@ mongo_tools_variables:
       - name: integration-4.2-auth
       - name: qa-tests-4.0
       - name: qa-tests-4.2
-      - name: qa-tests-unstable
       - name: native-cert-ssl-current
       - name: unit
     windows_64_enterprise_task_list: &windows_64_enterprise_tasks
@@ -241,7 +231,6 @@ mongo_tools_variables:
       - name: qa-tests-4.2
         distros:
         - windows-64-vs2017-test
-      - name: qa-tests-unstable
         distros:
         - windows-64-vs2017-test
       - name: unit
@@ -259,7 +248,6 @@ mongo_tools_variables:
       - name: qa-tests-3.6
       - name: qa-tests-4.0
       - name: qa-tests-4.2
-      - name: qa-tests-unstable
       - name: native-cert-ssl-current
       - name: replay-dist
       - name: replay-sanity_check-4.2
@@ -283,7 +271,6 @@ mongo_tools_variables:
       - name: qa-tests-3.6
       - name: qa-tests-4.0
       - name: qa-tests-4.2
-      - name: qa-tests-unstable
       - name: native-cert-ssl-current
       - name: replay-dist
       - name: replay-sanity_check-4.2
@@ -308,7 +295,6 @@ mongo_tools_variables:
       - name: qa-dump-restore-with-archiving-current
       - name: qa-dump-restore-with-gzip-current
       - name: qa-tests-4.2
-      - name: qa-tests-unstable
       - name: native-cert-ssl-current
       - name: replay-dist
 

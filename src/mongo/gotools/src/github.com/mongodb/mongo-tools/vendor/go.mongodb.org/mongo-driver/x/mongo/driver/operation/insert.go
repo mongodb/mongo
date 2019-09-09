@@ -94,7 +94,7 @@ func (i *Insert) Execute(ctx context.Context) error {
 		ProcessResponseFn: i.processResponse,
 		Batches:           batches,
 		RetryMode:         i.retry,
-		RetryType:         driver.RetryWrite,
+		Type:              driver.Write,
 		Client:            i.session,
 		Clock:             i.clock,
 		CommandMonitor:    i.monitor,
@@ -230,9 +230,8 @@ func (i *Insert) WriteConcern(writeConcern *writeconcern.WriteConcern) *Insert {
 	return i
 }
 
-// Retry enables retryable writes for this operation. Retries are not handled automatically,
-// instead a boolean is returned from Execute and SelectAndExecute that indicates if the
-// operation can be retried. Retrying is handled by calling RetryExecute.
+// Retry enables retryable mode for this operation. Retries are handled automatically in driver.Operation.Execute based
+// on how the operation is set.
 func (i *Insert) Retry(retry driver.RetryMode) *Insert {
 	if i == nil {
 		i = new(Insert)

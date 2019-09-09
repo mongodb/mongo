@@ -14,18 +14,14 @@ type DeferredQuery struct {
 	LogReplay bool
 }
 
-// Count issues a count command. We don't use the Hint because
-// that's not supported with older servers.
-func (q *DeferredQuery) Count() (int, error) {
-	opt := mopt.Count()
-	filter := q.Filter
-	if filter == nil {
-		filter = bson.D{}
-	}
-	c, err := q.Coll.CountDocuments(nil, filter, opt)
+// EstimatedDocumentCount issues a count command.
+func (q *DeferredQuery) EstimatedDocumentCount() (int, error) {
+	opt := mopt.EstimatedDocumentCount()
+	c, err := q.Coll.EstimatedDocumentCount(nil, opt)
 	return int(c), err
 }
 
+// Iter executes a find query and returns a cursor.
 func (q *DeferredQuery) Iter() (*mongo.Cursor, error) {
 	opts := mopt.Find()
 	if q.Hint != nil {

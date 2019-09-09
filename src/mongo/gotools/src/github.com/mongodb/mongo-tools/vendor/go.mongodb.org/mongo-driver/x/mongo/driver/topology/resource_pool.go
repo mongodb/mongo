@@ -7,115 +7,212 @@
 package topology
 
 import (
-	"container/list"
+	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
-// expiredFunc is the function type used for testing whether or not resources in a resourcePool have expired. It should
-// return true if the resource has expired and can be removed from the pool.
+// expiredFunc is the function type used for testing whether or not resources in a resourcePool have stale. It should
+// return true if the resource has stale and can be removed from the pool.
 type expiredFunc func(interface{}) bool
 
-// closeFunc is the function type used to close resources in a resourcePool. The pool will always call this function
-// asynchronously.
+// closeFunc is the function type used to closeConnection resources in a resourcePool. The pool will always call this function
+// asynchronously
 type closeFunc func(interface{})
 
-// resourcePool is a concurrent resource pool that implements the behavior described in the sessions spec.
+// initFunc is the function used to add a resource to the resource pool to maintain minimum size. It returns a new
+// resource each time it is called.
+type initFunc func() interface{}
+
+type resourcePoolConfig struct {
+	MinSize          uint64
+	MaintainInterval time.Duration
+	ExpiredFn        expiredFunc
+	CloseFn          closeFunc
+	InitFn           initFunc
+}
+
+// setup sets defaults in the rpc and checks that the given values are valid
+func (rpc *resourcePoolConfig) setup() error {
+	if rpc.ExpiredFn == nil {
+		return fmt.Errorf("an ExpiredFn is required to create a resource pool")
+	}
+	if rpc.CloseFn == nil {
+		return fmt.Errorf("an CloseFn is required to create a resource pool")
+	}
+	if rpc.MaintainInterval == time.Duration(0) {
+		return fmt.Errorf("unable to have MaintainInterval time of %v", rpc.MaintainInterval)
+	}
+	return nil
+}
+
+// resourcePoolElement is a link list element
+type resourcePoolElement struct {
+	next, prev *resourcePoolElement
+	value      interface{}
+}
+
+// resourcePool is a concurrent resource pool
 type resourcePool struct {
-	deque         *list.List
-	len, maxSize  uint64
-	expiredFn     expiredFunc
-	closeFn       closeFunc
-	pruneTimer    *time.Timer
-	pruneInterval time.Duration
+	start, end       *resourcePoolElement
+	size, minSize    uint64
+	expiredFn        expiredFunc
+	closeFn          closeFunc
+	initFn           initFunc
+	maintainTimer    *time.Timer
+	maintainInterval time.Duration
 
 	sync.Mutex
 }
 
 // NewResourcePool creates a new resourcePool instance that is capped to maxSize resources.
 // If maxSize is 0, the pool size will be unbounded.
-func newResourcePool(maxSize uint64, expiredFn expiredFunc, closeFn closeFunc, pruneInterval time.Duration) *resourcePool {
-	rp := &resourcePool{
-		deque:         list.New(),
-		maxSize:       maxSize,
-		expiredFn:     expiredFn,
-		closeFn:       closeFn,
-		pruneInterval: pruneInterval,
+func newResourcePool(config resourcePoolConfig) (*resourcePool, error) {
+	err := (&config).setup()
+	if err != nil {
+		return nil, err
 	}
-	rp.Lock()
-	rp.pruneTimer = time.AfterFunc(rp.pruneInterval, rp.Prune)
-	rp.Unlock()
-	return rp
+	rp := &resourcePool{
+		minSize:          config.MinSize,
+		expiredFn:        config.ExpiredFn,
+		closeFn:          config.CloseFn,
+		initFn:           config.InitFn,
+		maintainInterval: config.MaintainInterval,
+	}
+
+	return rp, nil
 }
 
-// Get returns the first un-expired resource from the pool. If no such resource can be found, nil is returned.
+func (rp *resourcePool) initialize() {
+	rp.Lock()
+	rp.maintainTimer = time.AfterFunc(rp.maintainInterval, rp.Maintain)
+	rp.Unlock()
+
+	rp.Maintain()
+}
+
+// add will add a new rpe to the pool, requires that the resource pool is locked
+func (rp *resourcePool) add(e *resourcePoolElement) {
+	if e == nil {
+		e = &resourcePoolElement{
+			value: rp.initFn(),
+		}
+	}
+
+	e.next = rp.start
+	if rp.start != nil {
+		rp.start.prev = e
+	}
+	rp.start = e
+	if rp.end == nil {
+		rp.end = e
+	}
+	atomic.AddUint64(&rp.size, 1)
+}
+
+// Get returns the first un-stale resource from the pool. If no such resource can be found, nil is returned.
 func (rp *resourcePool) Get() interface{} {
 	rp.Lock()
 	defer rp.Unlock()
 
-	var next *list.Element
-	for curr := rp.deque.Front(); curr != nil; curr = next {
-		next = curr.Next()
-
-		// remove the current resource and return it if it is valid
-		rp.deque.Remove(curr)
-		rp.len--
-		if !rp.expiredFn(curr.Value) {
-			// found un-expired resource
-			return curr.Value
+	for rp.start != nil {
+		curr := rp.start
+		rp.remove(curr)
+		if !rp.expiredFn(curr.value) {
+			return curr.value
 		}
-
-		// close expired resources
-		rp.closeFn(curr.Value)
+		rp.closeFn(curr.value)
 	}
-
-	// did not find a valid resource
 	return nil
 }
 
-// Put clears expired resources from the pool and then returns resource v to the pool if there is room. It returns true
-// if v was successfully added to the pool and false otherwise.
+// Put puts the resource back into the pool if it will not exceed the max size of the pool
 func (rp *resourcePool) Put(v interface{}) bool {
-	rp.Lock()
-	defer rp.Unlock()
-
-	// close expired resources from the back of the pool
-	rp.prune()
-	if (rp.maxSize != 0 && rp.len == rp.maxSize) || rp.expiredFn(v) {
+	if rp.expiredFn(v) {
+		rp.closeFn(v)
 		return false
 	}
-	rp.deque.PushFront(v)
-	rp.len++
+
+	rp.Lock()
+	defer rp.Unlock()
+	rp.add(&resourcePoolElement{value: v})
 	return true
 }
 
-// Prune clears expired resources from the pool.
-func (rp *resourcePool) Prune() {
-	rp.Lock()
-	defer rp.Unlock()
-	rp.prune()
+// remove removes a rpe from the linked list. Requires that the pool be locked
+func (rp *resourcePool) remove(e *resourcePoolElement) {
+	if e == nil {
+		return
+	}
+
+	if e.prev != nil {
+		e.prev.next = e.next
+	}
+	if e.next != nil {
+		e.next.prev = e.prev
+	}
+	if e == rp.start {
+		rp.start = e.next
+	}
+	if e == rp.end {
+		rp.end = e.prev
+	}
+	atomicSubtract1Uint64(&rp.size)
 }
 
-func (rp *resourcePool) prune() {
-	// iterate over the list and stop at the first valid value
-	var prev *list.Element
-	for curr := rp.deque.Back(); curr != nil; curr = prev {
-		prev = curr.Prev()
-		if !rp.expiredFn(curr.Value) {
-			// found unexpired resource
-			break
+// Maintain puts the pool back into a state of having a correct number of resources if possible and removes all stale resources
+func (rp *resourcePool) Maintain() {
+	rp.Lock()
+	defer rp.Unlock()
+	for curr := rp.end; curr != nil; curr = curr.prev {
+		if rp.expiredFn(curr.value) {
+			rp.remove(curr)
+			rp.closeFn(curr.value)
 		}
+	}
 
-		// remove and close expired resources
-		rp.deque.Remove(curr)
-		rp.closeFn(curr.Value)
-		rp.len--
+	for atomic.LoadUint64(&rp.size) < rp.minSize {
+		rp.add(nil)
 	}
 
 	// reset the timer for the background cleanup routine
-	if !rp.pruneTimer.Stop() {
-		rp.pruneTimer = time.AfterFunc(rp.pruneInterval, rp.Prune)
+	if rp.maintainTimer == nil {
+		rp.maintainTimer = time.AfterFunc(rp.maintainInterval, rp.Maintain)
+	}
+	if !rp.maintainTimer.Stop() {
+		rp.maintainTimer = time.AfterFunc(rp.maintainInterval, rp.Maintain)
 		return
 	}
-	rp.pruneTimer.Reset(rp.pruneInterval)
+	rp.maintainTimer.Reset(rp.maintainInterval)
+}
+
+// Close clears the pool and stops the background maintenance of the pool
+func (rp *resourcePool) Close() {
+	rp.Clear()
+	_ = rp.maintainTimer.Stop()
+}
+
+// Clear closes all resources in the pool
+func (rp *resourcePool) Clear() {
+	rp.Lock()
+	defer rp.Unlock()
+	for ; rp.start != nil; rp.start = rp.start.next {
+		rp.closeFn(rp.start.value)
+	}
+	atomic.StoreUint64(&rp.size, 0)
+	rp.end = nil
+}
+
+func atomicSubtract1Uint64(p *uint64) {
+	if p == nil || atomic.LoadUint64(p) == 0 {
+		return
+	}
+
+	for {
+		expected := atomic.LoadUint64(p)
+		if atomic.CompareAndSwapUint64(p, expected, expected-1) {
+			return
+		}
+	}
 }

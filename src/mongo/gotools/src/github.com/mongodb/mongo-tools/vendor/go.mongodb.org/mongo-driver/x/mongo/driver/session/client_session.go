@@ -74,6 +74,7 @@ type Client struct {
 	Committing     bool
 	Aborting       bool
 	RetryWrite     bool
+	RetryRead      bool
 
 	// options for the current transaction
 	// most recently set by transactionopt

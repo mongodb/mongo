@@ -15,11 +15,10 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"strings"
 
 	"github.com/golang/snappy"
 	"go.mongodb.org/mongo-driver/x/bsonx/bsoncore"
@@ -29,7 +28,7 @@ import (
 	"go.mongodb.org/mongo-driver/x/mongo/driver/wiremessage"
 )
 
-var globalConnectionID uint64
+var globalConnectionID uint64 = 1
 
 func nextConnectionID() uint64 { return atomic.AddUint64(&globalConnectionID, 1) }
 
@@ -46,6 +45,9 @@ type connection struct {
 	compressor       wiremessage.CompressorID
 	zliblevel        int
 	connected        int32 // must be accessed using the sync/atomic package
+	connectDone      chan struct{}
+	connectErr       error
+	config           *connectionConfig
 
 	// pool related fields
 	pool       *pool
@@ -53,25 +55,11 @@ type connection struct {
 	generation uint64
 }
 
-// newConnection handles the creation of a connection. It will dial, configure TLS, and perform
-// initialization handshakes.
+// newConnection handles the creation of a connection. It does not connect the connection.
 func newConnection(ctx context.Context, addr address.Address, opts ...ConnectionOption) (*connection, error) {
 	cfg, err := newConnectionConfig(opts...)
 	if err != nil {
 		return nil, err
-	}
-
-	nc, err := cfg.dialer.DialContext(ctx, addr.Network(), addr.String())
-	if err != nil {
-		return nil, ConnectionError{Wrapped: err, init: true}
-	}
-
-	if cfg.tlsConfig != nil {
-		tlsConfig := cfg.tlsConfig.Clone()
-		nc, err = configureTLS(ctx, nc, addr, tlsConfig)
-		if err != nil {
-			return nil, ConnectionError{Wrapped: err, init: true}
-		}
 	}
 
 	var lifetimeDeadline time.Time
@@ -83,32 +71,64 @@ func newConnection(ctx context.Context, addr address.Address, opts ...Connection
 
 	c := &connection{
 		id:               id,
-		nc:               nc,
 		addr:             addr,
 		idleTimeout:      cfg.idleTimeout,
 		lifetimeDeadline: lifetimeDeadline,
 		readTimeout:      cfg.readTimeout,
 		writeTimeout:     cfg.writeTimeout,
+		connectDone:      make(chan struct{}),
+		config:           cfg,
 	}
-	atomic.StoreInt32(&c.connected, connected)
+	atomic.StoreInt32(&c.connected, initialized)
+
+	return c, nil
+}
+
+// connect handles the I/O for a connection. It will dial, configure TLS, and perform
+// initialization handshakes.
+func (c *connection) connect(ctx context.Context) {
+	if !atomic.CompareAndSwapInt32(&c.connected, initialized, connected) {
+		return
+	}
+	defer close(c.connectDone)
+
+	var err error
+	c.nc, err = c.config.dialer.DialContext(ctx, c.addr.Network(), c.addr.String())
+	if err != nil {
+		atomic.StoreInt32(&c.connected, disconnected)
+		c.connectErr = ConnectionError{Wrapped: err, init: true}
+		return
+	}
+
+	if c.config.tlsConfig != nil {
+		tlsConfig := c.config.tlsConfig.Clone()
+		c.nc, err = configureTLS(ctx, c.nc, c.addr, tlsConfig)
+		if err != nil {
+			atomic.StoreInt32(&c.connected, disconnected)
+			c.connectErr = ConnectionError{Wrapped: err, init: true}
+			return
+		}
+	}
 
 	c.bumpIdleDeadline()
 
 	// running isMaster and authentication is handled by a handshaker on the configuration instance.
-	if cfg.handshaker != nil {
-		c.desc, err = cfg.handshaker.Handshake(ctx, c.addr, initConnection{c})
+	if c.config.handshaker != nil {
+		c.desc, err = c.config.handshaker.Handshake(ctx, c.addr, initConnection{c})
 		if err != nil {
 			if c.nc != nil {
 				_ = c.nc.Close()
 			}
-			return nil, ConnectionError{Wrapped: err, init: true}
+			atomic.StoreInt32(&c.connected, disconnected)
+			c.connectErr = ConnectionError{Wrapped: err, init: true}
+			return
 		}
-		if cfg.descCallback != nil {
-			cfg.descCallback(c.desc)
+		if c.config.descCallback != nil {
+			c.config.descCallback(c.desc)
 		}
 		if len(c.desc.Compression) > 0 {
 		clientMethodLoop:
-			for _, method := range cfg.compressors {
+			for _, method := range c.config.compressors {
 				for _, serverMethod := range c.desc.Compression {
 					if method != serverMethod {
 						continue
@@ -120,8 +140,8 @@ func newConnection(ctx context.Context, addr address.Address, opts ...Connection
 					case "zlib":
 						c.compressor = wiremessage.CompressorZLib
 						c.zliblevel = wiremessage.DefaultZlibLevel
-						if cfg.zlibLevel != nil {
-							c.zliblevel = *cfg.zlibLevel
+						if c.config.zlibLevel != nil {
+							c.zliblevel = *c.config.zlibLevel
 						}
 					}
 					break clientMethodLoop
@@ -129,7 +149,11 @@ func newConnection(ctx context.Context, addr address.Address, opts ...Connection
 			}
 		}
 	}
-	return c, nil
+}
+
+func (c *connection) connectWait() error {
+	<-c.connectDone
+	return c.connectErr
 }
 
 func (c *connection) writeWireMessage(ctx context.Context, wm []byte) error {
@@ -174,7 +198,7 @@ func (c *connection) readWireMessage(ctx context.Context, dst []byte) ([]byte, e
 
 	select {
 	case <-ctx.Done():
-		// We close the connection because we don't know if there is an unread message on the wire.
+		// We closeConnection the connection because we don't know if there is an unread message on the wire.
 		c.close()
 		return nil, ConnectionError{ConnectionID: c.id, Wrapped: ctx.Err(), message: "failed to read"}
 	default:
@@ -202,7 +226,7 @@ func (c *connection) readWireMessage(ctx context.Context, dst []byte) ([]byte, e
 	// reading messages from an exhaust cursor.
 	_, err := io.ReadFull(c.nc, sizeBuf[:])
 	if err != nil {
-		// We close the connection because we don't know if there are other bytes left to read.
+		// We closeConnection the connection because we don't know if there are other bytes left to read.
 		c.close()
 		return nil, ConnectionError{ConnectionID: c.id, Wrapped: err, message: "unable to decode message length"}
 	}
@@ -221,7 +245,7 @@ func (c *connection) readWireMessage(ctx context.Context, dst []byte) ([]byte, e
 
 	_, err = io.ReadFull(c.nc, dst[4:])
 	if err != nil {
-		// We close the connection because we don't know if there are other bytes left to read.
+		// We closeConnection the connection because we don't know if there are other bytes left to read.
 		c.close()
 		return nil, ConnectionError{ConnectionID: c.id, Wrapped: err, message: "unable to read full message"}
 	}
@@ -239,7 +263,7 @@ func (c *connection) close() error {
 		atomic.StoreInt32(&c.connected, disconnected)
 		return err
 	}
-	return c.pool.close(c)
+	return c.pool.closeConnection(c)
 }
 
 func (c *connection) expired() bool {
@@ -272,6 +296,12 @@ func (c initConnection) Description() description.Server { return description.Se
 func (c initConnection) Close() error                    { return nil }
 func (c initConnection) ID() string                      { return c.id }
 func (c initConnection) Address() address.Address        { return c.addr }
+func (c initConnection) LocalAddress() address.Address {
+	if c.connection == nil || c.nc == nil {
+		return address.Address("0.0.0.0")
+	}
+	return address.Address(c.nc.LocalAddr().String())
+}
 func (c initConnection) WriteWireMessage(ctx context.Context, wm []byte) error {
 	return c.writeWireMessage(ctx, wm)
 }
@@ -368,7 +398,7 @@ func (c *Connection) Description() description.Server {
 	return c.desc
 }
 
-// Close returns this connection to the connection pool. This method may not close the underlying
+// Close returns this connection to the connection pool. This method may not closeConnection the underlying
 // socket.
 func (c *Connection) Close() error {
 	c.mu.Lock()
@@ -377,7 +407,7 @@ func (c *Connection) Close() error {
 		return nil
 	}
 	if c.s != nil {
-		c.s.sem.Release(1)
+		defer c.s.sem.Release(1)
 	}
 	err := c.pool.put(c.connection)
 	if err != nil {
@@ -387,7 +417,7 @@ func (c *Connection) Close() error {
 	return nil
 }
 
-// Expire closes this connection and will close the underlying socket.
+// Expire closes this connection and will closeConnection the underlying socket.
 func (c *Connection) Expire() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -428,6 +458,16 @@ func (c *Connection) Address() address.Address {
 		return address.Address("0.0.0.0")
 	}
 	return c.addr
+}
+
+// LocalAddress returns the local address of the connection
+func (c *Connection) LocalAddress() address.Address {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.connection == nil || c.nc == nil {
+		return address.Address("0.0.0.0")
+	}
+	return address.Address(c.nc.LocalAddr().String())
 }
 
 var notMasterCodes = []int32{10107, 13435}

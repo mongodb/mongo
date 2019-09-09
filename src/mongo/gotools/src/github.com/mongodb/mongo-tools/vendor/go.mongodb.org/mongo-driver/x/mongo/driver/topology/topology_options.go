@@ -96,8 +96,11 @@ func WithConnString(fn func(connstring.ConnString) connstring.ConnString) Option
 		}
 
 		if cs.MaxPoolSizeSet {
-			c.serverOpts = append(c.serverOpts, WithMaxConnections(func(uint16) uint16 { return cs.MaxPoolSize }))
-			c.serverOpts = append(c.serverOpts, WithMaxIdleConnections(func(uint16) uint16 { return cs.MaxPoolSize }))
+			c.serverOpts = append(c.serverOpts, WithMaxConnections(func(uint64) uint64 { return cs.MaxPoolSize }))
+		}
+
+		if cs.MinPoolSizeSet {
+			c.serverOpts = append(c.serverOpts, WithMinConnections(func(u uint64) uint64 { return cs.MinPoolSize }))
 		}
 
 		if cs.ReplicaSet != "" {
