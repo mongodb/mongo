@@ -63,6 +63,7 @@ REQUIRED_CONFIG_KEYS = {
 }
 
 DEFAULT_CONFIG_VALUES = {
+    "max_tests_per_suite": 100,
     "resmoke_args": "",
     "resmoke_repeat_suites": 1,
     "run_multiple_jobs": "true",
@@ -74,6 +75,7 @@ DEFAULT_CONFIG_VALUES = {
 CONFIG_FORMAT_FN = {
     "fallback_num_sub_suites": int,
     "max_sub_suites": int,
+    "max_tests_per_suite": int,
     "target_resmoke_time": int,
 }
 
@@ -212,20 +214,56 @@ def divide_remaining_tests_among_suites(remaining_tests_runtimes, suites):
             suite_idx = 0
 
 
-def divide_tests_into_suites(tests_runtimes, max_time_seconds, max_suites=None):
+def _new_suite_needed(current_suite, test_runtime, max_suite_runtime, max_tests_per_suite):
+    """
+    Check if a new suite should be created for the given suite.
+
+    :param current_suite: Suite currently being added to.
+    :param test_runtime: Runtime of test being added.
+    :param max_suite_runtime: Max runtime of a single suite.
+    :param max_tests_per_suite: Max number of tests in a suite.
+    :return: True if a new test suite should be created.
+    """
+    if current_suite.get_runtime() + test_runtime > max_suite_runtime:
+        # Will adding this test put us over the target runtime?
+        return True
+
+    if max_tests_per_suite and current_suite.get_test_count() + 1 > max_tests_per_suite:
+        # Will adding this test put us over the max number of tests?
+        return True
+
+    return False
+
+
+def divide_tests_into_suites(tests_runtimes, max_time_seconds, max_suites=None,
+                             max_tests_per_suite=None):
     """
     Divide the given tests into suites.
 
-    Each suite should be able to execute in less than the max time specified.
+    Each suite should be able to execute in less than the max time specified. If a single
+    test has a runtime greater than `max_time_seconds`, it will be run in a suite on its own.
+
+    If max_suites is reached before assigning all tests to a suite, the remaining tests will be
+    divided up among the created suites.
+
+    Note: If `max_suites` is hit, suites may have more tests than `max_tests_per_suite` and may have
+    runtimes longer than `max_time_seconds`.
+
+    :param tests_runtimes: List of tuples containing test names and test runtimes.
+    :param max_time_seconds: Maximum runtime to add to a single bucket.
+    :param max_suites: Maximum number of suites to create.
+    :param max_tests_per_suite: Maximum number of tests to add to a single suite.
+    :return: List of Suite objects representing grouping of tests.
     """
     suites = []
     current_suite = Suite()
     last_test_processed = len(tests_runtimes)
-    LOGGER.debug("Determines suites for runtime", max_runtime_seconds=max_time_seconds)
+    LOGGER.debug("Determines suites for runtime", max_runtime_seconds=max_time_seconds,
+                 max_suites=max_suites, max_tests_per_suite=max_tests_per_suite)
     for idx, (test_file, runtime) in enumerate(tests_runtimes):
         LOGGER.debug("Adding test", test=test_file, test_runtime=runtime)
-        if current_suite.get_runtime() + runtime > max_time_seconds:
-            LOGGER.debug("Runtime greater than boundary", suite_runtime=current_suite.get_runtime(),
+        if _new_suite_needed(current_suite, runtime, max_time_seconds, max_tests_per_suite):
+            LOGGER.debug("Finished suite", suite_runtime=current_suite.get_runtime(),
                          test_runtime=runtime, max_time=max_time_seconds)
             if current_suite.get_test_count() > 0:
                 suites.append(current_suite)
@@ -631,7 +669,8 @@ class GenerateSubSuites(object):
             return self.calculate_fallback_suites()
         self.test_list = [info[0] for info in tests_runtimes]
         return divide_tests_into_suites(tests_runtimes, execution_time_secs,
-                                        self.config_options.max_sub_suites)
+                                        self.config_options.max_sub_suites,
+                                        self.config_options.max_tests_per_suite)
 
     def filter_existing_tests(self, tests_runtimes):
         """Filter out tests that do not exist in the filesystem."""
