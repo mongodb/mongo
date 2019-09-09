@@ -112,22 +112,22 @@ DatabaseCloner::DatabaseCloner(executor::TaskExecutor* executor,
       _storageInterface(si),
       _collectionWork(collWork),
       _onCompletion(std::move(onCompletion)),
-      _listCollectionsFetcher(_executor,
-                              _source,
-                              _dbname,
-                              createListCollectionsCommandObject(_listCollectionsFilter),
-                              [=](const StatusWith<Fetcher::QueryResponse>& result,
-                                  Fetcher::NextAction* nextAction,
-                                  BSONObjBuilder* getMoreBob) {
-                                  _listCollectionsCallback(result, nextAction, getMoreBob);
-                              },
-                              ReadPreferenceSetting::secondaryPreferredMetadata(),
-                              RemoteCommandRequest::kNoTimeout /* find network timeout */,
-                              RemoteCommandRequest::kNoTimeout /* getMore network timeout */,
-                              RemoteCommandRetryScheduler::makeRetryPolicy(
-                                  numInitialSyncListCollectionsAttempts.load(),
-                                  executor::RemoteCommandRequest::kNoTimeout,
-                                  RemoteCommandRetryScheduler::kAllRetriableErrors)),
+      _listCollectionsFetcher(
+          _executor,
+          _source,
+          _dbname,
+          createListCollectionsCommandObject(_listCollectionsFilter),
+          [=](const StatusWith<Fetcher::QueryResponse>& result,
+              Fetcher::NextAction* nextAction,
+              BSONObjBuilder* getMoreBob) {
+              _listCollectionsCallback(result, nextAction, getMoreBob);
+          },
+          ReadPreferenceSetting::secondaryPreferredMetadata(),
+          RemoteCommandRequest::kNoTimeout /* find network timeout */,
+          RemoteCommandRequest::kNoTimeout /* getMore network timeout */,
+          RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::RetriableError>(
+              numInitialSyncListCollectionsAttempts.load(),
+              executor::RemoteCommandRequest::kNoTimeout)),
       _startCollectionCloner([](CollectionCloner& cloner) { return cloner.startup(); }) {
     // Fetcher throws an exception on null executor.
     invariant(executor);

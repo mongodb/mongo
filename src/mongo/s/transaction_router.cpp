@@ -158,13 +158,6 @@ bool isReadConcernLevelAllowedInTransaction(repl::ReadConcernLevel readConcernLe
         readConcernLevel == repl::ReadConcernLevel::kLocalReadConcern;
 }
 
-// Returns if the error code would be considered a retryable error for a retryable write.
-bool isRetryableWritesError(ErrorCodes::Error code) {
-    return std::find(RemoteCommandRetryScheduler::kAllRetriableErrors.begin(),
-                     RemoteCommandRetryScheduler::kAllRetriableErrors.end(),
-                     code) != RemoteCommandRetryScheduler::kAllRetriableErrors.end();
-}
-
 // Returns if a transaction's commit result is unknown based on the given statuses. A result is
 // considered unknown if it would be given the "UnknownTransactionCommitResult" as defined by the
 // driver transactions specification or fails with one of the errors for invalid write concern that
@@ -176,8 +169,8 @@ bool isRetryableWritesError(ErrorCodes::Error code) {
 // https://github.com/mongodb/specifications/blob/master/source/transactions/transactions.rst#unknowntransactioncommitresult.
 bool isCommitResultUnknown(const Status& commitStatus, const Status& commitWCStatus) {
     if (!commitStatus.isOK()) {
-        return isRetryableWritesError(commitStatus.code()) ||
-            ErrorCodes::isExceededTimeLimitError(commitStatus.code()) ||
+        return ErrorCodes::isRetriableError(commitStatus) ||
+            ErrorCodes::isExceededTimeLimitError(commitStatus) ||
             commitStatus.code() == ErrorCodes::TransactionTooOld;
     }
 

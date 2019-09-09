@@ -93,10 +93,8 @@ Status Shard::CommandResponse::processBatchWriteResponse(
 const Milliseconds Shard::kDefaultConfigCommandTimeout = Seconds{30};
 
 bool Shard::shouldErrorBePropagated(ErrorCodes::Error code) {
-    return std::find(RemoteCommandRetryScheduler::kAllRetriableErrors.begin(),
-                     RemoteCommandRetryScheduler::kAllRetriableErrors.end(),
-                     code) == RemoteCommandRetryScheduler::kAllRetriableErrors.end() &&
-        code != ErrorCodes::NetworkInterfaceExceededTimeLimit;
+    return !ErrorCodes::isRetriableError(code) &&
+        (code != ErrorCodes::NetworkInterfaceExceededTimeLimit);
 }
 
 Shard::Shard(const ShardId& id) : _id(id) {}
