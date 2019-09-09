@@ -96,6 +96,9 @@ namespace mr {
 namespace {
 
 Rarely mapParamsDeprecationSampler;  // Used to occasionally log deprecation messages.
+// Used to log occassional deprecation warnings when CodeWScope is used in MapReduce.
+Rarely mapReduceCodeWScopeSampler;
+
 
 /**
  * Runs a count against the namespace specified by 'ns'. If the caller holds the global write lock,
@@ -232,8 +235,8 @@ JSFunction::JSFunction(const std::string& type, const BSONElement& e) {
     _code = e._asCode();
 
     if (e.type() == CodeWScope) {
-        if (_sampler.tick())
-            warning() << "Use of CodeWScope with MapReduce is deprecated. Prefer putting all scope "
+        if (mapReduceCodeWScopeSampler.tick())
+            warning() << "Use of CodeWScope with MapReduce is deprecated. Put all scope "
                          "variables in the scope parameter of the MapReduce command";
         _wantedScope = e.codeWScopeObject();
     }
