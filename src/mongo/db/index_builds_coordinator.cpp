@@ -588,9 +588,9 @@ IndexBuildsCoordinator::_registerAndSetUpIndexBuild(
     MultiIndexBlock::OnInitFn onInitFn;
     // Two-phase index builds write a different oplog entry than the default behavior which
     // writes a no-op just to generate an optime.
-    using FCV = ServerGlobalParams::FeatureCompatibility::Version;
-    const auto currentFCV = serverGlobalParams.featureCompatibility.getVersion();
-    if (currentFCV == FCV::kFullyUpgradedTo44) {
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        serverGlobalParams.featureCompatibility.getVersion() ==
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
         onInitFn = [&](std::vector<BSONObj>& specs) {
             // TODO (SERVER-40807): disabling the following code for the v4.2 release so it does not
             // have downstream impact.
@@ -959,6 +959,13 @@ void IndexBuildsCoordinator::_buildIndex(
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     auto fromMigrate = false;
     auto onCommitFn = [&] {
+        if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+            return;
+        }
+        if (serverGlobalParams.featureCompatibility.getVersion() !=
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+            return;
+        }
         opObserver->onCommitIndexBuild(opCtx,
                                        collection->ns(),
                                        replState->collectionUUID,
