@@ -93,13 +93,13 @@ TEST_F(RecoveryUnitTestHarness, CommitAndRollbackChanges) {
     const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
 
     ru->beginUnitOfWork(opCtx.get());
-    ru->registerChange(new TestChange(&count));
+    ru->registerChange(std::make_unique<TestChange>(&count));
     ASSERT_EQUALS(count, 0);
     ru->commitUnitOfWork();
     ASSERT_EQUALS(count, 1);
 
     ru->beginUnitOfWork(opCtx.get());
-    ru->registerChange(new TestChange(&count));
+    ru->registerChange(std::make_unique<TestChange>(&count));
     ASSERT_EQUALS(count, 1);
     ru->abortUnitOfWork();
     ASSERT_EQUALS(count, 0);
@@ -125,7 +125,7 @@ TEST_F(RecoveryUnitTestHarness, CheckInActiveTxnWithAbort) {
 
 DEATH_TEST_F(RecoveryUnitTestHarness, RegisterChangeMustBeInUnitOfWork, "invariant") {
     int count = 0;
-    opCtx->recoveryUnit()->registerChange(new TestChange(&count));
+    opCtx->recoveryUnit()->registerChange(std::make_unique<TestChange>(&count));
 }
 
 DEATH_TEST_F(RecoveryUnitTestHarness, CommitMustBeInUnitOfWork, "invariant") {

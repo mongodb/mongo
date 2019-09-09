@@ -77,7 +77,7 @@ void EphemeralForTestRecoveryUnit::abortUnitOfWork() {
     try {
         for (Changes::reverse_iterator it = _changes.rbegin(), end = _changes.rend(); it != end;
              ++it) {
-            ChangePtr change = *it;
+            auto change = *it;
             LOG(2) << "CUSTOM ROLLBACK " << demangleName(typeid(*change));
             change->rollback();
         }
@@ -108,7 +108,7 @@ Status EphemeralForTestRecoveryUnit::obtainMajorityCommittedSnapshot() {
     return Status::OK();
 }
 
-void EphemeralForTestRecoveryUnit::registerChange(Change* change) {
-    _changes.push_back(ChangePtr(change));
+void EphemeralForTestRecoveryUnit::registerChange(std::unique_ptr<Change> change) {
+    _changes.push_back(std::move(change));
 }
 }  // namespace mongo

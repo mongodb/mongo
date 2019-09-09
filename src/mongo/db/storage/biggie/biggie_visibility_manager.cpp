@@ -78,7 +78,7 @@ void VisibilityManager::addUncommittedRecord(OperationContext* opCtx,
                                              RecordId rid) {
     stdx::lock_guard<stdx::mutex> lock(_stateLock);
     _uncommittedRecords.insert(rid);
-    opCtx->recoveryUnit()->registerChange(new VisibilityManagerChange(this, rs, rid));
+    opCtx->recoveryUnit()->registerChange(std::make_unique<VisibilityManagerChange>(this, rs, rid));
 
     if (rid > _highestSeen)
         _highestSeen = rid;

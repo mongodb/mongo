@@ -645,12 +645,13 @@ void AuthzManagerExternalStateLocal::logOp(OperationContext* opCtx,
         nss == AuthorizationManager::usersCollectionNamespace ||
         nss == AuthorizationManager::adminCommandNamespace) {
 
-        auto change = new AuthzManagerLogOpHandler(opCtx, authzManager, this, op, nss, o, o2);
+        auto change =
+            std::make_unique<AuthzManagerLogOpHandler>(opCtx, authzManager, this, op, nss, o, o2);
         // AuthzManagerExternalState's logOp method registers a RecoveryUnit::Change
         // and to do so we need to have begun a UnitOfWork
         WriteUnitOfWork wuow(opCtx);
 
-        opCtx->recoveryUnit()->registerChange(change);
+        opCtx->recoveryUnit()->registerChange(std::move(change));
 
         wuow.commit();
     }

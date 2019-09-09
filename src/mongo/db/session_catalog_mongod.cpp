@@ -307,7 +307,8 @@ void MongoDSessionCatalog::observeDirectWriteToConfigTransactions(OperationConte
                               << " because it is in the prepared state",
                 !participant.transactionIsPrepared());
 
-        opCtx->recoveryUnit()->registerChange(new KillSessionTokenOnCommit(opCtx, session.kill()));
+        opCtx->recoveryUnit()->registerChange(
+            std::make_unique<KillSessionTokenOnCommit>(opCtx, session.kill()));
     });
 }
 

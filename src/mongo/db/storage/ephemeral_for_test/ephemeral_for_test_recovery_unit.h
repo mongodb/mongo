@@ -58,7 +58,7 @@ public:
 
     Status obtainMajorityCommittedSnapshot() final;
 
-    virtual void registerChange(Change* change);
+    virtual void registerChange(std::unique_ptr<Change> change);
 
     virtual SnapshotId getSnapshotId() const {
         return SnapshotId();
@@ -89,8 +89,7 @@ public:
     }
 
 private:
-    typedef std::shared_ptr<Change> ChangePtr;
-    typedef std::vector<ChangePtr> Changes;
+    typedef std::vector<std::shared_ptr<Change>> Changes;
 
     Changes _changes;
     std::function<void()> _waitUntilDurableCallback;

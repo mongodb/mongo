@@ -335,9 +335,9 @@ public:
     public:
         MockRecoveryUnit(size_t* registeredChanges) : _registeredChanges(registeredChanges) {}
 
-        virtual void registerChange(Change* change) final {
+        virtual void registerChange(std::unique_ptr<Change> change) final {
             // RecoveryUnitNoop takes ownership of the Change
-            RecoveryUnitNoop::registerChange(change);
+            RecoveryUnitNoop::registerChange(std::move(change));
             ++(*_registeredChanges);
         }
 

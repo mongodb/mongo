@@ -35,9 +35,9 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-void RecoveryUnit::registerChange(Change* change) {
+void RecoveryUnit::registerChange(std::unique_ptr<Change> change) {
     invariant(_inUnitOfWork(), toString(_getState()));
-    _changes.push_back(std::unique_ptr<Change>{change});
+    _changes.push_back(std::move(change));
 }
 
 void RecoveryUnit::commitRegisteredChanges(boost::optional<Timestamp> commitTimestamp) {

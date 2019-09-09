@@ -420,9 +420,9 @@ std::unique_ptr<Collection> CollectionCatalog::deregisterCollection(CollectionUU
     return coll;
 }
 
-RecoveryUnit::Change* CollectionCatalog::makeFinishDropCollectionChange(
+std::unique_ptr<RecoveryUnit::Change> CollectionCatalog::makeFinishDropCollectionChange(
     std::unique_ptr<Collection> coll, CollectionUUID uuid) {
-    return new FinishDropCollectionChange(this, std::move(coll), uuid);
+    return std::make_unique<FinishDropCollectionChange>(this, std::move(coll), uuid);
 }
 
 void CollectionCatalog::deregisterAllCollections() {

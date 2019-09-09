@@ -126,8 +126,8 @@ public:
     /**
      * Returns the RecoveryUnit's Change for dropping the collection
      */
-    RecoveryUnit::Change* makeFinishDropCollectionChange(std::unique_ptr<Collection>,
-                                                         CollectionUUID uuid);
+    std::unique_ptr<RecoveryUnit::Change> makeFinishDropCollectionChange(
+        std::unique_ptr<Collection>, CollectionUUID uuid);
 
     /**
      * Deregister all the collection objects.

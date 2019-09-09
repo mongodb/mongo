@@ -368,7 +368,7 @@ Status _collModInternal(OperationContext* opCtx,
                 // in cmrNew will be invalidated and the idx pointer in cmrOld will be valid again.
                 cmrNew.idx = coll->getIndexCatalog()->refreshEntry(opCtx, cmrOld.idx);
                 opCtx->recoveryUnit()->registerChange(
-                    new CollModResultChange(oldExpireSecs, newExpireSecs, result));
+                    std::make_unique<CollModResultChange>(oldExpireSecs, newExpireSecs, result));
 
                 if (MONGO_FAIL_POINT(assertAfterIndexUpdate)) {
                     log() << "collMod - assertAfterIndexUpdate fail point enabled.";

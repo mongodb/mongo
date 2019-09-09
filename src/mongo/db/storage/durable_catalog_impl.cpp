@@ -493,7 +493,7 @@ Status DurableCatalogImpl::_addEntry(OperationContext* opCtx,
         return Status(ErrorCodes::NamespaceExists, "collection already exists");
     }
 
-    opCtx->recoveryUnit()->registerChange(new AddIdentChange(this, nss.ns()));
+    opCtx->recoveryUnit()->registerChange(std::make_unique<AddIdentChange>(this, nss.ns()));
 
     BSONObj obj;
     {
@@ -657,8 +657,8 @@ Status DurableCatalogImpl::_replaceEntry(OperationContext* opCtx,
     invariant(fromIt != _idents.end());
 
     opCtx->recoveryUnit()->registerChange(
-        new RemoveIdentChange(this, fromNss.ns(), fromIt->second));
-    opCtx->recoveryUnit()->registerChange(new AddIdentChange(this, toNss.ns()));
+        std::make_unique<RemoveIdentChange>(this, fromNss.ns(), fromIt->second));
+    opCtx->recoveryUnit()->registerChange(std::make_unique<AddIdentChange>(this, toNss.ns()));
 
     _idents.erase(fromIt);
     _idents[toNss.toString()] = Entry(old["ident"].String(), loc);
@@ -679,7 +679,8 @@ Status DurableCatalogImpl::_removeEntry(OperationContext* opCtx, const Namespace
         return Status(ErrorCodes::NamespaceNotFound, "collection not found");
     }
 
-    opCtx->recoveryUnit()->registerChange(new RemoveIdentChange(this, nss.ns(), it->second));
+    opCtx->recoveryUnit()->registerChange(
+        std::make_unique<RemoveIdentChange>(this, nss.ns(), it->second));
 
     LOG(1) << "deleting metadata for " << nss << " @ " << it->second.storedLoc;
     _rs->deleteRecord(opCtx, it->second.storedLoc);
@@ -766,7 +767,7 @@ StatusWith<std::string> DurableCatalogImpl::newOrphanedIdent(OperationContext* o
         return Status(ErrorCodes::NamespaceExists,
                       str::stream() << ns << " already exists in the catalog");
     }
-    opCtx->recoveryUnit()->registerChange(new AddIdentChange(this, ns));
+    opCtx->recoveryUnit()->registerChange(std::make_unique<AddIdentChange>(this, ns));
 
     // Generate a new UUID for the orphaned collection.
     CollectionOptions optionsWithUUID;
@@ -982,7 +983,7 @@ Status DurableCatalogImpl::removeIndex(OperationContext* opCtx,
 
     // Lazily remove to isolate underlying engine from rollback.
     opCtx->recoveryUnit()->registerChange(
-        new RemoveIndexChange(opCtx, _engine, md.options.uuid, ns, indexName, ident));
+        std::make_unique<RemoveIndexChange>(opCtx, _engine, md.options.uuid, ns, indexName, ident));
     return Status::OK();
 }
 
@@ -1027,7 +1028,8 @@ Status DurableCatalogImpl::prepareForIndexBuild(OperationContext* opCtx,
     const Status status = kvEngine->createGroupedSortedDataInterface(
         opCtx, getCollectionOptions(opCtx, ns), ident, spec, prefix);
     if (status.isOK()) {
-        opCtx->recoveryUnit()->registerChange(new AddIndexChange(opCtx, _engine, ident));
+        opCtx->recoveryUnit()->registerChange(
+            std::make_unique<AddIndexChange>(opCtx, _engine, ident));
     }
 
     return status;

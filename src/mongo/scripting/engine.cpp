@@ -199,7 +199,7 @@ public:
 };
 
 void Scope::storedFuncMod(OperationContext* opCtx) {
-    opCtx->recoveryUnit()->registerChange(new StoredFuncModLogOpHandler());
+    opCtx->recoveryUnit()->registerChange(std::make_unique<StoredFuncModLogOpHandler>());
 }
 
 void Scope::validateObjectIdString(const string& str) {

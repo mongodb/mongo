@@ -170,8 +170,9 @@ void OpObserverShardingImpl::shardObserveTransactionPrepareOrUnpreparedCommit(
     const std::vector<repl::ReplOperation>& stmts,
     const repl::OpTime& prepareOrCommitOptime) {
 
-    opCtx->recoveryUnit()->registerChange(new LogTransactionOperationsForShardingHandler(
-        opCtx->getServiceContext(), stmts, prepareOrCommitOptime));
+    opCtx->recoveryUnit()->registerChange(
+        std::make_unique<LogTransactionOperationsForShardingHandler>(
+            opCtx->getServiceContext(), stmts, prepareOrCommitOptime));
 }
 
 }  // namespace mongo

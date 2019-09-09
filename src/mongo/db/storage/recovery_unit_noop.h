@@ -68,8 +68,8 @@ public:
         return true;
     }
 
-    virtual void registerChange(Change* change) {
-        _changes.push_back(std::unique_ptr<Change>(change));
+    virtual void registerChange(std::unique_ptr<Change> change) {
+        _changes.push_back(std::move(change));
     }
 
     virtual SnapshotId getSnapshotId() const {

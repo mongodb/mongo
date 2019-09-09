@@ -177,7 +177,8 @@ public:
         IndexKeyEntry entry(key.getOwned(), loc);
         if (_data->insert(entry).second) {
             _currentKeySize += key.objsize();
-            opCtx->recoveryUnit()->registerChange(new IndexChange(_data, entry, true));
+            opCtx->recoveryUnit()->registerChange(
+                std::make_unique<IndexChange>(_data, entry, true));
         }
         return Status::OK();
     }
@@ -204,7 +205,8 @@ public:
         invariant(numDeleted <= 1);
         if (numDeleted == 1) {
             _currentKeySize -= key.objsize();
-            opCtx->recoveryUnit()->registerChange(new IndexChange(_data, entry, false));
+            opCtx->recoveryUnit()->registerChange(
+                std::make_unique<IndexChange>(_data, entry, false));
         }
     }
 
