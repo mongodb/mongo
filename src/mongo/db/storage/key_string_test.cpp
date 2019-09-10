@@ -1148,20 +1148,11 @@ void testPermutation(KeyString::Version version,
 
                     KeyString::Builder k1(version, o1, ordering);
 
-                    KeyString::Builder l1(
-                        version, BSON("l" << o1.firstElement()), ordering);  // kLess
-                    KeyString::Builder g1(
-                        version, BSON("g" << o1.firstElement()), ordering);  // kGreater
-                    ASSERT_LT(l1, k1);
-                    ASSERT_GT(g1, k1);
-
                     if (i + 1 < elements.size()) {
                         const BSONObj& o2 = elements[i + 1];
                         if (debug)
                             log() << "\t\t o2: " << o2;
                         KeyString::Builder k2(version, o2, ordering);
-                        KeyString::Builder g2(version, BSON("g" << o2.firstElement()), ordering);
-                        KeyString::Builder l2(version, BSON("l" << o2.firstElement()), ordering);
 
                         int bsonCmp = o1.woCompare(o2, ordering);
                         invariant(bsonCmp <= 0);  // We should be sorted...
@@ -1178,21 +1169,6 @@ void testPermutation(KeyString::Version version,
                             firstElementComp = -firstElementComp;
 
                         invariant(firstElementComp <= 0);
-
-                        if (firstElementComp == 0) {
-                            // If they share a first element then l1/g1 should equal l2/g2 and l1
-                            // should
-                            // be
-                            // less than both and g1 should be greater than both.
-                            ASSERT_EQ(l1, l2);
-                            ASSERT_EQ(g1, g2);
-                            ASSERT_LT(l1, k2);
-                            ASSERT_GT(g1, k2);
-                        } else {
-                            // k1 is less than k2. Less(k2) and Greater(k1) should be between them.
-                            ASSERT_LT(g1, k2);
-                            ASSERT_GT(l2, k1);
-                        }
                     }
                 }
             }));

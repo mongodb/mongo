@@ -132,8 +132,6 @@ struct KeyStringEntry {
  *          with the comparison being done exclusively
  *
  * 'prefixLen = 0' and 'prefixExclusive = true' are mutually incompatible.
- *
- * @see IndexEntryComparison::makeQueryObject
  */
 struct IndexSeekPoint {
     BSONObj keyPrefix;
@@ -165,11 +163,10 @@ struct IndexSeekPoint {
 };
 
 /**
- * Compares two different IndexKeyEntry instances.
- * The existence of compound indexes necessitates some complicated logic. This is meant to
- * support the comparisons of IndexKeyEntries (that are stored in an index) with IndexSeekPoints
- * (that were encoded with makeQueryObject) to support fine-grained control over whether the
- * ranges of various keys comprising a compound index are inclusive or exclusive.
+ * Compares two different IndexKeyEntry instances. The existence of compound indexes necessitates
+ * some complicated logic. This is meant to support the comparisons of IndexKeyEntries (that are
+ * stored in an index) with IndexSeekPoints to support fine-grained control over whether the ranges
+ * of various keys comprising a compound index are inclusive or exclusive.
  */
 class IndexEntryComparison {
 public:
@@ -182,24 +179,19 @@ public:
      * otherwise.
      *
      * IndexKeyEntries are compared lexicographically field by field in the BSONObj, followed by
-     * the RecordId. Either lhs or rhs (but not both) can be a query object returned by
-     * makeQueryObject(). See makeQueryObject() for a description of how its arguments affect
-     * the outcome of the comparison.
+     * the RecordId.
      */
     int compare(const IndexKeyEntry& lhs, const IndexKeyEntry& rhs) const;
 
     /**
-     * Encodes the arguments into a query object suitable to pass in to compare().
+     * Encodes the SeekPoint into a KeyString object suitable to pass in to seek().
      *
-     * A query object is used for seeking an iterator to a position in a sorted index.  The
-     * difference between a query object and the keys inserted into indexes is that query
-     * objects can be exclusive. This means that the first matching entry in the index is the
-     * first key in the index after the query. The meaning of "after" depends on
-     * cursorDirection.
-     *
-     * The fields of the key are the combination of keyPrefix and keySuffix. The first prefixLen
-     * keys of keyPrefix are used, as well as the keys starting at the prefixLen index of
-     * keySuffix.  The first prefixLen elements of keySuffix are ignored.
+     * A KeyString is used for seeking an iterator to a position in a sorted index. The difference
+     * between a query KeyString and the KeyStrings inserted into indexes is that a query KeyString
+     * can have an exclusive discriminator, which forces the key to compare less than or greater to
+     * a matching key in the index. This means that the first matching key is not returned, but
+     * rather the one immediately after. The meaning of "after" depends on the cursor directory,
+     * isForward.
      *
      * If a field is marked as exclusive, then comparisons stop after that field and return
      * either higher or lower, even if that field compares equal. If prefixExclusive is true and
@@ -212,36 +204,6 @@ public:
      * database, as their format may change. The only reason this is the same type as the
      * entries in an index is to support storage engines that require comparators that take
      * arguments of the same type.
-     *
-     * A cursurDirection of 1 indicates a forward cursor, and -1 indicates a reverse cursor.
-     * This effects the result when the exclusive field compares equal.
-     */
-    static BSONObj makeQueryObject(const BSONObj& keyPrefix,
-                                   int prefixLen,
-                                   bool prefixExclusive,
-                                   const std::vector<const BSONElement*>& keySuffix,
-                                   const std::vector<bool>& suffixInclusive,
-                                   const int cursorDirection);
-
-    static BSONObj makeQueryObject(const IndexSeekPoint& seekPoint, bool isForward) {
-        return makeQueryObject(seekPoint.keyPrefix,
-                               seekPoint.prefixLen,
-                               seekPoint.prefixExclusive,
-                               seekPoint.keySuffix,
-                               seekPoint.suffixInclusive,
-                               isForward ? 1 : -1);
-    }
-
-    /**
-     * Encodes the SeekPoint into a KeyString object suitable to pass in to compare().
-     *
-     * A KeyString is used for seeking an iterator to a position in a sorted index. The difference
-     * between a query KeyString and the KeyStrings inserted into indexes is that query KeyString
-     * can be exclusive. This means that the first matching entry in the index is the first key in
-     * the index after the query. The meaning of "after" depends on isForward.
-     *
-     * Returned KeyString are for use in lookups only and should never be inserted into the
-     * database.
      */
     static KeyString::Value makeKeyStringFromSeekPointForSeek(const IndexSeekPoint& seekPoint,
                                                               KeyString::Version version,

@@ -111,72 +111,52 @@ int IndexEntryComparison::compare(const IndexKeyEntry& lhs, const IndexKeyEntry&
     return lhs.loc.compare(rhs.loc);  // is supposed to ignore ordering
 }
 
-// reading the comment in the .h file is highly recommended if you need to understand what this
-// function is doing
-BSONObj IndexEntryComparison::makeQueryObject(const BSONObj& keyPrefix,
-                                              int prefixLen,
-                                              bool prefixExclusive,
-                                              const std::vector<const BSONElement*>& keySuffix,
-                                              const std::vector<bool>& suffixInclusive,
-                                              const int cursorDirection) {
-    // Please read the comments in the header file to see why this is done.
-    // The basic idea is that we use the field name to store a byte which indicates whether
-    // each field in the query object is inclusive and exclusive, and if it is exclusive, in
-    // which direction.
-    const char exclusiveByte = (cursorDirection == 1 ? greater : less);
-
-    const StringData exclusiveFieldName(&exclusiveByte, 1);
-
-    BSONObjBuilder bb;
-
-    // handle the prefix
-    if (prefixLen > 0) {
-        BSONObjIterator it(keyPrefix);
-        for (int i = 0; i < prefixLen; i++) {
-            invariant(it.more());
-            const BSONElement e = it.next();
-
-            if (prefixExclusive && i == prefixLen - 1) {
-                bb.appendAs(e, exclusiveFieldName);
-            } else {
-                bb.appendAs(e, StringData());
-            }
-        }
-    }
-
-    // If the prefix is exclusive then the suffix does not matter as it will never be used
-    if (prefixExclusive) {
-        invariant(prefixLen > 0);
-        return bb.obj();
-    }
-
-    // Handle the suffix. Note that the useful parts of the suffix start at index prefixLen
-    // rather than at 0.
-    invariant(keySuffix.size() == suffixInclusive.size());
-    for (size_t i = prefixLen; i < keySuffix.size(); i++) {
-        invariant(keySuffix[i]);
-        if (suffixInclusive[i]) {
-            bb.appendAs(*keySuffix[i], StringData());
-        } else {
-            bb.appendAs(*keySuffix[i], exclusiveFieldName);
-
-            // If an exclusive field exists then no fields after this will matter, since an
-            // exclusive field never evaluates as equal
-            return bb.obj();
-        }
-    }
-
-    return bb.obj();
-}
-
 KeyString::Value IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
     const IndexSeekPoint& seekPoint, KeyString::Version version, Ordering ord, bool isForward) {
-    BSONObj key = IndexEntryComparison::makeQueryObject(seekPoint, isForward);
 
-    const auto discriminator = isForward ? KeyString::Discriminator::kExclusiveBefore
-                                         : KeyString::Discriminator::kExclusiveAfter;
+    // Determines the discriminator used to build the KeyString.
+    auto suffixExclusive = [&]() {
+        for (size_t i = seekPoint.prefixLen; i < seekPoint.keySuffix.size(); i++) {
+            if (!seekPoint.suffixInclusive[i])
+                return true;
+        }
+        return false;
+    };
+    bool inclusive = !seekPoint.prefixExclusive && !suffixExclusive();
+    const auto discriminator = isForward == inclusive ? KeyString::Discriminator::kExclusiveBefore
+                                                      : KeyString::Discriminator::kExclusiveAfter;
 
-    KeyString::Builder builder(version, key, ord, discriminator);
+    KeyString::Builder builder(version, ord, discriminator);
+
+    // Appends keyPrefix elements to the builder.
+    if (seekPoint.prefixLen > 0) {
+        BSONObjIterator it(seekPoint.keyPrefix);
+        for (int i = 0; i < seekPoint.prefixLen; i++) {
+            invariant(it.more());
+            const BSONElement e = it.next();
+            builder.appendBSONElement(e);
+        }
+    }
+
+    // If the prefix is exclusive then the suffix does not matter as it will never be used.
+    if (seekPoint.prefixExclusive) {
+        invariant(seekPoint.prefixLen > 0);
+        return builder.getValueCopy();
+    }
+
+    // Handles the suffix. Note that the useful parts of the suffix start at index prefixLen rather
+    // than at 0.
+    invariant(seekPoint.keySuffix.size() == seekPoint.suffixInclusive.size());
+    for (size_t i = seekPoint.prefixLen; i < seekPoint.keySuffix.size(); i++) {
+        invariant(seekPoint.keySuffix[i]);
+        builder.appendBSONElement(*seekPoint.keySuffix[i]);
+
+        // If an exclusive field exists then no fields after this will matter, since an
+        // exclusive field never evaluates as equal.
+        if (!seekPoint.suffixInclusive[i]) {
+            return builder.getValueCopy();
+        }
+    }
     return builder.getValueCopy();
 }
 

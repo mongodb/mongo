@@ -436,18 +436,6 @@ void BuilderBase<BufferT>::_appendAllElementsForIndexing(const BSONObj& obj,
     while (auto elem = it.next()) {
         appendBSONElement(elem);
         dassert(elem.fieldNameSize() < 3);  // fieldNameSize includes the NUL
-
-        // IndexEntryComparison::makeQueryObject() encodes a discriminator in the first byte of
-        // the field name. This discriminator overrides the passed in one. Normal elements only
-        // have the NUL byte terminator. Entries stored in an index are not allowed to have a
-        // discriminator.
-        if (char ch = *elem.fieldName()) {
-            // l for less / g for greater.
-            invariant(ch == 'l' || ch == 'g');
-            discriminator =
-                ch == 'l' ? Discriminator::kExclusiveBefore : Discriminator::kExclusiveAfter;
-            invariant(!it.more());
-        }
     }
     appendDiscriminator(discriminator);
 }
