@@ -34,6 +34,18 @@ def build_benchmark(env, target, source, **kwargs):
     kwargs['LIBDEPS'] = libdeps
     kwargs['INSTALL_ALIAS'] = ['benchmarks']
 
+    benchmark_test_components = {'tests', 'benchmarks'}
+    if (
+            'AIB_COMPONENT' in kwargs
+            and not kwargs['AIB_COMPONENT'].endswith('-benchmark')
+    ):
+        kwargs['AIB_COMPONENT'] += '-benchmark'
+
+    if 'AIB_COMPONENTS_EXTRA' in kwargs:
+        benchmark_test_components = set(kwargs['AIB_COMPONENTS_EXTRA']).union(benchmark_test_components)
+
+    kwargs['AIB_COMPONENTS_EXTRA'] = benchmark_test_components
+
     result = bmEnv.Program(target, source, **kwargs)
     bmEnv.RegisterBenchmark(result[0])
     hygienic = bmEnv.GetOption('install-mode') == 'hygienic'
