@@ -432,9 +432,11 @@ StatusWith<std::set<NamespaceString>> RollbackImpl::_namespacesForOp(const Oplog
                 }
                 break;
             }
-            // TODO(SERVER-39451): Ignore no-op startIndexBuild and commitIndexBuild commands.
+            // TODO(SERVER-39451): Ignore no-op startIndexBuild, abortIndexBuild, and
+            // commitIndexBuild commands.
             // Revisit when we are ready to implement rollback logic.
             case OplogEntry::CommandType::kStartIndexBuild:
+            case OplogEntry::CommandType::kAbortIndexBuild:
             case OplogEntry::CommandType::kCommitIndexBuild:
             case OplogEntry::CommandType::kCommitTransaction:
             case OplogEntry::CommandType::kAbortTransaction: {

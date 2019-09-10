@@ -424,9 +424,13 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
 
                 return Status::OK();
             }
-            // TODO(SERVER-39452): Ignore no-op startIndexBuild and commitIndexBuild commands.
+            // TODO(SERVER-39452): Ignore no-op startIndexBuild, abortIndexBuild, and
+            // commitIndexBuild commands.
             // Revisit when we are ready to implement rollback logic.
             case OplogEntry::CommandType::kStartIndexBuild: {
+                return Status::OK();
+            }
+            case OplogEntry::CommandType::kAbortIndexBuild: {
                 return Status::OK();
             }
             case OplogEntry::CommandType::kCommitIndexBuild: {
