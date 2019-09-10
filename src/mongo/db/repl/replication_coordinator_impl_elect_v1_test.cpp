@@ -478,9 +478,7 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
     replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
 
-    getGlobalFailPointRegistry()
-        ->getFailPoint("blockHeartbeatReconfigFinish")
-        ->setMode(FailPoint::alwaysOn);
+    globalFailPointRegistry().find("blockHeartbeatReconfigFinish")->setMode(FailPoint::alwaysOn);
 
     // hb reconfig
     NetworkInterfaceMock* net = getNet();
@@ -573,9 +571,7 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     ASSERT_EQUALS(1,
                   countLogLinesContaining("Not standing for election; processing "
                                           "a configuration change"));
-    getGlobalFailPointRegistry()
-        ->getFailPoint("blockHeartbeatReconfigFinish")
-        ->setMode(FailPoint::off);
+    globalFailPointRegistry().find("blockHeartbeatReconfigFinish")->setMode(FailPoint::off);
 }
 
 TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringRequestVotes) {

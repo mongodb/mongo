@@ -217,30 +217,30 @@ private:
                                           moveChunkRequest.getFromShardId());
 
         moveTimingHelper.done(1);
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep1);
+        moveChunkHangAtStep1.pauseWhileSet();
 
         MigrationSourceManager migrationSourceManager(
             opCtx, moveChunkRequest, donorConnStr, recipientHost);
 
         moveTimingHelper.done(2);
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep2);
+        moveChunkHangAtStep2.pauseWhileSet();
 
         uassertStatusOKWithWarning(migrationSourceManager.startClone(opCtx));
         moveTimingHelper.done(3);
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep3);
+        moveChunkHangAtStep3.pauseWhileSet();
 
         uassertStatusOKWithWarning(migrationSourceManager.awaitToCatchUp(opCtx));
         moveTimingHelper.done(4);
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep4);
+        moveChunkHangAtStep4.pauseWhileSet();
 
         uassertStatusOKWithWarning(migrationSourceManager.enterCriticalSection(opCtx));
         uassertStatusOKWithWarning(migrationSourceManager.commitChunkOnRecipient(opCtx));
         moveTimingHelper.done(5);
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep5);
+        moveChunkHangAtStep5.pauseWhileSet();
 
         uassertStatusOKWithWarning(migrationSourceManager.commitChunkMetadataOnConfig(opCtx));
         moveTimingHelper.done(6);
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep6);
+        moveChunkHangAtStep6.pauseWhileSet();
     }
 
 } moveChunkCmd;

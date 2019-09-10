@@ -185,7 +185,7 @@ void WiredTigerRecoveryUnit::_commit() {
     }
     _setState(State::kCommitting);
 
-    if (MONGO_FAIL_POINT(WTAlwaysNotifyPrepareConflictWaiters)) {
+    if (MONGO_unlikely(WTAlwaysNotifyPrepareConflictWaiters.shouldFail())) {
         notifyDone = true;
     }
 
@@ -204,7 +204,7 @@ void WiredTigerRecoveryUnit::_abort() {
     }
     _setState(State::kAborting);
 
-    if (notifyDone || MONGO_FAIL_POINT(WTAlwaysNotifyPrepareConflictWaiters)) {
+    if (notifyDone || MONGO_unlikely(WTAlwaysNotifyPrepareConflictWaiters.shouldFail())) {
         _sessionCache->notifyPreparedUnitOfWorkHasCommittedOrAborted();
     }
 

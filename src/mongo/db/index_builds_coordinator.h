@@ -507,8 +507,8 @@ private:
 
 // These fail points are used to control index build progress. Declared here to be shared
 // temporarily between createIndexes command and IndexBuildsCoordinator.
-MONGO_FAIL_POINT_DECLARE(hangAfterIndexBuildFirstDrain);
-MONGO_FAIL_POINT_DECLARE(hangAfterIndexBuildSecondDrain);
-MONGO_FAIL_POINT_DECLARE(hangAfterIndexBuildDumpsInsertsFromBulk);
+extern FailPoint hangAfterIndexBuildFirstDrain;
+extern FailPoint hangAfterIndexBuildSecondDrain;
+extern FailPoint hangAfterIndexBuildDumpsInsertsFromBulk;
 
 }  // namespace mongo

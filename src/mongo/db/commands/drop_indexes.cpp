@@ -220,7 +220,7 @@ public:
             });
         }
 
-        if (MONGO_FAIL_POINT(reIndexCrashAfterDrop)) {
+        if (MONGO_unlikely(reIndexCrashAfterDrop.shouldFail())) {
             log() << "exiting because 'reIndexCrashAfterDrop' fail point was set";
             quickExit(EXIT_ABRUPT);
         }

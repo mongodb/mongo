@@ -415,13 +415,16 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
 }
 
 void failPointHangDuringBuild(FailPoint* fp, StringData where, const BSONObj& doc) {
-    MONGO_FAIL_POINT_BLOCK(*fp, data) {
-        int i = doc.getIntField("i");
-        if (data.getData()["i"].numberInt() == i) {
+    fp->executeIf(
+        [&](const BSONObj& data) {
+            int i = doc.getIntField("i");
             log() << "Hanging " << where << " index build of i=" << i;
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET((*fp));
-        }
-    }
+            fp->pauseWhileSet();
+        },
+        [&](const BSONObj& data) {
+            int i = doc.getIntField("i");
+            return data["i"].numberInt() == i;
+        });
 }
 
 Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
@@ -451,16 +454,16 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
         progress.set(CurOp::get(opCtx)->setProgress_inlock(curopMessage, numRecords));
     }
 
-    if (MONGO_FAIL_POINT(hangAfterSettingUpIndexBuild)) {
+    if (MONGO_unlikely(hangAfterSettingUpIndexBuild.shouldFail())) {
         // Hang the build after the BackgroundOperation and curOP info is set up.
         log() << "Hanging index build due to failpoint 'hangAfterSettingUpIndexBuild'";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterSettingUpIndexBuild);
+        hangAfterSettingUpIndexBuild.pauseWhileSet();
     }
 
-    if (MONGO_FAIL_POINT(hangAndThenFailIndexBuild)) {
+    if (MONGO_unlikely(hangAndThenFailIndexBuild.shouldFail())) {
         // Hang the build after the BackgroundOperation and curOP info is set up.
         log() << "Hanging index build due to failpoint 'hangAndThenFailIndexBuild'";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAndThenFailIndexBuild);
+        hangAndThenFailIndexBuild.pauseWhileSet();
         return {ErrorCodes::InternalError,
                 "Failed index build because of failpoint 'hangAndThenFailIndexBuild'"};
     }
@@ -494,7 +497,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
     int retries = 0;  // non-zero when retrying our last document.
     while (retries ||
            (PlanExecutor::ADVANCED == (state = exec->getNextSnapshotted(&objToIndex, &loc))) ||
-           MONGO_FAIL_POINT(hangAfterStartingIndexBuild)) {
+           MONGO_unlikely(hangAfterStartingIndexBuild.shouldFail())) {
         try {
             auto interruptStatus = opCtx->checkForInterruptNoAssert();
             if (!interruptStatus.isOK())
@@ -565,7 +568,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
         return exec->getMemberObjectStatus(objToIndex.value());
     }
 
-    if (MONGO_FAIL_POINT(leaveIndexBuildUnfinishedForShutdown)) {
+    if (MONGO_unlikely(leaveIndexBuildUnfinishedForShutdown.shouldFail())) {
         log() << "Index build interrupted due to 'leaveIndexBuildUnfinishedForShutdown' failpoint. "
                  "Mimicing shutdown error code.";
         return Status(
@@ -573,14 +576,14 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
             "background index build interrupted due to failpoint. returning a shutdown error.");
     }
 
-    if (MONGO_FAIL_POINT(hangAfterStartingIndexBuildUnlocked)) {
+    if (MONGO_unlikely(hangAfterStartingIndexBuildUnlocked.shouldFail())) {
         // Unlock before hanging so replication recognizes we've completed.
         Locker::LockSnapshot lockInfo;
         invariant(opCtx->lockState()->saveLockStateAndUnlock(&lockInfo));
 
         log() << "Hanging index build with no locks due to "
                  "'hangAfterStartingIndexBuildUnlocked' failpoint";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterStartingIndexBuildUnlocked);
+        hangAfterStartingIndexBuildUnlocked.pauseWhileSet();
 
         if (isBackgroundBuilding()) {
             opCtx->lockState()->restoreLockState(opCtx, lockInfo);

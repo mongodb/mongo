@@ -84,7 +84,7 @@ void FailPoint::shouldFailCloseBlock() {
     _fpInfo.subtractAndFetch(1);
 }
 
-void FailPoint::setMode(Mode mode, ValType val, const BSONObj& extra) {
+void FailPoint::setMode(Mode mode, ValType val, BSONObj extra) {
     /**
      * Outline:
      *
@@ -96,20 +96,20 @@ void FailPoint::setMode(Mode mode, ValType val, const BSONObj& extra) {
     stdx::lock_guard<stdx::mutex> scoped(_modMutex);
 
     // Step 1
-    disableFailPoint();
+    disable();
 
     // Step 2
     while (_fpInfo.load() != 0) {
         sleepmillis(50);
     }
 
+    // Step 3
     _mode = mode;
     _timesOrPeriod.store(val);
-
-    _data = extra.copy();
+    _data = std::move(extra);
 
     if (_mode != off) {
-        enableFailPoint();
+        enable();
     }
 }
 
@@ -117,19 +117,19 @@ const BSONObj& FailPoint::getData() const {
     return _data;
 }
 
-void FailPoint::enableFailPoint() {
-    _fpInfo.fetchAndBitOr(ACTIVE_BIT);
+void FailPoint::enable() {
+    _fpInfo.fetchAndBitOr(kActiveBit);
 }
 
-void FailPoint::disableFailPoint() {
-    _fpInfo.fetchAndBitAnd(~ACTIVE_BIT);
+void FailPoint::disable() {
+    _fpInfo.fetchAndBitAnd(~kActiveBit);
 }
 
 FailPoint::RetCode FailPoint::slowShouldFailOpenBlock(
     std::function<bool(const BSONObj&)> cb) noexcept {
     ValType localFpInfo = _fpInfo.addAndFetch(1);
 
-    if ((localFpInfo & ACTIVE_BIT) == 0) {
+    if ((localFpInfo & kActiveBit) == 0) {
         return slowOff;
     }
 
@@ -149,7 +149,7 @@ FailPoint::RetCode FailPoint::slowShouldFailOpenBlock(
         }
         case nTimes: {
             if (_timesOrPeriod.subtractAndFetch(1) <= 0)
-                disableFailPoint();
+                disable();
 
             return slowOn;
         }
@@ -168,8 +168,7 @@ FailPoint::RetCode FailPoint::slowShouldFailOpenBlock(
     }
 }
 
-StatusWith<std::tuple<FailPoint::Mode, FailPoint::ValType, BSONObj>> FailPoint::parseBSON(
-    const BSONObj& obj) {
+StatusWith<FailPoint::ModeOptions> FailPoint::parseBSON(const BSONObj& obj) {
     Mode mode = FailPoint::alwaysOn;
     ValType val = 0;
     const BSONElement modeElem(obj["mode"]);
@@ -177,7 +176,6 @@ StatusWith<std::tuple<FailPoint::Mode, FailPoint::ValType, BSONObj>> FailPoint::
         return {ErrorCodes::IllegalOperation, "When setting a failpoint, you must supply a 'mode'"};
     } else if (modeElem.type() == String) {
         const std::string modeStr(modeElem.valuestr());
-
         if (modeStr == "off") {
             mode = FailPoint::off;
         } else if (modeStr == "alwaysOn") {
@@ -255,7 +253,7 @@ StatusWith<std::tuple<FailPoint::Mode, FailPoint::ValType, BSONObj>> FailPoint::
         data = obj["data"].Obj().getOwned();
     }
 
-    return std::make_tuple(mode, val, data);
+    return ModeOptions{mode, val, data};
 }
 
 BSONObj FailPoint::toBSON() const {

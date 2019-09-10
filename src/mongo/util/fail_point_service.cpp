@@ -38,49 +38,34 @@
 
 namespace mongo {
 
-using std::unique_ptr;
-
 MONGO_FAIL_POINT_DEFINE(dummy);  // used by tests in jstests/fail_point
 
-unique_ptr<FailPointRegistry> _fpRegistry(nullptr);
+MONGO_INITIALIZER_GROUP(FailPointRegistry, (), ("BeginStartupOptionHandling"));
 
-MONGO_INITIALIZER_GENERAL(FailPointRegistry,
-                          MONGO_NO_PREREQUISITES,
-                          ("BeginGeneralStartupOptionRegistration"))
+MONGO_INITIALIZER_GENERAL(AllFailPointsRegistered, (), ())
 (InitializerContext* context) {
-    _fpRegistry.reset(new FailPointRegistry());
+    globalFailPointRegistry().freeze();
     return Status::OK();
 }
 
-MONGO_INITIALIZER_GENERAL(AllFailPointsRegistered, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS)
-(InitializerContext* context) {
-    _fpRegistry->freeze();
-    return Status::OK();
-}
-
-FailPointRegistry* getGlobalFailPointRegistry() {
-    return _fpRegistry.get();
+FailPointRegistry& globalFailPointRegistry() {
+    static auto& p = *new FailPointRegistry();
+    return p;
 }
 
 void setGlobalFailPoint(const std::string& failPointName, const BSONObj& cmdObj) {
-    FailPointRegistry* registry = getGlobalFailPointRegistry();
-    FailPoint* failPoint = registry->getFailPoint(failPointName);
+    FailPoint* failPoint = globalFailPointRegistry().find(failPointName);
 
     if (failPoint == nullptr)
         uasserted(ErrorCodes::FailPointSetFailed, failPointName + " not found");
 
-    FailPoint::Mode mode;
-    FailPoint::ValType val;
-    BSONObj data;
-    std::tie(mode, val, data) = uassertStatusOK(FailPoint::parseBSON(cmdObj));
-
-    failPoint->setMode(mode, val, data);
+    failPoint->setMode(uassertStatusOK(FailPoint::parseBSON(cmdObj)));
     warning() << "failpoint: " << failPointName << " set to: " << failPoint->toBSON();
 }
 
 FailPointEnableBlock::FailPointEnableBlock(const std::string& failPointName)
     : _failPointName(failPointName) {
-    _failPoint = getGlobalFailPointRegistry()->getFailPoint(failPointName);
+    _failPoint = globalFailPointRegistry().find(failPointName);
     invariant(_failPoint != nullptr);
     _failPoint->setMode(FailPoint::alwaysOn);
     warning() << "failpoint: " << failPointName << " set to: " << _failPoint->toBSON();
@@ -88,7 +73,7 @@ FailPointEnableBlock::FailPointEnableBlock(const std::string& failPointName)
 
 FailPointEnableBlock::FailPointEnableBlock(const std::string& failPointName, const BSONObj& data)
     : _failPointName(failPointName) {
-    _failPoint = getGlobalFailPointRegistry()->getFailPoint(failPointName);
+    _failPoint = globalFailPointRegistry().find(failPointName);
     invariant(_failPoint != nullptr);
     _failPoint->setMode(FailPoint::alwaysOn, 0, data);
     warning() << "failpoint: " << failPointName << " set to: " << _failPoint->toBSON();

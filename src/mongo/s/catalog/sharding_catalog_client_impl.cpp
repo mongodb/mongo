@@ -709,7 +709,7 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* opCt
     // TODO (Dianna) This fail point needs to be reexamined when CommitChunkMigration is in:
     // migrations will no longer be able to exercise it, so split or merge will need to do so.
     // SERVER-22659.
-    if (MONGO_FAIL_POINT(failApplyChunkOps)) {
+    if (MONGO_unlikely(failApplyChunkOps.shouldFail())) {
         status = Status(ErrorCodes::InternalError, "Failpoint 'failApplyChunkOps' generated error");
     }
 

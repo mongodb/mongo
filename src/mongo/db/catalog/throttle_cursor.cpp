@@ -118,7 +118,7 @@ void DataThrottle::awaitIfNeeded(OperationContext* opCtx, const int64_t dataSize
         _bytesProcessed = 0;
     }
 
-    _bytesProcessed += MONGO_FAIL_POINT(fixedCursorDataSizeOf512KBForDataThrottle)
+    _bytesProcessed += MONGO_unlikely(fixedCursorDataSizeOf512KBForDataThrottle.shouldFail())
         ? /*512KB*/ 1 * 1024 * 512
         : dataSize;
 

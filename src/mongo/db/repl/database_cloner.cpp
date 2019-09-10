@@ -178,19 +178,21 @@ Status DatabaseCloner::startup() noexcept {
             return Status(ErrorCodes::ShutdownInProgress, "database cloner completed");
     }
 
-    MONGO_FAIL_POINT_BLOCK(initialSyncHangBeforeListCollections, customArgs) {
-        const auto& data = customArgs.getData();
-        const auto databaseElem = data["database"];
-        if (!databaseElem || databaseElem.checkAndGetStringData() == _dbname) {
+    initialSyncHangBeforeListCollections.executeIf(
+        [&](const BSONObj&) {
             lk.unlock();
             log() << "initial sync - initialSyncHangBeforeListCollections fail point "
                      "enabled. Blocking until fail point is disabled.";
-            while (MONGO_FAIL_POINT(initialSyncHangBeforeListCollections) && !_isShuttingDown()) {
+            while (MONGO_unlikely(initialSyncHangBeforeListCollections.shouldFail()) &&
+                   !_isShuttingDown()) {
                 mongo::sleepsecs(1);
             }
             lk.lock();
-        }
-    }
+        },
+        [&](const BSONObj& data) {
+            const auto databaseElem = data["database"];
+            return !databaseElem || databaseElem.checkAndGetStringData() == _dbname;
+        });
 
     _stats.start = _executor->now();
     LOG(1) << "Scheduling listCollections call for database: " << _dbname;
@@ -294,16 +296,13 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
         return;
     }
 
-    MONGO_FAIL_POINT_BLOCK(initialSyncHangAfterListCollections, options) {
-        const BSONObj& data = options.getData();
-        if (data["database"].String() == _dbname) {
+    initialSyncHangAfterListCollections.executeIf(
+        [&](const BSONObj&) {
             log() << "initial sync - initialSyncHangAfterListCollections fail point "
                      "enabled. Blocking until fail point is disabled.";
-            while (MONGO_FAIL_POINT(initialSyncHangAfterListCollections)) {
-                mongo::sleepsecs(1);
-            }
-        }
-    }
+            initialSyncHangAfterListCollections.pauseWhileSet();
+        },
+        [&](const BSONObj& data) { return data["database"].String() == _dbname; });
 
     _collectionNamespaces.reserve(_collectionInfos.size());
     std::set<std::string> seen;

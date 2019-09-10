@@ -42,8 +42,8 @@
 namespace mongo {
 namespace executor {
 
-MONGO_FAIL_POINT_DECLARE(networkInterfaceDiscardCommandsBeforeAcquireConn);
-MONGO_FAIL_POINT_DECLARE(networkInterfaceDiscardCommandsAfterAcquireConn);
+extern FailPoint networkInterfaceDiscardCommandsBeforeAcquireConn;
+extern FailPoint networkInterfaceDiscardCommandsAfterAcquireConn;
 
 /**
  * Interface to networking for use by TaskExecutor implementations.

@@ -472,7 +472,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_waitForInserts(CappedInsertNotifierDa
 
 PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<BSONObj>* objOut,
                                                        RecordId* dlOut) {
-    if (MONGO_FAIL_POINT(planExecutorAlwaysFails)) {
+    if (MONGO_unlikely(planExecutorAlwaysFails.shouldFail())) {
         Status status(ErrorCodes::InternalError,
                       str::stream() << "PlanExecutor hit planExecutorAlwaysFails fail point");
         *objOut =
@@ -573,7 +573,8 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<BSONObj>* obj
             // This result didn't have the data the caller wanted, try again.
         } else if (PlanStage::NEED_YIELD == code) {
             invariant(id == WorkingSet::INVALID_ID);
-            if (!_yieldPolicy->canAutoYield() || MONGO_FAIL_POINT(skipWriteConflictRetries)) {
+            if (!_yieldPolicy->canAutoYield() ||
+                MONGO_unlikely(skipWriteConflictRetries.shouldFail())) {
                 throw WriteConflictException();
             }
 
@@ -589,10 +590,10 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<BSONObj>* obj
         } else if (PlanStage::NEED_TIME == code) {
             // Fall through to yield check at end of large conditional.
         } else if (PlanStage::IS_EOF == code) {
-            if (MONGO_FAIL_POINT(planExecutorHangBeforeShouldWaitForInserts)) {
+            if (MONGO_unlikely(planExecutorHangBeforeShouldWaitForInserts.shouldFail())) {
                 log() << "PlanExecutor - planExecutorHangBeforeShouldWaitForInserts fail point "
                          "enabled. Blocking until fail point is disabled.";
-                MONGO_FAIL_POINT_PAUSE_WHILE_SET(planExecutorHangBeforeShouldWaitForInserts);
+                planExecutorHangBeforeShouldWaitForInserts.pauseWhileSet();
             }
             if (!_shouldWaitForInserts()) {
                 return PlanExecutor::IS_EOF;

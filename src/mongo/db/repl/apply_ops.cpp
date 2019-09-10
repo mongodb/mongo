@@ -271,8 +271,8 @@ Status _applyOps(OperationContext* opCtx,
 
         (*numApplied)++;
 
-        if (MONGO_FAIL_POINT(applyOpsPauseBetweenOperations)) {
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET(applyOpsPauseBetweenOperations);
+        if (MONGO_unlikely(applyOpsPauseBetweenOperations.shouldFail())) {
+            applyOpsPauseBetweenOperations.pauseWhileSet();
         }
     }
 

@@ -38,12 +38,12 @@
 namespace mongo {
 
 // When set, simulates returning WT_PREPARE_CONFLICT on WT cursor read operations.
-MONGO_FAIL_POINT_DECLARE(WTPrepareConflictForReads);
+extern FailPoint WTPrepareConflictForReads;
 
 // When set, WT_ROLLBACK is returned in place of retrying on WT_PREPARE_CONFLICT errors.
-MONGO_FAIL_POINT_DECLARE(WTSkipPrepareConflictRetries);
+extern FailPoint WTSkipPrepareConflictRetries;
 
-MONGO_FAIL_POINT_DECLARE(WTPrintPrepareConflictLog);
+extern FailPoint WTPrintPrepareConflictLog;
 
 /**
  * Logs a message with the number of prepare conflict retry attempts.
@@ -72,8 +72,8 @@ int wiredTigerPrepareConflictRetry(OperationContext* opCtx, F&& f) {
     // error other than WT_PREPARE_CONFLICT. Reset PrepareConflictTracker accordingly.
     ON_BLOCK_EXIT([opCtx] { PrepareConflictTracker::get(opCtx).endPrepareConflict(); });
     // If the failpoint is enabled, don't call the function, just simulate a conflict.
-    int ret =
-        MONGO_FAIL_POINT(WTPrepareConflictForReads) ? WT_PREPARE_CONFLICT : WT_READ_CHECK(f());
+    int ret = MONGO_unlikely(WTPrepareConflictForReads.shouldFail()) ? WT_PREPARE_CONFLICT
+                                                                     : WT_READ_CHECK(f());
     if (ret != WT_PREPARE_CONFLICT)
         return ret;
 
@@ -85,7 +85,7 @@ int wiredTigerPrepareConflictRetry(OperationContext* opCtx, F&& f) {
     // this way are expected to be set to ignore prepare conflicts.
     invariant(!opCtx->isIgnoringInterrupts());
 
-    if (MONGO_FAIL_POINT(WTPrintPrepareConflictLog)) {
+    if (MONGO_unlikely(WTPrintPrepareConflictLog.shouldFail())) {
         wiredTigerPrepareConflictFailPointLog();
     }
 
@@ -111,7 +111,7 @@ int wiredTigerPrepareConflictRetry(OperationContext* opCtx, F&& f) {
                       str::stream() << lock.resourceId.toString() << " in " << modeName(lock.mode));
     }
 
-    if (MONGO_FAIL_POINT(WTSkipPrepareConflictRetries)) {
+    if (MONGO_unlikely(WTSkipPrepareConflictRetries.shouldFail())) {
         // Callers of wiredTigerPrepareConflictRetry() should eventually call wtRCToStatus() via
         // invariantWTOK() and have the WT_ROLLBACK error bubble up as a WriteConflictException.
         // Enabling the "skipWriteConflictRetries" failpoint in conjunction with the
@@ -124,8 +124,8 @@ int wiredTigerPrepareConflictRetry(OperationContext* opCtx, F&& f) {
         attempts++;
         auto lastCount = recoveryUnit->getSessionCache()->getPrepareCommitOrAbortCount();
         // If the failpoint is enabled, don't call the function, just simulate a conflict.
-        ret =
-            MONGO_FAIL_POINT(WTPrepareConflictForReads) ? WT_PREPARE_CONFLICT : WT_READ_CHECK(f());
+        ret = MONGO_unlikely(WTPrepareConflictForReads.shouldFail()) ? WT_PREPARE_CONFLICT
+                                                                     : WT_READ_CHECK(f());
 
         if (ret != WT_PREPARE_CONFLICT)
             return ret;

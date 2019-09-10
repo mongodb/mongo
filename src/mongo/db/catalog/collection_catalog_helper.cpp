@@ -76,7 +76,7 @@ void forEachCollectionFromDb(OperationContext* opCtx,
         if (!callback(collection))
             break;
 
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeGettingNextCollection);
+        hangBeforeGettingNextCollection.pauseWhileSet();
     }
 }
 

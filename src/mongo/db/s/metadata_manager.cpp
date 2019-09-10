@@ -145,7 +145,7 @@ void scheduleCleanup(executor::TaskExecutor* executor,
             auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
             auto opCtx = uniqueOpCtx.get();
 
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET(suspendRangeDeletion);
+            suspendRangeDeletion.pauseWhileSet();
 
             auto next = CollectionRangeDeleter::cleanUpNextRange(opCtx, nss, epoch);
             if (next) {

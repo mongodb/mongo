@@ -413,16 +413,18 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
 }
 
 void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
-    MONGO_FAIL_POINT_BLOCK(failCollectionUpdates, extraData) {
-        auto collElem = extraData.getData()["collectionNS"];
-        // If the failpoint specifies no collection or matches the existing one, fail.
-        if (!collElem || args.nss.ns() == collElem.String()) {
+    failCollectionUpdates.executeIf(
+        [&](const BSONObj&) {
             uasserted(40654,
                       str::stream() << "failCollectionUpdates failpoint enabled, namespace: "
                                     << args.nss.ns() << ", update: " << args.updateArgs.update
                                     << " on document with " << args.updateArgs.criteria);
-        }
-    }
+        },
+        [&](const BSONObj& data) {
+            // If the failpoint specifies no collection or matches the existing one, fail.
+            auto collElem = data["collectionNS"];
+            return !collElem || args.nss.ns() == collElem.String();
+        });
 
     // Do not log a no-op operation; see SERVER-21738
     if (args.updateArgs.update.isEmpty()) {

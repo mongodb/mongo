@@ -459,7 +459,7 @@ public:
 
                 Grid::get(serviceContext)->shardRegistry()->updateReplSetHosts(connStr);
 
-                if (MONGO_FAIL_POINT(failReplicaSetChangeConfigServerUpdateHook)) {
+                if (MONGO_unlikely(failReplicaSetChangeConfigServerUpdateHook.shouldFail())) {
                     return;
                 }
                 ShardRegistry::updateReplicaSetOnConfigServer(serviceContext, connStr);

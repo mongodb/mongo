@@ -171,7 +171,7 @@ Status waitForWriteConcern(OperationContext* opCtx,
 
     if (!opCtx->getClient()->isInDirectClient()) {
         // Respecting this failpoint for internal clients prevents stepup from working properly.
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeWaitingForWriteConcern);
+        hangBeforeWaitingForWriteConcern.pauseWhileSet();
     }
 
     // Next handle blocking on disk

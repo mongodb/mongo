@@ -719,7 +719,7 @@ void TransactionRouter::Router::_clearPendingParticipants(OperationContext* opCt
 }
 
 bool TransactionRouter::Router::canContinueOnStaleShardOrDbError(StringData cmdName) const {
-    if (MONGO_FAIL_POINT(enableStaleVersionAndSnapshotRetriesWithinTransactions)) {
+    if (MONGO_unlikely(enableStaleVersionAndSnapshotRetriesWithinTransactions.shouldFail())) {
         // We can always retry on the first overall statement because all targeted participants must
         // be pending, so the retry will restart the local transaction on each one, overwriting any
         // effects from the first attempt.
@@ -770,7 +770,7 @@ void TransactionRouter::Router::onViewResolutionError(OperationContext* opCtx,
 }
 
 bool TransactionRouter::Router::canContinueOnSnapshotError() const {
-    if (MONGO_FAIL_POINT(enableStaleVersionAndSnapshotRetriesWithinTransactions)) {
+    if (MONGO_unlikely(enableStaleVersionAndSnapshotRetriesWithinTransactions.shouldFail())) {
         return o().atClusterTime && o().atClusterTime->canChange(p().latestStmtId);
     }
 

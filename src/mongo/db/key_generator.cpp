@@ -76,7 +76,7 @@ KeyGenerator::KeyGenerator(std::string purpose,
 
 Status KeyGenerator::generateNewKeysIfNeeded(OperationContext* opCtx) {
 
-    if (MONGO_FAIL_POINT(disableKeyGeneration)) {
+    if (MONGO_unlikely(disableKeyGeneration.shouldFail())) {
         return {ErrorCodes::FailPointEnabled, "key generation disabled"};
     }
 

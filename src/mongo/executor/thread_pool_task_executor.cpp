@@ -420,7 +420,7 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleRemoteC
     const RemoteCommandOnAnyCallbackFn& cb,
     const BatonHandle& baton) {
 
-    if (MONGO_FAIL_POINT(initialSyncFuzzerSynchronizationPoint1)) {
+    if (MONGO_unlikely(initialSyncFuzzerSynchronizationPoint1.shouldFail())) {
         // We are only going to pause on these failpoints if the command issued is for the
         // collection cloning part of initial sync.
         const auto cmdName = request.cmdObj.firstElementFieldName();
@@ -431,11 +431,11 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleRemoteC
             log() << "Collection Cloner scheduled a remote command on the " << request.dbname
                   << " db: " << request.cmdObj;
             log() << "initialSyncFuzzerSynchronizationPoint1 fail point enabled.";
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET(initialSyncFuzzerSynchronizationPoint1);
+            initialSyncFuzzerSynchronizationPoint1.pauseWhileSet();
 
-            if (MONGO_FAIL_POINT(initialSyncFuzzerSynchronizationPoint2)) {
+            if (MONGO_unlikely(initialSyncFuzzerSynchronizationPoint2.shouldFail())) {
                 log() << "initialSyncFuzzerSynchronizationPoint2 fail point enabled.";
-                MONGO_FAIL_POINT_PAUSE_WHILE_SET(initialSyncFuzzerSynchronizationPoint2);
+                initialSyncFuzzerSynchronizationPoint2.pauseWhileSet();
             }
         }
     }
@@ -600,7 +600,7 @@ void ThreadPoolTaskExecutor::scheduleIntoPool_inlock(WorkQueue* fromQueue,
 
     lk.unlock();
 
-    if (MONGO_FAIL_POINT(scheduleIntoPoolSpinsUntilThreadPoolTaskExecutorShutsDown)) {
+    if (MONGO_unlikely(scheduleIntoPoolSpinsUntilThreadPoolTaskExecutorShutsDown.shouldFail())) {
         scheduleIntoPoolSpinsUntilThreadPoolTaskExecutorShutsDown.setMode(FailPoint::off);
 
         lk.lock();

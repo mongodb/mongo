@@ -61,20 +61,19 @@ ExecutorFuture<void> waitForMajorityWithHangFailpoint(ServiceContext* service,
         return WaitForMajorityService::get(service).waitUntilMajority(opTime).thenRunOn(executor);
     };
 
-    MONGO_FAIL_POINT_BLOCK(failpoint, fp) {
+    if (auto sfp = failpoint.scoped(); MONGO_unlikely(sfp.isActive())) {
+        const BSONObj& data = sfp.getData();
         LOG(0) << "Hit " << failPointName << " failpoint";
-        const BSONObj& data = fp.getData();
 
         // Run the hang failpoint asynchronously on a different thread to avoid self deadlocks.
         return ExecutorFuture<void>(executor).then(
             [service, &failpoint, failPointName, data, waitForWC, opTime] {
                 if (!data["useUninterruptibleSleep"].eoo()) {
-                    MONGO_FAIL_POINT_PAUSE_WHILE_SET(failpoint);
+                    failpoint.pauseWhileSet();
                 } else {
                     ThreadClient tc(failPointName, service);
                     auto opCtx = tc->makeOperationContext();
-
-                    MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx.get(), failpoint);
+                    failpoint.pauseWhileSet(opCtx.get());
                 }
 
                 return waitForWC(std::move(opTime));

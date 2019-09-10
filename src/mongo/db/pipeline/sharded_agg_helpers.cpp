@@ -425,10 +425,10 @@ std::vector<RemoteCursor> establishShardCursors(
                               appendDbVersionIfPresent(cmdObjWithShardVersion, routingInfo->db()));
     }
 
-    if (MONGO_FAIL_POINT(clusterAggregateHangBeforeEstablishingShardCursors)) {
+    if (MONGO_unlikely(clusterAggregateHangBeforeEstablishingShardCursors.shouldFail())) {
         log() << "clusterAggregateHangBeforeEstablishingShardCursors fail point enabled.  Blocking "
                  "until fail point is disabled.";
-        while (MONGO_FAIL_POINT(clusterAggregateHangBeforeEstablishingShardCursors)) {
+        while (MONGO_unlikely(clusterAggregateHangBeforeEstablishingShardCursors.shouldFail())) {
             sleepsecs(1);
         }
     }

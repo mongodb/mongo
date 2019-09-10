@@ -669,7 +669,7 @@ ExitCode _initAndListen(int listenPort) {
     }
 #endif
 
-    if (MONGO_FAIL_POINT(shutdownAtStartup)) {
+    if (MONGO_unlikely(shutdownAtStartup.shouldFail())) {
         log() << "starting clean exit via failpoint";
         exitCleanly(EXIT_CLEAN);
     }

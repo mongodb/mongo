@@ -288,7 +288,7 @@ TEST_F(ScopedTaskExecutorTest, scheduleLoseRaceWithShutdownOfUnderlying) {
                 .isOK());
     });
 
-    MONGO_FAIL_POINT_PAUSE_WHILE_SET((bfp));
+    (bfp).pauseWhileSet();
 
     shutdownUnderlying();
 

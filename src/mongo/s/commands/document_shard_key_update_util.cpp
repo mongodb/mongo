@@ -77,9 +77,9 @@ bool executeOperationsAsPartOfShardKeyUpdate(OperationContext* opCtx,
         return false;
     }
 
-    if (MONGO_FAIL_POINT(hangBeforeInsertOnUpdateShardKey)) {
+    if (MONGO_unlikely(hangBeforeInsertOnUpdateShardKey.shouldFail())) {
         log() << "Hit hangBeforeInsertOnUpdateShardKey failpoint";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangBeforeInsertOnUpdateShardKey);
+        hangBeforeInsertOnUpdateShardKey.pauseWhileSet(opCtx);
     }
 
     auto insertOpMsg = OpMsgRequest::fromDBAndBody(db, insertCmdObj);

@@ -446,7 +446,7 @@ private:
         std::error_code ec;
         size_t size;
 
-        if (MONGO_FAIL_POINT(transportLayerASIOshortOpportunisticReadWrite) &&
+        if (MONGO_unlikely(transportLayerASIOshortOpportunisticReadWrite.shouldFail()) &&
             _blockingMode == Async) {
             asio::mutable_buffer localBuffer = buffers;
 
@@ -529,7 +529,7 @@ private:
         std::error_code ec;
         std::size_t size;
 
-        if (MONGO_FAIL_POINT(transportLayerASIOshortOpportunisticReadWrite) &&
+        if (MONGO_unlikely(transportLayerASIOshortOpportunisticReadWrite.shouldFail()) &&
             _blockingMode == Async) {
             asio::const_buffer localBuffer = buffers;
 

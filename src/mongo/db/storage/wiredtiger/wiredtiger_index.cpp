@@ -1125,7 +1125,7 @@ protected:
                 std::memcmp(_key.getBuffer(), item.data, std::min(_key.getSize(), item.size));
             bool nextNotIncreasing = cmp > 0 || (cmp == 0 && _key.getSize() > item.size);
 
-            if (MONGO_FAIL_POINT(WTEmulateOutOfOrderNextIndexKey)) {
+            if (MONGO_unlikely(WTEmulateOutOfOrderNextIndexKey.shouldFail())) {
                 log() << "WTIndex::updatePosition simulating next key not increasing.";
                 nextNotIncreasing = true;
             }

@@ -69,11 +69,11 @@ class ServiceEntryPoint;
 namespace transport {
 
 // This fail point simulates reads and writes that always return 1 byte and fail with EAGAIN
-MONGO_FAIL_POINT_DECLARE(transportLayerASIOshortOpportunisticReadWrite);
+extern FailPoint transportLayerASIOshortOpportunisticReadWrite;
 
 // This fail point will cause an asyncConnect to timeout after it's successfully connected
 // to the remote peer
-MONGO_FAIL_POINT_DECLARE(transportLayerASIOasyncConnectTimesOut);
+extern FailPoint transportLayerASIOasyncConnectTimesOut;
 
 /**
  * A TransportLayer implementation based on ASIO networking primitives.

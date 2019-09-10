@@ -90,7 +90,7 @@ Status PlanYieldPolicy::yieldOrInterrupt(std::function<void()> whileYieldingFn) 
         invariant(opCtx);
         // If the 'setInterruptOnlyPlansCheckForInterruptHang' fail point is enabled, set the 'msg'
         // field of this operation's CurOp to signal that we've hit this point.
-        if (MONGO_FAIL_POINT(setInterruptOnlyPlansCheckForInterruptHang)) {
+        if (MONGO_unlikely(setInterruptOnlyPlansCheckForInterruptHang.shouldFail())) {
             CurOpFailpointHelpers::waitWhileFailPointEnabled(
                 &setInterruptOnlyPlansCheckForInterruptHang,
                 opCtx,
@@ -183,20 +183,17 @@ void PlanYieldPolicy::_yieldAllLocks(OperationContext* opCtx,
     // Track the number of yields in CurOp.
     CurOp::get(opCtx)->yielded();
 
-    MONGO_FAIL_POINT_BLOCK(setYieldAllLocksHang, config) {
-        StringData ns{config.getData().getStringField("namespace")};
-        if (ns.empty() || ns == planExecNS.ns()) {
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET(setYieldAllLocksHang);
-        }
-    }
-
-    MONGO_FAIL_POINT_BLOCK(setYieldAllLocksWait, customWait) {
-        const BSONObj& data = customWait.getData();
-        BSONElement customWaitNS = data["namespace"];
-        if (!customWaitNS || planExecNS.ns() == customWaitNS.str()) {
-            sleepFor(Milliseconds(data["waitForMillis"].numberInt()));
-        }
-    }
+    setYieldAllLocksHang.executeIf([](auto&&) { setYieldAllLocksHang.pauseWhileSet(); },
+                                   [&](const BSONObj& config) {
+                                       StringData ns = config.getStringField("namespace");
+                                       return ns.empty() || ns == planExecNS.ns();
+                                   });
+    setYieldAllLocksWait.executeIf(
+        [&](const BSONObj& data) { sleepFor(Milliseconds(data["waitForMillis"].numberInt())); },
+        [&](const BSONObj& config) {
+            BSONElement dataNs = config["namespace"];
+            return !dataNs || planExecNS.ns() == dataNs.str();
+        });
 
     if (whileYieldingFn) {
         whileYieldingFn();

@@ -1663,7 +1663,7 @@ void WiredTigerKVEngine::setOldestTimestampFromStable() {
 
     // Set the oldest timestamp to the stable timestamp to ensure that there is no lag window
     // between the two.
-    if (MONGO_FAIL_POINT(WTSetOldestTSToStableTS)) {
+    if (MONGO_unlikely(WTSetOldestTSToStableTS.shouldFail())) {
         setOldestTimestamp(stableTimestamp, false);
         return;
     }
@@ -1681,7 +1681,7 @@ void WiredTigerKVEngine::setOldestTimestampFromStable() {
 }
 
 void WiredTigerKVEngine::setOldestTimestamp(Timestamp newOldestTimestamp, bool force) {
-    if (MONGO_FAIL_POINT(WTPreserveSnapshotHistoryIndefinitely)) {
+    if (MONGO_unlikely(WTPreserveSnapshotHistoryIndefinitely.shouldFail())) {
         return;
     }
 

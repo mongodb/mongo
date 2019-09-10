@@ -355,7 +355,7 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
                                             std::set<ShardId>* usedShards) {
     vector<MigrateInfo> migrations;
 
-    if (MONGO_FAIL_POINT(balancerShouldReturnRandomMigrations) &&
+    if (MONGO_unlikely(balancerShouldReturnRandomMigrations.shouldFail()) &&
         !distribution.nss().isConfigDB()) {
         LOG(1) << "balancerShouldReturnRandomMigrations failpoint is set";
 

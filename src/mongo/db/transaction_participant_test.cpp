@@ -848,7 +848,7 @@ TEST_F(TxnParticipantTest, UnstashFailsShouldLeaveTxnResourceStashUnchanged) {
     ASSERT_FALSE(txnParticipant.getTxnResourceStashLockerForTest()->isLocked());
 
     // Enable fail point.
-    getGlobalFailPointRegistry()->getFailPoint("restoreLocksFail")->setMode(FailPoint::alwaysOn);
+    globalFailPointRegistry().find("restoreLocksFail")->setMode(FailPoint::alwaysOn);
 
     ASSERT_THROWS_CODE(txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction"),
                        AssertionException,
@@ -858,7 +858,7 @@ TEST_F(TxnParticipantTest, UnstashFailsShouldLeaveTxnResourceStashUnchanged) {
     ASSERT_FALSE(txnParticipant.getTxnResourceStashLockerForTest()->isLocked());
 
     // Disable fail point.
-    getGlobalFailPointRegistry()->getFailPoint("restoreLocksFail")->setMode(FailPoint::off);
+    globalFailPointRegistry().find("restoreLocksFail")->setMode(FailPoint::off);
 
     // Should be successfully able to perform lock restore.
     txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");

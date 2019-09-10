@@ -205,7 +205,7 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* ses
             }
         }
 
-        while (!_shuttingDown && MONGO_FAIL_POINT(WTPausePrimaryOplogDurabilityLoop)) {
+        while (!_shuttingDown && MONGO_unlikely(WTPausePrimaryOplogDurabilityLoop.shouldFail())) {
             lk.unlock();
             sleepmillis(10);
             lk.lock();

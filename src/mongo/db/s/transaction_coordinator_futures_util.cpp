@@ -95,9 +95,9 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
             AuthorizationSession::get(opCtx->getClient())
                 ->grantInternalAuthorization(opCtx->getClient());
 
-            if (MONGO_FAIL_POINT(hangWhileTargetingLocalHost)) {
+            if (MONGO_unlikely(hangWhileTargetingLocalHost.shouldFail())) {
                 LOG(0) << "Hit hangWhileTargetingLocalHost failpoint";
-                MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangWhileTargetingLocalHost);
+                hangWhileTargetingLocalHost.pauseWhileSet(opCtx);
             }
 
             const auto service = opCtx->getServiceContext();
@@ -231,9 +231,9 @@ Future<AsyncWorkScheduler::HostAndShard> AsyncWorkScheduler::_targetHostAsync(
         const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
         const auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
 
-        if (MONGO_FAIL_POINT(hangWhileTargetingRemoteHost)) {
+        if (MONGO_unlikely(hangWhileTargetingRemoteHost.shouldFail())) {
             LOG(0) << "Hit hangWhileTargetingRemoteHost failpoint for shard " << shardId;
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangWhileTargetingRemoteHost);
+            hangWhileTargetingRemoteHost.pauseWhileSet(opCtx);
         }
 
         // TODO (SERVER-35678): Return a SemiFuture<HostAndShard> rather than using a blocking call

@@ -214,7 +214,7 @@ public:
                 str::stream() << "Invalid target namespace: " << toNss.ns(),
                 toNss.isValid());
 
-        if (MONGO_FAIL_POINT(useRenameCollectionPathThroughConfigsvr)) {
+        if (MONGO_unlikely(useRenameCollectionPathThroughConfigsvr.shouldFail())) {
             bool dropTarget = cmdObj["dropTarget"].trueValue();
             bool stayTemp = cmdObj["stayTemp"].trueValue();
 

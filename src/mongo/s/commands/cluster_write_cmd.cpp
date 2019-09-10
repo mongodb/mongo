@@ -204,10 +204,9 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
     bool updatedShardKey = false;
     boost::optional<BSONObj> upsertedId;
     if (isRetryableWrite) {
-        if (MONGO_FAIL_POINT(hangAfterThrowWouldChangeOwningShardRetryableWrite)) {
+        if (MONGO_unlikely(hangAfterThrowWouldChangeOwningShardRetryableWrite.shouldFail())) {
             log() << "Hit hangAfterThrowWouldChangeOwningShardRetryableWrite failpoint";
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
-                opCtx, hangAfterThrowWouldChangeOwningShardRetryableWrite);
+            hangAfterThrowWouldChangeOwningShardRetryableWrite.pauseWhileSet(opCtx);
         }
         RouterOperationContextSession routerSession(opCtx);
         try {

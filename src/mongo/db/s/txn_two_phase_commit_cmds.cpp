@@ -134,8 +134,8 @@ public:
                                   << opCtx->recoveryUnit()->getPrepareTimestamp().toString()
                                   << " participant prepareOpTime: " << prepareOpTime.toString());
 
-                if (MONGO_FAIL_POINT(
-                        participantReturnNetworkErrorForPrepareAfterExecutingPrepareLogic)) {
+                if (MONGO_unlikely(participantReturnNetworkErrorForPrepareAfterExecutingPrepareLogic
+                                       .shouldFail())) {
                     uasserted(ErrorCodes::HostUnreachable,
                               "returning network error because failpoint is on");
                 }
@@ -143,8 +143,8 @@ public:
             }
 
             const auto prepareTimestamp = txnParticipant.prepareTransaction(opCtx, {});
-            if (MONGO_FAIL_POINT(
-                    participantReturnNetworkErrorForPrepareAfterExecutingPrepareLogic)) {
+            if (MONGO_unlikely(participantReturnNetworkErrorForPrepareAfterExecutingPrepareLogic
+                                   .shouldFail())) {
                 uasserted(ErrorCodes::HostUnreachable,
                           "returning network error because failpoint is on");
             }
@@ -234,10 +234,9 @@ public:
                                         *opCtx->getTxnNumber(),
                                         validateParticipants(opCtx, cmd.getParticipants()));
 
-            if (MONGO_FAIL_POINT(hangAfterStartingCoordinateCommit)) {
+            if (MONGO_unlikely(hangAfterStartingCoordinateCommit.shouldFail())) {
                 LOG(0) << "Hit hangAfterStartingCoordinateCommit failpoint";
-                MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
-                                                                hangAfterStartingCoordinateCommit);
+                hangAfterStartingCoordinateCommit.pauseWhileSet(opCtx);
             }
 
             ON_BLOCK_EXIT([opCtx] {

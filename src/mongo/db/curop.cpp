@@ -247,7 +247,7 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
                                      bool backtraceMode,
                                      BSONObjBuilder* infoBuilder) {
     invariant(client);
-    if (MONGO_FAIL_POINT(keepDiagnosticCaptureOnFailedLock)) {
+    if (MONGO_unlikely(keepDiagnosticCaptureOnFailedLock.shouldFail())) {
         gHangLock.lock.lock();
         try {
             stdx::lock_guard testLock(gHangLock.mutex);
@@ -336,7 +336,7 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
         }
     }
 
-    if (MONGO_FAIL_POINT(keepDiagnosticCaptureOnFailedLock)) {
+    if (MONGO_unlikely(keepDiagnosticCaptureOnFailedLock.shouldFail())) {
         gHangLock.lock.unlock();
     }
 }

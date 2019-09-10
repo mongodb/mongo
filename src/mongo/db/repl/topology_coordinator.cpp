@@ -208,8 +208,8 @@ HostAndPort TopologyCoordinator::chooseNewSyncSource(Date_t now,
         return HostAndPort();
     }
 
-    MONGO_FAIL_POINT_BLOCK(forceSyncSourceCandidate, customArgs) {
-        const auto& data = customArgs.getData();
+    if (auto sfp = forceSyncSourceCandidate.scoped(); MONGO_unlikely(sfp.isActive())) {
+        const auto& data = sfp.getData();
         const auto hostAndPortElem = data["hostAndPort"];
         if (!hostAndPortElem) {
             severe() << "'forceSyncSoureCandidate' parameter set with invalid host and port: "
@@ -2659,7 +2659,7 @@ bool TopologyCoordinator::shouldChangeSyncSource(
         return true;
     }
 
-    if (MONGO_FAIL_POINT(disableMaxSyncSourceLagSecs)) {
+    if (MONGO_unlikely(disableMaxSyncSourceLagSecs.shouldFail())) {
         log() << "disableMaxSyncSourceLagSecs fail point enabled - not checking the most recent "
                  "OpTime, "
               << currentSourceOpTime.toString() << ", of our current sync source, " << currentSource

@@ -147,7 +147,7 @@ sharded_agg_helpers::DispatchShardPipelineResults dispatchExchangeConsumerPipeli
     invariant(!litePipe.hasChangeStream());
     auto opCtx = expCtx->opCtx;
 
-    if (MONGO_FAIL_POINT(clusterAggregateFailToDispatchExchangeConsumerPipeline)) {
+    if (MONGO_unlikely(clusterAggregateFailToDispatchExchangeConsumerPipeline.shouldFail())) {
         log() << "clusterAggregateFailToDispatchExchangeConsumerPipeline fail point enabled.";
         uasserted(ErrorCodes::FailPointEnabled,
                   "Asserting on exhange consumer pipeline dispatch due to failpoint.");
@@ -300,7 +300,7 @@ AsyncRequestsSender::Response establishMergingShardCursor(OperationContext* opCt
                                                           const AggregationRequest& request,
                                                           const BSONObj mergeCmdObj,
                                                           const ShardId& mergingShardId) {
-    if (MONGO_FAIL_POINT(clusterAggregateFailToEstablishMergingShardCursor)) {
+    if (MONGO_unlikely(clusterAggregateFailToEstablishMergingShardCursor.shouldFail())) {
         log() << "clusterAggregateFailToEstablishMergingShardCursor fail point enabled.";
         uasserted(ErrorCodes::FailPointEnabled,
                   "Asserting on establishing merging shard cursor due to failpoint.");

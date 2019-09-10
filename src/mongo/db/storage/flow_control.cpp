@@ -294,8 +294,8 @@ int FlowControl::getNumTickets() {
     // Flow Control is only enabled on nodes that can accept writes.
     const bool canAcceptWrites = _replCoord->canAcceptNonLocalWrites();
 
-    MONGO_FAIL_POINT_BLOCK(flowControlTicketOverride, failpointObj) {
-        int numTickets = failpointObj.getData().getIntField("numTickets");
+    if (auto sfp = flowControlTicketOverride.scoped(); MONGO_unlikely(sfp.isActive())) {
+        int numTickets = sfp.getData().getIntField("numTickets");
         if (numTickets > 0 && canAcceptWrites) {
             return numTickets;
         }

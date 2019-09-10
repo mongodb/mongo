@@ -621,7 +621,7 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(HostAndPort peer,
             return makeConnectError(status, connector->peer, connector->resolvedEndpoint);
         })
         .getAsync([connector](Status connectResult) {
-            if (MONGO_FAIL_POINT(transportLayerASIOasyncConnectTimesOut)) {
+            if (MONGO_unlikely(transportLayerASIOasyncConnectTimesOut.shouldFail())) {
                 log() << "asyncConnectTimesOut fail point is active. simulating timeout.";
                 return;
             }

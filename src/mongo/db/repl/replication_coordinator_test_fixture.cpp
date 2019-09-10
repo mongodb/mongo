@@ -86,9 +86,7 @@ ReplCoordTest::ReplCoordTest() {
 }
 
 ReplCoordTest::~ReplCoordTest() {
-    getGlobalFailPointRegistry()
-        ->getFailPoint("blockHeartbeatReconfigFinish")
-        ->setMode(FailPoint::off);
+    globalFailPointRegistry().find("blockHeartbeatReconfigFinish")->setMode(FailPoint::off);
 
     if (_callShutdown) {
         auto opCtx = makeOperationContext();

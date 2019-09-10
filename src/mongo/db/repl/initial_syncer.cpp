@@ -542,7 +542,7 @@ void InitialSyncer::_chooseSyncSourceCallback(
         return;
     }
 
-    if (MONGO_FAIL_POINT(failInitialSyncWithBadHost)) {
+    if (MONGO_unlikely(failInitialSyncWithBadHost.shouldFail())) {
         status = Status(ErrorCodes::InvalidSyncSource,
                         "initial sync failed - failInitialSyncWithBadHost failpoint is set.");
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
@@ -580,12 +580,13 @@ void InitialSyncer::_chooseSyncSourceCallback(
         return;
     }
 
-    if (MONGO_FAIL_POINT(initialSyncHangBeforeCreatingOplog)) {
+    if (MONGO_unlikely(initialSyncHangBeforeCreatingOplog.shouldFail())) {
         // This log output is used in js tests so please leave it.
         log() << "initial sync - initialSyncHangBeforeCreatingOplog fail point "
                  "enabled. Blocking until fail point is disabled.";
         lock.unlock();
-        while (MONGO_FAIL_POINT(initialSyncHangBeforeCreatingOplog) && !_isShuttingDown()) {
+        while (MONGO_unlikely(initialSyncHangBeforeCreatingOplog.shouldFail()) &&
+               !_isShuttingDown()) {
             mongo::sleepsecs(1);
         }
         lock.lock();
@@ -953,14 +954,15 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
         return;
     }
 
-    if (MONGO_FAIL_POINT(initialSyncHangBeforeCopyingDatabases)) {
+    if (MONGO_unlikely(initialSyncHangBeforeCopyingDatabases.shouldFail())) {
         lock.unlock();
         // This could have been done with a scheduleWorkAt but this is used only by JS tests where
         // we run with multiple threads so it's fine to spin on this thread.
         // This log output is used in js tests so please leave it.
         log() << "initial sync - initialSyncHangBeforeCopyingDatabases fail point "
                  "enabled. Blocking until fail point is disabled.";
-        while (MONGO_FAIL_POINT(initialSyncHangBeforeCopyingDatabases) && !_isShuttingDown()) {
+        while (MONGO_unlikely(initialSyncHangBeforeCopyingDatabases.shouldFail()) &&
+               !_isShuttingDown()) {
             mongo::sleepsecs(1);
         }
         lock.lock();
@@ -1026,13 +1028,13 @@ void InitialSyncer::_databasesClonerCallback(const Status& databaseClonerFinishS
     log() << "Finished cloning data: " << redact(databaseClonerFinishStatus)
           << ". Beginning oplog replay.";
 
-    if (MONGO_FAIL_POINT(initialSyncHangAfterDataCloning)) {
+    if (MONGO_unlikely(initialSyncHangAfterDataCloning.shouldFail())) {
         // This could have been done with a scheduleWorkAt but this is used only by JS tests where
         // we run with multiple threads so it's fine to spin on this thread.
         // This log output is used in js tests so please leave it.
         log() << "initial sync - initialSyncHangAfterDataCloning fail point "
                  "enabled. Blocking until fail point is disabled.";
-        while (MONGO_FAIL_POINT(initialSyncHangAfterDataCloning) && !_isShuttingDown()) {
+        while (MONGO_unlikely(initialSyncHangAfterDataCloning.shouldFail()) && !_isShuttingDown()) {
             mongo::sleepsecs(1);
         }
     }
@@ -1147,22 +1149,22 @@ void InitialSyncer::_getNextApplierBatchCallback(
 
     // Set and unset by the InitialSyncTest fixture to cause initial sync to pause so that the
     // Initial Sync Fuzzer can run commands on the sync source.
-    if (MONGO_FAIL_POINT(initialSyncFuzzerSynchronizationPoint1)) {
+    if (MONGO_unlikely(initialSyncFuzzerSynchronizationPoint1.shouldFail())) {
         log() << "Initial Syncer is about to apply the next oplog batch of size: "
               << batchResult.getValue().size();
         log() << "initialSyncFuzzerSynchronizationPoint1 fail point enabled.";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(initialSyncFuzzerSynchronizationPoint1);
+        initialSyncFuzzerSynchronizationPoint1.pauseWhileSet();
     }
 
-    if (MONGO_FAIL_POINT(initialSyncFuzzerSynchronizationPoint2)) {
+    if (MONGO_unlikely(initialSyncFuzzerSynchronizationPoint2.shouldFail())) {
         log() << "initialSyncFuzzerSynchronizationPoint2 fail point enabled.";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(initialSyncFuzzerSynchronizationPoint2);
+        initialSyncFuzzerSynchronizationPoint2.pauseWhileSet();
     }
 
-    if (MONGO_FAIL_POINT(failInitialSyncBeforeApplyingBatch)) {
+    if (MONGO_unlikely(failInitialSyncBeforeApplyingBatch.shouldFail())) {
         log() << "initial sync - failInitialSyncBeforeApplyingBatch fail point enabled. Pausing"
               << "until fail point is disabled, then will fail initial sync.";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(failInitialSyncBeforeApplyingBatch);
+        failInitialSyncBeforeApplyingBatch.pauseWhileSet();
         status = Status(ErrorCodes::CallbackCanceled,
                         "failInitialSyncBeforeApplyingBatch fail point enabled");
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
@@ -1236,7 +1238,7 @@ void InitialSyncer::_multiApplierCallback(const Status& multiApplierStatus,
 
     // Set to cause initial sync to fassert instead of restart if applying a batch fails, so that
     // tests can be robust to network errors but not oplog idempotency errors.
-    if (MONGO_FAIL_POINT(initialSyncFassertIfApplyingBatchFails)) {
+    if (MONGO_unlikely(initialSyncFassertIfApplyingBatchFails.shouldFail())) {
         log() << "initialSyncFassertIfApplyingBatchFails fail point enabled.";
         fassert(31210, status);
     }
@@ -1325,9 +1327,9 @@ void InitialSyncer::_finishInitialSyncAttempt(const StatusWith<OpTimeAndWallTime
     _stats.initialSyncAttemptInfos.emplace_back(
         InitialSyncer::InitialSyncAttemptInfo{runTime, result.getStatus(), _syncSource});
 
-    if (MONGO_FAIL_POINT(failAndHangInitialSync)) {
+    if (MONGO_unlikely(failAndHangInitialSync.shouldFail())) {
         log() << "failAndHangInitialSync fail point enabled.";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(failAndHangInitialSync);
+        failAndHangInitialSync.pauseWhileSet();
         result = Status(ErrorCodes::InternalError, "failAndHangInitialSync fail point enabled");
     }
 
@@ -1399,11 +1401,11 @@ void InitialSyncer::_finishCallback(StatusWith<OpTimeAndWallTime> lastApplied) {
         std::swap(_onCompletion, onCompletion);
     }
 
-    if (MONGO_FAIL_POINT(initialSyncHangBeforeFinish)) {
+    if (MONGO_unlikely(initialSyncHangBeforeFinish.shouldFail())) {
         // This log output is used in js tests so please leave it.
         log() << "initial sync - initialSyncHangBeforeFinish fail point "
                  "enabled. Blocking until fail point is disabled.";
-        while (MONGO_FAIL_POINT(initialSyncHangBeforeFinish) && !_isShuttingDown()) {
+        while (MONGO_unlikely(initialSyncHangBeforeFinish.shouldFail()) && !_isShuttingDown()) {
             mongo::sleepsecs(1);
         }
     }
@@ -1428,7 +1430,7 @@ void InitialSyncer::_finishCallback(StatusWith<OpTimeAndWallTime> lastApplied) {
 
     // Clear the initial sync progress after an initial sync attempt has been successfully
     // completed.
-    if (lastApplied.isOK() && !MONGO_FAIL_POINT(skipClearInitialSyncState)) {
+    if (lastApplied.isOK() && !MONGO_unlikely(skipClearInitialSyncState.shouldFail())) {
         _initialSyncState.reset();
     }
 }
@@ -1628,7 +1630,7 @@ StatusWith<Operations> InitialSyncer::_getNextApplierBatch_inlock() {
     // If the fail-point is active, delay the apply batch by returning an empty batch so that
     // _getNextApplierBatchCallback() will reschedule itself at a later time.
     // See InitialSyncerOptions::getApplierBatchCallbackRetryWait.
-    if (MONGO_FAIL_POINT(rsSyncApplyStop)) {
+    if (MONGO_unlikely(rsSyncApplyStop.shouldFail())) {
         return Operations();
     }
 

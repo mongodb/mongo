@@ -265,13 +265,9 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
             }
         }
 
-        MONGO_FAIL_POINT_BLOCK(maxKeyRefreshWaitTimeOverrideMS, data) {
-            const BSONObj& dataObj = data.getData();
-            auto overrideMS = Milliseconds(dataObj["overrideMS"].numberInt());
-            if (nextWakeup > overrideMS) {
-                nextWakeup = overrideMS;
-            }
-        }
+        maxKeyRefreshWaitTimeOverrideMS.execute([&](const BSONObj& data) {
+            nextWakeup = std::min(nextWakeup, Milliseconds(data["overrideMS"].numberInt()));
+        });
 
         stdx::unique_lock<stdx::mutex> lock(_mutex);
 

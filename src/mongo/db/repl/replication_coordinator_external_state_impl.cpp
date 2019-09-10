@@ -881,12 +881,12 @@ void ReplicationCoordinatorExternalStateImpl::notifyOplogMetadataWaiters(
             scheduleWork(
                 _taskExecutor.get(),
                 [committedOpTime, reaper](const executor::TaskExecutor::CallbackArgs& args) {
-                    if (MONGO_FAIL_POINT(dropPendingCollectionReaperHang)) {
+                    if (MONGO_unlikely(dropPendingCollectionReaperHang.shouldFail())) {
                         log() << "fail point dropPendingCollectionReaperHang enabled. "
                                  "Blocking until fail point is disabled. "
                                  "committedOpTime: "
                               << committedOpTime;
-                        MONGO_FAIL_POINT_PAUSE_WHILE_SET(dropPendingCollectionReaperHang);
+                        dropPendingCollectionReaperHang.pauseWhileSet();
                     }
                     auto opCtx = cc().makeOperationContext();
                     reaper->dropCollectionsOlderThan(opCtx.get(), committedOpTime);

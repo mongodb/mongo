@@ -88,10 +88,9 @@ void dropChunksIfEpochChanged(OperationContext* opCtx,
         // table cache.
         dropChunks(opCtx, nss);
 
-        if (MONGO_FAIL_POINT(hangPersistCollectionAndChangedChunksAfterDropChunks)) {
+        if (MONGO_unlikely(hangPersistCollectionAndChangedChunksAfterDropChunks.shouldFail())) {
             log() << "Hit hangPersistCollectionAndChangedChunksAfterDropChunks failpoint";
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
-                opCtx, hangPersistCollectionAndChangedChunksAfterDropChunks);
+            hangPersistCollectionAndChangedChunksAfterDropChunks.pauseWhileSet(opCtx);
         }
     }
 }

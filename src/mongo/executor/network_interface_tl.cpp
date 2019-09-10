@@ -286,7 +286,7 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
             }
         });
 
-    if (MONGO_FAIL_POINT(networkInterfaceDiscardCommandsBeforeAcquireConn)) {
+    if (MONGO_unlikely(networkInterfaceDiscardCommandsBeforeAcquireConn.shouldFail())) {
         log() << "Discarding command due to failpoint before acquireConn";
         return Status::OK();
     }
@@ -311,7 +311,7 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
         // We have a connection and the command hasn't already been attempted
         cmdState->request.emplace(cmdState->requestOnAny, idx);
 
-        if (MONGO_FAIL_POINT(networkInterfaceDiscardCommandsAfterAcquireConn)) {
+        if (MONGO_unlikely(networkInterfaceDiscardCommandsAfterAcquireConn.shouldFail())) {
             log() << "Discarding command due to failpoint after acquireConn";
             return Status::OK();
         }

@@ -73,7 +73,7 @@ MONGO_INITIALIZER(LockActions)(InitializerContext* context) {
             DiagnosticInfo::Diagnostic::clearDiagnostic();
         }
         void onFailedLock() override {
-            if (!MONGO_FAIL_POINT(keepDiagnosticCaptureOnFailedLock)) {
+            if (!MONGO_unlikely(keepDiagnosticCaptureOnFailedLock.shouldFail())) {
                 DiagnosticInfo::Diagnostic::clearDiagnostic();
             }
         }

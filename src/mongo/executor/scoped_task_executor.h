@@ -107,9 +107,9 @@ private:
     std::shared_ptr<TaskExecutor> _executor;
 };
 
-MONGO_FAIL_POINT_DECLARE(ScopedTaskExecutorHangBeforeSchedule);
-MONGO_FAIL_POINT_DECLARE(ScopedTaskExecutorHangExitBeforeSchedule);
-MONGO_FAIL_POINT_DECLARE(ScopedTaskExecutorHangAfterSchedule);
+extern FailPoint ScopedTaskExecutorHangBeforeSchedule;
+extern FailPoint ScopedTaskExecutorHangExitBeforeSchedule;
+extern FailPoint ScopedTaskExecutorHangAfterSchedule;
 
 }  // namespace executor
 }  // namespace mongo

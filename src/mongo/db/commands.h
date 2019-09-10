@@ -54,8 +54,8 @@
 
 namespace mongo {
 
-MONGO_FAIL_POINT_DECLARE(failCommand);
-MONGO_FAIL_POINT_DECLARE(waitInCommandMarkKillOnClientDisconnect);
+extern FailPoint failCommand;
+extern FailPoint waitInCommandMarkKillOnClientDisconnect;
 
 class Command;
 class CommandInvocation;

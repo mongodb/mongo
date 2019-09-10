@@ -53,13 +53,14 @@
  * conflict exception if the WTWriteConflictException failpoint is enabled. This is only checked
  * on cursor methods that make modifications.
  */
-#define WT_OP_CHECK(x) (((MONGO_FAIL_POINT(WTWriteConflictException))) ? (WT_ROLLBACK) : (x))
+#define WT_OP_CHECK(x) \
+    (((MONGO_unlikely(WTWriteConflictException.shouldFail()))) ? (WT_ROLLBACK) : (x))
 
 /**
  * Identical to WT_OP_CHECK except this is checked on cursor seeks/advancement.
  */
 #define WT_READ_CHECK(x) \
-    (((MONGO_FAIL_POINT(WTWriteConflictExceptionForReads))) ? (WT_ROLLBACK) : (x))
+    (((MONGO_unlikely(WTWriteConflictExceptionForReads.shouldFail()))) ? (WT_ROLLBACK) : (x))
 
 namespace mongo {
 
@@ -520,11 +521,11 @@ private:
 
 
 // WT failpoint to throw write conflict exceptions randomly
-MONGO_FAIL_POINT_DECLARE(WTWriteConflictException);
-MONGO_FAIL_POINT_DECLARE(WTWriteConflictExceptionForReads);
+extern FailPoint WTWriteConflictException;
+extern FailPoint WTWriteConflictExceptionForReads;
 
 // Prevents oplog writes from being considered durable on the primary. Once activated, new writes
 // will not be considered durable until deactivated. It is unspecified whether writes that commit
 // before activation will become visible while active.
-MONGO_FAIL_POINT_DECLARE(WTPausePrimaryOplogDurabilityLoop);
+extern FailPoint WTPausePrimaryOplogDurabilityLoop;
 }  // namespace mongo

@@ -184,7 +184,7 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
             return;
         }
 
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterInitializingIndexBuild);
+        hangAfterInitializingIndexBuild.pauseWhileSet();
 
         auto opCtx = Client::getCurrent()->makeOperationContext();
 

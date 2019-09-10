@@ -267,7 +267,7 @@ Status _collModInternal(OperationContext* opCtx,
     Database* const db = autoDb.getDb();
     Collection* coll = db ? db->getCollection(opCtx, nss) : nullptr;
 
-    MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterDatabaseLock);
+    hangAfterDatabaseLock.pauseWhileSet();
 
     // May also modify a view instead of a collection.
     boost::optional<ViewDefinition> view;
@@ -370,7 +370,7 @@ Status _collModInternal(OperationContext* opCtx,
                 opCtx->recoveryUnit()->registerChange(
                     std::make_unique<CollModResultChange>(oldExpireSecs, newExpireSecs, result));
 
-                if (MONGO_FAIL_POINT(assertAfterIndexUpdate)) {
+                if (MONGO_unlikely(assertAfterIndexUpdate.shouldFail())) {
                     log() << "collMod - assertAfterIndexUpdate fail point enabled.";
                     uasserted(50970, "trigger rollback after the index update");
                 }

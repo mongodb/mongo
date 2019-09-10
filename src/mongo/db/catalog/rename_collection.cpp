@@ -102,7 +102,7 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
                                     << target);
 
     // TODO: SERVER-42638 Replace checks of cm() with cm()->distributionMode() == sharded
-    if (!MONGO_FAIL_POINT(useRenameCollectionPathThroughConfigsvr)) {
+    if (!MONGO_unlikely(useRenameCollectionPathThroughConfigsvr.shouldFail())) {
         if (isCollectionSharded(opCtx, source))
             return {ErrorCodes::IllegalOperation, "source namespace cannot be sharded"};
     }
@@ -470,7 +470,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
     }
 
     // TODO: SERVER-42638 Replace checks of cm() with cm()->distributionMode() == sharded
-    if (!MONGO_FAIL_POINT(useRenameCollectionPathThroughConfigsvr)) {
+    if (!MONGO_unlikely(useRenameCollectionPathThroughConfigsvr.shouldFail())) {
         if (isCollectionSharded(opCtx, source))
             return {ErrorCodes::IllegalOperation, "source namespace cannot be sharded"};
     }
@@ -675,7 +675,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
                         opCtx, "retryRestoreCursor", ns, [&cursor] { cursor->restore(); });
                 });
                 // Used to make sure that a WCE can be handled by this logic without data loss.
-                if (MONGO_FAIL_POINT(writeConflictInRenameCollCopyToTmp)) {
+                if (MONGO_unlikely(writeConflictInRenameCollCopyToTmp.shouldFail())) {
                     throw WriteConflictException();
                 }
                 wunit.commit();

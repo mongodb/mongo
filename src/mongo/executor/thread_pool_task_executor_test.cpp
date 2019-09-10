@@ -215,11 +215,11 @@ TEST_F(ThreadPoolExecutorTest, ShutdownAndScheduleWorkRaceDoesNotCrash) {
                   })
                   .getStatus());
 
-    auto fpTPTE1 = getGlobalFailPointRegistry()->getFailPoint(
-        "scheduleIntoPoolSpinsUntilThreadPoolTaskExecutorShutsDown");
+    auto fpTPTE1 =
+        globalFailPointRegistry().find("scheduleIntoPoolSpinsUntilThreadPoolTaskExecutorShutsDown");
     fpTPTE1->setMode(FailPoint::alwaysOn);
     barrier.countDownAndWait();
-    MONGO_FAIL_POINT_PAUSE_WHILE_SET((*fpTPTE1));
+    (*fpTPTE1).pauseWhileSet();
     executor.shutdown();
     executor.join();
     ASSERT_OK(status1);
@@ -247,11 +247,11 @@ TEST_F(ThreadPoolExecutorTest, ShutdownAndScheduleRaceDoesNotCrash) {
         amRunningRecursively = false;
     });
 
-    auto fpTPTE1 = getGlobalFailPointRegistry()->getFailPoint(
-        "scheduleIntoPoolSpinsUntilThreadPoolTaskExecutorShutsDown");
+    auto fpTPTE1 =
+        globalFailPointRegistry().find("scheduleIntoPoolSpinsUntilThreadPoolTaskExecutorShutsDown");
     fpTPTE1->setMode(FailPoint::alwaysOn);
     barrier.countDownAndWait();
-    MONGO_FAIL_POINT_PAUSE_WHILE_SET((*fpTPTE1));
+    (*fpTPTE1).pauseWhileSet();
     executor.shutdown();
     executor.join();
     ASSERT_OK(status1);

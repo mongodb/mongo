@@ -3495,7 +3495,7 @@ TEST_F(
 
     // Enable 'rsSyncApplyStop' so that _getNextApplierBatch_inlock() returns an empty batch of
     // operations instead of a batch containing an oplog entry with a bad version.
-    auto failPoint = getGlobalFailPointRegistry()->getFailPoint("rsSyncApplyStop");
+    auto failPoint = globalFailPointRegistry().find("rsSyncApplyStop");
     failPoint->setMode(FailPoint::alwaysOn);
     ON_BLOCK_EXIT([failPoint]() { failPoint->setMode(FailPoint::off); });
 
@@ -3954,7 +3954,7 @@ TEST_F(InitialSyncerTest,
     auto opCtx = makeOpCtx();
 
     // This fail point makes chooseSyncSourceCallback fail with an InvalidSyncSource error.
-    auto failPoint = getGlobalFailPointRegistry()->getFailPoint("failInitialSyncWithBadHost");
+    auto failPoint = globalFailPointRegistry().find("failInitialSyncWithBadHost");
     failPoint->setMode(FailPoint::alwaysOn);
     ON_BLOCK_EXIT([failPoint]() { failPoint->setMode(FailPoint::off); });
 

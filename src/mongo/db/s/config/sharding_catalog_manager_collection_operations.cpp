@@ -527,10 +527,9 @@ void ShardingCatalogManager::renameCollection(OperationContext* opCtx,
             CommandHelpers::filterCommandRequestForPassthrough(passthroughFields)),
         Shard::RetryPolicy::kIdempotent));
 
-    if (MONGO_FAIL_POINT(hangRenameCollectionAfterSendingRenameToPrimaryShard)) {
+    if (MONGO_unlikely(hangRenameCollectionAfterSendingRenameToPrimaryShard.shouldFail())) {
         log() << "Hit hangRenameCollectionAfterSendingRenameToPrimaryShard";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
-            opCtx, hangRenameCollectionAfterSendingRenameToPrimaryShard);
+        hangRenameCollectionAfterSendingRenameToPrimaryShard.pauseWhileSet(opCtx);
     }
 
     uassertStatusOK(cmdResponse.commandStatus);
@@ -638,10 +637,9 @@ void ShardingCatalogManager::generateUUIDsForExistingShardedCollections(Operatio
 void ShardingCatalogManager::createCollection(OperationContext* opCtx,
                                               const NamespaceString& ns,
                                               const CollectionOptions& collOptions) {
-    if (MONGO_FAIL_POINT(hangCreateCollectionAfterAcquiringDistlocks)) {
+    if (MONGO_unlikely(hangCreateCollectionAfterAcquiringDistlocks.shouldFail())) {
         log() << "Hit hangCreateCollectionAfterAcquiringDistlocks";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
-            opCtx, hangCreateCollectionAfterAcquiringDistlocks);
+        hangCreateCollectionAfterAcquiringDistlocks.pauseWhileSet(opCtx);
     }
 
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
@@ -668,10 +666,9 @@ void ShardingCatalogManager::createCollection(OperationContext* opCtx,
         createCmdBuilder.obj(),
         Shard::RetryPolicy::kIdempotent);
 
-    if (MONGO_FAIL_POINT(hangCreateCollectionAfterSendingCreateToPrimaryShard)) {
+    if (MONGO_unlikely(hangCreateCollectionAfterSendingCreateToPrimaryShard.shouldFail())) {
         log() << "Hit hangCreateCollectionAfterSendingCreateToPrimaryShard";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
-            opCtx, hangCreateCollectionAfterSendingCreateToPrimaryShard);
+        hangCreateCollectionAfterSendingCreateToPrimaryShard.pauseWhileSet(opCtx);
     }
 
     auto createStatus = Shard::CommandResponse::getEffectiveStatus(swResponse);
@@ -681,10 +678,9 @@ void ShardingCatalogManager::createCollection(OperationContext* opCtx,
 
     const auto uuid = checkCollectionOptions(opCtx, primaryShard.get(), ns, collOptions);
 
-    if (MONGO_FAIL_POINT(hangCreateCollectionAfterGettingUUIDFromPrimaryShard)) {
+    if (MONGO_unlikely(hangCreateCollectionAfterGettingUUIDFromPrimaryShard.shouldFail())) {
         log() << "Hit hangCreateCollectionAfterGettingUUIDFromPrimaryShard";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
-            opCtx, hangCreateCollectionAfterGettingUUIDFromPrimaryShard);
+        hangCreateCollectionAfterGettingUUIDFromPrimaryShard.pauseWhileSet(opCtx);
     }
 
     if (collOptions.isView()) {
@@ -751,15 +747,14 @@ void ShardingCatalogManager::createCollection(OperationContext* opCtx,
                                                  ShardingCatalogClient::kLocalWriteConcern));
     }
 
-    if (MONGO_FAIL_POINT(writeUnshardedCollectionsToShardingCatalog)) {
+    if (MONGO_unlikely(writeUnshardedCollectionsToShardingCatalog.shouldFail())) {
         LOG(0) << "Going to write initial chunk for new unsharded collection " << ns.ns() << ": "
                << chunk.toString();
         writeFirstChunksForCollection(opCtx, initialChunks);
 
-        if (MONGO_FAIL_POINT(hangCreateCollectionAfterWritingEntryToConfigChunks)) {
+        if (MONGO_unlikely(hangCreateCollectionAfterWritingEntryToConfigChunks.shouldFail())) {
             log() << "Hit hangCreateCollectionAfterWritingEntryToConfigChunks";
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
-                opCtx, hangCreateCollectionAfterWritingEntryToConfigChunks);
+            hangCreateCollectionAfterWritingEntryToConfigChunks.pauseWhileSet(opCtx);
         }
 
         LOG(0) << "Going to write collection entry for new unsharded collection " << ns.ns() << ": "
@@ -767,10 +762,9 @@ void ShardingCatalogManager::createCollection(OperationContext* opCtx,
         uassertStatusOK(ShardingCatalogClientImpl::updateShardingCatalogEntryForCollection(
             opCtx, ns, targetCollType, true /*upsert*/));
 
-        if (MONGO_FAIL_POINT(hangCreateCollectionAfterWritingEntryToConfigCollections)) {
+        if (MONGO_unlikely(hangCreateCollectionAfterWritingEntryToConfigCollections.shouldFail())) {
             log() << "Hit hangCreateCollectionAfterWritingEntryToConfigCollections";
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
-                opCtx, hangCreateCollectionAfterWritingEntryToConfigCollections);
+            hangCreateCollectionAfterWritingEntryToConfigCollections.pauseWhileSet(opCtx);
         }
     }
 }
@@ -859,10 +853,9 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
         // the newly-generated objectid, (ii) their bounds for each new field in the refined key to
         // MinKey (except for the global max chunk where the max bounds are set to MaxKey), and
         // unsetting (iii) their jumbo field.
-        if (MONGO_FAIL_POINT(hangRefineCollectionShardKeyBeforeUpdatingChunks)) {
+        if (MONGO_unlikely(hangRefineCollectionShardKeyBeforeUpdatingChunks.shouldFail())) {
             log() << "Hit hangRefineCollectionShardKeyBeforeUpdatingChunks failpoint";
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
-                opCtx, hangRefineCollectionShardKeyBeforeUpdatingChunks);
+            hangRefineCollectionShardKeyBeforeUpdatingChunks.pauseWhileSet(opCtx);
         }
 
         uassertStatusOK(updateConfigDocumentInTxn(asr.opCtx(),
@@ -918,10 +911,9 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
               << executionTimer.millis() << " ms. Total time taken: " << totalTimer.millis()
               << " ms.";
 
-        if (MONGO_FAIL_POINT(hangRefineCollectionShardKeyBeforeCommit)) {
+        if (MONGO_unlikely(hangRefineCollectionShardKeyBeforeCommit.shouldFail())) {
             log() << "Hit hangRefineCollectionShardKeyBeforeCommit failpoint";
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
-                opCtx, hangRefineCollectionShardKeyBeforeCommit);
+            hangRefineCollectionShardKeyBeforeCommit.pauseWhileSet(opCtx);
         }
 
         uassertStatusOK(commitTxnForConfigDocument(asr.opCtx(), txnNumber));

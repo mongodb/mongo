@@ -685,7 +685,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
         }
     }
 
-    MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeLoggingCreateCollection);
+    hangBeforeLoggingCreateCollection.pauseWhileSet();
 
     opCtx->getServiceContext()->getOpObserver()->onCreateCollection(
         opCtx, collection, nss, optionsWithUUID, fullIdIndexSpec, createOplogSlot);

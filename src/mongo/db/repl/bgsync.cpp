@@ -219,7 +219,7 @@ void BackgroundSync::_runProducer() {
 }
 
 void BackgroundSync::_produce() {
-    if (MONGO_FAIL_POINT(stopReplProducer)) {
+    if (MONGO_unlikely(stopReplProducer.shouldFail())) {
         // This log output is used in js tests so please leave it.
         log() << "bgsync - stopReplProducer fail point "
                  "enabled. Blocking until fail point is disabled.";
@@ -227,7 +227,7 @@ void BackgroundSync::_produce() {
         // TODO(SERVER-27120): Remove the return statement and uncomment the while loop.
         // Currently we cannot block here or we prevent primaries from being fully elected since
         // we'll never call _signalNoNewDataForApplier.
-        //        while (MONGO_FAIL_POINT(stopReplProducer) && !inShutdown()) {
+        //        while (MONGO_unlikely(stopReplProducer.shouldFail()) && !inShutdown()) {
         //            mongo::sleepsecs(1);
         //        }
         mongo::sleepsecs(1);
@@ -577,11 +577,11 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
         }
     }
 
-    if (MONGO_FAIL_POINT(rollbackHangBeforeStart)) {
+    if (MONGO_unlikely(rollbackHangBeforeStart.shouldFail())) {
         // This log output is used in js tests so please leave it.
         log() << "rollback - rollbackHangBeforeStart fail point "
                  "enabled. Blocking until fail point is disabled.";
-        while (MONGO_FAIL_POINT(rollbackHangBeforeStart) && !inShutdown()) {
+        while (MONGO_unlikely(rollbackHangBeforeStart.shouldFail()) && !inShutdown()) {
             mongo::sleepsecs(1);
         }
     }

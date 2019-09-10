@@ -2030,11 +2030,12 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
         auto action = _updateMemberStateFromTopologyCoordinator(lk, opCtx);
         lk.unlock();
 
-        if (MONGO_FAIL_POINT(stepdownHangBeforePerformingPostMemberStateUpdateActions)) {
+        if (MONGO_unlikely(stepdownHangBeforePerformingPostMemberStateUpdateActions.shouldFail())) {
             log() << "stepping down from primary - "
                      "stepdownHangBeforePerformingPostMemberStateUpdateActions fail point enabled. "
                      "Blocking until fail point is disabled.";
-            while (MONGO_FAIL_POINT(stepdownHangBeforePerformingPostMemberStateUpdateActions)) {
+            while (MONGO_unlikely(
+                stepdownHangBeforePerformingPostMemberStateUpdateActions.shouldFail())) {
                 mongo::sleepsecs(1);
                 {
                     stdx::lock_guard<stdx::mutex> lock(_mutex);
@@ -3567,11 +3568,10 @@ boost::optional<OpTimeAndWallTime> ReplicationCoordinatorImpl::_chooseStableOpTi
                                           maximumStableOpTime.opTime.getTimestamp());
     }
 
-    MONGO_FAIL_POINT_BLOCK(holdStableTimestampAtSpecificTimestamp, data) {
-        const BSONObj& dataObj = data.getData();
+    holdStableTimestampAtSpecificTimestamp.execute([&](const BSONObj& dataObj) {
         const auto holdStableTimestamp = dataObj["timestamp"].timestamp();
         maximumStableTimestamp = std::min(maximumStableTimestamp, holdStableTimestamp);
-    }
+    });
 
     maximumStableOpTime = {OpTime(maximumStableTimestamp, maximumStableOpTime.opTime.getTerm()),
                            maximumStableOpTime.wallTime};
@@ -3693,7 +3693,7 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
                 }
                 // Set the stable timestamp regardless of whether the majority commit point moved
                 // forward.
-                if (!MONGO_FAIL_POINT(disableSnapshotting)) {
+                if (!MONGO_unlikely(disableSnapshotting.shouldFail())) {
                     _storage->setStableTimestamp(getServiceContext(),
                                                  stableOpTime->opTime.getTimestamp());
                 }
@@ -3980,7 +3980,7 @@ bool ReplicationCoordinatorImpl::_updateCommittedSnapshot(
                   _currentCommittedSnapshot->opTime.getTimestamp());
         invariant(newCommittedSnapshot.opTime >= _currentCommittedSnapshot->opTime);
     }
-    if (MONGO_FAIL_POINT(disableSnapshotting))
+    if (MONGO_unlikely(disableSnapshotting.shouldFail()))
         return false;
     _currentCommittedSnapshot = newCommittedSnapshot;
     _currentCommittedSnapshotCond.notify_all();

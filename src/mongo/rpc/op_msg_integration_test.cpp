@@ -279,12 +279,12 @@ TEST(OpMsg, DocumentSequenceReturnsWork) {
 constexpr auto kDisableChecksum = "dbClientConnectionDisableChecksum";
 
 void disableClientChecksum() {
-    auto failPoint = getGlobalFailPointRegistry()->getFailPoint(kDisableChecksum);
+    auto failPoint = globalFailPointRegistry().find(kDisableChecksum);
     failPoint->setMode(FailPoint::alwaysOn);
 }
 
 void enableClientChecksum() {
-    auto failPoint = getGlobalFailPointRegistry()->getFailPoint(kDisableChecksum);
+    auto failPoint = globalFailPointRegistry().find(kDisableChecksum);
     failPoint->setMode(FailPoint::off);
 }
 

@@ -180,13 +180,12 @@ const Seconds ReplicaSetMonitor::kDefaultFindHostTimeout(15);
 bool ReplicaSetMonitor::useDeterministicHostSelection = false;
 
 Seconds ReplicaSetMonitor::getDefaultRefreshPeriod() {
-    MONGO_FAIL_POINT_BLOCK_IF(modifyReplicaSetMonitorDefaultRefreshPeriod,
-                              data,
-                              [&](const BSONObj& data) { return data.hasField("period"); }) {
-        return Seconds{data.getData().getIntField("period")};
-    }
-
-    return kDefaultRefreshPeriod;
+    Seconds r = kDefaultRefreshPeriod;
+    static constexpr auto kPeriodField = "period"_sd;
+    modifyReplicaSetMonitorDefaultRefreshPeriod.executeIf(
+        [&r](const BSONObj& data) { r = Seconds{data.getIntField(kPeriodField)}; },
+        [](const BSONObj& data) { return data.hasField(kPeriodField); });
+    return r;
 }
 
 ReplicaSetMonitor::ReplicaSetMonitor(const SetStatePtr& initialState) : _state(initialState) {}

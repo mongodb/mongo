@@ -107,9 +107,9 @@ repl::OpTime persistParticipantListBlocking(OperationContext* opCtx,
                                             const std::vector<ShardId>& participantList) {
     LOG(3) << txnIdToString(lsid, txnNumber) << " Going to write participant list";
 
-    if (MONGO_FAIL_POINT(hangBeforeWritingParticipantList)) {
+    if (MONGO_unlikely(hangBeforeWritingParticipantList.shouldFail())) {
         LOG(0) << "Hit hangBeforeWritingParticipantList failpoint";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangBeforeWritingParticipantList);
+        hangBeforeWritingParticipantList.pauseWhileSet(opCtx);
     }
 
     OperationSessionInfo sessionInfo;
@@ -239,9 +239,9 @@ Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
         getTransactionCoordinatorWorkerCurOpRepository()->set(
             opCtx, lsid, txnNumber, CoordinatorAction::kSendingPrepare);
 
-        if (MONGO_FAIL_POINT(hangBeforeSendingPrepare)) {
+        if (MONGO_unlikely(hangBeforeSendingPrepare.shouldFail())) {
             LOG(0) << "Hit hangBeforeSendingPrepare failpoint";
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangBeforeSendingPrepare);
+            hangBeforeSendingPrepare.pauseWhileSet(opCtx);
         }
     };
 
@@ -292,9 +292,9 @@ repl::OpTime persistDecisionBlocking(OperationContext* opCtx,
     LOG(3) << txnIdToString(lsid, txnNumber) << " Going to write decision "
            << (isCommit ? "commit" : "abort");
 
-    if (MONGO_FAIL_POINT(hangBeforeWritingDecision)) {
+    if (MONGO_unlikely(hangBeforeWritingDecision.shouldFail())) {
         LOG(0) << "Hit hangBeforeWritingDecision failpoint";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangBeforeWritingDecision);
+        hangBeforeWritingDecision.pauseWhileSet(opCtx);
     }
 
     OperationSessionInfo sessionInfo;
@@ -401,9 +401,9 @@ Future<void> sendCommit(ServiceContext* service,
         getTransactionCoordinatorWorkerCurOpRepository()->set(
             opCtx, lsid, txnNumber, CoordinatorAction::kSendingCommit);
 
-        if (MONGO_FAIL_POINT(hangBeforeSendingCommit)) {
+        if (MONGO_unlikely(hangBeforeSendingCommit.shouldFail())) {
             LOG(0) << "Hit hangBeforeSendingCommit failpoint";
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangBeforeSendingCommit);
+            hangBeforeSendingCommit.pauseWhileSet(opCtx);
         }
     };
 
@@ -431,9 +431,9 @@ Future<void> sendAbort(ServiceContext* service,
         getTransactionCoordinatorWorkerCurOpRepository()->set(
             opCtx, lsid, txnNumber, CoordinatorAction::kSendingAbort);
 
-        if (MONGO_FAIL_POINT(hangBeforeSendingAbort)) {
+        if (MONGO_unlikely(hangBeforeSendingAbort.shouldFail())) {
             LOG(0) << "Hit hangBeforeSendingAbort failpoint";
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangBeforeSendingAbort);
+            hangBeforeSendingAbort.pauseWhileSet(opCtx);
         }
     };
 
@@ -451,9 +451,9 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
                                   TxnNumber txnNumber) {
     LOG(3) << txnIdToString(lsid, txnNumber) << " Going to delete coordinator doc";
 
-    if (MONGO_FAIL_POINT(hangBeforeDeletingCoordinatorDoc)) {
+    if (MONGO_unlikely(hangBeforeDeletingCoordinatorDoc.shouldFail())) {
         LOG(0) << "Hit hangBeforeDeletingCoordinatorDoc failpoint";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangBeforeDeletingCoordinatorDoc);
+        hangBeforeDeletingCoordinatorDoc.pauseWhileSet(opCtx);
     }
 
     OperationSessionInfo sessionInfo;
@@ -506,15 +506,14 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
 
     LOG(3) << txnIdToString(lsid, txnNumber) << " Deleted coordinator doc";
 
-    MONGO_FAIL_POINT_BLOCK(hangAfterDeletingCoordinatorDoc, fp) {
+    hangAfterDeletingCoordinatorDoc.execute([&](const BSONObj& data) {
         LOG(0) << "Hit hangAfterDeletingCoordinatorDoc failpoint";
-        const BSONObj& data = fp.getData();
         if (!data["useUninterruptibleSleep"].eoo()) {
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterDeletingCoordinatorDoc);
+            hangAfterDeletingCoordinatorDoc.pauseWhileSet();
         } else {
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangAfterDeletingCoordinatorDoc);
+            hangAfterDeletingCoordinatorDoc.pauseWhileSet(opCtx);
         }
-    }
+    });
 }
 }  // namespace
 

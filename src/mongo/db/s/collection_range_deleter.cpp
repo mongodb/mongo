@@ -395,9 +395,9 @@ StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
                                                      PlanExecutor::YIELD_MANUAL,
                                                      InternalPlanner::FORWARD);
 
-    if (MONGO_FAIL_POINT(hangBeforeDoingDeletion)) {
+    if (MONGO_unlikely(hangBeforeDoingDeletion.shouldFail())) {
         LOG(0) << "Hit hangBeforeDoingDeletion failpoint";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangBeforeDoingDeletion);
+        hangBeforeDoingDeletion.pauseWhileSet(opCtx);
     }
 
     PlanYieldPolicy planYieldPolicy(exec.get(), PlanExecutor::YIELD_MANUAL);

@@ -355,10 +355,9 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
     auto status = _applyOperationsForTransaction(opCtx, ops, mode);
     fassert(31137, status);
 
-    if (MONGO_FAIL_POINT(applyOpsHangBeforePreparingTransaction)) {
+    if (MONGO_unlikely(applyOpsHangBeforePreparingTransaction.shouldFail())) {
         LOG(0) << "Hit applyOpsHangBeforePreparingTransaction failpoint";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
-                                                        applyOpsHangBeforePreparingTransaction);
+        applyOpsHangBeforePreparingTransaction.pauseWhileSet(opCtx);
     }
 
     transaction.prepareTransaction(opCtx, entry.getOpTime());
@@ -435,7 +434,7 @@ Status applyPrepareTransaction(OperationContext* opCtx,
 }
 
 void reconstructPreparedTransactions(OperationContext* opCtx, repl::OplogApplication::Mode mode) {
-    if (MONGO_FAIL_POINT(skipReconstructPreparedTransactions)) {
+    if (MONGO_unlikely(skipReconstructPreparedTransactions.shouldFail())) {
         log() << "Hit skipReconstructPreparedTransactions failpoint";
         return;
     }

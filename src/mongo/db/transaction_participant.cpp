@@ -637,11 +637,11 @@ TransactionParticipant::OplogSlotReserver::OplogSlotReserver(OperationContext* o
 }
 
 TransactionParticipant::OplogSlotReserver::~OplogSlotReserver() {
-    if (MONGO_FAIL_POINT(hangBeforeReleasingTransactionOplogHole)) {
+    if (MONGO_unlikely(hangBeforeReleasingTransactionOplogHole.shouldFail())) {
         log()
             << "transaction - hangBeforeReleasingTransactionOplogHole fail point enabled. Blocking "
                "until fail point is disabled.";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeReleasingTransactionOplogHole);
+        hangBeforeReleasingTransactionOplogHole.pauseWhileSet();
     }
 
     // If the constructor did not complete, we do not attempt to abort the units of work.
@@ -744,7 +744,7 @@ void TransactionParticipant::TxnResources::release(OperationContext* opCtx) {
     }
     _locker->reacquireTicket(opCtx);
 
-    if (MONGO_FAIL_POINT(restoreLocksFail)) {
+    if (MONGO_unlikely(restoreLocksFail.shouldFail())) {
         uasserted(ErrorCodes::LockTimeout, str::stream() << "Lock restore failed due to failpoint");
     }
 
@@ -1002,7 +1002,7 @@ void TransactionParticipant::Participant::unstashTransactionResources(OperationC
 
     // The Client lock must not be held when executing this failpoint as it will block currentOp
     // execution.
-    if (MONGO_FAIL_POINT(hangAfterPreallocateSnapshot)) {
+    if (MONGO_unlikely(hangAfterPreallocateSnapshot.shouldFail())) {
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &hangAfterPreallocateSnapshot, opCtx, "hangAfterPreallocateSnapshot");
     }
@@ -1116,12 +1116,12 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
             o(lk).prepareOpTime = prepareOplogSlot;
         }
 
-        if (MONGO_FAIL_POINT(hangAfterReservingPrepareTimestamp)) {
+        if (MONGO_unlikely(hangAfterReservingPrepareTimestamp.shouldFail())) {
             // This log output is used in js tests so please leave it.
             log() << "transaction - hangAfterReservingPrepareTimestamp fail point "
                      "enabled. Blocking until fail point is disabled. Prepare OpTime: "
                   << prepareOplogSlot;
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterReservingPrepareTimestamp);
+            hangAfterReservingPrepareTimestamp.pauseWhileSet();
         }
     }
     opCtx->recoveryUnit()->setPrepareTimestamp(prepareOplogSlot.getTimestamp());
@@ -1145,10 +1145,10 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
         o(lk).lastWriteOpTime = prepareOplogSlot;
     }
 
-    if (MONGO_FAIL_POINT(hangAfterSettingPrepareStartTime)) {
+    if (MONGO_unlikely(hangAfterSettingPrepareStartTime.shouldFail())) {
         log() << "transaction - hangAfterSettingPrepareStartTime fail point enabled. Blocking "
                  "until fail point is disabled.";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterSettingPrepareStartTime);
+        hangAfterSettingPrepareStartTime.pauseWhileSet();
     }
 
     // We unlock the RSTL to allow prepared transactions to survive state transitions. This should
@@ -1314,7 +1314,7 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
                 "commitTransaction for a prepared transaction cannot be run before its prepare "
                 "oplog entry has been majority committed",
                 replCoord->getLastCommittedOpTime().getTimestamp() >= prepareTimestamp ||
-                    MONGO_FAIL_POINT(skipCommitTxnCheckPrepareMajorityCommitted));
+                    MONGO_unlikely(skipCommitTxnCheckPrepareMajorityCommitted.shouldFail()));
     }
 
     try {
@@ -2122,9 +2122,7 @@ void TransactionParticipant::Participant::_registerUpdateCacheOnCommit(
         }
     });
 
-    MONGO_FAIL_POINT_BLOCK(onPrimaryTransactionalWrite, customArgs) {
-        const auto& data = customArgs.getData();
-
+    onPrimaryTransactionalWrite.execute([&](const BSONObj& data) {
         const auto closeConnectionElem = data["closeConnection"];
         if (closeConnectionElem.eoo() || closeConnectionElem.Bool()) {
             opCtx->getClient()->session()->end();
@@ -2138,7 +2136,7 @@ void TransactionParticipant::Participant::_registerUpdateCacheOnCommit(
                           << "Failing write for " << _sessionId() << ":" << o().activeTxnNumber
                           << " due to failpoint. The write must not be reflected.");
         }
-    }
+    });
 }
 
 }  // namespace mongo

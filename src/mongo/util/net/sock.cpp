@@ -395,7 +395,7 @@ int Socket::_send(const char* data, int len, const char* context) {
 void Socket::send(const char* data, int len, const char* context) {
     while (len > 0) {
         int ret = -1;
-        if (MONGO_FAIL_POINT(throwSockExcep)) {
+        if (MONGO_unlikely(throwSockExcep.shouldFail())) {
 #if defined(_WIN32)
             WSASetLastError(WSAENETUNREACH);
 #else
@@ -458,7 +458,7 @@ void Socket::send(const vector<pair<char*, int>>& data, const char* context) {
 
     while (meta.msg_iovlen > 0) {
         int ret = -1;
-        if (MONGO_FAIL_POINT(throwSockExcep)) {
+        if (MONGO_unlikely(throwSockExcep.shouldFail())) {
 #if defined(_WIN32)
             WSASetLastError(WSAENETUNREACH);
 #else
@@ -491,7 +491,7 @@ void Socket::send(const vector<pair<char*, int>>& data, const char* context) {
 void Socket::recv(char* buf, int len) {
     while (len > 0) {
         int ret = -1;
-        if (MONGO_FAIL_POINT(throwSockExcep)) {
+        if (MONGO_unlikely(throwSockExcep.shouldFail())) {
 #if defined(_WIN32)
             WSASetLastError(WSAENETUNREACH);
 #else

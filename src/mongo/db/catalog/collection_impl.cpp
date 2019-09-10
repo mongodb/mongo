@@ -104,19 +104,21 @@ MONGO_FAIL_POINT_DEFINE(failAfterBulkLoadDocInsert);
  * Otherwise, the function should fail and return early with the error Status.
  */
 Status checkFailCollectionInsertsFailPoint(const NamespaceString& ns, const BSONObj& firstDoc) {
-    MONGO_FAIL_POINT_BLOCK(failCollectionInserts, extraData) {
-        const BSONObj& data = extraData.getData();
-        const auto collElem = data["collectionNS"];
-        // If the failpoint specifies no collection or matches the existing one, fail.
-        if (!collElem || ns.ns() == collElem.str()) {
+    Status s = Status::OK();
+    failCollectionInserts.executeIf(
+        [&](const BSONObj& data) {
             const std::string msg = str::stream()
                 << "Failpoint (failCollectionInserts) has been enabled (" << data
                 << "), so rejecting insert (first doc): " << firstDoc;
             log() << msg;
-            return {ErrorCodes::FailPointEnabled, msg};
-        }
-    }
-    return Status::OK();
+            s = {ErrorCodes::FailPointEnabled, msg};
+        },
+        [&](const BSONObj& data) {
+            // If the failpoint specifies no collection or matches the existing one, fail.
+            const auto collElem = data["collectionNS"];
+            return !collElem || ns.ns() == collElem.str();
+        });
+    return s;
 }
 
 // Uses the collator factory to convert the BSON representation of a collator to a
@@ -185,10 +187,6 @@ StatusWith<CollectionImpl::ValidationAction> _parseValidationAction(StringData n
 }
 
 }  // namespace
-
-using std::string;
-using std::unique_ptr;
-using std::vector;
 
 CollectionImpl::CollectionImpl(OperationContext* opCtx,
                                const NamespaceString& nss,
@@ -361,8 +359,8 @@ Status CollectionImpl::insertDocumentsForOplog(OperationContext* opCtx,
 
 
 Status CollectionImpl::insertDocuments(OperationContext* opCtx,
-                                       const vector<InsertStatement>::const_iterator begin,
-                                       const vector<InsertStatement>::const_iterator end,
+                                       const std::vector<InsertStatement>::const_iterator begin,
+                                       const std::vector<InsertStatement>::const_iterator end,
                                        OpDebug* opDebug,
                                        bool fromMigrate) {
 
@@ -401,25 +399,27 @@ Status CollectionImpl::insertDocuments(OperationContext* opCtx,
     opCtx->recoveryUnit()->onCommit(
         [this](boost::optional<Timestamp>) { notifyCappedWaitersIfNeeded(); });
 
-    MONGO_FAIL_POINT_BLOCK(hangAfterCollectionInserts, extraData) {
-        const BSONObj& data = extraData.getData();
-        const auto collElem = data["collectionNS"];
-        const auto firstIdElem = data["first_id"];
-        // If the failpoint specifies no collection or matches the existing one, hang.
-        if ((!collElem || _ns.ns() == collElem.str()) &&
-            (!firstIdElem ||
-             (begin != end && firstIdElem.type() == mongo::String &&
-              begin->doc["_id"].str() == firstIdElem.str()))) {
-            string whenFirst =
-                firstIdElem ? (string(" when first _id is ") + firstIdElem.str()) : "";
-            while (MONGO_FAIL_POINT(hangAfterCollectionInserts)) {
-                log() << "hangAfterCollectionInserts fail point enabled for " << _ns << whenFirst
-                      << ". Blocking until fail point is disabled.";
-                mongo::sleepsecs(1);
-                opCtx->checkForInterrupt();
+    hangAfterCollectionInserts.executeIf(
+        [&](const BSONObj& data) {
+            const auto& firstIdElem = data["first_id"];
+            std::string whenFirst;
+            if (firstIdElem) {
+                whenFirst += " when first _id is ";
+                whenFirst += firstIdElem.str();
             }
-        }
-    }
+            log() << "hangAfterCollectionInserts fail point enabled for " << _ns << whenFirst
+                  << ". Blocking until fail point is disabled.";
+            hangAfterCollectionInserts.pauseWhileSet(opCtx);
+        },
+        [&](const BSONObj& data) {
+            const auto& collElem = data["collectionNS"];
+            const auto& firstIdElem = data["first_id"];
+            // If the failpoint specifies no collection or matches the existing one, hang.
+            return (!collElem || _ns.ns() == collElem.str()) &&
+                (!firstIdElem ||
+                 (begin != end && firstIdElem.type() == mongo::String &&
+                  begin->doc["_id"].str() == firstIdElem.str()));
+        });
 
     return Status::OK();
 }
@@ -428,7 +428,7 @@ Status CollectionImpl::insertDocument(OperationContext* opCtx,
                                       const InsertStatement& docToInsert,
                                       OpDebug* opDebug,
                                       bool fromMigrate) {
-    vector<InsertStatement> docs;
+    std::vector<InsertStatement> docs;
     docs.push_back(docToInsert);
     return insertDocuments(opCtx, docs.begin(), docs.end(), opDebug, fromMigrate);
 }
@@ -459,13 +459,13 @@ Status CollectionImpl::insertDocumentForBulkLoader(OperationContext* opCtx,
 
     status = onRecordInserted(loc.getValue());
 
-    if (MONGO_FAIL_POINT(failAfterBulkLoadDocInsert)) {
+    if (MONGO_unlikely(failAfterBulkLoadDocInsert.shouldFail())) {
         log() << "Failpoint failAfterBulkLoadDocInsert enabled for " << _ns.ns()
               << ". Throwing WriteConflictException.";
         throw WriteConflictException();
     }
 
-    vector<InsertStatement> inserts;
+    std::vector<InsertStatement> inserts;
     OplogSlot slot;
     // Fetch a new optime now, if necessary.
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -485,8 +485,8 @@ Status CollectionImpl::insertDocumentForBulkLoader(OperationContext* opCtx,
 }
 
 Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
-                                        const vector<InsertStatement>::const_iterator begin,
-                                        const vector<InsertStatement>::const_iterator end,
+                                        const std::vector<InsertStatement>::const_iterator begin,
+                                        const std::vector<InsertStatement>::const_iterator end,
                                         OpDebug* opDebug) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_IX));
 
@@ -785,7 +785,7 @@ Status CollectionImpl::truncate(OperationContext* opCtx) {
     invariant(_indexCatalog->numIndexesInProgress(opCtx) == 0);
 
     // 1) store index specs
-    vector<BSONObj> indexSpecs;
+    std::vector<BSONObj> indexSpecs;
     {
         std::unique_ptr<IndexCatalog::IndexIterator> ii =
             _indexCatalog->getIndexIterator(opCtx, false);

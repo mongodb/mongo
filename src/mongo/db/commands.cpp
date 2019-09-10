@@ -506,34 +506,35 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
 void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
                                                   StringData commandName,
                                                   const NamespaceString& nss) {
-    bool closeConnection, hasErrorCode;
+    bool closeConnection;
+    bool hasErrorCode;
     long long errorCode;
+    failCommand.executeIf(
+        [&](const BSONObj&) {
+            if (closeConnection) {
+                opCtx->getClient()->session()->end();
+                log() << "Failing command '" << commandName
+                      << "' via 'failCommand' failpoint. Action: closing connection.";
+                uasserted(50985, "Failing command due to 'failCommand' failpoint");
+            }
 
-    MONGO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
-        closeConnection = data.hasField("closeConnection") &&
-            bsonExtractBooleanField(data, "closeConnection", &closeConnection).isOK() &&
-            closeConnection;
-        hasErrorCode = data.hasField("errorCode") &&
-            bsonExtractIntegerField(data, "errorCode", &errorCode).isOK();
-
-        return shouldActivateFailCommandFailPoint(data, commandName, opCtx->getClient(), nss) &&
-            (closeConnection || hasErrorCode);
-    }) {
-        if (closeConnection) {
-            opCtx->getClient()->session()->end();
-            log() << "Failing command '" << commandName
-                  << "' via 'failCommand' failpoint. Action: closing connection.";
-            uasserted(50985, "Failing command due to 'failCommand' failpoint");
-        }
-
-        if (hasErrorCode) {
-            log() << "Failing command '" << commandName
-                  << "' via 'failCommand' failpoint. Action: returning error code " << errorCode
-                  << ".";
-            uasserted(ErrorCodes::Error(errorCode),
-                      "Failing command due to 'failCommand' failpoint");
-        }
-    }
+            if (hasErrorCode) {
+                log() << "Failing command '" << commandName
+                      << "' via 'failCommand' failpoint. Action: returning error code " << errorCode
+                      << ".";
+                uasserted(ErrorCodes::Error(errorCode),
+                          "Failing command due to 'failCommand' failpoint");
+            }
+        },
+        [&](const BSONObj& data) {
+            closeConnection = data.hasField("closeConnection") &&
+                bsonExtractBooleanField(data, "closeConnection", &closeConnection).isOK() &&
+                closeConnection;
+            hasErrorCode = data.hasField("errorCode") &&
+                bsonExtractIntegerField(data, "errorCode", &errorCode).isOK();
+            return shouldActivateFailCommandFailPoint(data, commandName, opCtx->getClient(), nss) &&
+                (closeConnection || hasErrorCode);
+        });
 }
 
 void CommandHelpers::handleMarkKillOnClientDisconnect(OperationContext* opCtx,
@@ -546,16 +547,13 @@ void CommandHelpers::handleMarkKillOnClientDisconnect(OperationContext* opCtx,
         opCtx->markKillOnClientDisconnect();
     }
 
-    MONGO_FAIL_POINT_BLOCK_IF(
-        waitInCommandMarkKillOnClientDisconnect, options, [&](const BSONObj& obj) {
-            const auto& clientMetadata =
+    waitInCommandMarkKillOnClientDisconnect.executeIf(
+        [&](const BSONObj&) { waitInCommandMarkKillOnClientDisconnect.pauseWhileSet(opCtx); },
+        [&](const BSONObj& obj) {
+            const auto& md =
                 ClientMetadataIsMasterState::get(opCtx->getClient()).getClientMetadata();
-
-            return clientMetadata && (clientMetadata->getApplicationName() == obj["appName"].str());
-        }) {
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
-                                                        waitInCommandMarkKillOnClientDisconnect);
-    }
+            return md && (md->getApplicationName() == obj["appName"].str());
+        });
 }
 
 //////////////////////////////////////////////////////////////

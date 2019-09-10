@@ -394,18 +394,14 @@ void Balancer::_mainThread() {
                 LOG(1) << "*** End of balancing round";
             }
 
-            auto balancerInterval = [&]() -> Milliseconds {
-                MONGO_FAIL_POINT_BLOCK(overrideBalanceRoundInterval, data) {
-                    int interval = data.getData()["intervalMs"].numberInt();
-                    log() << "overrideBalanceRoundInterval: using shorter balancing interval: "
-                          << interval << "ms";
+            Milliseconds balancerInterval =
+                _balancedLastTime ? kShortBalanceRoundInterval : kBalanceRoundDefaultInterval;
 
-                    return Milliseconds(interval);
-                }
-
-                return _balancedLastTime ? kShortBalanceRoundInterval
-                                         : kBalanceRoundDefaultInterval;
-            }();
+            overrideBalanceRoundInterval.execute([&](const BSONObj& data) {
+                balancerInterval = Milliseconds(data["intervalMs"].numberInt());
+                log() << "overrideBalanceRoundInterval: using shorter balancing interval: "
+                      << balancerInterval;
+            });
 
             _endRound(opCtx.get(), balancerInterval);
         } catch (const DBException& e) {

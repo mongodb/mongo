@@ -331,13 +331,14 @@ void IndexBuildInterceptor::_tryYield(OperationContext* opCtx) {
     // Track the number of yields in CurOp.
     CurOp::get(opCtx)->yielded();
 
-    MONGO_FAIL_POINT_BLOCK(hangDuringIndexBuildDrainYield, config) {
-        StringData ns{config.getData().getStringField("namespace")};
-        if (ns == _indexCatalogEntry->ns().ns()) {
+    hangDuringIndexBuildDrainYield.executeIf(
+        [&](auto&&) {
             log() << "Hanging index build during drain yield";
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangDuringIndexBuildDrainYield);
-        }
-    }
+            hangDuringIndexBuildDrainYield.pauseWhileSet();
+        },
+        [&](auto&& config) {
+            return config.getStringField("namespace") == _indexCatalogEntry->ns().ns();
+        });
 
     locker->restoreLockState(opCtx, snapshot);
 }

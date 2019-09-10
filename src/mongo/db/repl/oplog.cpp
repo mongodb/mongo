@@ -339,10 +339,9 @@ void _logOpsInner(OperationContext* opCtx,
             }
 
             // Optionally hang before advancing lastApplied.
-            if (MONGO_FAIL_POINT(hangBeforeLogOpAdvancesLastApplied)) {
+            if (MONGO_unlikely(hangBeforeLogOpAdvancesLastApplied.shouldFail())) {
                 log() << "hangBeforeLogOpAdvancesLastApplied fail point enabled.";
-                MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
-                                                                hangBeforeLogOpAdvancesLastApplied);
+                hangBeforeLogOpAdvancesLastApplied.pauseWhileSet(opCtx);
             }
 
             // Optimes on the primary should always represent consistent database states.
@@ -477,13 +476,12 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
             RecordId(), RecordData(bsonOplogEntries[i].objdata(), bsonOplogEntries[i].objsize())};
     }
 
-    MONGO_FAIL_POINT_BLOCK(sleepBetweenInsertOpTimeGenerationAndLogOp, customWait) {
-        const BSONObj& data = customWait.getData();
+    sleepBetweenInsertOpTimeGenerationAndLogOp.execute([&](const BSONObj& data) {
         auto numMillis = data["waitForMillis"].numberInt();
         log() << "Sleeping for " << numMillis << "ms after receiving " << count << " optimes from "
               << opTimes.front() << " to " << opTimes.back();
         sleepmillis(numMillis);
-    }
+    });
 
     invariant(!opTimes.empty());
     auto lastOpTime = opTimes.back();

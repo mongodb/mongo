@@ -88,7 +88,7 @@ void _decreaseTargetSnapshotWindowSize(WithLock lock, OperationContext* opCtx) {
 }  // namespace
 
 void increaseTargetSnapshotWindowSize(OperationContext* opCtx) {
-    if (MONGO_FAIL_POINT(preventDynamicSnapshotHistoryWindowTargetAdjustments)) {
+    if (MONGO_unlikely(preventDynamicSnapshotHistoryWindowTargetAdjustments.shouldFail())) {
         return;
     }
 
@@ -146,7 +146,7 @@ void increaseTargetSnapshotWindowSize(OperationContext* opCtx) {
 }
 
 void decreaseTargetSnapshotWindowSize(OperationContext* opCtx) {
-    if (MONGO_FAIL_POINT(preventDynamicSnapshotHistoryWindowTargetAdjustments)) {
+    if (MONGO_unlikely(preventDynamicSnapshotHistoryWindowTargetAdjustments.shouldFail())) {
         return;
     }
 

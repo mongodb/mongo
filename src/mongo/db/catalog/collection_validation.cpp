@@ -565,11 +565,11 @@ Status validate(OperationContext* opCtx,
         //
         // Only useful for background validation because we hold an intent lock instead of an
         // exclusive lock, and thus allow concurrent operations.
-        if (MONGO_FAIL_POINT(pauseCollectionValidationWithLock)) {
+        if (MONGO_unlikely(pauseCollectionValidationWithLock.shouldFail())) {
             invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_IX));
             _validationIsPausedForTest.store(true);
             log() << "Failpoint 'pauseCollectionValidationWithLock' activated.";
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET(pauseCollectionValidationWithLock);
+            pauseCollectionValidationWithLock.pauseWhileSet();
             _validationIsPausedForTest.store(false);
         }
 

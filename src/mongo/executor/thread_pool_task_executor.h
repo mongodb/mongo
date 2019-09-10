@@ -44,8 +44,8 @@ namespace mongo {
 class ThreadPoolInterface;
 
 namespace executor {
-MONGO_FAIL_POINT_DECLARE(initialSyncFuzzerSynchronizationPoint1);
-MONGO_FAIL_POINT_DECLARE(initialSyncFuzzerSynchronizationPoint2);
+extern FailPoint initialSyncFuzzerSynchronizationPoint1;
+extern FailPoint initialSyncFuzzerSynchronizationPoint2;
 
 struct ConnectionPoolStats;
 class NetworkInterface;

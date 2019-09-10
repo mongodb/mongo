@@ -111,10 +111,8 @@ public:
                 opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
         Seconds waitFor(DistLockManager::kDefaultLockTimeout);
-        MONGO_FAIL_POINT_BLOCK(setDropCollDistLockWait, customWait) {
-            const BSONObj& data = customWait.getData();
-            waitFor = Seconds(data["waitForSecs"].numberInt());
-        }
+        setDropCollDistLockWait.execute(
+            [&](const BSONObj& data) { waitFor = Seconds(data["waitForSecs"].numberInt()); });
 
         auto const catalogClient = Grid::get(opCtx)->catalogClient();
 

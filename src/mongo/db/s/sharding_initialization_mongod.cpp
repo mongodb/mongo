@@ -111,7 +111,7 @@ public:
                     LOG(0) << "Updating config server with confirmed set " << connStr;
                     Grid::get(serviceContext)->shardRegistry()->updateReplSetHosts(connStr);
 
-                    if (MONGO_FAIL_POINT(failUpdateShardIdentityConfigString)) {
+                    if (MONGO_unlikely(failUpdateShardIdentityConfigString.shouldFail())) {
                         return;
                     }
 

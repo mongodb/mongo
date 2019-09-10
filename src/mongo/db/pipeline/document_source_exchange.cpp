@@ -315,7 +315,7 @@ DocumentSource::GetNextResult Exchange::getNext(OperationContext* opCtx,
                 // The return value is an index of a full consumer buffer.
                 size_t fullConsumerId = loadNextBatch();
 
-                if (MONGO_FAIL_POINT(exchangeFailLoadNextBatch)) {
+                if (MONGO_unlikely(exchangeFailLoadNextBatch.shouldFail())) {
                     log() << "exchangeFailLoadNextBatch fail point enabled.";
                     uasserted(ErrorCodes::FailPointEnabled,
                               "Asserting on loading the next batch due to failpoint.");

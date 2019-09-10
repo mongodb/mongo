@@ -36,7 +36,7 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-MONGO_FAIL_POINT_DECLARE(keepDiagnosticCaptureOnFailedLock);
+extern FailPoint keepDiagnosticCaptureOnFailedLock;
 /**
  * DiagnosticInfo keeps track of diagnostic information such as a developer provided
  * name, the time when a lock was first acquired, and a partial caller call stack.

@@ -298,15 +298,15 @@ void execCommandClient(OperationContext* opCtx,
             invocation->run(opCtx, result);
         }
 
-        auto body = result->getBodyBuilder();
-
-        MONGO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
-            return CommandHelpers::shouldActivateFailCommandFailPoint(
-                       data, request.getCommandName(), opCtx->getClient(), invocation->ns()) &&
-                data.hasField("writeConcernError");
-        }) {
-            body.append(data.getData()["writeConcernError"]);
-        }
+        failCommand.executeIf(
+            [&](const BSONObj& data) {
+                result->getBodyBuilder().append(data["writeConcernError"]);
+            },
+            [&](const BSONObj& data) {
+                return CommandHelpers::shouldActivateFailCommandFailPoint(
+                           data, request.getCommandName(), opCtx->getClient(), invocation->ns()) &&
+                    data.hasField("writeConcernError");
+            });
     }
 
     auto body = result->getBodyBuilder();
@@ -484,7 +484,7 @@ void runCommand(OperationContext* opCtx,
                 // under a transaction (see the invariant inside ShardConnection). Because of this,
                 // the retargeting error could not have come from a ShardConnection, so we don't
                 // need to reset the connection's in-memory state.
-                if (!MONGO_FAIL_POINT(doNotRefreshShardsOnRetargettingError) &&
+                if (!MONGO_unlikely(doNotRefreshShardsOnRetargettingError.shouldFail()) &&
                     !TransactionRouter::get(opCtx)) {
                     ShardConnection::checkMyConnectionVersions(opCtx, staleNs.ns());
                 }
@@ -990,7 +990,7 @@ void Strategy::explainFind(OperationContext* opCtx,
             // under a transaction (see the invariant inside ShardConnection). Because of this, the
             // retargeting error could not have come from a ShardConnection, so we don't need to
             // reset the connection's in-memory state.
-            if (!MONGO_FAIL_POINT(doNotRefreshShardsOnRetargettingError) &&
+            if (!MONGO_unlikely(doNotRefreshShardsOnRetargettingError.shouldFail()) &&
                 !TransactionRouter::get(opCtx)) {
                 ShardConnection::checkMyConnectionVersions(opCtx, staleNs.ns());
             }

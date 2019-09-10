@@ -51,7 +51,7 @@
 
 namespace mongo {
 
-MONGO_FAIL_POINT_DECLARE(leaveIndexBuildUnfinishedForShutdown);
+extern FailPoint leaveIndexBuildUnfinishedForShutdown;
 
 class Collection;
 class MatchExpression;

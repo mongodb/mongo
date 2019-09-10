@@ -894,9 +894,9 @@ void IndexBuildsCoordinator::_buildIndex(
             _indexBuildsManager.startBuildingIndex(opCtx, collection, replState->buildUUID));
     }
 
-    if (MONGO_FAIL_POINT(hangAfterIndexBuildDumpsInsertsFromBulk)) {
+    if (MONGO_unlikely(hangAfterIndexBuildDumpsInsertsFromBulk.shouldFail())) {
         log() << "Hanging after dumping inserts from bulk builder";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterIndexBuildDumpsInsertsFromBulk);
+        hangAfterIndexBuildDumpsInsertsFromBulk.pauseWhileSet();
     }
 
     // Perform the first drain while holding an intent lock.
@@ -908,9 +908,9 @@ void IndexBuildsCoordinator::_buildIndex(
             opCtx, replState->buildUUID, RecoveryUnit::ReadSource::kUnset));
     }
 
-    if (MONGO_FAIL_POINT(hangAfterIndexBuildFirstDrain)) {
+    if (MONGO_unlikely(hangAfterIndexBuildFirstDrain.shouldFail())) {
         log() << "Hanging after index build first drain";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterIndexBuildFirstDrain);
+        hangAfterIndexBuildFirstDrain.pauseWhileSet();
     }
 
     // Perform the second drain while stopping writes on the collection.
@@ -922,9 +922,9 @@ void IndexBuildsCoordinator::_buildIndex(
             opCtx, replState->buildUUID, RecoveryUnit::ReadSource::kUnset));
     }
 
-    if (MONGO_FAIL_POINT(hangAfterIndexBuildSecondDrain)) {
+    if (MONGO_unlikely(hangAfterIndexBuildSecondDrain.shouldFail())) {
         log() << "Hanging after index build second drain";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterIndexBuildSecondDrain);
+        hangAfterIndexBuildSecondDrain.pauseWhileSet();
     }
 
     // Need to return the collection lock back to exclusive mode, to complete the index build.

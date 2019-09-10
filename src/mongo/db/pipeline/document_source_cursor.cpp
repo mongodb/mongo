@@ -86,7 +86,7 @@ void DocumentSourceCursor::loadBatch() {
         return;
     }
 
-    while (MONGO_FAIL_POINT(hangBeforeDocumentSourceCursorLoadBatch)) {
+    while (MONGO_unlikely(hangBeforeDocumentSourceCursorLoadBatch.shouldFail())) {
         log() << "Hanging aggregation due to 'hangBeforeDocumentSourceCursorLoadBatch' failpoint";
         sleepmillis(10);
     }

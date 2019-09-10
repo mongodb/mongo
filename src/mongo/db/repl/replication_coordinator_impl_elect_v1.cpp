@@ -355,13 +355,13 @@ void ReplicationCoordinatorImpl::_onVoteRequestComplete(
     _voteRequester.reset();
     auto electionFinishedEvent = _electionFinishedEvent;
 
-    MONGO_FAIL_POINT_BLOCK(electionHangsBeforeUpdateMemberState, customWait) {
-        auto waitForMillis = Milliseconds(customWait.getData()["waitForMillis"].numberInt());
+    electionHangsBeforeUpdateMemberState.execute([&](const BSONObj& customWait) {
+        auto waitForMillis = Milliseconds(customWait["waitForMillis"].numberInt());
         log() << "election succeeded - electionHangsBeforeUpdateMemberState fail point "
                  "enabled, sleeping "
               << waitForMillis;
         sleepFor(waitForMillis);
-    }
+    });
 
     _postWonElectionUpdateMemberState(lk);
     _replExecutor->signalEvent(electionFinishedEvent);

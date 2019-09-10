@@ -670,12 +670,12 @@ void checkRbidAndUpdateMinValid(OperationContext* opCtx,
     replicationProcess->getConsistencyMarkers()->clearAppliedThrough(opCtx, {});
     replicationProcess->getConsistencyMarkers()->setMinValid(opCtx, minValid);
 
-    if (MONGO_FAIL_POINT(rollbackHangThenFailAfterWritingMinValid)) {
+    if (MONGO_unlikely(rollbackHangThenFailAfterWritingMinValid.shouldFail())) {
 
         // This log output is used in jstests so please leave it.
         log() << "rollback - rollbackHangThenFailAfterWritingMinValid fail point "
                  "enabled. Blocking until fail point is disabled.";
-        while (MONGO_FAIL_POINT(rollbackHangThenFailAfterWritingMinValid)) {
+        while (MONGO_unlikely(rollbackHangThenFailAfterWritingMinValid.shouldFail())) {
             invariant(!globalInShutdownDeprecated());  // It is an error to shutdown while enabled.
             mongo::sleepsecs(1);
         }
@@ -1001,7 +1001,7 @@ Status _syncRollback(OperationContext* opCtx,
         });
         syncFixUp(opCtx, how, rollbackSource, replCoord, replicationProcess);
 
-        if (MONGO_FAIL_POINT(rollbackExitEarlyAfterCollectionDrop)) {
+        if (MONGO_unlikely(rollbackExitEarlyAfterCollectionDrop.shouldFail())) {
             log() << "rollbackExitEarlyAfterCollectionDrop fail point enabled. Returning early "
                      "until fail point is disabled.";
             return Status(ErrorCodes::NamespaceNotFound,
@@ -1013,11 +1013,11 @@ Status _syncRollback(OperationContext* opCtx,
         return Status(ErrorCodes::UnrecoverableRollbackError, e.what());
     }
 
-    if (MONGO_FAIL_POINT(rollbackHangBeforeFinish)) {
+    if (MONGO_unlikely(rollbackHangBeforeFinish.shouldFail())) {
         // This log output is used in js tests so please leave it.
         log() << "rollback - rollbackHangBeforeFinish fail point "
                  "enabled. Blocking until fail point is disabled.";
-        while (MONGO_FAIL_POINT(rollbackHangBeforeFinish)) {
+        while (MONGO_unlikely(rollbackHangBeforeFinish.shouldFail())) {
             invariant(!globalInShutdownDeprecated());  // It is an error to shutdown while enabled.
             mongo::sleepsecs(1);
         }
@@ -1181,7 +1181,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         }
     }
 
-    if (MONGO_FAIL_POINT(rollbackExitEarlyAfterCollectionDrop)) {
+    if (MONGO_unlikely(rollbackExitEarlyAfterCollectionDrop.shouldFail())) {
         return;
     }
 
@@ -1643,11 +1643,10 @@ void rollback(OperationContext* opCtx,
         }
     }
 
-    if (MONGO_FAIL_POINT(rollbackHangAfterTransitionToRollback)) {
+    if (MONGO_unlikely(rollbackHangAfterTransitionToRollback.shouldFail())) {
         log() << "rollbackHangAfterTransitionToRollback fail point enabled. Blocking until fail "
                  "point is disabled (rs_rollback).";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
-                                                        rollbackHangAfterTransitionToRollback);
+        rollbackHangAfterTransitionToRollback.pauseWhileSet(opCtx);
     }
 
     try {

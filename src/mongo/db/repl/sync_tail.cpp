@@ -530,7 +530,7 @@ private:
         BatchLimits batchLimits;
 
         while (true) {
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET(rsSyncApplyStop);
+            rsSyncApplyStop.pauseWhileSet();
 
             batchLimits.slaveDelayLatestTimestamp = _calculateSlaveDelayLatestTimestamp();
 
@@ -661,10 +661,10 @@ void SyncTail::_oplogApplication(ReplicationCoordinator* replCoord,
         opCtx.setShouldParticipateInFlowControl(false);
 
         // For pausing replication in tests.
-        if (MONGO_FAIL_POINT(rsSyncApplyStop)) {
+        if (MONGO_unlikely(rsSyncApplyStop.shouldFail())) {
             log() << "sync tail - rsSyncApplyStop fail point enabled. Blocking until fail point is "
                      "disabled.";
-            while (MONGO_FAIL_POINT(rsSyncApplyStop)) {
+            while (MONGO_unlikely(rsSyncApplyStop.shouldFail())) {
                 // Tests should not trigger clean shutdown while that failpoint is active. If we
                 // think we need this, we need to think hard about what the behavior should be.
                 if (inShutdown()) {
@@ -689,7 +689,7 @@ void SyncTail::_oplogApplication(ReplicationCoordinator* replCoord,
                 // Shut down and exit oplog application loop.
                 return;
             }
-            if (MONGO_FAIL_POINT(rsSyncApplyStop)) {
+            if (MONGO_unlikely(rsSyncApplyStop.shouldFail())) {
                 continue;
             }
             if (ops.termWhenExhausted()) {
@@ -814,10 +814,10 @@ Status syncApply(OperationContext* opCtx,
     auto clockSource = opCtx->getServiceContext()->getFastClockSource();
     auto applyStartTime = clockSource->now();
 
-    if (MONGO_FAIL_POINT(hangAfterRecordingOpApplicationStartTime)) {
+    if (MONGO_unlikely(hangAfterRecordingOpApplicationStartTime.shouldFail())) {
         log() << "syncApply - fail point hangAfterRecordingOpApplicationStartTime enabled. "
               << "Blocking until fail point is disabled. ";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterRecordingOpApplicationStartTime);
+        hangAfterRecordingOpApplicationStartTime.pauseWhileSet();
     }
 
     auto opType = op.getOpType();
@@ -1198,11 +1198,10 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
 
         // Use this fail point to hold the PBWM lock after we have written the oplog entries but
         // before we have applied them.
-        if (MONGO_FAIL_POINT(pauseBatchApplicationAfterWritingOplogEntries)) {
+        if (MONGO_unlikely(pauseBatchApplicationAfterWritingOplogEntries.shouldFail())) {
             log() << "pauseBatchApplicationAfterWritingOplogEntries fail point enabled. Blocking "
                      "until fail point is disabled.";
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
-                opCtx, pauseBatchApplicationAfterWritingOplogEntries);
+            pauseBatchApplicationAfterWritingOplogEntries.pauseWhileSet(opCtx);
         }
 
         // Reset consistency markers in case the node fails while applying ops.
@@ -1239,10 +1238,10 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
     storageEngine->replicationBatchIsComplete();
 
     // Use this fail point to hold the PBWM lock and prevent the batch from completing.
-    if (MONGO_FAIL_POINT(pauseBatchApplicationBeforeCompletion)) {
+    if (MONGO_unlikely(pauseBatchApplicationBeforeCompletion.shouldFail())) {
         log() << "pauseBatchApplicationBeforeCompletion fail point enabled. Blocking until fail "
                  "point is disabled.";
-        while (MONGO_FAIL_POINT(pauseBatchApplicationBeforeCompletion)) {
+        while (MONGO_unlikely(pauseBatchApplicationBeforeCompletion.shouldFail())) {
             if (inShutdown()) {
                 severe() << "Turn off pauseBatchApplicationBeforeCompletion before attempting "
                             "clean shutdown";

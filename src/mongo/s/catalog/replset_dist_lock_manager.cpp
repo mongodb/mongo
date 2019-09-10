@@ -304,10 +304,9 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::lockWithSessionID(OperationCo
         const string who = str::stream() << _processID << ":" << getThreadName();
 
         auto lockExpiration = _lockExpiration;
-        MONGO_FAIL_POINT_BLOCK(setDistLockTimeout, customTimeout) {
-            const BSONObj& data = customTimeout.getData();
+        setDistLockTimeout.execute([&](const BSONObj& data) {
             lockExpiration = Milliseconds(data["timeoutMs"].numberInt());
-        }
+        });
 
         LOG(1) << "trying to acquire new distributed lock for " << name
                << " ( lock timeout : " << durationCount<Milliseconds>(lockExpiration)

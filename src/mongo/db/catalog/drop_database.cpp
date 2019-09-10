@@ -85,10 +85,10 @@ void _finishDropDatabase(OperationContext* opCtx,
     log() << "dropDatabase " << dbName << " - dropped " << numCollections << " collection(s)";
     log() << "dropDatabase " << dbName << " - finished";
 
-    if (MONGO_FAIL_POINT(dropDatabaseHangBeforeLog)) {
+    if (MONGO_unlikely(dropDatabaseHangBeforeLog.shouldFail())) {
         log() << "dropDatabase - fail point dropDatabaseHangBeforeLog enabled. "
                  "Blocking until fail point is disabled. ";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(dropDatabaseHangBeforeLog);
+        dropDatabaseHangBeforeLog.pauseWhileSet();
     }
 
     writeConflictRetry(opCtx, "dropDatabase_database", dbName, [&] {
@@ -292,10 +292,10 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
               << result.duration << ". dropping database";
     }
 
-    if (MONGO_FAIL_POINT(dropDatabaseHangAfterAllCollectionsDrop)) {
+    if (MONGO_unlikely(dropDatabaseHangAfterAllCollectionsDrop.shouldFail())) {
         log() << "dropDatabase - fail point dropDatabaseHangAfterAllCollectionsDrop enabled. "
                  "Blocking until fail point is disabled. ";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(dropDatabaseHangAfterAllCollectionsDrop);
+        dropDatabaseHangAfterAllCollectionsDrop.pauseWhileSet();
     }
 
     AutoGetDb autoDB(opCtx, dbName, MODE_X);

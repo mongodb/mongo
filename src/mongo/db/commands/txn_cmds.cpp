@@ -104,7 +104,8 @@ public:
             // commit oplog entry.
             auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
             replClient.setLastOpToSystemLastOpTime(opCtx);
-            if (MONGO_FAIL_POINT(participantReturnNetworkErrorForCommitAfterExecutingCommitLogic)) {
+            if (MONGO_unlikely(
+                    participantReturnNetworkErrorForCommitAfterExecutingCommitLogic.shouldFail())) {
                 uasserted(ErrorCodes::HostUnreachable,
                           "returning network error because failpoint is on");
             }
@@ -134,7 +135,8 @@ public:
             txnParticipant.commitUnpreparedTransaction(opCtx);
         }
 
-        if (MONGO_FAIL_POINT(participantReturnNetworkErrorForCommitAfterExecutingCommitLogic)) {
+        if (MONGO_unlikely(
+                participantReturnNetworkErrorForCommitAfterExecutingCommitLogic.shouldFail())) {
             uasserted(ErrorCodes::HostUnreachable,
                       "returning network error because failpoint is on");
         }
@@ -189,7 +191,7 @@ public:
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &hangBeforeAbortingTxn, opCtx, "hangBeforeAbortingTxn");
 
-        if (!MONGO_FAIL_POINT(dontRemoveTxnCoordinatorOnAbort) &&
+        if (!MONGO_unlikely(dontRemoveTxnCoordinatorOnAbort.shouldFail()) &&
             (ShardingState::get(opCtx)->canAcceptShardedCommands().isOK() ||
              serverGlobalParams.clusterRole == ClusterRole::ConfigServer)) {
             TransactionCoordinatorService::get(opCtx)->cancelIfCommitNotYetStarted(
@@ -198,7 +200,8 @@ public:
 
         txnParticipant.abortTransaction(opCtx);
 
-        if (MONGO_FAIL_POINT(participantReturnNetworkErrorForAbortAfterExecutingAbortLogic)) {
+        if (MONGO_unlikely(
+                participantReturnNetworkErrorForAbortAfterExecutingAbortLogic.shouldFail())) {
             uasserted(ErrorCodes::HostUnreachable,
                       "returning network error because failpoint is on");
         }

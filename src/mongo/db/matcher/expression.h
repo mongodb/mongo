@@ -46,7 +46,7 @@ namespace mongo {
  * Enabling the disableMatchExpressionOptimization fail point will stop match expressions from
  * being optimized.
  */
-MONGO_FAIL_POINT_DECLARE(disableMatchExpressionOptimization);
+extern FailPoint disableMatchExpressionOptimization;
 
 class CollatorInterface;
 class MatchExpression;
@@ -143,7 +143,7 @@ public:
     static std::unique_ptr<MatchExpression> optimize(std::unique_ptr<MatchExpression> expression) {
         // If the disableMatchExpressionOptimization failpoint is enabled, optimizations are skipped
         // and the expression is left unmodified.
-        if (MONGO_FAIL_POINT(disableMatchExpressionOptimization)) {
+        if (MONGO_unlikely(disableMatchExpressionOptimization.shouldFail())) {
             return expression;
         }
 

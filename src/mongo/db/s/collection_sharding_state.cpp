@@ -226,7 +226,7 @@ boost::optional<ScopedCollectionMetadata> CollectionShardingState::_getMetadataW
     auto metadata = _getMetadata(atClusterTime);
     auto wantedShardVersion = ChunkVersion::UNSHARDED();
 
-    if (MONGO_FAIL_POINT(useFCV44CheckShardVersionProtocol)) {
+    if (MONGO_unlikely(useFCV44CheckShardVersionProtocol.shouldFail())) {
         LOG(0) << "Received shardVersion: " << receivedShardVersion << " for " << _nss.ns();
         if (isCollection) {
             LOG(0) << "Namespace " << _nss.ns() << " is collection, "

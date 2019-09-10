@@ -679,10 +679,8 @@ public:
                      const string&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        MONGO_FAIL_POINT_BLOCK(rsDelayHeartbeatResponse, delay) {
-            const BSONObj& data = delay.getData();
-            sleepsecs(data["delay"].numberInt());
-        }
+        rsDelayHeartbeatResponse.execute(
+            [&](const BSONObj& data) { sleepsecs(data["delay"].numberInt()); });
 
         LOG_FOR_HEARTBEATS(2) << "Received heartbeat request from " << cmdObj.getStringField("from")
                               << ", " << cmdObj;

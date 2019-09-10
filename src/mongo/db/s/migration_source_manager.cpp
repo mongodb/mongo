@@ -364,7 +364,7 @@ Status MigrationSourceManager::commitChunkOnRecipient(OperationContext* opCtx) {
     // Tell the recipient shard to fetch the latest changes.
     auto commitCloneStatus = _cloneDriver->commitClone(opCtx);
 
-    if (MONGO_FAIL_POINT(failMigrationCommit) && commitCloneStatus.isOK()) {
+    if (MONGO_unlikely(failMigrationCommit.shouldFail()) && commitCloneStatus.isOK()) {
         commitCloneStatus = {ErrorCodes::InternalError,
                              "Failing _recvChunkCommit due to failpoint."};
     }
@@ -423,7 +423,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
             builder.obj(),
             Shard::RetryPolicy::kIdempotent);
 
-    if (MONGO_FAIL_POINT(migrationCommitNetworkError)) {
+    if (MONGO_unlikely(migrationCommitNetworkError.shouldFail())) {
         commitChunkMigrationResponse = Status(
             ErrorCodes::InternalError, "Failpoint 'migrationCommitNetworkError' generated error");
     }
@@ -547,7 +547,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
     LOG(0) << "Migration succeeded and updated collection version to "
            << refreshedMetadata->getCollVersion();
 
-    MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeLeavingCriticalSection);
+    hangBeforeLeavingCriticalSection.pauseWhileSet();
 
     scopedGuard.dismiss();
 
@@ -576,7 +576,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
         return CollectionShardingRuntime::get(opCtx, getNss())->cleanUpRange(range, whenToClean);
     }();
 
-    if (!MONGO_FAIL_POINT(doNotRefreshRecipientAfterCommit)) {
+    if (!MONGO_unlikely(doNotRefreshRecipientAfterCommit.shouldFail())) {
         // Best-effort make the recipient refresh its routing table to the new collection version.
         refreshRecipientRoutingTable(opCtx,
                                      getNss(),

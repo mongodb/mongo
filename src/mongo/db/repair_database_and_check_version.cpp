@@ -363,7 +363,7 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     if (storageGlobalParams.repair) {
         invariant(!storageGlobalParams.readOnly);
 
-        if (MONGO_FAIL_POINT(exitBeforeDataRepair)) {
+        if (MONGO_unlikely(exitBeforeDataRepair.shouldFail())) {
             log() << "Exiting because 'exitBeforeDataRepair' fail point was set.";
             quickExit(EXIT_ABRUPT);
         }
@@ -420,7 +420,7 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     }
 
     if (storageGlobalParams.repair) {
-        if (MONGO_FAIL_POINT(exitBeforeRepairInvalidatesConfig)) {
+        if (MONGO_unlikely(exitBeforeRepairInvalidatesConfig.shouldFail())) {
             log() << "Exiting because 'exitBeforeRepairInvalidatesConfig' fail point was set.";
             quickExit(EXIT_ABRUPT);
         }

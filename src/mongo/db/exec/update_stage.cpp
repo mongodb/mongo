@@ -607,7 +607,7 @@ void UpdateStage::doInsert() {
         }
     }
 
-    if (MONGO_FAIL_POINT(hangBeforeUpsertPerformsInsert)) {
+    if (MONGO_unlikely(hangBeforeUpsertPerformsInsert.shouldFail())) {
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &hangBeforeUpsertPerformsInsert, getOpCtx(), "hangBeforeUpsertPerformsInsert");
     }
@@ -972,10 +972,9 @@ bool UpdateStage::checkUpdateChangesShardKeyFields(ScopedCollectionMetadata meta
             getOpCtx()->getTxnNumber() || !getOpCtx()->writesAreReplicated());
 
     if (!metadata->keyBelongsToMe(newShardKey)) {
-        if (MONGO_FAIL_POINT(hangBeforeThrowWouldChangeOwningShard)) {
+        if (MONGO_unlikely(hangBeforeThrowWouldChangeOwningShard.shouldFail())) {
             log() << "Hit hangBeforeThrowWouldChangeOwningShard failpoint";
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(getOpCtx(),
-                                                            hangBeforeThrowWouldChangeOwningShard);
+            hangBeforeThrowWouldChangeOwningShard.pauseWhileSet(getOpCtx());
         }
 
         uasserted(WouldChangeOwningShardInfo(oldObj.value(), newObj, false /* upsert */),

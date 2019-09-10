@@ -533,7 +533,7 @@ Status Cloner::createCollectionsForDb(
 
     auto collCount = 0;
     for (auto&& params : createCollectionParams) {
-        if (MONGO_FAIL_POINT(movePrimaryFailPoint) && collCount > 0) {
+        if (MONGO_unlikely(movePrimaryFailPoint.shouldFail()) && collCount > 0) {
             return Status(ErrorCodes::CommandFailed, "movePrimary failed due to failpoint");
         }
         collCount++;

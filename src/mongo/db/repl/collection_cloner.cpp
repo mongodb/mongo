@@ -429,20 +429,22 @@ void CollectionCloner::_beginCollectionCallback(const executor::TaskExecutor::Ca
         _finishCallback(cbd.status);
         return;
     }
-    MONGO_FAIL_POINT_BLOCK(initialSyncHangCollectionClonerBeforeEstablishingCursor, nssData) {
-        const BSONObj& data = nssData.getData();
-        auto nss = data["nss"].str();
-        // Only hang when cloning the specified collection, or if no collection was specified.
-        if (nss.empty() || _destNss.toString() == nss) {
-            while (MONGO_FAIL_POINT(initialSyncHangCollectionClonerBeforeEstablishingCursor) &&
+    initialSyncHangCollectionClonerBeforeEstablishingCursor.executeIf(
+        [&](const BSONObj& data) {
+            while (MONGO_unlikely(
+                       initialSyncHangCollectionClonerBeforeEstablishingCursor.shouldFail()) &&
                    !_isShuttingDown()) {
                 log() << "initialSyncHangCollectionClonerBeforeEstablishingCursor fail point "
                          "enabled for "
                       << _destNss.toString() << ". Blocking until fail point is disabled.";
                 mongo::sleepsecs(1);
             }
-        }
-    }
+        },
+        [&](const BSONObj& data) {
+            auto nss = data["nss"].str();
+            // Only hang when cloning the specified collection, or if no collection was specified.
+            return nss.empty() || nss == _destNss.toString();
+        });
     if (!_idIndexSpec.isEmpty() && _options.autoIndexId == CollectionOptions::NO) {
         warning()
             << "Found the _id_ index spec but the collection specified autoIndexId of false on ns:"
@@ -510,16 +512,16 @@ void CollectionCloner::_runQuery(const executor::TaskExecutor::CallbackArgs& cal
         }
     }
 
-    MONGO_FAIL_POINT_BLOCK(initialSyncHangBeforeCollectionClone, options) {
-        const BSONObj& data = options.getData();
-        if (data["namespace"].String() == _destNss.ns()) {
+    initialSyncHangBeforeCollectionClone.executeIf(
+        [&](const BSONObj&) {
             log() << "initial sync - initialSyncHangBeforeCollectionClone fail point "
                      "enabled. Blocking until fail point is disabled.";
-            while (MONGO_FAIL_POINT(initialSyncHangBeforeCollectionClone) && !_isShuttingDown()) {
+            while (MONGO_unlikely(initialSyncHangBeforeCollectionClone.shouldFail()) &&
+                   !_isShuttingDown()) {
                 mongo::sleepsecs(1);
             }
-        }
-    }
+        },
+        [&](const BSONObj& data) { return data["namespace"].String() == _destNss.ns(); });
 
     Status clientConnectionStatus = _clientConnection->connect(_source, StringData());
     if (!clientConnectionStatus.isOK()) {
@@ -600,20 +602,22 @@ void CollectionCloner::_handleNextBatch(std::shared_ptr<OnCompletionGuard> onCom
         uassertStatusOK(newStatus);
     }
 
-    MONGO_FAIL_POINT_BLOCK(initialSyncHangCollectionClonerAfterHandlingBatchResponse, nssData) {
-        const BSONObj& data = nssData.getData();
-        auto nss = data["nss"].str();
-        // Only hang when cloning the specified collection, or if no collection was specified.
-        if (nss.empty() || _destNss.toString() == nss) {
-            while (MONGO_FAIL_POINT(initialSyncHangCollectionClonerAfterHandlingBatchResponse) &&
+    initialSyncHangCollectionClonerAfterHandlingBatchResponse.executeIf(
+        [&](const BSONObj&) {
+            while (MONGO_unlikely(
+                       initialSyncHangCollectionClonerAfterHandlingBatchResponse.shouldFail()) &&
                    !_isShuttingDown()) {
                 log() << "initialSyncHangCollectionClonerAfterHandlingBatchResponse fail point "
                          "enabled for "
                       << _destNss.toString() << ". Blocking until fail point is disabled.";
                 mongo::sleepsecs(1);
             }
-        }
-    }
+        },
+        [&](const BSONObj& data) {
+            // Only hang when cloning the specified collection, or if no collection was specified.
+            auto nss = data["nss"].str();
+            return nss.empty() || nss == _destNss.toString();
+        });
 }
 
 void CollectionCloner::_verifyCollectionWasDropped(
@@ -702,19 +706,21 @@ void CollectionCloner::_insertDocumentsCallback(
         return;
     }
 
-    MONGO_FAIL_POINT_BLOCK(initialSyncHangDuringCollectionClone, options) {
-        const BSONObj& data = options.getData();
-        if (data["namespace"].String() == _destNss.ns() &&
-            static_cast<int>(_stats.documentsCopied) >= data["numDocsToClone"].numberInt()) {
+    initialSyncHangDuringCollectionClone.executeIf(
+        [&](const BSONObj&) {
             lk.unlock();
             log() << "initial sync - initialSyncHangDuringCollectionClone fail point "
                      "enabled. Blocking until fail point is disabled.";
-            while (MONGO_FAIL_POINT(initialSyncHangDuringCollectionClone) && !_isShuttingDown()) {
+            while (MONGO_unlikely(initialSyncHangDuringCollectionClone.shouldFail()) &&
+                   !_isShuttingDown()) {
                 mongo::sleepsecs(1);
             }
             lk.lock();
-        }
-    }
+        },
+        [&](const BSONObj& data) {
+            return data["namespace"].String() == _destNss.ns() &&
+                static_cast<int>(_stats.documentsCopied) >= data["numDocsToClone"].numberInt();
+        });
 }
 
 void CollectionCloner::_finishCallback(const Status& status) {

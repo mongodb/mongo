@@ -72,10 +72,9 @@ public:
                 uassertStatusOK(ActiveRenameCollectionRegistry::get(opCtx).registerRenameCollection(
                     incomingRequest));
 
-            if (MONGO_FAIL_POINT(hangRenameCollectionAfterGettingRename)) {
+            if (MONGO_unlikely(hangRenameCollectionAfterGettingRename.shouldFail())) {
                 log() << "Hit hangRenameCollectionAfterGettingRename";
-                MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
-                    opCtx, hangRenameCollectionAfterGettingRename);
+                hangRenameCollectionAfterGettingRename.pauseWhileSet(opCtx);
             }
 
             // Check if there is an existing renameCollection running and if so, join it

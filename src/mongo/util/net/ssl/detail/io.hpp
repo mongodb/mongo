@@ -29,7 +29,7 @@ namespace ssl {
 namespace detail {
 
 // Failpoint to force small reads of data to exercise the SChannel buffering code
-MONGO_FAIL_POINT_DECLARE(smallTLSReads);
+extern ::mongo::FailPoint smallTLSReads;
 
 template <typename Stream, typename Operation>
 std::size_t io(Stream& next_layer, stream_core& core, const Operation& op, asio::error_code& ec) {
@@ -42,7 +42,7 @@ std::size_t io(Stream& next_layer, stream_core& core, const Operation& op, asio:
                 // the underlying transport.
                 if (core.input_.size() == 0) {
                     // Read tiny amounts of TLS data to test the SChannel buffering code
-                    if (MONGO_FAIL_POINT(smallTLSReads)) {
+                    if (MONGO_unlikely(smallTLSReads.shouldFail())) {
                         core.input_ =
                             asio::buffer(core.input_buffer_,
                                          next_layer.read_some(

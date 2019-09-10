@@ -177,12 +177,11 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
         }
 
         if (newVersion != ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
-            if (MONGO_FAIL_POINT(hangBeforeAbortingRunningTransactionsOnFCVDowngrade)) {
+            if (MONGO_unlikely(hangBeforeAbortingRunningTransactionsOnFCVDowngrade.shouldFail())) {
                 log() << "featureCompatibilityVersion - "
                          "hangBeforeAbortingRunningTransactionsOnFCVDowngrade fail point enabled. "
                          "Blocking until fail point is disabled.";
-                MONGO_FAIL_POINT_PAUSE_WHILE_SET(
-                    hangBeforeAbortingRunningTransactionsOnFCVDowngrade);
+                hangBeforeAbortingRunningTransactionsOnFCVDowngrade.pauseWhileSet();
             }
             // Abort all open transactions when downgrading the featureCompatibilityVersion.
             SessionKiller::Matcher matcherAllSessions(

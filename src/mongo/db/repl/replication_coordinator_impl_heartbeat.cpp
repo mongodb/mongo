@@ -370,7 +370,7 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
         return;
     }
 
-    if (MONGO_FAIL_POINT(blockHeartbeatStepdown)) {
+    if (MONGO_unlikely(blockHeartbeatStepdown.shouldFail())) {
         // This log output is used in js tests so please leave it.
         log() << "stepDown - blockHeartbeatStepdown fail point enabled. "
                  "Blocking until fail point is disabled.";
@@ -380,7 +380,7 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
             return _inShutdown;
         };
 
-        while (MONGO_FAIL_POINT(blockHeartbeatStepdown) && !inShutdown()) {
+        while (MONGO_unlikely(blockHeartbeatStepdown.shouldFail()) && !inShutdown()) {
             mongo::sleepsecs(1);
         }
     }
@@ -577,7 +577,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
         return;
     }
 
-    if (MONGO_FAIL_POINT(blockHeartbeatReconfigFinish)) {
+    if (MONGO_unlikely(blockHeartbeatReconfigFinish.shouldFail())) {
         LOG_FOR_HEARTBEATS(0) << "blockHeartbeatReconfigFinish fail point enabled. Rescheduling "
                                  "_heartbeatReconfigFinish until fail point is disabled.";
         _replExecutor

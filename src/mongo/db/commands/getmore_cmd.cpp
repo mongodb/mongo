@@ -385,11 +385,10 @@ public:
                 invariant(cursorPin->lockPolicy() ==
                           ClientCursorParams::LockPolicy::kLockExternally);
 
-                if (MONGO_FAIL_POINT(GetMoreHangBeforeReadLock)) {
+                if (MONGO_unlikely(GetMoreHangBeforeReadLock.shouldFail())) {
                     log() << "GetMoreHangBeforeReadLock fail point enabled. Blocking until fail "
                              "point is disabled.";
-                    MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
-                                                                    GetMoreHangBeforeReadLock);
+                    GetMoreHangBeforeReadLock.pauseWhileSet(opCtx);
                 }
 
                 // Lock the backing collection by using the executor's namespace. Note that it may
@@ -445,7 +444,7 @@ public:
             validateLSID(opCtx, _request, cursorPin.getCursor());
             validateTxnNumber(opCtx, _request, cursorPin.getCursor());
 
-            if (_request.nss.isOplog() && MONGO_FAIL_POINT(rsStopGetMoreCmd)) {
+            if (_request.nss.isOplog() && MONGO_unlikely(rsStopGetMoreCmd.shouldFail())) {
                 uasserted(ErrorCodes::CommandFailed,
                           str::stream() << "getMore on " << _request.nss.ns()
                                         << " rejected due to active fail point rsStopGetMoreCmd");
@@ -475,7 +474,7 @@ public:
                 readLock.reset();
                 readLock.emplace(opCtx, _request.nss);
             };
-            if (MONGO_FAIL_POINT(waitAfterPinningCursorBeforeGetMoreBatch)) {
+            if (MONGO_unlikely(waitAfterPinningCursorBeforeGetMoreBatch.shouldFail())) {
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &waitAfterPinningCursorBeforeGetMoreBatch,
                     opCtx,
@@ -486,7 +485,7 @@ public:
             }
 
             const bool disableAwaitDataFailpointActive =
-                MONGO_FAIL_POINT(disableAwaitDataForGetMoreCmd);
+                MONGO_unlikely(disableAwaitDataForGetMoreCmd.shouldFail());
 
             // Inherit properties like readConcern and maxTimeMS from our originating cursor.
             setUpOperationContextStateForGetMore(
@@ -553,8 +552,8 @@ public:
                     dropAndReacquireReadLock();
                     exec->restoreState();
                 };
-            MONGO_FAIL_POINT_BLOCK(waitWithPinnedCursorDuringGetMoreBatch, options) {
-                const BSONObj& data = options.getData();
+
+            waitWithPinnedCursorDuringGetMoreBatch.execute([&](const BSONObj& data) {
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &waitWithPinnedCursorDuringGetMoreBatch,
                     opCtx,
@@ -564,7 +563,7 @@ public:
                         : saveAndRestoreStateWithReadLockReacquisition,
                     false,
                     _request.nss);
-            }
+            });
 
             uassertStatusOK(generateBatch(
                 opCtx, cursorPin.getCursor(), _request, &nextBatch, &state, &numResults));
@@ -647,7 +646,7 @@ public:
             // If the 'waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch' failpoint is active, we
             // set the 'msg' field of this operation's CurOp to signal that we've hit this point and
             // then spin until the failpoint is released.
-            if (MONGO_FAIL_POINT(waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch)) {
+            if (MONGO_unlikely(waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch.shouldFail())) {
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch,
                     opCtx,
@@ -666,7 +665,7 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 
-    ReadWriteType getReadWriteType() const {
+    ReadWriteType getReadWriteType() const override {
         return ReadWriteType::kRead;
     }
 

@@ -208,7 +208,7 @@ const char kSocketFailPointName[] = "throwSockExcep";
 class SocketFailPointTest : public unittest::Test {
 public:
     SocketFailPointTest()
-        : _failPoint(getGlobalFailPointRegistry()->getFailPoint(kSocketFailPointName)),
+        : _failPoint(globalFailPointRegistry().find(kSocketFailPointName)),
           _sockets(socketPair(SOCK_STREAM)) {
         ASSERT_TRUE(_failPoint != nullptr);
         ASSERT_TRUE(_sockets.first);

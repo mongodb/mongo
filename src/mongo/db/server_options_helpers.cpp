@@ -146,7 +146,7 @@ Status validateBaseOptions(const moe::Environment& params) {
 
         if (enableTestCommandsValue) {
             // Only register failpoint server parameters if enableTestCommands=1.
-            getGlobalFailPointRegistry()->registerAllFailPointsAsServerParameters();
+            globalFailPointRegistry().registerAllFailPointsAsServerParameters();
         } else {
             // Deregister test-only parameters.
             ServerParameterSet::getGlobal()->disableTestParameters();

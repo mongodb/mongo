@@ -266,7 +266,7 @@ void Pipeline::validateCommon() const {
 
 void Pipeline::optimizePipeline() {
     // If the disablePipelineOptimization failpoint is enabled, the pipeline won't be optimized.
-    if (MONGO_FAIL_POINT(disablePipelineOptimization)) {
+    if (MONGO_unlikely(disablePipelineOptimization.shouldFail())) {
         return;
     }
 

@@ -332,13 +332,12 @@ void CmdShutdown::shutdownHelper(const BSONObj& cmdObj) {
     ShutdownTaskArgs shutdownArgs;
     shutdownArgs.isUserInitiated = true;
 
-    MONGO_FAIL_POINT_BLOCK(crashOnShutdown, crashBlock) {
-        const std::string crashHow = crashBlock.getData()["how"].str();
-        if (crashHow == "fault") {
+    crashOnShutdown.execute([&](const BSONObj& data) {
+        if (data["how"].str() == "fault") {
             ++*illegalAddress;
         }
         ::abort();
-    }
+    });
 
     log() << "terminating, shutdown command received " << cmdObj;
 
@@ -352,11 +351,10 @@ void CmdShutdown::shutdownHelper(const BSONObj& cmdObj) {
         // The ServiceMain thread will quit for us so just sleep until it does.
         while (true)
             sleepsecs(60);  // Loop forever
-    } else
-#endif
-    {
-        shutdown(EXIT_CLEAN, shutdownArgs);  // this never returns
+        return;
     }
+#endif
+    shutdown(EXIT_CLEAN, shutdownArgs);  // this never returns
 }
 
 }  // namespace mongo

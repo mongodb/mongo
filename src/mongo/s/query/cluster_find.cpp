@@ -601,7 +601,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
 
     // If the 'waitAfterPinningCursorBeforeGetMoreBatch' fail point is enabled, set the 'msg'
     // field of this operation's CurOp to signal that we've hit this point.
-    if (MONGO_FAIL_POINT(waitAfterPinningCursorBeforeGetMoreBatch)) {
+    if (MONGO_unlikely(waitAfterPinningCursorBeforeGetMoreBatch.shouldFail())) {
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &waitAfterPinningCursorBeforeGetMoreBatch,
             opCtx,
@@ -624,7 +624,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
 
     // If the 'waitWithPinnedCursorDuringGetMoreBatch' fail point is enabled, set the 'msg'
     // field of this operation's CurOp to signal that we've hit this point.
-    if (MONGO_FAIL_POINT(waitWithPinnedCursorDuringGetMoreBatch)) {
+    if (MONGO_unlikely(waitWithPinnedCursorDuringGetMoreBatch.shouldFail())) {
         CurOpFailpointHelpers::waitWhileFailPointEnabled(&waitWithPinnedCursorDuringGetMoreBatch,
                                                          opCtx,
                                                          "waitWithPinnedCursorDuringGetMoreBatch");
@@ -701,7 +701,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     CurOp::get(opCtx)->debug().cursorExhausted = (idToReturn == 0);
     CurOp::get(opCtx)->debug().nreturned = batch.size();
 
-    if (MONGO_FAIL_POINT(waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch)) {
+    if (MONGO_unlikely(waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch.shouldFail())) {
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch,
             opCtx,

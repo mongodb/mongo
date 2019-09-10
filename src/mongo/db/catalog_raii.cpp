@@ -73,10 +73,8 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     _resolvedNss = CollectionCatalog::get(opCtx).resolveNamespaceStringOrUUID(nsOrUUID);
 
     // Wait for a configured amount of time after acquiring locks if the failpoint is enabled
-    MONGO_FAIL_POINT_BLOCK(setAutoGetCollectionWait, customWait) {
-        const BSONObj& data = customWait.getData();
-        sleepFor(Milliseconds(data["waitForMillis"].numberInt()));
-    }
+    setAutoGetCollectionWait.execute(
+        [&](const BSONObj& data) { sleepFor(Milliseconds(data["waitForMillis"].numberInt())); });
 
     Database* const db = _autoDb.getDb();
     invariant(!nsOrUUID.uuid() || db,

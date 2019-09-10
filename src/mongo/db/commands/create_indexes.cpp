@@ -487,7 +487,7 @@ bool runCreateIndexes(OperationContext* opCtx,
     // The 'indexer' can throw, so ensure the build cleanup occurs.
     ON_BLOCK_EXIT([&] {
         opCtx->recoveryUnit()->abandonSnapshot();
-        if (MONGO_FAIL_POINT(leaveIndexBuildUnfinishedForShutdown)) {
+        if (MONGO_unlikely(leaveIndexBuildUnfinishedForShutdown.shouldFail())) {
             // Set a flag to leave the persisted index build state intact when cleanUpAfterBuild()
             // is called below. The index build will be found on server startup.
             //
@@ -533,9 +533,9 @@ bool runCreateIndexes(OperationContext* opCtx,
         uassertStatusOK(indexer.insertAllDocumentsInCollection(opCtx, collection));
     }
 
-    if (MONGO_FAIL_POINT(hangAfterIndexBuildDumpsInsertsFromBulk)) {
+    if (MONGO_unlikely(hangAfterIndexBuildDumpsInsertsFromBulk.shouldFail())) {
         log() << "Hanging after dumping inserts from bulk builder";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterIndexBuildDumpsInsertsFromBulk);
+        hangAfterIndexBuildDumpsInsertsFromBulk.pauseWhileSet();
     }
 
     // Perform the first drain while holding an intent lock.
@@ -554,9 +554,9 @@ bool runCreateIndexes(OperationContext* opCtx,
         uassertStatusOK(indexer.drainBackgroundWrites(opCtx));
     }
 
-    if (MONGO_FAIL_POINT(hangAfterIndexBuildFirstDrain)) {
+    if (MONGO_unlikely(hangAfterIndexBuildFirstDrain.shouldFail())) {
         log() << "Hanging after index build first drain";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterIndexBuildFirstDrain);
+        hangAfterIndexBuildFirstDrain.pauseWhileSet();
     }
 
     // Perform the second drain while stopping writes on the collection.
@@ -575,9 +575,9 @@ bool runCreateIndexes(OperationContext* opCtx,
         uassertStatusOK(indexer.drainBackgroundWrites(opCtx));
     }
 
-    if (MONGO_FAIL_POINT(hangAfterIndexBuildSecondDrain)) {
+    if (MONGO_unlikely(hangAfterIndexBuildSecondDrain.shouldFail())) {
         log() << "Hanging after index build second drain";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterIndexBuildSecondDrain);
+        hangAfterIndexBuildSecondDrain.pauseWhileSet();
     }
 
     // Need to get exclusive collection lock back to complete the index build.

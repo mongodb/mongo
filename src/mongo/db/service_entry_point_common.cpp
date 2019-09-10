@@ -574,16 +574,23 @@ bool runCommandImpl(OperationContext* opCtx,
         }
 
         auto waitForWriteConcern = [&](auto&& bb) {
-            MONGO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
-                return CommandHelpers::shouldActivateFailCommandFailPoint(
-                           data, request.getCommandName(), opCtx->getClient(), invocation->ns()) &&
-                    data.hasField("writeConcernError");
-            }) {
-                bb.append(data.getData()["writeConcernError"]);
-                return;  // Don't do normal waiting.
+            bool reallyWait = true;
+            failCommand.executeIf(
+                [&](const BSONObj& data) {
+                    bb.append(data["writeConcernError"]);
+                    reallyWait = false;
+                },
+                [&](const BSONObj& data) {
+                    return CommandHelpers::shouldActivateFailCommandFailPoint(
+                               data,
+                               request.getCommandName(),
+                               opCtx->getClient(),
+                               invocation->ns()) &&
+                        data.hasField("writeConcernError");
+                });
+            if (reallyWait) {
+                behaviors.waitForWriteConcern(opCtx, invocation, lastOpBeforeRun, bb);
             }
-
-            behaviors.waitForWriteConcern(opCtx, invocation, lastOpBeforeRun, bb);
         };
 
         try {
@@ -623,8 +630,7 @@ bool runCommandImpl(OperationContext* opCtx,
     // This failpoint should affect both getMores and commands which are read-only and thus don't
     // support writeConcern.
     if (!shouldWaitForWriteConcern || command->getLogicalOp() == LogicalOp::opGetMore) {
-        MONGO_FAIL_POINT_BLOCK(waitAfterReadCommandFinishesExecution, options) {
-            const BSONObj& data = options.getData();
+        waitAfterReadCommandFinishesExecution.execute([&](const BSONObj& data) {
             auto db = data["db"].str();
             if (db.empty() || request.getDatabase() == db) {
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
@@ -632,7 +638,7 @@ bool runCommandImpl(OperationContext* opCtx,
                     opCtx,
                     "waitAfterReadCommandFinishesExecution");
             }
-        }
+        });
     }
 
     behaviors.waitForLinearizableReadConcern(opCtx);
@@ -692,15 +698,14 @@ void execCommandDatabase(OperationContext* opCtx,
             CurOp::get(opCtx)->setCommand_inlock(command);
         }
 
-        MONGO_FAIL_POINT_BLOCK(sleepMillisAfterCommandExecutionBegins, arg) {
-            const BSONObj& data = arg.getData();
+        sleepMillisAfterCommandExecutionBegins.execute([&](const BSONObj& data) {
             auto numMillis = data["millis"].numberInt();
             auto commands = data["commands"].Obj().getFieldNames<std::set<std::string>>();
             // Only sleep for one of the specified commands.
             if (commands.find(command->getName()) != commands.end()) {
                 mongo::sleepmillis(numMillis);
             }
-        }
+        });
 
         // TODO: move this back to runCommands when mongos supports OperationContext
         // see SERVER-18515 for details.
@@ -776,7 +781,7 @@ void execCommandDatabase(OperationContext* opCtx,
         const bool iAmPrimary = replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbname);
 
         if (!opCtx->getClient()->isInDirectClient() &&
-            !MONGO_FAIL_POINT(skipCheckingForNotMasterInCommandDispatch)) {
+            !MONGO_unlikely(skipCheckingForNotMasterInCommandDispatch.shouldFail())) {
             const bool inMultiDocumentTransaction = (sessionOptions.getAutocommit() == false);
             auto allowed = command->secondaryAllowed(opCtx->getServiceContext());
             bool alwaysAllowed = allowed == Command::AllowedOnSecondary::kAlways;
@@ -789,7 +794,7 @@ void execCommandDatabase(OperationContext* opCtx,
                 uasserted(ErrorCodes::NotMasterNoSlaveOk, "not master and slaveOk=false");
             }
 
-            if (MONGO_FAIL_POINT(respondWithNotPrimaryInCommandDispatch)) {
+            if (MONGO_unlikely(respondWithNotPrimaryInCommandDispatch.shouldFail())) {
                 uassert(ErrorCodes::NotMaster, "not primary", canRunHere);
             } else {
                 uassert(ErrorCodes::NotMaster, "not master", canRunHere);
@@ -1246,7 +1251,7 @@ DbResponse receivedGetMore(OperationContext* opCtx,
         audit::logGetMoreAuthzCheck(opCtx->getClient(), nsString, cursorid, status.code());
         uassertStatusOK(status);
 
-        while (MONGO_FAIL_POINT(rsStopGetMore)) {
+        while (MONGO_unlikely(rsStopGetMore.shouldFail())) {
             sleepmillis(0);
         }
 

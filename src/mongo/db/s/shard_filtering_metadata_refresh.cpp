@@ -90,7 +90,7 @@ void onShardVersionMismatch(OperationContext* opCtx,
         }
     }
 
-    if (MONGO_FAIL_POINT(skipShardFilteringMetadataRefresh)) {
+    if (MONGO_unlikely(skipShardFilteringMetadataRefresh.shouldFail())) {
         return;
     }
 
@@ -117,7 +117,7 @@ void onDbVersionMismatch(OperationContext* opCtx,
     // StaleDatabaseVersion retry attempts while the movePrimary is being committed.
     OperationShardingState::get(opCtx).waitForMovePrimaryCriticalSectionSignal(opCtx);
 
-    if (MONGO_FAIL_POINT(skipDatabaseVersionMetadataRefresh)) {
+    if (MONGO_unlikely(skipDatabaseVersionMetadataRefresh.shouldFail())) {
         return;
     }
 

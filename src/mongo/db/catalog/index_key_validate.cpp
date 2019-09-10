@@ -503,7 +503,7 @@ Status validateIdIndexSpec(const BSONObj& indexSpec) {
  * expected fields are present at creation time
  */
 Status validateIndexSpecFieldNames(const BSONObj& indexSpec) {
-    if (MONGO_FAIL_POINT(skipIndexCreateFieldNameValidation)) {
+    if (MONGO_unlikely(skipIndexCreateFieldNameValidation.shouldFail())) {
         return Status::OK();
     }
 

@@ -469,9 +469,7 @@ TEST_F(
     simulateSuccessfulV1Election();
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
-    getGlobalFailPointRegistry()
-        ->getFailPoint("blockHeartbeatReconfigFinish")
-        ->setMode(FailPoint::alwaysOn);
+    globalFailPointRegistry().find("blockHeartbeatReconfigFinish")->setMode(FailPoint::alwaysOn);
 
     // hb reconfig
     NetworkInterfaceMock* net = getNet();
@@ -511,9 +509,7 @@ TEST_F(
     ASSERT_EQUALS(ErrorCodes::ConfigurationInProgress,
                   getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
 
-    getGlobalFailPointRegistry()
-        ->getFailPoint("blockHeartbeatReconfigFinish")
-        ->setMode(FailPoint::off);
+    globalFailPointRegistry().find("blockHeartbeatReconfigFinish")->setMode(FailPoint::off);
 }
 
 TEST_F(ReplCoordTest, NodeDoesNotAcceptHeartbeatReconfigWhileInTheMidstOfReconfig) {

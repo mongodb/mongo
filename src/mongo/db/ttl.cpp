@@ -214,9 +214,9 @@ private:
         LOG(1) << "ns: " << collectionNSS << " key: " << key << " name: " << name;
 
         AutoGetCollection autoGetCollection(opCtx, collectionNSS, MODE_IX);
-        if (MONGO_FAIL_POINT(hangTTLMonitorWithLock)) {
+        if (MONGO_unlikely(hangTTLMonitorWithLock.shouldFail())) {
             log() << "Hanging due to hangTTLMonitorWithLock fail point";
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangTTLMonitorWithLock);
+            hangTTLMonitorWithLock.pauseWhileSet(opCtx);
         }
 
 

@@ -109,7 +109,7 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
-        if (MONGO_FAIL_POINT(validateCmdCollectionNotValid)) {
+        if (MONGO_unlikely(validateCmdCollectionNotValid.shouldFail())) {
             result.appendBool("valid", false);
             return true;
         }

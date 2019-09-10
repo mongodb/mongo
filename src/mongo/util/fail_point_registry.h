@@ -53,12 +53,12 @@ public:
      *     51006 - if the given name already exists in this registry.
      *     CannotMutateObject - if this registry is already frozen.
      */
-    Status addFailPoint(const std::string& name, FailPoint* failPoint);
+    Status add(const std::string& name, FailPoint* failPoint);
 
     /**
-     * @return the fail point object registered. Returns NULL if it was not registered.
+     * @return the fail point object registered, or nullptr if it was not registered.
      */
-    FailPoint* getFailPoint(const std::string& name) const;
+    FailPoint* find(const std::string& name) const;
 
     /**
      * Freezes this registry from being modified.

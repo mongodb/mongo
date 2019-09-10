@@ -62,7 +62,7 @@ bool ExprMatchExpression::matches(const MatchableDocument* doc, MatchDetails* de
         auto value = _expression->evaluate(document, &variables);
         return value.coerceToBool();
     } catch (const DBException&) {
-        if (MONGO_FAIL_POINT(ExprMatchExpressionMatchesReturnsFalseOnException)) {
+        if (MONGO_unlikely(ExprMatchExpressionMatchesReturnsFalseOnException.shouldFail())) {
             return false;
         }
 

@@ -58,10 +58,9 @@ public:
                 Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
                                                                                              nss));
 
-            if (MONGO_FAIL_POINT(hangRefineCollectionShardKeyAfterRefresh)) {
+            if (MONGO_unlikely(hangRefineCollectionShardKeyAfterRefresh.shouldFail())) {
                 log() << "Hit hangRefineCollectionShardKeyAfterRefresh failpoint";
-                MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
-                    opCtx, hangRefineCollectionShardKeyAfterRefresh);
+                hangRefineCollectionShardKeyAfterRefresh.pauseWhileSet(opCtx);
             }
 
             ConfigsvrRefineCollectionShardKey configsvrRefineCollShardKey(

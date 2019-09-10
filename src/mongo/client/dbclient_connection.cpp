@@ -577,7 +577,7 @@ void DBClientConnection::say(Message& toSend, bool isRetry, string* actualServer
 
     toSend.header().setId(nextMessageId());
     toSend.header().setResponseToMsgId(0);
-    if (!MONGO_FAIL_POINT(dbClientConnectionDisableChecksum)) {
+    if (!MONGO_unlikely(dbClientConnectionDisableChecksum.shouldFail())) {
 #ifdef MONGO_CONFIG_SSL
         if (!SSLPeerInfo::forSession(_session).isTLS) {
             OpMsg::appendChecksum(&toSend);
@@ -627,7 +627,7 @@ bool DBClientConnection::call(Message& toSend,
 
     toSend.header().setId(nextMessageId());
     toSend.header().setResponseToMsgId(0);
-    if (!MONGO_FAIL_POINT(dbClientConnectionDisableChecksum)) {
+    if (!MONGO_unlikely(dbClientConnectionDisableChecksum.shouldFail())) {
 #ifdef MONGO_CONFIG_SSL
         if (!SSLPeerInfo::forSession(_session).isTLS) {
             OpMsg::appendChecksum(&toSend);

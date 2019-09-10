@@ -368,7 +368,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
         true,  // Check for interrupt periodically.
         wholeOp.getNamespace());
 
-    if (MONGO_FAIL_POINT(failAllInserts)) {
+    if (MONGO_unlikely(failAllInserts.shouldFail())) {
         uasserted(ErrorCodes::InternalError, "failAllInserts failpoint active!");
     }
 
@@ -601,7 +601,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         false /*checkForInterrupt*/,
         ns);
 
-    if (MONGO_FAIL_POINT(failAllUpdates)) {
+    if (MONGO_unlikely(failAllUpdates.shouldFail())) {
         uasserted(ErrorCodes::InternalError, "failAllUpdates failpoint active!");
     }
 
@@ -848,7 +848,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
         },
         true  // Check for interrupt periodically.
     );
-    if (MONGO_FAIL_POINT(failAllRemoves)) {
+    if (MONGO_unlikely(failAllRemoves.shouldFail())) {
         uasserted(ErrorCodes::InternalError, "failAllRemoves failpoint active!");
     }
 
@@ -936,12 +936,12 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
             curOp.setCommand_inlock(cmd);
         }
         ON_BLOCK_EXIT([&] {
-            if (MONGO_FAIL_POINT(hangBeforeChildRemoveOpFinishes)) {
+            if (MONGO_unlikely(hangBeforeChildRemoveOpFinishes.shouldFail())) {
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &hangBeforeChildRemoveOpFinishes, opCtx, "hangBeforeChildRemoveOpFinishes");
             }
             finishCurOp(opCtx, &curOp);
-            if (MONGO_FAIL_POINT(hangBeforeChildRemoveOpIsPopped)) {
+            if (MONGO_unlikely(hangBeforeChildRemoveOpIsPopped.shouldFail())) {
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &hangBeforeChildRemoveOpIsPopped, opCtx, "hangBeforeChildRemoveOpIsPopped");
             }
@@ -959,7 +959,7 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
         }
     }
 
-    if (MONGO_FAIL_POINT(hangAfterAllChildRemoveOpsArePopped)) {
+    if (MONGO_unlikely(hangAfterAllChildRemoveOpsArePopped.shouldFail())) {
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &hangAfterAllChildRemoveOpsArePopped, opCtx, "hangAfterAllChildRemoveOpsArePopped");
     }

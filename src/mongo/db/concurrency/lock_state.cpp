@@ -895,7 +895,8 @@ void LockerImpl::_lockComplete(OperationContext* opCtx,
 
     // This failpoint is used to time out non-intent locks if they cannot be granted immediately.
     // Testing-only.
-    if (!_uninterruptibleLocksRequested && MONGO_FAIL_POINT(failNonIntentLocksIfWaitNeeded)) {
+    if (!_uninterruptibleLocksRequested &&
+        MONGO_unlikely(failNonIntentLocksIfWaitNeeded.shouldFail())) {
         uassert(ErrorCodes::LockTimeout,
                 str::stream() << "Cannot immediately acquire lock '" << resId.toString()
                               << "'. Timing out due to failpoint.",
@@ -991,7 +992,7 @@ void LockerImpl::getFlowControlTicket(OperationContext* opCtx, LockMode lockMode
 LockResult LockerImpl::lockRSTLBegin(OperationContext* opCtx, LockMode mode) {
     bool testOnly = false;
 
-    if (MONGO_FAIL_POINT(enableTestOnlyFlagforRSTL)) {
+    if (MONGO_unlikely(enableTestOnlyFlagforRSTL.shouldFail())) {
         testOnly = true;
     }
 

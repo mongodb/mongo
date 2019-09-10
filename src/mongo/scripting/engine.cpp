@@ -237,7 +237,7 @@ void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
         uassert(10209, str::stream() << "name has to be a string: " << n, n.type() == String);
         uassert(10210, "value has to be set", v.type() != EOO);
 
-        if (MONGO_FAIL_POINT(mr_killop_test_fp)) {
+        if (MONGO_unlikely(mr_killop_test_fp.shouldFail())) {
 
             /* This thread sleep makes the interrupts in the test come in at a time
              *  where the js misses the interrupt and throw an exception instead of
