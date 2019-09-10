@@ -206,16 +206,6 @@ selector:
   - jstests/concurrency/fsm_workloads/indexed_insert_text.js
   - jstests/concurrency/fsm_workloads/indexed_insert_text_multikey.js
 
-  # TODO SERVER-40700: Reads outside transactions aren't killed on stepdown, which can create a
-  # 3-way deadlock if the read enters a prepare conflict retry loop between the read, a prepared
-  # transaction, and a force stepdown. The read can't complete until the transaction commits or
-  # aborts, but the transaction's decision can't be written without the RSTL, which it can't take
-  # before a stepdown that can't take the lock in X mode until the read completes.
-  - jstests/concurrency/fsm_workloads/count.js
-  - jstests/concurrency/fsm_workloads/count_indexed.js
-  - jstests/concurrency/fsm_workloads/count_limit_skip.js
-  - jstests/concurrency/fsm_workloads/explain_count.js
-
   exclude_with_any_tags:
   - does_not_support_causal_consistency
   - requires_replication
