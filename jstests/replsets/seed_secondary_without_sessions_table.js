@@ -149,6 +149,7 @@
     seed = rst.restart(seed, {noReplSet: false});
     reconnect(seed);
     seed.setSlaveOk();
+    rst.waitForState(seed, ReplSetTest.State.SECONDARY);
 
     assertCollSize(sessionsColl(primary), 2);
     assertCollSize(txnColl(primary), 2);
