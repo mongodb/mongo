@@ -31,6 +31,7 @@
 
 #include <string>
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 
@@ -43,22 +44,24 @@ class MapReduceJavascriptCode {
 public:
     static MapReduceJavascriptCode parseFromBSON(const BSONElement& element) {
         uassert(ErrorCodes::BadValue,
-                "'scope' must be a string, code or 'code with scope'",
-                element.type() == String || element.type() == Code || element.type() == CodeWScope);
-        return MapReduceJavascriptCode(element);
+                "'scope' must be of string or code type",
+                element.type() == String || element.type() == Code);
+        return MapReduceJavascriptCode(element._asCode());
     }
 
     MapReduceJavascriptCode() = default;
-    MapReduceJavascriptCode(const BSONElement& element) : code(element.wrap()) {}
+    MapReduceJavascriptCode(std::string&& code) : code(code) {}
 
     void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
-        (*builder) << fieldName << code[0];
+        (*builder) << fieldName << code;
+    }
+
+    auto getCode() const {
+        return code;
     }
 
 private:
-    // We have to save a local copy of the BSON for reserialization since it's difficult to rebuild
-    // once it has been turned into a code type.
-    BSONObj code;
+    std::string code;
 };
 
 }  // namespace mongo

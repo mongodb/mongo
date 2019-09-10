@@ -822,8 +822,21 @@ public:
     explicit ExpressionArray(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionVariadic<ExpressionArray>(expCtx) {}
 
+    ExpressionArray(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                    std::vector<boost::intrusive_ptr<Expression>>&& children)
+        : ExpressionVariadic<ExpressionArray>(expCtx) {
+        _children = std::move(children);
+    }
+
     Value evaluate(const Document& root, Variables* variables) const final;
     Value serialize(bool explain) const final;
+
+    static boost::intrusive_ptr<ExpressionArray> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        std::vector<boost::intrusive_ptr<Expression>>&& children) {
+        return make_intrusive<ExpressionArray>(expCtx, std::move(children));
+    }
+
     boost::intrusive_ptr<Expression> optimize() final;
     const char* getOpName() const final;
 
@@ -1788,8 +1801,8 @@ public:
 
     static boost::intrusive_ptr<ExpressionObject> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        std::vector<boost::intrusive_ptr<Expression>> children,
-        std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>&>>&& expressions);
+        std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>>&&
+            expressionsWithChildrenInPlace);
 
     /**
      * Parses and constructs an ExpressionObject from 'obj'.

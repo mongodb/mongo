@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/document_source_group.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/plan_executor.h"
 
 namespace mongo {
@@ -129,7 +130,16 @@ public:
      */
     static std::unique_ptr<CollatorInterface> resolveCollator(OperationContext* opCtx,
                                                               BSONObj userCollation,
-                                                              const Collection* collection);
+                                                              const Collection* collection) {
+        if (!userCollation.isEmpty()) {
+            return uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                       ->makeFromBSON(userCollation));
+        }
+
+        return (collection && collection->getDefaultCollator()
+                    ? collection->getDefaultCollator()->clone()
+                    : nullptr);
+    }
 
 private:
     PipelineD();  // does not exist:  prevent instantiation

@@ -210,20 +210,7 @@ TEST_F(DocumentSourceGroupTest, ShouldReportMultipleFieldGroupKeysAsARename) {
     VariablesParseState vps = expCtx->variablesParseState;
     auto x = ExpressionFieldPath::parse(expCtx, "$x", vps);
     auto y = ExpressionFieldPath::parse(expCtx, "$y", vps);
-    auto groupByExpression = [&]() {
-        std::vector<boost::intrusive_ptr<Expression>> children;
-        std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>&>> expressions;
-        auto doc = std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>>{{"x", x},
-                                                                                         {"y", y}};
-        for (auto& [unused, expression] : doc)
-            children.push_back(std::move(expression));
-        std::vector<boost::intrusive_ptr<Expression>>::size_type index = 0;
-        for (auto& [fieldName, unused] : doc) {
-            expressions.emplace_back(fieldName, children[index]);
-            ++index;
-        }
-        return ExpressionObject::create(expCtx, std::move(children), std::move(expressions));
-    }();
+    auto groupByExpression = ExpressionObject::create(expCtx, {{"x", x}, {"y", y}});
     auto group = DocumentSourceGroup::create(expCtx, groupByExpression, {});
     auto modifiedPathsRet = group->getModifiedPaths();
     ASSERT(modifiedPathsRet.type == DocumentSource::GetModPathsReturn::Type::kAllExcept);

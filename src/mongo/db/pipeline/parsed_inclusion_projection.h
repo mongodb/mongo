@@ -90,8 +90,13 @@ protected:
 class ParsedInclusionProjection : public ParsedAggregationProjection {
 public:
     ParsedInclusionProjection(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                              ProjectionPolicies policies,
+                              std::unique_ptr<InclusionNode> root)
+        : ParsedAggregationProjection(expCtx, policies), _root(std::move(root)) {}
+
+    ParsedInclusionProjection(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                               ProjectionPolicies policies)
-        : ParsedAggregationProjection(expCtx, policies), _root(new InclusionNode(policies)) {}
+        : ParsedInclusionProjection(expCtx, policies, std::make_unique<InclusionNode>(policies)) {}
 
     TransformerType getType() const final {
         return TransformerType::kInclusionProjection;

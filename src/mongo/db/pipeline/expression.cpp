@@ -93,7 +93,7 @@ intrusive_ptr<Expression> Expression::parseObject(
     BSONObj obj,
     const VariablesParseState& vps) {
     if (obj.isEmpty()) {
-        return ExpressionObject::create(expCtx, {}, {});
+        return ExpressionObject::create(expCtx, {});
     }
 
     if (obj.firstElementFieldName()[0] == '$') {
@@ -1882,11 +1882,23 @@ ExpressionObject::ExpressionObject(const boost::intrusive_ptr<ExpressionContext>
                                    vector<pair<string, intrusive_ptr<Expression>&>>&& expressions)
     : Expression(expCtx, std::move(_children)), _expressions(std::move(expressions)) {}
 
-intrusive_ptr<ExpressionObject> ExpressionObject::create(
+boost::intrusive_ptr<ExpressionObject> ExpressionObject::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    std::vector<boost::intrusive_ptr<Expression>> _children,
-    vector<pair<string, intrusive_ptr<Expression>&>>&& expressions) {
-    return new ExpressionObject(expCtx, std::move(_children), std::move(expressions));
+    std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>>&&
+        expressionsWithChildrenInPlace) {
+    std::vector<boost::intrusive_ptr<Expression>> children;
+    std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>&>> expressions;
+    for (auto& [unused, expression] : expressionsWithChildrenInPlace)
+        // These 'push_back's must complete before we insert references to the 'children' vector
+        // into the 'expressions' vector since 'push_back' invalidates references.
+        children.push_back(std::move(expression));
+    std::vector<boost::intrusive_ptr<Expression>>::size_type index = 0;
+    for (auto& [fieldName, unused] : expressionsWithChildrenInPlace) {
+        expressions.emplace_back(fieldName, children[index]);
+        ++index;
+    }
+    // It is safe to 'std::move' 'children' since the standard guarantees the references are stable.
+    return new ExpressionObject(expCtx, std::move(children), std::move(expressions));
 }
 
 intrusive_ptr<ExpressionObject> ExpressionObject::parse(

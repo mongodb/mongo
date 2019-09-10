@@ -49,6 +49,13 @@ public:
         BSONElement expr,
         const VariablesParseState& vps);
 
+    static boost::intrusive_ptr<ExpressionInternalJsEmit> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        boost::intrusive_ptr<Expression> thisRef,
+        std::string funcSourceString) {
+        return new ExpressionInternalJsEmit{expCtx, thisRef, std::move(funcSourceString)};
+    }
+
     Value evaluate(const Document& root, Variables* variables) const final;
 
     Value serialize(bool explain) const final;
@@ -81,6 +88,13 @@ public:
         BSONElement expr,
         const VariablesParseState& vps);
 
+    static boost::intrusive_ptr<ExpressionInternalJs> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        boost::intrusive_ptr<Expression> passedArgs,
+        std::string funcSourceString) {
+        return new ExpressionInternalJs{expCtx, passedArgs, std::move(funcSourceString)};
+    }
+
     Value evaluate(const Document& root, Variables* variables) const final;
 
     Value serialize(bool explain) const final;
@@ -88,6 +102,8 @@ public:
     void acceptVisitor(ExpressionVisitor* visitor) final {
         return visitor->visit(this);
     }
+
+    static constexpr auto kExpressionName = "$_internalJs"_sd;
 
 private:
     ExpressionInternalJs(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -97,6 +113,5 @@ private:
 
     const boost::intrusive_ptr<Expression>& _passedArgs;
     std::string _funcSource;
-    static constexpr auto kExpressionName = "$_internalJs"_sd;
 };
 }  // namespace mongo

@@ -70,7 +70,7 @@ private:
                   std::string& errmsg,
                   BSONObjBuilder& result) final {
         if (getTestCommandsEnabled() && internalQueryUseAggMapReduce.load()) {
-            return runAggregationMapReduce(opCtx, dbname, cmd, errmsg, result);
+            return map_reduce_agg::runAggregationMapReduce(opCtx, dbname, cmd, errmsg, result);
         }
         return mr::runMapReduce(opCtx, dbname, cmd, errmsg, result);
     }

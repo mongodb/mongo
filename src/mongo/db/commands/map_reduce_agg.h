@@ -27,7 +27,19 @@
  *    it in the license file.
  */
 
-namespace mongo {
+#pragma once
+
+#include <memory>
+#include <string>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/commands/map_reduce_gen.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline.h"
+
+namespace mongo::map_reduce_agg {
 
 bool runAggregationMapReduce(OperationContext* opCtx,
                              const std::string& dbname,
@@ -35,4 +47,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                              std::string& errmsg,
                              BSONObjBuilder& result);
 
-}  // namespace mongo
+std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
+    MapReduce parsedMr, boost::intrusive_ptr<ExpressionContext> expCtx);
+
+}  // namespace mongo::map_reduce_agg

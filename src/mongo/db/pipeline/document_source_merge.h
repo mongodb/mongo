@@ -143,6 +143,10 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
+    auto getPipeline() const {
+        return _pipeline;
+    }
+
 private:
     /**
      * Builds a new $merge stage which will merge all documents into 'outputNs'. If
