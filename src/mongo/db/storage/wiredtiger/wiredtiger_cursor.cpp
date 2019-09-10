@@ -48,9 +48,17 @@ WiredTigerCursor::WiredTigerCursor(const std::string& uri,
         (_ru->getTimestampReadSource() == WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
 
     str::stream builder;
-    builder << ((allowOverwrite) ? "" : "overwrite=false,");
-    builder << ((_readOnce) ? "read_once=true," : "");
-    builder << ((_isCheckpoint) ? "checkpoint=WiredTigerCheckpoint," : "");
+    if (_readOnce) {
+        builder << "read_once=true,";
+    }
+    if (_isCheckpoint) {
+        builder << "checkpoint=WiredTigerCheckpoint,";
+    }
+    // Add this option last to avoid needing a trailing comma. This enables an optimization in
+    // WiredTiger to skip parsing the config string. See SERVER-43232 for details.
+    if (!allowOverwrite) {
+        builder << "overwrite=false";
+    }
 
     const std::string config = builder;
     if (_readOnce || _isCheckpoint) {
