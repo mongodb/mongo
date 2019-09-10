@@ -513,6 +513,9 @@ public:
                                   int len,
                                   BinDataType type,
                                   const void* data) {
+        if (type == ByteArrayDeprecated) {
+            return appendBinDataArrayDeprecated(fieldName, data, len);
+        }
         _b.appendNum((char)BinData);
         _b.appendStr(fieldName);
         _b.appendNum(len);
@@ -531,11 +534,11 @@ public:
     @param data a byte array
     @param len the length of data
     */
-    BSONObjBuilder& appendBinDataArrayDeprecated(const char* fieldName, const void* data, int len) {
+    BSONObjBuilder& appendBinDataArrayDeprecated(StringData fieldName, const void* data, int len) {
         _b.appendNum((char)BinData);
         _b.appendStr(fieldName);
         _b.appendNum(len + 4);
-        _b.appendNum((char)0x2);
+        _b.appendNum((char)ByteArrayDeprecated);
         _b.appendNum(len);
         _b.appendBuf(data, len);
         return *this;

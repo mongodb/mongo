@@ -213,7 +213,11 @@ void BSONElement::jsonStringStream(JsonStringFormat format,
             BinDataType type = static_cast<BinDataType>(reader.readAndAdvance<uint8_t>());
 
             s << "{ \"$binary\" : \"";
-            base64::encode(s, reader.view(), len);
+            if (type == ByteArrayDeprecated && len >= 4) {
+                base64::encode(s, reader.view() + 4, len - 4);
+            } else {
+                base64::encode(s, reader.view(), len);
+            }
 
             auto origFill = s.fill();
             auto origFmtF = s.flags();

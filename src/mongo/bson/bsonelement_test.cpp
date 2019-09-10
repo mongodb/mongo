@@ -72,6 +72,19 @@ TEST(BSONElement, BinDataToString) {
     builder.appendBinData(
         "unknownType", unknownType.size(), unknownBinDataType, unknownType.rawData());
 
+    builder.bb().appendNum((char)BinData);
+    builder.bb().appendStr("brokenType2");
+    builder.bb().appendNum(3);
+    builder.bb().appendNum((char)ByteArrayDeprecated);
+    builder.bb().appendBuf("foo", 3);
+
+    builder.bb().appendNum((char)BinData);
+    builder.bb().appendStr("fixedType2");
+    builder.bb().appendNum(4 + 3);
+    builder.bb().appendNum((char)ByteArrayDeprecated);
+    builder.bb().appendNum(3);
+    builder.bb().appendBuf("foo", 3);
+
     BSONObj obj = builder.obj();
     ASSERT_EQ(obj["bintype0"].toString(), "bintype0: BinData(0, DEEABEEF01)");
     ASSERT_EQ(obj["validUUID"].toString(), "validUUID: UUID(\"" + validUUID.toString() + "\")");
@@ -83,6 +96,8 @@ TEST(BSONElement, BinDataToString) {
     ASSERT_EQ(obj["unknownType"].toString(),
               "unknownType: BinData(42, "
               "62696E6172792064617461007769746820616E20756E6B6E6F776E2074797065)");
+    ASSERT_EQ(obj["brokenType2"].toString(), "brokenType2: BinData(2, 666F6F)");
+    ASSERT_EQ(obj["fixedType2"].toString(), "fixedType2: BinData(2, 666F6F)");
 }
 
 
