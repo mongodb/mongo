@@ -27,7 +27,6 @@ tests:
                 q: { _id: { $gt: 1 }}
                 u: { $inc: { x: 1 }}
                 multi: true
-                upsert: false
           command_name: "update"
           database_name: *database_name
       -
@@ -54,7 +53,6 @@ tests:
                 q: { _id: { $gt: 1 }}
                 u: { $nothing: { x: 1 }}
                 multi: true
-                upsert: false
           command_name: "update"
           database_name: *database_name
       -

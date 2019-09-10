@@ -84,7 +84,7 @@ type Options struct {
 // StorageOptions defines the set of options to use in storing/retrieving data from server.
 type StorageOptions struct {
 	// Specified database to use. defaults to 'test' if none is specified
-	DB string `short:"d" value-name:"<database-name>" default:"test" default-mask:"-" long:"db" description:"database to use (default is 'test')"`
+	DB string `short:"d" value-name:"<database-name>" default:"test" default-mask:"-" long:"db" description:"database to use"`
 
 	// 'LocalFileName' is an option that specifies what filename to use for (put|get)
 	LocalFileName string `long:"local" value-name:"<filename>" short:"l" description:"local filename for put|get"`
@@ -96,7 +96,7 @@ type StorageOptions struct {
 	Replace bool `long:"replace" short:"r" description:"remove other files with same name after put"`
 
 	// GridFSPrefix specifies what GridFS prefix to use; defaults to 'fs'
-	GridFSPrefix string `long:"prefix" value-name:"<prefix>" default:"fs" default-mask:"-" description:"GridFS prefix to use (default is 'fs')"`
+	GridFSPrefix string `long:"prefix" value-name:"<prefix>" default:"fs" default-mask:"-" description:"GridFS prefix to use"`
 
 	// Specifies the write concern for each write operation that mongofiles writes to the target database.
 	// By default, mongofiles waits for a majority of members from the replica set to respond before returning.

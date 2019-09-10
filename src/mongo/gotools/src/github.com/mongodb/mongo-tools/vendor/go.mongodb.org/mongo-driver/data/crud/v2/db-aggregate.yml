@@ -1,6 +1,8 @@
-database_name: &database_name "admin"
+runOn:
+    -
+        minServerVersion: "3.6.0"
 
-minServerVersion: '3.6'
+database_name: &database_name "admin"
 
 tests:
   -

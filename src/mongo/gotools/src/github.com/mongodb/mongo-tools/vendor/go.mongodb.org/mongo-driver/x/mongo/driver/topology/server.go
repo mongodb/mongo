@@ -27,11 +27,11 @@ import (
 const minHeartbeatInterval = 500 * time.Millisecond
 const connectionSemaphoreSize = math.MaxInt64
 
-// ErrServerClosed occurs when an attempt to get a connection is made after
+// ErrServerClosed occurs when an attempt to Get a connection is made after
 // the server has been closed.
 var ErrServerClosed = errors.New("server is closed")
 
-// ErrServerConnected occurs when at attempt to connect is made after a server
+// ErrServerConnected occurs when at attempt to Connect is made after a server
 // has already been connected.
 var ErrServerConnected = errors.New("server is connected")
 
@@ -58,6 +58,7 @@ const (
 	disconnecting
 	connected
 	connecting
+	initialized
 )
 
 func connectionStateString(state int32) string {
@@ -70,6 +71,8 @@ func connectionStateString(state int32) string {
 		return "Connected"
 	case 3:
 		return "Connecting"
+	case 4:
+		return "Initialized"
 	}
 
 	return ""
@@ -125,7 +128,7 @@ func NewServer(addr address.Address, opts ...ServerOption) (*Server, error) {
 		return nil, err
 	}
 
-	var maxConns = uint64(cfg.maxConns)
+	var maxConns = cfg.maxConns
 	if maxConns == 0 {
 		maxConns = math.MaxInt64
 	}
@@ -144,8 +147,18 @@ func NewServer(addr address.Address, opts ...ServerOption) (*Server, error) {
 	s.desc.Store(description.Server{Addr: addr})
 
 	callback := func(desc description.Server) { s.updateDescription(desc, false) }
-	s.pool = newPool(addr, uint64(cfg.maxIdleConns), withServerDescriptionCallback(callback, cfg.connectionOpts...)...)
+	pc := poolConfig{
+		Address:     addr,
+		MinPoolSize: cfg.minConns,
+		MaxPoolSize: cfg.maxConns,
+		MaxIdleTime: cfg.connectionPoolMaxIdleTime,
+		PoolMonitor: cfg.poolMonitor,
+	}
 
+	s.pool, err = newPool(pc, withServerDescriptionCallback(callback, cfg.connectionOpts...)...)
+	if err != nil {
+		return nil, err
+	}
 	return s, nil
 }
 
@@ -164,7 +177,7 @@ func (s *Server) Connect(updateCallback func(description.Server)) error {
 
 // Disconnect closes sockets to the server referenced by this Server.
 // Subscriptions to this Server will be closed. Disconnect will shutdown
-// any monitoring goroutines, close the idle connection pool, and will
+// any monitoring goroutines, closeConnection the idle connection pool, and will
 // wait until all the in use connections have been returned to the connection
 // pool and are closed before returning. If the context expires via
 // cancellation, deadline, or timeout before the in use connections have been
@@ -194,28 +207,43 @@ func (s *Server) Disconnect(ctx context.Context) error {
 
 // Connection gets a connection to the server.
 func (s *Server) Connection(ctx context.Context) (driver.Connection, error) {
+
+	if s.pool.monitor != nil {
+		s.pool.monitor.Event(&event.PoolEvent{
+			Type:    "ConnectionCheckOutStarted",
+			Address: s.pool.address.String(),
+		})
+	}
+
 	if atomic.LoadInt32(&s.connectionstate) != connected {
 		return nil, ErrServerClosed
 	}
 
 	err := s.sem.Acquire(ctx, 1)
 	if err != nil {
-		return nil, err
+		if s.pool.monitor != nil {
+			s.pool.monitor.Event(&event.PoolEvent{
+				Type:    "ConnectionCheckOutFailed",
+				Address: s.pool.address.String(),
+				Reason:  "timeout",
+			})
+		}
+		return nil, ErrWaitQueueTimeout
 	}
 
 	conn, err := s.pool.get(ctx)
 	if err != nil {
 		s.sem.Release(1)
-		connerr, ok := err.(ConnectionError)
+		connErr, ok := err.(ConnectionError)
 		if !ok {
 			return nil, err
 		}
 
-		// Since the only kind of ConnectionError we receive from pool.get will be an initialization
+		// Since the only kind of ConnectionError we receive from pool.Get will be an initialization
 		// error, we should set the description.Server appropriately.
 		desc := description.Server{
 			Kind:      description.Unknown,
-			LastError: connerr.Wrapped,
+			LastError: connErr.Wrapped,
 		}
 		s.updateDescription(desc, false)
 
@@ -287,8 +315,11 @@ func (s *Server) ProcessError(err error) {
 		desc.LastError = err
 		// updates description to unknown
 		s.updateDescription(desc, false)
-		s.RequestImmediateCheck()
-		s.pool.drain()
+		// If the node is shutting down or is older than 4.2, we synchronously clear the pool
+		if cerr.NodeIsShuttingDown() || desc.WireVersion == nil || desc.WireVersion.Max < 8 {
+			s.RequestImmediateCheck()
+			s.pool.clear()
+		}
 		return
 	}
 	if wcerr, ok := err.(driver.WriteConcernError); ok && (wcerr.NodeIsRecovering() || wcerr.NotMaster()) {
@@ -297,8 +328,11 @@ func (s *Server) ProcessError(err error) {
 		desc.LastError = err
 		// updates description to unknown
 		s.updateDescription(desc, false)
-		s.RequestImmediateCheck()
-		s.pool.drain()
+		// If the node is shutting down or is older than 4.2, we synchronously clear the pool
+		if wcerr.NodeIsShuttingDown() || desc.WireVersion == nil || desc.WireVersion.Max < 8 {
+			s.RequestImmediateCheck()
+			s.pool.clear()
+		}
 		return
 	}
 
@@ -462,6 +496,10 @@ func (s *Server) heartbeat(conn *connection) (description.Server, *connection) {
 			}))
 
 			conn, err = newConnection(ctx, s.address, opts...)
+
+			conn.connect(ctx)
+
+			err := conn.connectWait()
 			if err == nil {
 				descPtr = &conn.desc
 			}
@@ -526,20 +564,6 @@ func (s *Server) updateAverageRTT(delay time.Duration) time.Duration {
 		s.averageRTT = time.Duration(alpha*float64(delay) + (1-alpha)*float64(s.averageRTT))
 	}
 	return s.averageRTT
-}
-
-// Drain will drain the connection pool of this server. This is mainly here so the
-// pool for the server doesn't need to be directly exposed and so that when an error
-// is returned from reading or writing, a client can drain the pool for this server.
-// This is exposed here so we don't have to wrap the Connection type and sniff responses
-// for errors that would cause the pool to be drained, which can in turn centralize the
-// logic for handling errors in the Client type.
-//
-// TODO(GODRIVER-617): I don't think we actually need this method. It's likely replaced by
-// ProcessError.
-func (s *Server) Drain() error {
-	s.pool.drain()
-	return nil
 }
 
 // String implements the Stringer interface.

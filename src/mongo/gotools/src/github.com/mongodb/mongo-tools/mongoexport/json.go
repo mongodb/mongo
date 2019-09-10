@@ -24,12 +24,12 @@ type JSONExportOutput struct {
 	PrettyOutput bool
 	Out          io.Writer
 	NumExported  int64
-	JSONFormat   jsonFormat
+	JSONFormat   JSONFormat
 }
 
 // NewJSONExportOutput creates a new JSONExportOutput in array mode if specified,
 // configured to write data to the given io.Writer.
-func NewJSONExportOutput(arrayOutput bool, prettyOutput bool, out io.Writer, jsonFormat jsonFormat) *JSONExportOutput {
+func NewJSONExportOutput(arrayOutput bool, prettyOutput bool, out io.Writer, jsonFormat JSONFormat) *JSONExportOutput {
 	return &JSONExportOutput{
 		arrayOutput,
 		prettyOutput,
@@ -92,7 +92,7 @@ func (jsonExporter *JSONExportOutput) ExportDocument(document bson.D) error {
 			}
 		}
 
-		jsonOut, err := bson.MarshalExtJSON(document, jsonExporter.JSONFormat == canonical, false)
+		jsonOut, err := bson.MarshalExtJSON(document, jsonExporter.JSONFormat == Canonical, false)
 		if err != nil {
 			return err
 		}
@@ -109,7 +109,7 @@ func (jsonExporter *JSONExportOutput) ExportDocument(document bson.D) error {
 			return err
 		}
 	} else {
-		extendedDoc, err := bson.MarshalExtJSON(document, jsonExporter.JSONFormat == canonical, false)
+		extendedDoc, err := bson.MarshalExtJSON(document, jsonExporter.JSONFormat == Canonical, false)
 		if err != nil {
 			return err
 		}

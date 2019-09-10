@@ -4,6 +4,7 @@ documentation = "ListDatabases performs a listDatabases operation."
 
 [properties]
 enabled = ["read preference"]
+retryable = {mode = "once per command", type = "reads"}
 disabled = ["collection"]
 
 [command]

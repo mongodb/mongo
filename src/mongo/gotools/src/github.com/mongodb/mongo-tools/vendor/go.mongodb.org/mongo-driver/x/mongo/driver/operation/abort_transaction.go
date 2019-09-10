@@ -54,7 +54,7 @@ func (at *AbortTransaction) Execute(ctx context.Context) error {
 		CommandFn:         at.command,
 		ProcessResponseFn: at.processResponse,
 		RetryMode:         at.retry,
-		RetryType:         driver.RetryWrite,
+		Type:              driver.Write,
 		Client:            at.session,
 		Clock:             at.clock,
 		CommandMonitor:    at.monitor,
@@ -165,9 +165,8 @@ func (at *AbortTransaction) WriteConcern(writeConcern *writeconcern.WriteConcern
 	return at
 }
 
-// Retry enables retryable writes for this operation. Retries are not handled automatically,
-// instead a boolean is returned from Execute and SelectAndExecute that indicates if the
-// operation can be retried. Retrying is handled by calling RetryExecute.
+// Retry enables retryable mode for this operation. Retries are handled automatically in driver.Operation.Execute based
+// on how the operation is set.
 func (at *AbortTransaction) Retry(retry driver.RetryMode) *AbortTransaction {
 	if at == nil {
 		at = new(AbortTransaction)

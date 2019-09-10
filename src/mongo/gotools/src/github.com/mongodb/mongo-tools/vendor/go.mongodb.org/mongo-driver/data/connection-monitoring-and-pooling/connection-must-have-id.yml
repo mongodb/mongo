@@ -1,0 +1,21 @@
+version: 1
+style: unit
+description: must have an ID number associated with it
+operations:
+  - name: checkOut
+  - name: checkOut
+events:
+  - type: ConnectionCheckOutStarted
+  - type: ConnectionCreated
+    connectionId: 42
+  - type: ConnectionCheckedOut
+    connectionId: 42
+  - type: ConnectionCheckOutStarted
+  - type: ConnectionCreated
+    connectionId: 42
+  - type: ConnectionCheckedOut
+    connectionId: 42
+ignore:
+  - ConnectionPoolCreated
+  - ConnectionPoolClosed
+  - ConnectionReady

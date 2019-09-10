@@ -1,0 +1,160 @@
+runOn:
+    -
+        minServerVersion: "4.0"
+        topology: ["single", "replicaset"]
+    -
+        minServerVersion: "4.1.7"
+        topology: ["sharded"]
+
+database_name: &database_name "retryable-reads-tests"
+collection_name: &collection_name "coll"
+
+data:
+    - {_id: 1, x: 11}
+    - {_id: 2, x: 22}
+    - {_id: 3, x: 33}
+    - {_id: 4, x: 44}
+    - {_id: 5, x: 55}
+
+tests:
+    -
+        description: "Find succeeds after InterruptedAtShutdown"
+        failPoint: &failCommand_failPoint
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data: { failCommands: [find], errorCode: 11600 }
+        operations:
+            - &retryable_operation_succeeds
+                <<: &retryable_operation
+                    name: find
+                    object: collection
+                    arguments: { filter: {}, sort: { _id: 1 }, limit: 4 }
+                result:
+                    - {_id: 1, x: 11}
+                    - {_id: 2, x: 22}
+                    - {_id: 3, x: 33}
+                    - {_id: 4, x: 44}
+        expectations:
+            - &retryable_command_started_event
+                command_started_event:
+                    command:
+                        find: *collection_name
+                        filter: {}
+                        sort: {_id: 1}
+                        limit: 4
+                    database_name: *database_name
+            - *retryable_command_started_event
+    -
+        description: "Find succeeds after InterruptedDueToReplStateChange"
+        failPoint:
+            <<: *failCommand_failPoint
+            data: { failCommands: [find], errorCode: 11602 }
+        operations: [*retryable_operation_succeeds]
+        expectations:
+             - *retryable_command_started_event
+             - *retryable_command_started_event
+    -
+        description: "Find succeeds after NotMaster"
+        failPoint:
+            <<: *failCommand_failPoint
+            data: { failCommands: [find], errorCode: 10107 }
+        operations: [*retryable_operation_succeeds]
+        expectations:
+             - *retryable_command_started_event
+             - *retryable_command_started_event
+    -
+        description: "Find succeeds after NotMasterNoSlaveOk"
+        failPoint:
+            <<: *failCommand_failPoint
+            data: { failCommands: [find], errorCode: 13435 }
+        operations: [*retryable_operation_succeeds]
+        expectations:
+             - *retryable_command_started_event
+             - *retryable_command_started_event
+    -
+        description: "Find succeeds after NotMasterOrSecondary"
+        failPoint:
+            <<: *failCommand_failPoint
+            data: { failCommands: [find], errorCode: 13436 }
+        operations: [*retryable_operation_succeeds]
+        expectations:
+             - *retryable_command_started_event
+             - *retryable_command_started_event
+    -
+        description: "Find succeeds after PrimarySteppedDown"
+        failPoint:
+            <<: *failCommand_failPoint
+            data: { failCommands: [find], errorCode: 189 }
+        operations: [*retryable_operation_succeeds]
+        expectations:
+             - *retryable_command_started_event
+             - *retryable_command_started_event
+    -
+        description: "Find succeeds after ShutdownInProgress"
+        failPoint:
+            <<: *failCommand_failPoint
+            data: { failCommands: [find], errorCode: 91 }
+        operations: [*retryable_operation_succeeds]
+        expectations:
+             - *retryable_command_started_event
+             - *retryable_command_started_event
+    -
+        description: "Find succeeds after HostNotFound"
+        failPoint:
+            <<: *failCommand_failPoint
+            data: { failCommands: [find], errorCode: 7 }
+        operations: [*retryable_operation_succeeds]
+        expectations:
+             - *retryable_command_started_event
+             - *retryable_command_started_event
+    -
+        description: "Find succeeds after HostUnreachable"
+        failPoint:
+            <<: *failCommand_failPoint
+            data: { failCommands: [find], errorCode: 6 }
+        operations: [*retryable_operation_succeeds]
+        expectations:
+             - *retryable_command_started_event
+             - *retryable_command_started_event
+    -
+        description: "Find succeeds after NetworkTimeout"
+        failPoint:
+            <<: *failCommand_failPoint
+            data: { failCommands: [find], errorCode: 89 }
+        operations: [*retryable_operation_succeeds]
+        expectations:
+             - *retryable_command_started_event
+             - *retryable_command_started_event
+    -
+        description: "Find succeeds after SocketException"
+        failPoint:
+            <<: *failCommand_failPoint
+            data: { failCommands: [find], errorCode: 9001 }
+        operations: [*retryable_operation_succeeds]
+        expectations:
+             - *retryable_command_started_event
+             - *retryable_command_started_event
+    -
+        description: "Find fails after two NotMaster errors"
+        failPoint:
+            <<: *failCommand_failPoint
+            mode: { times: 2 }
+            data: { failCommands: [find], errorCode: 10107 }
+        operations:
+            - &retryable_operation_fails
+                <<: *retryable_operation
+                error: true
+        expectations:
+             - *retryable_command_started_event
+             - *retryable_command_started_event
+    -
+        description: "Find fails after NotMaster when retryReads is false"
+        clientOptions:
+            retryReads: false
+        failPoint:
+            <<: *failCommand_failPoint
+            data: { failCommands: [find], errorCode: 10107 }
+        operations: [*retryable_operation_fails]
+        expectations:
+             - *retryable_command_started_event
+

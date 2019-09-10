@@ -53,8 +53,10 @@ type ConnString struct {
 	LocalThresholdSet                  bool
 	MaxConnIdleTime                    time.Duration
 	MaxConnIdleTimeSet                 bool
-	MaxPoolSize                        uint16
+	MaxPoolSize                        uint64
 	MaxPoolSizeSet                     bool
+	MinPoolSize                        uint64
+	MinPoolSizeSet                     bool
 	Password                           string
 	PasswordSet                        bool
 	ReadConcernLevel                   string
@@ -119,6 +121,7 @@ type parser struct {
 	ConnString
 
 	dnsResolver *dns.Resolver
+	tlsssl      *bool // used to determine if tls and ssl options are both specified and set differently.
 }
 
 func (p *parser) parse(original string) error {
@@ -499,8 +502,15 @@ func (p *parser) addOption(pair string) error {
 		if err != nil || n < 0 {
 			return fmt.Errorf("invalid value for %s: %s", key, value)
 		}
-		p.MaxPoolSize = uint16(n)
+		p.MaxPoolSize = uint64(n)
 		p.MaxPoolSizeSet = true
+	case "minpoolsize":
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 0 {
+			return fmt.Errorf("invalid value for %s: %s", key, value)
+		}
+		p.MinPoolSize = uint64(n)
+		p.MinPoolSizeSet = true
 	case "readconcernlevel":
 		p.ReadConcernLevel = value
 	case "readpreference":
@@ -521,7 +531,7 @@ func (p *parser) addOption(pair string) error {
 			tags[parts[0]] = parts[1]
 		}
 		p.ReadPreferenceTagSets = append(p.ReadPreferenceTagSets, tags)
-	case "maxstaleness":
+	case "maxstaleness", "maxstalenessseconds":
 		n, err := strconv.Atoi(value)
 		if err != nil || n < 0 {
 			return fmt.Errorf("invalid value for %s: %s", key, value)
@@ -531,7 +541,15 @@ func (p *parser) addOption(pair string) error {
 	case "replicaset":
 		p.ReplicaSet = value
 	case "retrywrites":
-		p.RetryWrites = value == "true"
+		switch value {
+		case "true":
+			p.RetryWrites = true
+		case "false":
+			p.RetryWrites = false
+		default:
+			return fmt.Errorf("invalid value for %s: %s", key, value)
+		}
+
 		p.RetryWritesSet = true
 	case "serverselectiontimeoutms":
 		n, err := strconv.Atoi(value)
@@ -547,7 +565,7 @@ func (p *parser) addOption(pair string) error {
 		}
 		p.SocketTimeout = time.Duration(n) * time.Millisecond
 		p.SocketTimeoutSet = true
-	case "ssl":
+	case "ssl", "tls":
 		switch value {
 		case "true":
 			p.SSL = true
@@ -556,17 +574,23 @@ func (p *parser) addOption(pair string) error {
 		default:
 			return fmt.Errorf("invalid value for %s: %s", key, value)
 		}
+		if p.tlsssl != nil && *p.tlsssl != p.SSL {
+			return errors.New("tls and ssl options, when both specified, must be equivalent")
+		}
+
+		p.tlsssl = new(bool)
+		*p.tlsssl = p.SSL
 
 		p.SSLSet = true
-	case "sslclientcertificatekeyfile":
+	case "sslclientcertificatekeyfile", "tlscertificatekeyfile":
 		p.SSL = true
 		p.SSLSet = true
 		p.SSLClientCertificateKeyFile = value
 		p.SSLClientCertificateKeyFileSet = true
-	case "sslclientcertificatekeypassword":
+	case "sslclientcertificatekeypassword", "tlscertificatekeyfilepassword":
 		p.SSLClientCertificateKeyPassword = func() string { return value }
 		p.SSLClientCertificateKeyPasswordSet = true
-	case "sslinsecure":
+	case "sslinsecure", "tlsinsecure":
 		switch value {
 		case "true":
 			p.SSLInsecure = true
@@ -577,7 +601,7 @@ func (p *parser) addOption(pair string) error {
 		}
 
 		p.SSLInsecureSet = true
-	case "sslcertificateauthorityfile":
+	case "sslcertificateauthorityfile", "tlscafile":
 		p.SSL = true
 		p.SSLSet = true
 		p.SSLCaFile = value

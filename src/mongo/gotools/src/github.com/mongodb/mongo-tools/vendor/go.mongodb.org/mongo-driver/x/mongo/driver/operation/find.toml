@@ -5,6 +5,7 @@ response.type = "batch cursor"
 
 [properties]
 enabled = ["collection", "read concern", "read preference", "command monitor", "client session", "cluster clock"]
+retryable = {mode = "once per command", type = "reads"}
 legacy = "find"
 
 [command]

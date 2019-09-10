@@ -142,7 +142,7 @@ func (u *Update) Execute(ctx context.Context) error {
 		ProcessResponseFn: u.processResponse,
 		Batches:           batches,
 		RetryMode:         u.retry,
-		RetryType:         driver.RetryWrite,
+		Type:              driver.Write,
 		Client:            u.session,
 		Clock:             u.clock,
 		CommandMonitor:    u.monitor,

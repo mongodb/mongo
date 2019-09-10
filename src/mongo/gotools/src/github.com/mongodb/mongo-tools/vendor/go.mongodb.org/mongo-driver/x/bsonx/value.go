@@ -403,6 +403,7 @@ func (v Val) asMDoc() MDoc {
 	if ok {
 		return mdoc
 	}
+	mdoc = make(MDoc)
 	doc := v.primitive.(Doc)
 	for _, elem := range doc {
 		mdoc[elem.Key] = elem.Value

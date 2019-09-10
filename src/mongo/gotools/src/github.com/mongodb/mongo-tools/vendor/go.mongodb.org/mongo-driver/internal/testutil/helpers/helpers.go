@@ -99,6 +99,8 @@ func VerifyConnStringOptions(t *testing.T, cs connstring.ConnString, options map
 			require.Equal(t,
 				mapInterfaceToString(convertedMap),
 				cs.AuthMechanismProperties)
+		case "compressors":
+			require.Equal(t, convertToStringSlice(value), cs.Compressors)
 		case "connecttimeoutms":
 			require.Equal(t, value, float64(cs.ConnectTimeout/time.Millisecond))
 		case "heartbeatfrequencyms":
@@ -106,23 +108,57 @@ func VerifyConnStringOptions(t *testing.T, cs connstring.ConnString, options map
 		case "journal":
 			require.True(t, cs.JSet)
 			require.Equal(t, value, cs.J)
+		case "localthresholdms":
+			require.True(t, cs.LocalThresholdSet)
+			require.Equal(t, value, float64(cs.LocalThreshold/time.Millisecond))
 		case "maxidletimems":
-			require.Equal(t, value, cs.MaxConnIdleTime)
+			require.Equal(t, value, float64(cs.MaxConnIdleTime/time.Millisecond))
 		case "maxpoolsize":
 			require.True(t, cs.MaxPoolSizeSet)
 			require.Equal(t, value, cs.MaxPoolSize)
+		case "maxstalenessseconds":
+			require.True(t, cs.MaxStalenessSet)
+			require.Equal(t, value, float64(cs.MaxStaleness/time.Second))
+		case "minpoolsize":
+			require.True(t, cs.MinPoolSizeSet)
+			require.Equal(t, value, int64(cs.MinPoolSize))
 		case "readpreference":
 			require.Equal(t, value, cs.ReadPreference)
 		case "readpreferencetags":
-			require.Equal(t, value, cs.ReadPreferenceTagSets)
+			sm, ok := value.([]interface{})
+			require.True(t, ok)
+			tags := make([]map[string]string, 0, len(sm))
+			for _, i := range sm {
+				m, ok := i.(map[string]interface{})
+				require.True(t, ok)
+				tags = append(tags, mapInterfaceToString(m))
+			}
+			require.Equal(t, tags, cs.ReadPreferenceTagSets)
+		case "readconcernlevel":
+			require.Equal(t, value, cs.ReadConcernLevel)
 		case "replicaset":
 			require.Equal(t, value, cs.ReplicaSet)
+		case "retrywrites":
+			require.True(t, cs.RetryWritesSet)
+			require.Equal(t, value, cs.RetryWrites)
 		case "serverselectiontimeoutms":
 			require.Equal(t, value, float64(cs.ServerSelectionTimeout/time.Millisecond))
-		case "ssl":
+		case "ssl", "tls":
 			require.Equal(t, value, cs.SSL)
 		case "sockettimeoutms":
 			require.Equal(t, value, float64(cs.SocketTimeout/time.Millisecond))
+		case "tlsallowinvalidcertificates", "tlsallowinvalidhostnames", "tlsinsecure":
+			require.True(t, cs.SSLInsecureSet)
+			require.Equal(t, value, cs.SSLInsecure)
+		case "tlscafile":
+			require.True(t, cs.SSLCaFileSet)
+			require.Equal(t, value, cs.SSLCaFile)
+		case "tlscertificatekeyfile":
+			require.True(t, cs.SSLClientCertificateKeyFileSet)
+			require.Equal(t, value, cs.SSLClientCertificateKeyFile)
+		case "tlscertificatekeyfilepassword":
+			require.True(t, cs.SSLClientCertificateKeyPasswordSet)
+			require.Equal(t, value, cs.SSLClientCertificateKeyPassword())
 		case "w":
 			if cs.WNumberSet {
 				valueInt := GetIntFromInterface(value)
@@ -133,6 +169,10 @@ func VerifyConnStringOptions(t *testing.T, cs connstring.ConnString, options map
 			}
 		case "wtimeoutms":
 			require.Equal(t, value, float64(cs.WTimeout/time.Millisecond))
+		case "waitqueuetimeoutms":
+		case "zlibcompressionlevel":
+			require.True(t, cs.ZlibLevelSet)
+			require.Equal(t, value, float64(cs.ZlibLevel))
 		default:
 			opt, ok := cs.UnknownOptions[key]
 			require.True(t, ok)
@@ -150,6 +190,22 @@ func mapInterfaceToString(m map[string]interface{}) map[string]string {
 	}
 
 	return out
+}
+
+func convertToStringSlice(i interface{}) []string {
+	s, ok := i.([]interface{})
+	if !ok {
+		return nil
+	}
+	ret := make([]string, 0, len(s))
+	for _, v := range s {
+		str, ok := v.(string)
+		if !ok {
+			continue
+		}
+		ret = append(ret, str)
+	}
+	return ret
 }
 
 // GetIntFromInterface attempts to convert an empty interface value to an integer.

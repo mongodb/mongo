@@ -35,12 +35,14 @@ const (
 	watchProgressorUpdateFrequency = 8000
 )
 
-// jsonFormat is the type for all valid extended JSON formats to output.
-type jsonFormat string
+// JSONFormat is the type for all valid extended JSON formats to output.
+type JSONFormat string
 
 const (
-	canonical jsonFormat = "canonical"
-	relaxed              = "relaxed"
+  // Canonical indicates canonical json format
+	Canonical JSONFormat = "canonical"
+  // Relaxed indicates relaxed json format
+	Relaxed JSONFormat = "relaxed"
 )
 
 const (
@@ -174,7 +176,7 @@ func (exp *MongoExport) validateSettings() error {
 		return fmt.Errorf("invalid output type '%v', choose 'json' or 'csv'", exp.OutputOpts.Type)
 	}
 
-	if exp.OutputOpts.JSONFormat != canonical && exp.OutputOpts.JSONFormat != relaxed {
+	if exp.OutputOpts.JSONFormat != Canonical && exp.OutputOpts.JSONFormat != Relaxed {
 		return fmt.Errorf("invalid JSON format '%v', choose 'relaxed' or 'canonical'", exp.OutputOpts.JSONFormat)
 	}
 

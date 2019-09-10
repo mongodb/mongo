@@ -33,7 +33,7 @@ type FindAndModify struct {
 	query                    bsoncore.Document
 	remove                   *bool
 	sort                     bsoncore.Document
-	update                   bsoncore.Document
+	update                   bsoncore.Value
 	upsert                   *bool
 	session                  *session.Client
 	clock                    *session.ClusterClock
@@ -123,7 +123,7 @@ func (fam *FindAndModify) Execute(ctx context.Context) error {
 		ProcessResponseFn: fam.processResponse,
 
 		RetryMode:      fam.retry,
-		RetryType:      driver.RetryWrite,
+		Type:           driver.Write,
 		Client:         fam.session,
 		Clock:          fam.clock,
 		CommandMonitor: fam.monitor,
@@ -179,9 +179,8 @@ func (fam *FindAndModify) command(dst []byte, desc description.SelectedServer) (
 
 		dst = bsoncore.AppendDocumentElement(dst, "sort", fam.sort)
 	}
-	if fam.update != nil {
-
-		dst = bsoncore.AppendDocumentElement(dst, "update", fam.update)
+	if fam.update.Data != nil {
+		dst = bsoncore.AppendValueElement(dst, "update", fam.update)
 	}
 	if fam.upsert != nil {
 
@@ -283,7 +282,7 @@ func (fam *FindAndModify) Sort(sort bsoncore.Document) *FindAndModify {
 }
 
 // Update specifies the update document to perform on the matched document.
-func (fam *FindAndModify) Update(update bsoncore.Document) *FindAndModify {
+func (fam *FindAndModify) Update(update bsoncore.Value) *FindAndModify {
 	if fam == nil {
 		fam = new(FindAndModify)
 	}

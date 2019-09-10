@@ -30,13 +30,13 @@ import (
 
 // ErrSubscribeAfterClosed is returned when a user attempts to subscribe to a
 // closed Server or Topology.
-var ErrSubscribeAfterClosed = errors.New("cannot subscribe after close")
+var ErrSubscribeAfterClosed = errors.New("cannot subscribe after closeConnection")
 
 // ErrTopologyClosed is returned when a user attempts to call a method on a
 // closed Topology.
 var ErrTopologyClosed = errors.New("topology is closed")
 
-// ErrTopologyConnected is returned whena  user attempts to connect to an
+// ErrTopologyConnected is returned whena  user attempts to Connect to an
 // already connected Topology.
 var ErrTopologyConnected = errors.New("topology is connected or connecting")
 
@@ -82,7 +82,7 @@ type Topology struct {
 	subscriptionsClosed bool
 	subLock             sync.Mutex
 
-	// We should redesign how we connect and handle individal servers. This is
+	// We should redesign how we Connect and handle individal servers. This is
 	// too difficult to maintain and it's rather easy to accidentally access
 	// the servers without acquiring the lock or checking if the servers are
 	// closed. This lock should also be an RWMutex.
@@ -256,8 +256,10 @@ func (t *Topology) SupportsSessions() bool {
 	return t.Description().SessionTimeoutMinutes != 0 && t.Description().Kind != description.Single
 }
 
-// SupportsRetry returns true if the topology supports retryability, which it does if it supports sessions.
-func (t *Topology) SupportsRetry() bool { return t.SupportsSessions() }
+// SupportsRetryWrites returns true if the topology supports retryable writes, which it does if it supports sessions.
+func (t *Topology) SupportsRetryWrites() bool {
+	return t.SupportsSessions()
+}
 
 // SelectServer selects a server with given a selector. SelectServer complies with the
 // server selection spec, and will time out after severSelectionTimeout or when the

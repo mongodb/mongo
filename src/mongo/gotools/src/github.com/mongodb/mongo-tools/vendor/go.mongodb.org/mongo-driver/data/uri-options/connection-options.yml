@@ -1,0 +1,106 @@
+tests:
+    -
+        description: "Valid connection and timeout options are parsed correctly"
+        uri: "mongodb://example.com/?appname=URI-OPTIONS-SPEC-TEST&connectTimeoutMS=20000&heartbeatFrequencyMS=5000&localThresholdMS=3000&maxIdleTimeMS=50000&replicaSet=uri-options-spec&retryWrites=true&serverSelectionTimeoutMS=15000&socketTimeoutMS=7500"
+        valid: true
+        warning: false
+        hosts: ~
+        auth: ~
+        options:
+            appname: "URI-OPTIONS-SPEC-TEST"
+            connectTimeoutMS: 20000
+            heartbeatFrequencyMS: 5000
+            localThresholdMS: 3000
+            maxIdleTimeMS: 50000
+            replicaSet: "uri-options-spec"
+            retryWrites: true
+            serverSelectionTimeoutMS: 15000
+            socketTimeoutMS: 7500
+    -
+        description: "Non-numeric connectTimeoutMS causes a warning"
+        uri: "mongodb://example.com/?connectTimeoutMS=invalid"
+        valid: true
+        warning: true
+        hosts: ~
+        auth: ~
+        options: {}
+    -
+        description: "Too low connectTimeoutMS causes a warning"
+        uri: "mongodb://example.com/?connectTimeoutMS=-2"
+        valid: true
+        warning: true
+        hosts: ~
+        auth: ~
+        options: {}
+    -
+        description: "Non-numeric heartbeatFrequencyMS causes a warning"
+        uri: "mongodb://example.com/?heartbeatFrequencyMS=invalid"
+        valid: true
+        warning: true
+        hosts: ~
+        auth: ~
+        options: {}
+    -
+        description: "Too low heartbeatFrequencyMS causes a warning"
+        uri: "mongodb://example.com/?heartbeatFrequencyMS=-2"
+        valid: true
+        warning: true
+        hosts: ~
+        auth: ~
+        options: {}
+    -
+        description: "Non-numeric localThresholdMS causes a warning"
+        uri: "mongodb://example.com/?localThresholdMS=invalid"
+        valid: true
+        warning: true
+        hosts: ~
+        auth: ~
+        options: {}
+    -
+        description: "Too low localThresholdMS causes a warning"
+        uri: "mongodb://example.com/?localThresholdMS=-2"
+        valid: true
+        warning: true
+        hosts: ~
+        auth: ~
+        options: {}
+    - 
+        description: "Invalid retryWrites causes a warning"
+        uri: "mongodb://example.com/?retryWrites=invalid"
+        valid: true
+        warning: true
+        hosts: ~
+        auth: ~
+        options: {}
+    -
+        description: "Non-numeric serverSelectionTimeoutMS causes a warning"
+        uri: "mongodb://example.com/?serverSelectionTimeoutMS=invalid"
+        valid: true
+        warning: true
+        hosts: ~
+        auth: ~
+        options: {}
+    -
+        description: "Too low serverSelectionTimeoutMS causes a warning"
+        uri: "mongodb://example.com/?serverSelectionTimeoutMS=-2"
+        valid: true
+        warning: true
+        hosts: ~
+        auth: ~
+        options: {}
+    -
+        description: "Non-numeric socketTimeoutMS causes a warning"
+        uri: "mongodb://example.com/?socketTimeoutMS=invalid"
+        valid: true
+        warning: true
+        hosts: ~
+        auth: ~
+        options: {}
+    -
+        description: "Too low socketTimeoutMS causes a warning"
+        uri: "mongodb://example.com/?socketTimeoutMS=-2"
+        valid: true
+        warning: true
+        hosts: ~
+        auth: ~
+        options: {}

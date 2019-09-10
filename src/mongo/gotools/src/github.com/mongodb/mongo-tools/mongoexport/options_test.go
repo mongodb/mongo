@@ -74,12 +74,12 @@ func TestParseOptions(t *testing.T) {
 	t.Run("TestJSONFormat", func(t *testing.T) {
 		testCases := []struct {
 			name           string
-			jsonFormat     jsonFormat // If "", no jsonFormat will be included
+			jsonFormat     JSONFormat // If "", no jsonFormat will be included
 			expectSuccess  bool
-			expectedFormat jsonFormat
+			expectedFormat JSONFormat
 		}{
-			{"JSON format defaults to relaxed", "", true, relaxed},
-			{"JSON format can be set", canonical, true, canonical},
+			{"JSON format defaults to relaxed", "", true, Relaxed},
+			{"JSON format can be set", Canonical, true, Canonical},
 		}
 
 		baseOpts := []string{"--host", "localhost:27017", "--db", "db", "--collection", "coll"}

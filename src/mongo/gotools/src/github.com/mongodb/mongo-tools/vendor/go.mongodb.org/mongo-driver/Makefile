@@ -10,6 +10,7 @@ EXAMPLES_PKGS = $(shell etc/list_pkgs.sh ./examples)
 EXAMPLES_TEST_PKGS = $(shell etc/list_test_pkgs.sh ./examples)
 PKGS = $(BSON_PKGS) $(MONGO_PKGS) $(UNSTABLE_PKGS) $(TAG_PKG) $(EXAMPLES_PKGS)
 TEST_PKGS = $(BSON_TEST_PKGS) $(MONGO_TEST_PKGS) $(UNSTABLE_TEST_PKGS) $(TAG_PKG) $(EXAMPLES_TEST_PKGS)
+ATLAS_URIS = "$(ATLAS_FREE)" "$(ATLAS_REPLSET)" "$(ATLAS_SHARD)" "$(ATLAS_TLS11)" "$(ATLAS_TLS12)" "$(ATLAS_FREE_SRV)" "$(ATLAS_REPLSET_SRV)" "$(ATLAS_SHARD_SRV)" "$(ATLAS_TLS11_SRV)" "$(ATLAS_TLS12_SRV)"
 
 TEST_TIMEOUT = 600
 
@@ -34,7 +35,7 @@ build:
 
 .PHONY: check-fmt
 check-fmt:
-	@gofmt -l -s $(PKGS) | read; if [ $$? == 0 ]; then echo "gofmt check failed for:"; gofmt -l -s $(PKGS) | sed -e 's/^/ - /'; exit 1; fi
+	etc/check_fmt.sh $(PKGS)
 
 .PHONY: fmt
 fmt:
@@ -55,19 +56,27 @@ errcheck:
 
 .PHONY: test
 test:
-	go test $(BUILD_TAGS) -timeout $(TEST_TIMEOUT)s $(TEST_PKGS)
+	for TEST in $(TEST_PKGS) ; do \
+		go test $(BUILD_TAGS) -timeout $(TEST_TIMEOUT)s $$TEST ; \
+	done
 
 .PHONY: test-cover
 test-cover:
-	go test $(BUILD_TAGS) -timeout $(TEST_TIMEOUT)s -cover $(COVER_ARGS) $(TEST_PKGS)
+	for TEST in $(TEST_PKGS) ; do \
+    	go test $(BUILD_TAGS) -timeout $(TEST_TIMEOUT)s -cover $(COVER_ARGS) $$TEST ; \
+    done
 
 .PHONY: test-race
 test-race:
-	go test $(BUILD_TAGS) -timeout $(TEST_TIMEOUT)s -race $(TEST_PKGS)
+	for TEST in $(TEST_PKGS) ; do \
+    	go test $(BUILD_TAGS) -timeout $(TEST_TIMEOUT)s -race $(COVER_ARGS) $$TEST ; \
+    done
 
 .PHONY: test-short
 test-short:
-	go test $(BUILD_TAGS) -timeout $(TEST_TIMEOUT)s -short $(TEST_PKGS)
+	for TEST in $(TEST_PKGS) ; do \
+    	go test $(BUILD_TAGS) -timeout $(TEST_TIMEOUT)s -short $(COVER_ARGS) $$TEST ; \
+    done
 
 .PHONY: update-bson-corpus-tests
 update-bson-corpus-tests:
@@ -109,11 +118,17 @@ vet:
 # Evergreen specific targets
 .PHONY: evg-test
 evg-test:
-	go test $(BUILD_TAGS) -v -timeout $(TEST_TIMEOUT)s $(TEST_PKGS) > test.suite
+	for TEST in $(TEST_PKGS) ; do \
+		go test $(BUILD_TAGS) -v -timeout $(TEST_TIMEOUT)s $$TEST >> test.suite ; \
+	done
 
 .PHONY: evg-test-auth
 evg-test-auth:
 	go run -tags gssapi ./x/mongo/driver/examples/count/main.go -uri $(MONGODB_URI)
+
+.PHONY: evg-test-atlas
+evg-test-atlas:
+	go run ./mongo/testatlas/main.go $(ATLAS_URIS)
 
 # benchmark specific targets and support
 perf:driver-test-data.tar.gz

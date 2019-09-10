@@ -33,7 +33,7 @@ const (
 
 type OutputOptions struct {
 	// Format to display the BSON data file
-	Type string `long:"type" value-name:"<type>" default:"json" default-mask:"-" description:"type of output: debug, json (default 'json')"`
+	Type string `long:"type" value-name:"<type>" default:"json" default-mask:"-" description:"type of output: debug, json"`
 
 	// Validate each BSON document before displaying
 	ObjCheck bool `long:"objcheck" description:"validate BSON during processing"`

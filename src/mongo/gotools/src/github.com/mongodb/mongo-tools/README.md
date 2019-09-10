@@ -13,27 +13,52 @@ MongoDB Tools
 
 Report any bugs, improvements, or new feature requests at https://jira.mongodb.org/browse/TOOLS
 
-Setup
+Building Tools
 ---------------
-Clone the repo and run `. ./set_goenv.sh` to setup your GOPATH:
+To build the tools, you need to have Go version 1.9 and up. `go get` will not work; you
+need to clone the repository to build it.
 
 ```
 git clone https://github.com/mongodb/mongo-tools
 cd mongo-tools
-. ./set_gopath.sh
 ```
 
-Building Tools
----------------
-To build the tools, you need to have Go version 1.3 and up.
+To use build/test scripts in the repo, you *MUST* set GOROOT to your Go root directory.
 
-An additional flag, `-tags`, can be passed to the `go build` command in order to build the tools with support for SSL and/or SASL. For example:
+```
+export GOROOT=/usr/local/go
+```
+
+### Quick build
+
+The `build.sh` script builds all the tools, placing them in the `bin`
+directory.  Pass any build tags (like `ssl` or `sasl`) as additional command
+line arguments.
+
+```
+./build.sh
+./build.sh ssl
+./build.sh ssl sasl
+```
+
+### Manual build
+
+Source `set_goenv.sh` and run the `set_goenv` function to setup your GOPATH and
+architecture-specific configuration flags:
+
+```
+. ./set_goenv.sh
+set_goenv
+```
+
+Pass tags to the `go build` command as needed in order to build the tools with
+support for SSL and/or SASL. For example:
 
 ```
 mkdir bin
-go build -o bin/mongoimport mongoimport/main/mongoimport.go # build mongoimport
-go build -o bin/mongoimport -tags ssl mongoimport/main/mongoimport.go # build mongoimport with SSL support enabled
-go build -o bin/mongoimport -tags "ssl sasl" mongoimport/main/mongoimport.go # build mongoimport with SSL and SASL support enabled
+go build -o bin/mongoimport mongoimport/main/mongoimport.go
+go build -o bin/mongoimport -tags ssl mongoimport/main/mongoimport.go
+go build -o bin/mongoimport -tags "ssl sasl" mongoimport/main/mongoimport.go
 ```
 
 Contributing
@@ -43,4 +68,3 @@ See our [Contributor's Guide](CONTRIBUTING.md).
 Documentation
 ---------------
 See the MongoDB packages [documentation](http://docs.mongodb.org/master/reference/program/).
-

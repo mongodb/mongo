@@ -333,6 +333,102 @@ func transformAggregatePipelinev2(registry *bsoncodec.Registry, pipeline interfa
 	}
 }
 
+func transformUpdateValue(registry *bsoncodec.Registry, update interface{}, checkDocDollarKey bool) (bsoncore.Value, error) {
+	var u bsoncore.Value
+	var err error
+	switch t := update.(type) {
+	case nil:
+		return u, ErrNilDocument
+	case primitive.D, bsonx.Doc:
+		u.Type = bsontype.EmbeddedDocument
+		u.Data, err = transformBsoncoreDocument(registry, update)
+		if err != nil {
+			return u, err
+		}
+
+		if checkDocDollarKey {
+			err = ensureDollarKeyv2(u.Data)
+		}
+		return u, err
+	case bson.Raw:
+		u.Type = bsontype.EmbeddedDocument
+		u.Data = t
+		if checkDocDollarKey {
+			err = ensureDollarKeyv2(u.Data)
+		}
+		return u, err
+	case bsoncore.Document:
+		u.Type = bsontype.EmbeddedDocument
+		u.Data = t
+		if checkDocDollarKey {
+			err = ensureDollarKeyv2(u.Data)
+		}
+		return u, err
+	case []byte:
+		u.Type = bsontype.EmbeddedDocument
+		u.Data = t
+		if checkDocDollarKey {
+			err = ensureDollarKeyv2(u.Data)
+		}
+		return u, err
+	case bsoncodec.Marshaler:
+		u.Type = bsontype.EmbeddedDocument
+		u.Data, err = t.MarshalBSON()
+		if err != nil {
+			return u, err
+		}
+
+		if checkDocDollarKey {
+			err = ensureDollarKeyv2(u.Data)
+		}
+		return u, err
+	case bsoncodec.ValueMarshaler:
+		u.Type, u.Data, err = t.MarshalBSONValue()
+		if err != nil {
+			return u, err
+		}
+		if u.Type != bsontype.Array && u.Type != bsontype.EmbeddedDocument {
+			return u, fmt.Errorf("ValueMarshaler returned a %v, but was expecting %v or %v", u.Type, bsontype.Array, bsontype.EmbeddedDocument)
+		}
+		return u, err
+	default:
+		val := reflect.ValueOf(t)
+		if !val.IsValid() {
+			return u, fmt.Errorf("can only transform slices and arrays into update pipelines, but got %v", val.Kind())
+		}
+		if val.Kind() != reflect.Slice && val.Kind() != reflect.Array {
+			u.Type = bsontype.EmbeddedDocument
+			u.Data, err = transformBsoncoreDocument(registry, update)
+			if err != nil {
+				return u, err
+			}
+
+			if checkDocDollarKey {
+				err = ensureDollarKeyv2(u.Data)
+			}
+			return u, err
+		}
+
+		u.Type = bsontype.Array
+		aidx, arr := bsoncore.AppendArrayStart(nil)
+		valLen := val.Len()
+		for idx := 0; idx < valLen; idx++ {
+			doc, err := transformBsoncoreDocument(registry, val.Index(idx).Interface())
+			if err != nil {
+				return u, err
+			}
+
+			if err := ensureDollarKeyv2(doc); err != nil {
+				return u, err
+			}
+
+			arr = bsoncore.AppendDocumentElement(arr, strconv.Itoa(idx), doc)
+		}
+		u.Data, _ = bsoncore.AppendArrayEnd(arr, aidx)
+		return u, err
+	}
+}
+
 func transformValue(registry *bsoncodec.Registry, val interface{}) (bsoncore.Value, error) {
 	switch conv := val.(type) {
 	case string:

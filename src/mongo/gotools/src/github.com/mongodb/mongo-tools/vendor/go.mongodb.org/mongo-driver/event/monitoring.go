@@ -47,3 +47,45 @@ type CommandMonitor struct {
 	Succeeded func(context.Context, *CommandSucceededEvent)
 	Failed    func(context.Context, *CommandFailedEvent)
 }
+
+// strings for pool command monitoring reasons
+const (
+	ReasonIdle              = "idle"
+	ReasonPoolClosed        = "poolClosed"
+	ReasonStale             = "stale"
+	ReasonConnectionErrored = "connectionError"
+	ReasonTimedOut          = "timeout"
+)
+
+// strings for pool command monitoring types
+const (
+	ConnectionClosed   = "ConnectionClosed"
+	PoolCreated        = "ConnectionPoolCreated"
+	ConnectionCreated  = "ConnectionCreated"
+	GetFailed          = "ConnectionCheckOutFailed"
+	GetSucceeded       = "ConnectionCheckedOut"
+	ConnectionReturned = "ConnectionCheckedIn"
+	PoolCleared        = "ConnectionPoolCleared"
+	PoolClosedEvent    = "ConnectionPoolClosed"
+)
+
+// MonitorPoolOptions contains pool options as formatted in pool events
+type MonitorPoolOptions struct {
+	MaxPoolSize        uint64 `json:"maxPoolSize"`
+	MinPoolSize        uint64 `json:"minPoolSize"`
+	WaitQueueTimeoutMS uint64 `json:"maxIdleTimeMS"`
+}
+
+// PoolEvent contains all information summarizing a pool event
+type PoolEvent struct {
+	Type         string              `json:"type"`
+	Address      string              `json:"address"`
+	ConnectionID uint64              `json:"connectionId"`
+	PoolOptions  *MonitorPoolOptions `json:"options"`
+	Reason       string              `json:"reason"`
+}
+
+// PoolMonitor is a function that allows the user to gain access to events occurring in the pool
+type PoolMonitor struct {
+	Event func(*PoolEvent)
+}

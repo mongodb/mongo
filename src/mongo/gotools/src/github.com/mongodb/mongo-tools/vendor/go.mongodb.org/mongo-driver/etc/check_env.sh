@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 if [[ ! $TOPOLOGY =~ ^(server|replica_set|sharded_cluster)$ ]]; then
     >&2 echo "Invalid value of TOPOLOGY. TOPOLOGY must be set to one of: server, replica_set, sharded_cluster"

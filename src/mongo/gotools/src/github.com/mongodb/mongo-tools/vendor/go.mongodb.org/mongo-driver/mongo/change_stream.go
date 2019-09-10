@@ -101,7 +101,7 @@ func newChangeStream(ctx context.Context, config changeStreamConfig, pipeline in
 	cs.aggregate = operation.NewAggregate(nil).
 		ReadPreference(config.readPreference).ReadConcern(config.readConcern).
 		Deployment(cs.client.topology).ClusterClock(cs.client.clock).
-		CommandMonitor(cs.client.monitor).Session(cs.sess).ServerSelector(cs.selector)
+		CommandMonitor(cs.client.monitor).Session(cs.sess).ServerSelector(cs.selector).Retry(driver.RetryNone)
 
 	if cs.options.Collation != nil {
 		cs.aggregate.Collation(bsoncore.Document(cs.options.Collation.ToDocument()))
@@ -161,12 +161,17 @@ func newChangeStream(ctx context.Context, config changeStreamConfig, pipeline in
 func (cs *ChangeStream) executeOperation(ctx context.Context, resuming bool) error {
 	var server driver.Server
 	var conn driver.Connection
+	var err error
+
 	if server, cs.err = cs.client.topology.SelectServer(ctx, cs.selector); cs.err != nil {
 		return cs.Err()
 	}
 	if conn, cs.err = server.Connection(ctx); cs.err != nil {
 		return cs.Err()
 	}
+
+	defer conn.Close()
+
 	cs.aggregate.Deployment(driver.SingleConnectionDeployment{
 		C: conn,
 	})
@@ -189,9 +194,52 @@ func (cs *ChangeStream) executeOperation(ctx context.Context, resuming bool) err
 		cs.aggregate.Pipeline(plArr)
 	}
 
-	if cs.err = replaceErrors(cs.aggregate.Execute(ctx)); cs.err != nil {
-		return cs.Err()
+	if original := cs.aggregate.Execute(ctx); original != nil {
+		wireVersion := conn.Description().WireVersion
+		retryableRead := cs.client.retryReads && wireVersion != nil && wireVersion.Max >= 6
+		if !retryableRead {
+			cs.err = replaceErrors(original)
+			return cs.err
+		}
+
+		cs.err = original
+		switch tt := original.(type) {
+		case driver.Error:
+			if !tt.Retryable() {
+				break
+			}
+
+			server, err = cs.client.topology.SelectServer(ctx, cs.selector)
+			if err != nil {
+				break
+			}
+
+			conn.Close()
+			conn, err = server.Connection(ctx)
+			defer conn.Close()
+
+			if err != nil {
+				break
+			}
+
+			wireVersion := conn.Description().WireVersion
+			if wireVersion == nil || wireVersion.Max < 6 {
+				break
+			}
+
+			cs.aggregate.Deployment(driver.SingleConnectionDeployment{
+				C: conn,
+			})
+			cs.err = cs.aggregate.Execute(ctx)
+		}
+
+		if cs.err != nil {
+			cs.err = replaceErrors(cs.err)
+			return cs.Err()
+		}
+
 	}
+	cs.err = nil
 
 	cr := cs.aggregate.ResultCursorResponse()
 	cr.Server = server
@@ -393,7 +441,7 @@ func (cs *ChangeStream) Close(ctx context.Context) error {
 		ctx = context.Background()
 	}
 
-	closeImplicitSession(cs.sess)
+	defer closeImplicitSession(cs.sess)
 
 	if cs.cursor == nil {
 		return nil // cursor is already closed

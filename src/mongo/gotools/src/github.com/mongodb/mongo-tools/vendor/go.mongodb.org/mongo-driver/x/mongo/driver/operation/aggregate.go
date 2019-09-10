@@ -41,6 +41,7 @@ type Aggregate struct {
 	deployment               driver.Deployment
 	readConcern              *readconcern.ReadConcern
 	readPreference           *readpref.ReadPref
+	retry                    *driver.RetryMode
 	selector                 description.ServerSelector
 	writeConcern             *writeconcern.WriteConcern
 
@@ -92,6 +93,8 @@ func (a *Aggregate) Execute(ctx context.Context) error {
 		Deployment:                     a.deployment,
 		ReadConcern:                    a.readConcern,
 		ReadPreference:                 a.readPreference,
+		Type:                           driver.Read,
+		RetryMode:                      a.retry,
 		Selector:                       a.selector,
 		WriteConcern:                   a.writeConcern,
 		MinimumWriteConcernWireVersion: 5,
@@ -324,5 +327,17 @@ func (a *Aggregate) WriteConcern(writeConcern *writeconcern.WriteConcern) *Aggre
 	}
 
 	a.writeConcern = writeConcern
+	return a
+}
+
+// Retry enables retryable writes for this operation. Retries are not handled automatically,
+// instead a boolean is returned from Execute and SelectAndExecute that indicates if the
+// operation can be retried. Retrying is handled by calling RetryExecute.
+func (a *Aggregate) Retry(retry driver.RetryMode) *Aggregate {
+	if a == nil {
+		a = new(Aggregate)
+	}
+
+	a.retry = &retry
 	return a
 }

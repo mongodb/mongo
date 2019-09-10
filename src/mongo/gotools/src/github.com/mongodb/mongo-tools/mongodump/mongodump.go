@@ -540,15 +540,6 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent, buffer resettableOutpu
 		return err
 	}
 
-	// set where the intent will be written to
-	if dump.OutputOptions.Archive != "" {
-		if dump.OutputOptions.Archive == "-" {
-			intent.Location = "archive on stdout"
-		} else {
-			intent.Location = fmt.Sprintf("archive '%v'", dump.OutputOptions.Archive)
-		}
-	}
-
 	log.Logvf(log.Always, "writing %v to %v", intent.Namespace(), intent.Location)
 	if dumpCount, err = dump.dumpQueryToIntent(findQuery, intent, buffer); err != nil {
 		return err
@@ -578,7 +569,7 @@ func (dump *MongoDump) getCount(query *db.DeferredQuery, intent *intents.Intent)
 		return 0, nil
 	}
 
-	total, err := query.Count()
+	total, err := query.EstimatedDocumentCount()
 	if err != nil {
 		return 0, fmt.Errorf("error getting count from db: %v", err)
 	}

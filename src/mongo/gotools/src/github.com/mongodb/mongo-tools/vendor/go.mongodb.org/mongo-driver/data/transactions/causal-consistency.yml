@@ -48,7 +48,6 @@ tests:
             updates:
               - q: {_id: 1}
                 u: {$inc: {count: 1}}
-                multi: false
                 upsert: false
             ordered: true
             lsid: session0
@@ -150,7 +149,6 @@ tests:
             updates:
               - q: {_id: 1}
                 u: {$inc: {count: 1}}
-                multi: false
                 upsert: false
             ordered: true
             # No afterClusterTime

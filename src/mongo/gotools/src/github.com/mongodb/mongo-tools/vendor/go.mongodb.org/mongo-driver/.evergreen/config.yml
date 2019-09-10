@@ -326,6 +326,37 @@ functions:
           export PATH="${GCC_PATH}:${GO_DIST}/bin:$PATH"
           MONGO_GO_DRIVER_COMPRESSOR="${MONGO_GO_DRIVER_COMPRESSOR}" make -s evg-test-auth
 
+  run-atlas-test:
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src/go.mongodb.org/mongo-driver
+        script: |
+          # DO NOT ECHO WITH XTRACE (which PREPARE_SHELL does)
+          if [ "Windows_NT" = "$OS" ]; then
+            export GOPATH=$(cygpath -w $(dirname $(dirname $(dirname `pwd`))))
+            export GOCACHE=$(cygpath -w "$(pwd)/.cache")
+          else
+            export GOPATH=$(dirname $(dirname $(dirname `pwd`)))
+            export GOCACHE="$(pwd)/.cache"
+          fi;
+          export GOPATH="$GOPATH"
+          export GOROOT="${GO_DIST}"
+          export GOCACHE="$GOCACHE"
+          export PATH="${GCC_PATH}:${GO_DIST}/bin:$PATH"
+          export ATLAS_FREE="${atlas_free_tier_uri}"
+          export ATLAS_REPLSET="${atlas_replica_set_uri}"
+          export ATLAS_SHARD="${atlas_sharded_uri}"
+          export ATLAS_TLS11="${atlas_tls_v11_uri}"
+          export ATLAS_TLS12="${atlas_tls_v12_uri}"
+          export ATLAS_FREE_SRV="${atlas_free_tier_uri_srv}"
+          export ATLAS_REPLSET_SRV="${atlas_replica_set_uri_srv}"
+          export ATLAS_SHARD_SRV="${atlas_sharded_uri_srv}"
+          export ATLAS_TLS11_SRV="${atlas_tls_v11_uri_srv}"
+          export ATLAS_TLS12_SRV="${atlas_tls_v12_uri_srv}"
+          make -s evg-test-atlas
+
+
 pre:
   - func: fetch-source
   - func: prepare-resources
@@ -655,6 +686,10 @@ tasks:
             targets: "build"
             BUILD_ENV: "GOARCH=ppc64le"
 
+    - name: "atlas-test"
+      commands:
+        - func: "run-atlas-test"
+
 axes:
   - id: version
     display_name: MongoDB Version
@@ -752,6 +787,15 @@ buildvariants:
     GO_DIST: "/opt/golang/go1.12"
   tasks:
     - name: ".compile-check"
+
+- name: atlas-test
+  display_name: "Atlas test"
+  run_on:
+    - ubuntu1604-build
+  expansions:
+    GO_DIST: "/opt/golang/go1.12"
+  tasks:
+    - name: "atlas-test"
 
 - matrix_name: "tests-legacy-auth-ssl"
   matrix_spec: { version: ["2.6", "3.0"], os-ssl-legacy: "*" }

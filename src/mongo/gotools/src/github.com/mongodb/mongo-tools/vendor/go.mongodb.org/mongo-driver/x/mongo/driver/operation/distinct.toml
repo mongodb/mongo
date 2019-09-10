@@ -4,6 +4,7 @@ documentation = "Distinct performs a distinct operation."
 
 [properties]
 enabled = ["read concern", "read preference"]
+retryable = {mode = "once per command", type = "reads"}
 
 [command]
 name = "distinct"

@@ -413,7 +413,6 @@ tests:
             updates:
               - q: {_id: 0}
                 u: {$inc: {x: 1}}
-                multi: false
                 upsert: true
             ordered: true
             <<: *transactionCommandArgs

@@ -1,0 +1,18 @@
+version: 1
+style: unit
+description: must have a method of allowing the driver to check in a connection
+operations:
+  - name: checkOut
+    label: conn
+  - name: checkIn
+    connection: conn
+events:
+  - type: ConnectionCheckedIn
+    connectionId: 42
+ignore:
+  - ConnectionPoolCreated
+  - ConnectionCreated
+  - ConnectionReady
+  - ConnectionClosed
+  - ConnectionCheckOutStarted
+  - ConnectionCheckedOut

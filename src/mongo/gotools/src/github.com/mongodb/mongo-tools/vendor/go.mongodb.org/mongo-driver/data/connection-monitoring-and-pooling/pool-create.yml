@@ -1,0 +1,12 @@
+version: 1
+style: unit
+description: must be able to create a pool
+operations:
+  - name: waitForEvent
+    event: ConnectionPoolCreated
+    count: 1
+events:
+  - type: ConnectionPoolCreated
+    address: 42
+    options: 42
+      
