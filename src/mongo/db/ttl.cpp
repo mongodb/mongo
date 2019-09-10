@@ -273,6 +273,7 @@ private:
             BSON(keyFieldName << BSON("$gte" << kDawnOfTime << "$lte" << expirationTime));
         auto qr = std::make_unique<QueryRequest>(collectionNSS);
         qr->setFilter(query);
+        qr->setLimit(static_cast<long long>(ttlDeleteBatch.load()));
         auto canonicalQuery = CanonicalQuery::canonicalize(opCtx, std::move(qr));
         invariant(canonicalQuery.getStatus());
 

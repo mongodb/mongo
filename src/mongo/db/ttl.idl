@@ -44,3 +44,12 @@ server_parameters:
         default: 60
         validator:
             gt: 0
+
+    ttlDeleteBatch:
+        description: "Limit of delete batch size per TTL monitor operation (used for testing)."
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: ttlDeleteBatch
+        default: { expr: 'std::numeric_limits<int>::max()' }
+        validator:
+            gt: 0
