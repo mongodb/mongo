@@ -124,6 +124,12 @@ void ChunkRange::append(BSONObjBuilder* builder) const {
     builder->append(kMaxKey, _maxKey);
 }
 
+BSONObj ChunkRange::toBSON() const {
+    BSONObjBuilder builder;
+    append(&builder);
+    return builder.obj();
+}
+
 const Status ChunkRange::extractKeyPattern(KeyPattern* shardKeyPatternOut) const {
     BSONObjIterator min(getMin());
     BSONObjIterator max(getMax());

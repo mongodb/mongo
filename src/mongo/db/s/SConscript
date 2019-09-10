@@ -71,6 +71,8 @@ env.Library(
         'split_chunk.cpp',
         'split_vector.cpp',
         env.Idlc('sharding_runtime_d_params.idl')[0],
+        env.Idlc('deletion_task.idl')[0],
+
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/multi_index_block',

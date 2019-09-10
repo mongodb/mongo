@@ -59,6 +59,13 @@ public:
      */
     static StatusWith<ChunkRange> fromBSON(const BSONObj& obj);
 
+    /**
+     * A throwing version of 'fromBSON'.
+     */
+    static ChunkRange fromBSONThrowing(const BSONObj& obj) {
+        return uassertStatusOK(fromBSON(obj));
+    }
+
     const BSONObj& getMin() const {
         return _minKey;
     }
@@ -78,6 +85,8 @@ public:
      * Writes the contents of this chunk range as { min: <min bound>, max: <max bound> }.
      */
     void append(BSONObjBuilder* builder) const;
+
+    BSONObj toBSON() const;
 
     std::string toString() const;
 
