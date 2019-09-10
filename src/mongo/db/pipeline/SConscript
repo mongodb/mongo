@@ -437,6 +437,7 @@ env.Library(
 env.CppUnitTest(
     target='db_pipeline_test',
     source=[
+        'accumulator_js_test.cpp',
         'accumulator_test.cpp',
         'aggregation_request_test.cpp',
         'dependencies_test.cpp',
@@ -479,6 +480,7 @@ env.CppUnitTest(
         'document_value_test_util_self_test.cpp',
         'expression_convert_test.cpp',
         'expression_date_test.cpp',
+        'expression_javascript_test.cpp',
         'expression_test.cpp',
         'expression_trigonometric_test.cpp',
         'expression_walker_test.cpp',
@@ -508,6 +510,8 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/repl/oplog_entry',
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/service_context',
+        "$BUILD_DIR/mongo/db/service_context_d",
+        "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         '$BUILD_DIR/mongo/s/is_mongos',

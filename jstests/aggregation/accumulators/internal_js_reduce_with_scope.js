@@ -11,30 +11,26 @@ load('jstests/aggregation/extras/utils.js');
 const coll = db.js_reduce_with_scope;
 coll.drop();
 
-for (const i of ["hello", "world", "world", "hello", "hi"]) {
+for (const i of ["hello", "world", "world", "world", "hello", "hi", "hi", "hi", "hi"]) {
     assert.commandWorked(coll.insert({word: i, val: 1}));
 }
 
-// Simple reduce function which calculates the word value based on weights defined in a local JS
-// variable.
-const weights = {
-    hello: 3,
-    world: 2,
-    hi: 1
-};
+// Simple reduce function which calculates the word count and mods it based on a value defined in a
+// local JS variable.
+const modulus = 3;
 function reduce(key, values) {
-    return Array.sum(values) * weights[key];
+    return Array.sum(values) % modulus;
 }
 
 const command = {
     aggregate: coll.getName(),
     cursor: {},
     runtimeConstants:
-        {localNow: new Date(), clusterTime: new Timestamp(0, 0), jsScope: {weights: weights}},
+        {localNow: new Date(), clusterTime: new Timestamp(0, 0), jsScope: {modulus: modulus}},
     pipeline: [{
         $group: {
             _id: "$word",
-            wordCount: {
+            wordCountMod: {
                 $_internalJsReduce: {
                     data: {k: "$word", v: "$val"},
                     eval: reduce,
@@ -45,9 +41,9 @@ const command = {
 };
 
 const expectedResults = [
-    {_id: "hello", wordCount: 6},
-    {_id: "world", wordCount: 4},
-    {_id: "hi", wordCount: 1},
+    {_id: "hello", wordCountMod: 2},
+    {_id: "world", wordCountMod: 0},
+    {_id: "hi", wordCountMod: 1},
 ];
 
 const res = assert.commandWorked(db.runCommand(command));

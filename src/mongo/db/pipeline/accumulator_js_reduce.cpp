@@ -96,9 +96,6 @@ Value AccumulatorInternalJsReduce::getValue(bool toBeMerged) {
     auto val = [&]() {
         if (_values.size() < 1) {
             return Value{};
-        } else if (_values.size() == 1) {
-            return _values[0];  // This preserves existing behavior where reduce will not be run
-                                // with only one value.
         }
 
         BSONArrayBuilder bsonValues;

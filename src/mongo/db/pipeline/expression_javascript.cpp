@@ -93,9 +93,10 @@ boost::intrusive_ptr<Expression> ExpressionInternalJsEmit::parse(
             evalField.type() == BSONType::String || evalField.type() == BSONType::Code);
 
     std::string funcSourceString = evalField._asCode();
-    boost::intrusive_ptr<Expression> thisRef = parseOperand(expCtx, expr["this"], vps);
-
-    uassert(31223, str::stream() << kExpressionName << " requires 'this' to be specified", thisRef);
+    BSONElement thisField = expr["this"];
+    uassert(
+        31223, str::stream() << kExpressionName << " requires 'this' to be specified", thisField);
+    boost::intrusive_ptr<Expression> thisRef = parseOperand(expCtx, thisField, vps);
 
     return new ExpressionInternalJsEmit(expCtx, std::move(thisRef), std::move(funcSourceString));
 }
