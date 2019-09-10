@@ -442,157 +442,132 @@ commandsRemovedFromMongosIn44.forEach(function(cmd) {
     testCases[cmd] = {skip: "must define test coverage for 4.2 backwards compatibility"};
 });
 
-class TestRunner {
-    constructor() {
-        this.st = new ShardingTest(this.getShardingTestOptions());
-        let db = this.st.s.getDB(dbName);
-        // We do this create and drop so that we create an entry for the database in the
-        // sharding catalog.
-        assert.commandWorked(db.createCollection(collName));
-        assert.commandWorked(db.runCommand({drop: collName}));
-        this.primaryShard = this.st.shard0;
-        this.st.ensurePrimaryShard(dbName, this.primaryShard.shardName);
+function assertSentDatabaseVersion(testCase, commandProfile, dbVersion, primaryShard) {
+    const res = primaryShard.adminCommand({getDatabaseVersion: dbName});
+    assert.commandWorked(res);
+    assert.eq(dbVersion, res.dbVersion);
 
-        this.dbVersion =
-            this.st.s.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
-        this.previousDbVersion = null;
-
-        let res = this.st.s.adminCommand({listCommands: 1});
-        assert.commandWorked(res);
-        this.commands = Object.keys(res.commands);
-    }
-
-    shutdown() {
-        this.st.stop();
-    }
-
-    getShardingTestOptions() {
-        return {shards: 2};
-    }
-    makeShardDatabaseCacheStale() {
-        let fromShard = this.st.getPrimaryShard(dbName);
-        let toShard = this.st.getOther(fromShard);
-
-        this.primaryShard = toShard;
-        this.previousDbVersion = this.dbVersion;
-
-        assert.commandWorked(this.st.s0.adminCommand({movePrimary: dbName, to: toShard.name}));
-        this.dbVersion =
-            this.st.s.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
-
-        // The dbVersion should have changed due to the movePrimary operation.
-        assert.eq(this.dbVersion.lastMod, this.previousDbVersion.lastMod + 1);
-
-        // The fromShard should have cleared its in-memory database info.
-        const res = fromShard.adminCommand({getDatabaseVersion: dbName});
-        assert.commandWorked(res);
-        assert.eq({}, res.dbVersion);
-    }
-
-    assertSentDatabaseVersion(testCase, commandProfile) {
-        const res = this.primaryShard.adminCommand({getDatabaseVersion: dbName});
-        assert.commandWorked(res);
-        assert.eq(this.dbVersion, res.dbVersion);
-
-        // If the test case is marked as not tracked by the profiler, then we won't be able to
-        // verify the version was not sent here. Any test cases marked with this flag should be
-        // fixed in SERVER-33499.
-        if (!testCase.skipProfilerCheck) {
-            commandProfile["command.databaseVersion"] = this.dbVersion;
-            profilerHasSingleMatchingEntryOrThrow(
-                {profileDB: this.primaryShard.getDB(dbName), filter: commandProfile});
-        }
-    }
-
-    assertDidNotSendDatabaseVersion(testCase, commandProfile) {
-        const res = this.primaryShard.adminCommand({getDatabaseVersion: dbName});
-        assert.commandWorked(res);
-        assert.eq({}, res.dbVersion);
-
-        // If the test case is marked as not tracked by the profiler, then we won't be able to
-        // verify the version was not sent here. Any test cases marked with this flag should be
-        // fixed in SERVER-33499.
-        if (!testCase.skipProfilerCheck) {
-            commandProfile["command.databaseVersion"] = {$exists: false};
-            profilerHasSingleMatchingEntryOrThrow(
-                {profileDB: this.primaryShard.getDB(dbName), filter: commandProfile});
-        }
-    }
-
-    runCommands() {
-        // Use the profiler to check that the command was received with or without a
-        // databaseVersion and shardVersion as expected by the 'testCase' for the command.
-        for (let command of this.commands) {
-            let testCase = testCases[command];
-            assert(testCase !== undefined,
-                   "coverage failure: must define a test case for " + command);
-            if (!testCases[command].validated) {
-                validateTestCase(testCase);
-                testCases[command].validated = true;
-            }
-
-            if (testCase.skip) {
-                print("skipping " + command + ": " + testCase.skip);
-                continue;
-            }
-
-            this.primaryShard.getDB(dbName).setProfilingLevel(2);
-
-            jsTest.log("testing command " + tojson(testCase.command));
-
-            if (testCase.setUp) {
-                testCase.setUp(this.st.s);
-            }
-
-            let commandProfile = buildCommandProfile(testCase.command, false);
-            commandProfile["command.shardVersion"] =
-                testCase.sendsShardVersion ? SHARD_VERSION_UNSHARDED : {$exists: false};
-
-            if (testCase.runsAgainstAdminDb) {
-                assert.commandWorked(this.st.s.adminCommand(testCase.command));
-            } else {
-                assert.commandWorked(this.st.s.getDB(dbName).runCommand(testCase.command));
-            }
-
-            if (testCase.sendsDbVersion) {
-                this.assertSentDatabaseVersion(testCase, commandProfile);
-            } else {
-                this.assertDidNotSendDatabaseVersion(testCase, commandProfile);
-            }
-
-            if (testCase.cleanUp) {
-                testCase.cleanUp(this.st.s);
-            }
-
-            // Clear the profiler collection in between testing each command.
-            this.primaryShard.getDB(dbName).setProfilingLevel(0);
-            assert(this.primaryShard.getDB(dbName).getCollection("system.profile").drop());
-
-            this.makeShardDatabaseCacheStale();
-        }
-
-        // After iterating through all the existing commands, ensure there were no additional
-        // test cases that did not correspond to any mongos command.
-        for (let key of Object.keys(testCases)) {
-            // We have defined real test cases for commands added in 4.4 so that the test
-            // cases are exercised in the regular suites, but because these test cases can't
-            // run in the last stable suite, we skip processing them here to avoid failing the
-            // below assertion. We have defined "skip" test cases for commands removed in 4.4
-            // so the test case is defined in last stable suites (in which these commands still
-            // exist on the mongos), but these test cases won't be run in regular suites, so we
-            // skip processing them below as well.
-            if (commandsAddedToMongosIn44.includes(key) ||
-                commandsRemovedFromMongosIn44.includes(key)) {
-                continue;
-            }
-            assert(testCases[key].validated || testCases[key].conditional,
-                   "you defined a test case for a command '" + key +
-                       "' that does not exist on mongos: " + tojson(testCases[key]));
-        }
+    // If the test case is marked as not tracked by the profiler, then we won't be able to
+    // verify the version was not sent here. Any test cases marked with this flag should be
+    // fixed in SERVER-33499.
+    if (!testCase.skipProfilerCheck) {
+        commandProfile["command.databaseVersion"] = dbVersion;
+        profilerHasSingleMatchingEntryOrThrow(
+            {profileDB: primaryShard.getDB(dbName), filter: commandProfile});
     }
 }
 
-let testRunner = new TestRunner();
-testRunner.runCommands();
-testRunner.shutdown();
+function assertDidNotSendDatabaseVersion(testCase, commandProfile, primaryShard) {
+    const res = primaryShard.adminCommand({getDatabaseVersion: dbName});
+    assert.commandWorked(res);
+    assert.eq({}, res.dbVersion);
+
+    // If the test case is marked as not tracked by the profiler, then we won't be able to
+    // verify the version was not sent here. Any test cases marked with this flag should be
+    // fixed in SERVER-33499.
+    if (!testCase.skipProfilerCheck) {
+        commandProfile["command.databaseVersion"] = {$exists: false};
+        profilerHasSingleMatchingEntryOrThrow(
+            {profileDB: primaryShard.getDB(dbName), filter: commandProfile});
+    }
+}
+
+const st = new ShardingTest({shards: 2});
+
+// We do this create and drop so that we create an entry for the database in the sharding catalog.
+assert.commandWorked(st.s.getDB(dbName).createCollection(collName));
+assert.commandWorked(st.s.getDB(dbName).runCommand({drop: collName}));
+
+let primaryShard = st.shard0;
+st.ensurePrimaryShard(dbName, primaryShard.shardName);
+
+let dbVersion = st.s.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
+
+let res = st.s.adminCommand({listCommands: 1});
+assert.commandWorked(res);
+
+// Use the profiler to check that the command was received with or without a databaseVersion and
+// shardVersion as expected by the 'testCase' for the command.
+for (let command of Object.keys(res.commands)) {
+    let testCase = testCases[command];
+    assert(testCase !== undefined, "coverage failure: must define a test case for " + command);
+    if (!testCases[command].validated) {
+        validateTestCase(testCase);
+        testCases[command].validated = true;
+    }
+
+    if (testCase.skip) {
+        print("skipping " + command + ": " + testCase.skip);
+        continue;
+    }
+    jsTest.log("testing command " + tojson(testCase.command));
+
+    if (testCase.setUp) {
+        testCase.setUp(st.s);
+    }
+
+    primaryShard.getDB(dbName).setProfilingLevel(2);
+    let commandProfile = buildCommandProfile(testCase.command, false);
+    commandProfile["command.shardVersion"] =
+        testCase.sendsShardVersion ? SHARD_VERSION_UNSHARDED : {$exists: false};
+
+    if (testCase.runsAgainstAdminDb) {
+        assert.commandWorked(st.s.adminCommand(testCase.command));
+    } else {
+        assert.commandWorked(st.s.getDB(dbName).runCommand(testCase.command));
+    }
+
+    if (testCase.sendsDbVersion) {
+        assertSentDatabaseVersion(testCase, commandProfile, dbVersion, primaryShard);
+    } else {
+        assertDidNotSendDatabaseVersion(testCase, commandProfile, primaryShard);
+    }
+
+    if (testCase.cleanUp) {
+        testCase.cleanUp(st.s);
+    }
+
+    // Clear the profiler collection in between testing each command.
+    primaryShard.getDB(dbName).setProfilingLevel(0);
+    assert(primaryShard.getDB(dbName).getCollection("system.profile").drop());
+
+    // Ensure the primary shard's database entry is stale for the next command by changing the
+    // primary shard (the recipient shard does not refresh until getting a request with the new
+    // version).
+    let fromShard = st.getPrimaryShard(dbName);
+    let toShard = st.getOther(fromShard);
+
+    primaryShard = toShard;
+    const previousDbVersion = dbVersion;
+
+    assert.commandWorked(st.s0.adminCommand({movePrimary: dbName, to: toShard.name}));
+    dbVersion = st.s.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
+
+    // The dbVersion should have changed due to the movePrimary operation.
+    assert.eq(dbVersion.lastMod, previousDbVersion.lastMod + 1);
+
+    // The fromShard should have cleared its in-memory database info.
+    const res = fromShard.adminCommand({getDatabaseVersion: dbName});
+    assert.commandWorked(res);
+    assert.eq({}, res.dbVersion);
+}
+
+// After iterating through all the existing commands, ensure there were no additional test cases
+// that did not correspond to any mongos command.
+for (let key of Object.keys(testCases)) {
+    // We have defined real test cases for commands added in 4.4 so that the test cases are
+    // exercised in the regular suites, but because these test cases can't run in the last stable
+    // suite, we skip processing them here to avoid failing the below assertion. We have defined
+    // "skip" test cases for commands removed in 4.4 so the test case is defined in last stable
+    // suites (in which these commands still exist on the mongos), but these test cases won't be
+    // run in regular suites, so we skip processing them below as well.
+    if (commandsAddedToMongosIn44.includes(key) || commandsRemovedFromMongosIn44.includes(key)) {
+        continue;
+    }
+    assert(testCases[key].validated || testCases[key].conditional,
+           "you defined a test case for a command '" + key +
+               "' that does not exist on mongos: " + tojson(testCases[key]));
+}
+
+st.stop();
 })();
