@@ -96,6 +96,7 @@ extern template class SaslSCRAMServerMechanism<SCRAMSHA256Policy>;
 template <typename ScramMechanism>
 class SCRAMServerFactory : public MakeServerFactory<ScramMechanism> {
 public:
+    using MakeServerFactory<ScramMechanism>::MakeServerFactory;
     static constexpr bool isInternal = true;
     bool canMakeMechanismForUser(const User* user) const final {
         auto credentials = user->getCredentials();

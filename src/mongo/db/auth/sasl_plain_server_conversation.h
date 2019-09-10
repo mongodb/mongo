@@ -46,6 +46,7 @@ private:
 
 class PLAINServerFactory : public MakeServerFactory<SASLPlainServerMechanism> {
 public:
+    using MakeServerFactory<SASLPlainServerMechanism>::MakeServerFactory;
     static constexpr bool isInternal = true;
     bool canMakeMechanismForUser(const User* user) const final {
         auto credentials = user->getCredentials();

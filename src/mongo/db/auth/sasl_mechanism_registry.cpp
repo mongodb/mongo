@@ -59,8 +59,9 @@ void SASLServerMechanismRegistry::set(ServiceContext* service,
     getSASLServerMechanismRegistry(service) = std::move(registry);
 }
 
-SASLServerMechanismRegistry::SASLServerMechanismRegistry(std::vector<std::string> enabledMechanisms)
-    : _enabledMechanisms(std::move(enabledMechanisms)) {}
+SASLServerMechanismRegistry::SASLServerMechanismRegistry(ServiceContext* svcCtx,
+                                                         std::vector<std::string> enabledMechanisms)
+    : _svcCtx(svcCtx), _enabledMechanisms(std::move(enabledMechanisms)) {}
 
 void SASLServerMechanismRegistry::setEnabledMechanisms(std::vector<std::string> enabledMechanisms) {
     _enabledMechanisms = std::move(enabledMechanisms);
@@ -149,7 +150,7 @@ ServiceContext::ConstructorActionRegisterer SASLServerMechanismRegistryInitializ
     "CreateSASLServerMechanismRegistry", {"EndStartupOptionStorage"}, [](ServiceContext* service) {
         SASLServerMechanismRegistry::set(service,
                                          std::make_unique<SASLServerMechanismRegistry>(
-                                             saslGlobalParams.authenticationMechanisms));
+                                             service, saslGlobalParams.authenticationMechanisms));
     }};
 }  // namespace
 

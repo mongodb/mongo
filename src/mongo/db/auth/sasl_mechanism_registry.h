@@ -209,6 +209,9 @@ protected:
 /** Base class for server mechanism factories. */
 class ServerFactoryBase : public SaslServerCommonBase {
 public:
+    explicit ServerFactoryBase(ServiceContext*) {}
+    ServerFactoryBase() = default;
+
     /**
      * Returns if the factory is capable of producing a server mechanism object which could
      * authenticate the provided user.
@@ -266,6 +269,9 @@ public:
     using mechanism_type = ServerMechanism;
     using policy_type = typename ServerMechanism::policy_type;
 
+    explicit MakeServerFactory(ServiceContext*) {}
+    MakeServerFactory() = default;
+
     virtual ServerMechanism* createImpl(std::string authenticationDatabase) override {
         return new ServerMechanism(std::move(authenticationDatabase));
     }
@@ -301,7 +307,8 @@ public:
     /**
      * Intialize the registry with a list of enabled mechanisms.
      */
-    explicit SASLServerMechanismRegistry(std::vector<std::string> enabledMechanisms);
+    explicit SASLServerMechanismRegistry(ServiceContext* svcCtx,
+                                         std::vector<std::string> enabledMechanisms);
 
     /**
      * Sets a new list of enabled mechanisms - used in testing.
@@ -349,7 +356,7 @@ public:
         }
 
         auto& list = _getMapRef(T::isInternal);
-        list.emplace_back(std::make_unique<T>());
+        list.emplace_back(std::make_unique<T>(_svcCtx));
         std::stable_sort(list.begin(), list.end(), [](const auto& a, const auto& b) {
             return (a->securityLevel() > b->securityLevel());
         });
@@ -372,6 +379,8 @@ private:
     }
 
     bool _mechanismSupportedByConfig(StringData mechName) const;
+
+    ServiceContext* _svcCtx = nullptr;
 
     // Stores factories which make mechanisms for all databases other than $external
     MechList _internalMechs;
