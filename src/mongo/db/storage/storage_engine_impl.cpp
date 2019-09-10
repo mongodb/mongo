@@ -419,6 +419,21 @@ StorageEngineImpl::reconcileCatalogAndIdents(OperationContext* opCtx) {
             const std::string& indexName = indexMetaData.name();
             std::string indexIdent = _catalog->getIndexIdent(opCtx, coll, indexName);
 
+            // Warn in case of incorrect "multikeyPath" information in catalog documents. This is
+            // the result of a concurrency bug which has since been fixed, but may persist in
+            // certain catalog documents. See https://jira.mongodb.org/browse/SERVER-43074
+            const bool hasMultiKeyPaths =
+                std::any_of(indexMetaData.multikeyPaths.begin(),
+                            indexMetaData.multikeyPaths.end(),
+                            [](auto& pathSet) { return pathSet.size() > 0; });
+            if (!indexMetaData.multikey && hasMultiKeyPaths) {
+                warning() << "The 'multikey' field for index " << indexName << " on collection "
+                          << coll << " was false with non-empty 'multikeyPaths'. This indicates "
+                          << "corruption of the catalog. Consider either dropping and recreating "
+                          << "the index, or rerunning with the --repair option. See "
+                          << "http://dochub.mongodb.org/core/repair for more information.";
+            }
+
             const bool foundIdent = engineIdents.find(indexIdent) != engineIdents.end();
             // An index drop will immediately remove the ident, but the `indexMetaData` catalog
             // entry still exists implying the drop hasn't necessarily been replicated to a
