@@ -1101,12 +1101,24 @@ std::vector<ProcessId> getRunningMongoChildProcessIds() {
     return outPids;
 }
 
+BSONObj RunningMongoChildProcessIds(const BSONObj&, void*) {
+    std::vector<ProcessId> pids = getRunningMongoChildProcessIds();
+    BSONObjBuilder bob;
+    BSONArrayBuilder pidArr(bob.subarrayStart("runningPids"));
+    for (const auto& pid : pids) {
+        pidArr << pid.asInt64();
+    }
+    pidArr.done();
+    return bob.obj();
+}
+
 MongoProgramScope::~MongoProgramScope() {
     DESTRUCTOR_GUARD(KillMongoProgramInstances(); ClearRawMongoProgramOutput(BSONObj(), nullptr);)
 }
 
 void installShellUtilsLauncher(Scope& scope) {
     scope.injectNative("_startMongoProgram", StartMongoProgram);
+    scope.injectNative("_runningMongoChildProcessIds", RunningMongoChildProcessIds);
     scope.injectNative("runProgram", RunMongoProgram);
     scope.injectNative("run", RunMongoProgram);
     scope.injectNative("_runMongoProgram", RunMongoProgram);

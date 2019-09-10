@@ -698,6 +698,13 @@ MongoRunner.mongosOptions = function(opts) {
 };
 
 /**
+ * @return {NumberLong[]} Running pids e.g. those started by `MongoRunner.runMongod`.
+ */
+MongoRunner.runningChildPids = function() {
+    return _runningMongoChildProcessIds();
+};
+
+/**
  * Starts a mongod instance.
  *
  * @param {Object} opts
