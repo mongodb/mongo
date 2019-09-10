@@ -68,6 +68,15 @@ void MultikeyPathTracker::mergeMultikeyPaths(MultikeyPaths* toMergeInto,
     }
 }
 
+bool MultikeyPathTracker::isMultikeyPathsTrivial(const MultikeyPaths& paths) {
+    for (auto&& path : paths) {
+        if (!path.empty()) {
+            return false;
+        }
+    }
+    return true;
+}
+
 void MultikeyPathTracker::addMultikeyPathInfo(MultikeyPathInfo info) {
     invariant(_trackMultikeyPathInfo);
     // Merge the `MultikeyPathInfo` input into the accumulated value being tracked for the

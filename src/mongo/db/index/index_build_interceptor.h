@@ -48,6 +48,8 @@ class IndexBuildInterceptor {
 public:
     enum class Op { kInsert, kDelete };
 
+    static bool typeCanFastpathMultikeyUpdates(IndexType type);
+
     /**
      * Creates a temporary table for writes during an index build. Additionally creates a temporary
      * table to store any duplicate key constraint violations found during the build, if the index
@@ -90,6 +92,7 @@ public:
      * constraint violations on the index.
      */
     Status checkDuplicateKeyConstraints(OperationContext* opCtx) const;
+
 
     /**
      * Performs a resumable scan on the side writes table, and either inserts or removes each key
