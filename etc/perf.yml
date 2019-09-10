@@ -515,6 +515,9 @@ buildvariants:
 - name: linux-mmap-standalone
   display_name: Standalone Linux MMAPv1
   batchtime: 90 # 1.5 hours
+  modules:
+    - dsi
+    - mongo-perf
   expansions:
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
@@ -580,6 +583,9 @@ buildvariants:
 - name: linux-mmap-repl
   display_name: 1-Node ReplSet Linux MMAPv1
   batchtime: 90 # 1.5 hours
+  modules:
+    - dsi
+    - mongo-perf
   expansions:
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
