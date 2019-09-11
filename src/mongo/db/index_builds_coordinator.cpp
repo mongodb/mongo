@@ -39,6 +39,7 @@
 #include "mongo/db/catalog/index_build_entry_gen.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/locker.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index_build_entry_helpers.h"
@@ -839,6 +840,26 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
             fassert(51101,
                     status.withContext(str::stream() << "Index build: " << replState->buildUUID
                                                      << "; Database: " << replState->dbName));
+        }
+
+        // Signal downstream secondary nodes to abort index build.
+        if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+            serverGlobalParams.featureCompatibility.getVersion() ==
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+            Lock::GlobalLock lock(opCtx, MODE_IX);
+            auto collUUID = replState->collectionUUID;
+            auto fromMigrate = false;
+            writeConflictRetry(
+                opCtx, "onAbortIndexBuild", NamespaceString::kRsOplogNamespace.ns(), [&] {
+                    opCtx->getServiceContext()->getOpObserver()->onAbortIndexBuild(
+                        opCtx,
+                        nss,
+                        collUUID,
+                        replState->buildUUID,
+                        replState->indexSpecs,
+                        fromMigrate);
+                });
         }
 
         uassertStatusOK(status);
