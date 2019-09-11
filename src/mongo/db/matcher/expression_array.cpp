@@ -185,6 +185,40 @@ void ElemMatchValueMatchExpression::debugString(StringBuilder& debug, int level)
 void ElemMatchValueMatchExpression::serialize(BSONObjBuilder* out) const {
     BSONObjBuilder emBob;
 
+    // NotMatchExpression will serialize to a $nor. This serialization is incorrect for
+    // ElemMatchValue however as $nor is a top-level expression and expects that contained
+    // expressions have path information. For this case we will serialize to $not.
+    if (_subs.size() == 1 && _subs[0]->matchType() == MatchType::NOT) {
+        std::vector<MatchExpression*> childList{_subs[0]->getChild(0)};
+
+        MatchExpression* notChildExpr = _subs[0]->getChild(0);
+        if (notChildExpr->matchType() == MatchType::AND) {
+            childList = *notChildExpr->getChildVector();
+        }
+
+        const bool allChildrenArePathMatchExpression =
+            std::all_of(childList.begin(), childList.end(), [](MatchExpression* child) {
+                return dynamic_cast<PathMatchExpression*>(child);
+            });
+
+        if (allChildrenArePathMatchExpression) {
+            BSONObjBuilder pathBuilder(out->subobjStart(path()));
+            BSONObjBuilder elemMatchBuilder(pathBuilder.subobjStart("$elemMatch"));
+            BSONObjBuilder notBuilder(elemMatchBuilder.subobjStart("$not"));
+
+            for (auto&& child : childList) {
+                BSONObjBuilder predicate;
+                child->serialize(&predicate);
+                notBuilder.appendElements(predicate.obj().firstElement().embeddedObject());
+            }
+
+            notBuilder.doneFast();
+            elemMatchBuilder.doneFast();
+            pathBuilder.doneFast();
+            return;
+        }
+    }
+
     for (unsigned i = 0; i < _subs.size(); i++) {
         BSONObjBuilder predicate;
         _subs[i]->serialize(&predicate);
