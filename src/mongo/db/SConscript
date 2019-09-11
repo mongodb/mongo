@@ -755,6 +755,7 @@ env.Library(
         "collection_index_builds_tracker.cpp",
         "database_index_builds_tracker.cpp",
         "index_builds_coordinator.cpp",
+        env.Idlc('enable_two_phase_index_build.idl')[0],
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
@@ -773,6 +774,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/s/sharding_api_d',
+        '$BUILD_DIR/mongo/idl/server_parameter',
         '$BUILD_DIR/mongo/util/fail_point',
     ],
 )
