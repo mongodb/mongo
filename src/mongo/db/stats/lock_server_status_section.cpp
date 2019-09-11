@@ -63,7 +63,7 @@ public:
             const OperationContext* clientOpCtx = client->getOperationContext();
             auto state =
                 clientOpCtx ? clientOpCtx->lockState()->getClientState() : Locker::kInactive;
-            invariant(state < sizeof(clientStatusCounts));
+            invariant(state < clientStatusCounts.size());
             clientStatusCounts[state]++;
         }
 
