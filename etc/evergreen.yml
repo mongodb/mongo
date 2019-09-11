@@ -4862,6 +4862,10 @@ tasks:
 - name: lint
   depends_on: []
   commands:
+    - command: timeout.update
+      params:
+        # 40 minutes
+        exec_timeout_secs: 2400
     - command: manifest.load
     - func: "git get project"
     - func: "set task expansion macros"
