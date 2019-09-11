@@ -44,7 +44,6 @@
 #include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/enable_coordinator_for_create_indexes_command_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
@@ -814,8 +813,7 @@ public:
         while (true) {
             try {
                 // TODO: SERVER-42513 Re-enable on mobile.
-                if (enableIndexBuildsCoordinatorForCreateIndexesCommand &&
-                    storageGlobalParams.engine != "mobile") {
+                if (storageGlobalParams.engine != "mobile") {
                     return runCreateIndexesWithCoordinator(
                         opCtx, dbname, cmdObj, errmsg, result, false /*two phase build*/);
                 }

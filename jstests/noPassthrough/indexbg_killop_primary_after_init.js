@@ -28,17 +28,6 @@ const primary = rst.getPrimary();
 const testDB = primary.getDB('test');
 const coll = testDB.getCollection('test');
 
-const enableIndexBuildsCoordinator =
-    assert
-        .commandWorked(primary.adminCommand(
-            {getParameter: 1, enableIndexBuildsCoordinatorForCreateIndexesCommand: 1}))
-        .enableIndexBuildsCoordinatorForCreateIndexesCommand;
-if (!enableIndexBuildsCoordinator) {
-    jsTestLog('IndexBuildsCoordinator not enabled for index creation on primary, skipping test.');
-    rst.stopSet();
-    return;
-}
-
 assert.commandWorked(coll.insert({a: 1}));
 
 assert.commandWorked(primary.adminCommand(

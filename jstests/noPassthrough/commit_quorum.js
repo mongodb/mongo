@@ -21,7 +21,7 @@ const replSet = new ReplSetTest({
 });
 
 // Allow the createIndexes command to use the index builds coordinator in single-phase mode.
-replSet.startSet({setParameter: {enableIndexBuildsCoordinatorForCreateIndexesCommand: true}});
+replSet.startSet();
 replSet.initiate();
 
 const testDB = replSet.getPrimary().getDB('test');
