@@ -45,7 +45,10 @@
 @mongo_config_debug_build@
 
 // Defined if OpenSSL has `SSL_CTX_set_ecdh_auto` and `SSL_set_ecdh_auto`
-@mongo_config_has_ssl_set_ecdh_auto@
+@mongo_config_have_ssl_set_ecdh_auto@
+
+// Defined if OpenSSL has `EC_KEY_new_by_curve_name` and the `NID_X9_62_prime256v1` curve defined
+@mongo_config_have_ssl_ec_key_new@
 
 // Defined if execinfo.h and backtrace are available
 @mongo_config_have_execinfo_backtrace@
