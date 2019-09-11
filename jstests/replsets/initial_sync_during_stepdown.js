@@ -48,6 +48,9 @@ function setupTest({
 
     jsTestLog("Starting secondary.");
     secondaryStartupParams['numInitialSyncAttempts'] = 1;
+    // Skip clearing initial sync progress after a successful initial sync attempt so that we can
+    // check initialSyncStatus fields after initial sync is complete.
+    secondaryStartupParams['failpoint.skipClearInitialSyncState'] = tojson({mode: 'alwaysOn'});
     rst.start(secondary, {startClean: true, setParameter: secondaryStartupParams});
 
     // Wait until secondary reaches RS_STARTUP2 state.
@@ -78,7 +81,7 @@ function finishTest(
     rst.waitForState(primary, ReplSetTest.State.SECONDARY);
 
     jsTestLog("Validating initial sync data.");
-    let res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 1}));
+    let res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
     assert.eq(0, res.initialSyncStatus.failedInitialSyncAttempts);
     assert.eq(2 + DocsCopiedByOplogFetcher, secondaryColl.find().itcount());
 

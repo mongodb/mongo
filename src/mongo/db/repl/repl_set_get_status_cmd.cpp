@@ -55,9 +55,9 @@ public:
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
         uassertStatusOK(status);
 
-        bool includeInitialSync = false;
+        bool includeInitialSync = true;
         Status initialSyncStatus =
-            bsonExtractBooleanFieldWithDefault(cmdObj, "initialSync", false, &includeInitialSync);
+            bsonExtractBooleanFieldWithDefault(cmdObj, "initialSync", true, &includeInitialSync);
         uassertStatusOK(initialSyncStatus);
 
         auto responseStyle = ReplicationCoordinator::ReplSetGetStatusResponseStyle::kBasic;

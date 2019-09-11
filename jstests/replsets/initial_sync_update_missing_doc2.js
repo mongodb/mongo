@@ -47,7 +47,7 @@ turnOffHangBeforeCopyingDatabasesFailPoint(secondary);
 // insert this document after failing to apply the udpate.
 assert.commandWorked(coll.insert({_id: 0, x: 3}));
 
-var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 1}));
+var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
 assert.eq(res.initialSyncStatus.fetchedMissingDocs, 0);
 var firstOplogEnd = res.initialSyncStatus.initialSyncOplogEnd;
 

@@ -41,7 +41,7 @@ updateRemove(coll, {_id: 0});
 
 turnOffHangBeforeCopyingDatabasesFailPoint(secondary);
 
-var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 1}));
+var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
 assert.eq(res.initialSyncStatus.fetchedMissingDocs, 0);
 var firstOplogEnd = res.initialSyncStatus.initialSyncOplogEnd;
 

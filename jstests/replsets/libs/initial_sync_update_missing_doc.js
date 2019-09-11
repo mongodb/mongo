@@ -24,6 +24,11 @@ var reInitiateSetWithSecondary = function(replSet, secondaryConfig) {
     assert.commandWorked(secondary.getDB('admin').runCommand(
         {configureFailPoint: 'initialSyncHangBeforeGettingMissingDocument', mode: 'alwaysOn'}));
 
+    // Skip clearing initial sync progress after a successful initial sync attempt so that we
+    // can check initialSyncStatus fields after initial sync is complete.
+    assert.commandWorked(secondary.getDB('admin').runCommand(
+        {configureFailPoint: 'skipClearInitialSyncState', mode: 'alwaysOn'}));
+
     replSet.reInitiate();
 
     // Wait for fail point message to be logged.
@@ -85,7 +90,7 @@ var finishAndValidate = function(replSet, name, firstOplogEnd, numInserted, numD
               secondary.getDB(dbName).getCollection(name).find().itcount(),
               'documents successfully synced to secondary');
 
-    const res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 1}));
+    const res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
 
     // If we haven't re-inserted any documents after deleting them, the fetch count is 0 because we
     // are unable to get the document from the sync source.

@@ -212,7 +212,7 @@ public:
 
     /**
      * Returns stats about the progress of initial sync. If initial sync is not in progress it
-     * returns summary statistics for what occurred during initial sync.
+     * returns an empty BSON object.
      */
     BSONObj getInitialSyncProgress() const;
 

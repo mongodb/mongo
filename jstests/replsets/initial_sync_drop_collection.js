@@ -39,6 +39,9 @@ function setupTest({failPoint, secondaryStartupParams}) {
 
     jsTestLog("Restarting secondary with failPoint " + failPoint + " set for " + nss);
     secondaryStartupParams = secondaryStartupParams || {};
+    // Skip clearing initial sync progress after a successful initial sync attempt so that we can
+    // check initialSyncStatus fields after initial sync is complete.
+    secondaryStartupParams['failpoint.skipClearInitialSyncState'] = tojson({mode: 'alwaysOn'});
     secondaryStartupParams['failpoint.' + failPoint] = tojson({mode: 'alwaysOn', data: {nss: nss}});
     secondaryStartupParams['numInitialSyncAttempts'] = 1;
     replTest.restart(secondary, {startClean: true, setParameter: secondaryStartupParams});
@@ -80,7 +83,7 @@ function finishTest({failPoint, secondaryStartupParams, expectedLog, waitForDrop
     jsTestLog("Waiting for initial sync to complete.");
     replTest.waitForState(secondary, ReplSetTest.State.SECONDARY);
 
-    let res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 1}));
+    let res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
     assert.eq(0, res.initialSyncStatus.failedInitialSyncAttempts);
 
     if (createNew) {

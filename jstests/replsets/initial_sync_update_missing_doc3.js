@@ -59,7 +59,7 @@ assert.commandWorked(coll.insert({_id: 0, x: 3}));
 // Mark the collection as drop pending so it gets renamed, but retains the UUID.
 assert.commandWorked(primary.getDB('test').runCommand({"drop": name}));
 
-var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 1}));
+var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
 assert.eq(res.initialSyncStatus.fetchedMissingDocs, 0);
 var firstOplogEnd = res.initialSyncStatus.initialSyncOplogEnd;
 
