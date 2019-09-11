@@ -397,12 +397,16 @@ Collection* getOrCreateCollection(OperationContext* opCtx,
     });
 }
 
-bool runCreateIndexes(OperationContext* opCtx,
-                      const std::string& dbname,
-                      const BSONObj& cmdObj,
-                      std::string& errmsg,
-                      BSONObjBuilder& result,
-                      bool runTwoPhaseBuild) {
+/**
+ * Creates indexes using the given specs for the mobile storage engine.
+ * TODO(SERVER-42513): Remove this function.
+ */
+bool runCreateIndexesForMobile(OperationContext* opCtx,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               std::string& errmsg,
+                               BSONObjBuilder& result,
+                               bool runTwoPhaseBuild) {
     NamespaceString ns(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
     uassertStatusOK(userAllowedWriteNS(ns));
 
@@ -812,12 +816,13 @@ public:
         bool shouldLogMessageOnAlreadyBuildingError = true;
         while (true) {
             try {
-                // TODO: SERVER-42513 Re-enable on mobile.
-                if (storageGlobalParams.engine != "mobile") {
-                    return runCreateIndexesWithCoordinator(
+                // TODO(SERVER-42513): Remove runCreateIndexesForMobile() when the mobile storage
+                // engine is supported by runCreateIndexesWithCoordinator().
+                if (storageGlobalParams.engine == "mobile") {
+                    return runCreateIndexesForMobile(
                         opCtx, dbname, cmdObj, errmsg, result, false /*two phase build*/);
                 }
-                return runCreateIndexes(
+                return runCreateIndexesWithCoordinator(
                     opCtx, dbname, cmdObj, errmsg, result, false /*two phase build*/);
             } catch (const DBException& ex) {
                 if (ex.toStatus() != ErrorCodes::IndexBuildAlreadyInProgress) {
