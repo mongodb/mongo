@@ -89,46 +89,66 @@ const char kFindCmdName[] = "find";
  * suitable for forwarding to the targeted hosts.
  */
 StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(
-    const QueryRequest& qr, bool appendGeoNearDistanceProjection) {
-    // If there is a limit, we forward the sum of the limit and the skip.
+    const QueryRequest& qr, bool appendGeoNearDistanceProjection, bool forwardToSingleShard) {
     boost::optional<long long> newLimit;
     if (qr.getLimit()) {
-        long long newLimitValue;
-        if (overflow::add(*qr.getLimit(), qr.getSkip().value_or(0), &newLimitValue)) {
-            return Status(
-                ErrorCodes::Overflow,
-                str::stream()
-                    << "sum of limit and skip cannot be represented as a 64-bit integer, limit: "
-                    << *qr.getLimit() << ", skip: " << qr.getSkip().value_or(0));
+        if (forwardToSingleShard) {
+            newLimit = *qr.getLimit();
+        } else {
+            // If there is a limit, we forward the sum of the limit and the skip.
+            long long newLimitValue;
+            if (overflow::add(*qr.getLimit(), qr.getSkip().value_or(0), &newLimitValue)) {
+                return Status(
+                    ErrorCodes::Overflow,
+                    str::stream()
+                        << "sum of limit and skip cannot be represented as a 64-bit integer, limit: "
+                        << *qr.getLimit() << ", skip: " << qr.getSkip().value_or(0));
+            }
+            newLimit = newLimitValue;
         }
-        newLimit = newLimitValue;
     }
 
-    // Similarly, if nToReturn is set, we forward the sum of nToReturn and the skip.
     boost::optional<long long> newNToReturn;
     if (qr.getNToReturn()) {
         // !wantMore and ntoreturn mean the same as !wantMore and limit, so perform the conversion.
         if (!qr.wantMore()) {
-            long long newLimitValue;
-            if (overflow::add(*qr.getNToReturn(), qr.getSkip().value_or(0), &newLimitValue)) {
-                return Status(ErrorCodes::Overflow,
-                              str::stream()
-                                  << "sum of ntoreturn and skip cannot be represented as a 64-bit "
-                                     "integer, ntoreturn: "
-                                  << *qr.getNToReturn() << ", skip: " << qr.getSkip().value_or(0));
+            if (forwardToSingleShard) {
+                newLimit = *qr.getNToReturn();
+            } else {
+                // if nToReturn is set, we forward the sum of nToReturn and the skip.
+                long long newLimitValue;
+                if (overflow::add(*qr.getNToReturn(), qr.getSkip().value_or(0), &newLimitValue)) {
+                    return Status(ErrorCodes::Overflow,
+                                  str::stream()
+                                      << "sum of ntoreturn and skip cannot be represented as a 64-bit "
+                                         "integer, ntoreturn: "
+                                      << *qr.getNToReturn() << ", skip: " << qr.getSkip().value_or(0));
+                }
+                newLimit = newLimitValue;
             }
-            newLimit = newLimitValue;
         } else {
-            long long newNToReturnValue;
-            if (overflow::add(*qr.getNToReturn(), qr.getSkip().value_or(0), &newNToReturnValue)) {
-                return Status(ErrorCodes::Overflow,
+            if (forwardToSingleShard) {
+                newNToReturn = *qr.getNToReturn();
+            } else {
+                long long newNToReturnValue;
+                if (overflow::add(*qr.getNToReturn(), qr.getSkip().value_or(0), &newNToReturnValue)) {
+                    return Status(ErrorCodes::Overflow,
                               str::stream()
                                   << "sum of ntoreturn and skip cannot be represented as a 64-bit "
                                      "integer, ntoreturn: "
                                   << *qr.getNToReturn() << ", skip: " << qr.getSkip().value_or(0));
+                }
+                newNToReturn = newNToReturnValue;
             }
-            newNToReturn = newNToReturnValue;
         }
+    }
+
+    // For requests that sent to a single shard, do skip in mongod
+    boost::optional<long long> newSkip;
+    if (qr.getSkip() && forwardToSingleShard) {
+        newSkip = *qr.getSkip();
+    } else {
+        newSkip = boost::none;
     }
 
     // If there is a sort other than $natural, we send a sortKey meta-projection to the remote node.
@@ -150,7 +170,7 @@ StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(
 
     auto newQR = std::make_unique<QueryRequest>(qr);
     newQR->setProj(newProjection);
-    newQR->setSkip(boost::none);
+    newQR->setSkip(newSkip);
     newQR->setLimit(newLimit);
     newQR->setNToReturn(newNToReturn);
 
@@ -172,9 +192,10 @@ std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
     const CachedCollectionRoutingInfo& routingInfo,
     const std::set<ShardId>& shardIds,
     const CanonicalQuery& query,
-    bool appendGeoNearDistanceProjection) {
+    bool appendGeoNearDistanceProjection,
+    bool forwardToSingleShard) {
     const auto qrToForward = uassertStatusOK(
-        transformQueryForShards(query.getQueryRequest(), appendGeoNearDistanceProjection));
+        transformQueryForShards(query.getQueryRequest(), appendGeoNearDistanceProjection, forwardToSingleShard));
 
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     std::vector<std::pair<ShardId, BSONObj>> requests;
@@ -261,11 +282,18 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     // Tailable cursors can't have a sort, which should have already been validated.
     invariant(params.sort.isEmpty() || !query.getQueryRequest().isTailable());
 
+    // For query forward to single shard, do not skip in mongos, but in mongod
+    bool forwardToSingleShard = false;
+    if (shardIds.size() == 1) {
+        forwardToSingleShard = true;
+        params.skip = boost::none;
+    }
+
     // Construct the requests that we will use to establish cursors on the targeted shards,
     // attaching the shardVersion and txnNumber, if necessary.
 
     auto requests = constructRequestsForShards(
-        opCtx, routingInfo, shardIds, query, appendGeoNearDistanceProjection);
+        opCtx, routingInfo, shardIds, query, appendGeoNearDistanceProjection, forwardToSingleShard);
 
     // Establish the cursors with a consistent shardVersion across shards.
 
