@@ -373,6 +373,7 @@ public:
                 warning() << errmsg;
 
                 result.append("ns", nss.ns());
+                result.append("code", status.code());
                 requestedVersion.appendLegacyWithField(&result, "version");
                 currVersion.appendLegacyWithField(&result, "globalVersion");
                 result.appendBool("reloadConfig", true);
