@@ -658,6 +658,10 @@ public:
         void _abortActiveTransaction(OperationContext* opCtx,
                                      TransactionState::StateSet expectedStates);
 
+        // Factors out code for clarity from _abortActiveTransaction.
+        void _finishAbortingActiveTransaction(OperationContext* opCtx,
+                                              TransactionState::StateSet expectedStates);
+
         // Aborts a prepared transaction.
         void _abortActivePreparedTransaction(OperationContext* opCtx);
 

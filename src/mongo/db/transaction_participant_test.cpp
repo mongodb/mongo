@@ -1472,7 +1472,9 @@ TEST_F(TxnParticipantTest, ThrowDuringUnpreparedOnTransactionAbort) {
         txnParticipant.abortTransaction(opCtx()), AssertionException, ErrorCodes::OperationFailed);
 }
 
-TEST_F(TxnParticipantTest, ThrowDuringPreparedOnTransactionAbortIsFatal) {
+DEATH_TEST_F(TxnParticipantTest,
+             ThrowDuringPreparedOnTransactionAbortIsFatal,
+             "Caught exception during abort of transaction") {
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "abortTransaction");
@@ -1480,8 +1482,7 @@ TEST_F(TxnParticipantTest, ThrowDuringPreparedOnTransactionAbortIsFatal) {
 
     _opObserver->onTransactionAbortThrowsException = true;
 
-    ASSERT_THROWS_CODE(
-        txnParticipant.abortTransaction(opCtx()), AssertionException, ErrorCodes::OperationFailed);
+    txnParticipant.abortTransaction(opCtx());
 }
 
 TEST_F(TxnParticipantTest, InterruptedSessionsCannotBePrepared) {

@@ -6,10 +6,6 @@
 
 (function() {
 "use strict";
-// TODO (SERVER-42987) Re-enable this test.
-if (true) {
-    return;
-}
 load("jstests/core/txns/libs/prepare_helpers.js");
 load("jstests/libs/parallelTester.js");  // for ScopedThread.
 
@@ -51,11 +47,10 @@ function killOpThread(host, dbName, collName, shutdownLatch) {
             ]
         };
         let ops = nodeDB.currentOp(filter).inprog;
-        if (ops.length > 0) {
-            print("Going to run 'killOp' on " + ops.length + " ops.");
-        }
         ops.forEach(op => {
-            if (op.opid) {
+            // Let some operations survive so the test terminates.
+            const shouldKill = (Math.random() < 0.8);
+            if (op.opid && shouldKill) {
                 nodeDB.killOp(op.opid);
             }
         });
@@ -125,20 +120,15 @@ function commitOrAbortAllTransactions(sessions) {
 // The number of sessions and transactions to create.
 const numTxns = 100;
 
-// Make the server sleep a bit right after commit/abort commands start to make it more likely that
-// the kill op thread will be able to find and kill them.
-assert.commandWorked(primary.adminCommand({
-    configureFailPoint: "sleepMillisAfterCommandExecutionBegins",
-    mode: "alwaysOn",
-    data: {millis: 50, commands: {"commitTransaction": 1, "abortTransaction": 1}}
-}));
-
 jsTestLog("Creating sessions and preparing " + numTxns + " transactions.");
 let sessions = createPreparedTransactions(numTxns);
 
 jsTestLog("Starting the killOp thread.");
 let killThread = new Thread(killOpThread, primary.host, dbName, collName, shutdownLatch);
 killThread.start();
+
+// Sleep for a second to let the killThread begin killing.
+sleep(1000);
 
 jsTestLog("Committing/aborting all transactions.");
 commitOrAbortAllTransactions(sessions);
