@@ -101,6 +101,12 @@ public:
     static IndexBuildsCoordinator* get(OperationContext* operationContext);
 
     /**
+     * Returns true if two phase index builds are supported.
+     * This is determined by the current FCV and the server parameter 'enableTwoPhaseIndexBuild'.
+     */
+    bool supportsTwoPhaseIndexBuild() const;
+
+    /**
      * Sets up the in-memory and persisted state of the index build. A Future is returned upon which
      * the user can await the build result.
      *

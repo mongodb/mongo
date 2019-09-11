@@ -42,6 +42,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/enable_two_phase_index_build_gen.h"
 #include "mongo/db/index_build_entry_helpers.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
@@ -150,6 +151,23 @@ IndexBuildsCoordinator::~IndexBuildsCoordinator() {
     invariant(_disallowedDbs.empty());
     invariant(_disallowedCollections.empty());
     invariant(_collectionIndexBuilds.empty());
+}
+
+bool IndexBuildsCoordinator::supportsTwoPhaseIndexBuild() const {
+    if (!enableTwoPhaseIndexBuild) {
+        return false;
+    }
+
+    if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+        return false;
+    }
+
+    if (serverGlobalParams.featureCompatibility.getVersion() !=
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+        return false;
+    }
+
+    return true;
 }
 
 StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::startIndexRebuildForRecovery(
