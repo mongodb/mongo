@@ -115,6 +115,10 @@ DBCollection.prototype.bulkWrite = function(operations, options) {
                 operation = operation.upsert();
             }
 
+            if (op.updateOne.hint) {
+                operation = operation.hint(op.updateOne.hint);
+            }
+
             if (op.updateOne.collation) {
                 operation.collation(op.updateOne.collation);
             }
@@ -137,6 +141,10 @@ DBCollection.prototype.bulkWrite = function(operations, options) {
             var operation = bulkOp.find(op.updateMany.filter);
             if (op.updateMany.upsert) {
                 operation = operation.upsert();
+            }
+
+            if (op.updateMany.hint) {
+                operation = operation.hint(op.updateMany.hint);
             }
 
             if (op.updateMany.collation) {
@@ -565,6 +573,10 @@ DBCollection.prototype.updateOne = function(filter, update, options) {
         op = op.upsert();
     }
 
+    if (opts.hint) {
+        op.hint(opts.hint);
+    }
+
     if (opts.collation) {
         op.collation(opts.collation);
     }
@@ -649,6 +661,10 @@ DBCollection.prototype.updateMany = function(filter, update, options) {
     var op = bulk.find(filter);
     if (opts.upsert) {
         op = op.upsert();
+    }
+
+    if (opts.hint) {
+        op.hint(opts.hint);
     }
 
     if (opts.collation) {
