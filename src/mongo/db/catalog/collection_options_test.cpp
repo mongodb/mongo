@@ -349,19 +349,8 @@ TEST(CollectionOptions, MaxNumberLimits) {
     ASSERT_EQ(options.cappedMaxDocs, 0);
 }
 
-TEST(CollectionOptions, NExtentsNumberLimits) {
-    CollectionOptions options = assertGet(CollectionOptions::parse(fromjson("{$nExtents: 'a'}")));
-    ASSERT_EQ(options.initialNumExtents, 0);
-
-    options = assertGet(CollectionOptions::parse(fromjson("{$nExtents: '-1'}")));
-    ASSERT_EQ(options.initialNumExtents, 0);
-
-    options = assertGet(
-        CollectionOptions::parse(fromjson("{$nExtents: '-9999999999999999999999999999999999'}")));
-    ASSERT_EQ(options.initialNumExtents, 0);
-
-    options = assertGet(
-        CollectionOptions::parse(fromjson("{$nExtents: 9999999999999999999999999999999}")));
-    ASSERT_EQ(options.initialNumExtents, LLONG_MAX);
+TEST(CollectionOptions, NExtentsNoError) {
+    // Check that $nExtents does not cause an error for backwards compatability
+    assertGet(CollectionOptions::parse(fromjson("{$nExtents: 'a'}")));
 }
 }  // namespace mongo

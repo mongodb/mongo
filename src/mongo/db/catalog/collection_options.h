@@ -108,10 +108,6 @@ struct CollectionOptions {
     long long cappedSize = 0;
     long long cappedMaxDocs = 0;
 
-    // (MMAPv1) The following 2 are mutually exclusive, can only have one set.
-    long long initialNumExtents = 0;
-    std::vector<long long> initialExtentSizes;
-
     // The behavior of _id index creation when collection created
     void setNoIdIndex() {
         autoIndexId = NO;

@@ -77,8 +77,7 @@ public:
 
         uassert(ErrorCodes::InvalidOptions,
                 "specify size:<n> when capped is true",
-                !cmdObj["capped"].trueValue() || cmdObj["size"].isNumber() ||
-                    cmdObj.hasField("$nExtents"));
+                !cmdObj["capped"].trueValue() || cmdObj["size"].isNumber());
 
         ConfigsvrCreateCollection configCreateCmd(nss);
         configCreateCmd.setDbName(NamespaceString::kAdminDb);

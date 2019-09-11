@@ -161,8 +161,7 @@ Status createCollection(OperationContext* opCtx,
     BSONObj options = optionsBuilder.obj();
     uassert(14832,
             "specify size:<n> when capped is true",
-            !options["capped"].trueValue() || options["size"].isNumber() ||
-                options.hasField("$nExtents"));
+            !options["capped"].trueValue() || options["size"].isNumber());
 
     CollectionOptions collectionOptions;
     {

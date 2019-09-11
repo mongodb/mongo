@@ -156,15 +156,8 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
                 return Status(ErrorCodes::BadValue,
                               "max in a capped collection has to be < 2^31 or not set");
         } else if (fieldName == "$nExtents") {
-            if (e.type() == Array) {
-                BSONObjIterator j(e.Obj());
-                while (j.more()) {
-                    BSONElement inner = j.next();
-                    collectionOptions.initialExtentSizes.push_back(inner.numberInt());
-                }
-            } else {
-                collectionOptions.initialNumExtents = e.safeNumberLong();
-            }
+            // Ignoring for backwards compatibility.
+            continue;
         } else if (fieldName == "autoIndexId") {
             if (e.trueValue())
                 collectionOptions.autoIndexId = YES;
@@ -287,11 +280,6 @@ void CollectionOptions::appendBSON(BSONObjBuilder* builder) const {
             builder->appendNumber("max", cappedMaxDocs);
     }
 
-    if (initialNumExtents)
-        builder->appendNumber("$nExtents", initialNumExtents);
-    if (!initialExtentSizes.empty())
-        builder->append("$nExtents", initialExtentSizes);
-
     if (autoIndexId != DEFAULT)
         builder->appendBool("autoIndexId", autoIndexId == YES);
 
@@ -346,20 +334,6 @@ bool CollectionOptions::matchesStorageOptions(const CollectionOptions& other,
     }
 
     if (cappedMaxDocs != other.cappedMaxDocs) {
-        return false;
-    }
-
-    if (initialNumExtents != other.initialNumExtents) {
-        return false;
-    }
-
-    if (initialExtentSizes.size() != other.initialExtentSizes.size()) {
-        return false;
-    }
-
-    if (!std::equal(other.initialExtentSizes.begin(),
-                    other.initialExtentSizes.end(),
-                    initialExtentSizes.begin())) {
         return false;
     }
 
