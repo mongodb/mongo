@@ -1,0 +1,9 @@
+# These are the dependencies of ldaptor
+passlib == 1.7.1
+pyOpenSSL == 19.0.0
+pyparsing == 2.4.0
+service_identity == 18.1.0
+twisted == 19.2.1
+zope.interface == 4.6.0
+
+ldaptor == 19.0.0

@@ -5,3 +5,4 @@
 -r components/lint.req
 -r components/resmoke.req
 -r components/evergreen.req
+-r components/external_auth.req
