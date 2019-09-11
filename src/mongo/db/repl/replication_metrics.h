@@ -49,6 +49,7 @@ public:
     ~ReplicationMetrics();
 
     void incrementNumElectionsCalledForReason(TopologyCoordinator::StartElectionReason reason);
+    void incrementNumElectionsSuccessfulForReason(TopologyCoordinator::StartElectionReason reason);
     void incrementNumStepDownsCausedByHigherTerm();
 
     int getNumStepUpCmdsCalled_forTesting();
@@ -56,6 +57,11 @@ public:
     int getNumCatchUpTakeoversCalled_forTesting();
     int getNumElectionTimeoutsCalled_forTesting();
     int getNumFreezeTimeoutsCalled_forTesting();
+    int getNumStepUpCmdsSuccessful_forTesting();
+    int getNumPriorityTakeoversSuccessful_forTesting();
+    int getNumCatchUpTakeoversSuccessful_forTesting();
+    int getNumElectionTimeoutsSuccessful_forTesting();
+    int getNumFreezeTimeoutsSuccessful_forTesting();
     int getNumStepDownsCausedByHigherTerm_forTesting();
 
     BSONObj getElectionMetricsBSON();

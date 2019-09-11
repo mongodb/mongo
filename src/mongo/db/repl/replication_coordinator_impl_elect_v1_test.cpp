@@ -252,15 +252,21 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenAllNodesVoteYea) {
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("election succeeded"));
 
-    // Check that the numElectionTimeoutsCalled election metric has been incremented, and that none
-    // of the metrics that track the number of elections called for other reasons has been
-    // incremented.
+    // Check that the numElectionTimeoutsCalled and the numElectionTimeoutsSuccessful election
+    // metrics have been incremented, and that none of the metrics that track the number of
+    // elections called or successful for other reasons has been incremented.
     ServiceContext* svcCtx = getServiceContext();
     ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumStepUpCmdsCalled_forTesting());
     ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumPriorityTakeoversCalled_forTesting());
     ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumCatchUpTakeoversCalled_forTesting());
     ASSERT_EQUALS(1, ReplicationMetrics::get(svcCtx).getNumElectionTimeoutsCalled_forTesting());
     ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumFreezeTimeoutsCalled_forTesting());
+    ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumStepUpCmdsSuccessful_forTesting());
+    ASSERT_EQUALS(0,
+                  ReplicationMetrics::get(svcCtx).getNumPriorityTakeoversSuccessful_forTesting());
+    ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumCatchUpTakeoversSuccessful_forTesting());
+    ASSERT_EQUALS(1, ReplicationMetrics::get(svcCtx).getNumElectionTimeoutsSuccessful_forTesting());
+    ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumFreezeTimeoutsSuccessful_forTesting());
 }
 
 TEST_F(ReplCoordTest, ElectionSucceedsWhenMaxSevenNodesVoteYea) {
@@ -1403,15 +1409,21 @@ TEST_F(TakeoverTest, SuccessfulCatchupTakeover) {
                               TopologyCoordinator::StartElectionReason::kCatchupTakeover,
                               lastVoteExpected);
 
-    // Check that the numCatchUpTakeoversCalled election metric has been incremented, and that none
-    // of the metrics that track the number of elections called for other reasons has been
-    // incremented.
+    // Check that the numCatchUpTakeoversCalled and the numCatchUpTakeoversSuccessful election
+    // metrics have been incremented, and that none of the metrics that track the number of
+    // elections called or successful for other reasons has been incremented.
     ServiceContext* svcCtx = getServiceContext();
     ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumStepUpCmdsCalled_forTesting());
     ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumPriorityTakeoversCalled_forTesting());
     ASSERT_EQUALS(1, ReplicationMetrics::get(svcCtx).getNumCatchUpTakeoversCalled_forTesting());
     ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumElectionTimeoutsCalled_forTesting());
     ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumFreezeTimeoutsCalled_forTesting());
+    ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumStepUpCmdsSuccessful_forTesting());
+    ASSERT_EQUALS(0,
+                  ReplicationMetrics::get(svcCtx).getNumPriorityTakeoversSuccessful_forTesting());
+    ASSERT_EQUALS(1, ReplicationMetrics::get(svcCtx).getNumCatchUpTakeoversSuccessful_forTesting());
+    ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumElectionTimeoutsSuccessful_forTesting());
+    ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumFreezeTimeoutsSuccessful_forTesting());
 }
 
 TEST_F(TakeoverTest, CatchupTakeoverDryRunFailsPrimarySaysNo) {
@@ -1750,15 +1762,21 @@ TEST_F(TakeoverTest, SuccessfulPriorityTakeover) {
                               TopologyCoordinator::StartElectionReason::kPriorityTakeover,
                               lastVoteExpected);
 
-    // Check that the numPriorityTakeoversCalled election metric has been incremented, and that none
-    // of the metrics that track the number of elections called for other reasons has been
-    // incremented.
+    // Check that the numPriorityTakeoversCalled and the numPriorityTakeoversSuccessful election
+    // metrics have been incremented, and that none of the metrics that track the number of
+    // elections called or successful for other reasons has been incremented.
     ServiceContext* svcCtx = getServiceContext();
     ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumStepUpCmdsCalled_forTesting());
     ASSERT_EQUALS(1, ReplicationMetrics::get(svcCtx).getNumPriorityTakeoversCalled_forTesting());
     ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumCatchUpTakeoversCalled_forTesting());
     ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumElectionTimeoutsCalled_forTesting());
     ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumFreezeTimeoutsCalled_forTesting());
+    ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumStepUpCmdsSuccessful_forTesting());
+    ASSERT_EQUALS(1,
+                  ReplicationMetrics::get(svcCtx).getNumPriorityTakeoversSuccessful_forTesting());
+    ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumCatchUpTakeoversSuccessful_forTesting());
+    ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumElectionTimeoutsSuccessful_forTesting());
+    ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumFreezeTimeoutsSuccessful_forTesting());
 }
 
 TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedSameSecond) {

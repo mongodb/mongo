@@ -1032,12 +1032,14 @@ private:
      * This job will be scheduled to run in DB worker threads.
      */
     void _writeLastVoteForMyElection(LastVote lastVote,
-                                     const executor::TaskExecutor::CallbackArgs& cbData);
+                                     const executor::TaskExecutor::CallbackArgs& cbData,
+                                     TopologyCoordinator::StartElectionReason reason);
 
     /**
      * Starts VoteRequester to run the real election when last vote write has completed.
      */
-    void _startVoteRequester_inlock(long long newTerm);
+    void _startVoteRequester_inlock(long long newTerm,
+                                    TopologyCoordinator::StartElectionReason reason);
 
     /**
      * Callback called when the VoteRequester has completed; checks the results and
@@ -1045,7 +1047,8 @@ private:
      * "originalTerm" was the term during which the election began, if the term has since
      * changed, do not step up as primary.
      */
-    void _onVoteRequestComplete(long long originalTerm);
+    void _onVoteRequestComplete(long long originalTerm,
+                                TopologyCoordinator::StartElectionReason reason);
 
     /**
      * Removes 'host' from the sync source blacklist. If 'host' isn't found, it's simply

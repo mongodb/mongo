@@ -40,10 +40,16 @@ namespace repl {
 class ElectionReasonCounter : public ElectionReasonCounterBase {
 public:
     using ElectionReasonCounterBase::getCalled;
+    using ElectionReasonCounterBase::getSuccessful;
     using ElectionReasonCounterBase::setCalled;
+    using ElectionReasonCounterBase::setSuccessful;
 
     void incrementCalled() {
         setCalled(getCalled() + 1);
+    }
+
+    void incrementSuccessful() {
+        setSuccessful(getSuccessful() + 1);
     }
 
     ElectionReasonCounter parse(const IDLParserErrorContext& ctxt, const BSONObj& bsonObject);

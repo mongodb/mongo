@@ -1,5 +1,5 @@
 /**
- * Tests the format of electionMetrics serverStatus section.
+ * Tests the format of 'electionMetrics' serverStatus section.
  */
 (function() {
 "use strict";
