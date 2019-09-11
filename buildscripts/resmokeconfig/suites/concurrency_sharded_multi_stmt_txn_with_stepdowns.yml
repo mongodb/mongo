@@ -201,11 +201,6 @@ selector:
   - jstests/concurrency/fsm_workloads/remove_where.js
   - jstests/concurrency/fsm_workloads/update_where.js
 
-  # TODO SERVER-40705: Stepdown with prepared transaction that performed text search triggers
-  # invariant
-  - jstests/concurrency/fsm_workloads/indexed_insert_text.js
-  - jstests/concurrency/fsm_workloads/indexed_insert_text_multikey.js
-
   exclude_with_any_tags:
   - does_not_support_causal_consistency
   - requires_replication
