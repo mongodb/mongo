@@ -57,6 +57,11 @@ namespace mongo {
 namespace {
 
 const int kMaxStressThreads = 32;  // max number of threads to use for lock stress
+#ifdef _WIN32
+const auto kMaxClockJitterMillis = Milliseconds(100);  // max backward jumps to tolerate
+#else
+const auto kMaxClockJitterMillis = Milliseconds(0);
+#endif
 
 /**
  * A RAII object that instantiates a TicketHolder that limits number of allowed global lock
@@ -1435,7 +1440,7 @@ TEST_F(DConcurrencyTestFixture, Throttling) {
         Date_t t2 = Date_t::now();
 
         // Test that the timeout did result in at least the requested wait.
-        ASSERT_GTE(t2 - t1, timeoutMillis);
+        ASSERT_GTE(t2 - t1 + kMaxClockJitterMillis, timeoutMillis);
 
         // Timeouts should be reasonably immediate. In maxTries attempts at least one test should be
         // able to complete within a second, as the theoretical test duration is less than 50 ms.
@@ -1719,7 +1724,7 @@ TEST_F(DConcurrencyTestFixture, DBLockTimeout) {
                        AssertionException,
                        ErrorCodes::LockTimeout);
     Date_t t2 = Date_t::now();
-    ASSERT_GTE(t2 - t1, Milliseconds(timeoutMillis));
+    ASSERT_GTE(t2 - t1 + kMaxClockJitterMillis, Milliseconds(timeoutMillis));
 }
 
 TEST_F(DConcurrencyTestFixture, DBLockTimeoutDueToGlobalLock) {
@@ -1737,7 +1742,7 @@ TEST_F(DConcurrencyTestFixture, DBLockTimeoutDueToGlobalLock) {
                        AssertionException,
                        ErrorCodes::LockTimeout);
     Date_t t2 = Date_t::now();
-    ASSERT_GTE(t2 - t1, Milliseconds(timeoutMillis));
+    ASSERT_GTE(t2 - t1 + kMaxClockJitterMillis, Milliseconds(timeoutMillis));
 }
 
 TEST_F(DConcurrencyTestFixture, CollectionLockInInterruptedContextThrowsEvenWhenUncontested) {
@@ -1806,8 +1811,7 @@ TEST_F(DConcurrencyTestFixture, CollectionLockTimeout) {
         AssertionException,
         ErrorCodes::LockTimeout);
     Date_t t2 = Date_t::now();
-    // 2 terms both can have .9ms rounded away, so we adjust by + 1.
-    ASSERT_GTE(t2 - t1 + Milliseconds(1), Milliseconds(timeoutMillis));
+    ASSERT_GTE(t2 - t1 + kMaxClockJitterMillis, Milliseconds(timeoutMillis));
 }
 
 TEST_F(DConcurrencyTestFixture, CompatibleFirstWithSXIS) {
