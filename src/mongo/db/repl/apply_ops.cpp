@@ -126,7 +126,7 @@ Status _applyOps(OperationContext* opCtx,
         if (*opType != 'c' && !nss.isValid())
             return {ErrorCodes::InvalidNamespace, "invalid ns: " + nss.ns()};
 
-        Status status(ErrorCodes::InternalError, "");
+        Status status = Status::OK();
 
         if (haveWrappingWUOW) {
             // Only CRUD operations are allowed in atomic mode.
