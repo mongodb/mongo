@@ -79,11 +79,11 @@ Status SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext
 
 Status SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* opCtx) {
     try {
-        scatterGatherOnlyVersionIfUnsharded(opCtx,
-                                            NamespaceString::kLogicalSessionsNamespace,
-                                            SessionsCollection::generateCreateIndexesCmd(),
-                                            ReadPreferenceSetting::get(opCtx),
-                                            Shard::RetryPolicy::kNoRetry);
+        dispatchCommandAssertCollectionExistsOnAtLeastOneShard(
+            opCtx,
+            NamespaceString::kLogicalSessionsNamespace,
+            SessionsCollection::generateCreateIndexesCmd());
+
         return Status::OK();
     } catch (const DBException& ex) {
         return ex.toStatus();

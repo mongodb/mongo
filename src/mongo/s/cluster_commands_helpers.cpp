@@ -570,4 +570,27 @@ StatusWith<CachedCollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd(
     return catalogCache->getCollectionRoutingInfoAt(opCtx, nss, atClusterTime.asTimestamp());
 }
 
+std::vector<AsyncRequestsSender::Response> dispatchCommandAssertCollectionExistsOnAtLeastOneShard(
+    OperationContext* opCtx, const NamespaceString& nss, const BSONObj& cmdObj) {
+    auto shardResponses = scatterGatherOnlyVersionIfUnsharded(
+        opCtx,
+        nss,
+        CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+        ReadPreferenceSetting::get(opCtx),
+        Shard::RetryPolicy::kNoRetry,
+        {ErrorCodes::CannotImplicitlyCreateCollection});
+
+    if (std::all_of(shardResponses.begin(), shardResponses.end(), [](const auto& response) {
+            return response.swResponse.getStatus().isOK() &&
+                getStatusFromCommandResult(response.swResponse.getValue().data) ==
+                ErrorCodes::CannotImplicitlyCreateCollection;
+        })) {
+        // Propagate the ExtraErrorInfo from the first response.
+        uassertStatusOK(
+            getStatusFromCommandResult(shardResponses.front().swResponse.getValue().data));
+    }
+
+    return shardResponses;
+}
+
 }  // namespace mongo

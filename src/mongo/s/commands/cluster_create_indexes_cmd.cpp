@@ -73,23 +73,8 @@ public:
 
         createShardDatabase(opCtx, dbName);
 
-        auto shardResponses = scatterGatherOnlyVersionIfUnsharded(
-            opCtx,
-            nss,
-            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
-            ReadPreferenceSetting::get(opCtx),
-            Shard::RetryPolicy::kNoRetry,
-            {ErrorCodes::CannotImplicitlyCreateCollection});
-
-        if (std::all_of(shardResponses.begin(), shardResponses.end(), [](const auto& response) {
-                return response.swResponse.getStatus().isOK() &&
-                    getStatusFromCommandResult(response.swResponse.getValue().data) ==
-                    ErrorCodes::CannotImplicitlyCreateCollection;
-            })) {
-            // Propagate the ExtraErrorInfo from the first response.
-            uassertStatusOK(
-                getStatusFromCommandResult(shardResponses.front().swResponse.getValue().data));
-        }
+        auto shardResponses =
+            dispatchCommandAssertCollectionExistsOnAtLeastOneShard(opCtx, nss, cmdObj);
 
         return appendRawResponses(opCtx,
                                   &errmsg,
