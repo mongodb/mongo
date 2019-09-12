@@ -722,6 +722,16 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
+- name: refine_shard_key_transaction_stress
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "refine_shard_key_transaction_stress"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
 - name: secondary_performance
   priority: 5
   commands:
@@ -835,6 +845,7 @@ tasks:
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
+
 
 #######################################
 #               Modules               #
@@ -1239,6 +1250,7 @@ buildvariants:
     - name: mixed_workloads
     - name: misc_workloads
     - name: map_reduce_workloads
+    - name: refine_shard_key_transaction_stress
     - name: smoke_test
     - name: retryable_writes_workloads
     - name: industry_benchmarks_wmajority
