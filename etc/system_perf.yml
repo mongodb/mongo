@@ -152,6 +152,7 @@ functions:
           mv mongo${extension|} mongodb/bin
           mv mongod${extension|} mongodb/bin
           mv mongos${extension|} mongodb/bin
+          mv mongocryptd mongodb/bin || /bin/true
           mv src/mongo-tools/* mongodb/bin
           if [ -d jstests/hooks ]
           then
@@ -920,6 +921,7 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --release
       --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      mongocryptd
     compile-variant: -enterprise
   run_on:
       - "amazon2-build"
@@ -1054,6 +1056,28 @@ buildvariants:
     - name: industry_benchmarks
     - name: crud_workloads
     - name: smoke_test
+
+- name: linux-1-node-replSet-fle
+  display_name: Linux 1-Node ReplSet FLE
+  batchtime: 1440 # 24 hours
+  modules: *modules
+  expansions:
+    setup: single-replica-fle
+    cluster: single
+    platform: linux
+    project_dir: *project_dir
+    authentication: enabled
+    fle: enabled
+    storageEngine: wiredTiger
+    compile-variant: -enterprise
+  run_on:
+      - "rhel70-perf-single"
+  depends_on:
+      - name: compile
+        variant: compile-amazon2
+  tasks: &standalonetasks
+    - name: industry_benchmarks
+    - name: linkbench
 
 - name: linux-1-node-replSet-ese-cbc
   display_name: Linux 1-Node ReplSet ESE CBC
