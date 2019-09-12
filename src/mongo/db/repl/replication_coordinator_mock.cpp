@@ -558,5 +558,9 @@ void ReplicationCoordinatorMock::attemptToAdvanceStableTimestamp() {
     return;
 }
 
+void ReplicationCoordinatorMock::finishRecoveryIfEligible(OperationContext* opCtx) {
+    return;
+}
+
 }  // namespace repl
 }  // namespace mongo

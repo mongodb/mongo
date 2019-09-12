@@ -100,6 +100,11 @@ MONGO_FAIL_POINT_DEFINE(stepdownHangBeforePerformingPostMemberStateUpdateActions
 MONGO_FAIL_POINT_DEFINE(holdStableTimestampAtSpecificTimestamp);
 MONGO_FAIL_POINT_DEFINE(stepdownHangBeforeRSTLEnqueue);
 
+// Number of times we tried to go live as a secondary.
+Counter64 attemptsToBecomeSecondary;
+ServerStatusMetricField<Counter64> displayAttemptsToBecomeSecondary(
+    "repl.apply.attemptsToBecomeSecondary", &attemptsToBecomeSecondary);
+
 // Tracks the number of operations killed on step down.
 Counter64 userOpsKilled;
 ServerStatusMetricField<Counter64> displayuserOpsKilled("repl.stepDown.userOperationsKilled",
@@ -3700,6 +3705,53 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
             }
         }
         _cleanupStableOpTimeCandidates(&_stableOpTimeCandidates, stableOpTime.get());
+    }
+}
+
+void ReplicationCoordinatorImpl::finishRecoveryIfEligible(OperationContext* opCtx) {
+    // Check to see if we can immediately return without taking any locks.
+    if (isInPrimaryOrSecondaryState_UNSAFE()) {
+        return;
+    }
+
+    // This needs to happen after the attempt so readers can be sure we've already tried.
+    ON_BLOCK_EXIT([] { attemptsToBecomeSecondary.increment(); });
+
+    // Need the RSTL in mode X to transition to SECONDARY
+    ReplicationStateTransitionLockGuard transitionGuard(opCtx, MODE_X);
+
+    // We can only transition to SECONDARY from RECOVERING state.
+    MemberState state(getMemberState());
+    if (!state.recovering()) {
+        LOG(2) << "We cannot transition to SECONDARY state since we are not currently in "
+                  "RECOVERING state. Current state: "
+               << state.toString();
+        return;
+    }
+
+    // Maintenance mode will force us to remain in RECOVERING state, no matter what.
+    if (getMaintenanceMode()) {
+        LOG(1) << "We cannot transition to SECONDARY state while in maintenance mode.";
+        return;
+    }
+
+    // We can't go to SECONDARY state until we reach 'minValid', since the data may be in an
+    // inconsistent state before this point. If our state is inconsistent, we need to disallow reads
+    // from clients, which is why we stay in RECOVERING state.
+    auto lastApplied = getMyLastAppliedOpTime();
+    auto minValid = _replicationProcess->getConsistencyMarkers()->getMinValid(opCtx);
+    if (lastApplied < minValid) {
+        LOG(2) << "We cannot transition to SECONDARY state because our 'lastApplied' optime"
+                  " is less than the 'minValid' optime. minValid optime: "
+               << minValid << ", lastApplied optime: " << lastApplied;
+        return;
+    }
+
+    // Execute the transition to SECONDARY.
+    auto status = setFollowerMode(MemberState::RS_SECONDARY);
+    if (!status.isOK()) {
+        warning() << "Failed to transition into " << MemberState(MemberState::RS_SECONDARY)
+                  << ". Current state: " << getMemberState() << causedBy(status);
     }
 }
 

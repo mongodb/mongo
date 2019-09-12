@@ -335,6 +335,8 @@ public:
 
     virtual void attemptToAdvanceStableTimestamp() override;
 
+    virtual void finishRecoveryIfEligible(OperationContext* opCtx) override;
+
     // ================== Test support API ===================
 
     /**

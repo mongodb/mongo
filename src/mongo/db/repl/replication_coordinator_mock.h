@@ -317,6 +317,8 @@ public:
 
     virtual void attemptToAdvanceStableTimestamp() override;
 
+    virtual void finishRecoveryIfEligible(OperationContext* opCtx) override;
+
     virtual void setCanAcceptNonLocalWrites(bool canAcceptNonLocalWrites);
 
 private:

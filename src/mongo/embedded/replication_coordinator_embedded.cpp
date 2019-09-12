@@ -492,5 +492,9 @@ void ReplicationCoordinatorEmbedded::attemptToAdvanceStableTimestamp() {
     UASSERT_NOT_IMPLEMENTED;
 }
 
+void ReplicationCoordinatorEmbedded::finishRecoveryIfEligible(OperationContext* opCtx) {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 }  // namespace embedded
 }  // namespace mongo

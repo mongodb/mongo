@@ -925,6 +925,10 @@ public:
      */
     virtual void attemptToAdvanceStableTimestamp() = 0;
 
+    /**
+     * If our state is RECOVERING and lastApplied is at least minValid, transition to SECONDARY.
+     */
+    virtual void finishRecoveryIfEligible(OperationContext* opCtx) = 0;
 
 protected:
     ReplicationCoordinator();

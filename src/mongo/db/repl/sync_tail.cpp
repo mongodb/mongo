@@ -99,11 +99,6 @@ Counter64 oplogApplicationBatchSize;
 ServerStatusMetricField<Counter64> displayOplogApplicationBatchSize("repl.apply.batchSize",
                                                                     &oplogApplicationBatchSize);
 
-// Number of times we tried to go live as a secondary.
-Counter64 attemptsToBecomeSecondary;
-ServerStatusMetricField<Counter64> displayAttemptsToBecomeSecondary(
-    "repl.apply.attemptsToBecomeSecondary", &attemptsToBecomeSecondary);
-
 // Number and time of each ApplyOps worker pool round
 TimerStats applyBatchStats;
 ServerStatusMetricField<TimerStats> displayOpBatchesApplied("repl.apply.batches", &applyBatchStats);
@@ -410,59 +405,6 @@ private:
     StringMap<CollectionProperties> _cache;
 };
 
-void tryToGoLiveAsASecondary(OperationContext* opCtx,
-                             ReplicationCoordinator* replCoord,
-                             OpTime minValid) {
-    // Check to see if we can immediately return without taking any locks.
-    if (replCoord->isInPrimaryOrSecondaryState_UNSAFE()) {
-        return;
-    }
-
-    // This needs to happen after the attempt so readers can be sure we've already tried.
-    ON_BLOCK_EXIT([] { attemptsToBecomeSecondary.increment(); });
-
-    // Need the RSTL in mode X to transition to SECONDARY
-    ReplicationStateTransitionLockGuard transitionGuard(opCtx, MODE_X);
-
-    // Check if we are primary or secondary again now that we have the RSTL in mode X.
-    if (replCoord->isInPrimaryOrSecondaryState(opCtx)) {
-        return;
-    }
-
-    // Maintenance mode will force us to remain in RECOVERING state, no matter what.
-    if (replCoord->getMaintenanceMode()) {
-        LOG(1) << "We cannot transition to SECONDARY state while in maintenance mode.";
-        return;
-    }
-
-    // We can only transition to SECONDARY from RECOVERING state.
-    MemberState state(replCoord->getMemberState());
-    if (!state.recovering()) {
-        LOG(2) << "We cannot transition to SECONDARY state since we are not currently in "
-                  "RECOVERING state. Current state: "
-               << state.toString();
-        return;
-    }
-
-    // We can't go to SECONDARY state until we reach 'minValid', since the database may be in an
-    // inconsistent state before this point. If our state is inconsistent, we need to disallow reads
-    // from clients, which is why we stay in RECOVERING state.
-    auto lastApplied = replCoord->getMyLastAppliedOpTime();
-    if (lastApplied < minValid) {
-        LOG(2) << "We cannot transition to SECONDARY state because our 'lastApplied' optime is "
-                  "less than the 'minValid' optime. minValid optime: "
-               << minValid << ", lastApplied optime: " << lastApplied;
-        return;
-    }
-
-    // Execute the transition to SECONDARY.
-    auto status = replCoord->setFollowerMode(MemberState::RS_SECONDARY);
-    if (!status.isOK()) {
-        warning() << "Failed to transition into " << MemberState(MemberState::RS_SECONDARY)
-                  << ". Current state: " << replCoord->getMemberState() << causedBy(status);
-    }
-}
-
 /**
  * Updates a CRUD op's hash and isForCappedCollection field if necessary.
  */
@@ -704,9 +646,6 @@ void SyncTail::runLoop(OplogBuffer* oplogBuffer,
             ? new ApplyBatchFinalizerForJournal(replCoord)
             : new ApplyBatchFinalizer(replCoord)};
 
-    // Get replication consistency markers.
-    OpTime minValid;
-
     while (true) {  // Exits on message from OpQueueBatcher.
         // Use a new operation context each iteration, as otherwise we may appear to use a single
         // collection name to refer to collections with different UUIDs.
@@ -733,11 +672,8 @@ void SyncTail::runLoop(OplogBuffer* oplogBuffer,
             }
         }
 
-        // Get the current value of 'minValid'.
-        minValid = _consistencyMarkers->getMinValid(&opCtx);
-
         // Transition to SECONDARY state, if possible.
-        tryToGoLiveAsASecondary(&opCtx, replCoord, minValid);
+        replCoord->finishRecoveryIfEligible(&opCtx);
 
         // Blocks up to a second waiting for a batch to be ready to apply. If one doesn't become
         // ready in time, we'll loop again so we can do the above checks periodically.
@@ -787,14 +723,6 @@ void SyncTail::runLoop(OplogBuffer* oplogBuffer,
             fassertNoTrace(34437, multiApply(&opCtx, ops.releaseBatch()));
         invariant(lastOpTimeAppliedInBatch == lastOpTimeInBatch);
 
-        // In order to provide resilience in the event of a crash in the middle of batch
-        // application, 'multiApply' will update 'minValid' so that it is at least as great as the
-        // last optime that it applied in this batch. If 'minValid' was moved forward, we make sure
-        // to update our view of it here.
-        if (lastOpTimeInBatch > minValid) {
-            minValid = lastOpTimeInBatch;
-        }
-
         // Update various things that care about our last applied optime. Tests rely on 1 happening
         // before 2 even though it isn't strictly necessary.
 
@@ -815,12 +743,14 @@ void SyncTail::runLoop(OplogBuffer* oplogBuffer,
             &opCtx, lastOpTimeInBatch.getTimestamp(), orderedCommit);
 
         // 4. Finalize this batch. We are at a consistent optime if our current optime is >= the
-        // current 'minValid' optime. Note that recording the lastOpTime in the finalizer includes
-        // advancing the global timestamp to at least its timestamp.
+        // current 'minValid' optime. In case we crash while applying a batch, multiApply advances
+        // minValid to the last opTime in the batch, so check minValid *after* calling multiApply.
+        const auto minValid = _consistencyMarkers->getMinValid(&opCtx);
         auto consistency = (lastOpTimeInBatch >= minValid)
             ? ReplicationCoordinator::DataConsistency::Consistent
             : ReplicationCoordinator::DataConsistency::Inconsistent;
 
+        // The finalizer advances the global timestamp to lastOpTimeInBatch.
         finalizer->record({lastOpTimeInBatch, lastWallTimeInBatch}, consistency);
     }
 }
