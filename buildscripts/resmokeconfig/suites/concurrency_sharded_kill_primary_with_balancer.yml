@@ -95,6 +95,9 @@ selector:
   - jstests/concurrency/fsm_workloads/rename_collection_dbname_droptarget.js
   - jstests/concurrency/fsm_workloads/rename_collection_droptarget.js
 
+  # SERVER-20361 Improve the behaviour of multi-update/delete against a sharded collection
+  - jstests/concurrency/fsm_workloads/update_where.js
+
   # cannot use upsert command with $where with sharded collections
   - jstests/concurrency/fsm_workloads/upsert_where.js
 
