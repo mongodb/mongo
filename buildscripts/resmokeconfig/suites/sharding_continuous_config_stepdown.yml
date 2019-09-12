@@ -100,6 +100,7 @@ selector:
   - jstests/sharding/move_chunk_remove_with_write_retryability.js
   - jstests/sharding/move_chunk_update_with_write_retryability.js
   - jstests/sharding/track_unsharded_collections_create_collection.js
+  - jstests/sharding/track_unsharded_collections_rename_collection.js
   - jstests/sharding/txn_two_phase_commit_commands_basic_requirements.js
   - jstests/sharding/txn_two_phase_commit_coordinator_shutdown_and_restart.js
   - jstests/sharding/txn_two_phase_commit_failover.js
