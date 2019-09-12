@@ -323,6 +323,8 @@ rsConfig.members.forEach(function(member) {
         member.tags = PRIMARY_TAG;
     } else {
         member.tags = SECONDARY_TAG;
+        member.priority = 0;
+        member.votes = 0;
     }
 });
 
