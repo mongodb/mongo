@@ -64,15 +64,14 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                              std::string& errmsg,
                              BSONObjBuilder& result) {
     // Pretend we have built the appropriate pipeline and aggregation request.
-    NamespaceString nss(dbname, cmd.firstElement().valueStringData());
+    auto mrRequest = MapReduce::parse(IDLParserErrorContext("MapReduce"), cmd);
     const BSONObj aggRequest =
-        fromjson(str::stream() << "{aggregate: '" << nss.coll()
+        fromjson(str::stream() << "{aggregate: '" << mrRequest.getNamespace().coll()
                                << "', pipeline: [ { $group: { _id: { user: \"$user\" },"
                                << "count: { $sum: 1 } } } ], cursor: {}}");
     BSONObj aggResult = CommandHelpers::runCommandDirectly(
         opCtx, OpMsgRequest::fromDBAndBody(dbname, std::move(aggRequest)));
 
-    auto mrRequest = MapReduce::parse(IDLParserErrorContext("MapReduce"), cmd);
     bool inMemory = mrRequest.getOutOptions().getOutputType() == OutputType::InMemory;
     std::string outColl = mrRequest.getOutOptions().getCollectionName();
     // Either inline response specified or we have an output collection.

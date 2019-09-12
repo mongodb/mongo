@@ -320,7 +320,6 @@ selector:
   - jstests/sharding/version1.js
   - jstests/sharding/disable_autosplit.js
   - jstests/sharding/allow_partial_results.js
-  - jstests/sharding/map_reduce_validation.js
   - jstests/sharding/query_sharded.js
   - jstests/sharding/server_status.js
   - jstests/sharding/ssv_config_check.js

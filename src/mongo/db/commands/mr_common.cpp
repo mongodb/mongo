@@ -75,6 +75,9 @@ OutputOptions parseOutputOptions(const std::string& dbname, const BSONObj& cmdOb
             outputOptions.collectionName = o["reduce"].String();
         } else if (o.hasElement("inline")) {
             outputOptions.outType = OutputType::kInMemory;
+            uassert(ErrorCodes::InvalidOptions,
+                    "cannot specify 'sharded' in combination with 'inline'",
+                    !o.hasElement("sharded"));
         } else {
             uasserted(13522,
                       str::stream() << "please specify one of "
@@ -83,6 +86,10 @@ OutputOptions parseOutputOptions(const std::string& dbname, const BSONObj& cmdOb
 
         if (o.hasElement("db")) {
             outputOptions.outDB = o["db"].String();
+            uassert(ErrorCodes::CommandNotSupported,
+                    "cannot target internal database as output",
+                    !(NamespaceString(outputOptions.outDB, outputOptions.collectionName)
+                          .isOnInternalDb()));
         }
         if (o.hasElement("nonAtomic")) {
             outputOptions.outNonAtomic = o["nonAtomic"].Bool();

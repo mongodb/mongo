@@ -31,6 +31,7 @@
 #include <utility>
 
 #include "mongo/db/commands/map_reduce_out_options.h"
+#include "mongo/db/namespace_string.h"
 
 namespace mongo {
 
@@ -43,7 +44,8 @@ MapReduceOutOptions MapReduceOutOptions::parseFromBSON(const BSONElement& elemen
         const auto obj = element.embeddedObject();
         // The inline option is allowed alone.
         if (const auto inMemory = obj["inline"]) {
-            uassert(ErrorCodes::BadValue, "'inline' must be specified alone", obj.nFields() == 1);
+            uassert(
+                ErrorCodes::InvalidOptions, "'inline' must be specified alone", obj.nFields() == 1);
             uassert(
                 ErrorCodes::BadValue, "'inline' takes only numeric '1'", inMemory.number() == 1.0);
 
@@ -64,18 +66,6 @@ MapReduceOutOptions MapReduceOutOptions::parseFromBSON(const BSONElement& elemen
             }
         }();
 
-        const auto databaseName = [&]() -> boost::optional<std::string> {
-            if (const auto db = obj["db"]) {
-                uassert(ErrorCodes::BadValue,
-                        "db field value must be string",
-                        db.type() == BSONType::String);
-                return boost::make_optional(db.str());
-            } else {
-                --allowedNFields;
-                return boost::none;
-            }
-        }();
-
         const auto [collectionName, outputType] = [&]() {
             auto stringOrError = [](auto&& element) {
                 uassert(ErrorCodes::BadValue,
@@ -92,6 +82,22 @@ MapReduceOutOptions MapReduceOutOptions::parseFromBSON(const BSONElement& elemen
                 return std::pair{stringOrError(reduce), OutputType::Reduce};
             else
                 uasserted(ErrorCodes::BadValue, "'out' requires 'replace', 'merge' or 'reduce'");
+        }();
+
+        const auto databaseName =
+            [&, &collectionName = collectionName]() -> boost::optional<std::string> {
+            if (const auto db = obj["db"]) {
+                uassert(ErrorCodes::BadValue,
+                        "db field value must be string",
+                        db.type() == BSONType::String);
+                uassert(ErrorCodes::CommandNotSupported,
+                        "cannot target internal database as output",
+                        !(NamespaceString(db.valueStringData(), collectionName).isOnInternalDb()));
+                return boost::make_optional(db.str());
+            } else {
+                --allowedNFields;
+                return boost::none;
+            }
         }();
 
         uassert(ErrorCodes::BadValue,
