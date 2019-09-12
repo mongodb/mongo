@@ -232,7 +232,9 @@ void implicitlyAbortAllTransactions(OperationContext* opCtx) {
         newOpCtx->setLogicalSessionId(session->getSessionId());
 
         auto txnRouter = TransactionRouter::get(newOpCtx);
-        txnRouter.implicitlyAbortTransaction(newOpCtx, shutDownStatus);
+        if (txnRouter.isInitialized()) {
+            txnRouter.implicitlyAbortTransaction(newOpCtx, shutDownStatus);
+        }
     }
 }
 

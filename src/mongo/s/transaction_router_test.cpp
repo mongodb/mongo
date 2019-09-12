@@ -39,6 +39,7 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/logger/logger.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -2794,6 +2795,9 @@ protected:
     const TxnNumber kTxnNumber = 10;
     const TxnRecoveryToken kDummyRecoveryToken;
 
+    static constexpr auto kDefaultTimeActive = Microseconds(50);
+    static constexpr auto kDefaultTimeInactive = Microseconds(100);
+
     void setUp() override {
         TransactionRouterTestWithDefaultSession::setUp();
         repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
@@ -2842,18 +2846,28 @@ protected:
     }
 
     void assertDurationIs(Microseconds micros) {
-        auto stats = txnRouter().getTimingStats();
+        auto stats = txnRouter().getTimingStats_forTest();
         ASSERT_EQ(stats.getDuration(tickSource(), tickSource()->getTicks()), micros);
     }
 
     void assertCommitDurationIs(Microseconds micros) {
-        auto stats = txnRouter().getTimingStats();
+        auto stats = txnRouter().getTimingStats_forTest();
         ASSERT_EQ(stats.getCommitDuration(tickSource(), tickSource()->getTicks()), micros);
     }
 
     bool networkHasReadyRequests() {
         executor::NetworkInterfaceMock::InNetworkGuard guard(network());
         return guard->hasReadyRequests();
+    }
+
+    void assertTimeActiveIs(Microseconds micros) {
+        auto stats = txnRouter().getTimingStats_forTest();
+        ASSERT_EQ(stats.getTimeActiveMicros(tickSource(), tickSource()->getTicks()), micros);
+    }
+
+    void assertTimeInactiveIs(Microseconds micros) {
+        auto stats = txnRouter().getTimingStats_forTest();
+        ASSERT_EQ(stats.getTimeInactiveMicros(tickSource(), tickSource()->getTicks()), micros);
     }
 
     //
@@ -3051,6 +3065,31 @@ protected:
     auto routerTxnMetrics() {
         return RouterTransactionsMetrics::get(operationContext());
     }
+
+    void assertTimeActiveAndInactiveCannotAdvance(Microseconds timeActive,
+                                                  Microseconds timeInactive) {
+        tickSource()->advance(Microseconds(150));
+        assertTimeActiveIs(Microseconds(timeActive));
+        assertTimeInactiveIs(Microseconds(timeInactive));
+
+        txnRouter().stash(operationContext());
+
+        tickSource()->advance(Microseconds(150));
+        assertTimeActiveIs(Microseconds(timeActive));
+        assertTimeInactiveIs(Microseconds(timeInactive));
+    }
+
+    void setUpDefaultTimeActiveAndInactive() {
+        tickSource()->advance(kDefaultTimeActive);
+        assertTimeActiveIs(kDefaultTimeActive);
+        assertTimeInactiveIs(Microseconds(0));
+
+        txnRouter().stash(operationContext());
+
+        tickSource()->advance(kDefaultTimeInactive);
+        assertTimeActiveIs(kDefaultTimeActive);
+        assertTimeInactiveIs(kDefaultTimeInactive);
+    }
 };
 
 //
@@ -3130,6 +3169,23 @@ TEST_F(TransactionRouterMetricsTest, SlowLoggingPrintsDurationAtEnd) {
     assertDurationIs(Milliseconds(111));
     runCommit(kDummyOkRes);
     ASSERT_EQUALS(1, countLogLinesContaining(" 111ms\n") + countLogLinesContaining(" 111ms\r\n"));
+}
+
+TEST_F(TransactionRouterMetricsTest, SlowLoggingPrintsTimeActiveAndInactive) {
+    beginTxnWithDefaultTxnNumber();
+    tickSource()->advance(Microseconds(111));
+    assertTimeActiveIs(Microseconds(111));
+
+    txnRouter().stash(operationContext());
+    tickSource()->advance(Microseconds(222));
+    assertTimeInactiveIs(Microseconds(222));
+
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kCommit);
+    runCommit(kDummyOkRes);
+
+    ASSERT_EQUALS(1, countLogLinesContaining("timeActiveMicros:111,"));
+    ASSERT_EQUALS(1, countLogLinesContaining("timeInactiveMicros:222,"));
 }
 
 //
@@ -3386,6 +3442,23 @@ TEST_F(TransactionRouterMetricsTest, NoSlowLoggingOnImplicitAbortAfterUnknownCom
     assertDidNotPrintSlowLogLine();
 }
 
+TEST_F(TransactionRouterMetricsTest, NoSlowLoggingCommitAfterAbort_Failed) {
+    beginSlowTxnWithDefaultTxnNumber();
+    implicitAbortInProgress();
+
+    runCommit(kDummyErrorRes);
+    assertDidNotPrintSlowLogLine();
+}
+
+TEST_F(TransactionRouterMetricsTest, NoSlowLoggingCommitAfterAbort_Successful) {
+    beginSlowTxnWithDefaultTxnNumber();
+    implicitAbortInProgress();
+
+    // Note that this shouldn't be possible, but is included as a test case for completeness.
+    runCommit(kDummyOkRes);
+    assertDidNotPrintSlowLogLine();
+}
+
 //
 // Slow transaction logging tests that retrying after an unknown commit result logs if the result is
 // discovered.
@@ -3587,6 +3660,51 @@ TEST_F(TransactionRouterMetricsTest, CommitDurationDoesNotAdvanceAfterFailedComm
     assertCommitDurationIs(Microseconds(50));
 }
 
+TEST_F(TransactionRouterMetricsTest, CommitStatsNotInReportStatsForFailedCommitAfterAbort) {
+    // It's a user error to commit a transaction after a failed command or explicit abort, but if it
+    // happens, stats for the commit should not be tracked or included in reporting.
+    beginTxnWithDefaultTxnNumber();
+    txnRouter().implicitlyAbortTransaction(operationContext(), kDummyStatus);
+
+    // A commit in this case should always fail.
+    auto future = beginAndPauseCommit();
+    tickSource()->advance(Microseconds(50));
+    expectCommitTransaction(kDummyErrorRes);
+    future.default_timed_get();
+
+    auto activeState = txnRouter().reportState(operationContext(), true /* sessionIsActive */);
+    ASSERT(activeState.hasField("transaction"));
+    ASSERT(!activeState["transaction"].Obj().hasField("commitStartWallClockTime"));
+    ASSERT(!activeState["transaction"].Obj().hasField("commitType"));
+
+    auto inactiveState = txnRouter().reportState(operationContext(), false /* sessionIsActive */);
+    ASSERT(inactiveState.hasField("transaction"));
+    ASSERT(!inactiveState["transaction"].Obj().hasField("commitStartWallClockTime"));
+    ASSERT(!inactiveState["transaction"].Obj().hasField("commitType"));
+}
+
+TEST_F(TransactionRouterMetricsTest, CommitStatsNotInReportStatsForSuccessfulCommitAfterAbort) {
+    beginTxnWithDefaultTxnNumber();
+    txnRouter().implicitlyAbortTransaction(operationContext(), kDummyStatus);
+
+    // Note that it shouldn't be possible for this commit to succeed, but it is included as a test
+    // case for completeness.
+    auto future = beginAndPauseCommit();
+    tickSource()->advance(Microseconds(50));
+    expectCommitTransaction(kDummyOkRes);
+    future.default_timed_get();
+
+    auto activeState = txnRouter().reportState(operationContext(), true /* sessionIsActive */);
+    ASSERT(activeState.hasField("transaction"));
+    ASSERT(!activeState["transaction"].Obj().hasField("commitStartWallClockTime"));
+    ASSERT(!activeState["transaction"].Obj().hasField("commitType"));
+
+    auto inactiveState = txnRouter().reportState(operationContext(), false /* sessionIsActive */);
+    ASSERT(inactiveState.hasField("transaction"));
+    ASSERT(!inactiveState["transaction"].Obj().hasField("commitStartWallClockTime"));
+    ASSERT(!inactiveState["transaction"].Obj().hasField("commitType"));
+}
+
 TEST_F(TransactionRouterMetricsTest, DurationsAdvanceAfterUnknownCommitResult) {
     beginTxnWithDefaultTxnNumber();
 
@@ -3613,6 +3731,520 @@ TEST_F(TransactionRouterMetricsTest, DurationsAdvanceAfterUnknownCommitResult) {
     tickSource()->advance(Microseconds(500));
     assertDurationIs(Microseconds(250));
     assertCommitDurationIs(Microseconds(200));
+}
+
+TEST_F(TransactionRouterMetricsTest, TimeActiveAndInactiveAdvanceSeparatelyAndSumToDuration) {
+    beginTxnWithDefaultTxnNumber();
+
+    // Both timeActive and timeInactive start at 0.
+    assertTimeActiveIs(Microseconds(0));
+    assertTimeInactiveIs(Microseconds(0));
+    assertDurationIs(Microseconds(0));
+
+    // Only timeActive will advance while a txn is active.
+    tickSource()->advance(Microseconds(50));
+    assertTimeActiveIs(Microseconds(50));
+    assertTimeInactiveIs(Microseconds(0));
+    assertDurationIs(Microseconds(50));
+
+    // Only timeInactive will advance while a txn is stashed.
+    txnRouter().stash(operationContext());
+    tickSource()->advance(Microseconds(100));
+    assertTimeActiveIs(Microseconds(50));
+    assertTimeInactiveIs(Microseconds(100));
+    assertDurationIs(Microseconds(150));
+
+    // Will not advance after commit.
+    // Neither can advance after a successful commit.
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kCommit);
+    runCommit(kDummyOkRes);
+
+    tickSource()->advance(Microseconds(150));
+    assertTimeActiveIs(Microseconds(50));
+    assertTimeInactiveIs(Microseconds(100));
+    assertDurationIs(Microseconds(150));
+}
+
+TEST_F(TransactionRouterMetricsTest, StashIsIdempotent) {
+    // An error after checking out a session and before continuing a transaction can lead to
+    // back-to-back calls to TransactionRouter::stash(), so a repeated call to stash() shouldn't
+    // toggle the transaction back to the active state.
+
+    beginTxnWithDefaultTxnNumber();
+
+    setUpDefaultTimeActiveAndInactive();
+
+    assertTimeActiveIs(kDefaultTimeActive);
+    assertTimeInactiveIs(kDefaultTimeInactive);
+
+    txnRouter().stash(operationContext());
+    ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentInactive());
+
+    // Only timeInactive can advance.
+    tickSource()->advance(Microseconds(100));
+    assertTimeActiveIs(kDefaultTimeActive);
+    assertTimeInactiveIs(kDefaultTimeInactive + Microseconds(100));
+
+    txnRouter().stash(operationContext());
+    ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentInactive());
+
+    // Still only timeInactive can advance.
+    tickSource()->advance(Microseconds(100));
+    assertTimeActiveIs(kDefaultTimeActive);
+    assertTimeInactiveIs(kDefaultTimeInactive + Microseconds(200));
+}
+
+TEST_F(TransactionRouterMetricsTest, DurationsForImplicitlyAbortedStashedTxn) {
+    beginTxnWithDefaultTxnNumber();
+
+    setUpDefaultTimeActiveAndInactive();
+
+    assertTimeActiveIs(kDefaultTimeActive);
+    assertTimeInactiveIs(kDefaultTimeInactive);
+    assertDurationIs(kDefaultTimeActive + kDefaultTimeInactive);
+
+    txnRouter().stash(operationContext());
+
+    // At shutdown transactions are implicitly aborted without being continued so a transaction may
+    // be stashed when aborting, which should still lead to durations in a consistent state.
+    txnRouter().implicitlyAbortTransaction(operationContext(), kDummyStatus);
+
+    assertTimeActiveIs(kDefaultTimeActive);
+    assertTimeInactiveIs(kDefaultTimeInactive);
+    assertDurationIs(kDefaultTimeActive + kDefaultTimeInactive);
+}
+
+TEST_F(TransactionRouterMetricsTest, DurationsForImplicitlyAbortedActiveTxn) {
+    beginTxnWithDefaultTxnNumber();
+
+    setUpDefaultTimeActiveAndInactive();
+
+    assertTimeActiveIs(kDefaultTimeActive);
+    assertTimeInactiveIs(kDefaultTimeInactive);
+    assertDurationIs(kDefaultTimeActive + kDefaultTimeInactive);
+
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kContinue);
+    tickSource()->advance(Microseconds(100));
+
+    assertTimeActiveIs(kDefaultTimeActive + Microseconds(100));
+    assertTimeInactiveIs(kDefaultTimeInactive);
+    assertDurationIs(kDefaultTimeActive + kDefaultTimeInactive + Microseconds(100));
+
+    txnRouter().implicitlyAbortTransaction(operationContext(), kDummyStatus);
+
+    assertTimeActiveIs(kDefaultTimeActive + Microseconds(100));
+    assertTimeInactiveIs(kDefaultTimeInactive);
+    assertDurationIs(kDefaultTimeActive + kDefaultTimeInactive + Microseconds(100));
+}
+
+TEST_F(TransactionRouterMetricsTest, DurationsForImplicitlyAbortedEndedTxn) {
+    beginTxnWithDefaultTxnNumber();
+
+    setUpDefaultTimeActiveAndInactive();
+
+    assertTimeActiveIs(kDefaultTimeActive);
+    assertTimeInactiveIs(kDefaultTimeInactive);
+    assertDurationIs(kDefaultTimeActive + kDefaultTimeInactive);
+
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kCommit);
+    runCommit(kDummyOkRes);
+    txnRouter().stash(operationContext());
+
+    // At shutdown transactions are implicitly aborted without being continued, so an "ended"
+    // transaction (i.e. committed or aborted) may be implicitly aborted again. This shouldn't
+    // affect any transaction durations.
+    auto future = launchAsync(
+        [&] { return txnRouter().implicitlyAbortTransaction(operationContext(), kDummyStatus); });
+    expectAbortTransactions({hostAndPort1}, getSessionId(), kTxnNumber);
+    future.default_timed_get();
+
+    assertTimeActiveIs(kDefaultTimeActive);
+    assertTimeInactiveIs(kDefaultTimeInactive);
+    assertDurationIs(kDefaultTimeActive + kDefaultTimeInactive);
+}
+
+TEST_F(TransactionRouterMetricsTest, NeitherTimeActiveNorInactiveAdvanceAfterSuccessfulCommit) {
+    beginTxnWithDefaultTxnNumber();
+
+    setUpDefaultTimeActiveAndInactive();
+
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kCommit);
+    runCommit(kDummyOkRes);
+
+    // Neither can advance.
+    assertTimeActiveAndInactiveCannotAdvance(kDefaultTimeActive /*timeActive*/,
+                                             kDefaultTimeInactive /*timeInactive*/);
+}
+
+TEST_F(TransactionRouterMetricsTest, NeitherTimeActiveNorInactiveAdvanceAfterFailedCommit) {
+    beginTxnWithDefaultTxnNumber();
+
+    setUpDefaultTimeActiveAndInactive();
+
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kContinue);
+    runCommit(kDummyErrorRes);
+
+    // Neither can advance.
+    assertTimeActiveAndInactiveCannotAdvance(kDefaultTimeActive /*timeActive*/,
+                                             kDefaultTimeInactive /*timeInactive*/);
+}
+
+TEST_F(TransactionRouterMetricsTest, TimeActiveAndInactiveAdvanceAfterUnknownCommitResult) {
+    beginTxnWithDefaultTxnNumber();
+
+    setUpDefaultTimeActiveAndInactive();
+
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kCommit);
+    runCommit(Status(ErrorCodes::HostUnreachable, "dummy"), true /* expectRetries */);
+
+    // timeActive can advance.
+    tickSource()->advance(Microseconds(100));
+    assertTimeActiveIs(kDefaultTimeActive + Microseconds(100));
+    assertTimeInactiveIs(kDefaultTimeInactive);
+
+    // timeInactive can advance.
+    txnRouter().stash(operationContext());
+    tickSource()->advance(Microseconds(100));
+    assertTimeActiveIs(kDefaultTimeActive + Microseconds(100));
+    assertTimeInactiveIs(kDefaultTimeInactive + Microseconds(100));
+
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kCommit);
+    runCommit(kDummyRetryableErrorRes, true /* expectRetries */);
+
+    // timeActive can advance.
+    tickSource()->advance(Microseconds(100));
+    assertTimeActiveIs(kDefaultTimeActive + Microseconds(200));
+    assertTimeInactiveIs(kDefaultTimeInactive + Microseconds(100));
+
+    // timeInactive can advance.
+    txnRouter().stash(operationContext());
+    tickSource()->advance(Microseconds(100));
+    assertTimeActiveIs(kDefaultTimeActive + Microseconds(200));
+    assertTimeInactiveIs(kDefaultTimeInactive + Microseconds(200));
+
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kCommit);
+    runCommit(kDummyOkRes);
+
+    // The result is known, so neither can advance.
+    assertTimeActiveAndInactiveCannotAdvance(kDefaultTimeActive + Microseconds(200) /*timeActive*/,
+                                             kDefaultTimeInactive +
+                                                 Microseconds(200) /*timeInactive*/);
+}
+
+TEST_F(TransactionRouterMetricsTest, NeitherTimeActiveNorInactiveAdvanceAfterAbort) {
+    beginTxnWithDefaultTxnNumber();
+
+    setUpDefaultTimeActiveAndInactive();
+
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kContinue);
+    ASSERT_THROWS_CODE(txnRouter().abortTransaction(operationContext()),
+                       AssertionException,
+                       ErrorCodes::NoSuchTransaction);
+
+    // Neither can advance.
+    assertTimeActiveAndInactiveCannotAdvance(kDefaultTimeActive /*timeActive*/,
+                                             kDefaultTimeInactive /*timeInactive*/);
+}
+
+TEST_F(TransactionRouterMetricsTest, NeitherTimeActiveNorInactiveAdvanceAfterImplicitAbort) {
+    beginTxnWithDefaultTxnNumber();
+
+    setUpDefaultTimeActiveAndInactive();
+
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kContinue);
+    txnRouter().implicitlyAbortTransaction(operationContext(), kDummyStatus);
+
+    // Neither can advance.
+    assertTimeActiveAndInactiveCannotAdvance(kDefaultTimeActive /*timeActive*/,
+                                             kDefaultTimeInactive /*timeInactive*/);
+}
+
+TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_DefaultTo0) {
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentOpen());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentActive());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentInactive());
+}
+
+TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_BeginTxn) {
+    beginTxnWithDefaultTxnNumber();
+    ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentOpen());
+    ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentActive());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentInactive());
+}
+
+TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_BeginRecover) {
+    beginRecoverCommitWithDefaultTxnNumber();
+    ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentOpen());
+    ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentActive());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentInactive());
+}
+
+TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_Stash) {
+    beginRecoverCommitWithDefaultTxnNumber();
+    txnRouter().stash(operationContext());
+    ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentOpen());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentActive());
+    ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentInactive());
+}
+
+TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_BeginAfterStash) {
+    beginRecoverCommitWithDefaultTxnNumber();
+    txnRouter().stash(operationContext());
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kContinue);
+
+    ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentOpen());
+    ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentActive());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentInactive());
+}
+
+TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_AreNotCumulative) {
+    // Test active.
+    beginTxnWithDefaultTxnNumber();
+    ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentOpen());
+    ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentActive());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentInactive());
+
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber + 1, TransactionRouter::TransactionActions::kStart);
+    ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentOpen());
+    ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentActive());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentInactive());
+
+    // Test inactive.
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber + 2, TransactionRouter::TransactionActions::kStart);
+    txnRouter().stash(operationContext());
+    ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentOpen());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentActive());
+    ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentInactive());
+
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber + 3, TransactionRouter::TransactionActions::kStart);
+    txnRouter().stash(operationContext());
+    ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentOpen());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentActive());
+    ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentInactive());
+}
+
+TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_TxnEnds) {
+    beginTxnWithDefaultTxnNumber();
+    runCommit(kDummyOkRes);
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentOpen());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentActive());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentInactive());
+}
+
+TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_UnknownCommit) {
+    beginTxnWithDefaultTxnNumber();
+    runCommit(kDummyRetryableErrorRes, true /* expectRetries */);
+    ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentOpen());
+    ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentActive());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentInactive());
+}
+
+TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_ImplicitAbortForStashedTxn) {
+    beginTxnWithDefaultTxnNumber();
+    txnRouter().stash(operationContext());
+    ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentOpen());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentActive());
+    ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentInactive());
+
+    txnRouter().implicitlyAbortTransaction(operationContext(), kDummyStatus);
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentOpen());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentActive());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentInactive());
+}
+
+TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_ImplicitAbortForActiveTxn) {
+    beginTxnWithDefaultTxnNumber();
+    ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentOpen());
+    ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentActive());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentInactive());
+
+    txnRouter().implicitlyAbortTransaction(operationContext(), kDummyStatus);
+
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentOpen());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentActive());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentInactive());
+}
+
+TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_BeginAndStashForEndedTxn) {
+    beginTxnWithDefaultTxnNumber();
+    runCommit(kDummyOkRes);
+
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentOpen());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentActive());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentInactive());
+
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kContinue);
+
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentOpen());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentActive());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentInactive());
+
+    txnRouter().stash(operationContext());
+
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentOpen());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentActive());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentInactive());
+}
+
+TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_CommitEndedTxn) {
+    beginTxnWithDefaultTxnNumber();
+    runCommit(kDummyOkRes);
+
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentOpen());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentActive());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentInactive());
+
+    runCommit(kDummyOkRes);
+
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentOpen());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentActive());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentInactive());
+}
+
+TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_ExplicitAbortEndedTxn) {
+    beginTxnWithDefaultTxnNumber();
+    runCommit(kDummyOkRes);
+
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentOpen());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentActive());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentInactive());
+
+    auto future = launchAsync([&] { txnRouter().abortTransaction(operationContext()); });
+    expectAbortTransactions({hostAndPort1}, getSessionId(), kTxnNumber);
+    future.default_timed_get();
+
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentOpen());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentActive());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentInactive());
+}
+
+TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_ImplicitAbortEndedTxn) {
+    beginTxnWithDefaultTxnNumber();
+    runCommit(kDummyOkRes);
+
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentOpen());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentActive());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentInactive());
+
+    auto future = launchAsync(
+        [&] { txnRouter().implicitlyAbortTransaction(operationContext(), kDummyStatus); });
+    expectAbortTransactions({hostAndPort1}, getSessionId(), kTxnNumber);
+    future.default_timed_get();
+
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentOpen());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentActive());
+    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentInactive());
+}
+
+TEST_F(TransactionRouterTest, RouterMetricsCurrent_ReapForInactiveTxn) {
+    auto routerTxnMetrics = RouterTransactionsMetrics::get(operationContext());
+    operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
+
+    {
+        // Check out a session to create one in the session catalog.
+        RouterOperationContextSession routerOpCtxSession(operationContext());
+
+        // Start a transaction on the session.
+        auto txnRouter = TransactionRouter::get(operationContext());
+        txnRouter.beginOrContinueTxn(
+            operationContext(), 5, TransactionRouter::TransactionActions::kStart);
+        txnRouter.setDefaultAtClusterTime(operationContext());
+
+        ASSERT_EQUALS(1L, routerTxnMetrics->getCurrentOpen());
+        ASSERT_EQUALS(1L, routerTxnMetrics->getCurrentActive());
+        ASSERT_EQUALS(0L, routerTxnMetrics->getCurrentInactive());
+    }
+
+    // The router session is out of scope, so the transaction is stashed.
+    ASSERT_EQUALS(1L, routerTxnMetrics->getCurrentOpen());
+    ASSERT_EQUALS(0L, routerTxnMetrics->getCurrentActive());
+    ASSERT_EQUALS(1L, routerTxnMetrics->getCurrentInactive());
+
+    // Mark the session for reap which will also erase it from the catalog.
+    auto catalog = SessionCatalog::get(operationContext()->getServiceContext());
+    catalog->scanSession(*operationContext()->getLogicalSessionId(),
+                         [](ObservableSession& session) { session.markForReap(); });
+
+    // Verify the session was reaped.
+    catalog->scanSession(*operationContext()->getLogicalSessionId(), [](const ObservableSession&) {
+        FAIL("The callback was called for non-existent session");
+    });
+
+    // Verify serverStatus was updated correctly and the reaped transactions were not considered
+    // committed or aborted.
+    ASSERT_EQUALS(0L, routerTxnMetrics->getCurrentOpen());
+    ASSERT_EQUALS(0L, routerTxnMetrics->getCurrentActive());
+    ASSERT_EQUALS(0L, routerTxnMetrics->getCurrentInactive());
+    ASSERT_EQUALS(0L, routerTxnMetrics->getTotalCommitted());
+    ASSERT_EQUALS(0L, routerTxnMetrics->getTotalAborted());
+}
+
+TEST_F(TransactionRouterTest, RouterMetricsCurrent_ReapForUnstartedTxn) {
+    auto routerTxnMetrics = RouterTransactionsMetrics::get(operationContext());
+    operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
+
+    {
+        // Check out a session to create one in the session catalog, but don't start a txn on it.
+        RouterOperationContextSession routerOpCtxSession(operationContext());
+    }
+
+    ASSERT_EQUALS(0L, routerTxnMetrics->getCurrentOpen());
+    ASSERT_EQUALS(0L, routerTxnMetrics->getCurrentActive());
+    ASSERT_EQUALS(0L, routerTxnMetrics->getCurrentInactive());
+
+    // Mark the session for reap which will also erase it from the catalog.
+    auto catalog = SessionCatalog::get(operationContext()->getServiceContext());
+    catalog->scanSession(*operationContext()->getLogicalSessionId(),
+                         [](ObservableSession& session) { session.markForReap(); });
+
+    // Verify the session was reaped.
+    catalog->scanSession(*operationContext()->getLogicalSessionId(), [](const ObservableSession&) {
+        FAIL("The callback was called for non-existent session");
+    });
+
+    // Verify serverStatus was not modified and the reaped transactions were not considered
+    // committed or aborted.
+    ASSERT_EQUALS(0L, routerTxnMetrics->getCurrentOpen());
+    ASSERT_EQUALS(0L, routerTxnMetrics->getCurrentActive());
+    ASSERT_EQUALS(0L, routerTxnMetrics->getCurrentInactive());
+    ASSERT_EQUALS(0L, routerTxnMetrics->getTotalCommitted());
+    ASSERT_EQUALS(0L, routerTxnMetrics->getTotalAborted());
+}
+
+// The following three tests verify that the methods that end metrics tracking for a transaction
+// can't be called for an unstarted one.
+
+DEATH_TEST_F(TransactionRouterMetricsTest,
+             ImplicitlyAbortingUnstartedTxnCrashes,
+             "Invariant failure isInitialized()") {
+    txnRouter().implicitlyAbortTransaction(operationContext(), kDummyStatus);
+}
+
+DEATH_TEST_F(TransactionRouterMetricsTest,
+             AbortingUnstartedTxnCrashes,
+             "Invariant failure isInitialized()") {
+    txnRouter().abortTransaction(operationContext());
+}
+
+DEATH_TEST_F(TransactionRouterMetricsTest,
+             CommittingUnstartedTxnCrashes,
+             "Invariant failure isInitialized()") {
+    txnRouter().commitTransaction(operationContext(), boost::none);
 }
 
 TEST_F(TransactionRouterMetricsTest, RouterMetricsTotalStarted_DefaultsTo0) {
@@ -4023,6 +4655,8 @@ TEST_F(TransactionRouterMetricsTest, ReportResources) {
             .getValue(),
         startTime);
     ASSERT_GTE(transactionDocument.getField("timeOpenMicros").numberLong(), 0);
+    ASSERT_GTE(transactionDocument.getField("timeActiveMicros").numberLong(), 0);
+    ASSERT_GTE(transactionDocument.getField("timeInactiveMicros").numberLong(), 0);
     ASSERT_EQ(transactionDocument.getField("numNonReadOnlyParticipants").numberInt(), 0);
     ASSERT_EQ(transactionDocument.getField("numReadOnlyParticipants").numberInt(), 0);
 
@@ -4050,8 +4684,6 @@ TEST_F(TransactionRouterMetricsTest, ReportResourcesWithParticipantList) {
     auto transactionDocument = state.getObjectField("transaction");
     auto parametersDocument = transactionDocument.getObjectField("parameters");
 
-    ASSERT_EQ(state.getField("desc").valueStringData().toString(), "active transaction");
-    ASSERT_EQ(state.getField("type").valueStringData().toString(), "activeSession");
     ASSERT_GTE(transactionDocument.getField("readTimestamp").timestamp(), Timestamp(0, 0));
     ASSERT_EQ(dateFromISOString(transactionDocument.getField("startWallClockTime").String()),
               startTime);
@@ -4102,8 +4734,9 @@ TEST_F(TransactionRouterMetricsTest, ReportResourcesWithParticipantList) {
     ASSERT_EQ(transactionDocument.getField("numNonReadOnlyParticipants").numberInt(), 1);
     ASSERT_EQ(transactionDocument.getField("numReadOnlyParticipants").numberInt(), 1);
 
-    ASSERT_EQ(state.getField("active").boolean(), true);
     ASSERT_GTE(transactionDocument.getField("timeOpenMicros").numberLong(), 0);
+    ASSERT_GTE(transactionDocument.getField("timeActiveMicros").numberLong(), 0);
+    ASSERT_GTE(transactionDocument.getField("timeInactiveMicros").numberLong(), 0);
 }
 
 TEST_F(TransactionRouterMetricsTest, ReportResourcesCommit) {
@@ -4133,6 +4766,11 @@ TEST_F(TransactionRouterMetricsTest, ReportResourcesRecoveryCommit) {
     auto state = txnRouter().reportState(operationContext(), true /* sessionIsActive */);
     auto transactionDocument = state.getObjectField("transaction");
     ASSERT_EQ(transactionDocument.hasField("participants"), false);
+}
+
+TEST_F(TransactionRouterMetricsTest, ReportResourcesUnstartedTxn) {
+    auto state = txnRouter().reportState(operationContext(), true /* sessionIsActive */);
+    ASSERT_BSONOBJ_EQ(state, BSONObj());
 }
 
 }  // unnamed namespace

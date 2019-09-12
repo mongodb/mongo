@@ -542,6 +542,7 @@ env.CppUnitTest(
         'transaction_router_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/session_catalog',
         'sharding_router_api',
         'sharding_router_test_fixture',
     ]

@@ -34,6 +34,7 @@
 #include "mongo/s/session_catalog_router.h"
 
 #include "mongo/db/sessions_collection.h"
+#include "mongo/s/transaction_router.h"
 
 namespace mongo {
 
@@ -68,8 +69,10 @@ int RouterSessionCatalog::reapSessionsOlderThan(OperationContext* opCtx,
 }
 
 RouterOperationContextSession::RouterOperationContextSession(OperationContext* opCtx)
-    : _operationContextSession(opCtx) {}
+    : _opCtx(opCtx), _operationContextSession(opCtx) {}
 
-RouterOperationContextSession::~RouterOperationContextSession() = default;
+RouterOperationContextSession::~RouterOperationContextSession() {
+    TransactionRouter::get(_opCtx).stash(_opCtx);
+};
 
 }  // namespace mongo
