@@ -56,25 +56,25 @@ public:
     void incrementNumCatchUpsConcludedForReason(
         ReplicationCoordinator::PrimaryCatchUpConclusionReason reason);
 
-    int getNumStepUpCmdsCalled_forTesting();
-    int getNumPriorityTakeoversCalled_forTesting();
-    int getNumCatchUpTakeoversCalled_forTesting();
-    int getNumElectionTimeoutsCalled_forTesting();
-    int getNumFreezeTimeoutsCalled_forTesting();
-    int getNumStepUpCmdsSuccessful_forTesting();
-    int getNumPriorityTakeoversSuccessful_forTesting();
-    int getNumCatchUpTakeoversSuccessful_forTesting();
-    int getNumElectionTimeoutsSuccessful_forTesting();
-    int getNumFreezeTimeoutsSuccessful_forTesting();
-    int getNumStepDownsCausedByHigherTerm_forTesting();
-    int getNumCatchUps_forTesting();
-    int getNumCatchUpsSucceeded_forTesting();
-    int getNumCatchUpsAlreadyCaughtUp_forTesting();
-    int getNumCatchUpsSkipped_forTesting();
-    int getNumCatchUpsTimedOut_forTesting();
-    int getNumCatchUpsFailedWithError_forTesting();
-    int getNumCatchUpsFailedWithNewTerm_forTesting();
-    int getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_forTesting();
+    long getNumStepUpCmdsCalled_forTesting();
+    long getNumPriorityTakeoversCalled_forTesting();
+    long getNumCatchUpTakeoversCalled_forTesting();
+    long getNumElectionTimeoutsCalled_forTesting();
+    long getNumFreezeTimeoutsCalled_forTesting();
+    long getNumStepUpCmdsSuccessful_forTesting();
+    long getNumPriorityTakeoversSuccessful_forTesting();
+    long getNumCatchUpTakeoversSuccessful_forTesting();
+    long getNumElectionTimeoutsSuccessful_forTesting();
+    long getNumFreezeTimeoutsSuccessful_forTesting();
+    long getNumStepDownsCausedByHigherTerm_forTesting();
+    long getNumCatchUps_forTesting();
+    long getNumCatchUpsSucceeded_forTesting();
+    long getNumCatchUpsAlreadyCaughtUp_forTesting();
+    long getNumCatchUpsSkipped_forTesting();
+    long getNumCatchUpsTimedOut_forTesting();
+    long getNumCatchUpsFailedWithError_forTesting();
+    long getNumCatchUpsFailedWithNewTerm_forTesting();
+    long getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_forTesting();
 
     // Election candidate metrics
 
@@ -96,12 +96,18 @@ public:
 private:
     class ElectionMetricsSSS;
 
+    void _updateAverageCatchUpOps(WithLock lk);
+
     mutable stdx::mutex _mutex;
     ElectionMetrics _electionMetrics;
     ElectionCandidateMetrics _electionCandidateMetrics;
     ElectionParticipantMetrics _electionParticipantMetrics;
 
     bool _nodeIsCandidateOrPrimary = false;
+
+    // This field is a double so that the division result in _updateAverageCatchUpOps will be a
+    // double without any casting.
+    double _totalNumCatchUpOps = 0.0;
 };
 
 }  // namespace repl

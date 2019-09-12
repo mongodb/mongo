@@ -1128,9 +1128,9 @@ var ReplSetTest = function(opts) {
      * Modifies the election timeout to be 24 hours so that no unplanned elections happen. Then
      * runs replSetInitiate on the replica set with the new config.
      */
-    this.initiateWithHighElectionTimeout = function(timeout) {
+    this.initiateWithHighElectionTimeout = function(opts = {}) {
         let cfg = this.getReplSetConfig();
-        cfg.settings = {"electionTimeoutMillis": 24 * 60 * 60 * 1000};
+        cfg.settings = Object.assign(opts, {"electionTimeoutMillis": 24 * 60 * 60 * 1000});
         this.initiate(cfg);
     };
 
@@ -1148,9 +1148,28 @@ var ReplSetTest = function(opts) {
             return;
         }
 
+        jsTest.log("Stepping up: " + node.host + " in stepUp");
         assert.commandWorked(node.adminCommand({replSetStepUp: 1}));
         this.awaitNodesAgreeOnPrimary();
-        assert.eq(this.getPrimary(), node, node.host + " was not primary after stepUp");
+        assert.eq(this.getPrimary(), node, 'failed to step up node ' + node.host + ' in stepUp');
+    };
+
+    /**
+     * Steps up 'node' as primary.
+     */
+    this.stepUpNoAwaitReplication = function(node) {
+        jsTest.log("Stepping up: " + node.host + " in stepUpNoAwaitReplication");
+        assert.soonNoExcept(
+            function() {
+                assert.commandWorked(node.adminCommand({replSetStepUp: 1}));
+                self.awaitNodesAgreeOnPrimary(
+                    self.kDefaultTimeoutMS, self.nodes, self.getNodeId(node));
+                return node.adminCommand('replSetGetStatus').myState === ReplSetTest.State.PRIMARY;
+            },
+            'failed to step up node ' + node.host + ' in stepUpNoAwaitReplication',
+            self.kDefaultTimeoutMS);
+
+        return node;
     };
 
     /**

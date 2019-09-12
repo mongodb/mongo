@@ -48,18 +48,6 @@ function disableFailPoint(node) {
     assert.commandWorked(node.adminCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'}));
 }
 
-// Since this test blocks a node in drain mode, we cannot use the ReplSetTest stepUp helper
-// that waits for a node to leave drain mode.
-function stepUpNode(node) {
-    assert.soonNoExcept(function() {
-        assert.commandWorked(node.adminCommand({replSetStepUp: 1}));
-        // We do not specify a specific primary so that if a different primary gets elected
-        // due to unfortunate timing we can try again.
-        replSet.awaitNodesAgreeOnPrimary();
-        return node.adminCommand('replSetGetStatus').myState === ReplSetTest.State.PRIMARY;
-    }, 'failed to step up node ' + node.host, replSet.kDefaultTimeoutMS);
-}
-
 // Do an initial insert to prevent the secondary from going into recovery
 var numDocuments = 20;
 var coll = primary.getDB("foo").foo;
@@ -91,7 +79,7 @@ assert.soon(
     1000);
 
 reconnect(secondary);
-stepUpNode(secondary);
+replSet.stepUpNoAwaitReplication(secondary);
 
 // Secondary doesn't allow writes yet.
 var res = secondary.getDB("admin").runCommand({"isMaster": 1});
@@ -107,10 +95,10 @@ assert.commandFailedWithCode(
 
 // Original primary steps up.
 reconnect(primary);
-stepUpNode(primary);
+replSet.stepUpNoAwaitReplication(primary);
 
 reconnect(secondary);
-stepUpNode(secondary);
+replSet.stepUpNoAwaitReplication(secondary);
 
 // Disable fail point to allow replication.
 secondaries.forEach(disableFailPoint);
