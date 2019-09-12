@@ -266,6 +266,15 @@ public:
                          const ShardId& dbPrimaryShardId);
 
     /**
+     * Attempts to sets the shard version to the given chunk version with authoritative: true on
+     * the primary shard. If it fails, emit a warning then move on.
+     */
+    void trySetShardVersionOnPrimaryShard(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          const ShardId& dbPrimaryShardId,
+                                          const ChunkVersion& collVersion);
+
+    /**
      * Iterates through each entry in config.collections that does not have a UUID, generates a UUID
      * for the collection, and updates the entry with the generated UUID.
      *

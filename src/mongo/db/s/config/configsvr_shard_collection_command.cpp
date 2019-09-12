@@ -833,6 +833,28 @@ public:
 
         // Step 2.
         if (auto existingColl = checkIfAlreadyShardedWithSameOptions(opCtx, nss, request)) {
+            auto findResponse = uassertStatusOK(
+                Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+                    opCtx,
+                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                    repl::ReadConcernLevel::kLocalReadConcern,
+                    NamespaceString(ChunkType::ConfigNS),
+                    BSON("ns" << nss.ns() << "shard" << primaryShardId),
+                    BSON(ChunkType::lastmod << -1),
+                    1));
+
+            const auto& chunksVector = findResponse.docs;
+
+            // If the vector is empty, it implies that the shard has moved all chunks away. We
+            // accordingly send the "has no chunks" shard version, (0, 0, collection epoch).
+            const auto chunkVersion = chunksVector.empty()
+                ? ChunkVersion(0, 0, existingColl->getEpoch())
+                : uassertStatusOK(ChunkType::fromConfigBSON(chunksVector.front())).getVersion();
+
+            // Send setShardVersion just in case this command invocation is a retry and the primary
+            // shard has not yet received its new shardVersion.
+            catalogManager->trySetShardVersionOnPrimaryShard(
+                opCtx, nss, primaryShardId, chunkVersion);
             result << "collectionsharded" << nss.ns();
             if (existingColl->getUUID()) {
                 result << "collectionUUID" << *existingColl->getUUID();

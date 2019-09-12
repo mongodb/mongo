@@ -72,6 +72,7 @@ selector:
   - jstests/sharding/secondary_shard_versioning.js
   - jstests/sharding/session_info_in_oplog.js
   - jstests/sharding/sessions_collection_auto_healing.js
+  - jstests/sharding/shard_collection_sets_shard_version_on_retry.js
   - jstests/sharding/shard_config_db_collections.js
   - jstests/sharding/time_zone_info_mongos.js
   - jstests/sharding/verify_sessions_expiration_sharded.js

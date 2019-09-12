@@ -61,6 +61,7 @@
 #include "mongo/s/set_shard_version_request.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_util.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
@@ -73,6 +74,8 @@ using std::vector;
 using std::set;
 
 namespace {
+
+MONGO_FP_DECLARE(skipSendingSetShardVersionAfterCompletionOfShardCollection);
 
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
 const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
@@ -295,28 +298,9 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
     auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, dbPrimaryShardId));
     invariant(!shard->isConfig());
 
-    // Tell the primary mongod to refresh its data
-    // TODO:  Think the real fix here is for mongos to just
-    //        assume that all collections are sharded, when we get there
-    SetShardVersionRequest ssv = SetShardVersionRequest::makeForVersioningNoPersist(
-        shardRegistry->getConfigServerConnectionString(),
-        dbPrimaryShardId,
-        primaryShard->getConnString(),
-        NamespaceString(ns),
-        collVersion,
-        true);
-
-    auto ssvResponse =
-        shard->runCommandWithFixedRetryAttempts(opCtx,
-                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                "admin",
-                                                ssv.toBSON(),
-                                                Shard::RetryPolicy::kIdempotent);
-    auto status = ssvResponse.isOK() ? std::move(ssvResponse.getValue().commandStatus)
-                                     : std::move(ssvResponse.getStatus());
-    if (!status.isOK()) {
-        warning() << "could not update initial version of " << ns << " on shard primary "
-                  << dbPrimaryShardId << causedBy(redact(status));
+    if (!MONGO_FAIL_POINT(skipSendingSetShardVersionAfterCompletionOfShardCollection)) {
+        // Inform primary shard that the collection has been sharded.
+        trySetShardVersionOnPrimaryShard(opCtx, NamespaceString(ns), dbPrimaryShardId, collVersion);
     }
 
     catalogClient
@@ -326,6 +310,36 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
                     BSON("version" << collVersion.toString()),
                     ShardingCatalogClient::kMajorityWriteConcern)
         .transitional_ignore();
+}
+
+void ShardingCatalogManager::trySetShardVersionOnPrimaryShard(OperationContext* opCtx,
+                                                              const NamespaceString& nss,
+                                                              const ShardId& dbPrimaryShardId,
+                                                              const ChunkVersion& collVersion) {
+    const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+    auto primaryShard = uassertStatusOK(shardRegistry->getShard(opCtx, dbPrimaryShardId));
+    SetShardVersionRequest ssv = SetShardVersionRequest::makeForVersioningNoPersist(
+        shardRegistry->getConfigServerConnectionString(),
+        dbPrimaryShardId,
+        primaryShard->getConnString(),
+        nss,
+        collVersion,
+        true  // isAuthoritative
+        );
+
+    auto ssvResponse = primaryShard->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        "admin",
+        ssv.toBSON(),
+        Shard::RetryPolicy::kIdempotent);
+
+    auto status = ssvResponse.isOK() ? std::move(ssvResponse.getValue().commandStatus)
+                                     : std::move(ssvResponse.getStatus());
+    if (!status.isOK()) {
+        warning() << "could not update initial version of " << nss << " on shard primary "
+                  << dbPrimaryShardId << causedBy(redact(status));
+    }
 }
 
 void ShardingCatalogManager::generateUUIDsForExistingShardedCollections(OperationContext* opCtx) {

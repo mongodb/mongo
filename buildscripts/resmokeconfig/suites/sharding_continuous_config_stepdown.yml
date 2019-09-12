@@ -155,6 +155,8 @@ selector:
   # Test expects a specific chunk distribution after shardCollection and it can be broken when
   # a step down occurs.
   - jstests/sharding/regex_targeting.js
+  # Test does not expect the primary config server node to step down.
+  - jstests/sharding/shard_collection_sets_shard_version_on_retry.js
 
 executor:
   config:
