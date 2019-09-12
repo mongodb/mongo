@@ -450,15 +450,30 @@ public:
                "primary.)\n"
                "http://dochub.mongodb.org/core/replicasetcommands";
     }
-    CmdReplSetStepDown() : ReplSetCommand("replSetStepDown") {}
+    CmdReplSetStepDown()
+        : ReplSetCommand("replSetStepDown"),
+          _stepDownCmdsWithForceExecutedMetric("commands.replSetStepDownWithForce.total",
+                                               &_stepDownCmdsWithForceExecuted),
+          _stepDownCmdsWithForceFailedMetric("commands.replSetStepDownWithForce.failed",
+                                             &_stepDownCmdsWithForceFailed) {}
     virtual bool run(OperationContext* opCtx,
                      const string&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
+        const bool force = cmdObj["force"].trueValue();
+
+        if (force) {
+            _stepDownCmdsWithForceExecuted.increment();
+        }
+
+        auto onExitGuard = makeGuard([&] {
+            if (force) {
+                _stepDownCmdsWithForceFailed.increment();
+            }
+        });
+
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
         uassertStatusOK(status);
-
-        const bool force = cmdObj["force"].trueValue();
 
         long long stepDownForSecs = cmdObj.firstElement().numberLong();
         if (stepDownForSecs == 0) {
@@ -498,10 +513,17 @@ public:
 
         ReplicationCoordinator::get(opCtx)->stepDown(
             opCtx, force, Seconds(secondaryCatchUpPeriodSecs), Seconds(stepDownForSecs));
+
+        onExitGuard.dismiss();
         return true;
     }
 
 private:
+    mutable Counter64 _stepDownCmdsWithForceExecuted;
+    mutable Counter64 _stepDownCmdsWithForceFailed;
+    ServerStatusMetricField<Counter64> _stepDownCmdsWithForceExecutedMetric;
+    ServerStatusMetricField<Counter64> _stepDownCmdsWithForceFailedMetric;
+
     ActionSet getAuthActionSet() const override {
         return ActionSet{ActionType::replSetStateChange};
     }
@@ -743,7 +765,9 @@ public:
         uassertStatusOK(status);
         log() << "Received replSetAbortPrimaryCatchUp request";
 
-        status = ReplicationCoordinator::get(opCtx)->abortCatchupIfNeeded();
+        status = ReplicationCoordinator::get(opCtx)->abortCatchupIfNeeded(
+            ReplicationCoordinator::PrimaryCatchUpConclusionReason::
+                kFailedWithReplSetAbortPrimaryCatchUpCmd);
         if (!status.isOK()) {
             log() << "replSetAbortPrimaryCatchUp request failed" << causedBy(status);
         }

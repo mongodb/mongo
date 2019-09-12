@@ -69,6 +69,7 @@
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_metrics.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/balancer/balancer.h"
@@ -487,6 +488,9 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     const auto loadLastOpTimeAndWallTimeResult = loadLastOpTimeAndWallTime(opCtx);
     fassert(28665, loadLastOpTimeAndWallTimeResult);
     auto opTimeToReturn = loadLastOpTimeAndWallTimeResult.getValue().opTime;
+
+    auto newTermStartDate = loadLastOpTimeAndWallTimeResult.getValue().wallTime;
+    ReplicationMetrics::get(opCtx).setNewTermStartDate(newTermStartDate);
 
     _shardingOnTransitionToPrimaryHook(opCtx);
 

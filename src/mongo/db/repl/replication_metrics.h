@@ -48,9 +48,13 @@ public:
     ReplicationMetrics();
     ~ReplicationMetrics();
 
+    // Election metrics
     void incrementNumElectionsCalledForReason(TopologyCoordinator::StartElectionReason reason);
     void incrementNumElectionsSuccessfulForReason(TopologyCoordinator::StartElectionReason reason);
     void incrementNumStepDownsCausedByHigherTerm();
+    void incrementNumCatchUps();
+    void incrementNumCatchUpsConcludedForReason(
+        ReplicationCoordinator::PrimaryCatchUpConclusionReason reason);
 
     int getNumStepUpCmdsCalled_forTesting();
     int getNumPriorityTakeoversCalled_forTesting();
@@ -63,8 +67,30 @@ public:
     int getNumElectionTimeoutsSuccessful_forTesting();
     int getNumFreezeTimeoutsSuccessful_forTesting();
     int getNumStepDownsCausedByHigherTerm_forTesting();
+    int getNumCatchUps_forTesting();
+    int getNumCatchUpsSucceeded_forTesting();
+    int getNumCatchUpsAlreadyCaughtUp_forTesting();
+    int getNumCatchUpsSkipped_forTesting();
+    int getNumCatchUpsTimedOut_forTesting();
+    int getNumCatchUpsFailedWithError_forTesting();
+    int getNumCatchUpsFailedWithNewTerm_forTesting();
+    int getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_forTesting();
+
+    // Election candidate metrics
+
+    // All the election candidate metrics that should be set when a node calls an election are set
+    // in this one function, so that the 'electionCandidateMetrics' section of replSetStatus shows a
+    // consistent state.
+    void setElectionCandidateMetrics(Date_t lastElectionDate);
+    void setTargetCatchupOpTime(OpTime opTime);
+    void setNumCatchUpOps(int numCatchUpOps);
+    void setNewTermStartDate(Date_t newTermStartDate);
+
+    boost::optional<OpTime> getTargetCatchupOpTime_forTesting();
 
     BSONObj getElectionMetricsBSON();
+    BSONObj getElectionCandidateMetricsBSON();
+    void clearElectionCandidateMetrics();
 
 private:
     class ElectionMetricsSSS;
@@ -73,6 +99,8 @@ private:
     ElectionMetrics _electionMetrics;
     ElectionCandidateMetrics _electionCandidateMetrics;
     ElectionParticipantMetrics _electionParticipantMetrics;
+
+    bool _nodeIsCandidateOrPrimary = false;
 };
 
 }  // namespace repl

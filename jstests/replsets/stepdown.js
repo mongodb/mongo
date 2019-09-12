@@ -2,10 +2,14 @@
  * Check that on a loss of primary, another node doesn't assume primary if it is stale. We force a
  * stepDown to test this.
  *
+ * This test also checks that the serverStatus command metrics replSetStepDown and
+ * replSetStepDownWithForce are incremented correctly.
+ *
  * This test requires the fsync command to force a secondary to be stale.
  * @tags: [requires_fsync]
  */
 
+load("jstests/replsets/libs/election_metrics.js");
 load("jstests/replsets/rslib.js");
 
 // We are bypassing collection validation because this test runs "shutdown" command so the server is
@@ -60,6 +64,11 @@ try {
         assert.writeOK(master.getDB("foo").bar.insert({x: i}));
     }
 
+    let res = assert.commandWorked(master.adminCommand({replSetGetStatus: 1}));
+    assert(res.electionCandidateMetrics,
+           () => "Response should have an 'electionCandidateMetrics' field: " + tojson(res));
+    let intitialServerStatus = assert.commandWorked(master.adminCommand({serverStatus: 1}));
+
     jsTestLog('Do stepdown of primary ' + master + ' that should not work');
 
     // this should fail, so we don't need to try/catch
@@ -67,15 +76,126 @@ try {
         'Step down ' + master + ' expected error: ' +
         tojson(assert.commandFailed(master.getDB("admin").runCommand({replSetStepDown: 10}))));
 
+    // Check that the 'total' and 'failed' fields of 'replSetStepDown' have been incremented in
+    // serverStatus and that they have not been incremented for 'replSetStepDownWithForce'.
+    let newServerStatus = assert.commandWorked(master.adminCommand({serverStatus: 1}));
+    verifyServerStatusChange(intitialServerStatus.metrics.commands.replSetStepDown,
+                             newServerStatus.metrics.commands.replSetStepDown,
+                             "total",
+                             1);
+    verifyServerStatusChange(intitialServerStatus.metrics.commands.replSetStepDown,
+                             newServerStatus.metrics.commands.replSetStepDown,
+                             "failed",
+                             1);
+    verifyServerStatusChange(intitialServerStatus.metrics.commands.replSetStepDownWithForce,
+                             newServerStatus.metrics.commands.replSetStepDownWithForce,
+                             "total",
+                             0);
+    verifyServerStatusChange(intitialServerStatus.metrics.commands.replSetStepDownWithForce,
+                             newServerStatus.metrics.commands.replSetStepDownWithForce,
+                             "failed",
+                             0);
+
+    // This section checks that the metrics are incremented accurately when the command fails due to
+    // an error occurring before stepDown is called in the replication coordinator, such as due to
+    // bad values or type mismatches in the arguments, or checkReplEnabledForCommand returning a bad
+    // status. The stepdown period being negative is one example of such an error, but success in
+    // this case gives us confidence that the behavior in the other cases is the same.
+
+    // Stepdown should fail because the stepdown period is negative
+    jsTestLog('Do stepdown of primary ' + master + ' that should not work');
+    assert.commandFailedWithCode(
+        master.getDB("admin").runCommand({replSetStepDown: -1, force: true}), ErrorCodes.BadValue);
+
+    // Check that the 'total' and 'failed' fields of 'replSetStepDown' and
+    // 'replSetStepDownWithForce' have been incremented in serverStatus.
+    intitialServerStatus = newServerStatus;
+    newServerStatus = assert.commandWorked(master.adminCommand({serverStatus: 1}));
+    verifyServerStatusChange(intitialServerStatus.metrics.commands.replSetStepDown,
+                             newServerStatus.metrics.commands.replSetStepDown,
+                             "total",
+                             1);
+    verifyServerStatusChange(intitialServerStatus.metrics.commands.replSetStepDown,
+                             newServerStatus.metrics.commands.replSetStepDown,
+                             "failed",
+                             1);
+    verifyServerStatusChange(intitialServerStatus.metrics.commands.replSetStepDownWithForce,
+                             newServerStatus.metrics.commands.replSetStepDownWithForce,
+                             "total",
+                             1);
+    verifyServerStatusChange(intitialServerStatus.metrics.commands.replSetStepDownWithForce,
+                             newServerStatus.metrics.commands.replSetStepDownWithForce,
+                             "failed",
+                             1);
+
     jsTestLog('Do stepdown of primary ' + master + ' that should work');
     assert.commandWorked(
         master.adminCommand({replSetStepDown: ReplSetTest.kDefaultTimeoutMS, force: true}));
+
+    // Check that the 'total' fields of 'replSetStepDown' and 'replSetStepDownWithForce' have been
+    // incremented in serverStatus and that their 'failed' fields have not been incremented.
+    intitialServerStatus = newServerStatus;
+    newServerStatus = assert.commandWorked(master.adminCommand({serverStatus: 1}));
+    verifyServerStatusChange(intitialServerStatus.metrics.commands.replSetStepDown,
+                             newServerStatus.metrics.commands.replSetStepDown,
+                             "total",
+                             1);
+    verifyServerStatusChange(intitialServerStatus.metrics.commands.replSetStepDown,
+                             newServerStatus.metrics.commands.replSetStepDown,
+                             "failed",
+                             0);
+    verifyServerStatusChange(intitialServerStatus.metrics.commands.replSetStepDownWithForce,
+                             newServerStatus.metrics.commands.replSetStepDownWithForce,
+                             "total",
+                             1);
+    verifyServerStatusChange(intitialServerStatus.metrics.commands.replSetStepDownWithForce,
+                             newServerStatus.metrics.commands.replSetStepDownWithForce,
+                             "failed",
+                             0);
 
     jsTestLog('Checking isMaster on ' + master);
     var r2 = assert.commandWorked(master.getDB("admin").runCommand({ismaster: 1}));
     jsTestLog('Result from running isMaster on ' + master + ': ' + tojson(r2));
     assert.eq(r2.ismaster, false);
     assert.eq(r2.secondary, true);
+
+    // Check that the 'electionCandidateMetrics' section of the replSetGetStatus response has been
+    // cleared, since the node is no longer primary.
+    res = assert.commandWorked(master.adminCommand({replSetGetStatus: 1}));
+    assert(!res.electionCandidateMetrics,
+           () => "Response should not have an 'electionCandidateMetrics' field: " + tojson(res));
+
+    // This section checks that the metrics are incremented accurately when the command fails due to
+    // an error while stepping down. This is one reason the replSetStepDown command could fail once
+    // we call stepDown in the replication coordinator, but success in this case gives us confidence
+    // that the behavior in the other cases is the same.
+
+    // Stepdown should fail because the node is no longer primary
+    jsTestLog('Do stepdown of primary ' + master + ' that should not work');
+    assert.commandFailedWithCode(master.getDB("admin").runCommand(
+                                     {replSetStepDown: ReplSetTest.kDefaultTimeoutMS, force: true}),
+                                 ErrorCodes.NotMaster);
+
+    // Check that the 'total' and 'failed' fields of 'replSetStepDown' and
+    // 'replSetStepDownWithForce' have been incremented in serverStatus.
+    intitialServerStatus = newServerStatus;
+    newServerStatus = assert.commandWorked(master.adminCommand({serverStatus: 1}));
+    verifyServerStatusChange(intitialServerStatus.metrics.commands.replSetStepDown,
+                             newServerStatus.metrics.commands.replSetStepDown,
+                             "total",
+                             1);
+    verifyServerStatusChange(intitialServerStatus.metrics.commands.replSetStepDown,
+                             newServerStatus.metrics.commands.replSetStepDown,
+                             "failed",
+                             1);
+    verifyServerStatusChange(intitialServerStatus.metrics.commands.replSetStepDownWithForce,
+                             newServerStatus.metrics.commands.replSetStepDownWithForce,
+                             "total",
+                             1);
+    verifyServerStatusChange(intitialServerStatus.metrics.commands.replSetStepDownWithForce,
+                             newServerStatus.metrics.commands.replSetStepDownWithForce,
+                             "failed",
+                             1);
 } catch (e) {
     throw e;
 } finally {

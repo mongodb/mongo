@@ -2110,6 +2110,10 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
 
     lk.lock();
     _updateAndLogStatsOnStepDown(&arsd);
+
+    // Clear the node's election candidate metrics since it is no longer primary.
+    ReplicationMetrics::get(opCtx).clearElectionCandidateMetrics();
+
     _topCoord->finishUnconditionalStepDown();
 
     onExitGuard.dismiss();
@@ -2374,6 +2378,9 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
         }
     }
 
+    BSONObj electionCandidateMetrics =
+        ReplicationMetrics::get(getServiceContext()).getElectionCandidateMetricsBSON();
+
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     Status result(ErrorCodes::InternalError, "didn't set status in prepareStatusResponse");
     _topCoord->prepareStatusResponse(
@@ -2382,6 +2389,7 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
             static_cast<unsigned>(time(0) - serverGlobalParams.started),
             _getCurrentCommittedSnapshotOpTimeAndWallTime_inlock(),
             initialSyncProgress,
+            electionCandidateMetrics,
             _storage->getLastStableCheckpointTimestampDeprecated(_service),
             _storage->getLastStableRecoveryTimestamp(_service)},
         response,
@@ -2687,6 +2695,9 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
 
             lk.lock();
             _updateAndLogStatsOnStepDown(&arsd.get());
+
+            // Clear the node's election candidate metrics since it is no longer primary.
+            ReplicationMetrics::get(opCtx).clearElectionCandidateMetrics();
         } else {
             // Release the rstl lock as the node might have stepped down due to
             // other unconditional step down code paths like learning new term via heartbeat &
@@ -2835,7 +2846,6 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
         _readWriteAbility->setCanAcceptNonLocalWrites(lk, opCtx, canAcceptWrites);
     }
 
-
     const MemberState newState = _topCoord->getMemberState();
     if (newState == _memberState) {
         if (_topCoord->getRole() == TopologyCoordinator::Role::kCandidate) {
@@ -2867,7 +2877,16 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
     // Exit catchup mode if we're in it and enable replication producer and applier on stepdown.
     if (_memberState.primary()) {
         if (_catchupState) {
-            _catchupState->abort_inlock();
+            // _pendingTermUpdateDuringStepDown is set before stepping down due to hearing about a
+            // higher term, so that we can remember the term we heard and update our term as part of
+            // finishing stepdown. It is then unset toward the end of stepdown, after the function
+            // we are in is called. Thus we must be stepping down due to seeing a higher term if and
+            // only if _pendingTermUpdateDuringStepDown is set here.
+            if (_pendingTermUpdateDuringStepDown) {
+                _catchupState->abort_inlock(PrimaryCatchUpConclusionReason::kFailedWithNewTerm);
+            } else {
+                _catchupState->abort_inlock(PrimaryCatchUpConclusionReason::kFailedWithError);
+            }
         }
         _applierState = ApplierState::Running;
         _externalState->startProducerIfStopped();
@@ -3011,7 +3030,7 @@ void ReplicationCoordinatorImpl::CatchupState::start_inlock() {
 
     // No catchup in single node replica set.
     if (_repl->_rsConfig.getNumMembers() == 1) {
-        abort_inlock();
+        abort_inlock(PrimaryCatchUpConclusionReason::kSkipped);
         return;
     }
 
@@ -3020,7 +3039,7 @@ void ReplicationCoordinatorImpl::CatchupState::start_inlock() {
     // When catchUpTimeoutMillis is 0, we skip doing catchup entirely.
     if (catchupTimeout == ReplSetConfig::kCatchUpDisabled) {
         log() << "Skipping primary catchup since the catchup timeout is 0.";
-        abort_inlock();
+        abort_inlock(PrimaryCatchUpConclusionReason::kSkipped);
         return;
     }
 
@@ -3035,7 +3054,7 @@ void ReplicationCoordinatorImpl::CatchupState::start_inlock() {
             return;
         }
         log() << "Catchup timed out after becoming primary.";
-        abort_inlock();
+        abort_inlock(PrimaryCatchUpConclusionReason::kTimedOut);
     };
 
     // Deal with infinity and overflow - no timeout.
@@ -3048,14 +3067,19 @@ void ReplicationCoordinatorImpl::CatchupState::start_inlock() {
     auto status = _repl->_replExecutor->scheduleWorkAt(timeoutDate, std::move(timeoutCB));
     if (!status.isOK()) {
         log() << "Failed to schedule catchup timeout work.";
-        abort_inlock();
+        abort_inlock(PrimaryCatchUpConclusionReason::kFailedWithError);
         return;
     }
     _timeoutCbh = status.getValue();
+
+    _numCatchUpOps = 0;
 }
 
-void ReplicationCoordinatorImpl::CatchupState::abort_inlock() {
+void ReplicationCoordinatorImpl::CatchupState::abort_inlock(PrimaryCatchUpConclusionReason reason) {
     invariant(_repl->_getMemberState_inlock().primary());
+
+    ReplicationMetrics::get(getGlobalServiceContext())
+        .incrementNumCatchUpsConcludedForReason(reason);
 
     log() << "Exited primary catch-up mode.";
     // Clean up its own members.
@@ -3084,7 +3108,10 @@ void ReplicationCoordinatorImpl::CatchupState::signalHeartbeatUpdate_inlock() {
     if (*targetOpTime <= myLastApplied) {
         log() << "Caught up to the latest optime known via heartbeats after becoming primary. "
               << "Target optime: " << *targetOpTime << ". My Last Applied: " << myLastApplied;
-        abort_inlock();
+        // Report the number of ops applied during catchup in replSetGetStatus once the primary is
+        // caught up.
+        ReplicationMetrics::get(getGlobalServiceContext()).setNumCatchUpOps(_numCatchUpOps);
+        abort_inlock(PrimaryCatchUpConclusionReason::kAlreadyCaughtUp);
         return;
     }
 
@@ -3092,6 +3119,8 @@ void ReplicationCoordinatorImpl::CatchupState::signalHeartbeatUpdate_inlock() {
     if (_waiter && _waiter->opTime == *targetOpTime) {
         return;
     }
+
+    ReplicationMetrics::get(getGlobalServiceContext()).setTargetCatchupOpTime(targetOpTime.get());
 
     log() << "Heartbeats updated catchup target optime to " << *targetOpTime;
     log() << "Latest known optime per replica set member:";
@@ -3103,27 +3132,47 @@ void ReplicationCoordinatorImpl::CatchupState::signalHeartbeatUpdate_inlock() {
 
     if (_waiter) {
         _repl->_opTimeWaiterList.remove_inlock(_waiter.get());
+    } else {
+        // Only increment the 'numCatchUps' election metric the first time we add a waiter, so that
+        // we only increment it once each time a primary has to catch up. If there is already an
+        // existing waiter, then the node is catching up and has already been counted.
+        ReplicationMetrics::get(getGlobalServiceContext()).incrementNumCatchUps();
     }
+
     auto targetOpTimeCB = [this, targetOpTime]() {
         // Double check the target time since stepdown may signal us too.
         const auto myLastApplied = _repl->_getMyLastAppliedOpTime_inlock();
         if (*targetOpTime <= myLastApplied) {
             log() << "Caught up to the latest known optime successfully after becoming primary. "
                   << "Target optime: " << *targetOpTime << ". My Last Applied: " << myLastApplied;
-            abort_inlock();
+            // Report the number of ops applied during catchup in replSetGetStatus once the primary
+            // is caught up.
+            ReplicationMetrics::get(getGlobalServiceContext()).setNumCatchUpOps(_numCatchUpOps);
+            abort_inlock(PrimaryCatchUpConclusionReason::kSucceeded);
         }
     };
     _waiter = stdx::make_unique<CallbackWaiter>(*targetOpTime, targetOpTimeCB);
     _repl->_opTimeWaiterList.add_inlock(_waiter.get());
 }
 
-Status ReplicationCoordinatorImpl::abortCatchupIfNeeded() {
+void ReplicationCoordinatorImpl::CatchupState::incrementNumCatchUpOps_inlock(int numOps) {
+    _numCatchUpOps += numOps;
+}
+
+Status ReplicationCoordinatorImpl::abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_catchupState) {
-        _catchupState->abort_inlock();
+        _catchupState->abort_inlock(reason);
         return Status::OK();
     }
     return Status(ErrorCodes::IllegalOperation, "The node is not in catch-up mode.");
+}
+
+void ReplicationCoordinatorImpl::incrementNumCatchUpOpsIfCatchingUp(int numOps) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    if (_catchupState) {
+        _catchupState->incrementNumCatchUpOps_inlock(numOps);
+    }
 }
 
 void ReplicationCoordinatorImpl::signalDropPendingCollectionsRemovedFromStorage() {

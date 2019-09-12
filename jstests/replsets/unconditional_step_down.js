@@ -106,6 +106,10 @@ function runStepDownTest({testMsg, stepDownFn, toRemovedState}) {
     jsTestLog("Wait for write cmd to reach the fail point");
     waitForCurOpByFailPoint(primaryDB, collNss, writeFailPoint);
 
+    let res = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}));
+    assert(res.electionCandidateMetrics,
+           () => "Response should have an 'electionCandidateMetrics' field: " + tojson(res));
+
     jsTestLog("Trigger step down");
     var oldConfig = stepDownFn();
 
@@ -119,6 +123,16 @@ function runStepDownTest({testMsg, stepDownFn, toRemovedState}) {
                  (toRemovedState) ? ReplSetTest.State.REMOVED : ReplSetTest.State.SECONDARY);
 
     assert.commandWorked(primary.adminCommand({configureFailPoint: writeFailPoint, mode: "off"}));
+
+    // Check that the 'electionCandidateMetrics' section of the replSetGetStatus response has been
+    // cleared, since the node is no longer primary.
+    if (!toRemovedState) {
+        res = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}));
+        assert(
+            !res.electionCandidateMetrics,
+            () => "Response should not have an 'electionCandidateMetrics' field: " + tojson(res));
+    }
+
     // Get the new primary.
     refreshConnection();
 }

@@ -302,7 +302,9 @@ public:
         return _service;
     }
 
-    virtual Status abortCatchupIfNeeded() override;
+    virtual Status abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) override;
+
+    virtual void incrementNumCatchUpOpsIfCatchingUp(int numOps) override;
 
     void signalDropPendingCollectionsRemovedFromStorage() final;
 

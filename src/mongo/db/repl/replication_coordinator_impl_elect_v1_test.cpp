@@ -48,6 +48,8 @@
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
+#include <boost/optional/optional_io.hpp>
+
 namespace mongo {
 namespace repl {
 namespace {
@@ -221,6 +223,20 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyNode) {
     getReplCoord()->fillIsMasterForReplSet(&imResponse, {});
     ASSERT_TRUE(imResponse.isMaster()) << imResponse.toBSON().toString();
     ASSERT_FALSE(imResponse.isSecondary()) << imResponse.toBSON().toString();
+
+    // Check that only the 'numCatchUpsSkipped' primary catchup conclusion reason was incremented.
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtxPtr.get()).getNumCatchUpsSucceeded_forTesting());
+    ASSERT_EQ(0,
+              ReplicationMetrics::get(opCtxPtr.get()).getNumCatchUpsAlreadyCaughtUp_forTesting());
+    ASSERT_EQ(1, ReplicationMetrics::get(opCtxPtr.get()).getNumCatchUpsSkipped_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtxPtr.get()).getNumCatchUpsTimedOut_forTesting());
+    ASSERT_EQ(0,
+              ReplicationMetrics::get(opCtxPtr.get()).getNumCatchUpsFailedWithError_forTesting());
+    ASSERT_EQ(0,
+              ReplicationMetrics::get(opCtxPtr.get()).getNumCatchUpsFailedWithNewTerm_forTesting());
+    ASSERT_EQ(0,
+              ReplicationMetrics::get(opCtxPtr.get())
+                  .getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_forTesting());
 }
 
 TEST_F(ReplCoordTest, ElectionSucceedsWhenAllNodesVoteYea) {
@@ -330,6 +346,10 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun)
 
     simulateEnoughHeartbeatsForAllNodesUp();
 
+    // Check that the node's election candidate metrics are unset before it becomes primary.
+    ASSERT_BSONOBJ_EQ(
+        BSONObj(), ReplicationMetrics::get(getServiceContext()).getElectionCandidateMetricsBSON());
+
     auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
     ASSERT_NOT_EQUALS(Date_t(), electionTimeoutWhen);
     log() << "Election timeout scheduled at " << electionTimeoutWhen << " (simulator time)";
@@ -354,6 +374,11 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun)
                                                                << false << "reason"
                                                                << "don't like him much")));
             voteRequests++;
+            // Check that the node's election candidate metrics are set once it has called an
+            // election.
+            ASSERT_BSONOBJ_NE(
+                BSONObj(),
+                ReplicationMetrics::get(getServiceContext()).getElectionCandidateMetricsBSON());
         } else {
             net->blackHole(noi);
         }
@@ -363,6 +388,11 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun)
     stopCapturingLogMessages();
     ASSERT_EQUALS(
         1, countLogLinesContaining("not running for primary, we received insufficient votes"));
+
+    // Check that the node's election candidate metrics have been cleared, since it lost the dry-run
+    // election and will not become primary.
+    ASSERT_BSONOBJ_EQ(
+        BSONObj(), ReplicationMetrics::get(getServiceContext()).getElectionCandidateMetricsBSON());
 }
 
 TEST_F(ReplCoordTest, ElectionFailsWhenDryRunResponseContainsANewerTerm) {
@@ -653,8 +683,16 @@ TEST_F(ReplCoordTest, ElectionFailsWhenVoteRequestResponseContainsANewerTerm) {
     replCoordSetMyLastDurableOpTime(time1, Date_t() + Seconds(time1.getSecs()));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
+    // Check that the node's election candidate metrics are unset before it becomes primary.
+    ASSERT_BSONOBJ_EQ(
+        BSONObj(), ReplicationMetrics::get(getServiceContext()).getElectionCandidateMetricsBSON());
+
     simulateEnoughHeartbeatsForAllNodesUp();
     simulateSuccessfulDryRun();
+
+    // Check that the node's election candidate metrics are set once it has called an election.
+    ASSERT_BSONOBJ_NE(
+        BSONObj(), ReplicationMetrics::get(getServiceContext()).getElectionCandidateMetricsBSON());
 
     NetworkInterfaceMock* net = getNet();
     net->enterNetwork();
@@ -680,6 +718,11 @@ TEST_F(ReplCoordTest, ElectionFailsWhenVoteRequestResponseContainsANewerTerm) {
     stopCapturingLogMessages();
     ASSERT_EQUALS(1,
                   countLogLinesContaining("not becoming primary, we have been superseded already"));
+
+    // Check that the node's election candidate metrics have been cleared, since it lost the actual
+    // election and will not become primary.
+    ASSERT_BSONOBJ_EQ(
+        BSONObj(), ReplicationMetrics::get(getServiceContext()).getElectionCandidateMetricsBSON());
 }
 
 TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringDryRun) {
@@ -2199,6 +2242,25 @@ TEST_F(PrimaryCatchUpTest, PrimaryDoesNotNeedToCatchUp) {
     signalDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+
+    // Check that the number of elections requiring primary catchup was not incremented.
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
+
+    // Check that only the 'numCatchUpsAlreadyCaughtUp' primary catchup conclusion reason was
+    // incremented.
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSucceeded_forTesting());
+    ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsAlreadyCaughtUp_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSkipped_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsTimedOut_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsFailedWithError_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsFailedWithNewTerm_forTesting());
+    ASSERT_EQ(0,
+              ReplicationMetrics::get(opCtx.get())
+                  .getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_forTesting());
+
+    // Check that the targetCatchupOpTime metric was not set.
+    ASSERT_EQUALS(boost::none,
+                  ReplicationMetrics::get(getServiceContext()).getTargetCatchupOpTime_forTesting());
 }
 
 // Heartbeats set a future target OpTime and we reached that successfully.
@@ -2208,11 +2270,23 @@ TEST_F(PrimaryCatchUpTest, CatchupSucceeds) {
     OpTime time1(Timestamp(100, 1), 0);
     OpTime time2(Timestamp(100, 2), 0);
     ReplSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
+
+    // Check that the targetCatchupOpTime metric is unset before the target opTime for catchup is
+    // set.
+    ASSERT_EQUALS(boost::none,
+                  ReplicationMetrics::get(getServiceContext()).getTargetCatchupOpTime_forTesting());
+
     processHeartbeatRequests([this, time2](const NetworkOpIter noi) {
         auto net = getNet();
         // The old primary accepted one more op and all nodes caught up after voting for me.
         net->scheduleResponse(noi, net->now(), makeHeartbeatResponse(time2));
     });
+
+    // Check that the targetCatchupOpTime metric was set correctly when heartbeats updated the
+    // target opTime for catchup.
+    ASSERT_EQUALS(time2,
+                  ReplicationMetrics::get(getServiceContext()).getTargetCatchupOpTime_forTesting());
+
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
     advanceMyLastAppliedOpTime(time2, Date_t() + Seconds(time2.getSecs()));
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
@@ -2222,6 +2296,20 @@ TEST_F(PrimaryCatchUpTest, CatchupSucceeds) {
     signalDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+
+    // Check that the number of elections requiring primary catchup was incremented.
+    ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
+
+    // Check that only the 'numCatchUpsSucceeded' primary catchup conclusion reason was incremented.
+    ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSucceeded_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsAlreadyCaughtUp_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSkipped_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsTimedOut_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsFailedWithError_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsFailedWithNewTerm_forTesting());
+    ASSERT_EQ(0,
+              ReplicationMetrics::get(opCtx.get())
+                  .getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_forTesting());
 }
 
 TEST_F(PrimaryCatchUpTest, CatchupTimeout) {
@@ -2242,6 +2330,20 @@ TEST_F(PrimaryCatchUpTest, CatchupTimeout) {
     signalDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+
+    // Check that the number of elections requiring primary catchup was incremented.
+    ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
+
+    // Check that only the 'numCatchUpsTimedOut' primary catchup conclusion reason was incremented.
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSucceeded_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsAlreadyCaughtUp_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSkipped_forTesting());
+    ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsTimedOut_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsFailedWithError_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsFailedWithNewTerm_forTesting());
+    ASSERT_EQ(0,
+              ReplicationMetrics::get(opCtx.get())
+                  .getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_forTesting());
 }
 
 TEST_F(PrimaryCatchUpTest, CannotSeeAllNodes) {
@@ -2267,6 +2369,21 @@ TEST_F(PrimaryCatchUpTest, CannotSeeAllNodes) {
     signalDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+
+    // Check that the number of elections requiring primary catchup was not incremented.
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
+
+    // Check that only the 'numCatchUpsAlreadyCaughtUp' primary catchup conclusion reason was
+    // incremented.
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSucceeded_forTesting());
+    ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsAlreadyCaughtUp_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSkipped_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsTimedOut_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsFailedWithError_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsFailedWithNewTerm_forTesting());
+    ASSERT_EQ(0,
+              ReplicationMetrics::get(opCtx.get())
+                  .getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_forTesting());
 }
 
 TEST_F(PrimaryCatchUpTest, HeartbeatTimeout) {
@@ -2292,6 +2409,21 @@ TEST_F(PrimaryCatchUpTest, HeartbeatTimeout) {
     signalDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+
+    // Check that the number of elections requiring primary catchup was not incremented.
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
+
+    // Check that only the 'numCatchUpsAlreadyCaughtUp' primary catchup conclusion reason was
+    // incremented.
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSucceeded_forTesting());
+    ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsAlreadyCaughtUp_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSkipped_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsTimedOut_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsFailedWithError_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsFailedWithNewTerm_forTesting());
+    ASSERT_EQ(0,
+              ReplicationMetrics::get(opCtx.get())
+                  .getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_forTesting());
 }
 
 TEST_F(PrimaryCatchUpTest, PrimaryStepsDownBeforeHeartbeatRefreshing) {
@@ -2315,6 +2447,21 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownBeforeHeartbeatRefreshing) {
     auto opCtx = makeOperationContext();
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
     ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+
+    // Check that the number of elections requiring primary catchup was not incremented.
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
+
+    // Since the primary stepped down in catchup mode because it saw a higher term, check that only
+    // the 'numCatchUpsFailedWithNewTerm' primary catchup conclusion reason was incremented.
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSucceeded_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsAlreadyCaughtUp_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSkipped_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsTimedOut_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsFailedWithError_forTesting());
+    ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsFailedWithNewTerm_forTesting());
+    ASSERT_EQ(0,
+              ReplicationMetrics::get(opCtx.get())
+                  .getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_forTesting());
 }
 
 TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringCatchUp) {
@@ -2329,6 +2476,10 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringCatchUp) {
         // Other nodes are ahead of me.
         getNet()->scheduleResponse(noi, getNet()->now(), makeHeartbeatResponse(time2));
     });
+
+    ASSERT_EQUALS(time2,
+                  ReplicationMetrics::get(getServiceContext()).getTargetCatchupOpTime_forTesting());
+
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
     TopologyCoordinator::UpdateTermResult updateTermResult;
     auto evh = getReplCoord()->updateTerm_forTest(2, &updateTermResult);
@@ -2344,6 +2495,25 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringCatchUp) {
     auto opCtx = makeOperationContext();
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
     ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+
+    // Check that the number of elections requiring primary catchup was incremented.
+    ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
+
+    // Since the primary stepped down in catchup mode because it saw a higher term, check that only
+    // the 'numCatchUpsFailedWithNewTerm' primary catchup conclusion reason was incremented.
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSucceeded_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsAlreadyCaughtUp_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSkipped_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsTimedOut_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsFailedWithError_forTesting());
+    ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsFailedWithNewTerm_forTesting());
+    ASSERT_EQ(0,
+              ReplicationMetrics::get(opCtx.get())
+                  .getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_forTesting());
+
+    // Check that the targetCatchupOpTime metric was cleared when the node stepped down.
+    ASSERT_EQUALS(boost::none,
+                  ReplicationMetrics::get(getServiceContext()).getTargetCatchupOpTime_forTesting());
 }
 
 TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
@@ -2365,6 +2535,21 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Caught up to the latest"));
 
+    // Check that the number of elections requiring primary catchup was incremented.
+    auto opCtx = makeOperationContext();
+    ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
+
+    // Check that only the 'numCatchUpsSucceeded' primary catchup conclusion reason was incremented.
+    ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSucceeded_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsAlreadyCaughtUp_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSkipped_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsTimedOut_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsFailedWithError_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsFailedWithNewTerm_forTesting());
+    ASSERT_EQ(0,
+              ReplicationMetrics::get(opCtx.get())
+                  .getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_forTesting());
+
     // Step down during drain mode.
     TopologyCoordinator::UpdateTermResult updateTermResult;
     auto evh = replCoord->updateTerm_forTest(2, &updateTermResult);
@@ -2383,7 +2568,6 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
         net->scheduleResponse(noi, net->now(), makeHeartbeatResponse(time2));
     });
     ASSERT(replCoord->getApplierState() == ApplierState::Draining);
-    auto opCtx = makeOperationContext();
     {
         Lock::GlobalLock lock(opCtx.get(), MODE_IX);
         ASSERT_FALSE(replCoord->canAcceptWritesForDatabase(opCtx.get(), "test"));
@@ -2392,6 +2576,21 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
     ASSERT(replCoord->getApplierState() == ApplierState::Stopped);
     ASSERT_TRUE(replCoord->canAcceptWritesForDatabase(opCtx.get(), "test"));
+
+    // Check that the number of elections requiring primary catchup was not incremented again.
+    ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
+
+    // Check that only the 'numCatchUpsAlreadyCaughtUp' primary catchup conclusion reason was
+    // incremented.
+    ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSucceeded_forTesting());
+    ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsAlreadyCaughtUp_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSkipped_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsTimedOut_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsFailedWithError_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsFailedWithNewTerm_forTesting());
+    ASSERT_EQ(0,
+              ReplicationMetrics::get(opCtx.get())
+                  .getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_forTesting());
 }
 
 TEST_F(PrimaryCatchUpTest, FreshestNodeBecomesAvailableLater) {
@@ -2420,6 +2619,8 @@ TEST_F(PrimaryCatchUpTest, FreshestNodeBecomesAvailableLater) {
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
     stopCapturingLogMessages();
     ASSERT_EQ(1, countLogLinesContaining("Heartbeats updated catchup target optime"));
+    ASSERT_EQUALS(time3,
+                  ReplicationMetrics::get(getServiceContext()).getTargetCatchupOpTime_forTesting());
 
     // 3) Advancing its applied optime to time 2 isn't enough.
     advanceMyLastAppliedOpTime(time2, Date_t() + Seconds(time2.getSecs()));
@@ -2440,6 +2641,8 @@ TEST_F(PrimaryCatchUpTest, FreshestNodeBecomesAvailableLater) {
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
     stopCapturingLogMessages();
     ASSERT_EQ(1, countLogLinesContaining("Heartbeats updated catchup target optime"));
+    ASSERT_EQUALS(time4,
+                  ReplicationMetrics::get(getServiceContext()).getTargetCatchupOpTime_forTesting());
 
     // 5) Advancing to time 3 isn't enough now.
     advanceMyLastAppliedOpTime(time3, Date_t() + Seconds(time3.getSecs()));
@@ -2455,6 +2658,20 @@ TEST_F(PrimaryCatchUpTest, FreshestNodeBecomesAvailableLater) {
     signalDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+
+    // Check that the number of elections requiring primary catchup was incremented.
+    ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
+
+    // Check that only the 'numCatchUpsSucceeded' primary catchup conclusion reason was incremented.
+    ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSucceeded_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsAlreadyCaughtUp_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSkipped_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsTimedOut_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsFailedWithError_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsFailedWithNewTerm_forTesting());
+    ASSERT_EQ(0,
+              ReplicationMetrics::get(opCtx.get())
+                  .getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_forTesting());
 }
 
 TEST_F(PrimaryCatchUpTest, InfiniteTimeoutAndAbort) {
@@ -2489,7 +2706,9 @@ TEST_F(PrimaryCatchUpTest, InfiniteTimeoutAndAbort) {
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
 
     // Simulate a user initiated abort.
-    ASSERT_OK(getReplCoord()->abortCatchupIfNeeded());
+    ASSERT_OK(getReplCoord()->abortCatchupIfNeeded(
+        ReplicationCoordinator::PrimaryCatchUpConclusionReason::
+            kFailedWithReplSetAbortPrimaryCatchUpCmd));
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
 
     stopCapturingLogMessages();
@@ -2500,6 +2719,21 @@ TEST_F(PrimaryCatchUpTest, InfiniteTimeoutAndAbort) {
     signalDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+
+    // Check that the number of elections requiring primary catchup was incremented.
+    ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
+
+    // Check that only the 'numCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd' primary catchup
+    // conclusion reason was incremented.
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSucceeded_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsAlreadyCaughtUp_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSkipped_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsTimedOut_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsFailedWithError_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsFailedWithNewTerm_forTesting());
+    ASSERT_EQ(1,
+              ReplicationMetrics::get(opCtx.get())
+                  .getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_forTesting());
 }
 
 TEST_F(PrimaryCatchUpTest, ZeroTimeout) {
@@ -2514,6 +2748,60 @@ TEST_F(PrimaryCatchUpTest, ZeroTimeout) {
     signalDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+
+    // Check that the number of elections requiring primary catchup was not incremented.
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
+
+    // Check that only the 'numCatchUpsSkipped' primary catchup conclusion reason was incremented.
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSucceeded_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsAlreadyCaughtUp_forTesting());
+    ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSkipped_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsTimedOut_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsFailedWithError_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsFailedWithNewTerm_forTesting());
+    ASSERT_EQ(0,
+              ReplicationMetrics::get(opCtx.get())
+                  .getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_forTesting());
+}
+
+TEST_F(PrimaryCatchUpTest, CatchUpFailsDueToPrimaryStepDown) {
+    startCapturingLogMessages();
+
+    OpTime time1(Timestamp(100, 1), 0);
+    OpTime time2(Timestamp(100, 2), 0);
+    ReplSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
+    // Step down in the middle of catchup.
+    auto abortTime = getNet()->now() + config.getCatchUpTimeoutPeriod() / 2;
+    replyHeartbeatsAndRunUntil(abortTime, [this, time2](const NetworkOpIter noi) {
+        // Other nodes are ahead of me.
+        getNet()->scheduleResponse(noi, getNet()->now(), makeHeartbeatResponse(time2));
+    });
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
+
+    auto opCtx = makeOperationContext();
+    getReplCoord()->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000));
+    ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
+
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1, countLogLinesContaining("Exited primary catch-up mode"));
+    ASSERT_EQUALS(0, countLogLinesContaining("Caught up to the latest"));
+    ASSERT_EQUALS(0, countLogLinesContaining("Catchup timed out"));
+
+    // Check that the number of elections requiring primary catchup was incremented.
+    ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
+
+    // Check that only the 'numCatchUpsFailedWithError' primary catchup conclusion reason was
+    // incremented.
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSucceeded_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsAlreadyCaughtUp_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSkipped_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsTimedOut_forTesting());
+    ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsFailedWithError_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsFailedWithNewTerm_forTesting());
+    ASSERT_EQ(0,
+              ReplicationMetrics::get(opCtx.get())
+                  .getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_forTesting());
 }
 
 }  // namespace

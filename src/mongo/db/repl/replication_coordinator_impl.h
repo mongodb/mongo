@@ -321,7 +321,9 @@ public:
 
     virtual Status stepUpIfEligible(bool skipDryRun) override;
 
-    virtual Status abortCatchupIfNeeded() override;
+    virtual Status abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) override;
+
+    virtual void incrementNumCatchUpOpsIfCatchingUp(int numOps) override;
 
     void signalDropPendingCollectionsRemovedFromStorage() final;
 
@@ -669,9 +671,11 @@ private:
         // start() can only be called once.
         void start_inlock();
         // Reset the state itself to destruct the state.
-        void abort_inlock();
+        void abort_inlock(PrimaryCatchUpConclusionReason reason);
         // Heartbeat calls this function to update the target optime.
         void signalHeartbeatUpdate_inlock();
+        // Increment the counter for the number of ops applied during catchup.
+        void incrementNumCatchUpOps_inlock(int numOps);
 
     private:
         ReplicationCoordinatorImpl* _repl;  // Not owned.
@@ -680,6 +684,8 @@ private:
         // Handle to a Waiter that contains the current target optime to reach after which
         // we can exit catchup mode.
         std::unique_ptr<CallbackWaiter> _waiter;
+        // Counter for the number of ops applied during catchup.
+        int _numCatchUpOps;
     };
 
     // Inner class to manage the concurrency of _canAcceptNonLocalWrites and _canServeNonLocalReads.

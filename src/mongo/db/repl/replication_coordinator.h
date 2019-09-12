@@ -863,10 +863,26 @@ public:
 
     virtual ServiceContext* getServiceContext() = 0;
 
+    enum PrimaryCatchUpConclusionReason {
+        kSucceeded,
+        kAlreadyCaughtUp,
+        kSkipped,
+        kTimedOut,
+        kFailedWithError,
+        kFailedWithNewTerm,
+        kFailedWithReplSetAbortPrimaryCatchUpCmd
+    };
+
     /**
      * Abort catchup if the node is in catchup mode.
      */
-    virtual Status abortCatchupIfNeeded() = 0;
+    virtual Status abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) = 0;
+
+    /**
+     * Increment the counter for the number of ops applied during catchup if the node is in catchup
+     * mode.
+     */
+    virtual void incrementNumCatchUpOpsIfCatchingUp(int numOps) = 0;
 
     /**
      * Signals that drop pending collections have been removed from storage.

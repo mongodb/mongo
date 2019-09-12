@@ -34,9 +34,11 @@ global:
     cpp_namespace: "mongo::repl"
     cpp_includes:
         - "mongo/db/repl/election_reason_counter_parser.h"
+        - "mongo/db/repl/optime.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
+    - "mongo/db/repl/replication_types.idl"
 
 types:
     ElectionReasonCounter:
@@ -76,15 +78,67 @@ structs:
                 description: "Number of times this node stepped down because it saw a higher term"
                 type: long
                 default: 0
-        
+            numCatchUps:
+                description: "Number of elections that required the primary to catch up because it
+                              was behind"
+                type: long
+                default: 0
+            numCatchUpsSucceeded:
+                description: "Number of times primary catchup concluded because the primary caught
+                              up to the latest known optime successfully"
+                type: long
+                default: 0
+            numCatchUpsAlreadyCaughtUp:
+                description: "Number of times primary catchup concluded because the primary was
+                              already caught up"
+                type: long
+                default: 0
+            numCatchUpsSkipped:
+                description: "Number of times primary catchup concluded because it was skipped"
+                type: long
+                default: 0
+            numCatchUpsTimedOut:
+                description: "Number of times primary catchup concluded because it timed out"
+                type: long
+                default: 0
+            numCatchUpsFailedWithError:
+                description: "Number of times primary catchup concluded because it failed with an
+                              error"
+                type: long
+                default: 0
+            numCatchUpsFailedWithNewTerm:
+                description: "Number of times primary catchup concluded because the primary stepped
+                              down on seeing a higher term"
+                type: long
+                default: 0
+            numCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd:
+                description: "Number of times primary catchup concluded because of the
+                              replSetAbortPrimaryCatchUp command"
+                type: long
+                default: 0
+
     ElectionCandidateMetrics:
         description: "Stores metrics that are specific to the last election in which the node was a
                       candidate"
         strict: true
         fields:
-            priorityAtElection:
-                description: "The node's priority at the time of the election"
-                type: double
+            lastElectionDate:
+                description: "Time the node called the dry run election, or the actual election if
+                              it skipped dry run"
+                type: date
+            targetCatchupOpTime:
+                description: "The node's target opTime for catchup"
+                type: optime
+                optional: true
+            numCatchUpOps:
+                description: "Number of ops applied during catchup when the primary successfully
+                              catches up"
+                type: long
+                optional: true
+            newTermStartDate:
+                description: "Time the new term oplog entry was written"
+                type: date
+                optional: true
 
     ElectionParticipantMetrics:
         description: "Stores metrics that are specific to the last election in which the node voted"

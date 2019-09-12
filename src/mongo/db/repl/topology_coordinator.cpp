@@ -1417,7 +1417,8 @@ const MemberConfig* TopologyCoordinator::_currentPrimaryMember() const {
 std::string TopologyCoordinator::_getReplSetStatusString() {
     // Construct a ReplSetStatusArgs using default parameters. Missing parameters will not be
     // included in the status string.
-    ReplSetStatusArgs rsStatusArgs{Date_t::now(), 0U, OpTimeAndWallTime(), BSONObj(), boost::none};
+    ReplSetStatusArgs rsStatusArgs{
+        Date_t::now(), 0U, OpTimeAndWallTime(), BSONObj(), BSONObj(), boost::none};
     BSONObjBuilder builder;
     Status result(ErrorCodes::InternalError, "didn't set status in prepareStatusResponse");
     prepareStatusResponse(rsStatusArgs, &builder, &result);
@@ -1439,6 +1440,7 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
     const OpTime lastOpDurable = getMyLastDurableOpTime();
     const Date_t lastOpDurableWall = getMyLastDurableOpTimeAndWallTime().wallTime;
     const BSONObj& initialSyncStatus = rsStatusArgs.initialSyncStatus;
+    const BSONObj& electionCandidateMetrics = rsStatusArgs.electionCandidateMetrics;
     const boost::optional<Timestamp>& lastStableRecoveryTimestamp =
         rsStatusArgs.lastStableRecoveryTimestamp;
     const boost::optional<Timestamp>& lastStableCheckpointTimestampDeprecated =
@@ -1636,6 +1638,10 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
 
     if (!initialSyncStatus.isEmpty()) {
         response->append("initialSyncStatus", initialSyncStatus);
+    }
+
+    if (!electionCandidateMetrics.isEmpty()) {
+        response->append("electionCandidateMetrics", electionCandidateMetrics);
     }
 
     response->append("members", membersOut);

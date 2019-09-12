@@ -33,14 +33,15 @@ var primary = replSet.getPrimary();
 var writeConcern = {writeConcern: {w: 2, wtimeout: replSet.kDefaultTimeoutMS}};
 assert.writeOK(primary.getDB(name).bar.insert({x: 100}, writeConcern));
 
-const initialPrimaryStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
-
 // Write something so that node 0 is ahead of node 1.
 stopServerReplication(nodes[1]);
 writeConcern = {
     writeConcern: {w: 1, wtimeout: replSet.kDefaultTimeoutMS}
 };
 assert.writeOK(primary.getDB(name).bar.insert({y: 100}, writeConcern));
+
+const initialPrimaryStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
+const initialNode2Status = assert.commandWorked(nodes[2].adminCommand({serverStatus: 1}));
 
 // Step up one of the lagged nodes.
 assert.commandWorked(nodes[2].adminCommand({replSetStepUp: 1}));
@@ -64,6 +65,13 @@ replSet.waitForState(0, ReplSetTest.State.PRIMARY, 60 * 1000);
 const newPrimaryStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
 verifyServerStatusElectionReasonCounterChange(
     initialPrimaryStatus.electionMetrics, newPrimaryStatus.electionMetrics, "catchUpTakeover", 1);
+
+// Check that the 'numCatchUpsFailedWithNewTerm' field has been incremented in serverStatus, and
+// that none of the other reasons for catchup concluding has been incremented.
+const newNode2Status = assert.commandWorked(nodes[2].adminCommand({serverStatus: 1}));
+verifyCatchUpConclusionReason(initialNode2Status.electionMetrics,
+                              newNode2Status.electionMetrics,
+                              'numCatchUpsFailedWithNewTerm');
 
 // Wait until the old primary steps down so the connections won't be closed.
 replSet.waitForState(2, ReplSetTest.State.SECONDARY, replSet.kDefaultTimeoutMS);
