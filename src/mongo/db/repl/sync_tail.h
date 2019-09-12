@@ -99,9 +99,9 @@ public:
      * Retrieves operations from the OplogBuffer in batches that will be applied in parallel using
      * multiApply().
      */
-    void oplogApplication(OplogBuffer* oplogBuffer,
-                          OplogApplier::GetNextApplierBatchFn getNextApplierBatchFn,
-                          ReplicationCoordinator* replCoord);
+    void runLoop(OplogBuffer* oplogBuffer,
+                 OplogApplier::GetNextApplierBatchFn getNextApplierBatchFn,
+                 ReplicationCoordinator* replCoord);
 
     /**
      * Shuts down oplogApplication() processing.
@@ -219,26 +219,15 @@ public:
 private:
     class OpQueueBatcher;
 
-    void _oplogApplication(ReplicationCoordinator* replCoord, OpQueueBatcher* batcher) noexcept;
-
-    void _fillWriterVectors(OperationContext* opCtx,
-                            MultiApplier::Operations* ops,
-                            std::vector<MultiApplier::OperationPtrs>* writerVectors,
-                            std::vector<MultiApplier::Operations>* derivedOps,
-                            SessionUpdateTracker* sessionUpdateTracker) noexcept;
-
-    /**
-     * Doles out all the work to the writer pool threads. Does not modify writerVectors, but passes
-     * non-const pointers to inner vectors into func.
-     */
-    void _applyOps(std::vector<MultiApplier::OperationPtrs>& writerVectors,
-                   std::vector<Status>* statusVector,
-                   std::vector<WorkerMultikeyPathInfo>* workerMultikeyPathInfo);
-
     OplogApplier::Observer* const _observer;
     ReplicationConsistencyMarkers* const _consistencyMarkers;
     StorageInterface* const _storageInterface;
 
+    void _deriveOpsAndFillWriterVectors(OperationContext* opCtx,
+                                        MultiApplier::Operations* ops,
+                                        std::vector<MultiApplier::OperationPtrs>* writerVectors,
+                                        std::vector<MultiApplier::Operations>* derivedOps,
+                                        SessionUpdateTracker* sessionUpdateTracker) noexcept;
     // Function to use during applyOps
     MultiSyncApplyFunc _applyFunc;
 

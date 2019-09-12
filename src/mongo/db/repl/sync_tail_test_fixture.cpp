@@ -138,6 +138,16 @@ StorageInterface* SyncTailTest::getStorageInterface() const {
     return StorageInterface::get(serviceContext);
 }
 
+// Since syncApply is being tested outside of its calling function (multiSyncApply), we recreate the
+// necessary calling context.
+Status SyncTailTest::_syncApplyWrapper(OperationContext* opCtx,
+                                       const OplogEntryBatch& batch,
+                                       OplogApplication::Mode oplogApplicationMode) {
+    UnreplicatedWritesBlock uwb(opCtx);
+    DisableDocumentValidation validationDisabler(opCtx);
+    return syncApply(opCtx, batch, oplogApplicationMode);
+}
+
 void SyncTailTest::_testSyncApplyCrudOperation(ErrorCodes::Error expectedError,
                                                const OplogEntry& op,
                                                bool expectedApplyOpCalled) {
@@ -176,9 +186,9 @@ void SyncTailTest::_testSyncApplyCrudOperation(ErrorCodes::Error expectedError,
         ASSERT_BSONOBJ_EQ(op.getObject(), *deletedDoc);
         return Status::OK();
     };
-    ASSERT_TRUE(_opCtx->writesAreReplicated());
-    ASSERT_FALSE(documentValidationDisabled(_opCtx.get()));
-    ASSERT_EQ(syncApply(_opCtx.get(), &op, OplogApplication::Mode::kSecondary), expectedError);
+
+    ASSERT_EQ(_syncApplyWrapper(_opCtx.get(), &op, OplogApplication::Mode::kSecondary),
+              expectedError);
     ASSERT_EQ(applyOpCalled, expectedApplyOpCalled);
 }
 

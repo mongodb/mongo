@@ -52,7 +52,7 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
     auto getNextApplierBatchFn = [this](OperationContext* opCtx, const BatchLimits& batchLimits) {
         return getNextApplierBatch(opCtx, batchLimits);
     };
-    _syncTail.oplogApplication(oplogBuffer, getNextApplierBatchFn, _replCoord);
+    _syncTail.runLoop(oplogBuffer, getNextApplierBatchFn, _replCoord);
 }
 
 void OplogApplierImpl::_shutdown() {
