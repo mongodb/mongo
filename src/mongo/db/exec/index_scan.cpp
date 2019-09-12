@@ -64,7 +64,7 @@ IndexScan::IndexScan(OperationContext* opCtx,
                      IndexScanParams params,
                      WorkingSet* workingSet,
                      const MatchExpression* filter)
-    : RequiresIndexStage(kStageType, opCtx, params.indexDescriptor),
+    : RequiresIndexStage(kStageType, opCtx, params.indexDescriptor, workingSet),
       _workingSet(workingSet),
       _keyPattern(params.keyPattern.getOwned()),
       _bounds(std::move(params.bounds)),
@@ -233,7 +233,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
     WorkingSetID id = _workingSet->allocate();
     WorkingSetMember* member = _workingSet->get(id);
     member->recordId = kv->loc;
-    member->keyData.push_back(IndexKeyDatum(_keyPattern, kv->key, indexAccessMethod()));
+    member->keyData.push_back(IndexKeyDatum(_keyPattern, kv->key, workingSetIndexId()));
     _workingSet->transitionToRecordIdAndIdx(id);
 
     if (_addKeyMetadata) {

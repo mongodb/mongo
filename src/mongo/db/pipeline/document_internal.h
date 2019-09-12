@@ -422,6 +422,7 @@ public:
     }
 
     DocumentMetadataFields releaseMetadata() {
+        loadLazyMetadata();
         return std::move(_metadataFields);
     }
 
@@ -532,6 +533,11 @@ private:
 
     BSONObj _bson;
     mutable BSONObjIterator _bsonIt;
+
+    // If '_stripMetadata' is true, tracks whether or not the metadata has been lazy-loaded from the
+    // backing '_bson' object. If so, then no attempt will be made to load the metadata again, even
+    // if the metadata has been released by a call to 'releaseMetadata()'.
+    mutable bool _haveLazyLoadedMetadata = false;
 
     mutable DocumentMetadataFields _metadataFields;
 

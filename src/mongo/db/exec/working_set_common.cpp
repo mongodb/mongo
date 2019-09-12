@@ -72,10 +72,11 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
     member->resetDocument(opCtx->recoveryUnit()->getSnapshotId(), record->data.releaseToBson());
 
     if (member->isSuspicious) {
-        // Make sure that all of the keyData is still valid for this copy of the document.
-        // This ensures both that index-provided filters and sort orders still hold.
-        // TODO provide a way for the query planner to opt out of this checking if it is
-        // unneeded due to the structure of the plan.
+        // Make sure that all of the keyData is still valid for this copy of the document.  This
+        // ensures both that index-provided filters and sort orders still hold.
+        //
+        // TODO provide a way for the query planner to opt out of this checking if it is unneeded
+        // due to the structure of the plan.
         invariant(!member->keyData.empty());
         for (size_t i = 0; i < member->keyData.size(); i++) {
             KeyStringSet keys;
@@ -83,7 +84,8 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
             // be multikey when ensuring the keyData is still valid.
             KeyStringSet* multikeyMetadataKeys = nullptr;
             MultikeyPaths* multikeyPaths = nullptr;
-            auto* iam = member->keyData[i].index;
+            auto indexId = member->keyData[i].indexId;
+            auto* iam = workingSet->retrieveIndexAccessMethod(indexId);
             iam->getKeys(member->doc.value().toBson(),
                          IndexAccessMethod::GetKeysMode::kEnforceConstraints,
                          &keys,

@@ -47,7 +47,7 @@ using std::vector;
 const char* DistinctScan::kStageType = "DISTINCT_SCAN";
 
 DistinctScan::DistinctScan(OperationContext* opCtx, DistinctParams params, WorkingSet* workingSet)
-    : RequiresIndexStage(kStageType, opCtx, params.indexDescriptor),
+    : RequiresIndexStage(kStageType, opCtx, params.indexDescriptor, workingSet),
       _workingSet(workingSet),
       _keyPattern(std::move(params.keyPattern)),
       _scanDirection(params.scanDirection),
@@ -122,7 +122,7 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
             WorkingSetID id = _workingSet->allocate();
             WorkingSetMember* member = _workingSet->get(id);
             member->recordId = kv->loc;
-            member->keyData.push_back(IndexKeyDatum(_keyPattern, kv->key, indexAccessMethod()));
+            member->keyData.push_back(IndexKeyDatum(_keyPattern, kv->key, workingSetIndexId()));
             _workingSet->transitionToRecordIdAndIdx(id);
 
             *out = id;

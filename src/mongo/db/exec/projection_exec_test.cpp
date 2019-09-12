@@ -193,7 +193,7 @@ TEST(ProjectionExecTest, TransformCoveredDottedProjection) {
     ASSERT_EQ(boost::make_optional("{ b: { c: 2, d: 3, f: { g: 4, h: 5 } } }"s),
               project("{'b.c': 1, 'b.d': 1, 'b.f.g': 1, 'b.f.h': 1}",
                       "{}",
-                      IndexKeyDatum(keyPattern, keyData, nullptr)));
+                      IndexKeyDatum(keyPattern, keyData, 0)));
 }
 
 TEST(ProjectionExecTest, TransformNonCoveredDottedProjection) {
@@ -249,7 +249,7 @@ TEST(ProjectionExecTest, TransformMetaSortKeyCoveredNormal) {
     ASSERT_EQ(boost::make_optional("{ a: 5, b: { : 5 } }"s),
               project("{_id: 0, a: 1, b: {$meta: 'sortKey'}}",
                       "{}",
-                      IndexKeyDatum(BSON("a" << 1), BSON("" << 5), nullptr),
+                      IndexKeyDatum(BSON("a" << 1), BSON("" << 5), 0),
                       boost::none,      // collator
                       BSON("" << 5)));  // sortKey
 }
@@ -258,7 +258,7 @@ TEST(ProjectionExecTest, TransformMetaSortKeyCoveredOverwrite) {
     ASSERT_EQ(boost::make_optional("{ a: { : 5 } }"s),
               project("{_id: 0, a: 1, a: {$meta: 'sortKey'}}",
                       "{}",
-                      IndexKeyDatum(BSON("a" << 1), BSON("" << 5), nullptr),
+                      IndexKeyDatum(BSON("a" << 1), BSON("" << 5), 0),
                       boost::none,      // collator
                       BSON("" << 5)));  // sortKey
 }
@@ -267,7 +267,7 @@ TEST(ProjectionExecTest, TransformMetaSortKeyCoveredAdditionalData) {
     ASSERT_EQ(boost::make_optional("{ a: 5, c: 6, b: { : 5 } }"s),
               project("{_id: 0, a: 1, b: {$meta: 'sortKey'}, c: 1}",
                       "{}",
-                      IndexKeyDatum(BSON("a" << 1 << "c" << 1), BSON("" << 5 << "" << 6), nullptr),
+                      IndexKeyDatum(BSON("a" << 1 << "c" << 1), BSON("" << 5 << "" << 6), 0),
                       boost::none,      // collator
                       BSON("" << 5)));  // sortKey
 }
@@ -276,7 +276,7 @@ TEST(ProjectionExecTest, TransformMetaSortKeyCoveredCompound) {
     ASSERT_EQ(boost::make_optional("{ a: 5, b: { : 5, : 6 } }"s),
               project("{_id: 0, a: 1, b: {$meta: 'sortKey'}}",
                       "{}",
-                      IndexKeyDatum(BSON("a" << 1 << "c" << 1), BSON("" << 5 << "" << 6), nullptr),
+                      IndexKeyDatum(BSON("a" << 1 << "c" << 1), BSON("" << 5 << "" << 6), 0),
                       boost::none,                 // collator
                       BSON("" << 5 << "" << 6)));  // sortKey
 }
@@ -287,7 +287,7 @@ TEST(ProjectionExecTest, TransformMetaSortKeyCoveredCompound2) {
                       "{}",
                       IndexKeyDatum(BSON("a" << 1 << "b" << 1 << "c" << 1),
                                     BSON("" << 5 << "" << 6 << "" << 4),
-                                    nullptr),
+                                    0),
                       boost::none,                 // collator
                       BSON("" << 5 << "" << 6)));  // sortKey
 }
@@ -298,7 +298,7 @@ TEST(ProjectionExecTest, TransformMetaSortKeyCoveredCompound3) {
                       "{}",
                       IndexKeyDatum(BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1),
                                     BSON("" << 5 << "" << 6 << "" << 4 << "" << 9000),
-                                    nullptr),
+                                    0),
                       boost::none,                 // collator
                       BSON("" << 6 << "" << 4)));  // sortKey
 }

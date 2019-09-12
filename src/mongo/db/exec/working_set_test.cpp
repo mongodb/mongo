@@ -33,7 +33,9 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/pipeline/document.h"
+#include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/storage/snapshot.h"
+#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -119,7 +121,7 @@ TEST_F(WorkingSetFixture, getFieldFromIndex) {
     string secondName = "y";
     int secondValue = 10;
 
-    member->keyData.push_back(IndexKeyDatum(BSON(firstName << 1), BSON("" << firstValue), nullptr));
+    member->keyData.push_back(IndexKeyDatum(BSON(firstName << 1), BSON("" << firstValue), 0));
     // Also a minor lie as RecordId is bogus.
     ws->transitionToRecordIdAndIdx(id);
     BSONElement elt;
@@ -129,8 +131,7 @@ TEST_F(WorkingSetFixture, getFieldFromIndex) {
     ASSERT_FALSE(member->getFieldDotted("foo", &elt));
 
     // Add another index datum.
-    member->keyData.push_back(
-        IndexKeyDatum(BSON(secondName << 1), BSON("" << secondValue), nullptr));
+    member->keyData.push_back(IndexKeyDatum(BSON(secondName << 1), BSON("" << secondValue), 0));
     ASSERT_TRUE(member->getFieldDotted(secondName, &elt));
     ASSERT_EQUALS(elt.numberInt(), secondValue);
     ASSERT_TRUE(member->getFieldDotted(firstName, &elt));
@@ -143,7 +144,7 @@ TEST_F(WorkingSetFixture, getDottedFieldFromIndex) {
     string firstName = "x.y";
     int firstValue = 5;
 
-    member->keyData.push_back(IndexKeyDatum(BSON(firstName << 1), BSON("" << firstValue), nullptr));
+    member->keyData.push_back(IndexKeyDatum(BSON(firstName << 1), BSON("" << firstValue), 0));
     ws->transitionToRecordIdAndIdx(id);
     BSONElement elt;
     ASSERT_TRUE(member->getFieldDotted(firstName, &elt));
@@ -188,6 +189,95 @@ TEST_F(WorkingSetFixture, MetadataCanBeCorrectlyTransferredBackAndForthFromDocum
     ASSERT_TRUE(member->metadata());
     ASSERT_TRUE(member->metadata().hasTextScore());
     ASSERT_TRUE(member->metadata().hasSearchScore());
+}
+
+namespace {
+// Serializes the given working set member to a buffer, then returns a working set member resulting
+// from deserializing this buffer.
+WorkingSetMember roundtripWsmThroughSerialization(const WorkingSetMember& wsm) {
+    BufBuilder builder{};
+    wsm.serializeForSorter(builder);
+    BufReader reader{builder.buf(), static_cast<unsigned>(builder.len())};
+    return WorkingSetMember::deserializeForSorter(reader,
+                                                  WorkingSetMember::SorterDeserializeSettings{});
+}
+}  // namespace
+
+TEST_F(WorkingSetFixture, RecordIdAndObjStateCanRoundtripThroughSerialization) {
+    Document doc{{"foo", Value{"bar"_sd}}};
+    member->doc.setValue(doc);
+    member->doc.setSnapshotId(SnapshotId{42u});
+    member->recordId = RecordId{43};
+    ws->transitionToRecordIdAndObj(id);
+    auto roundtripped = roundtripWsmThroughSerialization(*member);
+    ASSERT_EQ(WorkingSetMember::RID_AND_OBJ, roundtripped.getState());
+    ASSERT_DOCUMENT_EQ(roundtripped.doc.value(), doc);
+    ASSERT_EQ(roundtripped.doc.snapshotId().toNumber(), 42u);
+    ASSERT_EQ(roundtripped.recordId.repr(), 43);
+    ASSERT_FALSE(roundtripped.isSuspicious);
+    ASSERT_FALSE(roundtripped.metadata());
+}
+
+TEST_F(WorkingSetFixture, OwnedObjStateCanRoundtripThroughSerialization) {
+    Document doc{{"foo", Value{"bar"_sd}}};
+    member->doc.setValue(doc);
+    member->doc.setSnapshotId(SnapshotId{42u});
+    ws->transitionToOwnedObj(id);
+    auto roundtripped = roundtripWsmThroughSerialization(*member);
+    ASSERT_EQ(WorkingSetMember::OWNED_OBJ, roundtripped.getState());
+    ASSERT_DOCUMENT_EQ(roundtripped.doc.value(), doc);
+    ASSERT_EQ(roundtripped.doc.snapshotId().toNumber(), 42u);
+    ASSERT(roundtripped.recordId.isNull());
+    ASSERT_FALSE(roundtripped.isSuspicious);
+    ASSERT_FALSE(roundtripped.metadata());
+}
+
+TEST_F(WorkingSetFixture, RecordIdAndIdxStateCanRoundtripThroughSerialization) {
+    member->recordId = RecordId{43};
+    member->keyData.emplace_back(BSON("a" << 1 << "b" << 1), BSON("" << 3 << "" << 4), 8u);
+    member->keyData.emplace_back(BSON("c" << -1), BSON("" << 5), 9u);
+    ws->transitionToRecordIdAndIdx(id);
+    ASSERT_FALSE(member->isSuspicious);
+
+    auto roundtripped = roundtripWsmThroughSerialization(*member);
+    ASSERT_EQ(WorkingSetMember::RID_AND_IDX, roundtripped.getState());
+    ASSERT_EQ(roundtripped.recordId.repr(), 43);
+    ASSERT_EQ(roundtripped.keyData.size(), 2u);
+
+    ASSERT_BSONOBJ_EQ(roundtripped.keyData[0].indexKeyPattern, BSON("a" << 1 << "b" << 1));
+    ASSERT_BSONOBJ_EQ(roundtripped.keyData[0].keyData, BSON("" << 3 << "" << 4));
+    ASSERT_EQ(roundtripped.keyData[0].indexId, 8u);
+
+    ASSERT_BSONOBJ_EQ(roundtripped.keyData[1].indexKeyPattern, BSON("c" << -1));
+    ASSERT_BSONOBJ_EQ(roundtripped.keyData[1].keyData, BSON("" << 5));
+    ASSERT_EQ(roundtripped.keyData[1].indexId, 9u);
+
+    ASSERT_TRUE(roundtripped.isSuspicious);
+    ASSERT_FALSE(roundtripped.metadata());
+}
+
+TEST_F(WorkingSetFixture, WsmWithMetadataCanRoundtripThroughSerialization) {
+    Document doc{{"foo", Value{"bar"_sd}}};
+    member->doc.setValue(doc);
+    member->metadata().setTextScore(42.0);
+    member->metadata().setSearchScore(43.0);
+    ws->transitionToRecordIdAndObj(id);
+    auto roundtripped = roundtripWsmThroughSerialization(*member);
+
+    ASSERT_EQ(WorkingSetMember::RID_AND_OBJ, roundtripped.getState());
+    ASSERT_DOCUMENT_EQ(roundtripped.doc.value(), doc);
+    ASSERT_FALSE(roundtripped.doc.value().metadata());
+    ASSERT_TRUE(roundtripped.doc.snapshotId().isNull());
+    ASSERT_TRUE(roundtripped.recordId.isNull());
+    ASSERT_FALSE(roundtripped.isSuspicious);
+
+    ASSERT_TRUE(roundtripped.metadata());
+    ASSERT_TRUE(roundtripped.metadata().hasTextScore());
+    ASSERT_EQ(roundtripped.metadata().getTextScore(), 42.0);
+    ASSERT_TRUE(roundtripped.metadata().hasSearchScore());
+    ASSERT_EQ(roundtripped.metadata().getSearchScore(), 43.0);
+    ASSERT_FALSE(roundtripped.metadata().hasGeoNearPoint());
+    ASSERT_FALSE(roundtripped.metadata().hasGeoNearDistance());
 }
 
 }  // namespace mongo

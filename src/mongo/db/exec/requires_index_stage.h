@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/requires_collection_stage.h"
+#include "mongo/db/exec/working_set.h"
 #include "mongo/db/index/index_descriptor.h"
 
 namespace mongo {
@@ -48,7 +49,8 @@ class RequiresIndexStage : public RequiresCollectionStage {
 public:
     RequiresIndexStage(const char* stageType,
                        OperationContext* opCtx,
-                       const IndexDescriptor* indexDescriptor);
+                       const IndexDescriptor* indexDescriptor,
+                       WorkingSet* workingSet);
 
     virtual ~RequiresIndexStage() = default;
 
@@ -75,6 +77,10 @@ protected:
         return _indexAccessMethod;
     }
 
+    WorkingSetRegisteredIndexId workingSetIndexId() const {
+        return _workingSetIndexId;
+    }
+
 private:
     // We keep a weak_ptr to the index catalog entry in order to detect when the underlying catalog
     // object has been destroyed, e.g. due to an index drop. In this scenario, the
@@ -93,6 +99,10 @@ private:
     const IndexAccessMethod* _indexAccessMethod;
 
     std::string _indexName;
+
+    // An indentifier for the index required by this stage. Any working set member allocated to
+    // represent an index key from this index must include this id.
+    WorkingSetRegisteredIndexId _workingSetIndexId;
 };
 
 }  // namespace mongo

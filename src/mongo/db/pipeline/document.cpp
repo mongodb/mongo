@@ -323,6 +323,7 @@ intrusive_ptr<DocumentStorage> DocumentStorage::clone() const {
         dassert(out->_numFields == _numFields);
     }
 
+    out->_haveLazyLoadedMetadata = _haveLazyLoadedMetadata;
     out->_metadataFields = _metadataFields;
 
     return out;
@@ -361,7 +362,7 @@ void DocumentStorage::reset(const BSONObj& bson, bool stripMetadata) {
 }
 
 void DocumentStorage::loadLazyMetadata() const {
-    if (_metadataFields) {
+    if (_haveLazyLoadedMetadata) {
         return;
     }
 
@@ -397,6 +398,8 @@ void DocumentStorage::loadLazyMetadata() const {
             }
         }
     }
+
+    _haveLazyLoadedMetadata = true;
 }
 
 Document::Document(const BSONObj& bson) {

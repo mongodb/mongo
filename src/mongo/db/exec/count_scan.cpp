@@ -74,7 +74,7 @@ const char* CountScan::kStageType = "COUNT_SCAN";
 // the CountScanParams rather than resolving them via the IndexDescriptor, since these may differ
 // from the descriptor's contents.
 CountScan::CountScan(OperationContext* opCtx, CountScanParams params, WorkingSet* workingSet)
-    : RequiresIndexStage(kStageType, opCtx, params.indexDescriptor),
+    : RequiresIndexStage(kStageType, opCtx, params.indexDescriptor, workingSet),
       _workingSet(workingSet),
       _keyPattern(std::move(params.keyPattern)),
       _shouldDedup(params.isMultiKey),

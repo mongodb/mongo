@@ -98,7 +98,25 @@ int SortExecutor::Comparator::operator()(const DocumentSorter::Data& lhs,
     return 0;
 }
 
-boost::optional<Document> SortExecutor::getNext() {
+boost::optional<Document> SortExecutor::getNextDoc() {
+    auto wsm = getNextWsm();
+    if (!wsm) {
+        return boost::none;
+    }
+
+    // Ensure that this WorkingSetMember only houses a Document. This guarantees that we are not
+    // discarding data inside the working set member (e.g. the RecordId) when returning the Document
+    // to the caller.
+    invariant(wsm->hasOwnedObj());
+
+    // Transfer metadata from the WorkingSetMember to the Document.
+    MutableDocument mutableDoc{std::move(wsm->doc.value())};
+    mutableDoc.setMetadata(wsm->releaseMetadata());
+
+    return mutableDoc.freeze();
+}
+
+boost::optional<WorkingSetMember> SortExecutor::getNextWsm() {
     if (_isEOF) {
         return boost::none;
     }
@@ -113,6 +131,22 @@ boost::optional<Document> SortExecutor::getNext() {
 }
 
 void SortExecutor::add(Value sortKey, Document data) {
+    invariant(data.isOwned());
+    WorkingSetMember wsm;
+
+    // Transfer metadata from the Document to the WorkingSetMember.
+    MutableDocument mutableDoc{std::move(data)};
+    wsm.setMetadata(mutableDoc.releaseMetadata());
+
+    wsm.doc.setValue(mutableDoc.freeze());
+    wsm.transitionToOwnedObj();
+    this->add(std::move(sortKey), std::move(wsm));
+}
+
+void SortExecutor::add(Value sortKey, WorkingSetMember data) {
+    // Metadata should be attached directly to the WSM rather than inside the Document.
+    invariant(!data.doc.value().metadata());
+
     if (!_sorter) {
         _sorter.reset(DocumentSorter::make(makeSortOptions(), Comparator(_sortPattern)));
     }

@@ -35,7 +35,8 @@ namespace mongo {
 
 RequiresIndexStage::RequiresIndexStage(const char* stageType,
                                        OperationContext* opCtx,
-                                       const IndexDescriptor* indexDescriptor)
+                                       const IndexDescriptor* indexDescriptor,
+                                       WorkingSet* workingSet)
     : RequiresCollectionStage(stageType, opCtx, indexDescriptor->getCollection()),
       _weakIndexCatalogEntry(collection()->getIndexCatalog()->getEntryShared(indexDescriptor)) {
     auto indexCatalogEntry = _weakIndexCatalogEntry.lock();
@@ -44,6 +45,7 @@ RequiresIndexStage::RequiresIndexStage(const char* stageType,
     invariant(_indexDescriptor);
     invariant(_indexAccessMethod);
     _indexName = _indexDescriptor->indexName();
+    _workingSetIndexId = workingSet->registerIndexAccessMethod(_indexAccessMethod);
 }
 
 void RequiresIndexStage::doSaveStateRequiresCollection() {

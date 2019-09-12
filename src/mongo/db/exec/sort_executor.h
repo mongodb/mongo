@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/working_set.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/sort_pattern.h"
@@ -52,7 +53,9 @@ public:
                  std::string tempDir,
                  bool allowDiskUse);
 
-    boost::optional<Document> getNext();
+    boost::optional<Document> getNextDoc();
+
+    boost::optional<WorkingSetMember> getNextWsm();
 
     const SortPattern& sortPattern() const {
         return _sortPattern;
@@ -89,8 +92,13 @@ public:
      */
     void add(Value, Document);
 
+    /**
+     * Add a WorkingSetMember with sort key specified by Value to the DocumentSorter.
+     */
+    void add(Value, WorkingSetMember);
+
 private:
-    using DocumentSorter = Sorter<Value, Document>;
+    using DocumentSorter = Sorter<Value, WorkingSetMember>;
     class Comparator {
     public:
         Comparator(const SortPattern& sortPattern) : _sort(sortPattern) {}
