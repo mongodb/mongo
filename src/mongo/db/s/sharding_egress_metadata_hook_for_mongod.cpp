@@ -55,12 +55,12 @@ repl::OpTime ShardingEgressMetadataHookForMongod::_getConfigServerOpTime() {
     }
 }
 
-Status ShardingEgressMetadataHookForMongod::_advanceConfigOptimeFromShard(
-    ShardId shardId, const BSONObj& metadataObj) {
+Status ShardingEgressMetadataHookForMongod::_advanceConfigOpTimeFromShard(
+    OperationContext* opCtx, const ShardId& shardId, const BSONObj& metadataObj) {
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         return Status::OK();
     }
-    return ShardingEgressMetadataHook::_advanceConfigOptimeFromShard(shardId, metadataObj);
+    return ShardingEgressMetadataHook::_advanceConfigOpTimeFromShard(opCtx, shardId, metadataObj);
 }
 
 }  // namespace rpc

@@ -180,7 +180,7 @@ Status ShardingState::updateConfigServerOpTimeFromMetadata(OperationContext* opC
             return Status(ErrorCodes::Unauthorized, "Unauthorized to update config opTime");
         }
 
-        Grid::get(opCtx)->advanceConfigOpTime(*opTime);
+        Grid::get(opCtx)->advanceConfigOpTime(opCtx, *opTime, "request from");
     }
 
     return Status::OK();

@@ -44,7 +44,9 @@ private:
 
     repl::OpTime _getConfigServerOpTime() override;
 
-    Status _advanceConfigOptimeFromShard(ShardId shardId, const BSONObj& metadataObj) override;
+    Status _advanceConfigOpTimeFromShard(OperationContext* opCtx,
+                                         const ShardId& shardId,
+                                         const BSONObj& metadataObj) override;
 };
 
 }  // namespace rpc
