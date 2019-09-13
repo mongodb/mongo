@@ -5,7 +5,7 @@ Resmoke Test Suite Generator.
 Analyze the evergreen history for tests run under the given task and create new evergreen tasks
 to attempt to keep the task runtime under a specified amount.
 """
-
+from copy import deepcopy
 import datetime
 from datetime import timedelta
 import logging
@@ -14,6 +14,7 @@ import os
 import re
 import sys
 from distutils.util import strtobool  # pylint: disable=no-name-in-module
+from typing import Dict, List, Tuple
 
 import click
 import requests
@@ -41,8 +42,7 @@ from buildscripts.patch_builds.task_generation import TimeoutInfo, resmoke_comma
 
 LOGGER = structlog.getLogger(__name__)
 
-TEST_SUITE_DIR = os.path.join("buildscripts", "resmokeconfig", "suites")
-CONFIG_DIR = "generated_resmoke_config"
+DEFAULT_TEST_SUITE_DIR = os.path.join("buildscripts", "resmokeconfig", "suites")
 CONFIG_FILE = "./.evergreen.yml"
 MIN_TIMEOUT_SECONDS = int(timedelta(minutes=5).total_seconds())
 LOOKBACK_DURATION_DAYS = 14
@@ -62,11 +62,13 @@ REQUIRED_CONFIG_KEYS = {
 }
 
 DEFAULT_CONFIG_VALUES = {
+    "generated_config_dir": "generated_resmoke_config",
     "max_tests_per_suite": 100,
     "resmoke_args": "",
     "resmoke_repeat_suites": 1,
     "run_multiple_jobs": "true",
     "target_resmoke_time": 60,
+    "test_suites_dir": DEFAULT_TEST_SUITE_DIR,
     "use_default_timeouts": False,
     "use_large_distro": False,
 }
@@ -175,6 +177,49 @@ def enable_logging(verbose):
     structlog.configure(logger_factory=structlog.stdlib.LoggerFactory())
 
 
+def write_file(directory: str, filename: str, contents: str):
+    """
+    Write the given contents to the specified file.
+
+    :param directory: Directory to write file into.
+    :param filename: Name of file to write to.
+    :param contents: Data to write to file.
+    """
+    with open(os.path.join(directory, filename), "w") as fileh:
+        fileh.write(contents)
+
+
+def write_file_dict(directory: str, file_dict: Dict[str, str]):
+    """
+    Write files in the given dictionary to disk.
+
+    The keys of the dictionary should be the filenames to write and the values should be
+    the contents to write to each file.
+
+    If the given directory does not exist, it will be created.
+
+    :param directory: Directory to write files to.
+    :param file_dict: Dictionary of files to write.
+    """
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+    for name, contents in file_dict.items():
+        write_file(directory, name, contents)
+
+
+def read_yaml(directory: str, filename: str) -> Dict:
+    """
+    Read the given yaml file.
+
+    :param directory: Directory containing file.
+    :param filename: Name of file to read.
+    :return: Yaml contents of file.
+    """
+    with open(os.path.join(directory, filename), "r") as fileh:
+        return yaml.safe_load(fileh)
+
+
 def split_if_exists(str_to_split):
     """Split the given string on "," if it is not None."""
     if str_to_split:
@@ -232,7 +277,7 @@ def _new_suite_needed(current_suite, test_runtime, max_suite_runtime, max_tests_
     return False
 
 
-def divide_tests_into_suites(tests_runtimes, max_time_seconds, max_suites=None,
+def divide_tests_into_suites(suite_name, tests_runtimes, max_time_seconds, max_suites=None,
                              max_tests_per_suite=None):
     """
     Divide the given tests into suites.
@@ -246,6 +291,7 @@ def divide_tests_into_suites(tests_runtimes, max_time_seconds, max_suites=None,
     Note: If `max_suites` is hit, suites may have more tests than `max_tests_per_suite` and may have
     runtimes longer than `max_time_seconds`.
 
+    :param suite_name: Name of suite being split.
     :param tests_runtimes: List of tuples containing test names and test runtimes.
     :param max_time_seconds: Maximum runtime to add to a single bucket.
     :param max_suites: Maximum number of suites to create.
@@ -253,7 +299,7 @@ def divide_tests_into_suites(tests_runtimes, max_time_seconds, max_suites=None,
     :return: List of Suite objects representing grouping of tests.
     """
     suites = []
-    current_suite = Suite()
+    current_suite = Suite(suite_name)
     last_test_processed = len(tests_runtimes)
     LOGGER.debug("Determines suites for runtime", max_runtime_seconds=max_time_seconds,
                  max_suites=max_suites, max_tests_per_suite=max_tests_per_suite)
@@ -264,7 +310,7 @@ def divide_tests_into_suites(tests_runtimes, max_time_seconds, max_suites=None,
                          test_runtime=runtime, max_time=max_time_seconds)
             if current_suite.get_test_count() > 0:
                 suites.append(current_suite)
-                current_suite = Suite()
+                current_suite = Suite(suite_name)
                 if max_suites and len(suites) >= max_suites:
                     last_test_processed = idx
                     break
@@ -309,40 +355,46 @@ def update_suite_config(suite_config, roots=None, excludes=None):
     return suite_config
 
 
-def generate_subsuite_file(source_suite_name, target_suite_name, roots=None, excludes=None):
+def generate_resmoke_suite_config(source_config, source_file, roots=None, excludes=None):
     """
     Read and evaluate the yaml suite file.
 
     Override selector.roots and selector.excludes with the provided values. Write the results to
     target_suite_name.
+
+    :param source_config: Config of suite to base generated config on.
+    :param source_file: Filename of source suite.
+    :param roots: Roots used to select tests for split suite.
+    :param excludes: Tests that should be excluded from split suite.
     """
-    source_file = os.path.join(TEST_SUITE_DIR, source_suite_name + ".yml")
-    with open(source_file, "r") as fstream:
-        suite_config = yaml.safe_load(fstream)
+    suite_config = update_suite_config(deepcopy(source_config), roots, excludes)
 
-    with open(os.path.join(CONFIG_DIR, target_suite_name + ".yml"), "w") as out:
-        out.write(HEADER_TEMPLATE.format(file=__file__, suite_file=source_file))
-        suite_config = update_suite_config(suite_config, roots, excludes)
-        out.write(yaml.dump(suite_config, default_flow_style=False, Dumper=yaml.SafeDumper))
+    contents = HEADER_TEMPLATE.format(file=__file__, suite_file=source_file)
+    contents += yaml.safe_dump(suite_config, default_flow_style=False)
+    return contents
 
 
-def render_suite(suites, suite_name):
-    """Render the given suites into yml files that can be used by resmoke.py."""
-    for idx, suite in enumerate(suites):
-        suite.name = taskname.name_generated_task(suite_name, idx, len(suites))
-        generate_subsuite_file(suite_name, suite.name, roots=suite.tests)
+def render_suite_files(suites: List, suite_name: str, test_list: List[str], suite_dir):
+    """
+    Render the given list of suites.
 
+    This will create a dictionary of all the resmoke config files to create with the
+    filename of each file as the key and the contents as the value.
 
-def render_misc_suite(test_list, suite_name):
-    """Render a misc suite to run any tests that might be added to the directory."""
-    subsuite_name = "{0}_{1}".format(suite_name, "misc")
-    generate_subsuite_file(suite_name, subsuite_name, excludes=test_list)
-
-
-def prepare_directory_for_suite(directory):
-    """Ensure that dir exists."""
-    if not os.path.exists(directory):
-        os.makedirs(directory)
+    :param suites: List of suites to render.
+    :param suite_name: Base name of suites.
+    :param test_list: List of tests used in suites.
+    :param suite_dir: Directory containing test suite configurations.
+    :return: Dictionary of rendered resmoke config files.
+    """
+    source_config = read_yaml(suite_dir, suite_name + ".yml")
+    suite_configs = {
+        f"{os.path.basename(suite.name)}.yml": suite.generate_resmoke_config(source_config)
+        for suite in suites
+    }
+    suite_configs[f"{os.path.basename(suite_name)}_misc.yml"] = generate_resmoke_suite_config(
+        source_config, suite_name, excludes=test_list)
+    return suite_configs
 
 
 def calculate_timeout(avg_runtime, scaling_factor):
@@ -472,9 +524,10 @@ class EvergreenConfigGenerator(object):
 
         return task
 
-    def _generate_task(self, sub_suite_name, sub_task_name, max_test_runtime=None,
+    def _generate_task(self, sub_suite_name, sub_task_name, target_dir, max_test_runtime=None,
                        expected_suite_runtime=None):
         """Generate evergreen config for a resmoke task."""
+        # pylint: disable=too-many-arguments
         LOGGER.debug("Generating task", sub_suite=sub_suite_name)
         spec = TaskSpec(sub_task_name)
         self._set_task_distro(spec)
@@ -483,7 +536,7 @@ class EvergreenConfigGenerator(object):
         self.task_names.append(sub_task_name)
         task = self.evg_config.task(sub_task_name)
 
-        target_suite_file = os.path.join(CONFIG_DIR, sub_suite_name)
+        target_suite_file = os.path.join(target_dir, os.path.basename(sub_suite_name))
         run_tests_vars = self._get_run_tests_vars(target_suite_file)
 
         use_multiversion = self.options.use_multiversion
@@ -503,12 +556,13 @@ class EvergreenConfigGenerator(object):
             if suite.should_overwrite_timeout():
                 max_runtime = suite.max_runtime
                 total_runtime = suite.get_runtime()
-            self._generate_task(suite.name, sub_task_name, max_runtime, total_runtime)
+            self._generate_task(suite.name, sub_task_name, self.options.generated_config_dir,
+                                max_runtime, total_runtime)
 
         # Add the misc suite
-        misc_suite_name = "{0}_misc".format(self.options.suite)
-        self._generate_task(misc_suite_name, "{0}_misc_{1}".format(self.options.task,
-                                                                   self.options.variant))
+        misc_suite_name = f"{os.path.basename(self.options.suite)}_misc"
+        misc_task_name = f"{self.options.task}_misc_{self.options.variant}"
+        self._generate_task(misc_suite_name, misc_task_name, self.options.generated_config_dir)
 
     def _generate_display_task(self):
         dt = DisplayTaskDefinition(self.options.task)\
@@ -533,14 +587,24 @@ class EvergreenConfigGenerator(object):
 class Suite(object):
     """A suite of tests that can be run by evergreen."""
 
-    def __init__(self):
-        """Initialize the object."""
+    _current_index = 0
+
+    def __init__(self, source_name: str) -> None:
+        """
+        Initialize the object.
+
+        :param source_name: Base name of suite.
+        """
         self.tests = []
         self.total_runtime = 0
         self.max_runtime = 0
         self.tests_with_runtime_info = 0
+        self.source_name = source_name
 
-    def add_test(self, test_file, runtime):
+        self.index = Suite._current_index
+        Suite._current_index += 1
+
+    def add_test(self, test_file: str, runtime: float):
         """Add the given test to this suite."""
 
         self.tests.append(test_file)
@@ -570,6 +634,23 @@ class Suite(object):
 
         return len(self.tests)
 
+    @property
+    def name(self) -> str:
+        """Get the name of this suite."""
+        return taskname.name_generated_task(self.source_name, self.index, Suite._current_index)
+
+    def generate_resmoke_config(self, source_config: Dict) -> str:
+        """
+        Generate the contents of resmoke config for this suite.
+
+        :param source_config: Resmoke config to base generate config on.
+        :return: Resmoke config to run this suite.
+        """
+        suite_config = update_suite_config(deepcopy(source_config), roots=self.tests)
+        contents = HEADER_TEMPLATE.format(file=__file__, suite_file=self.source_name)
+        contents += yaml.safe_dump(suite_config, default_flow_style=False)
+        return contents
+
 
 class GenerateSubSuites(object):
     """Orchestrate the execution of generate_resmoke_suites."""
@@ -586,6 +667,7 @@ class GenerateSubSuites(object):
             evg_stats = self.get_evg_stats(self.config_options.project, start_date, end_date,
                                            self.config_options.task, self.config_options.variant)
             if not evg_stats:
+                LOGGER.debug("No test history, using fallback suites")
                 # This is probably a new suite, since there is no test history, just use the
                 # fallback values.
                 return self.calculate_fallback_suites()
@@ -616,10 +698,11 @@ class GenerateSubSuites(object):
         test_stats = teststats.TestStats(data)
         tests_runtimes = self.filter_existing_tests(test_stats.get_tests_runtimes())
         if not tests_runtimes:
+            LOGGER.debug("No test runtimes after filter, using fallback")
             return self.calculate_fallback_suites()
         self.test_list = [info.test_name for info in tests_runtimes]
-        return divide_tests_into_suites(tests_runtimes, execution_time_secs,
-                                        self.config_options.max_sub_suites,
+        return divide_tests_into_suites(self.config_options.suite, tests_runtimes,
+                                        execution_time_secs, self.config_options.max_sub_suites,
                                         self.config_options.max_tests_per_suite)
 
     def filter_existing_tests(self, tests_runtimes):
@@ -632,9 +715,11 @@ class GenerateSubSuites(object):
 
     def calculate_fallback_suites(self):
         """Divide tests into a fixed number of suites."""
+        LOGGER.debug("Splitting tasks based on fallback",
+                     fallback=self.config_options.fallback_num_sub_suites)
         num_suites = self.config_options.fallback_num_sub_suites
         self.test_list = self.list_tests()
-        suites = [Suite() for _ in range(num_suites)]
+        suites = [Suite(self.config_options.suite) for _ in range(num_suites)]
         for idx, test_file in enumerate(self.test_list):
             suites[idx % num_suites].add_test(test_file, 0)
         return suites
@@ -643,13 +728,11 @@ class GenerateSubSuites(object):
         """List the test files that are part of the suite being split."""
         return suitesconfig.get_suite(self.config_options.suite).tests
 
-    def write_evergreen_configuration(self, suites, task):
+    def render_evergreen_config(self, suites: List[Suite], task: str) -> Tuple[str, str]:
         """Generate the evergreen configuration for the new suite and write it to disk."""
         evg_config_gen = EvergreenConfigGenerator(suites, self.config_options, self.evergreen_api)
         evg_config = evg_config_gen.generate_config()
-
-        with open(os.path.join(CONFIG_DIR, task + ".json"), "w") as file_handle:
-            file_handle.write(evg_config.to_json())
+        return task + ".json", evg_config.to_json()
 
     def run(self):
         """Generate resmoke suites that run within a specified target execution time."""
@@ -661,17 +744,19 @@ class GenerateSubSuites(object):
 
         end_date = datetime.datetime.utcnow().replace(microsecond=0)
         start_date = end_date - datetime.timedelta(days=LOOKBACK_DURATION_DAYS)
-
-        prepare_directory_for_suite(CONFIG_DIR)
+        target_dir = self.config_options.generated_config_dir
 
         suites = self.calculate_suites(start_date, end_date)
 
-        LOGGER.debug("Creating suites", num_suites=len(suites), task=self.config_options.task)
+        LOGGER.debug("Creating suites", num_suites=len(suites), task=self.config_options.task,
+                     dir=target_dir)
+        config_file_dict = render_suite_files(suites, self.config_options.suite, self.test_list,
+                                              self.config_options.test_suites_dir)
 
-        render_suite(suites, self.config_options.suite)
-        render_misc_suite(self.test_list, self.config_options.suite)
+        shrub_config = self.render_evergreen_config(suites, self.config_options.task)
+        config_file_dict[shrub_config[0]] = shrub_config[1]
 
-        self.write_evergreen_configuration(suites, self.config_options.task)
+        write_file_dict(target_dir, config_file_dict)
 
 
 @click.command()
