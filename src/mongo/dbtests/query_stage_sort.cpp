@@ -116,14 +116,12 @@ public:
         auto queuedDataStage = std::make_unique<QueuedDataStage>(&_opCtx, ws.get());
         insertVarietyOfObjects(ws.get(), queuedDataStage.get(), coll);
 
-        SortStageParams params;
-        params.pattern = BSON("foo" << 1);
-        params.limit = limit();
-
+        auto sortPattern = BSON("foo" << 1);
         auto keyGenStage = std::make_unique<SortKeyGeneratorStage>(
-            _pExpCtx, std::move(queuedDataStage), ws.get(), params.pattern);
+            _expCtx, std::move(queuedDataStage), ws.get(), sortPattern);
 
-        auto ss = std::make_unique<SortStage>(&_opCtx, params, ws.get(), std::move(keyGenStage));
+        auto ss = std::make_unique<SortStage>(
+            _expCtx, ws.get(), sortPattern, limit(), maxMemoryUsageBytes(), std::move(keyGenStage));
 
         // The PlanExecutor will be automatically registered on construction due to the auto
         // yield policy, so it can receive invalidations when we remove documents later.
@@ -154,15 +152,12 @@ public:
         // Insert a mix of the various types of data.
         insertVarietyOfObjects(ws.get(), queuedDataStage.get(), coll);
 
-        SortStageParams params;
-        params.pattern = BSON("foo" << direction);
-        params.limit = limit();
-
+        auto sortPattern = BSON("foo" << direction);
         auto keyGenStage = std::make_unique<SortKeyGeneratorStage>(
-            _pExpCtx, std::move(queuedDataStage), ws.get(), params.pattern);
+            _expCtx, std::move(queuedDataStage), ws.get(), sortPattern);
 
-        auto sortStage =
-            std::make_unique<SortStage>(&_opCtx, params, ws.get(), std::move(keyGenStage));
+        auto sortStage = std::make_unique<SortStage>(
+            _expCtx, ws.get(), sortPattern, limit(), maxMemoryUsageBytes(), std::move(keyGenStage));
 
         auto fetchStage =
             std::make_unique<FetchStage>(&_opCtx, ws.get(), std::move(sortStage), nullptr, coll);
@@ -185,7 +180,7 @@ public:
         BSONObj current;
         PlanExecutor::ExecState state;
         while (PlanExecutor::ADVANCED == (state = exec->getNext(&current, nullptr))) {
-            int cmp = sgn(dps::compareObjectsAccordingToSort(current, last, params.pattern));
+            int cmp = sgn(dps::compareObjectsAccordingToSort(current, last, sortPattern));
             // The next object should be equal to the previous or oriented according to the sort
             // pattern.
             ASSERT(cmp == 0 || cmp == 1);
@@ -217,6 +212,9 @@ public:
         return 0;
     };
 
+    uint64_t maxMemoryUsageBytes() const {
+        return internalQueryExecMaxBlockingSortBytes.load();
+    }
 
     static const char* ns() {
         return "unittests.QueryStageSort";
@@ -228,7 +226,7 @@ public:
 protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_txnPtr;
-    boost::intrusive_ptr<ExpressionContext> _pExpCtx = new ExpressionContext(&_opCtx, nullptr);
+    boost::intrusive_ptr<ExpressionContext> _expCtx = new ExpressionContext(&_opCtx, nullptr);
     DBDirectClient _client;
 };
 
@@ -557,14 +555,13 @@ public:
             }
         }
 
-        SortStageParams params;
-        params.pattern = BSON("b" << -1 << "c" << 1 << "a" << 1);
+        auto sortPattern = BSON("b" << -1 << "c" << 1 << "a" << 1);
 
         auto keyGenStage = std::make_unique<SortKeyGeneratorStage>(
-            _pExpCtx, std::move(queuedDataStage), ws.get(), params.pattern);
+            _expCtx, std::move(queuedDataStage), ws.get(), sortPattern);
 
-        auto sortStage =
-            std::make_unique<SortStage>(&_opCtx, params, ws.get(), std::move(keyGenStage));
+        auto sortStage = std::make_unique<SortStage>(
+            _expCtx, ws.get(), sortPattern, 0u, maxMemoryUsageBytes(), std::move(keyGenStage));
 
         auto fetchStage =
             std::make_unique<FetchStage>(&_opCtx, ws.get(), std::move(sortStage), nullptr, coll);

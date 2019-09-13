@@ -66,15 +66,21 @@ bool SortStage::WorkingSetComparator::operator()(const SortableDataItem& lhs,
     return lhs.recordId < rhs.recordId;
 }
 
-SortStage::SortStage(OperationContext* opCtx,
-                     const SortStageParams& params,
+SortStage::SortStage(boost::intrusive_ptr<ExpressionContext> expCtx,
                      WorkingSet* ws,
+                     BSONObj sortPattern,
+                     uint64_t limit,
+                     uint64_t maxMemoryUsageBytes,
                      std::unique_ptr<PlanStage> child)
-    : PlanStage(kStageType, opCtx),
+    : PlanStage(kStageType, expCtx->opCtx),
       _ws(ws),
-      _pattern(params.pattern),
-      _limit(params.limit),
-      _allowDiskUse(params.allowDiskUse),
+      _sortExecutor(SortPattern{sortPattern, expCtx},
+                    limit,
+                    maxMemoryUsageBytes,
+                    expCtx->tempDir,
+                    expCtx->allowDiskUse),
+      _pattern(std::move(sortPattern)),
+      _limit(limit),
       _sorted(false),
       _resultIterator(_data.end()),
       _memUsage(0) {
@@ -90,8 +96,6 @@ SortStage::SortStage(OperationContext* opCtx,
         _dataSet.reset(new SortableDataItemSet(cmp));
     }
 }
-
-SortStage::~SortStage() {}
 
 bool SortStage::isEOF() {
     // We're done when our child has no more results, we've sorted the child's results, and

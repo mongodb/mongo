@@ -51,6 +51,8 @@ namespace {
 
 class SortStageTest : public ServiceContextMongoDTest {
 public:
+    static constexpr uint64_t kMaxMemoryUsageBytes = 1024u * 1024u;
+
     SortStageTest() {
         getServiceContext()->setFastClockSource(std::make_unique<ClockSourceMock>());
         _opCtx = makeOperationContext();
@@ -62,11 +64,13 @@ public:
     }
 
     /**
-     * Test function to verify sort stage.
-     * SortStageParams will be initialized using patternStr, collator, and limit.
-     * inputStr represents the input data set in a BSONObj.
+     * Test function to verify sort stage. SortStage will be initialized using 'patternStr',
+     * 'collator', and 'limit;.
+     *
+     * 'inputStr' represents the input data set in a BSONObj.
      *     {input: [doc1, doc2, doc3, ...]}
-     * expectedStr represents the expected sorted data set.
+     *
+     * 'expectedStr; represents the expected sorted data set.
      *     {output: [docA, docB, docC, ...]}
      */
     void testWork(const char* patternStr,
@@ -97,20 +101,16 @@ public:
             queuedDataStage->pushBack(id);
         }
 
-        // Initialize SortStageParams
-        // Setting limit to 0 means no limit
-        SortStageParams params;
-        params.pattern = fromjson(patternStr);
-        params.limit = limit;
+        auto sortPattern = fromjson(patternStr);
 
         // Create an ExpressionContext for the SortKeyGeneratorStage.
-        boost::intrusive_ptr<ExpressionContext> pExpCtx(
-            new ExpressionContext(getOpCtx(), collator));
+        auto expCtx = make_intrusive<ExpressionContext>(getOpCtx(), collator);
 
         auto sortKeyGen = std::make_unique<SortKeyGeneratorStage>(
-            pExpCtx, std::move(queuedDataStage), &ws, params.pattern);
+            expCtx, std::move(queuedDataStage), &ws, sortPattern);
 
-        SortStage sort(getOpCtx(), params, &ws, std::move(sortKeyGen));
+        SortStage sort(
+            expCtx, &ws, sortPattern, limit, kMaxMemoryUsageBytes, std::move(sortKeyGen));
 
         WorkingSetID id = WorkingSet::INVALID_ID;
         PlanStage::StageState state = PlanStage::NEED_TIME;
@@ -163,14 +163,14 @@ TEST_F(SortStageTest, SortEmptyWorkingSet) {
     WorkingSet ws;
 
     // Create an ExpressionContext for the SortKeyGeneratorStage.
-    boost::intrusive_ptr<ExpressionContext> pExpCtx(new ExpressionContext(getOpCtx(), nullptr));
+    auto expCtx = make_intrusive<ExpressionContext>(getOpCtx(), nullptr);
 
     // QueuedDataStage will be owned by SortStage.
     auto queuedDataStage = std::make_unique<QueuedDataStage>(getOpCtx(), &ws);
-    auto sortKeyGen = std::make_unique<SortKeyGeneratorStage>(
-        pExpCtx, std::move(queuedDataStage), &ws, BSONObj());
-    SortStageParams params;
-    SortStage sort(getOpCtx(), params, &ws, std::move(sortKeyGen));
+    auto sortKeyGen =
+        std::make_unique<SortKeyGeneratorStage>(expCtx, std::move(queuedDataStage), &ws, BSONObj());
+    auto sortPattern = BSON("a" << 1);
+    SortStage sort(expCtx, &ws, sortPattern, 0u, kMaxMemoryUsageBytes, std::move(sortKeyGen));
 
     // Check initial EOF state.
     ASSERT_FALSE(sort.isEOF());

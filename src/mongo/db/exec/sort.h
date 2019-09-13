@@ -33,31 +33,12 @@
 #include <vector>
 
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/sort_executor.h"
 #include "mongo/db/exec/sort_key_generator.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/query/index_bounds.h"
 #include "mongo/db/record_id.h"
-#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
-
-class BtreeKeyGenerator;
-
-// Parameters that must be provided to a SortStage
-class SortStageParams {
-public:
-    SortStageParams() = default;
-
-    // How we're sorting.
-    BSONObj pattern;
-
-    // Equal to 0 for no limit.
-    size_t limit = 0;
-
-    // Whether we allow disk use, disabled by default.
-    bool allowDiskUse = false;
-};
 
 /**
  * Sorts the input received from the child according to the sort pattern provided.
@@ -69,11 +50,12 @@ public:
  */
 class SortStage final : public PlanStage {
 public:
-    SortStage(OperationContext* opCtx,
-              const SortStageParams& params,
+    SortStage(boost::intrusive_ptr<ExpressionContext> expCtx,
               WorkingSet* ws,
+              BSONObj sortPattern,
+              uint64_t limit,
+              uint64_t maxMemoryUsageBytes,
               std::unique_ptr<PlanStage> child);
-    ~SortStage();
 
     bool isEOF() final;
     StageState doWork(WorkingSetID* out) final;
@@ -89,20 +71,17 @@ public:
     static const char* kStageType;
 
 private:
-    //
-    // Query Stage
-    //
-
     // Not owned by us.
     WorkingSet* _ws;
+
+    // TODO SERVER-42182: Use SortExecutor to implement 'doWork()'.
+    SortExecutor _sortExecutor;
 
     // The raw sort _pattern as expressed by the user
     BSONObj _pattern;
 
     // Equal to 0 for no limit.
     size_t _limit;
-
-    bool _allowDiskUse;
 
     //
     // Data storage

@@ -122,11 +122,12 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
         case STAGE_SORT: {
             const SortNode* sn = static_cast<const SortNode*>(root);
             auto childStage = buildStages(opCtx, collection, cq, qsol, sn->children[0], ws);
-            SortStageParams params;
-            params.pattern = sn->pattern;
-            params.limit = sn->limit;
-            params.allowDiskUse = sn->allowDiskUse;
-            return std::make_unique<SortStage>(opCtx, params, ws, std::move(childStage));
+            return std::make_unique<SortStage>(cq.getExpCtx(),
+                                               ws,
+                                               sn->pattern,
+                                               sn->limit,
+                                               internalQueryExecMaxBlockingSortBytes.load(),
+                                               std::move(childStage));
         }
         case STAGE_SORT_KEY_GENERATOR: {
             const SortKeyGeneratorNode* keyGenNode = static_cast<const SortKeyGeneratorNode*>(root);

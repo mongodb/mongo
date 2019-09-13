@@ -42,6 +42,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find.h"
@@ -73,6 +74,48 @@ std::unique_ptr<QueryRequest> parseCmdObjectToQueryRequest(OperationContext* opC
         qr->setRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
     }
     return qr;
+}
+
+boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* opCtx,
+                                                              const QueryRequest& queryRequest) {
+    std::unique_ptr<CollatorInterface> collator;
+    if (!queryRequest.getCollation().isEmpty()) {
+        collator = uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                       ->makeFromBSON(queryRequest.getCollation()));
+    }
+
+    // Although both 'find' and 'aggregate' commands have an ExpressionContext, some of the data
+    // members in the ExpressionContext are used exclusively by the aggregation subsystem. This
+    // includes the following fields which here we simply initialize to some meaningless default
+    // value:
+    //  - explain
+    //  - fromMongos
+    //  - needsMerge
+    //  - bypassDocumentValidation
+    //  - mongoProcessInterface
+    //  - resolvedNamespaces
+    //  - uuid
+    //
+    // As we change the code to make the find and agg systems more tightly coupled, it would make
+    // sense to start initializing these fields for find operations as well.
+    auto expCtx =
+        make_intrusive<ExpressionContext>(opCtx,
+                                          boost::none,  // explain
+                                          StringData{queryRequest.getComment()},
+                                          false,  // fromMongos
+                                          false,  // needsMerge
+                                          queryRequest.allowDiskUse(),
+                                          false,  // bypassDocumentValidation
+                                          queryRequest.nss(),
+                                          queryRequest.getCollation(),
+                                          queryRequest.getRuntimeConstants(),
+                                          std::move(collator),
+                                          nullptr,  // mongoProcessInterface
+                                          StringMap<ExpressionContext::ResolvedNamespace>{},
+                                          boost::none  // uuid
+        );
+    expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
+    return expCtx;
 }
 
 /**
@@ -185,11 +228,11 @@ public:
 
             // Finish the parsing step by using the QueryRequest to create a CanonicalQuery.
             const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-            const boost::intrusive_ptr<ExpressionContext> expCtx;
+            auto expCtx = makeExpressionContext(opCtx, *qr);
             auto cq = uassertStatusOK(
                 CanonicalQuery::canonicalize(opCtx,
                                              std::move(qr),
-                                             expCtx,
+                                             std::move(expCtx),
                                              extensionsCallback,
                                              MatchExpressionParser::kAllowAllSpecialFeatures));
 
@@ -383,11 +426,11 @@ public:
 
             // Finish the parsing step by using the QueryRequest to create a CanonicalQuery.
             const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-            const boost::intrusive_ptr<ExpressionContext> expCtx;
+            auto expCtx = makeExpressionContext(opCtx, *qr);
             auto cq = uassertStatusOK(
                 CanonicalQuery::canonicalize(opCtx,
                                              std::move(qr),
-                                             expCtx,
+                                             std::move(expCtx),
                                              extensionsCallback,
                                              MatchExpressionParser::kAllowAllSpecialFeatures));
 

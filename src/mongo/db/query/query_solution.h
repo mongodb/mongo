@@ -732,10 +732,7 @@ struct SortKeyGeneratorNode : public QuerySolutionNode {
 };
 
 struct SortNode : public QuerySolutionNode {
-    SortNode()
-        : _sorts(SimpleBSONObjComparator::kInstance.makeBSONObjSet()),
-          limit(0),
-          allowDiskUse(false) {}
+    SortNode() : _sorts(SimpleBSONObjComparator::kInstance.makeBSONObjSet()), limit(0) {}
 
     virtual ~SortNode() {}
 
@@ -775,8 +772,6 @@ struct SortNode : public QuerySolutionNode {
 
     // Sum of both limit and skip count in the parsed query.
     size_t limit;
-
-    bool allowDiskUse;
 };
 
 struct LimitNode : public QuerySolutionNode {
