@@ -60,6 +60,7 @@ public:
                            CollectionUUID collUUID,
                            const UUID& indexBuildUUID,
                            const std::vector<BSONObj>& indexes,
+                           const Status& cause,
                            bool fromMigrate) override {}
 
     void onInserts(OperationContext* opCtx,

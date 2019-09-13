@@ -207,11 +207,13 @@ TEST_F(OpObserverTest, AbortIndexBuildExpectedOplogEntry) {
     std::vector<BSONObj> specs = {specX, specA};
 
     // Write to the oplog.
+    Status cause(ErrorCodes::OperationFailed, "index build failed");
     {
         AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
+        auto fromMigrate = false;
         opObserver.onAbortIndexBuild(
-            opCtx.get(), nss, uuid, indexBuildUUID, specs, false /*fromMigrate*/);
+            opCtx.get(), nss, uuid, indexBuildUUID, specs, cause, fromMigrate);
         wunit.commit();
     }
 

@@ -311,6 +311,7 @@ void OpObserverImpl::onAbortIndexBuild(OperationContext* opCtx,
                                        CollectionUUID collUUID,
                                        const UUID& indexBuildUUID,
                                        const std::vector<BSONObj>& indexes,
+                                       const Status& cause,
                                        bool fromMigrate) {
     BSONObjBuilder oplogEntryBuilder;
     oplogEntryBuilder.append("abortIndexBuild", nss.coll());

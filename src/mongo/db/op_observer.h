@@ -113,6 +113,7 @@ public:
                                    CollectionUUID collUUID,
                                    const UUID& indexBuildUUID,
                                    const std::vector<BSONObj>& indexes,
+                                   const Status& cause,
                                    bool fromMigrate) = 0;
 
     virtual void onInserts(OperationContext* opCtx,

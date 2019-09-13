@@ -876,6 +876,7 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
                         collUUID,
                         replState->buildUUID,
                         replState->indexSpecs,
+                        status,
                         fromMigrate);
                 });
         }

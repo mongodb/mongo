@@ -97,10 +97,11 @@ public:
                                    CollectionUUID collUUID,
                                    const UUID& indexBuildUUID,
                                    const std::vector<BSONObj>& indexes,
+                                   const Status& cause,
                                    bool fromMigrate) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers) {
-            o->onAbortIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexes, fromMigrate);
+            o->onAbortIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexes, cause, fromMigrate);
         }
     }
 
