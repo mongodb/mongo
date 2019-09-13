@@ -285,10 +285,14 @@ DispatchShardPipelineResults dispatchShardPipeline(
         : createPassthroughCommandForShard(
               opCtx, aggRequest, expCtx->getRuntimeConstants(), pipeline.get(), collationObj);
 
-    // Refresh the shard registry if we're targeting all shards.  We need the shard registry
-    // to be at least as current as the logical time used when creating the command for
-    // $changeStream to work reliably, so we do a "hard" reload.
-    if (mustRunOnAll) {
+    // In order for a $changeStream to work reliably, we need the shard registry to be at least as
+    // current as the logical time at which the pipeline was serialized to 'targetedCommand' above.
+    // We therefore hard-reload and retarget the shards here. We don't refresh for other pipelines
+    // that must run on all shards (e.g. $currentOp) because, unlike $changeStream, those pipelines
+    // may not have been forced to split if there was only one shard in the cluster when the command
+    // began execution. If a shard was added since the earlier targeting logic ran, then refreshing
+    // here may cause us to illegally target an unsplit pipeline to more than one shard.
+    if (litePipe.hasChangeStream()) {
         auto* shardRegistry = Grid::get(opCtx)->shardRegistry();
         if (!shardRegistry->reload(opCtx)) {
             shardRegistry->reload(opCtx);
@@ -297,6 +301,13 @@ DispatchShardPipelineResults dispatchShardPipeline(
         shardIds = getTargetedShards(
             opCtx, mustRunOnAll, executionNsRoutingInfo, shardQuery, aggRequest.getCollation());
     }
+
+    // If there were no shards when we began execution, we wouldn't have run this aggregation in the
+    // first place. Here, we double-check that the shards have not been removed mid-operation.
+    uassert(ErrorCodes::ShardNotFound,
+            "Unexpectedly found 0 shards while preparing to dispatch aggregation requests. Were "
+            "the shards removed mid-operation?",
+            shardIds.size() > 0);
 
     // Explain does not produce a cursor, so instead we scatter-gather commands to the shards.
     if (expCtx->explain) {
@@ -329,10 +340,10 @@ DispatchShardPipelineResults dispatchShardPipeline(
                                         executionNss,
                                         litePipe,
                                         executionNsRoutingInfo,
+                                        shardIds,
                                         targetedCommand,
                                         aggRequest,
-                                        ReadPreferenceSetting::get(opCtx),
-                                        shardQuery);
+                                        ReadPreferenceSetting::get(opCtx));
         invariant(cursors.size() % shardIds.size() == 0,
                   str::stream() << "Number of cursors (" << cursors.size()
                                 << ") is not a multiple of producers (" << shardIds.size() << ")");
@@ -384,15 +395,13 @@ std::vector<RemoteCursor> establishShardCursors(
     const NamespaceString& nss,
     const LiteParsedPipeline& litePipe,
     boost::optional<CachedCollectionRoutingInfo>& routingInfo,
+    const std::set<ShardId>& shardIds,
     const BSONObj& cmdObj,
     const AggregationRequest& request,
-    const ReadPreferenceSetting& readPref,
-    const BSONObj& shardQuery) {
+    const ReadPreferenceSetting& readPref) {
     LOG(1) << "Dispatching command " << redact(cmdObj) << " to establish cursors on shards";
 
     const bool mustRunOnAll = mustRunOnAllShards(nss, litePipe);
-    std::set<ShardId> shardIds =
-        getTargetedShards(opCtx, mustRunOnAll, routingInfo, shardQuery, request.getCollation());
     std::vector<std::pair<ShardId, BSONObj>> requests;
 
     // If we don't need to run on all shards, then we should always have a valid routing table.

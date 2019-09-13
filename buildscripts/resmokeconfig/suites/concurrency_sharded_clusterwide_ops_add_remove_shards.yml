@@ -1,0 +1,41 @@
+test_kind: fsm_workload_test
+
+selector:
+  roots:
+  - jstests/concurrency/fsm_workloads_add_remove_shards/**/*.js
+
+  exclude_with_any_tags:
+  - requires_replication
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHashInBackground
+      - CheckReplDBHash
+      - ValidateCollections
+    tests: true
+  config:
+    shell_options:
+      readMode: commands
+      global_vars:
+        TestData:
+          usingReplicaSetShards: true
+  hooks:
+  - class: CheckReplDBHashInBackground
+  - class: CheckReplDBHash
+  - class: ValidateCollections
+  - class: CleanupConcurrencyWorkloads
+  fixture:
+    class: ShardedClusterFixture
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    shard_options:
+      mongod_options:
+        oplogSize: 1024
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_rs_nodes_per_shard: 3
+    num_shards: 2
+    num_mongos: 2

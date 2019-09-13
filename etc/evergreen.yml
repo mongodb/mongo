@@ -6609,6 +6609,16 @@ tasks:
       resmoke_args: --suites=concurrency_sharded_replication_with_balancer --excludeWithAnyTags=uses_transactions --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
+- <<: *task_template
+  name: concurrency_sharded_clusterwide_ops_add_remove_shards
+  tags: ["concurrency", "common", "read_concern_maj"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=concurrency_sharded_clusterwide_ops_add_remove_shards --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
+
 - name: concurrency_sharded_causal_consistency_gen
   tags: ["concurrency"]
   commands:
@@ -10220,6 +10230,7 @@ buildvariants:
   - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
+  - name: concurrency_sharded_clusterwide_ops_add_remove_shards
   - name: concurrency_sharded_local_read_write_multi_stmt_txn
   - name: concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer
   - name: concurrency_sharded_multi_stmt_txn
@@ -11842,6 +11853,7 @@ buildvariants:
     - rhel62-large
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
+  - name: concurrency_sharded_clusterwide_ops_add_remove_shards
   - name: concurrency_simultaneous
   - name: concurrency_simultaneous_replication
     distros:
