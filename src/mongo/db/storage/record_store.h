@@ -403,15 +403,6 @@ public:
     }
 
     /**
-     * Does compact() leave RecordIds alone or can they change.
-     *
-     * Only called if compactSupported() returns true.
-     */
-    virtual bool compactsInPlace() const {
-        MONGO_UNREACHABLE;
-    }
-
-    /**
      * If compact() supports online compaction.
      *
      * Only called if compactSupported() returns true.

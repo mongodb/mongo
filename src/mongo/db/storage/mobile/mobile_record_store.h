@@ -85,14 +85,6 @@ public:
         // Capped Collections are not supported, do nothing
     }
 
-    bool compactSupported() const override {
-        return false;
-    }
-
-    bool compactsInPlace() const override {
-        return false;
-    }
-
     /**
      * Validates the entire database file, not just the table used by this record store.
      */
