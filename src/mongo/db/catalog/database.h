@@ -108,7 +108,6 @@ public:
 
     /**
      * Returns the 'drop-pending' state of this Database.
-     * The database must be locked in MODE_X when calling this function.
      */
     virtual bool isDropPending(OperationContext* opCtx) const = 0;
 
