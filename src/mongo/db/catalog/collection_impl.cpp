@@ -33,6 +33,8 @@
 
 #include "mongo/db/catalog/private/record_store_validate_adaptor.h"
 
+#include <fmt/format.h>
+
 #include "mongo/db/catalog/collection_impl.h"
 
 #include "mongo/base/counter.h"
@@ -1274,6 +1276,35 @@ void addErrorIfUnequal(T stored, T cached, StringData name, ValidateResults* res
     }
 }
 
+std::string multikeyPathsToString(MultikeyPaths paths) {
+    str::stream builder;
+    builder << "[";
+    auto pathIt = paths.begin();
+    while (true) {
+        builder << "{";
+
+        auto pathSet = *pathIt;
+        auto setIt = pathSet.begin();
+        while (true) {
+            builder << *setIt++;
+            if (setIt == pathSet.end()) {
+                break;
+            } else {
+                builder << ",";
+            }
+        }
+        builder << "}";
+
+        if (++pathIt == paths.end()) {
+            break;
+        } else {
+            builder << ",";
+        }
+    }
+    builder << "]";
+    return builder;
+}
+
 void _validateCatalogEntry(OperationContext* opCtx,
                            CollectionImpl* coll,
                            BSONObj validatorDoc,
@@ -1307,6 +1338,27 @@ void _validateCatalogEntry(OperationContext* opCtx,
         results->valid = false;
         results->errors.push_back(str::stream() << "collection options are not valid for storage: "
                                                 << options.toBSON());
+    }
+
+    std::vector<std::string> indexes;
+    DurableCatalog::get(opCtx)->getReadyIndexes(opCtx, coll->ns(), &indexes);
+    for (auto& index : indexes) {
+        MultikeyPaths multikeyPaths;
+        const bool isMultikey =
+            DurableCatalog::get(opCtx)->isIndexMultikey(opCtx, coll->ns(), index, &multikeyPaths);
+        const bool hasMultiKeyPaths = std::any_of(multikeyPaths.begin(),
+                                                  multikeyPaths.end(),
+                                                  [](auto& pathSet) { return pathSet.size() > 0; });
+        // It is illegal for multikey paths to exist without the multikey flag set on the index, but
+        // it may be possible for multikey to be set on the index while having no multikey paths. If
+        // any of the paths are multikey, then the entire index should also be marked multikey.
+        if (hasMultiKeyPaths && !isMultikey) {
+            results->valid = false;
+            results->errors.push_back(fmt::format(
+                "The 'multikey' field for index {} was false with non-empty 'multikeyPaths': {}",
+                index,
+                multikeyPathsToString(multikeyPaths)));
+        }
     }
 }
 
