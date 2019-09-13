@@ -289,6 +289,22 @@ env.Library(
 )
 
 env.Library(
+    target="validate_state",
+    source=[
+        "validate_state.cpp"
+    ],
+    LIBDEPS_PRIVATE=[
+        "collection_catalog",
+        "database_holder",
+        "throttle_cursor",
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/catalog_raii",
+        "$BUILD_DIR/mongo/db/views/views",
+        "$BUILD_DIR/mongo/util/fail_point",
+    ]
+)
+
+env.Library(
     target='catalog_impl',
     source=[
         "collection_impl.cpp",
@@ -329,6 +345,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         'index_build_block',
         'throttle_cursor',
+        'validate_state',
         '$BUILD_DIR/mongo/db/catalog/collection_catalog_helper',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/index/index_build_interceptor',
@@ -350,6 +367,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'throttle_cursor',
+        'validate_state',
     ]
 )
 

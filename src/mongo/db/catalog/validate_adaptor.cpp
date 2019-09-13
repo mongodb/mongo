@@ -49,6 +49,10 @@
 namespace mongo {
 
 namespace {
+
+const long long kInterruptIntervalNumRecords = 4096;
+const long long kInterruptIntervalNumBytes = 50 * 1024 * 1024;  // 50MB.
+
 KeyString::Builder makeWildCardMultikeyMetadataKeyString(const BSONObj& indexKey) {
     const auto multikeyMetadataOrd = Ordering::make(BSON("" << 1 << "" << 1));
     const RecordId multikeyMetadataRecordId(RecordId::ReservedId::kWildcardMultikeyMetadataId);
@@ -59,13 +63,10 @@ KeyString::Builder makeWildCardMultikeyMetadataKeyString(const BSONObj& indexKey
 }
 }  // namespace
 
-Status ValidateAdaptor::validateRecord(
-    OperationContext* opCtx,
-    Collection* coll,
-    const RecordId& recordId,
-    const RecordData& record,
-    const std::unique_ptr<SeekableRecordThrottleCursor>& seekRecordStoreCursor,
-    size_t* dataSize) {
+Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
+                                       const RecordId& recordId,
+                                       const RecordData& record,
+                                       size_t* dataSize) {
     BSONObj recordBson;
     try {
         recordBson = record.toBson();
@@ -81,7 +82,7 @@ Status ValidateAdaptor::validateRecord(
         return status;
     }
 
-    IndexCatalog* indexCatalog = coll->getIndexCatalog();
+    const IndexCatalog* indexCatalog = _validateState->getCollection()->getIndexCatalog();
     if (!indexCatalog->haveAnyIndexes()) {
         return status;
     }
@@ -144,8 +145,7 @@ Status ValidateAdaptor::validateRecord(
                                                  indexInfo.ord,
                                                  keyString.getTypeBits());
                 indexInfo.ks->resetToKey(key, indexInfo.ord, recordId);
-                _indexConsistency->addDocKey(
-                    opCtx, *indexInfo.ks, &indexInfo, recordId, seekRecordStoreCursor, key);
+                _indexConsistency->addDocKey(opCtx, *indexInfo.ks, &indexInfo, recordId, key);
             } catch (...) {
                 return exceptionToStatus();
             }
@@ -154,12 +154,10 @@ Status ValidateAdaptor::validateRecord(
     return status;
 }
 
-void ValidateAdaptor::traverseIndex(
-    OperationContext* opCtx,
-    int64_t* numTraversedKeys,
-    const std::unique_ptr<SortedDataInterfaceThrottleCursor>& indexCursor,
-    const IndexDescriptor* descriptor,
-    ValidateResults* results) {
+void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
+                                    const IndexDescriptor* descriptor,
+                                    int64_t* numTraversedKeys,
+                                    ValidateResults* results) {
     auto indexName = descriptor->indexName();
     IndexInfo* indexInfo = &_indexConsistency->getIndexInfo(indexName);
     int64_t numKeys = 0;
@@ -175,15 +173,23 @@ void ValidateAdaptor::traverseIndex(
     std::unique_ptr<KeyString::Builder> prevIndexKeyStringBuilder =
         std::make_unique<KeyString::Builder>(version);
 
-    int interruptInterval = 4096;
-
     KeyString::Builder firstKeyString(
         version, BSONObj(), ord, KeyString::Discriminator::kExclusiveBefore);
 
+    // Ensure that this index has an open index cursor.
+    const auto indexCursorIt = _validateState->getIndexCursors().find(indexName);
+    invariant(indexCursorIt != _validateState->getIndexCursors().end());
+
+    const std::unique_ptr<SortedDataInterfaceThrottleCursor>& indexCursor = indexCursorIt->second;
     for (auto indexEntry = indexCursor->seek(opCtx, firstKeyString.getValueCopy()); indexEntry;
          indexEntry = indexCursor->next(opCtx)) {
-        if (!(numKeys % interruptInterval)) {
+        if (numKeys % kInterruptIntervalNumRecords == 0) {
             opCtx->checkForInterrupt();
+
+            // Periodically yield locks.
+            if (_validateState->isBackground()) {
+                _validateState->yieldLocks(opCtx);
+            }
         }
         indexKeyStringBuilder->resetToKey(indexEntry->key, ord, indexEntry->loc);
 
@@ -229,35 +235,43 @@ void ValidateAdaptor::traverseIndex(
     }
 }
 
-void ValidateAdaptor::traverseRecordStore(
-    OperationContext* opCtx,
-    Collection* coll,
-    const RecordId& firstRecordId,
-    const std::unique_ptr<SeekableRecordThrottleCursor>& traverseRecordStoreCursor,
-    const std::unique_ptr<SeekableRecordThrottleCursor>& seekRecordStoreCursor,
-    bool background,
-    ValidateResults* results,
-    BSONObjBuilder* output) {
+void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
+                                          ValidateResults* results,
+                                          BSONObjBuilder* output) {
     long long nrecords = 0;
     long long dataSizeTotal = 0;
+    long long interruptIntervalNumBytes = 0;
     long long nInvalid = 0;
 
     results->valid = true;
-    int interruptInterval = 4096;
     RecordId prevRecordId;
-    for (auto record = traverseRecordStoreCursor->seekExact(opCtx, firstRecordId); record;
+
+    const std::unique_ptr<SeekableRecordThrottleCursor>& traverseRecordStoreCursor =
+        _validateState->getTraverseRecordStoreCursor();
+    for (auto record =
+             traverseRecordStoreCursor->seekExact(opCtx, _validateState->getFirstRecordId());
+         record;
          record = traverseRecordStoreCursor->next(opCtx)) {
         ++nrecords;
-
-        if (!(nrecords % interruptInterval)) {
+        interruptIntervalNumBytes += record->data.size();
+        if (nrecords % kInterruptIntervalNumRecords == 0 ||
+            interruptIntervalNumBytes >= kInterruptIntervalNumBytes) {
             opCtx->checkForInterrupt();
+
+            // Periodically yield locks.
+            if (_validateState->isBackground()) {
+                _validateState->yieldLocks(opCtx);
+            }
+
+            if (interruptIntervalNumBytes >= kInterruptIntervalNumBytes) {
+                interruptIntervalNumBytes = 0;
+            }
         }
 
         auto dataSize = record->data.size();
         dataSizeTotal += dataSize;
         size_t validatedSize;
-        Status status = validateRecord(
-            opCtx, coll, record->id, record->data, seekRecordStoreCursor, &validatedSize);
+        Status status = validateRecord(opCtx, record->id, record->data, &validatedSize);
 
         // Checks to ensure isInRecordIdOrder() is being used properly.
         if (prevRecordId.isValid()) {
@@ -293,8 +307,9 @@ void ValidateAdaptor::traverseRecordStore(
 
     // Do not update the record store stats if we're in the background as we've validated a
     // checkpoint and it may not have the most up-to-date changes.
-    if (results->valid && !background) {
-        coll->getRecordStore()->updateStatsAfterRepair(opCtx, nrecords, dataSizeTotal);
+    if (results->valid && !_validateState->isBackground()) {
+        _validateState->getCollection()->getRecordStore()->updateStatsAfterRepair(
+            opCtx, nrecords, dataSizeTotal);
     }
 
     output->appendNumber("nInvalidDocuments", nInvalid);
@@ -309,7 +324,7 @@ void ValidateAdaptor::validateIndexKeyCount(const IndexDescriptor* idx,
     auto numTotalKeys = indexInfo->numKeys;
 
     bool hasTooFewKeys = false;
-    bool noErrorOnTooFewKeys = (_level != kValidateFull);
+    bool noErrorOnTooFewKeys = !_validateState->isFullValidate();
 
     if (idx->isIdIndex() && numTotalKeys != numRecs) {
         hasTooFewKeys = numTotalKeys < numRecs ? true : hasTooFewKeys;
@@ -352,7 +367,7 @@ void ValidateAdaptor::validateIndexKeyCount(const IndexDescriptor* idx,
         }
     }
 
-    if ((_level != kValidateFull) && hasTooFewKeys) {
+    if (!_validateState->isFullValidate() && hasTooFewKeys) {
         std::string warning = str::stream()
             << "index " << idx->indexName() << " has fewer keys than records."
             << " Please re-run the validate command with {full: true}";

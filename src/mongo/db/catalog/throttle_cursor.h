@@ -51,15 +51,23 @@ class SeekableRecordThrottleCursor {
 public:
     SeekableRecordThrottleCursor(OperationContext* opCtx,
                                  const RecordStore* rs,
-                                 std::shared_ptr<DataThrottle> dataThrottle);
+                                 DataThrottle* dataThrottle);
 
     boost::optional<Record> seekExact(OperationContext* opCtx, const RecordId& id);
 
     boost::optional<Record> next(OperationContext* opCtx);
 
+    void save() {
+        _cursor->save();
+    }
+
+    bool restore() {
+        return _cursor->restore();
+    }
+
 private:
     std::unique_ptr<SeekableRecordCursor> _cursor;
-    std::shared_ptr<DataThrottle> _dataThrottle;
+    DataThrottle* _dataThrottle;
 };
 
 /**
@@ -70,15 +78,23 @@ class SortedDataInterfaceThrottleCursor {
 public:
     SortedDataInterfaceThrottleCursor(OperationContext* opCtx,
                                       const IndexAccessMethod* iam,
-                                      std::shared_ptr<DataThrottle> dataThrottle);
+                                      DataThrottle* dataThrottle);
 
     boost::optional<IndexKeyEntry> seek(OperationContext* opCtx, const KeyString::Value& key);
 
     boost::optional<IndexKeyEntry> next(OperationContext* opCtx);
 
+    void save() {
+        _cursor->save();
+    }
+
+    void restore() {
+        _cursor->restore();
+    }
+
 private:
     std::unique_ptr<SortedDataInterface::Cursor> _cursor;
-    std::shared_ptr<DataThrottle> _dataThrottle;
+    DataThrottle* _dataThrottle;
 };
 
 /**

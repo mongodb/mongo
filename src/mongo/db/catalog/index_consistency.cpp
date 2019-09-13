@@ -57,15 +57,15 @@ IndexInfo::IndexInfo(const IndexDescriptor* descriptor)
       ord(Ordering::make(descriptor->keyPattern())),
       ks(std::make_unique<KeyString::Builder>(KeyString::Version::kLatestVersion)) {}
 
-IndexConsistency::IndexConsistency(OperationContext* opCtx, Collection* coll) : _firstPhase(true) {
+IndexConsistency::IndexConsistency(OperationContext* opCtx,
+                                   CollectionValidation::ValidateState* validateState)
+    : _validateState(validateState), _firstPhase(true) {
     _indexKeyCount.resize(kNumHashBuckets);
 
-    std::unique_ptr<IndexCatalog::IndexIterator> indexIterator =
-        coll->getIndexCatalog()->getIndexIterator(opCtx, false);
-
-    while (indexIterator->more()) {
-        const IndexDescriptor* descriptor = indexIterator->next()->descriptor();
-        if (DurableCatalog::get(opCtx)->isIndexReady(opCtx, coll->ns(), descriptor->indexName()))
+    for (const auto& index : _validateState->getIndexes()) {
+        const IndexDescriptor* descriptor = index->descriptor();
+        if (DurableCatalog::get(opCtx)->isIndexReady(
+                opCtx, _validateState->nss(), descriptor->indexName()))
             _indexesInfo.emplace(descriptor->indexName(), IndexInfo(descriptor));
     }
 }
@@ -188,13 +188,11 @@ void IndexConsistency::addIndexEntryErrors(ValidateResultsMap* indexNsResultsMap
     results->valid = false;
 }
 
-void IndexConsistency::addDocKey(
-    OperationContext* opCtx,
-    const KeyString::Builder& ks,
-    IndexInfo* indexInfo,
-    RecordId recordId,
-    const std::unique_ptr<SeekableRecordThrottleCursor>& seekRecordStoreCursor,
-    const BSONObj& indexKey) {
+void IndexConsistency::addDocKey(OperationContext* opCtx,
+                                 const KeyString::Builder& ks,
+                                 IndexInfo* indexInfo,
+                                 RecordId recordId,
+                                 const BSONObj& indexKey) {
     const uint32_t hash = _hashKeyString(ks, indexInfo->indexNameHash);
 
     if (_firstPhase) {
@@ -206,7 +204,7 @@ void IndexConsistency::addDocKey(
         // Found a document key for a hash bucket that had mismatches.
 
         // Get the documents _id index key.
-        auto record = seekRecordStoreCursor->seekExact(opCtx, recordId);
+        auto record = _validateState->getSeekRecordStoreCursor()->seekExact(opCtx, recordId);
         invariant(record);
 
         BSONObj data = record->data.toBson();

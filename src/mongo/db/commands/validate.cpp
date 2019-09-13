@@ -127,17 +127,11 @@ public:
                                     << storageGlobalParams.engine << " storage engine");
         }
 
-        const bool full = cmdObj["full"].trueValue();
-
-        if (background && full) {
+        const bool fullValidate = cmdObj["full"].trueValue();
+        if (background && fullValidate) {
             uasserted(ErrorCodes::CommandNotSupported,
                       str::stream() << "Running the validate command with both { background: true }"
                                     << " and { full: true } is not supported.");
-        }
-
-        ValidateCmdLevel level = kValidateNormal;
-        if (full) {
-            level = kValidateFull;
         }
 
         if (!serverGlobalParams.quiet.load()) {
@@ -170,12 +164,12 @@ public:
 
         ValidateResults validateResults;
         Status status = CollectionValidation::validate(
-            opCtx, nss, level, background, &validateResults, &result);
+            opCtx, nss, fullValidate, background, &validateResults, &result);
         if (!status.isOK()) {
             return CommandHelpers::appendCommandStatusNoThrow(result, status);
         }
 
-        if (!full) {
+        if (!fullValidate) {
             validateResults.warnings.push_back(
                 "Some checks omitted for speed. use {full:true} option to do more thorough scan.");
         }

@@ -30,7 +30,9 @@
 #pragma once
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/catalog/collection_validation.h"
 #include "mongo/db/catalog/throttle_cursor.h"
+#include "mongo/db/catalog/validate_state.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/record_store.h"
 
@@ -74,7 +76,7 @@ class IndexConsistency final {
     using ValidateResultsMap = std::map<std::string, ValidateResults>;
 
 public:
-    IndexConsistency(OperationContext* opCtx, Collection* coll);
+    IndexConsistency(OperationContext* opCtx, CollectionValidation::ValidateState* validateState);
 
     /**
      * During the first phase of validation, given the document's key KeyString, increment the
@@ -86,7 +88,6 @@ public:
                    const KeyString::Builder& ks,
                    IndexInfo* indexInfo,
                    RecordId recordId,
-                   const std::unique_ptr<SeekableRecordThrottleCursor>& cursor,
                    const BSONObj& indexKey);
 
     /**
@@ -140,6 +141,8 @@ public:
 
 private:
     IndexConsistency() = delete;
+
+    CollectionValidation::ValidateState* _validateState;
 
     // We map the hashed KeyString values to a bucket that contains the count of how many
     // index keys and document keys we've seen in each bucket. This counter is unsigned to avoid

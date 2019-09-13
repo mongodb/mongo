@@ -93,7 +93,7 @@ public:
  */
 void foregroundValidate(
     OperationContext* opCtx, bool valid, int numRecords, int numInvalidDocuments, int numErrors) {
-    std::vector<ValidateCmdLevel> levels{kValidateNormal, kValidateFull};
+    std::vector<bool> levels = {false, true};
     for (auto level : levels) {
         ValidateResults validateResults;
         BSONObjBuilder output;
@@ -130,7 +130,7 @@ void backgroundValidate(OperationContext* opCtx,
     BSONObjBuilder output;
     ASSERT_OK(CollectionValidation::validate(opCtx,
                                              kNss,
-                                             ValidateCmdLevel::kValidateNormal,
+                                             /*fullValidate*/ false,
                                              /*background*/ true,
                                              &validateResults,
                                              &output));
