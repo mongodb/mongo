@@ -5,6 +5,8 @@
 //   uses_map_reduce_with_temp_collections,
 // ]
 
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryUseAggMapReduce: true}));
+
 t = db.mr_index;
 t.drop();
 
@@ -43,3 +45,5 @@ res = t.mapReduce(m, r, {out: outName});
 
 assert.eq(3, ex().executionStats.nReturned, "B1");
 res.drop();
+
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryUseAggMapReduce: false}));
