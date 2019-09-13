@@ -48,6 +48,7 @@
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/transaction_participant_gen.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/clock_source_mock.h"
 
@@ -225,12 +226,19 @@ TEST_F(OpObserverTest, AbortIndexBuildExpectedOplogEntry) {
     indexesArr.append(specX);
     indexesArr.append(specA);
     indexesArr.done();
+    BSONObjBuilder causeBuilder(abortIndexBuildBuilder.subobjStart("cause"));
+    causeBuilder.appendBool("ok", 0);
+    cause.serializeErrorToBSON(&causeBuilder);
+    causeBuilder.done();
     BSONObj abortIndexBuildCmd = abortIndexBuildBuilder.done();
 
     // Ensure the abortIndexBuild fields were correctly set.
     auto oplogEntry = getSingleOplogEntry(opCtx.get());
     auto o = oplogEntry.getObjectField("o");
     ASSERT_BSONOBJ_EQ(abortIndexBuildCmd, o);
+
+    // Should be able to extract a Status from the 'cause' field.
+    ASSERT_EQUALS(cause, getStatusFromCommandResult(o.getObjectField("cause")));
 }
 
 TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {

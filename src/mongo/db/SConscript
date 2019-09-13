@@ -1785,6 +1785,7 @@ envWithAsio.CppUnitTest(
         '$BUILD_DIR/mongo/executor/async_timer_mock',
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/rpc/rpc',
         '$BUILD_DIR/mongo/transport/transport_layer_mock',
         '$BUILD_DIR/mongo/util/clock_source_mock',

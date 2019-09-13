@@ -324,6 +324,13 @@ void OpObserverImpl::onAbortIndexBuild(OperationContext* opCtx,
     }
     indexesArr.done();
 
+    BSONObjBuilder causeBuilder(oplogEntryBuilder.subobjStart("cause"));
+    // Some functions that extract a Status from a BSONObj, such as getStatusFromCommandResult(),
+    // expect the 'ok' field.
+    causeBuilder.appendBool("ok", 0);
+    cause.serializeErrorToBSON(&causeBuilder);
+    causeBuilder.done();
+
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
     oplogEntry.setNss(nss.getCommandNS());
