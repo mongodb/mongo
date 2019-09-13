@@ -124,10 +124,19 @@ public:
     Document applyProjection(const Document& inputDoc) const final;
 
     DepsTracker::State addDependencies(DepsTracker* deps) const final {
+        if (_rootReplacementExpression) {
+            _rootReplacementExpression->addDependencies(deps);
+        }
         return DepsTracker::State::SEE_NEXT;
     }
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final {
+        // A root-replacement expression can replace the entire root document, so all paths are
+        // considered as modified.
+        if (_rootReplacementExpression) {
+            return {DocumentSource::GetModPathsReturn::Type::kAllPaths, {}, {}};
+        }
+
         std::set<std::string> modifiedPaths;
         _root->reportProjectedPaths(&modifiedPaths);
         return {DocumentSource::GetModPathsReturn::Type::kFiniteSet, std::move(modifiedPaths), {}};

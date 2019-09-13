@@ -128,15 +128,25 @@ public:
      * Optimize any computed expressions.
      */
     void optimize() final {
+        ParsedAggregationProjection::optimize();
         _root->optimize();
     }
 
     DepsTracker::State addDependencies(DepsTracker* deps) const final {
         _root->reportDependencies(deps);
+        if (_rootReplacementExpression) {
+            _rootReplacementExpression->addDependencies(deps);
+        }
         return DepsTracker::State::EXHAUSTIVE_FIELDS;
     }
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final {
+        // A root-replacement expression can replace the entire root document, so all paths are
+        // considered as modified.
+        if (_rootReplacementExpression) {
+            return {DocumentSource::GetModPathsReturn::Type::kAllPaths, {}, {}};
+        }
+
         std::set<std::string> preservedPaths;
         _root->reportProjectedPaths(&preservedPaths);
 

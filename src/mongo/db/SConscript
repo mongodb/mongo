@@ -958,6 +958,16 @@ env.Library(
 )
 
 env.Library(
+    target='projection_executor',
+    source=[
+        'exec/find_projection_executor.cpp',
+    ],
+    LIBDEPS=[
+        'matcher/expressions'
+    ],
+)
+
+env.Library(
     target='query_exec',
     source=[
         'clientcursor.cpp',
@@ -974,7 +984,6 @@ env.Library(
         'exec/ensure_sorted.cpp',
         'exec/eof.cpp',
         'exec/fetch.cpp',
-        'exec/find_projection_executor.cpp',
         'exec/geo_near.cpp',
         'exec/idhack.cpp',
         'exec/index_scan.cpp',
@@ -1054,6 +1063,7 @@ env.Library(
         'matcher/expressions_mongod_only',
         'ops/parsed_update',
         'pipeline/pipeline',
+        'projection_executor',
         'query/query_common',
         'query/query_planner',
         'repl/repl_coordinator_interface',

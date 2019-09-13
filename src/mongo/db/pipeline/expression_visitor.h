@@ -137,10 +137,13 @@ class ExpressionHyperbolicArcSine;
 class ExpressionHyperbolicTangent;
 class ExpressionHyperbolicCosine;
 class ExpressionHyperbolicSine;
-class ExpressionDegreesToRadians;
-class ExpressionRadiansToDegrees;
+class ExpressionInternalFindSlice;
+class ExpressionInternalFindPositional;
+class ExpressionInternalFindElemMatch;
 class ExpressionInternalJsEmit;
 class ExpressionInternalJs;
+class ExpressionDegreesToRadians;
+class ExpressionRadiansToDegrees;
 
 class AccumulatorAvg;
 class AccumulatorMax;
@@ -279,6 +282,9 @@ public:
     virtual void visit(ExpressionTests::Testable*) = 0;
     virtual void visit(ExpressionInternalJsEmit*) = 0;
     virtual void visit(ExpressionInternalJs*) = 0;
+    virtual void visit(ExpressionInternalFindSlice*) = 0;
+    virtual void visit(ExpressionInternalFindPositional*) = 0;
+    virtual void visit(ExpressionInternalFindElemMatch*) = 0;
 };
 
 }  // namespace mongo
