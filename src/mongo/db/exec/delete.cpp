@@ -193,7 +193,6 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     // TODO: Do we want to buffer docs and delete them in a group rather than saving/restoring state
     // repeatedly?
 
-    WorkingSetCommon::prepareForSnapshotChange(_ws);
     try {
         child()->saveState();
     } catch (const WriteConflictException&) {

@@ -749,8 +749,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         // is allowed to free the memory.
         member->makeObjOwnedIfNeeded();
 
-        // Save state before making changes
-        WorkingSetCommon::prepareForSnapshotChange(_ws);
+        // Save state before making changes.
         try {
             child()->saveState();
         } catch (const WriteConflictException&) {

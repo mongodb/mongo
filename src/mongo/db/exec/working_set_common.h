@@ -42,18 +42,6 @@ class SeekableRecordCursor;
 class WorkingSetCommon {
 public:
     /**
-     * This must be called as part of "saveState" operations after all nodes in the tree save their
-     * state.
-     *
-     * Iterates over WorkingSetIDs in 'workingSet' which are "sensitive to yield". These are ids
-     * that have transitioned into the RID_AND_IDX state since the previous yield.
-     *
-     * The RID_AND_IDX members are tagged as suspicious so that they can be handled properly in case
-     * the document keyed by the index key is deleted or updated during the yield.
-     */
-    static void prepareForSnapshotChange(WorkingSet* workingSet);
-
-    /**
      * Transitions the WorkingSetMember with WorkingSetID 'id' from the RID_AND_IDX state to the
      * RID_AND_OBJ state by fetching a document. Does the fetch using 'cursor'.
      *

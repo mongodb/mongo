@@ -279,7 +279,8 @@ public:
     }
 
     void setRecordIdAndIdx(BSONObj keyPattern, BSONObj key) {
-        _member->keyData.push_back(IndexKeyDatum(std::move(keyPattern), std::move(key), 0));
+        _member->keyData.push_back(
+            IndexKeyDatum(std::move(keyPattern), std::move(key), 0, SnapshotId{}));
         _workingSet.transitionToRecordIdAndIdx(_wsid);
     }
 

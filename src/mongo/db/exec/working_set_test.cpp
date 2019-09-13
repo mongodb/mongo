@@ -121,7 +121,8 @@ TEST_F(WorkingSetFixture, getFieldFromIndex) {
     string secondName = "y";
     int secondValue = 10;
 
-    member->keyData.push_back(IndexKeyDatum(BSON(firstName << 1), BSON("" << firstValue), 0));
+    member->keyData.push_back(
+        IndexKeyDatum(BSON(firstName << 1), BSON("" << firstValue), 0, SnapshotId{}));
     // Also a minor lie as RecordId is bogus.
     ws->transitionToRecordIdAndIdx(id);
     BSONElement elt;
@@ -131,7 +132,8 @@ TEST_F(WorkingSetFixture, getFieldFromIndex) {
     ASSERT_FALSE(member->getFieldDotted("foo", &elt));
 
     // Add another index datum.
-    member->keyData.push_back(IndexKeyDatum(BSON(secondName << 1), BSON("" << secondValue), 0));
+    member->keyData.push_back(
+        IndexKeyDatum(BSON(secondName << 1), BSON("" << secondValue), 0, SnapshotId{}));
     ASSERT_TRUE(member->getFieldDotted(secondName, &elt));
     ASSERT_EQUALS(elt.numberInt(), secondValue);
     ASSERT_TRUE(member->getFieldDotted(firstName, &elt));
@@ -144,7 +146,8 @@ TEST_F(WorkingSetFixture, getDottedFieldFromIndex) {
     string firstName = "x.y";
     int firstValue = 5;
 
-    member->keyData.push_back(IndexKeyDatum(BSON(firstName << 1), BSON("" << firstValue), 0));
+    member->keyData.push_back(
+        IndexKeyDatum(BSON(firstName << 1), BSON("" << firstValue), 0, SnapshotId{}));
     ws->transitionToRecordIdAndIdx(id);
     BSONElement elt;
     ASSERT_TRUE(member->getFieldDotted(firstName, &elt));
@@ -214,7 +217,6 @@ TEST_F(WorkingSetFixture, RecordIdAndObjStateCanRoundtripThroughSerialization) {
     ASSERT_DOCUMENT_EQ(roundtripped.doc.value(), doc);
     ASSERT_EQ(roundtripped.doc.snapshotId().toNumber(), 42u);
     ASSERT_EQ(roundtripped.recordId.repr(), 43);
-    ASSERT_FALSE(roundtripped.isSuspicious);
     ASSERT_FALSE(roundtripped.metadata());
 }
 
@@ -228,16 +230,15 @@ TEST_F(WorkingSetFixture, OwnedObjStateCanRoundtripThroughSerialization) {
     ASSERT_DOCUMENT_EQ(roundtripped.doc.value(), doc);
     ASSERT_EQ(roundtripped.doc.snapshotId().toNumber(), 42u);
     ASSERT(roundtripped.recordId.isNull());
-    ASSERT_FALSE(roundtripped.isSuspicious);
     ASSERT_FALSE(roundtripped.metadata());
 }
 
 TEST_F(WorkingSetFixture, RecordIdAndIdxStateCanRoundtripThroughSerialization) {
     member->recordId = RecordId{43};
-    member->keyData.emplace_back(BSON("a" << 1 << "b" << 1), BSON("" << 3 << "" << 4), 8u);
-    member->keyData.emplace_back(BSON("c" << -1), BSON("" << 5), 9u);
+    member->keyData.emplace_back(
+        BSON("a" << 1 << "b" << 1), BSON("" << 3 << "" << 4), 8u, SnapshotId{11u});
+    member->keyData.emplace_back(BSON("c" << -1), BSON("" << 5), 9u, SnapshotId{12u});
     ws->transitionToRecordIdAndIdx(id);
-    ASSERT_FALSE(member->isSuspicious);
 
     auto roundtripped = roundtripWsmThroughSerialization(*member);
     ASSERT_EQ(WorkingSetMember::RID_AND_IDX, roundtripped.getState());
@@ -247,12 +248,13 @@ TEST_F(WorkingSetFixture, RecordIdAndIdxStateCanRoundtripThroughSerialization) {
     ASSERT_BSONOBJ_EQ(roundtripped.keyData[0].indexKeyPattern, BSON("a" << 1 << "b" << 1));
     ASSERT_BSONOBJ_EQ(roundtripped.keyData[0].keyData, BSON("" << 3 << "" << 4));
     ASSERT_EQ(roundtripped.keyData[0].indexId, 8u);
+    ASSERT_EQ(roundtripped.keyData[0].snapshotId.toNumber(), 11u);
 
     ASSERT_BSONOBJ_EQ(roundtripped.keyData[1].indexKeyPattern, BSON("c" << -1));
     ASSERT_BSONOBJ_EQ(roundtripped.keyData[1].keyData, BSON("" << 5));
     ASSERT_EQ(roundtripped.keyData[1].indexId, 9u);
+    ASSERT_EQ(roundtripped.keyData[1].snapshotId.toNumber(), 12u);
 
-    ASSERT_TRUE(roundtripped.isSuspicious);
     ASSERT_FALSE(roundtripped.metadata());
 }
 
@@ -269,7 +271,6 @@ TEST_F(WorkingSetFixture, WsmWithMetadataCanRoundtripThroughSerialization) {
     ASSERT_FALSE(roundtripped.doc.value().metadata());
     ASSERT_TRUE(roundtripped.doc.snapshotId().isNull());
     ASSERT_TRUE(roundtripped.recordId.isNull());
-    ASSERT_FALSE(roundtripped.isSuspicious);
 
     ASSERT_TRUE(roundtripped.metadata());
     ASSERT_TRUE(roundtripped.metadata().hasTextScore());
@@ -278,6 +279,36 @@ TEST_F(WorkingSetFixture, WsmWithMetadataCanRoundtripThroughSerialization) {
     ASSERT_EQ(roundtripped.metadata().getSearchScore(), 43.0);
     ASSERT_FALSE(roundtripped.metadata().hasGeoNearPoint());
     ASSERT_FALSE(roundtripped.metadata().hasGeoNearDistance());
+}
+
+TEST_F(WorkingSetFixture, WsmCanBeExtractedAndReinserted) {
+    Document doc{{"foo", Value{"bar"_sd}}};
+    member->doc.setValue(doc);
+    member->doc.setSnapshotId(SnapshotId{42u});
+    member->recordId = RecordId{43};
+    ws->transitionToRecordIdAndObj(id);
+    member = nullptr;
+    ASSERT_FALSE(ws->isFree(id));
+
+    auto extractedWsm = ws->extract(id);
+    ASSERT_TRUE(ws->isFree(id));
+    ASSERT_TRUE(extractedWsm.hasObj());
+    ASSERT_EQ(extractedWsm.getState(), WorkingSetMember::RID_AND_OBJ);
+    ASSERT_DOCUMENT_EQ(extractedWsm.doc.value(), doc);
+    ASSERT_EQ(extractedWsm.doc.snapshotId().toNumber(), 42u);
+    ASSERT_EQ(extractedWsm.recordId.repr(), 43);
+    ASSERT_FALSE(extractedWsm.metadata());
+
+    auto emplacedId = ws->emplace(std::move(extractedWsm));
+    ASSERT_FALSE(ws->isFree(emplacedId));
+
+    auto emplacedWsm = ws->get(emplacedId);
+    ASSERT_TRUE(emplacedWsm->hasObj());
+    ASSERT_EQ(emplacedWsm->getState(), WorkingSetMember::RID_AND_OBJ);
+    ASSERT_DOCUMENT_EQ(emplacedWsm->doc.value(), doc);
+    ASSERT_EQ(emplacedWsm->doc.snapshotId().toNumber(), 42u);
+    ASSERT_EQ(emplacedWsm->recordId.repr(), 43);
+    ASSERT_FALSE(emplacedWsm->metadata());
 }
 
 }  // namespace mongo

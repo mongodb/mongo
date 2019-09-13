@@ -323,11 +323,6 @@ OperationContext* PlanExecutorImpl::getOpCtx() const {
 void PlanExecutorImpl::saveState() {
     invariant(_currentState == kUsable || _currentState == kSaved);
 
-    // The query stages inside this stage tree might buffer record ids (e.g. text, geoNear,
-    // mergeSort, sort) which are no longer protected by the storage engine's transactional
-    // boundaries.
-    WorkingSetCommon::prepareForSnapshotChange(_workingSet.get());
-
     if (!isMarkedAsKilled()) {
         _root->saveState();
     }

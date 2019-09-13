@@ -76,14 +76,11 @@ void WorkingSet::clear() {
     // Since working set is now empty, the free list pointer should
     // point to nothing.
     _freeList = INVALID_ID;
-
-    _yieldSensitiveIds.clear();
 }
 
 void WorkingSet::transitionToRecordIdAndIdx(WorkingSetID id) {
     WorkingSetMember* member = get(id);
     member->_state = WorkingSetMember::RID_AND_IDX;
-    _yieldSensitiveIds.push_back(id);
 }
 
 void WorkingSet::transitionToRecordIdAndObj(WorkingSetID id) {
@@ -96,11 +93,17 @@ void WorkingSet::transitionToOwnedObj(WorkingSetID id) {
     member->transitionToOwnedObj();
 }
 
-std::vector<WorkingSetID> WorkingSet::getAndClearYieldSensitiveIds() {
-    std::vector<WorkingSetID> out;
-    // Clear '_yieldSensitiveIds' by swapping it into the set to be returned.
-    _yieldSensitiveIds.swap(out);
-    return out;
+WorkingSetMember WorkingSet::extract(WorkingSetID wsid) {
+    invariant(wsid < _data.size());
+    WorkingSetMember ret = std::move(_data[wsid].member);
+    free(wsid);
+    return ret;
+}
+
+WorkingSetID WorkingSet::emplace(WorkingSetMember&& wsm) {
+    auto wsid = allocate();
+    *get(wsid) = std::move(wsm);
+    return wsid;
 }
 
 //
@@ -210,6 +213,7 @@ void WorkingSetMember::serializeForSorter(BufBuilder& buf) const {
             indexKeyDatum.indexKeyPattern.serializeForSorter(buf);
             indexKeyDatum.keyData.serializeForSorter(buf);
             buf.appendNum(indexKeyDatum.indexId);
+            buf.appendNum(static_cast<unsigned long long>(indexKeyDatum.snapshotId.toNumber()));
         }
     }
 
@@ -244,14 +248,11 @@ WorkingSetMember WorkingSetMember::deserializeForSorter(BufReader& buf,
             auto indexKey =
                 BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings{}).getOwned();
             auto indexId = buf.read<LittleEndian<unsigned int>>();
-            wsm.keyData.push_back(
-                IndexKeyDatum{std::move(indexKeyPattern), std::move(indexKey), indexId});
+            auto snapshotIdRepr = buf.read<LittleEndian<uint64_t>>();
+            auto snapshotId = snapshotIdRepr ? SnapshotId{snapshotIdRepr} : SnapshotId{};
+            wsm.keyData.push_back(IndexKeyDatum{
+                std::move(indexKeyPattern), std::move(indexKey), indexId, snapshotId});
         }
-
-        // Mark any working set member representing an index key as suspicious on deserialization.
-        // This is needed because the member may have survived a yield while absent from the working
-        // set.
-        wsm.isSuspicious = true;
     }
 
     if (wsm.hasRecordId()) {

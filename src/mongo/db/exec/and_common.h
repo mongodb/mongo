@@ -93,9 +93,6 @@ public:
                 dest->keyData.push_back(src.keyData[i]);
             }
         }
-
-        if (src.isSuspicious)
-            dest->isSuspicious = true;
     }
 };
 

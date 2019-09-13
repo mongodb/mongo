@@ -60,8 +60,9 @@ using WorkingSetRegisteredIndexId = unsigned int;
 struct IndexKeyDatum {
     IndexKeyDatum(const BSONObj& keyPattern,
                   const BSONObj& key,
-                  WorkingSetRegisteredIndexId indexId)
-        : indexKeyPattern(keyPattern), keyData(key), indexId(indexId) {}
+                  WorkingSetRegisteredIndexId indexId,
+                  SnapshotId snapshotId)
+        : indexKeyPattern(keyPattern), keyData(key), indexId(indexId), snapshotId(snapshotId) {}
 
     /**
      * getFieldDotted produces the field with the provided name based on index keyData. The return
@@ -95,6 +96,9 @@ struct IndexKeyDatum {
     // Associates this index key with an index that has been registered with the WorkingSet. Can be
     // used to recover pointers to catalog objects for this index from the WorkingSet.
     WorkingSetRegisteredIndexId indexId;
+
+    // Identifies the storage engine snapshot from which this index key was obtained.
+    SnapshotId snapshotId;
 };
 
 /**
@@ -151,10 +155,6 @@ public:
     RecordId recordId;
     Snapshotted<Document> doc;
     std::vector<IndexKeyDatum> keyData;
-
-    // True if this WSM has survived a yield in RID_AND_IDX state.
-    // TODO consider replacing by tracking SnapshotIds for IndexKeyDatums.
-    bool isSuspicious = false;
 
     bool hasRecordId() const;
     bool hasObj() const;
@@ -302,20 +302,6 @@ public:
     void transitionToOwnedObj(WorkingSetID id);
 
     /**
-     * Returns the list of working set ids that have transitioned into the RID_AND_IDX state since
-     * the last yield. The members corresponding to these ids may have since transitioned to a
-     * different state or been freed, so these cases must be handled by the caller. The list may
-     * also contain duplicates.
-     *
-     * Execution stages are *not* responsible for managing this list, as working set ids are added
-     * to the set automatically by WorkingSet::transitionToRecordIdAndIdx().
-     *
-     * As a side effect, calling this method clears the list of flagged yield sensitive ids kept by
-     * the working set.
-     */
-    std::vector<WorkingSetID> getAndClearYieldSensitiveIds();
-
-    /**
      * Registers an IndexAccessMethod pointer with the WorkingSet, and returns a handle that can be
      * used to recover the IndexAccessMethod.
      */
@@ -328,6 +314,24 @@ public:
     const IndexAccessMethod* retrieveIndexAccessMethod(WorkingSetRegisteredIndexId indexId) const {
         return _registeredIndexes[indexId];
     }
+
+    /**
+     * Returns the WorkingSetMember with the given id after removing it from this WorkingSet. The
+     * WSM can be reinstated in the WorkingSet by calling 'emplace()'.
+     *
+     * WorkingSetMembers typically only temporarily live free of their WorkingSet, so calls to
+     * 'extract()' and 'emplace()' should come in pairs.
+     */
+    WorkingSetMember extract(WorkingSetID);
+
+    /**
+     * Puts the given WorkingSetMember into this WorkingSet. Assigns the WorkingSetMember an id and
+     * returns it. This id can be used later to obtain a pointer to the WSM using 'get()'.
+     *
+     * WorkingSetMembers typically only temporarily live free of their WorkingSet, so calls to
+     * 'extract()' and 'emplace()' should come in pairs.
+     */
+    WorkingSetID emplace(WorkingSetMember&&);
 
 private:
     struct MemberHolder {
@@ -345,9 +349,6 @@ private:
     // link. INVALID_ID is the list terminator since 0 is a valid index.
     // If _freeList == INVALID_ID, the free list is empty and all elements in _data are in use.
     WorkingSetID _freeList;
-
-    // Contains ids of WSMs that may need to be adjusted when we next yield.
-    std::vector<WorkingSetID> _yieldSensitiveIds;
 
     // Holds IndexAccessMethods that have been registered with 'registerIndexAccessMethod()`. The
     // WorkingSetRegisteredIndexId is the offset into the vector.

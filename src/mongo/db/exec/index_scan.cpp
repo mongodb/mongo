@@ -233,7 +233,8 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
     WorkingSetID id = _workingSet->allocate();
     WorkingSetMember* member = _workingSet->get(id);
     member->recordId = kv->loc;
-    member->keyData.push_back(IndexKeyDatum(_keyPattern, kv->key, workingSetIndexId()));
+    member->keyData.push_back(IndexKeyDatum(
+        _keyPattern, kv->key, workingSetIndexId(), getOpCtx()->recoveryUnit()->getSnapshotId()));
     _workingSet->transitionToRecordIdAndIdx(id);
 
     if (_addKeyMetadata) {

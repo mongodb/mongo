@@ -40,20 +40,6 @@
 
 namespace mongo {
 
-void WorkingSetCommon::prepareForSnapshotChange(WorkingSet* workingSet) {
-    for (auto id : workingSet->getAndClearYieldSensitiveIds()) {
-        if (workingSet->isFree(id)) {
-            continue;
-        }
-
-        // We may see the same member twice, so anything we do here should be idempotent.
-        WorkingSetMember* member = workingSet->get(id);
-        if (member->getState() == WorkingSetMember::RID_AND_IDX) {
-            member->isSuspicious = true;
-        }
-    }
-}
-
 bool WorkingSetCommon::fetch(OperationContext* opCtx,
                              WorkingSet* workingSet,
                              WorkingSetID id,
@@ -69,23 +55,29 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
         return false;
     }
 
-    member->resetDocument(opCtx->recoveryUnit()->getSnapshotId(), record->data.releaseToBson());
+    auto currentSnapshotId = opCtx->recoveryUnit()->getSnapshotId();
+    member->resetDocument(currentSnapshotId, record->data.releaseToBson());
 
-    if (member->isSuspicious) {
-        // Make sure that all of the keyData is still valid for this copy of the document.  This
-        // ensures both that index-provided filters and sort orders still hold.
-        //
-        // TODO provide a way for the query planner to opt out of this checking if it is unneeded
-        // due to the structure of the plan.
-        invariant(!member->keyData.empty());
+    // Make sure that all of the keyData is still valid for this copy of the document.  This ensures
+    // both that index-provided filters and sort orders still hold.
+    //
+    // TODO provide a way for the query planner to opt out of this checking if it is unneeded due to
+    // the structure of the plan.
+    if (member->getState() == WorkingSetMember::RID_AND_IDX) {
         for (size_t i = 0; i < member->keyData.size(); i++) {
+            auto&& memberKey = member->keyData[i];
+            // For storage engines that support document-level concurrency, if this key was obtained
+            // in the current snapshot, then move on to the next key.
+            if (supportsDocLocking() && memberKey.snapshotId == currentSnapshotId) {
+                continue;
+            }
+
             KeyStringSet keys;
             // There's no need to compute the prefixes of the indexed fields that cause the index to
             // be multikey when ensuring the keyData is still valid.
             KeyStringSet* multikeyMetadataKeys = nullptr;
             MultikeyPaths* multikeyPaths = nullptr;
-            auto indexId = member->keyData[i].indexId;
-            auto* iam = workingSet->retrieveIndexAccessMethod(indexId);
+            auto* iam = workingSet->retrieveIndexAccessMethod(memberKey.indexId);
             iam->getKeys(member->doc.value().toBson(),
                          IndexAccessMethod::GetKeysMode::kEnforceConstraints,
                          &keys,
@@ -93,7 +85,7 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
                          multikeyPaths,
                          member->recordId);
             KeyString::HeapBuilder keyString(iam->getSortedDataInterface()->getKeyStringVersion(),
-                                             member->keyData[i].keyData,
+                                             memberKey.keyData,
                                              iam->getSortedDataInterface()->getOrdering(),
                                              member->recordId);
             if (!keys.count(keyString.release())) {
@@ -101,8 +93,6 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
                 return false;
             }
         }
-
-        member->isSuspicious = false;
     }
 
     member->keyData.clear();
