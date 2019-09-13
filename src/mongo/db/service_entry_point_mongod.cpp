@@ -72,7 +72,8 @@ public:
                 LOG(debugLevel) << "Command on database " << request.getDatabase()
                                 << " timed out waiting for read concern to be satisfied. Command: "
                                 << redact(ServiceEntryPointCommon::getRedactedCopyForLogging(
-                                       invocation->definition(), request.body));
+                                       invocation->definition(), request.body))
+                                << ". Info: " << redact(rcStatus);
             }
 
             uassertStatusOK(rcStatus);
