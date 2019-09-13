@@ -79,7 +79,7 @@ for (let i = 0; i < nDocs; i++) {
     bulk.insert({word: "hello", val: "a".repeat(longStringLength)});
 }
 assert.commandWorked(bulk.execute());
-assert.commandFailedWithCode(db.runCommand(command), ErrorCodes.BSONObjectTooLarge);
+assert.commandFailedWithCode(db.runCommand(command), [ErrorCodes.BSONObjectTooLarge, 16493]);
 
 //
 // Test that the accumulator correctly fails for invalid arguments.
