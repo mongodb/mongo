@@ -132,7 +132,7 @@ def is_supported_distro():
     if (distro_name == 'Ubuntu' and float(version_number) >= 14.04):
         return True
 
-    if ((distro_name == 'Red Hat Enterprise Linux Server' or 'CentOS' in distro_name)
+    if (('Red Hat Enterprise Linux' in distro_name or 'CentOS' in distro_name)
             and (float(version_number) >= 7.0)):
         return True
 

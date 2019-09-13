@@ -328,7 +328,7 @@ class Distro(object):
         if re.search("(suse)", self.dname):
             return ["suse11", "suse12", "suse15"]
         elif re.search("(redhat|fedora|centos)", self.dname):
-            return ["rhel70", "rhel71", "rhel72", "rhel62", "rhel55", "rhel67"]
+            return ["rhel80", "rhel70", "rhel71", "rhel72", "rhel62", "rhel55", "rhel67"]
         elif self.dname in ['amazon', 'amazon2']:
             return [self.dname]
         elif self.dname == 'ubuntu':
@@ -841,12 +841,8 @@ def make_rpm(distro, build_os, arch, spec, srcdir):  # pylint: disable=too-many-
 
     # Versions of RPM after 4.4 ignore our BuildRoot tag so we need to
     # specify it on the command line args to rpmbuild
-    #
-    # Current versions of RHEL at the time of this writing (RHEL < 8) patch in
-    # the old behavior so that our BuildRoot tag still works on these versions.
-    #
-    # Probably need to add RHEL 8 to this when we start building for it
-    if distro.name() == "suse" and distro.repo_os_version(build_os) == "15":
+    if ((distro.name() == "suse" and distro.repo_os_version(build_os) == "15")
+            or (distro.name() == "redhat" and distro.repo_os_version(build_os) == "8")):
         flags.extend([
             "--buildroot",
             os.path.join(topdir, "BUILDROOT"),
