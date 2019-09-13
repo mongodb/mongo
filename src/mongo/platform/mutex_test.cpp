@@ -32,12 +32,37 @@
 #include "mongo/platform/mutex.h"
 
 namespace mongo {
-TEST(MongoMutexTest, BasicSingleThread) {
+TEST(MutexTest, BasicSingleThread) {
     Mutex m;
     m.lock();
     ASSERT(!m.try_lock());
     m.unlock();
     ASSERT(m.try_lock());
     m.unlock();
+}
+
+namespace {
+// Since this MONGO_MAKE_LATCH has no arguments, the mutex is anonymous
+auto gMutex = MONGO_MAKE_LATCH();
+}  // anonymous namespace
+
+TEST(MutexTest, Macros) {
+    // Verify a pure inline latch
+    auto constexpr kLatchName = "inlineLatchForTest";
+    auto m1 = MONGO_MAKE_LATCH(kLatchName);
+    static_assert(std::is_same_v<decltype(m1), Mutex>);
+    ASSERT_EQ(m1.getName(), kLatchName);
+
+    // Verify a class member latch
+    struct MutexHolder {
+        Mutex m2 = MONGO_MAKE_LATCH("MutexHolder");
+    } holder;
+    static_assert(std::is_same_v<decltype(MutexHolder::m2), Mutex>);
+    ASSERT_NE(holder.m2.getName().find("MutexHolder"_sd), std::string::npos);
+    ASSERT_NE(holder.m2.getName().find("m2"_sd), std::string::npos);
+
+    // Verify the global named latch
+    static_assert(std::is_same_v<decltype(gMutex), Mutex>);
+    ASSERT_EQ(gMutex.getName(), Mutex::kAnonymousMutexStr);
 }
 }  // namespace mongo

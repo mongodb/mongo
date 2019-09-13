@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <type_traits>
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/stdx/mutex.h"
@@ -46,7 +48,11 @@ public:
 
 class Mutex {
 public:
-    Mutex() : Mutex("AnonymousMutex"_sd) {}
+    static constexpr auto kAnonymousMutexStr = "AnonymousMutex"_sd;
+
+    Mutex() : Mutex(kAnonymousMutexStr) {}
+    // Note that StringData is a view type, thus the underlying string for _name must outlive any
+    // given Mutex
     explicit Mutex(const StringData& name) : _name(name) {}
     explicit Mutex(const StringData& name, Seconds lockTimeout)
         : _name(name), _lockTimeout(lockTimeout) {}
@@ -54,7 +60,7 @@ public:
     void lock();
     void unlock();
     bool try_lock();
-    const StringData& getName() {
+    const StringData& getName() const {
         return _name;
     }
 
@@ -68,3 +74,11 @@ private:
 };
 
 }  // namespace mongo
+
+/**
+ * Define a mongo::Mutex with all arguments passed through to the ctor
+ */
+#define MONGO_MAKE_LATCH(...) \
+    mongo::Mutex {            \
+        __VA_ARGS__           \
+    }
