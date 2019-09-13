@@ -570,6 +570,7 @@ public:
 
         opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
         opCtx()->setTxnNumber(txnNum());
+        opCtx()->setInMultiDocumentTransaction();
         _sessionCheckout = std::make_unique<MongoDOperationContextSession>(opCtx());
 
         auto txnParticipant = TransactionParticipant::get(opCtx());

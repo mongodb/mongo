@@ -505,6 +505,7 @@ void TransactionParticipant::Participant::beginOrContinue(OperationContext* opCt
     // autocommit be given as an argument on the request, and currently it can only be false, which
     // is verified earlier when parsing the request.
     invariant(*autocommit == false);
+    invariant(opCtx->inMultiDocumentTransaction());
 
     if (!startTransaction) {
         _continueMultiDocumentTransaction(opCtx, txnNumber);
@@ -546,6 +547,7 @@ void TransactionParticipant::Participant::beginOrContinue(OperationContext* opCt
 
 void TransactionParticipant::Participant::beginOrContinueTransactionUnconditionally(
     OperationContext* opCtx, TxnNumber txnNumber) {
+    invariant(opCtx->inMultiDocumentTransaction());
 
     // We don't check or fetch any on-disk state, so treat the transaction as 'valid' for the
     // purposes of this method and continue the transaction unconditionally

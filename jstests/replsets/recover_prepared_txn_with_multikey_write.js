@@ -5,10 +5,9 @@
  * @tags: [uses_transactions, uses_prepare_transaction, requires_persistence]
  */
 (function() {
-// TODO (SERVER-42750) Re-enable this test.
-if (true) {
-    return;
-}
+"use strict";
+load("jstests/core/txns/libs/prepare_helpers.js");
+
 const rst = new ReplSetTest({
     nodes: [
         {},
@@ -38,7 +37,9 @@ session.startTransaction();
 // Make the index multikey.
 jsTestLog("Making the index multikey.");
 sessionColl.insert({x: [1, 2, 3]});
-assert.commandWorked(sessionDB.adminCommand({prepareTransaction: 1}));
+// Make sure { w: "majority" } is always used, otherwise the prepare may not get journaled before
+// the shutdown below.
+PrepareHelpers.prepareTransaction(session);
 
 // Do an unclean shutdown so we don't force a checkpoint, and then restart.
 jsTestLog("Killing the primary.");

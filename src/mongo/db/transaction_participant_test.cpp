@@ -262,6 +262,7 @@ protected:
 
         opCtx()->setLogicalSessionId(_sessionId);
         opCtx()->setTxnNumber(_txnNumber);
+        opCtx()->setInMultiDocumentTransaction();
 
         // Normally, committing a transaction is supposed to usassert if the corresponding prepare
         // has not been majority committed. We excempt our unit tests from this expectation.
@@ -298,6 +299,7 @@ protected:
     std::unique_ptr<MongoDOperationContextSession> checkOutSession(
         boost::optional<bool> startNewTxn = true) {
         opCtx()->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
+        opCtx()->setInMultiDocumentTransaction();
         auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx());
         auto txnParticipant = TransactionParticipant::get(opCtx());
         txnParticipant.beginOrContinue(opCtx(), *opCtx()->getTxnNumber(), false, startNewTxn);
@@ -344,6 +346,7 @@ TEST_F(TxnParticipantTest, TransactionThrowsLockTimeoutIfLockIsUnavailable) {
         auto newOpCtx = newClient->makeOperationContext();
         newOpCtx.get()->setLogicalSessionId(newSessionId);
         newOpCtx.get()->setTxnNumber(newTxnNum);
+        newOpCtx.get()->setInMultiDocumentTransaction();
 
         MongoDOperationContextSession newOpCtxSession(newOpCtx.get());
         auto newTxnParticipant = TransactionParticipant::get(newOpCtx.get());
@@ -752,6 +755,7 @@ TEST_F(TxnParticipantTest, KillOpBeforeCommittingPreparedTransaction) {
     auto commitPreparedFunc = [&](OperationContext* opCtx) {
         opCtx->setLogicalSessionId(_sessionId);
         opCtx->setTxnNumber(_txnNumber);
+        opCtx->setInMultiDocumentTransaction();
 
         // Check out the session and continue the transaction.
         auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
@@ -793,6 +797,7 @@ TEST_F(TxnParticipantTest, KillOpBeforeAbortingPreparedTransaction) {
     auto commitPreparedFunc = [&](OperationContext* opCtx) {
         opCtx->setLogicalSessionId(_sessionId);
         opCtx->setTxnNumber(_txnNumber);
+        opCtx->setInMultiDocumentTransaction();
 
         // Check out the session and continue the transaction.
         auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
@@ -1163,6 +1168,7 @@ TEST_F(TxnParticipantTest, CannotStartNewTransactionWhilePreparedTransactionInPr
              txnNumberToStart = *opCtx()->getTxnNumber() + 1](OperationContext* newOpCtx) {
                 newOpCtx->setLogicalSessionId(lsid);
                 newOpCtx->setTxnNumber(txnNumberToStart);
+                newOpCtx->setInMultiDocumentTransaction();
 
                 MongoDOperationContextSession ocs(newOpCtx);
                 auto txnParticipant = TransactionParticipant::get(newOpCtx);

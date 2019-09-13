@@ -170,6 +170,7 @@ Status applyCommitTransaction(OperationContext* opCtx,
             invariant(entry.getTxnNumber());
             opCtx->setLogicalSessionId(*entry.getSessionId());
             opCtx->setTxnNumber(*entry.getTxnNumber());
+            opCtx->setInMultiDocumentTransaction();
 
             // The write on transaction table may be applied concurrently, so refreshing state
             // from disk may read that write, causing starting a new transaction on an existing
@@ -211,6 +212,7 @@ Status applyAbortTransaction(OperationContext* opCtx,
             invariant(entry.getTxnNumber());
             opCtx->setLogicalSessionId(*entry.getSessionId());
             opCtx->setTxnNumber(*entry.getTxnNumber());
+            opCtx->setInMultiDocumentTransaction();
 
             // The write on transaction table may be applied concurrently, so refreshing state
             // from disk may read that write, causing starting a new transaction on an existing
@@ -338,6 +340,7 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
     invariant(entry.getTxnNumber());
     opCtx->setLogicalSessionId(*entry.getSessionId());
     opCtx->setTxnNumber(*entry.getTxnNumber());
+    opCtx->setInMultiDocumentTransaction();
     // The write on transaction table may be applied concurrently, so refreshing state
     // from disk may read that write, causing starting a new transaction on an existing
     // txnNumber. Thus, we start a new transaction without refreshing state from disk.

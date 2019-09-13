@@ -203,6 +203,7 @@ void abortInProgressTransactions(OperationContext* opCtx) {
             IDLParserErrorContext("abort-in-progress-transactions"), cursor->next());
         opCtx->setLogicalSessionId(txnRecord.getSessionId());
         opCtx->setTxnNumber(txnRecord.getTxnNum());
+        opCtx->setInMultiDocumentTransaction();
         MongoDOperationContextSessionWithoutRefresh ocs(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
         LOG(3) << "Aborting transaction sessionId: " << txnRecord.getSessionId().toBSON()
