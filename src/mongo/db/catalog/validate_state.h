@@ -63,11 +63,11 @@ public:
         return _nss;
     }
 
-    const bool isBackground() const {
+    bool isBackground() const {
         return _background;
     }
 
-    const bool isFullValidate() const {
+    bool isFullValidate() const {
         return _fullValidate;
     }
 
