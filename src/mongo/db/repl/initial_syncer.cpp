@@ -159,16 +159,7 @@ StatusWith<OpTimeAndWallTime> parseOpTimeAndWallTime(const QueryResponseStatus& 
                                              "no oplog entry found"};
     }
 
-    auto opTimeStatus = OpTime::parseFromOplogEntry(docs.front());
-    if (!opTimeStatus.getStatus().isOK()) {
-        return opTimeStatus.getStatus();
-    }
-    auto wallTimeStatus = OpTime::parseWallTimeFromOplogEntry(docs.front());
-    if (!wallTimeStatus.getStatus().isOK()) {
-        return wallTimeStatus.getStatus();
-    }
-    OpTimeAndWallTime result = {opTimeStatus.getValue(), wallTimeStatus.getValue()};
-    return result;
+    return OpTimeAndWallTime::parseOpTimeAndWallTimeFromOplogEntry(docs.front());
 }
 
 }  // namespace

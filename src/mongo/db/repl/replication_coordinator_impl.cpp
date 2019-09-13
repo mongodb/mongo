@@ -599,7 +599,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     // Do not check optime, if this node is an arbiter.
     bool isArbiter =
         myIndex.getValue() != -1 && localConfig.getMemberAt(myIndex.getValue()).isArbiter();
-    OpTimeAndWallTime lastOpTimeAndWallTime = {OpTime(), Date_t()};
+    OpTimeAndWallTime lastOpTimeAndWallTime = OpTimeAndWallTime();
     if (!isArbiter) {
         if (!lastOpTimeAndWallTimeStatus.isOK()) {
             warning() << "Failed to load timestamp and/or wall clock time of most recently applied "
@@ -1191,8 +1191,8 @@ void ReplicationCoordinatorImpl::_resetMyLastOpTimes(WithLock lk) {
     // Reset to uninitialized OpTime
     bool isRollbackAllowed = true;
     _setMyLastAppliedOpTimeAndWallTime(
-        lk, {OpTime(), Date_t()}, isRollbackAllowed, DataConsistency::Inconsistent);
-    _setMyLastDurableOpTimeAndWallTime(lk, {OpTime(), Date_t()}, isRollbackAllowed);
+        lk, OpTimeAndWallTime(), isRollbackAllowed, DataConsistency::Inconsistent);
+    _setMyLastDurableOpTimeAndWallTime(lk, OpTimeAndWallTime(), isRollbackAllowed);
     _stableOpTimeCandidates.clear();
 }
 

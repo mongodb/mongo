@@ -1429,7 +1429,10 @@ TEST_F(InitialSyncerTest,
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::NoSuchKey, _lastApplied);
+
+    // OpTimeAndWallTime now uses the IDL parser, so the status code returned is from
+    // IDLParserErrorContext
+    ASSERT_EQUALS(_lastApplied.getStatus().code(), 40414);
 }
 
 TEST_F(InitialSyncerTest,

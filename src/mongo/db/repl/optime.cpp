@@ -37,6 +37,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/optime_and_wall_time_base_gen.h"
 
 namespace mongo {
 namespace repl {
@@ -56,16 +57,6 @@ void OpTime::append(BSONObjBuilder* builder, const std::string& subObjName) cons
 
     opTimeBuilder.append(kTermFieldName, _term);
     opTimeBuilder.doneFast();
-}
-
-StatusWith<Date_t> OpTime::parseWallTimeFromOplogEntry(const BSONObj& obj) {
-    BSONElement wallClockTimeElement;
-    Status status = bsonExtractTypedField(
-        obj, OplogEntryBase::kWallClockTimeFieldName, BSONType::Date, &wallClockTimeElement);
-    if (!status.isOK())
-        return status;
-    auto wallClockTime = wallClockTimeElement.Date();
-    return wallClockTime;
 }
 
 StatusWith<OpTime> OpTime::parseFromOplogEntry(const BSONObj& obj) {
@@ -121,6 +112,25 @@ BSONObj OpTime::asQuery() const {
     BSONObjBuilder builder;
     appendAsQuery(&builder);
     return builder.obj();
+}
+
+StatusWith<OpTimeAndWallTime> OpTimeAndWallTime::parseOpTimeAndWallTimeFromOplogEntry(
+    const BSONObj& bsonObject) {
+
+    try {
+        OpTimeAndWallTimeBase base = OpTimeAndWallTimeBase::parse(
+            IDLParserErrorContext("OpTimeAndWallTimeBase"), bsonObject);
+
+        long long term = OpTime::kUninitializedTerm;
+
+        if (base.getTerm()) {
+            term = base.getTerm().get();
+        }
+
+        return OpTimeAndWallTime(OpTime(base.getTimestamp(), term), base.getWallClockTime());
+    } catch (...) {
+        return exceptionToStatus();
+    }
 }
 
 }  // namespace repl

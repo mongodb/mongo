@@ -651,32 +651,9 @@ StatusWith<OpTimeAndWallTime> ReplicationCoordinatorExternalStateImpl::loadLastO
                                                      << "Did not find any entries in "
                                                      << NamespaceString::kRsOplogNamespace.ns());
         }
-        BSONElement tsElement = oplogEntry[tsFieldName];
-        if (tsElement.eoo()) {
-            return StatusWith<OpTimeAndWallTime>(
-                ErrorCodes::NoSuchKey,
-                str::stream() << "Most recent entry in " << NamespaceString::kRsOplogNamespace.ns()
-                              << " missing \"" << tsFieldName << "\" field");
-        }
-        if (tsElement.type() != bsonTimestamp) {
-            return StatusWith<OpTimeAndWallTime>(
-                ErrorCodes::TypeMismatch,
-                str::stream() << "Expected type of \"" << tsFieldName << "\" in most recent "
-                              << NamespaceString::kRsOplogNamespace.ns()
-                              << " entry to have type Timestamp, but found "
-                              << typeName(tsElement.type()));
-        }
 
-        auto opTimeStatus = OpTime::parseFromOplogEntry(oplogEntry);
-        if (!opTimeStatus.isOK()) {
-            return opTimeStatus.getStatus();
-        }
-        auto wallTimeStatus = OpTime::parseWallTimeFromOplogEntry(oplogEntry);
-        if (!wallTimeStatus.isOK()) {
-            return wallTimeStatus.getStatus();
-        }
-        OpTimeAndWallTime parseResult = {opTimeStatus.getValue(), wallTimeStatus.getValue()};
-        return parseResult;
+        return OpTimeAndWallTime::parseOpTimeAndWallTimeFromOplogEntry(oplogEntry);
+
     } catch (const DBException& ex) {
         return StatusWith<OpTimeAndWallTime>(ex.toStatus());
     }

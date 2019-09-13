@@ -31,6 +31,7 @@
 
 #include <tuple>
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 
 namespace mongo {
@@ -90,8 +91,6 @@ public:
      */
     void append(BSONObjBuilder* builder, const std::string& subObjName) const;
     BSONObj toBSON() const;
-
-    static StatusWith<Date_t> parseWallTimeFromOplogEntry(const BSONObj& obj);
 
     static StatusWith<OpTime> parseFromOplogEntry(const BSONObj& obj);
 
@@ -160,9 +159,18 @@ private:
     long long _term = kInitialTerm;
 };
 
-struct OpTimeAndWallTime {
-    OpTime opTime;
+class OpTimeAndWallTime {
+public:
+    OpTime opTime = OpTime();
     Date_t wallTime = Date_t();
+
+    static StatusWith<OpTimeAndWallTime> parseOpTimeAndWallTimeFromOplogEntry(
+        const BSONObj& bsonObject);
+
+    OpTimeAndWallTime() {}
+
+    OpTimeAndWallTime(OpTime optime, Date_t wall) : opTime(optime), wallTime(wall) {}
+
     inline bool operator==(const OpTimeAndWallTime& rhs) const {
         return opTime == rhs.opTime && wallTime == rhs.wallTime;
     }

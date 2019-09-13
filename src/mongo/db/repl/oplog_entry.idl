@@ -34,6 +34,7 @@ global:
 imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/db/logical_session_id.idl"
+    - "mongo/db/repl/optime_and_wall_time_base.idl"
     - "mongo/db/repl/replication_types.idl"
 
 enums:
@@ -90,16 +91,8 @@ structs:
         chained_structs:
             OperationSessionInfo : OperationSessionInfo
             DurableReplOperation: DurableReplOperation
+            OpTimeAndWallTimeBase: OpTimeAndWallTimeBase
         fields:
-            ts:
-                cpp_name: timestamp
-                type: timestamp
-                description: "The time when the oplog entry was created"
-            t:
-                cpp_name: term
-                type: long
-                optional: true # The term is optional for PV0 oplog entries.
-                description: "The term of the primary that created the oplog entry"
             h:
                 cpp_name: hash
                 type: long
@@ -118,10 +111,6 @@ structs:
                 type: objectid
                 optional: true
                 description: "An optional _id field for tests that manually insert oplog entries"
-            wall:
-                cpp_name: wallClockTime
-                type: date
-                description: "A wallclock time with MS resolution"
             stmtId:
                 cpp_name: statementId
                 type: StmtId

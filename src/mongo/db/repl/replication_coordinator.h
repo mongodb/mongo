@@ -72,7 +72,7 @@ namespace repl {
 class BackgroundSync;
 class IsMasterResponse;
 class OpTime;
-struct OpTimeAndWallTime;
+class OpTimeAndWallTime;
 class ReadConcernArgs;
 class ReplSetConfig;
 class ReplSetHeartbeatArgsV1;

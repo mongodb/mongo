@@ -481,8 +481,20 @@ env.Library(
     ],
     LIBDEPS=[
         'optime',
+        'optime_and_wall_time_base',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/logical_session_id',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
+env.Library(
+    target='optime_and_wall_time_base',
+    source=[
+        env.Idlc('optime_and_wall_time_base.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
@@ -991,6 +1003,7 @@ env.Library(target='optime',
                 'optime.cpp',
             ],
             LIBDEPS=[
+                'optime_and_wall_time_base',
                 '$BUILD_DIR/mongo/base',
                 '$BUILD_DIR/mongo/bson/util/bson_extract',
             ],
