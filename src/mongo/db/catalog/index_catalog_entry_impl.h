@@ -113,6 +113,14 @@ public:
 
     void setIsReady(bool newIsReady) final;
 
+    void setDropped() final {
+        _isDropped.store(true);
+    }
+
+    bool isDropped() const final {
+        return _isDropped.load();
+    }
+
     // --
 
     /**
@@ -199,8 +207,9 @@ private:
 
     // cached stuff
 
-    Ordering _ordering;  // TODO: this might be b-tree specific
-    bool _isReady;       // cache of NamespaceDetails info
+    Ordering _ordering;           // TODO: this might be b-tree specific
+    bool _isReady;                // cache of NamespaceDetails info
+    AtomicWord<bool> _isDropped;  // Whether the index drop is committed.
 
     // Set to true if this index supports path-level multikey tracking.
     // '_indexTracksPathLevelMultikeyInfo' is effectively const after IndexCatalogEntry::init() is

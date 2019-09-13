@@ -881,6 +881,7 @@ public:
             // future, and we will need to do another write to reach the minimum visible snapshot.
             commitTime = LogicalClock::getClusterTimeForReplicaSet(_opCtx).asTimestamp();
         }
+        _entry->setDropped();
         _collection->setMinimumVisibleSnapshot(commitTime.get());
     }
 

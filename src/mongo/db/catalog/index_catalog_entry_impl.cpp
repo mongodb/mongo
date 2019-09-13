@@ -66,6 +66,7 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
       _queryInfo(queryInfo),
       _ordering(Ordering::make(_descriptor->keyPattern())),
       _isReady(false),
+      _isDropped(false),
       _prefix(DurableCatalog::get(opCtx)->getIndexPrefix(
           opCtx, _descriptor->parentNS(), _descriptor->indexName())) {
     _descriptor->_cachedEntry = this;

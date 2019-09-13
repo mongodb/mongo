@@ -90,6 +90,9 @@ public:
 
     virtual void setIsReady(const bool newIsReady) = 0;
 
+    virtual void setDropped() = 0;
+    virtual bool isDropped() const = 0;
+
     // --
 
     /**
