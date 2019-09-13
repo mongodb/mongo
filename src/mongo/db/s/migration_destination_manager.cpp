@@ -41,6 +41,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
@@ -688,7 +689,12 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationCont
                 // Make sure to create index on secondaries as well. Oplog entry must be written
                 // before the index is added to the index catalog for correct rollback operation.
                 // See SERVER-35780 and SERVER-35070.
-                opObserver->onCreateIndex(opCtx, nss, collection->uuid(), spec, fromMigrate);
+
+                // If two phase index builds is enabled, index build will be coordinated using
+                // startIndexBuild and commitIndexBuild oplog entries.
+                if (!IndexBuildsCoordinator::get(opCtx)->supportsTwoPhaseIndexBuild()) {
+                    opObserver->onCreateIndex(opCtx, nss, collection->uuid(), spec, fromMigrate);
+                }
 
                 // Since the collection is empty, we can add and commit the index catalog entry
                 // within a single WUOW.

@@ -794,11 +794,10 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                   ui);
           auto collUUID = ui.get();
 
-          LOG(3) << "startIndexBuild: " << indexBuildUUID << ": collection: " << nss << " ("
-                 << collUUID << "): " << redact(cmd);
+          if (IndexBuildsCoordinator::get(opCtx)->supportsTwoPhaseIndexBuild()) {
+              return startIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexesElem, mode);
+          }
 
-          // TODO(SERVER-39239): Revisit when we are ready to implement commitIndexBuild.
-          // return startIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexesElem, mode);
           return Status::OK();
       },
       {ErrorCodes::NamespaceNotFound}}},

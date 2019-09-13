@@ -637,9 +637,13 @@ void State::prepTempCollection() {
                     continue;
                 }
 
-                // Log the createIndex operation.
-                opObserver->onCreateIndex(
-                    _opCtx, tmpName, tempColl->uuid(), indexToInsert, fromMigrate);
+                // If two phase index builds is enabled, index build will be coordinated using
+                // startIndexBuild and commitIndexBuild oplog entries.
+                if (!IndexBuildsCoordinator::get(_opCtx)->supportsTwoPhaseIndexBuild()) {
+                    // Log the createIndex operation.
+                    opObserver->onCreateIndex(
+                        _opCtx, tmpName, tempColl->uuid(), indexToInsert, fromMigrate);
+                }
             }
 
             if (buildUUID) {

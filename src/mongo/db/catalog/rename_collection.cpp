@@ -601,8 +601,12 @@ Status renameBetweenDBs(OperationContext* opCtx,
             }
 
             for (const auto& indexToCopy : indexesToCopy) {
-                opObserver->onCreateIndex(
-                    opCtx, tmpName, tmpColl->uuid(), indexToCopy, fromMigrate);
+                // If two phase index builds is enabled, index build will be coordinated using
+                // startIndexBuild and commitIndexBuild oplog entries.
+                if (!IndexBuildsCoordinator::get(opCtx)->supportsTwoPhaseIndexBuild()) {
+                    opObserver->onCreateIndex(
+                        opCtx, tmpName, tmpColl->uuid(), indexToCopy, fromMigrate);
+                }
 
                 auto indexResult =
                     tmpIndexCatalog->createIndexOnEmptyCollection(opCtx, indexToCopy);

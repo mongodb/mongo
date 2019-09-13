@@ -1014,6 +1014,11 @@ void IndexBuildsCoordinator::_buildIndex(
     };
 
     auto onCreateEachFn = [&](const BSONObj& spec) {
+        // If two phase index builds is enabled, index build will be coordinated using
+        // startIndexBuild and commitIndexBuild oplog entries.
+        if (supportsTwoPhaseIndexBuild()) {
+            return;
+        }
         opObserver->onCreateIndex(
             opCtx, collection->ns(), replState->collectionUUID, spec, fromMigrate);
     };
