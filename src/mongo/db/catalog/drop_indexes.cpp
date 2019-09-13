@@ -226,12 +226,16 @@ Status dropIndexes(OperationContext* opCtx,
         WriteUnitOfWork wunit(opCtx);
         OldClientContext ctx(opCtx, nss.ns());
 
-        Status status = wrappedRun(opCtx, collection, cmdObj, result);
+        // Use an empty BSONObjBuilder to avoid duplicate appends to result on retry loops.
+        BSONObjBuilder tempObjBuilder;
+        Status status = wrappedRun(opCtx, collection, cmdObj, &tempObjBuilder);
         if (!status.isOK()) {
             return status;
         }
 
         wunit.commit();
+
+        result->appendElementsUnique(tempObjBuilder.done());  // This append will only happen once.
         return Status::OK();
     });
 }
