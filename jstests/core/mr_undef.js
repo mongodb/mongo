@@ -5,8 +5,6 @@
 //   uses_map_reduce_with_temp_collections,
 // ]
 
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryUseAggMapReduce: true}));
-
 t = db.mr_undef;
 t.drop();
 
@@ -34,5 +32,3 @@ assert.eq(1, out.find({_id: {$type: 10}}).itcount(), "A2");
 
 x = out.findOne();
 assert.eq(x, out.findOne({_id: x["_id"]}), "A3");
-
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryUseAggMapReduce: false}));

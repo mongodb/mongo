@@ -241,38 +241,28 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     };
 
     auto parsedMr = MapReduce::parse(IDLParserErrorContext("MapReduce"), cmd);
-    auto expCtx = makeExpressionContext(opCtx, parsedMr);
-    auto runnablePipeline = [&]() {
-        auto pipeline = translateFromMR(parsedMr, expCtx);
-        return expCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
-            expCtx, pipeline.release());
-    }();
+    bool inMemory = parsedMr.getOutOptions().getOutputType() == OutputType::InMemory;
 
-    if (parsedMr.getOutOptions().getOutputType() == OutputType::InMemory) {
-        map_reduce_output_format::appendInlineResponse(
-            exhaustPipelineIntoBSONArray(runnablePipeline),
-            boost::get_optional_value_or(parsedMr.getVerbose(), false),
-            false,
-            &result);
-    } else {
-        // For non-inline output, the pipeline should not return any results however getNext() still
-        // needs to be called once to ensure documents are written to the output collection.
-        invariant(!runnablePipeline->getNext());
+    auto pipe = translateFromMR(parsedMr, makeExpressionContext(opCtx, parsedMr));
 
+    if (inMemory)
+        map_reduce_output_format::appendInlineResponse(exhaustPipelineIntoBSONArray(pipe),
+                                                       parsedMr.getVerbose().get_value_or(false),
+                                                       false,
+                                                       &result);
+    else
         map_reduce_output_format::appendOutResponse(
             parsedMr.getOutOptions().getDatabaseName(),
             parsedMr.getOutOptions().getCollectionName(),
             boost::get_optional_value_or(parsedMr.getVerbose(), false),
             false,
             &result);
-    }
 
     return true;
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
     MapReduce parsedMr, boost::intrusive_ptr<ExpressionContext> expCtx) {
-
     // TODO: It would be good to figure out what kind of errors this would produce in the Status.
     // It would be better not to produce something incomprehensible out of an internal translation.
     return uassertStatusOK(Pipeline::create(

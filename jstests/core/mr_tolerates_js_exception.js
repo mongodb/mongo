@@ -12,8 +12,6 @@
 (function() {
 "use strict";
 
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryUseAggMapReduce: true}));
-
 let coll = db.mr_tolerates_js_exception;
 coll.drop();
 for (let i = 0; i < 100; i++) {
@@ -69,6 +67,4 @@ assert(!cmdOutput.hasOwnProperty("stack"),
        () => "mapReduce shouldn't return JavaScript stacktrace separately: " + tojson(cmdOutput));
 assert(!cmdOutput.hasOwnProperty("originalError"),
        () => "mapReduce shouldn't return wrapped version of the error: " + tojson(cmdOutput));
-
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryUseAggMapReduce: false}));
 }());

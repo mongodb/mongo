@@ -6,8 +6,6 @@
 (function() {
 "use strict";
 
-load('jstests/libs/fixture_helpers.js');  // For 'FixtureHelpers'
-
 const source = db.mr_validation;
 source.drop();
 assert.commandWorked(source.insert({x: 1}));
@@ -89,20 +87,4 @@ assert.commandFailed(db.runCommand({
     reduce: reduceFunc,
     out: {merge: "foo", db: /test/}
 }));
-
-// Test that mapReduce fails when run against a view.
-assert.commandWorked(db.createView("sourceView", source.getName(), [{$project: {_id: 0}}]));
-assert.commandFailedWithCode(
-    db.runCommand({mapReduce: "sourceView", map: mapFunc, reduce: reduceFunc, out: "foo"}),
-    ErrorCodes.CommandNotSupportedOnView);
-
-// The new implementation is not supported in a sharded cluster yet, so avoid running it in the
-// passthrough suites.
-if (!FixtureHelpers.isMongos(db)) {
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryUseAggMapReduce: true}));
-    assert.commandFailedWithCode(
-        db.runCommand({mapReduce: "sourceView", map: mapFunc, reduce: reduceFunc, out: "foo"}),
-        ErrorCodes.CommandNotSupportedOnView);
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryUseAggMapReduce: false}));
-}
 }());
