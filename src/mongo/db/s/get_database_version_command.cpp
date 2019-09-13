@@ -80,7 +80,7 @@ public:
             AutoGetDb autoDb(opCtx, _targetDb(), MODE_IS);
             if (auto db = autoDb.getDb()) {
                 auto& dss = DatabaseShardingState::get(db);
-                auto dssLock = DatabaseShardingState::DSSLock::lock(opCtx, &dss);
+                auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, &dss);
 
                 if (auto dbVersion = dss.getDbVersion(opCtx, dssLock)) {
                     versionObj = dbVersion->toBSON();

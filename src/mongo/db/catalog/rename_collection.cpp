@@ -155,7 +155,7 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
 
     {
         auto& dss = DatabaseShardingState::get(db);
-        auto dssLock = DatabaseShardingState::DSSLock::lock(opCtx, &dss);
+        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, &dss);
         dss.checkDbVersion(opCtx, dssLock);
     }
 
@@ -474,7 +474,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
 
     {
         auto& dss = DatabaseShardingState::get(sourceDB);
-        auto dssLock = DatabaseShardingState::DSSLock::lock(opCtx, &dss);
+        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, &dss);
         dss.checkDbVersion(opCtx, dssLock);
     }
 

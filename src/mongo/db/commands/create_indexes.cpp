@@ -353,7 +353,7 @@ Database* getOrCreateDatabase(OperationContext* opCtx, StringData dbName, Lock::
  */
 void checkDatabaseShardingState(OperationContext* opCtx, Database* db) {
     auto& dss = DatabaseShardingState::get(db);
-    auto dssLock = DatabaseShardingState::DSSLock::lock(opCtx, &dss);
+    auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, &dss);
     dss.checkDbVersion(opCtx, dssLock);
 }
 

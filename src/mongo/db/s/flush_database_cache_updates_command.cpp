@@ -128,7 +128,7 @@ public:
                 // propagated back to this shard. This ensures the read your own writes causal
                 // consistency guarantee.
                 auto& dss = DatabaseShardingState::get(autoDb.getDb());
-                auto dssLock = DatabaseShardingState::DSSLock::lock(opCtx, &dss);
+                auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, &dss);
 
                 if (auto criticalSectionSignal = dss.getCriticalSectionSignal(
                         ShardingMigrationCriticalSection::kRead, dssLock)) {

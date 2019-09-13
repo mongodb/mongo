@@ -258,7 +258,7 @@ void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName) {
         }
 
         auto& dss = DatabaseShardingState::get(db);
-        auto dssLock = DatabaseShardingState::DSSLock::lock(opCtx, &dss);
+        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, &dss);
 
         const auto cachedDbVersion = dss.getDbVersion(opCtx, dssLock);
         if (cachedDbVersion && cachedDbVersion->getUuid() == refreshedDbVersion.getUuid() &&

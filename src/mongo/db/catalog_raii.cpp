@@ -51,7 +51,7 @@ AutoGetDb::AutoGetDb(OperationContext* opCtx, StringData dbName, LockMode mode, 
       }()) {
     if (_db) {
         auto& dss = DatabaseShardingState::get(_db);
-        auto dssLock = DatabaseShardingState::DSSLock::lock(opCtx, &dss);
+        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, &dss);
         dss.checkDbVersion(opCtx, dssLock);
     }
 }
@@ -183,7 +183,7 @@ AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* opCtx,
     }
 
     auto& dss = DatabaseShardingState::get(_db);
-    auto dssLock = DatabaseShardingState::DSSLock::lock(opCtx, &dss);
+    auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, &dss);
     dss.checkDbVersion(opCtx, dssLock);
 }
 
