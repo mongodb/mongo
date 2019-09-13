@@ -1344,7 +1344,7 @@ IndexDescriptor* IndexCatalogImpl::findShardKeyPrefixedIndex(OperationContext* o
         IndexDescriptor* desc = ii.next();
         bool hasSimpleCollation = desc->infoObj().getObjectField("collation").isEmpty();
 
-        if (desc->isPartial())
+        if (desc->isPartial() || desc->isSparse())
             continue;
 
         if (!shardKey.isPrefixOf(desc->keyPattern(), SimpleBSONElementComparator::kInstance))
