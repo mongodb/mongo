@@ -49,10 +49,11 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.transitions = {
-        query: {aggregate: 1.0},
         aggregate: {aggregate: 0.8, killOp: 0.2},
         killOp: {aggregate: 0.8, killOp: 0.2}
     };
+
+    $config.startState = 'aggregate';
 
     return $config;
 });
