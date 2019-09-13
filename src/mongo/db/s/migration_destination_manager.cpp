@@ -389,7 +389,8 @@ repl::OpTime MigrationDestinationManager::cloneDocumentsFromDonor(
     repl::OpTime lastOpApplied;
 
     stdx::thread inserterThread{[&] {
-        ThreadClient tc("chunkInserter", opCtx->getServiceContext());
+        Client::initKillableThread("chunkInserter", opCtx->getServiceContext());
+
         auto inserterOpCtx = Client::getCurrent()->makeOperationContext();
         auto consumerGuard = makeGuard([&] {
             batches.closeConsumerEnd();
@@ -716,9 +717,8 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationCont
 }
 
 void MigrationDestinationManager::_migrateThread() {
-    Client::initThread("migrateThread");
+    Client::initKillableThread("migrateThread", getGlobalServiceContext());
     auto opCtx = Client::getCurrent()->makeOperationContext();
-
 
     if (AuthorizationManager::get(opCtx->getServiceContext())->isAuthEnabled()) {
         AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization(opCtx.get());

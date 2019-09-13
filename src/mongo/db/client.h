@@ -76,6 +76,11 @@ public:
                            transport::SessionHandle session);
 
     /**
+     * Same as initThread, but also explicitly sets the client for this thread to be killable.
+     */
+    static void initKillableThread(StringData desc, ServiceContext* serviceContext);
+
+    /**
      * Moves client into the thread_local for this thread. After this call, Client::getCurrent
      * and cc() will return client.get(). The client will be destroyed when the thread exits
      * or the ThreadClient RAII helper exits its scope.
