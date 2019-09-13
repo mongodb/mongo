@@ -709,11 +709,6 @@ std::string runQuery(OperationContext* opCtx,
         MONGO_UNREACHABLE;
     }
 
-    // Before saving the cursor, ensure that whatever plan we established happened with the expected
-    // collection version
-    auto css = CollectionShardingState::get(opCtx, nss);
-    css->checkShardVersionOrThrow(opCtx);
-
     // Fill out CurOp based on query results. If we have a cursorid, we will fill out CurOp with
     // this cursorid later.
     long long ccId = 0;

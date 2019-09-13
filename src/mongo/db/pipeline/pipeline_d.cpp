@@ -126,16 +126,13 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorEx
 
     // If the incoming operation is sharded, use the CSS to infer the filtering metadata for the
     // collection, otherwise treat it as unsharded
-    boost::optional<ScopedCollectionMetadata> shardMetadata =
-        (OperationShardingState::isOperationVersioned(opCtx)
-             ? CollectionShardingState::get(opCtx, coll->ns())->getOrphansFilter(opCtx)
-             : boost::optional<ScopedCollectionMetadata>{});
+    auto shardMetadata = CollectionShardingState::get(opCtx, coll->ns())->getOrphansFilter(opCtx);
 
     // Because 'numRecords' includes orphan documents, our initial decision to optimize the $sample
     // cursor may have been mistaken. For sharded collections, build a TRIAL plan that will switch
     // to a collection scan if the ratio of orphaned to owned documents encountered over the first
     // 100 works() is such that we would have chosen not to optimize.
-    if (shardMetadata && (*shardMetadata)->isSharded()) {
+    if (shardMetadata->isSharded()) {
         // The ratio of owned to orphaned documents must be at least equal to the ratio between the
         // requested sampleSize and the maximum permitted sampleSize for the original constraints to
         // be satisfied. For instance, if there are 200 documents and the sampleSize is 5, then at
@@ -146,12 +143,12 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorEx
             sampleSize / (numRecords * kMaxSampleRatioForRandCursor), kMaxSampleRatioForRandCursor);
         // The trial plan is SHARDING_FILTER-MULTI_ITERATOR.
         auto randomCursorPlan =
-            std::make_unique<ShardFilterStage>(opCtx, *shardMetadata, ws.get(), root.release());
+            std::make_unique<ShardFilterStage>(opCtx, shardMetadata, ws.get(), root.release());
         // The backup plan is SHARDING_FILTER-COLLSCAN.
         std::unique_ptr<PlanStage> collScanPlan = std::make_unique<CollectionScan>(
             opCtx, coll, CollectionScanParams{}, ws.get(), nullptr);
         collScanPlan = std::make_unique<ShardFilterStage>(
-            opCtx, *shardMetadata, ws.get(), collScanPlan.release());
+            opCtx, shardMetadata, ws.get(), collScanPlan.release());
         // Place a TRIAL stage at the root of the plan tree, and pass it the trial and backup plans.
         root = std::make_unique<TrialStage>(opCtx,
                                             ws.get(),

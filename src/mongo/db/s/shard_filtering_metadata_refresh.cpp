@@ -157,7 +157,7 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         // No chunk manager, so unsharded. Avoid using AutoGetCollection() as it returns the
         // InvalidViewDefinition error code if an invalid view is in the 'system.views' collection.
         AutoGetDb autoDb(opCtx, nss.db(), MODE_IX);
-        Lock::CollectionLock collLock(opCtx, nss, MODE_X);
+        Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
         CollectionShardingRuntime::get(opCtx, nss)
             ->setFilteringMetadata(opCtx, CollectionMetadata());
 
@@ -186,11 +186,10 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         }
     }
 
-    // Exclusive collection lock needed since we're now changing the metadata. Avoid using
-    // AutoGetCollection() as it returns the InvalidViewDefinition error code if an invalid view is
-    // in the 'system.views' collection.
+    // Avoid using AutoGetCollection() as it returns the InvalidViewDefinition error code if an
+    // invalid view is in the 'system.views' collection.
     AutoGetDb autoDb(opCtx, nss.db(), MODE_IX);
-    Lock::CollectionLock collLock(opCtx, nss, MODE_X);
+    Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
     auto* const css = CollectionShardingRuntime::get(opCtx, nss);
 
     {

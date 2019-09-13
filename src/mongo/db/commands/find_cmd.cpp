@@ -49,7 +49,6 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/server_read_concern_metrics.h"
@@ -487,11 +486,6 @@ public:
 
                 uassertStatusOK(status.withContext("Executor error during find command"));
             }
-
-            // Before saving the cursor, ensure that whatever plan we established happened with the
-            // expected collection version
-            auto css = CollectionShardingState::get(opCtx, nss);
-            css->checkShardVersionOrThrow(opCtx);
 
             // Set up the cursor for getMore.
             CursorId cursorId = 0;

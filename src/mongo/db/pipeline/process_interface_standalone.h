@@ -57,6 +57,11 @@ public:
     DBClientBase* directClient() final;
     std::unique_ptr<TransactionHistoryIteratorBase> createTransactionHistoryIterator(
         repl::OpTime time) const final;
+
+    /**
+     * Note: Information returned can be stale. Caller should always attach shardVersion when
+     * sending request against nss based on this information.
+     */
     bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final;
     Status insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                   const NamespaceString& ns,

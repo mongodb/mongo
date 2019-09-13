@@ -206,8 +206,9 @@ unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceShardServer::attachCursorSou
 
 std::unique_ptr<ShardFilterer> MongoInterfaceShardServer::getShardFilterer(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
-    return std::make_unique<ShardFiltererImpl>(
-        CollectionShardingState::get(expCtx->opCtx, expCtx->ns)->getOrphansFilter(expCtx->opCtx));
+    auto shardingMetadata =
+        CollectionShardingState::get(expCtx->opCtx, expCtx->ns)->getOrphansFilter(expCtx->opCtx);
+    return std::make_unique<ShardFiltererImpl>(std::move(shardingMetadata));
 }
 
 }  // namespace mongo

@@ -1469,7 +1469,7 @@ public:
 
         const auto metadata = [&] {
             AutoGetCollectionForReadCommand autoColl(opCtx, config.nss);
-            return CollectionShardingState::get(opCtx, config.nss)->getCurrentMetadata();
+            return CollectionShardingState::get(opCtx, config.nss)->getOrphansFilter(opCtx);
         }();
 
         bool shouldHaveData = false;
