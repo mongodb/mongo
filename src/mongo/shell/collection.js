@@ -1413,8 +1413,11 @@ DBCollection.prototype.countDocuments = function(query, options) {
 
     // Format cursor into an array.
     const res = this.aggregate(pipeline, aggregateOptions).toArray();
+    if (res.length) {
+        return res[0].n;
+    }
 
-    return res[0].n;
+    return 0;
 };
 
 /**

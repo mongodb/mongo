@@ -12,6 +12,9 @@ const collName = "document_count_functions";
 const coll = db.getCollection(collName);
 
 coll.drop();
+assert.eq(0, coll.countDocuments({i: 1}));
+assert.commandWorked(db.createCollection(collName));
+assert.eq(0, coll.countDocuments({i: 1}));
 
 assert.commandWorked(coll.insert({i: 1, j: 1}));
 assert.commandWorked(coll.insert({i: 2, j: 1}));
