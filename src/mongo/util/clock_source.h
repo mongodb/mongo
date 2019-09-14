@@ -34,6 +34,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/lockable_adapter.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -47,11 +48,11 @@ class ClockSource {
     // We need a type trait to differentiate waitable ptr args from predicates.
     //
     // This returns true for non-pointers and function pointers
-    template <typename Pred>
-    struct CouldBePredicate
-        : public std::integral_constant<bool,
-                                        !std::is_pointer<Pred>::value ||
-                                            std::is_function<std::remove_pointer_t<Pred>>::value> {
+    template <typename PredicateT>
+    struct CouldBePredicate : public std::integral_constant<
+                                  bool,
+                                  !std::is_pointer<PredicateT>::value ||
+                                      std::is_function<std::remove_pointer_t<PredicateT>>::value> {
     };
 
 public:
@@ -91,7 +92,7 @@ public:
      * stdx::chrono::system_clock to measure the passage of time.
      */
     stdx::cv_status waitForConditionUntil(stdx::condition_variable& cv,
-                                          stdx::unique_lock<stdx::mutex>& m,
+                                          BasicLockableAdapter m,
                                           Date_t deadline,
                                           Waitable* waitable = nullptr);
 
@@ -99,11 +100,13 @@ public:
      * Like cv.wait_until(m, deadline, pred), but uses this ClockSource instead of
      * stdx::chrono::system_clock to measure the passage of time.
      */
-    template <typename Pred, std::enable_if_t<CouldBePredicate<Pred>::value, int> = 0>
+    template <typename LockT,
+              typename PredicateT,
+              std::enable_if_t<CouldBePredicate<PredicateT>::value, int> = 0>
     bool waitForConditionUntil(stdx::condition_variable& cv,
-                               stdx::unique_lock<stdx::mutex>& m,
+                               LockT& m,
                                Date_t deadline,
-                               const Pred& pred,
+                               const PredicateT& pred,
                                Waitable* waitable = nullptr) {
         while (!pred()) {
             if (waitForConditionUntil(cv, m, deadline, waitable) == stdx::cv_status::timeout) {
@@ -117,13 +120,14 @@ public:
      * Like cv.wait_for(m, duration, pred), but uses this ClockSource instead of
      * stdx::chrono::system_clock to measure the passage of time.
      */
-    template <typename Duration,
-              typename Pred,
-              std::enable_if_t<CouldBePredicate<Pred>::value, int> = 0>
+    template <typename LockT,
+              typename Duration,
+              typename PredicateT,
+              std::enable_if_t<CouldBePredicate<PredicateT>::value, int> = 0>
     bool waitForConditionFor(stdx::condition_variable& cv,
-                             stdx::unique_lock<stdx::mutex>& m,
+                             LockT& m,
                              Duration duration,
-                             const Pred& pred,
+                             const PredicateT& pred,
                              Waitable* waitable = nullptr) {
         return waitForConditionUntil(cv, m, now() + duration, pred, waitable);
     }

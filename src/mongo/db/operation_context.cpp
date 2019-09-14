@@ -266,7 +266,7 @@ Status OperationContext::checkForInterruptNoAssert() noexcept {
 // - _baton is notified (someone's queuing work for the baton)
 // - _baton::run returns (timeout fired / networking is ready / socket disconnected)
 StatusWith<stdx::cv_status> OperationContext::waitForConditionOrInterruptNoAssertUntil(
-    stdx::condition_variable& cv, stdx::unique_lock<stdx::mutex>& m, Date_t deadline) noexcept {
+    stdx::condition_variable& cv, BasicLockableAdapter m, Date_t deadline) noexcept {
     invariant(getClient());
 
     if (auto status = checkForInterruptNoAssert(); !status.isOK()) {

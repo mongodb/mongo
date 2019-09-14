@@ -49,10 +49,11 @@ namespace mongo {
  */
 class Waitable : public Notifyable {
 public:
+    template <typename LockT>
     static void wait(Waitable* waitable,
                      ClockSource* clkSource,
                      stdx::condition_variable& cv,
-                     stdx::unique_lock<stdx::mutex>& lk) {
+                     LockT& lk) {
         if (waitable) {
             cv._runWithNotifyable(*waitable, [&]() noexcept {
                 lk.unlock();
@@ -64,22 +65,23 @@ public:
         }
     }
 
-    template <typename Predicate>
+    template <typename LockT, typename PredicateT>
     static void wait(Waitable* waitable,
                      ClockSource* clkSource,
                      stdx::condition_variable& cv,
-                     stdx::unique_lock<stdx::mutex>& lk,
-                     Predicate pred) {
+                     LockT& lk,
+                     PredicateT pred) {
         while (!pred()) {
             wait(waitable, clkSource, cv, lk);
         }
     }
 
+    template <typename LockT>
     static stdx::cv_status wait_until(
         Waitable* waitable,
         ClockSource* clkSource,
         stdx::condition_variable& cv,
-        stdx::unique_lock<stdx::mutex>& lk,
+        LockT& lk,
         const stdx::chrono::time_point<stdx::chrono::system_clock>& timeout_time) {
         if (waitable) {
             auto rval = stdx::cv_status::no_timeout;
@@ -98,13 +100,13 @@ public:
         }
     }
 
-    template <typename Predicate>
+    template <typename LockT, typename PredicateT>
     static bool wait_until(Waitable* waitable,
                            ClockSource* clkSource,
                            stdx::condition_variable& cv,
-                           stdx::unique_lock<stdx::mutex>& lk,
+                           LockT& lk,
                            const stdx::chrono::time_point<stdx::chrono::system_clock>& timeout_time,
-                           Predicate pred) {
+                           PredicateT pred) {
         while (!pred()) {
             if (wait_until(waitable, clkSource, cv, lk, timeout_time) == stdx::cv_status::timeout) {
                 return pred();

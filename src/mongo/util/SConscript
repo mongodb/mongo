@@ -552,6 +552,7 @@ icuEnv.CppUnitTest(
         'icu_test.cpp',
         'invalidating_lru_cache_test.cpp',
         'itoa_test.cpp',
+        'lockable_adapter_test.cpp',
         'lru_cache_test.cpp',
         'md5_test.cpp',
         'md5main.cpp',

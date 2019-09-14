@@ -79,9 +79,7 @@ public:
 
 class DummyInterruptable final : public Interruptible {
     StatusWith<stdx::cv_status> waitForConditionOrInterruptNoAssertUntil(
-        stdx::condition_variable& cv,
-        stdx::unique_lock<stdx::mutex>& m,
-        Date_t deadline) noexcept override {
+        stdx::condition_variable& cv, BasicLockableAdapter m, Date_t deadline) noexcept override {
         return Status(ErrorCodes::Interrupted, "");
     }
     Date_t getDeadline() const override {
