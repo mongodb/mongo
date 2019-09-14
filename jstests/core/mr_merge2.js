@@ -8,6 +8,13 @@
 //   uses_map_reduce_with_temp_collections,
 // ]
 
+load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+
+// Do not execute new path on the passthrough suites.
+if (!FixtureHelpers.isMongos(db)) {
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryUseAggMapReduce: true}));
+}
+
 t = db.mr_merge2;
 t.drop();
 
@@ -54,3 +61,5 @@ res = t.mapReduce(m, r, outOptions);
 expected["4"]++;
 expected["5"] = 1;
 assert.eq(tos(expected), tos(res.convertToSingleObject()), "B");
+
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryUseAggMapReduce: false}));
