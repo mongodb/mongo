@@ -3802,6 +3802,19 @@ tasks:
         files:
           - src/artifacts.json
 
+## compile_core_tools - minimal/fast version of compile used for commit queue ##
+- name: compile_core_tools
+  depends_on: []
+  commands:
+    - func: "build new tools"
+    - func: "scons compile"
+      vars:
+        targets: core tools
+        task_compile_flags: >-
+          --use-new-tools
+          --build-mongoreplay="${build_mongoreplay}"
+          --detect-odr-violations
+
 ## compile_all - build all scons targets ##
 - name: compile_all
   commands:
@@ -8424,6 +8437,10 @@ task_groups:
   tasks:
   - compile
 - <<: *compile_task_group_template
+  name: compile_core_tools_TG
+  tasks:
+  - compile_core_tools
+- <<: *compile_task_group_template
   name: dbtest_TG
   tasks:
   - dbtest
@@ -12510,5 +12527,30 @@ buildvariants:
     - rhel62-small
   batchtime: 10080 # 7 days
   stepback: false
+  expansions:
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: x86_64-enterprise-rhel62
+    mh_target: dist-mh
+    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: rhel62
+    multiversion_edition: enterprise
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: x86_64
+    packager_distro: rhel62
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    tooltags: "ssl sasl gssapi"
+    build_mongoreplay: true
+    jstestfuzz_num_generated_files: 40
+    jstestfuzz_concurrent_num_files: 10
+    target_resmoke_time: 10
+    large_distro_name: rhel62-large
+    burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff
   tasks:
-    - name: commit_queue_placeholder
+  - name: commit_queue_placeholder
+  - name: compile_core_tools_TG
+    distros:
+    - rhel62-large
