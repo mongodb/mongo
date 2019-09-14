@@ -115,7 +115,7 @@ void batchErrorToLastError(const BatchedCommandRequest& request,
         }
 
         const int numUpserted = response.isUpsertDetailsSet() ? response.sizeUpsertDetails() : 0;
-        const int numMatched = response.getN() - numUpserted;
+        const auto numMatched = response.getN() - numUpserted;
         invariant(numMatched >= 0);
 
         // Wrap upserted id in "upserted" field
