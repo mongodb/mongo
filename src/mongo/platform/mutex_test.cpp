@@ -59,7 +59,7 @@ TEST(MutexTest, Macros) {
     } holder;
     static_assert(std::is_same_v<decltype(MutexHolder::m2), Mutex>);
     ASSERT_NE(holder.m2.getName().find("MutexHolder"_sd), std::string::npos);
-    ASSERT_NE(holder.m2.getName().find("m2"_sd), std::string::npos);
+    ASSERT_EQ(holder.m2.getName().find("m2"_sd), std::string::npos) << holder.m2.getName();
 
     // Verify the global named latch
     static_assert(std::is_same_v<decltype(gMutex), Mutex>);
