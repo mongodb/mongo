@@ -199,13 +199,25 @@ public:
         // Time how long it takes to run the explain command on the shard.
         Timer timer;
         BSONObjBuilder bob;
-        _runCommand(opCtx,
-                    shard->getId(),
-                    (chunkMgr ? chunkMgr->getVersion(shard->getId()) : ChunkVersion::UNSHARDED()),
-                    boost::none,
-                    nss,
-                    explainCmd,
-                    &bob);
+
+        if (chunkMgr) {
+            _runCommand(opCtx,
+                        shard->getId(),
+                        chunkMgr->getVersion(shard->getId()),
+                        boost::none,
+                        nss,
+                        explainCmd,
+                        &bob);
+        } else {
+            _runCommand(opCtx,
+                        shard->getId(),
+                        ChunkVersion::UNSHARDED(),
+                        routingInfo.db().databaseVersion(),
+                        nss,
+                        explainCmd,
+                        &bob);
+        }
+
         const auto millisElapsed = timer.millis();
 
         Strategy::CommandResult cmdResult;

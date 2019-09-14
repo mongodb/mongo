@@ -349,8 +349,7 @@ let testCases = {
         },
         explain: {
             skipProfilerCheck: true,
-            sendsDbVersion:
-                false,  // TODO: SERVER-42569 Make findAndModify explain send databaseVersion
+            sendsDbVersion: true,
             sendsShardVersion: true,
             command: {explain: {findAndModify: collName, query: {_id: 0}, remove: true}}
         }
