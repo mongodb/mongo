@@ -90,6 +90,7 @@
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/platform/random.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/elapsed_tracker.h"
@@ -217,10 +218,11 @@ Status commitIndexBuild(OperationContext* opCtx,
 
 Status abortIndexBuild(OperationContext* opCtx,
                        const UUID& indexBuildUUID,
+                       const Status& cause,
                        OplogApplication::Mode mode) {
     // Wait until the index build finishes aborting.
     Future<void> abort = IndexBuildsCoordinator::get(opCtx)->abortIndexBuildByBuildUUID(
-        indexBuildUUID, "abortIndexBuild oplog entry encountered");
+        indexBuildUUID, str::stream() << "abortIndexBuild oplog entry encountered: " << cause);
     return abort.waitNoThrow();
 }
 
@@ -914,7 +916,18 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                  "index names.",
                  indexesElem.type() == Array);
 
-         return abortIndexBuild(opCtx, indexBuildUUID, mode);
+         // Get the reason this index build was aborted on the primary.
+         auto causeElem = cmd.getField("cause");
+         uassert(ErrorCodes::BadValue,
+                 "Error parsing 'abortIndexBuild' oplog entry, missing required field 'cause'.",
+                 !causeElem.eoo());
+         uassert(ErrorCodes::BadValue,
+                 "Error parsing 'abortIndexBuild' oplog entry, field 'cause' must be an object.",
+                 causeElem.type() == Object);
+         auto causeStatusObj = causeElem.Obj();
+         auto cause = getStatusFromCommandResult(causeStatusObj);
+
+         return abortIndexBuild(opCtx, indexBuildUUID, cause, mode);
      }}},
     {"collMod",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
