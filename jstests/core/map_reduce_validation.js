@@ -90,15 +90,16 @@ assert.commandFailed(db.runCommand({
     out: {merge: "foo", db: /test/}
 }));
 
-// Test that mapReduce fails when run against a view.
-assert.commandWorked(db.createView("sourceView", source.getName(), [{$project: {_id: 0}}]));
-assert.commandFailedWithCode(
-    db.runCommand({mapReduce: "sourceView", map: mapFunc, reduce: reduceFunc, out: "foo"}),
-    ErrorCodes.CommandNotSupportedOnView);
-
 // The new implementation is not supported in a sharded cluster yet, so avoid running it in the
 // passthrough suites.
 if (!FixtureHelpers.isMongos(db)) {
+    // Test that mapReduce fails when run against a view.
+    db.sourceView.drop();
+    assert.commandWorked(db.createView("sourceView", source.getName(), [{$project: {_id: 0}}]));
+    assert.commandFailedWithCode(
+        db.runCommand({mapReduce: "sourceView", map: mapFunc, reduce: reduceFunc, out: "foo"}),
+        ErrorCodes.CommandNotSupportedOnView);
+
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryUseAggMapReduce: true}));
     assert.commandFailedWithCode(
         db.runCommand({mapReduce: "sourceView", map: mapFunc, reduce: reduceFunc, out: "foo"}),
