@@ -316,6 +316,7 @@ variables:
   - name: buildscripts_test
   - name: ese
   - name: external_auth
+  - name: external_auth_windows
     distros:
     - windows-64-2016
   - name: jsCore
@@ -3338,6 +3339,7 @@ tasks:
           - "*Test"
           - "./**.pdb"
           - "./**.msi"
+          - "./etc/pip/**"
           - "./etc/*san.suppressions"
           - "./etc/repo_config.yaml"
           - "./etc/test_lifecycle.yml"
@@ -5326,9 +5328,37 @@ tasks:
   name: external_auth
   commands:
   - func: "do setup"
+  - command: shell.exec
+    params:
+      shell: bash
+      script: |
+        set -o errexit
+        set -o verbose
+        ${activate_virtualenv}
+
+        # Not all git get project calls clone into ${workdir}/src so we allow
+        # callers to tell us where the pip requirements files are.
+        pip_dir="${pip_dir}"
+        if [[ -z $pip_dir ]]; then
+          # Default to most common location
+          pip_dir="${workdir}/src/etc/pip"
+        fi
+
+        # Same as above we have to use quotes to preserve the
+        # Windows path separator
+        external_auth_txt="$pip_dir/external-auth-requirements.txt"
+        python -m pip install -r "$external_auth_txt"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=external_auth --storageEngine=wiredTiger
+      resmoke_args: --suites=external_auth --excludeWithAnyTags=requires_domain_controller --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: external_auth_windows
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=external_auth --includeWithAnyTags=requires_domain_controller --storageEngine=wiredTiger
 
 - <<: *task_template
   name: sharding_gle_auth_basics_passthrough
@@ -8727,6 +8757,7 @@ buildvariants:
     - windows-64-vs2015-large
   - name: ese
   - name: external_auth
+  - name: external_auth_windows
     distros:
     - windows-64-2016
   - name: jsCore
