@@ -1721,9 +1721,9 @@ var ReplSetTest = function(opts) {
     this.getHashes = function(dbName, slaves) {
         assert.neq(dbName, 'local', 'Cannot run getHashes() on the "local" database');
 
-        // getPrimary() repopulates 'self._slaves'.
-        this.getPrimary();
-        slaves = slaves || this._slaves;
+        // _determineLiveSlaves() repopulates both 'self._slaves' and 'self._master'. If we're
+        // passed an explicit set of slaves we don't want to do that.
+        slaves = slaves || _determineLiveSlaves();
 
         const sessions = [
             this._master,
