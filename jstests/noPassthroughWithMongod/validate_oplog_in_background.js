@@ -1,7 +1,7 @@
 /**
  * Ensures that background validation works on the Oplog.
  *
- * @tags: [requires_wiredtiger]
+ * @tags: [requires_wiredtiger, requires_persistence]
  */
 (function() {
 'use strict';
