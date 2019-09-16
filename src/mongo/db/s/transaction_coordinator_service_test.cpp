@@ -362,17 +362,6 @@ TEST_F(TransactionCoordinatorServiceTest, CoordinateCommitReturnsNoneIfNoCoordin
     ASSERT(boost::none == commitDecisionFuture);
 }
 
-TEST_F(TransactionCoordinatorServiceTest, CoordinateCommitReturnsNoneIfCoordinatorWasRemoved) {
-    auto coordinatorService = TransactionCoordinatorService::get(operationContext());
-
-    coordinatorService->createCoordinator(operationContext(), _lsid, _txnNumber, kCommitDeadline);
-    commitTransaction(*coordinatorService, _lsid, _txnNumber, kTwoShardIdSet);
-
-    auto commitDecisionFuture =
-        coordinatorService->coordinateCommit(operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
-    ASSERT(boost::none == commitDecisionFuture);
-}
-
 TEST_F(TransactionCoordinatorServiceTest,
        CoordinateCommitWithSameParticipantListJoinsOngoingCoordinationThatLeadsToAbort) {
     auto coordinatorService = TransactionCoordinatorService::get(operationContext());
