@@ -49,6 +49,11 @@ platforms:
       image_id: ami-71b7750b
     transport:
       username: admin
+  - name: debian10
+    driver:
+      image_id: ami-02ad06066b040a84b
+    transport:
+      username: admin
   - name: rhel62
     driver:
       # Use rhel 6.3 because chef-solo fails on rhel 6.2

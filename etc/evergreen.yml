@@ -361,6 +361,7 @@ variables:
 - mongocryptd_variants: &mongocryptd_variants
   - enterprise-amazon2
   - enterprise-debian92-64
+  - enterprise-debian10-64
   - enterprise-linux-64-amazon-ami
   - enterprise-macos
   - enterprise-macos-openssl
@@ -11839,6 +11840,110 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
     distros:
       - debian92-build
+  - name: disk_wiredtiger
+  - name: free_monitoring
+  - name: .jscore .common !.decimal
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: multiversion
+  - name: replica_sets
+  - name: .replica_sets .common
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .common !.op_query !.csrs
+  - name: .ssl
+  - name: .stitch
+  - name: package
+    distros:
+    - ubuntu1604-packer
+  - name: .publish
+
+- name: enterprise-debian10-64
+  display_name: Enterprise Debian 10
+  modules:
+  - enterprise
+  run_on:
+  - debian10-test
+  batchtime: 1440 # 1 day
+  expansions:
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: x86_64-enterprise-debian10
+    mh_target: dist-mh
+    compile_flags: --ssl MONGO_DISTMOD=debian10 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: debian10
+    multiversion_edition: enterprise
+    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
+    # spawning a large number of linker processes.
+    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: x86_64
+    packager_distro: debian10
+    repo_edition: enterprise
+    tooltags: "ssl sasl gssapi"
+    scons_cache_scope: shared
+    build_mongoreplay: true
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - debian10-build
+  - name: .aggfuzzer .common
+  - name: audit
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
+  - name: .jscore .common !.decimal !.compat !.sharding
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: replica_sets_auth_gen
+  - name: replica_sets_jscore_passthrough
+  - name: sasl
+  - name: sharding_auth_gen
+  - name: snmp
+  - name: .stitch
+  - name: package
+    distros:
+    - ubuntu1604-packer
+  - name: .publish
+
+- name: debian10
+  display_name: Debian 10
+  run_on:
+  - debian10-test
+  batchtime: 1440 # 1 day
+  expansions:
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: x86_64-debian10
+    compile_flags: --ssl MONGO_DISTMOD=debian10 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
+    # spawning a large number of linker processes.
+    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
+    multiversion_platform: debian10
+    multiversion_edition: targeted
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: debian10
+    repo_edition: org
+    tooltags: "ssl"
+    scons_cache_scope: shared
+    build_mongoreplay: true
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - debian10-build
+  - name: .aggfuzzer .common
+  - name: aggregation
+  - name: aggregation_auth
+  - name: .auth !.audit !.multiversion
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .misc_js
+  - name: .concurrency .common
+  - name: concurrency_replication_causal_consistency
+    distros:
+      - debian10-build
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: .jscore .common !.decimal
