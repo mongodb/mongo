@@ -31,14 +31,16 @@ import SCons
 from SCons.Tool import install
 
 ALIAS_MAP = "AIB_ALIAS_MAP"
+BASE_ROLE = "AIB_BASE_ROLE"
 COMPONENTS = "AIB_COMPONENTS_EXTRA"
 INSTALL_ACTIONS = "AIB_INSTALL_ACTIONS"
+META_ROLE = "AIB_META_ROLE"
 PACKAGE_ALIAS_MAP = "AIB_PACKAGE_ALIAS_MAP"
 PACKAGE_PREFIX = "AIB_PACKAGE_PREFIX"
 PRIMARY_COMPONENT = "AIB_COMPONENT"
 PRIMARY_ROLE = "AIB_ROLE"
 ROLES = "AIB_ROLES"
-ROLE_DEPENDENCIES = "AIB_ROLE_DEPENDENCIES"
+ROLE_DECLARATIONS = "AIB_ROLE_DECLARATIONS"
 SUFFIX_MAP = "AIB_SUFFIX_MAP"
 
 AIB_MAKE_ARCHIVE_CONTENT = """
@@ -100,14 +102,6 @@ if __name__ == "__main__":
     archive.close()
 """
 
-AVAILABLE_ROLES = [
-    "base",
-    "debug",
-    "dev",
-    "meta",
-    "runtime",
-]
-
 RoleInfo = namedtuple(
     'RoleInfo',
     [
@@ -124,12 +118,111 @@ SuffixMap = namedtuple(
     ],
 )
 
-def generate_alias(component, role, target="install"):
+class DeclaredRole():
+    def __init__(self, name, dependencies=None, transitive=False, silent=False):
+        self.name = name
+
+        if dependencies is None:
+            self.dependencies = set()
+        else:
+            self.dependencies = {dep for dep in dependencies if dep is not None}
+
+        self.transitive = transitive
+        self.silent = silent
+
+def declare_role(env, **kwargs):
+    """Construct a new role declaration"""
+    return DeclaredRole(**kwargs)
+
+def declare_roles(env, roles, base_role=None, meta_role=None):
+    """Given a list of role declarations, validate them and store them in the environment"""
+
+    role_names = [role.name for role in roles]
+    if len(role_names) != len(set(role_names)):
+        raise Exception(
+            "Cannot declare duplicate roles"
+        )
+
+    # Ensure that all roles named in dependency lists actually were
+    # passed in as a role.
+    for role in roles:
+        for d in role.dependencies:
+            if d not in role_names:
+                raise Exception(
+                    "Role dependency '{}' does not name a declared role".format(d)
+                )
+
+    if isinstance(base_role, str):
+        if base_role not in role_names:
+            raise Exception(
+                "A base_role argument was provided but it does not name a declared role"
+            )
+    elif isinstance(base_role, DeclaredRole):
+        if base_role not in roles:
+            raise Exception(
+                "A base_role argument was provided but it is not a declared role"
+            )
+    elif base_role is not None:
+        raise Exception(
+            "The base_role argument must be a string name of a role or a role object"
+        )
+    else:
+        # Set it to something falsy
+        base_role = str()
+
+    if isinstance(meta_role, str):
+        if meta_role not in role_names:
+            raise Exception(
+                "A meta_role argument was provided but it does not name a declared role"
+            )
+    elif isinstance(meta_role, DeclaredRole):
+        if meta_role not in roles:
+            raise Exception(
+                "A meta_role argument was provided but it is not a declared role"
+            )
+    elif meta_role is not None:
+        raise Exception(
+            "The meta_role argument must be a string name of a role or a role object"
+        )
+    else:
+        # Set it to something falsy
+        meta_role = str()
+
+    silents = [role for role in roles if role.silent]
+    if len(silents) > 1:
+        raise Exception(
+            "No more than one role can be declared as silent"
+        )
+
+    # If a base role was given, then add it as a dependency of every
+    # role that isn't the base role (which would be circular).
+    if base_role:
+        for role in roles:
+            if role.name != base_role:
+                role.dependencies.add(base_role)
+
+    # Become a dictionary, so we can look up roles easily.
+    roles = { role.name : role for role in roles }
+
+    # If a meta role was given, then add every role which isn't the
+    # meta role as one of its dependencies.
+    if meta_role:
+        roles[meta_role].dependencies.update(r for r in roles.keys() if r != meta_role)
+
+    # TODO: Check for DAG
+
+    # TODO: What if base_role or meta_role is really None?
+    env[BASE_ROLE] = base_role
+    env[META_ROLE] = meta_role
+    env[ROLE_DECLARATIONS] = roles
+
+
+def generate_alias(env, component, role, target="install"):
     """Generate a scons alias for the component and role combination"""
     return "{target}-{component}{role}".format(
         target=target,
         component=component,
-        role="" if role == "runtime" else "-" + role,
+        role="" if env[ROLE_DECLARATIONS][role].silent else "-" + role,
     )
 
 
@@ -143,6 +236,7 @@ def get_package_name(env, component, role):
 
 
 def get_dependent_actions(
+        env,
         components,
         roles,
         non_transitive_roles,
@@ -170,7 +264,7 @@ def get_dependent_actions(
     #
     # If they are overlapping then that means we can't transition to a
     # new role during scanning.
-    if "base" not in roles:
+    if env[BASE_ROLE] not in roles:
         can_transfer = (
             non_transitive_roles
             and roles.isdisjoint(non_transitive_roles)
@@ -181,11 +275,11 @@ def get_dependent_actions(
     node_roles = {
         role for role
         in getattr(node.attributes, ROLES, set())
-        if role != "meta"
+        if role != env[META_ROLE]
     }
     if (
         # TODO: make the "always transitive" roles configurable
-        "base" not in node_roles
+        env[BASE_ROLE] not in node_roles
         # If we are not transferrable
         and not can_transfer
         # Checks if we are actually crossing a boundry
@@ -218,10 +312,10 @@ def scan_for_transitive_install(node, env, cb=None):
     roles = {
         role for role
         in getattr(node.sources[0].attributes, ROLES, set())
-        if role != "meta"
+        if role != env[META_ROLE]
     }
-    # TODO: add fancy configurability
-    non_transitive_roles = {role for role in roles if role == "runtime"}
+
+    non_transitive_roles = {role for role in roles if env[ROLE_DECLARATIONS][role].transitive}
     for install_source in install_sources:
         install_executor = install_source.get_executor()
         if not install_executor:
@@ -234,6 +328,7 @@ def scan_for_transitive_install(node, env, cb=None):
             for grandchild in grandchildren:
                 results.extend(
                     get_dependent_actions(
+                        env,
                         components,
                         roles,
                         non_transitive_roles,
@@ -319,9 +414,10 @@ def auto_install(env, target, source, **kwargs):
     source = [env.Entry(s) for s in env.Flatten([source])]
     roles = {
         kwargs.get(PRIMARY_ROLE),
-        # The 'meta' tag is implicitly attached as a role.
-        "meta",
     }
+
+    if env[META_ROLE]:
+        roles.add(env[META_ROLE])
 
     if kwargs.get(ROLES) is not None:
         roles = roles.union(set(kwargs[ROLES]))
@@ -381,7 +477,7 @@ def auto_install(env, target, source, **kwargs):
 
     actions = env.Flatten(actions)
     for component, role in itertools.product(components, roles):
-        alias_name = generate_alias(component, role)
+        alias_name = generate_alias(env, component, role)
         alias = env.Alias(alias_name, actions)
         setattr(alias[0].attributes, COMPONENTS, components)
         setattr(alias[0].attributes, ROLES, roles)
@@ -390,7 +486,7 @@ def auto_install(env, target, source, **kwargs):
         if component != "common":
             # We have to call env.Alias just in case the
             # generated_alias does not already exist.
-            env.Depends(alias, env.Alias(generate_alias("common", role)))
+            env.Depends(alias, env.Alias(generate_alias(env, "common", role)))
 
         env[ALIAS_MAP][component][role] = RoleInfo(
             alias_name=alias_name,
@@ -424,7 +520,8 @@ def finalize_install_dependencies(env):
                 env.Depends(info.alias, common_rolemap[role].alias)
                 aliases.extend(common_rolemap[role].alias)
 
-            for dependency in env[ROLE_DEPENDENCIES].get(role, []):
+            role_decl = env[ROLE_DECLARATIONS].get(role)
+            for dependency in role_decl.dependencies:
                 dependency_info = rolemap.get(dependency, [])
                 if dependency_info:
                     env.Depends(info.alias, dependency_info.alias)
@@ -450,7 +547,7 @@ def finalize_install_dependencies(env):
                 # configurable? It's possible someone would want to do it.
                 env.NoCache(archive)
 
-                archive_alias = generate_alias(component, role, target=fmt)
+                archive_alias = generate_alias(env, component, role, target=fmt)
                 env.Alias(archive_alias, archive)
 
 
@@ -477,10 +574,10 @@ def auto_install_emitter(target, source, env):
 def add_suffix_mapping(env, suffix, role=None):
     """Map suffix to role"""
     if isinstance(suffix, str):
-        if role not in AVAILABLE_ROLES:
+        if role not in env[ROLE_DECLARATIONS]:
             raise Exception(
                 "target {} is not a known role. Available roles are {}".format(
-                    role, AVAILABLE_ROLES
+                    role, env[ROLE_DECLARATIONS].keys()
                 )
             )
         env[SUFFIX_MAP][env.subst(suffix)] = role
@@ -490,10 +587,10 @@ def add_suffix_mapping(env, suffix, role=None):
 
     for _, mapping in suffix.items():
         for role in mapping.default_roles:
-            if role not in AVAILABLE_ROLES:
+            if role not in env[ROLE_DECLARATIONS]:
                 raise Exception(
                     "target {} is not a known role. Available roles are {}".format(
-                        target, AVAILABLE_ROLES
+                        target, env[ROLE_DECLARATIONS].keys()
                     )
                 )
 
@@ -511,20 +608,12 @@ def add_package_name_alias(env, component, role, name):
         raise Exception("No role provided for package name alias")
     env[PACKAGE_ALIAS_MAP][(component, role)] = name
 
-def add_role_dependencies(env, role, dependencies):
-    current = env[ROLE_DEPENDENCIES].get(role, None)
-    if not current:
-        current = env[ROLE_DEPENDENCIES][role] = list()
-    current.extend(dependencies)
-    current = list(set(current))
-
 def suffix_mapping(env, directory=False, default_roles=False):
     """Generate a SuffixMap object from source and target."""
     return SuffixMap(
         directory=directory,
         default_roles=default_roles,
     )
-
 
 def dest_dir_generator(initial_value=None):
     """Memoized dest_dir_generator"""
@@ -613,37 +702,14 @@ def generate(env):  # pylint: disable=too-many-statements
     env[SUFFIX_MAP] = {}
     env[PACKAGE_ALIAS_MAP] = {}
     env[ALIAS_MAP] = defaultdict(dict)
-    # TODO: make this configurable?
-    env[ROLE_DEPENDENCIES] = {
-        "debug": [
-            "base",
-
-            # TODO: Debug should depend on these when making packages, but shouldn't when building
-            # the legacy tarball. Probably fuel for the above configurability fire. For now, make it not
-            # depend so that we can get AIB in place for the dist builders.
-            # "runtime",
-        ],
-        "dev": [
-            "base",
-            "runtime",
-        ],
-        "meta": [
-            "base",
-            "debug",
-            "dev",
-            "runtime",
-        ],
-        "runtime": [
-            "base",
-        ],
-    }
 
     env.AddMethod(suffix_mapping, "SuffixMap")
     env.AddMethod(add_suffix_mapping, "AddSuffixMapping")
     env.AddMethod(add_package_name_alias, "AddPackageNameAlias")
     env.AddMethod(auto_install, "AutoInstall")
     env.AddMethod(finalize_install_dependencies, "FinalizeInstallDependencies")
-    env.AddMethod(add_role_dependencies, "AddRoleDependencies")
+    env.AddMethod(declare_role, "Role")
+    env.AddMethod(declare_roles, "DeclareRoles")
     env.Tool("install")
 
     # TODO: we should probably expose these as PseudoBuilders and let
