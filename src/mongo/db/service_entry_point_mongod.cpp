@@ -449,7 +449,8 @@ bool runCommandImpl(OperationContext* opCtx,
                 serverGlobalParams.clusterRole == ClusterRole::ConfigServer ? 0 : 2;
             LOG(debugLevel) << "Command on database " << db
                             << " timed out waiting for read concern to be satisfied. Command: "
-                            << redact(command->getRedactedCopyForLogging(request.body));
+                            << redact(command->getRedactedCopyForLogging(request.body))
+                            << ". Info: " << redact(rcStatus);
         }
 
         auto result = Command::appendCommandStatus(inPlaceReplyBob, rcStatus);
