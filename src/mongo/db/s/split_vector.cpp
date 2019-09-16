@@ -179,6 +179,36 @@ StatusWith<std::vector<BSONObj>> splitVector(OperationContext* opCtx,
                     "can't open a cursor to scan the range (desired range is possibly empty)"};
         }
 
+        // Get the final key in the range, and see if it's the same as the first key.
+        BSONObj maxKeyInChunk;
+        {
+            auto exec = InternalPlanner::indexScan(opCtx,
+                                                   collection,
+                                                   idx,
+                                                   maxKey,
+                                                   minKey,
+                                                   BoundInclusion::kIncludeEndKeyOnly,
+                                                   PlanExecutor::YIELD_AUTO,
+                                                   InternalPlanner::BACKWARD);
+
+            PlanExecutor::ExecState state = exec->getNext(&maxKeyInChunk, NULL);
+            if (PlanExecutor::ADVANCED != state) {
+                return {ErrorCodes::OperationFailed,
+                        "can't open a cursor to find final key in range (desired range is possibly "
+                        "empty)"};
+            }
+        }
+
+        if (currKey.woCompare(maxKeyInChunk) == 0) {
+            // Range contains only documents with a single key value.  So we cannot possibly find a
+            // split point, and there is no need to scan any further.
+            warning() << "possible low cardinality key detected in " << nss.toString()
+                      << " - range " << redact(minKey) << " -->> " << redact(maxKey)
+                      << " contains only the key " << redact(prettyKey(idx->keyPattern(), currKey));
+            std::vector<BSONObj> emptyVector;
+            return emptyVector;
+        }
+
         // Use every 'keyCount'-th key as a split point. We add the initial key as a sentinel,
         // to be removed at the end. If a key appears more times than entries allowed on a
         // chunk, we issue a warning and split on the following key.
