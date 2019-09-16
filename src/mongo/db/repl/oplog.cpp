@@ -707,7 +707,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           const auto& ui = entry.getUuid();
           const auto& cmd = entry.getObject();
           const NamespaceString nss(extractNs(entry.getNss(), cmd));
-          Lock::DBLock dbXLock(opCtx, nss.db(), MODE_X);
+          Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
           if (auto idIndexElem = cmd["idIndex"]) {
               // Remove "idIndex" field from command.
               auto cmdWithoutIdIndex = cmd.removeField("idIndex");

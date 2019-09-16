@@ -120,7 +120,7 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsWithSpecificUuidNoExisti
     ASSERT_FALSE(collectionExists(opCtx.get(), newNss));
 
     auto uuid = UUID::gen();
-    Lock::DBLock lock(opCtx.get(), newNss.db(), MODE_X);
+    Lock::DBLock lock(opCtx.get(), newNss.db(), MODE_IX);
     ASSERT_OK(createCollectionForApplyOps(
         opCtx.get(), newNss.db().toString(), uuid, BSON("create" << newNss.coll())));
 
@@ -134,7 +134,7 @@ TEST_F(CreateCollectionTest,
 
     auto opCtx = makeOpCtx();
     auto uuid = UUID::gen();
-    Lock::DBLock lock(opCtx.get(), newNss.db(), MODE_X);
+    Lock::DBLock lock(opCtx.get(), newNss.db(), MODE_IX);
 
     // Create existing collection using StorageInterface.
     {
@@ -160,7 +160,7 @@ TEST_F(CreateCollectionTest,
 
     auto opCtx = makeOpCtx();
     auto uuid = UUID::gen();
-    Lock::DBLock lock(opCtx.get(), newNss.db(), MODE_X);
+    Lock::DBLock lock(opCtx.get(), newNss.db(), MODE_IX);
 
     // Create existing collection with same name but different UUID using StorageInterface.
     auto existingCollectionUuid = UUID::gen();
@@ -197,7 +197,7 @@ TEST_F(CreateCollectionTest,
 
     auto opCtx = makeOpCtx();
     auto uuid = UUID::gen();
-    Lock::DBLock lock(opCtx.get(), newNss.db(), MODE_X);
+    Lock::DBLock lock(opCtx.get(), newNss.db(), MODE_IX);
 
     // Create drop pending collection using StorageInterface.
     {

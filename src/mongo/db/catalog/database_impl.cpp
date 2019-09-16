@@ -122,7 +122,8 @@ DatabaseImpl::DatabaseImpl(const StringData name, uint64_t epoch)
     : _name(name.toString()),
       _epoch(epoch),
       _profileName(_name + ".system.profile"),
-      _viewsName(_name + "." + DurableViewCatalog::viewsCollectionName().toString()) {
+      _viewsName(_name + "." + DurableViewCatalog::viewsCollectionName().toString()),
+      _uniqueCollectionNamespacePseudoRandom(Date_t::now().asInt64()) {
     auto durableViewCatalog = std::make_unique<DurableViewCatalogImpl>(this);
     auto viewCatalog = std::make_unique<ViewCatalog>(std::move(durableViewCatalog));
 
@@ -704,7 +705,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
 
 StatusWith<NamespaceString> DatabaseImpl::makeUniqueCollectionNamespace(
     OperationContext* opCtx, StringData collectionNameModel) {
-    invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_IX));
 
     // There must be at least one percent sign in the collection name model.
     auto numPercentSign = std::count(collectionNameModel.begin(), collectionNameModel.end(), '%');
@@ -716,22 +717,17 @@ StatusWith<NamespaceString> DatabaseImpl::makeUniqueCollectionNamespace(
                           << collectionNameModel << " must contain at least one percent sign.");
     }
 
-    if (!_uniqueCollectionNamespacePseudoRandom) {
-        _uniqueCollectionNamespacePseudoRandom =
-            std::make_unique<PseudoRandom>(Date_t::now().asInt64());
-    }
-
     const auto charsToChooseFrom =
         "0123456789"
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         "abcdefghijklmnopqrstuvwxyz"_sd;
     invariant((10U + 26U * 2) == charsToChooseFrom.size());
 
-    auto replacePercentSign = [&, this](const auto& c) {
+    auto replacePercentSign = [&, this](char c) {
         if (c != '%') {
             return c;
         }
-        auto i = _uniqueCollectionNamespacePseudoRandom->nextInt32(charsToChooseFrom.size());
+        auto i = _uniqueCollectionNamespacePseudoRandom.nextInt32(charsToChooseFrom.size());
         return charsToChooseFrom[i];
     };
 

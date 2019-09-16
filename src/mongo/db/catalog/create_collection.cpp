@@ -197,7 +197,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                                    const OptionalCollectionUUID& ui,
                                    const BSONObj& cmdObj,
                                    const BSONObj& idIndex) {
-    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IX));
 
     const NamespaceString newCollName(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
     auto newCmd = cmdObj;
@@ -250,7 +250,9 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                 // of the initial sync or result in rollback to fassert, requiring a resync of that
                 // node.
                 const bool stayTemp = true;
-                if (auto futureColl = db ? db->getCollection(opCtx, newCollName) : nullptr) {
+                auto futureColl = db ? db->getCollection(opCtx, newCollName) : nullptr;
+                bool needsRenaming = static_cast<bool>(futureColl);
+                for (int tries = 0; needsRenaming && tries < 10; ++tries) {
                     auto tmpNameResult =
                         db->makeUniqueCollectionNamespace(opCtx, "tmp%%%%%.create");
                     if (!tmpNameResult.isOK()) {
@@ -260,7 +262,14 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                                              "create command: collection: "
                                           << newCollName));
                     }
+
                     const auto& tmpName = tmpNameResult.getValue();
+                    AutoGetCollection tmpCollLock(opCtx, tmpName, LockMode::MODE_X);
+                    if (tmpCollLock.getCollection()) {
+                        // Conflicting on generating a unique temp collection name. Try again.
+                        continue;
+                    }
+
                     // It is ok to log this because this doesn't happen very frequently.
                     log() << "CMD: create " << newCollName
                           << " - renaming existing collection with conflicting UUID " << uuid
@@ -275,6 +284,15 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                                                    /*dropTargetUUID*/ {},
                                                    /*numRecords*/ 0U,
                                                    stayTemp);
+                    // The existing collection has been successfully moved out of the way.
+                    needsRenaming = false;
+                }
+                if (needsRenaming) {
+                    return Result(Status(ErrorCodes::NamespaceExists,
+                                         str::stream() << "Cannot generate temporary "
+                                                          "collection namespace for applyOps "
+                                                          "create command: collection: "
+                                                       << newCollName));
                 }
 
                 // If the collection with the requested UUID already exists, but with a different
