@@ -65,11 +65,18 @@ public:
      */
     void endPrepareConflict();
 
+    /**
+     * Returns the total duration of time spent blocked on prepare conflicts.
+     */
+    Microseconds getPrepareConflictDuration();
+
 private:
     /**
      * Set to true when a read operation is currently blocked on a prepare conflict.
      */
     AtomicWord<bool> _waitOnPrepareConflict{false};
+    long long _prepareConflictStartTime{0};
+    Microseconds _prepareConflictDuration{0};
 };
 
 }  // namespace mongo

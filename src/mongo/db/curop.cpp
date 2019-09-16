@@ -45,6 +45,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/json.h"
+#include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/platform/mutex.h"
@@ -475,6 +476,11 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
                                       "operation due to interrupt";
             }
         }
+
+        // Gets the time spent blocked on prepare conflicts.
+        _debug.prepareConflictDurationMicros = durationCount<Microseconds>(
+            PrepareConflictTracker::get(opCtx).getPrepareConflictDuration());
+
         log(component) << _debug.report(client,
                                         *this,
                                         (lockerInfo ? &lockerInfo->stats : nullptr),
@@ -700,6 +706,10 @@ string OpDebug::report(Client* client,
 
     if (!curop.getPlanSummary().empty()) {
         s << " planSummary: " << curop.getPlanSummary().toString();
+    }
+
+    if (prepareConflictDurationMicros > 0) {
+        s << " prepareConflictDuration: " << (prepareConflictDurationMicros / 1000) << "ms";
     }
 
     OPDEBUG_TOSTRING_HELP(nShards);

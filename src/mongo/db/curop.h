@@ -229,6 +229,9 @@ public:
     // Shard targeting info.
     int nShards{-1};
 
+    // Stores the duration of time spent blocked on prepare conflicts.
+    long long prepareConflictDurationMicros{0};
+
     // Stores additive metrics.
     AdditiveMetrics additiveMetrics;
 

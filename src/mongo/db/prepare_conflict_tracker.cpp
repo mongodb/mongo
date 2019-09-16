@@ -40,13 +40,28 @@ bool PrepareConflictTracker::isWaitingOnPrepareConflict() const {
 }
 
 void PrepareConflictTracker::beginPrepareConflict() {
+    invariant(_prepareConflictStartTime == 0);
+    _prepareConflictStartTime = curTimeMicros64();
+
     // Implies that the current read operation is blocked on a prepared transaction.
     _waitOnPrepareConflict.store(true);
 }
 
 void PrepareConflictTracker::endPrepareConflict() {
+    // This function is called regardless whether there was a prepare conflict.
+    if (_prepareConflictStartTime > 0) {
+        invariant(_prepareConflictStartTime <= static_cast<long long>(curTimeMicros64()));
+        _prepareConflictDuration +=
+            Microseconds{static_cast<long long>(curTimeMicros64()) - _prepareConflictStartTime};
+    }
+    _prepareConflictStartTime = 0;
+
     // Implies that the current read operation is not blocked on a prepared transaction.
     _waitOnPrepareConflict.store(false);
+}
+
+Microseconds PrepareConflictTracker::getPrepareConflictDuration() {
+    return _prepareConflictDuration;
 }
 
 }  // namespace mongo

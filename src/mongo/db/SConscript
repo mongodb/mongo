@@ -128,6 +128,9 @@ env.Library(
         'server_options',
         'generic_cursor',
     ],
+    LIBDEPS_PRIVATE=[
+        'prepare_conflict_tracker',
+    ],
 )
 
 env.Library(
