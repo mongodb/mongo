@@ -77,6 +77,9 @@ executor:
     mongod_options:
       oplogSize: 1024
       set_parameters:
+        # Increase the timeout of the cursor so that the cursor will continue to stay alive even
+        # when there is a delay in lock acquisition during a getMore command.
+        cursorTimeoutMillis: 3600000
         enableTestCommands: 1
         # We have historically had deadlocks occur due to lock acquisition issues involving the
         # system running out of WiredTiger write tickets. We intentionally lower the number of
