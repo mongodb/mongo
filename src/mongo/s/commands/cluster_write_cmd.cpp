@@ -366,7 +366,13 @@ private:
         // Assemble requests
         std::vector<AsyncRequestsSender::Request> requests;
         for (const auto& endpoint : swEndpoints.getValue()) {
-            requests.emplace_back(endpoint.shardName, command);
+            BSONObj cmdObjWithVersions = BSONObj(command);
+            if (endpoint.databaseVersion) {
+                cmdObjWithVersions =
+                    appendDbVersionIfPresent(cmdObjWithVersions, *endpoint.databaseVersion);
+            }
+            cmdObjWithVersions = appendShardVersion(cmdObjWithVersions, endpoint.shardVersion);
+            requests.emplace_back(endpoint.shardName, cmdObjWithVersions);
         }
 
         // Send the requests.

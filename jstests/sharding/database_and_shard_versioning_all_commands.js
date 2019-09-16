@@ -263,8 +263,7 @@ let testCases = {
         },
         explain: {
             skipProfilerCheck: true,
-            // TODO SERVER-43299 Make explain for write commands send databaseVersion
-            sendsDbVersion: false,
+            sendsDbVersion: true,
             // The profiler extracts the individual deletes from the 'deletes' array, and so loses
             // the overall delete command's attached shardVersion, though one is sent.
             sendsShardVersion: true,
@@ -589,8 +588,7 @@ let testCases = {
         },
         explain: {
             skipProfilerCheck: true,
-            // TODO SERVER-43299 Make explain for write commands send databaseVersion
-            sendsDbVersion: false,
+            sendsDbVersion: true,
             // The profiler extracts the individual updates from the 'updates' array, and so loses
             // the overall update command's attached shardVersion, though one is sent.
             sendsShardVersion: true,
