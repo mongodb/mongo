@@ -61,6 +61,32 @@ public:
      */
     void onRepairStarted();
 
+    class Modification {
+    public:
+        static Modification invalidating(const std::string& description) {
+            return {description, true};
+        }
+
+        static Modification benign(const std::string& description) {
+            return {description, false};
+        }
+
+        const std::string& getDescription() const {
+            return _description;
+        }
+
+        bool isInvalidating() const {
+            return _invalidating;
+        }
+
+    private:
+        Modification(const std::string& description, bool invalidating)
+            : _description(description), _invalidating(invalidating) {}
+
+        std::string _description;
+        bool _invalidating;
+    };
+
     /**
      * Indicate that a data modification was made by repair. If even a single call is made, the
      * replica set configuration will be invalidated.
@@ -68,12 +94,22 @@ public:
      * Provide a 'description' of the modification that will added to a list of modifications by
      * getModifications();
      */
-    void onModification(const std::string& description);
+    void invalidatingModification(const std::string& description);
+
+    /**
+     * Indicates a data modification was made by repair, but the change does not indicate the node's
+     * data is different than other replica set members. The replica set configuration will be left
+     * alone if all modifications are benign.
+     *
+     * Provide a 'description' of the modification that will added to a list of modifications by
+     * getModifications();
+     */
+    void benignModification(const std::string& description);
 
     /**
      * This must be called to notify the repair observer that a database repair operation completed
-     * successfully. If any calls to onModification have been made, this invalidates the replica set
-     * configuration so this node will be unable to rejoin a replica set.
+     * successfully. If any calls to invalidatingModification have been made, this invalidates the
+     * replica set configuration so this node will be unable to rejoin a replica set.
      *
      * May only be called after a call to onRepairStarted().
      */
@@ -94,19 +130,15 @@ public:
     }
 
     /**
-     * Returns 'true' if repair modified data.
+     * Returns 'true' if repair modified data in an invalidating way.
      *
      * May only be called after a call to onRepairDone().
      */
-    bool isDataModified() const {
-        invariant(_repairState == RepairState::kIncomplete || _repairState == RepairState::kDone);
-        return !_modifications.empty();
-    }
+    bool isDataInvalidated() const;
 
-    const std::vector<std::string>& getModifications() const {
+    const std::vector<Modification>& getModifications() const {
         return _modifications;
     }
-
 
 private:
     enum class RepairState {
@@ -135,7 +167,8 @@ private:
 
     boost::filesystem::path _repairIncompleteFilePath;
     RepairState _repairState;
-    std::vector<std::string> _modifications;
+
+    std::vector<Modification> _modifications;
 };
 
 }  // namespace mongo

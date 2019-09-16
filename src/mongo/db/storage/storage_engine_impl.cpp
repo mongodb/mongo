@@ -92,8 +92,8 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx) {
 
         if (status.code() == ErrorCodes::DataModifiedByRepair) {
             warning() << "Catalog data modified by repair: " << status.reason();
-            repairObserver->onModification(str::stream()
-                                           << "DurableCatalog repaired: " << status.reason());
+            repairObserver->invalidatingModification(str::stream() << "DurableCatalog repaired: "
+                                                                   << status.reason());
         } else {
             fassertNoTrace(50926, status);
         }
@@ -167,8 +167,8 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx) {
                                      "build the index.";
 
                         StorageRepairObserver::get(getGlobalServiceContext())
-                            ->onModification(str::stream() << "Orphan collection created: "
-                                                           << statusWithNs.getValue());
+                            ->benignModification(str::stream() << "Orphan collection created: "
+                                                               << statusWithNs.getValue());
 
                     } else {
                         // Log an error message if we cannot create the entry.
@@ -209,8 +209,9 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx) {
 
                     if (_options.forRepair) {
                         StorageRepairObserver::get(getGlobalServiceContext())
-                            ->onModification(str::stream() << "Collection " << nss
-                                                           << " dropped: " << status.reason());
+                            ->invalidatingModification(str::stream()
+                                                       << "Collection " << nss
+                                                       << " dropped: " << status.reason());
                     }
                     wuow.commit();
                     continue;
@@ -298,8 +299,8 @@ Status StorageEngineImpl::_recoverOrphanedCollection(OperationContext* opCtx,
     }
     if (dataModified) {
         StorageRepairObserver::get(getGlobalServiceContext())
-            ->onModification(str::stream() << "Collection " << collectionName
-                                           << " recovered: " << status.reason());
+            ->invalidatingModification(str::stream() << "Collection " << collectionName
+                                                     << " recovered: " << status.reason());
     }
     wuow.commit();
     return Status::OK();
@@ -682,8 +683,8 @@ Status StorageEngineImpl::repairRecordStore(OperationContext* opCtx, const Names
     }
 
     if (dataModified) {
-        repairObserver->onModification(str::stream()
-                                       << "Collection " << nss << ": " << status.reason());
+        repairObserver->invalidatingModification(str::stream() << "Collection " << nss << ": "
+                                                               << status.reason());
     }
 
     // After repairing, re-initialize the collection with a valid RecordStore.
