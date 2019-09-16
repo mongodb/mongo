@@ -48,8 +48,7 @@ function testFault(kmsType, func) {
     const shell = Mongo(conn.host, clientSideFLEOptions);
     const keyVault = shell.getKeyVault();
 
-    assert.writeOK(
-        keyVault.createKey(kmsType, "arn:aws:kms:us-east-1:fake:fake:fake", ['mongoKey']));
+    keyVault.createKey(kmsType, "arn:aws:kms:us-east-1:fake:fake:fake", ['mongoKey']);
     const keyId = keyVault.getKeyByAltName("mongoKey").toArray()[0]._id;
 
     func(keyId, shell);

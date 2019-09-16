@@ -28,9 +28,10 @@ class KeyVault {
         var masterKey = masterKeyAndMaterial.masterKey;
 
         var current = ISODate();
+        var uuid = UUID();
 
         var doc = {
-            "_id": UUID(),
+            "_id": uuid,
             "keyMaterial": masterKeyAndMaterial.keyMaterial,
             "creationDate": current,
             "updateDate": current,
@@ -54,7 +55,8 @@ class KeyVault {
             doc.keyAltNames = keyAltNames;
         }
 
-        return this.keyColl.insert(doc);
+        this.keyColl.insert(doc);
+        return uuid;
     }
 
     getKey(keyId) {

@@ -87,9 +87,8 @@ for (const kmsType of kmsTypes) {
     for (const encryptionAlgorithm of encryptionAlgorithms) {
         collection.drop();
 
-        assert.writeOK(
-            keyVault.createKey(kmsType, "arn:aws:kms:us-east-1:fake:fake:fake", ['mongoKey']));
-        const keyId = keyVault.getKeyByAltName("mongoKey").toArray()[0]._id;
+        const keyId =
+            keyVault.createKey(kmsType, "arn:aws:kms:us-east-1:fake:fake:fake", ['mongoKey']);
 
         let pass;
         let fail;

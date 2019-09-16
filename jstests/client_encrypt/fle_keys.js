@@ -39,7 +39,7 @@ const conn_str = "mongodb://" + conn.host + "/?ssl=true";
 const shell = Mongo(conn_str, clientSideFLEOptions);
 const keyVault = shell.getKeyVault();
 
-var key = keyVault.createKey("aws", "arn:aws:kms:us-east-1:fake:fake:fake", ['mongoKey']);
+keyVault.createKey("aws", "arn:aws:kms:us-east-1:fake:fake:fake", ['mongoKey']);
 assert.eq(1, keyVault.getKeys().itcount());
 
 var result = keyVault.createKey("aws", "arn:aws:kms:us-east-4:fake:fake:fake", {});
@@ -68,9 +68,9 @@ result = keyVault.deleteKey(keyId);
 assert.eq(0, keyVault.getKey(keyId).itcount());
 assert.eq(0, keyVault.getKeys().itcount());
 
-assert.writeOK(keyVault.createKey("aws", "arn:aws:kms:us-east-1:fake:fake:fake1"));
-assert.writeOK(keyVault.createKey("aws", "arn:aws:kms:us-east-2:fake:fake:fake2"));
-assert.writeOK(keyVault.createKey("aws", "arn:aws:kms:us-east-3:fake:fake:fake3"));
+keyVault.createKey("aws", "arn:aws:kms:us-east-1:fake:fake:fake1");
+keyVault.createKey("aws", "arn:aws:kms:us-east-2:fake:fake:fake2");
+keyVault.createKey("aws", "arn:aws:kms:us-east-3:fake:fake:fake3");
 
 assert.eq(3, keyVault.getKeys().itcount());
 
