@@ -55,6 +55,13 @@ WiredTigerCursor::WiredTigerCursor(const std::string& uri,
         builder << "read_once=true,";
     }
     if (_isCheckpoint) {
+        // Type can be "lsm" or "file".
+        std::string type, sourceURI;
+        WiredTigerUtil::fetchTypeAndSourceURI(opCtx, uri, &type, &sourceURI);
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "LSM does not support opening cursors by checkpoint",
+                type != "lsm");
+
         builder << "checkpoint=WiredTigerCheckpoint,";
     }
     // Add this option last to avoid needing a trailing comma. This enables an optimization in

@@ -13,7 +13,9 @@
  *   # A failpoint is set that only exists on the mongod.
  *   assumes_against_mongod_not_mongos,
  *   # A failpoint is set against the primary only.
- *   does_not_support_stepdowns
+ *   does_not_support_stepdowns,
+ *   # Checkpoint cursors cannot be open in lsm.
+ *   does_not_support_wiredtiger_lsm
  * ]
  */
 
