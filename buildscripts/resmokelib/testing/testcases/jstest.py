@@ -67,6 +67,7 @@ class _SingleJSTestCase(interface.ProcessTestCase):
         test_data = global_vars.get("TestData", {}).copy()
         test_data["minPort"] = core.network.PortAllocator.min_test_port(self.fixture.job_num)
         test_data["maxPort"] = core.network.PortAllocator.max_test_port(self.fixture.job_num)
+        test_data["peerPids"] = self.fixture.pids()
         test_data["failIfUnterminatedProcesses"] = True
 
         global_vars["TestData"] = test_data

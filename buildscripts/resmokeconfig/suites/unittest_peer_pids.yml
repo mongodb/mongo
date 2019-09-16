@@ -1,0 +1,15 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/resmoke_selftest/peer_pids.js
+
+executor:
+  fixture:
+    class: ShardedClusterFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_rs_nodes_per_shard: 3
+    num_shards: 2
+    num_mongos: 2

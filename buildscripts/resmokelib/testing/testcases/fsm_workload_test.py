@@ -63,6 +63,7 @@ class FSMWorkloadTestCase(jsrunnerfile.JSRunnerFileTestCase):
         test_data["dbNamePrefix"] = "{}{:d}_".format(test_prefix, count)
         test_data["sameDB"] = self.same_db
         test_data["sameCollection"] = self.same_collection
+        test_data["peerPids"] = self.fixture.pids()
 
     @staticmethod
     def get_workload_group(selected_tests):

@@ -57,6 +57,21 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         self.mongos = []
         self.shards = []
 
+    def pids(self):
+        """:return: pids owned by this fixture if any."""
+        out = []
+        if self.configsvr is not None:
+            out.extend(self.configsvr.pids())
+        else:
+            self.logger.debug(
+                'Config server not running when gathering sharded cluster fixture pids.')
+        if self.shards is not None:
+            for shard in self.shards:
+                out.extend(shard.pids())
+        else:
+            self.logger.debug('No shards when gathering sharded cluster fixture pids.')
+        return out
+
     def setup(self):
         """Set up the sharded cluster."""
         if self.configsvr is None:
@@ -344,6 +359,14 @@ class _MongoSFixture(interface.Fixture):
             raise errors.ServerFailure(msg)
 
         self.mongos = mongos
+
+    def pids(self):
+        """:return: pids owned by this fixture if any."""
+        if self.mongos is not None:
+            return [self.mongos.pid]
+        else:
+            self.logger.debug('Mongos not running when gathering mongos fixture pids.')
+        return []
 
     def await_ready(self):
         """Block until the fixture can be used for testing."""

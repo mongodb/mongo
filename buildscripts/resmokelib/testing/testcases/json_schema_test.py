@@ -26,3 +26,4 @@ class JSONSchemaTestCase(jsrunnerfile.JSRunnerFileTestCase):
 
     def _populate_test_data(self, test_data):
         test_data["jsonSchemaTestFile"] = self.json_filename
+        test_data["peerPids"] = self.fixture.pids()

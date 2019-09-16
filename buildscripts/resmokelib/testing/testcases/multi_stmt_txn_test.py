@@ -25,3 +25,4 @@ class MultiStmtTxnTestCase(jsrunnerfile.JSRunnerFileTestCase):
 
     def _populate_test_data(self, test_data):
         test_data["multiStmtTxnTestFile"] = self.multi_stmt_txn_test_file
+        test_data["peerPids"] = self.fixture.pids()
