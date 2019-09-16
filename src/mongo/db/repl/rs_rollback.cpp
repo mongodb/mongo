@@ -301,8 +301,6 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
             // If this is a transaction which did not commit, we need do nothing more than
             // rollback the transaction table entry.  If it did commit, we will have rolled it
             // back when we rolled back the commit.
-            //
-            // TODO(SERVER-39797): Roll back partial transactions when they commit.
             return Status::OK();
         }
     }
