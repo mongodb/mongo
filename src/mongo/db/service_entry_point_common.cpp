@@ -1152,11 +1152,10 @@ void receivedKillCursors(OperationContext* opCtx, const Message& m) {
         uassert(51250, "must kill fewer than 30000 cursors", n < 30000);
     }
 
-    uassert(13659, "sent 0 cursors to kill", n != 0);
+    uassert(31289, str::stream() << "must kill at least 1 cursor, n=" << n, n >= 1);
     massert(13658,
             str::stream() << "bad kill cursors size: " << m.dataSize(),
             m.dataSize() == 8 + (8 * n));
-    uassert(13004, str::stream() << "sent negative cursors to kill: " << n, n >= 1);
 
     const char* cursorArray = dbmessage.getArray(n);
     int found = runOpKillCursors(opCtx, static_cast<size_t>(n), cursorArray);
