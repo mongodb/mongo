@@ -9795,7 +9795,7 @@ buildvariants:
 - name: macos
   display_name: macOS
   run_on:
-  - macos-1014-i7
+  - macos-1014
   batchtime: 1440 # 1 day
   expansions:
     test_flags: --excludeWithAnyTags=requires_ssl_mongo_tools
@@ -9845,7 +9845,7 @@ buildvariants:
 - name: macos-debug
   display_name: "* macOS DEBUG"
   run_on:
-  - macos-1014-i7
+  - macos-1014
   expansions:
     resmoke_jobs_max: 6
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
@@ -9873,7 +9873,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - macos-1014-i7
+  - macos-1014
   batchtime: 1440 # 1 day
   expansions:
     test_flags: --excludeWithAnyTags=requires_ssl_mongo_tools
@@ -9908,7 +9908,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - macos-1014-i7
+  - macos-1014
   batchtime: 1440 # 1 day
   expansions:
     test_flags: --excludeWithAnyTags=requires_ssl_mongo_tools
@@ -9943,7 +9943,7 @@ buildvariants:
 - name: embedded-sdk-macos
   display_name: "Embedded SDK - macOS"
   run_on:
-  - macos-1014-i7
+  - macos-1014
   batchtime: 1440 # 1 day
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions
@@ -9973,7 +9973,7 @@ buildvariants:
 - name: embedded-sdk-iphoneos
   display_name: "Embedded SDK - iOS"
   run_on:
-  - macos-1014-i7
+  - macos-1014
   batchtime: 1440 # 1 day
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions
@@ -10005,7 +10005,7 @@ buildvariants:
 - name: embedded-sdk-iphonesimulator
   display_name: "Embedded SDK - iOS Simulator"
   run_on:
-  - macos-1014-i7
+  - macos-1014
   batchtime: 1440 # 1 day
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions
@@ -10040,7 +10040,7 @@ buildvariants:
 - name: embedded-sdk-appletvos
   display_name: "Embedded SDK - tvOS"
   run_on:
-  - macos-1014-i7
+  - macos-1014
   batchtime: 1440 # 1 day
   expansions:
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
@@ -10072,7 +10072,7 @@ buildvariants:
 - name: embedded-sdk-appletvsimulator
   display_name: "Embedded SDK - tvOS Simulator"
   run_on:
-  - macos-1014-i7
+  - macos-1014
   batchtime: 1440 # 1 day
   expansions:
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
@@ -10107,7 +10107,7 @@ buildvariants:
 - name: embedded-sdk-watchos
   display_name: "Embedded SDK - watchOS"
   run_on:
-  - macos-1014-i7
+  - macos-1014
   batchtime: 1440 # 1 day
   expansions:
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
@@ -10139,7 +10139,7 @@ buildvariants:
 - name: embedded-sdk-watchsimulator
   display_name: "Embedded SDK - watchOS Simulator"
   run_on:
-  - macos-1014-i7
+  - macos-1014
   batchtime: 1440 # 1 day
   expansions:
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
@@ -10174,7 +10174,7 @@ buildvariants:
 - name: embedded-sdk-apple-multiarch
   display_name: "Embedded SDK - Apple Multiarch"
   run_on:
-  - macos-1014-i7
+  - macos-1014
   batchtime: 1440 # 1 day
   expansions:
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
@@ -12163,7 +12163,7 @@ buildvariants:
 - name: macos-mobile
   display_name: macOS (mobile)
   run_on:
-  - macos-1014-i7
+  - macos-1014
   batchtime: 1440 # 1 day
   expansions:
     push_path: osx
