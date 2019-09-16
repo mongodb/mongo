@@ -76,12 +76,12 @@ public:
     std::shared_ptr<void> data;
 };
 
-std::unique_ptr<HarnessHelper> makeHarnessHelper() {
+std::unique_ptr<RecordStoreHarnessHelper> makeEphemeralForTestRecordStoreHarness() {
     return std::make_unique<EphemeralForTestHarnessHelper>();
 }
 
-MONGO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {
-    mongo::registerHarnessHelperFactory(makeHarnessHelper);
+MONGO_INITIALIZER(RegisterRecordStoreHarnessFactory)(InitializerContext* const) {
+    mongo::registerRecordStoreHarnessHelperFactory(makeEphemeralForTestRecordStoreHarness);
     return Status::OK();
 }
 }  // namespace

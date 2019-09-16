@@ -45,52 +45,22 @@ env.Library(
 
 # Testing
 env.CppUnitTest(
-    target='storage_biggie_store_test',
+    target='storage_biggie_test',
     source=[
+        'biggie_kv_engine_test.cpp',
+        'biggie_record_store_test.cpp',
+        'biggie_recovery_unit_test.cpp',
+        'biggie_sorted_impl_test.cpp',
         'store_test.cpp',
     ],
-)
-
-env.CppUnitTest(
-    target='biggie_record_store_test',
-    source=['biggie_record_store_test.cpp'
-            ],
     LIBDEPS=[
         'storage_biggie_core',
-        '$BUILD_DIR/mongo/db/storage/key_string',
-        '$BUILD_DIR/mongo/db/storage/record_store_test_harness'
-        ],
-)
-
-env.CppUnitTest(
-   target='biggie_sorted_data_interface_test',
-   source=['biggie_sorted_impl_test.cpp'
-           ],
-   LIBDEPS=[
-        'storage_biggie_core', 
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/index/index_descriptor',
         '$BUILD_DIR/mongo/db/storage/key_string',
-        '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness'
-        ],
-)
-
-env.CppUnitTest(
-   target='biggie_recovery_unit_test',
-   source=['biggie_recovery_unit_test.cpp'
-           ],
-   LIBDEPS=[
-        'storage_biggie_core',
-        '$BUILD_DIR/mongo/db/storage/recovery_unit_test_harness'
-        ],
-)
-
-env.CppUnitTest(
-   target='biggie_kv_engine_test',
-   source=['biggie_kv_engine_test.cpp'
-           ],
-   LIBDEPS=[
-        'storage_biggie_core',
-        '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness'
-        ],
+        '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness',
+        '$BUILD_DIR/mongo/db/storage/record_store_test_harness',
+        '$BUILD_DIR/mongo/db/storage/recovery_unit_test_harness',
+        '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness',
+    ],
 )

@@ -102,6 +102,11 @@ public:
         bool unique, bool partial, std::initializer_list<IndexKeyEntry> toInsert);
 };
 
+void registerSortedDataInterfaceHarnessHelperFactory(
+    std::function<std::unique_ptr<SortedDataInterfaceHarnessHelper>()> factory);
+
+std::unique_ptr<SortedDataInterfaceHarnessHelper> newSortedDataInterfaceHarnessHelper();
+
 KeyString::Value makeKeyString(SortedDataInterface* sorted,
                                BSONObj bsonKey,
                                boost::optional<RecordId> rid = boost::none);
@@ -146,7 +151,4 @@ inline void removeFromIndex(unowned_ptr<HarnessHelper> harness,
     removeFromIndex(harness->newOperationContext(client.get()), index, toRemove);
 }
 
-inline std::unique_ptr<SortedDataInterfaceHarnessHelper> newSortedDataInterfaceHarnessHelper() {
-    return dynamic_ptr_cast<SortedDataInterfaceHarnessHelper>(newHarnessHelper());
-}
 }  // namespace mongo

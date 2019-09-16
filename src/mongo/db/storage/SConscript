@@ -152,18 +152,6 @@ env.Library(
 )
 
 env.Library(
-    target='test_harness_helper',
-    source=[
-        'test_harness_helper.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/storage/storage_options',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-    ],
-)
-
-env.Library(
     target='sorted_data_interface_test_harness',
     source=[
         'sorted_data_interface_test_bulkbuilder.cpp',
@@ -189,7 +177,6 @@ env.Library(
         '$BUILD_DIR/mongo/unittest/unittest',
         'index_entry_comparison',
         'key_string',
-        'test_harness_helper',
     ],
 
 )
@@ -218,7 +205,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/unittest/unittest',
-        'test_harness_helper',
         ],
     )
 
@@ -229,8 +215,8 @@ env.Library(
         'recovery_unit_test_harness.cpp'
         ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/unittest/unittest',
-        'test_harness_helper',
         ],
     )
 
@@ -382,6 +368,9 @@ env.CppUnitTest(
         'flow_control_test.cpp',
         'index_entry_comparison_test.cpp',
         'key_string_test.cpp',
+        'kv/durable_catalog_test.cpp',
+        'kv/kv_drop_pending_ident_reaper_test.cpp',
+        'kv/storage_engine_test.cpp',
         'storage_engine_lock_file_test.cpp',
         'storage_engine_metadata_test.cpp',
         'storage_repair_observer_test.cpp',
@@ -389,18 +378,28 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
+        '$BUILD_DIR/mongo/db/catalog_raii',
         '$BUILD_DIR/mongo/db/concurrency/flow_control_ticketholder',
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/repl/topology_coordinator',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/mongo/db/storage/devnull/storage_devnull_core',
+        '$BUILD_DIR/mongo/db/storage/durable_catalog_impl',
+        '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store',
+        '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/storage_ephemeral_for_test_core',
+        '$BUILD_DIR/mongo/db/storage/storage_engine_impl',
+        '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
         '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/storage_ephemeral_for_test_core',
         '$BUILD_DIR/mongo/executor/network_interface_factory',
         '$BUILD_DIR/mongo/executor/network_interface_mock',
         'flow_control',
         'flow_control_parameters',
         'key_string',
+        'kv/kv_drop_pending_ident_reaper',
         'storage_engine_lock_file',
         'storage_engine_metadata',
         'storage_repair_observer',

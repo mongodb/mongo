@@ -63,12 +63,12 @@ private:
     KVEngine _kvEngine{};
 };
 
-std::unique_ptr<HarnessHelper> makeHarnessHelper() {
+std::unique_ptr<RecoveryUnitHarnessHelper> makeBiggieRecoveryUnitHarnessHelper() {
     return std::make_unique<BiggieRecoveryUnitHarnessHelper>();
 }
 
-MONGO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {
-    mongo::registerHarnessHelperFactory(makeHarnessHelper);
+MONGO_INITIALIZER(RegisterRecoveryUnitHarnessFactory)(InitializerContext* const) {
+    mongo::registerRecoveryUnitHarnessHelperFactory(makeBiggieRecoveryUnitHarnessHelper);
     return Status::OK();
 }
 

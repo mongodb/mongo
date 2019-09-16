@@ -54,9 +54,9 @@ namespace {
 
 using std::string;
 
-class MyHarnessHelper final : public SortedDataInterfaceHarnessHelper {
+class WiredTigerPrefixedIndexHarnessHelper final : public SortedDataInterfaceHarnessHelper {
 public:
-    MyHarnessHelper() : _dbpath("wt_test"), _conn(nullptr) {
+    WiredTigerPrefixedIndexHarnessHelper() : _dbpath("wt_test"), _conn(nullptr) {
         const char* config = "create,cache_size=1G,";
         int ret = wiredtiger_open(_dbpath.path().c_str(), nullptr, config, &_conn);
         invariantWTOK(ret);
@@ -65,7 +65,7 @@ public:
         _sessionCache = new WiredTigerSessionCache(_conn, _fastClockSource.get());
     }
 
-    ~MyHarnessHelper() final {
+    ~WiredTigerPrefixedIndexHarnessHelper() final {
         delete _sessionCache;
         _conn->close(_conn, nullptr);
     }
@@ -138,12 +138,12 @@ private:
     WiredTigerOplogManager _oplogManager;
 };
 
-std::unique_ptr<HarnessHelper> makeHarnessHelper() {
-    return std::make_unique<MyHarnessHelper>();
+std::unique_ptr<SortedDataInterfaceHarnessHelper> makeWTPrefixedIndexHarnessHelper() {
+    return std::make_unique<WiredTigerPrefixedIndexHarnessHelper>();
 }
 
-MONGO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {
-    mongo::registerHarnessHelperFactory(makeHarnessHelper);
+MONGO_INITIALIZER(RegisterSortedDataInterfaceHarnessFactory)(InitializerContext* const) {
+    mongo::registerSortedDataInterfaceHarnessHelperFactory(makeWTPrefixedIndexHarnessHelper);
     return Status::OK();
 }
 }  // namespace

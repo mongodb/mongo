@@ -127,12 +127,12 @@ private:
     WiredTigerKVEngine _engine;
 };
 
-std::unique_ptr<HarnessHelper> makeHarnessHelper() {
+std::unique_ptr<RecoveryUnitHarnessHelper> makeWTRUHarnessHelper() {
     return std::make_unique<WiredTigerRecoveryUnitHarnessHelper>();
 }
 
 MONGO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {
-    mongo::registerHarnessHelperFactory(makeHarnessHelper);
+    mongo::registerRecoveryUnitHarnessHelperFactory(makeWTRUHarnessHelper);
     return Status::OK();
 }
 

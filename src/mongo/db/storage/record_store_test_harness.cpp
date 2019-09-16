@@ -37,6 +37,19 @@
 
 namespace mongo {
 namespace {
+std::function<std::unique_ptr<RecordStoreHarnessHelper>()> recordStoreHarnessFactory;
+}
+
+void registerRecordStoreHarnessHelperFactory(
+    std::function<std::unique_ptr<RecordStoreHarnessHelper>()> factory) {
+    recordStoreHarnessFactory = std::move(factory);
+}
+
+auto newRecordStoreHarnessHelper() -> std::unique_ptr<RecordStoreHarnessHelper> {
+    return recordStoreHarnessFactory();
+}
+
+namespace {
 
 using std::string;
 using std::unique_ptr;

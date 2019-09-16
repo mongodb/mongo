@@ -53,35 +53,20 @@ env.Library(
 )
 
 env.CppUnitTest(
-   target='storage_ephemeral_for_test_btree_test',
-   source=['ephemeral_for_test_btree_impl_test.cpp'
-           ],
+   target='storage_ephemeral_for_test_test',
+   source=[
+       'ephemeral_for_test_btree_impl_test.cpp',
+       'ephemeral_for_test_engine_test.cpp',
+       'ephemeral_for_test_record_store_test.cpp',
+   ],
    LIBDEPS=[
-        'storage_ephemeral_for_test_core',
-        '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness'
-        ]
-   )
-
-env.CppUnitTest(
-   target='storage_ephemeral_for_test_record_store_test',
-   source=['ephemeral_for_test_record_store_test.cpp'
-           ],
-   LIBDEPS=[
-        'storage_ephemeral_for_test_core',
-        '$BUILD_DIR/mongo/db/storage/record_store_test_harness'
-        ]
-   )
-
-env.CppUnitTest(
-    target='storage_ephemeral_for_test_engine_test',
-    source=['ephemeral_for_test_engine_test.cpp',
-            ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
-        'storage_ephemeral_for_test_core',
-        ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-    ],
+       'storage_ephemeral_for_test_core',
+       '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness',
+       '$BUILD_DIR/mongo/db/storage/record_store_test_harness',
+       '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness',
+       '$BUILD_DIR/mongo/db/storage/storage_options',
+   ],
+   LIBDEPS_PRIVATE=[
+       '$BUILD_DIR/mongo/db/auth/authmocks',
+   ],
 )

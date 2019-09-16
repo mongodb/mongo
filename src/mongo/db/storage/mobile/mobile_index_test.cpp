@@ -82,12 +82,12 @@ private:
     const Ordering _ordering;
 };
 
-std::unique_ptr<HarnessHelper> makeHarnessHelper() {
+std::unique_ptr<SortedDataInterfaceHarnessHelper> makeMobileIndexHarnessHelper() {
     return std::make_unique<MobileIndexTestHarnessHelper>();
 }
 
-MONGO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {
-    mongo::registerHarnessHelperFactory(makeHarnessHelper);
+MONGO_INITIALIZER(RegisterSortedDataInterfaceHarnessFactory)(InitializerContext* const) {
+    mongo::registerSortedDataInterfaceHarnessHelperFactory(makeMobileIndexHarnessHelper);
     return Status::OK();
 }
 }  // namespace mongo

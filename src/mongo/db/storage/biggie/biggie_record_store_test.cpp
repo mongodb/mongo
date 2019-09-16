@@ -91,12 +91,12 @@ public:
     }
 };
 
-std::unique_ptr<mongo::HarnessHelper> makeHarnessHelper() {
+std::unique_ptr<mongo::RecordStoreHarnessHelper> makeBiggieRecordStoreHarnessHelper() {
     return std::make_unique<RecordStoreHarnessHelper>();
 }
 
-MONGO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {
-    mongo::registerHarnessHelperFactory(makeHarnessHelper);
+MONGO_INITIALIZER(RegisterRecordStoreHarnessFactory)(InitializerContext* const) {
+    mongo::registerRecordStoreHarnessHelperFactory(makeBiggieRecordStoreHarnessHelper);
     return Status::OK();
 }
 }  // namespace

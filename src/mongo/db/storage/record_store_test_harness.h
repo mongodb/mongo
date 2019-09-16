@@ -63,7 +63,9 @@ public:
     virtual bool supportsDocLocking() = 0;
 };
 
-inline std::unique_ptr<RecordStoreHarnessHelper> newRecordStoreHarnessHelper() {
-    return dynamic_ptr_cast<RecordStoreHarnessHelper>(newHarnessHelper());
-}
+void registerRecordStoreHarnessHelperFactory(
+    std::function<std::unique_ptr<RecordStoreHarnessHelper>()> factory);
+
+std::unique_ptr<RecordStoreHarnessHelper> newRecordStoreHarnessHelper();
+
 }  // namespace mongo

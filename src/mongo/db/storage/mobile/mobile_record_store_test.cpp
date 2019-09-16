@@ -56,9 +56,9 @@ namespace {
 
 static int inc = 0;
 
-class MobileHarnessHelper final : public RecordStoreHarnessHelper {
+class MobileRecordStoreHarnessHelper final : public RecordStoreHarnessHelper {
 public:
-    MobileHarnessHelper() : _dbPath("mobile_record_store_harness") {
+    MobileRecordStoreHarnessHelper() : _dbPath("mobile_record_store_harness") {
         // TODO: Determine if this should be util function.
         boost::system::error_code err;
         boost::filesystem::path dir(_dbPath.path());
@@ -148,12 +148,12 @@ private:
     std::unique_ptr<MobileSessionPool> _sessionPool;
 };
 
-std::unique_ptr<HarnessHelper> makeHarnessHelper() {
-    return std::make_unique<MobileHarnessHelper>();
+std::unique_ptr<RecordStoreHarnessHelper> makeMobileRecordStoreHarnessHelper() {
+    return std::make_unique<MobileRecordStoreHarnessHelper>();
 }
 
 MONGO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {
-    mongo::registerHarnessHelperFactory(makeHarnessHelper);
+    mongo::registerRecordStoreHarnessHelperFactory(makeMobileRecordStoreHarnessHelper);
     return Status::OK();
 }
 }  // namespace

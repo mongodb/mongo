@@ -45,13 +45,15 @@
 namespace mongo {
 namespace biggie {
 namespace {
-class SortedDataInterfaceTestHarnessHelper final : public virtual SortedDataInterfaceHarnessHelper {
+
+class BiggieSortedDataInterfaceTestHarnessHelper final
+    : public virtual SortedDataInterfaceHarnessHelper {
 private:
     KVEngine _kvEngine{};
     Ordering _order;
 
 public:
-    SortedDataInterfaceTestHarnessHelper() : _order(Ordering::make(BSONObj())) {}
+    BiggieSortedDataInterfaceTestHarnessHelper() : _order(Ordering::make(BSONObj())) {}
 
     std::unique_ptr<mongo::SortedDataInterface> newIdIndexSortedDataInterface() final {
         std::string ns = "test.biggie";
@@ -96,12 +98,14 @@ public:
     }
 };
 
-std::unique_ptr<HarnessHelper> makeHarnessHelper() {
-    return std::make_unique<SortedDataInterfaceTestHarnessHelper>();
+std::unique_ptr<mongo::SortedDataInterfaceHarnessHelper>
+makeBiggieSortedDataInterfaceHarnessHelper() {
+    return std::make_unique<BiggieSortedDataInterfaceTestHarnessHelper>();
 }
 
-MONGO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {
-    mongo::registerHarnessHelperFactory(makeHarnessHelper);
+MONGO_INITIALIZER(RegisterSortedDataInterfaceHarnessFactory)(InitializerContext* const) {
+    mongo::registerSortedDataInterfaceHarnessHelperFactory(
+        makeBiggieSortedDataInterfaceHarnessHelper);
     return Status::OK();
 }
 }  // namespace

@@ -40,10 +40,10 @@
 namespace mongo {
 namespace {
 
-class EphemeralForBtreeImplTestHarnessHelper final
+class EphemeralForTestBtreeImplTestHarnessHelper final
     : public virtual SortedDataInterfaceHarnessHelper {
 public:
-    EphemeralForBtreeImplTestHarnessHelper() : _order(Ordering::make(BSONObj())) {}
+    EphemeralForTestBtreeImplTestHarnessHelper() : _order(Ordering::make(BSONObj())) {}
 
     std::unique_ptr<SortedDataInterface> newIdIndexSortedDataInterface() final {
         BSONObj spec = BSON("key" << BSON("_id" << 1) << "name"
@@ -79,12 +79,12 @@ private:
     Ordering _order;
 };
 
-std::unique_ptr<HarnessHelper> makeHarnessHelper() {
-    return std::make_unique<EphemeralForBtreeImplTestHarnessHelper>();
+std::unique_ptr<SortedDataInterfaceHarnessHelper> makeEFTHarnessHelper() {
+    return std::make_unique<EphemeralForTestBtreeImplTestHarnessHelper>();
 }
 
-MONGO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {
-    mongo::registerHarnessHelperFactory(makeHarnessHelper);
+MONGO_INITIALIZER(RegisterSortedDataInterfaceHarnessFactory)(InitializerContext* const) {
+    mongo::registerSortedDataInterfaceHarnessHelperFactory(makeEFTHarnessHelper);
     return Status::OK();
 }
 }  // namespace

@@ -37,6 +37,22 @@
 
 namespace mongo {
 namespace {
+std::function<std::unique_ptr<RecoveryUnitHarnessHelper>()> recoveryUnitHarnessFactory;
+}
+}  // namespace mongo
+
+void mongo::registerRecoveryUnitHarnessHelperFactory(
+    std::function<std::unique_ptr<RecoveryUnitHarnessHelper>()> factory) {
+    recoveryUnitHarnessFactory = std::move(factory);
+}
+
+namespace mongo {
+
+auto newRecoveryUnitHarnessHelper() -> std::unique_ptr<RecoveryUnitHarnessHelper> {
+    return recoveryUnitHarnessFactory();
+}
+
+namespace {
 
 class RecoveryUnitTestHarness : public unittest::Test {
 public:

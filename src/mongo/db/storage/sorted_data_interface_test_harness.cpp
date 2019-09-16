@@ -91,6 +91,21 @@ mongo::KeyString::Value mongo::makeKeyStringForSeek(SortedDataInterface* sorted,
 
 namespace mongo {
 namespace {
+std::function<std::unique_ptr<mongo::SortedDataInterfaceHarnessHelper>()>
+    sortedDataInterfaceHarnessFactory;
+}
+
+void registerSortedDataInterfaceHarnessHelperFactory(
+    std::function<std::unique_ptr<mongo::SortedDataInterfaceHarnessHelper>()> factory) {
+    sortedDataInterfaceHarnessFactory = std::move(factory);
+}
+
+auto newSortedDataInterfaceHarnessHelper()
+    -> std::unique_ptr<mongo::SortedDataInterfaceHarnessHelper> {
+    return sortedDataInterfaceHarnessFactory();
+}
+
+namespace {
 
 TEST(SortedDataInterface, InsertWithDups1) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());

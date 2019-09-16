@@ -42,7 +42,8 @@ public:
                                                            const std::string& ns) = 0;
 };
 
-inline std::unique_ptr<RecoveryUnitHarnessHelper> newRecoveryUnitHarnessHelper() {
-    return dynamic_ptr_cast<RecoveryUnitHarnessHelper>(newHarnessHelper());
-}
+void registerRecoveryUnitHarnessHelperFactory(
+    std::function<std::unique_ptr<RecoveryUnitHarnessHelper>()> factory);
+
+std::unique_ptr<RecoveryUnitHarnessHelper> newRecoveryUnitHarnessHelper();
 }  // namespace mongo

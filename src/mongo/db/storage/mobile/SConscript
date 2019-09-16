@@ -76,6 +76,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_engine_common',
     ],
 )
+
 '''
 env.CppUnitTest(
     target='storage_mobile_index_test',
@@ -90,27 +91,18 @@ env.CppUnitTest(
 '''
 
 env.CppUnitTest(
-    target='storage_mobile_record_store_test',
-    source=[
-        'mobile_record_store_test.cpp'
-    ],
-    LIBDEPS=[
-        'storage_mobile_core',
-        '$BUILD_DIR/mongo/db/storage/record_store_test_harness',
-        '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
-        '$BUILD_DIR/mongo/util/options_parser/options_parser',
-    ]
-)
-
-env.CppUnitTest(
-    target='storage_mobile_kv_engine_test',
+    target='storage_mobile_test',
     source=[
         'mobile_kv_engine_test.cpp',
+        'mobile_record_store_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
         'storage_mobile_core',
+        '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
+        '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness',
+        '$BUILD_DIR/mongo/db/storage/record_store_test_harness',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
