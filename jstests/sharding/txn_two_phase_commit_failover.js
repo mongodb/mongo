@@ -30,18 +30,21 @@ let txnNumber = 0;
 
 const runTest = function(sameNodeStepsUpAfterFailover) {
     let stepDownSecs;  // The amount of time the node has to wait before becoming primary again.
-    let numCoordinatorNodes;
+    let coordinatorReplSetConfig;
+
     if (sameNodeStepsUpAfterFailover) {
-        numCoordinatorNodes = 1;
         stepDownSecs = 1;
+        coordinatorReplSetConfig = [{}];
     } else {
-        numCoordinatorNodes = 3;
+        // We are making one of the secondaries non-electable to ensure
+        // that elections always result in a winner (see SERVER-42234)
         stepDownSecs = 3;
+        coordinatorReplSetConfig = [{}, {}, {rsConfig: {priority: 0}}];
     }
 
     let st = new ShardingTest({
         shards: 3,
-        rs0: {nodes: numCoordinatorNodes},
+        rs0: {nodes: coordinatorReplSetConfig},
         causallyConsistent: true,
         other: {mongosOptions: {verbose: 3}}
     });
