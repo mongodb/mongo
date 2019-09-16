@@ -54,6 +54,9 @@ const resetCollection = () => {
         bulk.insert({x: i});
     }
     assert.commandWorked(bulk.execute());
+
+    assert.commandWorked(testDb.fsyncLock());
+    assert.commandWorked(testDb.fsyncUnlock());
 };
 
 /**

@@ -22,6 +22,11 @@
 
 load("jstests/libs/check_log.js");
 
+const forceCheckpoint = () => {
+    assert.commandWorked(db.fsyncLock());
+    assert.commandWorked(db.fsyncUnlock());
+};
+
 const dbName = "test_db_background_validation";
 const collName = "test_coll_background_validation";
 const testDB = db.getSiblingDB(dbName);
@@ -46,6 +51,8 @@ for (let i = 0; i < numDocs; ++i) {
  */
 assert.commandFailedWithCode(testColl.validate({background: true, full: true}),
                              ErrorCodes.CommandNotSupported);
+
+forceCheckpoint();
 
 // Check that {backround:true} is successful.
 let res = testColl.validate({background: true});

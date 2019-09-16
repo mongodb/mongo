@@ -22,7 +22,7 @@ assertErrorOnStartupWhenFilesAreCorruptOrMissing(dbpath, baseName, collName, (mo
     MongoRunner.stopMongod(mongod);
     jsTestLog("deleting collection file: " + testCollFile);
     removeFile(testCollFile);
-}, "Fatal Assertion 50882");
+}, "Fatal Assertion 50883");
 
 /**
  * Test 2. Delete the _mdb_catalog.
@@ -33,7 +33,7 @@ assertErrorOnStartupWhenFilesAreCorruptOrMissing(dbpath, baseName, collName, (mo
     let mdbCatalogFile = dbpath + "_mdb_catalog.wt";
     jsTestLog("deleting catalog file: " + mdbCatalogFile);
     removeFile(mdbCatalogFile);
-}, "Fatal Assertion 50882");
+}, "Fatal Assertion 50883");
 
 /**
  * Test 3. Delete the WiredTiger.wt.
@@ -70,5 +70,5 @@ assertErrorOnRequestWhenFilesAreCorruptOrMissing(
             testColl.insert({a: 1});
         });
     },
-    "Fatal Assertion 50882");
+    "Fatal Assertion 50883");
 })();

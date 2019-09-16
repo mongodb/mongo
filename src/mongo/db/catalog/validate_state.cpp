@@ -125,11 +125,45 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
     invariant(!_traverseRecordStoreCursor && !_seekRecordStoreCursor && _indexCursors.size() == 0 &&
               _indexes.size() == 0);
 
+    // Background validation will read from the last stable checkpoint instead of the latest data.
+    // This allows concurrent writes to go ahead without interfering with validation's view of the
+    // data. The checkpoint lock must be taken around cursor creation to ensure all cursors point at
+    // the same checkpoint, i.e. a consistent view of the collection data.
+    std::unique_ptr<StorageEngine::CheckpointLock> checkpointCursorsLock;
+    if (_background) {
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        invariant(storageEngine->supportsCheckpoints());
+        opCtx->recoveryUnit()->abandonSnapshot();
+        opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kCheckpoint);
+        checkpointCursorsLock = storageEngine->getCheckpointLock(opCtx);
+    }
+
     // We want to share the same data throttle instance across all the cursors used during this
     // validation. Validations started on other collections will not share the same data
     // throttle instance.
     if (!_background) {
         _dataThrottle.turnThrottlingOff();
+    }
+
+    std::vector<std::string> readyDurableIndexes;
+    try {
+        DurableCatalog::get(opCtx)->getReadyIndexes(opCtx, _nss, &readyDurableIndexes);
+    } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
+        log() << "Skipping validation on collection with name " << _nss
+              << " because there is no checkpoint available for the MDB catalog yet (" << ex
+              << ").";
+        throw;
+    }
+
+    try {
+        _traverseRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(
+            opCtx, _collection->getRecordStore(), &_dataThrottle);
+        _seekRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(
+            opCtx, _collection->getRecordStore(), &_dataThrottle);
+    } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
+        // End the validation if we can't open a checkpoint cursor on the collection.
+        log() << "Skipping validation on collection with name " << _nss << " due to " << ex;
+        throw;
     }
 
     const IndexCatalog* indexCatalog = _collection->getIndexCatalog();
@@ -138,16 +172,29 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
     while (it->more()) {
         const IndexCatalogEntry* entry = it->next();
         const IndexDescriptor* desc = entry->descriptor();
-        _indexes.push_back(indexCatalog->getEntryShared(desc));
-        _indexCursors.emplace(desc->indexName(),
-                              std::make_unique<SortedDataInterfaceThrottleCursor>(
-                                  opCtx, entry->accessMethod(), &_dataThrottle));
-    }
 
-    _traverseRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(
-        opCtx, _collection->getRecordStore(), &_dataThrottle);
-    _seekRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(
-        opCtx, _collection->getRecordStore(), &_dataThrottle);
+        // Skip indexes that are not yet durable and ready in the checkpointed MDB catalog.
+        bool isIndexDurable =
+            std::find(readyDurableIndexes.begin(), readyDurableIndexes.end(), desc->indexName()) !=
+            readyDurableIndexes.end();
+        if (_background && !isIndexDurable) {
+            log() << "Skipping validation on index with name " << desc->indexName()
+                  << " as it is not ready in the checkpoint yet.";
+            continue;
+        }
+
+        try {
+            _indexCursors.emplace(desc->indexName(),
+                                  std::make_unique<SortedDataInterfaceThrottleCursor>(
+                                      opCtx, entry->accessMethod(), &_dataThrottle));
+        } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
+            log() << "Skipping validation on index with name " << desc->indexName() << " due to "
+                  << ex;
+            continue;
+        }
+
+        _indexes.push_back(indexCatalog->getEntryShared(desc));
+    }
 
     // Because SeekableRecordCursors don't have a method to reset to the start, we save and then
     // use a seek to the first RecordId to reset the cursor (and reuse it) as needed. When

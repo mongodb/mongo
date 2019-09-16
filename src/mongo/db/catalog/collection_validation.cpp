@@ -273,9 +273,7 @@ void _reportValidationResults(OperationContext* opCtx,
         results->errors.insert(results->errors.end(), vr.errors.begin(), vr.errors.end());
     }
 
-
-    output->append("nIndexes",
-                   validateState->getCollection()->getIndexCatalog()->numIndexesReady(opCtx));
+    output->append("nIndexes", static_cast<int>(validateState->getIndexes().size()));
     output->append("keysPerIndex", keysPerIndex->done());
     if (indexDetails) {
         output->append("indexDetails", indexDetails->done());
@@ -395,12 +393,6 @@ Status validate(OperationContext* opCtx,
     invariant(!opCtx->lockState()->isLocked());
     invariant(!(background && fullValidate));
 
-    if (background) {
-        // Force a checkpoint to ensure background validation has a checkpoint on which to run.
-        // TODO (SERVER-43134): to sort out how to do this properly.
-        opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx);
-    }
-
     ValidateResultsMap indexNsResultsMap;
     BSONObjBuilder keysPerIndex;  // not using subObjStart to be exception safe.
 
@@ -427,24 +419,9 @@ Status validate(OperationContext* opCtx,
         // source to kCheckpoint otherwise we'd use a checkpointed MDB catalog file.
         _validateCatalogEntry(opCtx, &validateState, results);
 
-        // Background validation will read from the last stable checkpoint instead of the latest
-        // data. This allows concurrent writes to go ahead without interfering with validation's
-        // view of the data.
-        // The checkpoint lock must be taken around cursor creation to ensure all cursors
-        // point at the same checkpoint, i.e. a consistent view of the collection data.
-        std::unique_ptr<StorageEngine::CheckpointLock> checkpointCursorsLock;
-        if (background) {
-            auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-            invariant(storageEngine->supportsCheckpoints());
-            opCtx->recoveryUnit()->abandonSnapshot();
-            opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kCheckpoint);
-            checkpointCursorsLock = storageEngine->getCheckpointLock(opCtx);
-        }
-
         // Open all cursors at once before running non-full validation code so that all steps of
         // validation during background validation use the same view of the data.
         validateState.initializeCursors(opCtx);
-        checkpointCursorsLock.reset();
 
         const string uuidString = str::stream() << " (UUID: " << validateState.uuid() << ")";
 
@@ -519,11 +496,23 @@ Status validate(OperationContext* opCtx,
         }
 
         output->append("ns", validateState.nss().ns());
+    } catch (ExceptionFor<ErrorCodes::CursorNotFound>&) {
+        invariant(background);
+        string warning = str::stream()
+            << "Collection validation with {background: true} validates"
+            << " the latest checkpoint (data in a snapshot written to disk in a consistent"
+            << " way across all data files). During this validation, some tables have not yet been"
+            << " checkpointed.";
+        results->warnings.push_back(warning);
+
+        // Nothing to validate, so it must be valid.
+        results->valid = true;
+        return Status::OK();
     } catch (DBException& e) {
         if (ErrorCodes::isInterruption(e.code())) {
             return e.toStatus();
         }
-        string err = str::stream() << "exception during index validation: " << e.toString();
+        string err = str::stream() << "exception during collection validation: " << e.toString();
         results->errors.push_back(err);
         results->valid = false;
     }

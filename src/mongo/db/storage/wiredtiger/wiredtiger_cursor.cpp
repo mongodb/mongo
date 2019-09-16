@@ -27,12 +27,15 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
 
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -61,10 +64,20 @@ WiredTigerCursor::WiredTigerCursor(const std::string& uri,
     }
 
     const std::string config = builder;
-    if (_readOnce || _isCheckpoint) {
-        _cursor = _session->getNewCursor(uri, config.c_str());
-    } else {
-        _cursor = _session->getCachedCursor(uri, tableID, config.c_str());
+    try {
+        if (_readOnce || _isCheckpoint) {
+            _cursor = _session->getNewCursor(uri, config.c_str());
+        } else {
+            _cursor = _session->getCachedCursor(uri, tableID, config.c_str());
+        }
+    } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
+        // A WiredTiger table will not be available in the latest checkpoint if the checkpoint
+        // thread hasn't ran after the initial WiredTiger table was created.
+        if (!_isCheckpoint) {
+            error() << ex;
+            fassertFailedNoTrace(50883);
+        }
+        throw;
     }
 }
 

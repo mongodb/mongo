@@ -94,9 +94,17 @@ void _openCursor(WT_SESSION* session,
         // by a verify or salvage, because we don't employ database locks to protect the oplog.
         throw WriteConflictException();
     }
+
     if (ret != 0) {
-        error() << "Failed to open a WiredTiger cursor. Reason: " << wtRCToStatus(ret)
-                << ", uri: " << uri << ", config: " << config;
+        std::string cursorErrMsg = str::stream()
+            << "Failed to open a WiredTiger cursor. Reason: " << wtRCToStatus(ret)
+            << ", uri: " << uri << ", config: " << config;
+
+        if (ret == ENOENT) {
+            uasserted(ErrorCodes::CursorNotFound, cursorErrMsg);
+        }
+
+        error() << cursorErrMsg;
         error() << "This may be due to data corruption. " << kWTRepairMsg;
 
         fassertFailedNoTrace(50882);

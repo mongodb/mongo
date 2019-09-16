@@ -169,11 +169,6 @@ public:
             return CommandHelpers::appendCommandStatusNoThrow(result, status);
         }
 
-        if (!fullValidate) {
-            validateResults.warnings.push_back(
-                "Some checks omitted for speed. use {full:true} option to do more thorough scan.");
-        }
-
         result.appendBool("valid", validateResults.valid);
         result.append("warnings", validateResults.warnings);
         result.append("errors", validateResults.errors);
