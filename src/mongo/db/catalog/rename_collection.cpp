@@ -116,7 +116,8 @@ Status renameCollectionCommon(OperationContext* opCtx,
                               const NamespaceString& target,
                               OptionalCollectionUUID targetUUID,
                               repl::OpTime renameOpTimeFromApplyOps,
-                              const RenameCollectionOptions& options) {
+                              const RenameCollectionOptions& options,
+                              bool forApplyOps) {
     auto uuidString = targetUUID ? targetUUID->toString() : "no UUID";
     log() << "renameCollection: renaming collection " << uuidString << " from " << source << " to "
           << target;
@@ -205,14 +206,15 @@ Status renameCollectionCommon(OperationContext* opCtx,
             return {ErrorCodes::IllegalOperation, "cannot rename to a sharded collection"};
         }
 
-        if (!options.dropTarget) {
+        // RenameCollectionForCommand cannot drop target by renaming.
+        if (!forApplyOps && !options.dropTarget) {
             return Status(ErrorCodes::NamespaceExists, "target namespace exists");
         }
 
         // If UUID doesn't point to the existing target, we should rename the target rather than
         // drop it.
-        if (options.dropTargetUUID && options.dropTargetUUID != targetColl->uuid()) {
-            auto dropTargetNssFromUUID = getNamespaceFromUUID(opCtx, options.dropTargetUUID.get());
+        if (!options.dropTarget ||
+            (options.dropTargetUUID && options.dropTargetUUID != targetColl->uuid())) {
             // We need to rename the targetColl to a temporary name.
             auto status = renameTargetCollectionToTmp(
                 opCtx, source, targetUUID.get(), targetDB, target, targetColl->uuid().get());
@@ -506,7 +508,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
     // in-place rename and remove the source collection.
     invariant(tmpName.db() == target.db());
     status = renameCollectionCommon(
-        opCtx, tmpName, target, targetUUID, renameOpTimeFromApplyOps, options);
+        opCtx, tmpName, target, targetUUID, renameOpTimeFromApplyOps, options, false);
     if (!status.isOK()) {
         return status;
     }
@@ -534,7 +536,7 @@ Status renameCollection(OperationContext* opCtx,
     }
 
     OptionalCollectionUUID noTargetUUID;
-    return renameCollectionCommon(opCtx, source, target, noTargetUUID, {}, options);
+    return renameCollectionCommon(opCtx, source, target, noTargetUUID, {}, options, false);
 }
 
 
@@ -612,7 +614,8 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
     }
 
     options.stayTemp = cmd["stayTemp"].trueValue();
-    return renameCollectionCommon(opCtx, sourceNss, targetNss, targetUUID, renameOpTime, options);
+    return renameCollectionCommon(
+        opCtx, sourceNss, targetNss, targetUUID, renameOpTime, options, true);
 }
 
 Status renameCollectionForRollback(OperationContext* opCtx,
@@ -625,7 +628,7 @@ Status renameCollectionForRollback(OperationContext* opCtx,
     RenameCollectionOptions options;
     invariant(!options.dropTarget);
 
-    return renameCollectionCommon(opCtx, source, target, uuid, {}, options);
+    return renameCollectionCommon(opCtx, source, target, uuid, {}, options, false);
 }
 
 }  // namespace mongo
