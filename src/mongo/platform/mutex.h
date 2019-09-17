@@ -42,20 +42,18 @@ class LockActions {
 public:
     virtual ~LockActions() = default;
     virtual void onContendedLock(const StringData& name) = 0;
-    virtual void onUnlock() = 0;
-    virtual void onFailedLock() = 0;
+    virtual void onUnlock(const StringData& name) = 0;
 };
 
 class Mutex {
 public:
     static constexpr auto kAnonymousMutexStr = "AnonymousMutex"_sd;
+    static constexpr Milliseconds kContendedLockTimeout = Milliseconds(100);
 
     Mutex() : Mutex(kAnonymousMutexStr) {}
     // Note that StringData is a view type, thus the underlying string for _name must outlive any
     // given Mutex
     explicit Mutex(const StringData& name) : _name(name) {}
-    explicit Mutex(const StringData& name, Seconds lockTimeout)
-        : _name(name), _lockTimeout(lockTimeout) {}
 
     void lock();
     void unlock();
@@ -68,8 +66,6 @@ public:
 
 private:
     const StringData _name;
-    const Seconds _lockTimeout = Seconds(60);
-    static constexpr Milliseconds kContendedLockTimeout = Milliseconds(100);
     stdx::timed_mutex _mutex;
 };
 

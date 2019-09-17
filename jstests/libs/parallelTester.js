@@ -204,9 +204,6 @@ if (typeof _threadInject != "undefined") {
             // Destroys and recreates the catalog, which will interfere with other tests.
             "restart_catalog.js",
 
-            // Concurrently using keepDiagnosticCaptureOnFailedLock fails, will be fixed soon.
-            "currentop_waiting_for_latch.js",
-
             // This test works close to the BSON document limit for entries in the durable catalog,
             // so running it in parallel with other tests will cause failures.
             "long_collection_names.js",

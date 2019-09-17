@@ -10,35 +10,69 @@
 const adminDB = db.getSiblingDB("admin");
 
 const getCurrentOp = function() {
-    let myUri = adminDB.runCommand({whatsmyuri: 1}).you;
-    return adminDB
-        .aggregate(
-            [
-                {$currentOp: {localOps: true, allUsers: false, backtrace: true}},
-                {$match: {client: myUri}}
-            ],
-            {readConcern: {level: "local"}})
-        .toArray()[0];
+    jsTestLog("Getting $currentOp");
+    let result =
+        adminDB
+            .aggregate(
+                [
+                    {
+                        $currentOp:
+                            {allUsers: true, idleConnections: true, localOps: true, backtrace: true}
+                    },
+                ],
+                {readConcern: {level: "local"}})
+            .toArray();
+    assert(result);
+    return result;
 };
 
-assert.commandWorked(db.adminCommand(
-    {"configureFailPoint": 'keepDiagnosticCaptureOnFailedLock', "mode": 'alwaysOn'}));
-var result = getCurrentOp();
+const blockedOpClientName = "DiagnosticCaptureTest";
 
-assert(result.hasOwnProperty("waitingForLatch"));
-assert(result["waitingForLatch"].hasOwnProperty("timestamp"));
-assert(result["waitingForLatch"].hasOwnProperty("captureName"));
-assert(result["waitingForLatch"].hasOwnProperty("backtrace"));
-result["waitingForLatch"]["backtrace"].forEach(function(obj) {
-    assert(obj.hasOwnProperty("addr"));
-    assert(typeof obj["addr"] === "string");
-    assert(obj.hasOwnProperty("path"));
-    assert(typeof obj["path"] === "string");
-});
+const getClientName = function() {
+    let myUri = adminDB.runCommand({whatsmyuri: 1}).you;
+    return adminDB.aggregate([{$currentOp: {localOps: true}}, {$match: {client: myUri}}])
+        .toArray()[0]
+        .desc;
+};
 
-assert.commandWorked(
-    db.adminCommand({"configureFailPoint": 'keepDiagnosticCaptureOnFailedLock', "mode": 'off'}));
-result = getCurrentOp();
+let clientName = getClientName();
 
-assert(!result.hasOwnProperty("waitingForLatch"));
+try {
+    assert.commandWorked(db.adminCommand({
+        "configureFailPoint": 'currentOpSpawnsThreadWaitingForLatch',
+        "mode": 'alwaysOn',
+        "data": {
+            'clientName': clientName,
+        },
+    }));
+
+    let result = null;
+    getCurrentOp().forEach(function(op) {
+        jsTestLog(tojson(op));
+        if (op["desc"] == blockedOpClientName) {
+            result = op;
+        }
+    });
+    assert(result);
+    assert(result.hasOwnProperty("waitingForLatch"));
+    assert(result["waitingForLatch"].hasOwnProperty("timestamp"));
+    assert(result["waitingForLatch"].hasOwnProperty("captureName"));
+    assert(result["waitingForLatch"].hasOwnProperty("backtrace"));
+    result["waitingForLatch"]["backtrace"].forEach(function(frame) {
+        assert(frame.hasOwnProperty("addr"));
+        assert(typeof frame["addr"] === "string");
+        assert(frame.hasOwnProperty("path"));
+        assert(typeof frame["path"] === "string");
+    });
+} finally {
+    assert.commandWorked(db.adminCommand(
+        {"configureFailPoint": 'currentOpSpawnsThreadWaitingForLatch', "mode": 'off'}));
+
+    getCurrentOp().forEach(function(op) {
+        jsTestLog(tojson(op));
+        if (op["desc"] == blockedOpClientName) {
+            assert(!op.hasOwnProperty("waitingForLatch"));
+        }
+    });
+}
 })();

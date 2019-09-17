@@ -54,9 +54,79 @@ using namespace fmt::literals;
 namespace mongo {
 // Maximum number of stack frames to appear in a backtrace.
 const unsigned int kMaxBackTraceFrames = 100;
-MONGO_FAIL_POINT_DEFINE(keepDiagnosticCaptureOnFailedLock);
 
 namespace {
+MONGO_FAIL_POINT_DEFINE(currentOpSpawnsThreadWaitingForLatch);
+
+constexpr auto kBlockedOpMutexName = "BlockedOpForTest"_sd;
+
+class BlockedOp {
+public:
+    void start(ServiceContext* serviceContext);
+    void join();
+    void setIsContended(bool value);
+
+private:
+    Mutex _testMutex{kBlockedOpMutexName};
+
+    stdx::condition_variable _cv;
+    stdx::mutex _m;
+
+    struct State {
+        bool isContended = false;
+        boost::optional<stdx::thread> thread{boost::none};
+    };
+    State _state;
+} gBlockedOp;
+
+// This function causes us to make an additional thread with a self-contended lock so that
+// $currentOp can observe its DiagnosticInfo. Note that we track each thread that called us so that
+// we can join the thread when they are gone.
+void BlockedOp::start(ServiceContext* serviceContext) {
+    stdx::unique_lock<stdx::mutex> lk(_m);
+
+    invariant(!_state.thread);
+
+    _testMutex.lock();
+    _state.thread = stdx::thread([this, serviceContext]() mutable {
+        ThreadClient tc("DiagnosticCaptureTest", serviceContext);
+
+        log() << "Entered currentOpSpawnsThreadWaitingForLatch thread";
+
+        stdx::lock_guard testLock(_testMutex);
+
+        log() << "Joining currentOpSpawnsThreadWaitingForLatch thread";
+    });
+
+    _cv.wait(lk, [this] { return _state.isContended; });
+    log() << "Started thread for currentOpSpawnsThreadWaitingForLatch";
+}
+
+// This function unlocks testMutex and joins if there are no more callers of BlockedOp::start()
+// remaining
+void BlockedOp::join() {
+    auto thread = [&] {
+        stdx::lock_guard<stdx::mutex> lk(_m);
+
+        invariant(_state.thread);
+
+        _testMutex.unlock();
+
+        _state.isContended = false;
+        _cv.notify_one();
+
+        return std::exchange(_state.thread, boost::none);
+    }();
+    thread->join();
+}
+
+void BlockedOp::setIsContended(bool value) {
+    log() << "Setting isContended to " << (value ? "true" : "false");
+    stdx::lock_guard lk(_m);
+    _state.isContended = value;
+    _cv.notify_one();
+}
+
 const auto gDiagnosticHandle = Client::declareDecoration<DiagnosticInfo::Diagnostic>();
 
 MONGO_INITIALIZER(LockActions)(InitializerContext* context) {
@@ -68,14 +138,14 @@ MONGO_INITIALIZER(LockActions)(InitializerContext* context) {
                     Client::getCurrent(),
                     std::make_shared<DiagnosticInfo>(takeDiagnosticInfo(name)));
             }
-        }
-        void onUnlock() override {
-            DiagnosticInfo::Diagnostic::clearDiagnostic();
-        }
-        void onFailedLock() override {
-            if (!MONGO_unlikely(keepDiagnosticCaptureOnFailedLock.shouldFail())) {
-                DiagnosticInfo::Diagnostic::clearDiagnostic();
+
+            if (currentOpSpawnsThreadWaitingForLatch.shouldFail() &&
+                (name == kBlockedOpMutexName)) {
+                gBlockedOp.setIsContended(true);
             }
+        }
+        void onUnlock(const StringData&) override {
+            DiagnosticInfo::Diagnostic::clearDiagnostic();
         }
     };
 
@@ -275,4 +345,24 @@ DiagnosticInfo takeDiagnosticInfo(const StringData& captureName) {
                           captureName,
                           getBacktraceAddresses());
 }
+
+DiagnosticInfo::BlockedOpGuard::~BlockedOpGuard() {
+    gBlockedOp.join();
+}
+
+auto DiagnosticInfo::maybeMakeBlockedOpForTest(Client* client) -> std::unique_ptr<BlockedOpGuard> {
+    std::unique_ptr<BlockedOpGuard> guard;
+    currentOpSpawnsThreadWaitingForLatch.executeIf(
+        [&](const BSONObj&) {
+            gBlockedOp.start(client->getServiceContext());
+            guard = std::make_unique<BlockedOpGuard>();
+        },
+        [&](const BSONObj& data) {
+            return data.hasField("clientName") &&
+                (data.getStringField("clientName") == client->desc());
+        });
+
+    return guard;
+}
+
 }  // namespace mongo

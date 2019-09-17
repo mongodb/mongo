@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/mongo_process_common.h"
@@ -39,8 +41,12 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/diagnostic_info.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/socket_utils.h"
 
 namespace mongo {
@@ -57,6 +63,8 @@ std::vector<BSONObj> MongoProcessCommon::getCurrentOps(
     AuthorizationSession* ctxAuth = AuthorizationSession::get(opCtx->getClient());
 
     std::vector<BSONObj> ops;
+
+    auto blockedOpGuard = DiagnosticInfo::maybeMakeBlockedOpForTest(opCtx->getClient());
 
     for (ServiceContext::LockedClientsCursor cursor(opCtx->getClient()->getServiceContext());
          Client* client = cursor.next();) {

@@ -30,19 +30,29 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/service_context.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/db/client.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-extern FailPoint keepDiagnosticCaptureOnFailedLock;
 /**
  * DiagnosticInfo keeps track of diagnostic information such as a developer provided
  * name, the time when a lock was first acquired, and a partial caller call stack.
  */
 class DiagnosticInfo {
 public:
+    /**
+     * A simple RAII guard to attempt to join a blocked op once it is no longer needed
+     *
+     * This type is used in tests in conjunction with maybeMakeBlockedOpForTest
+     */
+    class BlockedOpGuard {
+    public:
+        ~BlockedOpGuard();
+    };
+
     struct Diagnostic {
         static std::shared_ptr<DiagnosticInfo> get(Client*);
         static void set(Client*, std::shared_ptr<DiagnosticInfo>);
@@ -92,6 +102,12 @@ public:
     std::string toString() const;
     friend DiagnosticInfo takeDiagnosticInfo(const StringData& captureName);
 
+    /**
+     * This function checks the FailPoint currentOpSpawnsThreadWaitingForLatch and potentially
+     * launches a blocked operation to populate waitingForLatch for $currentOp.
+     */
+    static std::unique_ptr<BlockedOpGuard> maybeMakeBlockedOpForTest(Client* client);
+
 private:
     friend bool operator==(const DiagnosticInfo& info1, const DiagnosticInfo& info2);
     friend bool operator!=(const DiagnosticInfo& info1, const DiagnosticInfo& info2) {
@@ -124,4 +140,5 @@ inline std::ostream& operator<<(std::ostream& s, const DiagnosticInfo& info) {
  * Captures the diagnostic information based on the caller's context.
  */
 DiagnosticInfo takeDiagnosticInfo(const StringData& captureName);
+
 }  // namespace mongo

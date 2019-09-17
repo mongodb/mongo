@@ -48,7 +48,6 @@
 #include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
@@ -234,28 +233,12 @@ CurOp* CurOp::get(const OperationContext& opCtx) {
     return _curopStack(opCtx).top();
 }
 
-namespace {
-
-struct {
-    Mutex mutex = Mutex("TestMutex"_sd, Seconds(1));
-    stdx::unique_lock<Mutex> lock = stdx::unique_lock<Mutex>(mutex, stdx::defer_lock);
-} gHangLock;
-
-}  // namespace
 void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
                                      Client* client,
                                      bool truncateOps,
                                      bool backtraceMode,
                                      BSONObjBuilder* infoBuilder) {
     invariant(client);
-    if (MONGO_unlikely(keepDiagnosticCaptureOnFailedLock.shouldFail())) {
-        gHangLock.lock.lock();
-        try {
-            stdx::lock_guard testLock(gHangLock.mutex);
-        } catch (const DBException& e) {
-            log() << "Successfully caught " << e;
-        }
-    }
 
     OperationContext* clientOpCtx = client->getOperationContext();
 
@@ -335,10 +318,6 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
                 backtraceObj.append("path", frame.objectPath);
             }
         }
-    }
-
-    if (MONGO_unlikely(keepDiagnosticCaptureOnFailedLock.shouldFail())) {
-        gHangLock.lock.unlock();
     }
 }
 
