@@ -63,19 +63,19 @@ class ClientConnections;
 class ActiveClientConnections {
 public:
     void add(const ClientConnections* cc) {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        stdx::lock_guard<Latch> lg(_mutex);
         _clientConnections.insert(cc);
     }
 
     void remove(const ClientConnections* cc) {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        stdx::lock_guard<Latch> lg(_mutex);
         _clientConnections.erase(cc);
     }
 
     void appendInfo(BSONObjBuilder* b) const;
 
 private:
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("ActiveClientConnections::_mutex");
     std::set<const ClientConnections*> _clientConnections;
 
 } activeClientConnections;
@@ -331,7 +331,7 @@ void ActiveClientConnections::appendInfo(BSONObjBuilder* b) const {
     BSONArrayBuilder arr(64 * 1024);
 
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         for (const auto* conn : _clientConnections) {
             BSONObjBuilder bb(arr.subobjStart());
             conn->appendInfo(bb);

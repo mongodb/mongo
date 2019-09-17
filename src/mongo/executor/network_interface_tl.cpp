@@ -65,7 +65,7 @@ std::string NetworkInterfaceTL::getDiagnosticString() {
 
 void NetworkInterfaceTL::appendConnectionStats(ConnectionPoolStats* stats) const {
     auto pool = [&] {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         return _pool.get();
     }();
     if (pool)
@@ -74,7 +74,7 @@ void NetworkInterfaceTL::appendConnectionStats(ConnectionPoolStats* stats) const
 
 NetworkInterface::Counters NetworkInterfaceTL::getCounters() const {
     invariant(getTestCommandsEnabled());
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     return _counters;
 }
 
@@ -83,7 +83,7 @@ std::string NetworkInterfaceTL::getHostName() {
 }
 
 void NetworkInterfaceTL::startup() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     if (_svcCtx) {
         _tl = _svcCtx->getTransportLayer();
     }
@@ -144,19 +144,19 @@ bool NetworkInterfaceTL::inShutdown() const {
 }
 
 void NetworkInterfaceTL::waitForWork() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     MONGO_IDLE_THREAD_BLOCK;
     _workReadyCond.wait(lk, [this] { return _isExecutorRunnable; });
 }
 
 void NetworkInterfaceTL::waitForWorkUntil(Date_t when) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     MONGO_IDLE_THREAD_BLOCK;
     _workReadyCond.wait_until(lk, when.toSystemTimePoint(), [this] { return _isExecutorRunnable; });
 }
 
 void NetworkInterfaceTL::signalWorkAvailable() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     if (!_isExecutorRunnable) {
         _isExecutorRunnable = true;
         _workReadyCond.notify_one();
@@ -401,7 +401,7 @@ void NetworkInterfaceTL::_onAcquireConn(std::shared_ptr<CommandState> state,
                 }
 
                 if (getTestCommandsEnabled()) {
-                    stdx::lock_guard<stdx::mutex> lk(_mutex);
+                    stdx::lock_guard<Latch> lk(_mutex);
                     _counters.timedOut++;
                 }
 
@@ -449,7 +449,7 @@ void NetworkInterfaceTL::_onAcquireConn(std::shared_ptr<CommandState> state,
             }
 
             if (getTestCommandsEnabled()) {
-                stdx::lock_guard<stdx::mutex> lk(_mutex);
+                stdx::lock_guard<Latch> lk(_mutex);
                 if (swr.isOK() && swr.getValue().status.isOK()) {
                     _counters.succeeded++;
                 } else {
@@ -467,7 +467,7 @@ void NetworkInterfaceTL::_onAcquireConn(std::shared_ptr<CommandState> state,
 
 void NetworkInterfaceTL::cancelCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                        const BatonHandle& baton) {
-    stdx::unique_lock<stdx::mutex> lk(_inProgressMutex);
+    stdx::unique_lock<Latch> lk(_inProgressMutex);
     auto it = _inProgress.find(cbHandle);
     if (it == _inProgress.end()) {
         return;
@@ -485,7 +485,7 @@ void NetworkInterfaceTL::cancelCommand(const TaskExecutor::CallbackHandle& cbHan
     }
 
     if (getTestCommandsEnabled()) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         _counters.canceled++;
     }
 
@@ -528,7 +528,7 @@ Status NetworkInterfaceTL::setAlarm(const TaskExecutor::CallbackHandle& cbHandle
         std::make_shared<AlarmState>(when, cbHandle, _reactor->makeTimer(), std::move(pf.promise));
 
     {
-        stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
+        stdx::lock_guard<Latch> lk(_inProgressMutex);
 
         // If a user has already scheduled an alarm with a handle, make sure they intentionally
         // override it by canceling and setting a new one.
@@ -546,7 +546,7 @@ Status NetworkInterfaceTL::setAlarm(const TaskExecutor::CallbackHandle& cbHandle
 }
 
 void NetworkInterfaceTL::cancelAlarm(const TaskExecutor::CallbackHandle& cbHandle) {
-    stdx::unique_lock<stdx::mutex> lk(_inProgressMutex);
+    stdx::unique_lock<Latch> lk(_inProgressMutex);
 
     auto iter = _inProgressAlarms.find(cbHandle);
 
@@ -566,7 +566,7 @@ void NetworkInterfaceTL::cancelAlarm(const TaskExecutor::CallbackHandle& cbHandl
 
 void NetworkInterfaceTL::_cancelAllAlarms() {
     auto alarms = [&] {
-        stdx::unique_lock<stdx::mutex> lk(_inProgressMutex);
+        stdx::unique_lock<Latch> lk(_inProgressMutex);
         return std::exchange(_inProgressAlarms, {});
     }();
 
@@ -599,7 +599,7 @@ void NetworkInterfaceTL::_answerAlarm(Status status, std::shared_ptr<AlarmState>
 
     // Erase the AlarmState from the map.
     {
-        stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
+        stdx::lock_guard<Latch> lk(_inProgressMutex);
 
         auto iter = _inProgressAlarms.find(state->cbHandle);
         if (iter == _inProgressAlarms.end()) {

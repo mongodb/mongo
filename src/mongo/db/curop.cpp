@@ -305,12 +305,11 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
         CurOp::get(clientOpCtx)->reportState(infoBuilder, truncateOps);
     }
 
-    std::shared_ptr<DiagnosticInfo> diagnostic = DiagnosticInfo::Diagnostic::get(client);
-    if (diagnostic && backtraceMode) {
+    if (auto diagnostic = DiagnosticInfo::get(*client)) {
         BSONObjBuilder waitingForLatchBuilder(infoBuilder->subobjStart("waitingForLatch"));
         waitingForLatchBuilder.append("timestamp", diagnostic->getTimestamp());
         waitingForLatchBuilder.append("captureName", diagnostic->getCaptureName());
-        {
+        if (backtraceMode) {
             BSONArrayBuilder backtraceBuilder(waitingForLatchBuilder.subarrayStart("backtrace"));
             for (const auto& frame : diagnostic->makeStackTrace().frames) {
                 BSONObjBuilder backtraceObj(backtraceBuilder.subobjStart());

@@ -530,7 +530,7 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(HostAndPort peer,
         AtomicWord<bool> done{false};
         Promise<SessionHandle> promise;
 
-        stdx::mutex mutex;
+        Mutex mutex = MONGO_MAKE_LATCH("AsyncConnectState::mutex");
         GenericSocket socket;
         ASIOReactorTimer timeoutTimer;
         WrappedResolver resolver;
@@ -562,7 +562,7 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(HostAndPort peer,
                                      connector->resolvedEndpoint));
 
                 std::error_code ec;
-                stdx::lock_guard<stdx::mutex> lk(connector->mutex);
+                stdx::lock_guard<Latch> lk(connector->mutex);
                 connector->resolver.cancel();
                 if (connector->session) {
                     connector->session->end();
@@ -583,7 +583,7 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(HostAndPort peer,
                               << " took " << timeAfter - timeBefore;
                 }
 
-                stdx::lock_guard<stdx::mutex> lk(connector->mutex);
+                stdx::lock_guard<Latch> lk(connector->mutex);
 
                 connector->resolvedEndpoint = results.front();
                 connector->socket.open(connector->resolvedEndpoint->protocol());
@@ -595,7 +595,7 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(HostAndPort peer,
             return connector->socket.async_connect(*connector->resolvedEndpoint, UseFuture{});
         })
         .then([this, connector, sslMode]() -> Future<void> {
-            stdx::unique_lock<stdx::mutex> lk(connector->mutex);
+            stdx::unique_lock<Latch> lk(connector->mutex);
             connector->session =
                 std::make_shared<ASIOSession>(this, std::move(connector->socket), false);
             connector->session->ensureAsync();
@@ -780,7 +780,7 @@ Status TransportLayerASIO::setup() {
 }
 
 Status TransportLayerASIO::start() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _running.store(true);
 
     if (_listenerOptions.isIngress()) {
@@ -812,7 +812,7 @@ Status TransportLayerASIO::start() {
 }
 
 void TransportLayerASIO::shutdown() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _running.store(false);
 
     // Loop through the acceptors and cancel their calls to async_accept. This will prevent new

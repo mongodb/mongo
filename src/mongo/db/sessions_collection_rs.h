@@ -37,7 +37,7 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/sessions_collection.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -108,7 +108,7 @@ private:
                                                            LocalCallback&& localCallback,
                                                            RemoteCallback&& remoteCallback);
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("SessionsCollectionRS::_mutex");
     std::unique_ptr<RemoteCommandTargeter> _targeter;
 };
 

@@ -181,12 +181,12 @@ bool SessionCatalogMigrationSource::hasMoreOplog() {
         return true;
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_newOplogMutex);
+    stdx::lock_guard<Latch> lk(_newOplogMutex);
     return _hasNewWrites(lk);
 }
 
 void SessionCatalogMigrationSource::onCommitCloneStarted() {
-    stdx::lock_guard<stdx::mutex> _lk(_newOplogMutex);
+    stdx::lock_guard<Latch> _lk(_newOplogMutex);
 
     _state = State::kCommitStarted;
     if (_newOplogNotification) {
@@ -196,7 +196,7 @@ void SessionCatalogMigrationSource::onCommitCloneStarted() {
 }
 
 void SessionCatalogMigrationSource::onCloneCleanup() {
-    stdx::lock_guard<stdx::mutex> _lk(_newOplogMutex);
+    stdx::lock_guard<Latch> _lk(_newOplogMutex);
 
     _state = State::kCleanup;
     if (_newOplogNotification) {
@@ -207,14 +207,14 @@ void SessionCatalogMigrationSource::onCloneCleanup() {
 
 SessionCatalogMigrationSource::OplogResult SessionCatalogMigrationSource::getLastFetchedOplog() {
     {
-        stdx::lock_guard<stdx::mutex> _lk(_sessionCloneMutex);
+        stdx::lock_guard<Latch> _lk(_sessionCloneMutex);
         if (_lastFetchedOplog) {
             return OplogResult(_lastFetchedOplog, false);
         }
     }
 
     {
-        stdx::lock_guard<stdx::mutex> _lk(_newOplogMutex);
+        stdx::lock_guard<Latch> _lk(_newOplogMutex);
         return OplogResult(_lastFetchedNewWriteOplog, true);
     }
 }
@@ -230,7 +230,7 @@ bool SessionCatalogMigrationSource::fetchNextOplog(OperationContext* opCtx) {
 std::shared_ptr<Notification<bool>> SessionCatalogMigrationSource::getNotificationForNewOplog() {
     invariant(!_hasMoreOplogFromSessionCatalog());
 
-    stdx::lock_guard<stdx::mutex> lk(_newOplogMutex);
+    stdx::lock_guard<Latch> lk(_newOplogMutex);
 
     if (_newOplogNotification) {
         return _newOplogNotification;
@@ -293,13 +293,13 @@ bool SessionCatalogMigrationSource::_handleWriteHistory(WithLock, OperationConte
 }
 
 bool SessionCatalogMigrationSource::_hasMoreOplogFromSessionCatalog() {
-    stdx::lock_guard<stdx::mutex> _lk(_sessionCloneMutex);
+    stdx::lock_guard<Latch> _lk(_sessionCloneMutex);
     return _lastFetchedOplog || !_lastFetchedOplogBuffer.empty() ||
         !_sessionOplogIterators.empty() || _currentOplogIterator;
 }
 
 bool SessionCatalogMigrationSource::_fetchNextOplogFromSessionCatalog(OperationContext* opCtx) {
-    stdx::unique_lock<stdx::mutex> lk(_sessionCloneMutex);
+    stdx::unique_lock<Latch> lk(_sessionCloneMutex);
 
     if (!_lastFetchedOplogBuffer.empty()) {
         _lastFetchedOplog = _lastFetchedOplogBuffer.back();
@@ -334,7 +334,7 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
     EntryAtOpTimeType entryAtOpTimeType;
 
     {
-        stdx::lock_guard<stdx::mutex> lk(_newOplogMutex);
+        stdx::lock_guard<Latch> lk(_newOplogMutex);
 
         if (_newWriteOpTimeList.empty()) {
             _lastFetchedNewWriteOplog.reset();
@@ -369,7 +369,7 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
     }
 
     {
-        stdx::lock_guard<stdx::mutex> lk(_newOplogMutex);
+        stdx::lock_guard<Latch> lk(_newOplogMutex);
         _lastFetchedNewWriteOplog = newWriteOplogEntry;
         _newWriteOpTimeList.pop_front();
     }
@@ -379,7 +379,7 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
 
 void SessionCatalogMigrationSource::notifyNewWriteOpTime(repl::OpTime opTime,
                                                          EntryAtOpTimeType entryAtOpTimeType) {
-    stdx::lock_guard<stdx::mutex> lk(_newOplogMutex);
+    stdx::lock_guard<Latch> lk(_newOplogMutex);
     _newWriteOpTimeList.emplace_back(opTime, entryAtOpTimeType);
 
     if (_newOplogNotification) {

@@ -61,7 +61,7 @@ void DefaultBaton::detachImpl() noexcept {
     decltype(_scheduled) scheduled;
 
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
 
         invariant(_opCtx->getBaton().get() == this);
         _opCtx->setBaton(nullptr);
@@ -79,7 +79,7 @@ void DefaultBaton::detachImpl() noexcept {
 }
 
 void DefaultBaton::schedule(Task func) noexcept {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     if (!_opCtx) {
         lk.unlock();
@@ -97,14 +97,14 @@ void DefaultBaton::schedule(Task func) noexcept {
 }
 
 void DefaultBaton::notify() noexcept {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _notified = true;
     _cv.notify_one();
 }
 
 Waitable::TimeoutState DefaultBaton::run_until(ClockSource* clkSource,
                                                Date_t oldDeadline) noexcept {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     // We'll fulfill promises and run jobs on the way out, ensuring we don't hold any locks
     const auto guard = makeGuard([&] {

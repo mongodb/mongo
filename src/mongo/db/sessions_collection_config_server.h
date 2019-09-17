@@ -33,7 +33,7 @@
 
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/sessions_collection_sharded.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -64,7 +64,7 @@ private:
     Status _shardCollectionIfNeeded(OperationContext* opCtx);
     Status _generateIndexesIfNeeded(OperationContext* opCtx);
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("SessionsCollectionConfigServer::_mutex");
 };
 
 }  // namespace mongo

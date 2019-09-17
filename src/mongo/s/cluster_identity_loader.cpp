@@ -56,14 +56,14 @@ ClusterIdentityLoader* ClusterIdentityLoader::get(OperationContext* operationCon
 }
 
 OID ClusterIdentityLoader::getClusterId() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     invariant(_initializationState == InitializationState::kInitialized && _lastLoadResult.isOK());
     return _lastLoadResult.getValue();
 }
 
 Status ClusterIdentityLoader::loadClusterId(OperationContext* opCtx,
                                             const repl::ReadConcernLevel& readConcernLevel) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     if (_initializationState == InitializationState::kInitialized) {
         invariant(_lastLoadResult.isOK());
         return Status::OK();
@@ -105,7 +105,7 @@ StatusWith<OID> ClusterIdentityLoader::_fetchClusterIdFromConfig(
 }
 
 void ClusterIdentityLoader::discardCachedClusterId() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
 
     if (_initializationState == InitializationState::kUninitialized) {
         return;

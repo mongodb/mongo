@@ -34,8 +34,8 @@
 #include <thread>
 
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/time_support.h"
@@ -93,7 +93,7 @@ private:
 
     const Milliseconds _granularity;
 
-    stdx::mutex _mutex;
+    stdx::mutex _mutex;  // NOLINT
     stdx::condition_variable _condition;
     bool _inShutdown = false;
     bool _started = false;

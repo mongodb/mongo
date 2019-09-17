@@ -34,8 +34,8 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 namespace executor {

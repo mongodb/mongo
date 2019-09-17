@@ -52,7 +52,7 @@ std::string AbstractAsyncComponent::_getComponentName() const {
 }
 
 bool AbstractAsyncComponent::isActive() noexcept {
-    stdx::lock_guard<stdx::mutex> lock(*_getMutex());
+    stdx::lock_guard<Latch> lock(*_getMutex());
     return _isActive_inlock();
 }
 
@@ -61,7 +61,7 @@ bool AbstractAsyncComponent::_isActive_inlock() noexcept {
 }
 
 bool AbstractAsyncComponent::_isShuttingDown() noexcept {
-    stdx::lock_guard<stdx::mutex> lock(*_getMutex());
+    stdx::lock_guard<Latch> lock(*_getMutex());
     return _isShuttingDown_inlock();
 }
 
@@ -70,7 +70,7 @@ bool AbstractAsyncComponent::_isShuttingDown_inlock() noexcept {
 }
 
 Status AbstractAsyncComponent::startup() noexcept {
-    stdx::lock_guard<stdx::mutex> lock(*_getMutex());
+    stdx::lock_guard<Latch> lock(*_getMutex());
     switch (_state) {
         case State::kPreStart:
             _state = State::kRunning;
@@ -97,7 +97,7 @@ Status AbstractAsyncComponent::startup() noexcept {
 }
 
 void AbstractAsyncComponent::shutdown() noexcept {
-    stdx::lock_guard<stdx::mutex> lock(*_getMutex());
+    stdx::lock_guard<Latch> lock(*_getMutex());
     switch (_state) {
         case State::kPreStart:
             // Transition directly from PreStart to Complete if not started yet.
@@ -116,17 +116,17 @@ void AbstractAsyncComponent::shutdown() noexcept {
 }
 
 void AbstractAsyncComponent::join() noexcept {
-    stdx::unique_lock<stdx::mutex> lk(*_getMutex());
+    stdx::unique_lock<Latch> lk(*_getMutex());
     _stateCondition.wait(lk, [this]() { return !_isActive_inlock(); });
 }
 
 AbstractAsyncComponent::State AbstractAsyncComponent::getState_forTest() noexcept {
-    stdx::lock_guard<stdx::mutex> lock(*_getMutex());
+    stdx::lock_guard<Latch> lock(*_getMutex());
     return _state;
 }
 
 void AbstractAsyncComponent::_transitionToComplete() noexcept {
-    stdx::lock_guard<stdx::mutex> lock(*_getMutex());
+    stdx::lock_guard<Latch> lock(*_getMutex());
     _transitionToComplete_inlock();
 }
 
@@ -138,13 +138,13 @@ void AbstractAsyncComponent::_transitionToComplete_inlock() noexcept {
 
 Status AbstractAsyncComponent::_checkForShutdownAndConvertStatus(
     const executor::TaskExecutor::CallbackArgs& callbackArgs, const std::string& message) {
-    stdx::unique_lock<stdx::mutex> lk(*_getMutex());
+    stdx::unique_lock<Latch> lk(*_getMutex());
     return _checkForShutdownAndConvertStatus_inlock(callbackArgs, message);
 }
 
 Status AbstractAsyncComponent::_checkForShutdownAndConvertStatus(const Status& status,
                                                                  const std::string& message) {
-    stdx::unique_lock<stdx::mutex> lk(*_getMutex());
+    stdx::unique_lock<Latch> lk(*_getMutex());
     return _checkForShutdownAndConvertStatus_inlock(status, message);
 }
 

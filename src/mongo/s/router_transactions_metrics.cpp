@@ -223,7 +223,7 @@ void RouterTransactionsMetrics::incrementCommitSuccessful(TransactionRouter::Com
 void RouterTransactionsMetrics::incrementAbortCauseMap(std::string abortCause) {
     invariant(!abortCause.empty());
 
-    stdx::lock_guard<stdx::mutex> lock(_abortCauseMutex);
+    stdx::lock_guard<Latch> lock(_abortCauseMutex);
     auto it = _abortCauseMap.find(abortCause);
     if (it == _abortCauseMap.end()) {
         _abortCauseMap.emplace(std::pair<std::string, std::int64_t>(std::move(abortCause), 1));
@@ -263,7 +263,7 @@ void RouterTransactionsMetrics::updateStats(RouterTransactionsStats* stats) {
 
     BSONObjBuilder bob;
     {
-        stdx::lock_guard<stdx::mutex> lock(_abortCauseMutex);
+        stdx::lock_guard<Latch> lock(_abortCauseMutex);
         for (auto const& abortCauseEntry : _abortCauseMap) {
             bob.append(abortCauseEntry.first, abortCauseEntry.second);
         }

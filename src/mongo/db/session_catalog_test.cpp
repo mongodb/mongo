@@ -600,9 +600,9 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ConcurrentCheckOutAndKill) {
 
         // The main thread won't check in the session until it's killed.
         {
-            stdx::mutex m;
+            auto m = MONGO_MAKE_LATCH();
             stdx::condition_variable cond;
-            stdx::unique_lock<stdx::mutex> lock(m);
+            stdx::unique_lock<Latch> lock(m);
             ASSERT_EQ(ErrorCodes::InternalError,
                       _opCtx->waitForConditionOrInterruptNoAssert(cond, lock));
         }

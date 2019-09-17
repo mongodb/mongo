@@ -253,7 +253,7 @@ Status IndexBuildsManager::commitIndexBuild(OperationContext* opCtx,
 }
 
 bool IndexBuildsManager::abortIndexBuild(const UUID& buildUUID, const std::string& reason) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     auto builderIt = _builders.find(buildUUID);
     if (builderIt == _builders.end()) {
@@ -270,7 +270,7 @@ bool IndexBuildsManager::abortIndexBuild(const UUID& buildUUID, const std::strin
 bool IndexBuildsManager::interruptIndexBuild(OperationContext* opCtx,
                                              const UUID& buildUUID,
                                              const std::string& reason) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     auto builderIt = _builders.find(buildUUID);
     if (builderIt == _builders.end()) {
@@ -305,14 +305,14 @@ void IndexBuildsManager::verifyNoIndexBuilds_forTestOnly() {
 }
 
 void IndexBuildsManager::_registerIndexBuild(UUID buildUUID) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     std::shared_ptr<MultiIndexBlock> mib = std::make_shared<MultiIndexBlock>();
     invariant(_builders.insert(std::make_pair(buildUUID, mib)).second);
 }
 
 void IndexBuildsManager::_unregisterIndexBuild(const UUID& buildUUID) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     auto builderIt = _builders.find(buildUUID);
     invariant(builderIt != _builders.end());
@@ -320,7 +320,7 @@ void IndexBuildsManager::_unregisterIndexBuild(const UUID& buildUUID) {
 }
 
 std::shared_ptr<MultiIndexBlock> IndexBuildsManager::_getBuilder(const UUID& buildUUID) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     auto builderIt = _builders.find(buildUUID);
     invariant(builderIt != _builders.end());
     return builderIt->second;

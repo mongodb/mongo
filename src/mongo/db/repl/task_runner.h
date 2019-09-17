@@ -33,8 +33,8 @@
 #include <list>
 
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/functional.h"
 
@@ -151,7 +151,7 @@ private:
     ThreadPool* _threadPool;
 
     // Protects member data of this TaskRunner.
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("TaskRunner::_mutex");
 
     stdx::condition_variable _condition;
 

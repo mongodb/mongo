@@ -31,9 +31,9 @@
 
 #include "mongo/client/connection_string.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -216,7 +216,7 @@ private:
     // (R) Read only, can only be written during initialization.
     //
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("ShardingCatalogClientImpl::_mutex");
 
     // Distributed lock manager singleton.
     std::unique_ptr<DistLockManager> _distLockManager;  // (R)

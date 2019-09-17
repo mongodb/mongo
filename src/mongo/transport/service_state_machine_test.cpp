@@ -282,19 +282,19 @@ private:
 class SimpleEvent {
 public:
     void signal() {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<Latch> lk(_mutex);
         _signaled = true;
         _cond.notify_one();
     }
 
     void wait() {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<Latch> lk(_mutex);
         _cond.wait(lk, [this] { return _signaled; });
         _signaled = false;
     }
 
 private:
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("SimpleEvent::_mutex");
     stdx::condition_variable _cond;
     bool _signaled = false;
 };

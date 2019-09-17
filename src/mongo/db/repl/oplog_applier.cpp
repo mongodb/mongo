@@ -75,12 +75,12 @@ Future<void> OplogApplier::startup() {
 void OplogApplier::shutdown() {
     _shutdown();
 
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     _inShutdown = true;
 }
 
 bool OplogApplier::inShutdown() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     return _inShutdown;
 }
 

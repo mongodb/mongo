@@ -32,8 +32,8 @@
 #include <cstdint>
 #include <vector>
 
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
 
 namespace mongo {
@@ -60,14 +60,14 @@ public:
     void schedule(Task task) override;
 
 private:
-    void _consumeTasks(stdx::unique_lock<stdx::mutex> lk);
-    void _consumeTasksInline(stdx::unique_lock<stdx::mutex> lk) noexcept;
+    void _consumeTasks(stdx::unique_lock<Latch> lk);
+    void _consumeTasksInline(stdx::unique_lock<Latch> lk) noexcept;
     void _dtorImpl();
 
     NetworkInterface* const _net;
 
     // Protects all of the pool state below
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("NetworkInterfaceThreadPool::_mutex");
     stdx::condition_variable _joiningCondition;
     std::vector<Task> _tasks;
     bool _started = false;

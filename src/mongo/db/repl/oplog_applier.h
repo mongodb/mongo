@@ -40,7 +40,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
@@ -219,7 +219,7 @@ private:
     Observer* const _observer;
 
     // Protects member data of OplogApplier.
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("OplogApplier::_mutex");
 
     // Set to true if shutdown() has been called.
     bool _inShutdown = false;

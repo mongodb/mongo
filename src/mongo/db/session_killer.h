@@ -37,8 +37,8 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/kill_sessions.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/net/hostandport.h"
@@ -125,13 +125,13 @@ private:
         std::shared_ptr<boost::optional<Result>> result;
     };
 
-    void _periodicKill(OperationContext* opCtx, stdx::unique_lock<stdx::mutex>& lk);
+    void _periodicKill(OperationContext* opCtx, stdx::unique_lock<Latch>& lk);
 
     KillFunc _killFunc;
 
     stdx::thread _thread;
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("SessionKiller::_mutex");
     stdx::condition_variable _callerCV;
     stdx::condition_variable _killerCV;
 

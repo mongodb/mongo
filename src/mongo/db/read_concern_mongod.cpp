@@ -73,7 +73,7 @@ public:
      */
     std::tuple<bool, std::shared_ptr<Notification<Status>>> getOrCreateWriteRequest(
         LogicalTime clusterTime) {
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        stdx::unique_lock<Latch> lock(_mutex);
         auto lastEl = _writeRequests.rbegin();
         if (lastEl != _writeRequests.rend() && lastEl->first >= clusterTime.asTimestamp()) {
             return std::make_tuple(false, lastEl->second);
@@ -88,7 +88,7 @@ public:
      * Erases writeRequest that happened at clusterTime
      */
     void deleteWriteRequest(LogicalTime clusterTime) {
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        stdx::unique_lock<Latch> lock(_mutex);
         auto el = _writeRequests.find(clusterTime.asTimestamp());
         invariant(el != _writeRequests.end());
         invariant(el->second);
@@ -97,7 +97,7 @@ public:
     }
 
 private:
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("WriteRequestSynchronizer::_mutex");
     std::map<Timestamp, std::shared_ptr<Notification<Status>>> _writeRequests;
 };
 

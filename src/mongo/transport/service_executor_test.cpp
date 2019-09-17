@@ -178,13 +178,13 @@ protected:
 
 void scheduleBasicTask(ServiceExecutor* exec, bool expectSuccess) {
     stdx::condition_variable cond;
-    stdx::mutex mutex;
+    auto mutex = MONGO_MAKE_LATCH();
     auto task = [&cond, &mutex] {
-        stdx::unique_lock<stdx::mutex> lk(mutex);
+        stdx::unique_lock<Latch> lk(mutex);
         cond.notify_all();
     };
 
-    stdx::unique_lock<stdx::mutex> lk(mutex);
+    stdx::unique_lock<Latch> lk(mutex);
     auto status = exec->schedule(
         std::move(task), ServiceExecutor::kEmptyFlags, ServiceExecutorTaskName::kSSMStartSession);
     if (expectSuccess) {

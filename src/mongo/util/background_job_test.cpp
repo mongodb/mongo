@@ -30,7 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/background.h"
@@ -114,7 +114,7 @@ TEST(BackgroundJobLifeCycle, Go) {
 
         virtual void run() {
             {
-                stdx::lock_guard<stdx::mutex> lock(_mutex);
+                stdx::lock_guard<Latch> lock(_mutex);
                 ASSERT_FALSE(_hasRun);
                 _hasRun = true;
             }
@@ -127,7 +127,7 @@ TEST(BackgroundJobLifeCycle, Go) {
         }
 
     private:
-        stdx::mutex _mutex;
+        Mutex _mutex = MONGO_MAKE_LATCH("Job::_mutex");
         bool _hasRun;
         Notification<void> _n;
     };

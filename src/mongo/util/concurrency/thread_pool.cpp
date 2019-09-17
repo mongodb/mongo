@@ -79,7 +79,7 @@ ThreadPool::Options cleanUpOptions(ThreadPool::Options&& options) {
 ThreadPool::ThreadPool(Options options) : _options(cleanUpOptions(std::move(options))) {}
 
 ThreadPool::~ThreadPool() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     _shutdown_inlock();
     if (shutdownComplete != _state) {
         _join_inlock(&lk);
@@ -94,7 +94,7 @@ ThreadPool::~ThreadPool() {
 }
 
 void ThreadPool::startup() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     if (_state != preStart) {
         severe() << "Attempting to start pool " << _options.poolName
                  << ", but it has already started";
@@ -110,7 +110,7 @@ void ThreadPool::startup() {
 }
 
 void ThreadPool::shutdown() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _shutdown_inlock();
 }
 
@@ -130,11 +130,11 @@ void ThreadPool::_shutdown_inlock() {
 }
 
 void ThreadPool::join() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     _join_inlock(&lk);
 }
 
-void ThreadPool::_join_inlock(stdx::unique_lock<stdx::mutex>* lk) {
+void ThreadPool::_join_inlock(stdx::unique_lock<Latch>* lk) {
     _stateChange.wait(*lk, [this] {
         switch (_state) {
             case preStart:
@@ -177,7 +177,7 @@ void ThreadPool::_drainPendingTasks() {
             << _options.threadNamePrefix << _nextThreadId++;
         setThreadName(threadName);
         _options.onCreateThread(threadName);
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        stdx::unique_lock<Latch> lock(_mutex);
         while (!_pendingTasks.empty()) {
             _doOneTask(&lock);
         }
@@ -186,7 +186,7 @@ void ThreadPool::_drainPendingTasks() {
 }
 
 void ThreadPool::schedule(Task task) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     switch (_state) {
         case joinRequired:
@@ -221,7 +221,7 @@ void ThreadPool::schedule(Task task) {
 }
 
 void ThreadPool::waitForIdle() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     // If there are any pending tasks, or non-idle threads, the pool is not idle.
     while (!_pendingTasks.empty() || _numIdleThreads < _threads.size()) {
         _poolIsIdle.wait(lk);
@@ -229,7 +229,7 @@ void ThreadPool::waitForIdle() {
 }
 
 ThreadPool::Stats ThreadPool::getStats() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     Stats result;
     result.options = _options;
     result.numThreads = _threads.size();
@@ -257,7 +257,7 @@ void ThreadPool::_workerThreadBody(ThreadPool* pool, const std::string& threadNa
 }
 
 void ThreadPool::_consumeTasks() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     while (_state == running) {
         if (_pendingTasks.empty()) {
             if (_threads.size() > _options.minThreads) {
@@ -331,7 +331,7 @@ void ThreadPool::_consumeTasks() {
     fassertFailedNoTrace(28703);
 }
 
-void ThreadPool::_doOneTask(stdx::unique_lock<stdx::mutex>* lk) noexcept {
+void ThreadPool::_doOneTask(stdx::unique_lock<Latch>* lk) noexcept {
     invariant(!_pendingTasks.empty());
     LOG(3) << "Executing a task on behalf of pool " << _options.poolName;
     Task task = std::move(_pendingTasks.front());

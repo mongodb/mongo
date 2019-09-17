@@ -226,7 +226,7 @@ private:
             [id, work = std::forward<Work>(work), self = shared_from_this()](const auto& cargs) {
                 using ArgsT = std::decay_t<decltype(cargs)>;
 
-                stdx::unique_lock<stdx::mutex> lk(self->_mutex);
+                stdx::unique_lock<Latch> lk(self->_mutex);
 
                 auto doWorkAndNotify = [&](const ArgsT& x) noexcept {
                     lk.unlock();
@@ -301,7 +301,7 @@ private:
         }
     }
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("ScopedTaskExecutor::_mutex");
     bool _inShutdown = false;
     std::shared_ptr<TaskExecutor> _executor;
     size_t _id = 0;

@@ -37,8 +37,8 @@
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/platform/process_id.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"

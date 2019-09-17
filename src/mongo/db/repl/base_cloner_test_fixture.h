@@ -41,8 +41,8 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -135,7 +135,7 @@ protected:
 
 private:
     // Protects member data of this base cloner fixture.
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("BaseCloner::_mutex");
 
     stdx::condition_variable _setStatusCondition;
 

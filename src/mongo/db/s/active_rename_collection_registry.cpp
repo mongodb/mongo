@@ -97,14 +97,14 @@ StatusWith<ScopedRenameCollection> ActiveRenameCollectionRegistry::registerRenam
 }
 
 void ActiveRenameCollectionRegistry::_clearRenameCollection(std::string nss) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     auto iter = _activeRenameCollectionMap.find(nss);
     invariant(iter != _activeRenameCollectionMap.end());
     _activeRenameCollectionMap.erase(nss);
 }
 
 void ActiveRenameCollectionRegistry::_setEmptyOrError(std::string nss, Status status) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     auto iter = _activeRenameCollectionMap.find(nss);
     invariant(iter != _activeRenameCollectionMap.end());
     auto activeRenameCollectionState = iter->second;

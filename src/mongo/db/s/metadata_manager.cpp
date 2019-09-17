@@ -173,7 +173,7 @@ public:
     }
 
     ~RangePreserver() {
-        stdx::lock_guard<stdx::mutex> managerLock(_metadataManager->_managerLock);
+        stdx::lock_guard<Latch> managerLock(_metadataManager->_managerLock);
 
         invariant(_metadataTracker->usageCounter != 0);
         if (--_metadataTracker->usageCounter == 0) {
@@ -232,7 +232,7 @@ void MetadataManager::_clearAllCleanups(WithLock, Status status) {
 
 boost::optional<ScopedCollectionMetadata> MetadataManager::getActiveMetadata(
     std::shared_ptr<MetadataManager> self, const boost::optional<LogicalTime>& atClusterTime) {
-    stdx::lock_guard<stdx::mutex> lg(_managerLock);
+    stdx::lock_guard<Latch> lg(_managerLock);
 
     if (_metadata.empty()) {
         return boost::none;
@@ -269,7 +269,7 @@ boost::optional<ScopedCollectionMetadata> MetadataManager::getActiveMetadata(
 }
 
 size_t MetadataManager::numberOfMetadataSnapshots() const {
-    stdx::lock_guard<stdx::mutex> lg(_managerLock);
+    stdx::lock_guard<Latch> lg(_managerLock);
     if (_metadata.empty())
         return 0;
 
@@ -277,7 +277,7 @@ size_t MetadataManager::numberOfMetadataSnapshots() const {
 }
 
 int MetadataManager::numberOfEmptyMetadataSnapshots() const {
-    stdx::lock_guard<stdx::mutex> lg(_managerLock);
+    stdx::lock_guard<Latch> lg(_managerLock);
 
     int emptyMetadataSnapshots = 0;
     for (const auto& collMetadataTracker : _metadata) {
@@ -289,7 +289,7 @@ int MetadataManager::numberOfEmptyMetadataSnapshots() const {
 }
 
 void MetadataManager::setFilteringMetadata(CollectionMetadata remoteMetadata) {
-    stdx::lock_guard<stdx::mutex> lg(_managerLock);
+    stdx::lock_guard<Latch> lg(_managerLock);
 
     // Collection is becoming sharded
     if (_metadata.empty()) {
@@ -352,7 +352,7 @@ void MetadataManager::setFilteringMetadata(CollectionMetadata remoteMetadata) {
 }
 
 void MetadataManager::clearFilteringMetadata() {
-    stdx::lock_guard<stdx::mutex> lg(_managerLock);
+    stdx::lock_guard<Latch> lg(_managerLock);
     _receivingChunks.clear();
     _clearAllCleanups(lg);
     _metadata.clear();
@@ -394,7 +394,7 @@ void MetadataManager::_retireExpiredMetadata(WithLock lock) {
 }
 
 void MetadataManager::toBSONPending(BSONArrayBuilder& bb) const {
-    stdx::lock_guard<stdx::mutex> lg(_managerLock);
+    stdx::lock_guard<Latch> lg(_managerLock);
 
     for (auto it = _receivingChunks.begin(); it != _receivingChunks.end(); ++it) {
         BSONArrayBuilder pendingBB(bb.subarrayStart());
@@ -405,7 +405,7 @@ void MetadataManager::toBSONPending(BSONArrayBuilder& bb) const {
 }
 
 void MetadataManager::append(BSONObjBuilder* builder) const {
-    stdx::lock_guard<stdx::mutex> lg(_managerLock);
+    stdx::lock_guard<Latch> lg(_managerLock);
 
     _rangesToClean.append(builder);
 
@@ -450,7 +450,7 @@ void MetadataManager::_pushListToClean(WithLock, std::list<Deletion> ranges) {
 }
 
 auto MetadataManager::beginReceive(ChunkRange const& range) -> CleanupNotification {
-    stdx::lock_guard<stdx::mutex> lg(_managerLock);
+    stdx::lock_guard<Latch> lg(_managerLock);
     invariant(!_metadata.empty());
 
     if (_overlapsInUseChunk(lg, range)) {
@@ -467,7 +467,7 @@ auto MetadataManager::beginReceive(ChunkRange const& range) -> CleanupNotificati
 }
 
 void MetadataManager::forgetReceive(ChunkRange const& range) {
-    stdx::lock_guard<stdx::mutex> lg(_managerLock);
+    stdx::lock_guard<Latch> lg(_managerLock);
     invariant(!_metadata.empty());
 
     // This is potentially a partially received chunk, which needs to be cleaned up. We know none
@@ -486,7 +486,7 @@ void MetadataManager::forgetReceive(ChunkRange const& range) {
 
 auto MetadataManager::cleanUpRange(ChunkRange const& range, Date_t whenToDelete)
     -> CleanupNotification {
-    stdx::lock_guard<stdx::mutex> lg(_managerLock);
+    stdx::lock_guard<Latch> lg(_managerLock);
     invariant(!_metadata.empty());
 
     auto* const activeMetadata = _metadata.back().get();
@@ -523,7 +523,7 @@ auto MetadataManager::cleanUpRange(ChunkRange const& range, Date_t whenToDelete)
 }
 
 size_t MetadataManager::numberOfRangesToCleanStillInUse() const {
-    stdx::lock_guard<stdx::mutex> lg(_managerLock);
+    stdx::lock_guard<Latch> lg(_managerLock);
     size_t count = 0;
     for (auto& tracker : _metadata) {
         count += tracker->orphans.size();
@@ -532,13 +532,13 @@ size_t MetadataManager::numberOfRangesToCleanStillInUse() const {
 }
 
 size_t MetadataManager::numberOfRangesToClean() const {
-    stdx::lock_guard<stdx::mutex> lg(_managerLock);
+    stdx::lock_guard<Latch> lg(_managerLock);
     return _rangesToClean.size();
 }
 
 auto MetadataManager::trackOrphanedDataCleanup(ChunkRange const& range) const
     -> boost::optional<CleanupNotification> {
-    stdx::lock_guard<stdx::mutex> lg(_managerLock);
+    stdx::lock_guard<Latch> lg(_managerLock);
     auto overlaps = _overlapsInUseCleanups(lg, range);
     if (overlaps) {
         return overlaps;
@@ -591,7 +591,7 @@ auto MetadataManager::_overlapsInUseCleanups(WithLock, ChunkRange const& range) 
 }
 
 boost::optional<ChunkRange> MetadataManager::getNextOrphanRange(BSONObj const& from) const {
-    stdx::lock_guard<stdx::mutex> lg(_managerLock);
+    stdx::lock_guard<Latch> lg(_managerLock);
     invariant(!_metadata.empty());
     return _metadata.back()->metadata->getNextOrphanRange(_receivingChunks, from);
 }

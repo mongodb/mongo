@@ -38,7 +38,7 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/baton.h"
 #include "mongo/transport/session_asio.h"
@@ -158,7 +158,7 @@ public:
         auto pf = makePromiseFuture<void>();
         auto id = timer.id();
 
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<Latch> lk(_mutex);
 
         if (!_opCtx) {
             return kDetached;
@@ -178,7 +178,7 @@ public:
     bool cancelSession(Session& session) noexcept override {
         const auto id = session.id();
 
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<Latch> lk(_mutex);
 
         if (_sessions.find(id) == _sessions.end()) {
             return false;
@@ -192,7 +192,7 @@ public:
     bool cancelTimer(const ReactorTimer& timer) noexcept override {
         const auto id = timer.id();
 
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<Latch> lk(_mutex);
 
         if (_timersById.find(id) == _timersById.end()) {
             return false;
@@ -211,7 +211,7 @@ public:
     }
 
     void schedule(Task func) noexcept override {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
 
         if (!_opCtx) {
             func(kDetached);
@@ -261,7 +261,7 @@ public:
                 promise.emplaceValue();
             }
 
-            stdx::unique_lock<stdx::mutex> lk(_mutex);
+            stdx::unique_lock<Latch> lk(_mutex);
             while (_scheduled.size()) {
                 auto toRun = std::exchange(_scheduled, {});
 
@@ -273,7 +273,7 @@ public:
             }
         });
 
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<Latch> lk(_mutex);
 
         // If anything was scheduled, run it now.  No need to poll
         if (_scheduled.size()) {
@@ -374,7 +374,7 @@ private:
         auto id = session.id();
         auto pf = makePromiseFuture<void>();
 
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<Latch> lk(_mutex);
 
         if (!_opCtx) {
             return kDetached;
@@ -394,7 +394,7 @@ private:
         decltype(_timers) timers;
 
         {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            stdx::lock_guard<Latch> lk(_mutex);
 
             invariant(_opCtx->getBaton().get() == this);
             _opCtx->setBaton(nullptr);
@@ -438,10 +438,10 @@ private:
      * the eventfd.  If not, we run inline.
      */
     template <typename Callback>
-    void _safeExecute(stdx::unique_lock<stdx::mutex> lk, Callback&& cb) {
+    void _safeExecute(stdx::unique_lock<Latch> lk, Callback&& cb) {
         if (_inPoll) {
             _scheduled.push_back([cb = std::forward<Callback>(cb), this](Status) mutable {
-                stdx::lock_guard<stdx::mutex> lk(_mutex);
+                stdx::lock_guard<Latch> lk(_mutex);
                 cb();
             });
 
@@ -455,7 +455,7 @@ private:
         return EventFDHolder::getForClient(_opCtx->getClient());
     }
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("BatonASIO::_mutex");
 
     OperationContext* _opCtx;
 

@@ -225,12 +225,12 @@ MigrationDestinationManager* MigrationDestinationManager::get(OperationContext* 
 }
 
 MigrationDestinationManager::State MigrationDestinationManager::getState() const {
-    stdx::lock_guard<stdx::mutex> sl(_mutex);
+    stdx::lock_guard<Latch> sl(_mutex);
     return _state;
 }
 
 void MigrationDestinationManager::setState(State newState) {
-    stdx::lock_guard<stdx::mutex> sl(_mutex);
+    stdx::lock_guard<Latch> sl(_mutex);
     _state = newState;
     _stateChangedCV.notify_all();
 }
@@ -238,7 +238,7 @@ void MigrationDestinationManager::setState(State newState) {
 void MigrationDestinationManager::_setStateFail(StringData msg) {
     log() << msg;
     {
-        stdx::lock_guard<stdx::mutex> sl(_mutex);
+        stdx::lock_guard<Latch> sl(_mutex);
         _errmsg = msg.toString();
         _state = FAIL;
         _stateChangedCV.notify_all();
@@ -250,7 +250,7 @@ void MigrationDestinationManager::_setStateFail(StringData msg) {
 void MigrationDestinationManager::_setStateFailWarn(StringData msg) {
     warning() << msg;
     {
-        stdx::lock_guard<stdx::mutex> sl(_mutex);
+        stdx::lock_guard<Latch> sl(_mutex);
         _errmsg = msg.toString();
         _state = FAIL;
         _stateChangedCV.notify_all();
@@ -260,7 +260,7 @@ void MigrationDestinationManager::_setStateFailWarn(StringData msg) {
 }
 
 bool MigrationDestinationManager::isActive() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     return _isActive(lk);
 }
 
@@ -272,7 +272,7 @@ void MigrationDestinationManager::report(BSONObjBuilder& b,
                                          OperationContext* opCtx,
                                          bool waitForSteadyOrDone) {
     if (waitForSteadyOrDone) {
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        stdx::unique_lock<Latch> lock(_mutex);
         try {
             opCtx->waitForConditionOrInterruptFor(_stateChangedCV, lock, Seconds(1), [&]() -> bool {
                 return _state != READY && _state != CLONE && _state != CATCHUP;
@@ -283,7 +283,7 @@ void MigrationDestinationManager::report(BSONObjBuilder& b,
         }
         b.append("waited", true);
     }
-    stdx::lock_guard<stdx::mutex> sl(_mutex);
+    stdx::lock_guard<Latch> sl(_mutex);
 
     b.appendBool("active", _sessionId.is_initialized());
 
@@ -314,7 +314,7 @@ void MigrationDestinationManager::report(BSONObjBuilder& b,
 }
 
 BSONObj MigrationDestinationManager::getMigrationStatusReport() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     if (_isActive(lk)) {
         return migrationutil::makeMigrationStatusDocument(
             _nss, _fromShard, _toShard, false, _min, _max);
@@ -329,7 +329,7 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
                                           const StartChunkCloneRequest cloneRequest,
                                           const OID& epoch,
                                           const WriteConcernOptions& writeConcern) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     invariant(!_sessionId);
     invariant(!_scopedReceiveChunk);
 
@@ -437,7 +437,7 @@ repl::OpTime MigrationDestinationManager::cloneDocumentsFromDonor(
 }
 
 Status MigrationDestinationManager::abort(const MigrationSessionId& sessionId) {
-    stdx::lock_guard<stdx::mutex> sl(_mutex);
+    stdx::lock_guard<Latch> sl(_mutex);
 
     if (!_sessionId) {
         return Status::OK();
@@ -458,7 +458,7 @@ Status MigrationDestinationManager::abort(const MigrationSessionId& sessionId) {
 }
 
 void MigrationDestinationManager::abortWithoutSessionIdCheck() {
-    stdx::lock_guard<stdx::mutex> sl(_mutex);
+    stdx::lock_guard<Latch> sl(_mutex);
     _state = ABORT;
     _stateChangedCV.notify_all();
     _errmsg = "aborted without session id check";
@@ -466,7 +466,7 @@ void MigrationDestinationManager::abortWithoutSessionIdCheck() {
 
 Status MigrationDestinationManager::startCommit(const MigrationSessionId& sessionId) {
 
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    stdx::unique_lock<Latch> lock(_mutex);
 
     if (_state != STEADY) {
         return {ErrorCodes::CommandFailed,
@@ -734,7 +734,7 @@ void MigrationDestinationManager::_migrateThread() {
         _forgetPending(opCtx.get(), ChunkRange(_min, _max));
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _sessionId.reset();
     _scopedReceiveChunk.reset();
     _isActiveCV.notify_all();
@@ -846,7 +846,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
                 }
 
                 {
-                    stdx::lock_guard<stdx::mutex> statsLock(_mutex);
+                    stdx::lock_guard<Latch> statsLock(_mutex);
                     _numCloned += batchNumCloned;
                     ShardingStatistics::get(opCtx).countDocsClonedOnRecipient.addAndFetch(
                         batchNumCloned);

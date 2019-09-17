@@ -37,7 +37,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mobile/mobile_options.h"
 #include "mongo/db/storage/mobile/mobile_session.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 class MobileSession;
@@ -58,7 +58,7 @@ public:
 
 private:
     AtomicWord<bool> _isEmpty;
-    stdx::mutex _queueMutex;
+    Mutex _queueMutex = MONGO_MAKE_LATCH("MobileDelayedOpQueue::_queueMutex");
     std::queue<std::string> _opQueryQueue;
 };
 
@@ -107,7 +107,7 @@ private:
     sqlite3* _popSession_inlock();
 
     // This is used to lock the _sessions vector.
-    stdx::mutex _mutex;
+    Mutex _mutex;
     stdx::condition_variable _releasedSessionNotifier;
 
     std::string _path;

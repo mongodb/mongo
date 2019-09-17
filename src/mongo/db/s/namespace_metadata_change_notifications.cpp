@@ -36,7 +36,7 @@ namespace mongo {
 NamespaceMetadataChangeNotifications::NamespaceMetadataChangeNotifications() = default;
 
 NamespaceMetadataChangeNotifications::~NamespaceMetadataChangeNotifications() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     invariant(_notificationsList.empty());
 }
 
@@ -44,7 +44,7 @@ NamespaceMetadataChangeNotifications::ScopedNotification
 NamespaceMetadataChangeNotifications::createNotification(const NamespaceString& nss) {
     auto notifToken = std::make_shared<NotificationToken>(nss);
 
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    stdx::lock_guard<Latch> lg(_mutex);
 
     auto& notifList = _notificationsList[nss];
     notifToken->itToErase = notifList.insert(notifList.end(), notifToken);
@@ -53,7 +53,7 @@ NamespaceMetadataChangeNotifications::createNotification(const NamespaceString& 
 }
 
 void NamespaceMetadataChangeNotifications::notifyChange(const NamespaceString& nss) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
 
     auto mapIt = _notificationsList.find(nss);
     if (mapIt == _notificationsList.end()) {
@@ -70,7 +70,7 @@ void NamespaceMetadataChangeNotifications::notifyChange(const NamespaceString& n
 
 void NamespaceMetadataChangeNotifications::_unregisterNotificationToken(
     std::shared_ptr<NotificationToken> token) {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    stdx::lock_guard<Latch> lg(_mutex);
 
     if (!token->itToErase) {
         return;

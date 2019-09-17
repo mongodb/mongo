@@ -38,10 +38,10 @@
 #include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -260,7 +260,7 @@ private:
     stdx::unordered_map<NamespaceString, std::list<MigrationType>> _migrationRecoveryMap;
 
     // Protects the class state below.
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("MigrationManager::_mutex");
 
     // Always start the migration manager in a stopped state.
     State _state{State::kStopped};

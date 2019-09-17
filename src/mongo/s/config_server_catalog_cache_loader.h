@@ -64,7 +64,7 @@ private:
     ThreadPool _threadPool;
 
     // Protects the class state below
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("ConfigServerCatalogCacheLoader::_mutex");
 
     // True if shutDown was called.
     bool _inShutdown{false};

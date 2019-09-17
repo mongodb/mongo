@@ -199,12 +199,12 @@ class PendingValue {
 public:
     PendingValue(int initialValue) : _value(initialValue) {}
     void set(int newValue) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         _value = newValue;
         _condition.notify_all();
     }
     void await(int expectedValue) const {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<Latch> lk(_mutex);
         while (_value != expectedValue) {
             _condition.wait(lk);
         }
@@ -212,7 +212,7 @@ public:
 
 private:
     int _value;
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("PendingValue::_mutex");
     mutable stdx::condition_variable _condition;
 };
 

@@ -35,7 +35,7 @@
 
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/condition_variable.h"
+#include "mongo/platform/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_task_names.h"
@@ -138,7 +138,7 @@ private:
         CumulativeTickTimer(TickSource* ts) : _timer(ts) {}
 
         TickSource::Tick markStopped() {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            stdx::lock_guard<Latch> lk(_mutex);
             invariant(_running);
             _running = false;
             auto curTime = _timer.sinceStartTicks();
@@ -147,14 +147,14 @@ private:
         }
 
         void markRunning() {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            stdx::lock_guard<Latch> lk(_mutex);
             invariant(!_running);
             _timer.reset();
             _running = true;
         }
 
         TickSource::Tick totalTime() const {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            stdx::lock_guard<Latch> lk(_mutex);
             if (!_running)
                 return _accumulator;
             return _timer.sinceStartTicks() + _accumulator;
@@ -162,7 +162,7 @@ private:
 
     private:
         TickTimer _timer;
-        mutable stdx::mutex _mutex;
+        mutable Mutex _mutex = MONGO_MAKE_LATCH("::_mutex");
         TickSource::Tick _accumulator = 0;
         bool _running = false;
     };
@@ -202,15 +202,15 @@ private:
 
     void _accumulateTaskMetrics(MetricsArray* outArray, const MetricsArray& inputArray) const;
     void _accumulateAllTaskMetrics(MetricsArray* outputMetricsArray,
-                                   const stdx::unique_lock<stdx::mutex>& lk) const;
+                                   const stdx::unique_lock<Latch>& lk) const;
     TickSource::Tick _getThreadTimerTotal(ThreadTimer which,
-                                          const stdx::unique_lock<stdx::mutex>& lk) const;
+                                          const stdx::unique_lock<Latch>& lk) const;
 
     ReactorHandle _reactorHandle;
 
     std::unique_ptr<Options> _config;
 
-    mutable stdx::mutex _threadsMutex;
+    mutable Mutex _threadsMutex = MONGO_MAKE_LATCH("ServiceExecutorAdaptive::_threadsMutex");
     ThreadList _threads;
     std::array<int64_t, static_cast<size_t>(ThreadCreationReason::kMax)> _threadStartCounters;
 

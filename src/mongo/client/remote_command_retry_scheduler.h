@@ -37,8 +37,8 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -150,7 +150,7 @@ private:
     Milliseconds _currentUsedMillis{0};
 
     // Protects member data of this scheduler declared after mutex.
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("RemoteCommandRetryScheduler::_mutex");
 
     mutable stdx::condition_variable _condition;
 

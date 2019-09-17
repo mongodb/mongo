@@ -210,7 +210,7 @@ Status MigrationManager::executeManualMigration(
 
 void MigrationManager::startRecoveryAndAcquireDistLocks(OperationContext* opCtx) {
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         invariant(_state == State::kStopped);
         invariant(_migrationRecoveryMap.empty());
         _state = State::kRecovering;
@@ -285,7 +285,7 @@ void MigrationManager::finishRecovery(OperationContext* opCtx,
                                       uint64_t maxChunkSizeBytes,
                                       const MigrationSecondaryThrottleOptions& secondaryThrottle) {
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         if (_state == State::kStopping) {
             _migrationRecoveryMap.clear();
             return;
@@ -367,7 +367,7 @@ void MigrationManager::finishRecovery(OperationContext* opCtx,
     scopedGuard.dismiss();
 
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         if (_state == State::kRecovering) {
             _state = State::kEnabled;
             _condVar.notify_all();
@@ -383,7 +383,7 @@ void MigrationManager::finishRecovery(OperationContext* opCtx,
 void MigrationManager::interruptAndDisableMigrations() {
     auto executor = Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor();
 
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     invariant(_state == State::kEnabled || _state == State::kRecovering);
     _state = State::kStopping;
 
@@ -402,7 +402,7 @@ void MigrationManager::interruptAndDisableMigrations() {
 }
 
 void MigrationManager::drainActiveMigrations() {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    stdx::unique_lock<Latch> lock(_mutex);
 
     if (_state == State::kStopped)
         return;
@@ -421,7 +421,7 @@ shared_ptr<Notification<RemoteCommandResponse>> MigrationManager::_schedule(
 
     // Ensure we are not stopped in order to avoid doing the extra work
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         if (_state != State::kEnabled && _state != State::kRecovering) {
             return std::make_shared<Notification<RemoteCommandResponse>>(
                 Status(ErrorCodes::BalancerInterrupted,
@@ -457,7 +457,7 @@ shared_ptr<Notification<RemoteCommandResponse>> MigrationManager::_schedule(
         secondaryThrottle,
         waitForDelete);
 
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
 
     if (_state != State::kEnabled && _state != State::kRecovering) {
         return std::make_shared<Notification<RemoteCommandResponse>>(
@@ -522,7 +522,7 @@ void MigrationManager::_schedule(WithLock lock,
                 ThreadClient tc(getThreadName(), service);
                 auto opCtx = cc().makeOperationContext();
 
-                stdx::lock_guard<stdx::mutex> lock(_mutex);
+                stdx::lock_guard<Latch> lock(_mutex);
                 _complete(lock, opCtx.get(), itMigration, args.response);
             });
 
@@ -573,12 +573,12 @@ void MigrationManager::_checkDrained(WithLock) {
 }
 
 void MigrationManager::_waitForRecovery() {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    stdx::unique_lock<Latch> lock(_mutex);
     _condVar.wait(lock, [this] { return _state != State::kRecovering; });
 }
 
 void MigrationManager::_abandonActiveMigrationsAndEnableManager(OperationContext* opCtx) {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    stdx::unique_lock<Latch> lock(_mutex);
     if (_state == State::kStopping) {
         // The balancer was interrupted. Let the next balancer recover the state.
         return;
@@ -605,7 +605,7 @@ Status MigrationManager::_processRemoteCommandResponse(
     const RemoteCommandResponse& remoteCommandResponse,
     ScopedMigrationRequest* scopedMigrationRequest) {
 
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     Status commandStatus(ErrorCodes::InternalError, "Uninitialized value.");
 
     // Check for local errors sending the remote command caused by stepdown.

@@ -35,7 +35,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/storage/capped_callback.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 
 

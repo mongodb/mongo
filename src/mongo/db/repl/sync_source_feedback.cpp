@@ -98,7 +98,7 @@ Reporter::PrepareReplSetUpdatePositionCommandFn makePrepareReplSetUpdatePosition
 
 void SyncSourceFeedback::forwardSlaveProgress() {
     {
-        stdx::unique_lock<stdx::mutex> lock(_mtx);
+        stdx::unique_lock<Latch> lock(_mtx);
         _positionChanged = true;
         _cond.notify_all();
         if (_reporter) {
@@ -133,7 +133,7 @@ Status SyncSourceFeedback::_updateUpstream(Reporter* reporter) {
 }
 
 void SyncSourceFeedback::shutdown() {
-    stdx::unique_lock<stdx::mutex> lock(_mtx);
+    stdx::unique_lock<Latch> lock(_mtx);
     if (_reporter) {
         _reporter->shutdown();
     }
@@ -161,7 +161,7 @@ void SyncSourceFeedback::run(executor::TaskExecutor* executor,
             // Take SyncSourceFeedback lock before calling into ReplicationCoordinator
             // to avoid deadlock because ReplicationCoordinator could conceivably calling back into
             // this class.
-            stdx::unique_lock<stdx::mutex> lock(_mtx);
+            stdx::unique_lock<Latch> lock(_mtx);
             while (!_positionChanged && !_shutdownSignaled) {
                 {
                     MONGO_IDLE_THREAD_BLOCK;
@@ -184,7 +184,7 @@ void SyncSourceFeedback::run(executor::TaskExecutor* executor,
         }
 
         {
-            stdx::lock_guard<stdx::mutex> lock(_mtx);
+            stdx::lock_guard<Latch> lock(_mtx);
             MemberState state = replCoord->getMemberState();
             if (state.primary() || state.startup()) {
                 continue;
@@ -220,14 +220,14 @@ void SyncSourceFeedback::run(executor::TaskExecutor* executor,
                           keepAliveInterval,
                           syncSourceFeedbackNetworkTimeoutSecs);
         {
-            stdx::lock_guard<stdx::mutex> lock(_mtx);
+            stdx::lock_guard<Latch> lock(_mtx);
             if (_shutdownSignaled) {
                 break;
             }
             _reporter = &reporter;
         }
         ON_BLOCK_EXIT([this]() {
-            stdx::lock_guard<stdx::mutex> lock(_mtx);
+            stdx::lock_guard<Latch> lock(_mtx);
             _reporter = nullptr;
         });
 

@@ -34,8 +34,8 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -140,7 +140,7 @@ public:
      * cache.
      */
     boost::optional<std::shared_ptr<Value>> get(const Key& key) {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<Latch> lk(_mutex);
         auto myGeneration = _generation;
 
         auto cacheIt = _cache.find(key);
@@ -192,7 +192,7 @@ public:
      * Returns a vector of info about items in the cache for testing/reporting purposes
      */
     std::vector<CachedItemInfo> getCacheInfo() const {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         std::vector<CachedItemInfo> ret;
         ret.reserve(_active.size() + _cache.size());
 
@@ -255,7 +255,7 @@ private:
 
     private:
         InvalidatingLRUCache<Key, Value, Invalidator>* _cache;
-        stdx::unique_lock<stdx::mutex> _lk;
+        stdx::unique_lock<Latch> _lk;
         std::vector<std::shared_ptr<Value>> _activePtrsToDestroy;
     };
 
@@ -331,7 +331,7 @@ private:
     auto _makeDeleterWithLock(const Key& key, uint64_t myGeneration) -> auto {
         return [this, key, myGeneration](Value* d) {
             std::unique_ptr<Value> owned(d);
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            stdx::lock_guard<Latch> lk(_mutex);
             auto it = _active.find(key);
             if (it != _active.end() && it->second.expired()) {
                 _active.erase(it);
@@ -345,7 +345,7 @@ private:
         };
     }
 
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("InvalidatingLRUCache::_mutex");
 
     // The generation count - items will not be returned to the cache if their generation count
     // does not match the current generation count

@@ -34,7 +34,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/uuid.h"
 
 /**
@@ -52,7 +52,7 @@ public:
     std::vector<std::pair<UUID, std::string>> getTTLInfos();
 
 private:
-    stdx::mutex _ttlInfosLock;
+    Mutex _ttlInfosLock = MONGO_MAKE_LATCH("TTLCollectionCache::_ttlInfosLock");
     std::vector<std::pair<UUID, std::string>> _ttlInfos;  // <CollectionUUID, IndexName>
 };
 }  // namespace mongo

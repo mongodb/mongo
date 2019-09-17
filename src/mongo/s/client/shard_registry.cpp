@@ -50,13 +50,13 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/grid.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/log.h"
 #include "mongo/util/map_util.h"
@@ -202,12 +202,12 @@ void ShardRegistry::updateReplSetHosts(const ConnectionString& newConnString) {
               newConnString.type() == ConnectionString::CUSTOM);  // For dbtests
 
     // to prevent update config shard connection string during init
-    stdx::unique_lock<stdx::mutex> lock(_reloadMutex);
+    stdx::unique_lock<Latch> lock(_reloadMutex);
     _data.rebuildShardIfExists(newConnString, _shardFactory.get());
 }
 
 void ShardRegistry::init() {
-    stdx::unique_lock<stdx::mutex> reloadLock(_reloadMutex);
+    stdx::unique_lock<Latch> reloadLock(_reloadMutex);
     invariant(_initConfigServerCS.isValid());
     auto configShard =
         _shardFactory->createShard(ShardRegistry::kConfigServerShardId, _initConfigServerCS);
@@ -282,12 +282,12 @@ void ShardRegistry::_internalReload(const CallbackArgs& cbArgs) {
 }
 
 bool ShardRegistry::isUp() const {
-    stdx::unique_lock<stdx::mutex> reloadLock(_reloadMutex);
+    stdx::unique_lock<Latch> reloadLock(_reloadMutex);
     return _isUp;
 }
 
 bool ShardRegistry::reload(OperationContext* opCtx) {
-    stdx::unique_lock<stdx::mutex> reloadLock(_reloadMutex);
+    stdx::unique_lock<Latch> reloadLock(_reloadMutex);
 
     if (_reloadState == ReloadState::Reloading) {
         // Another thread is already in the process of reloading so no need to do duplicate work.
@@ -444,7 +444,7 @@ ShardRegistryData::ShardRegistryData(OperationContext* opCtx, ShardFactory* shar
 }
 
 void ShardRegistryData::swap(ShardRegistryData& other) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _lookup.swap(other._lookup);
     _rsLookup.swap(other._rsLookup);
     _hostLookup.swap(other._hostLookup);
@@ -452,29 +452,29 @@ void ShardRegistryData::swap(ShardRegistryData& other) {
 }
 
 shared_ptr<Shard> ShardRegistryData::getConfigShard() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     return _configShard;
 }
 
 void ShardRegistryData::addConfigShard(std::shared_ptr<Shard> shard) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _configShard = shard;
     _addShard(lk, shard, true);
 }
 
 shared_ptr<Shard> ShardRegistryData::findByRSName(const string& name) const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     auto i = _rsLookup.find(name);
     return (i != _rsLookup.end()) ? i->second : nullptr;
 }
 
 shared_ptr<Shard> ShardRegistryData::findByHostAndPort(const HostAndPort& hostAndPort) const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     return mapFindWithDefault(_hostLookup, hostAndPort);
 }
 
 shared_ptr<Shard> ShardRegistryData::findByShardId(const ShardId& shardId) const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     return _findByShardId(lk, shardId);
 }
 
@@ -487,7 +487,7 @@ void ShardRegistryData::toBSON(BSONObjBuilder* result) const {
     // Need to copy, then sort by shardId.
     std::vector<std::pair<ShardId, std::string>> shards;
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         shards.reserve(_lookup.size());
         for (auto&& shard : _lookup) {
             shards.emplace_back(shard.first, shard.second->getConnString().toString());
@@ -503,7 +503,7 @@ void ShardRegistryData::toBSON(BSONObjBuilder* result) const {
 }
 
 void ShardRegistryData::getAllShardIds(std::set<ShardId>& seen) const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     for (auto i = _lookup.begin(); i != _lookup.end(); ++i) {
         const auto& s = i->second;
         if (s->getId().toString() == "config") {
@@ -514,7 +514,7 @@ void ShardRegistryData::getAllShardIds(std::set<ShardId>& seen) const {
 }
 
 void ShardRegistryData::shardIdSetDifference(std::set<ShardId>& diff) const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     for (auto i = _lookup.begin(); i != _lookup.end(); ++i) {
         invariant(i->second);
         auto res = diff.find(i->second->getId());
@@ -526,7 +526,7 @@ void ShardRegistryData::shardIdSetDifference(std::set<ShardId>& diff) const {
 
 void ShardRegistryData::rebuildShardIfExists(const ConnectionString& newConnString,
                                              ShardFactory* factory) {
-    stdx::unique_lock<stdx::mutex> updateConnStringLock(_mutex);
+    stdx::unique_lock<Latch> updateConnStringLock(_mutex);
     auto it = _rsLookup.find(newConnString.getSetName());
     if (it == _rsLookup.end()) {
         return;

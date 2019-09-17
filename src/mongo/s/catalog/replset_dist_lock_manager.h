@@ -34,12 +34,12 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/dist_lock_catalog.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/dist_lock_ping_info.h"
 #include "mongo/stdx/chrono.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 
@@ -132,7 +132,7 @@ private:
     const Milliseconds _pingInterval;                 // (I)
     const Milliseconds _lockExpiration;               // (I)
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("ReplSetDistLockManager::_mutex");
     std::unique_ptr<stdx::thread> _execThread;  // (S)
 
     // Contains the list of locks queued for unlocking. Cases when unlock operation can

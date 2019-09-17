@@ -43,7 +43,7 @@
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/session_update_tracker.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
@@ -239,7 +239,7 @@ private:
     const OplogApplier::Options _options;
 
     // Protects member data of SyncTail.
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("SyncTail::_mutex");
 
     // Set to true if shutdown() has been called.
     bool _inShutdown = false;

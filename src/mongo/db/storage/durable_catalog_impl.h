@@ -40,7 +40,7 @@
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/kv/kv_prefix.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 
@@ -261,7 +261,7 @@ private:
     };
     typedef std::map<std::string, Entry> NSToIdentMap;
     NSToIdentMap _idents;
-    mutable stdx::mutex _identsLock;
+    mutable Mutex _identsLock = MONGO_MAKE_LATCH("DurableCatalogImpl::_identsLock");
 
     // Manages the feature document that may be present in the DurableCatalogImpl. '_featureTracker'
     // is guaranteed to be non-null after DurableCatalogImpl::init() is called.

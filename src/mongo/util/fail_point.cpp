@@ -93,7 +93,7 @@ void FailPoint::setMode(Mode mode, ValType val, BSONObj extra) {
      * 3. Sets the new mode.
      */
 
-    stdx::lock_guard<stdx::mutex> scoped(_modMutex);
+    stdx::lock_guard<Latch> scoped(_modMutex);
 
     // Step 1
     disable();
@@ -259,7 +259,7 @@ StatusWith<FailPoint::ModeOptions> FailPoint::parseBSON(const BSONObj& obj) {
 BSONObj FailPoint::toBSON() const {
     BSONObjBuilder builder;
 
-    stdx::lock_guard<stdx::mutex> scoped(_modMutex);
+    stdx::lock_guard<Latch> scoped(_modMutex);
     builder.append("mode", _mode);
     builder.append("data", _data);
 

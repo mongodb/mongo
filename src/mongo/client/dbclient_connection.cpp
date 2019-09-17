@@ -62,10 +62,10 @@
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/s/stale_exception.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/debug_util.h"
@@ -331,7 +331,7 @@ Status DBClientConnection::connectSocketOnly(const HostAndPort& serverAddress) {
     }
 
     {
-        stdx::lock_guard<stdx::mutex> lk(_sessionMutex);
+        stdx::lock_guard<Latch> lk(_sessionMutex);
         if (_stayFailed.load()) {
             // This object is still in a failed state. The session we just created will be destroyed
             // immediately since we aren't holding on to it.
@@ -400,7 +400,7 @@ void DBClientConnection::_markFailed(FailAction action) {
         } else if (action == kReleaseSession) {
             transport::SessionHandle destroyedOutsideMutex;
 
-            stdx::lock_guard<stdx::mutex> lk(_sessionMutex);
+            stdx::lock_guard<Latch> lk(_sessionMutex);
             _session.swap(destroyedOutsideMutex);
         }
     }
@@ -452,7 +452,7 @@ void DBClientConnection::setTags(transport::Session::TagMask tags) {
 }
 
 void DBClientConnection::shutdownAndDisallowReconnect() {
-    stdx::lock_guard<stdx::mutex> lk(_sessionMutex);
+    stdx::lock_guard<Latch> lk(_sessionMutex);
     _stayFailed.store(true);
     _markFailed(kEndSession);
 }

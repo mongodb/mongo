@@ -60,7 +60,7 @@ ActiveMigrationsRegistry& ActiveMigrationsRegistry::get(OperationContext* opCtx)
 
 StatusWith<ScopedDonateChunk> ActiveMigrationsRegistry::registerDonateChunk(
     const MoveChunkRequest& args) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     if (_activeReceiveChunkState) {
         return _activeReceiveChunkState->constructErrorStatus();
     }
@@ -80,7 +80,7 @@ StatusWith<ScopedDonateChunk> ActiveMigrationsRegistry::registerDonateChunk(
 
 StatusWith<ScopedReceiveChunk> ActiveMigrationsRegistry::registerReceiveChunk(
     const NamespaceString& nss, const ChunkRange& chunkRange, const ShardId& fromShardId) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     if (_activeReceiveChunkState) {
         return _activeReceiveChunkState->constructErrorStatus();
     }
@@ -95,7 +95,7 @@ StatusWith<ScopedReceiveChunk> ActiveMigrationsRegistry::registerReceiveChunk(
 }
 
 boost::optional<NamespaceString> ActiveMigrationsRegistry::getActiveDonateChunkNss() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     if (_activeMoveChunkState) {
         return _activeMoveChunkState->args.getNss();
     }
@@ -106,7 +106,7 @@ boost::optional<NamespaceString> ActiveMigrationsRegistry::getActiveDonateChunkN
 BSONObj ActiveMigrationsRegistry::getActiveMigrationStatusReport(OperationContext* opCtx) {
     boost::optional<NamespaceString> nss;
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
 
         if (_activeMoveChunkState) {
             nss = _activeMoveChunkState->args.getNss();
@@ -132,13 +132,13 @@ BSONObj ActiveMigrationsRegistry::getActiveMigrationStatusReport(OperationContex
 }
 
 void ActiveMigrationsRegistry::_clearDonateChunk() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     invariant(_activeMoveChunkState);
     _activeMoveChunkState.reset();
 }
 
 void ActiveMigrationsRegistry::_clearReceiveChunk() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     invariant(_activeReceiveChunkState);
     _activeReceiveChunkState.reset();
 }

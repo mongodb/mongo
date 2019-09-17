@@ -78,7 +78,7 @@ AllowedIndexEntry::AllowedIndexEntry(const BSONObj& query,
 
 boost::optional<AllowedIndicesFilter> QuerySettings::getAllowedIndicesFilter(
     const CanonicalQuery::QueryShapeString& key) const {
-    stdx::lock_guard<stdx::mutex> cacheLock(_mutex);
+    stdx::lock_guard<Latch> cacheLock(_mutex);
     AllowedIndexEntryMap::const_iterator cacheIter = _allowedIndexEntryMap.find(key);
 
     // Nothing to do if key does not exist in query settings.
@@ -90,7 +90,7 @@ boost::optional<AllowedIndicesFilter> QuerySettings::getAllowedIndicesFilter(
 }
 
 std::vector<AllowedIndexEntry> QuerySettings::getAllAllowedIndices() const {
-    stdx::lock_guard<stdx::mutex> cacheLock(_mutex);
+    stdx::lock_guard<Latch> cacheLock(_mutex);
     std::vector<AllowedIndexEntry> entries;
     for (const auto& entryPair : _allowedIndexEntryMap) {
         entries.push_back(entryPair.second);
@@ -109,7 +109,7 @@ void QuerySettings::setAllowedIndices(const CanonicalQuery& canonicalQuery,
     const BSONObj collation =
         canonicalQuery.getCollator() ? canonicalQuery.getCollator()->getSpec().toBSON() : BSONObj();
 
-    stdx::lock_guard<stdx::mutex> cacheLock(_mutex);
+    stdx::lock_guard<Latch> cacheLock(_mutex);
     _allowedIndexEntryMap.erase(key);
     _allowedIndexEntryMap.emplace(
         std::piecewise_construct,
@@ -118,7 +118,7 @@ void QuerySettings::setAllowedIndices(const CanonicalQuery& canonicalQuery,
 }
 
 void QuerySettings::removeAllowedIndices(const CanonicalQuery::QueryShapeString& key) {
-    stdx::lock_guard<stdx::mutex> cacheLock(_mutex);
+    stdx::lock_guard<Latch> cacheLock(_mutex);
     AllowedIndexEntryMap::iterator i = _allowedIndexEntryMap.find(key);
 
     // Nothing to do if key does not exist in query settings.
@@ -130,7 +130,7 @@ void QuerySettings::removeAllowedIndices(const CanonicalQuery::QueryShapeString&
 }
 
 void QuerySettings::clearAllowedIndices() {
-    stdx::lock_guard<stdx::mutex> cacheLock(_mutex);
+    stdx::lock_guard<Latch> cacheLock(_mutex);
     _allowedIndexEntryMap.clear();
 }
 

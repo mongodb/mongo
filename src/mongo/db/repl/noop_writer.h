@@ -32,7 +32,7 @@
 #include <functional>
 
 #include "mongo/db/repl/optime.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -75,7 +75,7 @@ private:
      * Protects member data of this class during start and stop. There is no need to synchronize
      * access once its running because its run by a one thread only.
      */
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("NoopWriter::_mutex");
 
     std::unique_ptr<PeriodicNoopRunner> _noopRunner;
 };

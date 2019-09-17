@@ -94,7 +94,7 @@ std::unique_ptr<mongo::RecordStore> KVEngine::getRecordStore(OperationContext* o
 }
 
 bool KVEngine::trySwapMaster(StringStore& newMaster, uint64_t version) {
-    stdx::lock_guard<stdx::mutex> lock(_masterLock);
+    stdx::lock_guard<Latch> lock(_masterLock);
     invariant(!newMaster.hasBranch() && !_master.hasBranch());
     if (_masterVersion != version)
         return false;

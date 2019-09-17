@@ -41,7 +41,7 @@
 #include "mongo/db/concurrency/flow_control_ticketholder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/stacktrace.h"
@@ -77,7 +77,7 @@ public:
     }
 
     static std::string nameForId(ResourceId resourceId) {
-        stdx::lock_guard<stdx::mutex> lk(resourceIdFactory->labelsMutex);
+        stdx::lock_guard<Latch> lk(resourceIdFactory->labelsMutex);
         return resourceIdFactory->labels.at(resourceId.getHashId());
     }
 
@@ -93,7 +93,7 @@ public:
 
 private:
     ResourceId _newResourceIdForMutex(std::string resourceLabel) {
-        stdx::lock_guard<stdx::mutex> lk(labelsMutex);
+        stdx::lock_guard<Latch> lk(labelsMutex);
         invariant(nextId == labels.size());
         labels.push_back(std::move(resourceLabel));
 
@@ -104,7 +104,7 @@ private:
 
     std::uint64_t nextId = 0;
     std::vector<std::string> labels;
-    stdx::mutex labelsMutex;
+    Mutex labelsMutex = MONGO_MAKE_LATCH("ResourceIdFactory::labelsMutex");
 };
 
 ResourceIdFactory* ResourceIdFactory::resourceIdFactory;

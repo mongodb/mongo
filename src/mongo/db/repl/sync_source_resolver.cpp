@@ -85,7 +85,7 @@ SyncSourceResolver::~SyncSourceResolver() {
 }
 
 bool SyncSourceResolver::isActive() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     return _isActive_inlock();
 }
 
@@ -95,7 +95,7 @@ bool SyncSourceResolver::_isActive_inlock() const {
 
 Status SyncSourceResolver::startup() {
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         switch (_state) {
             case State::kPreStart:
                 _state = State::kRunning;
@@ -113,7 +113,7 @@ Status SyncSourceResolver::startup() {
 }
 
 void SyncSourceResolver::shutdown() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     // Transition directly from PreStart to Complete if not started yet.
     if (State::kPreStart == _state) {
         _state = State::kComplete;
@@ -137,12 +137,12 @@ void SyncSourceResolver::shutdown() {
 }
 
 void SyncSourceResolver::join() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     _condition.wait(lk, [this]() { return !_isActive_inlock(); });
 }
 
 bool SyncSourceResolver::_isShuttingDown() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     return State::kShuttingDown == _state;
 }
 
@@ -206,7 +206,7 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeRequiredOpTimeFetcher(HostAndP
 }
 
 Status SyncSourceResolver::_scheduleFetcher(std::unique_ptr<Fetcher> fetcher) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     // TODO SERVER-27499 need to check if _state is kShuttingDown inside the mutex.
     // Must schedule fetcher inside lock in case fetcher's callback gets invoked immediately by task
     // executor.
@@ -341,7 +341,7 @@ Status SyncSourceResolver::_scheduleRBIDRequest(HostAndPort candidate, OpTime ea
     // Once a work is scheduled, nothing prevents it finishing. We need the mutex to protect the
     // access of member variables after scheduling, because otherwise the scheduled callback could
     // finish and allow the destructor to fire before we access the member variables.
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     if (_state == State::kShuttingDown) {
         return Status(
             ErrorCodes::CallbackCanceled,
@@ -530,7 +530,7 @@ Status SyncSourceResolver::_finishCallback(const SyncSourceResolverResponse& res
                   << exceptionToStatus();
     }
 
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     invariant(_state != State::kComplete);
     _state = State::kComplete;
     _condition.notify_all();

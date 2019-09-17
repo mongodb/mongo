@@ -38,11 +38,11 @@
 #include <vm/PosixNSPR.h>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/log.h"
 #include "mongo/util/stacktrace.h"
@@ -160,12 +160,12 @@ private:
         SharedData() = default;
 
         void setErrorStatus(Status status) {
-            stdx::lock_guard<stdx::mutex> lck(_statusMutex);
+            stdx::lock_guard<Latch> lck(_statusMutex);
             _status = std::move(status);
         }
 
         Status getErrorStatus() {
-            stdx::lock_guard<stdx::mutex> lck(_statusMutex);
+            stdx::lock_guard<Latch> lck(_statusMutex);
             return _status;
         }
 
@@ -179,7 +179,7 @@ private:
         std::string _stack;
 
     private:
-        stdx::mutex _statusMutex;
+        Mutex _statusMutex = MONGO_MAKE_LATCH("SharedData::_statusMutex");
         Status _status = Status::OK();
     };
 

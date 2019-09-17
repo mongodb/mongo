@@ -167,7 +167,8 @@ private:
     // shared resource.
     std::shared_ptr<AtomicWord<long long>> _sideWritesCounter;
 
-    mutable stdx::mutex _multikeyPathMutex;
+    mutable Mutex _multikeyPathMutex =
+        MONGO_MAKE_LATCH("IndexBuildInterceptor::_multikeyPathMutex");
     boost::optional<MultikeyPaths> _multikeyPaths;
 };
 

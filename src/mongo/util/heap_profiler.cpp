@@ -282,8 +282,10 @@ private:
     // >1: sample ever sampleIntervalBytes bytes allocated - less accurate but fast and small
     std::atomic_size_t sampleIntervalBytes;  // NOLINT
 
-    stdx::mutex hashtable_mutex;  // guards updates to both object and stack hash tables
-    stdx::mutex stackinfo_mutex;  // guards against races updating the StackInfo bson representation
+    // guards updates to both object and stack hash tables
+    stdx::mutex hashtable_mutex;  // NOLINT
+    // guards against races updating the StackInfo bson representation
+    stdx::mutex stackinfo_mutex;  // NOLINT
 
     // cumulative bytes allocated - determines when samples are taken
     std::atomic_size_t bytesAllocated{0};  // NOLINT

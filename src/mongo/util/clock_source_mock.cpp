@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/platform/mutex.h"
 #include "mongo/util/clock_source_mock.h"
 
 #include <algorithm>

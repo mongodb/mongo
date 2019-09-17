@@ -35,7 +35,7 @@
 
 #include "mongo/executor/egress_tag_closer.h"
 #include "mongo/executor/egress_tag_closer_manager.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
@@ -255,7 +255,7 @@ private:
     std::shared_ptr<ControllerInterface> _controller;
 
     // The global mutex for specific pool access and the generation counter
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("ConnectionPool::_mutex");
     PoolId _nextPoolId = 0;
     stdx::unordered_map<HostAndPort, std::shared_ptr<SpecificPool>> _pools;
 

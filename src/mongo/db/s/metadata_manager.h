@@ -240,7 +240,7 @@ private:
     executor::TaskExecutor* const _executor;
 
     // Mutex to protect the state below
-    mutable stdx::mutex _managerLock;
+    mutable Mutex _managerLock = MONGO_MAKE_LATCH("MetadataManager::_managerLock");
 
     // Contains a list of collection metadata for the same collection epoch, ordered in
     // chronological order based on the refreshes that occurred. The entry at _metadata.back() is

@@ -128,7 +128,7 @@ void TicketHolder::release() {
 }
 
 Status TicketHolder::resize(int newSize) {
-    stdx::lock_guard<stdx::mutex> lk(_resizeMutex);
+    stdx::lock_guard<Latch> lk(_resizeMutex);
 
     if (newSize < 5)
         return Status(ErrorCodes::BadValue,
@@ -174,12 +174,12 @@ TicketHolder::TicketHolder(int num) : _outof(num), _num(num) {}
 TicketHolder::~TicketHolder() = default;
 
 bool TicketHolder::tryAcquire() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     return _tryAcquire();
 }
 
 void TicketHolder::waitForTicket(OperationContext* opCtx) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     if (opCtx) {
         opCtx->waitForConditionOrInterrupt(_newTicket, lk, [this] { return _tryAcquire(); });
@@ -189,7 +189,7 @@ void TicketHolder::waitForTicket(OperationContext* opCtx) {
 }
 
 bool TicketHolder::waitForTicketUntil(OperationContext* opCtx, Date_t until) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     if (opCtx) {
         return opCtx->waitForConditionOrInterruptUntil(
@@ -202,14 +202,14 @@ bool TicketHolder::waitForTicketUntil(OperationContext* opCtx, Date_t until) {
 
 void TicketHolder::release() {
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         _num++;
     }
     _newTicket.notify_one();
 }
 
 Status TicketHolder::resize(int newSize) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
 
     int used = _outof.load() - _num;
     if (used > newSize) {

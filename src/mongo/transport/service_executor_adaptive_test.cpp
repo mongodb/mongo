@@ -114,11 +114,11 @@ protected:
 
     std::shared_ptr<asio::io_context> asioIoCtx;
 
-    stdx::mutex mutex;
+    mutex = MONGO_MAKE_LATCH("ServiceExecutorAdaptiveFixture::mutex");
     AtomicWord<int> waitFor{-1};
     stdx::condition_variable cond;
     std::function<void()> notifyCallback = [this] {
-        stdx::unique_lock<stdx::mutex> lk(mutex);
+        stdx::unique_lock<Latch> lk(mutex);
         invariant(waitFor.load() != -1);
         waitFor.fetchAndSubtract(1);
         cond.notify_one();
@@ -126,7 +126,7 @@ protected:
     };
 
     void waitForCallback(int expected, boost::optional<Milliseconds> timeout = boost::none) {
-        stdx::unique_lock<stdx::mutex> lk(mutex);
+        stdx::unique_lock<Latch> lk(mutex);
         invariant(waitFor.load() != -1);
         if (timeout) {
             ASSERT_TRUE(cond.wait_for(
@@ -163,8 +163,8 @@ protected:
  * that those threads retire when they become idle.
  */
 TEST_F(ServiceExecutorAdaptiveFixture, TestStuckTask) {
-    stdx::mutex blockedMutex;
-    stdx::unique_lock<stdx::mutex> blockedLock(blockedMutex);
+    auto blockedMutex = MONGO_MAKE_LATCH();
+    stdx::unique_lock<Latch> blockedLock(blockedMutex);
 
     auto exec = makeAndStartExecutor<TestOptions>();
     auto guard = makeGuard([&] {
@@ -178,7 +178,7 @@ TEST_F(ServiceExecutorAdaptiveFixture, TestStuckTask) {
     ASSERT_OK(exec->schedule(
         [this, &blockedMutex] {
             notifyCallback();
-            stdx::unique_lock<stdx::mutex> lk(blockedMutex);
+            stdx::unique_lock<Latch> lk(blockedMutex);
             notifyCallback();
         },
         ServiceExecutor::kEmptyFlags,
@@ -208,8 +208,8 @@ TEST_F(ServiceExecutorAdaptiveFixture, TestStuckTask) {
  * threads are running a task for longer than the stuckThreadTimeout.
  */
 TEST_F(ServiceExecutorAdaptiveFixture, TestStuckThreads) {
-    stdx::mutex blockedMutex;
-    stdx::unique_lock<stdx::mutex> blockedLock(blockedMutex);
+    auto blockedMutex = MONGO_MAKE_LATCH();
+    stdx::unique_lock<Latch> blockedLock(blockedMutex);
 
     auto exec = makeAndStartExecutor<TestOptions>();
     auto guard = makeGuard([&] {
@@ -221,7 +221,7 @@ TEST_F(ServiceExecutorAdaptiveFixture, TestStuckThreads) {
     auto blockedTask = [this, &blockedMutex] {
         log() << "waiting on blocked mutex";
         notifyCallback();
-        stdx::unique_lock<stdx::mutex> lk(blockedMutex);
+        stdx::unique_lock<Latch> lk(blockedMutex);
         notifyCallback();
     };
 
@@ -260,8 +260,8 @@ TEST_F(ServiceExecutorAdaptiveFixture, TestStuckThreads) {
 TEST_F(ServiceExecutorAdaptiveFixture, TestStarvation) {
     auto exec = makeAndStartExecutor<TestOptions>();
 
-    // Mutex so we don't attempt to call schedule and shutdown concurrently
-    stdx::mutex scheduleMutex;
+    // auto so = MONGO_MAKE_LATCH() we don't attempt to call schedule and shutdown concurrently
+    auto scheduleMutex = MONGO_MAKE_LATCH();
 
     auto guard = makeGuard([&] { ASSERT_OK(exec->shutdown(config->workerThreadRunTime() * 2)); });
 
@@ -274,7 +274,7 @@ TEST_F(ServiceExecutorAdaptiveFixture, TestStarvation) {
         stdx::this_thread::sleep_for(config->maxQueueLatency().toSystemDuration() * 5);
 
         {
-            stdx::unique_lock<stdx::mutex> lock(scheduleMutex);
+            stdx::unique_lock<Latch> lock(scheduleMutex);
 
             if (scheduleNew) {
                 ASSERT_OK(exec->schedule(task,
@@ -298,7 +298,7 @@ TEST_F(ServiceExecutorAdaptiveFixture, TestStarvation) {
     stdx::this_thread::sleep_for(config->workerThreadRunTime().toSystemDuration() * 2);
     ASSERT_EQ(exec->threadsRunning(), 2);
 
-    stdx::unique_lock<stdx::mutex> lock(scheduleMutex);
+    stdx::unique_lock<Latch> lock(scheduleMutex);
     scheduleNew = false;
 }
 
@@ -310,7 +310,7 @@ TEST_F(ServiceExecutorAdaptiveFixture, TestRecursion) {
     auto exec = makeAndStartExecutor<RecursionOptions>();
 
     AtomicWord<int> remainingTasks{config->recursionLimit() - 1};
-    stdx::mutex mutex;
+    auto mutex = MONGO_MAKE_LATCH();
     stdx::condition_variable cv;
     std::function<void()> task;
 
@@ -334,7 +334,7 @@ TEST_F(ServiceExecutorAdaptiveFixture, TestRecursion) {
         log() << "Completing task recursively";
     };
 
-    stdx::unique_lock<stdx::mutex> lock(mutex);
+    stdx::unique_lock<Latch> lock(mutex);
 
     ASSERT_OK(exec->schedule(
         task, ServiceExecutor::kEmptyFlags, ServiceExecutorTaskName::kSSMProcessMessage));
@@ -352,8 +352,8 @@ TEST_F(ServiceExecutorAdaptiveFixture, TestRecursion) {
  * with new normal tasks
  */
 TEST_F(ServiceExecutorAdaptiveFixture, TestDeferredTasks) {
-    stdx::mutex blockedMutex;
-    stdx::unique_lock<stdx::mutex> blockedLock(blockedMutex);
+    auto blockedMutex = MONGO_MAKE_LATCH();
+    stdx::unique_lock<Latch> blockedLock(blockedMutex);
 
     auto exec = makeAndStartExecutor<TestOptions>();
     auto guard = makeGuard([&] {
@@ -366,7 +366,7 @@ TEST_F(ServiceExecutorAdaptiveFixture, TestDeferredTasks) {
     log() << "Scheduling a blocking task";
     ASSERT_OK(exec->schedule(
         [this, &blockedMutex] {
-            stdx::unique_lock<stdx::mutex> lk(blockedMutex);
+            stdx::unique_lock<Latch> lk(blockedMutex);
             notifyCallback();
         },
         ServiceExecutor::kEmptyFlags,

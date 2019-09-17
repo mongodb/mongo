@@ -38,11 +38,11 @@
 #include "mongo/db/kill_sessions.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/session_killer.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/query/cluster_client_cursor.h"
 #include "mongo/s/query/cluster_client_cursor_guard.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/time_support.h"
@@ -406,7 +406,7 @@ private:
     /**
      * Will detach a cursor, release the lock and then call kill() on it.
      */
-    void detachAndKillCursor(stdx::unique_lock<stdx::mutex> lk,
+    void detachAndKillCursor(stdx::unique_lock<Latch> lk,
                              OperationContext* opCtx,
                              const NamespaceString& nss,
                              CursorId cursorId);
@@ -443,7 +443,7 @@ private:
      *
      * Returns the number of cursors killed.
      */
-    std::size_t killCursorsSatisfying(stdx::unique_lock<stdx::mutex> lk,
+    std::size_t killCursorsSatisfying(stdx::unique_lock<Latch> lk,
                                       OperationContext* opCtx,
                                       std::function<bool(CursorId, const CursorEntry&)> pred);
 
@@ -597,7 +597,7 @@ private:
     ClockSource* _clockSource;
 
     // Synchronizes access to all private state variables below.
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("ClusterCursorManager::_mutex");
 
     bool _inShutdown{false};
 

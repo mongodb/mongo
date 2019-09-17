@@ -571,7 +571,7 @@ private:
         // Tracks number of operations left running on step down.
         size_t _userOpsRunning = 0;
         // Protects killSignaled and stopKillingOps cond. variable.
-        stdx::mutex _mutex;
+        Mutex _mutex = MONGO_MAKE_LATCH("AutoGetRstlForStepUpStepDown::_mutex");
         // Signals thread about the change of killSignaled value.
         stdx::condition_variable _stopKillingOps;
         // Once this is set to true, the killOpThreadFn method will terminate.
@@ -802,7 +802,7 @@ private:
      * Helper method for _awaitReplication that takes an already locked unique_lock, but leaves
      * operation timing to the caller.
      */
-    Status _awaitReplication_inlock(stdx::unique_lock<stdx::mutex>* lock,
+    Status _awaitReplication_inlock(stdx::unique_lock<Latch>* lock,
                                     OperationContext* opCtx,
                                     const OpTime& opTime,
                                     const WriteConcernOptions& writeConcern);
@@ -854,7 +854,7 @@ private:
      *
      * Lock will be released after this method finishes.
      */
-    void _reportUpstream_inlock(stdx::unique_lock<stdx::mutex> lock);
+    void _reportUpstream_inlock(stdx::unique_lock<Latch> lock);
 
     /**
      * Helpers to set the last applied and durable OpTime.
@@ -1141,10 +1141,10 @@ private:
      *
      * Requires "lock" to own _mutex, and returns the same unique_lock.
      */
-    stdx::unique_lock<stdx::mutex> _handleHeartbeatResponseAction_inlock(
+    stdx::unique_lock<Latch> _handleHeartbeatResponseAction_inlock(
         const HeartbeatResponseAction& action,
         const StatusWith<ReplSetHeartbeatResponse>& responseStatus,
-        stdx::unique_lock<stdx::mutex> lock);
+        stdx::unique_lock<Latch> lock);
 
     /**
      * Updates the last committed OpTime to be 'committedOpTime' if it is more recent than the
@@ -1366,7 +1366,7 @@ private:
     // (I)  Independently synchronized, see member variable comment.
 
     // Protects member data of this ReplicationCoordinator.
-    mutable stdx::mutex _mutex;  // (S)
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("ReplicationCoordinatorImpl::_mutex");  // (S)
 
     // Handles to actively queued heartbeats.
     HeartbeatHandles _heartbeatHandles;  // (M)

@@ -35,7 +35,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 
@@ -91,11 +91,13 @@ public:
 
 private:
     // Snapshot to use for reads at a commit timestamp.
-    mutable stdx::mutex _committedSnapshotMutex;  // Guards _committedSnapshot.
+    mutable Mutex _committedSnapshotMutex =  // Guards _committedSnapshot.
+        MONGO_MAKE_LATCH("WiredTigerSnapshotManager::_committedSnapshotMutex");
     boost::optional<Timestamp> _committedSnapshot;
 
     // Snapshot to use for reads at a local stable timestamp.
-    mutable stdx::mutex _localSnapshotMutex;  // Guards _localSnapshot.
+    mutable Mutex _localSnapshotMutex =  // Guards _localSnapshot.
+        MONGO_MAKE_LATCH("WiredTigerSnapshotManager::_localSnapshotMutex");
     boost::optional<Timestamp> _localSnapshot;
 };
 }  // namespace mongo

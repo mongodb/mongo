@@ -43,7 +43,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 namespace repl {
@@ -408,7 +408,7 @@ public:
     Timestamp oldestOpenReadTimestamp = Timestamp::min();
 
 private:
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("StorageInterfaceMock::_mutex");
     int _rbid;
     bool _rbidInitialized = false;
     Timestamp _stableTimestamp = Timestamp::min();

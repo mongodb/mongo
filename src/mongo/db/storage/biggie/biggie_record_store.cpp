@@ -120,7 +120,7 @@ bool RecordStore::isCapped() const {
 }
 
 void RecordStore::setCappedCallback(CappedCallback* cb) {
-    stdx::lock_guard<stdx::mutex> cappedCallbackLock(_cappedCallbackMutex);
+    stdx::lock_guard<Latch> cappedCallbackLock(_cappedCallbackMutex);
     _cappedCallback = cb;
 }
 
@@ -264,7 +264,7 @@ void RecordStore::cappedTruncateAfter(OperationContext* opCtx, RecordId end, boo
     auto endIt = workingCopy->upper_bound(_postfix);
 
     while (recordIt != endIt) {
-        stdx::lock_guard<stdx::mutex> cappedCallbackLock(_cappedCallbackMutex);
+        stdx::lock_guard<Latch> cappedCallbackLock(_cappedCallbackMutex);
         if (_cappedCallback) {
             // Documents are guaranteed to have a RecordId at the end of the KeyString, unlike
             // unique indexes.
@@ -357,11 +357,11 @@ void RecordStore::_cappedDeleteAsNeeded(OperationContext* opCtx, StringStore* wo
     auto recordIt = workingCopy->lower_bound(_prefix);
 
     // Ensure only one thread at a time can do deletes, otherwise they'll conflict.
-    stdx::lock_guard<stdx::mutex> cappedDeleterLock(_cappedDeleterMutex);
+    stdx::lock_guard<Latch> cappedDeleterLock(_cappedDeleterMutex);
 
     while (_cappedAndNeedDelete(opCtx, workingCopy)) {
 
-        stdx::lock_guard<stdx::mutex> cappedCallbackLock(_cappedCallbackMutex);
+        stdx::lock_guard<Latch> cappedCallbackLock(_cappedCallbackMutex);
         RecordId rid = RecordId(extractRecordId(recordIt->first));
 
         if (_isOplog && _visibilityManager->isFirstHidden(rid)) {

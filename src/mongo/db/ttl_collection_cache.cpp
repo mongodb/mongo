@@ -46,19 +46,19 @@ TTLCollectionCache& TTLCollectionCache::get(ServiceContext* ctx) {
 }
 
 void TTLCollectionCache::registerTTLInfo(std::pair<UUID, std::string>&& ttlInfo) {
-    stdx::lock_guard<stdx::mutex> lock(_ttlInfosLock);
+    stdx::lock_guard<Latch> lock(_ttlInfosLock);
     _ttlInfos.push_back(std::move(ttlInfo));
 }
 
 void TTLCollectionCache::deregisterTTLInfo(const std::pair<UUID, std::string>& ttlInfo) {
-    stdx::lock_guard<stdx::mutex> lock(_ttlInfosLock);
+    stdx::lock_guard<Latch> lock(_ttlInfosLock);
     auto collIter = std::find(_ttlInfos.begin(), _ttlInfos.end(), ttlInfo);
     fassert(40220, collIter != _ttlInfos.end());
     _ttlInfos.erase(collIter);
 }
 
 std::vector<std::pair<UUID, std::string>> TTLCollectionCache::getTTLInfos() {
-    stdx::lock_guard<stdx::mutex> lock(_ttlInfosLock);
+    stdx::lock_guard<Latch> lock(_ttlInfosLock);
     return _ttlInfos;
 }
 };  // namespace mongo

@@ -65,7 +65,7 @@
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/transaction_participant_gen.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
@@ -435,7 +435,7 @@ protected:
             _insertOp2->getOpTime());
         _opObserver->onInsertsFn =
             [&](OperationContext*, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
-                stdx::lock_guard<stdx::mutex> lock(_insertMutex);
+                stdx::lock_guard<Latch> lock(_insertMutex);
                 if (nss.isOplog() || nss == _nss1 || nss == _nss2 ||
                     nss == NamespaceString::kSessionTransactionsTableNamespace) {
                     _insertedDocs[nss].insert(_insertedDocs[nss].end(), docs.begin(), docs.end());
@@ -482,7 +482,7 @@ protected:
     std::unique_ptr<ThreadPool> _writerPool;
 
 private:
-    stdx::mutex _insertMutex;
+    Mutex _insertMutex = MONGO_MAKE_LATCH("MultiOplogEntrySyncTailTest::_insertMutex");
 };
 
 TEST_F(MultiOplogEntrySyncTailTest, MultiApplyUnpreparedTransactionSeparate) {
@@ -816,7 +816,7 @@ protected:
         _abortSinglePrepareApplyOp;
 
 private:
-    stdx::mutex _insertMutex;
+    Mutex _insertMutex = MONGO_MAKE_LATCH("MultiOplogEntryPreparedTransactionTest::_insertMutex");
 };
 
 TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionSteadyState) {

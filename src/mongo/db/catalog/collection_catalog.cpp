@@ -73,7 +73,7 @@ CollectionCatalog::iterator::iterator(StringData dbName,
     : _dbName(dbName), _genNum(genNum), _catalog(&catalog) {
     auto minUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
 
-    stdx::lock_guard<stdx::mutex> lock(_catalog->_catalogLock);
+    stdx::lock_guard<Latch> lock(_catalog->_catalogLock);
     _mapIter = _catalog->_orderedCollections.lower_bound(std::make_pair(_dbName, minUuid));
 
     if (_mapIter != _catalog->_orderedCollections.end() && _mapIter->first.first == _dbName) {
@@ -86,7 +86,7 @@ CollectionCatalog::iterator::iterator(
     : _mapIter(mapIter) {}
 
 const CollectionCatalog::iterator::value_type CollectionCatalog::iterator::operator*() {
-    stdx::lock_guard<stdx::mutex> lock(_catalog->_catalogLock);
+    stdx::lock_guard<Latch> lock(_catalog->_catalogLock);
     _repositionIfNeeded();
     if (_exhausted()) {
         return _nullCollection;
@@ -100,7 +100,7 @@ boost::optional<CollectionUUID> CollectionCatalog::iterator::uuid() {
 }
 
 CollectionCatalog::iterator CollectionCatalog::iterator::operator++() {
-    stdx::lock_guard<stdx::mutex> lock(_catalog->_catalogLock);
+    stdx::lock_guard<Latch> lock(_catalog->_catalogLock);
 
     if (!_repositionIfNeeded()) {
         _mapIter++;  // If the position was not updated, increment iterator to next element.
@@ -125,7 +125,7 @@ CollectionCatalog::iterator CollectionCatalog::iterator::operator++(int) {
 }
 
 bool CollectionCatalog::iterator::operator==(const iterator& other) {
-    stdx::lock_guard<stdx::mutex> lock(_catalog->_catalogLock);
+    stdx::lock_guard<Latch> lock(_catalog->_catalogLock);
 
     if (other._mapIter == _catalog->_orderedCollections.end()) {
         return _uuid == boost::none;
@@ -183,7 +183,7 @@ void CollectionCatalog::setCollectionNamespace(OperationContext* opCtx,
     // manager locks) are held. The purpose of this function is ensure that we write to the
     // Collection's namespace string under '_catalogLock'.
     invariant(coll);
-    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+    stdx::lock_guard<Latch> lock(_catalogLock);
 
     coll->setNs(toCollection);
 
@@ -197,7 +197,7 @@ void CollectionCatalog::setCollectionNamespace(OperationContext* opCtx,
     addResource(newRid, toCollection.ns());
 
     opCtx->recoveryUnit()->onRollback([this, coll, fromCollection, toCollection] {
-        stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+        stdx::lock_guard<Latch> lock(_catalogLock);
         coll->setNs(std::move(fromCollection));
 
         _collections[fromCollection] = _collections[toCollection];
@@ -219,7 +219,7 @@ void CollectionCatalog::onCloseDatabase(OperationContext* opCtx, std::string dbN
 
 void CollectionCatalog::onCloseCatalog(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isW());
-    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+    stdx::lock_guard<Latch> lock(_catalogLock);
     invariant(!_shadowCatalog);
     _shadowCatalog.emplace();
     for (auto& entry : _catalog)
@@ -228,13 +228,13 @@ void CollectionCatalog::onCloseCatalog(OperationContext* opCtx) {
 
 void CollectionCatalog::onOpenCatalog(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isW());
-    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+    stdx::lock_guard<Latch> lock(_catalogLock);
     invariant(_shadowCatalog);
     _shadowCatalog.reset();
 }
 
 Collection* CollectionCatalog::lookupCollectionByUUID(CollectionUUID uuid) const {
-    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+    stdx::lock_guard<Latch> lock(_catalogLock);
     return _lookupCollectionByUUID(lock, uuid);
 }
 
@@ -244,13 +244,13 @@ Collection* CollectionCatalog::_lookupCollectionByUUID(WithLock, CollectionUUID 
 }
 
 Collection* CollectionCatalog::lookupCollectionByNamespace(const NamespaceString& nss) const {
-    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+    stdx::lock_guard<Latch> lock(_catalogLock);
     auto it = _collections.find(nss);
     return it == _collections.end() ? nullptr : it->second;
 }
 
 boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(CollectionUUID uuid) const {
-    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+    stdx::lock_guard<Latch> lock(_catalogLock);
     auto foundIt = _catalog.find(uuid);
     if (foundIt != _catalog.end()) {
         NamespaceString ns = foundIt->second->ns();
@@ -271,7 +271,7 @@ boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(CollectionUU
 
 boost::optional<CollectionUUID> CollectionCatalog::lookupUUIDByNSS(
     const NamespaceString& nss) const {
-    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+    stdx::lock_guard<Latch> lock(_catalogLock);
     auto minUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
     auto it = _orderedCollections.lower_bound(std::make_pair(nss.db().toString(), minUuid));
 
@@ -312,7 +312,7 @@ bool CollectionCatalog::checkIfCollectionSatisfiable(CollectionUUID uuid,
                                                      CollectionInfoFn predicate) const {
     invariant(predicate);
 
-    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+    stdx::lock_guard<Latch> lock(_catalogLock);
     auto collection = _lookupCollectionByUUID(lock, uuid);
 
     if (!collection) {
@@ -324,7 +324,7 @@ bool CollectionCatalog::checkIfCollectionSatisfiable(CollectionUUID uuid,
 
 std::vector<CollectionUUID> CollectionCatalog::getAllCollectionUUIDsFromDb(
     StringData dbName) const {
-    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+    stdx::lock_guard<Latch> lock(_catalogLock);
     auto minUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
     auto it = _orderedCollections.lower_bound(std::make_pair(dbName.toString(), minUuid));
 
@@ -340,7 +340,7 @@ std::vector<NamespaceString> CollectionCatalog::getAllCollectionNamesFromDb(
     OperationContext* opCtx, StringData dbName) const {
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_S));
 
-    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+    stdx::lock_guard<Latch> lock(_catalogLock);
     auto minUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
 
     std::vector<NamespaceString> ret;
@@ -354,7 +354,7 @@ std::vector<NamespaceString> CollectionCatalog::getAllCollectionNamesFromDb(
 
 std::vector<std::string> CollectionCatalog::getAllDbNames() const {
     std::vector<std::string> ret;
-    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+    stdx::lock_guard<Latch> lock(_catalogLock);
     auto maxUuid = UUID::parse("FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF").getValue();
     auto iter = _orderedCollections.upper_bound(std::make_pair("", maxUuid));
     while (iter != _orderedCollections.end()) {
@@ -366,7 +366,7 @@ std::vector<std::string> CollectionCatalog::getAllDbNames() const {
 }
 
 void CollectionCatalog::registerCollection(CollectionUUID uuid, std::unique_ptr<Collection> coll) {
-    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+    stdx::lock_guard<Latch> lock(_catalogLock);
 
     LOG(1) << "Registering collection " << coll->ns() << " with UUID " << uuid;
 
@@ -391,7 +391,7 @@ void CollectionCatalog::registerCollection(CollectionUUID uuid, std::unique_ptr<
 }
 
 std::unique_ptr<Collection> CollectionCatalog::deregisterCollection(CollectionUUID uuid) {
-    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+    stdx::lock_guard<Latch> lock(_catalogLock);
 
     invariant(_catalog.find(uuid) != _catalog.end());
 
@@ -426,7 +426,7 @@ std::unique_ptr<RecoveryUnit::Change> CollectionCatalog::makeFinishDropCollectio
 }
 
 void CollectionCatalog::deregisterAllCollections() {
-    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+    stdx::lock_guard<Latch> lock(_catalogLock);
 
     LOG(0) << "Deregistering all the collections";
     for (auto& entry : _catalog) {
@@ -444,7 +444,7 @@ void CollectionCatalog::deregisterAllCollections() {
     _orderedCollections.clear();
     _catalog.clear();
 
-    stdx::lock_guard<stdx::mutex> resourceLock(_resourceLock);
+    stdx::lock_guard<Latch> resourceLock(_resourceLock);
     _resourceInformation.clear();
 
     _generationNumber++;
@@ -460,7 +460,7 @@ CollectionCatalog::iterator CollectionCatalog::end() const {
 
 boost::optional<std::string> CollectionCatalog::lookupResourceName(const ResourceId& rid) {
     invariant(rid.getType() == RESOURCE_DATABASE || rid.getType() == RESOURCE_COLLECTION);
-    stdx::lock_guard<stdx::mutex> lock(_resourceLock);
+    stdx::lock_guard<Latch> lock(_resourceLock);
 
     auto search = _resourceInformation.find(rid);
     if (search == _resourceInformation.end()) {
@@ -480,7 +480,7 @@ boost::optional<std::string> CollectionCatalog::lookupResourceName(const Resourc
 
 void CollectionCatalog::removeResource(const ResourceId& rid, const std::string& entry) {
     invariant(rid.getType() == RESOURCE_DATABASE || rid.getType() == RESOURCE_COLLECTION);
-    stdx::lock_guard<stdx::mutex> lock(_resourceLock);
+    stdx::lock_guard<Latch> lock(_resourceLock);
 
     auto search = _resourceInformation.find(rid);
     if (search == _resourceInformation.end()) {
@@ -498,7 +498,7 @@ void CollectionCatalog::removeResource(const ResourceId& rid, const std::string&
 
 void CollectionCatalog::addResource(const ResourceId& rid, const std::string& entry) {
     invariant(rid.getType() == RESOURCE_DATABASE || rid.getType() == RESOURCE_COLLECTION);
-    stdx::lock_guard<stdx::mutex> lock(_resourceLock);
+    stdx::lock_guard<Latch> lock(_resourceLock);
 
     auto search = _resourceInformation.find(rid);
     if (search == _resourceInformation.end()) {

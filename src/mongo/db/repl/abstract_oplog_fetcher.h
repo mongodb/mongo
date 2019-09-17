@@ -36,7 +36,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/abstract_async_component.h"
 #include "mongo/db/repl/optime_with.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 namespace repl {
@@ -148,7 +148,7 @@ protected:
     virtual void _doShutdown_inlock() noexcept override;
 
 private:
-    stdx::mutex* _getMutex() noexcept override;
+    Mutex* _getMutex() noexcept override;
 
     /**
      * This function must be overriden by subclass oplog fetchers to specify what `find` command
@@ -214,7 +214,7 @@ private:
     const std::size_t _maxFetcherRestarts;
 
     // Protects member data of this AbstractOplogFetcher.
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("AbstractOplogFetcher::_mutex");
 
     // Function to call when the oplog fetcher shuts down.
     OnShutdownCallbackFn _onShutdownCallbackFn;

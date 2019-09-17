@@ -50,8 +50,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_options.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/invalidating_lru_cache.h"
 
@@ -232,7 +232,7 @@ private:
 
     InvalidatingLRUCache<UserName, User, UserCacheInvalidator> _userCache;
 
-    stdx::mutex _pinnedUsersMutex;
+    Mutex _pinnedUsersMutex = MONGO_MAKE_LATCH("AuthorizationManagerImpl::_pinnedUsersMutex");
     stdx::condition_variable _pinnedUsersCond;
     std::once_flag _pinnedThreadTrackerStarted;
     boost::optional<std::vector<UserName>> _usersToPin;
@@ -241,7 +241,7 @@ private:
      * Protects _cacheGeneration, _version and _isFetchPhaseBusy.  Manipulated
      * via CacheGuard.
      */
-    stdx::mutex _cacheWriteMutex;
+    Mutex _cacheWriteMutex = MONGO_MAKE_LATCH("AuthorizationManagerImpl::_cacheWriteMutex");
 
     /**
      * Current generation of cached data.  Updated every time part of the cache gets

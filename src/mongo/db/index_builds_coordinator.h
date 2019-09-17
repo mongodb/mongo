@@ -43,8 +43,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl_index_build_state.h"
 #include "mongo/db/storage/durable_catalog.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/future.h"
@@ -414,7 +414,7 @@ protected:
         const UUID& buildUUID) noexcept;
 
     // Protects the below state.
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("IndexBuildsCoordinator::_mutex");
 
     // New index builds are not allowed on a collection or database if the collection or database is
     // in either of these maps. These are used when concurrent operations need to abort index builds

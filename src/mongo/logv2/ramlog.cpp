@@ -43,7 +43,7 @@ using std::string;
 
 namespace {
 typedef std::map<string, RamLog*> RM;
-stdx::mutex* _namedLock = NULL;
+stdx::mutex* _namedLock = NULL;  // NOLINT
 RM* _named = NULL;
 
 }  // namespace
@@ -156,7 +156,7 @@ RamLog::LineIterator::LineIterator(RamLog* ramlog)
 RamLog* RamLog::get(const std::string& name) {
     if (!_namedLock) {
         // Guaranteed to happen before multi-threaded operation.
-        _namedLock = new stdx::mutex();
+        _namedLock = new stdx::mutex();  // NOLINT
     }
 
     stdx::lock_guard<stdx::mutex> lk(*_namedLock);
@@ -201,7 +201,7 @@ MONGO_INITIALIZER(RamLogCatalogV2)(InitializerContext*) {
             return Status(ErrorCodes::InternalError,
                           "Inconsistent intiailization of RamLogCatalog.");
         }
-        _namedLock = new stdx::mutex();
+        _namedLock = new stdx::mutex();  // NOLINT
         _named = new RM();
     }
 

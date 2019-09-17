@@ -51,7 +51,7 @@ namespace {
 const auto getLogicalClockValidator =
     ServiceContext::declareDecoration<std::unique_ptr<LogicalTimeValidator>>();
 
-stdx::mutex validatorMutex;  // protects access to decoration instance of LogicalTimeValidator.
+Mutex validatorMutex;  // protects access to decoration instance of LogicalTimeValidator.
 
 std::vector<Privilege> advanceClusterTimePrivilege;
 
@@ -67,7 +67,7 @@ Milliseconds kRefreshIntervalIfErrored(200);
 }  // unnamed namespace
 
 LogicalTimeValidator* LogicalTimeValidator::get(ServiceContext* service) {
-    stdx::lock_guard<stdx::mutex> lk(validatorMutex);
+    stdx::lock_guard<Latch> lk(validatorMutex);
     return getLogicalClockValidator(service).get();
 }
 
@@ -77,7 +77,7 @@ LogicalTimeValidator* LogicalTimeValidator::get(OperationContext* ctx) {
 
 void LogicalTimeValidator::set(ServiceContext* service,
                                std::unique_ptr<LogicalTimeValidator> newValidator) {
-    stdx::lock_guard<stdx::mutex> lk(validatorMutex);
+    stdx::lock_guard<Latch> lk(validatorMutex);
     auto& validator = getLogicalClockValidator(service);
     validator = std::move(newValidator);
 }
@@ -91,7 +91,7 @@ SignedLogicalTime LogicalTimeValidator::_getProof(const KeysCollectionDocument& 
 
     // Compare and calculate HMAC inside mutex to prevent multiple threads computing HMAC for the
     // same cluster time.
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     // Note: _lastSeenValidTime will initially not have a proof set.
     if (newTime == _lastSeenValidTime.getTime() && _lastSeenValidTime.getProof()) {
         return _lastSeenValidTime;
@@ -143,7 +143,7 @@ SignedLogicalTime LogicalTimeValidator::signLogicalTime(OperationContext* opCtx,
 
 Status LogicalTimeValidator::validate(OperationContext* opCtx, const SignedLogicalTime& newTime) {
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         if (newTime.getTime() <= _lastSeenValidTime.getTime()) {
             return Status::OK();
         }
@@ -173,7 +173,7 @@ void LogicalTimeValidator::init(ServiceContext* service) {
 }
 
 void LogicalTimeValidator::shutDown() {
-    stdx::lock_guard<stdx::mutex> lk(_mutexKeyManager);
+    stdx::lock_guard<Latch> lk(_mutexKeyManager);
     if (_keyManager) {
         _keyManager->stopMonitoring();
     }
@@ -198,23 +198,23 @@ bool LogicalTimeValidator::shouldGossipLogicalTime() {
 void LogicalTimeValidator::resetKeyManagerCache() {
     log() << "Resetting key manager cache";
     {
-        stdx::lock_guard<stdx::mutex> keyManagerLock(_mutexKeyManager);
+        stdx::lock_guard<Latch> keyManagerLock(_mutexKeyManager);
         invariant(_keyManager);
         _keyManager->clearCache();
     }
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _lastSeenValidTime = SignedLogicalTime();
     _timeProofService.resetCache();
 }
 
 void LogicalTimeValidator::stopKeyManager() {
-    stdx::lock_guard<stdx::mutex> keyManagerLock(_mutexKeyManager);
+    stdx::lock_guard<Latch> keyManagerLock(_mutexKeyManager);
     if (_keyManager) {
         log() << "Stopping key manager";
         _keyManager->stopMonitoring();
         _keyManager->clearCache();
 
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         _lastSeenValidTime = SignedLogicalTime();
         _timeProofService.resetCache();
     } else {
@@ -223,7 +223,7 @@ void LogicalTimeValidator::stopKeyManager() {
 }
 
 std::shared_ptr<KeysCollectionManager> LogicalTimeValidator::_getKeyManagerCopy() {
-    stdx::lock_guard<stdx::mutex> lk(_mutexKeyManager);
+    stdx::lock_guard<Latch> lk(_mutexKeyManager);
     invariant(_keyManager);
     return _keyManager;
 }

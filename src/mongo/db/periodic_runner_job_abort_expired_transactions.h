@@ -32,7 +32,7 @@
 #include <memory>
 
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/periodic_runner.h"
 
 namespace mongo {
@@ -55,7 +55,7 @@ private:
     inline static const auto _serviceDecoration =
         ServiceContext::declareDecoration<PeriodicThreadToAbortExpiredTransactions>();
 
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("PeriodicThreadToAbortExpiredTransactions::_mutex");
     std::shared_ptr<PeriodicJobAnchor> _anchor;
 };
 

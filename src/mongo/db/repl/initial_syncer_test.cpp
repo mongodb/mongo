@@ -60,7 +60,7 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/fail_point_service.h"
@@ -104,9 +104,9 @@ using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 using unittest::log;
 
-using LockGuard = stdx::lock_guard<stdx::mutex>;
+using LockGuard = stdx::lock_guard<Latch>;
 using NetworkGuard = executor::NetworkInterfaceMock::InNetworkGuard;
-using UniqueLock = stdx::unique_lock<stdx::mutex>;
+using UniqueLock = stdx::unique_lock<Latch>;
 
 struct CollectionCloneInfo {
     std::shared_ptr<CollectionMockStats> stats = std::make_shared<CollectionMockStats>();
@@ -244,7 +244,9 @@ protected:
         int documentsInsertedCount = 0;
     };
 
-    stdx::mutex _storageInterfaceWorkDoneMutex;  // protects _storageInterfaceWorkDone.
+    // protects _storageInterfaceWorkDone.
+    Mutex _storageInterfaceWorkDoneMutex =
+        MONGO_MAKE_LATCH("InitialSyncerTest::_storageInterfaceWorkDoneMutex");
     StorageInterfaceResults _storageInterfaceWorkDone;
 
     void setUp() override {

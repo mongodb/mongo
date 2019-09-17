@@ -134,7 +134,7 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
         bool writeOpLog = false;
 
         {
-            stdx::lock_guard<stdx::mutex> scopedLock(csr->_metadataManager->_managerLock);
+            stdx::lock_guard<Latch> scopedLock(csr->_metadataManager->_managerLock);
             if (self->isEmpty()) {
                 LOG(1) << "No further range deletions scheduled on " << nss.ns();
                 return boost::none;
@@ -181,7 +181,7 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
                                      << "ns" << nss.ns() << "epoch" << epoch << "min"
                                      << range->getMin() << "max" << range->getMax()));
             } catch (const DBException& e) {
-                stdx::lock_guard<stdx::mutex> scopedLock(csr->_metadataManager->_managerLock);
+                stdx::lock_guard<Latch> scopedLock(csr->_metadataManager->_managerLock);
                 csr->_metadataManager->_clearAllCleanups(
                     scopedLock,
                     e.toStatus("cannot push startRangeDeletion record to Op Log,"
@@ -254,7 +254,7 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
 
         auto* const self = forTestOnly ? forTestOnly : &metadataManager->_rangesToClean;
 
-        stdx::lock_guard<stdx::mutex> scopedLock(csr->_metadataManager->_managerLock);
+        stdx::lock_guard<Latch> scopedLock(csr->_metadataManager->_managerLock);
 
         if (!replicationStatus.isOK()) {
             LOG(0) << "Error when waiting for write concern after removing " << nss << " range "
@@ -304,7 +304,7 @@ bool CollectionRangeDeleter::_checkCollectionMetadataStillValid(
     if (!scopedCollectionMetadata) {
         LOG(0) << "Abandoning any range deletions because the metadata for " << nss.ns()
                << " was reset";
-        stdx::lock_guard<stdx::mutex> lk(metadataManager->_managerLock);
+        stdx::lock_guard<Latch> lk(metadataManager->_managerLock);
         metadataManager->_clearAllCleanups(lk);
         return false;
     }
@@ -319,7 +319,7 @@ bool CollectionRangeDeleter::_checkCollectionMetadataStillValid(
                    << nss.ns();
         }
 
-        stdx::lock_guard<stdx::mutex> lk(metadataManager->_managerLock);
+        stdx::lock_guard<Latch> lk(metadataManager->_managerLock);
         metadataManager->_clearAllCleanups(lk);
         return false;
     }

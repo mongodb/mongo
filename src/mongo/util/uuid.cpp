@@ -34,15 +34,15 @@
 #include "mongo/util/uuid.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/hex.h"
 
 namespace mongo {
 
 namespace {
 
-stdx::mutex uuidGenMutex;
+Mutex uuidGenMutex;
 auto uuidGen = SecureRandom::create();
 
 // Regex to match valid version 4 UUIDs with variant bits set
@@ -100,7 +100,7 @@ UUID UUID::gen() {
     int64_t randomWords[2];
 
     {
-        stdx::lock_guard<stdx::mutex> lk(uuidGenMutex);
+        stdx::lock_guard<Latch> lk(uuidGenMutex);
 
         // Generate 128 random bits
         randomWords[0] = uuidGen->nextInt64();

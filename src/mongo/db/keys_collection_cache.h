@@ -34,7 +34,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/keys_collection_document.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 
@@ -68,7 +68,7 @@ private:
     const std::string _purpose;
     KeysCollectionClient* const _client;
 
-    stdx::mutex _cacheMutex;
+    Mutex _cacheMutex = MONGO_MAKE_LATCH("KeysCollectionCache::_cacheMutex");
     std::map<LogicalTime, KeysCollectionDocument> _cache;  // expiresAt -> KeysDocument
 };
 

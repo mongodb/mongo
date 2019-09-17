@@ -42,12 +42,12 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/platform/stack_locator.h"
 #include "mongo/scripting/jsexception.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -94,7 +94,7 @@ const int kStackChunkSize = 8192;
  * Runtime's can race on first creation (on some function statics), so we just
  * serialize the initial Runtime creation.
  */
-stdx::mutex gRuntimeCreationMutex;
+Mutex gRuntimeCreationMutex;
 bool gFirstRuntimeCreated = false;
 
 bool closeToMaxMemory() {
@@ -147,7 +147,7 @@ void MozJSImplScope::unregisterOperation() {
 
 void MozJSImplScope::kill() {
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
 
         // If we are on the right thread, in the middle of an operation, and we have a registered
         // opCtx, then we should check the opCtx for interrupts.
@@ -169,7 +169,7 @@ void MozJSImplScope::interrupt() {
 }
 
 bool MozJSImplScope::isKillPending() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     return !_killStatus.isOK();
 }
 
@@ -196,7 +196,7 @@ bool MozJSImplScope::_interruptCallback(JSContext* cx) {
 
     // Check our initial kill status (which might be fine).
     auto status = [&scope]() -> Status {
-        stdx::lock_guard<stdx::mutex> lk(scope->_mutex);
+        stdx::lock_guard<Latch> lk(scope->_mutex);
 
         return scope->_killStatus;
     }();
@@ -292,7 +292,7 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine) {
     }
 
     {
-        stdx::unique_lock<stdx::mutex> lk(gRuntimeCreationMutex);
+        stdx::unique_lock<Latch> lk(gRuntimeCreationMutex);
 
         if (gFirstRuntimeCreated) {
             // If we've already made a runtime, just proceed
@@ -787,7 +787,7 @@ void MozJSImplScope::gc() {
 }
 
 void MozJSImplScope::sleep(Milliseconds ms) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     uassert(ErrorCodes::JSUncatchableError,
             "sleep was interrupted by kill",
@@ -866,7 +866,7 @@ void MozJSImplScope::setStatus(Status status) {
 
 bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool assertOnError) {
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         if (!_killStatus.isOK()) {
             success = false;
             setStatus(_killStatus);

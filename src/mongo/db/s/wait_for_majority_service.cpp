@@ -141,7 +141,7 @@ SharedSemiFuture<void> WaitForMajorityService::waitUntilMajority(const repl::OpT
 void WaitForMajorityService::_periodicallyWaitForMajority(ServiceContext* service) {
     ThreadClient tc("waitForMajority", service);
 
-    stdx::unique_lock lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     while (!_inShutDown) {
         auto opCtx = tc->makeOperationContext();

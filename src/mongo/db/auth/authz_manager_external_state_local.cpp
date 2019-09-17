@@ -204,7 +204,7 @@ void AuthzManagerExternalStateLocal::resolveUserRoles(mutablebson::Document* use
     bool isRoleGraphConsistent = false;
 
     {
-        stdx::lock_guard<stdx::mutex> lk(_roleGraphMutex);
+        stdx::lock_guard<Latch> lk(_roleGraphMutex);
         isRoleGraphConsistent = _roleGraphState == roleGraphStateConsistent;
         for (const auto& role : directRoles) {
             indirectRoles.insert(role);
@@ -306,7 +306,7 @@ Status AuthzManagerExternalStateLocal::getRoleDescription(
         *result = resultDoc.getObject();
         return Status::OK();
     }
-    stdx::lock_guard<stdx::mutex> lk(_roleGraphMutex);
+    stdx::lock_guard<Latch> lk(_roleGraphMutex);
     return _getRoleDescription_inlock(roleName, showPrivileges, showRestrictions, result);
 }
 
@@ -326,7 +326,7 @@ Status AuthzManagerExternalStateLocal::getRolesDescription(
         return Status::OK();
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_roleGraphMutex);
+    stdx::lock_guard<Latch> lk(_roleGraphMutex);
     BSONArrayBuilder resultBuilder;
     for (const RoleName& role : roles) {
         BSONObj roleDoc;
@@ -441,7 +441,7 @@ Status AuthzManagerExternalStateLocal::getRoleDescriptionsForDB(
                       "Cannot get user fragment for all roles in a database");
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_roleGraphMutex);
+    stdx::lock_guard<Latch> lk(_roleGraphMutex);
     for (RoleNameIterator it = _roleGraph.getRolesForDatabase(dbname); it.more(); it.next()) {
         if (!showBuiltinRoles && _roleGraph.isBuiltinRole(it.get())) {
             continue;
@@ -476,7 +476,7 @@ void addRoleFromDocumentOrWarn(RoleGraph* roleGraph, const BSONObj& doc) {
 }  // namespace
 
 Status AuthzManagerExternalStateLocal::_initializeRoleGraph(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lkInitialzeRoleGraph(_roleGraphMutex);
+    stdx::lock_guard<Latch> lkInitialzeRoleGraph(_roleGraphMutex);
 
     _roleGraphState = roleGraphStateInitial;
     _roleGraph = RoleGraph();
@@ -562,7 +562,7 @@ private:
 
 
     void _refreshRoleGraph() {
-        stdx::lock_guard<stdx::mutex> lk(_externalState->_roleGraphMutex);
+        stdx::lock_guard<Latch> lk(_externalState->_roleGraphMutex);
         Status status = _externalState->_roleGraph.handleLogOp(
             _opCtx, _op.c_str(), _nss, _o, _o2 ? &*_o2 : nullptr);
 

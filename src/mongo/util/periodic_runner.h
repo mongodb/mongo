@@ -35,7 +35,7 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

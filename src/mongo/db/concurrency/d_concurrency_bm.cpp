@@ -34,7 +34,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_test_help.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -67,10 +67,10 @@ protected:
 };
 
 BENCHMARK_DEFINE_F(DConcurrencyTest, BM_StdMutex)(benchmark::State& state) {
-    static stdx::mutex mtx;
+    static auto mtx = MONGO_MAKE_LATCH();
 
     for (auto keepRunning : state) {
-        stdx::unique_lock<stdx::mutex> lk(mtx);
+        stdx::unique_lock<Latch> lk(mtx);
     }
 }
 

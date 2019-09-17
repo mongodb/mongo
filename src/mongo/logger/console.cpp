@@ -44,7 +44,7 @@ namespace mongo {
 namespace {
 
 stdx::mutex& consoleMutex() {
-    static stdx::mutex instance;
+    static stdx::mutex instance;  // NOLINT
     return instance;
 }
 

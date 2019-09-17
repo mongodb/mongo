@@ -49,7 +49,7 @@ NamespaceSerializer::ScopedLock::ScopedLock(StringData ns, NamespaceSerializer& 
     : _ns(ns.toString()), _nsSerializer(nsSerializer) {}
 
 NamespaceSerializer::ScopedLock::~ScopedLock() {
-    stdx::unique_lock<stdx::mutex> lock(_nsSerializer._mutex);
+    stdx::unique_lock<Latch> lock(_nsSerializer._mutex);
     auto iter = _nsSerializer._inProgressMap.find(_ns);
 
     iter->second->numWaiting--;
@@ -62,7 +62,7 @@ NamespaceSerializer::ScopedLock::~ScopedLock() {
 }
 
 NamespaceSerializer::ScopedLock NamespaceSerializer::lock(OperationContext* opCtx, StringData nss) {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    stdx::unique_lock<Latch> lock(_mutex);
     auto iter = _inProgressMap.find(nss);
 
     if (iter == _inProgressMap.end()) {

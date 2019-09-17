@@ -36,6 +36,8 @@
 #include <vector>
 
 #include "mongo/bson/json.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/dist_lock_catalog_mock.h"
 #include "mongo/s/catalog/replset_dist_lock_manager.h"
@@ -44,8 +46,6 @@
 #include "mongo/s/catalog/type_locks.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_server_test_fixture.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/system_tick_source.h"
 #include "mongo/util/tick_source_mock.h"
@@ -413,7 +413,7 @@ TEST_F(RSDistLockMgrWithMockTickSource, LockFailsAfterRetry) {
     getMockCatalog()->expectGetLockByName([](StringData) {},
                                           {ErrorCodes::LockNotFound, "not found!"});
 
-    stdx::mutex unlockMutex;
+    auto unlockMutex = MONGO_MAKE_LATCH();
     stdx::condition_variable unlockCV;
     OID unlockSessionIDPassed;
     int unlockCallCount = 0;
@@ -421,7 +421,7 @@ TEST_F(RSDistLockMgrWithMockTickSource, LockFailsAfterRetry) {
     getMockCatalog()->expectUnLock(
         [&unlockMutex, &unlockCV, &unlockCallCount, &unlockSessionIDPassed](
             const OID& lockSessionID) {
-            stdx::unique_lock<stdx::mutex> lk(unlockMutex);
+            stdx::unique_lock<Latch> lk(unlockMutex);
             unlockCallCount++;
             unlockSessionIDPassed = lockSessionID;
             unlockCV.notify_all();
@@ -435,7 +435,7 @@ TEST_F(RSDistLockMgrWithMockTickSource, LockFailsAfterRetry) {
 
     bool didTimeout = false;
     {
-        stdx::unique_lock<stdx::mutex> lk(unlockMutex);
+        stdx::unique_lock<Latch> lk(unlockMutex);
         if (unlockCallCount == 0) {
             didTimeout =
                 unlockCV.wait_for(lk, kJoinTimeout.toSystemDuration()) == stdx::cv_status::timeout;
@@ -558,7 +558,7 @@ TEST_F(ReplSetDistLockManagerFixture, MustUnlockOnLockError) {
         },
         {ErrorCodes::ExceededMemoryLimit, "bad remote server"});
 
-    stdx::mutex unlockMutex;
+    auto unlockMutex = MONGO_MAKE_LATCH();
     stdx::condition_variable unlockCV;
     int unlockCallCount = 0;
     OID unlockSessionIDPassed;
@@ -566,7 +566,7 @@ TEST_F(ReplSetDistLockManagerFixture, MustUnlockOnLockError) {
     getMockCatalog()->expectUnLock(
         [&unlockMutex, &unlockCV, &unlockCallCount, &unlockSessionIDPassed](
             const OID& lockSessionID) {
-            stdx::unique_lock<stdx::mutex> lk(unlockMutex);
+            stdx::unique_lock<Latch> lk(unlockMutex);
             unlockCallCount++;
             unlockSessionIDPassed = lockSessionID;
             unlockCV.notify_all();
@@ -580,7 +580,7 @@ TEST_F(ReplSetDistLockManagerFixture, MustUnlockOnLockError) {
 
     bool didTimeout = false;
     {
-        stdx::unique_lock<stdx::mutex> lk(unlockMutex);
+        stdx::unique_lock<Latch> lk(unlockMutex);
         if (unlockCallCount == 0) {
             didTimeout =
                 unlockCV.wait_for(lk, kJoinTimeout.toSystemDuration()) == stdx::cv_status::timeout;
@@ -609,13 +609,13 @@ TEST_F(ReplSetDistLockManagerFixture, MustUnlockOnLockError) {
  * 3. Check that correct process is being pinged.
  */
 TEST_F(ReplSetDistLockManagerFixture, LockPinging) {
-    stdx::mutex testMutex;
+    auto testMutex = MONGO_MAKE_LATCH();
     stdx::condition_variable ping3TimesCV;
     std::vector<std::string> processIDList;
 
     getMockCatalog()->expectPing(
         [&testMutex, &ping3TimesCV, &processIDList](StringData processIDArg, Date_t ping) {
-            stdx::lock_guard<stdx::mutex> lk(testMutex);
+            stdx::lock_guard<Latch> lk(testMutex);
             processIDList.push_back(processIDArg.toString());
 
             if (processIDList.size() >= 3) {
@@ -626,7 +626,7 @@ TEST_F(ReplSetDistLockManagerFixture, LockPinging) {
 
     bool didTimeout = false;
     {
-        stdx::unique_lock<stdx::mutex> lk(testMutex);
+        stdx::unique_lock<Latch> lk(testMutex);
         if (processIDList.size() < 3) {
             didTimeout = ping3TimesCV.wait_for(lk, kJoinTimeout.toSystemDuration()) ==
                 stdx::cv_status::timeout;
@@ -659,7 +659,7 @@ TEST_F(ReplSetDistLockManagerFixture, LockPinging) {
  * 4. Check that lockSessionID used on all unlock is the same as the one used to grab lock.
  */
 TEST_F(ReplSetDistLockManagerFixture, UnlockUntilNoError) {
-    stdx::mutex unlockMutex;
+    auto unlockMutex = MONGO_MAKE_LATCH();
     stdx::condition_variable unlockCV;
     const unsigned int kUnlockErrorCount = 3;
     std::vector<OID> lockSessionIDPassed;
@@ -667,13 +667,13 @@ TEST_F(ReplSetDistLockManagerFixture, UnlockUntilNoError) {
     getMockCatalog()->expectUnLock(
         [this, &unlockMutex, &unlockCV, &kUnlockErrorCount, &lockSessionIDPassed](
             const OID& lockSessionID) {
-            stdx::unique_lock<stdx::mutex> lk(unlockMutex);
+            stdx::unique_lock<Latch> lk(unlockMutex);
             lockSessionIDPassed.push_back(lockSessionID);
 
             if (lockSessionIDPassed.size() >= kUnlockErrorCount) {
                 getMockCatalog()->expectUnLock(
                     [&lockSessionIDPassed, &unlockMutex, &unlockCV](const OID& lockSessionID) {
-                        stdx::unique_lock<stdx::mutex> lk(unlockMutex);
+                        stdx::unique_lock<Latch> lk(unlockMutex);
                         lockSessionIDPassed.push_back(lockSessionID);
                         unlockCV.notify_all();
                     },
@@ -705,7 +705,7 @@ TEST_F(ReplSetDistLockManagerFixture, UnlockUntilNoError) {
 
     bool didTimeout = false;
     {
-        stdx::unique_lock<stdx::mutex> lk(unlockMutex);
+        stdx::unique_lock<Latch> lk(unlockMutex);
         if (lockSessionIDPassed.size() < kUnlockErrorCount) {
             didTimeout =
                 unlockCV.wait_for(lk, kJoinTimeout.toSystemDuration()) == stdx::cv_status::timeout;
@@ -739,7 +739,7 @@ TEST_F(ReplSetDistLockManagerFixture, UnlockUntilNoError) {
  * 5. Check that the lock session id used when lock was called matches with unlock.
  */
 TEST_F(ReplSetDistLockManagerFixture, MultipleQueuedUnlock) {
-    stdx::mutex testMutex;
+    auto testMutex = MONGO_MAKE_LATCH();
     stdx::condition_variable unlockCV;
     std::vector<OID> lockSessionIDPassed;
     std::map<OID, int> unlockIDMap;  // id -> count
@@ -761,14 +761,14 @@ TEST_F(ReplSetDistLockManagerFixture, MultipleQueuedUnlock) {
     getMockCatalog()->expectUnLock(
         [this, &unlockIDMap, &testMutex, &unlockCV, &mapEntriesGreaterThanTwo](
             const OID& lockSessionID) {
-            stdx::unique_lock<stdx::mutex> lk(testMutex);
+            stdx::unique_lock<Latch> lk(testMutex);
             unlockIDMap[lockSessionID]++;
 
             // Wait until we see at least 2 unique lockSessionID more than twice.
             if (unlockIDMap.size() >= 2 && mapEntriesGreaterThanTwo(unlockIDMap)) {
                 getMockCatalog()->expectUnLock(
                     [&testMutex, &unlockCV](const OID& lockSessionID) {
-                        stdx::unique_lock<stdx::mutex> lk(testMutex);
+                        stdx::unique_lock<Latch> lk(testMutex);
                         unlockCV.notify_all();
                     },
                     Status::OK());
@@ -792,7 +792,7 @@ TEST_F(ReplSetDistLockManagerFixture, MultipleQueuedUnlock) {
                                            StringData processId,
                                            Date_t time,
                                            StringData why) {
-            stdx::unique_lock<stdx::mutex> lk(testMutex);
+            stdx::unique_lock<Latch> lk(testMutex);
             lockSessionIDPassed.push_back(lockSessionIDArg);
         },
         retLockDoc);
@@ -804,7 +804,7 @@ TEST_F(ReplSetDistLockManagerFixture, MultipleQueuedUnlock) {
 
     bool didTimeout = false;
     {
-        stdx::unique_lock<stdx::mutex> lk(testMutex);
+        stdx::unique_lock<Latch> lk(testMutex);
 
         if (unlockIDMap.size() < 2 || !mapEntriesGreaterThanTwo(unlockIDMap)) {
             didTimeout =
@@ -1739,11 +1739,11 @@ TEST_F(ReplSetDistLockManagerFixture, LockOvertakingResultsInError) {
 
     OID unlockSessionIDPassed;
 
-    stdx::mutex unlockMutex;
+    auto unlockMutex = MONGO_MAKE_LATCH();
     stdx::condition_variable unlockCV;
     getMockCatalog()->expectUnLock(
         [&unlockSessionIDPassed, &unlockMutex, &unlockCV](const OID& lockSessionID) {
-            stdx::unique_lock<stdx::mutex> lk(unlockMutex);
+            stdx::unique_lock<Latch> lk(unlockMutex);
             unlockSessionIDPassed = lockSessionID;
             unlockCV.notify_all();
         },
@@ -1756,7 +1756,7 @@ TEST_F(ReplSetDistLockManagerFixture, LockOvertakingResultsInError) {
 
     bool didTimeout = false;
     {
-        stdx::unique_lock<stdx::mutex> lk(unlockMutex);
+        stdx::unique_lock<Latch> lk(unlockMutex);
         if (!unlockSessionIDPassed.isSet()) {
             didTimeout =
                 unlockCV.wait_for(lk, kJoinTimeout.toSystemDuration()) == stdx::cv_status::timeout;

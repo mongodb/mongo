@@ -47,7 +47,7 @@ StatusWith<KeysCollectionDocument> KeysCollectionCache::refresh(OperationContext
     decltype(_cache)::size_type originalSize = 0;
 
     {
-        stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
+        stdx::lock_guard<Latch> lk(_cacheMutex);
         auto iter = _cache.crbegin();
         if (iter != _cache.crend()) {
             newerThanThis = iter->second.getExpiresAt();
@@ -73,7 +73,7 @@ StatusWith<KeysCollectionDocument> KeysCollectionCache::refresh(OperationContext
 
     auto& newKeys = refreshStatus.getValue();
 
-    stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
+    stdx::lock_guard<Latch> lk(_cacheMutex);
     if (originalSize > _cache.size()) {
         // _cache cleared while we getting the new keys, just return the newest key without
         // touching the _cache so the next refresh will populate it properly.
@@ -96,7 +96,7 @@ StatusWith<KeysCollectionDocument> KeysCollectionCache::refresh(OperationContext
 
 StatusWith<KeysCollectionDocument> KeysCollectionCache::getKeyById(long long keyId,
                                                                    const LogicalTime& forThisTime) {
-    stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
+    stdx::lock_guard<Latch> lk(_cacheMutex);
 
     for (auto iter = _cache.lower_bound(forThisTime); iter != _cache.cend(); ++iter) {
         if (iter->second.getKeyId() == keyId) {
@@ -111,7 +111,7 @@ StatusWith<KeysCollectionDocument> KeysCollectionCache::getKeyById(long long key
 }
 
 StatusWith<KeysCollectionDocument> KeysCollectionCache::getKey(const LogicalTime& forThisTime) {
-    stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
+    stdx::lock_guard<Latch> lk(_cacheMutex);
 
     auto iter = _cache.upper_bound(forThisTime);
 
@@ -126,7 +126,7 @@ StatusWith<KeysCollectionDocument> KeysCollectionCache::getKey(const LogicalTime
 void KeysCollectionCache::resetCache() {
     // keys that read with non majority readConcern level can be rolled back.
     if (!_client->supportsMajorityReads()) {
-        stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
+        stdx::lock_guard<Latch> lk(_cacheMutex);
         _cache.clear();
     }
 }

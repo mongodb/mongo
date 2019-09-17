@@ -151,7 +151,7 @@ public:
 
     virtual void commit(boost::optional<Timestamp>) {}
     virtual void rollback() {
-        stdx::lock_guard<stdx::mutex> lk(_catalog->_identsLock);
+        stdx::lock_guard<Latch> lk(_catalog->_identsLock);
         _catalog->_idents.erase(_ident);
     }
 
@@ -166,7 +166,7 @@ public:
 
     virtual void commit(boost::optional<Timestamp>) {}
     virtual void rollback() {
-        stdx::lock_guard<stdx::mutex> lk(_catalog->_identsLock);
+        stdx::lock_guard<Latch> lk(_catalog->_identsLock);
         _catalog->_idents[_ident] = _entry;
     }
 
@@ -471,7 +471,7 @@ void DurableCatalogImpl::init(OperationContext* opCtx) {
 }
 
 std::vector<NamespaceString> DurableCatalogImpl::getAllCollections() const {
-    stdx::lock_guard<stdx::mutex> lk(_identsLock);
+    stdx::lock_guard<Latch> lk(_identsLock);
     std::vector<NamespaceString> result;
     for (NSToIdentMap::const_iterator it = _idents.begin(); it != _idents.end(); ++it) {
         result.push_back(NamespaceString(it->first));
@@ -487,7 +487,7 @@ Status DurableCatalogImpl::_addEntry(OperationContext* opCtx,
 
     const string ident = _newUniqueIdent(nss, "collection");
 
-    stdx::lock_guard<stdx::mutex> lk(_identsLock);
+    stdx::lock_guard<Latch> lk(_identsLock);
     Entry& old = _idents[nss.toString()];
     if (!old.ident.empty()) {
         return Status(ErrorCodes::NamespaceExists, "collection already exists");
@@ -517,7 +517,7 @@ Status DurableCatalogImpl::_addEntry(OperationContext* opCtx,
 }
 
 std::string DurableCatalogImpl::getCollectionIdent(const NamespaceString& nss) const {
-    stdx::lock_guard<stdx::mutex> lk(_identsLock);
+    stdx::lock_guard<Latch> lk(_identsLock);
     NSToIdentMap::const_iterator it = _idents.find(nss.toString());
     invariant(it != _idents.end());
     return it->second.ident;
@@ -536,7 +536,7 @@ BSONObj DurableCatalogImpl::_findEntry(OperationContext* opCtx,
                                        RecordId* out) const {
     RecordId dl;
     {
-        stdx::lock_guard<stdx::mutex> lk(_identsLock);
+        stdx::lock_guard<Latch> lk(_identsLock);
         NSToIdentMap::const_iterator it = _idents.find(nss.toString());
         invariant(it != _idents.end(), str::stream() << "Did not find collection. Ns: " << nss);
         dl = it->second.storedLoc;
@@ -652,7 +652,7 @@ Status DurableCatalogImpl::_replaceEntry(OperationContext* opCtx,
         fassert(28522, status);
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_identsLock);
+    stdx::lock_guard<Latch> lk(_identsLock);
     const NSToIdentMap::iterator fromIt = _idents.find(fromNss.toString());
     invariant(fromIt != _idents.end());
 
@@ -673,7 +673,7 @@ Status DurableCatalogImpl::_replaceEntry(OperationContext* opCtx,
 
 Status DurableCatalogImpl::_removeEntry(OperationContext* opCtx, const NamespaceString& nss) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
-    stdx::lock_guard<stdx::mutex> lk(_identsLock);
+    stdx::lock_guard<Latch> lk(_identsLock);
     const NSToIdentMap::iterator it = _idents.find(nss.toString());
     if (it == _idents.end()) {
         return Status(ErrorCodes::NamespaceNotFound, "collection not found");
@@ -693,7 +693,7 @@ std::vector<std::string> DurableCatalogImpl::getAllIdentsForDB(StringData db) co
     std::vector<std::string> v;
 
     {
-        stdx::lock_guard<stdx::mutex> lk(_identsLock);
+        stdx::lock_guard<Latch> lk(_identsLock);
         for (NSToIdentMap::const_iterator it = _idents.begin(); it != _idents.end(); ++it) {
             NamespaceString ns(it->first);
             if (ns.db() != db)
@@ -761,7 +761,7 @@ StatusWith<std::string> DurableCatalogImpl::newOrphanedIdent(OperationContext* o
                                      NamespaceString::kOrphanCollectionPrefix + identNs)
                          .ns();
 
-    stdx::lock_guard<stdx::mutex> lk(_identsLock);
+    stdx::lock_guard<Latch> lk(_identsLock);
     Entry& old = _idents[ns];
     if (!old.ident.empty()) {
         return Status(ErrorCodes::NamespaceExists,

@@ -46,8 +46,8 @@
 #include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/db/server_options.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/background.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
@@ -315,7 +315,7 @@ SemiFuture<std::vector<HostAndPort>> ReplicaSetMonitor::getHostsOrRefresh(
 Future<std::vector<HostAndPort>> ReplicaSetMonitor::_getHostsOrRefresh(
     const ReadPreferenceSetting& criteria, Milliseconds maxWait) {
 
-    stdx::lock_guard<stdx::mutex> lk(_state->mutex);
+    stdx::lock_guard<Latch> lk(_state->mutex);
     if (_state->isDropped) {
         return Status(ErrorCodes::ReplicaSetMonitorRemoved,
                       str::stream() << "ReplicaSetMonitor for set " << getName() << " is removed");
@@ -350,7 +350,7 @@ HostAndPort ReplicaSetMonitor::getMasterOrUassert() {
 }
 
 void ReplicaSetMonitor::failedHost(const HostAndPort& host, const Status& status) {
-    stdx::lock_guard<stdx::mutex> lk(_state->mutex);
+    stdx::lock_guard<Latch> lk(_state->mutex);
     Node* node = _state->findNode(host);
     if (node)
         node->markFailed(status);
@@ -359,19 +359,19 @@ void ReplicaSetMonitor::failedHost(const HostAndPort& host, const Status& status
 }
 
 bool ReplicaSetMonitor::isPrimary(const HostAndPort& host) const {
-    stdx::lock_guard<stdx::mutex> lk(_state->mutex);
+    stdx::lock_guard<Latch> lk(_state->mutex);
     Node* node = _state->findNode(host);
     return node ? node->isMaster : false;
 }
 
 bool ReplicaSetMonitor::isHostUp(const HostAndPort& host) const {
-    stdx::lock_guard<stdx::mutex> lk(_state->mutex);
+    stdx::lock_guard<Latch> lk(_state->mutex);
     Node* node = _state->findNode(host);
     return node ? node->isUp : false;
 }
 
 int ReplicaSetMonitor::getMinWireVersion() const {
-    stdx::lock_guard<stdx::mutex> lk(_state->mutex);
+    stdx::lock_guard<Latch> lk(_state->mutex);
     int minVersion = 0;
     for (const auto& host : _state->nodes) {
         if (host.isUp) {
@@ -383,7 +383,7 @@ int ReplicaSetMonitor::getMinWireVersion() const {
 }
 
 int ReplicaSetMonitor::getMaxWireVersion() const {
-    stdx::lock_guard<stdx::mutex> lk(_state->mutex);
+    stdx::lock_guard<Latch> lk(_state->mutex);
     int maxVersion = std::numeric_limits<int>::max();
     for (const auto& host : _state->nodes) {
         if (host.isUp) {
@@ -400,7 +400,7 @@ std::string ReplicaSetMonitor::getName() const {
 }
 
 std::string ReplicaSetMonitor::getServerAddress() const {
-    stdx::lock_guard<stdx::mutex> lk(_state->mutex);
+    stdx::lock_guard<Latch> lk(_state->mutex);
     // We return our setUri until first confirmation
     return _state->seedConnStr.isValid() ? _state->seedConnStr.toString()
                                          : _state->setUri.connectionString().toString();
@@ -412,7 +412,7 @@ const MongoURI& ReplicaSetMonitor::getOriginalUri() const {
 }
 
 bool ReplicaSetMonitor::contains(const HostAndPort& host) const {
-    stdx::lock_guard<stdx::mutex> lk(_state->mutex);
+    stdx::lock_guard<Latch> lk(_state->mutex);
     return _state->seedNodes.count(host);
 }
 
@@ -444,7 +444,7 @@ ReplicaSetChangeNotifier& ReplicaSetMonitor::getNotifier() {
 
 // TODO move to correct order with non-statics before pushing
 void ReplicaSetMonitor::appendInfo(BSONObjBuilder& bsonObjBuilder, bool forFTDC) const {
-    stdx::lock_guard<stdx::mutex> lk(_state->mutex);
+    stdx::lock_guard<Latch> lk(_state->mutex);
 
     BSONObjBuilder monitorInfo(bsonObjBuilder.subobjStart(getName()));
     if (forFTDC) {
@@ -489,7 +489,7 @@ void ReplicaSetMonitor::disableRefreshRetries_forTest() {
 }
 
 bool ReplicaSetMonitor::isKnownToHaveGoodPrimary() const {
-    stdx::lock_guard<stdx::mutex> lk(_state->mutex);
+    stdx::lock_guard<Latch> lk(_state->mutex);
 
     for (const auto& node : _state->nodes) {
         if (node.isMaster) {
@@ -501,7 +501,7 @@ bool ReplicaSetMonitor::isKnownToHaveGoodPrimary() const {
 }
 
 void ReplicaSetMonitor::runScanForMockReplicaSet() {
-    stdx::lock_guard<stdx::mutex> lk(_state->mutex);
+    stdx::lock_guard<Latch> lk(_state->mutex);
     _ensureScanInProgress(_state);
 
     // This function should only be called from tests using MockReplicaSet and they should use the

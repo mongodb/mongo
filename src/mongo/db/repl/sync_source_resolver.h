@@ -38,8 +38,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -234,7 +234,7 @@ private:
     const OnCompletionFn _onCompletion;
 
     // Protects members of this sync source resolver defined below.
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("SyncSourceResolverResponse::_mutex");
     mutable stdx::condition_variable _condition;
 
     // State transitions:

@@ -46,7 +46,7 @@
 #include "mongo/logger/logger.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/logger/message_log_domain.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/stacktrace.h"
@@ -251,7 +251,7 @@ public:
     }
 
 private:
-    stdx::mutex _mutex;
+    stdx::mutex _mutex;  // NOLINT
     bool _enabled = false;
     logger::MessageEventDetailsEncoder _encoder;
     std::vector<std::string>* _lines;

@@ -68,7 +68,7 @@ public:
     int unlockCalls{0};
 
 private:
-    stdx::mutex _mutex;
+    stdx::mutex _mutex;  // NOLINT
 };
 
 }  // namespace
@@ -76,7 +76,7 @@ private:
 TEST(BasicLockableAdapter, TestWithConditionVariable) {
     bool ready = false;
     stdx::condition_variable_any cv;
-    stdx::mutex mut;
+    stdx::mutex mut;  // NOLINT
 
     auto result = stdx::async(stdx::launch::async, [&ready, &mut, &cv] {
         stdx::lock_guard lock(mut);
@@ -93,7 +93,7 @@ TEST(BasicLockableAdapter, TestWithConditionVariable) {
 TEST(BasicLockableAdapter, TestWithMutexTypes) {
 
     {
-        stdx::mutex mut;
+        stdx::mutex mut;  // NOLINT
         callUnderLock(mut);
     }
 

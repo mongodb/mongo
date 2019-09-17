@@ -36,8 +36,8 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -188,7 +188,7 @@ private:
     const Milliseconds _updatePositionTimeout;
 
     // Protects member data of this Reporter declared below.
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("Reporter::_mutex");
 
     mutable stdx::condition_variable _condition;
 

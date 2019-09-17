@@ -33,7 +33,7 @@
 #include <boost/optional.hpp>
 #include <functional>
 
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -83,9 +83,9 @@ public:
      * Requires either a unique_lock or lock_guard to be passed in to ensure that we call
      * _cancelRemainingWork_inlock()) while we have a lock on the callers's mutex.
      */
-    void setResultAndCancelRemainingWork_inlock(const stdx::lock_guard<stdx::mutex>& lock,
+    void setResultAndCancelRemainingWork_inlock(const stdx::lock_guard<Latch>& lock,
                                                 const Result& result);
-    void setResultAndCancelRemainingWork_inlock(const stdx::unique_lock<stdx::mutex>& lock,
+    void setResultAndCancelRemainingWork_inlock(const stdx::unique_lock<Latch>& lock,
                                                 const Result& result);
 
 private:
@@ -124,13 +124,13 @@ CallbackCompletionGuard<Result>::~CallbackCompletionGuard() {
 
 template <typename Result>
 void CallbackCompletionGuard<Result>::setResultAndCancelRemainingWork_inlock(
-    const stdx::lock_guard<stdx::mutex>& lock, const Result& result) {
+    const stdx::lock_guard<Latch>& lock, const Result& result) {
     _setResultAndCancelRemainingWork_inlock(result);
 }
 
 template <typename Result>
 void CallbackCompletionGuard<Result>::setResultAndCancelRemainingWork_inlock(
-    const stdx::unique_lock<stdx::mutex>& lock, const Result& result) {
+    const stdx::unique_lock<Latch>& lock, const Result& result) {
     invariant(lock.owns_lock());
     _setResultAndCancelRemainingWork_inlock(result);
 }

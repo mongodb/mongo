@@ -37,9 +37,9 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/transaction_history_iterator.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/concurrency/with_lock.h"
 
@@ -231,7 +231,8 @@ private:
 
     // Protects _sessionCatalogCursor, _sessionOplogIterators, _currentOplogIterator,
     // _lastFetchedOplogBuffer, _lastFetchedOplog
-    stdx::mutex _sessionCloneMutex;
+    Mutex _sessionCloneMutex =
+        MONGO_MAKE_LATCH("SessionCatalogMigrationSource::_sessionCloneMutex");
 
     // List of remaining session records that needs to be cloned.
     std::vector<std::unique_ptr<SessionOplogIterator>> _sessionOplogIterators;
@@ -248,7 +249,7 @@ private:
     boost::optional<repl::OplogEntry> _lastFetchedOplog;
 
     // Protects _newWriteTsList, _lastFetchedNewWriteOplog, _state, _newOplogNotification
-    stdx::mutex _newOplogMutex;
+    Mutex _newOplogMutex = MONGO_MAKE_LATCH("SessionCatalogMigrationSource::_newOplogMutex");
 
 
     // Stores oplog opTime of new writes that are coming in.

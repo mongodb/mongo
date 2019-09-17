@@ -36,9 +36,9 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/s/client/shard.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/with_lock.h"
 
@@ -114,7 +114,7 @@ private:
     void _rebuildShard(WithLock, ConnectionString const& newConnString, ShardFactory* factory);
 
     // Protects the lookup maps below.
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("::_mutex");
 
     using ShardMap = stdx::unordered_map<ShardId, std::shared_ptr<Shard>, ShardId::Hasher>;
 
@@ -302,7 +302,7 @@ private:
     ShardRegistryData _data;
 
     // Protects the _reloadState and _initConfigServerCS during startup.
-    mutable stdx::mutex _reloadMutex;
+    mutable Mutex _reloadMutex = MONGO_MAKE_LATCH("ShardRegistry::_reloadMutex");
     stdx::condition_variable _inReloadCV;
 
     enum class ReloadState {

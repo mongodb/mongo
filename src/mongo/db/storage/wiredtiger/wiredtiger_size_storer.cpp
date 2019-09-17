@@ -64,7 +64,7 @@ WiredTigerSizeStorer::WiredTigerSizeStorer(WT_CONNECTION* conn,
 }
 
 WiredTigerSizeStorer::~WiredTigerSizeStorer() {
-    stdx::lock_guard<stdx::mutex> cursorLock(_cursorMutex);
+    stdx::lock_guard<Latch> cursorLock(_cursorMutex);
     _cursor->close(_cursor);
 }
 
@@ -74,7 +74,7 @@ void WiredTigerSizeStorer::store(StringData uri, std::shared_ptr<SizeInfo> sizeI
         return;
 
     // Ordering is important: as the entry may be flushed concurrently, set the dirty flag last.
-    stdx::lock_guard<stdx::mutex> lk(_bufferMutex);
+    stdx::lock_guard<Latch> lk(_bufferMutex);
     auto& entry = _buffer[uri];
     // During rollback it is possible to get a new SizeInfo. In that case clear the dirty flag,
     // so the SizeInfo can be destructed without triggering the dirty check invariant.
@@ -90,13 +90,13 @@ void WiredTigerSizeStorer::store(StringData uri, std::shared_ptr<SizeInfo> sizeI
 std::shared_ptr<WiredTigerSizeStorer::SizeInfo> WiredTigerSizeStorer::load(StringData uri) const {
     {
         // Check if we can satisfy the read from the buffer.
-        stdx::lock_guard<stdx::mutex> bufferLock(_bufferMutex);
+        stdx::lock_guard<Latch> bufferLock(_bufferMutex);
         Buffer::const_iterator it = _buffer.find(uri);
         if (it != _buffer.end())
             return it->second;
     }
 
-    stdx::lock_guard<stdx::mutex> cursorLock(_cursorMutex);
+    stdx::lock_guard<Latch> cursorLock(_cursorMutex);
     // Intentionally ignoring return value.
     ON_BLOCK_EXIT([&] { _cursor->reset(_cursor); });
 
@@ -125,7 +125,7 @@ std::shared_ptr<WiredTigerSizeStorer::SizeInfo> WiredTigerSizeStorer::load(Strin
 void WiredTigerSizeStorer::flush(bool syncToDisk) {
     Buffer buffer;
     {
-        stdx::lock_guard<stdx::mutex> bufferLock(_bufferMutex);
+        stdx::lock_guard<Latch> bufferLock(_bufferMutex);
         _buffer.swap(buffer);
     }
 
@@ -133,13 +133,13 @@ void WiredTigerSizeStorer::flush(bool syncToDisk) {
         return;  // Nothing to do.
 
     Timer t;
-    stdx::lock_guard<stdx::mutex> cursorLock(_cursorMutex);
+    stdx::lock_guard<Latch> cursorLock(_cursorMutex);
     {
         // On failure, place entries back into the map, unless a newer value already exists.
         ON_BLOCK_EXIT([this, &buffer]() {
             this->_cursor->reset(this->_cursor);
             if (!buffer.empty()) {
-                stdx::lock_guard<stdx::mutex> bufferLock(this->_bufferMutex);
+                stdx::lock_guard<Latch> bufferLock(this->_bufferMutex);
                 for (auto& it : buffer)
                     this->_buffer.try_emplace(it.first, it.second);
             }

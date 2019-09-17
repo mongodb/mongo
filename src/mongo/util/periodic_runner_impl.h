@@ -32,8 +32,8 @@
 #include <memory>
 #include <vector>
 
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/future.h"
@@ -82,7 +82,7 @@ private:
         stdx::thread _thread;
         SharedPromise<void> _stopPromise;
 
-        stdx::mutex _mutex;
+        Mutex _mutex = MONGO_MAKE_LATCH("PeriodicJobImpl::_mutex");
         stdx::condition_variable _condvar;
         /**
          * The current execution status of the job.

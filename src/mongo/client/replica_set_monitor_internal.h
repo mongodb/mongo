@@ -44,9 +44,9 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -251,7 +251,8 @@ public:
 
     bool isDropped = false;
 
-    mutable stdx::mutex mutex;  // You must hold this to access any member below.
+    // You must hold this to access any member below.
+    mutable Mutex mutex = MONGO_MAKE_LATCH("SetState::mutex");
 
     executor::TaskExecutor::CallbackHandle refresherHandle;
 

@@ -32,8 +32,8 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 struct HostAndPort;
@@ -79,7 +79,7 @@ private:
     Status _updateUpstream(Reporter* reporter);
 
     // protects cond, _shutdownSignaled, _keepAliveInterval, and _positionChanged.
-    stdx::mutex _mtx;
+    Mutex _mtx = MONGO_MAKE_LATCH("SyncSourceFeedback::_mtx");
     // used to alert our thread of changes which need to be passed up the chain
     stdx::condition_variable _cond;
     // used to indicate a position change which has not yet been pushed along

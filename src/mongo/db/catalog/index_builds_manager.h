@@ -36,7 +36,7 @@
 
 #include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 
@@ -205,7 +205,7 @@ private:
     std::shared_ptr<MultiIndexBlock> _getBuilder(const UUID& buildUUID);
 
     // Protects the map data structures below.
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("IndexBuildsManager::_mutex");
 
     // Map of index builders by build UUID. Allows access to the builders so that actions can be
     // taken on and information passed to and from index builds.

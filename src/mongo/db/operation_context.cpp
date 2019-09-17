@@ -35,8 +35,8 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/transport/baton.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"

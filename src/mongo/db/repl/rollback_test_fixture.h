@@ -119,7 +119,7 @@ protected:
 class RollbackTest::StorageInterfaceRollback : public StorageInterfaceImpl {
 public:
     void setStableTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) override {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         _stableTimestamp = snapshotName;
     }
 
@@ -129,7 +129,7 @@ public:
      * of '_currTimestamp'.
      */
     StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) override {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         if (_recoverToTimestampStatus) {
             return _recoverToTimestampStatus.get();
         } else {
@@ -152,17 +152,17 @@ public:
     }
 
     void setRecoverToTimestampStatus(Status status) {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         _recoverToTimestampStatus = status;
     }
 
     void setCurrentTimestamp(Timestamp ts) {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         _currTimestamp = ts;
     }
 
     Timestamp getCurrentTimestamp() {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         return _currTimestamp;
     }
 
@@ -172,7 +172,7 @@ public:
     Status setCollectionCount(OperationContext* opCtx,
                               const NamespaceStringOrUUID& nsOrUUID,
                               long long newCount) {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         if (_setCollectionCountStatus && _setCollectionCountStatusUUID &&
             nsOrUUID.uuid() == _setCollectionCountStatusUUID) {
             return *_setCollectionCountStatus;
@@ -182,18 +182,18 @@ public:
     }
 
     void setSetCollectionCountStatus(UUID uuid, Status status) {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         _setCollectionCountStatus = status;
         _setCollectionCountStatusUUID = uuid;
     }
 
     long long getFinalCollectionCount(const UUID& uuid) {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         return _newCounts[uuid];
     }
 
 private:
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("StorageInterfaceRollback::_mutex");
 
     Timestamp _stableTimestamp;
 

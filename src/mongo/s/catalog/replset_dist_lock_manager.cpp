@@ -94,7 +94,7 @@ void ReplSetDistLockManager::startUp() {
 
 void ReplSetDistLockManager::shutDown(OperationContext* opCtx) {
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         _isShutDown = true;
         _shutDownCV.notify_all();
     }
@@ -118,7 +118,7 @@ std::string ReplSetDistLockManager::getProcessID() {
 }
 
 bool ReplSetDistLockManager::isShutDown() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     return _isShutDown;
 }
 
@@ -147,7 +147,7 @@ void ReplSetDistLockManager::doTask() {
 
             std::deque<std::pair<DistLockHandle, boost::optional<std::string>>> toUnlockBatch;
             {
-                stdx::unique_lock<stdx::mutex> lk(_mutex);
+                stdx::unique_lock<Latch> lk(_mutex);
                 toUnlockBatch.swap(_unlockList);
             }
 
@@ -179,7 +179,7 @@ void ReplSetDistLockManager::doTask() {
         }
 
         MONGO_IDLE_THREAD_BLOCK;
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<Latch> lk(_mutex);
         _shutDownCV.wait_for(lk, _pingInterval.toSystemDuration(), [this] { return _isShutDown; });
     }
 }
@@ -222,7 +222,7 @@ StatusWith<bool> ReplSetDistLockManager::isLockExpired(OperationContext* opCtx,
 
     const auto& serverInfo = serverInfoStatus.getValue();
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     auto pingIter = _pingHistory.find(lockDoc.getName());
 
     if (pingIter == _pingHistory.end()) {
@@ -504,7 +504,7 @@ Status ReplSetDistLockManager::checkStatus(OperationContext* opCtx,
 
 void ReplSetDistLockManager::queueUnlock(const DistLockHandle& lockSessionID,
                                          const boost::optional<std::string>& name) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     _unlockList.push_back(std::make_pair(lockSessionID, name));
 }
 

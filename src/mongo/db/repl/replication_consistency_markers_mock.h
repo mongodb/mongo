@@ -31,7 +31,7 @@
 
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 
@@ -73,10 +73,12 @@ public:
     Status createInternalCollections(OperationContext* opCtx) override;
 
 private:
-    mutable stdx::mutex _initialSyncFlagMutex;
+    mutable Mutex _initialSyncFlagMutex =
+        MONGO_MAKE_LATCH("ReplicationConsistencyMarkersMock::_initialSyncFlagMutex");
     bool _initialSyncFlag = false;
 
-    mutable stdx::mutex _minValidBoundariesMutex;
+    mutable Mutex _minValidBoundariesMutex =
+        MONGO_MAKE_LATCH("ReplicationConsistencyMarkersMock::_minValidBoundariesMutex");
     OpTime _appliedThrough;
     OpTime _minValid;
     Timestamp _oplogTruncateAfterPoint;

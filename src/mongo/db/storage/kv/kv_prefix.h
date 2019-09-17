@@ -33,7 +33,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 
@@ -93,7 +93,7 @@ private:
     explicit KVPrefix(int64_t value) : _value(value) {}
     int64_t _value;
 
-    static stdx::mutex _nextValueMutex;
+    static Mutex _nextValueMutex;
     static int64_t _nextValue;
 };
 

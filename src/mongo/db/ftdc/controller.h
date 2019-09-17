@@ -37,8 +37,8 @@
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/file_manager.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/thread.h"
 
 namespace mongo {
@@ -187,7 +187,7 @@ private:
     boost::filesystem::path _path;
 
     // Mutex to protect the condvar, configuration changes, and most recent periodic document.
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("FTDCController::_mutex");
     stdx::condition_variable _condvar;
 
     // Config settings that are used by controller, file manager, and all other classes.

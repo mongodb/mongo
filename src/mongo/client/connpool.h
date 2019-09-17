@@ -35,6 +35,7 @@
 #include "mongo/client/dbclient_base.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/condition_variable.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/time_support.h"
@@ -179,7 +180,7 @@ public:
      * throw if a free connection cannot be acquired within that amount of
      * time. Timeout is in seconds.
      */
-    void waitForFreeConnection(int timeout, stdx::unique_lock<stdx::mutex>& lk);
+    void waitForFreeConnection(int timeout, stdx::unique_lock<Latch>& lk);
 
     /**
      * Notifies any waiters that there are new connections available.
@@ -392,7 +393,7 @@ private:
 
     typedef std::map<PoolKey, PoolForHost, poolKeyCompare> PoolMap;  // servername -> pool
 
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("DBConnectionPool::_mutex");
     std::string _name;
 
     // The maximum number of connections we'll save in the pool per-host

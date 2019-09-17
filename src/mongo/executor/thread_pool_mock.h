@@ -33,8 +33,8 @@
 #include <functional>
 #include <vector>
 
+#include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
 
@@ -73,14 +73,14 @@ public:
     void schedule(Task task) override;
 
 private:
-    void _consumeOneTask(stdx::unique_lock<stdx::mutex>& lk);
-    void _shutdown(stdx::unique_lock<stdx::mutex>& lk);
-    void _join(stdx::unique_lock<stdx::mutex>& lk);
+    void _consumeOneTask(stdx::unique_lock<Latch>& lk);
+    void _shutdown(stdx::unique_lock<Latch>& lk);
+    void _join(stdx::unique_lock<Latch>& lk);
 
     // These are the options with which the pool was configured at construction time.
     const Options _options;
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("ThreadPoolMock::_mutex");
     stdx::thread _worker;
     std::vector<Task> _tasks;
     PseudoRandom _prng;

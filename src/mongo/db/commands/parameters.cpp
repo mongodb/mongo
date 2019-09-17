@@ -185,7 +185,7 @@ Status setLogComponentVerbosity(const BSONObj& bsonSettings) {
 }
 
 // for automationServiceDescription
-stdx::mutex autoServiceDescriptorMutex;
+Mutex autoServiceDescriptorMutex;
 std::string autoServiceDescriptorValue;
 }  // namespace
 
@@ -436,7 +436,7 @@ Status LogComponentVerbosityServerParameter::setFromString(const std::string& st
 void AutomationServiceDescriptorServerParameter::append(OperationContext*,
                                                         BSONObjBuilder& builder,
                                                         const std::string& name) {
-    const stdx::lock_guard<stdx::mutex> lock(autoServiceDescriptorMutex);
+    const stdx::lock_guard<Latch> lock(autoServiceDescriptorMutex);
     if (!autoServiceDescriptorValue.empty()) {
         builder.append(name, autoServiceDescriptorValue);
     }
@@ -458,7 +458,7 @@ Status AutomationServiceDescriptorServerParameter::setFromString(const std::stri
                               << " must be no more than " << kMaxSize << " bytes"};
 
     {
-        const stdx::lock_guard<stdx::mutex> lock(autoServiceDescriptorMutex);
+        const stdx::lock_guard<Latch> lock(autoServiceDescriptorMutex);
         autoServiceDescriptorValue = str;
     }
 

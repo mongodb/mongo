@@ -68,7 +68,7 @@ ConnectionPool::~ConnectionPool() {
 }
 
 void ConnectionPool::cleanUpOlderThan(Date_t now) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
 
     HostConnectionMap::iterator hostConns = _connections.begin();
     while (hostConns != _connections.end()) {
@@ -102,7 +102,7 @@ bool ConnectionPool::_shouldKeepConnection(Date_t now, const ConnectionInfo& con
 }
 
 void ConnectionPool::closeAllInUseConnections() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     for (ConnectionList::iterator iter = _inUseConnections.begin(); iter != _inUseConnections.end();
          ++iter) {
         iter->conn->shutdownAndDisallowReconnect();
@@ -127,7 +127,7 @@ void ConnectionPool::_cleanUpStaleHosts_inlock(Date_t now) {
 
 ConnectionPool::ConnectionList::iterator ConnectionPool::acquireConnection(
     const HostAndPort& target, Date_t now, Milliseconds timeout) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     // Clean up connections on stale/unused hosts
     _cleanUpStaleHosts_inlock(now);
@@ -218,7 +218,7 @@ ConnectionPool::ConnectionList::iterator ConnectionPool::acquireConnection(
 }
 
 void ConnectionPool::releaseConnection(ConnectionList::iterator iter, const Date_t now) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     if (!_shouldKeepConnection(now, *iter)) {
         _destroyConnection_inlock(&_inUseConnections, iter);
         return;
@@ -232,7 +232,7 @@ void ConnectionPool::releaseConnection(ConnectionList::iterator iter, const Date
 }
 
 void ConnectionPool::destroyConnection(ConnectionList::iterator iter) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _destroyConnection_inlock(&_inUseConnections, iter);
 }
 

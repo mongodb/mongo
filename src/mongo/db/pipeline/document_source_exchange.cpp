@@ -48,13 +48,13 @@ MONGO_FAIL_POINT_DEFINE(exchangeFailLoadNextBatch);
 class MutexAndResourceLock {
     OperationContext* _opCtx;
     ResourceYielder* _resourceYielder;
-    stdx::unique_lock<stdx::mutex> _lock;
+    stdx::unique_lock<Latch> _lock;
 
 public:
     // Must be constructed with the mutex held. 'yielder' may be null if there are no resources
     // which need to be yielded while waiting.
     MutexAndResourceLock(OperationContext* opCtx,
-                         stdx::unique_lock<stdx::mutex> m,
+                         stdx::unique_lock<Latch> m,
                          ResourceYielder* yielder)
         : _opCtx(opCtx), _resourceYielder(yielder), _lock(std::move(m)) {
         invariant(_lock.owns_lock());
@@ -78,7 +78,7 @@ public:
      * Releases ownership of the lock to the caller. May only be called when the mutex is held
      * (after a call to unlock(), for example).
      */
-    stdx::unique_lock<stdx::mutex> releaseLockOwnership() {
+    stdx::unique_lock<Latch> releaseLockOwnership() {
         invariant(_lock.owns_lock());
         return std::move(_lock);
     }
@@ -280,7 +280,7 @@ DocumentSource::GetNextResult Exchange::getNext(OperationContext* opCtx,
                                                 size_t consumerId,
                                                 ResourceYielder* resourceYielder) {
     // Grab a lock.
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     for (;;) {
         // Guard against some of the trickiness we do with moving the lock to/from the
@@ -438,7 +438,7 @@ size_t Exchange::getTargetConsumer(const Document& input) {
 }
 
 void Exchange::dispose(OperationContext* opCtx, size_t consumerId) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
 
     invariant(_disposeRunDown < getConsumers());
 

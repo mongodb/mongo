@@ -62,7 +62,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -115,7 +115,7 @@ class PinnedUserSetParameter {
 public:
     void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) const {
         BSONArrayBuilder sub(b.subarrayStart(name));
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         for (const auto& username : _pinnedUsersList) {
             BSONObjBuilder nameObj(sub.subobjStart());
             nameObj << AuthorizationManager::USER_NAME_FIELD_NAME << username.getUser()
@@ -138,7 +138,7 @@ public:
                 return status;
             }
 
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            stdx::lock_guard<Latch> lk(_mutex);
             _pinnedUsersList = out;
             auto authzManager = _authzManager;
             if (!authzManager) {
@@ -171,7 +171,7 @@ public:
             return status;
         }
 
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         _pinnedUsersList = out;
         auto authzManager = _authzManager;
         if (!authzManager) {
@@ -183,7 +183,7 @@ public:
     }
 
     void setAuthzManager(AuthorizationManager* authzManager) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         _authzManager = authzManager;
         _authzManager->updatePinnedUsersList(std::move(_pinnedUsersList));
     }
@@ -200,7 +200,7 @@ private:
     }
     AuthorizationManager* _authzManager = nullptr;
 
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("PinnedUserSetParameter::_mutex");
     std::vector<UserName> _pinnedUsersList;
 } authorizationManagerPinnedUsers;
 
@@ -339,7 +339,7 @@ private:
     bool _isThisGuardInFetchPhase;
     AuthorizationManagerImpl* _authzManager;
 
-    stdx::unique_lock<stdx::mutex> _cacheLock;
+    stdx::unique_lock<Latch> _cacheLock;
 };
 
 AuthorizationManagerImpl::AuthorizationManagerImpl()
@@ -396,7 +396,7 @@ Status AuthorizationManagerImpl::getAuthorizationVersion(OperationContext* opCtx
 }
 
 OID AuthorizationManagerImpl::getCacheGeneration() {
-    stdx::lock_guard<stdx::mutex> lk(_cacheWriteMutex);
+    stdx::lock_guard<Latch> lk(_cacheWriteMutex);
     return _fetchGeneration;
 }
 
@@ -641,7 +641,7 @@ Status AuthorizationManagerImpl::_fetchUserV2(OperationContext* opCtx,
 }
 
 void AuthorizationManagerImpl::updatePinnedUsersList(std::vector<UserName> names) {
-    stdx::unique_lock<stdx::mutex> lk(_pinnedUsersMutex);
+    stdx::unique_lock<Latch> lk(_pinnedUsersMutex);
     _usersToPin = std::move(names);
     bool noUsersToPin = _usersToPin->empty();
     _pinnedUsersCond.notify_one();
@@ -664,7 +664,7 @@ void AuthorizationManagerImpl::_pinnedUsersThreadRoutine() noexcept try {
     while (true) {
         auto opCtx = cc().makeOperationContext();
 
-        stdx::unique_lock<stdx::mutex> lk(_pinnedUsersMutex);
+        stdx::unique_lock<Latch> lk(_pinnedUsersMutex);
         const Milliseconds timeout(authorizationManagerPinnedUsersRefreshIntervalMillis.load());
         auto waitRes = opCtx->waitForConditionOrInterruptFor(
             _pinnedUsersCond, lk, timeout, [&] { return _usersToPin.has_value(); });

@@ -52,8 +52,8 @@
 #include "mongo/db/repl/rollback_checker.h"
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/net/hostandport.h"
@@ -510,8 +510,7 @@ private:
      * Passes 'lock' through to completion guard.
      */
     void _checkApplierProgressAndScheduleGetNextApplierBatch_inlock(
-        const stdx::lock_guard<stdx::mutex>& lock,
-        std::shared_ptr<OnCompletionGuard> onCompletionGuard);
+        const stdx::lock_guard<Latch>& lock, std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
     /**
      * Schedules a rollback checker to get the rollback ID after data cloning or applying. This
@@ -521,8 +520,7 @@ private:
      * Passes 'lock' through to completion guard.
      */
     void _scheduleRollbackCheckerCheckForRollback_inlock(
-        const stdx::lock_guard<stdx::mutex>& lock,
-        std::shared_ptr<OnCompletionGuard> onCompletionGuard);
+        const stdx::lock_guard<Latch>& lock, std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
     /**
      * Checks the given status (or embedded status inside the callback args) and current data
@@ -582,7 +580,7 @@ private:
     // (MX) Must hold _mutex and be in a callback in _exec to write; must either hold
     //      _mutex or be in a callback in _exec to read.
 
-    mutable stdx::mutex _mutex;                                                 // (S)
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("InitialSyncer::_mutex");           // (S)
     const InitialSyncerOptions _opts;                                           // (R)
     std::unique_ptr<DataReplicatorExternalState> _dataReplicatorExternalState;  // (R)
     executor::TaskExecutor* _exec;                                              // (R)

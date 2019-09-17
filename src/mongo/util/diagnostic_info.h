@@ -53,19 +53,15 @@ public:
         ~BlockedOpGuard();
     };
 
-    struct Diagnostic {
-        static std::shared_ptr<DiagnosticInfo> get(Client*);
-        static void set(Client*, std::shared_ptr<DiagnosticInfo>);
-        static void clearDiagnostic();
-        stdx::mutex m;
-        std::shared_ptr<DiagnosticInfo> diagnostic;
-    };
+    static boost::optional<DiagnosticInfo> get(Client& client);
 
     virtual ~DiagnosticInfo() = default;
-    DiagnosticInfo(const DiagnosticInfo&) = delete;
-    DiagnosticInfo& operator=(const DiagnosticInfo&) = delete;
-    DiagnosticInfo(DiagnosticInfo&&) = default;
-    DiagnosticInfo& operator=(DiagnosticInfo&&) = default;
+
+    // Maximum number of stack frames to appear in a backtrace.
+    static constexpr size_t kMaxBackTraceFrames = 100ull;
+    struct Backtrace {
+        std::vector<void*> data = std::vector<void*>(kMaxBackTraceFrames, nullptr);
+    };
 
     struct StackFrame {
         std::string toString() const;
@@ -97,10 +93,23 @@ public:
 
     StackTrace makeStackTrace() const;
 
-    static std::vector<void*> getBacktraceAddresses();
+    static Backtrace getBacktrace();
 
     std::string toString() const;
-    friend DiagnosticInfo takeDiagnosticInfo(const StringData& captureName);
+
+    /**
+     * Simple options struct to go with takeDiagnosticInfo
+     */
+    struct Options {
+        Options() : shouldTakeBacktrace{false} {}
+
+        bool shouldTakeBacktrace;
+    };
+
+    /**
+     * Captures the diagnostic information based on the caller's context.
+     */
+    static DiagnosticInfo capture(const StringData& captureName, Options options = Options{});
 
     /**
      * This function checks the FailPoint currentOpSpawnsThreadWaitingForLatch and potentially
@@ -117,14 +126,10 @@ private:
 
     Date_t _timestamp;
     StringData _captureName;
-    std::vector<void*> _backtraceAddresses;
+    Backtrace _backtrace;
 
-    DiagnosticInfo(const Date_t& timestamp,
-                   const StringData& captureName,
-                   std::vector<void*> backtraceAddresses)
-        : _timestamp(timestamp),
-          _captureName(captureName),
-          _backtraceAddresses(backtraceAddresses) {}
+    DiagnosticInfo(const Date_t& timestamp, const StringData& captureName, Backtrace backtrace)
+        : _timestamp(timestamp), _captureName(captureName), _backtrace(std::move(backtrace)) {}
 };
 
 
@@ -135,10 +140,5 @@ inline std::ostream& operator<<(std::ostream& s, const DiagnosticInfo::StackFram
 inline std::ostream& operator<<(std::ostream& s, const DiagnosticInfo& info) {
     return s << info.toString();
 }
-
-/**
- * Captures the diagnostic information based on the caller's context.
- */
-DiagnosticInfo takeDiagnosticInfo(const StringData& captureName);
 
 }  // namespace mongo

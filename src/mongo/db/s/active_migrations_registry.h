@@ -33,8 +33,8 @@
 #include <memory>
 
 #include "mongo/db/s/migration_session_id.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/s/request_types/move_chunk_request.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/notification.h"
 
 namespace mongo {
@@ -152,7 +152,7 @@ private:
     void _clearReceiveChunk();
 
     // Protects the state below
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("ActiveMigrationsRegistry::_mutex");
 
     // If there is an active moveChunk operation, this field contains the original request
     boost::optional<ActiveMoveChunkState> _activeMoveChunkState;

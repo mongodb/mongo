@@ -39,7 +39,7 @@
 #include "mongo/db/repl/task_runner.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/snapshot_manager.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
@@ -121,7 +121,7 @@ private:
     /**
      * Stops data replication and returns with 'lock' locked.
      */
-    void _stopDataReplication_inlock(OperationContext* opCtx, stdx::unique_lock<stdx::mutex>& lock);
+    void _stopDataReplication_inlock(OperationContext* opCtx, stdx::unique_lock<Latch>& lock);
 
     /**
      * Called when the instance transitions to primary in order to notify a potentially sharded host
@@ -142,7 +142,7 @@ private:
     ServiceContext* _service;
 
     // Guards starting threads and setting _startedThreads
-    stdx::mutex _threadMutex;
+    Mutex _threadMutex = MONGO_MAKE_LATCH("ReplicationCoordinatorExternalStateImpl::_threadMutex");
 
     // Flag for guarding against concurrent data replication stopping.
     bool _stoppingDataReplication = false;
@@ -188,7 +188,8 @@ private:
     Future<void> _oplogApplierShutdownFuture;
 
     // Mutex guarding the _nextThreadId value to prevent concurrent incrementing.
-    stdx::mutex _nextThreadIdMutex;
+    Mutex _nextThreadIdMutex =
+        MONGO_MAKE_LATCH("ReplicationCoordinatorExternalStateImpl::_nextThreadIdMutex");
     // Number used to uniquely name threads.
     long long _nextThreadId = 0;
 

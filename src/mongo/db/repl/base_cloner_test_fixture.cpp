@@ -148,13 +148,13 @@ void BaseClonerTest::clear() {
 }
 
 void BaseClonerTest::setStatus(const Status& status) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     _status = status;
     _setStatusCondition.notify_all();
 }
 
 const Status& BaseClonerTest::getStatus() const {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     return _status;
 }
 

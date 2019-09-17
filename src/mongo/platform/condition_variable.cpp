@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/platform/condition_variable.h"
 
 namespace mongo {

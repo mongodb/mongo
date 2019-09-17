@@ -50,8 +50,8 @@ namespace mongo {
 namespace repl {
 
 namespace {
-using UniqueLock = stdx::unique_lock<stdx::mutex>;
-using LockGuard = stdx::lock_guard<stdx::mutex>;
+using UniqueLock = stdx::unique_lock<Latch>;
+using LockGuard = stdx::lock_guard<Latch>;
 
 
 /**
@@ -87,7 +87,7 @@ TaskRunner::~TaskRunner() {
 }
 
 std::string TaskRunner::getDiagnosticString() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     str::stream output;
     output << "TaskRunner";
     output << " scheduled tasks: " << _tasks.size();
@@ -97,14 +97,14 @@ std::string TaskRunner::getDiagnosticString() const {
 }
 
 bool TaskRunner::isActive() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     return _active;
 }
 
 void TaskRunner::schedule(Task task) {
     invariant(task);
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
 
     _tasks.push_back(std::move(task));
     _condition.notify_all();
@@ -123,7 +123,7 @@ void TaskRunner::schedule(Task task) {
 }
 
 void TaskRunner::cancel() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _cancelRequested = true;
     _condition.notify_all();
 }
@@ -159,7 +159,7 @@ void TaskRunner::_runTasks() {
         // Release thread back to pool after disposing if no scheduled tasks in queue.
         if (nextAction == NextAction::kDisposeOperationContext ||
             nextAction == NextAction::kInvalid) {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            stdx::lock_guard<Latch> lk(_mutex);
             if (_tasks.empty()) {
                 _finishRunTasks_inlock();
                 return;

@@ -172,7 +172,7 @@ double FlowControl::_getLocksPerOp() {
     Sample backOne;
     std::size_t numSamples;
     {
-        stdx::lock_guard<stdx::mutex> lk(_sampledOpsMutex);
+        stdx::lock_guard<Latch> lk(_sampledOpsMutex);
         numSamples = _sampledOpsApplied.size();
         if (numSamples >= 2) {
             backTwo = _sampledOpsApplied[numSamples - 2];
@@ -399,7 +399,7 @@ std::int64_t FlowControl::_approximateOpsBetween(Timestamp prevTs, Timestamp cur
     std::int64_t prevApplied = -1;
     std::int64_t currApplied = -1;
 
-    stdx::lock_guard<stdx::mutex> lk(_sampledOpsMutex);
+    stdx::lock_guard<Latch> lk(_sampledOpsMutex);
     for (auto&& sample : _sampledOpsApplied) {
         if (prevApplied == -1 && prevTs.asULL() <= std::get<0>(sample)) {
             prevApplied = std::get<1>(sample);
@@ -427,7 +427,7 @@ void FlowControl::sample(Timestamp timestamp, std::uint64_t opsApplied) {
         return;
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_sampledOpsMutex);
+    stdx::lock_guard<Latch> lk(_sampledOpsMutex);
     _numOpsSinceStartup += opsApplied;
     if (_numOpsSinceStartup - _lastSample <
         static_cast<std::size_t>(gFlowControlSamplePeriod.load())) {
@@ -469,7 +469,7 @@ void FlowControl::sample(Timestamp timestamp, std::uint64_t opsApplied) {
 
 void FlowControl::_trimSamples(const Timestamp trimTo) {
     int numTrimmed = 0;
-    stdx::lock_guard<stdx::mutex> lk(_sampledOpsMutex);
+    stdx::lock_guard<Latch> lk(_sampledOpsMutex);
     // Always leave at least two samples for calculating `locksPerOp`.
     while (_sampledOpsApplied.size() > 2 &&
            std::get<0>(_sampledOpsApplied.front()) < trimTo.asULL()) {

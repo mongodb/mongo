@@ -764,7 +764,7 @@ BenchRunState::~BenchRunState() {
 }
 
 void BenchRunState::waitForState(State awaitedState) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     switch (awaitedState) {
         case BRS_RUNNING:
@@ -792,7 +792,7 @@ void BenchRunState::tellWorkersToCollectStats() {
 }
 
 void BenchRunState::assertFinished() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     verify(0 == _numUnstartedWorkers + _numActiveWorkers);
 }
 
@@ -805,7 +805,7 @@ bool BenchRunState::shouldWorkerCollectStats() const {
 }
 
 void BenchRunState::onWorkerStarted() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     verify(_numUnstartedWorkers > 0);
     --_numUnstartedWorkers;
     ++_numActiveWorkers;
@@ -815,7 +815,7 @@ void BenchRunState::onWorkerStarted() {
 }
 
 void BenchRunState::onWorkerFinished() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     verify(_numActiveWorkers > 0);
     --_numActiveWorkers;
     if (_numActiveWorkers + _numUnstartedWorkers == 0) {
@@ -1376,7 +1376,7 @@ void BenchRunWorker::run() {
 BenchRunner::BenchRunner(BenchRunConfig* config) : _brState(config->parallel), _config(config) {
     _oid.init();
 
-    stdx::lock_guard<stdx::mutex> lk(_staticMutex);
+    stdx::lock_guard<Latch> lk(_staticMutex);
     _activeRuns[_oid] = this;
 }
 
@@ -1438,7 +1438,7 @@ void BenchRunner::stop() {
     }
 
     {
-        stdx::lock_guard<stdx::mutex> lk(_staticMutex);
+        stdx::lock_guard<Latch> lk(_staticMutex);
         _activeRuns.erase(_oid);
     }
 }
@@ -1449,7 +1449,7 @@ BenchRunner* BenchRunner::createWithConfig(const BSONObj& configArgs) {
 }
 
 BenchRunner* BenchRunner::get(OID oid) {
-    stdx::lock_guard<stdx::mutex> lk(_staticMutex);
+    stdx::lock_guard<Latch> lk(_staticMutex);
     return _activeRuns[oid];
 }
 
@@ -1523,7 +1523,7 @@ BSONObj BenchRunner::finish(BenchRunner* runner) {
     return zoo;
 }
 
-stdx::mutex BenchRunner::_staticMutex;
+Mutex BenchRunner::_staticMutex = MONGO_MAKE_LATCH("BenchRunner");
 std::map<OID, BenchRunner*> BenchRunner::_activeRuns;
 
 /**

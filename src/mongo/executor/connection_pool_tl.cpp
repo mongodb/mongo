@@ -56,7 +56,7 @@ void TLTypeFactory::shutdown() {
     // Stop any attempt to schedule timers in the future
     _inShutdown.store(true);
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
 
     log() << "Killing all outstanding egress activity.";
     for (auto collar : _collars) {
@@ -65,12 +65,12 @@ void TLTypeFactory::shutdown() {
 }
 
 void TLTypeFactory::fasten(Type* type) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _collars.insert(type);
 }
 
 void TLTypeFactory::release(Type* type) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _collars.erase(type);
 
     type->_wasReleased = true;

@@ -1673,6 +1673,13 @@ def CheckForMongoVolatile(filename, clean_lines, linenum, error):
           'Illegal use of the volatile storage keyword, use AtomicWord instead '
           'from "mongo/platform/atomic_word.h"')
 
+def CheckForMongoMutex(filename, clean_lines, linenum, error):
+  line = clean_lines.elided[linenum]
+  if re.search('[ ({,]stdx?::mutex[ ({]', line):
+    error(filename, linenum, 'mongodb/stdxmutex', 5,
+          'Illegal use of prohibited stdx::mutex, '
+          'use mongo::Mutex from mongo/platform/mutex.h instead.')
+
 def CheckForNonMongoAssert(filename, clean_lines, linenum, error):
   line = clean_lines.elided[linenum]
   if re.search(r'\bassert\s*\(', line):
@@ -5894,6 +5901,7 @@ def ProcessLine(filename, file_extension, clean_lines, line,
   CheckForMongoPolyfill(filename, clean_lines, line, error)
   CheckForMongoAtomic(filename, clean_lines, line, error)
   CheckForMongoVolatile(filename, clean_lines, line, error)
+  CheckForMongoMutex(filename, clean_lines, line, error)
   CheckForNonMongoAssert(filename, clean_lines, line, error)
   if nesting_state.InAsmBlock(): return
   CheckForFunctionLengths(filename, clean_lines, line, function_state, error)

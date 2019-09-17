@@ -133,7 +133,7 @@ public:
                         db.getCursor().write<LittleEndian<uint32_t>>(size);
 
                         {
-                            stdx::lock_guard<stdx::mutex> lk(_mutex);
+                            stdx::lock_guard<Latch> lk(_mutex);
                             _written += size;
                         }
 
@@ -150,7 +150,7 @@ public:
             } catch (...) {
                 auto status = exceptionToStatus();
 
-                stdx::lock_guard<stdx::mutex> lk(_mutex);
+                stdx::lock_guard<Latch> lk(_mutex);
                 _result = status;
             }
         });
@@ -173,7 +173,7 @@ public:
             // If we couldn't push our packet begin the process of failing the recording
             _pcqPipe.producer.close();
 
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            stdx::lock_guard<Latch> lk(_mutex);
 
             // If the result was otherwise okay, mark it as failed due to the queue blocking.  If
             // it failed for another reason, don't overwrite that.
@@ -187,7 +187,7 @@ public:
     }
 
     Status shutdown() {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<Latch> lk(_mutex);
 
         if (!_inShutdown) {
             _inShutdown = true;
@@ -203,7 +203,7 @@ public:
     }
 
     BSONObj getStats() {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         _trafficStats.setBufferedBytes(_pcqPipe.controller.getStats().queueDepth);
         _trafficStats.setCurrentFileSize(_written);
         return _trafficStats.toBSON();
@@ -251,7 +251,7 @@ private:
     MultiProducerSingleConsumerQueue<TrafficRecordingPacket, CostFunction>::Pipe _pcqPipe;
     stdx::thread _thread;
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("Recording::_mutex");
     bool _inShutdown = false;
     TrafficRecorderStats _trafficStats;
     size_t _written = 0;
@@ -282,7 +282,7 @@ void TrafficRecorder::start(const StartRecordingTraffic& options) {
             !gTrafficRecordingDirectory.empty());
 
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
 
         uassert(ErrorCodes::BadValue, "Traffic recording already active", !_recording);
 
@@ -299,7 +299,7 @@ void TrafficRecorder::stop() {
     _shouldRecord.store(false);
 
     auto recording = [&] {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
 
         uassert(ErrorCodes::BadValue, "Traffic recording not active", _recording);
 
@@ -314,7 +314,7 @@ void TrafficRecorder::observe(const transport::SessionHandle& ts,
                               const Message& message) {
     if (shouldAlwaysRecordTraffic) {
         {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            stdx::lock_guard<Latch> lk(_mutex);
 
             if (!_recording) {
                 StartRecordingTraffic options;
@@ -347,7 +347,7 @@ void TrafficRecorder::observe(const transport::SessionHandle& ts,
     }
 
     // We couldn't queue
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
 
     // If the recording isn't the one we have in hand bail (its been ended, or a new one has
     // been created
@@ -360,7 +360,7 @@ void TrafficRecorder::observe(const transport::SessionHandle& ts,
 }
 
 std::shared_ptr<TrafficRecorder::Recording> TrafficRecorder::_getCurrentRecording() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     return _recording;
 }
 

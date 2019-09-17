@@ -48,8 +48,8 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/task_runner.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/progress_meter.h"
@@ -239,7 +239,7 @@ private:
      * Verifies that an error from the query was the result of a collection drop.  If
      * so, cloning is stopped with no error.  Otherwise it is stopped with the given error.
      */
-    void _verifyCollectionWasDropped(const stdx::unique_lock<stdx::mutex>& lk,
+    void _verifyCollectionWasDropped(const stdx::unique_lock<Latch>& lk,
                                      Status batchStatus,
                                      std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
@@ -259,7 +259,7 @@ private:
     // (S)  Self-synchronizing; access in any way from any context.
     // (RT)  Read-only in concurrent operation; synchronized externally by tests
     //
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("CollectionCloner::_mutex");
     mutable stdx::condition_variable _condition;        // (M)
     executor::TaskExecutor* _executor;                  // (R) Not owned by us.
     ThreadPool* _dbWorkThreadPool;                      // (R) Not owned by us.

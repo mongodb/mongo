@@ -36,8 +36,8 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/chrono.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {

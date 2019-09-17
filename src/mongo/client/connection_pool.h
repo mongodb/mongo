@@ -33,7 +33,7 @@
 #include <map>
 
 #include "mongo/client/dbclient_connection.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
@@ -194,7 +194,7 @@ private:
     const int _messagingPortTags;
 
     // Mutex guarding members of the connection pool
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("ConnectionPool::_mutex");
 
     // Map from HostAndPort to idle connections.
     HostConnectionMap _connections;

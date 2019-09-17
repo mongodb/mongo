@@ -43,8 +43,8 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 namespace repl {
@@ -149,7 +149,7 @@ private:
     CallbackFn _onCompletion;
 
     // Protects member data of this MultiApplier.
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("MultiApplier::_mutex");
 
     stdx::condition_variable _condition;
 

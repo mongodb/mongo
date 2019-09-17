@@ -54,7 +54,7 @@ public:
 
     void run(OperationContext* opCtx) final {
         {
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            stdx::lock_guard<Latch> lock(_mutex);
             ++_counter;
         }
 
@@ -70,7 +70,7 @@ public:
     void waitForCount() {
         invariant(_wait != 0);
 
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        stdx::unique_lock<Latch> lock(_mutex);
         while (_counter < _wait) {
             _condvar.wait(lock);
         }
@@ -80,7 +80,7 @@ public:
 
     std::uint32_t getCounter() {
         {
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            stdx::lock_guard<Latch> lock(_mutex);
             return _counter;
         }
     }
@@ -88,7 +88,7 @@ public:
 private:
     std::uint32_t _counter{0};
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("TestPeriodicThread::_mutex");
     stdx::condition_variable _condvar;
     std::uint32_t _wait{0};
 };
@@ -198,7 +198,7 @@ class TestCounterCheck : public WatchdogCheck {
 public:
     void run(OperationContext* opCtx) final {
         {
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            stdx::lock_guard<Latch> lock(_mutex);
             ++_counter;
         }
 
@@ -218,7 +218,7 @@ public:
     void waitForCount() {
         invariant(_wait != 0);
 
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        stdx::unique_lock<Latch> lock(_mutex);
         while (_counter < _wait) {
             _condvar.wait(lock);
         }
@@ -226,7 +226,7 @@ public:
 
     std::uint32_t getCounter() {
         {
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            stdx::lock_guard<Latch> lock(_mutex);
             return _counter;
         }
     }
@@ -234,7 +234,7 @@ public:
 private:
     std::uint32_t _counter{0};
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("TestCounterCheck::_mutex");
     stdx::condition_variable _condvar;
     std::uint32_t _wait{0};
 };
@@ -274,14 +274,14 @@ TEST_F(WatchdogCheckThreadTest, Basic) {
 class ManualResetEvent {
 public:
     void set() {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
 
         _set = true;
         _condvar.notify_one();
     }
 
     void wait() {
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        stdx::unique_lock<Latch> lock(_mutex);
 
         _condvar.wait(lock, [this]() { return _set; });
     }
@@ -289,7 +289,7 @@ public:
 private:
     bool _set{false};
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("ManualResetEvent::_mutex");
     stdx::condition_variable _condvar;
 };
 

@@ -36,7 +36,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
@@ -113,7 +113,8 @@ private:
 
     const char* getLine_inlock(unsigned lineNumber) const;
 
-    stdx::mutex _mutex;  // Guards all non-static data.
+    // Guards all non-static data.
+    stdx::mutex _mutex;  // NOLINT
     char lines[N][C];
     unsigned h;  // current position
     unsigned n;  // number of lines stores 0 o N

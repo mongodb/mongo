@@ -69,7 +69,7 @@ protected:
      */
     ServiceContext* _context() override;
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("ServiceLiaisonMongos::_mutex");
     std::vector<PeriodicJobAnchor> _jobs;
 };
 

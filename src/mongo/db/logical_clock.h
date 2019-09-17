@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/logical_time.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 class ServiceContext;
@@ -107,7 +107,7 @@ private:
     ServiceContext* const _service;
 
     // The mutex protects _clusterTime and _isEnabled.
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("LogicalClock::_mutex");
     LogicalTime _clusterTime;
     bool _isEnabled{true};
 };

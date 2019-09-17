@@ -35,7 +35,7 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/mobile/mobile_options.h"
 #include "mongo/db/storage/mobile/mobile_session_pool.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/string_map.h"
 
@@ -124,7 +124,7 @@ public:
     std::vector<std::string> getAllIdents(OperationContext* opCtx) const override;
 
     void setJournalListener(JournalListener* jl) override {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<Latch> lk(_mutex);
         _journalListener = jl;
     }
 
@@ -143,7 +143,7 @@ public:
 private:
     void maybeVacuum(Client* client, Date_t deadline);
 
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("MobileKVEngine::_mutex");
     void _initDBPath(const std::string& path);
     std::int32_t _setSQLitePragma(const std::string& pragma, sqlite3* session);
 

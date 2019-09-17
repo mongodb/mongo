@@ -33,7 +33,7 @@
 
 #include "mongo/db/service_context.h"
 #include "mongo/executor/egress_tag_closer.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/net/hostandport.h"
@@ -65,7 +65,7 @@ public:
         const std::function<transport::Session::TagMask(transport::Session::TagMask)>& mutateFunc);
 
 private:
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("EgressTagCloserManager::_mutex");
     stdx::unordered_set<EgressTagCloser*> _egressTagClosers;
 };
 

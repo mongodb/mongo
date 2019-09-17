@@ -31,8 +31,8 @@
 
 #include "mongo/db/operation_context_group.h"
 #include "mongo/db/s/namespace_metadata_change_notifications.h"
+#include "mongo/platform/condition_variable.h"
 #include "mongo/s/catalog_cache_loader.h"
-#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
@@ -204,7 +204,7 @@ private:
          * same task object on which it was called because it might have been deleted during the
          * unlocked period.
          */
-        void waitForActiveTaskCompletion(stdx::unique_lock<stdx::mutex>& lg);
+        void waitForActiveTaskCompletion(stdx::unique_lock<Latch>& lg);
 
         /**
          * Checks whether 'term' matches the term of the latest task in the task list. This is
@@ -314,7 +314,7 @@ private:
          * same task object on which it was called because it might have been deleted during the
          * unlocked period.
          */
-        void waitForActiveTaskCompletion(stdx::unique_lock<stdx::mutex>& lg);
+        void waitForActiveTaskCompletion(stdx::unique_lock<Latch>& lg);
 
         /**
          * Checks whether 'term' matches the term of the latest task in the task list. This is
@@ -484,7 +484,7 @@ private:
     NamespaceMetadataChangeNotifications _namespaceNotifications;
 
     // Protects the class state below
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("ShardServerCatalogCacheLoader::_mutex");
 
     // True if shutDown was called.
     bool _inShutdown{false};

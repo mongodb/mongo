@@ -144,7 +144,7 @@ ShardingCatalogClientImpl::ShardingCatalogClientImpl(
 ShardingCatalogClientImpl::~ShardingCatalogClientImpl() = default;
 
 void ShardingCatalogClientImpl::startup() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     if (_started) {
         return;
     }
@@ -156,7 +156,7 @@ void ShardingCatalogClientImpl::startup() {
 void ShardingCatalogClientImpl::shutDown(OperationContext* opCtx) {
     LOG(1) << "ShardingCatalogClientImpl::shutDown() called.";
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         _inShutdown = true;
     }
 

@@ -49,7 +49,7 @@ const auto operationSessionDecoration =
 }  // namespace
 
 SessionCatalog::~SessionCatalog() {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    stdx::lock_guard<Latch> lg(_mutex);
     for (const auto& entry : _sessions) {
         ObservableSession session(lg, entry.second->session);
         invariant(!session.currentOperation());
@@ -58,7 +58,7 @@ SessionCatalog::~SessionCatalog() {
 }
 
 void SessionCatalog::reset_forTest() {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    stdx::lock_guard<Latch> lg(_mutex);
     _sessions.clear();
 }
 
@@ -79,7 +79,7 @@ SessionCatalog::ScopedCheckedOutSession SessionCatalog::_checkOutSession(Operati
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
     invariant(!opCtx->lockState()->isLocked());
 
-    stdx::unique_lock<stdx::mutex> ul(_mutex);
+    stdx::unique_lock<Latch> ul(_mutex);
     auto sri = _getOrCreateSessionRuntimeInfo(ul, opCtx, *opCtx->getLogicalSessionId());
 
     // Wait until the session is no longer checked out and until the previously scheduled kill has
@@ -106,7 +106,7 @@ SessionCatalog::SessionToKill SessionCatalog::checkOutSessionForKill(OperationCo
     invariant(!operationSessionDecoration(opCtx));
     invariant(!opCtx->getTxnNumber());
 
-    stdx::unique_lock<stdx::mutex> ul(_mutex);
+    stdx::unique_lock<Latch> ul(_mutex);
     auto sri = _getOrCreateSessionRuntimeInfo(ul, opCtx, killToken.lsidToKill);
     invariant(ObservableSession(ul, sri->session)._killed());
 
@@ -130,7 +130,7 @@ void SessionCatalog::scanSession(const LogicalSessionId& lsid,
     std::unique_ptr<SessionRuntimeInfo> sessionToReap;
 
     {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        stdx::lock_guard<Latch> lg(_mutex);
         auto it = _sessions.find(lsid);
         if (it != _sessions.end()) {
             auto& sri = it->second;
@@ -151,7 +151,7 @@ void SessionCatalog::scanSessions(const SessionKiller::Matcher& matcher,
     std::vector<std::unique_ptr<SessionRuntimeInfo>> sessionsToReap;
 
     {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        stdx::lock_guard<Latch> lg(_mutex);
 
         LOG(2) << "Beginning scanSessions. Scanning " << _sessions.size() << " sessions.";
 
@@ -173,7 +173,7 @@ void SessionCatalog::scanSessions(const SessionKiller::Matcher& matcher,
 }
 
 SessionCatalog::KillToken SessionCatalog::killSession(const LogicalSessionId& lsid) {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    stdx::lock_guard<Latch> lg(_mutex);
     auto it = _sessions.find(lsid);
     uassert(ErrorCodes::NoSuchSession, "Session not found", it != _sessions.end());
 
@@ -182,7 +182,7 @@ SessionCatalog::KillToken SessionCatalog::killSession(const LogicalSessionId& ls
 }
 
 size_t SessionCatalog::size() const {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    stdx::lock_guard<Latch> lg(_mutex);
     return _sessions.size();
 }
 
@@ -198,7 +198,7 @@ SessionCatalog::SessionRuntimeInfo* SessionCatalog::_getOrCreateSessionRuntimeIn
 
 void SessionCatalog::_releaseSession(SessionRuntimeInfo* sri,
                                      boost::optional<KillToken> killToken) {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    stdx::lock_guard<Latch> lg(_mutex);
 
     // Make sure we have exactly the same session on the map and that it is still associated with an
     // operation context (meaning checked-out)

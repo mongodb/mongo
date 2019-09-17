@@ -31,7 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/log.h"
@@ -46,15 +46,15 @@ struct Beerp {
     explicit Beerp(int i) {
         _blerp(WithLock::withoutLock(), i);
     }
-    Beerp(stdx::lock_guard<stdx::mutex> const& lk, int i) {
+    Beerp(stdx::lock_guard<Latch> const& lk, int i) {
         _blerp(lk, i);
     }
     int bleep(char n) {
-        stdx::lock_guard<stdx::mutex> lk(_m);
+        stdx::lock_guard<Latch> lk(_m);
         return _bloop(lk, n - '0');
     }
     int bleep(int i) {
-        stdx::unique_lock<stdx::mutex> lk(_m);
+        stdx::unique_lock<Latch> lk(_m);
         return _bloop(lk, i);
     }
 
@@ -66,7 +66,7 @@ private:
         log() << i << " bleep" << (i == 1 ? "\n" : "s\n");
         return i;
     }
-    stdx::mutex _m;
+    Mutex _m = MONGO_MAKE_LATCH("Beerp::_m");
 };
 
 TEST(WithLockTest, OverloadSet) {
@@ -74,8 +74,8 @@ TEST(WithLockTest, OverloadSet) {
     ASSERT_EQ(1, b.bleep('1'));
     ASSERT_EQ(2, b.bleep(2));
 
-    stdx::mutex m;
-    stdx::lock_guard<stdx::mutex> lk(m);
+    auto m = MONGO_MAKE_LATCH();
+    stdx::lock_guard<Latch> lk(m);
     Beerp(lk, 3);
 }
 

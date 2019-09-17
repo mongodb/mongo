@@ -39,11 +39,11 @@ namespace mongo {
 TEST(ConditionVariable, BasicSingleThread) {
     unittest::Barrier barrier(2U);
     ConditionVariable cv;
-    Mutex m;
+    stdx::mutex m;  // NOLINT
     bool done = false;
 
     stdx::thread worker([&]() {
-        stdx::unique_lock<Mutex> lk(m);
+        stdx::unique_lock<stdx::mutex> lk(m);
         barrier.countDownAndWait();
         ASSERT(!done);
         cv.wait(lk, [&] { return done; });
@@ -52,7 +52,7 @@ TEST(ConditionVariable, BasicSingleThread) {
 
     barrier.countDownAndWait();
     {
-        stdx::unique_lock<Mutex> lk(m);
+        stdx::unique_lock<stdx::mutex> lk(m);
         done = true;
     }
     cv.notify_one();

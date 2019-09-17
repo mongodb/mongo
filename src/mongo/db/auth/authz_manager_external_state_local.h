@@ -37,7 +37,7 @@
 #include "mongo/db/auth/role_graph.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 
@@ -161,7 +161,7 @@ private:
     /**
      * Guards _roleGraphState and _roleGraph.
      */
-    stdx::mutex _roleGraphMutex;
+    Mutex _roleGraphMutex = MONGO_MAKE_LATCH("AuthzManagerExternalStateLocal::_roleGraphMutex");
 };
 
 }  // namespace mongo

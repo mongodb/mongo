@@ -33,7 +33,7 @@
 
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/sessions_collection.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
@@ -89,7 +89,7 @@ private:
     Status _refreshSessions(const LogicalSessionRecordSet& sessions);
     Status _removeRecords(const LogicalSessionIdSet& sessions);
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("MockSessionsCollectionImpl::_mutex");
     SessionMap _sessions;
 
     RefreshHook _refresh;

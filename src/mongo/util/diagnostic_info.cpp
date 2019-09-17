@@ -33,10 +33,15 @@
 
 #include "mongo/util/diagnostic_info.h"
 
+#include "mongo/config.h"
+
 #if defined(__linux__)
 #include <elf.h>
-#include <execinfo.h>
 #include <link.h>
+#endif
+
+#if defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
+#include <execinfo.h>
 #endif
 
 #include <fmt/format.h>
@@ -52,8 +57,6 @@
 using namespace fmt::literals;
 
 namespace mongo {
-// Maximum number of stack frames to appear in a backtrace.
-const unsigned int kMaxBackTraceFrames = 100;
 
 namespace {
 MONGO_FAIL_POINT_DEFINE(currentOpSpawnsThreadWaitingForLatch);
@@ -67,10 +70,10 @@ public:
     void setIsContended(bool value);
 
 private:
-    Mutex _testMutex{kBlockedOpMutexName};
+    Mutex _testMutex = MONGO_MAKE_LATCH(kBlockedOpMutexName);
 
     stdx::condition_variable _cv;
-    stdx::mutex _m;
+    stdx::mutex _m;  // NOLINT
 
     struct State {
         bool isContended = false;
@@ -127,34 +130,45 @@ void BlockedOp::setIsContended(bool value) {
     _cv.notify_one();
 }
 
-const auto gDiagnosticHandle = Client::declareDecoration<DiagnosticInfo::Diagnostic>();
+struct DiagnosticInfoHandle {
+    stdx::mutex mutex;  // NOLINT
+    boost::optional<DiagnosticInfo> maybeInfo = boost::none;
+};
+const auto getDiagnosticInfoHandle = Client::declareDecoration<DiagnosticInfoHandle>();
 
 MONGO_INITIALIZER(LockActions)(InitializerContext* context) {
-
-    class LockActionsSubclass : public LockActions {
+    class LockActionsSubclass : public Mutex::LockActions {
         void onContendedLock(const StringData& name) override {
-            if (haveClient()) {
-                DiagnosticInfo::Diagnostic::set(
-                    Client::getCurrent(),
-                    std::make_shared<DiagnosticInfo>(takeDiagnosticInfo(name)));
-            }
+            auto client = Client::getCurrent();
+            if (client) {
+                auto& handle = getDiagnosticInfoHandle(client);
+                stdx::lock_guard<stdx::mutex> lk(handle.mutex);
+                handle.maybeInfo.emplace(DiagnosticInfo::capture(name));
 
-            if (currentOpSpawnsThreadWaitingForLatch.shouldFail() &&
-                (name == kBlockedOpMutexName)) {
-                gBlockedOp.setIsContended(true);
+                if (currentOpSpawnsThreadWaitingForLatch.shouldFail() &&
+                    (name == kBlockedOpMutexName)) {
+                    gBlockedOp.setIsContended(true);
+                }
             }
         }
-        void onUnlock(const StringData&) override {
-            DiagnosticInfo::Diagnostic::clearDiagnostic();
+        void onUnlock(const StringData& name) override {
+            auto client = Client::getCurrent();
+            if (client) {
+                auto& handle = getDiagnosticInfoHandle(client);
+                stdx::lock_guard<stdx::mutex> lk(handle.mutex);
+                handle.maybeInfo.reset();
+            }
         }
     };
 
-    std::unique_ptr<LockActions> mutexPointer = std::make_unique<LockActionsSubclass>();
-    Mutex::setLockActions(std::move(mutexPointer));
+    // Intentionally leaked, people use Latches in detached threads
+    static auto& actions = *new LockActionsSubclass;
+    Mutex::LockActions::add(&actions);
 
     return Status::OK();
 }
 
+/*
 MONGO_INITIALIZER(ConditionVariableActions)(InitializerContext* context) {
 
     class ConditionVariableActionsSubclass : public ConditionVariableActions {
@@ -162,7 +176,7 @@ MONGO_INITIALIZER(ConditionVariableActions)(InitializerContext* context) {
             if (haveClient()) {
                 DiagnosticInfo::Diagnostic::set(
                     Client::getCurrent(),
-                    std::make_shared<DiagnosticInfo>(takeDiagnosticInfo(name)));
+                    std::make_shared<DiagnosticInfo>(capture(name)));
             }
         }
         void onFulfilledConditionVariable() override {
@@ -176,27 +190,9 @@ MONGO_INITIALIZER(ConditionVariableActions)(InitializerContext* context) {
 
     return Status::OK();
 }
+*/
 
 }  // namespace
-
-auto DiagnosticInfo::Diagnostic::get(Client* const client) -> std::shared_ptr<DiagnosticInfo> {
-    auto& handle = gDiagnosticHandle(client);
-    stdx::lock_guard lk(handle.m);
-    return handle.diagnostic;
-}
-
-void DiagnosticInfo::Diagnostic::set(Client* const client,
-                                     std::shared_ptr<DiagnosticInfo> newDiagnostic) {
-    auto& handle = gDiagnosticHandle(client);
-    stdx::lock_guard lk(handle.m);
-    handle.diagnostic = newDiagnostic;
-}
-
-void DiagnosticInfo::Diagnostic::clearDiagnostic() {
-    if (haveClient()) {
-        DiagnosticInfo::Diagnostic::set(Client::getCurrent(), nullptr);
-    }
-}
 
 #if defined(__linux__)
 namespace {
@@ -231,8 +227,6 @@ MONGO_INITIALIZER(InitializeDynamicObjectMap)(InitializerContext* context) {
     gDynamicObjectMap.init();
     return Status::OK();
 };
-
-}  // anonymous namespace
 
 int DynamicObjectMap::addToMap(dl_phdr_info* info, size_t size, void* data) {
     auto& addr_map = *reinterpret_cast<decltype(DynamicObjectMap::_map)*>(data);
@@ -271,30 +265,33 @@ DiagnosticInfo::StackFrame DynamicObjectMap::getFrame(void* instructionPtr) cons
     return DiagnosticInfo::StackFrame{frame.objectPath, fileOffset};
 }
 
+}  // namespace
+#endif  // linux
+
+#if defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE) && defined(__linux__)
 // iterates through the backtrace instruction pointers to
 // find the instruction pointer that refers to a segment in the addr_map
 DiagnosticInfo::StackTrace DiagnosticInfo::makeStackTrace() const {
     DiagnosticInfo::StackTrace trace;
-    for (auto addr : _backtraceAddresses) {
-        trace.frames.emplace_back(gDynamicObjectMap.getFrame(addr));
+    for (auto address : _backtrace.data) {
+        trace.frames.emplace_back(gDynamicObjectMap.getFrame(address));
     }
     return trace;
 }
 
-static std::vector<void*> getBacktraceAddresses() {
-    std::vector<void*> backtraceAddresses(kMaxBackTraceFrames, 0);
-    int addressCount = backtrace(backtraceAddresses.data(), kMaxBackTraceFrames);
-    // backtrace will modify the vector's underlying array without updating its size
-    backtraceAddresses.resize(static_cast<unsigned int>(addressCount));
-    return backtraceAddresses;
+auto DiagnosticInfo::getBacktrace() -> Backtrace {
+    Backtrace list;
+    auto len = ::backtrace(list.data.data(), list.data.size());
+    list.data.resize(len);
+    return list;
 }
 #else
 DiagnosticInfo::StackTrace DiagnosticInfo::makeStackTrace() const {
     return DiagnosticInfo::StackTrace();
 }
 
-static std::vector<void*> getBacktraceAddresses() {
-    return std::vector<void*>();
+auto DiagnosticInfo::getBacktrace() -> Backtrace {
+    return {};
 }
 #endif
 
@@ -311,7 +308,7 @@ bool operator==(const DiagnosticInfo::StackTrace& trace1,
 
 bool operator==(const DiagnosticInfo& info1, const DiagnosticInfo& info2) {
     return info1._captureName == info2._captureName && info1._timestamp == info2._timestamp &&
-        info1._backtraceAddresses == info2._backtraceAddresses;
+        info1._backtrace.data == info2._backtrace.data;
 }
 
 std::string DiagnosticInfo::StackFrame::toString() const {
@@ -335,15 +332,16 @@ std::string DiagnosticInfo::StackTrace::toString() const {
 
 std::string DiagnosticInfo::toString() const {
     return "{{ \"name\": \"{}\", \"time\": \"{}\", \"backtraceSize\": {} }}"_format(
-        _captureName.toString(), _timestamp.toString(), _backtraceAddresses.size());
+        _captureName.toString(), _timestamp.toString(), _backtrace.data.size());
 }
 
-DiagnosticInfo takeDiagnosticInfo(const StringData& captureName) {
+DiagnosticInfo DiagnosticInfo::capture(const StringData& captureName, Options options) {
     // uses backtrace to retrieve an array of instruction pointers for currently active
     // function calls of the program
     return DiagnosticInfo(getGlobalServiceContext()->getFastClockSource()->now(),
                           captureName,
-                          getBacktraceAddresses());
+                          options.shouldTakeBacktrace ? DiagnosticInfo::getBacktrace()
+                                                      : Backtrace{{}});
 }
 
 DiagnosticInfo::BlockedOpGuard::~BlockedOpGuard() {
@@ -363,6 +361,12 @@ auto DiagnosticInfo::maybeMakeBlockedOpForTest(Client* client) -> std::unique_pt
         });
 
     return guard;
+}
+
+boost::optional<DiagnosticInfo> DiagnosticInfo::get(Client& client) {
+    auto& handle = getDiagnosticInfoHandle(client);
+    stdx::lock_guard<stdx::mutex> lk(handle.mutex);
+    return handle.maybeInfo;
 }
 
 }  // namespace mongo

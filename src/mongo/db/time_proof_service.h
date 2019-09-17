@@ -32,7 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 
@@ -90,7 +90,7 @@ private:
     };
 
     // protects _cache
-    stdx::mutex _cacheMutex;
+    Mutex _cacheMutex = MONGO_MAKE_LATCH("TimeProofService::_cacheMutex");
 
     // one-entry cache
     boost::optional<CacheEntry> _cache;

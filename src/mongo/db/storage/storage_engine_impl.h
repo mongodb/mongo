@@ -46,7 +46,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_interface.h"
 #include "mongo/db/storage/temporary_record_store.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/periodic_runner.h"
 
 namespace mongo {
@@ -290,7 +290,7 @@ public:
         PeriodicRunner* _periodicRunner;
 
         // Protects access to _listeners below.
-        stdx::mutex _monitorMutex;
+        Mutex _monitorMutex = MONGO_MAKE_LATCH("TimestampMonitor::_monitorMutex");
         std::vector<TimestampListener*> _listeners;
 
         // This should remain as the last member variable so that its destructor gets executed first

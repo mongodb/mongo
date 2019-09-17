@@ -61,13 +61,13 @@ boost::shared_ptr<std::ostream> makeNullStream() {
 // ConsoleAppender can be benchmarked.
 class StringstreamConsole {
 public:
-    stdx::mutex& mutex() {
-        static stdx::mutex instance;
+    Mutex& mutex() {
+        static auto instance = MONGO_MAKE_LATCH();
         return instance;
     }
 
     StringstreamConsole() {
-        stdx::unique_lock<stdx::mutex> lk(mutex());
+        stdx::unique_lock<Latch> lk(mutex());
         lk.swap(_consoleLock);
         _out = makeNullStream();
     }
@@ -78,7 +78,7 @@ public:
 
 private:
     boost::shared_ptr<std::ostream> _out;
-    stdx::unique_lock<stdx::mutex> _consoleLock;
+    stdx::unique_lock<Latch> _consoleLock;
 };
 
 // RAII style helper class for init/deinit log system

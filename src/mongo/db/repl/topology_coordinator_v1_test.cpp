@@ -1529,7 +1529,6 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     Date_t appliedWallTime = Date_t() + Seconds(oplogProgress.getSecs());
     OpTime oplogDurable(Timestamp(1, 1), 19);
     Date_t durableWallTime = Date_t() + Seconds(oplogDurable.getSecs());
-    ;
     OpTime lastCommittedOpTime(Timestamp(5, 1), 20);
     Date_t lastCommittedWallTime = Date_t() + Seconds(lastCommittedOpTime.getSecs());
     OpTime readConcernMajorityOpTime(Timestamp(4, 1), 20);

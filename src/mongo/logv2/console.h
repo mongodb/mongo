@@ -31,7 +31,7 @@
 
 #include <iosfwd>
 
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 namespace logv2 {

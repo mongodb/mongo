@@ -54,9 +54,9 @@
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/vote_requester.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -91,7 +91,7 @@ Milliseconds ReplicationCoordinatorImpl::_getRandomizedElectionOffset_inlock() {
 void ReplicationCoordinatorImpl::_doMemberHeartbeat(executor::TaskExecutor::CallbackArgs cbData,
                                                     const HostAndPort& target,
                                                     int targetIndex) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
 
     _untrackHeartbeatHandle_inlock(cbData.myHandle);
     if (cbData.status == ErrorCodes::CallbackCanceled) {
@@ -131,7 +131,7 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatToTarget_inlock(const HostAnd
 
 void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
     const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData, int targetIndex) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     // remove handle from queued heartbeats
     _untrackHeartbeatHandle_inlock(cbData.myHandle);
@@ -246,10 +246,10 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
     _handleHeartbeatResponseAction_inlock(action, hbStatusResponse, std::move(lk));
 }
 
-stdx::unique_lock<stdx::mutex> ReplicationCoordinatorImpl::_handleHeartbeatResponseAction_inlock(
+stdx::unique_lock<Latch> ReplicationCoordinatorImpl::_handleHeartbeatResponseAction_inlock(
     const HeartbeatResponseAction& action,
     const StatusWith<ReplSetHeartbeatResponse>& responseStatus,
-    stdx::unique_lock<stdx::mutex> lock) {
+    stdx::unique_lock<Latch> lock) {
     invariant(lock.owns_lock());
     switch (action.getAction()) {
         case HeartbeatResponseAction::NoAction:
@@ -376,7 +376,7 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
                  "Blocking until fail point is disabled.";
 
         auto inShutdown = [&] {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            stdx::lock_guard<Latch> lk(_mutex);
             return _inShutdown;
         };
 
@@ -391,7 +391,7 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
     // have taken global lock in S mode and operations blocked on prepare conflict will be killed to
     // avoid 3-way deadlock between read, prepared transaction and step down thread.
     AutoGetRstlForStepUpStepDown arsd(this, opCtx.get());
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     // This node has already stepped down due to reconfig. So, signal anyone who is waiting on the
     // step down event.
@@ -497,7 +497,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
         _externalState.get(), newConfig, getGlobalServiceContext());
 
     if (myIndex.getStatus() == ErrorCodes::NodeNotFound) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         // If this node absent in newConfig, and this node was not previously initialized,
         // return to kConfigUninitialized immediately, rather than storing the config and
         // transitioning into the RS_REMOVED state.  See SERVER-15740.
@@ -523,7 +523,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
         auto status = _externalState->storeLocalConfigDocument(opCtx.get(), newConfig.toBSON());
         bool isFirstConfig;
         {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            stdx::lock_guard<Latch> lk(_mutex);
             isFirstConfig = !_rsConfig.isInitialized();
             if (!status.isOK()) {
                 error() << "Ignoring new configuration in heartbeat response because we failed to"
@@ -594,7 +594,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     // we have already set our ReplicationCoordinatorImpl::_rsConfigState state to
     // "kConfigReconfiguring" which prevents new elections from happening.
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         if (auto electionFinishedEvent = _cancelElectionIfNeeded_inlock()) {
             LOG_FOR_HEARTBEATS(0)
                 << "Waiting for election to complete before finishing reconfig to version "
@@ -613,7 +613,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     auto opCtx = cc().makeOperationContext();
 
     boost::optional<AutoGetRstlForStepUpStepDown> arsd;
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     if (_shouldStepDownOnReconfig(lk, newConfig, myIndex)) {
         _topCoord->prepareForUnconditionalStepDown();
         lk.unlock();
@@ -740,7 +740,7 @@ void ReplicationCoordinatorImpl::_startHeartbeats_inlock() {
 
 void ReplicationCoordinatorImpl::_handleLivenessTimeout(
     const executor::TaskExecutor::CallbackArgs& cbData) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     // Only reset the callback handle if it matches, otherwise more will be coming through
     if (cbData.myHandle == _handleLivenessTimeoutCbh) {
         _handleLivenessTimeoutCbh = CallbackHandle();
@@ -864,7 +864,7 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout_inlock() {
 
 void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(
     TopologyCoordinator::StartElectionReason reason) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     // If it is not a single node replica set, no need to start an election after stepdown timeout.
     if (reason == TopologyCoordinator::StartElectionReason::kSingleNodePromptElection &&
         _rsConfig.getNumMembers() != 1) {

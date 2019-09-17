@@ -104,8 +104,7 @@ int CollectionIndexBuildsTracker::getNumberOfIndexBuilds(WithLock) const {
     return _buildStateByBuildUUID.size();
 }
 
-void CollectionIndexBuildsTracker::waitUntilNoIndexBuildsRemain(
-    stdx::unique_lock<stdx::mutex>& lk) {
+void CollectionIndexBuildsTracker::waitUntilNoIndexBuildsRemain(stdx::unique_lock<Latch>& lk) {
     _noIndexBuildsRemainCondVar.wait(lk, [&] {
         if (_buildStateByBuildUUID.empty()) {
             return true;

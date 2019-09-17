@@ -48,19 +48,19 @@ EgressTagCloserManager& EgressTagCloserManager::get(ServiceContext* svc) {
 }
 
 void EgressTagCloserManager::add(EgressTagCloser* etc) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
 
     _egressTagClosers.insert(etc);
 }
 
 void EgressTagCloserManager::remove(EgressTagCloser* etc) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
 
     _egressTagClosers.erase(etc);
 }
 
 void EgressTagCloserManager::dropConnections(transport::Session::TagMask tags) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
 
     for (auto etc : _egressTagClosers) {
         etc->dropConnections(tags);
@@ -68,7 +68,7 @@ void EgressTagCloserManager::dropConnections(transport::Session::TagMask tags) {
 }
 
 void EgressTagCloserManager::dropConnections(const HostAndPort& hostAndPort) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
 
     for (auto etc : _egressTagClosers) {
         etc->dropConnections(hostAndPort);
@@ -78,7 +78,7 @@ void EgressTagCloserManager::dropConnections(const HostAndPort& hostAndPort) {
 void EgressTagCloserManager::mutateTags(
     const HostAndPort& hostAndPort,
     const std::function<transport::Session::TagMask(transport::Session::TagMask)>& mutateFunc) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
 
     for (auto etc : _egressTagClosers) {
         etc->mutateTags(hostAndPort, mutateFunc);

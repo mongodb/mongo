@@ -39,7 +39,7 @@
 
 namespace mongo {
 
-class Date_t;
+class Waitable;
 
 /**
  * An interface for getting the current wall clock time.

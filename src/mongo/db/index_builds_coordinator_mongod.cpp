@@ -111,7 +111,7 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
     }
 
     auto replState = [&]() {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<Latch> lk(_mutex);
         auto it = _allIndexBuilds.find(buildUUID);
         invariant(it != _allIndexBuilds.end());
         return it->second;
@@ -172,7 +172,7 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
     ](auto status) noexcept {
         // Clean up the index build if we failed to schedule it.
         if (!status.isOK()) {
-            stdx::unique_lock<stdx::mutex> lk(_mutex);
+            stdx::unique_lock<Latch> lk(_mutex);
 
             // Unregister the index build before setting the promises,
             // so callers do not see the build again.
@@ -249,7 +249,7 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
 
     UUID collectionUUID = collection->uuid();
 
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     auto collectionIt = _collectionIndexBuilds.find(collectionUUID);
     if (collectionIt == _collectionIndexBuilds.end()) {
         return Status(ErrorCodes::IndexNotFound,

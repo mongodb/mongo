@@ -43,8 +43,8 @@
 #include "mongo/db/repl/rollback_impl.h"
 #include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -236,7 +236,7 @@ private:
 
     // Protects member data of BackgroundSync.
     // Never hold the BackgroundSync mutex when trying to acquire the ReplicationCoordinator mutex.
-    mutable stdx::mutex _mutex;  // (S)
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("BackgroundSync::_mutex");  // (S)
 
     OpTime _lastOpTimeFetched;  // (M)
 

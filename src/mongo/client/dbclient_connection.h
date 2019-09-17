@@ -44,12 +44,12 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logger/log_severity.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/unique_message.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
@@ -293,7 +293,7 @@ protected:
     // rebind the handle from the owning thread. The thread that owns this DBClientConnection is
     // allowed to use the _session without locking the mutex. This mutex also guards writes to
     // _stayFailed, although reads are allowed outside the mutex.
-    stdx::mutex _sessionMutex;
+    Mutex _sessionMutex = MONGO_MAKE_LATCH("DBClientConnection::_sessionMutex");
     transport::SessionHandle _session;
     boost::optional<Milliseconds> _socketTimeout;
     transport::Session::TagMask _tagMask = transport::Session::kEmptyTagMask;

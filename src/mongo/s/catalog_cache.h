@@ -33,12 +33,12 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/database_version_gen.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/string_map.h"
@@ -394,7 +394,7 @@ private:
     using CollectionsByDbMap = StringMap<CollectionInfoMap>;
 
     // Mutex to serialize access to the structures below
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("CatalogCache::_mutex");
 
     // Map from DB name to the info for that database
     DatabaseInfoMap _databases;

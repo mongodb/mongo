@@ -35,7 +35,7 @@
 #include "mongo/db/repl/abstract_async_component.h"
 #include "mongo/db/repl/task_executor_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 #include "mongo/unittest/unittest.h"
 
@@ -95,10 +95,10 @@ public:
 private:
     Status _doStartup_inlock() noexcept override;
     void _doShutdown_inlock() noexcept override;
-    stdx::mutex* _getMutex() noexcept override;
+    Mutex* _getMutex() noexcept override;
 
     // Used by AbstractAsyncComponent to guard start changes.
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("MockAsyncComponent::_mutex");
 
 public:
     // Returned by _doStartup_inlock(). Override for testing.
@@ -125,7 +125,7 @@ Status MockAsyncComponent::scheduleWorkAndSaveHandle_forTest(
     executor::TaskExecutor::CallbackFn work,
     executor::TaskExecutor::CallbackHandle* handle,
     const std::string& name) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     return _scheduleWorkAndSaveHandle_inlock(std::move(work), handle, name);
 }
 
@@ -134,12 +134,12 @@ Status MockAsyncComponent::scheduleWorkAtAndSaveHandle_forTest(
     executor::TaskExecutor::CallbackFn work,
     executor::TaskExecutor::CallbackHandle* handle,
     const std::string& name) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     return _scheduleWorkAtAndSaveHandle_inlock(when, std::move(work), handle, name);
 }
 
 void MockAsyncComponent::cancelHandle_forTest(executor::TaskExecutor::CallbackHandle handle) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     _cancelHandle_inlock(handle);
 }
 
@@ -160,7 +160,7 @@ Status MockAsyncComponent::_doStartup_inlock() noexcept {
 
 void MockAsyncComponent::_doShutdown_inlock() noexcept {}
 
-stdx::mutex* MockAsyncComponent::_getMutex() noexcept {
+Mutex* MockAsyncComponent::_getMutex() noexcept {
     return &_mutex;
 }
 

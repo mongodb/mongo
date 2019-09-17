@@ -101,7 +101,7 @@ private:
     void _setEmptyOrError(std::string nss, Status status);
 
     // Protects the state below
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("ActiveRenameCollectionRegistry::_mutex");
 
     // Map containing any collections currently being renamed
     StringMap<std::shared_ptr<ActiveRenameCollectionState>> _activeRenameCollectionMap;

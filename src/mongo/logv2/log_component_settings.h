@@ -32,7 +32,7 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 namespace logv2 {
@@ -87,7 +87,7 @@ private:
 
     // A mutex to synchronize writes to the severity arrays. This mutex is to synchronize changes to
     // the entire array, and the atomics are to synchronize individual elements.
-    stdx::mutex _mtx;
+    Mutex _mtx = MONGO_MAKE_LATCH("LogComponentSettings::_mtx");
 
     // True if a log severity is explicitly set for a component.
     // This differentiates between unconfigured components and components that happen to have

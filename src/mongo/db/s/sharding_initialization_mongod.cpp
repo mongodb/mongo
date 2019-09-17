@@ -313,7 +313,7 @@ void ShardingInitializationMongoD::initializeFromShardIdentity(
     auto const shardingState = ShardingState::get(opCtx);
     auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
 
-    stdx::unique_lock<stdx::mutex> ul(_initSynchronizationMutex);
+    stdx::unique_lock<Latch> ul(_initSynchronizationMutex);
 
     if (shardingState->enabled()) {
         uassert(40371, "", shardingState->shardId() == shardIdentity.getShardName());

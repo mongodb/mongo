@@ -115,12 +115,12 @@ AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
 }
 
 AsyncResultsMerger::~AsyncResultsMerger() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     invariant(_remotesExhausted(lk) || _lifecycleState == kKillComplete);
 }
 
 bool AsyncResultsMerger::remotesExhausted() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     return _remotesExhausted(lk);
 }
 
@@ -135,7 +135,7 @@ bool AsyncResultsMerger::_remotesExhausted(WithLock) const {
 }
 
 Status AsyncResultsMerger::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
 
     if (_tailableMode != TailableModeEnum::kTailableAndAwaitData) {
         return Status(ErrorCodes::BadValue,
@@ -155,12 +155,12 @@ Status AsyncResultsMerger::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
 }
 
 bool AsyncResultsMerger::ready() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     return _ready(lk);
 }
 
 void AsyncResultsMerger::detachFromOperationContext() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _opCtx = nullptr;
     // If we were about ready to return a boost::none because a tailable cursor reached the end of
     // the batch, that should no longer apply to the next use - when we are reattached to a
@@ -170,13 +170,13 @@ void AsyncResultsMerger::detachFromOperationContext() {
 }
 
 void AsyncResultsMerger::reattachToOperationContext(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     invariant(!_opCtx);
     _opCtx = opCtx;
 }
 
 void AsyncResultsMerger::addNewShardCursors(std::vector<RemoteCursor>&& newCursors) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     // Create a new entry in the '_remotes' list for each new shard, and add the first cursor batch
     // to its buffer. This ensures the shard's initial high water mark is respected, if it exists.
     for (auto&& remote : newCursors) {
@@ -189,7 +189,7 @@ void AsyncResultsMerger::addNewShardCursors(std::vector<RemoteCursor>&& newCurso
 }
 
 BSONObj AsyncResultsMerger::getHighWaterMark() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     auto minPromisedSortKey = _getMinPromisedSortKey(lk);
     if (!minPromisedSortKey.isEmpty() && !_ready(lk)) {
         _highWaterMark = minPromisedSortKey;
@@ -272,7 +272,7 @@ bool AsyncResultsMerger::_readyUnsorted(WithLock) {
 }
 
 StatusWith<ClusterQueryResult> AsyncResultsMerger::nextReady() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     dassert(_ready(lk));
     if (_lifecycleState != kAlive) {
         return Status(ErrorCodes::IllegalOperation, "AsyncResultsMerger killed");
@@ -400,7 +400,7 @@ Status AsyncResultsMerger::_askForNextBatch(WithLock, size_t remoteIndex) {
 
     auto callbackStatus =
         _executor->scheduleRemoteCommand(request, [this, remoteIndex](auto const& cbData) {
-            stdx::lock_guard<stdx::mutex> lk(this->_mutex);
+            stdx::lock_guard<Latch> lk(this->_mutex);
             this->_handleBatchResponse(lk, cbData, remoteIndex);
         });
 
@@ -413,7 +413,7 @@ Status AsyncResultsMerger::_askForNextBatch(WithLock, size_t remoteIndex) {
 }
 
 Status AsyncResultsMerger::scheduleGetMores() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     return _scheduleGetMores(lk);
 }
 
@@ -447,7 +447,7 @@ Status AsyncResultsMerger::_scheduleGetMores(WithLock lk) {
  * 3. Remotes that reached maximum retries will be in 'exhausted' state.
  */
 StatusWith<executor::TaskExecutor::EventHandle> AsyncResultsMerger::nextEvent() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
 
     if (_lifecycleState != kAlive) {
         // Can't schedule further network operations if the ARM is being killed.
@@ -704,7 +704,7 @@ void AsyncResultsMerger::_scheduleKillCursors(WithLock, OperationContext* opCtx)
 }
 
 executor::TaskExecutor::EventHandle AsyncResultsMerger::kill(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
 
     if (_killCompleteEvent.isValid()) {
         invariant(_lifecycleState != kAlive);

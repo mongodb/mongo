@@ -31,7 +31,7 @@
 
 #include "mongo/logger/log_severity.h"
 #include "mongo/logger/logstream_builder.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/time_support.h"
 
@@ -79,7 +79,7 @@ public:
     LogSeverity nextFor(const KeyT& key) {
         auto now = Date_t::now();
 
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         auto& cutoff = _cutoffByKey[key];
 
         if (now > cutoff) {
@@ -97,7 +97,7 @@ private:
     LogSeverity _limitedLogSeverity;
     LogSeverity _normalLogSeverity;
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("LogSeverityLimiter::_mutex");
     stdx::unordered_map<KeyT, Date_t> _cutoffByKey;
 };
 

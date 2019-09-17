@@ -193,7 +193,7 @@ void KeysCollectionManager::clearCache() {
 
 void KeysCollectionManager::PeriodicRunner::refreshNow(OperationContext* opCtx) {
     auto refreshRequest = [this]() {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
 
         if (_inShutdown) {
             uasserted(ErrorCodes::ShutdownInProgress,
@@ -227,7 +227,7 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
         unsigned errorCount = 0;
         std::shared_ptr<RefreshFunc> doRefresh;
         {
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            stdx::lock_guard<Latch> lock(_mutex);
 
             if (_inShutdown) {
                 break;
@@ -250,7 +250,7 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
                 auto currentTime = LogicalClock::get(service)->getClusterTime();
 
                 {
-                    stdx::unique_lock<stdx::mutex> lock(_mutex);
+                    stdx::unique_lock<Latch> lock(_mutex);
                     _hasSeenKeys = true;
                 }
 
@@ -269,7 +269,7 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
             nextWakeup = std::min(nextWakeup, Milliseconds(data["overrideMS"].numberInt()));
         });
 
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        stdx::unique_lock<Latch> lock(_mutex);
 
         if (_refreshRequest) {
             if (!hasRefreshRequestInitially) {
@@ -297,7 +297,7 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
         }
     }
 
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    stdx::unique_lock<Latch> lock(_mutex);
     if (_refreshRequest) {
         _refreshRequest->set();
         _refreshRequest.reset();
@@ -305,7 +305,7 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
 }
 
 void KeysCollectionManager::PeriodicRunner::setFunc(RefreshFunc newRefreshStrategy) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     _doRefresh = std::make_shared<RefreshFunc>(std::move(newRefreshStrategy));
     _refreshNeededCV.notify_all();
 }
@@ -318,7 +318,7 @@ void KeysCollectionManager::PeriodicRunner::switchFunc(OperationContext* opCtx,
 void KeysCollectionManager::PeriodicRunner::start(ServiceContext* service,
                                                   const std::string& threadName,
                                                   Milliseconds refreshInterval) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     invariant(!_backgroundThread.joinable());
     invariant(!_inShutdown);
 
@@ -329,7 +329,7 @@ void KeysCollectionManager::PeriodicRunner::start(ServiceContext* service,
 
 void KeysCollectionManager::PeriodicRunner::stop() {
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
         if (!_backgroundThread.joinable()) {
             return;
         }
@@ -343,7 +343,7 @@ void KeysCollectionManager::PeriodicRunner::stop() {
 }
 
 bool KeysCollectionManager::PeriodicRunner::hasSeenKeys() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     return _hasSeenKeys;
 }
 

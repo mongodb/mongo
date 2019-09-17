@@ -61,7 +61,7 @@ WatchdogPeriodicThread::WatchdogPeriodicThread(Milliseconds period, StringData t
 
 void WatchdogPeriodicThread::start() {
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
 
         invariant(_state == State::kNotStarted);
         _state = State::kStarted;
@@ -76,7 +76,7 @@ void WatchdogPeriodicThread::shutdown() {
     stdx::thread thread;
 
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
 
         bool started = (_state == State::kStarted);
 
@@ -101,7 +101,7 @@ void WatchdogPeriodicThread::shutdown() {
 }
 
 void WatchdogPeriodicThread::setPeriod(Milliseconds period) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
 
     bool wasEnabled = _enabled;
 
@@ -130,7 +130,7 @@ void WatchdogPeriodicThread::doLoop() {
     auto preciseClockSource = client->getServiceContext()->getPreciseClockSource();
 
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
 
         // Ensure state is starting from a clean slate.
         resetState();
@@ -144,7 +144,7 @@ void WatchdogPeriodicThread::doLoop() {
         Date_t startTime = preciseClockSource->now();
 
         {
-            stdx::unique_lock<stdx::mutex> lock(_mutex);
+            stdx::unique_lock<Latch> lock(_mutex);
             MONGO_IDLE_THREAD_BLOCK;
 
 
@@ -257,7 +257,7 @@ void WatchdogMonitor::start() {
     _watchdogMonitorThread.start();
 
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
 
         invariant(_state == State::kNotStarted);
         _state = State::kStarted;
@@ -266,7 +266,7 @@ void WatchdogMonitor::start() {
 
 void WatchdogMonitor::setPeriod(Milliseconds duration) {
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
 
         if (duration > Milliseconds(0)) {
             dassert(duration >= Milliseconds(1));
@@ -290,7 +290,7 @@ void WatchdogMonitor::setPeriod(Milliseconds duration) {
 
 void WatchdogMonitor::shutdown() {
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
 
         bool started = (_state == State::kStarted);
 

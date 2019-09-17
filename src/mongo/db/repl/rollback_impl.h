@@ -449,7 +449,7 @@ private:
     void _resetDropPendingState(OperationContext* opCtx);
 
     // Guards access to member variables.
-    mutable stdx::mutex _mutex;  // (S)
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("RollbackImpl::_mutex");  // (S)
 
     // Set to true when RollbackImpl should shut down.
     bool _inShutdown = false;  // (M)

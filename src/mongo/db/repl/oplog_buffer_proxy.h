@@ -33,7 +33,7 @@
 #include <memory>
 
 #include "mongo/db/repl/oplog_buffer.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 namespace repl {
@@ -80,10 +80,10 @@ private:
     std::unique_ptr<OplogBuffer> _target;
 
     // If both mutexes have to be acquired, acquire _lastPushedMutex first.
-    mutable stdx::mutex _lastPushedMutex;
+    mutable Mutex _lastPushedMutex = MONGO_MAKE_LATCH("OplogBufferProxy::_lastPushedMutex");
     boost::optional<Value> _lastPushed;
 
-    mutable stdx::mutex _lastPeekedMutex;
+    mutable Mutex _lastPeekedMutex = MONGO_MAKE_LATCH("OplogBufferProxy::_lastPeekedMutex");
     boost::optional<Value> _lastPeeked;
 };
 

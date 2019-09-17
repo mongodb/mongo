@@ -118,7 +118,7 @@ void DeferredWriter::_worker(InsertStatement stmt) {
         return Status::OK();
     });
 
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
 
     _numBytes -= stmt.doc.objsize();
 
@@ -166,7 +166,7 @@ bool DeferredWriter::insertDocument(BSONObj obj) {
     // We can't insert documents if we haven't been started up.
     invariant(_pool);
 
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
 
     // Check if we're allowed to insert this object.
     if (_numBytes + obj.objsize() >= _maxNumBytes) {

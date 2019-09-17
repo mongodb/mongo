@@ -31,10 +31,10 @@
 
 #include "mongo/scripting/mozjs/countdownlatch.h"
 
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
@@ -61,17 +61,17 @@ public:
 
     int32_t make(int32_t count) {
         uassert(ErrorCodes::JSInterpreterFailure, "argument must be >= 0", count >= 0);
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<Latch> lock(_mutex);
 
         int32_t desc = ++_counter;
-        _latches.insert(std::make_pair(desc, std::make_shared<Latch>(count)));
+        _latches.insert(std::make_pair(desc, std::make_shared<CountDownLatch>(count)));
 
         return desc;
     }
 
     void await(int32_t desc) {
-        std::shared_ptr<Latch> latch = get(desc);
-        stdx::unique_lock<stdx::mutex> lock(latch->mutex);
+        auto latch = get(desc);
+        stdx::unique_lock<Latch> lock(latch->mutex);
 
         while (latch->count != 0) {
             latch->cv.wait(lock);
@@ -79,8 +79,8 @@ public:
     }
 
     void countDown(int32_t desc) {
-        std::shared_ptr<Latch> latch = get(desc);
-        stdx::unique_lock<stdx::mutex> lock(latch->mutex);
+        auto latch = get(desc);
+        stdx::unique_lock<Latch> lock(latch->mutex);
 
         if (latch->count > 0)
             latch->count--;
@@ -90,8 +90,8 @@ public:
     }
 
     int32_t getCount(int32_t desc) {
-        std::shared_ptr<Latch> latch = get(desc);
-        stdx::unique_lock<stdx::mutex> lock(latch->mutex);
+        auto latch = get(desc);
+        stdx::unique_lock<Latch> lock(latch->mutex);
 
         return latch->count;
     }
@@ -100,16 +100,16 @@ private:
     /**
      * Latches for communication between threads
      */
-    struct Latch {
-        Latch(int32_t count) : count(count) {}
+    struct CountDownLatch {
+        CountDownLatch(int32_t count) : count(count) {}
 
-        stdx::mutex mutex;
+        Mutex mutex = MONGO_MAKE_LATCH("Latch::mutex");
         stdx::condition_variable cv;
         int32_t count;
     };
 
-    std::shared_ptr<Latch> get(int32_t desc) {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::shared_ptr<CountDownLatch> get(int32_t desc) {
+        stdx::lock_guard<Latch> lock(_mutex);
 
         auto iter = _latches.find(desc);
         uassert(ErrorCodes::JSInterpreterFailure,
@@ -119,9 +119,9 @@ private:
         return iter->second;
     }
 
-    using Map = stdx::unordered_map<int32_t, std::shared_ptr<Latch>>;
+    using Map = stdx::unordered_map<int32_t, std::shared_ptr<CountDownLatch>>;
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("CountDownLatchHolder::_mutex");
     Map _latches;
     int32_t _counter;
 };

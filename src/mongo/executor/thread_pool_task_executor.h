@@ -33,8 +33,8 @@
 #include <memory>
 
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/baton.h"
 #include "mongo/util/fail_point_service.h"
@@ -149,13 +149,13 @@ private:
     /**
      * Signals the given event.
      */
-    void signalEvent_inlock(const EventHandle& event, stdx::unique_lock<stdx::mutex> lk);
+    void signalEvent_inlock(const EventHandle& event, stdx::unique_lock<Latch> lk);
 
     /**
      * Schedules all items from "fromQueue" into the thread pool and moves them into
      * _poolInProgressQueue.
      */
-    void scheduleIntoPool_inlock(WorkQueue* fromQueue, stdx::unique_lock<stdx::mutex> lk);
+    void scheduleIntoPool_inlock(WorkQueue* fromQueue, stdx::unique_lock<Latch> lk);
 
     /**
      * Schedules the given item from "fromQueue" into the thread pool and moves it into
@@ -163,7 +163,7 @@ private:
      */
     void scheduleIntoPool_inlock(WorkQueue* fromQueue,
                                  const WorkQueue::iterator& iter,
-                                 stdx::unique_lock<stdx::mutex> lk);
+                                 stdx::unique_lock<Latch> lk);
 
     /**
      * Schedules entries from "begin" through "end" in "fromQueue" into the thread pool
@@ -172,7 +172,7 @@ private:
     void scheduleIntoPool_inlock(WorkQueue* fromQueue,
                                  const WorkQueue::iterator& begin,
                                  const WorkQueue::iterator& end,
-                                 stdx::unique_lock<stdx::mutex> lk);
+                                 stdx::unique_lock<Latch> lk);
 
     /**
      * Executes the callback specified by "cbState".
@@ -181,7 +181,7 @@ private:
 
     bool _inShutdown_inlock() const;
     void _setState_inlock(State newState);
-    stdx::unique_lock<stdx::mutex> _join(stdx::unique_lock<stdx::mutex> lk);
+    stdx::unique_lock<Latch> _join(stdx::unique_lock<Latch> lk);
 
     // The network interface used for remote command execution and waiting.
     std::shared_ptr<NetworkInterface> _net;
@@ -190,7 +190,7 @@ private:
     std::shared_ptr<ThreadPoolInterface> _pool;
 
     // Mutex guarding all remaining fields.
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("ThreadPoolTaskExecutor::_mutex");
 
     // Queue containing all items currently scheduled into the thread pool but not yet completed.
     WorkQueue _poolInProgressQueue;

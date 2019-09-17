@@ -884,18 +884,18 @@ MultiIndexBlock::State MultiIndexBlock::getState_forTest() const {
 }
 
 MultiIndexBlock::State MultiIndexBlock::_getState() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     return _state;
 }
 
 void MultiIndexBlock::_setState(State newState) {
     invariant(State::kAborted != newState);
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     _state = newState;
 }
 
 void MultiIndexBlock::_setStateToAbortedIfNotCommitted(StringData reason) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<Latch> lock(_mutex);
     if (State::kCommitted == _state) {
         return;
     }

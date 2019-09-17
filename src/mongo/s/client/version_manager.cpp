@@ -63,14 +63,14 @@ namespace {
 class ConnectionShardStatus {
 public:
     bool hasAnySequenceSet(DBClientBase* conn) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
 
         SequenceMap::const_iterator seenConnIt = _map.find(conn->getConnectionId());
         return seenConnIt != _map.end() && seenConnIt->second.size() > 0;
     }
 
     bool getSequence(DBClientBase* conn, const string& ns, unsigned long long* sequence) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
 
         SequenceMap::const_iterator seenConnIt = _map.find(conn->getConnectionId());
         if (seenConnIt == _map.end())
@@ -85,18 +85,18 @@ public:
     }
 
     void setSequence(DBClientBase* conn, const string& ns, const unsigned long long& s) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         _map[conn->getConnectionId()][ns] = s;
     }
 
     void reset(DBClientBase* conn) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         _map.erase(conn->getConnectionId());
     }
 
 private:
     // protects _map
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("ConnectionShardStatus::_mutex");
 
     // a map from a connection into ChunkManager's sequence number for each namespace
     typedef map<unsigned long long, map<string, unsigned long long>> SequenceMap;

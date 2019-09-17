@@ -37,7 +37,7 @@
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/log.h"
 

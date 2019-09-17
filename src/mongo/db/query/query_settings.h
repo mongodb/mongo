@@ -37,7 +37,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/plan_cache.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
@@ -152,7 +152,7 @@ private:
     /**
      * Protects data in query settings.
      */
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("QuerySettings::_mutex");
 };
 
 }  // namespace mongo

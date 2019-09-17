@@ -234,12 +234,12 @@ ChunkSplitter& ChunkSplitter::get(ServiceContext* serviceContext) {
 }
 
 void ChunkSplitter::onShardingInitialization(bool isPrimary) {
-    stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
+    stdx::lock_guard<Latch> scopedLock(_mutex);
     _isPrimary = isPrimary;
 }
 
 void ChunkSplitter::onStepUp() {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    stdx::lock_guard<Latch> lg(_mutex);
     if (_isPrimary) {
         return;
     }
@@ -249,7 +249,7 @@ void ChunkSplitter::onStepUp() {
 }
 
 void ChunkSplitter::onStepDown() {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    stdx::lock_guard<Latch> lg(_mutex);
     if (!_isPrimary) {
         return;
     }

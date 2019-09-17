@@ -41,8 +41,8 @@
 #include "mongo/db/repl/base_cloner.h"
 #include "mongo/db/repl/collection_cloner.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -201,7 +201,7 @@ private:
     /**
      * Calls the above method after unlocking.
      */
-    void _finishCallback_inlock(stdx::unique_lock<stdx::mutex>& lk, const Status& status);
+    void _finishCallback_inlock(stdx::unique_lock<Latch>& lk, const Status& status);
 
     //
     // All member variables are labeled with one of the following codes indicating the
@@ -212,7 +212,7 @@ private:
     // (S)  Self-synchronizing; access in any way from any context.
     // (RT)  Read-only in concurrent operation; synchronized externally by tests
     //
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("DatabaseCloner::_mutex");
     mutable stdx::condition_variable _condition;                 // (M)
     executor::TaskExecutor* _executor;                           // (R)
     ThreadPool* _dbWorkThreadPool;                               // (R)

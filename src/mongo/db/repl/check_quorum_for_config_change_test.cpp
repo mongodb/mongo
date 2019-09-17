@@ -88,7 +88,7 @@ private:
 
     std::unique_ptr<stdx::thread> _quorumCheckThread;
     Status _quorumCheckStatus;
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("CheckQuorumTest::_mutex");
     bool _isQuorumCheckDone;
 };
 
@@ -109,13 +109,13 @@ Status CheckQuorumTest::waitForQuorumCheck() {
 }
 
 bool CheckQuorumTest::isQuorumCheckDone() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     return _isQuorumCheckDone;
 }
 
 void CheckQuorumTest::_runQuorumCheck(const ReplSetConfig& config, int myIndex) {
     _quorumCheckStatus = _runQuorumCheckImpl(config, myIndex);
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _isQuorumCheckDone = true;
 }
 

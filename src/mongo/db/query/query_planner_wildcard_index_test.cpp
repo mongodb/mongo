@@ -557,7 +557,6 @@ TEST_F(QueryPlannerWildcardTest, OrEqualityWithTwoPredicatesUsesTwoPaths) {
         "bounds: {'$_path': [['a','a',true,true]], a: [[5,5,true,true]]}}}, "
         "{ixscan: {filter: null, pattern: {'$_path': 1, b: 1},"
         "bounds: {'$_path': [['b','b',true,true]], b: [[10,10,true,true]]}}}]}}}}");
-    ;
 }
 
 TEST_F(QueryPlannerWildcardTest, OrWithOneRegularAndOneWildcardIndexPathUsesTwoIndexes) {
@@ -572,7 +571,6 @@ TEST_F(QueryPlannerWildcardTest, OrWithOneRegularAndOneWildcardIndexPathUsesTwoI
         "bounds: {'$_path': [['a','a',true,true]], a: [[5,5,true,true]]}}}, "
         "{ixscan: {filter: null, pattern: {b: 1},"
         "bounds: {b: [[10,10,true,true]]}}}]}}}}");
-    ;
 }
 
 TEST_F(QueryPlannerWildcardTest, BasicSkip) {

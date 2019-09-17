@@ -41,7 +41,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 
@@ -223,7 +223,8 @@ private:
     // Controls concurrent access to '_indexMultikeyPaths'. We acquire this mutex rather than the
     // RESOURCE_METADATA lock as a performance optimization so that it is cheaper to detect whether
     // there is actually any path-level multikey information to update or not.
-    mutable stdx::mutex _indexMultikeyPathsMutex;
+    mutable Mutex _indexMultikeyPathsMutex =
+        MONGO_MAKE_LATCH("IndexCatalogEntryImpl::_indexMultikeyPathsMutex");
 
     // Non-empty only if '_indexTracksPathLevelMultikeyInfo' is true.
     //

@@ -67,9 +67,9 @@
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/icu.h"
 #include "mongo/util/log.h"
@@ -558,7 +558,7 @@ Status writeAuthSchemaVersionIfNeeded(OperationContext* opCtx,
     return status;
 }
 
-auto getUMCMutex = ServiceContext::declareDecoration<stdx::mutex>();
+auto getUMCMutex = ServiceContext::declareDecoration<Mutex>();
 
 class AuthzLockGuard {
     AuthzLockGuard(AuthzLockGuard&) = delete;
@@ -590,7 +590,7 @@ public:
 private:
     OperationContext* _opCtx;
     AuthorizationManager* _authzManager;
-    stdx::unique_lock<stdx::mutex> _lock;
+    stdx::unique_lock<Latch> _lock;
     InvalidationMode _mode;
     OID _cacheGeneration;
 };

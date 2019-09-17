@@ -32,8 +32,8 @@
 #include "mongo/db/s/balancer/balancer_chunk_selection_policy.h"
 #include "mongo/db/s/balancer/balancer_random.h"
 #include "mongo/db/s/balancer/migration_manager.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/thread.h"
 
 namespace mongo {
@@ -208,7 +208,7 @@ private:
                            const BSONObj& minKey);
 
     // Protects the state below
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("Balancer::_mutex");
 
     // Indicates the current state of the balancer
     State _state{kStopped};

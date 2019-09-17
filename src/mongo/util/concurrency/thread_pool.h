@@ -34,8 +34,8 @@
 #include <string>
 #include <vector>
 
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
 #include "mongo/util/time_support.h"
@@ -189,7 +189,7 @@ private:
     /**
      * Implementation of join once _mutex is owned by "lk".
      */
-    void _join_inlock(stdx::unique_lock<stdx::mutex>* lk);
+    void _join_inlock(stdx::unique_lock<Latch>* lk);
 
     /**
      * Runs the remaining tasks on a new thread as part of the join process, blocking until
@@ -201,7 +201,7 @@ private:
      * Executes one task from _pendingTasks. "lk" must own _mutex, and _pendingTasks must have at
      * least one entry.
      */
-    void _doOneTask(stdx::unique_lock<stdx::mutex>* lk) noexcept;
+    void _doOneTask(stdx::unique_lock<Latch>* lk) noexcept;
 
     /**
      * Changes the lifecycle state (_state) of the pool and wakes up any threads waiting for a state
@@ -213,7 +213,7 @@ private:
     const Options _options;
 
     // Mutex guarding all non-const member variables.
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("ThreadPool::_mutex");
 
     // This variable represents the lifecycle state of the pool.
     //

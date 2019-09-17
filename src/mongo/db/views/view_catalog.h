@@ -44,7 +44,7 @@
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_graph.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/string_map.h"
 
@@ -199,7 +199,7 @@ private:
      */
     void _requireValidCatalog(WithLock);
 
-    stdx::mutex _mutex;  // Protects all members.
+    Mutex _mutex = MONGO_MAKE_LATCH("ViewCatalog::_mutex");  // Protects all members.
     ViewMap _viewMap;
     ViewMap _viewMapBackup;
     std::unique_ptr<DurableViewCatalog> _durable;

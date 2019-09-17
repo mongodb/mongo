@@ -33,40 +33,80 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/clock_source_mock.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 
-class LockActions {
+class Latch {
 public:
-    virtual ~LockActions() = default;
-    virtual void onContendedLock(const StringData& name) = 0;
-    virtual void onUnlock(const StringData& name) = 0;
+    virtual ~Latch() = default;
+
+    virtual void lock() = 0;
+    virtual void unlock() = 0;
+    virtual bool try_lock() = 0;
 };
 
-class Mutex {
+class Mutex : public Latch {
 public:
+    class LockActions;
     static constexpr auto kAnonymousMutexStr = "AnonymousMutex"_sd;
-    static constexpr Milliseconds kContendedLockTimeout = Milliseconds(100);
 
     Mutex() : Mutex(kAnonymousMutexStr) {}
     // Note that StringData is a view type, thus the underlying string for _name must outlive any
     // given Mutex
     explicit Mutex(const StringData& name) : _name(name) {}
 
-    void lock();
-    void unlock();
-    bool try_lock();
+    void lock() override;
+    void unlock() override;
+    bool try_lock() override;
     const StringData& getName() const {
         return _name;
     }
 
-    static void setLockActions(std::unique_ptr<LockActions> actions);
-
 private:
     const StringData _name;
-    stdx::timed_mutex _mutex;
+    stdx::mutex _mutex;  // NOLINT
+};
+
+/**
+ * A set of actions to happen upon notable events on a Lockable-conceptualized type
+ */
+class Mutex::LockActions {
+    friend class Mutex;
+
+public:
+    virtual ~LockActions() = default;
+    /**
+     * Action to do when a lock cannot be immediately acquired
+     */
+    virtual void onContendedLock(const StringData& name) = 0;
+
+    /**
+     * Action to do when a lock is unlocked
+     */
+    virtual void onUnlock(const StringData& name) = 0;
+
+    /**
+     * This function adds a LockActions subclass to the triggers for certain actions.
+     *
+     * Note that currently there is only one LockActions in use at a time. As part of SERVER-42895,
+     * this will change so that there is a list of LockActions maintained.
+     *
+     * LockActions can only be added and not removed. If you wish to deactivate a LockActions
+     * subclass, please provide the switch on that subclass to noop its functions.
+     */
+    static void add(LockActions* actions);
+
+private:
+    static auto& getState() {
+        struct State {
+            AtomicWord<LockActions*> actions{nullptr};
+        };
+        static State state;
+        return state;
+    }
 };
 
 }  // namespace mongo

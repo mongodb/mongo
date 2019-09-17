@@ -38,8 +38,8 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/timer.h"
 
@@ -449,7 +449,7 @@ public:
     void onWorkerFinished();
 
 private:
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("BenchRunState::_mutex");
 
     stdx::condition_variable _stateChangeCondition;
 
@@ -599,7 +599,7 @@ public:
 
 private:
     // TODO: Same as for createWithConfig.
-    static stdx::mutex _staticMutex;
+    static Mutex _staticMutex;
     static std::map<OID, BenchRunner*> _activeRuns;
 
     OID _oid;

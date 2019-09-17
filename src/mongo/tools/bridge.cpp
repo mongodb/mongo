@@ -41,11 +41,11 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/reply_builder_interface.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/tools/bridge_commands.h"
 #include "mongo/tools/mongobridge_options.h"
@@ -116,7 +116,7 @@ public:
 
     HostSettings getHostSettings(boost::optional<HostAndPort> host) {
         if (host) {
-            stdx::lock_guard<stdx::mutex> lk(_settingsMutex);
+            stdx::lock_guard<Latch> lk(_settingsMutex);
             return (_settings)[*host];
         }
         return {};
@@ -132,7 +132,7 @@ public:
 private:
     static const ServiceContext::Decoration<BridgeContext> _get;
 
-    stdx::mutex _settingsMutex;
+    Mutex _settingsMutex = MONGO_MAKE_LATCH("BridgeContext::_settingsMutex");
     HostSettingsMap _settings;
 };
 

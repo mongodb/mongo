@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/stdx/thread.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/platform/basic.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/waitable.h"
 
 namespace mongo {
@@ -55,7 +55,7 @@ stdx::cv_status ClockSource::waitForConditionUntil(stdx::condition_variable& cv,
     }
 
     struct AlarmInfo {
-        stdx::mutex controlMutex;
+        Mutex controlMutex = MONGO_MAKE_LATCH("AlarmInfo::controlMutex");
         BasicLockableAdapter* waitLock;
         stdx::condition_variable* waitCV;
         stdx::cv_status cvWaitResult = stdx::cv_status::no_timeout;
@@ -66,7 +66,7 @@ stdx::cv_status ClockSource::waitForConditionUntil(stdx::condition_variable& cv,
     const auto waiterThreadId = stdx::this_thread::get_id();
     bool invokedAlarmInline = false;
     invariant(setAlarm(deadline, [alarmInfo, waiterThreadId, &invokedAlarmInline] {
-        stdx::lock_guard<stdx::mutex> controlLk(alarmInfo->controlMutex);
+        stdx::lock_guard<Latch> controlLk(alarmInfo->controlMutex);
         alarmInfo->cvWaitResult = stdx::cv_status::timeout;
         if (!alarmInfo->waitLock) {
             return;
@@ -86,7 +86,7 @@ stdx::cv_status ClockSource::waitForConditionUntil(stdx::condition_variable& cv,
         Waitable::wait(waitable, this, cv, m);
     }
     m.unlock();
-    stdx::lock_guard<stdx::mutex> controlLk(alarmInfo->controlMutex);
+    stdx::lock_guard<Latch> controlLk(alarmInfo->controlMutex);
     m.lock();
     alarmInfo->waitLock = nullptr;
     alarmInfo->waitCV = nullptr;

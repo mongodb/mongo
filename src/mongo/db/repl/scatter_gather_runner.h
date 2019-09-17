@@ -33,7 +33,7 @@
 #include <vector>
 
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 
@@ -134,7 +134,7 @@ private:
         executor::TaskExecutor::EventHandle _sufficientResponsesReceived;
         std::vector<executor::TaskExecutor::CallbackHandle> _callbacks;
         bool _started = false;
-        stdx::mutex _mutex;
+        Mutex _mutex = MONGO_MAKE_LATCH("RunnerImpl::_mutex");
     };
 
     executor::TaskExecutor* _executor;  // Not owned here.

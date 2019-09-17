@@ -41,9 +41,9 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/db/s/session_catalog_migration_destination.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/s/shard_id.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/timer.h"
@@ -178,7 +178,7 @@ private:
     bool _isActive(WithLock) const;
 
     // Mutex to guard all fields
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("MigrationDestinationManager::_mutex");
 
     // Migration session ID uniquely identifies the migration and indicates whether the prepare
     // method has been called.

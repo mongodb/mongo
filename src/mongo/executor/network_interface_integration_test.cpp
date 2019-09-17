@@ -167,14 +167,14 @@ public:
         RemoteCommandResponse response;
     };
     IsMasterData waitForIsMaster() {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<Latch> lk(_mutex);
         _isMasterCond.wait(lk, [this] { return _isMasterResult != boost::none; });
 
         return std::move(*_isMasterResult);
     }
 
     bool hasIsMaster() {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         return _isMasterResult != boost::none;
     }
 
@@ -186,7 +186,7 @@ private:
         Status validateHost(const HostAndPort& host,
                             const BSONObj& request,
                             const RemoteCommandResponse& isMasterReply) override {
-            stdx::lock_guard<stdx::mutex> lk(_parent->_mutex);
+            stdx::lock_guard<Latch> lk(_parent->_mutex);
             _parent->_isMasterResult = IsMasterData{request, isMasterReply};
             _parent->_isMasterCond.notify_all();
             return Status::OK();
@@ -204,7 +204,7 @@ private:
         NetworkInterfaceTest* _parent;
     };
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("NetworkInterfaceTest::_mutex");
     stdx::condition_variable _isMasterCond;
     boost::optional<IsMasterData> _isMasterResult;
 };

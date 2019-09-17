@@ -127,7 +127,7 @@ StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx
               "SERVER-37398.");
     try {
         while (true) {
-            stdx::unique_lock<stdx::mutex> ul(_mutex);
+            stdx::unique_lock<Latch> ul(_mutex);
 
             auto& dbEntry = _databases[dbName];
             if (!dbEntry) {
@@ -217,7 +217,7 @@ CatalogCache::RefreshResult CatalogCache::_getCollectionRoutingInfoAt(
 
         const auto dbInfo = std::move(swDbInfo.getValue());
 
-        stdx::unique_lock<stdx::mutex> ul(_mutex);
+        stdx::unique_lock<Latch> ul(_mutex);
 
         const auto itDb = _collectionsByDb.find(nss.db());
         if (itDb == _collectionsByDb.end()) {
@@ -312,7 +312,7 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::getShardedCollectionRoutin
 
 void CatalogCache::onStaleDatabaseVersion(const StringData dbName,
                                           const DatabaseVersion& databaseVersion) {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    stdx::lock_guard<Latch> lg(_mutex);
 
     const auto itDbEntry = _databases.find(dbName);
     if (itDbEntry == _databases.end()) {
@@ -345,7 +345,7 @@ void CatalogCache::onStaleShardVersion(CachedCollectionRoutingInfo&& ccriToInval
 
     // We received StaleShardVersion for a collection we thought was sharded. Either a migration
     // occurred to or from a shard we contacted, or the collection was dropped.
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    stdx::lock_guard<Latch> lg(_mutex);
 
     const auto nss = ccri._cm->getns();
     const auto itDb = _collectionsByDb.find(nss.db());
@@ -369,7 +369,7 @@ void CatalogCache::onStaleShardVersion(CachedCollectionRoutingInfo&& ccriToInval
 
 void CatalogCache::checkEpochOrThrow(const NamespaceString& nss,
                                      ChunkVersion targetCollectionVersion) const {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    stdx::lock_guard<Latch> lg(_mutex);
     const auto itDb = _collectionsByDb.find(nss.db());
     uassert(StaleConfigInfo(nss, targetCollectionVersion, boost::none),
             str::stream() << "could not act as router for " << nss.ns()
@@ -397,7 +397,7 @@ void CatalogCache::checkEpochOrThrow(const NamespaceString& nss,
 }
 
 void CatalogCache::invalidateDatabaseEntry(const StringData dbName) {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    stdx::lock_guard<Latch> lg(_mutex);
     auto itDbEntry = _databases.find(dbName);
     if (itDbEntry == _databases.end()) {
         // The database was dropped.
@@ -407,7 +407,7 @@ void CatalogCache::invalidateDatabaseEntry(const StringData dbName) {
 }
 
 void CatalogCache::invalidateShardedCollection(const NamespaceString& nss) {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    stdx::lock_guard<Latch> lg(_mutex);
 
     auto itDb = _collectionsByDb.find(nss.db());
     if (itDb == _collectionsByDb.end()) {
@@ -421,7 +421,7 @@ void CatalogCache::invalidateShardedCollection(const NamespaceString& nss) {
 }
 
 void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    stdx::lock_guard<Latch> lg(_mutex);
 
     log() << "Starting to invalidate databases and collections with data on shard: " << shardId;
 
@@ -461,7 +461,7 @@ void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
 }
 
 void CatalogCache::purgeCollection(const NamespaceString& nss) {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    stdx::lock_guard<Latch> lg(_mutex);
 
     auto itDb = _collectionsByDb.find(nss.db());
     if (itDb == _collectionsByDb.end()) {
@@ -472,13 +472,13 @@ void CatalogCache::purgeCollection(const NamespaceString& nss) {
 }
 
 void CatalogCache::purgeDatabase(StringData dbName) {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    stdx::lock_guard<Latch> lg(_mutex);
     _databases.erase(dbName);
     _collectionsByDb.erase(dbName);
 }
 
 void CatalogCache::purgeAllDatabases() {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    stdx::lock_guard<Latch> lg(_mutex);
     _databases.clear();
     _collectionsByDb.clear();
 }
@@ -489,7 +489,7 @@ void CatalogCache::report(BSONObjBuilder* builder) const {
     size_t numDatabaseEntries;
     size_t numCollectionEntries{0};
     {
-        stdx::lock_guard<stdx::mutex> ul(_mutex);
+        stdx::lock_guard<Latch> ul(_mutex);
         numDatabaseEntries = _databases.size();
         for (const auto& entry : _collectionsByDb) {
             numCollectionEntries += entry.second.size();
@@ -546,7 +546,7 @@ void CatalogCache::_scheduleDatabaseRefresh(WithLock lk,
 
     const auto refreshCallback = [ this, dbName, dbEntry, onRefreshFailed, onRefreshCompleted ](
         OperationContext * opCtx, StatusWith<DatabaseType> swDbt) noexcept {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        stdx::lock_guard<Latch> lg(_mutex);
 
         if (!swDbt.isOK()) {
             onRefreshFailed(lg, swDbt.getStatus());
@@ -657,12 +657,12 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
 
             onRefreshCompleted(Status::OK(), newRoutingInfo.get());
         } catch (const DBException& ex) {
-            stdx::lock_guard<stdx::mutex> lg(_mutex);
+            stdx::lock_guard<Latch> lg(_mutex);
             onRefreshFailed(lg, ex.toStatus());
             return;
         }
 
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        stdx::lock_guard<Latch> lg(_mutex);
 
         collEntry->needsRefresh = false;
         collEntry->refreshCompletionNotification->set(Status::OK());

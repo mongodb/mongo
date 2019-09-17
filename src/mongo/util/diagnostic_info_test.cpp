@@ -33,6 +33,8 @@
 
 #include <string>
 
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/log.h"
@@ -47,7 +49,7 @@ TEST(DiagnosticInfo, BasicSingleThread) {
     setGlobalServiceContext(std::move(serviceContext));
 
     // take the initial diagnostic info
-    DiagnosticInfo capture1 = takeDiagnosticInfo("capture1"_sd);
+    DiagnosticInfo capture1 = DiagnosticInfo::capture("capture1"_sd);
     ASSERT_EQ(capture1.getCaptureName(), "capture1");
 
     // mock time advancing and check that the current time is greater than capture1's timestamp
@@ -55,7 +57,7 @@ TEST(DiagnosticInfo, BasicSingleThread) {
     ASSERT_LT(capture1.getTimestamp(), clockSourcePointer->now());
 
     // take a second diagnostic capture and compare its fields to the first
-    DiagnosticInfo capture2 = takeDiagnosticInfo("capture2"_sd);
+    DiagnosticInfo capture2 = DiagnosticInfo::capture("capture2"_sd);
     ASSERT_LT(capture1.getTimestamp(), capture2.getTimestamp());
     ASSERT_EQ(capture2.getCaptureName(), "capture2");
     ASSERT_NE(capture2, capture1);
@@ -65,7 +67,7 @@ TEST(DiagnosticInfo, BasicSingleThread) {
 }
 
 using MaybeDiagnosticInfo = boost::optional<DiagnosticInfo>;
-void recurseAndCaptureInfo(MaybeDiagnosticInfo& info, size_t i);
+void recurseAndCaptureInfo(MaybeDiagnosticInfo& info, AtomicWord<int>& i);
 
 TEST(DiagnosticInfo, StackTraceTest) {
     // set up serviceContext and clock source
@@ -75,7 +77,11 @@ TEST(DiagnosticInfo, StackTraceTest) {
     setGlobalServiceContext(std::move(serviceContext));
 
     MaybeDiagnosticInfo infoRecurse0;
-    recurseAndCaptureInfo(infoRecurse0, 0);
+    {
+        AtomicWord<int> i{0};
+        recurseAndCaptureInfo(infoRecurse0, i);
+    }
+
     ASSERT(infoRecurse0);
     log() << *infoRecurse0;
     auto trace0 = infoRecurse0->makeStackTrace();
@@ -120,34 +126,33 @@ TEST(DiagnosticInfo, StackTraceTest) {
     };
 
     {
-        volatile size_t i = 3;  // NOLINT
+        constexpr auto k = 3;
+        AtomicWord<int> i{k};
         MaybeDiagnosticInfo infoRecurse;
         recurseAndCaptureInfo(infoRecurse, i);
-        testRecursion(i, infoRecurse);
+        testRecursion(k, infoRecurse);
     }
 
     {
-        volatile size_t i = 10;  // NOLINT
+        constexpr auto k = 10;
+        AtomicWord<int> i{k};
         MaybeDiagnosticInfo infoRecurse;
         recurseAndCaptureInfo(infoRecurse, i);
-        testRecursion(i, infoRecurse);
+        testRecursion(k, infoRecurse);
     }
 #else
     ASSERT_TRUE(trace0.frames.empty());
 #endif
 }
 
-MONGO_COMPILER_NOINLINE void recurseAndCaptureInfo(MaybeDiagnosticInfo& info, size_t i) {
-    // Prevent tail-call optimization.
-#ifndef _WIN32
-    asm volatile("");  // NOLINT
-#endif
-
-    if (i == 0) {
-        info = takeDiagnosticInfo("Recursion!"_sd);
+MONGO_COMPILER_NOINLINE void recurseAndCaptureInfo(MaybeDiagnosticInfo& info, AtomicWord<int>& i) {
+    if (i.fetchAndSubtract(1) == 0) {
+        DiagnosticInfo::Options options;
+        options.shouldTakeBacktrace = true;
+        info = DiagnosticInfo::capture("Recursion!"_sd, std::move(options));
         return;
     }
 
-    recurseAndCaptureInfo(info, --i);
+    recurseAndCaptureInfo(info, i);
 }
 }  // namespace mongo

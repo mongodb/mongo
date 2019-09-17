@@ -38,7 +38,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
-#include "mongo/stdx/condition_variable.h"
+#include "mongo/platform/condition_variable.h"
 #include "mongo/transport/baton.h"
 #include "mongo/util/future.h"
 #include "mongo/util/out_of_line_executor.h"

@@ -36,7 +36,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -95,12 +95,13 @@ private:
     const WiredTigerSession _session;
     const bool _readOnly;
     // Guards _cursor. Acquire *before* _bufferMutex.
-    mutable stdx::mutex _cursorMutex;
+    mutable Mutex _cursorMutex = MONGO_MAKE_LATCH("WiredTigerSessionStorer::_cursorMutex");
     WT_CURSOR* _cursor;  // pointer is const after constructor
 
     using Buffer = StringMap<std::shared_ptr<SizeInfo>>;
 
-    mutable stdx::mutex _bufferMutex;  // Guards _buffer
+    mutable Mutex _bufferMutex =
+        MONGO_MAKE_LATCH("WiredTigerSessionStorer::_bufferMutex");  // Guards _buffer
     Buffer _buffer;
 };
 }  // namespace mongo

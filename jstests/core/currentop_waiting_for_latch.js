@@ -57,6 +57,8 @@ try {
     assert(result.hasOwnProperty("waitingForLatch"));
     assert(result["waitingForLatch"].hasOwnProperty("timestamp"));
     assert(result["waitingForLatch"].hasOwnProperty("captureName"));
+
+    /* Absent until we have efficient enough backtracing
     assert(result["waitingForLatch"].hasOwnProperty("backtrace"));
     result["waitingForLatch"]["backtrace"].forEach(function(frame) {
         assert(frame.hasOwnProperty("addr"));
@@ -64,6 +66,7 @@ try {
         assert(frame.hasOwnProperty("path"));
         assert(typeof frame["path"] === "string");
     });
+    */
 } finally {
     assert.commandWorked(db.adminCommand(
         {"configureFailPoint": 'currentOpSpawnsThreadWaitingForLatch', "mode": 'off'}));

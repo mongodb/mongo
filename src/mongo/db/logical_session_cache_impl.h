@@ -109,7 +109,7 @@ private:
     const std::shared_ptr<SessionsCollection> _sessionsColl;
     const ReapSessionsOlderThanFn _reapSessionsOlderThanFn;
 
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("LogicalSessionCacheImpl::_mutex");
 
     LogicalSessionIdMap<LogicalSessionRecord> _activeSessions;
 

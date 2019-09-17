@@ -37,8 +37,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/session.h"
 #include "mongo/db/session_killer.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/with_lock.h"
 
@@ -153,7 +153,7 @@ private:
     void _releaseSession(SessionRuntimeInfo* sri, boost::optional<KillToken> killToken);
 
     // Protects the state below
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("SessionCatalog::_mutex");
 
     // Owns the Session objects for all current Sessions.
     SessionRuntimeInfoMap _sessions;

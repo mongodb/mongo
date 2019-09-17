@@ -32,7 +32,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/functional.h"
 
 namespace mongo {
@@ -66,7 +66,7 @@ public:
     }
 
 private:
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("MutableObserverRegistry::_mutex");
     std::vector<unique_function<void(const T&)>> _registry;
 };
 

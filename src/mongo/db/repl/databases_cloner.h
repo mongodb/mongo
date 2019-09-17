@@ -42,8 +42,8 @@
 #include "mongo/db/repl/collection_cloner.h"
 #include "mongo/db/repl/database_cloner.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -138,10 +138,10 @@ private:
     void _setStatus_inlock(Status s);
 
     /** Will fail the cloner, call the completion function, and become inactive. */
-    void _fail_inlock(stdx::unique_lock<stdx::mutex>* lk, Status s);
+    void _fail_inlock(stdx::unique_lock<Latch>* lk, Status s);
 
     /** Will call the completion function, and become inactive. */
-    void _succeed_inlock(stdx::unique_lock<stdx::mutex>* lk);
+    void _succeed_inlock(stdx::unique_lock<Latch>* lk);
 
     /** Called each time a database clone is finished */
     void _onEachDBCloneFinish(const Status& status, const std::string& name);
@@ -175,7 +175,7 @@ private:
     // (M)  Reads and writes guarded by _mutex
     // (S)  Self-synchronizing; access in any way from any context.
     //
-    mutable stdx::mutex _mutex;                         // (S)
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("DatabasesCloner::_mutex");  // (S)
     Status _status{ErrorCodes::NotYetInitialized, ""};  // (M) If it is not OK, we stop everything.
     executor::TaskExecutor* _exec;                      // (R) executor to schedule things with
     ThreadPool* _dbWorkThreadPool;       // (R) db worker thread pool for collection cloning.

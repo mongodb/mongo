@@ -36,8 +36,8 @@
 #include "mongo/base/status_with.h"
 #include "mongo/config.h"
 #include "mongo/db/server_options.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_mode.h"
@@ -160,7 +160,7 @@ private:
     SSLParams::SSLModes _sslMode() const;
 #endif
 
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("TransportLayerASIO::_mutex");
 
     // There are three reactors that are used by TransportLayerASIO. The _ingressReactor contains
     // all the accepted sockets and all ingress networking activity. The _acceptorReactor contains

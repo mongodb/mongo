@@ -30,8 +30,8 @@
 #pragma once
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/with_lock.h"
 
@@ -60,7 +60,7 @@ public:
     void halt();
 
     bool isRunning() {
-        stdx::lock_guard<stdx::mutex> lk(_oplogVisibilityStateMutex);
+        stdx::lock_guard<Latch> lk(_oplogVisibilityStateMutex);
         return _isRunning && !_shuttingDown;
     }
 
@@ -89,7 +89,8 @@ private:
     void _setOplogReadTimestamp(WithLock, uint64_t newTimestamp);
 
     stdx::thread _oplogJournalThread;
-    mutable stdx::mutex _oplogVisibilityStateMutex;
+    mutable Mutex _oplogVisibilityStateMutex =
+        MONGO_MAKE_LATCH("WiredTigerOplogManager::_oplogVisibilityStateMutex");
     mutable stdx::condition_variable
         _opsWaitingForJournalCV;  // Signaled to trigger a journal flush.
     mutable stdx::condition_variable

@@ -35,7 +35,7 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
@@ -84,14 +84,14 @@ public:
 
 private:
     std::map<std::string, std::set<std::string>> _connectionUris;
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("ConnectionRegistry::_mutex");
 };
 
 extern ConnectionRegistry connectionRegistry;
 
 // This mutex helps the shell serialize output on exit, to avoid deadlocks at shutdown. So
 // it also protects the global dbexitCalled.
-extern stdx::mutex& mongoProgramOutputMutex;
+extern Mutex& mongoProgramOutputMutex;
 
 // Helper to tell if a file exists cross platform
 // TODO: Remove this when we have a cross platform file utility library

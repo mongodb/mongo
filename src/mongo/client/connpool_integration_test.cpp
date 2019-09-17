@@ -31,8 +31,8 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/global_conn_pool.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -46,7 +46,7 @@ TEST(ConnectionPoolTest, ConnectionPoolMaxInUseConnectionsTest) {
     auto host = fixture.getServers()[0].toString();
 
     stdx::condition_variable cv;
-    stdx::mutex mutex;
+    auto mutex = MONGO_MAKE_LATCH();
     int counter = 0;
 
     pool.setMaxInUse(2);
@@ -60,7 +60,7 @@ TEST(ConnectionPoolTest, ConnectionPoolMaxInUseConnectionsTest) {
     // Try creating a new one, should block until we release one.
     stdx::thread t([&] {
         {
-            stdx::lock_guard<stdx::mutex> lk(mutex);
+            stdx::lock_guard<Latch> lk(mutex);
             counter++;
         }
 
@@ -69,7 +69,7 @@ TEST(ConnectionPoolTest, ConnectionPoolMaxInUseConnectionsTest) {
         auto conn3 = pool.get(host);
 
         {
-            stdx::lock_guard<stdx::mutex> lk(mutex);
+            stdx::lock_guard<Latch> lk(mutex);
             counter++;
         }
 
@@ -79,7 +79,7 @@ TEST(ConnectionPoolTest, ConnectionPoolMaxInUseConnectionsTest) {
 
     // First thread should be blocked.
     {
-        stdx::unique_lock<stdx::mutex> lk(mutex);
+        stdx::unique_lock<Latch> lk(mutex);
         cv.wait(lk, [&] { return counter == 1; });
     }
 
@@ -87,7 +87,7 @@ TEST(ConnectionPoolTest, ConnectionPoolMaxInUseConnectionsTest) {
     pool.release(host, conn2);
 
     {
-        stdx::unique_lock<stdx::mutex> lk(mutex);
+        stdx::unique_lock<Latch> lk(mutex);
         cv.wait(lk, [&] { return counter == 2; });
     }
 
@@ -125,7 +125,7 @@ TEST(ConnectionPoolTest, ConnectionPoolShutdownLogicTest) {
     auto host = fixture.getServers()[0].toString();
 
     stdx::condition_variable cv;
-    stdx::mutex mutex;
+    auto mutex = MONGO_MAKE_LATCH();
     int counter = 0;
 
     pool.setMaxInUse(2);
@@ -139,7 +139,7 @@ TEST(ConnectionPoolTest, ConnectionPoolShutdownLogicTest) {
     // Attempt to open a new connection, should block.
     stdx::thread t([&] {
         {
-            stdx::lock_guard<stdx::mutex> lk(mutex);
+            stdx::lock_guard<Latch> lk(mutex);
             counter++;
         }
 
@@ -148,7 +148,7 @@ TEST(ConnectionPoolTest, ConnectionPoolShutdownLogicTest) {
         ASSERT_THROWS(pool.get(host), AssertionException);
 
         {
-            stdx::lock_guard<stdx::mutex> lk(mutex);
+            stdx::lock_guard<Latch> lk(mutex);
             counter++;
         }
 
@@ -157,14 +157,14 @@ TEST(ConnectionPoolTest, ConnectionPoolShutdownLogicTest) {
 
     // Wait for new thread to block.
     {
-        stdx::unique_lock<stdx::mutex> lk(mutex);
+        stdx::unique_lock<Latch> lk(mutex);
         cv.wait(lk, [&] { return counter == 1; });
     }
 
     // Shut down the pool, this should unblock our waiting connection.
     pool.shutdown();
     {
-        stdx::unique_lock<stdx::mutex> lk(mutex);
+        stdx::unique_lock<Latch> lk(mutex);
         cv.wait(lk, [&] { return counter == 2; });
     }
 

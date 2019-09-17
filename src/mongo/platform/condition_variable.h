@@ -28,10 +28,12 @@
  */
 
 #pragma once
-#include "mongo/platform/basic.h"
+
+#include <chrono>
 
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -46,8 +48,6 @@ public:
 };
 
 class ConditionVariable {
-    friend class ::mongo::Waitable;
-
 public:
     static constexpr Milliseconds kUnfulfilledConditionVariableTimeout = Milliseconds(100);
 
@@ -79,8 +79,10 @@ public:
 
 protected:
     template <typename Callback>
-    void _runWithNotifyable(Notifyable& notifyable, Callback&& cb) noexcept {
-        _condvar._runWithNotifyable(notifyable, cb);
+    friend void runWithNotifyable(ConditionVariable& cv,
+                                  Notifyable& notifyable,
+                                  Callback&& cb) noexcept {
+        runWithNotifyable(cv._condvar, notifyable, std::forward<Callback>(cb));
     }
 
 private:
@@ -105,7 +107,7 @@ private:
         }
 
         if (_conditionVariableActions) {
-            if constexpr (std::is_same<decltype(lock), Mutex>::value) {
+            if constexpr (std::is_same<decltype(lock), mongo::Mutex>::value) {
                 _conditionVariableActions->onUnfulfilledConditionVariable(lock.getName());
             } else {
                 _conditionVariableActions->onUnfulfilledConditionVariable("AnonymousLock");

@@ -38,7 +38,7 @@
 #include "mongo/db/storage/capped_callback.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 namespace biggie {
@@ -138,10 +138,11 @@ private:
     std::string _prefix;
     std::string _postfix;
 
-    mutable stdx::mutex _cappedCallbackMutex;  // Guards _cappedCallback
+    mutable Mutex _cappedCallbackMutex =
+        MONGO_MAKE_LATCH("RecordStore::_cappedCallbackMutex");  // Guards _cappedCallback
     CappedCallback* _cappedCallback;
 
-    mutable stdx::mutex _cappedDeleterMutex;
+    mutable Mutex _cappedDeleterMutex = MONGO_MAKE_LATCH("RecordStore::_cappedDeleterMutex");
 
     AtomicWord<long long> _highestRecordId{1};
     AtomicWord<long long> _numRecords{0};

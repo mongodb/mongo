@@ -33,8 +33,8 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 
@@ -99,7 +99,7 @@ public:
     //
 
     size_t numStones() const {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         return _stones.size();
     }
 
@@ -129,7 +129,7 @@ private:
 
     WiredTigerRecordStore* _rs;
 
-    stdx::mutex _oplogReclaimMutex;
+    Mutex _oplogReclaimMutex;
     stdx::condition_variable _oplogReclaimCv;
 
     // True if '_rs' has been destroyed, e.g. due to repairDatabase being called on the "local"
@@ -143,7 +143,8 @@ private:
     AtomicWord<long long> _currentRecords;  // Number of records in the stone being filled.
     AtomicWord<long long> _currentBytes;    // Number of bytes in the stone being filled.
 
-    mutable stdx::mutex _mutex;  // Protects against concurrent access to the deque of oplog stones.
+    // Protects against concurrent access to the deque of oplog stones.
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("OplogStones::_mutex");
     std::deque<OplogStones::Stone> _stones;  // front = oldest, back = newest.
 };
 

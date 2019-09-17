@@ -160,7 +160,7 @@ ClusterCursorManager::~ClusterCursorManager() {
 
 void ClusterCursorManager::shutdown(OperationContext* opCtx) {
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_mutex);
         _inShutdown = true;
     }
     killAllCursors(opCtx);
@@ -176,7 +176,7 @@ StatusWith<CursorId> ClusterCursorManager::registerCursor(
     // Read the clock out of the lock.
     const auto now = _clockSource->now();
 
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     if (_inShutdown) {
         lk.unlock();
@@ -239,7 +239,7 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
     OperationContext* opCtx,
     AuthzCheckFn authChecker,
     AuthCheck checkSessionAuth) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
 
     if (_inShutdown) {
         return Status(ErrorCodes::ShutdownInProgress,
@@ -299,7 +299,7 @@ void ClusterCursorManager::checkInCursor(std::unique_ptr<ClusterClientCursor> cu
     cursor->detachFromOperationContext();
     cursor->setLastUseDate(now);
 
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     CursorEntry* entry = _getEntry(lk, nss, cursorId);
     invariant(entry);
@@ -324,7 +324,7 @@ Status ClusterCursorManager::checkAuthForKillCursors(OperationContext* opCtx,
                                                      const NamespaceString& nss,
                                                      CursorId cursorId,
                                                      AuthzCheckFn authChecker) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     auto entry = _getEntry(lk, nss, cursorId);
 
     if (!entry) {
@@ -352,7 +352,7 @@ Status ClusterCursorManager::killCursor(OperationContext* opCtx,
                                         CursorId cursorId) {
     invariant(opCtx);
 
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     CursorEntry* entry = _getEntry(lk, nss, cursorId);
     if (!entry) {
@@ -376,7 +376,7 @@ Status ClusterCursorManager::killCursor(OperationContext* opCtx,
     return Status::OK();
 }
 
-void ClusterCursorManager::detachAndKillCursor(stdx::unique_lock<stdx::mutex> lk,
+void ClusterCursorManager::detachAndKillCursor(stdx::unique_lock<Latch> lk,
                                                OperationContext* opCtx,
                                                const NamespaceString& nss,
                                                CursorId cursorId) {
@@ -390,7 +390,7 @@ void ClusterCursorManager::detachAndKillCursor(stdx::unique_lock<stdx::mutex> lk
 
 std::size_t ClusterCursorManager::killMortalCursorsInactiveSince(OperationContext* opCtx,
                                                                  Date_t cutoff) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
 
     auto pred = [cutoff](CursorId cursorId, const CursorEntry& entry) -> bool {
         bool res = entry.getLifetimeType() == CursorLifetime::Mortal &&
@@ -408,14 +408,14 @@ std::size_t ClusterCursorManager::killMortalCursorsInactiveSince(OperationContex
 }
 
 void ClusterCursorManager::killAllCursors(OperationContext* opCtx) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
     auto pred = [](CursorId, const CursorEntry&) -> bool { return true; };
 
     killCursorsSatisfying(std::move(lk), opCtx, std::move(pred));
 }
 
 std::size_t ClusterCursorManager::killCursorsSatisfying(
-    stdx::unique_lock<stdx::mutex> lk,
+    stdx::unique_lock<Latch> lk,
     OperationContext* opCtx,
     std::function<bool(CursorId, const CursorEntry&)> pred) {
     invariant(opCtx);
@@ -471,7 +471,7 @@ std::size_t ClusterCursorManager::killCursorsSatisfying(
 }
 
 ClusterCursorManager::Stats ClusterCursorManager::stats() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
 
     Stats stats;
 
@@ -504,7 +504,7 @@ ClusterCursorManager::Stats ClusterCursorManager::stats() const {
 }
 
 void ClusterCursorManager::appendActiveSessions(LogicalSessionIdSet* lsids) const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
 
     for (const auto& nsContainerPair : _namespaceToContainerMap) {
         for (const auto& cursorIdEntryPair : nsContainerPair.second.entryMap) {
@@ -545,7 +545,7 @@ std::vector<GenericCursor> ClusterCursorManager::getIdleCursors(
     const OperationContext* opCtx, MongoProcessInterface::CurrentOpUserMode userMode) const {
     std::vector<GenericCursor> cursors;
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
 
     AuthorizationSession* ctxAuth = AuthorizationSession::get(opCtx->getClient());
 
@@ -593,7 +593,7 @@ std::pair<Status, int> ClusterCursorManager::killCursorsWithMatchingSessions(
 
 stdx::unordered_set<CursorId> ClusterCursorManager::getCursorsForSession(
     LogicalSessionId lsid) const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
 
     stdx::unordered_set<CursorId> cursorIds;
 
@@ -618,7 +618,7 @@ stdx::unordered_set<CursorId> ClusterCursorManager::getCursorsForSession(
 
 boost::optional<NamespaceString> ClusterCursorManager::getNamespaceForCursorId(
     CursorId cursorId) const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
 
     const auto it = _cursorIdPrefixToNamespaceMap.find(extractPrefixFromCursorId(cursorId));
     if (it == _cursorIdPrefixToNamespaceMap.end()) {

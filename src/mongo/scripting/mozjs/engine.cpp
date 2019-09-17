@@ -82,7 +82,7 @@ mongo::Scope* MozJSScriptEngine::createScopeForCurrentThread() {
 }
 
 void MozJSScriptEngine::interrupt(unsigned opId) {
-    stdx::lock_guard<stdx::mutex> intLock(_globalInterruptLock);
+    stdx::lock_guard<Latch> intLock(_globalInterruptLock);
     OpIdToScopeMap::iterator iScope = _opToScopeMap.find(opId);
     if (iScope == _opToScopeMap.end()) {
         // got interrupt request for a scope that no longer exists
@@ -109,7 +109,7 @@ std::string MozJSScriptEngine::printKnownOps_inlock() {
 }
 
 void MozJSScriptEngine::interruptAll() {
-    stdx::lock_guard<stdx::mutex> interruptLock(_globalInterruptLock);
+    stdx::lock_guard<Latch> interruptLock(_globalInterruptLock);
 
     for (auto&& iScope : _opToScopeMap) {
         iScope.second->kill();
@@ -141,7 +141,7 @@ void MozJSScriptEngine::setJSHeapLimitMB(int limit) {
 }
 
 void MozJSScriptEngine::registerOperation(OperationContext* opCtx, MozJSImplScope* scope) {
-    stdx::lock_guard<stdx::mutex> giLock(_globalInterruptLock);
+    stdx::lock_guard<Latch> giLock(_globalInterruptLock);
 
     auto opId = opCtx->getOpID();
 
@@ -155,7 +155,7 @@ void MozJSScriptEngine::registerOperation(OperationContext* opCtx, MozJSImplScop
 }
 
 void MozJSScriptEngine::unregisterOperation(unsigned int opId) {
-    stdx::lock_guard<stdx::mutex> giLock(_globalInterruptLock);
+    stdx::lock_guard<Latch> giLock(_globalInterruptLock);
 
     LOG(2) << "ImplScope " << static_cast<const void*>(this) << " unregistered for op " << opId;
 

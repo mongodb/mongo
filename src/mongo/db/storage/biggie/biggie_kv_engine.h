@@ -154,7 +154,7 @@ public:
      * Returns a pair of the current version and copy of tree of the master.
      */
     std::pair<uint64_t, StringStore> getMasterInfo() {
-        stdx::lock_guard<stdx::mutex> lock(_masterLock);
+        stdx::lock_guard<Latch> lock(_masterLock);
         return std::make_pair(_masterVersion, _master);
     }
 
@@ -170,7 +170,7 @@ private:
     std::map<std::string, bool> _idents;  // TODO : replace with a query to _master.
     std::unique_ptr<VisibilityManager> _visibilityManager;
 
-    mutable stdx::mutex _masterLock;
+    mutable Mutex _masterLock = MONGO_MAKE_LATCH("KVEngine::_masterLock");
     StringStore _master;
     uint64_t _masterVersion = 0;
 };

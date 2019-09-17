@@ -33,8 +33,8 @@
 #include "mongo/db/service_liaison.h"
 #include "mongo/executor/async_timer_mock.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/time_support.h"
 
@@ -87,7 +87,7 @@ private:
 
     boost::optional<SessionKiller::Matcher> _matcher;
 
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("MockServiceLiaisonImpl::_mutex");
     LogicalSessionIdSet _activeSessions;
     LogicalSessionIdSet _cursorSessions;
 };

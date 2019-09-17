@@ -32,7 +32,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 
@@ -158,7 +158,7 @@ private:
     /**
      * Guards all non-const, non-thread-safe members.
      */
-    stdx::mutex _mutex;
+    Mutex _mutex = MONGO_MAKE_LATCH("DeferredWriter::_mutex");
 
     /**
      * The number of bytes currently in the in-memory buffer.

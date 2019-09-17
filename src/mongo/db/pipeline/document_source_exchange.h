@@ -36,8 +36,8 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/exchange_spec_gen.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/condition_variable.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 
@@ -170,8 +170,8 @@ private:
     std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
 
     // Synchronization.
-    stdx::mutex _mutex;
-    stdx::condition_variable_any _haveBufferSpace;
+    Mutex _mutex = MONGO_MAKE_LATCH("Exchange::_mutex");
+    stdx::condition_variable _haveBufferSpace;
 
     // A thread that is currently loading the exchange buffers.
     size_t _loadingThreadId{kInvalidThreadId};

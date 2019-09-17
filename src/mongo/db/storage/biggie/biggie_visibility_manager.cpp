@@ -56,7 +56,7 @@ public:
 
     virtual void rollback() {
         _visibilityManager->dealtWithRecord(_rid);
-        stdx::lock_guard<stdx::mutex> lk(_rs->_cappedCallbackMutex);
+        stdx::lock_guard<Latch> lk(_rs->_cappedCallbackMutex);
         if (_rs->_cappedCallback)
             _rs->_cappedCallback->notifyCappedWaitersIfNeeded();
     }
@@ -68,7 +68,7 @@ private:
 };
 
 void VisibilityManager::dealtWithRecord(RecordId rid) {
-    stdx::lock_guard<stdx::mutex> lock(_stateLock);
+    stdx::lock_guard<Latch> lock(_stateLock);
     _uncommittedRecords.erase(rid);
     _opsBecameVisibleCV.notify_all();
 }
@@ -76,7 +76,7 @@ void VisibilityManager::dealtWithRecord(RecordId rid) {
 void VisibilityManager::addUncommittedRecord(OperationContext* opCtx,
                                              RecordStore* rs,
                                              RecordId rid) {
-    stdx::lock_guard<stdx::mutex> lock(_stateLock);
+    stdx::lock_guard<Latch> lock(_stateLock);
     _uncommittedRecords.insert(rid);
     opCtx->recoveryUnit()->registerChange(std::make_unique<VisibilityManagerChange>(this, rs, rid));
 
@@ -85,13 +85,13 @@ void VisibilityManager::addUncommittedRecord(OperationContext* opCtx,
 }
 
 RecordId VisibilityManager::getAllCommittedRecord() {
-    stdx::lock_guard<stdx::mutex> lock(_stateLock);
+    stdx::lock_guard<Latch> lock(_stateLock);
     return _uncommittedRecords.empty() ? _highestSeen
                                        : RecordId(_uncommittedRecords.begin()->repr() - 1);
 }
 
 bool VisibilityManager::isFirstHidden(RecordId rid) {
-    stdx::lock_guard<stdx::mutex> lock(_stateLock);
+    stdx::lock_guard<Latch> lock(_stateLock);
     if (_uncommittedRecords.empty())
         return false;
     return *_uncommittedRecords.begin() == rid;
@@ -100,7 +100,7 @@ bool VisibilityManager::isFirstHidden(RecordId rid) {
 void VisibilityManager::waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isNoop() || !opCtx->lockState()->inAWriteUnitOfWork());
 
-    stdx::unique_lock<stdx::mutex> lock(_stateLock);
+    stdx::unique_lock<Latch> lock(_stateLock);
     const RecordId waitFor = _highestSeen;
     opCtx->waitForConditionOrInterrupt(_opsBecameVisibleCV, lock, [&] {
         return _uncommittedRecords.empty() || *_uncommittedRecords.begin() > waitFor;

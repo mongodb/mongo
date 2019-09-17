@@ -97,7 +97,7 @@ private:
         StringMap<std::uint64_t> wTagCounts;
     };
 
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("ServerWriteConcernMetrics::_mutex");
     WriteConcernMetricsForOperationType _insertMetrics;
     WriteConcernMetricsForOperationType _updateMetrics;
     WriteConcernMetricsForOperationType _deleteMetrics;

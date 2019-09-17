@@ -38,7 +38,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 
@@ -113,7 +113,7 @@ private:
     KVEngine* const _engine;
 
     // Guards access to member variables below.
-    mutable stdx::mutex _mutex;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("KVDropPendingIdentReaper::_mutex");
 
     // Drop-pending idents. Ordered by drop timestamp.
     DropPendingIdents _dropPendingIdents;
