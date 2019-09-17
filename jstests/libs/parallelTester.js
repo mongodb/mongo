@@ -155,6 +155,19 @@ if (typeof _threadInject != "undefined") {
             "index_bigkeys_nofail.js",
             "index_bigkeys_validation.js",
 
+            // These tests set a parameter that changes Map Reduce implementations. Since the
+            // setting will erroneously be applied during other concurrent tests in this suite,
+            // these tests must be blacklisted.
+            // SERVER-43366 Reenable when internalQueryUseAggMapReduce is removed.
+            "map_reduce_validation.js",
+            "mr5.js",
+            "mr_index.js",
+            "mr_merge2.js",
+            "mr_mutable_properties.js",
+            "mr_sort.js",
+            "mr_tolerates_js_exception.js",
+            "mr_undef.js",
+
             "mr3.js",
             "evald.js",
             "run_program1.js",
