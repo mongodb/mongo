@@ -266,7 +266,7 @@ Status ClearFilters::clear(OperationContext* opCtx,
         // Remove entry from plan cache
         planCache->remove(*cq).transitional_ignore();
 
-        LOG(0) << "Removed index filter on " << ns << " " << redact(cq->toStringShort());
+        LOG(0) << "Removed index filter on " << redact(cq->toStringShort());
 
         return Status::OK();
     }
@@ -399,8 +399,7 @@ Status SetFilter::set(OperationContext* opCtx,
     // Remove entry from plan cache.
     planCache->remove(*cq).transitional_ignore();
 
-    LOG(0) << "Index filter set on " << ns << " " << redact(cq->toStringShort()) << " "
-           << indexesElt;
+    LOG(0) << "Index filter set on " << redact(cq->toStringShort()) << " " << indexesElt;
 
     return Status::OK();
 }

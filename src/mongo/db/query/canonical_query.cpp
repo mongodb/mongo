@@ -457,8 +457,8 @@ std::string CanonicalQuery::toString() const {
 
 std::string CanonicalQuery::toStringShort() const {
     str::stream ss;
-    ss << "query: " << _qr->getFilter().toString() << " sort: " << _qr->getSort().toString()
-       << " projection: " << _qr->getProj().toString();
+    ss << "ns: " << _qr->nss().ns() << " query: " << _qr->getFilter().toString()
+       << " sort: " << _qr->getSort().toString() << " projection: " << _qr->getProj().toString();
 
     if (!_qr->getCollation().isEmpty()) {
         ss << " collation: " << _qr->getCollation().toString();

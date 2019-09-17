@@ -37,7 +37,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/run_aggregate.h"
 #include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -444,12 +443,7 @@ public:
                 return;
             }
 
-            CurOpFailpointHelpers::waitWhileFailPointEnabled(&waitInFindBeforeMakingBatch,
-                                                             opCtx,
-                                                             "waitInFindBeforeMakingBatch",
-                                                             []() {},
-                                                             false,
-                                                             nss);
+            FindCommon::waitInFindBeforeMakingBatch(opCtx, *exec->getCanonicalQuery());
 
             const QueryRequest& originalQR = exec->getCanonicalQuery()->getQueryRequest();
 

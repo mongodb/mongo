@@ -153,7 +153,7 @@ const log = assert.commandWorked(testDB.adminCommand({getLog: "global"})).log;
 // Fetch the line that logs when an inactive cache entry is created for the query with
 // 'planCacheKey' and 'queryHash'. Confirm only one line does this.
 const creationLogList = log.filter(
-    logLine => (logLine.indexOf("Creating inactive cache entry for query shape query") != -1 &&
+    logLine => (logLine.indexOf("Creating inactive cache entry for query shape") != -1 &&
                 logLine.indexOf("planCacheKey " + String(onCreationHashes.planCacheKey)) != -1 &&
                 logLine.indexOf("queryHash " + String(onCreationHashes.queryHash)) != -1));
 assert.eq(1, creationLogList.length);

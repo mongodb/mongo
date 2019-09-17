@@ -27,14 +27,19 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/query/find_common.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/curop_failpoint_helpers.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -88,5 +93,21 @@ BSONObj FindCommon::transformSortSpec(const BSONObj& sortSpec) {
     }
 
     return comparatorBob.obj();
+}
+
+void FindCommon::waitInFindBeforeMakingBatch(OperationContext* opCtx, const CanonicalQuery& cq) {
+    auto whileWaitingFunc = [&, hasLogged = false]() mutable {
+        if (!std::exchange(hasLogged, true)) {
+            log() << "Waiting in find before making batch for query - "
+                  << redact(cq.toStringShort());
+        }
+    };
+
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(&mongo::waitInFindBeforeMakingBatch,
+                                                     opCtx,
+                                                     "waitInFindBeforeMakingBatch",
+                                                     std::move(whileWaitingFunc),
+                                                     /* checkForInterrupt = */ false,
+                                                     cq.nss());
 }
 }  // namespace mongo

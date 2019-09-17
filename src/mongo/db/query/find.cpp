@@ -657,8 +657,7 @@ std::string runQuery(OperationContext* opCtx,
     }
     opCtx->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
 
-    CurOpFailpointHelpers::waitWhileFailPointEnabled(
-        &waitInFindBeforeMakingBatch, opCtx, "waitInFindBeforeMakingBatch");
+    FindCommon::waitInFindBeforeMakingBatch(opCtx, *exec->getCanonicalQuery());
 
     // Run the query.
     // bb is used to hold query results

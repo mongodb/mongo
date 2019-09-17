@@ -53,6 +53,7 @@ struct AwaitDataState {
 extern const OperationContext::Decoration<AwaitDataState> awaitDataState;
 
 class BSONObj;
+class CanonicalQuery;
 class QueryRequest;
 
 // Failpoint for making find hang.
@@ -125,6 +126,15 @@ public:
      * meta-sort specification).
      */
     static BSONObj transformSortSpec(const BSONObj& sortSpec);
+
+    /**
+     * This function wraps waitWhileFailPointEnabled() on waitInFindBeforeMakingBatch.
+     *
+     * Since query processing happens in three different places, this function makes it easier to
+     * check the failpoint for a query's namespace and log a helpful diagnostic message when the
+     * failpoint is active.
+     */
+    static void waitInFindBeforeMakingBatch(OperationContext* opCtx, const CanonicalQuery& cq);
 };
 
 }  // namespace mongo
