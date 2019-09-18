@@ -324,7 +324,7 @@ private:
     /**
      * Implementation of waitForWork*.
      */
-    void _waitForWork_inlock(stdx::unique_lock<Latch>* lk);
+    void _waitForWork_inlock(stdx::unique_lock<stdx::mutex>* lk);
 
     /**
      * Returns true if there are ready requests for the network thread to service.
@@ -356,12 +356,12 @@ private:
      * reaquire "lk" several times, but will not return until the executor has blocked
      * in waitFor*.
      */
-    void _runReadyNetworkOperations_inlock(stdx::unique_lock<Latch>* lk);
+    void _runReadyNetworkOperations_inlock(stdx::unique_lock<stdx::mutex>* lk);
 
     // Mutex that synchronizes access to mutable data in this class and its subclasses.
     // Fields guarded by the mutex are labled (M), below, and those that are read-only
     // in multi-threaded execution, and so unsynchronized, are labeled (R).
-    Mutex _mutex = MONGO_MAKE_LATCH("NetworkInterfaceMock::_mutex");
+    stdx::mutex _mutex;  // NOLINT
 
     // Condition signaled to indicate that the network processing thread should wake up.
     stdx::condition_variable _shouldWakeNetworkCondition;  // (M)

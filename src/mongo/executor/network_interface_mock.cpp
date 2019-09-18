@@ -58,14 +58,14 @@ NetworkInterfaceMock::NetworkInterfaceMock()
       _executorNextWakeupDate(Date_t::max()) {}
 
 NetworkInterfaceMock::~NetworkInterfaceMock() {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(!_hasStarted || inShutdown());
     invariant(_scheduled.empty());
     invariant(_blackHoled.empty());
 }
 
 void NetworkInterfaceMock::logQueues() {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     const std::vector<std::pair<std::string, const NetworkOperationList*>> queues{
         {"unscheduled", &_unscheduled},
         {"scheduled", &_scheduled},
@@ -85,7 +85,7 @@ void NetworkInterfaceMock::logQueues() {
 }
 
 std::string NetworkInterfaceMock::getDiagnosticString() {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     return str::stream() << "NetworkInterfaceMock -- waitingToRunMask:" << _waitingToRunMask
                          << ", now:" << _now_inlock().toString() << ", hasStarted:" << _hasStarted
                          << ", inShutdown: " << _inShutdown.load()
@@ -96,7 +96,7 @@ std::string NetworkInterfaceMock::getDiagnosticString() {
 }
 
 Date_t NetworkInterfaceMock::now() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _now_inlock();
 }
 
@@ -112,7 +112,7 @@ Status NetworkInterfaceMock::startCommand(const CallbackHandle& cbHandle,
         return {ErrorCodes::ShutdownInProgress, "NetworkInterfaceMock shutdown in progress"};
     }
 
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     const Date_t now = _now_inlock();
     auto op = NetworkOperation(cbHandle, request, now, std::move(onFinish));
@@ -132,7 +132,7 @@ Status NetworkInterfaceMock::startCommand(const CallbackHandle& cbHandle,
 
 void NetworkInterfaceMock::setHandshakeReplyForHost(
     const mongo::HostAndPort& host, mongo::executor::RemoteCommandResponse&& reply) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     auto it = _handshakeReplies.find(host);
     if (it == std::end(_handshakeReplies)) {
         auto res = _handshakeReplies.emplace(host, std::move(reply));
@@ -145,7 +145,7 @@ void NetworkInterfaceMock::setHandshakeReplyForHost(
 void NetworkInterfaceMock::cancelCommand(const CallbackHandle& cbHandle, const BatonHandle& baton) {
     invariant(!inShutdown());
 
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     ResponseStatus rs(ErrorCodes::CallbackCanceled, "Network operation canceled", Milliseconds(0));
 
     // We mimic the real NetworkInterface by only delivering the CallbackCanceled status if the
@@ -179,7 +179,7 @@ Status NetworkInterfaceMock::setAlarm(const TaskExecutor::CallbackHandle& cbHand
         return {ErrorCodes::ShutdownInProgress, "NetworkInterfaceMock shutdown in progress"};
     }
 
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     if (when <= _now_inlock()) {
         lk.unlock();
@@ -210,7 +210,7 @@ bool NetworkInterfaceMock::onNetworkThread() {
 }
 
 void NetworkInterfaceMock::startup() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _startup_inlock();
 }
 
@@ -225,7 +225,7 @@ void NetworkInterfaceMock::_startup_inlock() {
 void NetworkInterfaceMock::shutdown() {
     invariant(!inShutdown());
 
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     if (!_hasStarted) {
         _startup_inlock();
     }
@@ -258,7 +258,7 @@ bool NetworkInterfaceMock::inShutdown() const {
 }
 
 void NetworkInterfaceMock::enterNetwork() {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     while (!_isNetworkThreadRunnable_inlock()) {
         _shouldWakeNetworkCondition.wait(lk);
     }
@@ -267,7 +267,7 @@ void NetworkInterfaceMock::enterNetwork() {
 }
 
 void NetworkInterfaceMock::exitNetwork() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_currentlyRunning != kNetworkThread) {
         return;
     }
@@ -279,7 +279,7 @@ void NetworkInterfaceMock::exitNetwork() {
 }
 
 bool NetworkInterfaceMock::hasReadyRequests() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_currentlyRunning == kNetworkThread);
     return _hasReadyRequests_inlock();
 }
@@ -294,7 +294,7 @@ bool NetworkInterfaceMock::_hasReadyRequests_inlock() {
 }
 
 NetworkInterfaceMock::NetworkOperationIterator NetworkInterfaceMock::getNextReadyRequest() {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_currentlyRunning == kNetworkThread);
     while (!_hasReadyRequests_inlock()) {
         _waitingToRunMask |= kExecutorThread;
@@ -311,7 +311,7 @@ NetworkInterfaceMock::NetworkOperationIterator NetworkInterfaceMock::getFrontOfU
 
 NetworkInterfaceMock::NetworkOperationIterator NetworkInterfaceMock::getNthUnscheduledRequest(
     size_t n) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_currentlyRunning == kNetworkThread);
     invariant(_hasReadyRequests_inlock());
 
@@ -325,7 +325,7 @@ NetworkInterfaceMock::NetworkOperationIterator NetworkInterfaceMock::getNthUnsch
 void NetworkInterfaceMock::scheduleResponse(NetworkOperationIterator noi,
                                             Date_t when,
                                             const ResponseStatus& response) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_currentlyRunning == kNetworkThread);
     NetworkOperationIterator insertBefore = _scheduled.begin();
     while ((insertBefore != _scheduled.end()) && (insertBefore->getResponseDate() <= when)) {
@@ -388,13 +388,13 @@ RemoteCommandRequest NetworkInterfaceMock::scheduleErrorResponse(NetworkOperatio
 }
 
 void NetworkInterfaceMock::blackHole(NetworkOperationIterator noi) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_currentlyRunning == kNetworkThread);
     _blackHoled.splice(_blackHoled.end(), _processing, noi);
 }
 
 void NetworkInterfaceMock::requeueAt(NetworkOperationIterator noi, Date_t dontAskUntil) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_currentlyRunning == kNetworkThread);
     invariant(noi->getNextConsiderationDate() < dontAskUntil);
     invariant(_now_inlock() < dontAskUntil);
@@ -409,7 +409,7 @@ void NetworkInterfaceMock::requeueAt(NetworkOperationIterator noi, Date_t dontAs
 }
 
 Date_t NetworkInterfaceMock::runUntil(Date_t until) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_currentlyRunning == kNetworkThread);
     invariant(until > _now_inlock());
     while (until > _now_inlock()) {
@@ -436,7 +436,7 @@ Date_t NetworkInterfaceMock::runUntil(Date_t until) {
 }
 
 void NetworkInterfaceMock::advanceTime(Date_t newTime) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_currentlyRunning == kNetworkThread);
     invariant(newTime > _now_inlock());
     _now = newTime;
@@ -446,19 +446,19 @@ void NetworkInterfaceMock::advanceTime(Date_t newTime) {
 }
 
 void NetworkInterfaceMock::runReadyNetworkOperations() {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_currentlyRunning == kNetworkThread);
     _runReadyNetworkOperations_inlock(&lk);
 }
 
 void NetworkInterfaceMock::waitForWork() {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_currentlyRunning == kExecutorThread);
     _waitForWork_inlock(&lk);
 }
 
 void NetworkInterfaceMock::waitForWorkUntil(Date_t when) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_currentlyRunning == kExecutorThread);
     _executorNextWakeupDate = when;
     if (_executorNextWakeupDate <= _now_inlock()) {
@@ -538,7 +538,7 @@ void NetworkInterfaceMock::_connectThenEnqueueOperation_inlock(const HostAndPort
     // The completion handler for the postconnect command schedules the original command.
     auto postconnectCompletionHandler =
         [this, op = std::move(op)](TaskExecutor::ResponseOnAnyStatus rs) mutable {
-            stdx::lock_guard<Latch> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             if (!rs.isOK()) {
                 op.setResponse(_now_inlock(), rs);
                 op.finishResponse();
@@ -566,7 +566,7 @@ void NetworkInterfaceMock::_connectThenEnqueueOperation_inlock(const HostAndPort
 }
 
 void NetworkInterfaceMock::setConnectionHook(std::unique_ptr<NetworkConnectionHook> hook) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(!_hasStarted);
     invariant(!_hook);
     _hook = std::move(hook);
@@ -574,21 +574,21 @@ void NetworkInterfaceMock::setConnectionHook(std::unique_ptr<NetworkConnectionHo
 
 void NetworkInterfaceMock::setEgressMetadataHook(
     std::unique_ptr<rpc::EgressMetadataHook> metadataHook) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(!_hasStarted);
     invariant(!_metadataHook);
     _metadataHook = std::move(metadataHook);
 }
 
 void NetworkInterfaceMock::signalWorkAvailable() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _waitingToRunMask |= kExecutorThread;
     if (_currentlyRunning == kNoThread) {
         _shouldWakeExecutorCondition.notify_one();
     }
 }
 
-void NetworkInterfaceMock::_runReadyNetworkOperations_inlock(stdx::unique_lock<Latch>* lk) {
+void NetworkInterfaceMock::_runReadyNetworkOperations_inlock(stdx::unique_lock<stdx::mutex>* lk) {
     while (!_alarms.empty() && _now_inlock() >= _alarms.top().when) {
         auto& alarm = _alarms.top();
 
@@ -626,7 +626,7 @@ void NetworkInterfaceMock::_runReadyNetworkOperations_inlock(stdx::unique_lock<L
     _waitingToRunMask &= ~kNetworkThread;
 }
 
-void NetworkInterfaceMock::_waitForWork_inlock(stdx::unique_lock<Latch>* lk) {
+void NetworkInterfaceMock::_waitForWork_inlock(stdx::unique_lock<stdx::mutex>* lk) {
     if (_waitingToRunMask & kExecutorThread) {
         _waitingToRunMask &= ~kExecutorThread;
         return;
