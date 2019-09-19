@@ -36,8 +36,6 @@
 
 #include "mongo/executor/connection_pool.h"
 
-#include <fmt/format.h>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/remote_command_request.h"
@@ -152,7 +150,8 @@ public:
             data.target = maxConns;
         }
 
-        return {{data.host}, stats.health.isExpired};
+        auto fate = stats.health.isExpired ? HostFate::kShouldDie : HostFate::kShouldLive;
+        return {{std::make_pair(data.host, fate)}};
     }
     void removeHost(PoolId id) override {
         stdx::lock_guard lk(_mutex);
@@ -202,7 +201,6 @@ protected:
  */
 class ConnectionPool::SpecificPool final
     : public std::enable_shared_from_this<ConnectionPool::SpecificPool> {
-    static constexpr int kDiagnosticLogLevel = 4;
 
 public:
     /**
@@ -322,12 +320,24 @@ public:
         _tags = mutateFunc(_tags);
     }
 
+    auto sslMode() const {
+        return _sslMode;
+    }
+
     void fassertSSLModeIs(transport::ConnectSSLMode desired) const {
         if (desired != _sslMode) {
             severe() << "Mixing ssl modes for a single host is not supported";
             fassertFailedNoTrace(51043);
         }
     }
+
+    // Update the controller and potentially change the controls
+    HostGroupState updateController();
+
+    /**
+     * Establishes connections until the ControllerInterface's target is met.
+     */
+    void spawnConnections();
 
 private:
     using OwnedConnection = std::shared_ptr<ConnectionInterface>;
@@ -341,11 +351,6 @@ private:
     };
 
     ConnectionHandle makeHandle(ConnectionInterface* connection);
-
-    /**
-     * Establishes connections until the ControllerInterface's target is met.
-     */
-    void spawnConnections();
 
     void finishRefresh(ConnectionInterface* connPtr, Status status);
 
@@ -371,9 +376,6 @@ private:
     // Update the event timer for this host pool
     void updateEventTimer();
 
-    // Update the controller and potentially change the controls
-    void updateController();
-
 private:
     const std::shared_ptr<ConnectionPool> _parent;
 
@@ -398,13 +400,6 @@ private:
     // It increases when we process a failure. If a connection is from a previous generation,
     // it will be discarded on return/refresh.
     size_t _generation = 0;
-
-    // When the pool needs to potentially die or spawn connections, updateController() is scheduled
-    // onto the executor and this flag is set. When updateController() finishes running, this flag
-    // is unset. This allows the pool to amortize the expensive spawning and hopefully do work once
-    // it is closer to steady state.
-    bool _updateScheduled = false;
-
     size_t _created = 0;
 
     transport::Session::TagMask _tags = transport::Session::kPending;
@@ -525,6 +520,7 @@ void ConnectionPool::get_forTest(const HostAndPort& hostAndPort,
             .thenRunOn(_factory->getExecutor())
             .getAsync(std::move(cb));
     };
+    LOG(kDiagnosticLogLevel) << "Scheduling get for " << hostAndPort << " with timeout " << timeout;
     _factory->getExecutor()->schedule(std::move(getConnectionFunc));
 }
 
@@ -1051,9 +1047,9 @@ void ConnectionPool::SpecificPool::updateEventTimer() {
     _eventTimer->setTimeout(timeout, std::move(deferredStateUpdateFunc));
 }
 
-void ConnectionPool::SpecificPool::updateController() {
+auto ConnectionPool::SpecificPool::updateController() -> HostGroupState {
     if (_health.isShutdown) {
-        return;
+        return {};
     }
 
     auto& controller = *_parent->_controller;
@@ -1068,41 +1064,66 @@ void ConnectionPool::SpecificPool::updateController() {
     };
     LOG(kDiagnosticLogLevel) << "Updating controller for " << _hostAndPort
                              << " with State: " << state;
-    auto hostGroup = controller.updateHost(_id, std::move(state));
+    return controller.updateHost(_id, std::move(state));
+}
 
-    // If we can shutdown, then do so
-    if (hostGroup.canShutdown) {
-        for (const auto& host : hostGroup.hosts) {
-            auto it = _parent->_pools.find(host);
-            if (it == _parent->_pools.end()) {
+void ConnectionPool::_updateController() {
+    stdx::lock_guard lk(_mutex);
+    _shouldUpdateController = false;
+
+    // First we call updateController() on each pool that needs it and cache the results
+    struct Command {
+        HostFate fate;
+        transport::ConnectSSLMode sslMode;
+        size_t updateId = 0;
+    };
+    stdx::unordered_map<HostAndPort, Command> hosts;
+    for (auto& [pool, updateId] : _poolsToUpdate) {
+        for (auto [otherHost, fate] : pool->updateController().fates) {
+            auto& cmd = hosts[otherHost];
+            if (cmd.updateId > updateId) {
                 continue;
             }
 
-            auto& pool = it->second;
-
-            // At the moment, controllers will never mark for shutdown a pool with active
-            // connections or pending requests. isExpired is never true if these invariants are
-            // false. That's not to say that it's a terrible idea, but if this happens then we
-            // should review what it means to be expired.
-
-            invariant(pool->_checkedOutPool.empty());
-            invariant(pool->_requests.empty());
-
-            pool->triggerShutdown(Status(ErrorCodes::ShutdownInProgress,
-                                         str::stream() << "Pool for " << host << " has expired."));
-        }
-        return;
-    }
-
-
-    // Make sure all related hosts exist
-    for (const auto& host : hostGroup.hosts) {
-        if (auto& pool = _parent->_pools[host]; !pool) {
-            pool = SpecificPool::make(_parent, host, _sslMode);
+            cmd.fate = fate;
+            cmd.sslMode = pool->sslMode();
         }
     }
+    _poolsToUpdate.clear();
 
-    spawnConnections();
+    // Then we go through each cached result host by host and address the HostFate we were given
+    for (auto& [host, cmd] : hosts) {
+        switch (cmd.fate) {
+            case HostFate::kShouldLive: {
+                LOG(kDiagnosticLogLevel) << "Vivifying pool for " << host;
+                auto& pool = _pools[host];
+                if (!pool) {
+                    pool = SpecificPool::make(shared_from_this(), host, cmd.sslMode);
+                }
+                pool->spawnConnections();
+            } break;
+            case HostFate::kShouldDie: {
+                auto it = _pools.find(host);
+                if (it == _pools.end()) {
+                    continue;
+                }
+
+                LOG(kDiagnosticLogLevel) << "Killing pool for " << host;
+                auto& pool = it->second;
+
+                // At the moment, controllers will never mark for shutdown a pool with active
+                // connections or pending requests. isExpired is never true if these invariants are
+                // false. That's not to say that it's a terrible idea, but if this happens then we
+                // should review what it means to be expired.
+                dassert(pool->inUseConnections() == 0);
+                dassert(pool->requestsPending() == 0);
+
+                pool->triggerShutdown(
+                    Status(ErrorCodes::ShutdownInProgress,
+                           str::stream() << "Pool for " << host << " has expired."));
+            } break;
+        }
+    }
 }
 
 // Updates our state and manages the request timer
@@ -1116,17 +1137,17 @@ void ConnectionPool::SpecificPool::updateState() {
     updateEventTimer();
     updateHealth();
 
-    if (std::exchange(_updateScheduled, true)) {
+    _parent->_poolsToUpdate[shared_from_this()] = ++_parent->_lastUpdateId;
+    if (std::exchange(_parent->_shouldUpdateController, true)) {
         return;
     }
 
+    LOG(kDiagnosticLogLevel) << "Scheduling controller update";
     ExecutorFuture(ExecutorPtr(_parent->_factory->getExecutor()))  //
-        .getAsync([this, anchor = shared_from_this()](Status&& status) mutable {
+        .getAsync([parent = _parent](Status&& status) mutable {
             invariant(status);
 
-            stdx::lock_guard lk(_parent->_mutex);
-            _updateScheduled = false;
-            updateController();
+            parent->_updateController();
         });
 }
 
