@@ -56,13 +56,13 @@ stdx::cv_status ClockSource::waitForConditionUntil(stdx::condition_variable& cv,
 
     struct AlarmInfo {
         Mutex controlMutex = MONGO_MAKE_LATCH("AlarmInfo::controlMutex");
-        BasicLockableAdapter* waitLock;
+        boost::optional<BasicLockableAdapter> waitLock;
         stdx::condition_variable* waitCV;
         stdx::cv_status cvWaitResult = stdx::cv_status::no_timeout;
     };
     auto alarmInfo = std::make_shared<AlarmInfo>();
     alarmInfo->waitCV = &cv;
-    alarmInfo->waitLock = &m;
+    alarmInfo->waitLock = m;
     const auto waiterThreadId = stdx::this_thread::get_id();
     bool invokedAlarmInline = false;
     invariant(setAlarm(deadline, [alarmInfo, waiterThreadId, &invokedAlarmInline] {
@@ -88,7 +88,7 @@ stdx::cv_status ClockSource::waitForConditionUntil(stdx::condition_variable& cv,
     m.unlock();
     stdx::lock_guard<Latch> controlLk(alarmInfo->controlMutex);
     m.lock();
-    alarmInfo->waitLock = nullptr;
+    alarmInfo->waitLock = boost::none;
     alarmInfo->waitCV = nullptr;
     return alarmInfo->cvWaitResult;
 }
