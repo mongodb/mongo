@@ -222,7 +222,8 @@ auto ShardingTaskExecutorPoolController::updateHost(PoolId id, const HostState& 
     // If the pool isn't in a groupData, we can return now
     auto groupData = poolData.groupData.lock();
     if (!groupData || groupData->state.passives.count(poolData.host)) {
-        return {{poolData.host}, poolData.isAbleToShutdown};
+        auto fate = poolData.isAbleToShutdown ? HostFate::kShouldDie : HostFate::kShouldLive;
+        return {{std::make_pair(poolData.host, fate)}};
     }
 
     switch (gParameters.matchingStrategy.load()) {
@@ -254,7 +255,14 @@ auto ShardingTaskExecutorPoolController::updateHost(PoolId id, const HostState& 
         std::all_of(groupData->poolIds.begin(), groupData->poolIds.end(), [&](auto otherId) {
                               return getOrInvariant(_poolDatas, otherId).isAbleToShutdown;
                           });
-    return {groupData->state.connStr.getServers(), shouldShutdown};
+
+    HostGroupState hostGroupState;
+    hostGroupState.fates.reserve(groupData->state.connStr.getServers().size());
+    auto fate = shouldShutdown ? HostFate::kShouldDie : HostFate::kShouldLive;
+    for (const auto& host : groupData->state.connStr.getServers()) {
+        hostGroupState.fates.emplace_back(host, fate);
+    }
+    return {hostGroupState};
 }
 
 void ShardingTaskExecutorPoolController::removeHost(PoolId id) {
