@@ -852,6 +852,18 @@ public:
     }
 };
 
+/** SERVER-43205: Constructing a Value with a very large BSONElement string causes the Value
+ * constructor to throw before it can completely initialize its ValueStorage member, which has the
+ * potential to lead to incorrect state. */
+class LongString {
+public:
+    void run() {
+        std::string longString(16793500, 'x');
+        auto obj = BSON("str" << longString);
+        ASSERT_THROWS_CODE([&]() { Value{obj["str"]}; }(), DBException, 16493);
+    }
+};
+
 /** Date type. */
 class Date {
 public:
@@ -2069,6 +2081,7 @@ public:
         add<Value::Double>();
         add<Value::String>();
         add<Value::StringWithNull>();
+        add<Value::LongString>();
         add<Value::Date>();
         add<Value::JSTimestamp>();
         add<Value::EmptyDocument>();

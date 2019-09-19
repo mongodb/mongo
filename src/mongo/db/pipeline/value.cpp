@@ -82,8 +82,16 @@ void ValueStorage::verifyRefCountingIfShould() const {
         case RegEx:
         case Code:
         case Symbol:
-            // the above types reference data when not using short-string optimization
-            verify(refCounter == !shortStr);
+            // If this is using the short-string optimization, it must not have a ref-counted
+            // pointer.
+            invariant(!shortStr || !refCounter);
+
+            // If this is _not_ using the short string optimization, it must be storing a
+            // ref-counted pointer. One exception: in the BSONElement constructor of Value, it is
+            // possible for this ValueStorage to get constructed as a type but never initialized;
+            // the ValueStorage gets left as a nullptr and not marked as ref-counted, which is ok
+            // (SERVER-43205).
+            invariant(shortStr || (refCounter || !genericRCPtr));
             break;
 
         case NumberDecimal:
@@ -92,13 +100,13 @@ void ValueStorage::verifyRefCountingIfShould() const {
         case DBRef:
         case CodeWScope:
             // the above types always reference external data.
-            verify(refCounter);
-            verify(bool(genericRCPtr));
+            invariant(refCounter);
+            invariant(bool(genericRCPtr));
             break;
 
         case Object:
             // Objects either hold a NULL ptr or should be ref-counting
-            verify(refCounter == bool(genericRCPtr));
+            invariant(refCounter == bool(genericRCPtr));
             break;
     }
 }
