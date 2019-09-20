@@ -29,6 +29,7 @@ selector:
   - jstests/sharding/cursor1.js
   - jstests/sharding/diffservers1.js
   - jstests/sharding/disable_autosplit.js
+  - jstests/sharding/drop_collection_in_admin_and_config_dbs.js
   - jstests/sharding/drop_sharded_db.js
   - jstests/sharding/findandmodify1.js
   - jstests/sharding/findandmodify2.js
