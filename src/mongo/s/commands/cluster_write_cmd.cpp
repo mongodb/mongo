@@ -220,6 +220,8 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
             ClusterWriter::write(opCtx, request, &stats, response);
             wouldChangeOwningShardErrorInfo =
                 getWouldChangeOwningShardErrorInfo(opCtx, request, response, !isRetryableWrite);
+            if (!wouldChangeOwningShardErrorInfo)
+                uassertStatusOK(response->toStatus());
 
             // If we do not get WouldChangeOwningShard when re-running the update, the document has
             // been modified or deleted concurrently and we do not need to delete it and insert a

@@ -333,6 +333,7 @@ private:
                     // updateShardKeyValueOnWouldChangeOwningShardError.
                     documentShardKeyUpdateUtil::startTransactionForShardKeyUpdate(opCtx);
                     _runCommand(opCtx, shardId, shardVersion, dbVersion, nss, cmdObj, result);
+                    uassertStatusOK(getStatusFromCommandResult(result->asTempObj()));
                     auto commitResponse =
                         documentShardKeyUpdateUtil::commitShardKeyUpdateTransaction(opCtx);
 
