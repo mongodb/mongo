@@ -413,6 +413,11 @@ protected:
         ReplIndexBuildState::IndexCatalogStats& indexCatalogStats,
         const UUID& buildUUID) noexcept;
 
+    /**
+     * Looks up active index build by UUID.
+     */
+    StatusWith<std::shared_ptr<ReplIndexBuildState>> _getIndexBuild(const UUID& buildUUID) const;
+
     // Protects the below state.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("IndexBuildsCoordinator::_mutex");
 

@@ -110,12 +110,7 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
         return statusWithOptionalResult.getValue().get();
     }
 
-    auto replState = [&]() {
-        stdx::unique_lock<Latch> lk(_mutex);
-        auto it = _allIndexBuilds.find(buildUUID);
-        invariant(it != _allIndexBuilds.end());
-        return it->second;
-    }();
+    auto replState = invariant(_getIndexBuild(buildUUID));
 
     // Run index build in-line if we are transitioning between replication modes.
     // While the RSTLExclusive is being held, an async thread in the thread pool would not be

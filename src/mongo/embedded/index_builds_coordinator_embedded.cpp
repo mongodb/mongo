@@ -68,12 +68,7 @@ IndexBuildsCoordinatorEmbedded::startIndexBuild(OperationContext* opCtx,
         return statusWithOptionalResult.getValue().get();
     }
 
-    auto replState = [&]() {
-        stdx::unique_lock<Latch> lk(_mutex);
-        auto it = _allIndexBuilds.find(buildUUID);
-        invariant(it != _allIndexBuilds.end());
-        return it->second;
-    }();
+    auto replState = invariant(_getIndexBuild(buildUUID));
 
     invariant(!indexBuildOptions.replSetAndNotPrimary);
     _runIndexBuild(opCtx, buildUUID, indexBuildOptions);

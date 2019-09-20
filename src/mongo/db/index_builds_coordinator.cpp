@@ -702,12 +702,7 @@ void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
         }
     }
 
-    auto replState = [&] {
-        stdx::unique_lock<Latch> lk(_mutex);
-        auto it = _allIndexBuilds.find(buildUUID);
-        invariant(it != _allIndexBuilds.end());
-        return it->second;
-    }();
+    auto replState = invariant(_getIndexBuild(buildUUID));
 
     // Add build UUID to lock manager diagnostic output.
     auto locker = opCtx->lockState();
@@ -1039,12 +1034,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
     // Index builds in recovery mode have the global write lock.
     invariant(opCtx->lockState()->isW());
 
-    auto replState = [&] {
-        stdx::unique_lock<Latch> lk(_mutex);
-        auto it = _allIndexBuilds.find(buildUUID);
-        invariant(it != _allIndexBuilds.end());
-        return it->second;
-    }();
+    auto replState = invariant(_getIndexBuild(buildUUID));
 
     // We rely on 'collection' for any collection information because no databases are open during
     // recovery.
@@ -1154,6 +1144,16 @@ void IndexBuildsCoordinator::_allowIndexBuildsOnCollection(const UUID& collectio
     if (--(it->second) == 0) {
         _disallowedCollections.erase(it);
     }
+}
+
+StatusWith<std::shared_ptr<ReplIndexBuildState>> IndexBuildsCoordinator::_getIndexBuild(
+    const UUID& buildUUID) const {
+    stdx::unique_lock<Latch> lk(_mutex);
+    auto it = _allIndexBuilds.find(buildUUID);
+    if (it == _allIndexBuilds.end()) {
+        return {ErrorCodes::NoSuchKey, str::stream() << "No index build with UUID: " << buildUUID};
+    }
+    return it->second;
 }
 
 ScopedStopNewDatabaseIndexBuilds::ScopedStopNewDatabaseIndexBuilds(
