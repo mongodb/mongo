@@ -718,6 +718,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
             // this be a no-op.
             log() << "Index build interrupted: " << buildUUID << ": aborting index build.";
             auto abortIndexFuture = indexBuildsCoord->abortIndexBuildByBuildUUID(
+                opCtx,
                 buildUUID,
                 str::stream() << "Index build interrupted: " << buildUUID << ": "
                               << interruptionEx.toString());
@@ -728,6 +729,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
             log() << "Index build interrupted: " << buildUUID
                   << ": aborting index build due to change in replication state.";
             auto abortIndexFuture = indexBuildsCoord->abortIndexBuildByBuildUUID(
+                opCtx,
                 buildUUID,
                 str::stream() << "Index build interrupted due to change in replication state: "
                               << buildUUID << ": " << ex.toString());

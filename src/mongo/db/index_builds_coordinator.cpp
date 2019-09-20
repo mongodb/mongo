@@ -329,7 +329,8 @@ void IndexBuildsCoordinator::abortDatabaseIndexBuilds(StringData db, const std::
     dbIndexBuilds->waitUntilNoIndexBuildsRemain(lk);
 }
 
-Future<void> IndexBuildsCoordinator::abortIndexBuildByBuildUUID(const UUID& buildUUID,
+Future<void> IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
+                                                                const UUID& buildUUID,
                                                                 const std::string& reason) {
     _indexBuildsManager.abortIndexBuild(buildUUID, reason);
     auto pf = makePromiseFuture<void>();
