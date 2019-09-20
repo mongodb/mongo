@@ -19,7 +19,11 @@ let name = "speculative_majority_find";
 let replTest = new ReplSetTest({
     name: name,
     nodes: [{}, {rsConfig: {priority: 0}}],
-    nodeOptions: {enableMajorityReadConcern: 'false'}
+    nodeOptions: {
+        enableMajorityReadConcern: 'false',
+        // Increase log verbosity so we can see all commands that run on the server.
+        setParameter: {logComponentVerbosity: tojson({command: 2})}
+    }
 });
 replTest.startSet();
 replTest.initiate();
