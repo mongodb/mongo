@@ -273,6 +273,14 @@ repos:
       - yum/redhat/7/mongodb-enterprise
       - yum/redhat/7Server/mongodb-enterprise
 
+  - name: rhel80
+    type: rpm
+    edition: enterprise
+    bucket: repo.mongodb.com
+    repos:
+      - yum/redhat/8/mongodb-enterprise
+      - yum/redhat/8Server/mongodb-enterprise
+
   - name: amazon
     type: rpm
     edition: enterprise
