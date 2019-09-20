@@ -628,3 +628,11 @@ generateItoATable = env.Command(
 )
 env.Alias('generated-sources', generateItoATable)
 
+env.CppUnitTest(
+    target='stacktrace_test',
+    source=[
+        'stacktrace_test.cpp',
+    ],
+    LIBDEPS=[
+    ],
+)

@@ -36,9 +36,7 @@
 #include <iosfwd>
 
 #if defined(_WIN32)
-// We need to pick up a decl for CONTEXT. Forward declaring would be preferable, but it is
-// unclear that we can do so.
-#include "mongo/platform/windows_basic.h"
+#include "mongo/platform/windows_basic.h"  // for CONTEXT
 #endif
 
 namespace mongo {
