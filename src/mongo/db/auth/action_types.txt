@@ -91,6 +91,7 @@
 "removeShard",
 "renameCollection",  # Not used for permissions checks, but to id the event in logs.
 "renameCollectionSameDB",
+"repairDatabase",   # Deprecated, needs to stay around for backwards compatibility
 "replSetConfigure",
 "replSetGetConfig",
 "replSetGetStatus",
