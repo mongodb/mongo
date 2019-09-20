@@ -755,6 +755,86 @@ TEST_F(TxnParticipantTest, KillSessionsDuringPrepareDoesNotAbortTransaction) {
     ASSERT_FALSE(txnParticipant.transactionIsAborted());
 }
 
+TEST_F(TxnParticipantTest, KillOpBeforeCommittingPreparedTransaction) {
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    // Prepare the transaction.
+    txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
+    auto prepareTimestamp = txnParticipant.prepareTransaction(opCtx(), {});
+    opCtx()->markKilled(ErrorCodes::Interrupted);
+    try {
+        // The commit should throw, since the operation was killed.
+        txnParticipant.commitPreparedTransaction(opCtx(), prepareTimestamp, boost::none);
+    } catch (const DBException& ex) {
+        ASSERT_EQ(ErrorCodes::Interrupted, ex.code());
+    }
+
+    // Check the session back in.
+    sessionCheckout->checkIn(opCtx());
+
+    // The transaction state should have been unaffected.
+    ASSERT_TRUE(txnParticipant.transactionIsPrepared());
+
+    auto commitPreparedFunc = [&](OperationContext* opCtx) {
+        opCtx->setLogicalSessionId(_sessionId);
+        opCtx->setTxnNumber(_txnNumber);
+
+        // Check out the session and continue the transaction.
+        auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
+        auto newTxnParticipant = TransactionParticipant::get(opCtx);
+        newTxnParticipant.beginOrContinue(
+            opCtx, *(opCtx->getTxnNumber()), false, boost::none /*startNewTxn*/);
+
+        newTxnParticipant.unstashTransactionResources(opCtx, "commitTransaction");
+        newTxnParticipant.commitPreparedTransaction(opCtx, prepareTimestamp, boost::none);
+    };
+
+    // Now try to commit the transaction again, with a fresh operation context.
+    runFunctionFromDifferentOpCtx(commitPreparedFunc);
+    ASSERT_TRUE(txnParticipant.transactionIsCommitted());
+}
+
+TEST_F(TxnParticipantTest, KillOpBeforeAbortingPreparedTransaction) {
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    // Prepare the transaction.
+    txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
+    auto prepareTimestamp = txnParticipant.prepareTransaction(opCtx(), {});
+    opCtx()->markKilled(ErrorCodes::Interrupted);
+    try {
+        // The abort should throw, since the operation was killed.
+        txnParticipant.abortActiveTransaction(opCtx());
+    } catch (const DBException& ex) {
+        ASSERT_EQ(ErrorCodes::Interrupted, ex.code());
+    }
+
+    // Check the session back in.
+    sessionCheckout->checkIn(opCtx());
+
+    // The transaction state should have been unaffected.
+    ASSERT_TRUE(txnParticipant.transactionIsPrepared());
+
+    auto commitPreparedFunc = [&](OperationContext* opCtx) {
+        opCtx->setLogicalSessionId(_sessionId);
+        opCtx->setTxnNumber(_txnNumber);
+
+        // Check out the session and continue the transaction.
+        auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
+        auto newTxnParticipant = TransactionParticipant::get(opCtx);
+        newTxnParticipant.beginOrContinue(
+            opCtx, *(opCtx->getTxnNumber()), false, boost::none /*startNewTxn*/);
+
+        newTxnParticipant.unstashTransactionResources(opCtx, "commitTransaction");
+        newTxnParticipant.commitPreparedTransaction(opCtx, prepareTimestamp, boost::none);
+    };
+
+    // Now try to commit the transaction again, with a fresh operation context.
+    runFunctionFromDifferentOpCtx(commitPreparedFunc);
+    ASSERT_TRUE(txnParticipant.transactionIsCommitted());
+}
+
 TEST_F(TxnParticipantTest, ThrowDuringOnTransactionPrepareAbortsTransaction) {
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
