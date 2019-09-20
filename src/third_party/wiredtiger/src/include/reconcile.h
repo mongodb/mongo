@@ -22,11 +22,6 @@ typedef struct {
     uint32_t flags; /* Caller's configuration */
 
     /*
-     * Track start/stop write generation to decide if all changes to the page are written.
-     */
-    uint32_t orig_write_gen;
-
-    /*
      * Track start/stop checkpoint generations to decide if lookaside table records are correct.
      */
     uint64_t orig_btree_checkpoint_gen;

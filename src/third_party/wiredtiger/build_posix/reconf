@@ -22,7 +22,6 @@ clean()
 		Makefile.am \
 		Makefile.in \
 		aclocal.m4 \
-		auto-includes.chk \
 		autom4te.cache \
 		config.cache \
 		config.hin \
