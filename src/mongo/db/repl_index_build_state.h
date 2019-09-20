@@ -35,6 +35,7 @@
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
@@ -126,10 +127,15 @@ struct ReplIndexBuildState {
     // SharedSemiFuture(s).
     SharedPromise<IndexCatalogStats> sharedPromise;
 
+    // Set to true on a secondary on receipt of a commitIndexBuild oplog entry.
+    bool isCommitReady = false;
+    Timestamp commitTimestamp;
+
     // There is a period of time where the index build is registered on the coordinator, but an
     // index builder does not yet exist. Since a signal cannot be set on the index builder at that
     // time, it must be saved here.
     bool aborted = false;
+    Timestamp abortTimestamp;
     std::string abortReason = "";
 
     // The coordinator for the index build will wait upon this when awaiting an external signal,
