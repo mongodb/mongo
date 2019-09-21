@@ -146,8 +146,6 @@ public:
 
     /**
      * Commits the index build identified by 'buildUUID'.
-     *
-     * TODO: not yet implemented.
      */
     Status commitIndexBuild(OperationContext* opCtx,
                             const std::vector<BSONObj>& specs,

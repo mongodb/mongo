@@ -841,6 +841,8 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                   "commitIndexBuild value must be a string",
                   first.type() == mongo::String);
 
+          // May throw NamespaceNotFound exception on a non-existent collection, especially if two
+          // phase index builds are not enabled.
           const NamespaceString nss(
               extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd));
 
@@ -861,9 +863,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
 
           return commitIndexBuild(opCtx, nss, indexBuildUUID, indexesElem, mode);
       },
-      // TODO(SERVER-39239): Remove NamespaceNotFound from acceptable errors for commitIndexBuild.
-      // It should be impossible to commit an index build on a dropped collection.
-      {ErrorCodes::NamespaceNotFound}}},
+      {ErrorCodes::NamespaceNotFound, ErrorCodes::NoSuchKey}}},
     {"abortIndexBuild",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
          // {

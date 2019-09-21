@@ -332,7 +332,14 @@ void IndexBuildsCoordinator::abortDatabaseIndexBuilds(StringData db, const std::
 Status IndexBuildsCoordinator::commitIndexBuild(OperationContext* opCtx,
                                                 const std::vector<BSONObj>& specs,
                                                 const UUID& buildUUID) {
-    // TODO: not yet implemented.
+    auto replState = uassertStatusOK(_getIndexBuild(buildUUID));
+
+    stdx::unique_lock<Latch> lk(replState->mutex);
+    replState->isCommitReady = true;
+    replState->commitTimestamp = opCtx->recoveryUnit()->getCommitTimestamp();
+    invariant(!replState->commitTimestamp.isNull(), buildUUID.toString());
+    replState->condVar.notify_all();
+
     return Status::OK();
 }
 
