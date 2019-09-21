@@ -377,6 +377,7 @@ protected:
     void _buildIndex(OperationContext* opCtx,
                      const NamespaceStringOrUUID& dbAndUUID,
                      std::shared_ptr<ReplIndexBuildState> replState,
+                     const IndexBuildOptions& indexBuildOptions,
                      boost::optional<Lock::CollectionLock>* collLock);
     /**
      * Returns total number of indexes in collection, including unfinished/in-progress indexes.

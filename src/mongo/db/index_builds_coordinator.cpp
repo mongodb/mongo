@@ -782,10 +782,11 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
             // waiting to acquire the RSTL in mode X.
             const bool unlocked = opCtx->lockState()->unlockRSTLforPrepare();
             invariant(unlocked);
-            opCtx->runWithoutInterruptionExceptAtGlobalShutdown(
-                [&, this] { _buildIndex(opCtx, dbAndUUID, replState, &collLock); });
+            opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&, this] {
+                _buildIndex(opCtx, dbAndUUID, replState, indexBuildOptions, &collLock);
+            });
         } else {
-            _buildIndex(opCtx, dbAndUUID, replState, &collLock);
+            _buildIndex(opCtx, dbAndUUID, replState, indexBuildOptions, &collLock);
         }
         // If _buildIndex returned normally, then we should have the collection X lock. It is not
         // required to safely access the collection, though, because an index build is registerd.
@@ -891,6 +892,7 @@ void IndexBuildsCoordinator::_buildIndex(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& dbAndUUID,
     std::shared_ptr<ReplIndexBuildState> replState,
+    const IndexBuildOptions& indexBuildOptions,
     boost::optional<Lock::CollectionLock>* exclusiveCollectionLock) {
 
     {
