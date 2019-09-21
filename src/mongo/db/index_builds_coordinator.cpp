@@ -340,6 +340,18 @@ Future<void> IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext
                                                                 const UUID& buildUUID,
                                                                 const std::string& reason) {
     _indexBuildsManager.abortIndexBuild(buildUUID, reason);
+
+    auto replStateResult = _getIndexBuild(buildUUID);
+    if (replStateResult.isOK()) {
+        auto replState = replStateResult.getValue();
+
+        stdx::unique_lock<Latch> lk(replState->mutex);
+        replState->aborted = true;
+        replState->abortTimestamp = opCtx->recoveryUnit()->getCommitTimestamp();
+        replState->abortReason = reason;
+        replState->condVar.notify_all();
+    }
+
     auto pf = makePromiseFuture<void>();
     auto promise = std::move(pf.promise);
     promise.setWith([] {});
