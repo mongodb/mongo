@@ -149,9 +149,9 @@ public:
      *
      * TODO: not yet implemented.
      */
-    virtual Status commitIndexBuild(OperationContext* opCtx,
-                                    const std::vector<BSONObj>& specs,
-                                    const UUID& buildUUID) = 0;
+    Status commitIndexBuild(OperationContext* opCtx,
+                            const std::vector<BSONObj>& specs,
+                            const UUID& buildUUID);
 
     /**
      * Waits for all index builds to stop after they have been interrupted during shutdown.

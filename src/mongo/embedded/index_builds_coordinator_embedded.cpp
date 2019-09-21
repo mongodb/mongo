@@ -76,12 +76,6 @@ IndexBuildsCoordinatorEmbedded::startIndexBuild(OperationContext* opCtx,
     return replState->sharedPromise.getFuture();
 }
 
-Status IndexBuildsCoordinatorEmbedded::commitIndexBuild(OperationContext* opCtx,
-                                                        const std::vector<BSONObj>& specs,
-                                                        const UUID& buildUUID) {
-    MONGO_UNREACHABLE;
-}
-
 Status IndexBuildsCoordinatorEmbedded::voteCommitIndexBuild(const UUID& buildUUID,
                                                             const HostAndPort& hostAndPort) {
     MONGO_UNREACHABLE;

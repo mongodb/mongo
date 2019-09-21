@@ -211,13 +211,6 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
     return replState->sharedPromise.getFuture();
 }
 
-Status IndexBuildsCoordinatorMongod::commitIndexBuild(OperationContext* opCtx,
-                                                      const std::vector<BSONObj>& specs,
-                                                      const UUID& buildUUID) {
-    // TODO: not yet implemented.
-    return Status::OK();
-}
-
 Status IndexBuildsCoordinatorMongod::voteCommitIndexBuild(const UUID& buildUUID,
                                                           const HostAndPort& hostAndPort) {
     // TODO: not yet implemented.

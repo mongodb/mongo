@@ -329,6 +329,13 @@ void IndexBuildsCoordinator::abortDatabaseIndexBuilds(StringData db, const std::
     dbIndexBuilds->waitUntilNoIndexBuildsRemain(lk);
 }
 
+Status IndexBuildsCoordinator::commitIndexBuild(OperationContext* opCtx,
+                                                const std::vector<BSONObj>& specs,
+                                                const UUID& buildUUID) {
+    // TODO: not yet implemented.
+    return Status::OK();
+}
+
 Future<void> IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
                                                                 const UUID& buildUUID,
                                                                 const std::string& reason) {

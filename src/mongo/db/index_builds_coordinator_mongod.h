@@ -78,13 +78,6 @@ public:
         IndexBuildProtocol protocol,
         IndexBuildOptions indexBuildOptions) override;
 
-    /**
-     * TODO: not yet implemented.
-     */
-    Status commitIndexBuild(OperationContext* opCtx,
-                            const std::vector<BSONObj>& specs,
-                            const UUID& buildUUID) override;
-
     Status voteCommitIndexBuild(const UUID& buildUUID, const HostAndPort& hostAndPort) override;
 
     Status setCommitQuorum(OperationContext* opCtx,
