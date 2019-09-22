@@ -1,5 +1,4 @@
 /**
-
  * Confirms that index builds on a secondary wait for the commitIndexBuild oplog entry before
  * committing.
  * Requires two phase index builds to be enabled via the twoPhaseIndexBuild server parameter.
@@ -46,22 +45,20 @@ assert.commandWorked(coll.insert({a: 1}));
 
 // Start index build on primary, but prevent it from finishing.
 IndexBuildTest.pauseIndexBuilds(primary);
-IndexBuildTest.pauseIndexBuilds(secondary);
 const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1});
 
 // When the index build starts on the secondary, find its op id.
 try {
     IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
 
-    IndexBuildTest.resumeIndexBuilds(secondary);
-    IndexBuildTest.waitForIndexBuildToStop(secondaryDB);
-    IndexBuildTest.assertIndexes(secondaryColl, 2, ["_id_", "a_1"]);
+    IndexBuildTest.assertIndexes(secondaryColl, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
 } finally {
     // Wait for the index build to stop.
     IndexBuildTest.resumeIndexBuilds(primary);
 }
 
 IndexBuildTest.waitForIndexBuildToStop(testDB);
+IndexBuildTest.waitForIndexBuildToStop(secondaryDB);
 
 // Expect successful createIndex command invocation in parallel shell. A new index should be
 // present on the primary.

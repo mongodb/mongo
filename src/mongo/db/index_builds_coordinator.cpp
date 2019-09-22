@@ -991,6 +991,25 @@ void IndexBuildsCoordinator::_buildIndex(
         hangAfterIndexBuildSecondDrain.pauseWhileSet();
     }
 
+    if (supportsTwoPhaseIndexBuild() && indexBuildOptions.replSetAndNotPrimary) {
+        stdx::unique_lock<Latch> lk(replState->mutex);
+        auto isReadyToCommitOrAbort = [rs = replState] { return rs->isCommitReady || rs->aborted; };
+        opCtx->waitForConditionOrInterrupt(replState->condVar, lk, isReadyToCommitOrAbort);
+
+        if (replState->isCommitReady) {
+            log() << "Committing index build: " << replState->buildUUID
+                  << ", timestamp: " << replState->commitTimestamp
+                  << ", collection UUID: " << replState->collectionUUID;
+            invariant(!replState->aborted, replState->buildUUID.toString());
+        } else if (replState->aborted) {
+            log() << "Aborting index build: " << replState->buildUUID
+                  << ", timestamp: " << replState->abortTimestamp
+                  << ", reason: " << replState->abortReason
+                  << ", collection UUID: " << replState->collectionUUID;
+            invariant(!replState->isCommitReady, replState->buildUUID.toString());
+        }
+    }
+
     // Need to return the collection lock back to exclusive mode, to complete the index build.
     opCtx->recoveryUnit()->abandonSnapshot();
     exclusiveCollectionLock->emplace(opCtx, dbAndUUID, MODE_X);
