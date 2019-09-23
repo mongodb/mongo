@@ -90,8 +90,6 @@ public:
 
     static const Status kConnectionStateUnknown;
 
-    static constexpr int kDiagnosticLogLevel = 4;
-
     struct Options {
         Options() {}
 
@@ -212,27 +210,13 @@ public:
     };
 
     /**
-     * A HostFate is a HostAndPort specific signal from a Controller to the ConnectionPool
-     *
-     * - kShouldLive implies that if the SpecificPool doesn't already exist, it should be created
-     * - kShouldDie implies that if the SpecificPool does exist, it should shutdown
-     */
-    enum class HostFate {
-        kShouldLive,
-        kShouldDie,
-    };
-
-    /**
-     * A set of (HostAndPort, HostFate) pairs representing the HostGroup
+     * A set of hosts and a flag canShutdown for if the group can shutdown
      *
      * This should only be constructed by a ControllerInterface
      */
     struct HostGroupState {
-        // While this is a list of pairs, the two controllers in use today each have a predictable
-        // pattern:
-        // * A single host with a single fate
-        // * A list of hosts (i.e. a replica set) all with the same fate
-        std::vector<std::pair<HostAndPort, HostFate>> fates;
+        std::vector<HostAndPort> hosts;
+        bool canShutdown = false;
     };
 
     explicit ConnectionPool(std::shared_ptr<DependentTypeFactoryInterface> impl,
@@ -263,8 +247,6 @@ public:
     size_t getNumConnectionsPerHost(const HostAndPort& hostAndPort) const;
 
 private:
-    void _updateController();
-
     std::string _name;
 
     const std::shared_ptr<DependentTypeFactoryInterface> _factory;
@@ -276,14 +258,6 @@ private:
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ConnectionPool::_mutex");
     PoolId _nextPoolId = 0;
     stdx::unordered_map<HostAndPort, std::shared_ptr<SpecificPool>> _pools;
-
-    // When the pool needs to potentially die or spawn connections, _updateController() is scheduled
-    // onto the executor and this flag is set. When _updateController() finishes running, this flag
-    // is unset. This allows the pool to amortize the expensive spawning and hopefully do work once
-    // it is closer to steady state.
-    bool _shouldUpdateController = false;
-    size_t _lastUpdateId = 0;
-    stdx::unordered_map<std::shared_ptr<SpecificPool>, size_t> _poolsToUpdate;
 
     EgressTagCloserManager* _manager;
 };
@@ -439,7 +413,6 @@ public:
     using HostState = typename ConnectionPool::HostState;
     using ConnectionControls = typename ConnectionPool::ConnectionControls;
     using HostGroupState = typename ConnectionPool::HostGroupState;
-    using HostFate = typename ConnectionPool::HostFate;
     using PoolId = typename ConnectionPool::PoolId;
 
     virtual ~ControllerInterface() = default;
