@@ -5533,6 +5533,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
+      num_files: 5
+      num_tasks: 30
       jstestfuzz_vars: --jsTestsDir ../jstests
       resmoke_args: --suites=jstestfuzz_interrupt_replication --flowControlTicketOverride=1 --storageEngine=wiredTiger
       name: jstestfuzz_interrupt_replication_flow_control
@@ -5573,6 +5575,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
+      num_files: 5
+      num_tasks: 30
       jstestfuzz_vars: --jsTestsDir ../jstests
       resmoke_args: --suites=jstestfuzz_replication_continuous_stepdown --flowControlTicketOverride=1 --storageEngine=wiredTiger
       name: jstestfuzz_replication_continuous_stepdown_flow_control
