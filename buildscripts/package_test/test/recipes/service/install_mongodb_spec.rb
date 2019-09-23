@@ -143,19 +143,19 @@ if deb
   describe file('/var/lib/mongodb') do
     it { should be_directory }
   end
-
-  if os[:release] == '18.04'
-    describe user('mongodb') do
-      it { should exist }
-      its('groups') { should include 'mongodb' }
-      its('shell') { should eq '/usr/sbin/nologin' }
-    end
-  else
-    describe user('mongodb') do
-      it { should exist }
-      its('groups') { should include 'mongodb' }
-      its('shell') { should eq '/bin/false' }
-    end
+  describe user('mongodb') do
+    it { should exist }
+    its('groups') { should include 'mongodb' }
+    # All versions of Debian 10 will use /usr/sbin/nologin for service
+    # account shells
+    its('shell') {
+      if ((os[:family] == 'debian' and os[:release].split('.')[0] == '10') or
+          (os[:family] == 'ubuntu' and os[:release] == '18.04'))
+        should eq '/usr/sbin/nologin'
+      else
+        should eq '/bin/false'
+      end
+    }
   end
 end
 

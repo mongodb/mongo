@@ -164,6 +164,17 @@ repos:
     repos:
       - apt/debian/dists/stretch/mongodb-org
 
+  - name: debian10
+    type: deb
+    code_name: "buster"
+    bucket: repo.mongodb.org
+    edition: org
+    component: main
+    architectures:
+      - amd64
+    repos:
+      - apt/debian/dists/buster/mongodb-org
+
   - name: debian71
     type: deb
     code_name: "wheezy"
@@ -315,6 +326,17 @@ repos:
     bucket: repo.mongodb.com
     repos:
       - zypper/suse/15/mongodb-enterprise
+
+  - name: debian10
+    type: deb
+    edition: enterprise
+    code_name: "buster"
+    bucket: repo.mongodb.com
+    component: main
+    architectures:
+      - amd64
+    repos:
+      - apt/debian/dists/buster/mongodb-enterprise
 
   - name: debian92
     type: deb
