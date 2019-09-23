@@ -183,10 +183,11 @@ var _kill_sessions_api_module = (function() {
         this.visit(function(client) {
             var db = client.getDB("admin");
             db.setSlaveOk();
-            var cursors =
-                db.aggregate([{"$currentOp": {"idleCursors": true, "allUsers": true}}]).toArray();
-            cursors.forEach(function(cursor) {
-                assert(!cursor.lsid);
+            assert.soon(() => {
+                let cursors = db.aggregate([
+                                    {"$currentOp": {"idleCursors": true, "allUsers": true}}
+                                ]).toArray();
+                return cursors.every(cursor => !cursor.lsid);
             });
         });
     };
