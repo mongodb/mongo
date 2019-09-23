@@ -411,12 +411,11 @@ private:
 void processCrudOp(OperationContext* opCtx,
                    OplogEntry* op,
                    uint32_t* hash,
-                   StringMapHashedKey* hashedNs) {
-    const auto serviceContext = opCtx->getServiceContext();
-    const auto storageEngine = serviceContext->getStorageEngine();
-    const bool supportsDocLocking = storageEngine->supportsDocLocking();
-    CachedCollectionProperties collPropertiesCache;
-    auto collProperties = collPropertiesCache.getCollectionProperties(opCtx, *hashedNs);
+                   StringMapHashedKey* hashedNs,
+                   CachedCollectionProperties* collPropertiesCache) {
+    const bool supportsDocLocking =
+        opCtx->getServiceContext()->getStorageEngine()->supportsDocLocking();
+    auto collProperties = collPropertiesCache->getCollectionProperties(opCtx, *hashedNs);
 
     // For doc locking engines, include the _id of the document in the hash so we get
     // parallelism even if all writes are to a single collection.
@@ -457,12 +456,13 @@ void addToWriterVector(OplogEntry* op,
  */
 void addDerivedOps(OperationContext* opCtx,
                    MultiApplier::Operations* derivedOps,
-                   std::vector<MultiApplier::OperationPtrs>* writerVectors) {
+                   std::vector<MultiApplier::OperationPtrs>* writerVectors,
+                   CachedCollectionProperties* collPropertiesCache) {
     for (auto&& op : *derivedOps) {
         auto hashedNs = StringMapHasher().hashed_key(op.getNss().ns());
         uint32_t hash = static_cast<uint32_t>(hashedNs.hash());
         if (op.isCrudOpType()) {
-            processCrudOp(opCtx, &op, &hash, &hashedNs);
+            processCrudOp(opCtx, &op, &hash, &hashedNs, collPropertiesCache);
         }
         addToWriterVector(&op, writerVectors, hash);
     }
@@ -969,7 +969,7 @@ void SyncTail::_deriveOpsAndFillWriterVectors(
     SessionUpdateTracker* sessionUpdateTracker) noexcept {
 
     LogicalSessionIdMap<std::vector<OplogEntry*>> partialTxnOps;
-
+    CachedCollectionProperties collPropertiesCache;
     for (auto&& op : *ops) {
         // If the operation's optime is before or the same as the beginApplyingOpTime we don't want
         // to apply it, so don't include it in writerVectors.
@@ -988,7 +988,7 @@ void SyncTail::_deriveOpsAndFillWriterVectors(
         if (sessionUpdateTracker) {
             if (auto newOplogWrites = sessionUpdateTracker->updateSession(op)) {
                 derivedOps->emplace_back(std::move(*newOplogWrites));
-                addDerivedOps(opCtx, &derivedOps->back(), writerVectors);
+                addDerivedOps(opCtx, &derivedOps->back(), writerVectors, &collPropertiesCache);
             }
         }
 
@@ -1014,7 +1014,7 @@ void SyncTail::_deriveOpsAndFillWriterVectors(
         }
 
         if (op.isCrudOpType())
-            processCrudOp(opCtx, &op, &hash, &hashedNs);
+            processCrudOp(opCtx, &op, &hash, &hashedNs, &collPropertiesCache);
         // Extract applyOps operations and fill writers with extracted operations using this
         // function.
         if (op.isTerminalApplyOps()) {
@@ -1032,7 +1032,7 @@ void SyncTail::_deriveOpsAndFillWriterVectors(
                 partialTxnList.clear();
 
                 // Transaction entries cannot have different session updates.
-                addDerivedOps(opCtx, &derivedOps->back(), writerVectors);
+                addDerivedOps(opCtx, &derivedOps->back(), writerVectors, &collPropertiesCache);
             } else {
                 // The applyOps entry was not generated as part of a transaction.
                 invariant(!op.getPrevWriteOpTimeInTransaction());
@@ -1040,7 +1040,7 @@ void SyncTail::_deriveOpsAndFillWriterVectors(
                 derivedOps->emplace_back(ApplyOps::extractOperations(op));
 
                 // Nested entries cannot have different session updates.
-                addDerivedOps(opCtx, &derivedOps->back(), writerVectors);
+                addDerivedOps(opCtx, &derivedOps->back(), writerVectors, &collPropertiesCache);
             }
             continue;
         }
@@ -1056,7 +1056,7 @@ void SyncTail::_deriveOpsAndFillWriterVectors(
                 readTransactionOperationsFromOplogChain(opCtx, op, partialTxnList));
             partialTxnList.clear();
 
-            addDerivedOps(opCtx, &derivedOps->back(), writerVectors);
+            addDerivedOps(opCtx, &derivedOps->back(), writerVectors, &collPropertiesCache);
             continue;
         }
 
