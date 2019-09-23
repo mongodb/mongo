@@ -159,6 +159,9 @@ StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(
     // Therefore, we must always send singleBatch=false (wantMore=true) to the shards.
     newQR->setWantMore(true);
 
+    // Any expansion of the 'showRecordId' flag should have already happened on mongos.
+    newQR->setShowRecordId(false);
+
     invariant(newQR->validate());
     return std::move(newQR);
 }

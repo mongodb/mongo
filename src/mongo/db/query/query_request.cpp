@@ -592,6 +592,11 @@ void QueryRequest::asFindCommandInternal(BSONObjBuilder* cmdBuilder) const {
 }
 
 void QueryRequest::addShowRecordIdMetaProj() {
+    if (_proj["$recordId"]) {
+        // There's already some projection on $recordId. Don't overwrite it.
+        return;
+    }
+
     BSONObjBuilder projBob;
     projBob.appendElements(_proj);
     BSONObj metaRecordId = BSON("$recordId" << BSON("$meta" << QueryRequest::metaRecordId));

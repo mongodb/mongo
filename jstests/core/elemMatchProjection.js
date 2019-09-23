@@ -94,17 +94,8 @@ assert.eq(1,
               .x.length,
           "single object match with elemMatch");
 
-assert.eq(1,
-          coll.find({'group': 2, 'x': {'$elemMatch': {'a': 1, 'b': 2}}}, {'x.$': {'$slice': 1}})
-              .toArray()[0]
-              .x.length,
-          "single object match with elemMatch and positive slice");
-
-assert.eq(1,
-          coll.find({'group': 2, 'x': {'$elemMatch': {'a': 1, 'b': 2}}}, {'x.$': {'$slice': -1}})
-              .toArray()[0]
-              .x.length,
-          "single object match with elemMatch and negative slice");
+const err = assert.throws(() => coll.find({'group': 2, x: 1}, {'x.$': {'$slice': 1}}).toArray());
+assert.commandFailedWithCode(err, 31271);
 
 assert.eq(1,
           coll.find({'group': 12, 'x.y.a': 1}, {'x.y.$': 1}).toArray()[0].x.y.length,

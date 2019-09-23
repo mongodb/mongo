@@ -147,7 +147,8 @@ TEST(DependenciesToProjectionTest, ShouldAttemptToExcludeOtherFieldsIfOnlyTextSc
     deps.setNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE, true);
     ASSERT_BSONOBJ_EQ(deps.toProjection(),
                       BSON(Document::metaFieldTextScore << metaTextScore << "_id" << 0
-                                                        << "$noFieldsNeeded" << 1));
+                                                        << "$__INTERNAL_QUERY_PROJECTION_RESERVED"
+                                                        << 1));
 }
 
 TEST(DependenciesToProjectionTest,

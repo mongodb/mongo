@@ -46,13 +46,20 @@ t.insert({
     title: 'foo'
 });
 
-out = t.findOne({}, {comments: {$slice: 2}, 'comments.id': true});
-assert.eq(out.comments, [{id: 0}, {id: 1}]);
+// $slice in an inclusion projection.
+out = t.findOne({}, {comments: {$slice: 2}, irrelevantField: 1});
+assert.eq(out.comments, [{id: 0, text: 'a'}, {id: 1, text: 'b'}]);
 assert.eq(out.title, undefined);
 
-out = t.findOne({}, {comments: {$slice: 2}, 'comments.id': false});
-assert.eq(out.comments, [{text: 'a'}, {text: 'b'}]);
+// Check that on its own, $slice defaults to an exclusion projection.
+out = t.findOne({}, {comments: {$slice: 2}});
+assert.eq(out.comments, [{id: 0, text: 'a'}, {id: 1, text: 'b'}]);
 assert.eq(out.title, 'foo');
+
+// $slice in an exclusion projection (with explicit exclusions).
+out = t.findOne({}, {comments: {$slice: 2}, title: 0});
+assert.eq(out.comments, [{id: 0, text: 'a'}, {id: 1, text: 'b'}]);
+assert.eq(out.title, undefined);
 
 // nested arrays
 t.drop();

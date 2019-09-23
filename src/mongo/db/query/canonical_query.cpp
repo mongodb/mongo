@@ -40,6 +40,7 @@
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/indexability.h"
+#include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/util/log.h"
 
@@ -239,12 +240,40 @@ Status CanonicalQuery::init(OperationContext* opCtx,
 
     // Validate the projection if there is one.
     if (!_qr->getProj().isEmpty()) {
-        ParsedProjection* pp;
+        Status newParserStatus = Status::OK();
+        try {
+            // TODO SERVER-42422: Use ProjectionAST in the query planner. For now we discard 'proj'
+            // and just check that any error thrown is consistent with the ParsedProjection parser.
+            auto proj = projection_ast::parse(
+                expCtx, _qr->getProj(), _root.get(), _qr->getFilter(), ProjectionPolicies{});
+        } catch (const DBException& e) {
+            newParserStatus = e.toStatus();
+        }
+
+        ParsedProjection* pp = nullptr;
         Status projStatus = ParsedProjection::make(opCtx, _qr->getProj(), _root.get(), &pp);
+
+        std::unique_ptr<ParsedProjection> projDeleter(pp);
+        pp = nullptr;
+
+        // The query system is in the process of migrating from one projection
+        // implementation/language to another. If there's a projection that the old parser rejects
+        // but the new parser accepts, then the client is attempting to use a feature only available
+        // as part of the new language, so we fail to parse.
+        if (newParserStatus.isOK() && !projStatus.isOK()) {
+            return projStatus.withContext(str::stream()
+                                          << "projection " << _qr->getProj()
+                                          << " is supported by new parser but not the old parser");
+        }
+
         if (!projStatus.isOK()) {
             return projStatus;
         }
-        _proj.reset(pp);
+
+        if (!newParserStatus.isOK()) {
+            return newParserStatus;
+        }
+        _proj = std::move(projDeleter);
     }
 
     if (_proj && _proj->wantSortKey() && _qr->getSort().isEmpty()) {

@@ -34,8 +34,32 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
+
+namespace {
+const StringDataSet kAllowedDollarPrefixedFields = {
+    // For DBRef
+    "$id"_sd,
+    "$ref"_sd,
+    "$db"_sd,
+
+    // Metadata fields.
+
+    // TODO SERVER-42560: It may be possible to eliminate some of these, if they're only used for
+    // creating the "dependency" projection. Some of them ($dis and $sortKey) may be used in
+    // sharded queries and are necessary.
+    "$sortKey",
+    "$pt",
+    "$dis",
+    "$textScore",
+    "$recordId",
+
+    // Used internally for forcing projections to be of a certain type.
+    "$__INTERNAL_QUERY_PROJECTION_RESERVED"};
+
+}  // namespace
 
 using std::string;
 using std::vector;
@@ -75,7 +99,11 @@ FieldPath::FieldPath(std::string inputPath)
 
 void FieldPath::uassertValidFieldName(StringData fieldName) {
     uassert(15998, "FieldPath field names may not be empty strings.", !fieldName.empty());
-    uassert(16410, "FieldPath field names may not start with '$'.", fieldName[0] != '$');
+
+    if (fieldName[0] == '$' && !kAllowedDollarPrefixedFields.count(fieldName)) {
+        uasserted(16410, "FieldPath field names may not start with '$'.");
+    }
+
     uassert(
         16411, "FieldPath field names may not contain '\0'.", fieldName.find('\0') == string::npos);
     uassert(

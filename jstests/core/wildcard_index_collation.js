@@ -116,9 +116,4 @@ assert(isIndexOnly(coll.getDB(), winningPlan({E: 5}, {_id: 0, E: 1})));
 // Confirm that the $** index differentiates fieldname case when attempting to cover.
 assert(!isIndexOnly(coll.getDB(), winningPlan({e: 5}, {_id: 0, E: 1})));
 assert(!isIndexOnly(coll.getDB(), winningPlan({E: 5}, {_id: 0, e: 1})));
-
-// Confirm that attempting to project the virtual $_path field which is present in $** index
-// keys produces a non-covered solution, which nonetheless returns the correct results.
-assert(!isIndexOnly(coll.getDB(), winningPlan({e: 5}, {_id: 0, e: 1, $_path: 1})));
-assertWildcardIndexAnswersQuery({e: 5}, [{e: 5}, {e: 5}], {_id: 0, e: 1, $_path: 1});
 })();

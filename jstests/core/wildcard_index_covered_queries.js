@@ -70,12 +70,12 @@ assertWildcardProvidesCoveredSolution({"a.b": {$in: [0, 50, 100, 150]}}, {_id: 0
 assertWildcardProvidesCoveredSolution({"a.c": {$in: ["0", "50", "100", "150"]}},
                                       {_id: 0, "a.c": 1});
 
-// Verify that attempting to project the virtual $_path field from the $** keyPattern will fail
-// to do so and will instead produce a non-covered query. However, this query will nonetheless
-// output the correct results.
+// Verify that attempting to project the virtual $_path field from the $** keyPattern will produce
+// an error, as it is a dollar-prefixed name.
 const shouldFailToCover = true;
-assertWildcardProvidesCoveredSolution(
-    {d: {$in: [0, 25, 50, 75, 100]}}, {_id: 0, d: 1, $_path: 1}, shouldFailToCover);
+const err = assert.throws(
+    () => coll.find({d: {$in: [0, 25, 50, 75, 100]}}, {_id: 0, d: 1, $_path: 1}).toArray());
+assert.commandFailedWithCode(err, 16410);
 
 // Verify that predicates which produce inexact-fetch bounds are not covered by a $** index.
 assertWildcardProvidesCoveredSolution(

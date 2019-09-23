@@ -35,8 +35,6 @@
 namespace mongo {
 namespace projection_ast {
 namespace {
-// TODO: SERVER-42421 Replace BadValue with numeric error code throughout this file.
-
 void addNodeAtPathHelper(ProjectionPathASTNode* root,
                          const FieldPath& path,
                          size_t componentIndex,
@@ -64,11 +62,10 @@ void addNodeAtPathHelper(ProjectionPathASTNode* root,
 
     // Either find or create an internal node.
     auto* childPathNode = exact_pointer_cast<ProjectionPathASTNode*>(child);
-    if (childPathNode == nullptr) {
-        uasserted(31249,
-                  str::stream() << "Path collision at " << path.fullPath() << " remaining portion "
-                                << path.tail().fullPath());
-    }
+    uassert(31249,
+            str::stream() << "Path collision at " << path.fullPath() << " remaining portion "
+                          << path.tail().fullPath(),
+            childPathNode != nullptr);
 
     addNodeAtPathHelper(childPathNode, path, componentIndex + 1, std::move(newChild));
 }
@@ -79,9 +76,29 @@ void addNodeAtPath(ProjectionPathASTNode* root,
     addNodeAtPathHelper(root, path, 0, std::move(newChild));
 }
 
-bool isPositionalOperator(const char* fieldName) {
-    // TODO: SERVER-42421: Deal with special cases of $id, $ref, and $db.
-    return str::endsWith(fieldName, ".$");
+/**
+ * Return a pair {begin, end} indicating where the first positional operator in the string is.
+ * If there is no positional operator, returns boost::none.
+ */
+boost::optional<std::pair<size_t, size_t>> findFirstPositionalOperator(StringData fullPath) {
+    size_t first = fullPath.find(".$.");
+    if (first != std::string::npos) {
+        return {{first, first + 3}};
+    }
+
+    // There are no cases of the positional operator in between paths, so it must be at the end.
+    if (fullPath.endsWith(".$")) {
+        return {{fullPath.size() - 2, fullPath.size()}};
+    }
+
+    // If the entire path is just a '$' we consider that part of the positional projection.
+    // This case may arise if there are two positional projections in a row, such as "a.$.$".
+    // For now such cases are banned elsewhere in the parsing code.
+    if (fullPath == "$") {
+        return {{0, fullPath.size()}};
+    }
+
+    return boost::none;
 }
 
 bool hasPositionalOperatorMatch(const MatchExpression* const query, StringData matchField) {
@@ -119,8 +136,7 @@ Projection parse(boost::intrusive_ptr<ExpressionContext> expCtx,
                  const MatchExpression* const query,
                  const BSONObj& queryObj,
                  ProjectionPolicies policies) {
-
-    // TODO: SERVER-42421 Support agg syntax with nesting.
+    // TODO: SERVER-42988 Support agg syntax with nesting.
 
     ProjectionPathASTNode root;
 
@@ -128,35 +144,37 @@ Projection parse(boost::intrusive_ptr<ExpressionContext> expCtx,
 
     bool hasPositional = false;
     bool hasElemMatch = false;
+    bool hasFindSlice = false;
     boost::optional<ProjectType> type;
     for (auto&& elem : obj) {
         idSpecified |=
             elem.fieldNameStringData() == "_id" || elem.fieldNameStringData().startsWith("_id.");
 
-        if (elem.type() == BSONType::Object) {
-            BSONObj obj = elem.embeddedObject();
-            BSONElement e2 = obj.firstElement();
+        const auto firstPositionalProjection =
+            findFirstPositionalOperator(elem.fieldNameStringData());
 
-            // Before converting to FieldPath make sure this is not a positional operator.
-            uassert(
-                ErrorCodes::BadValue,
-                "$slice and positional projection are not allowed together",
-                !(isPositionalOperator(elem.fieldName()) && e2.fieldNameStringData() == "$slice"));
+        if (elem.type() == BSONType::Object) {
+            BSONObj subObj = elem.embeddedObject();
+
+            // Make sure this isn't a positional operator. It's illegal to combine positional with
+            // any expression.
+            uassert(31271,
+                    "positional projection cannot be used with an expression",
+                    !firstPositionalProjection);
 
             FieldPath path(elem.fieldNameStringData());
 
-            if (e2.fieldNameStringData() == "$slice") {
-                if (e2.isNumber()) {
-                    // This is A-OK.
-                    addNodeAtPath(
-                        &root,
-                        path,
-                        std::make_unique<ProjectionSliceASTNode>(boost::none, e2.numberInt()));
-                } else if (e2.type() == BSONType::Array) {
-                    BSONObj arr = e2.embeddedObject();
-                    if (2 != arr.nFields()) {
-                        uasserted(ErrorCodes::BadValue, "$slice array wrong size");
-                    }
+            if (subObj.firstElementFieldNameStringData() == "$slice") {
+                if (subObj.firstElement().isNumber()) {
+                    addNodeAtPath(&root,
+                                  path,
+                                  std::make_unique<ProjectionSliceASTNode>(
+                                      boost::none, subObj.firstElement().numberInt()));
+                } else if (subObj.firstElementType() == BSONType::Array) {
+                    BSONObj arr = subObj.firstElement().embeddedObject();
+                    uassert(31272,
+                            "$slice array argument should be of form [skip, limit]",
+                            arr.nFields() == 2);
 
                     BSONObjIterator it(arr);
                     BSONElement skipElt = it.next();
@@ -172,34 +190,32 @@ Projection parse(boost::intrusive_ptr<ExpressionContext> expCtx,
                             limitElt.isNumber());
 
 
-                    if (limitElt.numberInt() <= 0) {
-                        uasserted(31259,
-                                  str::stream() << "$slice limit must be positive, got "
-                                                << limitElt.numberInt());
-                    }
+                    uassert(31259,
+                            str::stream()
+                                << "$slice limit must be positive, got " << limitElt.numberInt(),
+                            limitElt.numberInt() > 0);
                     addNodeAtPath(&root,
                                   path,
                                   std::make_unique<ProjectionSliceASTNode>(skipElt.numberInt(),
                                                                            limitElt.numberInt()));
                 } else {
-                    uasserted(ErrorCodes::BadValue,
-                              "$slice only supports numbers and [skip, limit] arrays");
+                    uasserted(31273, "$slice only supports numbers and [skip, limit] arrays");
                 }
-            } else if (e2.fieldNameStringData() == "$elemMatch") {
+
+                hasFindSlice = true;
+            } else if (subObj.firstElementFieldNameStringData() == "$elemMatch") {
                 // Validate $elemMatch arguments and dependencies.
-                if (BSONType::Object != e2.type()) {
-                    uasserted(ErrorCodes::BadValue,
-                              "elemMatch: Invalid argument, object required.");
-                }
+                uassert(31274,
+                        str::stream() << "elemMatch: Invalid argument, object required, but got "
+                                      << subObj.firstElementType(),
+                        subObj.firstElementType() == BSONType::Object);
 
-                if (hasPositional) {
-                    uasserted(31255, "Cannot specify positional operator and $elemMatch.");
-                }
+                uassert(
+                    31255, "Cannot specify positional operator and $elemMatch.", !hasPositional);
 
-                if (str::contains(elem.fieldName(), '.')) {
-                    uasserted(ErrorCodes::BadValue,
-                              "Cannot use $elemMatch projection on a nested field.");
-                }
+                uassert(31275,
+                        "Cannot use $elemMatch projection on a nested field.",
+                        !str::contains(elem.fieldName(), '.'));
 
                 // Create a MatchExpression for the elemMatch.
                 BSONObj elemMatchObj = elem.wrap();
@@ -220,46 +236,61 @@ Projection parse(boost::intrusive_ptr<ExpressionContext> expCtx,
                               std::make_unique<ProjectionElemMatchASTNode>(std::move(matchNode)));
                 hasElemMatch = true;
             } else {
-                uassert(31252,
-                        "Cannot use expression in exclusion projection",
-                        !type || *type == ProjectType::kInclusion);
-                type = ProjectType::kInclusion;
+                const bool isMeta = subObj.firstElementFieldNameStringData() == "$meta";
 
-                auto expr = Expression::parseExpression(expCtx, obj, expCtx->variablesParseState);
+                uassert(31252,
+                        "Cannot use expression other than $meta in exclusion projection",
+                        !type || *type == ProjectType::kInclusion || isMeta);
+
+                if (!isMeta) {
+                    type = ProjectType::kInclusion;
+                }
+
+                auto expr =
+                    Expression::parseExpression(expCtx, subObj, expCtx->variablesParseState);
                 addNodeAtPath(&root, path, std::make_unique<ExpressionASTNode>(expr));
             }
 
         } else if (elem.trueValue()) {
-            if (!isPositionalOperator(elem.fieldName())) {
+            if (!firstPositionalProjection) {
                 FieldPath path(elem.fieldNameStringData());
                 addNodeAtPath(&root, path, std::make_unique<BooleanConstantASTNode>(true));
             } else {
-                if (hasPositional) {
-                    uasserted(ErrorCodes::BadValue,
-                              "Cannot specify more than one positional proj. per query.");
-                }
+                uassert(31276,
+                        "Cannot specify more than one positional projection per query.",
+                        !hasPositional);
 
-                if (hasElemMatch) {
-                    uasserted(31256, "Cannot specify positional operator and $elemMatch.");
-                }
-
-                StringData after = str::after(elem.fieldNameStringData(), ".$");
-                if (after.find(".$"_sd) != std::string::npos) {
-                    str::stream ss;
-                    ss << "Positional projection '" << elem.fieldName() << "' contains "
-                       << "the positional operator more than once.";
-                    uasserted(ErrorCodes::BadValue, ss);
-                }
+                uassert(31256, "Cannot specify positional operator and $elemMatch.", !hasElemMatch);
 
                 StringData matchField = str::before(elem.fieldNameStringData(), '.');
-                if (!query || !hasPositionalOperatorMatch(query, matchField)) {
-                    str::stream ss;
-                    ss << "Positional projection '" << elem.fieldName() << "' does not "
-                       << "match the query document.";
-                    uasserted(ErrorCodes::BadValue, ss);
-                }
+                uassert(31277,
+                        str::stream()
+                            << "Positional projection '" << elem.fieldName() << "' does not "
+                            << "match the query document.",
+                        query && hasPositionalOperatorMatch(query, matchField));
 
-                FieldPath path(str::before(elem.fieldNameStringData(), ".$"));
+                // Check that the path does not end with ".$." which can be interpreted as the
+                // positional projection.
+                uassert(31270,
+                        str::stream() << "Path cannot end with '.$.'",
+                        !elem.fieldNameStringData().endsWith(".$."));
+
+                const auto [firstPositionalBegin, firstPositionalEnd] = *firstPositionalProjection;
+
+                // See if there's another positional operator after the first one. If there is,
+                // it's invalid.
+                StringData remainingPathAfterPositional =
+                    elem.fieldNameStringData().substr(firstPositionalEnd);
+                uassert(31287,
+                        str::stream() << "Cannot use positional operator twice: "
+                                      << elem.fieldNameStringData(),
+                        findFirstPositionalOperator(remainingPathAfterPositional) == boost::none);
+
+                // Get everything up to the first positional operator.
+                StringData pathWithoutPositionalOperator =
+                    elem.fieldNameStringData().substr(0, firstPositionalBegin);
+
+                FieldPath path(pathWithoutPositionalOperator);
                 invariant(query);
                 addNodeAtPath(
                     &root,
@@ -290,12 +321,28 @@ Projection parse(boost::intrusive_ptr<ExpressionContext> expCtx,
         }
     }
 
-    if (!idSpecified && policies.idPolicy == ProjectionPolicies::DefaultIdPolicy::kIncludeId) {
+    // find() defaults about inclusion/exclusion. These rules are preserved for compatibility
+    // reasons. If there are no explicit inclusion/exclusion fields, the type depends on which
+    // expressions (if any) are used.
+    if (!type) {
+        if (hasFindSlice) {
+            type = ProjectType::kExclusion;
+        } else if (hasElemMatch) {
+            type = ProjectType::kInclusion;
+        } else {
+            // This happens only when the projection is entirely $meta expressions.
+            type = ProjectType::kExclusion;
+        }
+    }
+    invariant(type);
+
+    if (!idSpecified && policies.idPolicy == ProjectionPolicies::DefaultIdPolicy::kIncludeId &&
+        *type == ProjectType::kInclusion) {
         // Add a node to the root indicating that _id is included.
         addNodeAtPath(&root, "_id", std::make_unique<BooleanConstantASTNode>(true));
     }
 
-    return Projection{std::move(root), type ? *type : ProjectType::kExclusion};
+    return Projection{std::move(root), *type};
 }
 
 Projection parse(boost::intrusive_ptr<ExpressionContext> expCtx,

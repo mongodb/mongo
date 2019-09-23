@@ -12,7 +12,6 @@ t.ensureIndex({a: "text"});
 
 // Project the text score.
 var results = t.find({$text: {$search: "textual content -irrelevant"}}, {
-                   _idCopy: 0,
                    score: {$meta: "textScore"}
                }).toArray();
 // printjson(results);
@@ -77,7 +76,6 @@ assert.throws(function() {
 // SERVER-12173
 // When $text operator is in $or, should evaluate first
 results = t.find({$or: [{$text: {$search: "textual content -irrelevant"}}, {_id: 1}]}, {
-               _idCopy: 0,
                score: {$meta: "textScore"}
            }).toArray();
 printjson(results);

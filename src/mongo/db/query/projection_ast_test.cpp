@@ -55,7 +55,7 @@ public:
         StatusWith<std::unique_ptr<MatchExpression>> swMatchExpression(nullptr);
         if (matchExprBson) {
             swMatchExpression = MatchExpressionParser::parse(*matchExprBson, getExpCtx());
-            ASSERT_OK(swMatchExpression.getStatus());
+            uassertStatusOK(swMatchExpression.getStatus());
         }
 
         return projection_ast::parse(getExpCtx(),
@@ -101,6 +101,55 @@ TEST_F(ProjectionASTTest, TestParsingTypeExclusion) {
     ASSERT(p.type() == ProjectType::kExclusion);
 }
 
+TEST_F(ProjectionASTTest, TestParsingTypeOnlyElemMatch) {
+    Projection p = parseWithDefaultPolicies(fromjson("{a: {$elemMatch: {foo: 3}}}"));
+    ASSERT(p.type() == ProjectType::kInclusion);
+}
+
+TEST_F(ProjectionASTTest, TestParsingTypeOnlySlice) {
+    Projection p = parseWithDefaultPolicies(fromjson("{a: {$slice: 1}}"));
+    ASSERT(p.type() == ProjectType::kExclusion);
+}
+
+TEST_F(ProjectionASTTest, TestParsingTypeOnlyElemMatchAndSlice) {
+    {
+        Projection p =
+            parseWithDefaultPolicies(fromjson("{a: {$elemMatch: {foo: 3}}, b: {$slice: 1}}"));
+        ASSERT(p.type() == ProjectType::kExclusion);
+    }
+
+    // The order shouldn't matter.
+    {
+        Projection p =
+            parseWithDefaultPolicies(fromjson("{a: {$slice: 1}, b: {$elemMatch: {foo: 3}}}"));
+        ASSERT(p.type() == ProjectType::kExclusion);
+    }
+}
+
+TEST_F(ProjectionASTTest, TestParsingExclusionWithMeta) {
+    {
+        Projection p = parseWithDefaultPolicies(fromjson("{a: 0, b: {$meta: 'sortKey'}}"));
+        ASSERT(p.type() == ProjectType::kExclusion);
+    }
+
+    {
+        Projection p = parseWithDefaultPolicies(fromjson("{b: {$meta: 'sortKey'}, c: 0}"));
+        ASSERT(p.type() == ProjectType::kExclusion);
+    }
+}
+
+TEST_F(ProjectionASTTest, TestParsingInclusionWithMeta) {
+    {
+        Projection p = parseWithDefaultPolicies(fromjson("{a: 1, b: {$meta: 'sortKey'}}"));
+        ASSERT(p.type() == ProjectType::kInclusion);
+    }
+
+    {
+        Projection p = parseWithDefaultPolicies(fromjson("{b: {$meta: 'sortKey'}, c: 1}"));
+        ASSERT(p.type() == ProjectType::kInclusion);
+    }
+}
+
 TEST_F(ProjectionASTTest, TestInvalidProjectionWithInclusionsAndExclusions) {
     ASSERT_THROWS_CODE(parseWithDefaultPolicies(fromjson("{a: 1, b: 0}")), DBException, 31254);
     ASSERT_THROWS_CODE(parseWithDefaultPolicies(fromjson("{a: 0, b: 1}")), DBException, 31253);
@@ -130,7 +179,6 @@ TEST_F(ProjectionASTTest, TestCloningWithPositionalAndSlice) {
     assertCanClone(std::move(proj));
 }
 
-// Can't use $elemMatch in projections which use the positional projection.
 TEST_F(ProjectionASTTest, TestCloningWithElemMatch) {
     Projection proj =
         parseWithDefaultPolicies(fromjson("{'a.b': 1, b: 1, f: {$elemMatch: {foo: 'bar'}}}"));
@@ -152,6 +200,28 @@ TEST_F(ProjectionASTTest, TestDebugBSONWithPositionalAndSliceSkipLimit) {
     BSONObj output = projection_ast::astToDebugBSON(proj.root());
     BSONObj expected = fromjson(
         "{a: {b: true}, b: true, c: {'d.$': {'c.d': {$eq: 1}}}, f: {$slice: [1, 2]}, _id: true}");
+    ASSERT_BSONOBJ_EQ(output, expected);
+}
+
+TEST_F(ProjectionASTTest, TestDebugBSONWithPositionalInTheMiddleOfFieldPaths) {
+    // Should treat "c.d.$.e" the same as "c.d.$".
+    Projection proj = parseWithDefaultPolicies(fromjson("{'a.b': 1, b: 1, 'c.d.$.e': 1}"),
+                                               fromjson("{'c.d': 1}"));
+
+    BSONObj output = projection_ast::astToDebugBSON(proj.root());
+    BSONObj expected =
+        fromjson("{a: {b: true}, b: true, c: {'d.$': {'c.d': {$eq: 1}}}, _id: true}");
+    ASSERT_BSONOBJ_EQ(output, expected);
+}
+
+TEST_F(ProjectionASTTest, TestDebugBSONWithPositionalInTheMiddleOfFieldPathsWithDollarPrefixField) {
+    // Should treat "c.$id.$.e" the same as "c.$id.$".
+    Projection proj = parseWithDefaultPolicies(fromjson("{'a.b': 1, b: 1, 'c.$id.$.e': 1}"),
+                                               fromjson("{'c.$id': 1}"));
+
+    BSONObj output = projection_ast::astToDebugBSON(proj.root());
+    BSONObj expected =
+        fromjson("{a: {b: true}, b: true, c: {'$id.$': {'c.$id': {$eq: 1}}}, _id: true}");
     ASSERT_BSONOBJ_EQ(output, expected);
 }
 
@@ -183,6 +253,30 @@ TEST_F(ProjectionASTTest, TestDebugBSONWithExpression) {
     ASSERT_BSONOBJ_EQ(output, expected);
 }
 
+TEST_F(ProjectionASTTest, TestDebugBSONWithExclusion) {
+    Projection proj = parseWithDefaultPolicies(fromjson("{a: 0, b: 0}"));
+
+    BSONObj output = projection_ast::astToDebugBSON(proj.root());
+    BSONObj expected = fromjson("{a: false, b: false}");
+    ASSERT_BSONOBJ_EQ(output, expected);
+}
+
+TEST_F(ProjectionASTTest, TestDebugBSONWithOnlyElemMatch) {
+    Projection proj = parseWithDefaultPolicies(fromjson("{a: {$elemMatch: {foo: 3}}}"));
+
+    BSONObj output = projection_ast::astToDebugBSON(proj.root());
+    BSONObj expected = fromjson("{a: {$elemMatch: {foo: {$eq: 3}}}, _id: true}");
+    ASSERT_BSONOBJ_EQ(output, expected);
+}
+
+TEST_F(ProjectionASTTest, TestDebugBSONWithOnlySlice) {
+    Projection proj = parseWithDefaultPolicies(fromjson("{a: {$slice: 1}}"));
+
+    BSONObj output = projection_ast::astToDebugBSON(proj.root());
+    BSONObj expected = fromjson("{a: {$slice: 1}}");
+    ASSERT_BSONOBJ_EQ(output, expected);
+}
+
 TEST_F(ProjectionASTTest, ParserErrorsOnCollisionNestedFieldFirst) {
     ASSERT_THROWS_CODE(
         parseWithDefaultPolicies(fromjson("{'a.b': 1, d: 1, a: 1}")), DBException, 31250);
@@ -193,7 +287,7 @@ TEST_F(ProjectionASTTest, ParserErrorsOnCollisionNestedFieldLast) {
         parseWithDefaultPolicies(fromjson("{a: 1, d: 1, 'a.b': 1}")), DBException, 31249);
 }
 
-TEST_F(ProjectionASTTest, ParserErrorsOnInvalidSlice) {
+TEST_F(ProjectionASTTest, ParserErrorsOnInvalidSliceArguments) {
     ASSERT_THROWS_CODE(parseWithDefaultPolicies(fromjson("{a: {$slice: ['not a number', 123]}}")),
                        DBException,
                        31257);
@@ -204,6 +298,104 @@ TEST_F(ProjectionASTTest, ParserErrorsOnInvalidSlice) {
 
     ASSERT_THROWS_CODE(
         parseWithDefaultPolicies(fromjson("{a: {$slice: [123, -5]}}")), DBException, 31259);
+}
+
+TEST_F(ProjectionASTTest, ParserErrorsOnSliceWithWrongNumberOfArguments) {
+    ASSERT_THROWS_CODE(
+        parseWithDefaultPolicies(fromjson("{'a': {$slice: []}}")), DBException, 31272);
+    ASSERT_THROWS_CODE(
+        parseWithDefaultPolicies(fromjson("{'a': {$slice: [1, 2, 3]}}")), DBException, 31272);
+}
+
+TEST_F(ProjectionASTTest, ParserErrorsOnSliceWithWrongArgumentType) {
+    ASSERT_THROWS_CODE(
+        parseWithDefaultPolicies(fromjson("{'a': {$slice: 'hello world'}}")), DBException, 31273);
+    ASSERT_THROWS_CODE(
+        parseWithDefaultPolicies(fromjson("{'a': {$slice: {foo: 1}}}")), DBException, 31273);
+}
+
+TEST_F(ProjectionASTTest, ParserErrorsOnInvalidElemMatchArgument) {
+    ASSERT_THROWS_CODE(
+        parseWithDefaultPolicies(fromjson("{a: {$elemMatch: []}}")), DBException, 31274);
+
+    ASSERT_THROWS_CODE(
+        parseWithDefaultPolicies(fromjson("{a: {$elemMatch: 'string'}}")), DBException, 31274);
+}
+
+TEST_F(ProjectionASTTest, ParserErrorsOnElemMatchOnDottedField) {
+    ASSERT_THROWS_CODE(
+        parseWithDefaultPolicies(fromjson("{'a.b': {$elemMatch: {b: 1}}}")), DBException, 31275);
+}
+
+TEST_F(ProjectionASTTest, ParserErrorsOnMultiplePositionalInOnePath) {
+    ASSERT_THROWS_CODE(parseWithDefaultPolicies(fromjson("{'a.$.b.$': 1}"), fromjson("{a: 1}")),
+                       DBException,
+                       31287);
+}
+
+TEST_F(ProjectionASTTest, ParserErrorsOnMultiplePositionalInProjection) {
+    ASSERT_THROWS_CODE(
+        parseWithDefaultPolicies(fromjson("{'a.$': 1, 'b.$': 1}"), fromjson("{a: 1, b: 1}")),
+        DBException,
+        31276);
+
+    ASSERT_THROWS_CODE(parseWithDefaultPolicies(fromjson("{'a.b.$.': 1}"), fromjson("{a: 1}")),
+                       DBException,
+                       31270);
+
+    ASSERT_THROWS_CODE(parseWithDefaultPolicies(fromjson("{'a.$.b.$': 1}"), fromjson("{a: 1}")),
+                       DBException,
+                       31287);
+
+    ASSERT_THROWS_CODE(
+        parseWithDefaultPolicies(fromjson("{'a.$.$': 1}"), fromjson("{a: 1}")), DBException, 31287);
+}
+
+TEST_F(ProjectionASTTest, ParserErrorsOnPositionalProjectionNotMatchingQuery) {
+    ASSERT_THROWS_CODE(
+        parseWithDefaultPolicies(fromjson("{'a.$': 1}"), fromjson("{b: 1}")), DBException, 31277);
+}
+
+TEST_F(ProjectionASTTest, ParserErrorsOnSubfieldPrefixedByDbRefField) {
+    ASSERT_THROWS_CODE(
+        parseWithDefaultPolicies(fromjson("{'a.$idFOOBAR': 1}")), DBException, 16410);
+}
+
+TEST_F(ProjectionASTTest, ParserErrorsOnJustPositionalProjection) {
+    ASSERT_THROWS_CODE(
+        parseWithDefaultPolicies(fromjson("{'$': 1}"), fromjson("{a: 1}")), DBException, 31277);
+
+    // {$: 1} is an invalid match expression.
+    ASSERT_THROWS_CODE(parseWithDefaultPolicies(fromjson("{$: 1}"), fromjson("{$: 1}")),
+                       DBException,
+                       ErrorCodes::BadValue);
+
+    ASSERT_THROWS_CODE(
+        parseWithDefaultPolicies(fromjson("{'$': 1}"), fromjson("{}")), DBException, 31277);
+}
+
+TEST_F(ProjectionASTTest, ParserErrorsOnPositionalAndSlice) {
+    ASSERT_THROWS_CODE(
+        parseWithDefaultPolicies(fromjson("{'a.$': {$slice: 1}}")), DBException, 31271);
+}
+
+TEST_F(ProjectionASTTest, ParserErrorsOnPositionalOnElemMatch) {
+    ASSERT_THROWS_CODE(
+        parseWithDefaultPolicies(fromjson("{'a.$': {$elemMatch: {b: 1}}}")), DBException, 31271);
+}
+
+TEST_F(ProjectionASTTest, ParserDoesNotErrorOnPositionalOfDbRefField) {
+    Projection idProj =
+        parseWithDefaultPolicies(fromjson("{'a.$id.b.$': 1, x: 1}"), fromjson("{'a.$id.b': 1}"));
+    ASSERT(idProj.type() == ProjectType::kInclusion);
+
+    Projection dbProj =
+        parseWithDefaultPolicies(fromjson("{'a.$db.b.$': 1, x: 1}"), fromjson("{'a.$db.b': 1}"));
+    ASSERT(dbProj.type() == ProjectType::kInclusion);
+
+    Projection refProj =
+        parseWithDefaultPolicies(fromjson("{'a.$ref.b.$': 1, x: 1}"), fromjson("{'a.$ref.b': 1}"));
+    ASSERT(refProj.type() == ProjectType::kInclusion);
 }
 
 }  // namespace

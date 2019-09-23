@@ -77,7 +77,7 @@ BSONObj DepsTracker::toProjection() const {
             // projection language. We use $noFieldsNeeded with a meta-projection since this is an
             // inclusion projection which will exclude all existing fields but add the metadata.
             bb.append("_id", 0);
-            bb.append("$noFieldsNeeded", 1);
+            bb.append("$__INTERNAL_QUERY_PROJECTION_RESERVED", 1);
         }
         // We either need nothing (as we would if this was logically a count), or only the metadata.
         return bb.obj();
