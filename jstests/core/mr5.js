@@ -9,15 +9,9 @@
 "use strict";
 
 load("jstests/aggregation/extras/utils.js");  // For resultsEq.
-load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.
 
 const t = db.mr5;
 t.drop();
-
-// Do not execute new path on the passthrough suites.
-if (!FixtureHelpers.isMongos(db)) {
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryUseAggMapReduce: true}));
-}
 
 assert.commandWorked(t.insert({"partner": 1, "visits": 9}));
 assert.commandWorked(t.insert({"partner": 2, "visits": 9}));
@@ -71,6 +65,4 @@ assert(resultsEq([9, 11, 30], resultAsObj["1"].stats));
 assert(resultsEq([9, 41, 41], resultAsObj["2"].stats));
 
 res.drop();
-
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryUseAggMapReduce: false}));
 }());

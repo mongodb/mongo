@@ -1,0 +1,34 @@
+# This suite spawns a mongod with the parameter 'internalQueryUseAggMapReduce' set to true to
+# direct mapReduce commands to the new aggregation implementation.
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/core/mr_index.js
+  - jstests/core/mr_merge2.js
+  - jstests/core/mr_mutable_properties.js
+  - jstests/core/mr_sort.js
+  - jstests/core/mr_tolerates_js_exception.js
+  - jstests/core/mr_undef.js
+  - jstests/core/mr5.js
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config:
+    shell_options:
+      readMode: commands
+  hooks:
+  - class: ValidateCollections
+    shell_options:
+      global_vars:
+        TestData:
+          skipValidationOnNamespaceNotFound: false
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        internalQueryUseAggMapReduce: true

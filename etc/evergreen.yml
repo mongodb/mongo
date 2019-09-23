@@ -6335,6 +6335,24 @@ tasks:
       resmoke_args: --suites=core_txns_large_txns_format --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: jsCore_map_reduce_agg
+  tags: ["jscore", "common"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=core_map_reduce_agg --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: sharding_map_reduce_agg
+  tags: ["sharding"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_map_reduce_agg --storageEngine=wiredTiger
+
+- <<: *task_template
   name: sharded_jscore_txns
   tags: ["sharding", "jscore", "txns"]
   commands:

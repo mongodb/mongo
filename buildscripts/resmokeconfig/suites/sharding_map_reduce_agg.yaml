@@ -1,0 +1,20 @@
+# This suite spawns a sharded cluster with the parameter 'internalQueryUseAggMapReduce' set to true
+# to direct mapReduce commands to the new aggregation implementation.
+test_kind: js_test
+
+selector:
+  roots:
+  # Placeholder test to avoid failing in resmoke.
+  - jstests/sharding/accurate_count_with_predicate.js
+
+executor:
+  config:
+    shell_options:
+      nodb: ''
+      readMode: commands
+      global_vars:
+        TestData:
+          setParameters:
+            internalQueryUseAggMapReduce: true
+          setParametersMongos:
+            internalQueryUseAggMapReduce: true

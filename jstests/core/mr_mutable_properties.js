@@ -7,14 +7,6 @@
 // See SERVER-9448
 // Test argument and receiver (aka 'this') objects and their children can be mutated
 // in Map, Reduce and Finalize functions
-
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
-
-// Do not execute new path on the passthrough suites.
-if (!FixtureHelpers.isMongos(db)) {
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryUseAggMapReduce: true}));
-}
-
 var collection = db.mrMutableReceiver;
 collection.drop();
 collection.insert({a: 1});
@@ -79,5 +71,3 @@ assert.eq(mr.results[0].value.food[5].cream, 1);
 mr.results[0].value.food.forEach(function(val) {
     assert.eq(val.mod, 1);
 });
-
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryUseAggMapReduce: false}));
