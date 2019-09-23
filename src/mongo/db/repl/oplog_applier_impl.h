@@ -30,7 +30,12 @@
 
 #pragma once
 
+#include "mongo/db/commands/fsync.h"
+#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
+#include "mongo/db/repl/initial_syncer.h"
 #include "mongo/db/repl/oplog_applier.h"
+#include "mongo/db/repl/opqueue_batcher.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -67,10 +72,22 @@ private:
 
     void _shutdown() override;
 
+    /**
+     * Runs oplog application in a loop until shutdown() is called.
+     * Retrieves operations from the OplogBuffer in batches that will be applied in parallel using
+     * multiApply().
+     */
+    void _runLoop(OplogBuffer* oplogBuffer,
+                  OplogApplier::GetNextApplierBatchFn getNextApplierBatchFn);
+
     StatusWith<OpTime> _multiApply(OperationContext* opCtx, Operations ops) override;
 
     // Not owned by us.
     ReplicationCoordinator* const _replCoord;
+
+    StorageInterface* _storageInterface;
+
+    ReplicationConsistencyMarkers* const _consistencyMarkers;
 
     // Used to run oplog application loop.
     SyncTail _syncTail;

@@ -523,8 +523,9 @@ env.Library(
     source=[
         'insert_group.cpp',
         'oplog_applier_impl.cpp',
+        'opqueue_batcher.cpp',
         'session_update_tracker.cpp',
-        'sync_tail.cpp',
+        'sync_tail.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
