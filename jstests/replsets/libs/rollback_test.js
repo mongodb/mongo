@@ -237,9 +237,6 @@ function RollbackTest(name = "RollbackTest", replSet) {
                 `may prevent a rollback here.`);
         }
 
-        // Unfreeze the node if it was previously frozen, so that it can run for the election.
-        assert.commandWorked(curSecondary.adminCommand({replSetFreeze: 0}));
-
         // Ensure that the tiebreaker node is connected to the other nodes. We must do this after
         // we are sure that rollback has completed on the rollback node.
         tiebreakerNode.reconnect([curPrimary, curSecondary]);
@@ -251,6 +248,9 @@ function RollbackTest(name = "RollbackTest", replSet) {
         rst.awaitReplication();
 
         log(`Rollback on ${curSecondary.host} (if needed) and awaitReplication completed`, true);
+
+        // Unfreeze the node if it was previously frozen, so that it can run for the election.
+        assert.commandWorked(curSecondary.adminCommand({replSetFreeze: 0}));
 
         // We call transition to steady state ops after awaiting replication has finished,
         // otherwise it could be confusing to see operations being replicated when we're already
@@ -445,10 +445,11 @@ function RollbackTest(name = "RollbackTest", replSet) {
         if (curState === State.kSyncSourceOpsDuringRollback &&
             rst.getNodeId(curSecondary) === nodeId) {
             assert.soon(() => {
-                // Try stepping down the rollback node if it became the primary after its
-                // restart, as it might have caught up with the original primary.
-                curSecondary.adminCommand({"replSetStepDown": kForeverSecs, "force": true});
                 try {
+                    // Try stepping down the rollback node if it became the primary after its
+                    // restart, as it might have caught up with the original primary and facing
+                    // arbitrary machine/network slowness.
+                    curSecondary.adminCommand({"replSetStepDown": kForeverSecs, "force": true});
                     // Prevent rollback node from running election. There is a chance that this
                     // node might have started running election or became primary after
                     // 'replSetStepDown' cmd, so 'replSetFreeze' cmd can fail.
@@ -456,12 +457,14 @@ function RollbackTest(name = "RollbackTest", replSet) {
                         curSecondary.adminCommand({"replSetFreeze": kForeverSecs}));
                     return true;
                 } catch (e) {
-                    if (e.code === ErrorCodes.NotSecondary) {
+                    // Network error can happen if the node simultaneously tries to transition to
+                    // ROLLBACK state.
+                    if (isNetworkError(e) || e.code === ErrorCodes.NotSecondary ||
+                        e.code === ErrorCodes.NotYetInitialized) {
+                        log('Failed to freeze the node.' + tojson(e));
                         return false;
                     }
-                    if (e.code === ErrorCodes.NotYetInitialized) {
-                        return false;
-                    }
+
                     throw e;
                 }
             }, `Failed to run replSetFreeze cmd on ${curSecondary.host}`);
