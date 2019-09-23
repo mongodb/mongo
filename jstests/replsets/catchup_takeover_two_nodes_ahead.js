@@ -56,8 +56,7 @@ jsTestLog('node 2 is now primary, but cannot accept writes');
 assert.commandFailedWithCode(nodes[2].getDB(name).bar.insert({z: 100}, writeConcern),
                              ErrorCodes.NotMaster);
 
-// Confirm that the most up-to-date node becomes primary
-// after the default catchup delay.
+// Confirm that the most up-to-date node becomes primary after the default catchup delay.
 replSet.waitForState(0, ReplSetTest.State.PRIMARY, 60 * 1000);
 
 // Check that both the 'called' and 'successful' fields of the 'catchUpTakeover' election reason
@@ -66,6 +65,9 @@ const newPrimaryStatus = assert.commandWorked(primary.adminCommand({serverStatus
 verifyServerStatusElectionReasonCounterChange(
     initialPrimaryStatus.electionMetrics, newPrimaryStatus.electionMetrics, "catchUpTakeover", 1);
 
+// Wait until the old primary steps down.
+replSet.waitForState(2, ReplSetTest.State.SECONDARY, replSet.kDefaultTimeoutMS);
+
 // Check that the 'numCatchUpsFailedWithNewTerm' field has been incremented in serverStatus, and
 // that none of the other reasons for catchup concluding has been incremented.
 const newNode2Status = assert.commandWorked(nodes[2].adminCommand({serverStatus: 1}));
@@ -73,8 +75,6 @@ verifyCatchUpConclusionReason(initialNode2Status.electionMetrics,
                               newNode2Status.electionMetrics,
                               'numCatchUpsFailedWithNewTerm');
 
-// Wait until the old primary steps down so the connections won't be closed.
-replSet.waitForState(2, ReplSetTest.State.SECONDARY, replSet.kDefaultTimeoutMS);
 // Let the nodes catchup.
 restartServerReplication(nodes.slice(1, 5));
 replSet.stopSet();
