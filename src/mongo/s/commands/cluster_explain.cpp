@@ -108,7 +108,7 @@ std::vector<Strategy::CommandResult> ClusterExplain::downconvert(
     OperationContext* opCtx, const std::vector<AsyncRequestsSender::Response>& responses) {
     std::vector<Strategy::CommandResult> results;
     for (auto& response : responses) {
-        Status status = Status::OK();
+        Status status = response.swResponse.getStatus();
         if (response.swResponse.isOK()) {
             auto& result = response.swResponse.getValue().data;
             status = getStatusFromCommandResult(result);
