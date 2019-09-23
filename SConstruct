@@ -180,15 +180,6 @@ add_option('ssl-provider',
     type='choice',
 )
 
-add_option('mmapv1',
-    choices=['auto', 'on', 'off'],
-    const='on',
-    default='auto',
-    help='Enable MMapV1',
-    nargs='?',
-    type='choice',
-)
-
 add_option('wiredtiger',
     choices=['on', 'off'],
     const='on',
@@ -1950,15 +1941,6 @@ if env.TargetOSIs('posix'):
                 '-Wl,-fatal_warnings' if env.TargetOSIs('darwin') else "-Wl,--fatal-warnings",
             ]
         )
-
-mmapv1 = False
-if get_option('mmapv1') == 'auto':
-    # The mmapv1 storage engine is only supported on x86
-    # targets. Unless explicitly requested, disable it on all other
-    # platforms.
-    mmapv1 = (env['TARGET_ARCH'] in ['i386', 'x86_64'])
-elif get_option('mmapv1') == 'on':
-    mmapv1 = True
 
 wiredtiger = False
 if get_option('wiredtiger') == 'on':
@@ -4031,7 +4013,6 @@ Export([
     'get_option',
     'has_option',
     'http_client',
-    'mmapv1',
     'mobile_se',
     'module_sconscripts',
     'optBuild',
