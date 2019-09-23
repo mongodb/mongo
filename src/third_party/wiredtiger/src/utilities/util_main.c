@@ -11,7 +11,7 @@
 const char *home = "."; /* Home directory */
 const char *progname;   /* Program name */
                         /* Global arguments */
-const char *usage_prefix = "[-LRSVv] [-C config] [-E secretkey] [-h home]";
+const char *usage_prefix = "[-LRrSVv] [-C config] [-E secretkey] [-h home]";
 bool verbose = false; /* Verbose flag */
 
 static const char *command; /* Command name */
@@ -44,6 +44,9 @@ usage(void)
       "\t"
       "-R\t"
       "run recovery (if recovery configured)\n"
+      "\t"
+      "-r\t"
+      "access the database via a readonly connection\n"
       "\t"
       "-S\t"
       "run salvage recovery (if recovery configured)\n"
@@ -144,7 +147,7 @@ main(int argc, char *argv[])
     rec_config = REC_ERROR;
     logoff = readonly = recover = salvage = false;
     /* Check for standard options. */
-    while ((ch = __wt_getopt(progname, argc, argv, "C:E:h:LRSVv")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "C:E:h:LRrSVv")) != EOF)
         switch (ch) {
         case 'C': /* wiredtiger_open config */
             cmd_config = __wt_optarg;
@@ -168,6 +171,10 @@ main(int argc, char *argv[])
             rec_config = REC_RECOVER;
             recover = true;
             break;
+        case 'r':
+            readonly_config = READONLY;
+            readonly = true;
+            break;
         case 'S': /* salvage */
             rec_config = REC_SALVAGE;
             salvage = true;
@@ -185,6 +192,10 @@ main(int argc, char *argv[])
         }
     if ((logoff && recover) || (logoff && salvage) || (recover && salvage)) {
         fprintf(stderr, "Only one of -L, -R, and -S is allowed.\n");
+        goto err;
+    }
+    if ((recover || salvage) && readonly) {
+        fprintf(stderr, "-R and -S cannot be used with -r\n");
         goto err;
     }
     argc -= __wt_optind;
@@ -225,20 +236,17 @@ main(int argc, char *argv[])
             func = util_downgrade;
         else if (strcmp(command, "drop") == 0)
             func = util_drop;
-        else if (strcmp(command, "dump") == 0) {
+        else if (strcmp(command, "dump") == 0)
             func = util_dump;
-            readonly_config = READONLY;
-        }
         break;
     case 'i':
         if (strcmp(command, "import") == 0)
             func = util_import;
         break;
     case 'l':
-        if (strcmp(command, "list") == 0) {
+        if (strcmp(command, "list") == 0)
             func = util_list;
-            readonly_config = READONLY;
-        } else if (strcmp(command, "load") == 0) {
+        else if (strcmp(command, "load") == 0) {
             func = util_load;
             config = "create";
         } else if (strcmp(command, "loadtext") == 0) {
@@ -250,14 +258,12 @@ main(int argc, char *argv[])
         if (strcmp(command, "printlog") == 0) {
             func = util_printlog;
             rec_config = REC_LOGOFF;
-            readonly_config = READONLY;
         }
         break;
     case 'r':
-        if (strcmp(command, "read") == 0) {
+        if (strcmp(command, "read") == 0)
             func = util_read;
-            readonly_config = READONLY;
-        } else if (strcmp(command, "rebalance") == 0)
+        else if (strcmp(command, "rebalance") == 0)
             func = util_rebalance;
         else if (strcmp(command, "rename") == 0)
             func = util_rename;
@@ -268,7 +274,6 @@ main(int argc, char *argv[])
         else if (strcmp(command, "stat") == 0) {
             func = util_stat;
             config = "statistics=(all)";
-            readonly_config = READONLY;
         }
         break;
     case 't':
@@ -280,10 +285,8 @@ main(int argc, char *argv[])
             func = util_upgrade;
         break;
     case 'v':
-        if (strcmp(command, "verify") == 0) {
+        if (strcmp(command, "verify") == 0)
             func = util_verify;
-            readonly_config = READONLY;
-        }
         break;
     case 'w':
         if (strcmp(command, "write") == 0)
@@ -296,13 +299,6 @@ main(int argc, char *argv[])
         usage();
         goto err;
     }
-
-    /*
-     * If the user has specified recovery or salvage disable readonly mode, as they are both not
-     * readonly operations.
-     */
-    if (recover || salvage)
-        readonly_config = NULL;
 
     /* Build the configuration string. */
     len = 10; /* some slop */
