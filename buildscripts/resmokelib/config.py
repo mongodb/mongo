@@ -118,7 +118,10 @@ DEFAULTS = {
     "benchmark_filter": None,
     "benchmark_list_tests": None,
     "benchmark_min_time_secs": None,
-    "benchmark_repetitions": None
+    "benchmark_repetitions": None,
+
+    # Config Dir
+    "config_dir": "buildscripts/resmokeconfig"
 }
 
 _SuiteOptions = collections.namedtuple("_SuiteOptions", [
@@ -451,3 +454,8 @@ DEFAULT_LIBFUZZER_TEST_LIST = "build/libfuzzer_tests.txt"
 EXTERNAL_SUITE_SELECTORS = (DEFAULT_BENCHMARK_TEST_LIST, DEFAULT_UNIT_TEST_LIST,
                             DEFAULT_INTEGRATION_TEST_LIST, DEFAULT_DBTEST_EXECUTABLE,
                             DEFAULT_MONGOEBENCH_EXECUTABLE, DEFAULT_LIBFUZZER_TEST_LIST)
+
+# Where to look for logging and suite configuration files
+CONFIG_DIR = None
+NAMED_SUITES = None
+LOGGER_DIR = None

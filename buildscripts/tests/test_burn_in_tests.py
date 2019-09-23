@@ -19,6 +19,8 @@ from shrub.config import Configuration
 import buildscripts.burn_in_tests as under_test
 import buildscripts.util.teststats as teststats_utils
 import buildscripts.ciconfig.evergreen as evg
+import buildscripts.resmokelib.parser as _parser
+_parser.set_options()
 
 # pylint: disable=missing-docstring,protected-access,too-many-lines,no-self-use
 

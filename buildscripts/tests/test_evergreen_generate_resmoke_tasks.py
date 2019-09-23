@@ -834,15 +834,17 @@ class GenerateSubSuitesTest(unittest.TestCase):
             TestRuntime(test_name="dir1/file3.js", runtime=36.32),
         ]
 
-        with patch("os.path.exists") as exists_mock, patch(ns("suitesconfig")) as suitesconfig_mock:
-            exists_mock.side_effect = [False, True, True]
+        with patch(ns("suitesconfig")) as suitesconfig_mock:
             evg = MagicMock()
             suitesconfig_mock.get_suite.return_value.tests = \
                 [runtime[0] for runtime in tests_runtimes]
             config_options = MagicMock(suite="suite")
 
             gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
-            filtered_list = gen_sub_suites.filter_existing_tests(tests_runtimes)
+
+            with patch("os.path.exists") as exists_mock:
+                exists_mock.side_effect = [False, True, True]
+                filtered_list = gen_sub_suites.filter_existing_tests(tests_runtimes)
 
             self.assertEqual(2, len(filtered_list))
             self.assertNotIn(tests_runtimes[0], filtered_list)

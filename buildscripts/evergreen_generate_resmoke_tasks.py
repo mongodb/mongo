@@ -31,6 +31,7 @@ from shrub.variant import TaskSpec
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import buildscripts.resmokelib.parser as _parser  # pylint: disable=wrong-import-position
 import buildscripts.resmokelib.suitesconfig as suitesconfig  # pylint: disable=wrong-import-position
 import buildscripts.util.read_config as read_config  # pylint: disable=wrong-import-position
 import buildscripts.util.taskname as taskname  # pylint: disable=wrong-import-position
@@ -660,6 +661,9 @@ class GenerateSubSuites(object):
         self.evergreen_api = evergreen_api
         self.config_options = config_options
         self.test_list = []
+
+        # Populate config values for methods like list_tests()
+        _parser.set_options()
 
     def calculate_suites(self, start_date, end_date):
         """Divide tests into suites based on statistics for the provided period."""

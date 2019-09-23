@@ -4,6 +4,7 @@ import collections
 import os
 import os.path
 import sys
+import shlex
 
 import datetime
 import optparse
@@ -11,7 +12,6 @@ import pymongo.uri_parser
 
 from . import config as _config
 from . import utils
-from .. import resmokeconfig
 
 ResmokeConfig = collections.namedtuple(
     "ResmokeConfig",
@@ -38,6 +38,9 @@ def _make_parser():  # pylint: disable=too-many-statements
         help=("A YAML file that specifies the logging configuration. If the file is"
               " located in the resmokeconfig/suites/ directory, then the basename"
               " without the .yml extension can be specified, e.g. 'console'."))
+
+    parser.add_option("--configDir", dest="config_dir", metavar="CONFIG_DIR",
+                      help="Directory to search for resmoke configuration files")
 
     parser.add_option(
         "--archiveFile", dest="archive_file", metavar="ARCHIVE_FILE",
@@ -433,7 +436,7 @@ def to_local_args(args=None):  # pylint: disable=too-many-branches,too-many-loca
     storage_engine_arg = None
     other_local_args = []
 
-    options_to_ignore = set([
+    options_to_ignore = {
         "--archiveFile",
         "--archiveLimitMb",
         "--archiveLimitTests",
@@ -444,7 +447,7 @@ def to_local_args(args=None):  # pylint: disable=too-many-branches,too-many-loca
         "--reportFile",
         "--staggerJobs",
         "--tagFile",
-    ])
+    }
 
     def format_option(option_name, option_value):
         """
@@ -556,7 +559,7 @@ def validate_benchmark_options():
             "results. Please use --jobs=1" % _config.JOBS)
 
 
-def _update_config_vars(values):  # pylint: disable=too-many-statements
+def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many-locals,too-many-branches
     """Update the variables of the config module."""
 
     config = _config.DEFAULTS.copy()
@@ -648,6 +651,31 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements
     _config.BENCHMARK_REPETITIONS = config.pop("benchmark_repetitions")
     _config.BENCHRUN_REPORT_ROOT = config.pop("benchrun_report_root")
 
+    # Config Dir options.
+    _config.CONFIG_DIR = config.pop("config_dir")
+
+    # Populate the named suites by scanning config_dir/suites
+    #
+    # Skip "with_*server" and "no_server" because they do not define any test files to run.
+    executor_only = {"with_server", "with_external_server", "no_server"}
+    named_suites = {}
+
+    suites_dir = os.path.join(_config.CONFIG_DIR, "suites")
+    root = os.path.abspath(suites_dir)
+    files = os.listdir(root)
+    for filename in files:
+        (short_name, ext) = os.path.splitext(filename)
+        if short_name in executor_only:
+            continue
+
+        if ext in (".yml", ".yaml"):
+            pathname = os.path.join(root, filename)
+            named_suites[short_name] = pathname
+
+    _config.NAMED_SUITES = named_suites
+
+    _config.LOGGER_DIR = os.path.join(_config.CONFIG_DIR, "loggers")
+
     shuffle = config.pop("shuffle")
     if shuffle == "auto":
         # If the user specified a value for --jobs > 1 (or -j > 1), then default to randomize
@@ -677,17 +705,21 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements
 
 def _get_logging_config(pathname):
     """Read YAML configuration from 'pathname' how to log tests and fixtures."""
+    try:
+        root = os.path.abspath(_config.LOGGER_DIR)
+        files = os.listdir(root)
+        for filename in files:
+            (short_name, ext) = os.path.splitext(filename)
+            if ext in (".yml", ".yaml") and short_name == pathname:
+                config_file = os.path.join(root, filename)
+                if not os.path.isfile(config_file):
+                    raise optparse.OptionValueError(
+                        "Expected a logger YAML config, but got '%s'" % pathname)
+                return utils.load_yaml_file(config_file).pop("logging")
 
-    # Named loggers are specified as the basename of the file, without the .yml extension.
-    if not utils.is_yaml_file(pathname) and not os.path.dirname(pathname):
-        if pathname not in resmokeconfig.NAMED_LOGGERS:
-            raise optparse.OptionValueError("Unknown logger '%s'" % pathname)
-        pathname = resmokeconfig.NAMED_LOGGERS[pathname]  # Expand 'pathname' to full path.
-
-    if not utils.is_yaml_file(pathname) or not os.path.isfile(pathname):
-        raise optparse.OptionValueError("Expected a logger YAML config, but got '%s'" % pathname)
-
-    return utils.load_yaml_file(pathname).pop("logging")
+        raise optparse.OptionValueError("Unknown logger '%s'" % pathname)
+    except FileNotFoundError:
+        raise IOError("Directory {} does not exist.".format(_config.LOGGER_DIR))
 
 
 def _expand_user(pathname):
@@ -709,3 +741,10 @@ def _tags_from_list(tags_list):
             tags.extend([t for t in tag.split(",") if t != ""])
         return tags
     return None
+
+
+def set_options(argstr=''):
+    """Populate the config module variables with the default options."""
+    parser = _make_parser()
+    options, _args = parser.parse_args(args=shlex.split(argstr))
+    _update_config_vars(options)

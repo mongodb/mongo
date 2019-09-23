@@ -8,7 +8,6 @@ import buildscripts.resmokelib.parser as parser
 import buildscripts.resmokelib.selector as selector
 import buildscripts.resmokelib.utils.globstar as globstar
 import buildscripts.resmokelib.config
-import buildscripts.resmokeconfig
 
 # pylint: disable=missing-docstring,protected-access
 
