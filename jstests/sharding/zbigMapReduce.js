@@ -18,6 +18,16 @@ let s = new ShardingTest({
     }
 });
 
+// Double the balancer interval to produce fewer migrations per unit time so that the test does not
+// run out of stale shard version retries.
+s._configServers.forEach((conn) => {
+    conn.adminCommand({
+        configureFailPoint: 'overrideBalanceRoundInterval',
+        mode: 'alwaysOn',
+        data: {intervalMs: 2000}
+    });
+});
+
 assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
 s.ensurePrimaryShard('test', s.shard0.shardName);
 assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {"_id": 1}}));
