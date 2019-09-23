@@ -73,11 +73,9 @@ var newPriConn = replTest.getPrimary();
 assert.neq(priConn, newPriConn);
 assert.commandWorked(newPriConn.getDB('test').foo.insert({a: 1}, {writeConcern: {w: 'majority'}}));
 
-// Restart the original primary so it triggers a rollback of the shardIdentity insert. Pass
-// {waitForConnect : false} to avoid a race condition between the node crashing (which we expect)
-// and waiting to be able to connect to the node.
+// Restart the original primary so it triggers a rollback of the shardIdentity insert.
 jsTest.log("Restarting original primary");
-priConn = replTest.start(priConn, {waitForConnect: false});
+priConn = replTest.restart(priConn);
 
 // Wait until we cannot create a connection to the former primary, which indicates that it must
 // have shut itself down during the rollback.
@@ -110,7 +108,7 @@ try {
 } catch (e) {
     // expected
 }
-priConn = replTest.start(priConn);
+priConn = replTest.restart(priConn, {shardsvr: ''});
 priConn.setSlaveOk();
 
 // Wait for the old primary to replicate the document that was written to the new primary while
