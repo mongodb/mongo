@@ -4,6 +4,8 @@
  * remove_single_document.js
  *
  * Repeatedly remove a document from the collection.
+ *
+ * @tags: [assumes_balancer_off]
  */
 var $config = (function() {
     var states = {
