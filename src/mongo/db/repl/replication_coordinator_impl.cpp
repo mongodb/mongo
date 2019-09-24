@@ -1599,6 +1599,15 @@ bool ReplicationCoordinatorImpl::_haveNumNodesReachedOpTime_inlock(const OpTime&
     }
 
     for (SlaveInfoVector::iterator it = _slaveInfo.begin(); it != _slaveInfo.end(); ++it) {
+        // Member id is -1 for master-slave nodes.
+        const auto memberId = it->memberId;
+        if (memberId >= 0) {
+            // We do not count arbiters towards the write concern.
+            if (_rsConfig.findMemberByID(memberId)->isArbiter()) {
+                continue;
+            }
+        }
+
         const OpTime& slaveTime = durablyWritten ? it->lastDurableOpTime : it->lastAppliedOpTime;
         if (slaveTime >= targetOpTime) {
             --numNodes;
