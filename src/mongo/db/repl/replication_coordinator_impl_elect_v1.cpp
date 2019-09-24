@@ -92,15 +92,12 @@ public:
     }
 };
 
-
-void ReplicationCoordinatorImpl::_startElectSelfV1(
-    TopologyCoordinator::StartElectionReason reason) {
+void ReplicationCoordinatorImpl::_startElectSelfV1(StartElectionReasonEnum reason) {
     stdx::lock_guard<Latch> lk(_mutex);
     _startElectSelfV1_inlock(reason);
 }
 
-void ReplicationCoordinatorImpl::_startElectSelfV1_inlock(
-    TopologyCoordinator::StartElectionReason reason) {
+void ReplicationCoordinatorImpl::_startElectSelfV1_inlock(StartElectionReasonEnum reason) {
     invariant(!_voteRequester);
 
     switch (_rsConfigState) {
@@ -146,10 +143,7 @@ void ReplicationCoordinatorImpl::_startElectSelfV1_inlock(
     long long term = _topCoord->getTerm();
     int primaryIndex = -1;
 
-    Date_t now = _replExecutor->now();
-    ReplicationMetrics::get(getServiceContext()).setElectionCandidateMetrics(now);
-
-    if (reason == TopologyCoordinator::StartElectionReason::kStepUpRequestSkipDryRun) {
+    if (reason == StartElectionReasonEnum::kStepUpRequestSkipDryRun) {
         long long newTerm = term + 1;
         log() << "skipping dry run and running for election in term " << newTerm;
         _startRealElection_inlock(newTerm, reason);
@@ -161,7 +155,7 @@ void ReplicationCoordinatorImpl::_startElectSelfV1_inlock(
     _voteRequester.reset(new VoteRequester);
 
     // Only set primaryIndex if the primary's vote is required during the dry run.
-    if (reason == TopologyCoordinator::StartElectionReason::kCatchupTakeover) {
+    if (reason == StartElectionReasonEnum::kCatchupTakeover) {
         primaryIndex = _topCoord->getCurrentPrimaryIndex();
     }
     StatusWith<executor::TaskExecutor::EventHandle> nextPhaseEvh =
@@ -185,8 +179,8 @@ void ReplicationCoordinatorImpl::_startElectSelfV1_inlock(
     lossGuard.dismiss();
 }
 
-void ReplicationCoordinatorImpl::_processDryRunResult(
-    long long originalTerm, TopologyCoordinator::StartElectionReason reason) {
+void ReplicationCoordinatorImpl::_processDryRunResult(long long originalTerm,
+                                                      StartElectionReasonEnum reason) {
     stdx::lock_guard<Latch> lk(_mutex);
     LoseElectionDryRunGuardV1 lossGuard(this);
 
@@ -221,8 +215,30 @@ void ReplicationCoordinatorImpl::_processDryRunResult(
     lossGuard.dismiss();
 }
 
-void ReplicationCoordinatorImpl::_startRealElection_inlock(
-    long long newTerm, TopologyCoordinator::StartElectionReason reason) {
+void ReplicationCoordinatorImpl::_startRealElection_inlock(long long newTerm,
+                                                           StartElectionReasonEnum reason) {
+
+    const Date_t now = _replExecutor->now();
+    const OpTime lastCommittedOpTime = _topCoord->getLastCommittedOpTime();
+    const OpTime lastSeenOpTime = _topCoord->latestKnownOpTime();
+    const int numVotesNeeded = _rsConfig.getMajorityVoteCount();
+    const double priorityAtElection = _rsConfig.getMemberAt(_selfIndex).getPriority();
+    const Milliseconds electionTimeoutMillis = _rsConfig.getElectionTimeoutPeriod();
+    const int priorPrimaryIndex = _topCoord->getCurrentPrimaryIndex();
+    const boost::optional<int> priorPrimaryMemberId = (priorPrimaryIndex == -1)
+        ? boost::none
+        : boost::make_optional(_rsConfig.getMemberAt(priorPrimaryIndex).getId().getData());
+
+    ReplicationMetrics::get(getServiceContext())
+        .setElectionCandidateMetrics(reason,
+                                     now,
+                                     newTerm,
+                                     lastCommittedOpTime,
+                                     lastSeenOpTime,
+                                     numVotesNeeded,
+                                     priorityAtElection,
+                                     electionTimeoutMillis,
+                                     priorPrimaryMemberId);
     ReplicationMetrics::get(getServiceContext()).incrementNumElectionsCalledForReason(reason);
 
     LoseElectionDryRunGuardV1 lossGuard(this);
@@ -254,7 +270,7 @@ void ReplicationCoordinatorImpl::_startRealElection_inlock(
 void ReplicationCoordinatorImpl::_writeLastVoteForMyElection(
     LastVote lastVote,
     const executor::TaskExecutor::CallbackArgs& cbData,
-    TopologyCoordinator::StartElectionReason reason) {
+    StartElectionReasonEnum reason) {
     // storeLocalLastVoteDocument can call back in to the replication coordinator,
     // so _mutex must be unlocked here.  However, we cannot return until we
     // lock it because we want to lose the election on cancel or error and
@@ -292,8 +308,8 @@ void ReplicationCoordinatorImpl::_writeLastVoteForMyElection(
     lossGuard.dismiss();
 }
 
-void ReplicationCoordinatorImpl::_startVoteRequester_inlock(
-    long long newTerm, TopologyCoordinator::StartElectionReason reason) {
+void ReplicationCoordinatorImpl::_startVoteRequester_inlock(long long newTerm,
+                                                            StartElectionReasonEnum reason) {
     const auto lastOpTime = _getMyLastAppliedOpTime_inlock();
 
     _voteRequester.reset(new VoteRequester);
@@ -313,8 +329,8 @@ void ReplicationCoordinatorImpl::_startVoteRequester_inlock(
 
 MONGO_FAIL_POINT_DEFINE(electionHangsBeforeUpdateMemberState);
 
-void ReplicationCoordinatorImpl::_onVoteRequestComplete(
-    long long newTerm, TopologyCoordinator::StartElectionReason reason) {
+void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long newTerm,
+                                                        StartElectionReasonEnum reason) {
     stdx::lock_guard<Latch> lk(_mutex);
     LoseElectionGuardV1 lossGuard(this);
 

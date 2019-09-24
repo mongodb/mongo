@@ -2185,8 +2185,7 @@ void ReplicationCoordinatorImpl::_handleTimePassing(
 
     // For election protocol v1, call _startElectSelfIfEligibleV1 to avoid race
     // against other elections caused by events like election timeout, replSetStepUp etc.
-    _startElectSelfIfEligibleV1(
-        TopologyCoordinator::StartElectionReason::kSingleNodePromptElection);
+    _startElectSelfIfEligibleV1(StartElectionReasonEnum::kSingleNodePromptElection);
 }
 
 bool ReplicationCoordinatorImpl::isMasterForReportingPurposes() {
@@ -2552,8 +2551,7 @@ Status ReplicationCoordinatorImpl::processReplSetFreeze(int secs, BSONObjBuilder
         result.getValue()) {
         // For election protocol v1, call _startElectSelfIfEligibleV1 to avoid race
         // against other elections caused by events like election timeout, replSetStepUp etc.
-        _startElectSelfIfEligibleV1(
-            TopologyCoordinator::StartElectionReason::kSingleNodePromptElection);
+        _startElectSelfIfEligibleV1(StartElectionReasonEnum::kSingleNodePromptElection);
     }
 
     return Status::OK();
@@ -3005,7 +3003,7 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
         case kActionStartSingleNodeElection:
             // In protocol version 1, single node replset will run an election instead of
             // kActionWinElection as in protocol version 0.
-            _startElectSelfV1(TopologyCoordinator::StartElectionReason::kElectionTimeout);
+            _startElectSelfV1(StartElectionReasonEnum::kElectionTimeout);
             break;
         default:
             severe() << "Unknown post member state update action " << static_cast<int>(action);
@@ -4116,8 +4114,8 @@ CallbackFn ReplicationCoordinatorImpl::_wrapAsCallbackFn(const std::function<voi
 
 Status ReplicationCoordinatorImpl::stepUpIfEligible(bool skipDryRun) {
 
-    auto reason = skipDryRun ? TopologyCoordinator::StartElectionReason::kStepUpRequestSkipDryRun
-                             : TopologyCoordinator::StartElectionReason::kStepUpRequest;
+    auto reason = skipDryRun ? StartElectionReasonEnum::kStepUpRequestSkipDryRun
+                             : StartElectionReasonEnum::kStepUpRequest;
     _startElectSelfIfEligibleV1(reason);
 
     EventHandle finishEvent;

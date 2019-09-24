@@ -374,9 +374,9 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun)
                                                                << false << "reason"
                                                                << "don't like him much")));
             voteRequests++;
-            // Check that the node's election candidate metrics are set once it has called an
-            // election.
-            ASSERT_BSONOBJ_NE(
+
+            // Check that the node's election candidate metrics are not set if a dry run fails.
+            ASSERT_BSONOBJ_EQ(
                 BSONObj(),
                 ReplicationMetrics::get(getServiceContext()).getElectionCandidateMetricsBSON());
         } else {
@@ -879,7 +879,7 @@ public:
     }
 
     void performSuccessfulTakeover(Date_t takeoverTime,
-                                   TopologyCoordinator::StartElectionReason reason,
+                                   StartElectionReasonEnum reason,
                                    const LastVote& lastVoteExpected) {
         startCapturingLogMessages();
         simulateSuccessfulV1ElectionAt(takeoverTime);
@@ -894,7 +894,7 @@ public:
         ASSERT_EQ(lastVoteExpected.getCandidateIndex(), lastVote.getValue().getCandidateIndex());
         ASSERT_EQ(lastVoteExpected.getTerm(), lastVote.getValue().getTerm());
 
-        if (reason == TopologyCoordinator::StartElectionReason::kPriorityTakeover) {
+        if (reason == StartElectionReasonEnum::kPriorityTakeover) {
             ASSERT_EQUALS(1,
                           countLogLinesContaining("Starting an election for a priority takeover"));
         }
@@ -1444,9 +1444,8 @@ TEST_F(TakeoverTest, SuccessfulCatchupTakeover) {
     ASSERT_EQUALS(1, countLogLinesContaining("Starting an election for a catchup takeover"));
 
     LastVote lastVoteExpected = LastVote(replCoord->getTerm() + 1, 0);
-    performSuccessfulTakeover(catchupTakeoverTime,
-                              TopologyCoordinator::StartElectionReason::kCatchupTakeover,
-                              lastVoteExpected);
+    performSuccessfulTakeover(
+        catchupTakeoverTime, StartElectionReasonEnum::kCatchupTakeover, lastVoteExpected);
 
     // Check that the numCatchUpTakeoversCalled and the numCatchUpTakeoversSuccessful election
     // metrics have been incremented, and that none of the metrics that track the number of
@@ -1703,9 +1702,8 @@ TEST_F(TakeoverTest, PrimaryCatchesUpBeforeHighPriorityNodeCatchupTakeover) {
         config, now + longElectionTimeout, HostAndPort("node2", 12345), currentOptime);
 
     LastVote lastVoteExpected = LastVote(replCoord->getTerm() + 1, 0);
-    performSuccessfulTakeover(priorityTakeoverTime,
-                              TopologyCoordinator::StartElectionReason::kPriorityTakeover,
-                              lastVoteExpected);
+    performSuccessfulTakeover(
+        priorityTakeoverTime, StartElectionReasonEnum::kPriorityTakeover, lastVoteExpected);
 }
 
 TEST_F(TakeoverTest, SchedulesPriorityTakeoverIfNodeHasHigherPriorityThanCurrentPrimary) {
@@ -1797,9 +1795,8 @@ TEST_F(TakeoverTest, SuccessfulPriorityTakeover) {
         config, now + halfElectionTimeout, HostAndPort("node2", 12345), myOptime);
 
     LastVote lastVoteExpected = LastVote(replCoord->getTerm() + 1, 0);
-    performSuccessfulTakeover(priorityTakeoverTime,
-                              TopologyCoordinator::StartElectionReason::kPriorityTakeover,
-                              lastVoteExpected);
+    performSuccessfulTakeover(
+        priorityTakeoverTime, StartElectionReasonEnum::kPriorityTakeover, lastVoteExpected);
 
     // Check that the numPriorityTakeoversCalled and the numPriorityTakeoversSuccessful election
     // metrics have been incremented, and that none of the metrics that track the number of
@@ -1888,9 +1885,8 @@ TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedSameSecond) {
                                     Date_t() + Seconds(closeEnoughOpTime.getSecs()));
 
     LastVote lastVoteExpected = LastVote(replCoord->getTerm() + 1, 0);
-    performSuccessfulTakeover(priorityTakeoverTime,
-                              TopologyCoordinator::StartElectionReason::kPriorityTakeover,
-                              lastVoteExpected);
+    performSuccessfulTakeover(
+        priorityTakeoverTime, StartElectionReasonEnum::kPriorityTakeover, lastVoteExpected);
 }
 
 TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedDifferentSecond) {
@@ -1963,9 +1959,8 @@ TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedDifferentSecond) {
                                     Date_t() + Seconds(closeEnoughOpTime.getSecs()));
 
     LastVote lastVoteExpected = LastVote(replCoord->getTerm() + 1, 0);
-    performSuccessfulTakeover(priorityTakeoverTime,
-                              TopologyCoordinator::StartElectionReason::kPriorityTakeover,
-                              lastVoteExpected);
+    performSuccessfulTakeover(
+        priorityTakeoverTime, StartElectionReasonEnum::kPriorityTakeover, lastVoteExpected);
 }
 
 TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringDryRun) {

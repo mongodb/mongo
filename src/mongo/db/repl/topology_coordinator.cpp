@@ -48,12 +48,8 @@
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/heartbeat_response_action.h"
-#include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/member_data.h"
-#include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
-#include "mongo/db/repl/repl_set_heartbeat_response.h"
-#include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -922,7 +918,8 @@ bool TopologyCoordinator::setMemberAsDown(Date_t now, const int memberIndex) {
     MemberData& hbData = _memberData.at(memberIndex);
     hbData.setDownValues(now, "no response within election timeout period");
 
-    if (CannotSeeMajority & _getMyUnelectableReason(now, StartElectionReason::kElectionTimeout)) {
+    if (CannotSeeMajority &
+        _getMyUnelectableReason(now, StartElectionReasonEnum::kElectionTimeout)) {
         return true;
     }
 
@@ -1213,7 +1210,7 @@ int TopologyCoordinator::_findHealthyPrimaryOfEqualOrGreaterPriority(
 }
 
 bool TopologyCoordinator::_amIFreshEnoughForPriorityTakeover() const {
-    const OpTime latestKnownOpTime = _latestKnownOpTime();
+    const OpTime ourLatestKnownOpTime = latestKnownOpTime();
 
     // Rules are:
     // - If the terms don't match, we don't call for priority takeover.
@@ -1227,23 +1224,24 @@ bool TopologyCoordinator::_amIFreshEnoughForPriorityTakeover() const {
     // passes the timestamp component of the last oplog entry.
 
     const OpTime ourLastOpApplied = getMyLastAppliedOpTime();
-    if (ourLastOpApplied.getTerm() != latestKnownOpTime.getTerm()) {
+    if (ourLastOpApplied.getTerm() != ourLatestKnownOpTime.getTerm()) {
         return false;
     }
 
-    if (ourLastOpApplied.getTimestamp().getSecs() != latestKnownOpTime.getTimestamp().getSecs()) {
+    if (ourLastOpApplied.getTimestamp().getSecs() !=
+        ourLatestKnownOpTime.getTimestamp().getSecs()) {
         return ourLastOpApplied.getTimestamp().getSecs() +
             gPriorityTakeoverFreshnessWindowSeconds >=
-            latestKnownOpTime.getTimestamp().getSecs();
+            ourLatestKnownOpTime.getTimestamp().getSecs();
     } else {
         return ourLastOpApplied.getTimestamp().getInc() + 1000 >=
-            latestKnownOpTime.getTimestamp().getInc();
+            ourLatestKnownOpTime.getTimestamp().getInc();
     }
 }
 
 bool TopologyCoordinator::_amIFreshEnoughForCatchupTakeover() const {
 
-    const OpTime latestKnownOpTime = _latestKnownOpTime();
+    const OpTime ourLatestKnownOpTime = latestKnownOpTime();
 
     // Rules are:
     // - We must have the freshest optime of all the up nodes.
@@ -1255,7 +1253,7 @@ bool TopologyCoordinator::_amIFreshEnoughForCatchupTakeover() const {
     // There is no point to a catchup takeover if we aren't the freshest node because
     // another node would immediately perform another catchup takeover when we become primary.
     const OpTime ourLastOpApplied = getMyLastAppliedOpTime();
-    if (ourLastOpApplied < latestKnownOpTime) {
+    if (ourLastOpApplied < ourLatestKnownOpTime) {
         return false;
     }
 
@@ -1282,34 +1280,6 @@ bool TopologyCoordinator::_iAmPrimary() const {
         return true;
     }
     return false;
-}
-
-OpTime TopologyCoordinator::_latestKnownOpTime() const {
-    OpTime latest = getMyLastAppliedOpTime();
-    for (std::vector<MemberData>::const_iterator it = _memberData.begin(); it != _memberData.end();
-         ++it) {
-        // Ignore self
-        // TODO(russotto): Simplify when heartbeat and spanning tree times are combined.
-        if (it->isSelf()) {
-            continue;
-        }
-        // Ignore down members
-        if (!it->up()) {
-            continue;
-        }
-        // Ignore removed nodes (not in config, so not valid).
-        if (it->getState().removed()) {
-            continue;
-        }
-
-        OpTime optime = it->getHeartbeatAppliedOpTime();
-
-        if (optime > latest) {
-            latest = optime;
-        }
-    }
-
-    return latest;
 }
 
 bool TopologyCoordinator::prepareForUnconditionalStepDown() {
@@ -1981,7 +1951,7 @@ TopologyCoordinator::UnelectableReasonMask TopologyCoordinator::_getUnelectableR
 }
 
 TopologyCoordinator::UnelectableReasonMask TopologyCoordinator::_getMyUnelectableReason(
-    const Date_t now, StartElectionReason reason) const {
+    const Date_t now, StartElectionReasonEnum reason) const {
     UnelectableReasonMask result = None;
     const OpTime lastApplied = getMyLastAppliedOpTime();
     if (lastApplied.isNull()) {
@@ -2009,11 +1979,13 @@ TopologyCoordinator::UnelectableReasonMask TopologyCoordinator::_getMyUnelectabl
         result |= NotSecondary;
     }
 
-    if (reason == StartElectionReason::kPriorityTakeover && !_amIFreshEnoughForPriorityTakeover()) {
+    if (reason == StartElectionReasonEnum::kPriorityTakeover &&
+        !_amIFreshEnoughForPriorityTakeover()) {
         result |= NotCloseEnoughToLatestForPriorityTakeover;
     }
 
-    if (reason == StartElectionReason::kCatchupTakeover && !_amIFreshEnoughForCatchupTakeover()) {
+    if (reason == StartElectionReasonEnum::kCatchupTakeover &&
+        !_amIFreshEnoughForCatchupTakeover()) {
         result |= NotFreshEnoughForCatchupTakeover;
     }
     return result;
@@ -2779,7 +2751,7 @@ void TopologyCoordinator::setPrimaryIndex(long long primaryIndex) {
 }
 
 Status TopologyCoordinator::becomeCandidateIfElectable(const Date_t now,
-                                                       StartElectionReason reason) {
+                                                       StartElectionReasonEnum reason) {
     if (_role == Role::kLeader) {
         return {ErrorCodes::NodeNotElectable, "Not standing for election again; already primary"};
     }
@@ -2810,6 +2782,33 @@ void TopologyCoordinator::restartHeartbeats() {
     for (auto& hb : _memberData) {
         hb.restart();
     }
+}
+
+OpTime TopologyCoordinator::latestKnownOpTime() const {
+    OpTime latest = getMyLastAppliedOpTime();
+    for (std::vector<MemberData>::const_iterator it = _memberData.begin(); it != _memberData.end();
+         ++it) {
+        // Ignore self
+        if (it->isSelf()) {
+            continue;
+        }
+        // Ignore down members
+        if (!it->up()) {
+            continue;
+        }
+        // Ignore removed nodes (not in config, so not valid).
+        if (it->getState().removed()) {
+            continue;
+        }
+
+        OpTime optime = it->getHeartbeatAppliedOpTime();
+
+        if (optime > latest) {
+            latest = optime;
+        }
+    }
+
+    return latest;
 }
 
 boost::optional<OpTime> TopologyCoordinator::latestKnownOpTimeSinceHeartbeatRestart() const {

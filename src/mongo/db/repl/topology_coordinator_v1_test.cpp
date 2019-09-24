@@ -2477,7 +2477,7 @@ TEST_F(TopoCoordTest, NodeReturnsArbiterWhenGetMemberStateRunsAgainstArbiter) {
 
 TEST_F(TopoCoordTest, ShouldNotStandForElectionWhileRemovedFromTheConfig) {
     const auto status = getTopoCoord().becomeCandidateIfElectable(
-        now()++, TopologyCoordinator::StartElectionReason::kElectionTimeout);
+        now()++, StartElectionReasonEnum::kElectionTimeout);
     ASSERT_NOT_OK(status);
     ASSERT_STRING_CONTAINS(status.reason(), "not a member of a valid replica set config");
 }
@@ -3678,8 +3678,8 @@ TEST_F(TopoCoordTest, FreshestNodeDoesCatchupTakeover) {
                                             StatusWith<ReplSetHeartbeatResponse>(hbResp));
     getTopoCoord().updateTerm(1, Date_t());
 
-    ASSERT_OK(getTopoCoord().becomeCandidateIfElectable(
-        Date_t(), TopologyCoordinator::StartElectionReason::kCatchupTakeover));
+    ASSERT_OK(getTopoCoord().becomeCandidateIfElectable(Date_t(),
+                                                        StartElectionReasonEnum::kCatchupTakeover));
 }
 
 TEST_F(TopoCoordTest, StaleNodeDoesntDoCatchupTakeover) {
@@ -3730,7 +3730,7 @@ TEST_F(TopoCoordTest, StaleNodeDoesntDoCatchupTakeover) {
     getTopoCoord().updateTerm(1, Date_t());
 
     Status result = getTopoCoord().becomeCandidateIfElectable(
-        Date_t(), TopologyCoordinator::StartElectionReason::kCatchupTakeover);
+        Date_t(), StartElectionReasonEnum::kCatchupTakeover);
     ASSERT_NOT_OK(result);
     ASSERT_STRING_CONTAINS(result.reason(),
                            "member is either not the most up-to-date member or not ahead of the "
@@ -3782,7 +3782,7 @@ TEST_F(TopoCoordTest, NodeDoesntDoCatchupTakeoverHeartbeatSaysPrimaryCaughtUp) {
     getTopoCoord().updateTerm(1, Date_t());
 
     Status result = getTopoCoord().becomeCandidateIfElectable(
-        Date_t(), TopologyCoordinator::StartElectionReason::kCatchupTakeover);
+        Date_t(), StartElectionReasonEnum::kCatchupTakeover);
     ASSERT_NOT_OK(result);
     ASSERT_STRING_CONTAINS(result.reason(),
                            "member is either not the most up-to-date member or not ahead of the "
@@ -3839,7 +3839,7 @@ TEST_F(TopoCoordTest, NodeDoesntDoCatchupTakeoverIfTermNumbersSayPrimaryCaughtUp
     getTopoCoord().updateTerm(1, Date_t());
 
     Status result = getTopoCoord().becomeCandidateIfElectable(
-        Date_t(), TopologyCoordinator::StartElectionReason::kCatchupTakeover);
+        Date_t(), StartElectionReasonEnum::kCatchupTakeover);
     ASSERT_NOT_OK(result);
     ASSERT_STRING_CONTAINS(result.reason(),
                            "member is either not the most up-to-date member or not ahead of the "
@@ -4993,8 +4993,8 @@ TEST_F(HeartbeatResponseTestV1,
     ASSERT_NO_ACTION(nextAction.getAction());
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     // We are electable now.
-    ASSERT_OK(getTopoCoord().becomeCandidateIfElectable(
-        now(), TopologyCoordinator::StartElectionReason::kElectionTimeout));
+    ASSERT_OK(getTopoCoord().becomeCandidateIfElectable(now(),
+                                                        StartElectionReasonEnum::kElectionTimeout));
     ASSERT_TRUE(TopologyCoordinator::Role::kCandidate == getTopoCoord().getRole());
 }
 
@@ -5019,8 +5019,8 @@ TEST_F(HeartbeatResponseTestV1, ScheduleElectionWhenPrimaryIsMarkedDownAndWeAreE
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     // We are electable now.
-    ASSERT_OK(getTopoCoord().becomeCandidateIfElectable(
-        now(), TopologyCoordinator::StartElectionReason::kElectionTimeout));
+    ASSERT_OK(getTopoCoord().becomeCandidateIfElectable(now(),
+                                                        StartElectionReasonEnum::kElectionTimeout));
     ASSERT_TRUE(TopologyCoordinator::Role::kCandidate == getTopoCoord().getRole());
 }
 
