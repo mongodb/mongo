@@ -79,6 +79,9 @@ node = rst.start(node, {noReplSet: true, setParameter: {logComponentVerbosity: l
 reconnect(node);
 assertDocsInColl(node, []);
 
+// Test that we can run the validate command on a standalone.
+assert.commandWorked(node.getDB(dbName).runCommand({"validate": collName}));
+
 jsTestLog("Test that on restart with the flag set we play recovery.");
 node = rst.restart(node, {
     noReplSet: true,
@@ -86,6 +89,9 @@ node = rst.restart(node, {
 });
 reconnect(node);
 assertDocsInColl(node, [3, 4, 5]);
+
+// Test that we can run the validate command on a standalone that recovered.
+assert.commandWorked(node.getDB(dbName).runCommand({"validate": collName}));
 
 jsTestLog("Test that we go into read-only mode.");
 assert.commandFailedWithCode(getColl(node).insert({_id: 1}), ErrorCodes.IllegalOperation);

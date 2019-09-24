@@ -397,6 +397,12 @@ Status validate(OperationContext* opCtx,
     // constructor fail the cmd, as opposed to returning OK with valid:false.
     ValidateState validateState(opCtx, nss, background, fullValidate);
 
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    // Check whether we are allowed to read from this node after acquiring our locks. If we are
+    // in a state where we cannot read, we should not run validate.
+    uassertStatusOK(replCoord->checkCanServeReadsFor(
+        opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
+
     try {
         std::map<std::string, int64_t> numIndexKeysPerIndex;
         ValidateResultsMap indexNsResultsMap;
