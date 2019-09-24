@@ -113,10 +113,10 @@ StatusWith<UpdateType> getUpdateExprType(const write_ops::UpdateOpEntry& updateD
  * generating the new document in the case of an upsert. It is therefore always correct to target
  * the operation on the basis of the combined updateExpr and query.
  */
-StatusWith<BSONObj> getUpdateExpr(OperationContext* opCtx,
-                                  const ShardKeyPattern& shardKeyPattern,
-                                  const UpdateType updateType,
-                                  const write_ops::UpdateOpEntry& updateDoc) {
+StatusWith<BSONObj> getUpdateExprForTargeting(OperationContext* opCtx,
+                                              const ShardKeyPattern& shardKeyPattern,
+                                              const UpdateType updateType,
+                                              const write_ops::UpdateOpEntry& updateDoc) {
     // We should never see an invalid update type here.
     invariant(updateType != UpdateType::kUnknown);
 
@@ -133,24 +133,17 @@ StatusWith<BSONObj> getUpdateExpr(OperationContext* opCtx,
     invariant(updateMod.type() == write_ops::UpdateModification::Type::kClassic);
     auto updateExpr = updateMod.getUpdateClassic();
 
-    // Find the set of all shard key fields that are missing from the update expression.
-    const auto missingFields = shardKeyPattern.findMissingShardKeyFieldsFromDoc(updateExpr);
+    // Replace any non-existent shard key values with a null value.
+    updateExpr = shardKeyPattern.emplaceMissingShardKeyValuesForDocument(updateExpr);
 
-    // If there are no missing fields, return the update expression as-is.
-    if (missingFields.empty()) {
+    // If we aren't missing _id, return the update expression as-is.
+    if (updateExpr.hasField(kIdFieldName)) {
         return updateExpr;
     }
-    // If there are any missing fields other than _id, then this update can never succeed.
-    if (missingFields.size() > 1 || *missingFields.begin() != kIdFieldName) {
-        return {ErrorCodes::ShardKeyNotFound,
-                str::stream() << "Expected replacement document to include all shard key fields, "
-                                 "but the following were omitted: "
-                              << BSON("missingShardKeyFields" << missingFields)};
-    }
-    // If the only missing field is _id, attempt to extract it from an exact match in the update's
-    // query spec. This will guarantee that we can target a single shard, but it is not necessarily
-    // fatal if no exact _id can be found.
-    invariant(missingFields.size() == 1 && *missingFields.begin() == kIdFieldName);
+
+    // We are missing _id, so attempt to extract it from an exact match in the update's query spec.
+    // This will guarantee that we can target a single shard, but it is not necessarily fatal if no
+    // exact _id can be found.
     const auto idFromQuery = kVirtualIdShardKey.extractShardKeyFromQuery(opCtx, updateDoc.getQ());
     if (!idFromQuery.isOK()) {
         return idFromQuery;
@@ -390,21 +383,7 @@ StatusWith<ShardEndpoint> ChunkManagerTargeter::targetInsert(OperationContext* o
     BSONObj shardKey;
 
     if (_routingInfo->cm()) {
-        //
-        // Sharded collections have the following requirements for targeting:
-        //
-        // Inserts must contain the exact shard key.
-        //
-
         shardKey = _routingInfo->cm()->getShardKeyPattern().extractShardKeyFromDoc(doc);
-
-        // Check shard key exists
-        if (shardKey.isEmpty()) {
-            return {ErrorCodes::ShardKeyNotFound,
-                    str::stream() << "document " << doc
-                                  << " does not contain shard key for pattern "
-                                  << _routingInfo->cm()->getShardKeyPattern().toString()};
-        }
     }
 
     // Target the shard key or database primary
@@ -427,15 +406,19 @@ StatusWith<ShardEndpoint> ChunkManagerTargeter::targetInsert(OperationContext* o
 
 StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetUpdate(
     OperationContext* opCtx, const write_ops::UpdateOpEntry& updateDoc) const {
+    // If the update is replacement-style:
+    // 1. Attempt to target using the query. If this fails, AND the query targets more than one
+    //    shard,
+    // 2. Fall back to targeting using the replacement document.
     //
-    // The rule is simple; we always attempt to target using the query first. If the update is
-    // replacement-style and the query targets more than one shard, we fall back to targeting using
-    // the replacement document, since it must always contain a full shard key. Upserts should have
-    // full shard key in the query and we always use query for targeting. Because mongoD will
-    // automatically propagate '_id' from an existing document, and will extract it from an
-    // exact-match in the query in the case of an upsert, we augment the replacement doc with the
-    // query's '_id' for targeting purposes, if it exists.
+    // If the update is an upsert:
+    // 1. Always attempt to target using the query. Upserts must have the full shard key in the
+    //    query.
     //
+    // NOTE: A replacement document is allowed to have missing shard key values, because we target
+    // as if the the shard key values are specified as NULL. A replacement document is also allowed
+    // to have a missing '_id', and if the '_id' exists in the query, it will be emplaced in the
+    // replacement document for targeting purposes.
     const auto updateType = getUpdateExprType(updateDoc);
     if (!updateType.isOK()) {
         return updateType.getStatus();
@@ -456,7 +439,8 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetUpdate(
     const auto& shardKeyPattern = _routingInfo->cm()->getShardKeyPattern();
     const auto collation = write_ops::collationOf(updateDoc);
 
-    const auto updateExpr = getUpdateExpr(opCtx, shardKeyPattern, updateType.getValue(), updateDoc);
+    const auto updateExpr =
+        getUpdateExprForTargeting(opCtx, shardKeyPattern, updateType.getValue(), updateDoc);
     const bool isUpsert = updateDoc.getUpsert();
     const auto query = updateDoc.getQ();
     if (!updateExpr.isOK()) {

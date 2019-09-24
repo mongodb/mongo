@@ -129,9 +129,9 @@ assert.commandWorked(st.shard0.getCollection(coll.toString()).insert({_id: "bad 
 // Index without shard key query - not covered but succeeds
 assert.commandWorked(coll.ensureIndex({c: 1}));
 var explain = coll.find({c: true}).explain(true).executionStats;
-assert.eq(0, explain.nReturned);
+assert.eq(1, explain.nReturned);
 assert.eq(1, explain.totalDocsExamined);
-assert.eq(1, getChunkSkips(explain.executionStages.shards[0].executionStages));
+assert.eq(0, getChunkSkips(explain.executionStages.shards[0].executionStages));
 
 // Index with shard key query - covered and succeeds and returns result
 //

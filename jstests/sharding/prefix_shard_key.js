@@ -42,14 +42,8 @@ assert.throws(function() {
 // create usable index
 assert.commandWorked(coll.ensureIndex({num: 1, x: 1}));
 
-// usable index, but doc with empty 'num' value, so still should throw
+// usable index, doc with empty 'num' value
 assert.commandWorked(coll.insert({x: -5}));
-assert.throws(function() {
-    s.adminCommand({shardCollection: coll.getFullName(), key: {num: 1}});
-});
-
-// remove the bad doc.  now should finally succeed
-assert.commandWorked(coll.remove({x: -5}));
 assert.commandWorked(s.s0.adminCommand({shardCollection: coll.getFullName(), key: {num: 1}}));
 
 // make sure extra index is not created

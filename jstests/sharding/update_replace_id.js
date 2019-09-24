@@ -10,6 +10,8 @@
  * These special cases are allowed because mongoD always propagates the _id of an existing document
  * into its replacement, and in the case of an upsert will use the value of _id from the query
  * filter.
+ *
+ * @tags: [requires_find_command]
  */
 (function() {
 load("jstests/libs/profiler.js");  // For profilerHas*OrThrow helper functions.
@@ -148,35 +150,28 @@ function runReplacementUpdateTestsForCompoundShardKey() {
     assert.docEq(mongosColl.find({_id: 101}).itcount(), 0);
 
     // Verify that an update whose query contains an exact match on _id but whose replacement
-    // doc does not contain all other shard key fields will be rejected by mongoS.
-    writeRes = assert.commandFailedWithCode(
-        mongosColl.update({_id: -100, a: -100}, {msg: "update_failed_missing_shard_key_field"}),
-        ErrorCodes.ShardKeyNotFound);
+    // doc does not contain all other shard key fields will be targeted as if the missing shard
+    // key values are null, but will write the replacement document as-is.
 
-    // Check that the existing document remains unchanged, and that the update did not reach
-    // either shard per their respective profilers.
-    assert.docEq(mongosColl.find({_id: -100, a: -100}).toArray(),
-                 [{_id: -100, a: -100, msg: "update_extracted_id_from_query"}]);
-    profilerHasZeroMatchingEntriesOrThrow({
-        profileDB: shard0DB,
-        filter: {op: "update", "command.u.msg": "update_failed_missing_shard_key_field"}
-    });
-    profilerHasZeroMatchingEntriesOrThrow({
-        profileDB: shard1DB,
-        filter: {op: "update", "command.u.msg": "update_failed_missing_shard_key_field"}
-    });
+    // Need to start a session to change the shard key.
+    const session = st.s.startSession({retryWrites: true});
+    const sessionDB = session.getDatabase(jsTestName());
+    const sessionColl = sessionDB.test;
+
+    sessionColl.insert({_id: -99, a: null, msg: "not_updated"});
+
+    assert.commandWorked(
+        sessionColl.update({_id: -99}, {_id: -99, msg: "update_missing_shard_key_field"}));
+
+    assert.docEq(sessionColl.find({_id: -99}).toArray(),
+                 [{_id: -99, msg: "update_missing_shard_key_field"}]);
 
     // Verify that an upsert whose query contains an exact match on _id but whose replacement
-    // document does not contain all other shard key fields will be rejected by mongoS, since it
-    // does not contain an exact shard key match.
-    writeRes = assert.commandFailedWithCode(
-        mongosColl.update({_id: 200, a: 200}, {msg: "upsert_targeting_failed"}, {upsert: true}),
-        ErrorCodes.ShardKeyNotFound);
-    profilerHasZeroMatchingEntriesOrThrow(
-        {profileDB: shard0DB, filter: {op: "update", "command.u.msg": "upsert_targeting_failed"}});
-    profilerHasZeroMatchingEntriesOrThrow(
-        {profileDB: shard1DB, filter: {op: "update", "command.u.msg": "upsert_targeting_failed"}});
-    assert.eq(mongosColl.find({_id: 200, a: 200}).itcount(), 0);
+    // document does not contain all other shard key fields will work properly.
+    assert.commandWorked(
+        sessionColl.update({_id: -100, a: -100}, {msg: "upsert_targeting_worked"}, {upsert: true}));
+    assert.eq(mongosColl.find({_id: -100, a: -100}).itcount(), 0);
+    assert.eq(mongosColl.find({msg: "upsert_targeting_worked"}).itcount(), 1);
 }
 
 // Shard the test collection on {_id: 1, a: 1}, split it into two chunks, and migrate one of

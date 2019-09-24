@@ -309,7 +309,6 @@ selector:
   - jstests/sharding/keys_rotation_interval_sec.js
   - jstests/sharding/major_version_check.js
   - jstests/sharding/sharded_profile.js
-  - jstests/sharding/missing_key.js
   - jstests/sharding/replication_with_undefined_shard_key.js
   - jstests/sharding/hash_single_shard.js
   - jstests/sharding/version2.js

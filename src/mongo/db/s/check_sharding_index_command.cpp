@@ -31,28 +31,18 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index_legacy.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/query/internal_plans.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
 using std::string;
 using std::unique_ptr;
-
-namespace dps = ::mongo::dotted_path_support;
 
 namespace {
 
@@ -102,13 +92,6 @@ public:
             return true;
         }
 
-        BSONObj min = jsobj.getObjectField("min");
-        BSONObj max = jsobj.getObjectField("max");
-        if (min.isEmpty() != max.isEmpty()) {
-            errmsg = "either provide both min and max or leave both empty";
-            return false;
-        }
-
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
 
         Collection* const collection = autoColl.getCollection();
@@ -124,87 +107,6 @@ public:
         if (idx == nullptr) {
             errmsg = "couldn't find valid index for shard key";
             return false;
-        }
-        // extend min to get (min, MinKey, MinKey, ....)
-        KeyPattern kp(idx->keyPattern());
-        min = Helpers::toKeyFormat(kp.extendRangeBound(min, false));
-        if (max.isEmpty()) {
-            // if max not specified, make it (MaxKey, Maxkey, MaxKey...)
-            max = Helpers::toKeyFormat(kp.extendRangeBound(max, true));
-        } else {
-            // otherwise make it (max,MinKey,MinKey...) so that bound is non-inclusive
-            max = Helpers::toKeyFormat(kp.extendRangeBound(max, false));
-        }
-
-        auto exec = InternalPlanner::indexScan(opCtx,
-                                               collection,
-                                               idx,
-                                               min,
-                                               max,
-                                               BoundInclusion::kIncludeStartKeyOnly,
-                                               PlanExecutor::YIELD_AUTO,
-                                               InternalPlanner::FORWARD);
-
-        // Find the 'missingField' value used to represent a missing document field in a key of
-        // this index.
-        // NOTE A local copy of 'missingField' is made because indices may be
-        // invalidated during a db lock yield.
-        BSONObj missingFieldObj = IndexLegacy::getMissingField(collection, idx->infoObj());
-        BSONElement missingField = missingFieldObj.firstElement();
-
-        // for now, the only check is that all shard keys are filled
-        // a 'missingField' valued index key is ok if the field is present in the document,
-        // TODO if $exist for nulls were picking the index, it could be used instead efficiently
-        int keyPatternLength = keyPattern.nFields();
-
-        RecordId loc;
-        BSONObj currKey;
-        PlanExecutor::ExecState state;
-        while (PlanExecutor::ADVANCED == (state = exec->getNext(&currKey, &loc))) {
-            // check that current key contains non missing elements for all fields in keyPattern
-            BSONObjIterator i(currKey);
-            for (int k = 0; k < keyPatternLength; k++) {
-                if (!i.more()) {
-                    errmsg = str::stream()
-                        << "index key " << currKey << " too short for pattern " << keyPattern;
-                    return false;
-                }
-                BSONElement currKeyElt = i.next();
-
-                const StringData::ComparatorInterface* stringComparator = nullptr;
-                BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
-                                             stringComparator);
-                if (!currKeyElt.eoo() && eltCmp.evaluate(currKeyElt != missingField))
-                    continue;
-
-                // This is a fetch, but it's OK.  The underlying code won't throw a page fault
-                // exception.
-                BSONObj obj = collection->docFor(opCtx, loc).value();
-                BSONObjIterator j(keyPattern);
-                BSONElement real;
-                for (int x = 0; x <= k; x++)
-                    real = j.next();
-
-                real = dps::extractElementAtPath(obj, real.fieldName());
-
-                if (real.type())
-                    continue;
-
-                const string msg = str::stream()
-                    << "There are documents which have missing or incomplete shard key fields ("
-                    << redact(currKey)
-                    << "). Please ensure that all documents in the collection "
-                       "include all fields from the shard key.";
-                log() << "checkShardingIndex for '" << nss.toString() << "' failed: " << msg;
-
-                errmsg = msg;
-                return false;
-            }
-        }
-
-        if (PlanExecutor::FAILURE == state) {
-            uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(currKey).withContext(
-                "Executor error while checking sharding index"));
         }
 
         return true;

@@ -13,7 +13,6 @@ var staleMongosA = st.s1;
 var staleMongosB = st.s2;
 
 var admin = mongos.getDB("admin");
-var config = mongos.getDB("config");
 var coll = mongos.getCollection("foo.bar");
 var staleCollA = staleMongosA.getCollection(coll + "");
 var staleCollB = staleMongosB.getCollection(coll + "");
@@ -38,9 +37,6 @@ st.shardColl(coll, {b: 1}, {b: 0}, {b: 1}, coll.getDB(), true);
 
 // Make sure that we can successfully insert, even though we have stale state
 assert.commandWorked(staleCollA.insert({b: "b"}));
-
-// Make sure we unsuccessfully insert with old info
-assert.writeError(staleCollB.insert({a: "a"}));
 
 // Change the collection sharding state
 coll.drop();

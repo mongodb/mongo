@@ -31,16 +31,14 @@ assert.commandWorked(testDB.coll.update({_id: 1}, {$set: {a: 2}}, {multi: false}
 
 // Should increment the metric because we broadcast by _id, even though the update subsequently
 // fails on the individual shard.
-assert.commandFailedWithCode(testDB.coll.update({_id: 1}, {$set: {x: 2}}, {multi: false}),
-                             [ErrorCodes.ImmutableField, 31025]);
 assert.commandFailedWithCode(
     testDB.coll.update({_id: 1}, {$set: {x: 2, $invalidField: 4}}, {multi: false}),
     ErrorCodes.DollarPrefixedFieldName);
 
 let mongosServerStatus = testDB.adminCommand({serverStatus: 1});
 
-// Verify that the above four updates incremented the metric counter.
-assert.eq(4, mongosServerStatus.metrics.query.updateOneOpStyleBroadcastWithExactIDCount);
+// Verify that the above three updates incremented the metric counter.
+assert.eq(3, mongosServerStatus.metrics.query.updateOneOpStyleBroadcastWithExactIDCount);
 
 // Shouldn't increment the metric when {multi:true}.
 assert.commandWorked(testDB.coll.update({_id: 1}, {$set: {a: 3}}, {multi: true}));
@@ -71,8 +69,8 @@ assert.commandFailedWithCode(
 
 mongosServerStatus = testDB.adminCommand({serverStatus: 1});
 
-// Verify that only the first four upserts incremented the metric counter.
-assert.eq(4, mongosServerStatus.metrics.query.updateOneOpStyleBroadcastWithExactIDCount);
+// Verify that only the first three upserts incremented the metric counter.
+assert.eq(3, mongosServerStatus.metrics.query.updateOneOpStyleBroadcastWithExactIDCount);
 
 st.stop();
 })();

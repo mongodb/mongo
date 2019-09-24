@@ -54,6 +54,8 @@ constexpr size_t kMaxFlattenedInCombinations = 4000000;
 
 constexpr auto kIdField = "_id"_sd;
 
+const BSONObj kNullObj = BSON("" << BSONNULL);
+
 /**
  * Currently the allowable shard keys are either:
  * i) a hashed single field, e.g. { a : "hashed" }, or
@@ -100,6 +102,10 @@ std::vector<std::unique_ptr<FieldRef>> parseShardKeyPattern(const BSONObj& keyPa
     }
 
     return parsedPaths;
+}
+
+bool isValidShardKeyElementForExtractionFromDocument(const BSONElement& element) {
+    return element.type() != Array;
 }
 
 bool isValidShardKeyElement(const BSONElement& element) {
@@ -245,8 +251,13 @@ BSONObj ShardKeyPattern::extractShardKeyFromMatchable(const MatchableDocument& m
         BSONElement matchEl =
             extractKeyElementFromMatchable(matchable, patternEl.fieldNameStringData());
 
-        if (!isValidShardKeyElement(matchEl))
+        if (matchEl.eoo()) {
+            matchEl = kNullObj.firstElement();
+        }
+
+        if (!isValidShardKeyElementForExtractionFromDocument(matchEl)) {
             return BSONObj();
+        }
 
         if (isHashedPatternEl(patternEl)) {
             keyBuilder.append(
@@ -268,15 +279,22 @@ BSONObj ShardKeyPattern::extractShardKeyFromDoc(const BSONObj& doc) const {
     return extractShardKeyFromMatchable(matchable);
 }
 
-std::vector<StringData> ShardKeyPattern::findMissingShardKeyFieldsFromDoc(const BSONObj doc) const {
-    std::vector<StringData> missingFields;
+BSONObj ShardKeyPattern::emplaceMissingShardKeyValuesForDocument(const BSONObj doc) const {
+    BSONObjBuilder fullDocBuilder(doc);
+
     BSONMatchableDocument matchable(doc);
     for (const auto& skField : _keyPattern.toBSON()) {
+        // Illegal to emplace a null _id.
+        if (skField.fieldNameStringData() == kIdField) {
+            continue;
+        }
         auto matchEl = extractKeyElementFromMatchable(matchable, skField.fieldNameStringData());
-        if (!isValidShardKeyElement(matchEl))
-            missingFields.emplace_back(skField.fieldNameStringData());
+        if (matchEl.eoo()) {
+            fullDocBuilder << skField.fieldNameStringData() << BSONNULL;
+        }
     }
-    return missingFields;
+
+    return fullDocBuilder.obj();
 }
 
 StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(OperationContext* opCtx,

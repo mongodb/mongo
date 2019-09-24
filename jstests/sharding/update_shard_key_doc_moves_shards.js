@@ -162,6 +162,17 @@ changeShardKeyOptions.forEach(function(updateConfig) {
                                    [{"$set": {"x": 30}}, {"$set": {"x": 600}}],
                                    upsert);
 
+    assertCanUnsetSKField(st,
+                          kDbName,
+                          ns,
+                          session,
+                          sessionDB,
+                          runInTxn,
+                          isFindAndModify,
+                          {"x": 300},
+                          {"$unset": {"x": 1}},
+                          upsert);
+
     // Failure cases. These tests do not take 'upsert' as an option so we do not need to test
     // them for both upsert true and false.
     if (!upsert) {
@@ -176,10 +187,6 @@ changeShardKeyOptions.forEach(function(updateConfig) {
         assertCannotUpdateSKToArray(
             st, kDbName, ns, session, sessionDB, runInTxn, isFindAndModify, {"x": 300}, {
                 "$set": {"x": [30]}
-            });
-        assertCannotUnsetSKField(
-            st, kDbName, ns, session, sessionDB, runInTxn, isFindAndModify, {"x": 300}, {
-                "$unset": {"x": 1}
             });
 
         if (!isFindAndModify) {
@@ -236,6 +243,9 @@ changeShardKeyOptions.forEach(function(updateConfig) {
                                    [{"x": 30, "y": 80}, {"x": 600, "y": 3}],
                                    upsert);
 
+    assertCanUnsetSKField(
+        st, kDbName, ns, session, sessionDB, runInTxn, isFindAndModify, {"x": 300}, {}, upsert);
+
     // Failure cases. These tests do not take 'upsert' as an option so we do not need to test
     // them for both upsert true and false.
     if (!upsert) {
@@ -255,8 +265,6 @@ changeShardKeyOptions.forEach(function(updateConfig) {
             st, kDbName, ns, session, sessionDB, runInTxn, isFindAndModify, {"x": 300}, {
                 "x": [30]
             });
-        assertCannotUnsetSKField(
-            st, kDbName, ns, session, sessionDB, runInTxn, isFindAndModify, {"x": 300}, {});
     }
 });
 

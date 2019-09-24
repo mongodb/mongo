@@ -101,31 +101,31 @@ function validateCRUDAfterRefine() {
     assert.eq([{a: 10, b: 10, c: 10, d: 10}],
               sessionDB.getCollection(kCollName).find({a: 10}, {_id: 0}).toArray());
 
-    // The full shard key is required when inserting documents.
-    assert.writeErrorWithCode(sessionDB.getCollection(kCollName).insert({a: 1, b: 1}),
-                              ErrorCodes.ShardKeyNotFound);
-    assert.writeErrorWithCode(sessionDB.getCollection(kCollName).insert({a: -1, b: -1}),
-                              ErrorCodes.ShardKeyNotFound);
+    // A write with the incomplete shard key is treated as if the missing values are null.
+
+    assert.commandWorked(sessionDB.getCollection(kCollName).insert({a: 1, b: 1}));
+    assert.commandWorked(sessionDB.getCollection(kCollName).insert({a: -1, b: -1}));
+
+    assert.neq(null, sessionDB.getCollection(kCollName).findOne({a: 1, b: 1, c: null, d: null}));
+    assert.neq(null, sessionDB.getCollection(kCollName).findOne({a: -1, b: -1, c: null, d: null}));
+
+    // Full shard key writes work properly.
     assert.commandWorked(sessionDB.getCollection(kCollName).insert({a: 1, b: 1, c: 1, d: 1}));
     assert.commandWorked(sessionDB.getCollection(kCollName).insert({a: -1, b: -1, c: -1, d: -1}));
 
-    // The full shard key is required when updating documents.
-    assert.writeErrorWithCode(
-        sessionDB.getCollection(kCollName).update({a: 1, b: 1}, {$set: {b: 2}}), 31025);
-    assert.writeErrorWithCode(
-        sessionDB.getCollection(kCollName).update({a: -1, b: -1}, {$set: {b: 2}}), 31025);
+    // The full shard key is not required when updating documents.
     assert.commandWorked(
-        sessionDB.getCollection(kCollName).update({a: 1, b: 1, c: 1, d: 1}, {$set: {b: 2}}));
+        sessionDB.getCollection(kCollName).update({a: 1, b: 1, c: 1}, {$set: {b: 2}}));
     assert.commandWorked(
-        sessionDB.getCollection(kCollName).update({a: -1, b: -1, c: -1, d: -1}, {$set: {b: 4}}));
+        sessionDB.getCollection(kCollName).update({a: -1, b: -1, c: -1}, {$set: {b: 4}}));
 
-    assert.eq(2, sessionDB.getCollection(kCollName).findOne({a: 1}).b);
-    assert.eq(4, sessionDB.getCollection(kCollName).findOne({a: -1}).b);
+    assert.eq(2, sessionDB.getCollection(kCollName).findOne({c: 1}).b);
+    assert.eq(4, sessionDB.getCollection(kCollName).findOne({c: -1}).b);
 
     // Versioned reads against secondaries should work as expected.
     mongos.setReadPref("secondary");
-    assert.eq(2, sessionDB.getCollection(kCollName).findOne({a: 1}).b);
-    assert.eq(4, sessionDB.getCollection(kCollName).findOne({a: -1}).b);
+    assert.eq(2, sessionDB.getCollection(kCollName).findOne({c: 1}).b);
+    assert.eq(4, sessionDB.getCollection(kCollName).findOne({c: -1}).b);
     mongos.setReadPref(null);
 
     // The full shard key is required when removing documents.
@@ -139,6 +139,11 @@ function validateCRUDAfterRefine() {
     assert.commandWorked(sessionDB.getCollection(kCollName).remove({a: 5, b: 5, c: 5, d: 5}, true));
     assert.commandWorked(
         sessionDB.getCollection(kCollName).remove({a: 10, b: 10, c: 10, d: 10}, true));
+    assert.commandWorked(
+        sessionDB.getCollection(kCollName).remove({a: 1, b: 1, c: null, d: null}, true));
+    assert.commandWorked(
+        sessionDB.getCollection(kCollName).remove({a: -1, b: -1, c: null, d: null}, true));
+
     assert.eq(null, sessionDB.getCollection(kCollName).findOne());
 }
 
@@ -408,15 +413,14 @@ assert.commandWorked(
 validateConfigCollections({_id: 1, aKey: 1}, oldEpoch);
 validateConfigChangelog(1);
 
-// Should fail because only an index with missing or incomplete shard key entries exists for new
-// shard key {_id: 1, aKey: 1}.
+// Should work because an index with missing or incomplete shard key entries exists for new shard
+// key {_id: 1, aKey: 1} and these entries are treated as null values.
 dropAndReshardColl({_id: 1});
 assert.commandWorked(mongos.getCollection(kNsName).createIndex({_id: 1, aKey: 1}));
 assert.commandWorked(mongos.getCollection(kNsName).insert({_id: 12345}));
 
-assert.commandFailedWithCode(
-    mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}}),
-    ErrorCodes.OperationFailed);
+assert.commandWorked(
+    mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}}));
 
 // Should fail because new shard key {aKey: 1} is not a prefix of current shard key {_id: 1,
 // aKey: 1}.
@@ -462,7 +466,7 @@ oldEpoch = mongos.getCollection(kConfigCollections).findOne({_id: kNsName}).last
 assert.commandWorked(
     mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}}));
 validateConfigCollections({_id: 1, aKey: 1}, oldEpoch);
-validateConfigChangelog(2);
+validateConfigChangelog(3);
 
 // Should work because a 'useful' index exists for new shard key {a: 1, b.c: 1}. NOTE: We are
 // explicitly verifying that refineCollectionShardKey works with a dotted field.
@@ -473,7 +477,7 @@ oldEpoch = mongos.getCollection(kConfigCollections).findOne({_id: kNsName}).last
 assert.commandWorked(
     mongos.adminCommand({refineCollectionShardKey: kNsName, key: {a: 1, 'b.c': 1}}));
 validateConfigCollections({a: 1, 'b.c': 1}, oldEpoch);
-validateConfigChangelog(3);
+validateConfigChangelog(4);
 
 assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
 

@@ -63,13 +63,13 @@ assert.eq(2, collUn.find().itcount());
 assert.commandWorked(collDi.insert(inserts));
 assert.eq(2, collDi.find().itcount());
 
-jsTest.log("Bulk insert (no COE) with mongos error...");
+jsTest.log("Bulk insert (no COE) to single shard...");
 
 resetColls();
 var inserts = [{ukey: 0}, {hello: "world"}, {ukey: 1}];
 
-assert.writeError(collSh.insert(inserts));
-assert.eq(1, collSh.find().itcount());
+assert.commandWorked(collSh.insert(inserts));
+assert.eq(3, collSh.find().itcount());
 
 jsTest.log("Bulk insert (no COE) with mongod error...");
 
@@ -85,7 +85,7 @@ assert.eq(1, collUn.find().itcount());
 assert.writeError(collDi.insert(inserts));
 assert.eq(1, collDi.find().itcount());
 
-jsTest.log("Bulk insert (no COE) with mongod and mongos error...");
+jsTest.log("Bulk insert (no COE) with mongod error...");
 
 resetColls();
 var inserts = [{ukey: 0}, {ukey: 0}, {ukey: 1}, {hello: "world"}];
@@ -116,7 +116,7 @@ assert.eq(2, collUn.find().itcount());
 assert.commandWorked(collDi.insert(inserts));
 assert.eq(2, collDi.find().itcount());
 
-jsTest.log("Bulk insert to second shard (no COE) with mongos error...");
+jsTest.log("Bulk insert to second shard (no COE) on second shard...");
 
 resetColls();
 var inserts = [
@@ -126,8 +126,8 @@ var inserts = [
     {hello: "world"}
 ];
 
-assert.writeError(collSh.insert(inserts));
-assert.eq(3, collSh.find().itcount());
+assert.commandWorked(collSh.insert(inserts));
+assert.eq(4, collSh.find().itcount());
 
 jsTest.log("Bulk insert to second shard (no COE) with mongod error...");
 
@@ -143,7 +143,7 @@ assert.eq(4, collUn.find().itcount());
 assert.writeError(collDi.insert(inserts));
 assert.eq(4, collDi.find().itcount());
 
-jsTest.log("Bulk insert to third shard (no COE) with mongod and mongos error...");
+jsTest.log("Bulk insert to third shard (no COE) with mongod error...");
 
 resetColls();
 var inserts =
@@ -165,14 +165,6 @@ assert.eq(5, collDi.find().itcount());
 // CONTINUE-ON-ERROR
 //
 
-jsTest.log("Bulk insert (yes COE) with mongos error...");
-
-resetColls();
-var inserts = [{ukey: 0}, {hello: "world"}, {ukey: 1}];
-
-assert.writeError(collSh.insert(inserts, 1));  // COE
-assert.eq(2, collSh.find().itcount());
-
 jsTest.log("Bulk insert (yes COE) with mongod error...");
 
 resetColls();
@@ -187,45 +179,23 @@ assert.eq(2, collUn.find().itcount());
 assert.writeError(collDi.insert(inserts, 1));
 assert.eq(2, collDi.find().itcount());
 
-jsTest.log("Bulk insert to third shard (yes COE) with mongod and mongos error...");
+jsTest.log("Bulk insert to third shard (yes COE) with mongod error...");
 
 resetColls();
 var inserts =
     [{ukey: 0}, {ukey: 1}, {ukey: -2}, {ukey: -3}, {ukey: 4}, {ukey: 4}, {hello: "world"}];
 
-// Last error here is mongos error
+// Extra insert goes through
 res = assert.writeError(collSh.insert(inserts, 1));
-assert(!isDupKeyError(res.getWriteErrorAt(res.getWriteErrorCount() - 1).errmsg), res.toString());
-assert.eq(5, collSh.find().itcount());
+assert.eq(6, res.nInserted, res.toString());
+assert.eq(6, collSh.find().itcount());
 
-// Extra insert goes through, since mongos error "doesn't count"
 res = assert.writeError(collUn.insert(inserts, 1));
 assert.eq(6, res.nInserted, res.toString());
 assert.eq(6, collUn.find().itcount());
 
 res = assert.writeError(collDi.insert(inserts, 1));
 assert.eq(6, res.nInserted, res.toString());
-assert.eq(6, collDi.find().itcount());
-
-jsTest.log("Bulk insert to third shard (yes COE) with mongod and mongos error " +
-           "(mongos error first)...");
-
-resetColls();
-var inserts =
-    [{ukey: 0}, {ukey: 1}, {ukey: -2}, {ukey: -3}, {hello: "world"}, {ukey: 4}, {ukey: 4}];
-
-// Last error here is mongos error
-res = assert.writeError(collSh.insert(inserts, 1));
-assert(isDupKeyError(res.getWriteErrorAt(res.getWriteErrorCount() - 1).errmsg), res.toString());
-assert.eq(5, collSh.find().itcount());
-
-// Extra insert goes through, since mongos error "doesn't count"
-res = assert.writeError(collUn.insert(inserts, 1));
-assert(isDupKeyError(res.getWriteErrorAt(res.getWriteErrorCount() - 1).errmsg), res.toString());
-assert.eq(6, collUn.find().itcount());
-
-res = assert.writeError(collDi.insert(inserts, 1));
-assert(isDupKeyError(res.getWriteErrorAt(0).errmsg), res.toString());
 assert.eq(6, collDi.find().itcount());
 
 //

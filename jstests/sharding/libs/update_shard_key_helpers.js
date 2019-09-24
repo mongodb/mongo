@@ -409,6 +409,42 @@ function assertCanUpdatePartialShardKey(st,
     sessionDB.foo.drop();
 }
 
+function assertCanDoReplacementUpdateWhereShardKeyMissingFields(st,
+                                                                kDbName,
+                                                                ns,
+                                                                session,
+                                                                sessionDB,
+                                                                inTxn,
+                                                                isFindAndModify,
+                                                                queries,
+                                                                updates,
+                                                                upsert,
+                                                                pipelineUpdateResult) {
+    assertCanUpdatePartialShardKey(st,
+                                   kDbName,
+                                   ns,
+                                   session,
+                                   sessionDB,
+                                   inTxn,
+                                   isFindAndModify,
+                                   queries,
+                                   updates,
+                                   upsert,
+                                   pipelineUpdateResult);
+}
+
+function assertCanUnsetSKField(
+    st, kDbName, ns, session, sessionDB, inTxn, isFindAndModify, query, update, upsert) {
+    assertCanUpdatePrimitiveShardKey(
+        st, kDbName, ns, session, sessionDB, inTxn, isFindAndModify, query, update, upsert);
+}
+
+function assertCanUnsetSKFieldUsingPipeline(
+    st, kDbName, ns, session, sessionDB, inTxn, isFindAndModify, query, update, upsert) {
+    assertCanUpdatePrimitiveShardKey(
+        st, kDbName, ns, session, sessionDB, inTxn, isFindAndModify, query, update, upsert);
+}
+
 function assertCannotUpdate_id(st,
                                kDbName,
                                ns,
@@ -483,23 +519,6 @@ function assertCannotUpdate_idDottedPath(st,
     sessionDB.foo.drop();
 }
 
-function assertCannotDoReplacementUpdateWhereShardKeyMissingFields(
-    st, kDbName, ns, session, sessionDB, inTxn, isFindAndModify, query, update) {
-    let docsToInsert =
-        [{"x": 4, "y": 3}, {"x": 100, "y": 50}, {"x": 300, "y": 80}, {"x": 500, "y": 600}];
-    shardCollectionMoveChunks(
-        st, kDbName, ns, {"x": 1, "y": 1}, docsToInsert, {"x": 100, "y": 50}, {"x": 300, "y": 80});
-    cleanupOrphanedDocs(st, ns);
-
-    if (isFindAndModify) {
-        runFindAndModifyCmdFail(st, kDbName, session, sessionDB, inTxn, query, update);
-    } else {
-        runUpdateCmdFail(st, kDbName, session, sessionDB, inTxn, query, update, false);
-    }
-
-    sessionDB.foo.drop();
-}
-
 function assertCannotUpdateWithMultiTrue(
     st, kDbName, ns, session, sessionDB, inTxn, query, update, pipelineUpdateResult) {
     let docsToInsert = [{"x": 4, "a": 3}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];
@@ -522,59 +541,6 @@ function assertCannotUpdateSKToArray(
         runFindAndModifyCmdFail(st, kDbName, session, sessionDB, inTxn, query, update);
     } else {
         runUpdateCmdFail(st, kDbName, session, sessionDB, inTxn, query, update, false);
-    }
-
-    sessionDB.foo.drop();
-}
-
-function assertCannotUnsetSKField(
-    st, kDbName, ns, session, sessionDB, inTxn, isFindAndModify, query, update) {
-    // Updates to the shard key cannot $unset a shard key field from a doc
-    let docsToInsert = [{"x": 4, "a": 3}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];
-    shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
-    cleanupOrphanedDocs(st, ns);
-
-    if (isFindAndModify) {
-        runFindAndModifyCmdFail(st, kDbName, session, sessionDB, inTxn, query, update);
-    } else {
-        runUpdateCmdFail(st, kDbName, session, sessionDB, inTxn, query, update, false);
-    }
-
-    sessionDB.foo.drop();
-}
-
-function assertCannotUnsetSKFieldUsingPipeline(st,
-                                               kDbName,
-                                               ns,
-                                               session,
-                                               sessionDB,
-                                               inTxn,
-                                               isFindAndModify,
-                                               query,
-                                               update,
-                                               pipelineUpdateResult) {
-    // Updates to the shard key cannot $project out a shard key field from a doc
-    let docsToInsert =
-        [{"x": 4, "y": 3}, {"x": 100, "y": 50}, {"x": 300, "y": 80}, {"x": 500, "y": 600}];
-    let splitDoc = {"x": 100, "y": 50};
-    shardCollectionMoveChunks(
-        st, kDbName, ns, {"x": 1, "y": 1}, docsToInsert, splitDoc, {"x": 300, "y": 80});
-    cleanupOrphanedDocs(st, ns);
-
-    if (isFindAndModify) {
-        runFindAndModifyCmdFail(
-            st, kDbName, session, sessionDB, inTxn, query, update, false, pipelineUpdateResult);
-    } else {
-        runUpdateCmdFail(st,
-                         kDbName,
-                         session,
-                         sessionDB,
-                         inTxn,
-                         query,
-                         update,
-                         false,
-                         null,
-                         pipelineUpdateResult);
     }
 
     sessionDB.foo.drop();

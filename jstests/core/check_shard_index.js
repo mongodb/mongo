@@ -24,7 +24,7 @@ res = db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPatter
 assert.eq(true, res.ok, "1b");
 
 // -------------------------
-// Case 2: entry with null values would make an index unsuitable
+// Case 2: entry with null values would make an index suitable
 //
 
 f.drop();
@@ -40,7 +40,7 @@ assert.eq(true, res.ok, "2a " + tojson(res));
 f.save({y: 2});
 assert.eq(3, f.count(), "2. count after initial insert should be 3");
 res = db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1}});
-assert.eq(false, res.ok, "2b " + tojson(res));
+assert.eq(true, res.ok, "2b " + tojson(res));
 
 // Check _id index
 res = db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPattern: {_id: 1}});

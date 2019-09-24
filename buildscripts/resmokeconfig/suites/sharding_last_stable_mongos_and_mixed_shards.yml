@@ -23,11 +23,18 @@ selector:
   # Enable after SERVER-40258 gets backported and available in the official 4.2 binaries.
   - jstests/sharding/prepared_txn_metadata_refresh.js
   # Enable when 4.4 becomes last stable
+  - jstests/sharding/bulk_insert.js
+  - jstests/sharding/covered_shard_key_indexes.js
   - jstests/sharding/explain_exec_stats_on_shards.js
+  - jstests/sharding/extract_shard_key_values.js
+  - jstests/sharding/features1.js
+  - jstests/sharding/prefix_shard_key.js
   - jstests/sharding/refine_collection_shard_key_basic.js
   - jstests/sharding/refine_collection_shard_key_jumbo.js
   - jstests/sharding/refine_collection_shard_key_drops_chunks.js
   - jstests/sharding/refine_collection_shard_key_atomic.js
+  - jstests/sharding/update_compound_shard_key.js
+  - jstests/sharding/update_replace_id.js
   - jstests/sharding/move_primary_clone_test.js
   - jstests/sharding/database_versioning_safe_secondary_reads.js
   - jstests/sharding/clone_catalog_data.js

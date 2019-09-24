@@ -110,11 +110,10 @@ assert.commandWorked(db.foo8.insert({a: 1}));
 assert.commandFailed(s.s0.adminCommand({shardcollection: "test.foo8", key: {a: 1}}),
                      "non-empty collection");
 
-// ---- can't shard non-empty collection with null values in shard key ----
+// ---- can shard non-empty collection with null values in shard key ----
 assert.commandWorked(db.foo9.insert({b: 1}));
 assert.commandWorked(db.foo9.createIndex({a: 1}));
-assert.commandFailed(s.s0.adminCommand({shardcollection: "test.foo9", key: {a: 1}}),
-                     "entry with null value");
+assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo9", key: {a: 1}}));
 
 // --- listDatabases ---
 var r = db.getMongo().getDBs();

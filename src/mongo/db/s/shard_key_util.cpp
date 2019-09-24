@@ -177,8 +177,7 @@ void validateShardKeyAgainstExistingIndexes(OperationContext* opCtx,
     const bool isEmpty = (countRes.response["n"].Int() == 0);
 
     if (hasUsefulIndexForKey) {
-        // Check 2.iii and 2.iv. Make sure no null entries in the sharding index
-        // and that there is a useful, non-multikey index available
+        // Check 2.iii Make sure that there is a useful, non-multikey index available.
         BSONObjBuilder checkShardingIndexCmd;
         checkShardingIndexCmd.append("checkShardingIndex", nss.ns());
         checkShardingIndexCmd.append("keyPattern", proposedKey);

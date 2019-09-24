@@ -85,6 +85,18 @@ changeShardKeyOptions.forEach(function(updateConfig) {
         upsert,
         [{"x": 600}, {"x": -4}]);
 
+    assertCanUnsetSKFieldUsingPipeline(st,
+                                       kDbName,
+                                       ns,
+                                       session,
+                                       sessionDB,
+                                       runInTxn,
+                                       isFindAndModify,
+                                       {"x": 300, "y": 80},
+                                       [{$project: {"y": 0}}],
+                                       upsert,
+                                       {"x": 300, "y": 80});
+
     // Failure cases. These tests do not take 'upsert' as an option so we do not need to test
     // them for both upsert true and false.
     if (!upsert) {
@@ -108,16 +120,6 @@ changeShardKeyOptions.forEach(function(updateConfig) {
                                         {"_id.a": 300},
                                         [{$set: {"_id": {"a": {$multiply: ["$_id.a", 2]}}}}],
                                         {"_id": {"a": 600}});
-        assertCannotUnsetSKFieldUsingPipeline(st,
-                                              kDbName,
-                                              ns,
-                                              session,
-                                              sessionDB,
-                                              runInTxn,
-                                              isFindAndModify,
-                                              {"x": 300, "y": 80},
-                                              [{$project: {"y": 0}}],
-                                              {"x": 300, "y": 80});
         if (!isFindAndModify) {
             assertCannotUpdateWithMultiTrue(st,
                                             kDbName,
@@ -186,6 +188,17 @@ changeShardKeyOptions.forEach(function(updateConfig) {
         [[{$set: {"x": {$multiply: ["$x", -1]}}}], [{$set: {"x": {$multiply: ["$x", 100]}}}]],
         upsert,
         [{"x": -300}, {"x": 400}]);
+    assertCanUnsetSKFieldUsingPipeline(st,
+                                       kDbName,
+                                       ns,
+                                       session,
+                                       sessionDB,
+                                       runInTxn,
+                                       isFindAndModify,
+                                       {"x": 300, "y": 80},
+                                       [{$project: {"y": 0}}],
+                                       upsert,
+                                       {"x": 300, "y": 80});
 
     // Failure cases. These tests do not take 'upsert' as an option so we do not need to test
     // them for both upsert true and false.
@@ -210,16 +223,6 @@ changeShardKeyOptions.forEach(function(updateConfig) {
                                         {"_id.a": 300},
                                         [{$set: {"_id": {"a": {$multiply: ["$_id.a", -1]}}}}],
                                         {"_id": {"a": -300}});
-        assertCannotUnsetSKFieldUsingPipeline(st,
-                                              kDbName,
-                                              ns,
-                                              session,
-                                              sessionDB,
-                                              runInTxn,
-                                              isFindAndModify,
-                                              {"x": 300, "y": 80},
-                                              [{$project: {"y": 0}}],
-                                              {"x": 300, "y": 80});
         if (!isFindAndModify) {
             assertCannotUpdateWithMultiTrue(st,
                                             kDbName,

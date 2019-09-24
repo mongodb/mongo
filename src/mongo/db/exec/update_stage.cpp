@@ -128,6 +128,19 @@ void assertRequiredPathsPresent(const mb::Document& document, const FieldRefSet&
     }
 }
 
+void assertPathsNotArray(const mb::Document& document, const FieldRefSet& requiredPaths) {
+    for (const auto& path : requiredPaths) {
+        auto elem = document.root();
+        for (size_t i = 0; i < (*path).numParts(); ++i) {
+            uassert(ErrorCodes::NotSingleValueField,
+                    str::stream() << "After applying the update to the document, the field '"
+                                  << (*path).dottedField()
+                                  << "' was found to be an array or array descendant.",
+                    elem.getType() != BSONType::Array);
+        }
+    }
+}
+
 /**
  * Returns true if we should throw a WriteConflictException in order to retry the operation in the
  * case of a conflict. Returns false if we should skip the document and keep going.
@@ -938,24 +951,8 @@ bool UpdateStage::checkUpdateChangesShardKeyFields(ScopedCollectionMetadata meta
     const auto& shardKeyPathsVector = metadata->getKeyPatternFields();
     shardKeyPaths.fillFrom(transitional_tools_do_not_use::unspool_vector(shardKeyPathsVector));
 
-    // Assert that the updated doc has all shard key fields and none are arrays or array
-    // descendants.
-    assertRequiredPathsPresent(_doc, shardKeyPaths);
-
-    // We do not allow modifying shard key value without specifying the full shard key in the query.
-    // If the query is a simple equality match on _id, then '_params.canonicalQuery' will be null.
-    // But if we are here, we already know that the shard key is not _id, since we have an assertion
-    // earlier for requests that try to modify the immutable _id field. So it is safe to uassert if
-    // '_params.canonicalQuery' is null OR if the query does not include equality matches on all
-    // shard key fields.
-    pathsupport::EqualityMatches equalities;
-    uassert(31025,
-            "Shard key update is not allowed without specifying the full shard key in the query",
-            _params.canonicalQuery &&
-                pathsupport::extractFullEqualityMatches(
-                    *(_params.canonicalQuery->root()), shardKeyPaths, &equalities)
-                    .isOK() &&
-                equalities.size() == shardKeyPathsVector.size());
+    // Assert that the updated doc has no arrays or array descendants for the shard key fields.
+    assertPathsNotArray(_doc, shardKeyPaths);
 
     // We do not allow updates to the shard key when 'multi' is true.
     uassert(ErrorCodes::InvalidOptions,
