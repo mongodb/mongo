@@ -1626,6 +1626,15 @@ var ShardingTest = function(params) {
              lastStableBinVersion,
              MongoRunner.getBinVersionFor(otherParams.configOptions.binVersion)))) {
         this.configRS.getPrimary().getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1});
+
+        for (let i = 0; i < numShards; i++) {
+            if (otherParams.rs || otherParams["rs" + i] || startShardsAsRS) {
+                const rs = this._rs[i].test;
+                rs.getPrimary().getDB("admin").runCommand({_flushRoutingTableCacheUpdatesCmd: 1});
+            } else {
+                this["shard" + i].getDB("admin").runCommand({_flushRoutingTableCacheUpdatesCmd: 1});
+            }
+        }
     }
 };
 
