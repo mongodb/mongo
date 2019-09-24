@@ -1177,8 +1177,18 @@ bool TopologyCoordinator::haveNumNodesReachedOpTime(const OpTime& targetOpTime,
     }
 
     for (auto&& memberData : _memberData) {
+        // The index in the config is -1 for master-slave nodes.
+        const auto configIndex = memberData.getConfigIndex();
+        if (configIndex >= 0) {
+            // We do not count arbiters towards the write concern.
+            if (_rsConfig.getMemberAt(configIndex).isArbiter()) {
+                continue;
+            }
+        }
+
         const OpTime& memberOpTime =
             durablyWritten ? memberData.getLastDurableOpTime() : memberData.getLastAppliedOpTime();
+
         if (memberOpTime >= targetOpTime) {
             --numNodes;
         }
