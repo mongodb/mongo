@@ -1303,6 +1303,35 @@ void addErrorIfUnequal(T stored, T cached, StringData name, ValidateResults* res
     }
 }
 
+std::string multikeyPathsToString(MultikeyPaths paths) {
+    str::stream builder;
+    builder << "[";
+    auto pathIt = paths.begin();
+    while (true) {
+        builder << "{";
+
+        auto pathSet = *pathIt;
+        auto setIt = pathSet.begin();
+        while (true) {
+            builder << *setIt++;
+            if (setIt == pathSet.end()) {
+                break;
+            } else {
+                builder << ",";
+            }
+        }
+        builder << "}";
+
+        if (++pathIt == paths.end()) {
+            break;
+        } else {
+            builder << ",";
+        }
+    }
+    builder << "]";
+    return builder;
+}
+
 void _validateCatalogEntry(OperationContext* opCtx,
                            CollectionImpl* coll,
                            BSONObj validatorDoc,
@@ -1336,6 +1365,34 @@ void _validateCatalogEntry(OperationContext* opCtx,
         results->valid = false;
         results->errors.push_back(str::stream() << "collection options are not valid for storage: "
                                                 << options.toBSON());
+    }
+
+    std::vector<std::string> indexes;
+    IndexCatalog::IndexIterator i = coll->getIndexCatalog()->getIndexIterator(opCtx, false);
+    while (i.more()) {
+        const IndexDescriptor* descriptor = i.next();
+        if (coll->getCatalogEntry()->isIndexReady(opCtx, descriptor->indexName())) {
+            indexes.push_back(descriptor->indexName());
+        }
+    }
+
+    for (auto& index : indexes) {
+        MultikeyPaths multikeyPaths;
+        const bool isMultikey =
+            coll->getCatalogEntry()->isIndexMultikey(opCtx, index, &multikeyPaths);
+        const bool hasMultiKeyPaths = std::any_of(multikeyPaths.begin(),
+                                                  multikeyPaths.end(),
+                                                  [](auto& pathSet) { return pathSet.size() > 0; });
+        // It is illegal for multikey paths to exist without the multikey flag set on the index, but
+        // it may be possible for multikey to be set on the index while having no multikey paths. If
+        // any of the paths are multikey, then the entire index should also be marked multikey.
+        if (hasMultiKeyPaths && !isMultikey) {
+            results->valid = false;
+            string err = str::stream() << "The 'multikey' field for index " << index
+                                       << " was false with non-empty 'multikeyPaths': "
+                                       << multikeyPathsToString(multikeyPaths);
+            results->errors.push_back(err);
+        }
     }
 }
 
