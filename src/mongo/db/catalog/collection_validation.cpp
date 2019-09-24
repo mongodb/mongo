@@ -393,14 +393,14 @@ Status validate(OperationContext* opCtx,
     invariant(!opCtx->lockState()->isLocked());
     invariant(!(background && fullValidate));
 
-    ValidateResultsMap indexNsResultsMap;
-    BSONObjBuilder keysPerIndex;  // not using subObjStart to be exception safe.
-
+    // This is deliberately outside of the try-catch block, so that any errors thrown in the
+    // constructor fail the cmd, as opposed to returning OK with valid:false.
     ValidateState validateState(opCtx, nss, background, fullValidate);
 
     try {
         std::map<std::string, int64_t> numIndexKeysPerIndex;
-
+        ValidateResultsMap indexNsResultsMap;
+        BSONObjBuilder keysPerIndex;  // not using subObjStart to be exception safe.
 
         // Full validation code is executed before we open cursors because it may close
         // and/or invalidate all open cursors.

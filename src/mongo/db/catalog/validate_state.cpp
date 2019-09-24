@@ -131,6 +131,7 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
     // the same checkpoint, i.e. a consistent view of the collection data.
     std::unique_ptr<StorageEngine::CheckpointLock> checkpointCursorsLock;
     if (_background) {
+        invariant(!opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_X));
         auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
         invariant(storageEngine->supportsCheckpoints());
         opCtx->recoveryUnit()->abandonSnapshot();
@@ -145,24 +146,26 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
         _dataThrottle.turnThrottlingOff();
     }
 
-    std::vector<std::string> readyDurableIndexes;
-    try {
-        DurableCatalog::get(opCtx)->getReadyIndexes(opCtx, _nss, &readyDurableIndexes);
-    } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
-        log() << "Skipping validation on collection with name " << _nss
-              << " because there is no checkpoint available for the MDB catalog yet (" << ex
-              << ").";
-        throw;
-    }
-
     try {
         _traverseRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(
             opCtx, _collection->getRecordStore(), &_dataThrottle);
         _seekRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(
             opCtx, _collection->getRecordStore(), &_dataThrottle);
     } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
+        invariant(_background);
         // End the validation if we can't open a checkpoint cursor on the collection.
-        log() << "Skipping validation on collection with name " << _nss << " due to " << ex;
+        log() << "Skipping background validation on collection '" << _nss
+              << "' because the collection is not yet in a checkpoint: " << ex;
+        throw;
+    }
+
+    std::vector<std::string> readyDurableIndexes;
+    try {
+        DurableCatalog::get(opCtx)->getReadyIndexes(opCtx, _nss, &readyDurableIndexes);
+    } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
+        invariant(_background);
+        log() << "Skipping background validation on collection '" << _nss
+              << "' because the data is not yet in a checkpoint: " << ex;
         throw;
     }
 
@@ -173,13 +176,13 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
         const IndexCatalogEntry* entry = it->next();
         const IndexDescriptor* desc = entry->descriptor();
 
-        // Skip indexes that are not yet durable and ready in the checkpointed MDB catalog.
+        // Filter out any index that is not in the checkpoint's MDB catalog table.
         bool isIndexDurable =
             std::find(readyDurableIndexes.begin(), readyDurableIndexes.end(), desc->indexName()) !=
             readyDurableIndexes.end();
         if (_background && !isIndexDurable) {
-            log() << "Skipping validation on index with name " << desc->indexName()
-                  << " as it is not ready in the checkpoint yet.";
+            log() << "Skipping validation on index '" << desc->indexName() << "' in collection '"
+                  << _nss << "' because the index is not yet in a checkpoint.";
             continue;
         }
 
@@ -188,8 +191,11 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
                                   std::make_unique<SortedDataInterfaceThrottleCursor>(
                                       opCtx, entry->accessMethod(), &_dataThrottle));
         } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
-            log() << "Skipping validation on index with name " << desc->indexName() << " due to "
-                  << ex;
+            invariant(_background);
+            // This can only happen if the checkpoint has the MDB catalog entry for the index, but
+            // not the corresponding index table.
+            log() << "Skipping validation on index '" << desc->indexName() << "' in collection '"
+                  << _nss << "' because the index data is not in a checkpoint: " << ex;
             continue;
         }
 

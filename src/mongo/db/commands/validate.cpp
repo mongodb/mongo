@@ -135,7 +135,8 @@ public:
         }
 
         if (!serverGlobalParams.quiet.load()) {
-            LOG(0) << "CMD: validate " << nss.ns();
+            LOG(0) << "CMD: validate " << nss.ns() << (background ? ", background:true" : "")
+                   << (fullValidate ? ", full:true" : "");
         }
 
         // Only one validation per collection can be in progress, the rest wait.
