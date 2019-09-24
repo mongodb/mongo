@@ -411,7 +411,7 @@ TEST_F(MergeChunkTest, NonMatchingEpochsOfChunkAndRequestErrors) {
     ASSERT_EQ(ErrorCodes::StaleEpoch, mergeStatus);
 }
 
-TEST_F(MergeChunkTest, MergeAlreadyHappenedFailsPrecondition) {
+TEST_F(MergeChunkTest, MergeAlreadyHappenedSucceeds) {
     ChunkType chunk;
     chunk.setName(OID::gen());
     chunk.setNS(kNamespace);
@@ -446,8 +446,7 @@ TEST_F(MergeChunkTest, MergeAlreadyHappenedFailsPrecondition) {
 
     Timestamp validAfter{1};
 
-    ASSERT_EQ(ErrorCodes::IncompatibleShardingMetadata,
-              ShardingCatalogManager::get(operationContext())
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->commitChunkMerge(operationContext(),
                                      kNamespace,
                                      origVersion.epoch(),

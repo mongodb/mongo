@@ -555,6 +555,12 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
                 "that the collection was dropped and re-created."};
     }
 
+    // Check if the chunk(s) have already been merged. If so, return success.
+    auto minChunkOnDisk = uassertStatusOK(_findChunkOnConfig(opCtx, nss, chunkBoundaries.front()));
+    if (minChunkOnDisk.getMax().woCompare(chunkBoundaries.back()) == 0) {
+        return Status::OK();
+    }
+
     // Build chunks to be merged
     std::vector<ChunkType> chunksToMerge;
 
