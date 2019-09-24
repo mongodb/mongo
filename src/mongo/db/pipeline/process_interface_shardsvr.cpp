@@ -49,7 +49,6 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/transaction_participant.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
@@ -167,8 +166,7 @@ unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceShardServer::attachCursorSou
     // a transaction, the foreign collection is unsharded. Otherwise, we may access the catalog
     // cache, and attempt to do a network request while holding locks.
     // TODO: SERVER-39162 allow $lookup in sharded transactions.
-    auto txnParticipant = TransactionParticipant::get(expCtx->opCtx);
-    const bool inTxn = txnParticipant && txnParticipant.inMultiDocumentTransaction();
+    const bool inTxn = expCtx->opCtx->inMultiDocumentTransaction();
 
     const bool isSharded = [&]() {
         if (inTxn || !ShardingState::get(expCtx->opCtx)->enabled()) {

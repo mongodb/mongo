@@ -263,6 +263,7 @@ protected:
 
         opCtx()->setLogicalSessionId(_sessionId);
         opCtx()->setTxnNumber(_txnNumber);
+        opCtx()->setInMultiDocumentTransaction();
 
         // Normally, committing a transaction is supposed to usassert if the corresponding prepare
         // has not been majority committed. We excempt our unit tests from this expectation.
@@ -299,6 +300,7 @@ protected:
     std::unique_ptr<MongoDOperationContextSession> checkOutSession(
         boost::optional<bool> startNewTxn = true) {
         opCtx()->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
+        opCtx()->setInMultiDocumentTransaction();
         auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx());
         auto txnParticipant = TransactionParticipant::get(opCtx());
         txnParticipant.beginOrContinue(opCtx(), *opCtx()->getTxnNumber(), false, startNewTxn);
@@ -345,6 +347,7 @@ TEST_F(TxnParticipantTest, TransactionThrowsLockTimeoutIfLockIsUnavailable) {
         auto newOpCtx = newClient->makeOperationContext();
         newOpCtx.get()->setLogicalSessionId(newSessionId);
         newOpCtx.get()->setTxnNumber(newTxnNum);
+        newOpCtx.get()->setInMultiDocumentTransaction();
 
         MongoDOperationContextSession newOpCtxSession(newOpCtx.get());
         auto newTxnParticipant = TransactionParticipant::get(newOpCtx.get());
@@ -415,7 +418,7 @@ TEST_F(TxnParticipantTest, CannotSpecifyStartTransactionOnInProgressTxn) {
     // Must specify startTransaction=true and autocommit=false to start a transaction.
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
-    ASSERT_TRUE(txnParticipant.inMultiDocumentTransaction());
+    ASSERT_TRUE(txnParticipant.transactionIsOpen());
 
     // Cannot try to start a transaction that already started.
     ASSERT_THROWS_CODE(
@@ -779,6 +782,7 @@ TEST_F(TxnParticipantTest, KillOpBeforeCommittingPreparedTransaction) {
     auto commitPreparedFunc = [&](OperationContext* opCtx) {
         opCtx->setLogicalSessionId(_sessionId);
         opCtx->setTxnNumber(_txnNumber);
+        opCtx->setInMultiDocumentTransaction();
 
         // Check out the session and continue the transaction.
         auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
@@ -819,6 +823,7 @@ TEST_F(TxnParticipantTest, KillOpBeforeAbortingPreparedTransaction) {
     auto commitPreparedFunc = [&](OperationContext* opCtx) {
         opCtx->setLogicalSessionId(_sessionId);
         opCtx->setTxnNumber(_txnNumber);
+        opCtx->setInMultiDocumentTransaction();
 
         // Check out the session and continue the transaction.
         auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
@@ -1196,7 +1201,7 @@ TEST_F(TxnParticipantTest, CannotContinueTransactionIfNotPrimary) {
     // Will start the transaction.
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
-    ASSERT_TRUE(txnParticipant.inMultiDocumentTransaction());
+    ASSERT_TRUE(txnParticipant.transactionIsOpen());
 
     ASSERT_OK(repl::ReplicationCoordinator::get(opCtx())->setFollowerMode(
         repl::MemberState::RS_SECONDARY));
@@ -1239,6 +1244,7 @@ TEST_F(TxnParticipantTest, CannotStartNewTransactionWhilePreparedTransactionInPr
              txnNumberToStart = *opCtx()->getTxnNumber() + 1](OperationContext* newOpCtx) {
                 newOpCtx->setLogicalSessionId(lsid);
                 newOpCtx->setTxnNumber(txnNumberToStart);
+                newOpCtx->setInMultiDocumentTransaction();
 
                 MongoDOperationContextSession ocs(newOpCtx);
                 auto txnParticipant = TransactionParticipant::get(newOpCtx);
@@ -1399,7 +1405,7 @@ protected:
         auto sessionCheckout = checkOutSession();
 
         auto txnParticipant = TransactionParticipant::get(opCtx());
-        ASSERT(txnParticipant.inMultiDocumentTransaction());
+        ASSERT(txnParticipant.transactionIsOpen());
 
         ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(
                                opCtx(), *opCtx()->getTxnNumber(), autocommit, startTransaction),
@@ -1413,14 +1419,14 @@ protected:
         auto sessionCheckout = checkOutSession();
 
         auto txnParticipant = TransactionParticipant::get(opCtx());
-        ASSERT(txnParticipant.inMultiDocumentTransaction());
+        ASSERT(txnParticipant.transactionIsOpen());
 
         txnParticipant.abortActiveTransaction(opCtx());
         ASSERT(txnParticipant.transactionIsAborted());
 
         txnParticipant.beginOrContinue(
             opCtx(), *opCtx()->getTxnNumber(), autocommit, startTransaction);
-        ASSERT(txnParticipant.inMultiDocumentTransaction());
+        ASSERT(txnParticipant.transactionIsOpen());
     }
 
     void cannotSpecifyStartTransactionOnCommittedTxn() {
@@ -1429,7 +1435,7 @@ protected:
         auto sessionCheckout = checkOutSession();
 
         auto txnParticipant = TransactionParticipant::get(opCtx());
-        ASSERT(txnParticipant.inMultiDocumentTransaction());
+        ASSERT(txnParticipant.transactionIsOpen());
 
         txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
         txnParticipant.commitUnpreparedTransaction(opCtx());
@@ -1446,7 +1452,7 @@ protected:
         auto sessionCheckout = checkOutSession();
 
         auto txnParticipant = TransactionParticipant::get(opCtx());
-        ASSERT(txnParticipant.inMultiDocumentTransaction());
+        ASSERT(txnParticipant.transactionIsOpen());
 
         txnParticipant.unstashTransactionResources(opCtx(), "insert");
         auto operation = repl::OplogEntry::makeInsertOperation(kNss, _uuid, BSON("TestValue" << 0));
@@ -1465,7 +1471,7 @@ protected:
         auto sessionCheckout = checkOutSession();
 
         auto txnParticipant = TransactionParticipant::get(opCtx());
-        ASSERT(txnParticipant.inMultiDocumentTransaction());
+        ASSERT(txnParticipant.transactionIsOpen());
 
         txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
         txnParticipant.prepareTransaction(opCtx(), {});
@@ -1486,7 +1492,7 @@ protected:
 
         auto txnParticipant = TransactionParticipant::get(opCtx());
         txnParticipant.beginOrContinue(opCtx(), *opCtx()->getTxnNumber(), boost::none, boost::none);
-        ASSERT_FALSE(txnParticipant.inMultiDocumentTransaction());
+        ASSERT_FALSE(txnParticipant.transactionIsOpen());
 
         auto autocommit = false;
         auto startTransaction = true;
@@ -1494,7 +1500,7 @@ protected:
         txnParticipant.beginOrContinue(
             opCtx(), *opCtx()->getTxnNumber(), autocommit, startTransaction);
 
-        ASSERT(txnParticipant.inMultiDocumentTransaction());
+        ASSERT(txnParticipant.transactionIsOpen());
     }
 };
 
@@ -3805,7 +3811,7 @@ TEST_F(TxnParticipantTest, AbortTransactionOnSessionCheckoutWithoutRefresh) {
     MongoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx());
 
     auto txnParticipant = TransactionParticipant::get(opCtx());
-    ASSERT(txnParticipant.inMultiDocumentTransaction());
+    ASSERT(txnParticipant.transactionIsOpen());
     ASSERT_EQ(txnParticipant.getActiveTxnNumber(), txnNumber);
 
     txnParticipant.unstashTransactionResources(opCtx(), "abortTransaction");

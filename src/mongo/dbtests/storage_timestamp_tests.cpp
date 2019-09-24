@@ -1518,6 +1518,7 @@ public:
         const auto sessionId = makeLogicalSessionIdForTest();
         _opCtx->setLogicalSessionId(sessionId);
         _opCtx->setTxnNumber(1);
+        _opCtx->setInMultiDocumentTransaction();
 
         // Check out the session.
         MongoDOperationContextSession ocs(_opCtx);
@@ -2683,6 +2684,7 @@ public:
         const auto sessionId = makeLogicalSessionIdForTest();
         _opCtx->setLogicalSessionId(sessionId);
         _opCtx->setTxnNumber(26);
+        _opCtx->setInMultiDocumentTransaction();
 
         ocs.emplace(_opCtx);
 

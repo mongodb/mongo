@@ -517,6 +517,7 @@ void TransactionParticipant::Participant::beginOrContinue(OperationContext* opCt
     // autocommit be given as an argument on the request, and currently it can only be false, which
     // is verified earlier when parsing the request.
     invariant(*autocommit == false);
+    invariant(opCtx->inMultiDocumentTransaction());
 
     if (!startTransaction) {
         _continueMultiDocumentTransaction(opCtx, txnNumber);
@@ -558,6 +559,7 @@ void TransactionParticipant::Participant::beginOrContinue(OperationContext* opCt
 
 void TransactionParticipant::Participant::beginOrContinueTransactionUnconditionally(
     OperationContext* opCtx, TxnNumber txnNumber) {
+    invariant(opCtx->inMultiDocumentTransaction());
 
     // We don't check or fetch any on-disk state, so treat the transaction as 'valid' for the
     // purposes of this method and continue the transaction unconditionally
@@ -782,6 +784,8 @@ void TransactionParticipant::TxnResources::release(OperationContext* opCtx) {
 
 TransactionParticipant::SideTransactionBlock::SideTransactionBlock(OperationContext* opCtx)
     : _opCtx(opCtx) {
+    // Do nothing if we are already in a SideTransactionBlock. We can tell we are already in a
+    // SideTransactionBlock because there is no top level write unit of work.
     if (!_opCtx->getWriteUnitOfWork()) {
         return;
     }
@@ -847,7 +851,7 @@ void TransactionParticipant::Participant::stashTransactionResources(OperationCon
     }
     invariant(opCtx->getTxnNumber());
 
-    if (o().txnState.inMultiDocumentTransaction()) {
+    if (o().txnState.isOpen()) {
         _stashActiveTransaction(opCtx);
     }
 }

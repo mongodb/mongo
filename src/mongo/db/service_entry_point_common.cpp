@@ -395,7 +395,7 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
             if (sessionOptions.getCoordinator() == boost::optional<bool>(true)) {
                 createTransactionCoordinator(opCtx, *sessionOptions.getTxnNumber());
             }
-        } else if (txnParticipant.inMultiDocumentTransaction()) {
+        } else if (txnParticipant.transactionIsOpen()) {
             const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
             uassert(ErrorCodes::InvalidOptions,
                     "Only the first command in a transaction may specify a readConcern",
@@ -780,9 +780,10 @@ void execCommandDatabase(OperationContext* opCtx,
         }
 
         auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-        // If the parent operation runs in snapshot isolation, we don't override the read concern.
-        auto skipReadConcern = opCtx->getClient()->isInDirectClient() &&
-            readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern;
+
+        // If the parent operation runs in a transaction, we don't override the read concern.
+        auto skipReadConcern =
+            opCtx->getClient()->isInDirectClient() && opCtx->inMultiDocumentTransaction();
         if (!skipReadConcern) {
             // If "startTransaction" is present, it must be true due to the parsing above.
             const bool upconvertToSnapshot(sessionOptions.getStartTransaction());
@@ -1259,10 +1260,9 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
     Client& c = *opCtx->getClient();
 
     if (c.isInDirectClient()) {
-        if (!opCtx->getLogicalSessionId() || !opCtx->getTxnNumber() ||
-            repl::ReadConcernArgs::get(opCtx).getLevel() !=
-                repl::ReadConcernLevel::kSnapshotReadConcern) {
-            invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+        if (!opCtx->getLogicalSessionId() || !opCtx->getTxnNumber()) {
+            invariant(!opCtx->inMultiDocumentTransaction() &&
+                      !opCtx->lockState()->inAWriteUnitOfWork());
         }
     } else {
         LastError::get(c).startRequest();

@@ -201,8 +201,7 @@ void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& ns) {
 }
 
 void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
-    auto txnParticipant = TransactionParticipant::get(opCtx);
-    auto inTransaction = txnParticipant && txnParticipant.inMultiDocumentTransaction();
+    auto inTransaction = opCtx->inMultiDocumentTransaction();
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             str::stream() << "Cannot create namespace " << ns.ns()
                           << " in multi-document transaction.",
@@ -246,7 +245,7 @@ bool handleError(OperationContext* opCtx,
     }
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
-    if (txnParticipant && txnParticipant.inMultiDocumentTransaction()) {
+    if (txnParticipant && opCtx->inMultiDocumentTransaction()) {
         if (isTransientTransactionError(
                 ex.code(), false /* hasWriteConcernError */, false /* isCommitTransaction */)) {
             // Tell the client to try the whole txn again, by returning ok: 0 with errorLabels.
@@ -304,8 +303,7 @@ void insertDocuments(OperationContext* opCtx,
     auto batchSize = std::distance(begin, end);
     if (supportsDocLocking()) {
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        auto txnParticipant = TransactionParticipant::get(opCtx);
-        auto inTransaction = txnParticipant && txnParticipant.inMultiDocumentTransaction();
+        auto inTransaction = opCtx->inMultiDocumentTransaction();
 
         if (!inTransaction && !replCoord->isOplogDisabledFor(opCtx, collection->ns())) {
             // Populate 'slots' with new optimes for each insert.
@@ -335,8 +333,7 @@ void insertDocuments(OperationContext* opCtx,
  * collection lock, which we cannot hold in transactions.
  */
 Status checkIfTransactionOnCappedColl(OperationContext* opCtx, Collection* collection) {
-    auto txnParticipant = TransactionParticipant::get(opCtx);
-    if (txnParticipant && txnParticipant.inMultiDocumentTransaction() && collection->isCapped()) {
+    if (opCtx->inMultiDocumentTransaction() && collection->isCapped()) {
         return {ErrorCodes::OperationNotSupportedInTransaction,
                 str::stream() << "Collection '" << collection->ns()
                               << "' is a capped collection. Writes in transactions are not allowed "
@@ -400,7 +397,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
     try {
         acquireCollection();
         auto txnParticipant = TransactionParticipant::get(opCtx);
-        auto inTxn = txnParticipant && txnParticipant.inMultiDocumentTransaction();
+        auto inTxn = txnParticipant && opCtx->inMultiDocumentTransaction();
         if (!collection->getCollection()->isCapped() && !inTxn && batch.size() > 1) {
             // First try doing it all together. If all goes well, this is all we need to do.
             // See Collection::_insertDocuments for why we do all capped inserts one-at-a-time.
@@ -491,7 +488,7 @@ WriteResult performInserts(OperationContext* opCtx,
     // transaction.
     auto txnParticipant = TransactionParticipant::get(opCtx);
     invariant(!opCtx->lockState()->inAWriteUnitOfWork() ||
-              (txnParticipant && txnParticipant.inMultiDocumentTransaction()));
+              (txnParticipant && opCtx->inMultiDocumentTransaction()));
     auto& curOp = *CurOp::get(opCtx);
     ON_BLOCK_EXIT([&] {
         // This is the only part of finishCurOp we need to do for inserts because they reuse the
@@ -544,7 +541,7 @@ WriteResult performInserts(OperationContext* opCtx,
         } else {
             const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
             if (opCtx->getTxnNumber()) {
-                if (!txnParticipant.inMultiDocumentTransaction() &&
+                if (!opCtx->inMultiDocumentTransaction() &&
                     txnParticipant.checkStatementExecutedNoOplogEntryFetch(stmtId)) {
                     containsRetry = true;
                     RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
@@ -697,11 +694,9 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(OperationContext* 
         curOp.ensureStarted();
     }
 
-    auto txnParticipant = TransactionParticipant::get(opCtx);
     uassert(ErrorCodes::InvalidOptions,
             "Cannot use (or request) retryable writes with multi=true",
-            (txnParticipant && txnParticipant.inMultiDocumentTransaction()) ||
-                !opCtx->getTxnNumber() || !op.getMulti());
+            opCtx->inMultiDocumentTransaction() || !opCtx->getTxnNumber() || !op.getMulti());
 
     UpdateRequest request(ns);
     request.setQuery(op.getQ());
@@ -715,11 +710,8 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(OperationContext* 
     request.setUpsert(op.getUpsert());
     request.setHint(op.getHint());
 
-    auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    request.setYieldPolicy(readConcernArgs.getLevel() ==
-                                   repl::ReadConcernLevel::kSnapshotReadConcern
-                               ? PlanExecutor::INTERRUPT_ONLY
-                               : PlanExecutor::YIELD_AUTO);
+    request.setYieldPolicy(opCtx->inMultiDocumentTransaction() ? PlanExecutor::INTERRUPT_ONLY
+                                                               : PlanExecutor::YIELD_AUTO);
 
     size_t numAttempts = 0;
     while (true) {
@@ -758,7 +750,7 @@ WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& who
     // transaction.
     auto txnParticipant = TransactionParticipant::get(opCtx);
     invariant(!opCtx->lockState()->inAWriteUnitOfWork() ||
-              (txnParticipant && txnParticipant.inMultiDocumentTransaction()));
+              (txnParticipant && opCtx->inMultiDocumentTransaction()));
     uassertStatusOK(userAllowedWriteNS(wholeOp.getNamespace()));
 
     DisableDocumentValidationIfTrue docValidationDisabler(
@@ -780,7 +772,7 @@ WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& who
     for (auto&& singleOp : wholeOp.getUpdates()) {
         const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
         if (opCtx->getTxnNumber()) {
-            if (!txnParticipant.inMultiDocumentTransaction()) {
+            if (!opCtx->inMultiDocumentTransaction()) {
                 if (auto entry = txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
                     containsRetry = true;
                     RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
@@ -820,11 +812,9 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
                                                const NamespaceString& ns,
                                                StmtId stmtId,
                                                const write_ops::DeleteOpEntry& op) {
-    auto txnParticipant = TransactionParticipant::get(opCtx);
     uassert(ErrorCodes::InvalidOptions,
             "Cannot use (or request) retryable writes with limit=0",
-            (txnParticipant && txnParticipant.inMultiDocumentTransaction()) ||
-                !opCtx->getTxnNumber() || !op.getMulti());
+            opCtx->inMultiDocumentTransaction() || !opCtx->getTxnNumber() || !op.getMulti());
 
     globalOpCounters.gotDelete();
     ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForDelete(opCtx->getWriteConcern());
@@ -842,11 +832,8 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     request.setQuery(op.getQ());
     request.setCollation(write_ops::collationOf(op));
     request.setMulti(op.getMulti());
-    auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    request.setYieldPolicy(readConcernArgs.getLevel() ==
-                                   repl::ReadConcernLevel::kSnapshotReadConcern
-                               ? PlanExecutor::INTERRUPT_ONLY
-                               : PlanExecutor::YIELD_AUTO);
+    request.setYieldPolicy(opCtx->inMultiDocumentTransaction() ? PlanExecutor::INTERRUPT_ONLY
+                                                               : PlanExecutor::YIELD_AUTO);
     request.setStmtId(stmtId);
 
     ParsedDelete parsedDelete(opCtx, &request);
@@ -915,7 +902,7 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
     // transaction.
     auto txnParticipant = TransactionParticipant::get(opCtx);
     invariant(!opCtx->lockState()->inAWriteUnitOfWork() ||
-              (txnParticipant && txnParticipant.inMultiDocumentTransaction()));
+              (txnParticipant && opCtx->inMultiDocumentTransaction()));
     uassertStatusOK(userAllowedWriteNS(wholeOp.getNamespace()));
 
     DisableDocumentValidationIfTrue docValidationDisabler(
@@ -932,7 +919,7 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
     for (auto&& singleOp : wholeOp.getDeletes()) {
         const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
         if (opCtx->getTxnNumber()) {
-            if (!txnParticipant.inMultiDocumentTransaction() &&
+            if (!opCtx->inMultiDocumentTransaction() &&
                 txnParticipant.checkStatementExecutedNoOplogEntryFetch(stmtId)) {
                 containsRetry = true;
                 RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();

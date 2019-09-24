@@ -127,11 +127,8 @@ void makeUpdateRequest(OperationContext* opCtx,
     requestOut->setMulti(false);
     requestOut->setExplain(explain);
 
-    const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    requestOut->setYieldPolicy(readConcernArgs.getLevel() ==
-                                       repl::ReadConcernLevel::kSnapshotReadConcern
-                                   ? PlanExecutor::INTERRUPT_ONLY
-                                   : PlanExecutor::YIELD_AUTO);
+    requestOut->setYieldPolicy(opCtx->inMultiDocumentTransaction() ? PlanExecutor::INTERRUPT_ONLY
+                                                                   : PlanExecutor::YIELD_AUTO);
 }
 
 void makeDeleteRequest(OperationContext* opCtx,
@@ -148,11 +145,8 @@ void makeDeleteRequest(OperationContext* opCtx,
     requestOut->setReturnDeleted(true);  // Always return the old value.
     requestOut->setExplain(explain);
 
-    const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    requestOut->setYieldPolicy(readConcernArgs.getLevel() ==
-                                       repl::ReadConcernLevel::kSnapshotReadConcern
-                                   ? PlanExecutor::INTERRUPT_ONLY
-                                   : PlanExecutor::YIELD_AUTO);
+    requestOut->setYieldPolicy(opCtx->inMultiDocumentTransaction() ? PlanExecutor::INTERRUPT_ONLY
+                                                                   : PlanExecutor::YIELD_AUTO);
 }
 
 void appendCommandResponse(const PlanExecutor* exec,
@@ -329,8 +323,7 @@ public:
             maybeDisableValidation.emplace(opCtx);
         }
 
-        const auto txnParticipant = TransactionParticipant::get(opCtx);
-        const auto inTransaction = txnParticipant && txnParticipant.inMultiDocumentTransaction();
+        const auto inTransaction = opCtx->inMultiDocumentTransaction();
         uassert(50781,
                 str::stream() << "Cannot write to system collection " << nsString.ns()
                               << " within a transaction.",

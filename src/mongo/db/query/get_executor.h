@@ -122,8 +122,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
 
 /**
  * Get a plan executor for a .find() operation. The executor will have a 'YIELD_AUTO' yield policy
- * unless a false value for 'permitYield' or a snapshot read concern (according to the
- * OperationContext) forces it to have a 'NO_INTERRUPT' yield policy.
+ * unless a false value for 'permitYield' or being part of a multi-document transaction forces it to
+ * have a 'NO_INTERRUPT' yield policy.
  *
  * If the query is valid and an executor could be created, returns a StatusWith with the
  * PlanExecutor.

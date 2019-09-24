@@ -699,6 +699,7 @@ TEST_F(ShardTxnParticipantRetryableWritesTest,
 
     const auto& sessionId = *opCtx()->getLogicalSessionId();
     const TxnNumber txnNum = 20;
+    opCtx()->setTxnNumber(txnNum);
     const auto uuid = UUID::gen();
 
     txnParticipant.beginOrContinue(opCtx(), txnNum, boost::none, boost::none);
@@ -719,6 +720,7 @@ TEST_F(ShardTxnParticipantRetryableWritesTest,
 
     auto autocommit = false;
     auto startTransaction = true;
+    opCtx()->setInMultiDocumentTransaction();
 
     ASSERT_THROWS_CODE(
         txnParticipant.beginOrContinue(opCtx(), txnNum, autocommit, startTransaction),

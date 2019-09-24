@@ -1542,8 +1542,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
             // [2] This upsert behavior exists to support idempotency guarantees outside
             //     steady-state replication and existing users of applyOps.
 
-            const auto txnParticipant = TransactionParticipant::get(opCtx);
-            const bool inTxn = txnParticipant && txnParticipant.inMultiDocumentTransaction();
+            const bool inTxn = opCtx->inMultiDocumentTransaction();
             bool needToDoUpsert = haveWrappingWriteUnitOfWork && !inTxn;
 
             Timestamp timestamp;

@@ -271,13 +271,11 @@ public:
             const auto txnParticipant = TransactionParticipant::get(opCtx);
             uassert(ErrorCodes::InvalidOptions,
                     "It is illegal to open a tailable cursor in a transaction",
-                    !txnParticipant ||
-                        !(txnParticipant.inMultiDocumentTransaction() && qr->isTailable()));
+                    !(opCtx->inMultiDocumentTransaction() && qr->isTailable()));
 
             uassert(ErrorCodes::OperationNotSupportedInTransaction,
                     "The 'readOnce' option is not supported within a transaction.",
-                    !txnParticipant || !txnParticipant.inMultiDocumentTransaction() ||
-                        !qr->isReadOnce());
+                    !txnParticipant || !opCtx->inMultiDocumentTransaction() || !qr->isReadOnce());
 
             uassert(ErrorCodes::InvalidOptions,
                     "The '$_internalReadAtClusterTime' option is only supported when testing"
@@ -287,7 +285,7 @@ public:
             uassert(
                 ErrorCodes::OperationNotSupportedInTransaction,
                 "The '$_internalReadAtClusterTime' option is not supported within a transaction.",
-                !txnParticipant || !txnParticipant.inMultiDocumentTransaction() ||
+                !txnParticipant || !opCtx->inMultiDocumentTransaction() ||
                     !qr->getReadAtClusterTime());
 
             uassert(ErrorCodes::InvalidOptions,
