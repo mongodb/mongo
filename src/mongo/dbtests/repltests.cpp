@@ -979,21 +979,6 @@ public:
     }
 };
 
-class PushWithDollarSigns : public Base {
-    void doIt() const {
-        _client.update(ns(), BSON("_id" << 0), BSON("$push" << BSON("a" << BSON("$foo" << 1))));
-    }
-    using ReplTests::Base::check;
-    void check() const {
-        ASSERT_EQUALS(1, count());
-        check(fromjson("{'_id':0, a:[0, {'$foo':1}]}"), one(fromjson("{'_id':0}")));
-    }
-    void reset() const {
-        deleteAll(ns());
-        insert(BSON("_id" << 0 << "a" << BSON_ARRAY(0)));
-    }
-};
-
 class PushSlice : public Base {
     void doIt() const {
         _client.update(
@@ -1276,21 +1261,6 @@ public:
     void reset() const {
         deleteAll(ns());
         insert(fromjson("{'_id':0}"));
-    }
-};
-
-class AddToSetWithDollarSigns : public Base {
-    void doIt() const {
-        _client.update(ns(), BSON("_id" << 0), BSON("$addToSet" << BSON("a" << BSON("$foo" << 1))));
-    }
-    using ReplTests::Base::check;
-    void check() const {
-        ASSERT_EQUALS(1, count());
-        check(fromjson("{'_id':0, a:[0, {'$foo':1}]}"), one(fromjson("{'_id':0}")));
-    }
-    void reset() const {
-        deleteAll(ns());
-        insert(BSON("_id" << 0 << "a" << BSON_ARRAY(0)));
     }
 };
 
