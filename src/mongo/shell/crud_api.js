@@ -175,6 +175,10 @@ DBCollection.prototype.bulkWrite = function(operations, options) {
                 operation.collation(op.replaceOne.collation);
             }
 
+            if (op.replaceOne.hint) {
+                operation.hint(op.replaceOne.hint);
+            }
+
             operation.replaceOne(op.replaceOne.replacement);
         } else if (op.deleteOne) {
             if (!op.deleteOne.filter) {
@@ -493,6 +497,10 @@ DBCollection.prototype.replaceOne = function(filter, replacement, options) {
 
     if (opts.collation) {
         op.collation(opts.collation);
+    }
+
+    if (opts.hint) {
+        op.hint(opts.hint);
     }
 
     op.replaceOne(replacement);
