@@ -118,7 +118,7 @@ public:
                                const BSONObj& to,
                                const RecordId& loc,
                                const InsertDeleteOptions& options,
-                               UpdateTicket* ticket) = 0;
+                               UpdateTicket* ticket) const = 0;
 
     /**
      * Perform a validated update.  The keys for the 'from' object will be removed, and the keys
@@ -473,7 +473,7 @@ public:
                        const BSONObj& to,
                        const RecordId& loc,
                        const InsertDeleteOptions& options,
-                       UpdateTicket* ticket) final;
+                       UpdateTicket* ticket) const final;
 
     Status update(OperationContext* opCtx,
                   const UpdateTicket& ticket,

@@ -360,7 +360,7 @@ void AbstractIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
                                               const BSONObj& to,
                                               const RecordId& record,
                                               const InsertDeleteOptions& options,
-                                              UpdateTicket* ticket) {
+                                              UpdateTicket* ticket) const {
     const MatchExpression* indexFilter = index->getFilterExpression();
     if (!indexFilter || indexFilter->matchesBSON(from)) {
         // Override key constraints when generating keys for removal. This only applies to keys
