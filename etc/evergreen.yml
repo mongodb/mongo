@@ -417,6 +417,8 @@ variables:
   - enterprise-macos
   - enterprise-rhel-62-64-bit
   - enterprise-rhel-70-64-bit
+  - enterprise-ubuntu1604-64
+  - enterprise-ubuntu1804-64
   - enterprise-windows-64-2k8
 
 #######################################
@@ -8768,6 +8770,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu1804
+    mh_target: dist-mh
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
@@ -11416,6 +11419,7 @@ buildvariants:
     push_name: linux
     lang_environment: LANG=C
     push_arch: x86_64-enterprise-ubuntu1604
+    mh_target: dist-mh
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: ubuntu1604
     multiversion_edition: enterprise
