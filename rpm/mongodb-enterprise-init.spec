@@ -263,6 +263,7 @@ fi
 %{_bindir}/install_compass
 %{_bindir}/mongodecrypt
 %{_bindir}/mongoldap
+%{_bindir}/mongokerberos
 %{_bindir}/mongodump
 %{_bindir}/mongoexport
 %{_bindir}/mongofiles

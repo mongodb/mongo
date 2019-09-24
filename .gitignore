@@ -80,6 +80,8 @@ scratch
 /mongod
 /mongoed
 /mongogrid
+/mongokerberos
+/mongoldap
 /mongoperf
 /mongos
 /mongoshim
