@@ -373,6 +373,15 @@ public:
         _inMultiDocumentTransaction = true;
     }
 
+    void setComment(const BSONObj& comment) {
+        _comment = comment.getOwned();
+    }
+
+    boost::optional<BSONElement> getComment() {
+        // The '_comment' object, if present, will only ever have one field.
+        return _comment ? boost::optional<BSONElement>(_comment->firstElement()) : boost::none;
+    }
+
 private:
     IgnoreInterruptsState pushIgnoreInterrupts() override {
         IgnoreInterruptsState iis{_ignoreInterrupts,
@@ -498,6 +507,10 @@ private:
     bool _writesAreReplicated = true;
     bool _shouldParticipateInFlowControl = true;
     bool _inMultiDocumentTransaction = false;
+
+    // If populated, this is an owned singleton BSONObj whose only field, 'comment', is a copy of
+    // the 'comment' field from the input command object.
+    boost::optional<BSONObj> _comment;
 };
 
 namespace repl {

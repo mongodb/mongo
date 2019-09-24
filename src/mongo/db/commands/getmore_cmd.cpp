@@ -200,6 +200,13 @@ void setUpOperationContextStateForGetMore(OperationContext* opCtx,
     applyCursorReadConcern(opCtx, cursor.getReadConcernArgs());
     opCtx->setWriteConcern(cursor.getWriteConcernOptions());
     setUpOperationDeadline(opCtx, cursor, request, disableAwaitDataFailpointActive);
+
+    // If the originating command had a 'comment' field, we extract it and set it on opCtx. Note
+    // that if the 'getMore' command itself has a 'comment' field, we give precedence to it.
+    auto comment = cursor.getOriginatingCommandObj()["comment"];
+    if (!opCtx->getComment() && comment) {
+        opCtx->setComment(comment.wrap());
+    }
 }
 
 /**

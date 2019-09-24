@@ -24,10 +24,13 @@ selector:
   - jstests/sharding/prepared_txn_metadata_refresh.js
   # Enable when 4.4 becomes last stable
   - jstests/sharding/bulk_insert.js
+  - jstests/sharding/comment_field.js
   - jstests/sharding/covered_shard_key_indexes.js
+  - jstests/sharding/explain_agg_read_pref.js
   - jstests/sharding/explain_exec_stats_on_shards.js
   - jstests/sharding/extract_shard_key_values.js
   - jstests/sharding/features1.js
+  - jstests/sharding/mongos_query_comment.js
   - jstests/sharding/prefix_shard_key.js
   - jstests/sharding/refine_collection_shard_key_basic.js
   - jstests/sharding/refine_collection_shard_key_jumbo.js

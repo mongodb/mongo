@@ -86,7 +86,7 @@ function confirmReadPreference(primary, secondary) {
                 filter: {
                     "ns": coll.getFullName(),
                     "command.explain.aggregate": coll.getName(),
-                    "command.explain.comment": comment,
+                    "command.comment": comment,
                     "command.$readPreference.mode": pref == 'primary' ? null : pref,
                     "errMsg": {"$exists": false}
                 }
@@ -99,12 +99,7 @@ function confirmReadPreference(primary, secondary) {
             comment = name + "_explain_wrapped_agg";
             assert.commandWorked(mongosDB.runCommand({
                 $query: {
-                    explain: {
-                        aggregate: "coll",
-                        pipeline: [],
-                        comment: comment,
-                        cursor: {},
-                    }
+                    explain: {aggregate: "coll", pipeline: [], cursor: {}, comment: comment},
                 },
                 $readPreference: {mode: pref, tags: tagSets}
             }));
@@ -122,7 +117,7 @@ function confirmReadPreference(primary, secondary) {
                 filter: {
                     "ns": coll.getFullName(),
                     "command.explain.aggregate": coll.getName(),
-                    "command.explain.comment": comment,
+                    "command.comment": comment,
                     "command.$readPreference.mode": pref == 'primary' ? null : pref,
                     "errMsg": {"$exists": false}
                 }

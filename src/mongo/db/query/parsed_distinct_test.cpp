@@ -67,7 +67,6 @@ TEST(ParsedDistinctTest, ConvertToAggregationNoQuery) {
     ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSONObj());
     ASSERT(ar.getValue().getReadConcern().isEmpty());
     ASSERT(ar.getValue().getUnwrappedReadPref().isEmpty());
-    ASSERT(ar.getValue().getComment().empty());
     ASSERT_EQUALS(ar.getValue().getMaxTimeMS(), 0u);
 
     std::vector<BSONObj> expectedPipeline{
@@ -107,7 +106,6 @@ TEST(ParsedDistinctTest, ConvertToAggregationDottedPathNoQuery) {
     ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSONObj());
     ASSERT(ar.getValue().getReadConcern().isEmpty());
     ASSERT(ar.getValue().getUnwrappedReadPref().isEmpty());
-    ASSERT(ar.getValue().getComment().empty());
     ASSERT_EQUALS(ar.getValue().getMaxTimeMS(), 0u);
 
     std::vector<BSONObj> expectedPipeline{
@@ -155,8 +153,6 @@ TEST(ParsedDistinctTest, ConvertToAggregationWithAllOptions) {
                                          << "$queryOptions"
                                          << BSON("readPreference"
                                                  << "secondary")
-                                         << "comment"
-                                         << "aComment"
                                          << "maxTimeMS" << 100 << "$db"
                                          << "testdb"),
                                     ExtensionsCallbackNoop(),
@@ -180,7 +176,6 @@ TEST(ParsedDistinctTest, ConvertToAggregationWithAllOptions) {
     ASSERT_BSONOBJ_EQ(ar.getValue().getUnwrappedReadPref(),
                       BSON("readPreference"
                            << "secondary"));
-    ASSERT_EQUALS(ar.getValue().getComment(), "aComment");
     ASSERT_EQUALS(ar.getValue().getMaxTimeMS(), 100u);
 
     std::vector<BSONObj> expectedPipeline{
@@ -221,7 +216,6 @@ TEST(ParsedDistinctTest, ConvertToAggregationWithQuery) {
     ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSONObj());
     ASSERT(ar.getValue().getReadConcern().isEmpty());
     ASSERT(ar.getValue().getUnwrappedReadPref().isEmpty());
-    ASSERT(ar.getValue().getComment().empty());
     ASSERT_EQUALS(ar.getValue().getMaxTimeMS(), 0u);
 
     std::vector<BSONObj> expectedPipeline{

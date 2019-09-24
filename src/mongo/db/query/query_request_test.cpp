@@ -430,7 +430,7 @@ TEST(QueryRequestTest, ParseFromCommandReadOnceDefaultsToFalse) {
     ASSERT(!qr->isReadOnce());
 }
 
-TEST(QueryRequestTest, ParseFromCommandCommentWithValidMinMax) {
+TEST(QueryRequestTest, ParseFromCommandValidMinMax) {
     BSONObj cmdObj = fromjson(
         "{find: 'testns',"
         "comment: 'the comment',"
@@ -441,7 +441,6 @@ TEST(QueryRequestTest, ParseFromCommandCommentWithValidMinMax) {
     unique_ptr<QueryRequest> qr(
         assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
 
-    ASSERT_EQUALS("the comment", qr->getComment());
     BSONObj expectedMin = BSON("a" << 1);
     ASSERT_EQUALS(0, expectedMin.woCompare(qr->getMin()));
     BSONObj expectedMax = BSON("a" << 2);
@@ -601,17 +600,6 @@ TEST(QueryRequestTest, ParseFromCommandSingleBatchWrongType) {
         "filter:  {a: 1},"
         "singleBatch: 'false',"
         "projection: {a: 1}}");
-    const NamespaceString nss("test.testns");
-    bool isExplain = false;
-    auto result = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
-    ASSERT_NOT_OK(result.getStatus());
-}
-
-TEST(QueryRequestTest, ParseFromCommandCommentWrongType) {
-    BSONObj cmdObj = fromjson(
-        "{find: 'testns',"
-        "filter:  {a: 1},"
-        "comment: 1}");
     const NamespaceString nss("test.testns");
     bool isExplain = false;
     auto result = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
@@ -1272,17 +1260,6 @@ TEST(QueryRequestTest, ConvertToAggregationWithReturnKeyFails) {
     ASSERT_NOT_OK(qr.asAggregationCommand());
 }
 
-TEST(QueryRequestTest, ConvertToAggregationWithCommentSucceeds) {
-    QueryRequest qr(testns);
-    qr.setComment("test");
-    const auto aggCmd = qr.asAggregationCommand();
-    ASSERT_OK(aggCmd);
-
-    auto ar = AggregationRequest::parseFromBSON(testns, aggCmd.getValue());
-    ASSERT_OK(ar.getStatus());
-    ASSERT_EQ(qr.getComment(), ar.getValue().getComment());
-}
-
 TEST(QueryRequestTest, ConvertToAggregationWithShowRecordIdFails) {
     QueryRequest qr(testns);
     qr.setShowRecordId(true);
@@ -1468,31 +1445,6 @@ TEST(QueryRequestTest, ConvertToFindWithAllowDiskUseFalseSucceeds) {
     const auto findCmd = qr.asFindCommand();
 
     ASSERT_FALSE(findCmd[QueryRequest::kAllowDiskUseField]);
-}
-
-TEST(QueryRequestTest, ParseFromLegacyObjMetaOpComment) {
-    BSONObj queryObj = fromjson(
-        "{$query: {a: 1},"
-        "$comment: {b: 2, c: {d: 'ParseFromLegacyObjMetaOpComment'}}}");
-    const NamespaceString nss("test.testns");
-    unique_ptr<QueryRequest> qr(
-        assertGet(QueryRequest::fromLegacyQuery(nss, queryObj, BSONObj(), 0, 0, 0)));
-
-    // Ensure that legacy comment meta-operator is parsed to a string comment
-    ASSERT_EQ(qr->getComment(), "{ b: 2, c: { d: \"ParseFromLegacyObjMetaOpComment\" } }");
-    ASSERT_BSONOBJ_EQ(qr->getFilter(), fromjson("{a: 1}"));
-}
-
-TEST(QueryRequestTest, ParseFromLegacyStringMetaOpComment) {
-    BSONObj queryObj = fromjson(
-        "{$query: {a: 1},"
-        "$comment: 'ParseFromLegacyStringMetaOpComment'}");
-    const NamespaceString nss("test.testns");
-    unique_ptr<QueryRequest> qr(
-        assertGet(QueryRequest::fromLegacyQuery(nss, queryObj, BSONObj(), 0, 0, 0)));
-
-    ASSERT_EQ(qr->getComment(), "ParseFromLegacyStringMetaOpComment");
-    ASSERT_BSONOBJ_EQ(qr->getFilter(), fromjson("{a: 1}"));
 }
 
 TEST(QueryRequestTest, ParseFromLegacyQuery) {

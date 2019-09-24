@@ -4,6 +4,7 @@
 //   requires_collstats,
 //   requires_non_retryable_commands,
 //   requires_non_retryable_writes,
+//   requires_profiling,
 //   uses_map_reduce_with_temp_collections,
 // ]
 

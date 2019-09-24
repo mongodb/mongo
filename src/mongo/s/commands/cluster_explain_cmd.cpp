@@ -176,6 +176,13 @@ std::unique_ptr<CommandInvocation> ClusterExplainCmd::parse(OperationContext* op
     // arguments into the inner command since it is what is passed to the virtual
     // CommandInvocation::explain() method.
     const BSONObj explainedObj = makeExplainedObj(cmdObj, dbName);
+
+    // Extract 'comment' field from the 'explainedObj' only if there is no top-level comment.
+    auto commentField = explainedObj["comment"];
+    if (!opCtx->getComment() && commentField) {
+        opCtx->setComment(commentField.wrap());
+    }
+
     const std::string cmdName = explainedObj.firstElementFieldName();
     auto explainedCommand = CommandHelpers::findCommand(cmdName);
     uassert(ErrorCodes::CommandNotFound,

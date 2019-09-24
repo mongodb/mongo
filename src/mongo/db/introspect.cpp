@@ -93,7 +93,7 @@ void profile(OperationContext* opCtx, NetworkOp op) {
         Locker::LockerInfo lockerInfo;
         opCtx->lockState()->getLockerInfo(&lockerInfo, CurOp::get(opCtx)->getLockStatsBase());
         CurOp::get(opCtx)->debug().append(
-            *CurOp::get(opCtx), lockerInfo.stats, opCtx->lockState()->getFlowControlStats(), b);
+            opCtx, lockerInfo.stats, opCtx->lockState()->getFlowControlStats(), b);
     }
 
     b.appendDate("ts", jsTime());

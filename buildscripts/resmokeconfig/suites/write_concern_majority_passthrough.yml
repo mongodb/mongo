@@ -11,9 +11,6 @@ selector:
   - jstests/core/opcounters_write_cmd.js
   - jstests/core/read_after_optime.js
   - jstests/core/capped_update.js
-  # These tests attempt to read from the "system.profile" collection, which may be missing entries
-  # if a write was performed on the primary of the replica set instead.
-  - jstests/core/*profile*.js
   # The shellkillop.js test spawns a parallel shell without using startParallelShell() and therefore
   # doesn't inherit the w="majority" write concern when performing its writes.
   - jstests/core/shellkillop.js
@@ -37,6 +34,9 @@ selector:
   # "Cowardly refusing to run test with overridden read preference when it reads from a
   #  non-replicated collection: ..."
   - assumes_read_preference_unchanged
+  # These tests attempt to read from the "system.profile" collection, which may be missing entries
+  # if a write was performed on the primary of the replica set instead.
+  - requires_profiling
 
 executor:
   archive:

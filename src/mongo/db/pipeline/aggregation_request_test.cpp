@@ -60,7 +60,7 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
         "{pipeline: [{$match: {a: 'abc'}}], explain: false, allowDiskUse: true, fromMongos: true, "
         "needsMerge: true, bypassDocumentValidation: true, collation: {locale: 'en_US'}, cursor: "
         "{batchSize: 10}, hint: {a: 1}, maxTimeMS: 100, readConcern: {level: 'linearizable'}, "
-        "$queryOptions: {$readPreference: 'nearest'}, comment: 'agg_comment', exchange: {policy: "
+        "$queryOptions: {$readPreference: 'nearest'}, exchange: {policy: "
         "'roundrobin', consumers:NumberInt(2)}}");
     auto request = unittest::assertGet(AggregationRequest::parseFromBSON(nss, inputBson));
     ASSERT_FALSE(request.getExplain());
@@ -70,7 +70,6 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
     ASSERT_TRUE(request.shouldBypassDocumentValidation());
     ASSERT_EQ(request.getBatchSize(), 10);
     ASSERT_BSONOBJ_EQ(request.getHint(), BSON("a" << 1));
-    ASSERT_EQ(request.getComment(), "agg_comment");
     ASSERT_BSONOBJ_EQ(request.getCollation(),
                       BSON("locale"
                            << "en_US"));
@@ -157,7 +156,6 @@ TEST(AggregationRequestTest, ShouldNotSerializeOptionalValuesIfEquivalentToDefau
     request.setBypassDocumentValidation(false);
     request.setCollation(BSONObj());
     request.setHint(BSONObj());
-    request.setComment("");
     request.setMaxTimeMS(0u);
     request.setUnwrappedReadPref(BSONObj());
     request.setReadConcern(BSONObj());
@@ -180,8 +178,6 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
     request.setMaxTimeMS(10u);
     const auto hintObj = BSON("a" << 1);
     request.setHint(hintObj);
-    const auto comment = std::string("agg_comment");
-    request.setComment(comment);
     const auto collationObj = BSON("locale"
                                    << "en_US");
     request.setCollation(collationObj);
@@ -203,7 +199,6 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
                  {AggregationRequest::kCursorName,
                   Value(Document({{AggregationRequest::kBatchSizeName, 10}}))},
                  {AggregationRequest::kHintName, hintObj},
-                 {AggregationRequest::kCommentName, comment},
                  {repl::ReadConcernArgs::kReadConcernFieldName, readConcernObj},
                  {QueryRequest::kUnwrappedReadPrefField, readPrefObj},
                  {QueryRequest::cmdOptionMaxTimeMS, 10}};
@@ -307,14 +302,6 @@ TEST(AggregationRequestTest, ShouldRejectHintAsArray) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson =
         fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, hint: []}]}");
-    ASSERT_NOT_OK(
-        AggregationRequest::parseFromBSON(NamespaceString("a.collection"), inputBson).getStatus());
-}
-
-TEST(AggregationRequestTest, ShouldRejectNonStringComment) {
-    NamespaceString nss("a.collection");
-    const BSONObj inputBson =
-        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, comment: 1}");
     ASSERT_NOT_OK(
         AggregationRequest::parseFromBSON(NamespaceString("a.collection"), inputBson).getStatus());
 }

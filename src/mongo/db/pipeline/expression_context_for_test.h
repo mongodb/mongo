@@ -54,7 +54,6 @@ public:
     ExpressionContextForTest(NamespaceString nss)
         : ExpressionContext(nullptr,      // opCtx, nullptr while base class is constructed.
                             boost::none,  // explain
-                            "",           // comment
                             false,        // fromMongos,
                             false,        // needsMerge,
                             false,        // allowDiskUse,

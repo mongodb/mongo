@@ -59,7 +59,12 @@ RemoteCommandRequestBase::RemoteCommandRequestBase(RequestId requestId,
                                                    const BSONObj& metadataObj,
                                                    OperationContext* opCtx,
                                                    Milliseconds timeoutMillis)
-    : id(requestId), dbname(theDbName), metadata(metadataObj), cmdObj(theCmdObj), opCtx(opCtx) {
+    : id(requestId), dbname(theDbName), metadata(metadataObj), opCtx(opCtx) {
+    // If there is a comment associated with the current operation, append it to the command that we
+    // are about to dispatch to the shards.
+    cmdObj = opCtx && opCtx->getComment() && !theCmdObj["comment"]
+        ? theCmdObj.addField(*opCtx->getComment())
+        : theCmdObj;
     timeout = opCtx ? std::min<Milliseconds>(opCtx->getRemainingMaxTimeMillis(), timeoutMillis)
                     : timeoutMillis;
 }

@@ -41,19 +41,37 @@ const profiler = shardDB.system.profile;
 mongosDB.getMongo().forceReadMode("legacy");
 shardDB.getMongo().forceReadMode("legacy");
 
+// TEST CASE: A legacy string $comment meta-operator inside $query is propagated to the shards via
+// mongos but not treated as a 'comment' field.
+assert.eq(mongosColl.find({a: 1, $comment: "TEST"}).itcount(), 1);
+profilerHasSingleMatchingEntryOrThrow({
+    profileDB: shardDB,
+    filter: {
+        op: "query",
+        ns: collNS,
+        "command.filter": {a: 1, $comment: "TEST"},
+        "command.comment": {$exists: false}
+    }
+});
+
 // TEST CASE: A legacy string $comment meta-operator is propagated to the shards via mongos.
 assert.eq(mongosColl.find({$query: {a: 1}, $comment: "TEST"}).itcount(), 1);
 profilerHasSingleMatchingEntryOrThrow(
     {profileDB: shardDB, filter: {op: "query", ns: collNS, "command.comment": "TEST"}});
 
-// TEST CASE: A legacy BSONObj $comment is converted to a string and propagated via mongos.
+// TEST CASE: A legacy BSONObj $comment propagated via mongos.
 assert.eq(mongosColl.find({$query: {a: 1}, $comment: {c: 2, d: {e: "TEST"}}}).itcount(), 1);
 profilerHasSingleMatchingEntryOrThrow({
     profileDB: shardDB,
-    filter: {op: "query", ns: collNS, "command.comment": "{ c: 2.0, d: { e: \"TEST\" } }"}
+    filter: {
+        op: "query",
+        ns: collNS,
+        "command.comment": {c: 2, d: {e: "TEST"}},
+        "command.filter": {a: 1}
+    }
 });
 
-// TEST CASE: Legacy BSONObj $comment is NOT converted to a string when issued on the mongod.
+// TEST CASE: Legacy BSONObj $comment when issued on the mongod.
 assert.eq(shardColl.find({$query: {a: 1}, $comment: {c: 3, d: {e: "TEST"}}}).itcount(), 1);
 profilerHasSingleMatchingEntryOrThrow({
     profileDB: shardDB,
@@ -66,7 +84,7 @@ profilerHasSingleMatchingEntryOrThrow({
 mongosDB.getMongo().forceReadMode("commands");
 shardDB.getMongo().forceReadMode("commands");
 
-// TEST CASE: Verify that string find.comment and non-string find.filter.$comment propagate.
+// TEST CASE: Verify that find.comment and non-string find.filter.$comment propagate.
 assert.eq(mongosColl.find({a: 1, $comment: {b: "TEST"}}).comment("TEST").itcount(), 1);
 profilerHasSingleMatchingEntryOrThrow({
     profileDB: shardDB,
@@ -74,11 +92,14 @@ profilerHasSingleMatchingEntryOrThrow({
         {op: "query", ns: collNS, "command.comment": "TEST", "command.filter.$comment": {b: "TEST"}}
 });
 
-// TEST CASE: Verify that find command with a non-string comment parameter is rejected.
-assert.commandFailedWithCode(
-    mongosDB.runCommand({"find": mongosColl.getName(), "filter": {a: 1}, "comment": {b: "TEST"}}),
-    9,
-    "Non-string find command comment did not return an error.");
+// TEST CASE: Verify that find command with a non-string comment parameter gets propagated.
+assert.commandWorked(mongosDB.runCommand(
+    {"find": mongosColl.getName(), "filter": {a: 1}, "comment": {b: "TEST_BSONOBJ"}}));
+
+profilerHasSingleMatchingEntryOrThrow({
+    profileDB: shardDB,
+    filter: {op: "query", ns: collNS, "command.comment": {b: "TEST_BSONOBJ"}}
+});
 
 st.stop();
 })();

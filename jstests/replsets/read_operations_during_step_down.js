@@ -78,11 +78,11 @@ const joinStepDownThread = startParallelShell(() => {
 // Wait until the step down has started to kill user operations.
 checkLog.contains(primary, "Starting to kill user operations");
 
-// Enable "waitAfterReadCommandFinishesExecution" fail point to make sure the find and get more
+// Enable "waitAfterCommandFinishesExecution" fail point to make sure the find and get more
 // commands on database 'test' does not complete before step down.
 assert.commandWorked(primaryAdmin.runCommand({
-    configureFailPoint: "waitAfterReadCommandFinishesExecution",
-    data: {db: dbName},
+    configureFailPoint: "waitAfterCommandFinishesExecution",
+    data: {ns: primaryColl.getFullName(), commands: ["find", "getMore"]},
     mode: "alwaysOn"
 }));
 
@@ -96,11 +96,11 @@ assert.commandWorked(primaryAdmin.runCommand(
 joinStepDownThread();
 rst.waitForState(primary, ReplSetTest.State.SECONDARY);
 
-// We don't want to check if we have reached "waitAfterReadCommandFinishesExecution" fail point
+// We don't want to check if we have reached "waitAfterCommandFinishesExecution" fail point
 // because we already know that the primary has stepped down successfully. This implies that
 // the find and get more commands are still running even after the node stepped down.
 assert.commandWorked(primaryAdmin.runCommand(
-    {configureFailPoint: "waitAfterReadCommandFinishesExecution", mode: "off"}));
+    {configureFailPoint: "waitAfterCommandFinishesExecution", mode: "off"}));
 
 // Wait for find & getmore thread to join.
 joinGetMoreThread();

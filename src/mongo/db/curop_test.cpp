@@ -201,7 +201,7 @@ TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {
         opCtx.get(), NamespaceString("myDb.coll"), nullptr, command, NetworkOp::dbQuery);
 
     BSONObjBuilder builder;
-    od.append(*curop, ls, {}, builder);
+    od.append(opCtx.get(), ls, {}, builder);
     auto bs = builder.done();
 
     // Append should always include these basic fields.
@@ -213,7 +213,7 @@ TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {
     ASSERT_EQ(static_cast<size_t>(bs.nFields()), basicFields.size());
 
     // 'reportString' should only contain basic fields.
-    std::string reportString = od.report(serviceContext.getClient(), *curop, nullptr, {});
+    std::string reportString = od.report(opCtx.get(), nullptr);
     std::string expectedReportString = "query myDb.coll command: { a: 3 } numYields:0 0ms";
 
     ASSERT_EQ(reportString, expectedReportString);

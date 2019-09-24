@@ -365,6 +365,11 @@ void runCommand(OperationContext* opCtx,
     }
     opCtx->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
 
+    // If the command includes a 'comment' field, set it on the current OpCtx.
+    if (auto commentField = request.body["comment"]) {
+        opCtx->setComment(commentField.wrap());
+    }
+
     auto invocation = command->parse(opCtx, request);
 
     // Set the logical optype, command object and namespace as soon as we identify the command. If
@@ -633,6 +638,12 @@ DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss
 
     Client* const client = opCtx->getClient();
     AuthorizationSession* const authSession = AuthorizationSession::get(client);
+
+    // The legacy '$comment' operator gets converted to 'comment' by upconvertQueryEntry(). We
+    // set the comment in 'opCtx' so that it can be passed on to the respective shards.
+    if (auto commentField = upconvertedQuery["comment"]) {
+        opCtx->setComment(commentField.wrap());
+    }
 
     Status status = authSession->checkAuthForFind(nss, false);
     audit::logQueryAuthzCheck(client, nss, q.query, status.code());

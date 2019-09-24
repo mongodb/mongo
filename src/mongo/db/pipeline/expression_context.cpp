@@ -53,7 +53,6 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                                      boost::optional<UUID> collUUID)
     : ExpressionContext(opCtx,
                         request.getExplain(),
-                        request.getComment(),
                         request.isFromMongos(),
                         request.needsMerge(),
                         request.shouldAllowDiskUse(),
@@ -69,7 +68,6 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
 ExpressionContext::ExpressionContext(
     OperationContext* opCtx,
     const boost::optional<ExplainOptions::Verbosity>& explain,
-    StringData comment,
     bool fromMongos,
     bool needsMerge,
     bool allowDiskUse,
@@ -82,7 +80,6 @@ ExpressionContext::ExpressionContext(
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
     boost::optional<UUID> collUUID)
     : explain(explain),
-      comment(comment),
       fromMongos(fromMongos),
       needsMerge(needsMerge),
       allowDiskUse(allowDiskUse),
@@ -192,7 +189,6 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
 
     auto expCtx = make_intrusive<ExpressionContext>(opCtx,
                                                     explain,
-                                                    comment,
                                                     fromMongos,
                                                     needsMerge,
                                                     allowDiskUse,

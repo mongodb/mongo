@@ -47,7 +47,6 @@ namespace mongo {
 const char ParsedDistinct::kKeyField[] = "key";
 const char ParsedDistinct::kQueryField[] = "query";
 const char ParsedDistinct::kCollationField[] = "collation";
-const char ParsedDistinct::kCommentField[] = "comment";
 
 namespace {
 
@@ -241,10 +240,6 @@ StatusWith<BSONObj> ParsedDistinct::asAggregationCommand() const {
         aggregationBuilder.append(QueryRequest::kUnwrappedReadPrefField, qr.getUnwrappedReadPref());
     }
 
-    if (!qr.getComment().empty()) {
-        aggregationBuilder.append(kCommentField, qr.getComment());
-    }
-
     // Specify the 'cursor' option so that aggregation uses the cursor interface.
     aggregationBuilder.append("cursor", BSONObj());
 
@@ -282,10 +277,6 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
 
     if (auto collation = parsedDistinct.getCollation()) {
         qr->setCollation(collation.get());
-    }
-
-    if (auto comment = parsedDistinct.getComment()) {
-        qr->setComment(comment.get().toString());
     }
 
     // The IDL parser above does not handle generic command arguments. Since the underlying query

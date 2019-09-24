@@ -163,7 +163,6 @@ boost::optional<Document> MongoSInterface::lookupSingleDocument(
         cmdBuilder.append("find", nss.coll());
     }
     cmdBuilder.append("filter", filterObj);
-    cmdBuilder.append("comment", expCtx->comment);
     if (readConcern) {
         cmdBuilder.append(repl::ReadConcernArgs::kReadConcernFieldName, *readConcern);
     }

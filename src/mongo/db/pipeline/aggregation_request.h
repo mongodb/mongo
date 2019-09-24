@@ -61,7 +61,6 @@ public:
     static constexpr StringData kExplainName = "explain"_sd;
     static constexpr StringData kAllowDiskUseName = "allowDiskUse"_sd;
     static constexpr StringData kHintName = "hint"_sd;
-    static constexpr StringData kCommentName = "comment"_sd;
     static constexpr StringData kExchangeName = "exchange"_sd;
     static constexpr StringData kRuntimeConstants = "runtimeConstants"_sd;
 
@@ -189,10 +188,6 @@ public:
         return _hint;
     }
 
-    const std::string& getComment() const {
-        return _comment;
-    }
-
     boost::optional<ExplainOptions::Verbosity> getExplain() const {
         return _explainMode;
     }
@@ -239,10 +234,6 @@ public:
 
     void setHint(BSONObj hint) {
         _hint = hint.getOwned();
-    }
-
-    void setComment(const std::string& comment) {
-        _comment = comment;
     }
 
     void setExplain(boost::optional<ExplainOptions::Verbosity> verbosity) {
@@ -308,9 +299,6 @@ private:
     // the key pattern hinted.  If the hint was by index name, the value of '_hint' is
     // {$hint: <String>}, where <String> is the index name hinted.
     BSONObj _hint;
-
-    // The comment parameter attached to this aggregation, empty if not set.
-    std::string _comment;
 
     BSONObj _readConcern;
 

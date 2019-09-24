@@ -101,9 +101,8 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* 
     auto expCtx =
         make_intrusive<ExpressionContext>(opCtx,
                                           boost::none,  // explain
-                                          StringData{queryRequest.getComment()},
-                                          false,  // fromMongos
-                                          false,  // needsMerge
+                                          false,        // fromMongos
+                                          false,        // needsMerge
                                           queryRequest.allowDiskUse(),
                                           false,  // bypassDocumentValidation
                                           queryRequest.nss(),

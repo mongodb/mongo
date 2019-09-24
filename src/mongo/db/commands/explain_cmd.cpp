@@ -150,6 +150,13 @@ std::unique_ptr<CommandInvocation> CmdExplain::parse(OperationContext* opCtx,
             "explain command requires a nested object",
             cmdObj.firstElement().type() == Object);
     auto explainedObj = cmdObj.firstElement().Obj();
+
+    // Extract 'comment' field from the 'explainedObj' only if there is no top-level comment.
+    auto commentField = explainedObj["comment"];
+    if (!opCtx->getComment() && commentField) {
+        opCtx->setComment(commentField.wrap());
+    }
+
     if (auto innerDb = explainedObj["$db"]) {
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Mismatched $db in explain command. Expected " << dbname

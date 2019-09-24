@@ -246,28 +246,6 @@ TEST(CountCommandTest, ConvertToAggregationWithQueryOptions) {
                       SimpleBSONObjComparator::kInstance.makeEqualTo()));
 }
 
-TEST(CountCommandTest, ConvertToAggregationWithComment) {
-    auto countCmd = CountCommand::parse(ctxt,
-                                        BSON("count"
-                                             << "TestColl"
-                                             << "$db"
-                                             << "TestDB"
-                                             << "comment"
-                                             << "aComment"));
-    auto agg = uassertStatusOK(countCommandAsAggregationCommand(countCmd, testns));
-
-    auto ar = uassertStatusOK(AggregationRequest::parseFromBSON(testns, agg));
-    ASSERT_EQ(ar.getComment(), "aComment");
-
-    std::vector<BSONObj> expectedPipeline{BSON("$count"
-                                               << "count")};
-    ASSERT(std::equal(expectedPipeline.begin(),
-                      expectedPipeline.end(),
-                      ar.getPipeline().begin(),
-                      ar.getPipeline().end(),
-                      SimpleBSONObjComparator::kInstance.makeEqualTo()));
-}
-
 TEST(CountCommandTest, ConvertToAggregationWithReadConcern) {
     auto countCmd = CountCommand::parse(ctxt,
                                         BSON("count"

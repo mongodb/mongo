@@ -211,11 +211,10 @@ auto makeExpressionContext(OperationContext* opCtx, const MapReduce& parsedMr) {
     // the $group stage of the translated pipeline to spill to disk.
     return make_intrusive<ExpressionContext>(
         opCtx,
-        boost::none,    // explain
-        std::string{},  // comment
-        false,          // fromMongos
-        false,          // needsmerge
-        true,           // allowDiskUse
+        boost::none,  // explain
+        false,        // fromMongos
+        false,        // needsmerge
+        true,         // allowDiskUse
         parsedMr.getBypassDocumentValidation().get_value_or(false),
         parsedMr.getNamespace(),
         parsedMr.getCollation().get_value_or(BSONObj()),

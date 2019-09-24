@@ -11,9 +11,6 @@ selector:
   - jstests/core/opcounters_write_cmd.js
   - jstests/core/read_after_optime.js
   - jstests/core/capped_update.js
-  # These tests attempt to read from the "system.profile" collection, which may be missing entries
-  # if a write was performed on the primary of the replica set instead.
-  - jstests/core/*profile*.js
 
   # Tests that fail for Causal Consistency with default injected readPreference 'secondary'
   # "TODO SERVER-30384: These tests assume that documents are returned in the same order they are
@@ -71,6 +68,9 @@ selector:
   # collStats and dbStats are not causally consistent
   - requires_collstats
   - requires_dbstats
+  # These tests attempt to read from the "system.profile" collection, which may be missing entries
+  # if a write was performed on the primary of the replica set instead.
+  - requires_profiling
 
 executor:
   archive:

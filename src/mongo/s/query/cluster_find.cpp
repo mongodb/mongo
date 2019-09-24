@@ -371,6 +371,12 @@ Status setUpOperationContextStateForGetMore(OperationContext* opCtx,
         ReadPreferenceSetting::get(opCtx) = *readPref;
     }
 
+    // If the originating command had a 'comment' field, we extract it and set it on opCtx. Note
+    // that if the 'getMore' command itself has a 'comment' field, we give precedence to it.
+    auto comment = cursor->getOriginatingCommand()["comment"];
+    if (!opCtx->getComment() && comment) {
+        opCtx->setComment(comment.wrap());
+    }
     if (cursor->isTailableAndAwaitData()) {
         // For tailable + awaitData cursors, the request may have indicated a maximum amount of time
         // to wait for new data. If not, default it to 1 second.  We track the deadline instead via

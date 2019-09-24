@@ -2039,6 +2039,7 @@ var authCommandsLib = {
           skipSharded: true,
           setup: function(db) {
               db.x.save({});
+              db.y.drop();
           },
           teardown: function(db) {
               db.x.drop();
@@ -3132,6 +3133,12 @@ var authCommandsLib = {
         {
           testname: "dataSize_2",
           command: {dataSize: secondDbName + ".x"},
+          setup: function(db) {
+              db.x.insert({});
+          },
+          teardown: function(db) {
+              db.x.drop();
+          },
           testcases: [{
               runOnDb: secondDbName,
               roles: roles_readAny,
@@ -4182,14 +4189,14 @@ var authCommandsLib = {
           testname: "killAllSessionsByPattern",
           command: {killAllSessionsByPattern: []},
           testcases: [
-              {runOnDb: adminDbName, roles: roles_hostManager},
+              {runOnDb: adminDbName, roles: roles_hostManager, expectFail: true},
           ]
         },
         {
           testname: "listCommands",
           command: {listCommands: 1},
           testcases: [
-              {runOnDb: adminDbName, roles: roles_all, privileges: []},
+              {runOnDb: adminDbName, roles: roles_all, privileges: [], expectFail: true},
               {runOnDb: firstDbName, roles: roles_all, privileges: []},
               {runOnDb: secondDbName, roles: roles_all, privileges: []}
           ]
@@ -5171,7 +5178,10 @@ var authCommandsLib = {
         {
           testname: "shutdown",
           command: {shutdown: 1},
-          testcases: [{runOnDb: firstDbName, roles: {}}, {runOnDb: secondDbName, roles: {}}]
+          testcases: [
+              {runOnDb: firstDbName, roles: {}, expectFail: true},
+              {runOnDb: secondDbName, roles: {}}
+          ]
         },
         {
           testname: "split",

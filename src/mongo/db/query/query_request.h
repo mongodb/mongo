@@ -259,14 +259,6 @@ public:
         _explain = explain;
     }
 
-    const std::string& getComment() const {
-        return _comment;
-    }
-
-    void setComment(const std::string& comment) {
-        _comment = comment;
-    }
-
     const BSONObj& getUnwrappedReadPref() const {
         return _unwrappedReadPref;
     }
@@ -517,8 +509,6 @@ private:
     boost::optional<long long> _ntoreturn;
 
     bool _explain = false;
-
-    std::string _comment;
 
     // A user-specified maxTimeMS limit, or a value of '0' if not specified.
     int _maxTimeMS = 0;
