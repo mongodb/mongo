@@ -1037,6 +1037,7 @@ env.Library(
     source=[
         'repl_client_info.cpp',
         'replication_coordinator.cpp',
+        'replication_coordinator_noop.cpp',
     ],
     LIBDEPS=[
         'optime',
