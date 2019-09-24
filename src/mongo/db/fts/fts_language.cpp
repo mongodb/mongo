@@ -30,6 +30,7 @@
 #include "mongo/db/fts/fts_language.h"
 
 #include <algorithm>
+#include <cctype>
 #include <fmt/format.h>
 #include <map>
 #include <memory>
