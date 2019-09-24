@@ -782,7 +782,7 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
 void ReplicationCoordinatorImpl::startup(OperationContext* opCtx) {
     if (!isReplEnabled()) {
         if (ReplSettings::shouldRecoverFromOplogAsStandalone()) {
-            if (!_storage->supportsRecoverToStableTimestamp(opCtx->getServiceContext())) {
+            if (!_storage->supportsRecoveryTimestamp(opCtx->getServiceContext())) {
                 severe() << "Cannot use 'recoverFromOplogAsStandalone' with a storage engine that "
                             "does not support recover to stable timestamp.";
                 fassertFailedNoTrace(50805);

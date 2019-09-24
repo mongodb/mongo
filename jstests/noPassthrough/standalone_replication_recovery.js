@@ -84,7 +84,8 @@
     reconnect(node);
     assertDocsInColl(node, []);
 
-    jsTestLog("Test that on restart with the flag set we play recovery.");
+    jsTestLog(
+        "Test that on restart with the 'recoverFromOplogAsStandalone' flag set we play recovery.");
     node = rst.restart(node, {
         noReplSet: true,
         setParameter: {recoverFromOplogAsStandalone: true, logComponentVerbosity: logLevel}
@@ -98,6 +99,16 @@
     jsTestLog("Test that we cannot set the parameter during standalone runtime.");
     assert.commandFailed(node.adminCommand({setParameter: 1, recoverFromOplogAsStandalone: true}));
     assert.commandFailed(node.adminCommand({setParameter: 1, recoverFromOplogAsStandalone: false}));
+
+    jsTestLog(
+        "Test that on restart with the 'recoverFromOplogAsStandalone' flag set we play recovery even if we also set 'enableMajorityReadConcern=false'.");
+    node = rst.restart(node, {
+        noReplSet: true,
+        enableMajorityReadConcern: false,
+        setParameter: {recoverFromOplogAsStandalone: true, logComponentVerbosity: logLevel}
+    });
+    reconnect(node);
+    assertDocsInColl(node, [3, 4, 5]);
 
     jsTestLog("Test that on restart after standalone recovery we do not see replicated writes.");
     node = rst.restart(node, {
