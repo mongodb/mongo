@@ -36,6 +36,9 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::parsed_aggregation_projection {
+constexpr auto kProjectionPostImageVarName =
+    parsed_aggregation_projection::ParsedAggregationProjection::kProjectionPostImageVarName;
+
 class PositionalProjectionExecutionTest : public AggregationContextFixture {
 protected:
     auto applyPositional(const BSONObj& projSpec,
@@ -47,6 +50,8 @@ protected:
         auto expr = make_intrusive<ExpressionInternalFindPositional>(
             getExpCtx(),
             ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState),
+            ExpressionFieldPath::parse(
+                getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
             path,
             matchExpr.get());
         proj->setRootReplacementExpression(expr);
@@ -64,7 +69,8 @@ protected:
         auto proj = ParsedAggregationProjection::create(getExpCtx(), projSpec, {});
         auto expr = make_intrusive<ExpressionInternalFindSlice>(
             getExpCtx(),
-            ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState),
+            ExpressionFieldPath::parse(
+                getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
             path,
             skip,
             limit);
@@ -87,6 +93,14 @@ TEST_F(PositionalProjectionExecutionTest, CanApplyPositionalWithInclusionProject
                                        Document{fromjson("{bar: 1, foo: [1,2,6,10]}")}));
 }
 
+TEST_F(PositionalProjectionExecutionTest, AppliesProjectionToPreImage) {
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{b: [6], c: 'abc'}")},
+                       applyPositional(fromjson("{b: 1, c: 1}"),
+                                       fromjson("{a: 1, b: {$gte: 5}}"),
+                                       "b",
+                                       Document{fromjson("{a: 1, b: [1,2,6,10], c: 'abc'}")}));
+}
+
 TEST_F(PositionalProjectionExecutionTest, ShouldAddInclusionFieldsAndWholeDocumentToDependencies) {
     auto proj = ParsedAggregationProjection::create(getExpCtx(), fromjson("{bar: 1, _id: 0}"), {});
     auto match = fromjson("{bar: 1, 'foo.bar': {$gte: 5}}");
@@ -94,6 +108,8 @@ TEST_F(PositionalProjectionExecutionTest, ShouldAddInclusionFieldsAndWholeDocume
     auto expr = make_intrusive<ExpressionInternalFindPositional>(
         getExpCtx(),
         ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState),
+        ExpressionFieldPath::parse(
+            getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
         "foo.bar",
         matchExpr.get());
     proj->setRootReplacementExpression(expr);
@@ -114,6 +130,8 @@ TEST_F(PositionalProjectionExecutionTest, ShouldConsiderAllPathsAsModified) {
     auto expr = make_intrusive<ExpressionInternalFindPositional>(
         getExpCtx(),
         ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState),
+        ExpressionFieldPath::parse(
+            getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
         "foo.bar",
         matchExpr.get());
     proj->setRootReplacementExpression(expr);
@@ -136,6 +154,15 @@ TEST_F(SliceProjectionExecutionTest, CanApplySliceWithInclusionProjection) {
                                   Document{fromjson("{bar: 1, foo: [1,2,6,10]}")}));
 }
 
+TEST_F(SliceProjectionExecutionTest, AppliesProjectionToPostImage) {
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{b: [1,2], c: 'abc'}")},
+                       applySlice(fromjson("{b: 1, c: 1}"),
+                                  "b",
+                                  boost::none,
+                                  2,
+                                  Document{fromjson("{a: 1, b: [1,2,6,10], c: 'abc'}")}));
+}
+
 TEST_F(SliceProjectionExecutionTest, CanApplySliceAndPositionalProjectionsTogether) {
     auto proj = ParsedAggregationProjection::create(getExpCtx(), fromjson("{foo: 1, bar: 1}"), {});
     auto matchSpec = fromjson("{foo: {$gte: 3}}");
@@ -143,6 +170,8 @@ TEST_F(SliceProjectionExecutionTest, CanApplySliceAndPositionalProjectionsTogeth
     auto positionalExpr = make_intrusive<ExpressionInternalFindPositional>(
         getExpCtx(),
         ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState),
+        ExpressionFieldPath::parse(
+            getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
         "foo",
         matchExpr.get());
     auto sliceExpr =
@@ -166,7 +195,8 @@ TEST_F(SliceProjectionExecutionTest,
     auto proj = ParsedAggregationProjection::create(getExpCtx(), fromjson("{bar: 1, _id: 0}"), {});
     auto expr = make_intrusive<ExpressionInternalFindSlice>(
         getExpCtx(),
-        ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState),
+        ExpressionFieldPath::parse(
+            getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
         "foo.bar",
         1,
         1);
@@ -184,7 +214,8 @@ TEST_F(SliceProjectionExecutionTest, ShouldConsiderAllPathsAsModifiedWithInclusi
     auto proj = ParsedAggregationProjection::create(getExpCtx(), fromjson("{bar: 1}"), {});
     auto expr = make_intrusive<ExpressionInternalFindSlice>(
         getExpCtx(),
-        ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState),
+        ExpressionFieldPath::parse(
+            getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
         "foo.bar",
         1,
         1);
@@ -198,7 +229,8 @@ TEST_F(SliceProjectionExecutionTest, ShouldConsiderAllPathsAsModifiedWithExclusi
     auto proj = ParsedAggregationProjection::create(getExpCtx(), fromjson("{bar: 0}"), {});
     auto expr = make_intrusive<ExpressionInternalFindSlice>(
         getExpCtx(),
-        ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState),
+        ExpressionFieldPath::parse(
+            getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
         "foo.bar",
         1,
         1);
@@ -212,7 +244,8 @@ TEST_F(SliceProjectionExecutionTest, ShouldAddWholeDocumentToDependenciesWithExc
     auto proj = ParsedAggregationProjection::create(getExpCtx(), fromjson("{bar: 0}"), {});
     auto expr = make_intrusive<ExpressionInternalFindSlice>(
         getExpCtx(),
-        ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState),
+        ExpressionFieldPath::parse(
+            getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
         "foo.bar",
         1,
         1);

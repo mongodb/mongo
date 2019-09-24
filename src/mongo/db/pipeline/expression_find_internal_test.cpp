@@ -36,12 +36,25 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::expression_internal_tests {
+constexpr auto kProjectionPostImageVarName =
+    parsed_aggregation_projection::ParsedAggregationProjection::kProjectionPostImageVarName;
+
+auto defineAndSetProjectionPostImageVariable(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                             Value postImage) {
+    auto& vps = expCtx->variablesParseState;
+    auto varId = vps.defineVariable(kProjectionPostImageVarName);
+    expCtx->variables.setValue(varId, postImage);
+    return varId;
+}
+
 class ExpressionInternalFindPositionalTest : public AggregationContextFixture {
 protected:
     auto createExpression(const MatchExpression* matchExpr, const std::string& path) {
         auto expr = make_intrusive<ExpressionInternalFindPositional>(
             getExpCtx(),
             ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState),
+            ExpressionFieldPath::parse(
+                getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
             path,
             matchExpr);
         return expr;
@@ -53,7 +66,8 @@ protected:
     auto createExpression(const std::string& path, boost::optional<int> skip, int limit) {
         auto expr = make_intrusive<ExpressionInternalFindSlice>(
             getExpCtx(),
-            ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState),
+            ExpressionFieldPath::parse(
+                getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
             path,
             skip,
             limit);
@@ -72,7 +86,10 @@ protected:
     }
 };
 
-TEST_F(ExpressionInternalFindPositionalTest, AppliesProjectionToRootDocument) {
+TEST_F(ExpressionInternalFindPositionalTest, AppliesProjectionToPostImage) {
+    defineAndSetProjectionPostImageVariable(getExpCtx(),
+                                            Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
+
     auto matchSpec = fromjson("{bar: 1, foo: {$gte: 5}}");
     auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(matchSpec, getExpCtx()));
     auto expr = createExpression(matchExpr.get(), "foo");
@@ -84,6 +101,8 @@ TEST_F(ExpressionInternalFindPositionalTest, AppliesProjectionToRootDocument) {
 }
 
 TEST_F(ExpressionInternalFindPositionalTest, RecordsProjectionDependencies) {
+    auto varId = defineAndSetProjectionPostImageVariable(
+        getExpCtx(), Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
     auto matchSpec = fromjson("{bar: 1, foo: {$gte: 5}}");
     auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(matchSpec, getExpCtx()));
     auto expr = createExpression(matchExpr.get(), "foo");
@@ -94,11 +113,15 @@ TEST_F(ExpressionInternalFindPositionalTest, RecordsProjectionDependencies) {
     ASSERT_EQ(deps.fields.size(), 2UL);
     ASSERT_EQ(deps.fields.count("bar"), 1UL);
     ASSERT_EQ(deps.fields.count("foo"), 1UL);
-    ASSERT_EQ(deps.vars.size(), 0UL);
-    ASSERT(deps.needWholeDocument);
+    ASSERT_EQ(deps.vars.size(), 1UL);
+    ASSERT_EQ(deps.vars.count(varId), 1UL);
+    ASSERT_TRUE(deps.needWholeDocument);
 }
 
 TEST_F(ExpressionInternalFindPositionalTest, AddsArrayUndottedPathToComputedPaths) {
+    defineAndSetProjectionPostImageVariable(getExpCtx(),
+                                            Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
+
     auto matchSpec = fromjson("{bar: 1, foo: {$gte: 5}}");
     auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(matchSpec, getExpCtx()));
     auto expr = createExpression(matchExpr.get(), "foo");
@@ -113,6 +136,9 @@ TEST_F(ExpressionInternalFindPositionalTest, AddsArrayUndottedPathToComputedPath
 
 TEST_F(ExpressionInternalFindPositionalTest,
        AddsOnlyTopLevelFieldOfArrayDottedPathToComputedPaths) {
+    defineAndSetProjectionPostImageVariable(getExpCtx(),
+                                            Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
+
     auto matchSpec = fromjson("{bar: 1, 'foo.bar': {$gte: 5}}");
     auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(matchSpec, getExpCtx()));
     auto expr = createExpression(matchExpr.get(), "foo.bar");
@@ -125,7 +151,10 @@ TEST_F(ExpressionInternalFindPositionalTest,
     ASSERT_EQ(computedPaths.paths.count("foo"), 1UL);
 }
 
-TEST_F(ExpressionInternalFindSliceTest, AppliesProjectionToRootDocument) {
+TEST_F(ExpressionInternalFindSliceTest, AppliesProjectionToPostImage) {
+    defineAndSetProjectionPostImageVariable(getExpCtx(),
+                                            Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
+
     auto expr = createExpression("foo", 1, 2);
 
     ASSERT_DOCUMENT_EQ(
@@ -135,17 +164,23 @@ TEST_F(ExpressionInternalFindSliceTest, AppliesProjectionToRootDocument) {
 }
 
 TEST_F(ExpressionInternalFindSliceTest, RecordsProjectionDependencies) {
+    auto varId = defineAndSetProjectionPostImageVariable(
+        getExpCtx(), Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
     auto expr = createExpression("foo", 1, 2);
 
     DepsTracker deps;
     expr->addDependencies(&deps);
 
     ASSERT_EQ(deps.fields.size(), 0UL);
-    ASSERT_EQ(deps.vars.size(), 0UL);
-    ASSERT(deps.needWholeDocument);
+    ASSERT_EQ(deps.vars.size(), 1UL);
+    ASSERT_EQ(deps.vars.count(varId), 1UL);
+    ASSERT_TRUE(deps.needWholeDocument);
 }
 
 TEST_F(ExpressionInternalFindSliceTest, AddsArrayUndottedPathToComputedPaths) {
+    defineAndSetProjectionPostImageVariable(getExpCtx(),
+                                            Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
+
     auto expr = createExpression("foo", 1, 2);
 
     DepsTracker deps;
@@ -157,6 +192,9 @@ TEST_F(ExpressionInternalFindSliceTest, AddsArrayUndottedPathToComputedPaths) {
 }
 
 TEST_F(ExpressionInternalFindSliceTest, AddsTopLevelFieldOfArrayDottedPathToComputedPaths) {
+    defineAndSetProjectionPostImageVariable(getExpCtx(),
+                                            Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
+
     auto expr = createExpression("foo.bar", 1, 2);
 
     DepsTracker deps;

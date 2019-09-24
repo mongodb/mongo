@@ -43,21 +43,28 @@ namespace projection_executor {
 Value extractArrayElement(const Value& arr, const std::string& elemIndex);
 
 /**
- * Applies a positional projection on the first array found in the 'path' on the 'input' document.
- * The applied projection is returned as a Document.  The 'matchExpr' specifies a condition to
- * locate the first matching element in the array and must match the input document. For example,
- * given:
+ * Applies a positional projection on the first array found in the 'path' on a projection
+ * 'preImage' document. The applied projection is merged with a projection 'postImage' document.
+ * The 'matchExpr' specifies a condition to locate the first matching element in the array and must
+ * match the input document. Note that the match expression must be applied to the projection
+ * post-image, as it may contain conditions on fields which are not included into the projection
+ * post-image. So, the pre-image document will be used to match an array and record a position of
+ * the matching element, whilst the actual result will be merged into the post-image.
  *
- *    - the 'input' document {bar: 1, foo: {bar: [1,2,6,10]}}
+ * For example, given:
+ *
+ *    - the 'preImage' document {bar: 1, foo: {bar: [1,2,6,10]}}
+ *    - the 'postImage' document {foo: {bar: [1,2,6,10]}}
  *    - the 'matchExpr' condition {bar: 1, 'foo.bar': {$gte: 5}}
  *    - and the 'path' for the positional projection of 'foo.bar'
  *
- * The resulting document will contain the following element: {bar: 1, foo: {bar: [6]}}
+ * The resulting document will contain the following element: {foo: {bar: [6]}}
  *
  * Throws an AssertionException if 'matchExpr' matches the input document, but an array element
  * satisfying positional projection requirements cannot be found.
  */
-Document applyPositionalProjection(const Document& input,
+Document applyPositionalProjection(const Document& preImage,
+                                   const Document& postImage,
                                    const MatchExpression& matchExpr,
                                    const FieldPath& path);
 /**

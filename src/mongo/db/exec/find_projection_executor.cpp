@@ -156,10 +156,11 @@ Value extractArrayElement(const Value& arr, const std::string& elemIndex) {
     return arr[*index];
 }
 
-Document applyPositionalProjection(const Document& input,
+Document applyPositionalProjection(const Document& preImage,
+                                   const Document& postImage,
                                    const MatchExpression& matchExpr,
                                    const FieldPath& path) {
-    MutableDocument output(input);
+    MutableDocument output(postImage);
 
     // Try to find the first matching array element from the 'input' document based on the condition
     // specified as 'matchExpr'. If such an element is found, its position within an array will be
@@ -169,7 +170,7 @@ Document applyPositionalProjection(const Document& input,
     // invariant to make sure this is the case indeed.
     MatchDetails details;
     details.requestElemMatchKey();
-    invariant(matchExpr.matchesBSON(input.toBson(), &details));
+    invariant(matchExpr.matchesBSON(preImage.toBson(), &details));
 
     // At this stage we know that the 'input' document matches against the specified condition,
     // but the matching array element may not be found. This can happen if the field, specified
@@ -181,7 +182,7 @@ Document applyPositionalProjection(const Document& input,
     // found, then we will extract the matching element from this array and will store it as
     // the current sub-path in the 'output' document. Otherwise, just leave the 'output'
     // document untouched.
-    for (auto [ind, subDoc] = std::pair{0ULL, input}; ind < path.getPathLength(); ind++) {
+    for (auto [ind, subDoc] = std::pair{0ULL, postImage}; ind < path.getPathLength(); ind++) {
         switch (auto val = subDoc[path.getFieldName(ind)]; val.getType()) {
             case BSONType::Array: {
                 // Raise an error if we found the first array on the 'path', but the matching array

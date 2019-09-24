@@ -39,10 +39,19 @@
 namespace mongo {
 namespace projection_executor {
 namespace positional_projection_tests {
-auto applyPositional(const BSONObj& match, const std::string& path, const Document& input) {
+/**
+ * Applies a find()-style positional projection at the given 'path' using 'matchSpec' to create
+ * a 'MatchExpression' to match an element on the first array in the 'path'. If no value for
+ * 'postImage' is provided, then the post-image used will be the value passed for the 'preImage'.
+ */
+auto applyPositional(const BSONObj& matchSpec,
+                     const std::string& path,
+                     const Document& preImage,
+                     boost::optional<Document> postImage = boost::none) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(match, expCtx));
-    return projection_executor::applyPositionalProjection(input, *matchExpr, path);
+    auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(matchSpec, expCtx));
+    return projection_executor::applyPositionalProjection(
+        preImage, postImage.value_or(preImage), *matchExpr, path);
 }
 
 TEST(PositionalProjection, CorrectlyProjectsSimplePath) {
@@ -114,6 +123,13 @@ TEST(PositionalProjection, CanMergeWithExistingFieldsInOutputDocument) {
 
     doc = Document{fromjson("{bar: 1, foo: 3}")};
     ASSERT_DOCUMENT_EQ(doc, applyPositional(fromjson("{foo: 3}"), "foo", doc));
+}
+
+TEST(PositionalProjection, AppliesMatchExpressionToPreImageAndStoresResultInPostImage) {
+    auto preImage = Document{fromjson("{foo: 1, bar: [1,2,6,10]}")};
+    auto postImage = Document{fromjson("{bar: [1,2,6,10]}")};
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{bar: [6]}")},
+                       applyPositional(fromjson("{foo: 1, bar: 6}"), "bar", preImage, postImage));
 }
 }  // namespace positional_projection_tests
 

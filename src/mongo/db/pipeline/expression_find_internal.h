@@ -44,21 +44,29 @@ namespace mongo {
 class ExpressionInternalFindPositional final : public Expression {
 public:
     ExpressionInternalFindPositional(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                     boost::intrusive_ptr<Expression> child,
+                                     boost::intrusive_ptr<Expression> preImageExpr,
+                                     boost::intrusive_ptr<Expression> postImageExpr,
                                      FieldPath path,
                                      const MatchExpression* matchExpr)
-        : Expression{expCtx, {child}}, _path{std::move(path)}, _matchExpr{matchExpr} {}
+        : Expression{expCtx, {preImageExpr, postImageExpr}},
+          _path{std::move(path)},
+          _matchExpr{matchExpr} {}
 
     Value evaluate(const Document& root, Variables* variables) const final {
         using namespace fmt::literals;
 
-        auto postImage = _children[0]->evaluate(root, variables);
+        auto preImage = _children[0]->evaluate(root, variables);
+        auto postImage = _children[1]->evaluate(root, variables);
         uassert(51255,
-                "Positional operator can only be applied to an object, but got {}"_format(
+                "Positional operator pre-image can only be an object, but got {}"_format(
+                    typeName(preImage.getType())),
+                preImage.getType() == BSONType::Object);
+        uassert(51258,
+                "Positional operator post-image can only be an object, but got {}"_format(
                     typeName(postImage.getType())),
                 postImage.getType() == BSONType::Object);
         return Value{projection_executor::applyPositionalProjection(
-            postImage.getDocument(), *_matchExpr, _path)};
+            preImage.getDocument(), postImage.getDocument(), *_matchExpr, _path)};
     }
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -79,6 +87,7 @@ public:
 protected:
     void _doAddDependencies(DepsTracker* deps) const final {
         _children[0]->addDependencies(deps);
+        _children[1]->addDependencies(deps);
         deps->needWholeDocument = true;
         _matchExpr->addDependencies(deps);
     }
@@ -97,11 +106,11 @@ private:
 class ExpressionInternalFindSlice final : public Expression {
 public:
     ExpressionInternalFindSlice(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                boost::intrusive_ptr<Expression> child,
+                                boost::intrusive_ptr<Expression> postImageExpr,
                                 FieldPath path,
                                 boost::optional<int> skip,
                                 int limit)
-        : Expression{expCtx, {child}}, _path{std::move(path)}, _skip{skip}, _limit{limit} {}
+        : Expression{expCtx, {postImageExpr}}, _path{std::move(path)}, _skip{skip}, _limit{limit} {}
 
     Value evaluate(const Document& root, Variables* variables) const final {
         using namespace fmt::literals;
