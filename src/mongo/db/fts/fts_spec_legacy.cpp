@@ -55,9 +55,8 @@ const FTSLanguage& FTSSpec::_getLanguageToUseV1(const BSONObj& userDoc) const {
     if (e.type() == String) {
         const char* x = e.valuestrsafe();
         if (strlen(x) > 0) {
-            StatusWithFTSLanguage swl = FTSLanguage::make(x, TEXT_INDEX_VERSION_1);
-            dassert(swl.isOK());  // make() w/ TEXT_INDEX_VERSION_1 guaranteed to not fail.
-            return *swl.getValue();
+            // make() w/ TEXT_INDEX_VERSION_1 guaranteed to not fail.
+            return FTSLanguage::make(x, TEXT_INDEX_VERSION_1);
         }
     }
     return *_defaultLanguage;

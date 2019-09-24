@@ -97,17 +97,17 @@ FTSSpec::FTSSpec(const BSONObj& indexInfo) {
     // Initialize _defaultLanguage.  Note that the FTSLanguage constructor requires
     // textIndexVersion, since language parsing is version-specific.
     auto indexLanguage = indexInfo["default_language"].String();
-    auto swl = FTSLanguage::make(indexLanguage, _textIndexVersion);
-
-    // This can fail if the user originally created the text index under an instance of
-    // MongoDB that supports different languages then the current instance
-    // TODO: consder propagating the index ns to here to improve the error message
-    uassert(28682,
-            str::stream() << "Unrecognized language " << indexLanguage
-                          << " found for text index. Verify mongod was started with the"
-                             " correct options.",
-            swl.getStatus().isOK());
-    _defaultLanguage = swl.getValue();
+    try {
+        _defaultLanguage = &FTSLanguage::make(indexLanguage, _textIndexVersion);
+    } catch (const DBException& ex) {
+        // This can fail if the user originally created the text index under an instance of
+        // MongoDB that supports different languages then the current instance
+        // TODO: consder propagating the index ns to here to improve the error message
+        uasserted(28682,
+                  str::stream() << "Unrecognized language " << indexLanguage
+                                << " found for text index. Verify mongod was started with the"
+                                   " correct options.");
+    }
 
     _languageOverrideField = indexInfo["language_override"].valuestrsafe();
 
@@ -163,9 +163,11 @@ const FTSLanguage* FTSSpec::_getLanguageToUseV2(const BSONObj& userDoc,
     uassert(17261,
             "found language override field in document with non-string type",
             e.type() == mongo::String);
-    StatusWithFTSLanguage swl = FTSLanguage::make(e.String(), getTextIndexVersion());
-    uassert(17262, "language override unsupported: " + e.String(), swl.getStatus().isOK());
-    return swl.getValue();
+    try {
+        return &FTSLanguage::make(e.String(), getTextIndexVersion());
+    } catch (DBException& ex) {
+        uasserted(17262, "language override unsupported: " + e.String());
+    }
 }
 
 void FTSSpec::scoreDocument(const BSONObj& obj, TermFrequencyMap* term_freqs) const {
@@ -439,7 +441,9 @@ StatusWith<BSONObj> FTSSpec::fixSpec(const BSONObj& spec) {
         return {ErrorCodes::CannotCreateIndex, "default_language needs a string type"};
     }
 
-    if (!FTSLanguage::make(default_language, TEXT_INDEX_VERSION_3).getStatus().isOK()) {
+    try {
+        FTSLanguage::make(default_language, TEXT_INDEX_VERSION_3);
+    } catch (DBException& ex) {
         return {ErrorCodes::CannotCreateIndex, "default_language is not valid"};
     }
 

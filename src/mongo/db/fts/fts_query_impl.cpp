@@ -48,9 +48,11 @@ using std::stringstream;
 using std::vector;
 
 Status FTSQueryImpl::parse(TextIndexVersion textIndexVersion) {
-    StatusWithFTSLanguage ftsLanguage = FTSLanguage::make(getLanguage(), textIndexVersion);
-    if (!ftsLanguage.getStatus().isOK()) {
-        return ftsLanguage.getStatus();
+    const FTSLanguage* ftsLanguage;
+    try {
+        ftsLanguage = &FTSLanguage::make(getLanguage(), textIndexVersion);
+    } catch (const DBException& e) {
+        return e.toStatus();
     }
 
     // Build a space delimited list of words to have the FtsTokenizer tokenize
@@ -128,7 +130,7 @@ Status FTSQueryImpl::parse(TextIndexVersion textIndexVersion) {
         }
     }
 
-    std::unique_ptr<FTSTokenizer> tokenizer(ftsLanguage.getValue()->createTokenizer());
+    std::unique_ptr<FTSTokenizer> tokenizer = ftsLanguage->createTokenizer();
 
     _addTerms(tokenizer.get(), positiveTermSentence, false);
     _addTerms(tokenizer.get(), negativeTermSentence, true);
