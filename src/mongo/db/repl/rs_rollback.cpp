@@ -846,6 +846,9 @@ void renameOutOfTheWay(OperationContext* opCtx, RenameCollectionInfo info, Datab
     auto collection = db->getCollection(opCtx, info.renameTo);
     invariant(collection);
 
+    // The generated unique collection name is only guaranteed to exist if the database is
+    // exclusively locked.
+    invariant(opCtx->lockState()->isDbLockedForMode(db->name(), LockMode::MODE_X));
     // Creates the oplog entry to temporarily rename the collection that is
     // preventing the renameCollection command from rolling back to a unique
     // namespace.

@@ -837,7 +837,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
          OplogApplication::Mode mode,
          boost::optional<Timestamp> stableTimestampForRecovery) -> Status {
           const NamespaceString nss(parseNs(ns, cmd));
-          Lock::DBLock dbXLock(opCtx, nss.db(), MODE_X);
+          Lock::DBLock dbXLock(opCtx, nss.db(), MODE_IX);
           if (auto idIndexElem = cmd["idIndex"]) {
               // Remove "idIndex" field from command.
               auto cmdWithoutIdIndex = cmd.removeField("idIndex");

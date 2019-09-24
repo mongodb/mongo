@@ -200,6 +200,9 @@ Status renameTargetCollectionToTmp(OperationContext* opCtx,
                                    const UUID& targetUUID) {
     repl::UnreplicatedWritesBlock uwb(opCtx);
 
+    // The generated unique collection name is only guaranteed to exist if the database is
+    // exclusively locked.
+    invariant(opCtx->lockState()->isDbLockedForMode(targetDB->name(), LockMode::MODE_X));
     auto tmpNameResult = targetDB->makeUniqueCollectionNamespace(opCtx, "tmp%%%%%.rename");
     if (!tmpNameResult.isOK()) {
         return tmpNameResult.getStatus().withContext(
@@ -538,6 +541,9 @@ Status renameBetweenDBs(OperationContext* opCtx,
         targetDB = DatabaseHolder::get(opCtx)->openDb(opCtx, target.db());
     }
 
+    // The generated unique collection name is only guaranteed to exist if the database is
+    // exclusively locked.
+    invariant(opCtx->lockState()->isDbLockedForMode(targetDB->name(), LockMode::MODE_X));
     auto tmpNameResult =
         targetDB->makeUniqueCollectionNamespace(opCtx, "tmp%%%%%.renameCollection");
     if (!tmpNameResult.isOK()) {

@@ -119,6 +119,16 @@ public:
         return _viewsName;
     }
 
+    /**
+     * Given an input pattern `collectionNameModel`, returns a namespace string where `%` characters
+     * are replaced with random alpha-numerics.
+     *
+     * When called while holding an exclusive database lock, the collection name is guaranteed to
+     * not exist. Otherwise the caller is responsible for acquiring locks to check uniqueness.
+     *
+     * Returns a NamespaceExists error status if multiple attempts fail to generate a possible
+     * unique name.
+     */
     StatusWith<NamespaceString> makeUniqueCollectionNamespace(OperationContext* opCtx,
                                                               StringData collectionNameModel) final;
 
@@ -176,9 +186,8 @@ private:
     AtomicWord<bool> _dropPending{false};
 
     // Random number generator used to create unique collection namespaces suitable for temporary
-    // collections. Lazily created on first call to makeUniqueCollectionNamespace().
-    // This variable may only be read/written while the database is locked in MODE_X.
-    std::unique_ptr<PseudoRandom> _uniqueCollectionNamespacePseudoRandom;
+    // collections.
+    PseudoRandom _uniqueCollectionNamespacePseudoRandom;
 };
 
 }  // namespace mongo
