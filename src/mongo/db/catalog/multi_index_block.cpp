@@ -50,7 +50,6 @@
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logger/redaction.h"
@@ -74,9 +73,6 @@ namespace {
  * acquire the RSTL in mode X.
  */
 void _unlockRSTLForIndexCleanup(OperationContext* opCtx) {
-    if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
-        return;
-    }
     opCtx->lockState()->unlockRSTLforPrepare();
     invariant(!opCtx->lockState()->isRSTLLocked());
 }
