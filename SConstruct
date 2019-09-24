@@ -1598,7 +1598,7 @@ elif env.TargetOSIs('freebsd'):
     env.Append( CCFLAGS=[ "-fno-omit-frame-pointer" ] )
 
 elif env.TargetOSIs('darwin'):
-     env.Append( LIBS=["resolv"] )
+    env.Append( LIBS=["resolv"] )
 
 elif env.TargetOSIs('openbsd'):
     env.Append( LIBS=[ "kvm" ] )
@@ -2300,6 +2300,10 @@ def doConfigure(myenv):
 
         # Enable sized deallocation support.
         AddToCXXFLAGSIfSupported(myenv, '-fsized-deallocation')
+
+        # This warning was added in Apple clang version 11 and flags many explicitly defaulted move
+        # constructors and assignment operators for being implicitly deleted, which is not useful.
+        AddToCXXFLAGSIfSupported(myenv, "-Wno-defaulted-function-deleted")
 
         # Check if we can set "-Wnon-virtual-dtor" when "-Werror" is set. The only time we can't set it is on
         # clang 3.4, where a class with virtual function(s) and a non-virtual destructor throws a warning when
