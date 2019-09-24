@@ -276,7 +276,7 @@ public:
 
             uassert(ErrorCodes::OperationNotSupportedInTransaction,
                     "The 'readOnce' option is not supported within a transaction.",
-                    !txnParticipant || !txnParticipant.inActiveOrKilledMultiDocumentTransaction() ||
+                    !txnParticipant || !txnParticipant.inMultiDocumentTransaction() ||
                         !qr->isReadOnce());
 
             uassert(ErrorCodes::InvalidOptions,
@@ -287,7 +287,7 @@ public:
             uassert(
                 ErrorCodes::OperationNotSupportedInTransaction,
                 "The '$_internalReadAtClusterTime' option is not supported within a transaction.",
-                !txnParticipant || !txnParticipant.inActiveOrKilledMultiDocumentTransaction() ||
+                !txnParticipant || !txnParticipant.inMultiDocumentTransaction() ||
                     !qr->getReadAtClusterTime());
 
             uassert(ErrorCodes::InvalidOptions,
