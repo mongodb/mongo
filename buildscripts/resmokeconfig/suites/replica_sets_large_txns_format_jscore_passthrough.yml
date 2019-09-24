@@ -12,8 +12,6 @@ selector:
   - jstests/core/txns/abort_expired_transaction.js
   - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js
   - jstests/core/txns/kill_op_on_txn_expiry.js
-  # TODO SERVER-40793: Unblacklist this test.
-  - jstests/core/txns/await_prepared_transactions_on_FCV_downgrade.js
 
 executor:
   archive:
