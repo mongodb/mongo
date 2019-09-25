@@ -1226,11 +1226,9 @@ std::vector<repl::ReplOperation>&
 TransactionParticipant::Participant::retrieveCompletedTransactionOperations(
     OperationContext* opCtx) {
 
-    // Ensure that we only ever retrieve a transaction's completed operations when in progress,
-    // committing with prepare, or prepared.
-    invariant(o().txnState.isInSet(TransactionState::kInProgress |
-                                   TransactionState::kCommittingWithPrepare |
-                                   TransactionState::kPrepared),
+    // Ensure that we only ever retrieve a transaction's completed operations when in progress
+    // or prepared.
+    invariant(o().txnState.isInSet(TransactionState::kInProgress | TransactionState::kPrepared),
               str::stream() << "Current state: " << o().txnState);
 
     return p().transactionOperations;
@@ -1244,9 +1242,8 @@ TxnResponseMetadata TransactionParticipant::Participant::getResponseMetadata() {
 }
 
 void TransactionParticipant::Participant::clearOperationsInMemory(OperationContext* opCtx) {
-    // Ensure that we only ever end a transaction when committing with prepare or in progress.
-    invariant(o().txnState.isInSet(TransactionState::kCommittingWithPrepare |
-                                   TransactionState::kInProgress),
+    // Ensure that we only ever end a prepared or in-progress transaction.
+    invariant(o().txnState.isInSet(TransactionState::kPrepared | TransactionState::kInProgress),
               str::stream() << "Current state: " << o().txnState);
     invariant(p().autoCommit);
     p().transactionOperationBytes = 0;
@@ -1275,22 +1272,11 @@ void TransactionParticipant::Participant::commitUnpreparedTransaction(OperationC
     auto needsNoopWrite = txnOps.empty() && !opCtx->getWriteConcern().usedDefault;
 
     clearOperationsInMemory(opCtx);
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        // The oplog entry is written in the same WUOW with the data change for unprepared
-        // transactions.  We can still consider the state is InProgress until now, since no
-        // externally visible changes have been made yet by the commit operation. If anything throws
-        // before this point in the function, entry point will abort the transaction.
-        o(lk).txnState.transitionTo(TransactionState::kCommittingWithoutPrepare);
-    }
 
     try {
-        // Once entering "committing without prepare" we cannot throw an exception.
+        // Once committing we cannot throw an exception.
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         _commitStorageTransaction(opCtx);
-        invariant(o().txnState.isCommittingWithoutPrepare(),
-                  str::stream() << "Current state: " << o().txnState);
-
         _finishCommitTransaction(opCtx);
     } catch (...) {
         // It is illegal for committing a transaction to fail for any reason, other than an
@@ -1362,11 +1348,6 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
                 "oplog entry has been majority committed",
                 replCoord->getLastCommittedOpTime().getTimestamp() >= prepareTimestamp ||
                     MONGO_FAIL_POINT(skipCommitTxnCheckPrepareMajorityCommitted));
-    }
-
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        o(lk).txnState.transitionTo(TransactionState::kCommittingWithPrepare);
     }
 
     try {
@@ -1550,7 +1531,6 @@ void TransactionParticipant::Participant::abortTransactionForStepUp(OperationCon
 void TransactionParticipant::Participant::_abortActiveTransaction(
     OperationContext* opCtx, TransactionState::StateSet expectedStates, bool writeOplog) {
     invariant(!o().txnResourceStash);
-    invariant(!o().txnState.isCommittingWithPrepare());
 
     if (!o().txnState.isInRetryableWriteMode()) {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -1593,8 +1573,6 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
 
         // Cannot abort these states unless they are specified in expectedStates explicitly.
         const auto unabortableStates = TransactionState::kPrepared  //
-            | TransactionState::kCommittingWithPrepare              //
-            | TransactionState::kCommittingWithoutPrepare           //
             | TransactionState::kCommitted;                         //
         invariant(!o().txnState.isInSet(unabortableStates),
                   str::stream() << "Cannot abort transaction in " << o().txnState);
@@ -1735,10 +1713,6 @@ std::string TransactionParticipant::TransactionState::toString(StateFlag state) 
             return "TxnState::InProgress";
         case TransactionParticipant::TransactionState::kPrepared:
             return "TxnState::Prepared";
-        case TransactionParticipant::TransactionState::kCommittingWithoutPrepare:
-            return "TxnState::CommittingWithoutPrepare";
-        case TransactionParticipant::TransactionState::kCommittingWithPrepare:
-            return "TxnState::CommittingWithPrepare";
         case TransactionParticipant::TransactionState::kCommitted:
             return "TxnState::Committed";
         case TransactionParticipant::TransactionState::kAbortedWithoutPrepare:
@@ -1768,7 +1742,7 @@ bool TransactionParticipant::TransactionState::_isLegalTransition(StateFlag oldS
             switch (newState) {
                 case kNone:
                 case kPrepared:
-                case kCommittingWithoutPrepare:
+                case kCommitted:
                 case kAbortedWithoutPrepare:
                     return true;
                 default:
@@ -1777,26 +1751,8 @@ bool TransactionParticipant::TransactionState::_isLegalTransition(StateFlag oldS
             MONGO_UNREACHABLE;
         case kPrepared:
             switch (newState) {
-                case kCommittingWithPrepare:
                 case kAbortedWithPrepare:
-                    return true;
-                default:
-                    return false;
-            }
-            MONGO_UNREACHABLE;
-        case kCommittingWithPrepare:
-            switch (newState) {
                 case kCommitted:
-                    return true;
-                default:
-                    return false;
-            }
-            MONGO_UNREACHABLE;
-        case kCommittingWithoutPrepare:
-            switch (newState) {
-                case kNone:
-                case kCommitted:
-                case kAbortedWithoutPrepare:
                     return true;
                 default:
                     return false;
@@ -1967,8 +1923,7 @@ void TransactionParticipant::Participant::_setNewTxnNumber(OperationContext* opC
                                                            const TxnNumber& txnNumber) {
     uassert(ErrorCodes::PreparedTransactionInProgress,
             "Cannot change transaction number while the session has a prepared transaction",
-            !o().txnState.isInSet(TransactionState::kPrepared |
-                                  TransactionState::kCommittingWithPrepare));
+            !o().txnState.isInSet(TransactionState::kPrepared));
 
     LOG_FOR_TRANSACTION(4) << "New transaction started with txnNumber: " << txnNumber
                            << " on session with lsid " << _sessionId().getId();
@@ -2124,8 +2079,7 @@ void TransactionParticipant::Participant::invalidate(OperationContext* opCtx) {
 
     uassert(ErrorCodes::PreparedTransactionInProgress,
             "Cannot invalidate prepared transaction",
-            !o().txnState.isInSet(TransactionState::kPrepared |
-                                  TransactionState::kCommittingWithPrepare));
+            !o().txnState.isInSet(TransactionState::kPrepared));
 
     // Invalidate the session and clear both the retryable writes and transactional states on
     // this participant.
