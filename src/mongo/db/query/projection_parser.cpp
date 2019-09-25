@@ -146,6 +146,7 @@ Projection parse(boost::intrusive_ptr<ExpressionContext> expCtx,
     bool hasElemMatch = false;
     bool hasFindSlice = false;
     boost::optional<ProjectType> type;
+
     for (auto&& elem : obj) {
         idSpecified |=
             elem.fieldNameStringData() == "_id" || elem.fieldNameStringData().startsWith("_id.");
@@ -342,7 +343,7 @@ Projection parse(boost::intrusive_ptr<ExpressionContext> expCtx,
         addNodeAtPath(&root, "_id", std::make_unique<BooleanConstantASTNode>(true));
     }
 
-    return Projection{std::move(root), *type};
+    return Projection{std::move(root), *type, obj};
 }
 
 Projection parse(boost::intrusive_ptr<ExpressionContext> expCtx,

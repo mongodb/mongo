@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_ast.h"
 #include "mongo/db/query/projection_policies.h"
 

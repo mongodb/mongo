@@ -131,6 +131,13 @@ public:
         return {_fieldPath.substr(_fieldPathDotPosition[1] + 1)};
     }
 
+    /**
+     * Returns a FieldPath like this, but missing the last element.
+     */
+    FieldPath withoutLastElement() const {
+        return FieldPath(getSubpath(getPathLength() - 2));
+    }
+
 private:
     static const char prefix = '$';
 

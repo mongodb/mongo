@@ -242,10 +242,8 @@ Status CanonicalQuery::init(OperationContext* opCtx,
     if (!_qr->getProj().isEmpty()) {
         Status newParserStatus = Status::OK();
         try {
-            // TODO SERVER-42422: Use ProjectionAST in the query planner. For now we discard 'proj'
-            // and just check that any error thrown is consistent with the ParsedProjection parser.
-            auto proj = projection_ast::parse(
-                expCtx, _qr->getProj(), _root.get(), _qr->getFilter(), ProjectionPolicies{});
+            _proj.emplace(projection_ast::parse(
+                expCtx, _qr->getProj(), _root.get(), _qr->getFilter(), ProjectionPolicies{}));
         } catch (const DBException& e) {
             newParserStatus = e.toStatus();
         }
@@ -273,7 +271,6 @@ Status CanonicalQuery::init(OperationContext* opCtx,
         if (!newParserStatus.isOK()) {
             return newParserStatus;
         }
-        _proj = std::move(projDeleter);
     }
 
     if (_proj && _proj->wantSortKey() && _qr->getSort().isEmpty()) {

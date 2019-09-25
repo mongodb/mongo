@@ -578,13 +578,11 @@ struct ReturnKeyNode : public QuerySolutionNode {
 struct ProjectionNode : QuerySolutionNode {
     ProjectionNode(std::unique_ptr<QuerySolutionNode> child,
                    const MatchExpression& fullExpression,
-                   BSONObj projection,
-                   ParsedProjection parsed)
+                   projection_ast::Projection proj)
         : QuerySolutionNode(std::move(child)),
           _sorts(SimpleBSONObjComparator::kInstance.makeBSONObjSet()),
           fullExpression(fullExpression),
-          projection(std::move(projection)),
-          parsed(parsed) {}
+          proj(std::move(proj)) {}
 
     void computeProperties() final;
 
@@ -634,11 +632,7 @@ public:
     // Owned in the CanonicalQuery, not here.
     const MatchExpression& fullExpression;
 
-    // Given that we don't yet have a MatchExpression analogue for the expression language, we
-    // use a BSONObj.
-    BSONObj projection;
-
-    ParsedProjection parsed;
+    projection_ast::Projection proj;
 };
 
 /**
@@ -664,10 +658,9 @@ struct ProjectionNodeDefault final : ProjectionNode {
 struct ProjectionNodeCovered final : ProjectionNode {
     ProjectionNodeCovered(std::unique_ptr<QuerySolutionNode> child,
                           const MatchExpression& fullExpression,
-                          BSONObj projection,
-                          ParsedProjection parsed,
+                          projection_ast::Projection proj,
                           BSONObj coveredKeyObj)
-        : ProjectionNode(std::move(child), fullExpression, projection, parsed),
+        : ProjectionNode(std::move(child), fullExpression, std::move(proj)),
           coveredKeyObj(std::move(coveredKeyObj)) {}
 
     StageType getType() const final {

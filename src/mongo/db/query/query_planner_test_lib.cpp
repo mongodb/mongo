@@ -617,7 +617,7 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
             return false;
         }
 
-        return SimpleBSONObjComparator::kInstance.evaluate(spec.Obj() == pn->projection) &&
+        return SimpleBSONObjComparator::kInstance.evaluate(spec.Obj() == pn->proj.getProjObj()) &&
             solutionMatches(child.Obj(), pn->children[0], relaxBoundsCheck);
     } else if (STAGE_SORT == trueSoln->getType()) {
         const SortNode* sn = static_cast<const SortNode*>(trueSoln);

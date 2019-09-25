@@ -128,7 +128,7 @@ public:
      * Add the fields and variables used in this expression to 'deps'. References to variables which
      * are local to a particular expression will be filtered out of the tracker upon return.
      */
-    void addDependencies(DepsTracker* deps) {
+    void addDependencies(DepsTracker* deps) const {
         _doAddDependencies(deps);
 
         // Filter out references to any local variables.
@@ -1667,7 +1667,7 @@ public:
         return visitor->visit(this);
     }
 
-    DocumentMetadataFields::MetaType getMetaType() {
+    DocumentMetadataFields::MetaType getMetaType() const {
         return _metaType;
     }
 

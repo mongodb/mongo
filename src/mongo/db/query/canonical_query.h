@@ -37,6 +37,7 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/parsed_projection.h"
+#include "mongo/db/query/projection.h"
 #include "mongo/db/query/query_request.h"
 
 namespace mongo {
@@ -120,8 +121,12 @@ public:
     const QueryRequest& getQueryRequest() const {
         return *_qr;
     }
-    const ParsedProjection* getProj() const {
-        return _proj.get();
+
+    /**
+     * Returns the projection, or nullptr if none.
+     */
+    const projection_ast::Projection* getProj() const {
+        return _proj.get_ptr();
     }
     const CollatorInterface* getCollator() const {
         return _collator.get();
@@ -203,7 +208,7 @@ private:
     // _root points into _qr->getFilter()
     std::unique_ptr<MatchExpression> _root;
 
-    std::unique_ptr<ParsedProjection> _proj;
+    boost::optional<projection_ast::Projection> _proj;
 
     std::unique_ptr<CollatorInterface> _collator;
 

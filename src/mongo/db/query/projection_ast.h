@@ -81,6 +81,10 @@ public:
         return _parent;
     }
 
+    const bool isRoot() const {
+        return !_parent;
+    }
+
 protected:
     virtual void addChildToInternalVector(std::unique_ptr<ASTNode> node) {
         node->_parent = this;
@@ -137,7 +141,7 @@ public:
         return std::make_unique<ProjectionPathASTNode>(*this);
     }
 
-    ASTNode* getChild(StringData fieldName) {
+    ASTNode* getChild(StringData fieldName) const {
         invariant(_fieldNames.size() == _children.size());
         for (size_t i = 0; i < _fieldNames.size(); ++i) {
             if (_fieldNames[i] == fieldName) {
@@ -269,27 +273,6 @@ private:
     bool _val;
 };
 
-//
-// Not part of the AST, just used to represent a projection by itself.
-//
-enum class ProjectType { kInclusion, kExclusion };
-class Projection {
-public:
-    Projection(ProjectionPathASTNode root, ProjectType type)
-        : _root(std::move(root)), _type(type) {}
-
-    ProjectionPathASTNode* root() {
-        return &_root;
-    }
-
-    ProjectType type() const {
-        return _type;
-    }
-
-private:
-    ProjectionPathASTNode _root;
-    ProjectType _type;
-};
 
 }  // namespace projection_ast
 }  // namespace mongo
