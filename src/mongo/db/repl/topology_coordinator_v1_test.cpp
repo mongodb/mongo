@@ -1704,6 +1704,8 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_FALSE(selfStatus.hasField("pingMs"));
 
     ASSERT_EQUALS(2000, rsStatus["heartbeatIntervalMillis"].numberInt());
+    ASSERT_EQUALS(3, rsStatus["majorityVoteCount"].numberInt());
+    ASSERT_EQUALS(3, rsStatus["writeMajorityCount"].numberInt());
     ASSERT_BSONOBJ_EQ(initialSyncStatus, rsStatus["initialSyncStatus"].Obj());
     ASSERT_BSONOBJ_EQ(electionCandidateMetrics, rsStatus["electionCandidateMetrics"].Obj());
 
@@ -1726,6 +1728,49 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_FALSE(rsStatus.hasField("lastStableCheckpointTimestamp"));
     ASSERT_FALSE(rsStatus.hasField("electionCandidateMetrics"));
 }
+
+TEST_F(TopoCoordTest, ReplSetGetStatusWriteMajorityDifferentFromMajorityVoteCount) {
+    // This tests that writeMajorityCount differs from majorityVoteCount in replSetGetStatus when
+    // the number of non-arbiter voters is less than majorityVoteCount.
+    Date_t startupTime = Date_t::fromMillisSinceEpoch(100);
+    Date_t heartbeatTime = Date_t::fromMillisSinceEpoch(5000);
+    Seconds uptimeSecs(10);
+    Date_t curTime = heartbeatTime + uptimeSecs;
+    OpTime readConcernMajorityOpTime(Timestamp(4, 1), 20);
+    Date_t readConcernMajorityWallTime = Date_t() + Seconds(readConcernMajorityOpTime.getSecs());
+    BSONObj initialSyncStatus = BSON("failedInitialSyncAttempts" << 1);
+    std::string setName = "mySet";
+
+    updateConfig(BSON("_id" << setName << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "test0:1234")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "test1:1234")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "test2:1234"
+                                                        << "arbiterOnly" << true)
+                                          << BSON("_id" << 3 << "host"
+                                                        << "test3:1234"
+                                                        << "arbiterOnly" << true))),
+                 3,
+                 startupTime + Milliseconds(1));
+
+    BSONObjBuilder statusBuilder;
+    Status resultStatus(ErrorCodes::InternalError, "prepareStatusResponse didn't set result");
+    getTopoCoord().prepareStatusResponse(
+        TopologyCoordinator::ReplSetStatusArgs{
+            curTime,
+            static_cast<unsigned>(durationCount<Seconds>(uptimeSecs)),
+            {readConcernMajorityOpTime, readConcernMajorityWallTime},
+            initialSyncStatus},
+        &statusBuilder,
+        &resultStatus);
+    ASSERT_OK(resultStatus);
+    BSONObj rsStatus = statusBuilder.obj();
+    ASSERT_EQUALS(3, rsStatus["majorityVoteCount"].numberInt());
+    ASSERT_EQUALS(2, rsStatus["writeMajorityCount"].numberInt());
+}
+
 
 TEST_F(TopoCoordTest, ReplSetGetStatusIPs) {
     BSONObj initialSyncStatus = BSON("failedInitialSyncAttempts" << 1);
