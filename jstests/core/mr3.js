@@ -29,25 +29,23 @@ r = function(key, values) {
     return {count: total};
 };
 
-res = t.mapReduce(m, r, {out: "mr3_out"});
-z = res.convertToSingleObject();
+assert.commandWorked(t.mapReduce(m, r, {out: "mr3_out"}));
 
-assert.eq(3, Object.keySet(z).length, "A1");
-assert.eq(2, z.a.count, "A2");
-assert.eq(3, z.b.count, "A3");
-assert.eq(3, z.c.count, "A4");
+assert.eq(3, db.mr3_out.find().itcount(), "A1");
+assert.eq(1, db.mr3_out.count({_id: "a", "value.count": 2}), "A2");
+assert.eq(1, db.mr3_out.count({_id: "b", "value.count": 3}), "A3");
+assert.eq(1, db.mr3_out.count({_id: "c", "value.count": 3}), "A4");
 
-res.drop();
+db.mr3_out.drop();
 
-res = t.mapReduce(m, r, {out: "mr3_out", mapparams: [2, 2]});
-z = res.convertToSingleObject();
+assert.commandWorked(t.mapReduce(m, r, {out: "mr3_out", mapparams: [2, 2]}));
 
-assert.eq(3, Object.keySet(z).length, "B1");
-assert.eq(8, z.a.count, "B2");
-assert.eq(12, z.b.count, "B3");
-assert.eq(12, z.c.count, "B4");
+assert.eq(3, db.mr3_out.find().itcount(), "B1");
+assert.eq(1, db.mr3_out.count({_id: "a", "value.count": 8}), "B2");
+assert.eq(1, db.mr3_out.count({_id: "b", "value.count": 12}), "B3");
+assert.eq(1, db.mr3_out.count({_id: "c", "value.count": 12}), "B4");
 
-res.drop();
+db.mr3_out.drop();
 
 // -- just some random tests
 
@@ -56,8 +54,8 @@ realm = m;
 m = function() {
     emit(this._id, 1);
 };
-res = t.mapReduce(m, r, {out: "mr3_out"});
-res.drop();
+assert.commandWorked(t.mapReduce(m, r, {out: "mr3_out"}));
+db.mr3_out.drop();
 
 m = function() {
     emit(this._id, this.xzz.a);

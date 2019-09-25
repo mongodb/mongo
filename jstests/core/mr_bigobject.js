@@ -33,8 +33,8 @@ assert.throws(function() {
 m = function() {
     emit(1, this.s);
 };
-
-assert.eq({1: 1}, t.mapReduce(m, r, "mr_bigobject_out").convertToSingleObject(), "A1");
+assert.commandWorked(t.mapReduce(m, r, "mr_bigobject_out"));
+assert.eq([{_id: 1, value: 1}], db.mr_bigobject_out.find().toArray(), "A1");
 
 r = function(k, v) {
     total = 0;
@@ -48,7 +48,7 @@ r = function(k, v) {
     return total;
 };
 
-assert.eq(
-    {1: t.count() * s.length}, t.mapReduce(m, r, "mr_bigobject_out").convertToSingleObject(), "A1");
+assert.commandWorked(t.mapReduce(m, r, "mr_bigobject_out"));
+assert.eq([{_id: 1, value: t.count() * s.length}], db.mr_bigobject_out.find().toArray(), "A1");
 
 t.drop();

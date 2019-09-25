@@ -121,7 +121,7 @@ let doMR = function(n) {
     assert.eq(4, res.counts.input, "MR T6 " + n);
 
     var z = {};
-    res.find().forEach(function(a) {
+    res.results.forEach(function(a) {
         z[a._id] = a.value.count;
     });
     printjson(z);

@@ -42,4 +42,4 @@ assert.eq(3, ex().executionStats.nReturned, "A2");
 res = t.mapReduce(m, r, {out: outName});
 
 assert.eq(3, ex().executionStats.nReturned, "B1");
-res.drop();
+out.drop();

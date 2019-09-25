@@ -37,7 +37,7 @@ function reformat(r) {
     if (r.results)
         cursor = r.results;
     else
-        cursor = r.find();
+        cursor = db.mr2_out.find();
     cursor.forEach(function(z) {
         x[z._id] = z.value;
     });
@@ -55,7 +55,7 @@ x = reformat(res);
 assert.eq(9, x.a.avg, "A1");
 assert.eq(16, x.b.avg, "A2");
 assert.eq(18, x.c.avg, "A3");
-res.drop();
+db.mr2_out.drop();
 
 // inline does needs to exist - so set it to false to make sure the code is just checking for
 // existence
@@ -65,7 +65,7 @@ x = reformat(res);
 assert.eq(9, x.a.avg, "B1");
 assert.eq(16, x.b.avg, "B2");
 assert.eq(18, x.c.avg, "B3");
-res.drop();
+db.mr2_out.drop();
 assert(!("result" in res), "B4");
 
 res = t.mapReduce(m, r, {finalize: f, out: "mr2_out", jsMode: true});
@@ -74,7 +74,7 @@ x = reformat(res);
 assert.eq(9, x.a.avg, "A1");
 assert.eq(16, x.b.avg, "A2");
 assert.eq(18, x.c.avg, "A3");
-res.drop();
+db.mr2_out.drop();
 
 res = t.mapReduce(m, r, {finalize: f, out: {inline: 5}, jsMode: true});
 printjson(res);
@@ -82,5 +82,5 @@ x = reformat(res);
 assert.eq(9, x.a.avg, "B1");
 assert.eq(16, x.b.avg, "B2");
 assert.eq(18, x.c.avg, "B3");
-res.drop();
+db.mr2_out.drop();
 assert(!("result" in res), "B4");

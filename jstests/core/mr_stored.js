@@ -44,21 +44,23 @@ let reduce = function(k, v) {
 assert.commandWorked(testDB.system.js.insert({_id: "mr_stored_map", value: map}));
 assert.commandWorked(testDB.system.js.insert({_id: "mr_stored_reduce", value: reduce}));
 
-let res = coll.mapReduce(
+const out = testDB.mr_stored_out;
+
+assert.commandWorked(coll.mapReduce(
     function() {
         mr_stored_map(this);
     },
     function(k, v) {
         return mr_stored_reduce(k, v);
     },
-    {out: "mr_stored_out", scope: {xx: 1}});
+    {out: "mr_stored_out", scope: {xx: 1}}));
 
-let z = res.convertToSingleObject();
+let z = out.convertToSingleObject("value");
 assert.eq(2, Object.keySet(z).length);
 assert.eq([9, 11, 30], z["1"].stats);
 assert.eq([9, 41, 41], z["2"].stats);
 
-res.drop();
+out.drop();
 
 map = function(obj) {
     var x = "partner";
@@ -68,16 +70,16 @@ map = function(obj) {
 
 assert.commandWorked(testDB.system.js.save({_id: "mr_stored_map", value: map}));
 
-res = coll.mapReduce(
+assert.commandWorked(coll.mapReduce(
     function() {
         mr_stored_map(this);
     },
     function(k, v) {
         return mr_stored_reduce(k, v);
     },
-    {out: "mr_stored_out", scope: {xx: 1}});
+    {out: "mr_stored_out", scope: {xx: 1}}));
 
-z = res.convertToSingleObject();
+z = out.convertToSingleObject("value");
 assert.eq(2, Object.keySet(z).length);
 assert.eq([9, 11, 30], z["1"].stats);
 assert.eq([9, 41, 41], z["2"].stats);
@@ -85,5 +87,5 @@ assert.eq([9, 41, 41], z["2"].stats);
 assert.commandWorked(testDB.system.js.remove({_id: "mr_stored_map"}));
 assert.commandWorked(testDB.system.js.remove({_id: "mr_stored_reduce"}));
 
-res.drop();
+out.drop();
 }());

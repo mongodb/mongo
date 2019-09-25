@@ -32,17 +32,15 @@ r = function(k, v) {
     return Array.sum(v);
 };
 
-res = t.mapReduce(m, r, "mr_sort_out ");
-x = res.convertToSingleObject();
-res.drop();
-assert.eq({"a": 55}, x, "A1");
+out = db.mr_sort_out;
+assert.commandWorked(t.mapReduce(m, r, out.getName()));
+assert.eq([{_id: "a", value: 55}], out.find().toArray(), "A1");
+out.drop();
 
-res = t.mapReduce(m, r, {out: "mr_sort_out", query: {x: {$lt: 3}}});
-x = res.convertToSingleObject();
-res.drop();
-assert.eq({"a": 3}, x, "A2");
+assert.commandWorked(t.mapReduce(m, r, {out: "mr_sort_out", query: {x: {$lt: 3}}}));
+assert.eq([{_id: "a", value: 3}], out.find().toArray(), "A2");
+out.drop();
 
-res = t.mapReduce(m, r, {out: "mr_sort_out", sort: {x: 1}, limit: 2});
-x = res.convertToSingleObject();
-res.drop();
-assert.eq({"a": 3}, x, "A3");
+assert.commandWorked(t.mapReduce(m, r, {out: "mr_sort_out", sort: {x: 1}, limit: 2}));
+assert.eq([{_id: "a", value: 3}], out.find().toArray(), "A3");
+out.drop();

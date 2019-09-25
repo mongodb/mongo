@@ -194,28 +194,10 @@ tests.push(function mapReduceOk() {
             return v[0];
         },
         {out: "coll_out"});
-    assert(res instanceof MapReduceResult);
     assert.doesNotThrow(() => assert.commandWorked(res));
     assert.doesNotThrow(() => assert.commandWorkedIgnoringWriteErrors(res));
     assert.throws(() => assert.commandFailed(res));
     assert.throws(() => assert.commandFailedWithCode(res, 0));
-});
-
-tests.push(function mapReduceErr() {
-    // db.coll.mapReduce throws if the command response has ok:0
-    // Instead manually construct a MapReduceResult with ok:0
-    const res = new MapReduceResult(db, {
-        "ok": 0,
-        "errmsg": "Example Error",
-        "code": ErrorCodes.JSInterpreterFailure,
-        "codeName": "JSInterpreterFailure"
-    });
-    assert.throws(() => assert.commandWorked(res));
-    assert.throws(() => assert.commandWorkedIgnoringWriteErrors(res));
-    assert.doesNotThrow(() => assert.commandFailed(res));
-    assert.doesNotThrow(() => assert.commandFailedWithCode(res, ErrorCodes.JSInterpreterFailure));
-    assert.doesNotThrow(
-        () => assert.commandFailedWithCode(res, [ErrorCodes.JSInterpreterFailure, kFakeErrCode]));
 });
 
 tests.push(function crudInsertOneOk() {

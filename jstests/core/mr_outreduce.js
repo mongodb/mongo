@@ -36,7 +36,7 @@ function tos(o) {
     return s;
 }
 
-res = t.mapReduce(m, r, {out: outName});
+assert.commandWorked(t.mapReduce(m, r, {out: outName}));
 
 expected = {
     "1": 1,
@@ -44,22 +44,23 @@ expected = {
     "3": 2,
     "4": 1
 };
-assert.eq(tos(expected), tos(res.convertToSingleObject()), "A");
+assert.eq(tos(expected), tos(out.convertToSingleObject("value")), "A");
 
 t.insert({_id: 4, a: [4, 5]});
 out.insert({_id: 10, value: "5"});  // this is a sentinal to make sure it wasn't killed
-res = t.mapReduce(m, r, {out: {reduce: outName}, query: {_id: {$gt: 3}}});
+assert.commandWorked(t.mapReduce(m, r, {out: {reduce: outName}, query: {_id: {$gt: 3}}}));
 
 expected["4"]++;
 expected["5"] = 1;
 expected["10"] = 5;
-assert.eq(tos(expected), tos(res.convertToSingleObject()), "B");
+assert.eq(tos(expected), tos(out.convertToSingleObject("value")), "B");
 
 t.insert({_id: 5, a: [5, 6]});
 out.insert({_id: 20, value: "10"});  // this is a sentinal to make sure it wasn't killed
-res = t.mapReduce(m, r, {out: {reduce: outName, nonAtomic: true}, query: {_id: {$gt: 4}}});
+assert.commandWorked(
+    t.mapReduce(m, r, {out: {reduce: outName, nonAtomic: true}, query: {_id: {$gt: 4}}}));
 
 expected["5"]++;
 expected["6"] = 1;
 expected["20"] = 10;
-assert.eq(tos(expected), tos(res.convertToSingleObject()), "C");
+assert.eq(tos(expected), tos(out.convertToSingleObject("value")), "C");

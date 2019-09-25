@@ -34,8 +34,11 @@ r = function(k, v) {
 };
 
 res = t.mapReduce(m_good, r, "mr_errorhandling_out");
-assert.eq({1: 1, 2: 2, 3: 2, 4: 1}, res.convertToSingleObject(), "A");
-res.drop();
+
+assert.eq([{_id: 1, value: 1}, {_id: 2, value: 2}, {_id: 3, value: 2}, {_id: 4, value: 1}],
+          db.mr_errorhandling_out.find().sort({_id: 1}).toArray(),
+          "A");
+db.mr_errorhandling_out.drop();
 
 res = null;
 
@@ -51,8 +54,10 @@ assert(theerror.indexOf("emit") >= 0, "B3");
 
 // test things are still in an ok state
 res = t.mapReduce(m_good, r, "mr_errorhandling_out");
-assert.eq({1: 1, 2: 2, 3: 2, 4: 1}, res.convertToSingleObject(), "A");
-res.drop();
+assert.eq([{_id: 1, value: 1}, {_id: 2, value: 2}, {_id: 3, value: 2}, {_id: 4, value: 1}],
+          db.mr_errorhandling_out.find().sort({_id: 1}).toArray(),
+          "A");
+db.mr_errorhandling_out.drop();
 
 assert.throws(function() {
     t.mapReduce(m_good, r, {out: "xxx", query: "foo"});

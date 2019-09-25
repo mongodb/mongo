@@ -17,15 +17,17 @@ reduce = function(k, vals) {
     return Array.sum(vals);
 };
 
-res = t.mapReduce(map, reduce, {out: "mr_index2_out", query: {}});
+res = assert.commandWorked(t.mapReduce(map, reduce, {out: "mr_index2_out", query: {}}));
 assert.eq(1, res.counts.input, "A");
-res.drop();
+db.mr_index2_out.drop();
 
-res = t.mapReduce(map, reduce, {out: "mr_index2_out", query: {arr: {$gte: 0}}});
+res =
+    assert.commandWorked(t.mapReduce(map, reduce, {out: "mr_index2_out", query: {arr: {$gte: 0}}}));
 assert.eq(1, res.counts.input, "B");
-res.drop();
+db.mr_index2_out.drop();
 
 t.ensureIndex({arr: 1});
-res = t.mapReduce(map, reduce, {out: "mr_index2_out", query: {arr: {$gte: 0}}});
+res =
+    assert.commandWorked(t.mapReduce(map, reduce, {out: "mr_index2_out", query: {arr: {$gte: 0}}}));
 assert.eq(1, res.counts.input, "C");
-res.drop();
+db.mr_index2_out.drop();

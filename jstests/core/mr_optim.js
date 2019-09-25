@@ -36,7 +36,7 @@ function reformat(r) {
     if (r.results)
         cursor = r.results;
     else
-        cursor = r.find().sort({_id: 1});
+        cursor = db.mr_optim_out.find().sort({_id: 1});
     cursor.forEach(function(z) {
         x[z._id] = z.value;
     });
@@ -49,12 +49,12 @@ x = reformat(res);
 for (var key in x) {
     assert.eq(x[key], 13, "value is not equal to original, maybe reduce has run");
 }
-res.drop();
+db.mr_optim_out.drop();
 
 res = t.mapReduce(m, r, {out: {inline: 1}});
 // printjson( res )
 x2 = reformat(res);
-res.drop();
+db.mr_optim_out.drop();
 
 assert.eq(x, x2, "object from inline and collection are not equal");
 

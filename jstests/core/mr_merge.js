@@ -36,7 +36,7 @@ function tos(o) {
     return s;
 }
 
-res = t.mapReduce(m, r, {out: outName});
+assert.commandWorked(t.mapReduce(m, r, {out: outName}));
 
 expected = {
     "1": 1,
@@ -44,33 +44,33 @@ expected = {
     "3": 2,
     "4": 1
 };
-assert.eq(tos(expected), tos(res.convertToSingleObject()), "A");
+assert.eq(tos(expected), tos(out.convertToSingleObject("value")), "A");
 
 t.insert({a: [4, 5]});
 out.insert({_id: 10, value: "5"});
-res = t.mapReduce(m, r, {out: outName});
+assert.commandWorked(t.mapReduce(m, r, {out: outName}));
 
 expected["4"]++;
 expected["5"] = 1;
-assert.eq(tos(expected), tos(res.convertToSingleObject()), "B");
+assert.eq(tos(expected), tos(out.convertToSingleObject("value")), "B");
 
 t.insert({a: [5, 6]});
 out.insert({_id: 10, value: "5"});
-res = t.mapReduce(m, r, {out: {merge: outName}});
+assert.commandWorked(t.mapReduce(m, r, {out: {merge: outName}}));
 
 expected["5"]++;
 expected["10"] = 5;
 expected["6"] = 1;
 
-assert.eq(tos(expected), tos(res.convertToSingleObject()), "C");
+assert.eq(tos(expected), tos(out.convertToSingleObject("value")), "C");
 
 // test that the nonAtomic output gives valid result
 t.insert({a: [6, 7]});
 out.insert({_id: 20, value: "10"});
-res = t.mapReduce(m, r, {out: {merge: outName, nonAtomic: true}});
+assert.commandWorked(t.mapReduce(m, r, {out: {merge: outName, nonAtomic: true}}));
 
 expected["6"]++;
 expected["20"] = 10;
 expected["7"] = 1;
 
-assert.eq(tos(expected), tos(res.convertToSingleObject()), "D");
+assert.eq(tos(expected), tos(out.convertToSingleObject("value")), "D");
