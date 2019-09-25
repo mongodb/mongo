@@ -19,6 +19,12 @@ load("jstests/noPassthrough/libs/backup_restore.js");
 (function() {
 "use strict";
 
+// Windows doesn't guarantee synchronous file operations.
+if (_isWindows()) {
+    print("Skipping test on windows");
+    return;
+}
+
 // Grab the storage engine, default is wiredTiger
 var storageEngine = jsTest.options().storageEngine || "wiredTiger";
 
