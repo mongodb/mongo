@@ -2,8 +2,8 @@
 """Mock AWS KMS Endpoint."""
 
 import argparse
-import collections
 import base64
+import collections
 import http.server
 import json
 import logging
@@ -11,6 +11,10 @@ import socketserver
 import sys
 import urllib.parse
 import ssl
+
+from botocore.auth import SigV4Auth, S3SigV4Auth
+from botocore.awsrequest import AWSRequest
+from botocore.credentials import Credentials
 
 import kms_http_common
 
@@ -55,6 +59,13 @@ SUPPORTED_FAULT_TYPES = [
     FAULT_DECRYPT_CORRECT_FORMAT,
     FAULT_DECRYPT_WRONG_KEY,
 ]
+
+def get_dict_subset(headers, subset):
+    ret = {}
+    for header in headers.keys():
+        if header.lower() in subset.lower():
+            ret[header] = headers[header]
+    return ret
 
 class AwsKmsHandler(http.server.BaseHTTPRequestHandler):
     """
@@ -108,6 +119,15 @@ class AwsKmsHandler(http.server.BaseHTTPRequestHandler):
 
         print("RAW INPUT: " + str(raw_input))
 
+        if not self.headers["Host"] == "localhost":
+            data = "Unexpected host"
+            self._send_reply(data.encode("utf-8"))
+
+        if not self._validate_signature(self.headers, raw_input):
+            data = "Bad Signature"
+            self._send_reply(data.encode("utf-8"))
+
+
         # X-Amz-Target: TrentService.Encrypt
         aws_operation = self.headers['X-Amz-Target']
 
@@ -120,6 +140,31 @@ class AwsKmsHandler(http.server.BaseHTTPRequestHandler):
         else:
             data = "Unknown AWS Operation"
             self._send_reply(data.encode("utf-8"))
+
+
+    def _validate_signature(self, headers, raw_input):
+        auth_header = headers["Authorization"]
+        signed_headers_start = auth_header.find("SignedHeaders")
+        signed_headers = auth_header[signed_headers_start:auth_header.find(",", signed_headers_start)]
+        signed_headers_dict = get_dict_subset(headers, signed_headers)
+
+        request = AWSRequest(method="POST", url="/", data=raw_input, headers=signed_headers_dict)
+        # SigV4Auth assumes this header exists even though it is not required by the algorithm
+        request.context['timestamp'] = headers['X-Amz-Date']
+
+        region_start = auth_header.find("Credential=access/") + len("Credential=access/YYYYMMDD/")
+        region = auth_header[region_start:auth_header.find("/", region_start)]
+
+        credentials = Credentials("access", "secret")
+        auth = SigV4Auth(credentials, "kms", region)
+        string_to_sign = auth.string_to_sign(request, auth.canonical_request(request))
+        expected_signature = auth.signature(string_to_sign, request)
+
+        signature_headers_start = auth_header.find("Signature=") + len("Signature=")
+        actual_signature = auth_header[signature_headers_start:]
+
+        return expected_signature == actual_signature
+
 
     def _do_encrypt(self, raw_input):
         request = json.loads(raw_input)
