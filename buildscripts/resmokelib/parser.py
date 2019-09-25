@@ -655,9 +655,6 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     _config.CONFIG_DIR = config.pop("config_dir")
 
     # Populate the named suites by scanning config_dir/suites
-    #
-    # Skip "with_*server" and "no_server" because they do not define any test files to run.
-    executor_only = {"with_server", "with_external_server", "no_server"}
     named_suites = {}
 
     suites_dir = os.path.join(_config.CONFIG_DIR, "suites")
@@ -665,9 +662,6 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     files = os.listdir(root)
     for filename in files:
         (short_name, ext) = os.path.splitext(filename)
-        if short_name in executor_only:
-            continue
-
         if ext in (".yml", ".yaml"):
             pathname = os.path.join(root, filename)
             named_suites[short_name] = pathname

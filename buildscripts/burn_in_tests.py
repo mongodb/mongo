@@ -30,6 +30,7 @@ if __name__ == "__main__" and __package__ is None:
 
 # pylint: disable=wrong-import-position
 from buildscripts.patch_builds.change_data import find_changed_files
+import buildscripts.resmokelib.parser
 from buildscripts.resmokelib.suitesconfig import create_test_membership_map, get_suites
 from buildscripts.resmokelib.utils import default_if_none, globstar
 from buildscripts.ciconfig.evergreen import parse_evergreen_file, ResmokeArgs, \
@@ -581,6 +582,8 @@ def create_task_list_for_tests(
     if not exclude_tasks:
         exclude_tasks = []
 
+    # Populate the config values that get_suites reads
+    buildscripts.resmokelib.parser.set_options()
     suites = get_suites(suite_files=SUITE_FILES, test_files=changed_tests)
     LOGGER.debug("Found suites to run", suites=suites)
 

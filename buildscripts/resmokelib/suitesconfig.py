@@ -12,7 +12,9 @@ from .testing import suite as _suite
 
 def get_named_suites():
     """Return a sorted list of the suites names."""
-    names = list(_config.NAMED_SUITES.keys())
+    # Skip "with_*server" and "no_server" because they do not define any test files to run.
+    executor_only = {"with_server", "with_external_server", "no_server"}
+    names = [name for name in _config.NAMED_SUITES.keys() if name not in executor_only]
     names.sort()
     return names
 
