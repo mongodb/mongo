@@ -446,14 +446,8 @@ let testCases = {
     multicast: {skip: "does not forward command to primary shard"},
     netstat: {skip: "executes locally on mongos (not sent to any remote node)"},
     ping: {skip: "executes locally on mongos (not sent to any remote node)"},
-    planCacheClear: {
-        run: {
-            sendsDbVersion: false,
-            // Uses connection versioning.
-            sendsShardVersion: false,
-            command: {planCacheClear: collName}
-        }
-    },
+    planCacheClear:
+        {run: {sendsDbVersion: true, sendsShardVersion: true, command: {planCacheClear: collName}}},
     planCacheClearFilters: {
         run: {
             sendsDbVersion: false,
@@ -472,9 +466,8 @@ let testCases = {
     },
     planCacheListPlans: {
         run: {
-            sendsDbVersion: false,
-            // Uses connection versioning.
-            sendsShardVersion: false,
+            sendsDbVersion: true,
+            sendsShardVersion: true,
             setUp: function(mongosConn) {
                 // Expects the collection to exist, and doesn't implicitly create it.
                 assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
@@ -487,9 +480,8 @@ let testCases = {
     },
     planCacheListQueryShapes: {
         run: {
-            sendsDbVersion: false,
-            // Uses connection versioning.
-            sendsShardVersion: false,
+            sendsDbVersion: true,
+            sendsShardVersion: true,
             command: {planCacheListQueryShapes: collName}
         }
     },
