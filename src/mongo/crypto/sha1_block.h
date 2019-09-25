@@ -43,7 +43,7 @@ struct SHA1BlockTraits {
 
     static constexpr StringData name = "SHA1Block"_sd;
 
-    static HashType computeHash(std::initializer_list<ConstDataRange> input);
+    static void computeHash(std::initializer_list<ConstDataRange> input, HashType* const output);
 
     static void computeHmac(const uint8_t* key,
                             size_t keyLen,

@@ -81,7 +81,9 @@ public:
      * Computes a hash of 'input' from multiple contigous buffers.
      */
     static HashBlock computeHash(std::initializer_list<ConstDataRange> input) {
-        return HashBlock{Traits::computeHash(input)};
+        HashBlock ret;
+        Traits::computeHash(input, &(ret._hash));
+        return ret;
     }
 
     /**

@@ -91,9 +91,9 @@ namespace {
  * Computes a SHA hash of 'input'.
  */
 template <typename HashType>
-HashType computeHashImpl(const EVP_MD* md, std::initializer_list<ConstDataRange> input) {
-    HashType output;
-
+void computeHashImpl(const EVP_MD* md,
+                     std::initializer_list<ConstDataRange> input,
+                     HashType* const output) {
     std::unique_ptr<EVP_MD_CTX, decltype(&EVP_MD_CTX_free)> digestCtx(EVP_MD_CTX_new(),
                                                                       EVP_MD_CTX_free);
 
@@ -104,8 +104,7 @@ HashType computeHashImpl(const EVP_MD* md, std::initializer_list<ConstDataRange>
                             [&](const auto& i) {
                                 return EVP_DigestUpdate(digestCtx.get(), i.data(), i.length()) == 1;
                             }) &&
-                EVP_DigestFinal_ex(digestCtx.get(), output.data(), nullptr) == 1);
-    return output;
+                EVP_DigestFinal_ex(digestCtx.get(), output->data(), nullptr) == 1);
 }
 
 template <typename HashType>
@@ -130,19 +129,19 @@ void computeHmacImpl(const EVP_MD* md,
 
 }  // namespace
 
-SHA1BlockTraits::HashType SHA1BlockTraits::computeHash(
-    std::initializer_list<ConstDataRange> input) {
-    return computeHashImpl<SHA1BlockTraits::HashType>(EVP_sha1(), input);
+void SHA1BlockTraits::computeHash(std::initializer_list<ConstDataRange> input,
+                                  HashType* const output) {
+    computeHashImpl<SHA1BlockTraits::HashType>(EVP_sha1(), input, output);
 }
 
-SHA256BlockTraits::HashType SHA256BlockTraits::computeHash(
-    std::initializer_list<ConstDataRange> input) {
-    return computeHashImpl<SHA256BlockTraits::HashType>(EVP_sha256(), input);
+void SHA256BlockTraits::computeHash(std::initializer_list<ConstDataRange> input,
+                                    HashType* const output) {
+    computeHashImpl<SHA256BlockTraits::HashType>(EVP_sha256(), input, output);
 }
 
-SHA512BlockTraits::HashType SHA512BlockTraits::computeHash(
-    std::initializer_list<ConstDataRange> input) {
-    return computeHashImpl<SHA512BlockTraits::HashType>(EVP_sha512(), input);
+void SHA512BlockTraits::computeHash(std::initializer_list<ConstDataRange> input,
+                                    HashType* const output) {
+    computeHashImpl<SHA512BlockTraits::HashType>(EVP_sha512(), input, output);
 }
 
 void SHA1BlockTraits::computeHmac(const uint8_t* key,

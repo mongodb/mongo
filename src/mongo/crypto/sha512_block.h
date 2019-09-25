@@ -45,14 +45,12 @@ struct SHA512BlockTraits {
 
     static HashType computeHash(std::initializer_list<ConstDataRange> input);
 
+    static void computeHash(std::initializer_list<ConstDataRange> input, HashType* const output);
+
     static void computeHmac(const uint8_t* key,
                             size_t keyLen,
                             std::initializer_list<ConstDataRange> input,
                             HashType* const output);
-
-    static HashType computeHmac(const uint8_t* key,
-                                size_t keyLen,
-                                std::initializer_list<ConstDataRange> input);
 };
 
 using SHA512Block = HashBlock<SHA512BlockTraits>;

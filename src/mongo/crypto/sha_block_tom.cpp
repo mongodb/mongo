@@ -53,9 +53,7 @@ template <typename HashType,
           int (*Init)(hash_state*),
           int (*Process)(hash_state*, const unsigned char*, unsigned long),
           int (*Done)(hash_state*, unsigned char*)>
-HashType computeHashImpl(std::initializer_list<ConstDataRange> input) {
-    HashType output;
-
+void computeHashImpl(std::initializer_list<ConstDataRange> input, HashType* const output) {
     hash_state hashState;
     fassert(40381,
             Init(&hashState) == CRYPT_OK &&
@@ -66,8 +64,7 @@ HashType computeHashImpl(std::initializer_list<ConstDataRange> input) {
                                                reinterpret_cast<const unsigned char*>(i.data()),
                                                i.length()) == CRYPT_OK;
                             }) &&
-                Done(&hashState, output.data()) == CRYPT_OK);
-    return output;
+                Done(&hashState, output->data()) == CRYPT_OK);
 }
 
 /*
@@ -110,21 +107,21 @@ void computeHmacImpl(const ltc_hash_descriptor* desc,
 
 }  // namespace
 
-SHA1BlockTraits::HashType SHA1BlockTraits::computeHash(
-    std::initializer_list<ConstDataRange> input) {
-    return computeHashImpl<SHA1BlockTraits::HashType, sha1_init, sha1_process, sha1_done>(input);
+void SHA1BlockTraits::computeHash(std::initializer_list<ConstDataRange> input,
+                                  HashType* const output) {
+    computeHashImpl<SHA1BlockTraits::HashType, sha1_init, sha1_process, sha1_done>(input, output);
 }
 
-SHA256BlockTraits::HashType SHA256BlockTraits::computeHash(
-    std::initializer_list<ConstDataRange> input) {
-    return computeHashImpl<SHA256BlockTraits::HashType, sha256_init, sha256_process, sha256_done>(
-        input);
+void SHA256BlockTraits::computeHash(std::initializer_list<ConstDataRange> input,
+                                    HashType* const output) {
+    computeHashImpl<SHA256BlockTraits::HashType, sha256_init, sha256_process, sha256_done>(input,
+                                                                                           output);
 }
 
-SHA512BlockTraits::HashType SHA512BlockTraits::computeHash(
-    std::initializer_list<ConstDataRange> input) {
-    return computeHashImpl<SHA512BlockTraits::HashType, sha512_init, sha512_process, sha512_done>(
-        input);
+void SHA512BlockTraits::computeHash(std::initializer_list<ConstDataRange> input,
+                                    HashType* const output) {
+    computeHashImpl<SHA512BlockTraits::HashType, sha512_init, sha512_process, sha512_done>(input,
+                                                                                           output);
 }
 
 void SHA1BlockTraits::computeHmac(const uint8_t* key,
