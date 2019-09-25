@@ -229,27 +229,6 @@ Status AbstractIndexAccessMethod::initializeAsEmpty(OperationContext* opCtx) {
     return _newInterface->initAsEmpty(opCtx);
 }
 
-Status AbstractIndexAccessMethod::touch(OperationContext* opCtx, const BSONObj& obj) {
-    KeyStringSet keys;
-    // There's no need to compute the prefixes of the indexed fields that cause the index to be
-    // multikey when paging a document's index entries into memory.
-    KeyStringSet* multikeyMetadataKeys = nullptr;
-    MultikeyPaths* multikeyPaths = nullptr;
-    getKeys(obj, GetKeysMode::kEnforceConstraints, &keys, multikeyMetadataKeys, multikeyPaths);
-
-    std::unique_ptr<SortedDataInterface::Cursor> cursor(_newInterface->newCursor(opCtx));
-    for (const auto& keyString : keys) {
-        cursor->seekExact(keyString);
-    }
-
-    return Status::OK();
-}
-
-
-Status AbstractIndexAccessMethod::touch(OperationContext* opCtx) const {
-    return _newInterface->touch(opCtx);
-}
-
 RecordId AbstractIndexAccessMethod::findSingle(OperationContext* opCtx,
                                                const BSONObj& requestedKey) const {
     // Generate the key for this index.

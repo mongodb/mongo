@@ -499,10 +499,6 @@ let viewsCommandTests = {
     startSession: {skip: isAnInternalCommand},
     stopRecordingTraffic: {skip: isUnrelated},
     top: {skip: "tested in views/views_stats.js"},
-    touch: {
-        command: {touch: "view", data: true},
-        expectFailure: true,
-    },
     unsetSharding: {skip: isAnInternalCommand},
     update: {command: {update: "view", updates: [{q: {x: 1}, u: {x: 2}}]}, expectFailure: true},
     updateRole: {

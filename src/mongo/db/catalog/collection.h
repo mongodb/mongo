@@ -335,14 +335,6 @@ public:
     virtual Status truncate(OperationContext* const opCtx) = 0;
 
     /**
-     * forces data into cache.
-     */
-    virtual Status touch(OperationContext* const opCtx,
-                         const bool touchData,
-                         const bool touchIndexes,
-                         BSONObjBuilder* const output) const = 0;
-
-    /**
      * Truncate documents newer than the document at 'end' from the capped
      * collection.  The collection cannot be completely emptied using this
      * function.  An assertion will be thrown if that is attempted.

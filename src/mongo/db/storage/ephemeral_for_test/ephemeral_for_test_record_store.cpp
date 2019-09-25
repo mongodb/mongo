@@ -548,14 +548,6 @@ void EphemeralForTestRecordStore::appendCustomStats(OperationContext* opCtx,
     }
 }
 
-Status EphemeralForTestRecordStore::touch(OperationContext* opCtx, BSONObjBuilder* output) const {
-    if (output) {
-        output->append("numRanges", 1);
-        output->append("millis", 0);
-    }
-    return Status::OK();
-}
-
 int64_t EphemeralForTestRecordStore::storageSize(OperationContext* opCtx,
                                                  BSONObjBuilder* extraInfo,
                                                  int infoLevel) const {

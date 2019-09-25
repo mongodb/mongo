@@ -154,19 +154,6 @@ public:
     virtual bool isEmpty(OperationContext* opCtx) = 0;
 
     /**
-     * Attempt to bring the entirety of 'this' index into memory.
-     *
-     * If the underlying storage engine does not support the operation,
-     * returns ErrorCodes::CommandNotSupported
-     *
-     * @return Status::OK()
-     */
-    virtual Status touch(OperationContext* opCtx) const {
-        return Status(ErrorCodes::CommandNotSupported,
-                      "this storage engine does not support touch");
-    }
-
-    /**
      * Return the number of entries in 'this' index.
      *
      * The default implementation should be overridden with a more

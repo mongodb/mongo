@@ -153,11 +153,6 @@ selector:
   - assumes_balancer_off
   - does_not_support_causal_consistency
   - requires_replication
-  # The touch command does not exist on mongos, which is enforced before session information is
-  # parsed, causing state functions in these workloads to fail before starting a transaction despite
-  # sending a command with startTransaction=true, leading to an infinite loop in the auto
-  # transaction retry override.
-  - requires_touch
   # Sharing cursors between state functions will fail in this suite because it will attempt to use
   # the same cursor in multiple transactions.
   - state_functions_share_cursor

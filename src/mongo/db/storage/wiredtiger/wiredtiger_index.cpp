@@ -401,15 +401,6 @@ bool WiredTigerIndex::isEmpty(OperationContext* opCtx) {
     return false;
 }
 
-Status WiredTigerIndex::touch(OperationContext* opCtx) const {
-    if (WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->isEphemeral()) {
-        // Everything is already in memory.
-        return Status::OK();
-    }
-    return Status(ErrorCodes::CommandNotSupported, "this storage engine does not support touch");
-}
-
-
 long long WiredTigerIndex::getSpaceUsedBytes(OperationContext* opCtx) const {
     dassert(opCtx->lockState()->isReadLocked());
     auto ru = WiredTigerRecoveryUnit::get(opCtx);

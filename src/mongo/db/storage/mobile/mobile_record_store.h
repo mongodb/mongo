@@ -98,8 +98,6 @@ public:
         // No custom stats to add
     }
 
-    Status touch(OperationContext* opCtx, BSONObjBuilder* output) const override;
-
     int64_t storageSize(OperationContext* opCtx,
                         BSONObjBuilder* extraInfo = nullptr,
                         int infoLevel = 0) const override;

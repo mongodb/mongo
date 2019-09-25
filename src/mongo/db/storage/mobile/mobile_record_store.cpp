@@ -390,10 +390,6 @@ void MobileRecordStore::validate(OperationContext* opCtx,
     embedded::doValidate(opCtx, results);
 }
 
-Status MobileRecordStore::touch(OperationContext* opCtx, BSONObjBuilder* output) const {
-    return Status(ErrorCodes::CommandNotSupported, "this storage engine does not support touch");
-}
-
 /**
  * Note: does not accurately return the size of the table on disk. Instead, it returns the number of
  * bytes used to store the BSON documents.

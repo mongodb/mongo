@@ -216,14 +216,6 @@ public:
     Status truncate(OperationContext* opCtx) final;
 
     /**
-     * forces data into cache
-     */
-    Status touch(OperationContext* opCtx,
-                 bool touchData,
-                 bool touchIndexes,
-                 BSONObjBuilder* output) const final;
-
-    /**
      * Truncate documents newer than the document at 'end' from the capped
      * collection.  The collection cannot be completely emptied using this
      * function.  An assertion will be thrown if that is attempted.

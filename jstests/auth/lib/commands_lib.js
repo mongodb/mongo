@@ -5278,34 +5278,6 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "touch",
-          command: {touch: "x", data: true, index: false},
-          skipSharded: true,
-          setup: function(db) {
-              db.x.save({});
-          },
-          teardown: function(db) {
-              db.x.drop();
-          },
-          testcases: [
-              {
-                runOnDb: adminDbName,
-                roles: roles_hostManager,
-                privileges: [{resource: {cluster: true}, actions: ["touch"]}]
-              },
-              {
-                runOnDb: firstDbName,
-                roles: roles_hostManager,
-                privileges: [{resource: {cluster: true}, actions: ["touch"]}]
-              },
-              {
-                runOnDb: secondDbName,
-                roles: roles_hostManager,
-                privileges: [{resource: {cluster: true}, actions: ["touch"]}]
-              }
-          ]
-        },
-        {
           testname: "unsetSharding",
           command: {unsetSharding: "x"},
           skipSharded: true,

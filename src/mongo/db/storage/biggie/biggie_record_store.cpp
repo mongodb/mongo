@@ -298,10 +298,6 @@ void RecordStore::appendCustomStats(OperationContext* opCtx,
     }
 }
 
-Status RecordStore::touch(OperationContext* opCtx, BSONObjBuilder* output) const {
-    return Status::OK();  // All data is already in 'cache'.
-}
-
 void RecordStore::updateStatsAfterRepair(OperationContext* opCtx,
                                          long long numRecords,
                                          long long dataSize) {

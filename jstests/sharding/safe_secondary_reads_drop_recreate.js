@@ -292,7 +292,6 @@ let testCases = {
     startSession: {skip: "does not return user data"},
     stopRecordingTraffic: {skip: "does not return user data"},
     top: {skip: "does not return user data"},
-    touch: {skip: "does not return user data"},
     unsetSharding: {skip: "does not return user data"},
     update: {skip: "primary only"},
     updateRole: {skip: "primary only"},

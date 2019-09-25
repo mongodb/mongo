@@ -155,19 +155,6 @@ public:
     virtual Status initializeAsEmpty(OperationContext* opCtx) = 0;
 
     /**
-     * Try to page-in the pages that contain the keys generated from 'obj'.
-     * This can be used to speed up future accesses to an index by trying to ensure the
-     * appropriate pages are not swapped out.
-     * See prefetch.cpp.
-     */
-    virtual Status touch(OperationContext* opCtx, const BSONObj& obj) = 0;
-
-    /**
-     * this pages in the entire index
-     */
-    virtual Status touch(OperationContext* opCtx) const = 0;
-
-    /**
      * Walk the entire index, checking the internal structure for consistency.
      * Set numKeys to the number of keys in the index.
      */
@@ -485,10 +472,6 @@ public:
     std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx) const final;
 
     Status initializeAsEmpty(OperationContext* opCtx) final;
-
-    Status touch(OperationContext* opCtx, const BSONObj& obj) final;
-
-    Status touch(OperationContext* opCtx) const final;
 
     void validate(OperationContext* opCtx,
                   int64_t* numKeys,

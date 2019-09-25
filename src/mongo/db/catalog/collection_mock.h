@@ -154,13 +154,6 @@ public:
         std::abort();
     }
 
-    Status touch(OperationContext* opCtx,
-                 bool touchData,
-                 bool touchIndexes,
-                 BSONObjBuilder* output) const {
-        std::abort();
-    }
-
     void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) {
         std::abort();
     }

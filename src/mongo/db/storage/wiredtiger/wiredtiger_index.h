@@ -109,8 +109,6 @@ public:
 
     virtual bool isEmpty(OperationContext* opCtx);
 
-    virtual Status touch(OperationContext* opCtx) const;
-
     virtual long long getSpaceUsedBytes(OperationContext* opCtx) const;
 
     virtual Status initAsEmpty(OperationContext* opCtx);

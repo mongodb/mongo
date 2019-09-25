@@ -100,8 +100,6 @@ public:
                                    BSONObjBuilder* result,
                                    double scale) const;
 
-    virtual Status touch(OperationContext* opCtx, BSONObjBuilder* output) const;
-
     virtual boost::optional<RecordId> oplogStartHack(OperationContext* opCtx,
                                                      const RecordId& startingPosition) const;
 

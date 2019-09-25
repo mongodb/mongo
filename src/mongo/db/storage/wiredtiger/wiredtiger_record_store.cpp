@@ -1574,14 +1574,6 @@ void WiredTigerRecordStore::appendCustomStats(OperationContext* opCtx,
     }
 }
 
-Status WiredTigerRecordStore::touch(OperationContext* opCtx, BSONObjBuilder* output) const {
-    if (_isEphemeral) {
-        // Everything is already in memory.
-        return Status::OK();
-    }
-    return Status(ErrorCodes::CommandNotSupported, "this storage engine does not support touch");
-}
-
 void WiredTigerRecordStore::waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const {
     // Make sure that callers do not hold an active snapshot so it will be able to see the oplog
     // entries it waited for afterwards.

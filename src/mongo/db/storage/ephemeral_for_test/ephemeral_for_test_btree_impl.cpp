@@ -254,11 +254,6 @@ public:
         return _data->empty();
     }
 
-    virtual Status touch(OperationContext* opCtx) const {
-        // already in memory...
-        return Status::OK();
-    }
-
     class Cursor final : public SortedDataInterface::Cursor {
     public:
         Cursor(OperationContext* opCtx,

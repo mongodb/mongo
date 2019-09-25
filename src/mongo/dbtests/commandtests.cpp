@@ -341,25 +341,6 @@ public:
         }
     }
 };
-
-class Touch : Base {
-public:
-    void run() {
-        ASSERT(db.createCollection(nss().ns()));
-        {
-            BSONObjBuilder cmd;
-            cmd.appendSymbol("touch", nsColl());  // Use Symbol for SERVER-16260
-            cmd.append("data", true);
-            cmd.append("index", true);
-
-            BSONObj result;
-            bool ok = db.runCommand(nsDb(), cmd.obj(), result);
-            log() << result.jsonString();
-            ASSERT(ok || result["code"].Int() == ErrorCodes::CommandNotSupported);
-        }
-    }
-};
-
 }  // namespace SymbolArgument
 
 /**
@@ -390,7 +371,6 @@ public:
         add<FileMD5::Type2>();
         add<SymbolArgument::DropIndexes>();
         add<SymbolArgument::FindAndModify>();
-        add<SymbolArgument::Touch>();
         add<SymbolArgument::Drop>();
         add<SymbolArgument::GeoSearch>();
         add<SymbolArgument::CreateIndexWithNoKey>();

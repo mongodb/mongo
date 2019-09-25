@@ -95,8 +95,6 @@ public:
                                    BSONObjBuilder* result,
                                    double scale) const;
 
-    virtual Status touch(OperationContext* opCtx, BSONObjBuilder* output) const;
-
     virtual int64_t storageSize(OperationContext* opCtx,
                                 BSONObjBuilder* extraInfo = nullptr,
                                 int infoLevel = 0) const;

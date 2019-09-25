@@ -364,7 +364,6 @@ env.Library(
         "shutdown_d.cpp",
         "snapshot_management.cpp",
         "top_command.cpp",
-        "touch.cpp",
         "txn_cmds.cpp",
         "user_management_commands.cpp",
         "vote_commit_index_build_command.cpp",
