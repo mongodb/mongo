@@ -3934,6 +3934,24 @@ tasks:
         targets: libfuzzer_tests
         task_compile_flags: >-
           --detect-odr-violations
+    - command: shell.exec
+      params:
+        working_dir: "src"
+        script: |
+          set -o errexit
+          set -o verbose
+
+          tar cfvz libfuzzer-tests.tgz --files-from=build/libfuzzer_tests.txt
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "src/libfuzzer-tests.tgz"
+        remote_file: "${project}/libfuzzer-tests/${build_variant}/${revision}/libfuzzer-tests.tgz"
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/tar
+        display_name: "LibFuzzer Tests"
 
 ## libfuzzertests - run libfuzzertests ##
 - name: libfuzzertests
