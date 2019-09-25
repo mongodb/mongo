@@ -991,7 +991,8 @@ void IndexBuildsCoordinator::_buildIndex(
         hangAfterIndexBuildSecondDrain.pauseWhileSet();
     }
 
-    if (supportsTwoPhaseIndexBuild() && indexBuildOptions.replSetAndNotPrimary) {
+    if (supportsTwoPhaseIndexBuild() && indexBuildOptions.replSetAndNotPrimary &&
+        IndexBuildProtocol::kTwoPhase == replState->protocol) {
         stdx::unique_lock<Latch> lk(replState->mutex);
         auto isReadyToCommitOrAbort = [rs = replState] { return rs->isCommitReady || rs->aborted; };
         opCtx->waitForConditionOrInterrupt(replState->condVar, lk, isReadyToCommitOrAbort);
