@@ -84,7 +84,7 @@ function runCommentParamTest(
         commentObj = {
             testName: jsTestName(),
             commentField: "comment_" + cmdName,
-            uuid: UUID().toString()
+            uuid: UUID().hex()
         };
         command["comment"] = commentObj;
     }
@@ -282,7 +282,7 @@ runCommentParamTest({
 //
 
 let innerComment = {name: "comment_field_explain", type: "innerComment"};
-let outerComment = {name: "comment_field_explain", type: "outerComment", uuid: UUID().toString()};
+let outerComment = {name: "comment_field_explain", type: "outerComment", uuid: UUID().hex()};
 
 // Verify that comment field gets populated on the profiler for the case where explain is within
 // aggregate.
@@ -335,7 +335,7 @@ innerComment = {
 outerComment = {
     name: "comment_field_explain",
     type: "outerComment_unsharded",
-    uuid: UUID().toString()
+    uuid: UUID().hex()
 };
 
 // Verify that comment field gets populated on the profiler for the case where explain is within
@@ -385,7 +385,7 @@ runCommentParamTest({
 
 // Verify the 'comment' field on the aggregate command is propagated to the subsequent getMore
 // command.
-let comment = {comment: "aggregate_comment", commandName: "aggregate", uuid: UUID().toString()};
+let comment = {comment: "aggregate_comment", commandName: "aggregate", uuid: UUID().hex()};
 let res = assert.commandWorked(
     testDB.runCommand({aggregate: "coll", pipeline: [], comment: comment, cursor: {batchSize: 0}}));
 runCommentParamTest({
@@ -402,7 +402,7 @@ res = assert.commandWorked(
 comment = {
     comment: "getmore_comment",
     commandName: "getmore",
-    uuid: UUID().toString()
+    uuid: UUID().hex()
 };
 runCommentParamTest({
     coll: shardedColl,
@@ -415,7 +415,7 @@ runCommentParamTest({
 comment = {
     comment: "find_comment",
     commandName: "find",
-    uuid: UUID().toString()
+    uuid: UUID().hex()
 };
 res = assert.commandWorked(
     testDB.runCommand({find: shardedColl.getName(), filter: {}, comment: comment, batchSize: 0}));
@@ -433,7 +433,7 @@ res = assert.commandWorked(
 comment = {
     comment: "getmore_comment",
     commandName: "getmore",
-    uuid: UUID().toString()
+    uuid: UUID().hex()
 };
 runCommentParamTest({
     coll: shardedColl,
@@ -451,7 +451,7 @@ runCommentParamTest({
 comment = {
     comment: "unsharded_aggregate_comment",
     commandName: "aggregate",
-    uuid: UUID().toString()
+    uuid: UUID().hex()
 };
 res = assert.commandWorked(testDB.runCommand(
     {aggregate: unshardedColl.getName(), pipeline: [], comment: comment, cursor: {batchSize: 0}}));
@@ -469,7 +469,7 @@ res = assert.commandWorked(testDB.runCommand(
 comment = {
     comment: "unsharded_getmore_comment",
     commandName: "getmore",
-    uuid: UUID().toString()
+    uuid: UUID().hex()
 };
 runCommentParamTest({
     coll: unshardedColl,

@@ -171,6 +171,7 @@ if (typeof _threadInject != "undefined") {
             // this suite because any test being run at the same time could conceivably spam the
             // logs so much that the line they are looking for has been rotated off the server's
             // in-memory buffer of log messages, which only stores the 1024 most recent operations.
+            "comment_field.js",
             "getlog2.js",
             "logprocessdetails.js",
             "queryoptimizera.js",
