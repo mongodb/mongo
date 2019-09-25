@@ -128,6 +128,13 @@ variables:
   commands:
   - func: "generate fuzzer tasks"
 
+- &multiversion_template
+  name: multiversion_template
+  exec_timeout_secs: 14400 # Time out the task if it runs for more than 4 hours.
+  depends_on: []
+  commands:
+  - func: "generate multiversion tasks"
+
 # Templates used by powercycle
 - &powercycle_remote_credentials
   private_key_file: $(${posix_workdir})/powercycle.pem
@@ -1909,6 +1916,49 @@ functions:
           set -o errexit
           echo "const AWS_KMS_SECRET_ID = '${aws_kms_access_key_id}';" >> src/mongo/db/modules/enterprise/jstests/fle/lib/aws_secrets.js
           echo "const AWS_KMS_SECRET_KEY = '${aws_kms_secret_access_key}';" >> src/mongo/db/modules/enterprise/jstests/fle/lib/aws_secrets.js
+
+  "generate multiversion tasks":
+    - command: manifest.load
+    - *git_get_project
+    - *set_task_expansion_macros
+    - *set_up_virtualenv
+    - *configure_evergreen_api_credentials
+    - command: expansions.write
+      params:
+        file: src/expansions.yml
+
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          ${activate_virtualenv}
+          $python buildscripts/evergreen_gen_multiversion_tests.py --expansion-file expansions.yml
+
+    - command: archive.targz_pack
+      params:
+        target: generate_tasks_config.tgz
+        source_dir: src/generated_resmoke_config
+        include:
+          - "*"
+
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: generate_tasks_config.tgz
+        remote_file: ${project}/${build_variant}/${revision}/generate_tasks/${task_name}-${build_id}.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/gzip}
+        display_name: Generated Task Config - Execution ${execution}
+
+    - command: generate.tasks
+      params:
+        files:
+          - src/generated_resmoke_config/*.json
 
   "generate fuzzer tasks":
     - command: manifest.load
@@ -5685,6 +5735,17 @@ tasks:
       resmoke_args: --suites=jstestfuzz_sharded_session --storageEngine=wiredTiger
       name: jstestfuzz_sharded_session
 
+- <<: *multiversion_template
+  name: replica_sets_jscore_multiversion_passthrough_gen
+  tags: ["multiversion_passthrough"]
+  commands:
+  - func: "generate multiversion tasks"
+    vars:
+      suite: replica_sets_jscore_passthrough
+      resmoke_args: --storageEngine=wiredTiger
+      task_path_suffix: /data/multiversion
+      fallback_num_sub_suites: 4
+
 # Check that the mutational fuzzer can parse JS files modified in a patch build.
 - name: lint_fuzzer_sanity_patch
   patch_only: true
@@ -8794,6 +8855,7 @@ buildvariants:
   - name: jsCore_auth
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
+  - name: .multiversion_passthrough
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
@@ -10801,6 +10863,7 @@ buildvariants:
     - name: .logical_session_cache .one_sec
     - name: .multi_shard .common
     - name: multiversion
+    - name: .multiversion_passthrough
     - name: .query_fuzzer
     - name: .read_write_concern
     - name: .replica_sets
@@ -12415,6 +12478,7 @@ buildvariants:
   - name: .logical_session_cache
   - name: .multi_shard .common
   - name: multiversion
+  - name: .multiversion_passthrough
   - name: .query_fuzzer
   - name: .read_write_concern
   - name: replica_sets_large_txns_format_gen
@@ -12502,6 +12566,7 @@ buildvariants:
   - name: .logical_session_cache .one_sec
   - name: .multi_shard .common
   - name: multiversion
+  - name: .multiversion_passthrough
   - name: .read_write_concern
   - name: replica_sets_large_txns_format_gen
   - name: replica_sets_large_txns_format_jscore_passthrough

@@ -1956,8 +1956,8 @@ var ReplSetTest = function(opts) {
                                 // Ignore the 'ns' field in the 'idIndex' field as 'ns' was removed
                                 // from index specs in 4.4.
                                 if (primaryInfo.idIndex) {
-                                    primaryInfo.idIndex.ns = null;
-                                    secondaryInfo.idIndex.ns = null;
+                                    delete primaryInfo.idIndex.ns;
+                                    delete secondaryInfo.idIndex.ns;
                                 }
 
                                 if (!bsonBinaryEqual(secondaryInfo, primaryInfo)) {

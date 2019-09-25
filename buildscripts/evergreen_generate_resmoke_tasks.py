@@ -375,7 +375,8 @@ def generate_resmoke_suite_config(source_config, source_file, roots=None, exclud
     return contents
 
 
-def render_suite_files(suites: List, suite_name: str, test_list: List[str], suite_dir):
+def render_suite_files(suites: List, suite_name: str, test_list: List[str], suite_dir,
+                       update_source_config_cb=None):
     """
     Render the given list of suites.
 
@@ -386,9 +387,12 @@ def render_suite_files(suites: List, suite_name: str, test_list: List[str], suit
     :param suite_name: Base name of suites.
     :param test_list: List of tests used in suites.
     :param suite_dir: Directory containing test suite configurations.
+    :param update_source_config_cb: Callback function to update the source_config dictionary.
     :return: Dictionary of rendered resmoke config files.
     """
     source_config = read_yaml(suite_dir, suite_name + ".yml")
+    if update_source_config_cb is not None:
+        update_source_config_cb(source_config)
     suite_configs = {
         f"{os.path.basename(suite.name)}.yml": suite.generate_resmoke_config(source_config)
         for suite in suites
