@@ -103,6 +103,17 @@ env.Library(
 )
 
 if not get_option('ssl') == 'off':
+    if ssl_provider == 'openssl':
+        env.Library(
+            target='openssl_init',
+            source=[
+                'openssl_init.cpp',
+            ],
+            LIBDEPS=[
+                '$BUILD_DIR/mongo/base',
+                'ssl_options',
+            ],
+        );
     env.Library(
         target='ssl_manager',
         source=[
@@ -118,6 +129,7 @@ if not get_option('ssl') == 'off':
             '$BUILD_DIR/mongo/db/auth/auth',
             '$BUILD_DIR/third_party/shim_asio',
             'network',
+            'openssl_init' if ssl_provider == 'openssl' else '',
             'socket',
             'ssl_options',
             'ssl_types',
