@@ -1067,37 +1067,6 @@ std::string escapeRfc2253(StringData str) {
     return ret;
 }
 
-namespace {
-/**
- * Status section of which tls versions connected to MongoDB and completed an SSL handshake.
- * Note: Clients are only not counted if they try to connect to the server with a unsupported TLS
- * version. They are still counted if the server rejects them for certificate issues in
- * parseAndValidatePeerCertificate.
- */
-class TLSVersionSatus : public ServerStatusSection {
-public:
-    TLSVersionSatus() : ServerStatusSection("transportSecurity") {}
-
-    bool includeByDefault() const override {
-        return true;
-    }
-
-    BSONObj generateSection(OperationContext* opCtx,
-                            const BSONElement& configElement) const override {
-        auto& counts = TLSVersionCounts::get(opCtx->getServiceContext());
-
-        BSONObjBuilder builder;
-        builder.append("1.0", counts.tls10.load());
-        builder.append("1.1", counts.tls11.load());
-        builder.append("1.2", counts.tls12.load());
-        builder.append("1.3", counts.tls13.load());
-        builder.append("unknown", counts.tlsUnknown.load());
-        return builder.obj();
-    }
-} tlsVersionStatus;
-
-}  // namespace
-
 void recordTLSVersion(TLSVersion version, const HostAndPort& hostForLogging) {
     StringData versionString;
     auto& counts = mongo::TLSVersionCounts::get(getGlobalServiceContext());

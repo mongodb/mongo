@@ -1731,15 +1731,6 @@ StatusWith<stdx::unordered_set<RoleName>> SSLManagerOpenSSL::_parsePeerRoles(X50
     return roles;
 }
 
-std::string SSLManagerInterface::getSSLErrorMessage(int code) {
-    // 120 from the SSL documentation for ERR_error_string
-    static const size_t msglen = 120;
-
-    char msg[msglen];
-    ERR_error_string_n(code, msg, msglen);
-    return msg;
-}
-
 void SSLManagerOpenSSL::_handleSSLError(SSLConnectionOpenSSL* conn, int ret) {
     int code = SSL_get_error(conn->ssl, ret);
     int err = ERR_get_error();

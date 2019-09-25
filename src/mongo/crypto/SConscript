@@ -65,7 +65,6 @@ env.Library(target='symmetric_crypto',
             ],
             LIBDEPS=[
                 '$BUILD_DIR/mongo/base/secure_allocator',
-                '$BUILD_DIR/mongo/util/net/ssl_manager',
                 '$BUILD_DIR/mongo/util/secure_zero_memory',
             ],
 )

@@ -219,10 +219,19 @@ public:
      */
     virtual const SSLConfiguration& getSSLConfiguration() const = 0;
 
+#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
     /**
      * Fetches the error text for an error code, in a thread-safe manner.
      */
-    static std::string getSSLErrorMessage(int code);
+    static std::string getSSLErrorMessage(int code) {
+        // 120 from the SSL documentation for ERR_error_string
+        static const size_t msglen = 120;
+
+        char msg[msglen];
+        ERR_error_string_n(code, msg, msglen);
+        return msg;
+    }
+#endif
 
     /**
      * SSL wrappers
