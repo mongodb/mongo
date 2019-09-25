@@ -450,17 +450,15 @@ let testCases = {
         {run: {sendsDbVersion: true, sendsShardVersion: true, command: {planCacheClear: collName}}},
     planCacheClearFilters: {
         run: {
-            sendsDbVersion: false,
-            // Uses connection versioning.
-            sendsShardVersion: false,
+            sendsDbVersion: true,
+            sendsShardVersion: true,
             command: {planCacheClearFilters: collName}
         }
     },
     planCacheListFilters: {
         run: {
-            sendsDbVersion: false,
-            // Uses connection versioning.
-            sendsShardVersion: false,
+            sendsDbVersion: true,
+            sendsShardVersion: true,
             command: {planCacheListFilters: collName}
         }
     },
@@ -487,9 +485,8 @@ let testCases = {
     },
     planCacheSetFilter: {
         run: {
-            sendsDbVersion: false,
-            // Uses connection versioning.
-            sendsShardVersion: false,
+            sendsDbVersion: true,
+            sendsShardVersion: true,
             setUp: function(mongosConn) {
                 // Expects the collection to exist, and doesn't implicitly create it.
                 assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));

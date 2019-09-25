@@ -33,7 +33,9 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/collation/collation_spec.h"
-#include "mongo/s/commands/strategy.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
 namespace {
@@ -89,35 +91,48 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbname, cmdObj));
-
-        // Dispatch command to all the shards.
-        // Targeted shard commands are generally data-dependent but index filter
-        // commands are tied to query shape (data has no effect on query shape).
-        std::vector<Strategy::CommandResult> results;
         const BSONObj query;
-        Strategy::commandOp(opCtx,
-                            dbname,
-                            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
-                            nss.ns(),
-                            query,
-                            CollationSpec::kSimpleSpec,
-                            &results);
+        const auto routingInfo =
+            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+        auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
+            opCtx,
+            nss.db(),
+            nss,
+            routingInfo,
+            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+            ReadPreferenceSetting::get(opCtx),
+            Shard::RetryPolicy::kIdempotent,
+            query,
+            CollationSpec::kSimpleSpec);
+
+        // Sort shard responses by shard id.
+        std::sort(shardResponses.begin(),
+                  shardResponses.end(),
+                  [](const AsyncRequestsSender::Response& response1,
+                     const AsyncRequestsSender::Response& response2) {
+                      return response1.shardId < response2.shardId;
+                  });
 
         // Set value of first shard result's "ok" field.
         bool clusterCmdResult = true;
 
-        for (auto i = results.begin(); i != results.end(); ++i) {
-            const Strategy::CommandResult& cmdResult = *i;
+        for (auto i = shardResponses.begin(); i != shardResponses.end(); ++i) {
+            const auto& response = *i;
+            auto status = response.swResponse.getStatus();
+            uassertStatusOK(status.withContext(str::stream() << "failed on: " << response.shardId));
+            const auto& cmdResult = response.swResponse.getValue().data;
 
             // XXX: In absence of sensible aggregation strategy,
             //      promote first shard's result to top level.
-            if (i == results.begin()) {
-                CommandHelpers::filterCommandReplyForPassthrough(cmdResult.result, &result);
-                clusterCmdResult = cmdResult.result["ok"].trueValue();
+            if (i == shardResponses.begin()) {
+                CommandHelpers::filterCommandReplyForPassthrough(cmdResult, &result);
+                status = getStatusFromCommandResult(cmdResult);
+                clusterCmdResult = status.isOK();
             }
 
-            // Append shard result as a sub object and name the field after the shard id
-            result.append(cmdResult.shardTargetId.toString(), cmdResult.result);
+            // Append shard result as a sub object.
+            // Name the field after the shard.
+            result.append(response.shardId, cmdResult);
         }
 
         return clusterCmdResult;
