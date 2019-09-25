@@ -104,6 +104,10 @@ function shellHelpersTest() {
     bulk.find({x: 2}).hint({s: 1}).upsert().updateOne({$set: {y: 1}});
     res = bulk.execute();
     assert.eq(res.nUpserted, 1);
+    bulk = coll.initializeUnorderedBulkOp();
+    bulk.find({x: 2}).hint({s: 1}).upsert().replaceOne({$set: {y: 1}});
+    res = bulk.execute();
+    assert.eq(res.nUpserted, 1);
 
     res = coll.bulkWrite([{
         updateOne: {
@@ -123,6 +127,16 @@ function shellHelpersTest() {
         }
     }]);
     assert.eq(res.matchedCount, 2);
+
+    res = coll.bulkWrite([{
+        replaceOne: {
+            filter: {x: 2},
+            replacement: {x: 2, y: 3},
+            hint: {s: 1},
+            upsert: true,
+        }
+    }]);
+    assert.eq(res.upsertedCount, 1);
 }
 
 function failedHintTest() {
