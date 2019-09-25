@@ -36,6 +36,7 @@
 #include <vector>
 
 #include "mongo/base/data_range.h"
+#include "mongo/base/secure_allocator.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -48,12 +49,56 @@ struct BSONBinData;
 class BSONObjBuilder;
 
 /**
+ * Secure allocator wrapper for HashBlock Traits.
+ *
+ * Usage:
+ *   HashBlock<SecureTraits<SHA256BlockTraits>> secureBlock;
+ * or as a convenience:
+ *   SHA256Block::Secure secureBlock;
+ */
+template <typename Traits>
+class SecureTraits {
+public:
+    using HashType = typename Traits::HashType;
+    static constexpr auto name = Traits::name;
+
+    SecureTraits() = default;
+    SecureTraits(const SecureTraits& hash) : _hash(hash) {}
+    SecureTraits(const Traits& hash) : _hash(hash) {}
+
+    static void computeHash(std::initializer_list<ConstDataRange> input, HashType* const output) {
+        Traits::computeHash(input, output);
+    }
+
+    static void computeHmac(const uint8_t* key,
+                            size_t keyLen,
+                            std::initializer_list<ConstDataRange> input,
+                            HashType* const output) {
+        Traits::computeHmac(key, keyLen, input, output);
+    }
+
+    auto data() {
+        return _hash->data();
+    }
+
+    auto size() const {
+        return _hash->size();
+    }
+
+private:
+    using SecureHashType = SecureAllocatorDefaultDomain::SecureHandle<HashType>;
+
+    SecureHashType _hash;
+};
+
+/**
  * Data structure with fixed sized byte array that can be used as HMAC key or result of a SHA
  * computation.
  */
 template <typename Traits>
 class HashBlock {
 public:
+    using Secure = HashBlock<SecureTraits<Traits>>;
     using HashType = typename Traits::HashType;
     static constexpr size_t kHashLength = sizeof(HashType);
     static constexpr auto kName = Traits::name;
@@ -77,12 +122,16 @@ public:
         return HashBlock(newHash);
     }
 
+    static void computeHash(std::initializer_list<ConstDataRange> input, HashBlock* const output) {
+        Traits::computeHash(input, &(output->_hash));
+    }
+
     /**
      * Computes a hash of 'input' from multiple contigous buffers.
      */
     static HashBlock computeHash(std::initializer_list<ConstDataRange> input) {
         HashBlock ret;
-        Traits::computeHash(input, &(ret._hash));
+        computeHash(input, &ret);
         return ret;
     }
 
@@ -209,6 +258,14 @@ public:
     }
 
     bool operator!=(const HashBlock& other) const {
+        return !(*this == other);
+    }
+
+    bool operator==(const HashBlock::Secure& other) const {
+        return consttimeMemEqual(this->_hash.data(), other.data(), kHashLength);
+    }
+
+    bool operator!=(const HashBlock::Secure& other) const {
         return !(*this == other);
     }
 

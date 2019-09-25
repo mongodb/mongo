@@ -65,9 +65,16 @@ const struct {
 
 TEST(CryptoVectors, SHA256) {
     size_t numTests = sizeof(sha256Tests) / sizeof(sha256Tests[0]);
+    SHA256Block::Secure resultSec;
     for (size_t i = 0; i < numTests; i++) {
+        // Normal allocator.
         SHA256Block result = SHA256Block::computeHash(sha256Tests[i].msg);
-        ASSERT(sha256Tests[i].hash == result) << "Failed SHA256 iteration " << i;
+        ASSERT_EQ(sha256Tests[i].hash, result) << "Failed SHA256 iteration " << i;
+        // Secure allocator.
+        SHA256Block::Secure::computeHash(sha256Tests[i].msg, &resultSec);
+        ASSERT_EQ(sha256Tests[i].hash, resultSec) << "Failed SHA256 secure iteration " << i;
+
+        ASSERT_EQ(result, resultSec) << "Stack allocator != Secure allocator hash" << i;
     }
 }
 
