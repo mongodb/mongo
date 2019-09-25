@@ -15,11 +15,11 @@ configure-stamp:
 
 build: build-stamp
 
-build-stamp: configure-stamp  
+build-stamp: configure-stamp
 	dh_testdir
 
-	# THE FOLLOWING LINE IS INTENTIONALLY COMMENTED. 
-	# scons 
+	# THE FOLLOWING LINE IS INTENTIONALLY COMMENTED.
+	# scons
 	#docbook-to-man debian/mongodb.sgml > mongodb.1
 	echo -n > debian/mongodb-enterprise-tools.manpages
 	for binary in ${TOOLS} ; \
@@ -36,7 +36,7 @@ build-stamp: configure-stamp
 
 	touch $@
 
-clean: 
+clean:
 	dh_testdir
 	dh_testroot
 	rm -f build-stamp configure-stamp
@@ -52,6 +52,7 @@ clean:
 	rm -rf $(CURDIR)/debian/mongodb-enterprise-server
 	rm -rf $(CURDIR)/debian/mongodb-enterprise-mongos
 	rm -rf $(CURDIR)/debian/mongodb-enterprise-tools
+	rm -rf $(CURDIR)/debian/mongodb-enterprise-cryptd
 	rm -f config.log
 	rm -f mongo
 	rm -f mongod
@@ -68,7 +69,7 @@ clean:
 	rm -rf tools/*.o
 	rm -rf shell/*.o
 	rm -rf .sconf_temp
-	rm -f buildscripts/*.pyc 
+	rm -f buildscripts/*.pyc
 	rm -f *.pyc
 	rm -f buildinfo.cpp
 	dh_clean debian/files
@@ -85,11 +86,12 @@ install: build
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-server/usr/bin
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-mongos/usr/bin
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-tools/usr/bin
+	mkdir -p $(CURDIR)/debian/mongodb-enterprise-cryptd/usr/bin
 	cp -v $(CURDIR)/bin/mongo $(CURDIR)/debian/mongodb-enterprise-shell/usr/bin
 	cp -v $(CURDIR)/bin/mongod $(CURDIR)/debian/mongodb-enterprise-server/usr/bin
-	cp -v $(CURDIR)/bin/mongocryptd $(CURDIR)/debian/mongodb-enterprise-server/usr/bin
 	cp -v $(CURDIR)/bin/mongos $(CURDIR)/debian/mongodb-enterprise-mongos/usr/bin
 	cp -v $(CURDIR)/bin/install_compass $(CURDIR)/debian/mongodb-enterprise-tools/usr/bin
+	cp -v $(CURDIR)/bin/mongocryptd $(CURDIR)/debian/mongodb-enterprise-cryptd/usr/bin
 
 	for binary in ${TOOLS} ; \
 	do \
@@ -97,16 +99,18 @@ install: build
 	done
 
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-server/etc
-	cp $(CURDIR)/debian/mongod.conf $(CURDIR)/debian/mongodb-enterprise-server/etc/mongod.conf 
+	cp $(CURDIR)/debian/mongod.conf $(CURDIR)/debian/mongodb-enterprise-server/etc/mongod.conf
 
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-shell/usr/share/lintian/overrides/
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-server/usr/share/lintian/overrides/
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-mongos/usr/share/lintian/overrides/
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-tools/usr/share/lintian/overrides/
+	mkdir -p $(CURDIR)/debian/mongodb-enterprise-cryptd/usr/share/lintian/overrides/
 	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-shell/usr/share/lintian/overrides/mongodb-enterprise-shell
 	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-server/usr/share/lintian/overrides/mongodb-enterprise-server
 	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-mongos/usr/share/lintian/overrides/mongodb-enterprise-mongos
 	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-tools/usr/share/lintian/overrides/mongodb-enterprise-tools
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-cryptd/usr/share/lintian/overrides/mongodb-enterprise-cryptd
 
 # Build architecture-independent files here.
 binary-indep: build install
@@ -116,12 +120,12 @@ binary-indep: build install
 binary-arch: build install
 	dh_testdir
 	dh_testroot
-	dh_installchangelogs 
+	dh_installchangelogs
 	dh_installdocs
 	dh_installexamples
 #	dh_install
 #	dh_installmenu
-#	dh_installdebconf	
+#	dh_installdebconf
 #	dh_installlogrotate
 #	dh_installemacsen
 #	dh_installpam
