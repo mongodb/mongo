@@ -50,12 +50,6 @@ ReplicationStateTransitionLockGuard::ReplicationStateTransitionLockGuard(Operati
     _enqueueLock();
 }
 
-ReplicationStateTransitionLockGuard::ReplicationStateTransitionLockGuard(
-    ReplicationStateTransitionLockGuard&& other)
-    : _opCtx(other._opCtx), _result(other._result) {
-    other._result = LOCK_INVALID;
-}
-
 ReplicationStateTransitionLockGuard::~ReplicationStateTransitionLockGuard() {
     _unlock();
 }
