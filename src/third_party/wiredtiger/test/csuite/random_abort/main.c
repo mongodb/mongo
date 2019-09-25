@@ -73,6 +73,10 @@ static bool inmem;
 #define MAX_MODIFY_ENTRIES 10
 
 #define MAX_VAL 4096
+/*
+ * STR_MAX_VAL is set to MAX_VAL - 1 to account for the extra null character.
+ */
+#define STR_MAX_VAL "4095"
 
 static void handler(int) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
@@ -161,8 +165,6 @@ thread_run(void *arg)
     else
         testutil_check(session->open_cursor(session, uri, NULL, NULL, &cursor));
 
-    data.data = buf;
-    data.size = sizeof(buf);
     /*
      * Write our portion of the key space until we're killed.
      */
@@ -495,7 +497,8 @@ recover_and_verify(uint32_t nthreads)
                  * If it is modify operation, make sure value of the fetched record matches with
                  * saved.
                  */
-                ret = fscanf(fp[MODIFY_RECORD_FILE_ID], "%s %" SCNu64 "\n", file_value, &key);
+                ret = fscanf(
+                  fp[MODIFY_RECORD_FILE_ID], "%" STR_MAX_VAL "s %" SCNu64 "\n", file_value, &key);
 
                 /*
                  * Consider anything other than clear success in getting the key to be EOF. We've
