@@ -5,7 +5,10 @@
 'use strict';
 
 const runURIAuthTest = function(userMech, uriMech, authMechanism, regexMechanism) {
-    const conn = MongoRunner.runMongod({auth: ""});
+    const conn = MongoRunner.runMongod({
+        auth: "",
+        slowms: 30000,  // Don't log slow operations to improve test reliability
+    });
     const adminDB = conn.getDB("admin");
 
     adminDB.createUser({
