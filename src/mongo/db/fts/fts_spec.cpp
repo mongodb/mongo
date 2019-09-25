@@ -99,7 +99,7 @@ FTSSpec::FTSSpec(const BSONObj& indexInfo) {
     auto indexLanguage = indexInfo["default_language"].String();
     try {
         _defaultLanguage = &FTSLanguage::make(indexLanguage, _textIndexVersion);
-    } catch (const DBException& ex) {
+    } catch (const DBException&) {
         // This can fail if the user originally created the text index under an instance of
         // MongoDB that supports different languages then the current instance
         // TODO: consder propagating the index ns to here to improve the error message
@@ -165,7 +165,7 @@ const FTSLanguage* FTSSpec::_getLanguageToUseV2(const BSONObj& userDoc,
             e.type() == mongo::String);
     try {
         return &FTSLanguage::make(e.String(), getTextIndexVersion());
-    } catch (DBException& ex) {
+    } catch (DBException&) {
         uasserted(17262, "language override unsupported: " + e.String());
     }
 }
@@ -443,7 +443,7 @@ StatusWith<BSONObj> FTSSpec::fixSpec(const BSONObj& spec) {
 
     try {
         FTSLanguage::make(default_language, TEXT_INDEX_VERSION_3);
-    } catch (DBException& ex) {
+    } catch (DBException&) {
         return {ErrorCodes::CannotCreateIndex, "default_language is not valid"};
     }
 
