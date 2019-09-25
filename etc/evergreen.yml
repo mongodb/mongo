@@ -270,6 +270,7 @@ variables:
   # The python virtual environment is installed in ${workdir}, which is created in
   # "set up virtualenv".
   - func: "set up virtualenv"
+  - func: "upload pip requirements"
   - func: "configure evergreen api credentials"
   # NOTE: To disable the compile bypass feature, comment out the next line.
   - func: "bypass compile and fetch binaries"
@@ -357,6 +358,7 @@ variables:
     - func: "git get project"
     - func: "set task expansion macros"
     - func: "set up virtualenv"
+    - func: "upload pip requirements"
     - func: "get buildnumber"
     - func: "set up win mount script"
     - func: "generate compile expansions"
@@ -1339,7 +1341,20 @@ functions:
           # Windows path separator
           toolchain_txt="$pip_dir/toolchain-requirements.txt"
           ${activate_virtualenv}
-          python -m pip install -r "$toolchain_txt"
+          python -m pip install -r "$toolchain_txt" -q
+          python -m pip freeze > pip-requirements.txt
+
+  "upload pip requirements": &upload_pip_requirements
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: pip-requirements.txt
+      remote_file: ${project}/${build_variant}/${revision}/pip-requirements-${task_id}-${execution}.txt
+      bucket: mciuploads
+      permissions: public-read
+      content_type: atext-plain
+      display_name: Pip Requirements
 
   "send benchmark results":
     command: json.send
@@ -1354,6 +1369,7 @@ functions:
   - *extract_binaries
   - *set_task_expansion_macros
   - *set_up_virtualenv
+  - *upload_pip_requirements
   - *check_binary_version
   - *get_buildnumber
   - *set_up_credentials
@@ -1366,6 +1382,7 @@ functions:
   - *git_get_project
   - *set_task_expansion_macros
   - *set_up_virtualenv
+  - *upload_pip_requirements
   - *update_bypass_expansions
   - *get_buildnumber
   - *set_up_credentials
@@ -1376,6 +1393,7 @@ functions:
   - *git_get_project
   - *set_task_expansion_macros
   - *set_up_virtualenv
+  - *upload_pip_requirements
   - *fetch_artifacts
   - *get_buildnumber
   - *set_up_credentials
@@ -1587,6 +1605,7 @@ functions:
     - *git_get_project
     - *set_task_expansion_macros
     - *set_up_virtualenv
+    - *upload_pip_requirements
     - *configure_evergreen_api_credentials
     - command: expansions.write
       params:
@@ -1965,6 +1984,7 @@ functions:
     - *git_get_project
     - *set_task_expansion_macros
     - *set_up_virtualenv
+    - *upload_pip_requirements
 
     - command: expansions.write
       params:
@@ -4235,6 +4255,7 @@ tasks:
     - func: "setup android toolchain" # noop if ${setup_android_toolchain} is not "true"
     - func: "set task expansion macros"
     - func: "set up virtualenv"
+    - func: "upload pip requirements"
     - func: "set up win mount script"
     - func: "generate compile expansions"
     - func: "apply compile expansions"
@@ -4328,6 +4349,7 @@ tasks:
     - func: "setup android toolchain" # noop if ${setup_android_toolchain} is not "true"
     - func: "set task expansion macros"
     - func: "set up virtualenv"
+    - func: "upload pip requirements"
     - func: "set up win mount script"
     - func: "generate compile expansions"
     - func: "apply compile expansions"
@@ -4901,6 +4923,7 @@ tasks:
     - func: "git get project"
     - func: "set task expansion macros"
     - func: "set up virtualenv"
+    - func: "upload pip requirements"
     - func: "get buildnumber"
     - func: "set up credentials"
     - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
@@ -4944,6 +4967,7 @@ tasks:
     - func: "git get project"
     - func: "set task expansion macros"
     - func: "set up virtualenv"
+    - func: "upload pip requirements"
     - command: shell.exec
       type: test
       params:
@@ -4972,6 +4996,7 @@ tasks:
   - func: "git get project"
   - func: "set task expansion macros"
   - func: "set up virtualenv"
+  - func: "upload pip requirements"
   - command: shell.exec
     type: test
     params:
@@ -4989,6 +5014,7 @@ tasks:
   - func: "git get project"
   - func: "set task expansion macros"
   - func: "set up virtualenv"
+  - func: "upload pip requirements"
   - func: "configure evergreen api credentials"
   - command: shell.exec
     type: test
@@ -5891,6 +5917,7 @@ tasks:
   - func: "set up virtualenv"
     vars:
       pip_dir: ${workdir}/src/etc/pip
+  - func: "upload pip requirements"
   - func: "generate burn in tags"
     vars:
       max_revisions: 25
@@ -7852,6 +7879,7 @@ tasks:
   - func: "git get project"
   - func: "set task expansion macros"
   - func: "set up virtualenv"
+  - func: "upload pip requirements"
   - func: "get buildnumber"
   - func: "set up credentials"
   - func: "run tests"
@@ -8561,6 +8589,7 @@ task_groups:
     - func: "setup android toolchain" # noop if ${setup_android_toolchain} is not "true"
     - func: "set task expansion macros"
     - func: "set up virtualenv"
+    - func: "upload pip requirements"
     - func: "set up win mount script"
     - func: "generate compile expansions"
   teardown_group:
