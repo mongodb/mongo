@@ -61,6 +61,7 @@ function RollbackTest(name = "RollbackTest", replSet) {
     const SIGTERM = 15;
     const kNumDataBearingNodes = 3;
     const kElectableNodes = 2;
+    const kForeverSecs = 24 * 60 * 60;
 
     let rst;
     let curPrimary;
@@ -376,7 +377,7 @@ function RollbackTest(name = "RollbackTest", replSet) {
         // catch up to curPrimary's oplog, then the rollback node can become the new primary.
         // If so, it can lead to unplanned state transitions, like unconditional step down, during
         // the test. To avoid those problems, prevent rollback node from starting an election.
-        assert.commandWorked(curSecondary.adminCommand({replSetFreeze: ReplSetTest.kForeverSecs}));
+        assert.commandWorked(curSecondary.adminCommand({replSetFreeze: kForeverSecs}));
 
         log(`Reconnecting the secondary ${curSecondary.host} so it'll go into rollback`);
         // Reconnect the rollback node to the current primary, which is the node we want to sync
@@ -443,7 +444,30 @@ function RollbackTest(name = "RollbackTest", replSet) {
         // Freeze the node if the restarted node is the rollback node.
         if (curState === State.kSyncSourceOpsDuringRollback &&
             rst.getNodeId(curSecondary) === nodeId) {
-            rst.freeze(nodeId);
+            assert.soon(() => {
+                try {
+                    // Try stepping down the rollback node if it became the primary after its
+                    // restart, as it might have caught up with the original primary and facing
+                    // arbitrary machine/network slowness.
+                    curSecondary.adminCommand({"replSetStepDown": kForeverSecs, "force": true});
+                    // Prevent rollback node from running election. There is a chance that this
+                    // node might have started running election or became primary after
+                    // 'replSetStepDown' cmd, so 'replSetFreeze' cmd can fail.
+                    assert.commandWorked(
+                        curSecondary.adminCommand({"replSetFreeze": kForeverSecs}));
+                    return true;
+                } catch (e) {
+                    // Network error can happen if the node simultaneously tries to transition to
+                    // ROLLBACK state.
+                    if (isNetworkError(e) || e.code === ErrorCodes.NotSecondary ||
+                        e.code === ErrorCodes.NotYetInitialized) {
+                        log('Failed to freeze the node.' + tojson(e));
+                        return false;
+                    }
+
+                    throw e;
+                }
+            }, `Failed to run replSetFreeze cmd on ${curSecondary.host}`);
         }
 
         const oldPrimary = curPrimary;
