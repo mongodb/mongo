@@ -235,18 +235,14 @@ Each node communicates with other nodes at regular intervals to:
 Each oplog entry is assigned an `OpTime` to describe when it occurred so other nodes can compare how
 up-to-date they are.
 
-In the old replication protocol,
-[PV0](https://docs.mongodb.com/manual/reference/replica-set-protocol-versions/), OpTimes were simply
-a timestamp.
+OpTimes include a timestamp and a term field. The term field indicates how many elections have
+occurred since the replica set started.
 
-In the new protocol,
-[PV1](https://docs.mongodb.com/manual/reference/replica-set-protocol-versions/), OpTimes also
-include a term field which indicates how many elections have occurred since the replica set started.
-
-The election protocol is built on top of [Raft](https://raft.github.io/raft.pdf), so it is
-guaranteed that two primaries will not be elected in the same term. This helps differentiate ops
-that occurred at the same time but from different primaries in the case of a network partition. This
-article will only talk about PV1, the new replication protocol.
+The election protocol, known as
+[protocol version 1 or PV1](https://docs.mongodb.com/manual/reference/replica-set-protocol-versions/),
+is built on top of [Raft](https://raft.github.io/raft.pdf), so it is guaranteed that two primaries
+will not be elected in the same term. This helps differentiate ops that occurred at the same time
+but from different primaries in the case of a network partition.
 
 #### Oplog Fetcher Responses
 
@@ -382,9 +378,9 @@ actually sends the `replSetUpdatePosition` command to the sync source. This comm
 sent every `keepAliveInterval` milliseconds (`(electionTimeout / 2)`) to maintain liveness
 information about the nodes in the replica set.
 
-In PV1, `replSetUpdatePosition` commands are the primary means of maintaining liveness. Thus, if the
-primary cannot communicate directly with every node, but it can communicate with every node through
-other nodes, it will still stay primary.
+`replSetUpdatePosition` commands are the primary means of maintaining liveness. Thus, if the primary
+cannot communicate directly with every node, but it can communicate with every node through other
+nodes, it will still stay primary.
 
 The `replSetUpdatePosition` command contains the following information:
 
