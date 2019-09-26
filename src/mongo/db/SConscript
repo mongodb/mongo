@@ -380,6 +380,9 @@ env.Library(
         'write_concern_options',
         'repl/read_concern_args',
     ],
+    LIBDEPS_PRIVATE=[
+        "logical_clock",
+    ],
 )
 
 env.Library(
