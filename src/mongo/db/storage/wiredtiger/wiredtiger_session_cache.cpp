@@ -195,7 +195,7 @@ void WiredTigerSession::closeCursorsForQueuedDrops(WiredTigerKVEngine* engine) {
 }
 
 namespace {
-AtomicWord<unsigned long long> nextTableId(1);
+AtomicWord<unsigned long long> nextTableId(WiredTigerSession::kLastTableId);
 }
 // static
 uint64_t WiredTigerSession::genTableId() {

@@ -16,13 +16,23 @@ const dbpath = MongoRunner.dataPath + baseName + "/";
  * Test 1. Delete a collection's .wt file.
  */
 
-assertErrorOnStartupWhenFilesAreCorruptOrMissing(dbpath, baseName, collName, (mongod, testColl) => {
-    const testCollUri = getUriForColl(testColl);
-    const testCollFile = dbpath + testCollUri + ".wt";
-    MongoRunner.stopMongod(mongod);
-    jsTestLog("deleting collection file: " + testCollFile);
-    removeFile(testCollFile);
-}, "Fatal Assertion 50883");
+assertErrorOnRequestWhenFilesAreCorruptOrMissing(
+    dbpath,
+    baseName,
+    collName,
+    (mongod, testColl) => {
+        const testCollUri = getUriForColl(testColl);
+        const testCollFile = dbpath + testCollUri + ".wt";
+        MongoRunner.stopMongod(mongod);
+        jsTestLog("deleting collection file: " + testCollFile);
+        removeFile(testCollFile);
+    },
+    (testColl) => {
+        assert.throws(() => {
+            testColl.insert({a: 1});
+        });
+    },
+    "Fatal Assertion 50883");
 
 /**
  * Test 2. Delete the _mdb_catalog.

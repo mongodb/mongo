@@ -62,6 +62,9 @@ public:
      * SizeInfo.
      */
     struct SizeInfo {
+        SizeInfo() = default;
+        SizeInfo(long long records, long long size) : numRecords(records), dataSize(size) {}
+
         ~SizeInfo() {
             invariant(!_dirty.load());
         }

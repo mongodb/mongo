@@ -169,14 +169,20 @@ public:
                                              BSONObjBuilder* bob);
 
     /**
-     * Gets entire metadata string for collection/index at URI with the provided session.
+     * Gets the creation metadata string for a collection or index at a given URI. Accepts an
+     * OperationContext or session.
+     *
+     * This returns more information, but is slower than getMetadata().
      */
-    static StatusWith<std::string> getMetadataRaw(WT_SESSION* session, StringData uri);
+    static StatusWith<std::string> getMetadataCreate(OperationContext* opCtx, StringData uri);
+    static StatusWith<std::string> getMetadataCreate(WT_SESSION* session, StringData uri);
 
     /**
-     * Gets entire metadata string for collection/index at URI.
+     * Gets the entire metadata string for collection or index at URI. Accepts an OperationContext
+     * or session.
      */
     static StatusWith<std::string> getMetadata(OperationContext* opCtx, StringData uri);
+    static StatusWith<std::string> getMetadata(WT_SESSION* session, StringData uri);
 
     /**
      * Reads app_metadata for collection/index at URI as a BSON document.

@@ -620,8 +620,9 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorsAreNotCached) {
     // Will search the checkpoint cursor for the record, then close the checkpoint cursor.
     ASSERT_TRUE(rs->findRecord(opCtx, s.getValue(), &rd));
 
-    // No new cursors should have been released into the cache.
-    ASSERT_EQ(ru->getSession()->cachedCursors(), cachedCursorsBefore);
+    // No new cursors should have been released into the cache, with the exception of a metadata
+    // cursor that is opened to determine if the table is LSM. Metadata cursors are cached.
+    ASSERT_EQ(ru->getSession()->cachedCursors(), cachedCursorsBefore + 1);
 
     // All opened cursors are closed.
     ASSERT_EQ(0, ru->getSession()->cursorsOut());

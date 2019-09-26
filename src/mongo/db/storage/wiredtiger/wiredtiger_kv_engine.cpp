@@ -63,6 +63,7 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/snapshot_window_options.h"
 #include "mongo/db/storage/journal_listener.h"
@@ -998,7 +999,7 @@ Status WiredTigerKVEngine::_rebuildIdent(WT_SESSION* session, const char* uri) {
 
     // This is safe to call after moving the file because it only reads from the metadata, and not
     // the data file itself.
-    auto swMetadata = WiredTigerUtil::getMetadataRaw(session, uri);
+    auto swMetadata = WiredTigerUtil::getMetadataCreate(session, uri);
     if (!swMetadata.isOK()) {
         error() << "Failed to get metadata for " << uri;
         return swMetadata.getStatus();
@@ -1290,6 +1291,16 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getGroupedRecordStore(
     }
     ret->postConstructorInit(opCtx);
 
+    // Sizes should always be checked when creating a collection during rollback or replication
+    // recovery. This is in case the size storer information is no longer accurate. This may be
+    // necessary if capped deletes are rolled-back, if rollback occurs across a collection rename,
+    // or when collection creation is not part of a stable checkpoint.
+    const auto replCoord = repl::ReplicationCoordinator::get(getGlobalServiceContext());
+    const bool inRollback = replCoord && replCoord->getMemberState().rollback();
+    if (inRollback || inReplicationRecovery(getGlobalServiceContext())) {
+        ret->checkSize(opCtx);
+    }
+
     return std::move(ret);
 }
 
@@ -1515,7 +1526,8 @@ bool WiredTigerKVEngine::hasIdent(OperationContext* opCtx, StringData ident) con
 bool WiredTigerKVEngine::_hasUri(WT_SESSION* session, const std::string& uri) const {
     // can't use WiredTigerCursor since this is called from constructor.
     WT_CURSOR* c = nullptr;
-    int ret = session->open_cursor(session, "metadata:create", nullptr, nullptr, &c);
+    // No need for a metadata:create cursor, since it gathers extra information and is slower.
+    int ret = session->open_cursor(session, "metadata:", nullptr, nullptr, &c);
     if (ret == ENOENT)
         return false;
     invariantWTOK(ret);
@@ -1528,7 +1540,8 @@ bool WiredTigerKVEngine::_hasUri(WT_SESSION* session, const std::string& uri) co
 std::vector<std::string> WiredTigerKVEngine::getAllIdents(OperationContext* opCtx) const {
     std::vector<std::string> all;
     int ret;
-    WiredTigerCursor cursor("metadata:create", WiredTigerSession::kMetadataTableId, false, opCtx);
+    // No need for a metadata:create cursor, since it gathers extra information and is slower.
+    WiredTigerCursor cursor("metadata:", WiredTigerSession::kMetadataTableId, false, opCtx);
     WT_CURSOR* c = cursor.get();
     if (!c)
         return all;

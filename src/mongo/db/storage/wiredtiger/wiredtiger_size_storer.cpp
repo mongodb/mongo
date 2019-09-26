@@ -116,10 +116,8 @@ std::shared_ptr<WiredTigerSizeStorer::SizeInfo> WiredTigerSizeStorer::load(Strin
     BSONObj data(reinterpret_cast<const char*>(value.data));
 
     LOG(2) << "WiredTigerSizeStorer::load " << uri << " -> " << redact(data);
-    auto result = std::make_shared<SizeInfo>();
-    result->numRecords.store(data["numRecords"].safeNumberLong());
-    result->dataSize.store(data["dataSize"].safeNumberLong());
-    return result;
+    return std::make_shared<SizeInfo>(data["numRecords"].safeNumberLong(),
+                                      data["dataSize"].safeNumberLong());
 }
 
 void WiredTigerSizeStorer::flush(bool syncToDisk) {

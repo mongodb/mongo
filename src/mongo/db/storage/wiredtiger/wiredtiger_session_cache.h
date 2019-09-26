@@ -154,9 +154,16 @@ public:
     static uint64_t genTableId();
 
     /**
-     * For "metadata:" cursors. Guaranteed never to collide with genTableId() ids.
+     * For special cursors. Guaranteed never to collide with genTableId() ids.
      */
-    static const uint64_t kMetadataTableId = 0;
+    enum TableId {
+        /* For "metadata:" cursors */
+        kMetadataTableId,
+        /* For "metadata:create" cursors */
+        kMetadataCreateTableId,
+        /* The start of non-special table ids for genTableId() */
+        kLastTableId
+    };
 
     void setIdleExpireTime(Date_t idleExpireTime) {
         _idleExpireTime = idleExpireTime;

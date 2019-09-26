@@ -16,13 +16,23 @@ const dbpath = MongoRunner.dataPath + baseName + "/";
  * Test 1. Corrupt a collection's .wt file.
  */
 
-assertErrorOnStartupWhenFilesAreCorruptOrMissing(dbpath, baseName, collName, (mongod, testColl) => {
-    const testCollUri = getUriForColl(testColl);
-    const testCollFile = dbpath + testCollUri + ".wt";
-    MongoRunner.stopMongod(mongod);
-    jsTestLog("corrupting collection file: " + testCollFile);
-    corruptFile(testCollFile);
-}, "Fatal Assertion 50882");
+assertErrorOnRequestWhenFilesAreCorruptOrMissing(
+    dbpath,
+    baseName,
+    collName,
+    (mongod, testColl) => {
+        const testCollUri = getUriForColl(testColl);
+        const testCollFile = dbpath + testCollUri + ".wt";
+        MongoRunner.stopMongod(mongod);
+        jsTestLog("corrupting collection file: " + testCollFile);
+        corruptFile(testCollFile);
+    },
+    (testColl) => {
+        assert.throws(() => {
+            testColl.insert({a: 1});
+        });
+    },
+    "Fatal Assertion 50882");
 
 /**
  * Test 2. Corrupt the _mdb_catalog.
