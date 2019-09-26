@@ -57,7 +57,7 @@ using std::vector;
 namespace {
 const std::string catalogInfo = "_mdb_catalog";
 const auto kCatalogLogLevel = logger::LogSeverity::Debug(2);
-}
+}  // namespace
 
 class KVStorageEngine::RemoveDBChange : public RecoveryUnit::Change {
 public:
@@ -107,8 +107,8 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
 
         if (status.code() == ErrorCodes::DataModifiedByRepair) {
             warning() << "Catalog data modified by repair: " << status.reason();
-            repairObserver->onModification(str::stream() << "KVCatalog repaired: "
-                                                         << status.reason());
+            repairObserver->invalidatingModification(str::stream() << "KVCatalog repaired: "
+                                                                   << status.reason());
         } else {
             fassertNoTrace(50926, status);
         }
@@ -182,8 +182,8 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
                                      "build the index.";
 
                         StorageRepairObserver::get(getGlobalServiceContext())
-                            ->onModification(str::stream() << "Orphan collection created: "
-                                                           << statusWithNs.getValue());
+                            ->benignModification(str::stream() << "Orphan collection created: "
+                                                               << statusWithNs.getValue());
 
                     } else {
                         // Log an error message if we cannot create the entry.
@@ -225,8 +225,9 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
 
                     if (_options.forRepair) {
                         StorageRepairObserver::get(getGlobalServiceContext())
-                            ->onModification(str::stream() << "Collection " << coll << " dropped: "
-                                                           << status.reason());
+                            ->invalidatingModification(str::stream() << "Collection " << coll
+                                                                     << " dropped: "
+                                                                     << status.reason());
                     }
                     wuow.commit();
                     continue;
@@ -296,8 +297,9 @@ Status KVStorageEngine::_recoverOrphanedCollection(OperationContext* opCtx,
     }
     if (dataModified) {
         StorageRepairObserver::get(getGlobalServiceContext())
-            ->onModification(str::stream() << "Collection " << collectionName.ns() << " recovered: "
-                                           << status.reason());
+            ->invalidatingModification(str::stream() << "Collection " << collectionName.ns()
+                                                     << " recovered: "
+                                                     << status.reason());
     }
     wuow.commit();
     return Status::OK();
@@ -614,8 +616,8 @@ Status KVStorageEngine::repairRecordStore(OperationContext* opCtx, const std::st
     }
 
     if (_options.forRepair && dataModified) {
-        repairObserver->onModification(str::stream() << "Collection " << ns << ": "
-                                                     << status.reason());
+        repairObserver->invalidatingModification(str::stream() << "Collection " << ns << ": "
+                                                               << status.reason());
     }
     _dbs[nsToDatabase(ns)]->reinitCollectionAfterRepair(opCtx, ns);
 

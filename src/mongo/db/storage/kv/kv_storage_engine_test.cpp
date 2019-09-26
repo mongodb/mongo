@@ -157,7 +157,7 @@ public:
 
         unittest::log() << "Modifications: ";
         for (const auto& mod : repairObserver->getModifications()) {
-            unittest::log() << "  " << mod;
+            unittest::log() << "  " << mod.getDescription();
         }
     }
 };
