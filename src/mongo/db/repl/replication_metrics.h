@@ -49,16 +49,31 @@ public:
     ~ReplicationMetrics();
 
     void incrementNumElectionsCalledForReason(TopologyCoordinator::StartElectionReason reason);
+    void incrementNumElectionsSuccessfulForReason(TopologyCoordinator::StartElectionReason reason);
     void incrementNumStepDownsCausedByHigherTerm();
     void incrementNumCatchUps();
+    void incrementNumCatchUpsConcludedForReason(
+        ReplicationCoordinator::PrimaryCatchUpConclusionReason reason);
 
     int getNumStepUpCmdsCalled_forTesting();
     int getNumPriorityTakeoversCalled_forTesting();
     int getNumCatchUpTakeoversCalled_forTesting();
     int getNumElectionTimeoutsCalled_forTesting();
     int getNumFreezeTimeoutsCalled_forTesting();
+    int getNumStepUpCmdsSuccessful_forTesting();
+    int getNumPriorityTakeoversSuccessful_forTesting();
+    int getNumCatchUpTakeoversSuccessful_forTesting();
+    int getNumElectionTimeoutsSuccessful_forTesting();
+    int getNumFreezeTimeoutsSuccessful_forTesting();
     int getNumStepDownsCausedByHigherTerm_forTesting();
     int getNumCatchUps_forTesting();
+    int getNumCatchUpsSucceeded_forTesting();
+    int getNumCatchUpsAlreadyCaughtUp_forTesting();
+    int getNumCatchUpsSkipped_forTesting();
+    int getNumCatchUpsTimedOut_forTesting();
+    int getNumCatchUpsFailedWithError_forTesting();
+    int getNumCatchUpsFailedWithNewTerm_forTesting();
+    int getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_forTesting();
 
     BSONObj getElectionMetricsBSON();
 

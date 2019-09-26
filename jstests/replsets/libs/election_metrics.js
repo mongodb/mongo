@@ -41,3 +41,30 @@ function verifyServerStatusChange(initialStatus, newStatus, fieldName, expectedI
               newStatus[fieldName],
               `expected '${fieldName}' to increase by ${expectedIncrement}`);
 }
+
+/**
+ * Verifies that the given reason for primary catchup concluding is incremented in serverStatus, and
+ * that none of the other reasons are.
+ */
+function verifyCatchUpConclusionReason(initialStatus, newStatus, fieldName) {
+    const catchUpConclusionMetrics = [
+        "numCatchUpsSucceeded",
+        "numCatchUpsAlreadyCaughtUp",
+        "numCatchUpsSkipped",
+        "numCatchUpsTimedOut",
+        "numCatchUpsFailedWithError",
+        "numCatchUpsFailedWithNewTerm",
+        "numCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd"
+    ];
+
+    catchUpConclusionMetrics.forEach(function(metric) {
+        if (metric === fieldName) {
+            assert.eq(initialStatus[metric] + 1,
+                      newStatus[metric],
+                      `expected '${metric}' to increase by 1`);
+        } else {
+            assert.eq(
+                initialStatus[metric], newStatus[metric], `did not expect '${metric}' to increase`);
+        }
+    });
+}

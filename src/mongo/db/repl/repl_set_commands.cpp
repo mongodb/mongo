@@ -455,7 +455,9 @@ public:
     CmdReplSetStepDown()
         : ReplSetCommand("replSetStepDown"),
           _stepDownCmdsWithForceExecutedMetric("commands.replSetStepDownWithForce.total",
-                                               &_stepDownCmdsWithForceExecuted) {}
+                                               &_stepDownCmdsWithForceExecuted),
+          _stepDownCmdsWithForceFailedMetric("commands.replSetStepDownWithForce.failed",
+                                             &_stepDownCmdsWithForceFailed) {}
     virtual bool run(OperationContext* opCtx,
                      const string&,
                      const BSONObj& cmdObj,
@@ -465,6 +467,12 @@ public:
         if (force) {
             _stepDownCmdsWithForceExecuted.increment();
         }
+
+        auto onExitGuard = MakeGuard([&] {
+            if (force) {
+                _stepDownCmdsWithForceFailed.increment();
+            }
+        });
 
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
         uassertStatusOK(status);
@@ -508,12 +516,16 @@ public:
         status = ReplicationCoordinator::get(opCtx)->stepDown(
             opCtx, force, Seconds(secondaryCatchUpPeriodSecs), Seconds(stepDownForSecs));
         uassertStatusOK(status);
+
+        onExitGuard.Dismiss();
         return true;
     }
 
 private:
     mutable Counter64 _stepDownCmdsWithForceExecuted;
+    mutable Counter64 _stepDownCmdsWithForceFailed;
     ServerStatusMetricField<Counter64> _stepDownCmdsWithForceExecutedMetric;
+    ServerStatusMetricField<Counter64> _stepDownCmdsWithForceFailedMetric;
 
     ActionSet getAuthActionSet() const override {
         return ActionSet{ActionType::replSetStateChange};
@@ -839,7 +851,9 @@ public:
         uassertStatusOK(status);
         log() << "Received replSetAbortPrimaryCatchUp request";
 
-        status = ReplicationCoordinator::get(opCtx)->abortCatchupIfNeeded();
+        status = ReplicationCoordinator::get(opCtx)->abortCatchupIfNeeded(
+            ReplicationCoordinator::PrimaryCatchUpConclusionReason::
+                kFailedWithReplSetAbortPrimaryCatchUpCmd);
         if (!status.isOK()) {
             log() << "replSetAbortPrimaryCatchUp request failed" << causedBy(status);
         }

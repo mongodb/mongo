@@ -233,8 +233,8 @@ void ReplicationCoordinatorImpl::_startRealElection_inlock(
     LastVote lastVote{newTerm, _selfIndex};
 
     auto cbStatus = _replExecutor->scheduleWork(
-        [this, lastVote](const executor::TaskExecutor::CallbackArgs& cbData) {
-            _writeLastVoteForMyElection(lastVote, cbData);
+        [this, lastVote, reason](const executor::TaskExecutor::CallbackArgs& cbData) {
+            _writeLastVoteForMyElection(lastVote, cbData, reason);
         });
     if (cbStatus.getStatus() == ErrorCodes::ShutdownInProgress) {
         return;
@@ -244,7 +244,9 @@ void ReplicationCoordinatorImpl::_startRealElection_inlock(
 }
 
 void ReplicationCoordinatorImpl::_writeLastVoteForMyElection(
-    LastVote lastVote, const executor::TaskExecutor::CallbackArgs& cbData) {
+    LastVote lastVote,
+    const executor::TaskExecutor::CallbackArgs& cbData,
+    TopologyCoordinator::StartElectionReason reason) {
     // storeLocalLastVoteDocument can call back in to the replication coordinator,
     // so _mutex must be unlocked here.  However, we cannot return until we
     // lock it because we want to lose the election on cancel or error and
@@ -274,13 +276,14 @@ void ReplicationCoordinatorImpl::_writeLastVoteForMyElection(
               << lastVote.getTerm() << ", current term: " << _topCoord->getTerm();
         return;
     }
-    _startVoteRequester_inlock(lastVote.getTerm());
+    _startVoteRequester_inlock(lastVote.getTerm(), reason);
     _replExecutor->signalEvent(_electionDryRunFinishedEvent);
 
     lossGuard.dismiss();
 }
 
-void ReplicationCoordinatorImpl::_startVoteRequester_inlock(long long newTerm) {
+void ReplicationCoordinatorImpl::_startVoteRequester_inlock(
+    long long newTerm, TopologyCoordinator::StartElectionReason reason) {
     const auto lastOpTime = _getMyLastAppliedOpTime_inlock();
 
     _voteRequester.reset(new VoteRequester);
@@ -291,15 +294,17 @@ void ReplicationCoordinatorImpl::_startVoteRequester_inlock(long long newTerm) {
     }
     fassert(28643, nextPhaseEvh.getStatus());
     _replExecutor
-        ->onEvent(
-            nextPhaseEvh.getValue(),
-            [=](const executor::TaskExecutor::CallbackArgs&) { _onVoteRequestComplete(newTerm); })
+        ->onEvent(nextPhaseEvh.getValue(),
+                  [=](const executor::TaskExecutor::CallbackArgs&) {
+                      _onVoteRequestComplete(newTerm, reason);
+                  })
         .status_with_transitional_ignore();
 }
 
 MONGO_FAIL_POINT_DEFINE(electionHangsBeforeUpdateMemberState);
 
-void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long newTerm) {
+void ReplicationCoordinatorImpl::_onVoteRequestComplete(
+    long long newTerm, TopologyCoordinator::StartElectionReason reason) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     LoseElectionGuardV1 lossGuard(this);
 
@@ -323,6 +328,8 @@ void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long newTerm) {
             return;
         case VoteRequester::Result::kSuccessfullyElected:
             log() << "election succeeded, assuming primary role in term " << _topCoord->getTerm();
+            ReplicationMetrics::get(getServiceContext())
+                .incrementNumElectionsSuccessfulForReason(reason);
             break;
         case VoteRequester::Result::kPrimaryRespondedNo:
             // This is impossible because we would only require the primary's
