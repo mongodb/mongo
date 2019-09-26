@@ -218,115 +218,134 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlockImpl::init(const std::vector<BSO
     WriteUnitOfWork wunit(_opCtx);
 
     invariant(_indexes.empty());
-    _opCtx->recoveryUnit()->registerChange(new CleanupIndexesVectorOnRollback(this));
+    // Guarantees that exceptions cannot be returned from index builder initialization except for
+    // WriteConflictExceptions, which should be dealt with by the caller.
+    try {
+        _opCtx->recoveryUnit()->registerChange(new CleanupIndexesVectorOnRollback(this));
 
-    const string& ns = _collection->ns().ns();
+        const string& ns = _collection->ns().ns();
 
-    const auto idxCat = _collection->getIndexCatalog();
-    invariant(idxCat);
-    invariant(idxCat->ok());
-    Status status = idxCat->checkUnfinished();
-    if (!status.isOK())
-        return status;
-
-    for (size_t i = 0; i < indexSpecs.size(); i++) {
-        BSONObj info = indexSpecs[i];
-
-        string pluginName = IndexNames::findPluginName(info["key"].Obj());
-        if (pluginName.size()) {
-            Status s = _collection->getIndexCatalog()->_upgradeDatabaseMinorVersionIfNeeded(
-                _opCtx, pluginName);
-            if (!s.isOK())
-                return s;
-        }
-
-        // Any foreground indexes make all indexes be built in the foreground.
-        _buildInBackground = (_buildInBackground && info["background"].trueValue());
-    }
-
-    std::vector<BSONObj> indexInfoObjs;
-    indexInfoObjs.reserve(indexSpecs.size());
-    std::size_t eachIndexBuildMaxMemoryUsageBytes = 0;
-    if (!indexSpecs.empty()) {
-        eachIndexBuildMaxMemoryUsageBytes =
-            static_cast<std::size_t>(maxIndexBuildMemoryUsageMegabytes.load()) * 1024 * 1024 /
-            indexSpecs.size();
-    }
-
-    for (size_t i = 0; i < indexSpecs.size(); i++) {
-        BSONObj info = indexSpecs[i];
-        StatusWith<BSONObj> statusWithInfo =
-            _collection->getIndexCatalog()->prepareSpecForCreate(_opCtx, info);
-        Status status = statusWithInfo.getStatus();
-        if (!status.isOK())
-            return status;
-        info = statusWithInfo.getValue();
-        indexInfoObjs.push_back(info);
-
-        IndexToBuild index;
-        index.block.reset(new IndexCatalogImpl::IndexBuildBlock(_opCtx, _collection, info));
-        status = index.block->init();
+        const auto idxCat = _collection->getIndexCatalog();
+        invariant(idxCat);
+        invariant(idxCat->ok());
+        Status status = idxCat->checkUnfinished();
         if (!status.isOK())
             return status;
 
-        index.real = index.block->getEntry()->accessMethod();
-        status = index.real->initializeAsEmpty(_opCtx);
-        if (!status.isOK())
-            return status;
+        for (size_t i = 0; i < indexSpecs.size(); i++) {
+            BSONObj info = indexSpecs[i];
 
-        if (!_buildInBackground) {
-            // Bulk build process requires foreground building as it assumes nothing is changing
-            // under it.
-            index.bulk = index.real->initiateBulk(eachIndexBuildMaxMemoryUsageBytes);
+            string pluginName = IndexNames::findPluginName(info["key"].Obj());
+            if (pluginName.size()) {
+                Status s = _collection->getIndexCatalog()->_upgradeDatabaseMinorVersionIfNeeded(
+                    _opCtx, pluginName);
+                if (!s.isOK())
+                    return s;
+            }
+
+            // Any foreground indexes make all indexes be built in the foreground.
+            _buildInBackground = (_buildInBackground && info["background"].trueValue());
         }
 
-        const IndexDescriptor* descriptor = index.block->getEntry()->descriptor();
-
-        IndexCatalog::prepareInsertDeleteOptions(_opCtx, descriptor, &index.options);
-        index.options.dupsAllowed = index.options.dupsAllowed || _ignoreUnique;
-        if (_ignoreUnique) {
-            index.options.getKeysMode = IndexAccessMethod::GetKeysMode::kRelaxConstraints;
+        std::vector<BSONObj> indexInfoObjs;
+        indexInfoObjs.reserve(indexSpecs.size());
+        std::size_t eachIndexBuildMaxMemoryUsageBytes = 0;
+        if (!indexSpecs.empty()) {
+            eachIndexBuildMaxMemoryUsageBytes =
+                static_cast<std::size_t>(maxIndexBuildMemoryUsageMegabytes.load()) * 1024 * 1024 /
+                indexSpecs.size();
         }
 
-        log() << "build index on: " << ns << " properties: " << descriptor->toString();
-        if (index.bulk)
-            log() << "\t building index using bulk method; build may temporarily use up to "
-                  << eachIndexBuildMaxMemoryUsageBytes / 1024 / 1024 << " megabytes of RAM";
+        for (size_t i = 0; i < indexSpecs.size(); i++) {
+            BSONObj info = indexSpecs[i];
+            StatusWith<BSONObj> statusWithInfo =
+                _collection->getIndexCatalog()->prepareSpecForCreate(_opCtx, info);
+            Status status = statusWithInfo.getStatus();
+            if (!status.isOK())
+                return status;
+            info = statusWithInfo.getValue();
+            indexInfoObjs.push_back(info);
 
-        index.filterExpression = index.block->getEntry()->getFilterExpression();
+            IndexToBuild index;
+            index.block.reset(new IndexCatalogImpl::IndexBuildBlock(_opCtx, _collection, info));
+            status = index.block->init();
+            if (!status.isOK())
+                return status;
 
-        // TODO SERVER-14888 Suppress this in cases we don't want to audit.
-        audit::logCreateIndex(_opCtx->getClient(), &info, descriptor->indexName(), ns);
+            index.real = index.block->getEntry()->accessMethod();
+            status = index.real->initializeAsEmpty(_opCtx);
+            if (!status.isOK())
+                return status;
 
-        _indexes.push_back(std::move(index));
-    }
+            if (!_buildInBackground) {
+                // Bulk build process requires foreground building as it assumes nothing is changing
+                // under it.
+                index.bulk = index.real->initiateBulk(eachIndexBuildMaxMemoryUsageBytes);
+            }
 
-    if (_buildInBackground)
-        _backgroundOperation.reset(new BackgroundOperation(ns));
+            const IndexDescriptor* descriptor = index.block->getEntry()->descriptor();
 
-    auto replCoord = repl::ReplicationCoordinator::get(_opCtx);
-    if (_opCtx->recoveryUnit()->getCommitTimestamp().isNull() &&
-        replCoord->canAcceptWritesForDatabase(_opCtx, "admin")) {
-        // Only primaries must timestamp this write. Secondaries run this from within a
-        // `TimestampBlock`. Primaries performing an index build via `applyOps` may have a
-        // wrapping commit timestamp that will be used instead.
-        _opCtx->getServiceContext()->getOpObserver()->onOpMessage(
-            _opCtx, BSON("msg" << std::string(str::stream() << "Creating indexes. Coll: " << ns)));
-    }
+            IndexCatalog::prepareInsertDeleteOptions(_opCtx, descriptor, &index.options);
+            index.options.dupsAllowed = index.options.dupsAllowed || _ignoreUnique;
+            if (_ignoreUnique) {
+                index.options.getKeysMode = IndexAccessMethod::GetKeysMode::kRelaxConstraints;
+            }
 
-    wunit.commit();
+            log() << "build index on: " << ns << " properties: " << descriptor->toString();
+            if (index.bulk)
+                log() << "\t building index using bulk method; build may temporarily use up to "
+                      << eachIndexBuildMaxMemoryUsageBytes / 1024 / 1024 << " megabytes of RAM";
 
-    if (MONGO_FAIL_POINT(crashAfterStartingIndexBuild)) {
-        log() << "Index build interrupted due to 'crashAfterStartingIndexBuild' failpoint. Exiting "
-                 "after waiting for changes to become durable.";
-        Locker::LockSnapshot lockInfo;
-        invariant(_opCtx->lockState()->saveLockStateAndUnlock(&lockInfo));
-        if (_opCtx->recoveryUnit()->waitUntilDurable()) {
-            quickExit(EXIT_TEST);
+            index.filterExpression = index.block->getEntry()->getFilterExpression();
+
+            // TODO SERVER-14888 Suppress this in cases we don't want to audit.
+            audit::logCreateIndex(_opCtx->getClient(), &info, descriptor->indexName(), ns);
+
+            _indexes.push_back(std::move(index));
         }
-    }
 
-    return indexInfoObjs;
+        if (_buildInBackground)
+            _backgroundOperation.reset(new BackgroundOperation(ns));
+
+        auto replCoord = repl::ReplicationCoordinator::get(_opCtx);
+        if (_opCtx->recoveryUnit()->getCommitTimestamp().isNull() &&
+            replCoord->canAcceptWritesForDatabase(_opCtx, "admin")) {
+            // Only primaries must timestamp this write. Secondaries run this from within a
+            // `TimestampBlock`. Primaries performing an index build via `applyOps` may have a
+            // wrapping commit timestamp that will be used instead.
+            _opCtx->getServiceContext()->getOpObserver()->onOpMessage(
+                _opCtx,
+                BSON("msg" << std::string(str::stream() << "Creating indexes. Coll: " << ns)));
+        }
+
+        wunit.commit();
+
+        if (MONGO_FAIL_POINT(crashAfterStartingIndexBuild)) {
+            log() << "Index build interrupted due to 'crashAfterStartingIndexBuild' failpoint. "
+                     "Exiting "
+                     "after waiting for changes to become durable.";
+            Locker::LockSnapshot lockInfo;
+            invariant(_opCtx->lockState()->saveLockStateAndUnlock(&lockInfo));
+            if (_opCtx->recoveryUnit()->waitUntilDurable()) {
+                quickExit(EXIT_TEST);
+            }
+        }
+
+        return indexInfoObjs;
+        // Avoid converting WCE to Status
+    } catch (const WriteConflictException&) {
+        throw;
+    } catch (...) {
+        return {exceptionToStatus().code(),
+                str::stream() << "Caught exception during index builder initialization "
+                              << _collection->ns().toString()
+                              << " ("
+                              << _collection->uuid()
+                              << "): "
+                              << indexSpecs.size()
+                              << " provided. First index spec: "
+                              << (indexSpecs.empty() ? BSONObj() : indexSpecs[0])};
+    }
 }
 
 void failPointHangDuringBuild(FailPoint* fp, StringData where, const BSONObj& doc) {
@@ -494,7 +513,14 @@ Status MultiIndexBlockImpl::insert(const BSONObj& doc, const RecordId& loc) {
         int64_t unused;
         Status idxStatus(ErrorCodes::InternalError, "");
         if (_indexes[i].bulk) {
-            idxStatus = _indexes[i].bulk->insert(_opCtx, doc, loc, _indexes[i].options, &unused);
+            // When calling insert, BulkBuilderImpl's Sorter performs file I/O that may result in an
+            // exception.
+            try {
+                idxStatus =
+                    _indexes[i].bulk->insert(_opCtx, doc, loc, _indexes[i].options, &unused);
+            } catch (...) {
+                return exceptionToStatus();
+            }
         } else {
             idxStatus = _indexes[i].real->insert(_opCtx, doc, loc, _indexes[i].options, &unused);
         }
@@ -512,13 +538,19 @@ Status MultiIndexBlockImpl::doneInserting(std::set<RecordId>* dupsOut) {
             continue;
         LOG(1) << "\t bulk commit starting for index: "
                << _indexes[i].block->getEntry()->descriptor()->indexName();
-        Status status = _indexes[i].real->commitBulk(_opCtx,
-                                                     _indexes[i].bulk.get(),
-                                                     _allowInterruption,
-                                                     _indexes[i].options.dupsAllowed,
-                                                     dupsOut);
-        if (!status.isOK()) {
-            return status;
+        // SERVER-41918 This call to commitBulk() results in file I/O that may result in an
+        // exception.
+        try {
+            Status status = _indexes[i].real->commitBulk(_opCtx,
+                                                         _indexes[i].bulk.get(),
+                                                         _allowInterruption,
+                                                         _indexes[i].options.dupsAllowed,
+                                                         dupsOut);
+            if (!status.isOK()) {
+                return status;
+            }
+        } catch (...) {
+            return exceptionToStatus();
         }
     }
 

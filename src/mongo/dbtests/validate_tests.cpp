@@ -691,8 +691,9 @@ public:
             wunit.commit();
         }
 
-        // Create a partial geo index that indexes the document. This should throw an error.
-        ASSERT_THROWS(dbtests::createIndexFromSpec(&_opCtx,
+        // Create a partial geo index that indexes the document. This should return a non-ok
+        // status.
+        ASSERT_NOT_OK(dbtests::createIndexFromSpec(&_opCtx,
                                                    coll->ns().ns(),
                                                    BSON("name"
                                                         << "partial_index"
@@ -706,9 +707,7 @@ public:
                                                         << "background"
                                                         << false
                                                         << "partialFilterExpression"
-                                                        << BSON("a" << BSON("$eq" << 2))))
-                          .transitional_ignore(),
-                      AssertionException);
+                                                        << BSON("a" << BSON("$eq" << 2)))));
 
         // Create a partial geo index that does not index the document.
         auto status = dbtests::createIndexFromSpec(&_opCtx,
