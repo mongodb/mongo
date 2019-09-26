@@ -274,6 +274,8 @@ public:
 
     virtual size_t getNumUncommittedSnapshots() override;
 
+    virtual void createWMajorityWriteAvailabilityDateWaiter(OpTime opTime) override;
+
     virtual WriteConcernOptions populateUnsetWriteConcernOptionsSyncMode(
         WriteConcernOptions wc) override;
 

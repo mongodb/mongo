@@ -85,6 +85,7 @@ public:
     void setTargetCatchupOpTime(OpTime opTime);
     void setNumCatchUpOps(int numCatchUpOps);
     void setNewTermStartDate(Date_t newTermStartDate);
+    void setWMajorityWriteAvailabilityDate(Date_t wMajorityWriteAvailabilityDate);
 
     boost::optional<OpTime> getTargetCatchupOpTime_forTesting();
 

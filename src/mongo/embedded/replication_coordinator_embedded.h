@@ -247,6 +247,8 @@ public:
 
     size_t getNumUncommittedSnapshots() override;
 
+    virtual void createWMajorityWriteAvailabilityDateWaiter(repl::OpTime opTime) override;
+
     Status stepUpIfEligible(bool skipDryRun) override;
 
     Status abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) override;

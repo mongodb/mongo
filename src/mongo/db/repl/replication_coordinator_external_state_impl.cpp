@@ -492,6 +492,9 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     auto newTermStartDate = loadLastOpTimeAndWallTimeResult.getValue().wallTime;
     ReplicationMetrics::get(opCtx).setNewTermStartDate(newTermStartDate);
 
+    auto replCoord = ReplicationCoordinator::get(opCtx);
+    replCoord->createWMajorityWriteAvailabilityDateWaiter(opTimeToReturn);
+
     _shardingOnTransitionToPrimaryHook(opCtx);
 
     _dropAllTempCollections(opCtx);

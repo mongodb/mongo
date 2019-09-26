@@ -464,6 +464,10 @@ size_t ReplicationCoordinatorEmbedded::getNumUncommittedSnapshots() {
     UASSERT_NOT_IMPLEMENTED;
 }
 
+void ReplicationCoordinatorEmbedded::createWMajorityWriteAvailabilityDateWaiter(OpTime opTime) {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 void ReplicationCoordinatorEmbedded::dropAllSnapshots() {
     UASSERT_NOT_IMPLEMENTED;
 }

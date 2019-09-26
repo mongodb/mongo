@@ -139,6 +139,10 @@ structs:
                 description: "Time the new term oplog entry was written"
                 type: date
                 optional: true
+            wMajorityWriteAvailabilityDate:
+                description: "Time w:majority write concern is satisfied for new term oplog entry"
+                type: date
+                optional: true
 
     ElectionParticipantMetrics:
         description: "Stores metrics that are specific to the last election in which the node voted"

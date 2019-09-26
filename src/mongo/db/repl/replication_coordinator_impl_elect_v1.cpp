@@ -68,6 +68,7 @@ public:
         // Clear the node's election candidate metrics if it loses either the dry-run or actual
         // election, since it will not become primary.
         ReplicationMetrics::get(getGlobalServiceContext()).clearElectionCandidateMetrics();
+        _replCoord->_wMajorityWriteAvailabilityWaiter.reset();
     }
 
     void dismiss() {
