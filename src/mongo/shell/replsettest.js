@@ -2215,7 +2215,6 @@ var ReplSetTest = function(opts) {
                 print("First 10 documents in collection: " +
                       tojson(coll.find().limit(10).toArray()));
 
-                // TODO (SERVER-35483): Remove this block and enable fastcount checks.
                 if (coll.getFullName() == "config.transactions") {
                     print(`Ignoring fastcount error for ${coll.getFullName()} on ` +
                           `${coll.getMongo().host}. itcount: ${itCount}, fast count: ${fastCount}`);
