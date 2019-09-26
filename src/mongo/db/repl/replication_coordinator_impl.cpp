@@ -1424,6 +1424,10 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
         // only then do we know that it will fill in all "holes" before that time.  If we do it
         // earlier, we may return when the requested optime has been reached, but other writes
         // at optimes before that time are not yet visible.
+        //
+        // Note that oplog queries by secondary nodes depend on this behavior to wait for
+        // all oplog holes to be filled in, despite providing an afterClusterTime field
+        // with Timestamp(0,1).
         _storage->waitForAllEarlierOplogWritesToBeVisible(opCtx);
     }
 
