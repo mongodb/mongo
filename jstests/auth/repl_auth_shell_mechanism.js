@@ -1,5 +1,8 @@
-// Start a replica set with auth using SCRAM-SHA-256 exclusively,
-// then connect via shell.
+/* Start a replica set with auth using SCRAM-SHA-256 exclusively,
+ * then connect via shell.
+`*
+ * @tags: [requires_replication]
+ */
 
 (function() {
 
