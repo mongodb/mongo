@@ -101,16 +101,15 @@ std::unique_ptr<ShardingCatalogClient> makeCatalogClient(ServiceContext* service
 
 std::shared_ptr<executor::TaskExecutor> makeShardingFixedTaskExecutor(
     std::unique_ptr<NetworkInterface> net) {
-    auto executor = stdx::make_unique<ThreadPoolTaskExecutor>(
-        stdx::make_unique<ThreadPool>([] {
-            ThreadPool::Options opts;
-            opts.poolName = "Sharding-Fixed";
-
-            const auto maxThreads = stdx::thread::hardware_concurrency();
-            opts.maxThreads = maxThreads == 0 ? 16 : 2 * maxThreads;
-            return opts;
-        }()),
-        std::move(net));
+    auto executor =
+        stdx::make_unique<ThreadPoolTaskExecutor>(stdx::make_unique<ThreadPool>([] {
+                                                      ThreadPool::Options opts;
+                                                      opts.poolName = "Sharding-Fixed";
+                                                      opts.maxThreads =
+                                                          ThreadPool::Options::kUnlimited;
+                                                      return opts;
+                                                  }()),
+                                                  std::move(net));
 
     return std::make_shared<executor::ShardingTaskExecutor>(std::move(executor));
 }
