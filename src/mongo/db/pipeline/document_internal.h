@@ -265,10 +265,8 @@ private:
 /// Storage class used by both Document and MutableDocument
 class DocumentStorage : public RefCountable {
 public:
-    DocumentStorage() : DocumentStorage(BSONObj(), false, false) {
-        // Aggregation assumes ownership of underlying BSON even if it is empty.
-        makeOwned();
-    }
+    DocumentStorage() : DocumentStorage(BSONObj(), false, false) {}
+
     /**
      * Construct a storage from the BSON. The BSON is lazily processed as fields are requested from
      * the document. If we know that the BSON does not contain any metadata fields we can set the
@@ -372,7 +370,9 @@ public:
     }
 
     bool isOwned() const {
-        return _bson.isOwned();
+        // An empty BSON is a special case, it can be treated 'owned'. We save on memory allocation
+        // when constructing an empty Document.
+        return _bson.isEmpty() || _bson.isOwned();
     }
 
     void makeOwned() {

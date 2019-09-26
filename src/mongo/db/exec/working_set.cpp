@@ -113,7 +113,7 @@ WorkingSetID WorkingSet::emplace(WorkingSetMember&& wsm) {
 void WorkingSetMember::clear() {
     _metadata = DocumentMetadataFields{};
     keyData.clear();
-    doc = {SnapshotId(), Document()};
+    resetDocument(SnapshotId(), BSONObj());
     _state = WorkingSetMember::INVALID;
 }
 
