@@ -2,7 +2,12 @@
  * Characterizes the actions (rebuilds or drops the index) taken upon unfinished indexes when
  * restarting mongod from (standalone -> standalone) and (replica set member -> standalone).
  *
- * @tags: [requires_replication, requires_persistence, requires_majority_read_concern]
+ * @tags: [
+ *   requires_majority_read_concern,
+ *   requires_persistence,
+ *   requires_replication,
+ *   two_phase_index_builds_unsupported,
+ * ]
  */
 (function() {
 'use strict';

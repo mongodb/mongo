@@ -1,6 +1,9 @@
 /**
  * Confirms that background index builds on a primary can be aborted using killop.
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   two_phase_index_builds_unsupported,
+ * ]
  */
 (function() {
 "use strict";

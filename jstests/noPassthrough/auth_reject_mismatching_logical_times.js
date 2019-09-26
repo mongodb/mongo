@@ -1,7 +1,10 @@
 /**
  * Verifies mismatching cluster time objects are rejected by a sharded cluster when auth is on. In
  * noPassthrough because auth is manually set.
- * @tags: [requires_replication, requires_sharding]
+ * @tags: [
+ *   requires_replication,
+ *   requires_sharding,
+ * ]
  */
 (function() {
 "use strict";
