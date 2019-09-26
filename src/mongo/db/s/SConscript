@@ -416,6 +416,7 @@ env.CppUnitTest(
         'collection_range_deleter_test.cpp',
         'collection_sharding_state_test.cpp',
         'metadata_manager_test.cpp',
+        'persistent_task_queue_test.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/remote_command_targeter_mock',
