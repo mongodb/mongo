@@ -37,7 +37,6 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -64,9 +63,7 @@ IndexConsistency::IndexConsistency(OperationContext* opCtx,
 
     for (const auto& index : _validateState->getIndexes()) {
         const IndexDescriptor* descriptor = index->descriptor();
-        if (DurableCatalog::get(opCtx)->isIndexReady(
-                opCtx, _validateState->nss(), descriptor->indexName()))
-            _indexesInfo.emplace(descriptor->indexName(), IndexInfo(descriptor));
+        _indexesInfo.emplace(descriptor->indexName(), IndexInfo(descriptor));
     }
 }
 
