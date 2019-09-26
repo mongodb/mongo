@@ -1687,11 +1687,10 @@ TEST_F(ChangeStreamStageTest, UsesResumeTokenAsSortKeyIfNeedsMergeIsFalse) {
 
     auto next = stages.back()->getNext();
 
-    auto expectedSortKey =
-        makeResumeToken(kDefaultTs, testUuid(), BSON("x" << 2 << "_id" << 1)).toBson();
+    auto expectedSortKey = makeResumeToken(kDefaultTs, testUuid(), BSON("x" << 2 << "_id" << 1));
 
     ASSERT_TRUE(next.isAdvanced());
-    ASSERT_BSONOBJ_EQ(next.releaseDocument().metadata().getSortKey(), expectedSortKey);
+    ASSERT_VALUE_EQ(next.releaseDocument().metadata().getSortKey(), Value(expectedSortKey));
 }
 
 //

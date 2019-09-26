@@ -76,8 +76,9 @@ public:
         return unittest::assertGet(PlanExecutor::make(opCtx,
                                                       std::move(workingSet),
                                                       std::move(queuedDataStage),
-                                                      kTestNss,
-                                                      PlanExecutor::YieldPolicy::NO_YIELD));
+                                                      nullptr,
+                                                      PlanExecutor::YieldPolicy::NO_YIELD,
+                                                      kTestNss));
     }
 
     ClientCursorParams makeParams(OperationContext* opCtx) {

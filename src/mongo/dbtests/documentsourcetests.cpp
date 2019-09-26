@@ -343,10 +343,9 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterTimeout)
     auto canonicalQuery = unittest::assertGet(
         CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest), nullptr));
     auto planExecutor =
-        uassertStatusOK(PlanExecutor::make(opCtx(),
+        uassertStatusOK(PlanExecutor::make(std::move(canonicalQuery),
                                            std::move(workingSet),
                                            std::move(collectionScan),
-                                           std::move(canonicalQuery),
                                            readLock.getCollection(),
                                            PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT));
 
@@ -380,10 +379,9 @@ TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {
     auto canonicalQuery = unittest::assertGet(
         CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest), nullptr));
     auto planExecutor =
-        uassertStatusOK(PlanExecutor::make(opCtx(),
+        uassertStatusOK(PlanExecutor::make(std::move(canonicalQuery),
                                            std::move(workingSet),
                                            std::move(collectionScan),
-                                           std::move(canonicalQuery),
                                            readLock.getCollection(),
                                            PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT));
 
@@ -426,10 +424,9 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKil
     auto canonicalQuery = unittest::assertGet(
         CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest), nullptr));
     auto planExecutor =
-        uassertStatusOK(PlanExecutor::make(opCtx(),
+        uassertStatusOK(PlanExecutor::make(std::move(canonicalQuery),
                                            std::move(workingSet),
                                            std::move(collectionScan),
-                                           std::move(canonicalQuery),
                                            readLock.getCollection(),
                                            PlanExecutor::YieldPolicy::ALWAYS_MARK_KILLED));
 
@@ -462,10 +459,9 @@ TEST_F(DocumentSourceCursorTest, NormalCursorShouldErrorAfterBeingKilled) {
     auto canonicalQuery = unittest::assertGet(
         CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest), nullptr));
     auto planExecutor =
-        uassertStatusOK(PlanExecutor::make(opCtx(),
+        uassertStatusOK(PlanExecutor::make(std::move(canonicalQuery),
                                            std::move(workingSet),
                                            std::move(collectionScan),
-                                           std::move(canonicalQuery),
                                            readLock.getCollection(),
                                            PlanExecutor::YieldPolicy::ALWAYS_MARK_KILLED));
 

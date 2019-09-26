@@ -65,7 +65,7 @@ void DocumentMetadataFields::mergeWith(const DocumentMetadataFields& other) {
         setRandVal(other.getRandVal());
     }
     if (!hasSortKey() && other.hasSortKey()) {
-        setSortKey(other.getSortKey());
+        setSortKey(other.getSortKey(), other.isSingleElementKey());
     }
     if (!hasGeoNearDistance() && other.hasGeoNearDistance()) {
         setGeoNearDistance(other.getGeoNearDistance());
@@ -92,7 +92,7 @@ void DocumentMetadataFields::copyFrom(const DocumentMetadataFields& other) {
         setRandVal(other.getRandVal());
     }
     if (other.hasSortKey()) {
-        setSortKey(other.getSortKey());
+        setSortKey(other.getSortKey(), other.isSingleElementKey());
     }
     if (other.hasGeoNearDistance()) {
         setGeoNearDistance(other.getGeoNearDistance());
@@ -121,7 +121,7 @@ size_t DocumentMetadataFields::getApproximateSize() const {
     size_t size = sizeof(MetadataHolder);
 
     // Count the "deep" portion of the metadata values.
-    size += _holder->sortKey.objsize();
+    size += _holder->sortKey.getApproximateSize();
     size += _holder->geoNearPoint.getApproximateSize();
     // Size of Value is double counted - once in sizeof(MetadataFields) and once in
     // getApproximateSize()
@@ -150,7 +150,8 @@ void DocumentMetadataFields::serializeForSorter(BufBuilder& buf) const {
     }
     if (hasSortKey()) {
         buf.appendNum(static_cast<char>(MetaType::kSortKey + 1));
-        getSortKey().appendSelfToBufBuilder(buf);
+        buf.appendChar(isSingleElementKey() ? 1 : 0);
+        getSortKey().serializeForSorter(buf);
     }
     if (hasGeoNearDistance()) {
         buf.appendNum(static_cast<char>(MetaType::kGeoNearDist + 1));
@@ -184,8 +185,9 @@ void DocumentMetadataFields::deserializeForSorter(BufReader& buf, DocumentMetada
         } else if (marker == static_cast<char>(MetaType::kRandVal) + 1) {
             out->setRandVal(buf.read<LittleEndian<double>>());
         } else if (marker == static_cast<char>(MetaType::kSortKey) + 1) {
-            out->setSortKey(
-                BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings()));
+            char isSingleElementKey = buf.read<char>();
+            out->setSortKey(Value::deserializeForSorter(buf, Value::SorterDeserializeSettings()),
+                            isSingleElementKey);
         } else if (marker == static_cast<char>(MetaType::kGeoNearDist) + 1) {
             out->setGeoNearDistance(buf.read<LittleEndian<double>>());
         } else if (marker == static_cast<char>(MetaType::kGeoNearPoint) + 1) {

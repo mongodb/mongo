@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/sort_key_comparator.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression.h"
@@ -101,11 +102,13 @@ private:
     using DocumentSorter = Sorter<Value, WorkingSetMember>;
     class Comparator {
     public:
-        Comparator(const SortPattern& sortPattern) : _sort(sortPattern) {}
-        int operator()(const DocumentSorter::Data& lhs, const DocumentSorter::Data& rhs) const;
+        Comparator(const SortPattern& sortPattern) : _sortKeyComparator(sortPattern) {}
+        int operator()(const DocumentSorter::Data& lhs, const DocumentSorter::Data& rhs) const {
+            return _sortKeyComparator(lhs.first, rhs.first);
+        }
 
     private:
-        const SortPattern& _sort;
+        SortKeyComparator _sortKeyComparator;
     };
 
     SortOptions makeSortOptions() const;

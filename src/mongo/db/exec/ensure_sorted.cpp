@@ -46,9 +46,8 @@ EnsureSortedStage::EnsureSortedStage(OperationContext* opCtx,
                                      BSONObj pattern,
                                      WorkingSet* ws,
                                      std::unique_ptr<PlanStage> child)
-    : PlanStage(kStageType, opCtx), _ws(ws) {
+    : PlanStage(kStageType, opCtx), _ws(ws), _sortKeyComparator(pattern) {
     _children.emplace_back(std::move(child));
-    _pattern = FindCommon::transformSortSpec(pattern);
 }
 
 bool EnsureSortedStage::isEOF() {
@@ -63,16 +62,15 @@ PlanStage::StageState EnsureSortedStage::doWork(WorkingSetID* out) {
         // SortKeyGeneratorStage descendent in the execution tree.
         WorkingSetMember* member = _ws->get(*out);
         auto curSortKey = member->metadata().getSortKey();
-        invariant(!curSortKey.isEmpty());
+        invariant(!curSortKey.missing());
 
-        if (!_prevSortKey.isEmpty() && !isInOrder(_prevSortKey, curSortKey)) {
+        if (!_prevSortKey.missing() && !isInOrder(_prevSortKey, curSortKey)) {
             // 'member' is out of order. Drop it from the result set.
             _ws->free(*out);
             ++_specificStats.nDropped;
             return PlanStage::NEED_TIME;
         }
 
-        invariant(curSortKey.isOwned());
         _prevSortKey = curSortKey;
         return PlanStage::ADVANCED;
     }
@@ -93,10 +91,10 @@ const SpecificStats* EnsureSortedStage::getSpecificStats() const {
     return &_specificStats;
 }
 
-bool EnsureSortedStage::isInOrder(const BSONObj& lhsSortKey, const BSONObj& rhsSortKey) const {
+bool EnsureSortedStage::isInOrder(const Value& lhsKey, const Value& rhsKey) const {
     // No need to compare with a collator, since the sort keys were extracted by the
     // SortKeyGenerator, which has already mapped strings to their comparison keys.
-    return lhsSortKey.woCompare(rhsSortKey, _pattern, /*considerFieldName*/ false) <= 0;
+    return _sortKeyComparator(lhsKey, rhsKey) <= 0;
 }
 
 }  // namespace mongo

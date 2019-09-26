@@ -277,6 +277,10 @@ public:
     boost::optional<ServerGlobalParams::FeatureCompatibility::Version>
         maxFeatureCompatibilityVersion;
 
+    // True if this ExpressionContext is associated with a Change Stream that should serialize its
+    // "$sortKey" using the 4.2 format.
+    bool use42ChangeStreamSortKeys = false;
+
 protected:
     static const int kInterruptCheckPeriod = 128;
 

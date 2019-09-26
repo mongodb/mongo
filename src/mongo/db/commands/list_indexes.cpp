@@ -196,7 +196,7 @@ public:
             }
 
             exec = uassertStatusOK(PlanExecutor::make(
-                opCtx, std::move(ws), std::move(root), nss, PlanExecutor::NO_YIELD));
+                opCtx, std::move(ws), std::move(root), nullptr, PlanExecutor::NO_YIELD, nss));
 
             for (long long objCount = 0; objCount < batchSize; objCount++) {
                 BSONObj next;

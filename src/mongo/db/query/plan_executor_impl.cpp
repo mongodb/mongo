@@ -126,72 +126,71 @@ PlanStage* getStageByType(PlanStage* root, StageType type) {
 }
 }  // namespace
 
-// static
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
-    OperationContext* opCtx,
-    unique_ptr<WorkingSet> ws,
-    unique_ptr<PlanStage> rt,
+    std::unique_ptr<CanonicalQuery> cq,
+    std::unique_ptr<WorkingSet> ws,
+    std::unique_ptr<PlanStage> rt,
     const Collection* collection,
-    YieldPolicy yieldPolicy) {
-    return PlanExecutorImpl::make(
-        opCtx, std::move(ws), std::move(rt), nullptr, nullptr, collection, {}, yieldPolicy);
-}
-
-// static
-StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
-    OperationContext* opCtx,
-    unique_ptr<WorkingSet> ws,
-    unique_ptr<PlanStage> rt,
+    YieldPolicy yieldPolicy,
     NamespaceString nss,
-    YieldPolicy yieldPolicy) {
-    return PlanExecutorImpl::make(opCtx,
-                                  std::move(ws),
-                                  std::move(rt),
-                                  nullptr,
-                                  nullptr,
-                                  nullptr,
-                                  std::move(nss),
-                                  yieldPolicy);
-}
-
-// static
-StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
-    OperationContext* opCtx,
-    unique_ptr<WorkingSet> ws,
-    unique_ptr<PlanStage> rt,
-    unique_ptr<CanonicalQuery> cq,
-    const Collection* collection,
-    YieldPolicy yieldPolicy) {
-    return PlanExecutorImpl::make(
-        opCtx, std::move(ws), std::move(rt), nullptr, std::move(cq), collection, {}, yieldPolicy);
-}
-
-// static
-StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
-    OperationContext* opCtx,
-    unique_ptr<WorkingSet> ws,
-    unique_ptr<PlanStage> rt,
-    unique_ptr<QuerySolution> qs,
-    unique_ptr<CanonicalQuery> cq,
-    const Collection* collection,
-    YieldPolicy yieldPolicy) {
-    return PlanExecutorImpl::make(opCtx,
+    std::unique_ptr<QuerySolution> qs) {
+    auto expCtx = cq->getExpCtx();
+    return PlanExecutorImpl::make(expCtx->opCtx,
                                   std::move(ws),
                                   std::move(rt),
                                   std::move(qs),
                                   std::move(cq),
+                                  expCtx,
                                   collection,
-                                  {},
+                                  nss,
                                   yieldPolicy);
 }
 
-// static
+StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    std::unique_ptr<WorkingSet> ws,
+    std::unique_ptr<PlanStage> rt,
+    const Collection* collection,
+    YieldPolicy yieldPolicy,
+    NamespaceString nss,
+    std::unique_ptr<QuerySolution> qs) {
+    return PlanExecutorImpl::make(expCtx->opCtx,
+                                  std::move(ws),
+                                  std::move(rt),
+                                  std::move(qs),
+                                  nullptr,
+                                  expCtx,
+                                  collection,
+                                  nss,
+                                  yieldPolicy);
+}
+
+StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
+    OperationContext* opCtx,
+    std::unique_ptr<WorkingSet> ws,
+    std::unique_ptr<PlanStage> rt,
+    const Collection* collection,
+    YieldPolicy yieldPolicy,
+    NamespaceString nss,
+    std::unique_ptr<QuerySolution> qs) {
+    return PlanExecutorImpl::make(opCtx,
+                                  std::move(ws),
+                                  std::move(rt),
+                                  std::move(qs),
+                                  nullptr,
+                                  nullptr,
+                                  collection,
+                                  nss,
+                                  yieldPolicy);
+}
+
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutorImpl::make(
     OperationContext* opCtx,
     unique_ptr<WorkingSet> ws,
     unique_ptr<PlanStage> rt,
     unique_ptr<QuerySolution> qs,
     unique_ptr<CanonicalQuery> cq,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const Collection* collection,
     NamespaceString nss,
     YieldPolicy yieldPolicy) {
@@ -201,6 +200,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutorImpl::ma
                                          std::move(rt),
                                          std::move(qs),
                                          std::move(cq),
+                                         expCtx,
                                          collection,
                                          std::move(nss),
                                          yieldPolicy);
@@ -221,17 +221,22 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
                                    unique_ptr<PlanStage> rt,
                                    unique_ptr<QuerySolution> qs,
                                    unique_ptr<CanonicalQuery> cq,
+                                   const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                    const Collection* collection,
                                    NamespaceString nss,
                                    YieldPolicy yieldPolicy)
     : _opCtx(opCtx),
       _cq(std::move(cq)),
+      _expCtx(_cq ? _cq->getExpCtx() : expCtx),
       _workingSet(std::move(ws)),
       _qs(std::move(qs)),
       _root(std::move(rt)),
       _nss(std::move(nss)),
       // There's no point in yielding if the collection doesn't exist.
       _yieldPolicy(makeYieldPolicy(this, collection ? yieldPolicy : NO_YIELD)) {
+    invariant(!_expCtx || _expCtx->opCtx == _opCtx);
+    invariant(!_cq || !_expCtx || _cq->getExpCtx() == _expCtx);
+
     // We may still need to initialize _nss from either collection or _cq.
     if (!_nss.isEmpty()) {
         return;  // We already have an _nss set, so there's nothing more to do.
@@ -288,7 +293,6 @@ PlanExecutorImpl::~PlanExecutorImpl() {
     invariant(_currentState == kDisposed);
 }
 
-// static
 string PlanExecutor::statestr(ExecState s) {
     if (PlanExecutor::ADVANCED == s) {
         return "ADVANCED";
@@ -541,11 +545,12 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<BSONObj>* obj
                         *objOut = Snapshotted<BSONObj>(SnapshotId(), member->keyData[0].keyData);
                     }
                 } else if (member->hasObj()) {
-                    *objOut =
-                        Snapshotted<BSONObj>(member->doc.snapshotId(),
-                                             member->metadata() && member->doc.value().metadata()
-                                                 ? member->doc.value().toBsonWithMetaData()
-                                                 : member->doc.value().toBson());
+                    *objOut = Snapshotted<BSONObj>(
+                        member->doc.snapshotId(),
+                        member->metadata() && member->doc.value().metadata()
+                            ? member->doc.value().toBsonWithMetaData(
+                                  _expCtx ? _expCtx->use42ChangeStreamSortKeys : false)
+                            : member->doc.value().toBson());
                 } else {
                     _workingSet->free(id);
                     hasRequestedData = false;

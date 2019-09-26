@@ -34,6 +34,7 @@ sortExecutorEnv.Library(
     target="sort_executor",
     source=[
         "sort_executor.cpp",
+        "sort_key_comparator.cpp",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/sort_pattern',

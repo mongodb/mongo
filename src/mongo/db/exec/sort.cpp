@@ -53,17 +53,16 @@ using std::vector;
 // static
 const char* SortStage::kStageType = "SORT";
 
-SortStage::WorkingSetComparator::WorkingSetComparator(BSONObj p) : pattern(p) {}
-
 bool SortStage::WorkingSetComparator::operator()(const SortableDataItem& lhs,
                                                  const SortableDataItem& rhs) const {
-    // False means ignore field names.
-    int result = lhs.sortKey.woCompare(rhs.sortKey, pattern, false);
-    if (0 != result) {
-        return result < 0;
+    int cmp = sortKeyComparator(lhs.sortKey, rhs.sortKey);
+    if (cmp != 0) {
+        return cmp < 0;
+    } else {
+        // Indexes use recordId as a final tiebreaker, and we do the same here, so that SortStage
+        // outputs documents in the same order that an index would have.
+        return lhs.recordId < rhs.recordId;
     }
-    // Indices use RecordId as an additional sort key so we must as well.
-    return lhs.recordId < rhs.recordId;
 }
 
 SortStage::SortStage(boost::intrusive_ptr<ExpressionContext> expCtx,
@@ -87,12 +86,12 @@ SortStage::SortStage(boost::intrusive_ptr<ExpressionContext> expCtx,
     _children.emplace_back(std::move(child));
 
     BSONObj sortComparator = FindCommon::transformSortSpec(_pattern);
-    _sortKeyComparator = std::make_unique<WorkingSetComparator>(sortComparator);
+    _workingSetComparator = std::make_unique<WorkingSetComparator>(sortComparator);
 
     // If limit > 1, we need to initialize _dataSet here to maintain ordered set of data items while
     // fetching from the child stage.
     if (_limit > 1) {
-        const WorkingSetComparator& cmp = *_sortKeyComparator;
+        const WorkingSetComparator& cmp = *_workingSetComparator;
         _dataSet.reset(new SortableDataItemSet(cmp));
     }
 }
@@ -226,7 +225,7 @@ void SortStage::addToBuffer(const SortableDataItem& item) {
             return;
         }
         wsidToFree = item.wsid;
-        const WorkingSetComparator& cmp = *_sortKeyComparator;
+        const WorkingSetComparator& cmp = *_workingSetComparator;
         // Compare new item with existing item in vector.
         if (cmp(item, _data[0])) {
             wsidToFree = _data[0].wsid;
@@ -250,7 +249,7 @@ void SortStage::addToBuffer(const SortableDataItem& item) {
         wsidToFree = item.wsid;
         SortableDataItemSet::const_iterator lastItemIt = --(_dataSet->end());
         const SortableDataItem& lastItem = *lastItemIt;
-        const WorkingSetComparator& cmp = *_sortKeyComparator;
+        const WorkingSetComparator& cmp = *_workingSetComparator;
         if (cmp(item, lastItem)) {
             _memUsage -= _ws->get(lastItem.wsid)->getMemUsage();
             _memUsage += member->getMemUsage();
@@ -275,7 +274,7 @@ void SortStage::addToBuffer(const SortableDataItem& item) {
 
 void SortStage::sortBuffer() {
     if (_limit == 0) {
-        const WorkingSetComparator& cmp = *_sortKeyComparator;
+        const WorkingSetComparator& cmp = *_workingSetComparator;
         std::sort(_data.begin(), _data.end(), cmp);
     } else if (_limit == 1) {
         // Buffer contains either 0 or 1 item so it is already in a sorted state.

@@ -55,7 +55,8 @@ BSONObj indexKey(const WorkingSetMember& member) {
 }
 
 BSONObj sortKey(const WorkingSetMember& member) {
-    return member.metadata().getSortKey();
+    return DocumentMetadataFields::serializeSortKey(member.metadata().isSingleElementKey(),
+                                                    member.metadata().getSortKey());
 }
 
 double geoDistance(const WorkingSetMember& member) {

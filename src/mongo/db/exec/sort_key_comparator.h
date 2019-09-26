@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,54 +29,30 @@
 
 #pragma once
 
-#include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/sort_key_comparator.h"
+#include <vector>
+
+#include "mongo/db/pipeline/value.h"
+#include "mongo/db/query/sort_pattern.h"
 
 namespace mongo {
 
 /**
- * Takes the output of its child and drops any results that are not in the sort order specified by
- * 'pattern'. Thus, if the pattern is {a: -1} and the following documents are inputted:
- *      {a: 9}, {a: 6}, {a: 8}, {a, 1}
- * The third document will be dropped so that the output is:
- *      {a: 9}, {a: 6}, {a, 1}
+ * This class is used to compare "sort keys," which are the values used to determine the order of
+ * documents returned by a query that requests a sort. When executing a query with a blocking sort,
+ * a SortKeyGenerator stage creates a sort key for each document based on the requested sort
+ * pattern, and a sort stage orders the documents using the sort keys and this comparator.
  */
-class EnsureSortedStage final : public PlanStage {
+class SortKeyComparator {
 public:
-    EnsureSortedStage(OperationContext* opCtx,
-                      BSONObj pattern,
-                      WorkingSet* ws,
-                      std::unique_ptr<PlanStage> child);
-
-    bool isEOF() final;
-    StageState doWork(WorkingSetID* out) final;
-
-    StageType stageType() const final {
-        return STAGE_ENSURE_SORTED;
-    }
-
-    std::unique_ptr<PlanStageStats> getStats() final;
-
-    const SpecificStats* getSpecificStats() const final;
-
-    static const char* kStageType;
+    SortKeyComparator(const SortPattern& sortPattern);
+    SortKeyComparator(const BSONObj& sortPattern);
+    int operator()(const Value& lhsKey, const Value& rhsKey) const;
 
 private:
-    /**
-     * Returns whether the result with the lhsSortKey should come before the result with the
-     * rhsSortKey in sort order.
-     */
-    bool isInOrder(const Value& lhsSortKey, const Value& rhsSortKey) const;
-
-    WorkingSet* _ws;
-
-    // Comparator that is aware of the pattern that we're sorting by.
-    SortKeyComparator _sortKeyComparator;
-
-    // The sort key of the previous result.
-    Value _prevSortKey;
-
-    EnsureSortedStats _specificStats;
+    // The comparator does not need the entire sort pattern, just the sort direction for each
+    // component.
+    enum class SortDirection { kDescending, kAscending };
+    std::vector<SortDirection> _pattern;
 };
 
 }  // namespace mongo

@@ -119,8 +119,8 @@ public:
             new CollectionScan(&_opCtx, coll, csparams, ws.get(), cq.get()->root()));
 
         // Hand the plan off to the executor.
-        auto statusWithPlanExecutor = PlanExecutor::make(
-            &_opCtx, std::move(ws), std::move(root), std::move(cq), coll, yieldPolicy);
+        auto statusWithPlanExecutor =
+            PlanExecutor::make(std::move(cq), std::move(ws), std::move(root), coll, yieldPolicy);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         return std::move(statusWithPlanExecutor.getValue());
     }
@@ -162,12 +162,8 @@ public:
         verify(nullptr != cq.get());
 
         // Hand the plan off to the executor.
-        auto statusWithPlanExecutor = PlanExecutor::make(&_opCtx,
-                                                         std::move(ws),
-                                                         std::move(root),
-                                                         std::move(cq),
-                                                         coll,
-                                                         PlanExecutor::YIELD_MANUAL);
+        auto statusWithPlanExecutor = PlanExecutor::make(
+            std::move(cq), std::move(ws), std::move(root), coll, PlanExecutor::YIELD_MANUAL);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         return std::move(statusWithPlanExecutor.getValue());
     }

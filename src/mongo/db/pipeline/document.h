@@ -222,10 +222,14 @@ public:
     BSONObj toBson() const;
 
     /**
-     * Like toBson, but includes metadata at the top-level.
-     * Output is parseable by fromBsonWithMetaData
+     * Like the 'toBson()' method, but includes metadata at the top-level. When
+     * 'use42ChangeStreamSortKeys' is true, we assume that any Value in the "sortKey" metadata
+     * represents the resume token, which gets assigned directly to the "$sortKey" field. Otherwise,
+     * the "$sortKey" field gets assigned using DocumentMetadataFields::serializeSortKey(). Output
+     * is parseable by the 'fromBsonWithMetaData()' method. Note that parsing is able to infer the
+     * value of 'use42ChangeStreamSortKeys' from the format of the '$sortKey' field.
      */
-    BSONObj toBsonWithMetaData() const;
+    BSONObj toBsonWithMetaData(bool use42ChangeStreamSortKeys = false) const;
 
     /**
      * Like Document(BSONObj) but treats top-level fields with special names as metadata.

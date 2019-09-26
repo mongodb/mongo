@@ -456,6 +456,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> createOuterPipelineProxyExe
     const NamespaceString& nss,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
     bool hasChangeStream) {
+    boost::intrusive_ptr<ExpressionContext> expCtx(pipeline->getContext());
+
     // Transfer ownership of the Pipeline to the PipelineProxyStage.
     auto ws = std::make_unique<WorkingSet>();
     auto proxy = hasChangeStream
@@ -467,8 +469,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> createOuterPipelineProxyExe
     // invalidations. The Pipeline may contain PlanExecutors which *are* yielding
     // PlanExecutors and which *are* registered with their respective collection's
     // CursorManager
-    return uassertStatusOK(
-        PlanExecutor::make(opCtx, std::move(ws), std::move(proxy), nss, PlanExecutor::NO_YIELD));
+    return uassertStatusOK(PlanExecutor::make(
+        std::move(expCtx), std::move(ws), std::move(proxy), nullptr, PlanExecutor::NO_YIELD, nss));
 }
 }  // namespace
 

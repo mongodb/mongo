@@ -94,7 +94,8 @@ DocumentSource::GetNextResult DocumentSourceSampleFromRandomCursor::doGetNext() 
     if (pExpCtx->needsMerge) {
         // This stage will be merged by sorting results according to this random metadata field, but
         // the merging logic expects to sort by the sort key metadata.
-        md.metadata().setSortKey(BSON("" << _randMetaFieldVal));
+        const bool isSingleElementKey = true;
+        md.metadata().setSortKey(Value(_randMetaFieldVal), isSingleElementKey);
     }
     return md.freeze();
 }

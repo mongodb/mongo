@@ -99,7 +99,7 @@ BSONObj RouterStagePipeline::_validateAndConvertToBSON(const Document& event) {
     auto eventBSON = event.toBson();
     auto resumeToken = event.metadata().getSortKey();
     auto idField = eventBSON.getObjectField("_id");
-    invariant(!resumeToken.isEmpty());
+    invariant(!resumeToken.missing());
     uassert(ErrorCodes::ChangeStreamFatalError,
             str::stream() << "Encountered an event whose _id field, which contains the resume "
                              "token, was modified by the pipeline. Modifying the _id field of an "
@@ -108,7 +108,8 @@ BSONObj RouterStagePipeline::_validateAndConvertToBSON(const Document& event) {
                              "Expected: "
                           << BSON("_id" << resumeToken) << " but found: "
                           << (eventBSON["_id"] ? BSON("_id" << eventBSON["_id"]) : BSONObj()),
-            idField.binaryEqual(resumeToken));
+            (resumeToken.getType() == BSONType::Object) &&
+                idField.binaryEqual(resumeToken.getDocument().toBson()));
 
     // Return the event in BSONObj form, minus the $sortKey metadata.
     return eventBSON;

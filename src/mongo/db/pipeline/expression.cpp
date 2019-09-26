@@ -2623,7 +2623,10 @@ Value ExpressionMeta::evaluate(const Document& root, Variables* variables) const
         case MetaType::kIndexKey:
             return metadata.hasIndexKey() ? Value(metadata.getIndexKey()) : Value();
         case MetaType::kSortKey:
-            return metadata.hasSortKey() ? Value(metadata.getSortKey()) : Value();
+            return metadata.hasSortKey()
+                ? Value(DocumentMetadataFields::serializeSortKey(metadata.isSingleElementKey(),
+                                                                 metadata.getSortKey()))
+                : Value();
         default:
             MONGO_UNREACHABLE;
     }

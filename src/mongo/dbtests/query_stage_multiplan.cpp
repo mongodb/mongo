@@ -253,12 +253,8 @@ TEST_F(QueryStageMultiPlanTest, MPSCollectionScanVsHighlySelectiveIXScan) {
     ASSERT_EQUALS(0, mps->bestPlanIdx());
 
     // Takes ownership of arguments other than 'collection'.
-    auto statusWithPlanExecutor = PlanExecutor::make(_opCtx.get(),
-                                                     std::move(sharedWs),
-                                                     std::move(mps),
-                                                     std::move(cq),
-                                                     coll,
-                                                     PlanExecutor::NO_YIELD);
+    auto statusWithPlanExecutor = PlanExecutor::make(
+        std::move(cq), std::move(sharedWs), std::move(mps), coll, PlanExecutor::NO_YIELD);
     ASSERT_OK(statusWithPlanExecutor.getStatus());
     auto exec = std::move(statusWithPlanExecutor.getValue());
 

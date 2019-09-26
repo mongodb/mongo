@@ -170,18 +170,23 @@ public:
         return _holder && _holder->metaFields.test(MetaType::kSortKey);
     }
 
-    BSONObj getSortKey() const {
+    Value getSortKey() const {
         invariant(hasSortKey());
         return _holder->sortKey;
     }
 
-    void setSortKey(BSONObj sortKey) {
+    void setSortKey(Value sortKey, bool isSingleElementKey) {
         if (!_holder) {
             _holder = std::make_unique<MetadataHolder>();
         }
 
         _holder->metaFields.set(MetaType::kSortKey);
-        _holder->sortKey = sortKey.getOwned();
+        _holder->isSingleElementKey = isSingleElementKey;
+        _holder->sortKey = std::move(sortKey);
+    }
+
+    bool isSingleElementKey() const {
+        return _holder && _holder->isSingleElementKey;
     }
 
     bool hasGeoNearDistance() const {
@@ -298,9 +303,15 @@ private:
     // A simple data struct housing all possible metadata fields.
     struct MetadataHolder {
         std::bitset<MetaType::kNumFields> metaFields;
+
+        // True when the sort key corresponds to a single-element sort pattern, meaning that
+        // comparisons should treat the sort key value as a single element, even if it is an array.
+        // Only relevant when 'kSortKey' is set.
+        bool isSingleElementKey;
+
         double textScore{0.0};
         double randVal{0.0};
-        BSONObj sortKey;
+        Value sortKey;
         double geoNearDistance{0.0};
         Value geoNearPoint;
         double searchScore{0.0};

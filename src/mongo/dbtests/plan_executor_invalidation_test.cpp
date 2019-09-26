@@ -85,10 +85,9 @@ public:
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
         // Takes ownership of 'ws', 'scan', and 'cq'.
-        auto statusWithPlanExecutor = PlanExecutor::make(&_opCtx,
+        auto statusWithPlanExecutor = PlanExecutor::make(std::move(cq),
                                                          std::move(ws),
                                                          std::move(scan),
-                                                         std::move(cq),
                                                          _ctx->db()->getCollection(&_opCtx, nss),
                                                          PlanExecutor::YIELD_MANUAL);
         ASSERT_OK(statusWithPlanExecutor.getStatus());

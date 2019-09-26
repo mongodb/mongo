@@ -82,7 +82,10 @@ Status ReturnKeyStage::_extractIndexKey(WorkingSetMember* member) {
     }
 
     auto indexKey = member->metadata().hasIndexKey() ? member->metadata().getIndexKey() : BSONObj();
-    auto sortKey = member->metadata().hasSortKey() ? member->metadata().getSortKey() : BSONObj();
+    auto sortKey = member->metadata().hasSortKey()
+        ? DocumentMetadataFields::serializeSortKey(member->metadata().isSingleElementKey(),
+                                                   member->metadata().getSortKey())
+        : BSONObj();
     BSONObjBuilder bob;
 
     if (!indexKey.isEmpty()) {

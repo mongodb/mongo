@@ -215,20 +215,17 @@ bool DocumentSourceSort::usedDisk() {
 }
 
 std::pair<Value, Document> DocumentSourceSort::extractSortKey(Document&& doc) const {
-    Value inMemorySortKey = _sortKeyGen->computeSortKeyFromDocument(doc);
+    Value sortKey = _sortKeyGen->computeSortKeyFromDocument(doc);
 
     if (pExpCtx->needsMerge) {
         // If this sort stage is part of a merged pipeline, make sure that each Document's sort key
         // gets saved with its metadata.
-        auto serializedSortKey = DocumentMetadataFields::serializeSortKey(
-            _sortKeyGen->isSingleElementKey(), inMemorySortKey);
-
         MutableDocument toBeSorted(std::move(doc));
-        toBeSorted.metadata().setSortKey(serializedSortKey);
+        toBeSorted.metadata().setSortKey(sortKey, _sortKeyGen->isSingleElementKey());
 
-        return std::make_pair(std::move(inMemorySortKey), toBeSorted.freeze());
+        return std::make_pair(std::move(sortKey), toBeSorted.freeze());
     } else {
-        return std::make_pair(std::move(inMemorySortKey), std::move(doc));
+        return std::make_pair(std::move(sortKey), std::move(doc));
     }
 }
 

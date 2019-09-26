@@ -42,7 +42,7 @@ TEST(DocumentMetadataFieldsTest, AllMetadataRoundtripsThroughSerialization) {
     DocumentMetadataFields metadata;
     metadata.setTextScore(9.9);
     metadata.setRandVal(42.0);
-    metadata.setSortKey(BSON("a" << 1));
+    metadata.setSortKey(Value(1), /* isSingleElementKey = */ true);
     metadata.setGeoNearDistance(3.2);
     metadata.setGeoNearPoint(Value{BSON_ARRAY(1 << 2)});
     metadata.setSearchScore(5.4);
@@ -57,7 +57,8 @@ TEST(DocumentMetadataFieldsTest, AllMetadataRoundtripsThroughSerialization) {
 
     ASSERT_EQ(deserialized.getTextScore(), 9.9);
     ASSERT_EQ(deserialized.getRandVal(), 42.0);
-    ASSERT_BSONOBJ_EQ(deserialized.getSortKey(), BSON("a" << 1));
+    ASSERT_VALUE_EQ(deserialized.getSortKey(), Value(1));
+    ASSERT_TRUE(deserialized.isSingleElementKey());
     ASSERT_EQ(deserialized.getGeoNearDistance(), 3.2);
     ASSERT_VALUE_EQ(deserialized.getGeoNearPoint(), Value{BSON_ARRAY(1 << 2)});
     ASSERT_EQ(deserialized.getSearchScore(), 5.4);
@@ -90,8 +91,9 @@ TEST(DocumentMetadataFieldsTest, HasMethodsReturnTrueForInitializedMetadata) {
     ASSERT_TRUE(metadata.hasRandVal());
 
     ASSERT_FALSE(metadata.hasSortKey());
-    metadata.setSortKey(BSON("a" << 1));
+    metadata.setSortKey(Value(1), /* isSingleElementKey = */ true);
     ASSERT_TRUE(metadata.hasSortKey());
+    ASSERT_TRUE(metadata.isSingleElementKey());
 
     ASSERT_FALSE(metadata.hasGeoNearDistance());
     metadata.setGeoNearDistance(3.2);
@@ -118,7 +120,7 @@ TEST(DocumentMetadataFieldsTest, MoveConstructor) {
     DocumentMetadataFields metadata;
     metadata.setTextScore(9.9);
     metadata.setRandVal(42.0);
-    metadata.setSortKey(BSON("a" << 1));
+    metadata.setSortKey(Value(1), /* isSingleElementKey = */ true);
     metadata.setGeoNearDistance(3.2);
     metadata.setGeoNearPoint(Value{BSON_ARRAY(1 << 2)});
     metadata.setSearchScore(5.4);
@@ -129,7 +131,8 @@ TEST(DocumentMetadataFieldsTest, MoveConstructor) {
     ASSERT_TRUE(moveConstructed);
     ASSERT_EQ(moveConstructed.getTextScore(), 9.9);
     ASSERT_EQ(moveConstructed.getRandVal(), 42.0);
-    ASSERT_BSONOBJ_EQ(moveConstructed.getSortKey(), BSON("a" << 1));
+    ASSERT_VALUE_EQ(moveConstructed.getSortKey(), Value(1));
+    ASSERT_TRUE(moveConstructed.isSingleElementKey());
     ASSERT_EQ(moveConstructed.getGeoNearDistance(), 3.2);
     ASSERT_VALUE_EQ(moveConstructed.getGeoNearPoint(), Value{BSON_ARRAY(1 << 2)});
     ASSERT_EQ(moveConstructed.getSearchScore(), 5.4);
@@ -143,7 +146,7 @@ TEST(DocumentMetadataFieldsTest, MoveAssignmentOperator) {
     DocumentMetadataFields metadata;
     metadata.setTextScore(9.9);
     metadata.setRandVal(42.0);
-    metadata.setSortKey(BSON("a" << 1));
+    metadata.setSortKey(Value(1), /* isSingleElementKey = */ true);
     metadata.setGeoNearDistance(3.2);
     metadata.setGeoNearPoint(Value{BSON_ARRAY(1 << 2)});
     metadata.setSearchScore(5.4);
@@ -157,7 +160,8 @@ TEST(DocumentMetadataFieldsTest, MoveAssignmentOperator) {
 
     ASSERT_EQ(moveAssigned.getTextScore(), 9.9);
     ASSERT_EQ(moveAssigned.getRandVal(), 42.0);
-    ASSERT_BSONOBJ_EQ(moveAssigned.getSortKey(), BSON("a" << 1));
+    ASSERT_VALUE_EQ(moveAssigned.getSortKey(), Value(1));
+    ASSERT_TRUE(moveAssigned.isSingleElementKey());
     ASSERT_EQ(moveAssigned.getGeoNearDistance(), 3.2);
     ASSERT_VALUE_EQ(moveAssigned.getGeoNearPoint(), Value{BSON_ARRAY(1 << 2)});
     ASSERT_EQ(moveAssigned.getSearchScore(), 5.4);
@@ -197,7 +201,7 @@ TEST(DocumentMetadataFieldsTest, MergeWithOnlyCopiesMetadataThatDestinationDoesN
     DocumentMetadataFields source;
     source.setTextScore(9.9);
     source.setRandVal(42.0);
-    source.setSortKey(BSON("a" << 1));
+    source.setSortKey(Value(1), /* isSingleElementKey = */ true);
     source.setGeoNearDistance(3.2);
 
     DocumentMetadataFields destination;
@@ -208,7 +212,8 @@ TEST(DocumentMetadataFieldsTest, MergeWithOnlyCopiesMetadataThatDestinationDoesN
 
     ASSERT_EQ(destination.getTextScore(), 12.3);
     ASSERT_EQ(destination.getRandVal(), 84.0);
-    ASSERT_BSONOBJ_EQ(destination.getSortKey(), BSON("a" << 1));
+    ASSERT_VALUE_EQ(destination.getSortKey(), Value(1));
+    ASSERT_TRUE(destination.isSingleElementKey());
     ASSERT_EQ(destination.getGeoNearDistance(), 3.2);
     ASSERT_FALSE(destination.hasGeoNearPoint());
     ASSERT_FALSE(destination.hasSearchScore());
@@ -220,7 +225,7 @@ TEST(DocumentMetadataFieldsTest, CopyFromCopiesAllMetadataThatSourceHas) {
     DocumentMetadataFields source;
     source.setTextScore(9.9);
     source.setRandVal(42.0);
-    source.setSortKey(BSON("a" << 1));
+    source.setSortKey(Value(1), /* isSingleElementKey = */ true);
     source.setGeoNearDistance(3.2);
 
     DocumentMetadataFields destination;
@@ -231,7 +236,8 @@ TEST(DocumentMetadataFieldsTest, CopyFromCopiesAllMetadataThatSourceHas) {
 
     ASSERT_EQ(destination.getTextScore(), 9.9);
     ASSERT_EQ(destination.getRandVal(), 42.0);
-    ASSERT_BSONOBJ_EQ(destination.getSortKey(), BSON("a" << 1));
+    ASSERT_VALUE_EQ(destination.getSortKey(), Value(1));
+    ASSERT_TRUE(destination.isSingleElementKey());
     ASSERT_EQ(destination.getGeoNearDistance(), 3.2);
     ASSERT_FALSE(destination.hasGeoNearPoint());
     ASSERT_FALSE(destination.hasSearchScore());

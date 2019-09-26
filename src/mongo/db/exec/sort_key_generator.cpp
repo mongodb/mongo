@@ -75,7 +75,8 @@ PlanStage::StageState SortKeyGeneratorStage::doWork(WorkingSetID* out) {
         }
 
         // Add the sort key to the WSM as metadata.
-        member->metadata().setSortKey(sortKey.getValue());
+        member->metadata().setSortKey(std::move(sortKey.getValue()),
+                                      _sortKeyGen.isSingleElementKey());
 
         return PlanStage::ADVANCED;
     }

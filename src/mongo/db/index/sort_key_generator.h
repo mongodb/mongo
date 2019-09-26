@@ -65,17 +65,7 @@ public:
      * If the sort pattern contains a $meta sort (e.g. sort by "textScore" or "randVal"), then the
      * necessary metadata is obtained from the WorkingSetMember.
      */
-    StatusWith<BSONObj> computeSortKey(const WorkingSetMember&) const;
-
-    /**
-     * Returns the key which should be used to sort 'obj', or a non-OK status if no key could be
-     * generated.
-     *
-     * The caller must supply the appropriate 'metadata' in the case that the sort pattern includes
-     * a $meta sort (i.e. if sortHasMeta() is true). These values are filled in at the corresponding
-     * positions in the sort key.
-     */
-    StatusWith<BSONObj> computeSortKeyFromDocument(const BSONObj& obj, const Metadata*) const;
+    StatusWith<Value> computeSortKey(const WorkingSetMember&) const;
 
     /**
      * Returns the sort key for the input 'doc' as a Value. When the sort pattern has multiple
@@ -94,10 +84,20 @@ public:
     }
 
 private:
+    /**
+     * Returns the key which should be used to sort 'obj', or a non-OK status if no key could be
+     * generated.
+     *
+     * The caller must supply the appropriate 'metadata' in the case that the sort pattern includes
+     * a $meta sort (i.e. if sortHasMeta() is true). These values are filled in at the corresponding
+     * positions in the sort key.
+     */
+    StatusWith<BSONObj> computeSortKeyFromDocument(const BSONObj& obj, const Metadata*) const;
+
     // Extracts the sort key from a WorkingSetMember which represents an index key. It is illegal to
     // call this if the working set member is not in RID_AND_IDX state. It is also illegal to call
     // this if the sort pattern has any $meta components.
-    StatusWith<BSONObj> computeSortKeyFromIndexKey(const WorkingSetMember& member) const;
+    StatusWith<Value> computeSortKeyFromIndexKey(const WorkingSetMember& member) const;
 
     // Extracts the sort key from 'obj', using '_sortSpecWithoutMeta' and thus ignoring any $meta
     // sort components of the sort pattern. The caller is responsible for augmenting this key with

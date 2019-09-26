@@ -56,7 +56,7 @@ boost::optional<Document> ChangeStreamProxyStage::getNext() {
         // the latest event observed in the oplog, the latter via its sort key metadata field.
         _validateResumeToken(*next);
         _latestOplogTimestamp = PipelineD::getLatestOplogTimestamp(_pipeline.get());
-        _postBatchResumeToken = next->metadata().getSortKey();
+        _postBatchResumeToken = next->metadata().getSortKey().getDocument().toBson();
         _setSpeculativeReadTimestamp();
         return next;
     }
@@ -85,7 +85,7 @@ void ChangeStreamProxyStage::_validateResumeToken(const Document& event) const {
     auto eventBSON = event.toBson();
     auto resumeToken = event.metadata().getSortKey();
     auto idField = eventBSON.getObjectField("_id");
-    invariant(!resumeToken.isEmpty());
+    invariant(!resumeToken.missing());
     uassert(ErrorCodes::ChangeStreamFatalError,
             str::stream() << "Encountered an event whose _id field, which contains the resume "
                              "token, was modified by the pipeline. Modifying the _id field of an "
@@ -94,7 +94,8 @@ void ChangeStreamProxyStage::_validateResumeToken(const Document& event) const {
                              "Expected: "
                           << BSON("_id" << resumeToken) << " but found: "
                           << (eventBSON["_id"] ? BSON("_id" << eventBSON["_id"]) : BSONObj()),
-            idField.binaryEqual(resumeToken));
+            (resumeToken.getType() == BSONType::Object) &&
+                idField.binaryEqual(resumeToken.getDocument().toBson()));
 }
 
 void ChangeStreamProxyStage::_setSpeculativeReadTimestamp() {

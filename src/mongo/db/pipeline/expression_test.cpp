@@ -6199,10 +6199,10 @@ TEST(ExpressionMetaTest, ExpressionMetaSortKey) {
         ExpressionMeta::parse(expCtx, expr.firstElement(), expCtx->variablesParseState);
 
     MutableDocument doc;
-    BSONObj sortKey = BSON("" << 1 << "" << 2);
-    doc.metadata().setSortKey(sortKey);
+    Value sortKey = Value({Value(1), Value(2)});
+    doc.metadata().setSortKey(sortKey, /* isSingleElementSortKey = */ false);
     Value val = expressionMeta->evaluate(doc.freeze(), &expCtx->variables);
-    ASSERT_DOCUMENT_EQ(val.getDocument(), Document(sortKey));
+    ASSERT_BSONOBJ_EQ(val.getDocument().toBson(), BSON("" << 1 << "" << 2));
 }
 
 TEST(ExpressionMetaTest, ExpressionMetaTextScore) {

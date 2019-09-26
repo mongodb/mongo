@@ -622,7 +622,7 @@ TEST(MetaFields, CopyMetadataFromCopiesAllMetadata) {
 
     ASSERT_EQ(result.metadata().getTextScore(), 9.9);
     ASSERT_EQ(result.metadata().getRandVal(), 42.0);
-    ASSERT_BSONOBJ_EQ(result.metadata().getSortKey(), BSON("x" << 1));
+    ASSERT_VALUE_EQ(result.metadata().getSortKey(), Value(1));
     ASSERT_EQ(result.metadata().getGeoNearDistance(), 3.2);
     ASSERT_VALUE_EQ(result.metadata().getGeoNearPoint(), Value{BSON_ARRAY(1 << 2)});
     ASSERT_EQ(result.metadata().getSearchScore(), 5.4);

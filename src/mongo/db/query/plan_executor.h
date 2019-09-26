@@ -197,8 +197,8 @@ public:
     //
     // On success, return a new PlanExecutor, owned by the caller.
     //
-    // Passing YIELD_AUTO to any of these factories will construct a yielding executor which
-    // may yield in the following circumstances:
+    // Passing YIELD_AUTO to any of these factories will construct a yielding executor which may
+    // yield in the following circumstances:
     //   - During plan selection inside the call to make().
     //   - On any call to getNext().
     //   - On any call to restoreState().
@@ -207,55 +207,51 @@ public:
     // If auto-yielding is enabled, a yield during make() may result in the PlanExecutor being
     // killed, in which case this method will return a non-OK status.
     //
+    // All callers of these factory methods should provide either a non-null value for 'collection'
+    // or a non-empty 'nss' NamespaceString but not both.
+    //
 
     /**
-     * Used when there is no canonical query and no query solution.
+     * Note that the PlanExecutor will use the ExpressionContext associated with 'cq' and the
+     * OperationContext associated with that ExpressionContext.
+     */
+    static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
+        std::unique_ptr<CanonicalQuery> cq,
+        std::unique_ptr<WorkingSet> ws,
+        std::unique_ptr<PlanStage> rt,
+        const Collection* collection,
+        YieldPolicy yieldPolicy,
+        NamespaceString nss = NamespaceString(),
+        std::unique_ptr<QuerySolution> qs = nullptr);
+
+    /**
+     * This overload is provided for executors that do not need a CanonicalQuery. For example, the
+     * outer plan executor for an aggregate command does not have a CanonicalQuery.
      *
-     * Right now this is only for idhack updates which neither canonicalize nor go through normal
-     * planning.
+     * Note that the PlanExecutor will use the OperationContext associated with the 'expCtx'
+     * ExpressionContext.
+     */
+    static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        std::unique_ptr<WorkingSet> ws,
+        std::unique_ptr<PlanStage> rt,
+        const Collection* collection,
+        YieldPolicy yieldPolicy,
+        NamespaceString nss = NamespaceString(),
+        std::unique_ptr<QuerySolution> qs = nullptr);
+
+    /**
+     * This overload is provided for executors that do not have a CanonicalQuery or an
+     * ExpressionContext, such as an aggregation command with a $listCollections stage.
      */
     static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
         OperationContext* opCtx,
         std::unique_ptr<WorkingSet> ws,
         std::unique_ptr<PlanStage> rt,
         const Collection* collection,
-        YieldPolicy yieldPolicy);
-
-    /**
-     * Used when we have a NULL collection and no canonical query. In this case, we need to
-     * explicitly pass a namespace to the plan executor.
-     */
-    static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
-        OperationContext* opCtx,
-        std::unique_ptr<WorkingSet> ws,
-        std::unique_ptr<PlanStage> rt,
-        NamespaceString nss,
-        YieldPolicy yieldPolicy);
-
-    /**
-     * Used when there is a canonical query but no query solution (e.g. idhack queries, queries
-     * against a NULL collection, queries using the subplan stage).
-     */
-    static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
-        OperationContext* opCtx,
-        std::unique_ptr<WorkingSet> ws,
-        std::unique_ptr<PlanStage> rt,
-        std::unique_ptr<CanonicalQuery> cq,
-        const Collection* collection,
-        YieldPolicy yieldPolicy);
-
-    /**
-     * The constructor for the normal case, when you have a collection, a canonical query, and a
-     * query solution.
-     */
-    static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
-        OperationContext* opCtx,
-        std::unique_ptr<WorkingSet> ws,
-        std::unique_ptr<PlanStage> rt,
-        std::unique_ptr<QuerySolution> qs,
-        std::unique_ptr<CanonicalQuery> cq,
-        const Collection* collection,
-        YieldPolicy yieldPolicy);
+        YieldPolicy yieldPolicy,
+        NamespaceString nss = NamespaceString(),
+        std::unique_ptr<QuerySolution> qs = nullptr);
 
     /**
      * A PlanExecutor must be disposed before destruction. In most cases, this will happen

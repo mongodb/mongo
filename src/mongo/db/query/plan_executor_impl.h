@@ -50,6 +50,7 @@ public:
         std::unique_ptr<PlanStage> rt,
         std::unique_ptr<QuerySolution> qs,
         std::unique_ptr<CanonicalQuery> cq,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const Collection* collection,
         NamespaceString nss,
         YieldPolicy yieldPolicy);
@@ -89,6 +90,7 @@ private:
                      std::unique_ptr<PlanStage> rt,
                      std::unique_ptr<QuerySolution> qs,
                      std::unique_ptr<CanonicalQuery> cq,
+                     const boost::intrusive_ptr<ExpressionContext>& expCtx,
                      const Collection* collection,
                      NamespaceString nss,
                      YieldPolicy yieldPolicy);
@@ -151,7 +153,15 @@ private:
     // detachFromOperationContext() and reattachToOperationContext().
     OperationContext* _opCtx;
 
+    // Note, this can be null. Some queries don't need a CanonicalQuery for planning. For example,
+    // aggregation queries create a PlanExecutor with no CanonicalQuery.
     std::unique_ptr<CanonicalQuery> _cq;
+
+    // When '_cq' is not null, this will point to the same ExpressionContext that is in the '_cq'
+    // object. Note that this pointer can also be null when '_cq' is null. For example a "list
+    // collections" query does not need a CanonicalQuery or ExpressionContext.
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
+
     std::unique_ptr<WorkingSet> _workingSet;
     std::unique_ptr<QuerySolution> _qs;
     std::unique_ptr<PlanStage> _root;

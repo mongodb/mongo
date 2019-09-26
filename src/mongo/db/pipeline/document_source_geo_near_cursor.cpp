@@ -105,7 +105,8 @@ Document DocumentSourceGeoNearCursor::transformBSONObjToDocument(const BSONObj& 
 
     // In a cluster, $geoNear will be merged via $sort, so add the sort key.
     if (pExpCtx->needsMerge) {
-        output.metadata().setSortKey(BSON("" << distance));
+        const bool isSingleElementKey = true;
+        output.metadata().setSortKey(Value(distance), isSingleElementKey);
     }
 
     return output.freeze();

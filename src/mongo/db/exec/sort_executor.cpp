@@ -60,44 +60,6 @@ SortExecutor::SortExecutor(SortPattern sortPattern,
       _tempDir(std::move(tempDir)),
       _diskUseAllowed(allowDiskUse) {}
 
-int SortExecutor::Comparator::operator()(const DocumentSorter::Data& lhs,
-                                         const DocumentSorter::Data& rhs) const {
-    Value lhsKey = lhs.first;
-    Value rhsKey = rhs.first;
-    // DocumentSourceSort::populate() has already guaranteed that the sort key is non-empty.
-    // However, the tricky part is deciding what to do if none of the sort keys are present. In that
-    // case, consider the document "less".
-    //
-    // Note that 'comparator' must use binary comparisons here, as both 'lhs' and 'rhs' are
-    // collation comparison keys.
-    ValueComparator comparator;
-    const size_t n = _sort.size();
-    if (n == 1) {  // simple fast case
-        if (_sort[0].isAscending)
-            return comparator.compare(lhsKey, rhsKey);
-        else
-            return -comparator.compare(lhsKey, rhsKey);
-    }
-
-    // compound sort
-    for (size_t i = 0; i < n; i++) {
-        int cmp = comparator.compare(lhsKey[i], rhsKey[i]);
-        if (cmp) {
-            /* if necessary, adjust the return value by the key ordering */
-            if (!_sort[i].isAscending)
-                cmp = -cmp;
-
-            return cmp;
-        }
-    }
-
-    /*
-      If we got here, everything matched (or didn't exist), so we'll
-      consider the documents equal for purposes of this sort.
-    */
-    return 0;
-}
-
 boost::optional<Document> SortExecutor::getNextDoc() {
     auto wsm = getNextWsm();
     if (!wsm) {

@@ -80,19 +80,25 @@ SortKeyGenerator::SortKeyGenerator(SortPattern sortPattern, const CollatorInterf
 // will be able to use the Document overload of computeSortKeyFromDocument, and it will be able to
 // store the text score with the Document instead of in a separate SortKeyGenerator::Metadata
 // object.
-StatusWith<BSONObj> SortKeyGenerator::computeSortKey(const WorkingSetMember& wsm) const {
+StatusWith<Value> SortKeyGenerator::computeSortKey(const WorkingSetMember& wsm) const {
     if (wsm.hasObj()) {
         SortKeyGenerator::Metadata metadata;
         if (_sortHasMeta && wsm.metadata().hasTextScore()) {
             metadata.textScore = wsm.metadata().getTextScore();
         }
-        return computeSortKeyFromDocument(wsm.doc.value().toBson(), &metadata);
+        auto statusWithSortKeyObj = computeSortKeyFromDocument(wsm.doc.value().toBson(), &metadata);
+        if (!statusWithSortKeyObj.isOK()) {
+            return statusWithSortKeyObj.getStatus();
+        }
+
+        return DocumentMetadataFields::deserializeSortKey(isSingleElementKey(),
+                                                          statusWithSortKeyObj.getValue());
     }
 
     return computeSortKeyFromIndexKey(wsm);
 }
 
-StatusWith<BSONObj> SortKeyGenerator::computeSortKeyFromIndexKey(
+StatusWith<Value> SortKeyGenerator::computeSortKeyFromIndexKey(
     const WorkingSetMember& member) const {
     invariant(member.getState() == WorkingSetMember::RID_AND_IDX);
     invariant(!_sortHasMeta);
@@ -109,7 +115,7 @@ StatusWith<BSONObj> SortKeyGenerator::computeSortKeyFromIndexKey(
         // non-simple collation.
         CollationIndexKey::collationAwareIndexKeyAppend(sortKeyElt, _collator, &objBuilder);
     }
-    return objBuilder.obj();
+    return DocumentMetadataFields::deserializeSortKey(isSingleElementKey(), objBuilder.obj());
 }
 
 StatusWith<BSONObj> SortKeyGenerator::computeSortKeyFromDocument(const BSONObj& obj,
