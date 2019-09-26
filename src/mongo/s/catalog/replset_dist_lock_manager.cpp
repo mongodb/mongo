@@ -166,7 +166,10 @@ void ReplSetDistLockManager::doTask() {
                 if (!unlockStatus.isOK()) {
                     warning() << "Failed to unlock lock with " << LocksType::lockID() << ": "
                               << toUnlock.first << nameMessage << causedBy(unlockStatus);
-                    queueUnlock(toUnlock.first, toUnlock.second);
+                    // Queue another attempt, unless the problem was no longer being primary.
+                    if (unlockStatus != ErrorCodes::NotMaster) {
+                        queueUnlock(toUnlock.first, toUnlock.second);
+                    }
                 } else {
                     LOG(0) << "distributed lock with " << LocksType::lockID() << ": "
                            << toUnlock.first << nameMessage << " unlocked.";
