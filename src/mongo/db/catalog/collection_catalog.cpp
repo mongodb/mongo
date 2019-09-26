@@ -85,7 +85,7 @@ CollectionCatalog::iterator::iterator(
     std::map<std::pair<std::string, CollectionUUID>, Collection*>::const_iterator mapIter)
     : _mapIter(mapIter) {}
 
-const CollectionCatalog::iterator::value_type CollectionCatalog::iterator::operator*() {
+CollectionCatalog::iterator::value_type CollectionCatalog::iterator::operator*() {
     stdx::lock_guard<Latch> lock(_catalog->_catalogLock);
     _repositionIfNeeded();
     if (_exhausted()) {

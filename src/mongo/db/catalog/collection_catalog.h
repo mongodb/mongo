@@ -63,7 +63,7 @@ public:
         iterator(StringData dbName, uint64_t genNum, const CollectionCatalog& catalog);
         iterator(
             std::map<std::pair<std::string, CollectionUUID>, Collection*>::const_iterator mapIter);
-        const value_type operator*();
+        value_type operator*();
         iterator operator++();
         iterator operator++(int);
         boost::optional<CollectionUUID> uuid();
