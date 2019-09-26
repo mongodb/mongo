@@ -69,52 +69,54 @@ public:
 
     virtual ~StorageEngineImpl();
 
-    virtual void finishInit();
+    virtual void finishInit() override;
 
-    virtual RecoveryUnit* newRecoveryUnit();
+    virtual RecoveryUnit* newRecoveryUnit() override;
 
-    virtual std::vector<std::string> listDatabases() const;
+    virtual std::vector<std::string> listDatabases() const override;
 
-    virtual bool supportsDocLocking() const {
+    virtual bool supportsDocLocking() const override {
         return _supportsDocLocking;
     }
 
-    virtual bool supportsDBLocking() const {
+    virtual bool supportsDBLocking() const override {
         return _supportsDBLocking;
     }
 
-    virtual bool supportsCappedCollections() const {
+    virtual bool supportsCappedCollections() const override {
         return _supportsCappedCollections;
     }
 
-    virtual Status closeDatabase(OperationContext* opCtx, StringData db);
+    virtual Status closeDatabase(OperationContext* opCtx, StringData db) override;
 
-    virtual Status dropDatabase(OperationContext* opCtx, StringData db);
+    virtual Status dropDatabase(OperationContext* opCtx, StringData db) override;
 
-    virtual int flushAllFiles(OperationContext* opCtx, bool sync);
+    virtual int flushAllFiles(OperationContext* opCtx, bool sync) override;
 
-    virtual Status beginBackup(OperationContext* opCtx);
+    virtual Status beginBackup(OperationContext* opCtx) override;
 
-    virtual void endBackup(OperationContext* opCtx);
+    virtual void endBackup(OperationContext* opCtx) override;
 
-    virtual StatusWith<std::vector<std::string>> beginNonBlockingBackup(OperationContext* opCtx);
+    virtual StatusWith<std::vector<std::string>> beginNonBlockingBackup(
+        OperationContext* opCtx) override;
 
-    virtual void endNonBlockingBackup(OperationContext* opCtx);
+    virtual void endNonBlockingBackup(OperationContext* opCtx) override;
 
-    virtual StatusWith<std::vector<std::string>> extendBackupCursor(OperationContext* opCtx);
+    virtual StatusWith<std::vector<std::string>> extendBackupCursor(
+        OperationContext* opCtx) override;
 
     virtual bool supportsCheckpoints() const override;
 
-    virtual bool isDurable() const;
+    virtual bool isDurable() const override;
 
-    virtual bool isEphemeral() const;
+    virtual bool isEphemeral() const override;
 
-    virtual Status repairRecordStore(OperationContext* opCtx, const NamespaceString& nss);
+    virtual Status repairRecordStore(OperationContext* opCtx, const NamespaceString& nss) override;
 
     virtual std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStore(
         OperationContext* opCtx) override;
 
-    virtual void cleanShutdown();
+    virtual void cleanShutdown() override;
 
     virtual void setStableTimestamp(Timestamp stableTimestamp, bool force = false) override;
 
@@ -304,11 +306,11 @@ public:
         return this;
     }
 
-    KVEngine* getEngine() {
+    KVEngine* getEngine() override {
         return _engine.get();
     }
 
-    const KVEngine* getEngine() const {
+    const KVEngine* getEngine() const override {
         return _engine.get();
     }
 
@@ -316,15 +318,15 @@ public:
                              const NamespaceString& nss,
                              StringData ident) override;
 
-    DurableCatalog* getCatalog() {
+    DurableCatalog* getCatalog() override {
         return _catalog.get();
     }
 
-    const DurableCatalog* getCatalog() const {
+    const DurableCatalog* getCatalog() const override {
         return _catalog.get();
     }
 
-    std::unique_ptr<CheckpointLock> getCheckpointLock(OperationContext* opCtx) {
+    std::unique_ptr<CheckpointLock> getCheckpointLock(OperationContext* opCtx) override {
         return _engine->getCheckpointLock(opCtx);
     }
 
@@ -348,7 +350,7 @@ public:
         return _timestampMonitor.get();
     }
 
-    std::set<std::string> getDropPendingIdents() const {
+    std::set<std::string> getDropPendingIdents() const override {
         return _dropPendingIdentReaper.getAllIdents();
     }
 

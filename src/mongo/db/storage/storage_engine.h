@@ -190,7 +190,7 @@ public:
      * are called. Any initialization work that requires the ability to create OperationContexts
      * should be done here rather than in the constructor.
      */
-    virtual void finishInit() {}
+    virtual void finishInit() = 0;
 
     /**
      * Returns a new interface to the storage engine's recovery unit.  The recovery
@@ -217,23 +217,17 @@ public:
     /**
      * Returns whether the storage engine supports locking at a database level.
      */
-    virtual bool supportsDBLocking() const {
-        return true;
-    }
+    virtual bool supportsDBLocking() const = 0;
 
     /**
      * Returns whether the storage engine supports capped collections.
      */
-    virtual bool supportsCappedCollections() const {
-        return true;
-    }
+    virtual bool supportsCappedCollections() const = 0;
 
     /**
      * Returns whether the storage engine supports checkpoints.
      */
-    virtual bool supportsCheckpoints() const {
-        return false;
-    }
+    virtual bool supportsCheckpoints() const = 0;
 
     /**
      * Returns whether the engine supports a journalling concept or not.
@@ -251,8 +245,8 @@ public:
      *
      * Must be called with the global lock acquired in exclusive mode.
      */
-    virtual void loadCatalog(OperationContext* opCtx) {}
-    virtual void closeCatalog(OperationContext* opCtx) {}
+    virtual void loadCatalog(OperationContext* opCtx) = 0;
+    virtual void closeCatalog(OperationContext* opCtx) = 0;
 
     /**
      * Closes all file handles associated with a database.
@@ -288,10 +282,7 @@ public:
      * retried, returns a non-OK status. This function may throw a WriteConflictException, which
      * should trigger a retry by the caller. All other exceptions should be treated as errors.
      */
-    virtual Status beginBackup(OperationContext* opCtx) {
-        return Status(ErrorCodes::CommandNotSupported,
-                      "The current storage engine doesn't support backup mode");
-    }
+    virtual Status beginBackup(OperationContext* opCtx) = 0;
 
     /**
      * Transitions the storage engine out of backup mode.
@@ -300,23 +291,14 @@ public:
      *
      * Storage engines implementing this feature should fassert when unable to leave backup mode.
      */
-    virtual void endBackup(OperationContext* opCtx) {
-        return;
-    }
+    virtual void endBackup(OperationContext* opCtx) = 0;
 
-    virtual StatusWith<std::vector<std::string>> beginNonBlockingBackup(OperationContext* opCtx) {
-        return Status(ErrorCodes::CommandNotSupported,
-                      "The current storage engine does not support a concurrent mode.");
-    }
+    virtual StatusWith<std::vector<std::string>> beginNonBlockingBackup(
+        OperationContext* opCtx) = 0;
 
-    virtual void endNonBlockingBackup(OperationContext* opCtx) {
-        return;
-    }
+    virtual void endNonBlockingBackup(OperationContext* opCtx) = 0;
 
-    virtual StatusWith<std::vector<std::string>> extendBackupCursor(OperationContext* opCtx) {
-        return Status(ErrorCodes::CommandNotSupported,
-                      "The current storage engine does not support a concurrent mode.");
-    }
+    virtual StatusWith<std::vector<std::string>> extendBackupCursor(OperationContext* opCtx) = 0;
 
     /**
      * Recover as much data as possible from a potentially corrupt RecordStore.
@@ -351,9 +333,7 @@ public:
      *
      * Pointer remains owned by the StorageEngine, not the caller.
      */
-    virtual SnapshotManager* getSnapshotManager() const {
-        return nullptr;
-    }
+    virtual SnapshotManager* getSnapshotManager() const = 0;
 
     /**
      * Sets a new JournalListener, which is used by the storage engine to alert the rest of the
@@ -367,36 +347,26 @@ public:
      * a stable timestamp. In that case StorageEngine::recoverToStableTimestamp() will return
      * a bad status.
      */
-    virtual bool supportsRecoverToStableTimestamp() const {
-        return false;
-    }
+    virtual bool supportsRecoverToStableTimestamp() const = 0;
 
     /**
      * Returns whether the storage engine can provide a recovery timestamp.
      */
-    virtual bool supportsRecoveryTimestamp() const {
-        return false;
-    }
+    virtual bool supportsRecoveryTimestamp() const = 0;
 
     /**
      * Returns true if the storage engine supports the readConcern level "snapshot".
      */
-    virtual bool supportsReadConcernSnapshot() const {
-        return false;
-    }
+    virtual bool supportsReadConcernSnapshot() const = 0;
 
-    virtual bool supportsReadConcernMajority() const {
-        return false;
-    }
+    virtual bool supportsReadConcernMajority() const = 0;
 
     /**
      * Returns true if the storage engine uses oplog stones to more finely control
      * deletion of oplog history, instead of the standard capped collection controls on
      * the oplog collection size.
      */
-    virtual bool supportsOplogStones() const {
-        return false;
-    }
+    virtual bool supportsOplogStones() const = 0;
 
     /**
      * Returns true if the storage engine supports deferring collection drops until the the storage
@@ -432,18 +402,14 @@ public:
      * It is illegal to call this concurrently with `setStableTimestamp` or
      * `setInitialDataTimestamp`.
      */
-    virtual StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) {
-        fassertFailed(40547);
-    }
+    virtual StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) = 0;
 
     /**
      * Returns the stable timestamp that the storage engine recovered to on startup. If the
      * recovery point was not stable, returns "none".
      * fasserts if StorageEngine::supportsRecoverToStableTimestamp() would return false.
      */
-    virtual boost::optional<Timestamp> getRecoveryTimestamp() const {
-        MONGO_UNREACHABLE;
-    }
+    virtual boost::optional<Timestamp> getRecoveryTimestamp() const = 0;
 
     /**
      * Returns a timestamp that is guaranteed to exist on storage engine recovery to a stable
@@ -455,22 +421,20 @@ public:
      * boost::none if the recovery time has not yet been established. Replication recoverable
      * rollback may not succeed before establishment, and restart will require resync.
      */
-    virtual boost::optional<Timestamp> getLastStableRecoveryTimestamp() const {
-        MONGO_UNREACHABLE;
-    }
+    virtual boost::optional<Timestamp> getLastStableRecoveryTimestamp() const = 0;
 
     /**
      * Sets the highest timestamp at which the storage engine is allowed to take a checkpoint. This
      * timestamp must not decrease unless force=true is set, in which case we force the stable
      * timestamp, the oldest timestamp, and the commit timestamp backward.
      */
-    virtual void setStableTimestamp(Timestamp stableTimestamp, bool force = false) {}
+    virtual void setStableTimestamp(Timestamp stableTimestamp, bool force = false) = 0;
 
     /**
      * Tells the storage engine the timestamp of the data at startup. This is necessary because
      * timestamps are not persisted in the storage layer.
      */
-    virtual void setInitialDataTimestamp(Timestamp timestamp) {}
+    virtual void setInitialDataTimestamp(Timestamp timestamp) = 0;
 
     /**
      * Uses the current stable timestamp to set the oldest timestamp for which the storage engine
@@ -482,13 +446,13 @@ public:
      * of the oplog read timestamp, ensuring the oplog reader's 'read_timestamp' can always be
      * serviced.
      */
-    virtual void setOldestTimestampFromStable() {}
+    virtual void setOldestTimestampFromStable() = 0;
 
     /**
      * Sets the oldest timestamp for which the storage engine must maintain snapshot history
      * through. Additionally, all future writes must be newer or equal to this value.
      */
-    virtual void setOldestTimestamp(Timestamp timestamp) {}
+    virtual void setOldestTimestamp(Timestamp timestamp) = 0;
 
     /**
      * Sets a callback which returns the timestamp of the oldest oplog entry involved in an
@@ -496,7 +460,7 @@ public:
      * oplog it must preserve.
      */
     virtual void setOldestActiveTransactionTimestampCallback(
-        OldestActiveTransactionTimestampCallback callback){};
+        OldestActiveTransactionTimestampCallback callback) = 0;
 
     /**
      * Indicates whether the storage engine cache is under pressure.
@@ -505,15 +469,13 @@ public:
      * it against storageGlobalParams.cachePressureThreshold, a dynamic server parameter, to
      * determine whether cache pressure is too high.
      */
-    virtual bool isCacheUnderPressure(OperationContext* opCtx) const {
-        return false;
-    }
+    virtual bool isCacheUnderPressure(OperationContext* opCtx) const = 0;
 
     /**
      * For unit tests only. Sets the cache pressure value with which isCacheUnderPressure()
      * evalutates to 'pressure'.
      */
-    virtual void setCachePressureForTest(int pressure) {}
+    virtual void setCachePressureForTest(int pressure) = 0;
 
     /**
      *  Notifies the storage engine that a replication batch has completed.
@@ -522,7 +484,7 @@ public:
      *  up in the future.
      *  This function can be used to ensure oplog visibility rules are not broken, for example.
      */
-    virtual void replicationBatchIsComplete() const {};
+    virtual void replicationBatchIsComplete() const = 0;
 
     // (CollectionName, IndexName)
     typedef std::pair<std::string, std::string> CollectionIndexNamePair;
@@ -532,9 +494,7 @@ public:
      * pairs to rebuild.
      */
     virtual StatusWith<std::vector<CollectionIndexNamePair>> reconcileCatalogAndIdents(
-        OperationContext* opCtx) {
-        return std::vector<CollectionIndexNamePair>();
-    };
+        OperationContext* opCtx) = 0;
 
     /**
      * Returns the all_durable timestamp. All transactions with timestamps earlier than the

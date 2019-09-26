@@ -45,6 +45,7 @@ namespace {
  */
 class MockStorageEngine : public StorageEngine {
 public:
+    void finishInit() final {}
     RecoveryUnit* newRecoveryUnit() final {
         return nullptr;
     }
@@ -54,12 +55,23 @@ public:
     bool supportsDocLocking() const final {
         return false;
     }
+    bool supportsDBLocking() const final {
+        return true;
+    }
+    bool supportsCappedCollections() const final {
+        return true;
+    }
+    bool supportsCheckpoints() const final {
+        return false;
+    }
     bool isDurable() const final {
         return false;
     }
-    bool isEphemeral() const {
+    bool isEphemeral() const final {
         return true;
     }
+    void loadCatalog(OperationContext* opCtx) final {}
+    void closeCatalog(OperationContext* opCtx) final {}
     Status closeDatabase(OperationContext* opCtx, StringData db) final {
         return Status::OK();
     }
@@ -69,6 +81,20 @@ public:
     int flushAllFiles(OperationContext* opCtx, bool sync) final {
         return 0;
     }
+    Status beginBackup(OperationContext* opCtx) final {
+        return Status(ErrorCodes::CommandNotSupported,
+                      "The current storage engine doesn't support backup mode");
+    }
+    void endBackup(OperationContext* opCtx) final {}
+    StatusWith<std::vector<std::string>> beginNonBlockingBackup(OperationContext* opCtx) final {
+        return Status(ErrorCodes::CommandNotSupported,
+                      "The current storage engine does not support a concurrent mode.");
+    }
+    void endNonBlockingBackup(OperationContext* opCtx) final {}
+    StatusWith<std::vector<std::string>> extendBackupCursor(OperationContext* opCtx) final {
+        return Status(ErrorCodes::CommandNotSupported,
+                      "The current storage engine does not support a concurrent mode.");
+    }
     Status repairRecordStore(OperationContext* opCtx, const NamespaceString& ns) final {
         return Status::OK();
     }
@@ -76,11 +102,53 @@ public:
         return {};
     }
     void cleanShutdown() final {}
+    SnapshotManager* getSnapshotManager() const final {
+        return nullptr;
+    }
     void setJournalListener(JournalListener* jl) final {}
+    bool supportsRecoverToStableTimestamp() const final {
+        return false;
+    }
+    bool supportsRecoveryTimestamp() const final {
+        return false;
+    }
+    bool supportsReadConcernSnapshot() const final {
+        return false;
+    }
+    bool supportsReadConcernMajority() const final {
+        return false;
+    }
+    bool supportsOplogStones() const final {
+        return false;
+    }
     bool supportsPendingDrops() const final {
         return false;
     }
     void clearDropPendingState() final {}
+    StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) final {
+        fassertFailed(40547);
+    }
+    boost::optional<Timestamp> getRecoveryTimestamp() const final {
+        MONGO_UNREACHABLE;
+    }
+    boost::optional<Timestamp> getLastStableRecoveryTimestamp() const final {
+        MONGO_UNREACHABLE;
+    }
+    void setStableTimestamp(Timestamp stableTimestamp, bool force = false) final {}
+    void setInitialDataTimestamp(Timestamp timestamp) final {}
+    void setOldestTimestampFromStable() final {}
+    void setOldestTimestamp(Timestamp timestamp) final {}
+    void setOldestActiveTransactionTimestampCallback(
+        OldestActiveTransactionTimestampCallback callback) final {}
+    bool isCacheUnderPressure(OperationContext* opCtx) const final {
+        return false;
+    }
+    void setCachePressureForTest(int pressure) final {}
+    void replicationBatchIsComplete() const final {}
+    StatusWith<std::vector<CollectionIndexNamePair>> reconcileCatalogAndIdents(
+        OperationContext* opCtx) final {
+        return std::vector<CollectionIndexNamePair>();
+    }
     Timestamp getAllDurableTimestamp() const final {
         return {};
     }
@@ -99,22 +167,22 @@ public:
     Status currentFilesCompatible(OperationContext* opCtx) const final {
         return Status::OK();
     }
-    int64_t sizeOnDiskForDb(OperationContext* opCtx, StringData dbName) {
+    int64_t sizeOnDiskForDb(OperationContext* opCtx, StringData dbName) final {
         return 0;
     }
-    KVEngine* getEngine() {
+    KVEngine* getEngine() final {
         return nullptr;
     }
-    const KVEngine* getEngine() const {
+    const KVEngine* getEngine() const final {
         return nullptr;
     }
-    DurableCatalog* getCatalog() {
+    DurableCatalog* getCatalog() final {
         return nullptr;
     }
-    const DurableCatalog* getCatalog() const {
+    const DurableCatalog* getCatalog() const final {
         return nullptr;
     }
-    std::unique_ptr<CheckpointLock> getCheckpointLock(OperationContext* opCtx) {
+    std::unique_ptr<CheckpointLock> getCheckpointLock(OperationContext* opCtx) final {
         return nullptr;
     }
 };
