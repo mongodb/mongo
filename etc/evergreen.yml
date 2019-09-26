@@ -5400,7 +5400,7 @@ tasks:
 
 ## jstestfuzz standalone fuzzer for checking find and aggregate equivalence ##
 - <<: *jstestfuzz_template
-  name: query_fuzzer_gen
+  name: query_fuzzer_standalone_gen
   tags: ["query_fuzzer"]
   commands:
   - func: "generate fuzzer tasks"
@@ -5408,9 +5408,25 @@ tasks:
       <<: *jstestfuzz_config_vars
       num_files: 5
       num_tasks: 10
+      jstestfuzz_vars: --diffTestingMode standalone
       npm_command: query-fuzzer
       resmoke_args: --suites=generational_fuzzer
-      name: query_fuzzer
+      name: query_fuzzer_standalone
+
+## jstestfuzz sharded fuzzer for checking find and aggregate equivalence ##
+- <<: *jstestfuzz_template
+  name: query_fuzzer_sharded_gen
+  tags: ["query_fuzzer"]
+  commands:
+  - func: "generate fuzzer tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      num_files: 5
+      num_tasks: 10
+      jstestfuzz_vars: --diffTestingMode sharded
+      npm_command: query-fuzzer
+      resmoke_args: --suites=generational_fuzzer
+      name: query_fuzzer_sharded
 
 ## jstestfuzz standalone update generational fuzzer ##
 - <<: *jstestfuzz_template
