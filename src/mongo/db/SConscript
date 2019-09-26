@@ -59,6 +59,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/index_names',
         '$BUILD_DIR/mongo/db/write_concern_options',
+        '$BUILD_DIR/mongo/db/read_write_concern_defaults',
     ]
 )
 
@@ -366,6 +367,18 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/util/bson_extract',
+    ],
+)
+
+env.Library(
+    target="read_write_concern_defaults",
+    source=[
+        "read_write_concern_defaults.cpp",
+        env.Idlc('rw_concern_default.idl')[0],
+    ],
+    LIBDEPS=[
+        'write_concern_options',
+        'repl/read_concern_args',
     ],
 )
 

@@ -356,6 +356,7 @@ let testCases = {
     flushRouterConfig: {skip: "executes locally on mongos (not sent to any remote node)"},
     fsync: {skip: "broadcast to all shards"},
     getCmdLineOpts: {skip: "executes locally on mongos (not sent to any remote node)"},
+    getDefaultRWConcern: {skip: "executes locally on mongos (not sent to any remote node)"},
     getDiagnosticData: {skip: "executes locally on mongos (not sent to any remote node)"},
     getLastError: {skip: "does not forward command to primary shard"},
     getLog: {skip: "executes locally on mongos (not sent to any remote node)"},
@@ -535,6 +536,7 @@ let testCases = {
     saslContinue: {skip: "not on a user database"},
     saslStart: {skip: "not on a user database"},
     serverStatus: {skip: "executes locally on mongos (not sent to any remote node)"},
+    setDefaultRWConcern: {skip: "always targets the config server"},
     setIndexCommitQuorum: {
         run: {
             skipProfilerCheck: true,

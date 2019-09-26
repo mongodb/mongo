@@ -48,11 +48,17 @@ namespace repl {
 
 class ReadConcernArgs {
 public:
-    static const std::string kReadConcernFieldName;
-    static const std::string kAfterOpTimeFieldName;
-    static const std::string kAfterClusterTimeFieldName;
-    static const std::string kAtClusterTimeFieldName;
-    static const std::string kLevelFieldName;
+    static constexpr StringData kReadConcernFieldName = "readConcern"_sd;
+    static constexpr StringData kAfterOpTimeFieldName = "afterOpTime"_sd;
+    static constexpr StringData kAfterClusterTimeFieldName = "afterClusterTime"_sd;
+    static constexpr StringData kAtClusterTimeFieldName = "atClusterTime"_sd;
+    static constexpr StringData kLevelFieldName = "level"_sd;
+
+    static constexpr StringData kLocalReadConcernStr = "local"_sd;
+    static constexpr StringData kMajorityReadConcernStr = "majority"_sd;
+    static constexpr StringData kLinearizableReadConcernStr = "linearizable"_sd;
+    static constexpr StringData kAvailableReadConcernStr = "available"_sd;
+    static constexpr StringData kSnapshotReadConcernStr = "snapshot"_sd;
 
     /**
      * Represents the internal mechanism an operation uses to satisfy 'majority' read concern.
@@ -102,6 +108,13 @@ public:
      * This method correctly handles missing BSONElements.
      */
     Status initialize(const BSONElement& readConcernElem);
+
+    /**
+     * Initializes the object by parsing the actual readConcern sub-object.
+     */
+    Status parse(const BSONObj& readConcernObj);
+
+    static ReadConcernArgs fromBSONThrows(const BSONObj& readConcernObj);
 
     /**
      * Sets the mechanism we should use to satisfy 'majority' reads.

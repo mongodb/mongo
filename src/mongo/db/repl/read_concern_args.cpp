@@ -45,23 +45,6 @@ using std::string;
 namespace mongo {
 namespace repl {
 
-namespace {
-
-constexpr StringData kLocalReadConcernStr = "local"_sd;
-constexpr StringData kMajorityReadConcernStr = "majority"_sd;
-constexpr StringData kLinearizableReadConcernStr = "linearizable"_sd;
-constexpr StringData kAvailableReadConcernStr = "available"_sd;
-constexpr StringData kSnapshotReadConcernStr = "snapshot"_sd;
-
-}  // unnamed namespace
-
-const string ReadConcernArgs::kReadConcernFieldName("readConcern");
-const string ReadConcernArgs::kAfterOpTimeFieldName("afterOpTime");
-const string ReadConcernArgs::kAfterClusterTimeFieldName("afterClusterTime");
-const string ReadConcernArgs::kAtClusterTimeFieldName("atClusterTime");
-
-const string ReadConcernArgs::kLevelFieldName("level");
-
 const OperationContext::Decoration<ReadConcernArgs> handle =
     OperationContext::declareDecoration<ReadConcernArgs>();
 
@@ -122,8 +105,6 @@ boost::optional<LogicalTime> ReadConcernArgs::getArgsAtClusterTime() const {
 }
 
 Status ReadConcernArgs::initialize(const BSONElement& readConcernElem) {
-    invariant(isEmpty());  // only legal to call on uninitialized object.
-
     if (readConcernElem.eoo()) {
         return Status::OK();
     }
@@ -135,7 +116,11 @@ Status ReadConcernArgs::initialize(const BSONElement& readConcernElem) {
                       str::stream() << kReadConcernFieldName << " field should be an object");
     }
 
-    BSONObj readConcernObj = readConcernElem.Obj();
+    return parse(readConcernElem.Obj());
+}
+
+Status ReadConcernArgs::parse(const BSONObj& readConcernObj) {
+    invariant(isEmpty());  // only legal to call on uninitialized object.
     for (auto&& field : readConcernObj) {
         auto fieldName = field.fieldNameStringData();
         if (fieldName == kAfterOpTimeFieldName) {
@@ -248,6 +233,12 @@ Status ReadConcernArgs::initialize(const BSONElement& readConcernElem) {
     return Status::OK();
 }
 
+ReadConcernArgs ReadConcernArgs::fromBSONThrows(const BSONObj& readConcernObj) {
+    ReadConcernArgs rc;
+    uassertStatusOK(rc.parse(readConcernObj));
+    return rc;
+}
+
 void ReadConcernArgs::setMajorityReadMechanism(MajorityReadMechanism mechanism) {
     invariant(*_level == ReadConcernLevel::kMajorityReadConcern);
     _majorityReadMechanism = mechanism;
@@ -297,7 +288,7 @@ void ReadConcernArgs::appendInfo(BSONObjBuilder* builder) const {
     }
 
     if (_opTime) {
-        _opTime->append(&rcBuilder, kAfterOpTimeFieldName);
+        _opTime->append(&rcBuilder, kAfterOpTimeFieldName.toString());
     }
 
     if (_afterClusterTime) {

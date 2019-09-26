@@ -159,20 +159,37 @@ Status WriteConcernOptions::parse(const BSONObj& obj) {
     return Status::OK();
 }
 
-WriteConcernOptions WriteConcernOptions::deserializerForIDL(const BSONObj& obj) {
-    WriteConcernOptions writeConcernOptions;
-    uassertStatusOK(writeConcernOptions.parse(obj));
-    return writeConcernOptions;
-}
+namespace {
 
-StatusWith<WriteConcernOptions> WriteConcernOptions::extractWCFromCommand(
-    const BSONObj& cmdObj, const WriteConcernOptions& defaultWC) {
+/**
+ * Construct a WriteConcernOptions based on an optional default WC object, in preparation for
+ * parsing out of a command object or IDL.
+ */
+WriteConcernOptions constructWCFromDefault(
+    const WriteConcernOptions& defaultWC = WriteConcernOptions()) {
     WriteConcernOptions writeConcern = defaultWC;
     writeConcern.usedDefault = true;
     writeConcern.usedDefaultW = true;
     if (writeConcern.wNumNodes == 0 && writeConcern.wMode.empty()) {
         writeConcern.wNumNodes = 1;
     }
+    return writeConcern;
+}
+
+}  // namespace
+
+
+WriteConcernOptions WriteConcernOptions::deserializerForIDL(const BSONObj& obj) {
+    WriteConcernOptions writeConcern = constructWCFromDefault();
+    if (!obj.isEmpty()) {
+        uassertStatusOK(writeConcern.parse(obj));
+    }
+    return writeConcern;
+}
+
+StatusWith<WriteConcernOptions> WriteConcernOptions::extractWCFromCommand(
+    const BSONObj& cmdObj, const WriteConcernOptions& defaultWC) {
+    WriteConcernOptions writeConcern = constructWCFromDefault(defaultWC);
 
     // Return the default write concern if no write concern is provided. We check for the existence
     // of the write concern field up front in order to avoid the expense of constructing an error

@@ -142,9 +142,11 @@ env.Library(
         'logical_session_server_status_section.cpp',
         'mr_common.cpp',
         'reap_logical_session_cache_now.cpp',
+        'rwc_defaults_commands.cpp',
         'traffic_recording_cmds.cpp',
         'user_management_commands_common.cpp',
         env.Idlc('drop_connections.idl')[0],
+        env.Idlc('rwc_defaults_commands.idl')[0],
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/clientdriver_minimal',
