@@ -1,6 +1,7 @@
 # Agreed with upstream, that redefining rpath is necessary as xulrunner used to
 # change API without changing so-name
 mongodb: binary-or-shlib-defines-rpath ./usr/bin/mongo /usr/lib64/xulrunner-1.9.1
+mongodb: binary-or-shlib-defines-rpath ./usr/bin/mongocryptd /usr/lib64/xulrunner-1.9.1
 mongodb: binary-or-shlib-defines-rpath ./usr/bin/mongod /usr/lib64/xulrunner-1.9.1
 mongodb: binary-or-shlib-defines-rpath ./usr/bin/mongodump /usr/lib64/xulrunner-1.9.1
 mongodb: binary-or-shlib-defines-rpath ./usr/bin/mongoexport /usr/lib64/xulrunner-1.9.1
