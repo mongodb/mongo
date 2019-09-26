@@ -3,3 +3,6 @@ evergreen.py == 0.3.9
 jinja2
 mock
 shrub.py == 0.2.3
+ocspresponder == 0.5.0
+bottle == 0.12.9
+ocspbuilder == 0.10.2
