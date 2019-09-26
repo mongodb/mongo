@@ -12771,6 +12771,8 @@ buildvariants:
 
 - name: commit-queue
   display_name: "~ Commit Queue"
+  modules:
+  - enterprise
   run_on:
     - rhel62-small
   batchtime: 10080 # 7 days
