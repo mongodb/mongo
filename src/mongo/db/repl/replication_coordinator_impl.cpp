@@ -3038,6 +3038,9 @@ void ReplicationCoordinatorImpl::_onFollowerModeStateChange() {
 void ReplicationCoordinatorImpl::CatchupState::start_inlock() {
     log() << "Entering primary catch-up mode.";
 
+    // Reset the number of catchup operations performed before starting catchup.
+    _numCatchUpOps = 0;
+
     // No catchup in single node replica set.
     if (_repl->_rsConfig.getNumMembers() == 1) {
         abort_inlock(PrimaryCatchUpConclusionReason::kSkipped);
@@ -3081,8 +3084,6 @@ void ReplicationCoordinatorImpl::CatchupState::start_inlock() {
         return;
     }
     _timeoutCbh = status.getValue();
-
-    _numCatchUpOps = 0;
 }
 
 void ReplicationCoordinatorImpl::CatchupState::abort_inlock(PrimaryCatchUpConclusionReason reason) {
@@ -3165,7 +3166,7 @@ void ReplicationCoordinatorImpl::CatchupState::signalHeartbeatUpdate_inlock() {
     _repl->_opTimeWaiterList.add_inlock(_waiter.get());
 }
 
-void ReplicationCoordinatorImpl::CatchupState::incrementNumCatchUpOps_inlock(int numOps) {
+void ReplicationCoordinatorImpl::CatchupState::incrementNumCatchUpOps_inlock(long numOps) {
     _numCatchUpOps += numOps;
 }
 
@@ -3178,7 +3179,7 @@ Status ReplicationCoordinatorImpl::abortCatchupIfNeeded(PrimaryCatchUpConclusion
     return Status(ErrorCodes::IllegalOperation, "The node is not in catch-up mode.");
 }
 
-void ReplicationCoordinatorImpl::incrementNumCatchUpOpsIfCatchingUp(int numOps) {
+void ReplicationCoordinatorImpl::incrementNumCatchUpOpsIfCatchingUp(long numOps) {
     stdx::lock_guard<Latch> lk(_mutex);
     if (_catchupState) {
         _catchupState->incrementNumCatchUpOps_inlock(numOps);

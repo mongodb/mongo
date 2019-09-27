@@ -334,7 +334,7 @@ Status ReplicationCoordinatorNoOp::abortCatchupIfNeeded(PrimaryCatchUpConclusion
     MONGO_UNREACHABLE;
 }
 
-void ReplicationCoordinatorNoOp::incrementNumCatchUpOpsIfCatchingUp(int numOps) {
+void ReplicationCoordinatorNoOp::incrementNumCatchUpOpsIfCatchingUp(long numOps) {
     MONGO_UNREACHABLE;
 }
 

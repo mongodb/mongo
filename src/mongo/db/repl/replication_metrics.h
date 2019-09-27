@@ -91,7 +91,7 @@ public:
                                      const Milliseconds electionTimeoutMillis,
                                      const boost::optional<int> priorPrimary);
     void setTargetCatchupOpTime(OpTime opTime);
-    void setNumCatchUpOps(int numCatchUpOps);
+    void setNumCatchUpOps(long numCatchUpOps);
     void setNewTermStartDate(Date_t newTermStartDate);
     void setWMajorityWriteAvailabilityDate(Date_t wMajorityWriteAvailabilityDate);
 

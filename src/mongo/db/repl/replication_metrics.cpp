@@ -292,8 +292,9 @@ void ReplicationMetrics::setTargetCatchupOpTime(OpTime opTime) {
     _electionCandidateMetrics.setTargetCatchupOpTime(opTime);
 }
 
-void ReplicationMetrics::setNumCatchUpOps(int numCatchUpOps) {
+void ReplicationMetrics::setNumCatchUpOps(long numCatchUpOps) {
     stdx::lock_guard<Latch> lk(_mutex);
+    invariant(numCatchUpOps >= 0);
     _electionCandidateMetrics.setNumCatchUpOps(numCatchUpOps);
     _totalNumCatchUpOps += numCatchUpOps;
     _updateAverageCatchUpOps(lk);
