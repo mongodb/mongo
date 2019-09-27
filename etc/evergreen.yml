@@ -11651,6 +11651,7 @@ buildvariants:
     # We need --allocator=system here solely due to SERVER-27675
     compile_flags: --link-model=dynamic --allocator=system -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --mobile-se=on
     scons_cache_scope: shared
+    scons_cache_mode: all
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
   tasks:
@@ -11670,6 +11671,7 @@ buildvariants:
     # We need --allocator=system here solely due to SERVER-27675
     compile_flags: --link-model=dynamic --allocator=system -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --mobile-se=on
     scons_cache_scope: shared
+    scons_cache_mode: all
   tasks:
   - name: clang_tidy_TG
 
@@ -11682,6 +11684,7 @@ buildvariants:
     # We need --allocator=system here solely due to SERVER-27675
     compile_flags: --link-model=dynamic --allocator=system -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
     scons_cache_scope: shared
+    scons_cache_mode: all
     tooltags: ""
     build_mongoreplay: true
   tasks:
