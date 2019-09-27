@@ -76,11 +76,11 @@ dropAndReshardColl();
 // a result of migrating documents {a: 10} and {a: 10, b: 1}.
 assert.commandWorked(mongos.adminCommand({split: kNsName, middle: {a: 5}}));
 assert.commandWorked(mongos.adminCommand({moveChunk: kNsName, find: {a: 5}, to: secondaryShard}));
-assert.lte(2, orphanDocCount());
+assert.lte(orphanDocCount(), 2);
 
 // Verify that refining the shard key produces no additional orphaned documents in 'db.foo'.
 assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: kNsName, key: kNewKeyDoc}));
-assert.lte(2, orphanDocCount());
+assert.lte(orphanDocCount(), 2);
 
 jsTestLog('********** REQUEST TARGETING **********');
 
