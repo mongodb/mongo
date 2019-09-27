@@ -195,6 +195,55 @@ var ReplSetTest = function(opts) {
     }
 
     /**
+     * Wrap a function so it can accept a node id or connection as its first argument. The argument
+     * is converted to a connection.
+     */
+    function _nodeParamToConn(wrapped) {
+        return function(node, ...wrappedArgs) {
+            if (node.getDB) {
+                return wrapped.call(this, node, ...wrappedArgs);
+            }
+
+            assert(self.nodes.hasOwnProperty(node), `${node} not found in self.nodes`);
+            return wrapped.call(this, self.nodes[node], ...wrappedArgs);
+        };
+    }
+
+    /**
+     * Wrap a function so it can accept a node id or connection as its first argument. The argument
+     * is converted to a node id.
+     */
+    function _nodeParamToId(wrapped) {
+        return function(node, ...wrappedArgs) {
+            if (node.getDB) {
+                return wrapped.call(this, self.getNodeId(node), ...wrappedArgs);
+            }
+
+            assert(Number.isInteger(node), `node must be an integer, not ${node}`);
+            return wrapped.call(this, node, ...wrappedArgs);
+        };
+    }
+
+    /**
+     * Wrap a function so it accepts a single node or list of them as its first argument. The
+     * function is called once per node provided.
+     */
+    function _nodeParamToSingleNode(wrapped) {
+        return function(node, ...wrappedArgs) {
+            if (node.hasOwnProperty('length')) {
+                let returnValueList = [];
+                for (let i = 0; i < node.length; i++) {
+                    returnValueList.push(wrapped.call(this, node[i], ...wrappedArgs));
+                }
+
+                return returnValueList;
+            }
+
+            return wrapped.call(this, node, ...wrappedArgs);
+        };
+    }
+
+    /**
      * Wait for a rs indicator to go to a particular state or states.
      *
      * @param node is a single node or list of nodes, by id or conn
@@ -203,26 +252,11 @@ var ReplSetTest = function(opts) {
      * @param timeout how long to wait for the state to be reached
      * @param reconnectNode indicates that we should reconnect to a node that stepped down
      */
-    function _waitForIndicator(node, states, ind, timeout, reconnectNode) {
+    const _waitForIndicator = _nodeParamToSingleNode(_nodeParamToConn(function(
+        node, states, ind, timeout, reconnectNode) {
         timeout = timeout || self.kDefaultTimeoutMS;
         if (reconnectNode === undefined) {
             reconnectNode = true;
-        }
-
-        if (node.length) {
-            var nodes = node;
-            for (var i = 0; i < nodes.length; i++) {
-                if (states.length)
-                    _waitForIndicator(nodes[i], states[i], ind, timeout, reconnectNode);
-                else
-                    _waitForIndicator(nodes[i], states, ind, timeout, reconnectNode);
-            }
-
-            return;
-        }
-
-        if (!node.getDB) {
-            node = self.nodes[node];
         }
 
         if (!states.length) {
@@ -318,7 +352,7 @@ var ReplSetTest = function(opts) {
 
         print("ReplSetTest waitForIndicator final status:");
         printjson(status);
-    }
+    }));
 
     /**
      * Wait for a health indicator to go to a particular state or states.
@@ -1767,10 +1801,11 @@ var ReplSetTest = function(opts) {
                   "function",
                   "Expected checkerFunction parameter to be a function");
 
+        assert(slaves, 'must pass list of live nodes to checkReplicaSet');
+
         // Call getPrimary to populate rst with information about the nodes.
         var primary = this.getPrimary();
         assert(primary, 'calling getPrimary() failed');
-        slaves = slaves || self._slaves;
 
         // Since we cannot determine if there is a background index in progress (SERVER-26624), we
         // use the "collMod" command to wait for any index builds that may be in progress on the
@@ -1804,32 +1839,53 @@ var ReplSetTest = function(opts) {
                 });
         }
 
-        var activeException = false;
+        // Prevent an election, which could start, then hang due to the fsyncLock.
+        jsTestLog(`Freezing nodes: [${slaves.map((n) => n.host)}]`);
+        self.freeze(slaves);
 
-        // Lock the primary to prevent the TTL monitor from deleting expired documents in
-        // the background while we are getting the dbhashes of the replica set members. It's not
-        // important if the storage engine fails to perform its fsync operation. The only
-        // requirement is that writes are locked out.
+        // Await primary in case freeze() had to step down a node that was unexpectedly primary.
+        self.getPrimary();
+
+        // Lock the primary to prevent writes in the background while we are getting the
+        // dbhashes of the replica set members. It's not important if the storage engine fails
+        // to perform its fsync operation. The only requirement is that writes are locked out.
         assert.commandWorked(primary.adminCommand({fsync: 1, lock: 1, allowFsyncFailure: true}),
                              'failed to lock the primary');
+
+        function postApplyCheckerFunction() {
+            // Unfreeze secondaries and unlock primary.
+            try {
+                assert.commandWorked(primary.adminCommand({fsyncUnlock: 1}));
+            } catch (e) {
+                print(`Continuing after fsyncUnlock error: ${e}`);
+            }
+
+            slaves.forEach(secondary => {
+                try {
+                    assert.commandWorked(secondary.adminCommand({replSetFreeze: 0}));
+                } catch (e) {
+                    print(`Continuing after replSetFreeze error: ${e}`);
+                }
+            });
+        }
+
+        let activeException = false;
         try {
-            this.awaitReplication(null, null, slaves);
+            self.awaitReplication(null, null, slaves);
             checkerFunction.apply(this, checkerFunctionArgs);
         } catch (e) {
             activeException = true;
             throw e;
         } finally {
-            // Allow writes on the primary.
-            var res = primary.adminCommand({fsyncUnlock: 1});
-
-            if (!res.ok) {
-                var msg = 'failed to unlock the primary, which may cause this' +
-                    ' test to hang: ' + tojson(res);
-                if (activeException) {
-                    print(msg);
-                } else {
-                    throw new Error(msg);
+            if (activeException) {
+                try {
+                    postApplyCheckerFunction();
+                } catch (e) {
+                    // Print the postApplyCheckerFunction error, propagate the original.
+                    print(e);
                 }
+            } else {
+                postApplyCheckerFunction();
             }
         }
     };
@@ -2241,7 +2297,7 @@ var ReplSetTest = function(opts) {
             assert(success, `Collection counts did not match. search for '${errPrefix}' in logs.`);
         }
 
-        this.checkReplicaSet(checkCollectionCountsForReplSet, null, this);
+        this.checkReplicaSet(checkCollectionCountsForReplSet, _determineLiveSlaves(), this);
     };
 
     /**
@@ -2259,23 +2315,7 @@ var ReplSetTest = function(opts) {
      *   before the server starts.  Default: false.
      *
      */
-    this.start = function(n, options, restart, wait) {
-        if (n.length) {
-            var nodes = n;
-            var started = [];
-
-            for (var i = 0; i < nodes.length; i++) {
-                if (this.start(nodes[i], Object.merge({}, options), restart, wait)) {
-                    started.push(nodes[i]);
-                }
-            }
-
-            return started;
-        }
-
-        // TODO: should we do something special if we don't currently know about this node?
-        n = this.getNodeId(n);
-
+    this.start = _nodeParamToSingleNode(_nodeParamToId(function(n, options, restart, wait) {
         print("ReplSetTest n is : " + n);
 
         var defaults = {
@@ -2404,7 +2444,7 @@ var ReplSetTest = function(opts) {
         }
 
         return this.nodes[n];
-    };
+    }));
 
     /**
      * Restarts a db without clearing the data directory by default, and using the node(s)'s
@@ -2443,6 +2483,31 @@ var ReplSetTest = function(opts) {
         return started;
     };
 
+    /**
+     * Step down and freeze a particular node or nodes.
+     *
+     * @param node is a single node or list of nodes, by id or conn
+     */
+    this.freeze = _nodeParamToSingleNode(_nodeParamToConn(function(node) {
+        assert.soon(() => {
+            try {
+                // Ensure node is not primary. Ignore errors, probably means it's already secondary.
+                node.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true});
+                // Prevent node from running election. Fails if it already started an election.
+                assert.commandWorked(node.adminCommand({replSetFreeze: ReplSetTest.kForeverSecs}));
+                return true;
+            } catch (e) {
+                if (isNetworkError(e) || e.code === ErrorCodes.NotSecondary ||
+                    e.code === ErrorCodes.NotYetInitialized) {
+                    jsTestLog(`Failed to freeze node ${node.host}: ${e}`);
+                    return false;
+                }
+
+                throw e;
+            }
+        }, `Failed to run replSetFreeze cmd on ${node.host}`);
+    }));
+
     this.stopMaster = function(signal, opts) {
         var master = this.getPrimary();
         var master_id = this.getNodeId(master);
@@ -2463,20 +2528,8 @@ var ReplSetTest = function(opts) {
      * @param {boolean} [extraOptions.forRestart=false] indicates whether stop() is being called
      * with the intent to call start() with restart=true for the same node(s) n.
      */
-    this.stop = function(n, signal, opts, {forRestart: forRestart = false} = {}) {
-        // Flatten array of nodes to stop
-        if (n.length) {
-            var nodes = n;
-
-            var stopped = [];
-            for (var i = 0; i < nodes.length; i++) {
-                if (this.stop(nodes[i], signal, opts))
-                    stopped.push(nodes[i]);
-            }
-
-            return stopped;
-        }
-
+    this.stop = _nodeParamToSingleNode(_nodeParamToConn(function(
+        n, signal, opts, {forRestart: forRestart = false} = {}) {
         // Can specify wait as second parameter, if using default signal
         if (signal == true || signal == false) {
             signal = undefined;
@@ -2501,7 +2554,7 @@ var ReplSetTest = function(opts) {
         }
 
         return ret;
-    };
+    }));
 
     /**
      * Kill all members of this replica set.
@@ -2746,6 +2799,11 @@ var ReplSetTest = function(opts) {
  *  Global default timeout (10 minutes).
  */
 ReplSetTest.kDefaultTimeoutMS = 10 * 60 * 1000;
+
+/**
+ *  Global default number that's effectively infinite.
+ */
+ReplSetTest.kForeverSecs = 24 * 60 * 60;
 
 /**
  * Set of states that the replica set can be in. Used for the wait functions.
