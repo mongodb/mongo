@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Bypass compile and fetch binaries."""
 
+from collections import namedtuple
 import json
 import logging
 import os
@@ -20,8 +21,6 @@ import structlog
 from structlog.stdlib import LoggerFactory
 import yaml
 
-EVG_CONFIG_FILE = ".evergreen.yml"
-
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -32,6 +31,8 @@ from buildscripts.ciconfig.evergreen import parse_evergreen_file
 
 structlog.configure(logger_factory=LoggerFactory())
 LOGGER = structlog.get_logger(__name__)
+
+EVG_CONFIG_FILE = ".evergreen.yml"
 
 _IS_WINDOWS = (sys.platform == "win32" or sys.platform == "cygwin")
 
@@ -80,6 +81,20 @@ BYPASS_EXTRA_CHECKS_REQUIRED = {
 EXPANSIONS_TO_CHECK = {
     "compile_flags",
 }  # yapf: disable
+
+# SERVER-21492 related issue where without running scons the jstests/libs/key1
+# and key2 files are not chmod to 0600. Need to change permissions since we bypass SCons.
+ARTIFACTS_NEEDING_PERMISSIONS = {
+    os.path.join("jstests", "libs", "key1"): 0o600,
+    os.path.join("jstests", "libs", "key2"): 0o600,
+    os.path.join("jstests", "libs", "keyForRollover"): 0o600,
+}
+
+TargetBuild = namedtuple("TargetBuild", [
+    "project",
+    "revision",
+    "build_variant",
+])
 
 
 def executable_name(pathname):
@@ -138,17 +153,15 @@ def _create_bypass_path(prefix, build_id, name):
     return archive_name(f"{prefix}/{name}-{build_id}")
 
 
-def generate_bypass_expansions(project, build_variant, revision, build_id):
+def generate_bypass_expansions(target, build_id):
     """
     Create a dictionary of the generate bypass expansions.
 
-    :param project: Evergreen project.
-    :param build_variant: Build variant being run in.
-    :param revision: Revision to use in expansions.
+    :param target: Build being targeted.
     :param build_id: Build id to use in expansions.
     :returns: Dictionary of expansions to update.
     """
-    prefix = f"{project}/{build_variant}/{revision}"
+    prefix = f"{target.project}/{target.build_variant}/{target.revision}"
 
     return {
         # With compile bypass we need to update the URL to point to the correct name of the base
@@ -268,20 +281,18 @@ def should_bypass_compile(patch_file, build_variant):
     return True
 
 
-def find_build_for_previous_compile_task(evg_api, revision, project, build_variant):
+def find_build_for_previous_compile_task(evg_api, target):
     """
     Find build_id of the base revision.
 
     :param evg_api: Evergreen.py object.
-    :param revision: The base revision being run against.
-    :param project: The evergreen project.
-    :param build_variant: The build variant whose artifacts we want to use.
+    :param target: Build being targeted.
     :return: build_id of the base revision.
     """
-    project_prefix = project.replace("-", "_")
-    version_of_base_revision = "{}_{}".format(project_prefix, revision)
+    project_prefix = target.project.replace("-", "_")
+    version_of_base_revision = "{}_{}".format(project_prefix, target.revision)
     version = evg_api.version_by_id(version_of_base_revision)
-    build_id = version.build_by_variant(build_variant).id
+    build_id = version.build_by_variant(target.build_variant).id
     return build_id
 
 
@@ -376,6 +387,37 @@ def fetch_artifacts(evg_api, build_id, revision):
     return artifacts
 
 
+def update_artifact_permissions(permission_dict):
+    """
+    Update the given files with the specified permissions.
+
+    :param permission_dict: Keys of dict should be files to update, values should be permissions.
+    """
+    for path, perm in permission_dict.items():
+        os.chmod(path, perm)
+
+
+def gather_artifacts_and_update_expansions(build_id, target, json_artifact_file, expansions_file,
+                                           evg_api):
+    """
+    Fetch the artifacts for this build and save them to be used by other tasks.
+
+    :param build_id: build_id of build with artifacts.
+    :param target: Target build being bypassed.
+    :param json_artifact_file: File to write json artifacts to.
+    :param expansions_file: Files to write expansions to.
+    :param evg_api: Evergreen Api.
+    """
+    artifacts = fetch_artifacts(evg_api, build_id, target.revision)
+    update_artifact_permissions(ARTIFACTS_NEEDING_PERMISSIONS)
+    write_out_artifacts(json_artifact_file, artifacts)
+
+    LOGGER.info("Creating expansions files", target=target, build_id=build_id)
+
+    expansions = generate_bypass_expansions(target, build_id)
+    write_out_bypass_compile_expansions(expansions_file, **expansions)
+
+
 @click.command()
 @click.option("--project", required=True, help="The evergreen project.")
 @click.option("--build-variant", required=True,
@@ -407,29 +449,18 @@ def main(  # pylint: disable=too-many-arguments,too-many-locals,too-many-stateme
         stream=sys.stdout,
     )
 
+    target = TargetBuild(project=project, build_variant=build_variant, revision=revision)
+
     # Determine if we should bypass compile based on modified patch files.
     if should_bypass_compile(patch_file, build_variant):
         evg_api = RetryingEvergreenApi.get_api(config_file=EVG_CONFIG_FILE)
-        build_id = find_build_for_previous_compile_task(evg_api, revision, project, build_variant)
+        build_id = find_build_for_previous_compile_task(evg_api, target)
         if not build_id:
             LOGGER.warning("Could not find build id. Default compile bypass to false.",
                            revision=revision, project=project)
             return
-        artifacts = fetch_artifacts(evg_api, build_id, revision)
 
-        # SERVER-21492 related issue where without running scons the jstests/libs/key1
-        # and key2 files are not chmod to 0600. Need to change permissions here since we
-        # bypass SCons.
-        os.chmod("jstests/libs/key1", 0o600)
-        os.chmod("jstests/libs/key2", 0o600)
-        os.chmod("jstests/libs/keyForRollover", 0o600)
-
-        # This is the artifacts.json file.
-        write_out_artifacts(json_artifact, artifacts)
-
-        # Need to apply these expansions for bypassing SCons.
-        expansions = generate_bypass_expansions(project, build_variant, revision, build_id)
-        write_out_bypass_compile_expansions(out_file, **expansions)
+        gather_artifacts_and_update_expansions(build_id, target, json_artifact, out_file, evg_api)
 
 
 if __name__ == "__main__":

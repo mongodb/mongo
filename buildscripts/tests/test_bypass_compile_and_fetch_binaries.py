@@ -6,7 +6,7 @@ from mock import mock_open, patch, MagicMock
 
 import buildscripts.bypass_compile_and_fetch_binaries as under_test
 
-# pylint: disable=missing-docstring,protected-access,too-many-lines
+# pylint: disable=missing-docstring,protected-access,too-many-lines,no-self-use
 
 NS = "buildscripts.bypass_compile_and_fetch_binaries"
 
@@ -148,17 +148,14 @@ pytests/test2.py
 
 class TestFindBuildForPreviousCompileTask(unittest.TestCase):
     def test_find_build(self):
-        revision = "a22"
-        project = "project"
-        build_variant = "variant"
+        target = under_test.TargetBuild(project="project", revision="a22", build_variant="variant")
         expected_build_id = "project_variant_patch_a22_date"
         evergreen_api = MagicMock()
         version_response = MagicMock()
         evergreen_api.version_by_id.return_value = version_response
         version_response.build_by_variant.return_value = MagicMock(id=expected_build_id)
 
-        build_id = under_test.find_build_for_previous_compile_task(evergreen_api, revision, project,
-                                                                   build_variant)
+        build_id = under_test.find_build_for_previous_compile_task(evergreen_api, target)
         self.assertEqual(build_id, expected_build_id)
 
 
@@ -222,3 +219,27 @@ class TestFindPreviousCompileTask(unittest.TestCase):
 
         task = under_test.find_previous_compile_task(evergreen_api, build_id, revision)
         self.assertEqual(task, task_response)
+
+
+class TestUpdateArtifactPermissions(unittest.TestCase):
+    @patch(ns("os.chmod"))
+    def test_one_file_is_updated(self, chmod_mock):
+        perm_dict = {
+            "file1": 0o600,
+        }
+
+        under_test.update_artifact_permissions(perm_dict)
+
+        chmod_mock.assert_called_with("file1", perm_dict["file1"])
+
+    @patch(ns("os.chmod"))
+    def test_multiple_files_are_updated(self, chmod_mock):
+        perm_dict = {
+            "file1": 0o600,
+            "file2": 0o755,
+            "file3": 0o444,
+        }
+
+        under_test.update_artifact_permissions(perm_dict)
+
+        self.assertEqual(len(perm_dict), chmod_mock.call_count)

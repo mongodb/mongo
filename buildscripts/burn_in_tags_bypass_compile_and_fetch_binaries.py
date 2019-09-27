@@ -9,8 +9,7 @@ import structlog
 from structlog.stdlib import LoggerFactory
 
 from evergreen.api import RetryingEvergreenApi
-from buildscripts.bypass_compile_and_fetch_binaries import fetch_artifacts, \
-    generate_bypass_expansions, write_out_bypass_compile_expansions, write_out_artifacts
+from buildscripts.bypass_compile_and_fetch_binaries import TargetBuild, gather_artifacts_and_update_expansions
 
 structlog.configure(logger_factory=LoggerFactory())
 LOGGER = structlog.get_logger(__name__)
@@ -84,15 +83,9 @@ def main(  # pylint: disable=too-many-arguments,too-many-locals
 
     version = evg_api.version_by_id(version_id)
     build_id = _retrieve_used_build_id(version.build_by_variant(build_variant))
-    artifacts = fetch_artifacts(evg_api, build_id, revision)
 
-    write_out_artifacts(json_artifact, artifacts)
-
-    LOGGER.info("Creating expansions files", project=project, build_variant=build_variant,
-                revision=revision, build_id=build_id)
-
-    expansions = generate_bypass_expansions(project, build_variant, revision, build_id)
-    write_out_bypass_compile_expansions(out_file, **expansions)
+    target = TargetBuild(project=project, revision=revision, build_variant=build_variant)
+    gather_artifacts_and_update_expansions(build_id, target, json_artifact, out_file, evg_api)
 
 
 if __name__ == "__main__":
