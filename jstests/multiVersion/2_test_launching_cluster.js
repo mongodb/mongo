@@ -29,8 +29,7 @@ var st = new ShardingTest({
         mongosOptions: {binVersion: versionsToCheckMongos},
         configOptions: {binVersion: versionsToCheckConfig},
         shardOptions: {binVersion: versionsToCheck},
-        enableBalancer: true,
-        shardAsReplicaSet: false
+        enableBalancer: true
     }
 });
 
