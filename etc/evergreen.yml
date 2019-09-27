@@ -3921,6 +3921,24 @@ tasks:
         display_name: Library Dependency Graph (library_dependency_graph.json)
         build_variants: [enterprise-rhel-70-64-bit-kitchen-sink] # This must be the Dagger variant
 
+## clang_tidy - run clang_tidy
+- name: clang_tidy
+  commands:
+    - func: "scons compile"
+      vars:
+        targets: generated-sources compiledb
+        task_compile_flags: >-
+          --detect-odr-violations
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: "src"
+        script: |
+          set -o errexit
+          set -o verbose
+          # This could probably be accelerated with gnu parallel
+          /opt/mongodbtoolchain/v3/bin/clang-tidy -p ./compile_commands.json --checks="-*,bugprone-unused-raii" -warnings-as-errors="*" $(jq -r '.[] | .file' compile_commands.json | grep src/mongo)
+
 ## unittests - run unittests ##
 - name: unittests
   commands:
@@ -8623,6 +8641,31 @@ task_groups:
   - unittests
   - dbtest
   - compile_all
+
+- name: clang_tidy_TG
+  setup_group_can_fail_task: true
+  setup_group:
+    - command: manifest.load
+    - func: "kill processes"
+    - func: "cleanup environment"
+    - func: "git get project"
+    - func: "set task expansion macros"
+    - func: "set up virtualenv"
+    - func: "configure evergreen api credentials"
+    - func: "get buildnumber"
+    - func: "set up credentials"
+    - func: "set up win mount script"
+    - func: "generate compile expansions"
+  teardown_group:
+    - func: "umount shared scons directory"
+    - func: "cleanup environment"
+  setup_task:
+    - func: "apply compile expansions"
+    - func: "set task expansion macros"
+  teardown_task:
+  tasks:
+  - clang_tidy
+
 - name: embedded_sdk_build_and_test
   setup_group_can_fail_task: true
   setup_group:
@@ -11615,6 +11658,20 @@ buildvariants:
     distros:
     - ubuntu1604-build
   - name: buildscripts_test
+
+- name: enterprise-ubuntu-dynamic-1604-clang-tidy
+  display_name: "* Enterprise Clang Tidy"
+  modules:
+  - enterprise
+  run_on:
+   - ubuntu1604-build
+  expansions:
+    lang_environment: LANG=C
+    # We need --allocator=system here solely due to SERVER-27675
+    compile_flags: --link-model=dynamic --allocator=system -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --mobile-se=on
+    scons_cache_scope: shared
+  tasks:
+  - name: clang_tidy_TG
 
 - name: ubuntu-dynamic-1604-clang
   display_name: "* Shared Library Ubuntu 16.04 (Clang)"
