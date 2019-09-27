@@ -3889,7 +3889,7 @@ tasks:
           --detect-odr-violations
     - func: "scons compile"
       vars:
-        targets: archive-dist 
+        targets: archive-dist
         additional_targets: ""
         task_compile_flags: >-
           --use-new-tools
