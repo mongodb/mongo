@@ -3882,11 +3882,21 @@ tasks:
     - func: "build new tools"
     - func: "scons compile"
       vars:
-        targets: core tools
+        targets: core tools ${mh_target|}
         task_compile_flags: >-
           --use-new-tools
           --build-mongoreplay="${build_mongoreplay}"
           --detect-odr-violations
+    - func: "scons compile"
+      vars:
+        targets: archive-dist 
+        additional_targets: ""
+        task_compile_flags: >-
+          --use-new-tools
+          --build-mongoreplay="${build_mongoreplay}"
+          --detect-odr-violations
+          --install-mode=hygienic
+          --separate-debug
 
 ## compile_all - build all scons targets ##
 - name: compile_all
