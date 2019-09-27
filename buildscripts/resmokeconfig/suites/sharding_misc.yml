@@ -13,7 +13,6 @@ selector:
   - jstests/sharding/mongos_rs_shard_failure_tolerance.js
   - jstests/sharding/top_chunk_autosplit.js
   - jstests/sharding/mongos_rs_auth_shard_failure_tolerance.js
-  - jstests/sharding/zbigMapReduce.js
   - jstests/sharding/remove2.js
   - jstests/sharding/move_chunk_find_and_modify_with_write_retryability.js
   - jstests/sharding/batch_write_command_sharded.js

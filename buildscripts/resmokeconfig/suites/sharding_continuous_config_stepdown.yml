@@ -136,8 +136,6 @@ selector:
   # ShardingTest is never used, so continuous step down thread never starts
   - jstests/sharding/config_rs_change.js
   - jstests/sharding/empty_cluster_init.js
-  # Test runs really slow with the primary continuously stepping down
-  - jstests/sharding/zbigMapReduce.js
   # Temporarily blacklisted until more robust
   - jstests/sharding/cleanup_orphaned_cmd_during_movechunk_hashed.js
   - jstests/sharding/cleanup_orphaned_cmd_during_movechunk.js

@@ -34,9 +34,6 @@ selector:
   - jstests/sharding/mongod_returns_no_cluster_time_without_keys.js
 
 executor:
-  archive:
-    tests:
-      - jstests/sharding/zbigMapReduce.js
   config:
     shell_options:
       global_vars:
