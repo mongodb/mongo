@@ -6199,7 +6199,7 @@ TEST(ExpressionMetaTest, ExpressionMetaSortKey) {
         ExpressionMeta::parse(expCtx, expr.firstElement(), expCtx->variablesParseState);
 
     MutableDocument doc;
-    Value sortKey = Value({Value(1), Value(2)});
+    Value sortKey = Value(std::vector<Value>{Value(1), Value(2)});
     doc.metadata().setSortKey(sortKey, /* isSingleElementSortKey = */ false);
     Value val = expressionMeta->evaluate(doc.freeze(), &expCtx->variables);
     ASSERT_BSONOBJ_EQ(val.getDocument().toBson(), BSON("" << 1 << "" << 2));

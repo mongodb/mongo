@@ -134,21 +134,21 @@ TEST(SortKeyGeneratorStageTest, SortKeyString) {
 TEST(SortKeyGeneratorStageTest, SortKeyCompound) {
     Value actualOut =
         extractSortKey("{a: 1, b: 1}", "{_id: 0, z: 'thing1', a: 99, c: {a: 4}, b: 16}", nullptr);
-    Value expectedOut({Value(99), Value(16)});
+    Value expectedOut(std::vector<Value>{Value(99), Value(16)});
     ASSERT_VALUE_EQ(actualOut, expectedOut);
 }
 
 TEST(SortKeyGeneratorStageTest, SortKeyEmbedded) {
     Value actualOut = extractSortKey(
         "{'c.a': 1, b: 1}", "{_id: 0, z: 'thing1', a: 99, c: {a: 4}, b: 16}", nullptr);
-    Value expectedOut = Value({Value(4), Value(16)});
+    Value expectedOut = Value(std::vector<Value>{Value(4), Value(16)});
     ASSERT_VALUE_EQ(actualOut, expectedOut);
 }
 
 TEST(SortKeyGeneratorStageTest, SortKeyArray) {
     Value actualOut = extractSortKey(
         "{'c': 1, b: 1}", "{_id: 0, z: 'thing1', a: 99, c: [2, 4, 1], b: 16}", nullptr);
-    Value expectedOut({Value(1), Value(16)});
+    Value expectedOut(std::vector<Value>{Value(1), Value(16)});
     ASSERT_VALUE_EQ(actualOut, expectedOut);
 }
 
@@ -176,7 +176,7 @@ TEST(SortKeyGeneratorStageTest, SortKeyCoveredCompound) {
         "{a: 1, c: 1}",
         IndexKeyDatum(BSON("a" << 1 << "c" << 1), BSON("" << 5 << "" << 6), 0, SnapshotId{}),
         collator);
-    Value expectedOut({Value(5), Value(6)});
+    Value expectedOut(std::vector<Value>{Value(5), Value(6)});
     ASSERT_VALUE_EQ(actualOut, expectedOut);
 }
 
@@ -188,7 +188,7 @@ TEST(SortKeyGeneratorStageTest, SortKeyCoveredCompound2) {
                                                           0,
                                                           SnapshotId{}),
                                             collator);
-    Value expectedOut({Value(5), Value(6)});
+    Value expectedOut(std::vector<Value>{Value(5), Value(6)});
     ASSERT_VALUE_EQ(actualOut, expectedOut);
 }
 
@@ -201,7 +201,7 @@ TEST(SortKeyGeneratorStageTest, SortKeyCoveredCompound3) {
                                             0,
                                             SnapshotId{}),
                               collator);
-    Value expectedOut({Value(6), Value(4)});
+    Value expectedOut(std::vector<Value>{Value(6), Value(4)});
     ASSERT_VALUE_EQ(actualOut, expectedOut);
 }
 
@@ -251,7 +251,7 @@ TEST(SortKeyGeneratorStageTest, SortKeyGenerationForArraysRespectsCompoundOrderi
     Value actualOut = extractSortKey("{'a.b': 1, 'a.c': -1}",
                                      "{_id: 0, a: [{b: 1, c: 0}, {b: 0, c: 3}, {b: 0, c: 1}]}",
                                      nullptr);
-    Value expectedOut({Value(0), Value(3)});
+    Value expectedOut(std::vector<Value>{Value(0), Value(3)});
     ASSERT_VALUE_EQ(actualOut, expectedOut);
 }
 
