@@ -1,5 +1,7 @@
 /**
  * Verify that adding 'comment' field to any command shouldn't cause unexpected failures.
+ * @tags: [requires_persistence, requires_capped, requires_wiredtiger, requires_journaling,
+ * requires_replication, requires_sharding]
  */
 (function() {
 
