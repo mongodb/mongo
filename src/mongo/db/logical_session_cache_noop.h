@@ -43,6 +43,8 @@ class ServiceContext;
  */
 class LogicalSessionCacheNoop : public LogicalSessionCache {
 public:
+    void joinOnShutDown() override {}
+
     Status promote(LogicalSessionId lsid) override {
         return Status::OK();
     }

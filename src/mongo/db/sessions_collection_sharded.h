@@ -74,6 +74,20 @@ public:
 
 protected:
     Status _checkCacheForSessionsCollection(OperationContext* opCtx);
+
+    /**
+     * These two methods use the sharding routing metadata to do a best effort attempt at grouping
+     * the specified set of sessions by the shards, which have the records for these sessions. This
+     * is done as an attempt to avoid broadcast queries.
+     *
+     * The reason it is 'best effort' is because it makes no attempt at checking whether the routing
+     * table is up-to-date and just picks up whatever was most recently fetched from the config
+     * server, which could be stale.
+     */
+    std::vector<LogicalSessionId> _groupSessionIdsByOwningShard(
+        OperationContext* opCtx, const LogicalSessionIdSet& sessions);
+    std::vector<LogicalSessionRecord> _groupSessionRecordsByOwningShard(
+        OperationContext* opCtx, const LogicalSessionRecordSet& sessions);
 };
 
 }  // namespace mongo

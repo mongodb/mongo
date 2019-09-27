@@ -32,8 +32,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <memory>
-
 #include "mongo/embedded/logical_session_cache_factory_embedded.h"
 
 #include "mongo/db/logical_session_cache_impl.h"
@@ -47,11 +45,14 @@ namespace mongo {
 std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheEmbedded() {
     auto liaison = std::make_unique<ServiceLiaisonMongod>();
 
-    // Set up the logical session cache
     auto sessionsColl = std::make_shared<SessionsCollectionStandalone>();
 
     return stdx::make_unique<LogicalSessionCacheImpl>(
-        std::move(liaison), std::move(sessionsColl), nullptr /* reaper */);
+        std::move(liaison),
+        std::move(sessionsColl),
+        [](OperationContext*, SessionsCollection&, Date_t) {
+            return 0; /* No op*/
+        });
 }
 
 }  // namespace mongo

@@ -38,11 +38,15 @@
 
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/kill_sessions_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/session_txn_record_gen.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
@@ -53,6 +57,64 @@ const auto sessionTransactionTableDecoration = ServiceContext::declareDecoration
 
 const auto operationSessionDecoration =
     OperationContext::declareDecoration<boost::optional<ScopedCheckedOutSession>>();
+
+const auto kIdProjection = BSON(SessionTxnRecord::kSessionIdFieldName << 1);
+const auto kSortById = BSON(SessionTxnRecord::kSessionIdFieldName << 1);
+const auto kLastWriteDateFieldName = SessionTxnRecord::kLastWriteDateFieldName;
+
+/**
+ * Removes the specified set of session ids from the persistent sessions collection and returns the
+ * number of sessions actually removed.
+ */
+int removeSessionsTransactionRecords(OperationContext* opCtx,
+                                     SessionsCollection& sessionsCollection,
+                                     const LogicalSessionIdSet& sessionIdsToRemove) {
+    if (sessionIdsToRemove.empty())
+        return 0;
+
+    // From the passed-in sessions, find the ones which are actually expired/removed
+    auto expiredSessionIds =
+        uassertStatusOK(sessionsCollection.findRemovedSessions(opCtx, sessionIdsToRemove));
+
+    if (expiredSessionIds.empty())
+        return 0;
+
+    // Remove the session ids from the on-disk catalog
+    write_ops::Delete deleteOp(NamespaceString::kSessionTransactionsTableNamespace);
+    deleteOp.setWriteCommandBase([] {
+        write_ops::WriteCommandBase base;
+        base.setOrdered(false);
+        return base;
+    }());
+    deleteOp.setDeletes([&] {
+        std::vector<write_ops::DeleteOpEntry> entries;
+        for (const auto& lsid : expiredSessionIds) {
+            entries.emplace_back([&] {
+                write_ops::DeleteOpEntry entry;
+                entry.setQ(BSON(LogicalSessionRecord::kIdFieldName << lsid.toBSON()));
+                entry.setMulti(false);
+                return entry;
+            }());
+        }
+        return entries;
+    }());
+
+    BSONObj result;
+
+    DBDirectClient client(opCtx);
+    client.runCommand(NamespaceString::kSessionTransactionsTableNamespace.db().toString(),
+                      deleteOp.toBSON({}),
+                      result);
+
+    BatchedCommandResponse response;
+    std::string errmsg;
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << "Failed to parse response " << result,
+            response.parseBSON(result, &errmsg));
+    uassertStatusOK(response.getTopLevelStatus());
+
+    return response.getN();
+}
 
 }  // namespace
 
@@ -87,6 +149,40 @@ boost::optional<UUID> SessionCatalog::getTransactionTableUUID(OperationContext* 
     }
 
     return coll->uuid();
+}
+
+int SessionCatalog::reapSessionsOlderThan(OperationContext* opCtx,
+                                          SessionsCollection& sessionsCollection,
+                                          Date_t possiblyExpired) {
+    // Scan for records older than the minimum lifetime and uses a sort to walk the '_id' index
+    DBDirectClient client(opCtx);
+    auto cursor =
+        client.query(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+                     Query(BSON(kLastWriteDateFieldName << LT << possiblyExpired)).sort(kSortById),
+                     0,
+                     0,
+                     &kIdProjection);
+
+    // The max batch size is chosen so that a single batch won't exceed the 16MB BSON object size
+    // limit
+    const int kMaxBatchSize = 10'000;
+
+    LogicalSessionIdSet lsids;
+    int numReaped = 0;
+    while (cursor->more()) {
+        auto transactionSession = SessionsCollectionFetchResultIndividualResult::parse(
+            "TransactionSession"_sd, cursor->next());
+
+        lsids.insert(transactionSession.get_id());
+        if (lsids.size() > kMaxBatchSize) {
+            numReaped += removeSessionsTransactionRecords(opCtx, sessionsCollection, lsids);
+            lsids.clear();
+        }
+    }
+
+    numReaped += removeSessionsTransactionRecords(opCtx, sessionsCollection, lsids);
+
+    return numReaped;
 }
 
 void SessionCatalog::onStepUp(OperationContext* opCtx) {

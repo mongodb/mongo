@@ -33,7 +33,6 @@
 #include <boost/optional.hpp>
 
 #include "mongo/base/status.h"
-#include "mongo/db/commands/end_sessions_gen.h"
 #include "mongo/db/logical_session_cache_stats_gen.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/refresh_sessions_gen.h"
@@ -57,6 +56,11 @@ public:
     static void set(ServiceContext* service, std::unique_ptr<LogicalSessionCache> sessionCache);
 
     virtual ~LogicalSessionCache() = 0;
+
+    /**
+     * Invoked on service shutdown time in order to join the cache's refresher and reaper tasks.
+     */
+    virtual void joinOnShutDown() = 0;
 
     /**
      * If the cache contains a record for this LogicalSessionId, promotes that lsid

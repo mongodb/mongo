@@ -105,6 +105,7 @@ env.Library(
         "refresh_sessions_command.cpp",
         "rename_collection_common.cpp",
         "start_session_command.cpp",
+        env.Idlc('end_sessions.idl')[0],
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',

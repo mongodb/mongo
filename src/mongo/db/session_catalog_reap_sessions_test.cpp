@@ -32,15 +32,15 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/sessions_collection_mock.h"
-#include "mongo/db/transaction_reaper.h"
 #include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
 namespace {
 
-class TransactionReaperTest : public ServiceContextMongoDTest {
+class SessionCatalogReapSessionsTest : public ServiceContextMongoDTest {
 protected:
     void setUp() override {
         const auto service = getServiceContext();
@@ -61,26 +61,12 @@ protected:
     std::shared_ptr<MockSessionsCollectionImpl> _collectionMock{
         std::make_shared<MockSessionsCollectionImpl>()};
 
-    std::unique_ptr<TransactionReaper> _reaper{
-        TransactionReaper::make(TransactionReaper::Type::kReplicaSet,
-                                std::make_shared<MockSessionsCollection>(_collectionMock))};
+    std::shared_ptr<SessionsCollection> _collection{
+        std::make_shared<MockSessionsCollection>(_collectionMock)};
 };
 
-TEST_F(TransactionReaperTest, ReapSomeExpiredSomeNot) {
-    _collectionMock->add([&] {
-        LogicalSessionRecord rec;
-        rec.setId(makeLogicalSessionIdForTest());
-        rec.setLastUse(clock()->now());
-        return rec;
-    }());
-
-    _collectionMock->add([&] {
-        LogicalSessionRecord rec;
-        rec.setId(makeLogicalSessionIdForTest());
-        rec.setLastUse(clock()->now());
-        return rec;
-    }());
-
+TEST_F(SessionCatalogReapSessionsTest, ReapSomeExpiredSomeNot) {
+    // Create some "old" sessions
     DBDirectClient client(_opCtx);
     SessionTxnRecord txn1;
     txn1.setSessionId(makeLogicalSessionIdForTest());
@@ -96,8 +82,25 @@ TEST_F(TransactionReaperTest, ReapSomeExpiredSomeNot) {
     client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(),
                   std::vector<BSONObj>{txn1.toBSON(), txn2.toBSON()});
 
+    // Add some "new" sessions to ensure they don't get reaped
     clock()->advance(Minutes{31});
-    ASSERT_EQ(2, _reaper->reap(_opCtx));
+    _collectionMock->add([&] {
+        LogicalSessionRecord rec;
+        rec.setId(makeLogicalSessionIdForTest());
+        rec.setLastUse(clock()->now());
+        return rec;
+    }());
+
+    _collectionMock->add([&] {
+        LogicalSessionRecord rec;
+        rec.setId(makeLogicalSessionIdForTest());
+        rec.setLastUse(clock()->now());
+        return rec;
+    }());
+
+    ASSERT_EQ(
+        2,
+        SessionCatalog::reapSessionsOlderThan(_opCtx, *_collection, clock()->now() - Minutes{30}));
 }
 
 }  // namespace

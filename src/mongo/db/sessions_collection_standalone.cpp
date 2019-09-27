@@ -100,26 +100,29 @@ Status SessionsCollectionStandalone::checkSessionsCollectionExists(OperationCont
 
 Status SessionsCollectionStandalone::refreshSessions(OperationContext* opCtx,
                                                      const LogicalSessionRecordSet& sessions) {
+    const std::vector<LogicalSessionRecord> sessionsVector(sessions.begin(), sessions.end());
     DBDirectClient client(opCtx);
-    return doRefresh(kSessionsNamespaceString,
-                     sessions,
-                     makeSendFnForBatchWrite(kSessionsNamespaceString, &client));
+    return doRefresh(NamespaceString::kLogicalSessionsNamespace,
+                     sessionsVector,
+                     makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, &client));
 }
 
 Status SessionsCollectionStandalone::removeRecords(OperationContext* opCtx,
                                                    const LogicalSessionIdSet& sessions) {
+    const std::vector<LogicalSessionId> sessionsVector(sessions.begin(), sessions.end());
     DBDirectClient client(opCtx);
-    return doRemove(kSessionsNamespaceString,
-                    sessions,
-                    makeSendFnForBatchWrite(kSessionsNamespaceString, &client));
+    return doRemove(NamespaceString::kLogicalSessionsNamespace,
+                    sessionsVector,
+                    makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, &client));
 }
 
 StatusWith<LogicalSessionIdSet> SessionsCollectionStandalone::findRemovedSessions(
     OperationContext* opCtx, const LogicalSessionIdSet& sessions) {
+    const std::vector<LogicalSessionId> sessionsVector(sessions.begin(), sessions.end());
     DBDirectClient client(opCtx);
-    return doFetch(kSessionsNamespaceString,
-                   sessions,
-                   makeFindFnForCommand(kSessionsNamespaceString, &client));
+    return doFindRemoved(NamespaceString::kLogicalSessionsNamespace,
+                         sessionsVector,
+                         makeFindFnForCommand(NamespaceString::kLogicalSessionsNamespace, &client));
 }
 
 }  // namespace mongo

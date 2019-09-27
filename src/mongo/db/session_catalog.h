@@ -34,6 +34,7 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/session.h"
 #include "mongo/db/session_killer.h"
+#include "mongo/db/sessions_collection.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
@@ -69,6 +70,16 @@ public:
      * exist or has no UUID. Acquires a lock on the collection. Required for rollback via refetch.
      */
     static boost::optional<UUID> getTransactionTableUUID(OperationContext* opCtx);
+
+    /**
+     * Locates session entries from the in-memory catalog and in 'config.transactions' which have
+     * not been referenced before 'possiblyExpired' and deletes them.
+     *
+     * Returns the number of sessions, which were reaped from the persisted store on disk.
+     */
+    static int reapSessionsOlderThan(OperationContext* opCtx,
+                                     SessionsCollection& sessionsCollection,
+                                     Date_t possiblyExpired);
 
     /**
      * Resets the transaction table to an uninitialized state.

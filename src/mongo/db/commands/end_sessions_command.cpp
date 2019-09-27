@@ -34,11 +34,13 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/end_sessions_gen.h"
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
+namespace {
 
 class EndSessionsCommand final : public BasicCommand {
     MONGO_DISALLOW_COPYING(EndSessionsCommand);
@@ -73,10 +75,10 @@ public:
         }
     }
 
-    virtual bool run(OperationContext* opCtx,
-                     const std::string& db,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) override {
+    bool run(OperationContext* opCtx,
+             const std::string& db,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
         auto lsCache = LogicalSessionCache::get(opCtx);
 
         auto cmd = EndSessionsCmdFromClient::parse("EndSessionsCmdFromClient"_sd, cmdObj);
@@ -84,6 +86,8 @@ public:
         lsCache->endSessions(makeLogicalSessionIds(cmd.getEndSessions(), opCtx));
         return true;
     }
+
 } endSessionsCommand;
 
+}  // namespace
 }  // namespace mongo
