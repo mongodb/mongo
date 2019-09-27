@@ -87,6 +87,27 @@ TEST(MapReduceParseTest, failedParse) {
                   DBException);
 }
 
+TEST(MapReduceParseTest, failsToParseCodeWithScope) {
+    auto ctx = IDLParserErrorContext("mapReduce");
+
+    ASSERT_THROWS(MapReduce::parse(ctx,
+                                   BSON("mapReduce"
+                                        << "theSource"
+                                        << "map" << mapJavascript << "reduce"
+                                        << BSONCodeWScope("var x = 3", BSONObj()) << "out"
+                                        << BSON("inline" << 1) << "$db"
+                                        << "db")),
+                  DBException);
+    ASSERT_THROWS(
+        MapReduce::parse(ctx,
+                         BSON("mapReduce"
+                              << "theSource"
+                              << "map" << BSONCodeWScope("var x = 3", BSONObj()) << "reduce"
+                              << reduceJavascript << "out" << BSON("inline" << 1) << "$db"
+                              << "db")),
+        DBException);
+}
+
 TEST(MapReduceParseTest, parseOutputTypes) {
     auto ctx = IDLParserErrorContext("mapReduce");
 

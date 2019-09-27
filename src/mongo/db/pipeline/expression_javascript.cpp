@@ -85,11 +85,8 @@ boost::intrusive_ptr<Expression> ExpressionInternalJsEmit::parse(
     BSONElement evalField = expr["eval"];
 
     uassert(31222, str::stream() << "The map function must be specified.", evalField);
-    uassert(ErrorCodes::BadValue,
-            str::stream() << kExpressionName << " with CodeWScope 'eval' argument is not supported",
-            evalField.type() != BSONType::CodeWScope);
     uassert(31224,
-            "The map function must be of type string, code, or code w/ scope",
+            "The map function must be of type string or code",
             evalField.type() == BSONType::String || evalField.type() == BSONType::Code);
 
     std::string funcSourceString = evalField._asCode();

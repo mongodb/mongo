@@ -54,18 +54,13 @@ void AccumulatorInternalJsReduce::processInternal(const Value& input, bool mergi
             str::stream() << kAccumulatorName << " requires both an 'eval' and 'data' argument",
             accInput.size() == 2ull && !accInput["eval"].missing() && !accInput["data"].missing());
 
-    uassert(ErrorCodes::BadValue,
-            str::stream() << kAccumulatorName
-                          << " with CodeWScope 'eval' argument is not supported",
-            accInput["eval"].getType() != BSONType::CodeWScope);
-
-    uassert(31244,
-            str::stream()
-                << kAccumulatorName
-                << " requires the 'eval' to be of type string, code, or code w/ scope but found "
-                << accInput["eval"].getType(),
-            accInput["eval"].getType() == BSONType::String ||
-                accInput["eval"].getType() == BSONType::Code);
+    uassert(
+        31244,
+        str::stream() << kAccumulatorName
+                      << " requires the 'eval' argument to be of type string, or code but found "
+                      << accInput["eval"].getType(),
+        accInput["eval"].getType() == BSONType::String ||
+            accInput["eval"].getType() == BSONType::Code);
 
     uassert(31245,
             str::stream() << kAccumulatorName
