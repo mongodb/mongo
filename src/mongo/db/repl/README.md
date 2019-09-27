@@ -1,39 +1,24 @@
-# Replication in 3.4
+# Replication Internals
 
 Replication is the set of systems used to continuously copy data from a primary server to secondary
 servers so if the primary server fails a secondary server can take over soon. This process is
 intended to be mostly transparent to the user, with drivers taking care of routing queries to the
-requested replica. MongoDB supports two forms of replication: [**replica
-sets**](https://docs.mongodb.com/manual/replication/) and
-[**master-slave**](https://docs.mongodb.com/manual/core/master-slave/).
-
-# Master-Slave
-
-This article will focus on replica sets, which are the main way people use replication today.
-Master-slave has one master node and multiple slave nodes. Slaves replicate from the master and all
-failover is done manually. Slave nodes can only replicate from other slave nodes if the other slave
-nodes are configured as masters themselves.
-
-Master-slave replication also allows for filtered replication. Slaves can replicate some chosen
-subset of the collections.
-
-Master-slave also allows for an unlimited number of slave nodes, only limited by your hardware.
-
-# Replica sets
+requested replica. Replication in MongoDB is facilitated through [**replica
+sets**](https://docs.mongodb.com/manual/replication/).
 
 Replica sets are a group of nodes with one primary and multiple secondaries. The primary is
 responsible for all writes. Users may specify that reads from secondaries are acceptable with a
 `slaveOK` flag, but they are not by default.
 
-## Steady State Replication
+# Steady State Replication
 
 The normal running of a replica set is referred to as steady state replication. This is when there
 is one primary and multiple secondaries. Each secondary is replicating data from the primary, or
 another secondary off of which it is **chaining**.
 
-### Life as a Primary
+## Life as a Primary
 
-#### Doing a Write
+### Doing a Write
 
 When a user does a write, all a primary node does is apply the write to the database like a
 standalone would. The one difference from a standalone write is that replica set nodes have an
@@ -60,7 +45,7 @@ or **majority**. If **majority** is specified, the write waits for that write to
 **committed snapshot** as well, so that it can be read with `readConcern: { level: majority }`
 reads. (If this last sentence made no sense, come back to it at the end).
 
-### Life as a Secondary
+## Life as a Secondary
 
 In general, secondaries just choose a node to sync from, their **sync source**, and then pull
 operations from its oplog and apply those oplog entries to their own copy of the data on disk.
@@ -68,7 +53,7 @@ operations from its oplog and apply those oplog entries to their own copy of the
 Secondaries also constantly update their sync source with their progress so that the primary can
 satisfy write concerns.
 
-#### Oplog Fetching
+### Oplog Fetching
 
 A secondary keeps its data synchronized with its sync source by fetching oplog entries from its sync
 source. This is done via the
@@ -121,7 +106,7 @@ it puts them into a buffer (the **`OplogBuffer`**) and another thread is in char
 operations off the buffer and applying them. That buffer uses an in-memory blocking queue for steady
 state replication; there is a similar collection-backed buffer used for initial sync.
 
-#### Sync Source Selection
+### Sync Source Selection
 
 Whenever a node starts initial sync, creates a new `BackgroundSync` (when it stops being primary),
 or errors on its current `OplogFetcher`, it must get a new sync source. Sync source selection is
@@ -134,7 +119,7 @@ which in turn asks the
 [**`TopologyCoordinator`**](https://github.com/mongodb/mongo/blob/r3.4.2/src/mongo/db/repl/topology_coordinator.h)
 to choose a new sync source.
 
-##### Choosing a sync source candidate
+#### Choosing a sync source candidate
 
 To choose a new sync source candidate, the `TopologyCoordinator` first checks if the user requested
 a specific sync source with the `replSetSyncFrom` command. In that case, the secondary chooses that
@@ -157,7 +142,7 @@ Otherwise, it iterates through all of the nodes and sees which one is the best.
 * If no node satisfies the necessary criteria, then the `BackgroundSync` waits 1 second and restarts
   the sync source selection process.
 
-##### Sync Source Probing
+#### Sync Source Probing
 
 After choosing a sync source candidate, the `SyncSourceResolver` probes the sync source candidate to
 make sure it actually is able to fetch from the sync source candidate’s oplog.
@@ -179,7 +164,7 @@ mode and waits for manual intervention (likely a call to `resync`). If no viable
 found, `BackgroundSync` waits 1 second and attempts the entire sync source selection process again.
 Otherwise, the secondary found a sync source! At that point `BackgroundSync` starts an OplogFetcher.
 
-#### Oplog Entry Application
+### Oplog Entry Application
 
 A separate thread,
 [`RSDataSync`](https://github.com/mongodb/mongo/blob/r3.4.2/src/mongo/db/repl/rs_sync.h) is used for
@@ -197,7 +182,7 @@ on the same document will be put on the same thread to be serialized. Additional
 operations are done serially in batches of size 1. Insert operations are also batched together for
 improved performance.
 
-### Replication and Topology Coordinators
+## Replication and Topology Coordinators
 
 The `ReplicationCoordinator` is the public api that replication presents to the rest of the code
 base. It is in charge of coordinating the interaction of replication with the rest of the system.
@@ -213,7 +198,7 @@ replication command requests and responses are filled in here.
 Both coordinators maintain views of the entire cluster and the state of each node, though there are
 plans to merge these together.
 
-### Communication
+## Communication
 
 Each node has a copy of the **`ReplicaSetConfig`** in the `ReplicationCoordinator` that lists all
 nodes in the replica set. This config lets each node talk to every other node.
@@ -244,7 +229,7 @@ is built on top of [Raft](https://raft.github.io/raft.pdf), so it is guaranteed 
 will not be elected in the same term. This helps differentiate ops that occurred at the same time
 but from different primaries in the case of a network partition.
 
-#### Oplog Fetcher Responses
+### Oplog Fetcher Responses
 
 The `OplogFetcher` just issues normal `find` and `getMore` commands, so the upstream node (the sync
 source) does not get any information from the request. In the response, however, the downstream
@@ -255,7 +240,7 @@ There are two types of metadata, `ReplSetMetadata` and `OplogQueryMetadata`. (Th
 `OplogQueryMetadata` is new, so there is some temporary field duplication for backwards
 compatibility.)
 
-##### ReplSetMetadata
+#### ReplSetMetadata
 
 `ReplSetMetadata` comes with all replication commands and is processed similarly for all commands.
 It includes:
@@ -276,7 +261,7 @@ The last committed OpTime is only used in this metadata for
 [arbiters](https://docs.mongodb.com/manual/core/replica-set-arbiter/), to advance their committed
 OpTime and in sharding in some places. Otherwise it is ignored.
 
-##### OplogQueryMetadata
+#### OplogQueryMetadata
 
 `OplogQueryMetadata` only comes with `OplogFetcher` responses. It includes:
 
@@ -299,7 +284,7 @@ the storage engine to erase any old ones if necessary.
 Before sending the next `getMore`, the downstream node uses the metadata to check if it should
 change sync sources.
 
-#### Heartbeats
+### Heartbeats
 
 At a default of every 2 seconds, the `HeartbeatInterval`, every node sends a heartbeat to every
 other node with the `replSetHeartbeat` command. This means that the number of heartbeats increases
@@ -360,7 +345,7 @@ assigns itself a priority takeover timeout proportional to its rank. After that 
 node will check if it's eligible to run for election and if so will begin an election. The timeout
 is simply: `(election timeout) * (priority rank + 1)`.
 
-#### Update Position Commands
+### Update Position Commands
 
 The last way that replica set nodes regularly communicate with each other is through
 `replSetUpdatePosition` commands. The `ReplicationCoordinatorExternalState` creates a
@@ -411,7 +396,7 @@ information to its own sync source.
 The `replSetUpdatePosition` command response does not include any information unless there is an
 error, such as in a `ReplSetConfig` mismatch.
 
-### Read Concern
+## Read Concern
 
 MongoDB does not provide snapshot isolation. All reads in MongoDB are executed on snapshots of the
 data taken at some point in time; however if the storage engine yields while executing a read, the
@@ -483,14 +468,14 @@ the local snapshot is beyond the specified OpTime. If read concern majority is s
 wait until the committed snapshot is beyond the specified OpTime. In 3.6 this feature will be
 extended to support a sharded cluster and use a **Lamport Clock** to provide **causal consistency**.
 
-## Elections
+# Elections
 
-### Step Up
+## Step Up
 
 A node runs for election when it does a priority takeover or when it doesn't see a primary within
 the election timeout.
 
-##### Candidate Perspective
+#### Candidate Perspective
 
 A candidate node first runs a dry-run election. In a **dry-run election**, a node sends out
 `replSetRequestVotes` commands to every node asking if that node would vote for it, but the
@@ -513,7 +498,7 @@ members in order to get elected.
 If the candidate received votes from a majority of nodes, including itself, the candidate wins the
 election.
 
-##### Voter Perspective
+#### Voter Perspective
 
 When a node receives a `replSetRequestVotes` command, it first checks if the term is up to date and
 updates its own term accordingly. The `ReplicationCoordinator` then asks the `TopologyCoordinator`
@@ -534,7 +519,7 @@ the `local.replset.election` collection. This information is read into memory at
 future elections. This ensures that even if a node restarts, it does not vote for two nodes in the
 same term.
 
-##### Transitioning to PRIMARY
+#### Transitioning to PRIMARY
 
 Now that the candidate has won, it must become PRIMARY. First it notifies all nodes that it won the
 election via a round of heartbeats. Then the node checks if it needs to catch up from the former
@@ -561,7 +546,7 @@ The node now writes a "new primary" noop oplog entry so that it can commit older
 possible. Finally, the node drops all temporary collections and logs “transition to primary
 complete”.
 
-### Step Down
+## Step Down
 
 When a `replSetStepDown` command comes in, the node begins to check if it can step down. First, the
 node kills all user operations and they return an error to the user. Then the node loops trying to
@@ -578,7 +563,7 @@ primary is connected to a majority of nodes, it will stay primary.
 Once the node begins to step down, it first sets its state to `follower` in the
 `TopologyCoordinator`. It then transitioning to SECONDARY in the `ReplicationCoordinator`.
 
-## Rollback
+# Rollback
 
 Rollback is the process whereby a node that diverges from its sync source undoes the divergent
 operations and gets back to a consistent point.
@@ -620,7 +605,7 @@ future. This leads to all of the same idempotency concerns and index constraint 
 
 This code is about to change radically in version 3.6.
 
-## Initial Sync
+# Initial Sync
 
 Initial sync is the process that we use to add a new node to a replica set. Initial sync is
 initiated by the `ReplicationCoordinator` and done in the
@@ -634,7 +619,7 @@ at the end that no rollbacks occurred during initial sync. Finally, it creates a
 starts fetching and buffering oplog entries from the sync source to be applied later. Operations are
 buffered to a collection so that they are not limited by the amount of memory available.
 
-##### Data clone phase
+#### Data clone phase
 
 The new node then begins to clone data from its sync source. The `DataReplicator` constructs a
 [`DatabasesCloner`](https://github.com/mongodb/mongo/blob/r3.4.2/src/mongo/db/repl/databases_cloner.h)
@@ -651,7 +636,7 @@ to create all of the indexes in parallel with the data cloning. The `CollectionC
 runs `find` and `getMore` requests on the sync source repeatedly, inserting the fetched documents
 each time, until it fetches all of the documents.
 
-##### Oplog application phase
+#### Oplog application phase
 
 After the cloning phase of initial sync has finished, the oplog application phase begins. The new
 node first asks its sync source for its last applied OpTime and this is saved as `minValid`, the
@@ -666,7 +651,7 @@ OpTime is again fetched from the sync source and `minValid` is pushed back to th
 can occur if a document that needs to be updated was deleted before it was cloned, so the `update`
 op refers to a document that does not exist on the initial syncing node.
 
-##### Idempotency concerns
+#### Idempotency concerns
 
 Some of the operations that are applied may already be reflected in the data that was cloned since
 we started buffering oplog entries before the collection cloning phase even started. Consider the
@@ -686,7 +671,7 @@ conflict with the data being added. As a result, many errors that occur here are
 to resolve themselves. If known problematic operations such as `renameCollection` are received,
 where we cannot assume a drop will come and fix them, we abort and retry initial sync.
 
-##### Finishing initial sync
+#### Finishing initial sync
 
 The oplog application phase concludes when the node applies `minValid`. The node checks its sync
 source's Rollback ID to see if a rollback occurred and if so, restarts initial sync. Otherwise, the
