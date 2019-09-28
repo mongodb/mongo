@@ -1592,7 +1592,8 @@ TEST_F(ReplCoordTest, ConcurrentStepDownShouldNotSignalTheSameFinishEventMoreTha
     // Prevent _stepDownFinish() from running and becoming secondary by blocking in this
     // exclusive task.
     const auto opCtx = makeOperationContext();
-    boost::optional<ReplicationStateTransitionLockGuard> transitionGuard({opCtx.get(), MODE_X});
+    boost::optional<ReplicationStateTransitionLockGuard> transitionGuard;
+    transitionGuard.emplace(opCtx.get(), MODE_X);
 
     TopologyCoordinator::UpdateTermResult termUpdated2;
     auto updateTermEvh2 = getReplCoord()->updateTerm_forTest(2, &termUpdated2);
