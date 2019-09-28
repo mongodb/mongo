@@ -870,7 +870,25 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
                                 << replState->buildUUID);
         nss = collection->ns();
 
-        _indexBuildsManager.tearDownIndexBuild(opCtx, collection, replState->buildUUID);
+        // If the index build was not completely successfully, we'll need to acquire some locks to
+        // clean it up.
+        if (!status.isOK()) {
+            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+
+            Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
+
+            // Since DBLock implicitly acquires RSTL, we release the RSTL after acquiring the
+            // database lock. Additionally, the RSTL has to be released before acquiring a strong
+            // lock (MODE_X) on the collection to avoid potential deadlocks.
+            opCtx->lockState()->unlockRSTLforPrepare();
+            invariant(!opCtx->lockState()->isRSTLLocked());
+
+            Lock::CollectionLock collLock(opCtx, nss, MODE_X);
+
+            _indexBuildsManager.tearDownIndexBuild(opCtx, collection, replState->buildUUID);
+        } else {
+            _indexBuildsManager.tearDownIndexBuild(opCtx, collection, replState->buildUUID);
+        }
     }
 
     if (!status.isOK()) {
