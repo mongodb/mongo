@@ -231,8 +231,7 @@ TEST_F(MapReduceFixture, InternalJsReduceFailsIfEvalArgumentNotOfTypeStringOrCod
         "eval", "function(key, values) { return Array.sum(values); };", BSONObj());
     objBuilder.append("data", BSON("k" << std::string("foo") << "v" << Value(2)));
 
-    assertProcessFailsWithCode(
-        "$_internalJsReduce", getExpCtx(), Value(objBuilder.obj()), ErrorCodes::BadValue);
+    assertProcessFailsWithCode("$_internalJsReduce", getExpCtx(), Value(objBuilder.obj()), 31244);
 }
 
 TEST_F(MapReduceFixture, InternalJsReduceFailsIfDataArgumentNotDocument) {
