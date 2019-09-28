@@ -1,10 +1,7 @@
 /**
  * Confirms that background index builds on a primary can be aborted using killop
  * on the client connection operation when the IndexBuildsCoordinator is enabled.
- * @tags: [
- *   requires_replication,
- *   two_phase_index_builds_unsupported,
- * ]
+ * @tags: [requires_replication]
  */
 (function() {
 "use strict";

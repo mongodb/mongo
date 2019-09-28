@@ -894,8 +894,12 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
     if (!status.isOK()) {
         logFailure(status, nss, replState);
 
-        // Failed index builds should abort secondary oplog application.
+        // Failed index builds should abort secondary oplog application, except when the index build
+        // was stopped due to processing an abortIndexBuild oplog entry.
         if (replSetAndNotPrimary) {
+            if (status == ErrorCodes::IndexBuildAborted) {
+                return;
+            }
             fassert(51101,
                     status.withContext(str::stream() << "Index build: " << replState->buildUUID
                                                      << "; Database: " << replState->dbName));
