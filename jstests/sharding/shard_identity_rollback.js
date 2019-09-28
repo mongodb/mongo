@@ -73,19 +73,30 @@ var newPriConn = replTest.getPrimary();
 assert.neq(priConn, newPriConn);
 assert.commandWorked(newPriConn.getDB('test').foo.insert({a: 1}, {writeConcern: {w: 'majority'}}));
 
-// Restart the original primary so it triggers a rollback of the shardIdentity insert. Pass
-// {waitForConnect : false} to avoid a race condition between the node crashing (which we expect)
-// and waiting to be able to connect to the node.
+// Restart the original primary so it triggers a rollback of the shardIdentity insert.
 jsTest.log("Restarting original primary");
-priConn = replTest.start(priConn, {waitForConnect: false}, true);
+priConn = replTest.restart(priConn);
 
+// Wait until we cannot create a connection to the former primary, which indicates that it must
+// have shut itself down during the rollback.
 jsTest.log("Waiting for original primary to rollback and shut down");
-// Wait until the node shuts itself down during the rollback. We will hit the first assertion if
-// we rollback using 'recoverToStableTimestamp' and the second if using 'rollbackViaRefetch'.
-assert.soon(() => {
-    return (rawMongoProgramOutput().indexOf("Fatal Assertion 50712") !== -1 ||
-            rawMongoProgramOutput().indexOf("Fatal Assertion 40498") !== -1);
-});
+assert.soon(
+    function() {
+        try {
+            var newConn = new Mongo(priConn.host);
+            return false;
+        } catch (x) {
+            return true;
+        }
+    },
+    function() {
+        var oldPriOplog = priConn.getDB('local').oplog.rs.find().sort({$natural: -1}).toArray();
+        var newPriOplog = newPriConn.getDB('local').oplog.rs.find().sort({$natural: -1}).toArray();
+        return "timed out waiting for original primary to shut down after rollback. " +
+            "Old primary oplog: " + tojson(oldPriOplog) +
+            "; new primary oplog: " + tojson(newPriOplog);
+    },
+    90000);
 
 // Restart the original primary again.  This time, the shardIdentity document should already be
 // rolled back, so there shouldn't be any rollback and the node should stay online.
@@ -97,8 +108,7 @@ try {
 } catch (e) {
     // expected
 }
-
-priConn = replTest.start(priConn, {shardsvr: '', waitForConnect: true}, true);
+priConn = replTest.restart(priConn, {shardsvr: ''});
 priConn.setSlaveOk();
 
 // Wait for the old primary to replicate the document that was written to the new primary while
