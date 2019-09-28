@@ -35,8 +35,6 @@
 
 namespace mongo {
 
-class BSONArrayBuilder;
-class BSONObjBuilder;
 class DBClientBase;
 class OperationContext;
 
@@ -100,6 +98,8 @@ public:
     static BSONObj generateCollModCmd();
 
 protected:
+    SessionsCollection();
+
     /**
      * Makes a send function for the given client.
      */

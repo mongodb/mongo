@@ -70,7 +70,6 @@ env.Library(
         'embedded_options.cpp',
         'embedded_options_init.cpp',
         'embedded_options_parser_init.cpp',
-        'logical_session_cache_factory_embedded.cpp',
         'periodic_runner_embedded.cpp',
         'replication_coordinator_embedded.cpp',
         'service_entry_point_embedded.cpp',

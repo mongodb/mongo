@@ -47,9 +47,6 @@
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
-
-constexpr StringData SessionsCollection::kSessionsTTLIndex;
-
 namespace {
 
 // This batch size is chosen to ensure that we don't form requests larger than the 16mb limit.
@@ -164,6 +161,10 @@ Status runBulkCmd(StringData label,
 
 const NamespaceString SessionsCollection::kSessionsNamespaceString =
     NamespaceString(NamespaceString::kConfigDb, "system.sessions");
+
+constexpr StringData SessionsCollection::kSessionsTTLIndex;
+
+SessionsCollection::SessionsCollection() = default;
 
 SessionsCollection::~SessionsCollection() = default;
 

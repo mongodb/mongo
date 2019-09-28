@@ -154,6 +154,17 @@ boost::optional<UUID> SessionCatalog::getTransactionTableUUID(OperationContext* 
 int SessionCatalog::reapSessionsOlderThan(OperationContext* opCtx,
                                           SessionsCollection& sessionsCollection,
                                           Date_t possiblyExpired) {
+    const auto catalog = SessionCatalog::get(opCtx);
+    catalog->_reapInMemorySessionsOlderThan(opCtx, sessionsCollection, possiblyExpired);
+
+    // The "unsafe" check for primary below is a best-effort attempt to ensure that the on-disk
+    // state reaping code doesn't run if the node is secondary and cause log spam. It is a work
+    // around the fact that the logical sessions cache is not registered to listen for replication
+    // state changes.
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (!replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, NamespaceString::kConfigDb))
+        return 0;
+
     // Scan for records older than the minimum lifetime and uses a sort to walk the '_id' index
     DBDirectClient client(opCtx);
     auto cursor =
@@ -233,6 +244,7 @@ ScopedCheckedOutSession SessionCatalog::checkOutSession(OperationContext* opCtx)
 
     invariant(!sri->checkedOut);
     sri->checkedOut = true;
+    sri->lastCheckout = Date_t::now();
 
     return ScopedCheckedOutSession(opCtx, ScopedSession(std::move(sri)));
 }
@@ -266,17 +278,6 @@ void SessionCatalog::invalidateSessions(OperationContext* opCtx,
                 !opCtx->getLogicalSessionId());
     }
 
-    const auto invalidateSessionFn = [&](WithLock, decltype(_txnTable)::iterator it) {
-        auto& sri = it->second;
-        sri->txnState.invalidate();
-
-        // We cannot remove checked-out sessions from the cache, because operations expect to find
-        // them there to check back in
-        if (!sri->checkedOut) {
-            _txnTable.erase(it);
-        }
-    };
-
     stdx::lock_guard<stdx::mutex> lg(_mutex);
 
     if (singleSessionDoc) {
@@ -285,12 +286,12 @@ void SessionCatalog::invalidateSessions(OperationContext* opCtx,
 
         auto it = _txnTable.find(lsid);
         if (it != _txnTable.end()) {
-            invalidateSessionFn(lg, it);
+            _invalidateSession(lg, it);
         }
     } else {
         auto it = _txnTable.begin();
         while (it != _txnTable.end()) {
-            invalidateSessionFn(lg, it++);
+            _invalidateSession(lg, it++);
         }
     }
 }
@@ -310,6 +311,11 @@ void SessionCatalog::scanSessions(OperationContext* opCtx,
             workerFn(opCtx, &(it->second->txnState));
         }
     }
+}
+
+size_t SessionCatalog::size() const {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    return _txnTable.size();
 }
 
 std::shared_ptr<SessionCatalog::SessionRuntimeInfo> SessionCatalog::_getOrCreateSessionRuntimeInfo(
@@ -335,6 +341,47 @@ void SessionCatalog::_releaseSession(const LogicalSessionId& lsid) {
 
     sri->checkedOut = false;
     sri->availableCondVar.notify_one();
+}
+
+void SessionCatalog::_invalidateSession(WithLock, SessionRuntimeInfoMap::iterator it) {
+    auto& sri = it->second;
+    sri->txnState.invalidate();
+
+    // We cannot remove checked-out sessions from the cache, because operations expect to find them
+    // there to check back in
+    if (!sri->checkedOut) {
+        _txnTable.erase(it);
+    }
+}
+
+void SessionCatalog::_reapInMemorySessionsOlderThan(OperationContext* opCtx,
+                                                    SessionsCollection& sessionsCollection,
+                                                    Date_t possiblyExpired) {
+    LogicalSessionIdSet possiblyExpiredLsids;
+    {
+        stdx::unique_lock<stdx::mutex> ul(_mutex);
+        for (auto& entry : _txnTable) {
+            auto& session = entry.second;
+            if (session->lastCheckout < possiblyExpired) {
+                possiblyExpiredLsids.insert(entry.first);
+            }
+        }
+    }
+
+    // From the passed-in sessions, find the ones which are actually expired/removed
+    auto expiredSessionIds =
+        uassertStatusOK(sessionsCollection.findRemovedSessions(opCtx, possiblyExpiredLsids));
+
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+
+    // Remove the session ids from the in-memory catalog
+    for (const auto& lsid : expiredSessionIds) {
+        auto it = _txnTable.find(lsid);
+        if (it == _txnTable.end())
+            continue;
+
+        _invalidateSession(lg, it);
+    }
 }
 
 OperationContextSession::OperationContextSession(OperationContext* opCtx, bool checkOutSession)

@@ -630,12 +630,12 @@ env.Library(
         env.Idlc('transactions_stats.idl')[0],
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/stats/fill_locker_info',
         '$BUILD_DIR/mongo/idl/idl_parser',
         'catalog/collection',
-        'catalog/database',
         'catalog/database_holder',
+        'catalog/database',
         'catalog/uuid_catalog',
+        'commands/test_commands_enabled',
         'concurrency/lock_manager',
         'curop_failpoint_helpers',
         'curop_metrics',
@@ -645,9 +645,9 @@ env.Library(
         'namespace_string',
         'repl/oplog_entry',
         's/sharding_api_d',
-        "stats/top",
+        'stats/fill_locker_info',
+        'stats/top',
         'views/views',
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
     ],
     LIBDEPS_PRIVATE=[
         'commands/server_status',
@@ -1182,6 +1182,7 @@ env.Library(
         '$BUILD_DIR/mongo/crypto/sha1_block',
         'keys_collection_document',
         'logical_clock',
+        'logical_session_id',
     ],
 )
 
@@ -1227,7 +1228,6 @@ envWithAsio.Library(
         'service_liaison_mongod.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/logical_session_id',
         '$BUILD_DIR/mongo/util/clock_sources',
         '$BUILD_DIR/mongo/util/periodic_runner',
         'query_exec',
@@ -1242,7 +1242,6 @@ env.Library(
         'service_liaison_mongos.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/logical_session_id',
         '$BUILD_DIR/mongo/util/clock_sources',
         '$BUILD_DIR/mongo/util/periodic_runner',
         '$BUILD_DIR/mongo/s/coreshard',
@@ -1359,7 +1358,6 @@ env.Library(
     source=[
         'initialize_operation_session_info.cpp',
         'logical_session_cache_impl.cpp',
-        'logical_session_server_status_section.cpp',
     ],
     LIBDEPS=[
         'logical_session_cache',
@@ -1371,8 +1369,7 @@ env.Library(
         'kill_sessions',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/server_status',
-        '$BUILD_DIR/mongo/db/s/sharding_api_d',
+        's/sharding_api_d',
     ]
 )
 

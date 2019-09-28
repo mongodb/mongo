@@ -39,12 +39,9 @@
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
-
 namespace {
 
 class RefreshLogicalSessionCacheNowCommand final : public BasicCommand {
-    MONGO_DISALLOW_COPYING(RefreshLogicalSessionCacheNowCommand);
-
 public:
     RefreshLogicalSessionCacheNowCommand() : BasicCommand("refreshLogicalSessionCacheNow") {}
 
@@ -75,10 +72,10 @@ public:
         return Status::OK();
     }
 
-    virtual bool run(OperationContext* opCtx,
-                     const std::string& db,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) override {
+    bool run(OperationContext* opCtx,
+             const std::string& db,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
         auto cache = LogicalSessionCache::get(opCtx);
         auto client = opCtx->getClient();
 
@@ -94,5 +91,4 @@ public:
 MONGO_REGISTER_TEST_COMMAND(RefreshLogicalSessionCacheNowCommand);
 
 }  // namespace
-
 }  // namespace mongo
