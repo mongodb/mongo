@@ -127,24 +127,10 @@ void MultiIndexBlock::cleanUpAfterBuild(OperationContext* opCtx, Collection* col
         return;
     }
 
-    // Make lock acquisition uninterruptible.
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-    // Lock the collection if it's not already locked.
-    boost::optional<Lock::DBLock> dbLock;
-    boost::optional<Lock::CollectionLock> collLock;
-
     auto nss = collection->ns();
 
-    if (!opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X)) {
-        dbLock.emplace(opCtx, nss.db(), MODE_IX);
-        // Since DBLock implicitly acquires RSTL, we release the RSTL after acquiring the database
-        // lock. Additionally, the RSTL has to be released before acquiring a strong lock (MODE_X)
-        // on the collection to avoid potential deadlocks.
-        _unlockRSTLForIndexCleanup(opCtx);
-        collLock.emplace(opCtx, nss, MODE_X);
-    } else {
-        _unlockRSTLForIndexCleanup(opCtx);
-    }
+    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X), nss.toString());
+    _unlockRSTLForIndexCleanup(opCtx);
 
     while (true) {
         try {
