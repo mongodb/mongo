@@ -1484,8 +1484,7 @@ if (
         get_option('build-fast-and-loose') == 'on' or
         (
             get_option('build-fast-and-loose') == 'auto' and
-            not has_option('release') and
-            not has_option('cache')
+            not has_option('release')
          )
 ):
     # See http://www.scons.org/wiki/GoFastButton for details
