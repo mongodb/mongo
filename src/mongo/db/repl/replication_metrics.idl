@@ -116,6 +116,10 @@ structs:
                               replSetAbortPrimaryCatchUp command"
                 type: long
                 default: 0
+            averageCatchUpOps:
+                description: "Average number of ops applied during catchup"
+                type: double
+                default: 0.0
 
     ElectionCandidateMetrics:
         description: "Stores metrics that are specific to the last election in which the node was a
