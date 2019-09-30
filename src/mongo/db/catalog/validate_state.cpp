@@ -67,7 +67,9 @@ ValidateState::ValidateState(OperationContext* opCtx,
     }
 
     _database = _databaseLock->getDb() ? _databaseLock->getDb() : nullptr;
-    _collection = _database ? _database->getCollection(opCtx, _nss) : nullptr;
+    _collection =
+        _database ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(_nss) : nullptr;
+
 
     if (!_collection) {
         if (_database && ViewCatalog::get(_database)->lookup(opCtx, _nss.ns())) {

@@ -272,8 +272,7 @@ public:
             OpDebug* opDebug = &curOp.debug();
             const CollatorInterface* collator = nullptr;
             UpdateDriver driver(new ExpressionContext(&_opCtx, collator));
-            Database* db = ctx.db();
-            Collection* coll = db->getCollection(&_opCtx, nss);
+            Collection* coll = CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(nss);
             ASSERT(coll);
 
             // Get the RecordIds that would be returned by an in-order scan.

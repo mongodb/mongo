@@ -850,7 +850,7 @@ void dropCollection(OperationContext* opCtx,
 void renameOutOfTheWay(OperationContext* opCtx, RenameCollectionInfo info, Database* db) {
 
     // Finds the UUID of the collection that we are renaming out of the way.
-    auto collection = db->getCollection(opCtx, info.renameTo);
+    auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(info.renameTo);
     invariant(collection);
 
     // The generated unique collection name is only guaranteed to exist if the database is
@@ -1528,7 +1528,8 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         Lock::DBLock oplogDbLock(opCtx, oplogNss.db(), MODE_IX);
         Lock::CollectionLock oplogCollectionLoc(opCtx, oplogNss, MODE_X);
         OldClientContext ctx(opCtx, oplogNss.ns());
-        Collection* oplogCollection = ctx.db()->getCollection(opCtx, oplogNss);
+        Collection* oplogCollection =
+            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(oplogNss);
         if (!oplogCollection) {
             fassertFailedWithStatusNoTrace(
                 40495,

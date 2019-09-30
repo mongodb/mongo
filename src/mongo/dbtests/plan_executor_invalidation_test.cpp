@@ -85,11 +85,13 @@ public:
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
         // Takes ownership of 'ws', 'scan', and 'cq'.
-        auto statusWithPlanExecutor = PlanExecutor::make(std::move(cq),
-                                                         std::move(ws),
-                                                         std::move(scan),
-                                                         _ctx->db()->getCollection(&_opCtx, nss),
-                                                         PlanExecutor::YIELD_MANUAL);
+        auto statusWithPlanExecutor =
+            PlanExecutor::make(std::move(cq),
+                               std::move(ws),
+                               std::move(scan),
+                               CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(nss),
+                               PlanExecutor::YIELD_MANUAL);
+
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         return std::move(statusWithPlanExecutor.getValue());
     }
@@ -115,7 +117,7 @@ public:
     }
 
     Collection* collection() {
-        return _ctx->db()->getCollection(&_opCtx, nss);
+        return CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(nss);
     }
 
     void truncateCollection(Collection* collection) const {

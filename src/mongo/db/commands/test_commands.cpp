@@ -89,7 +89,7 @@ public:
 
         WriteUnitOfWork wunit(opCtx);
         UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
-        Collection* collection = db->getCollection(opCtx, nss);
+        Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
         if (!collection) {
             collection = db->createCollection(opCtx, nss);
             if (!collection) {

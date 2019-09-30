@@ -95,7 +95,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     if (!db)
         return;
 
-    _coll = db->getCollection(opCtx, _resolvedNss);
+    _coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(_resolvedNss);
     invariant(!nsOrUUID.uuid() || _coll,
               str::stream() << "Collection for " << _resolvedNss.ns()
                             << " disappeared after successufully resolving "

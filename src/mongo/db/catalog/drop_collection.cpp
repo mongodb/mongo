@@ -108,7 +108,7 @@ Status _dropCollection(OperationContext* opCtx,
                        DropCollectionSystemCollectionMode systemCollectionMode,
                        BSONObjBuilder& result) {
     Lock::CollectionLock collLock(opCtx, collectionName, MODE_X);
-    Collection* coll = db->getCollection(opCtx, collectionName);
+    Collection* coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(collectionName);
     if (!coll) {
         return Status(ErrorCodes::NamespaceNotFound, "ns not found");
     }
@@ -172,7 +172,8 @@ Status dropCollection(OperationContext* opCtx,
             return Status(ErrorCodes::NamespaceNotFound, "ns not found");
         }
 
-        Collection* coll = db->getCollection(opCtx, collectionName);
+        Collection* coll =
+            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(collectionName);
         if (!coll) {
             return _dropView(opCtx, db, collectionName, result);
         } else {

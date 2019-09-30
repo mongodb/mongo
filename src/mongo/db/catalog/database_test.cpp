@@ -184,12 +184,12 @@ void _testDropCollection(OperationContext* opCtx,
         if (createCollectionBeforeDrop) {
             ASSERT_TRUE(db->createCollection(opCtx, nss, collOpts));
         } else {
-            ASSERT_FALSE(db->getCollection(opCtx, nss));
+            ASSERT_FALSE(CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss));
         }
 
         ASSERT_OK(db->dropCollection(opCtx, nss, dropOpTime));
 
-        ASSERT_FALSE(db->getCollection(opCtx, nss));
+        ASSERT_FALSE(CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss));
         wuow.commit();
     });
 }
@@ -364,8 +364,8 @@ TEST_F(DatabaseTest, RenameCollectionPreservesUuidOfSourceCollectionAndUpdatesUu
         auto stayTemp = false;
         ASSERT_OK(db->renameCollection(opCtx, fromNss, toNss, stayTemp));
 
-        ASSERT_FALSE(db->getCollection(opCtx, fromNss));
-        auto toCollection = db->getCollection(opCtx, toNss);
+        ASSERT_FALSE(CollectionCatalog::get(opCtx).lookupCollectionByNamespace(fromNss));
+        auto toCollection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(toNss);
         ASSERT_TRUE(toCollection);
 
         auto toCollectionOptions =

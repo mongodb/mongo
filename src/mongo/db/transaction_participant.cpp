@@ -347,7 +347,7 @@ TransactionParticipant::getOldestActiveTimestamp(Timestamp stableTimestamp) {
             return boost::none;
         }
 
-        auto collection = db->getCollection(opCtx.get(), nss);
+        auto collection = CollectionCatalog::get(opCtx.get()).lookupCollectionByNamespace(nss);
         if (!collection) {
             return boost::none;
         }

@@ -148,7 +148,8 @@ public:
         ixparams.bounds.endKey = BSON("" << end);
         ixparams.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
 
-        const Collection* coll = db->getCollection(&_opCtx, nss);
+        const Collection* coll = CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(nss);
+
 
         unique_ptr<WorkingSet> ws(new WorkingSet());
         auto ixscan = std::make_unique<IndexScan>(&_opCtx, ixparams, ws.get(), nullptr);
@@ -174,7 +175,7 @@ protected:
 
 private:
     const IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
-        Collection* collection = db->getCollection(&_opCtx, nss);
+        Collection* collection = CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(nss);
         std::vector<const IndexDescriptor*> indexes;
         collection->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, obj, false, &indexes);
         ASSERT_LTE(indexes.size(), 1U);

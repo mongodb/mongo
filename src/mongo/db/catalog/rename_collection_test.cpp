@@ -454,7 +454,7 @@ Collection* _getCollection_inlock(OperationContext* opCtx, const NamespaceString
     if (!db) {
         return nullptr;
     }
-    return db->getCollection(opCtx, nss);
+    return CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
 }
 
 TEST_F(RenameCollectionTest, RenameCollectionReturnsNamespaceNotFoundIfDatabaseDoesNotExist) {

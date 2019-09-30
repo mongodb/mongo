@@ -386,7 +386,8 @@ AutoGetCollectionForDbCheck::AutoGetCollectionForDbCheck(OperationContext* opCtx
     : _agd(opCtx, nss), _collLock(opCtx, nss, MODE_S) {
     std::string msg;
 
-    _collection = _agd.getDb() ? _agd.getDb()->getCollection(opCtx, nss) : nullptr;
+    _collection =
+        _agd.getDb() ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss) : nullptr;
 
     // If the collection gets deleted after the check is launched, record that in the health log.
     if (!_collection) {

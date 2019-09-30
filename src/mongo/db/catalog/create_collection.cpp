@@ -81,7 +81,12 @@ Status _createView(OperationContext* opCtx,
 
         // Create 'system.views' in a separate WUOW if it does not exist.
         WriteUnitOfWork wuow(opCtx);
-        db->getOrCreateCollection(opCtx, NamespaceString(db->getSystemViewsName()));
+        Collection* coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
+            NamespaceString(db->getSystemViewsName()));
+        if (!coll) {
+            coll = db->createCollection(opCtx, NamespaceString(db->getSystemViewsName()));
+        }
+        invariant(coll);
         wuow.commit();
 
         WriteUnitOfWork wunit(opCtx);
@@ -250,7 +255,9 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                 // of the initial sync or result in rollback to fassert, requiring a resync of that
                 // node.
                 const bool stayTemp = true;
-                auto futureColl = db ? db->getCollection(opCtx, newCollName) : nullptr;
+                auto futureColl = db
+                    ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(newCollName)
+                    : nullptr;
                 bool needsRenaming = static_cast<bool>(futureColl);
                 for (int tries = 0; needsRenaming && tries < 10; ++tries) {
                     auto tmpNameResult =

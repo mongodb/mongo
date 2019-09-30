@@ -113,7 +113,7 @@ unsigned long long collectionCount(OperationContext* opCtx,
         auto databaseHolder = DatabaseHolder::get(opCtx);
         auto db = databaseHolder->getDb(opCtx, nss.ns());
         if (db) {
-            coll = db->getCollection(opCtx, nss);
+            coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
         }
     } else {
         ctx.emplace(opCtx, nss);
@@ -182,7 +182,8 @@ void dropTempCollections(OperationContext* cleanupOpCtx,
             [cleanupOpCtx, &tempNamespace] {
                 AutoGetDb autoDb(cleanupOpCtx, tempNamespace.db(), MODE_X);
                 if (auto db = autoDb.getDb()) {
-                    if (auto collection = db->getCollection(cleanupOpCtx, tempNamespace)) {
+                    if (auto collection = CollectionCatalog::get(cleanupOpCtx)
+                                              .lookupCollectionByNamespace(tempNamespace)) {
                         uassert(ErrorCodes::PrimarySteppedDown,
                                 str::stream() << "no longer primary while dropping temporary "
                                                  "collection for mapReduce: "
@@ -207,7 +208,8 @@ void dropTempCollections(OperationContext* cleanupOpCtx,
                 Lock::DBLock lk(cleanupOpCtx, incLong.db(), MODE_X);
                 auto databaseHolder = DatabaseHolder::get(cleanupOpCtx);
                 if (auto db = databaseHolder->getDb(cleanupOpCtx, incLong.ns())) {
-                    if (auto collection = db->getCollection(cleanupOpCtx, incLong)) {
+                    if (auto collection = CollectionCatalog::get(cleanupOpCtx)
+                                              .lookupCollectionByNamespace(incLong)) {
                         BackgroundOperation::assertNoBgOpInProgForNs(incLong.ns());
                         IndexBuildsCoordinator::get(cleanupOpCtx)
                             ->assertNoIndexBuildInProgForCollection(collection->uuid());
@@ -522,7 +524,7 @@ void State::prepTempCollection() {
         writeConflictRetry(_opCtx, "M/R prepTempCollection", _config.incLong.ns(), [this] {
             AutoGetOrCreateDb autoGetIncCollDb(_opCtx, _config.incLong.db(), MODE_X);
             auto const db = autoGetIncCollDb.getDb();
-            invariant(!db->getCollection(_opCtx, _config.incLong));
+            invariant(!CollectionCatalog::get(_opCtx).lookupCollectionByNamespace(_config.incLong));
 
             CollectionOptions options;
             options.setNoIdIndex();
@@ -584,7 +586,8 @@ void State::prepTempCollection() {
         // Create temp collection and insert the indexes from temporary storage
         AutoGetOrCreateDb autoGetFinalDb(_opCtx, _config.tempNamespace.db(), MODE_X);
         auto const db = autoGetFinalDb.getDb();
-        invariant(!db->getCollection(_opCtx, _config.tempNamespace));
+        invariant(
+            !CollectionCatalog::get(_opCtx).lookupCollectionByNamespace(_config.tempNamespace));
 
         uassert(
             ErrorCodes::PrimarySteppedDown,

@@ -145,12 +145,6 @@ public:
                               const NamespaceString& viewName,
                               const CollectionOptions& options) const = 0;
 
-    virtual Collection* getCollection(OperationContext* opCtx,
-                                      const NamespaceString& nss) const = 0;
-
-    virtual Collection* getOrCreateCollection(OperationContext* const opCtx,
-                                              const NamespaceString& nss) const = 0;
-
     /**
      * Arguments are passed by value as they otherwise would be changing as result of renaming.
      */

@@ -344,8 +344,10 @@ OldClientContext::OldClientContext(OperationContext* opCtx, const std::string& n
                 break;
             default:
                 CollectionShardingState::get(_opCtx, NamespaceString(ns))
-                    ->checkShardVersionOrThrow(_opCtx,
-                                               _db->getCollection(opCtx, NamespaceString(ns)));
+                    ->checkShardVersionOrThrow(
+                        _opCtx,
+                        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
+                            NamespaceString(ns)));
                 break;
         }
     }

@@ -89,7 +89,7 @@ public:
         if (!database) {
             uasserted(ErrorCodes::NamespaceNotFound, "database local does not exist");
         }
-        Collection* coll = database->getCollection(opCtx, nss);
+        Collection* coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
         if (!coll) {
             uasserted(ErrorCodes::NamespaceNotFound, "oplog does not exist");
         }

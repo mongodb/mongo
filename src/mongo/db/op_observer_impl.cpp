@@ -611,7 +611,7 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
     if (!db) {
         return;
     }
-    Collection* coll = db->getCollection(opCtx, nss);
+    Collection* coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
 
     invariant(coll->uuid() == uuid);
     invariant(DurableCatalog::get(opCtx)->isEqualToMetadataUUID(opCtx, nss, uuid));

@@ -36,6 +36,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -86,7 +87,8 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments() {
             // We need to hold the database lock while getting the collection. Otherwise a
             // concurrent collection creation would write to the map in the Database object
             // while we concurrently read the map.
-            Collection* collection = db->getCollection(opCtx.get(), oplogNss);
+            Collection* collection =
+                CollectionCatalog::get(opCtx.get()).lookupCollectionByNamespace(oplogNss);
             if (!collection) {
                 LOG(2) << "no collection " << oplogNss;
                 return false;

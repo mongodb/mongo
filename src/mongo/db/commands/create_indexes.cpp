@@ -370,7 +370,7 @@ Collection* getOrCreateCollection(OperationContext* opCtx,
                                   const BSONObj& cmdObj,
                                   std::string* errmsg,
                                   BSONObjBuilder* result) {
-    if (auto collection = db->getCollection(opCtx, ns)) {
+    if (auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(ns)) {
         result->appendBool(kCreateCollectionAutomaticallyFieldName, false);
         return collection;
     }
@@ -600,7 +600,7 @@ bool runCreateIndexesForMobile(OperationContext* opCtx,
 
     auto databaseHolder = DatabaseHolder::get(opCtx);
     db = databaseHolder->getDb(opCtx, ns.db());
-    invariant(db->getCollection(opCtx, ns));
+    invariant(CollectionCatalog::get(opCtx).lookupCollectionByNamespace(ns));
 
     // Perform the third and final drain while holding the exclusive collection lock.
     uassertStatusOK(indexer.drainBackgroundWrites(opCtx));

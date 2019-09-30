@@ -103,11 +103,6 @@ public:
                       const NamespaceString& viewName,
                       const CollectionOptions& options) const final;
 
-    Collection* getCollection(OperationContext* opCtx, const NamespaceString& nss) const;
-
-    Collection* getOrCreateCollection(OperationContext* opCtx,
-                                      const NamespaceString& nss) const final;
-
     Status renameCollection(OperationContext* opCtx,
                             NamespaceString fromNss,
                             NamespaceString toNss,

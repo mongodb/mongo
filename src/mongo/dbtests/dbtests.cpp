@@ -99,7 +99,10 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
     Collection* coll;
     {
         WriteUnitOfWork wunit(opCtx);
-        coll = autoDb.getDb()->getOrCreateCollection(opCtx, NamespaceString(ns));
+        coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(NamespaceString(ns));
+        if (!coll) {
+            coll = autoDb.getDb()->createCollection(opCtx, NamespaceString(ns));
+        }
         invariant(coll);
         wunit.commit();
     }

@@ -238,8 +238,9 @@ Value DocumentSourceCursor::serialize(boost::optional<ExplainOptions::Verbosity>
         auto lockMode = getLockModeForQuery(opCtx, _exec->nss());
         AutoGetDb dbLock(opCtx, _exec->nss().db(), lockMode);
         Lock::CollectionLock collLock(opCtx, _exec->nss(), lockMode);
-        auto collection =
-            dbLock.getDb() ? dbLock.getDb()->getCollection(opCtx, _exec->nss()) : nullptr;
+        auto collection = dbLock.getDb()
+            ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(_exec->nss())
+            : nullptr;
 
         Explain::explainStages(_exec.get(),
                                collection,

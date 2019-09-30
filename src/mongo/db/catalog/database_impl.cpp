@@ -304,7 +304,7 @@ Status DatabaseImpl::dropView(OperationContext* opCtx, NamespaceString viewName)
 Status DatabaseImpl::dropCollection(OperationContext* opCtx,
                                     NamespaceString nss,
                                     repl::OpTime dropOpTime) const {
-    if (!getCollection(opCtx, nss)) {
+    if (!CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss)) {
         // Collection doesn't exist so don't bother validating if it can be dropped.
         return Status::OK();
     }
@@ -341,7 +341,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
             "dropCollection() cannot accept a valid drop optime when writes are replicated.");
     }
 
-    Collection* collection = getCollection(opCtx, nss);
+    Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
 
     if (!collection) {
         return Status::OK();  // Post condition already met.
@@ -469,10 +469,6 @@ Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
     return Status::OK();
 }
 
-Collection* DatabaseImpl::getCollection(OperationContext* opCtx, const NamespaceString& nss) const {
-    return CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
-}
-
 Status DatabaseImpl::renameCollection(OperationContext* opCtx,
                                       NamespaceString fromNss,
                                       NamespaceString toNss,
@@ -484,13 +480,13 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
 
     invariant(fromNss.db() == _name);
     invariant(toNss.db() == _name);
-    if (getCollection(opCtx, toNss)) {
+    if (CollectionCatalog::get(opCtx).lookupCollectionByNamespace(toNss)) {
         return Status(ErrorCodes::NamespaceExists,
                       str::stream() << "Cannot rename '" << fromNss << "' to '" << toNss
                                     << "' because the destination namespace already exists");
     }
 
-    Collection* collToRename = getCollection(opCtx, fromNss);
+    Collection* collToRename = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(fromNss);
     if (!collToRename) {
         return Status(ErrorCodes::NamespaceNotFound, "collection not found to rename");
     }
@@ -499,7 +495,7 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
                                "collection "
                             << fromNss);
 
-    Collection* toColl = getCollection(opCtx, toNss);
+    Collection* toColl = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(toNss);
     if (toColl) {
         invariant(
             !toColl->getIndexCatalog()->haveAnyIndexesInProgress(),
@@ -531,22 +527,12 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
     return status;
 }
 
-Collection* DatabaseImpl::getOrCreateCollection(OperationContext* opCtx,
-                                                const NamespaceString& nss) const {
-    Collection* c = getCollection(opCtx, nss);
-
-    if (!c) {
-        c = createCollection(opCtx, nss);
-    }
-    return c;
-}
-
 void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
                                              const NamespaceString& nss,
                                              const CollectionOptions& options) const {
     massert(17399,
             str::stream() << "Cannot create collection " << nss << " - collection already exists.",
-            getCollection(opCtx, nss) == nullptr);
+            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss) == nullptr);
 
     uassert(14037,
             "can't create user databases on a --configsvr instance",
@@ -740,7 +726,7 @@ StatusWith<NamespaceString> DatabaseImpl::makeUniqueCollectionNamespace(
                        replacePercentSign);
 
         NamespaceString nss(_name, collectionName);
-        if (!getCollection(opCtx, nss)) {
+        if (!CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss)) {
             return nss;
         }
     }
@@ -772,7 +758,7 @@ void DatabaseImpl::checkForIdIndexesAndDropPendingCollections(OperationContext* 
         if (nss.isSystem())
             continue;
 
-        Collection* coll = getCollection(opCtx, nss);
+        Collection* coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
         if (!coll)
             continue;
 
@@ -797,7 +783,7 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
     if (!NamespaceString::validCollectionComponent(nss.ns()))
         return Status(ErrorCodes::InvalidNamespace, str::stream() << "invalid ns: " << nss);
 
-    Collection* collection = getCollection(opCtx, nss);
+    Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
 
     if (collection)
         return Status(ErrorCodes::NamespaceExists,

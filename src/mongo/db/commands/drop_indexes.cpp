@@ -136,7 +136,8 @@ public:
         Lock::GlobalWrite lk(opCtx);
         AutoGetOrCreateDb autoDb(opCtx, dbname, MODE_X);
 
-        Collection* collection = autoDb.getDb()->getCollection(opCtx, toReIndexNss);
+        Collection* collection =
+            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(toReIndexNss);
         if (!collection) {
             if (ViewCatalog::get(autoDb.getDb())->lookup(opCtx, toReIndexNss.ns()))
                 uasserted(ErrorCodes::CommandNotSupportedOnView, "can't re-index a view");

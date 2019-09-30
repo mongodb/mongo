@@ -157,7 +157,8 @@ Status verifySystemIndexes(OperationContext* opCtx) {
             return Status::OK();
         }
 
-        Collection* collection = autoDb.getDb()->getCollection(opCtx, systemUsers);
+        Collection* collection =
+            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(systemUsers);
         if (collection) {
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
             invariant(indexCatalog);
@@ -187,7 +188,7 @@ Status verifySystemIndexes(OperationContext* opCtx) {
         }
 
         // Ensure that system indexes exist for the roles collection, if it exists.
-        collection = autoDb.getDb()->getCollection(opCtx, systemRoles);
+        collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(systemRoles);
         if (collection) {
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
             invariant(indexCatalog);

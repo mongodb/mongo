@@ -431,7 +431,7 @@ std::shared_ptr<CappedInsertNotifier> PlanExecutorImpl::_getCappedInsertNotifier
     auto databaseHolder = DatabaseHolder::get(_opCtx);
     auto db = databaseHolder->getDb(_opCtx, _nss.db());
     invariant(db);
-    auto collection = db->getCollection(_opCtx, _nss);
+    auto collection = CollectionCatalog::get(_opCtx).lookupCollectionByNamespace(_nss);
     invariant(collection);
 
     return collection->getCappedInsertNotifier();

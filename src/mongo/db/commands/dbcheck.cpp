@@ -334,7 +334,7 @@ private:
             return false;
         }
 
-        auto collection = db->getCollection(opCtx, info.nss);
+        auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(info.nss);
         if (!collection) {
             return false;
         }

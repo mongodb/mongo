@@ -60,7 +60,7 @@ protected:
         return NamespaceString("unittests.pdfiletests.Insert");
     }
     Collection* collection() {
-        return _context.db()->getCollection(&_opCtx, nss());
+        return CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(nss());
     }
 
     const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
@@ -75,15 +75,19 @@ public:
         WriteUnitOfWork wunit(&_opCtx);
         BSONObj x = BSON("x" << 1);
         ASSERT(x["_id"].type() == 0);
-        Collection* collection = _context.db()->getOrCreateCollection(&_opCtx, nss());
+        Collection* coll = CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(nss());
+        if (!coll) {
+            coll = _context.db()->createCollection(&_opCtx, nss());
+        }
+        ASSERT(coll);
         OpDebug* const nullOpDebug = nullptr;
-        ASSERT(!collection->insertDocument(&_opCtx, InsertStatement(x), nullOpDebug, true).isOK());
+        ASSERT(!coll->insertDocument(&_opCtx, InsertStatement(x), nullOpDebug, true).isOK());
 
         StatusWith<BSONObj> fixed = fixDocumentForInsert(_opCtx.getServiceContext(), x);
         ASSERT(fixed.isOK());
         x = fixed.getValue();
         ASSERT(x["_id"].type() == jstOID);
-        ASSERT(collection->insertDocument(&_opCtx, InsertStatement(x), nullOpDebug, true).isOK());
+        ASSERT(coll->insertDocument(&_opCtx, InsertStatement(x), nullOpDebug, true).isOK());
         wunit.commit();
     }
 };

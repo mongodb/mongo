@@ -138,7 +138,8 @@ bool Helpers::findById(OperationContext* opCtx,
                        bool* indexFound) {
     invariant(database);
 
-    Collection* collection = database->getCollection(opCtx, NamespaceString(ns));
+    Collection* collection =
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(NamespaceString(ns));
     if (!collection) {
         return false;
     }
@@ -262,7 +263,8 @@ BSONObj Helpers::inferKeyPattern(const BSONObj& o) {
 void Helpers::emptyCollection(OperationContext* opCtx, const NamespaceString& nss) {
     OldClientContext context(opCtx, nss.ns());
     repl::UnreplicatedWritesBlock uwb(opCtx);
-    Collection* collection = context.db() ? context.db()->getCollection(opCtx, nss) : nullptr;
+    Collection* collection =
+        context.db() ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss) : nullptr;
     deleteObjects(opCtx, collection, nss, BSONObj(), false);
 }
 

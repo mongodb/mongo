@@ -3788,7 +3788,7 @@ TEST_F(TxnParticipantTest, OldestActiveTransactionTimestamp) {
 
         AutoGetOrCreateDb autoDb(opCtx(), nss.db(), MODE_X);
         WriteUnitOfWork wuow(opCtx());
-        auto coll = autoDb.getDb()->getCollection(opCtx(), nss);
+        auto coll = CollectionCatalog::get(opCtx()).lookupCollectionByNamespace(nss);
         ASSERT(coll);
         OpDebug* const nullOpDebug = nullptr;
         ASSERT_OK(
@@ -3800,7 +3800,7 @@ TEST_F(TxnParticipantTest, OldestActiveTransactionTimestamp) {
         Timestamp ts(1, i);
         AutoGetOrCreateDb autoDb(opCtx(), nss.db(), MODE_X);
         WriteUnitOfWork wuow(opCtx());
-        auto coll = autoDb.getDb()->getCollection(opCtx(), nss);
+        auto coll = CollectionCatalog::get(opCtx()).lookupCollectionByNamespace(nss);
         ASSERT(coll);
         auto cursor = coll->getCursor(opCtx());
         while (auto record = cursor->next()) {

@@ -212,8 +212,10 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
         AutoGetOrCreateDb db(opCtx, ns.db(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, ns, MODE_X);
 
-        assertCanWrite_inlock(opCtx, ns, db.getDb()->getCollection(opCtx, ns));
-        if (!db.getDb()->getCollection(opCtx, ns)) {  // someone else may have beat us to it.
+        assertCanWrite_inlock(
+            opCtx, ns, CollectionCatalog::get(opCtx).lookupCollectionByNamespace(ns));
+        if (!CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
+                ns)) {  // someone else may have beat us to it.
             uassertStatusOK(userAllowedCreateNS(ns.db(), ns.coll()));
             WriteUnitOfWork wuow(opCtx);
             CollectionOptions defaultCollectionOptions;

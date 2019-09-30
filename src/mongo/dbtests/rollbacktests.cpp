@@ -87,20 +87,17 @@ Status renameCollection(OperationContext* opCtx,
     return renameCollection(opCtx, source, target, {});
 }
 Status truncateCollection(OperationContext* opCtx, const NamespaceString& nss) {
-    auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto coll = databaseHolder->getDb(opCtx, nss.db())->getCollection(opCtx, nss);
+    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
     return coll->truncate(opCtx);
 }
 
 void insertRecord(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& data) {
-    auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto coll = databaseHolder->getDb(opCtx, nss.db())->getCollection(opCtx, nss);
+    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
     OpDebug* const nullOpDebug = nullptr;
     ASSERT_OK(coll->insertDocument(opCtx, InsertStatement(data), nullOpDebug, false));
 }
 void assertOnlyRecord(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& data) {
-    auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto coll = databaseHolder->getDb(opCtx, nss.db())->getCollection(opCtx, nss);
+    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
     auto cursor = coll->getCursor(opCtx);
 
     auto record = cursor->next();
@@ -110,18 +107,15 @@ void assertOnlyRecord(OperationContext* opCtx, const NamespaceString& nss, const
     ASSERT(!cursor->next());
 }
 void assertEmpty(OperationContext* opCtx, const NamespaceString& nss) {
-    auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto coll = databaseHolder->getDb(opCtx, nss.db())->getCollection(opCtx, nss);
+    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
     ASSERT(!coll->getCursor(opCtx)->next());
 }
 bool indexExists(OperationContext* opCtx, const NamespaceString& nss, const string& idxName) {
-    auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto coll = databaseHolder->getDb(opCtx, nss.db())->getCollection(opCtx, nss);
+    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
     return coll->getIndexCatalog()->findIndexByName(opCtx, idxName, true) != nullptr;
 }
 bool indexReady(OperationContext* opCtx, const NamespaceString& nss, const string& idxName) {
-    auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto coll = databaseHolder->getDb(opCtx, nss.db())->getCollection(opCtx, nss);
+    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
     return coll->getIndexCatalog()->findIndexByName(opCtx, idxName, false) != nullptr;
 }
 size_t getNumIndexEntries(OperationContext* opCtx,
@@ -129,8 +123,7 @@ size_t getNumIndexEntries(OperationContext* opCtx,
                           const string& idxName) {
     size_t numEntries = 0;
 
-    auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto coll = databaseHolder->getDb(opCtx, nss.db())->getCollection(opCtx, nss);
+    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
     IndexCatalog* catalog = coll->getIndexCatalog();
     auto desc = catalog->findIndexByName(opCtx, idxName, false);
 
@@ -152,8 +145,7 @@ size_t getNumIndexEntries(OperationContext* opCtx,
 }
 
 void dropIndex(OperationContext* opCtx, const NamespaceString& nss, const string& idxName) {
-    auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto coll = databaseHolder->getDb(opCtx, nss.db())->getCollection(opCtx, nss);
+    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
     auto desc = coll->getIndexCatalog()->findIndexByName(opCtx, idxName);
     ASSERT(desc);
     ASSERT_OK(coll->getIndexCatalog()->dropIndex(opCtx, desc));
@@ -543,7 +535,7 @@ public:
 
         AutoGetDb autoDb(&opCtx, nss.db(), MODE_X);
 
-        Collection* coll = autoDb.getDb()->getCollection(&opCtx, nss);
+        Collection* coll = CollectionCatalog::get(&opCtx).lookupCollectionByNamespace(nss);
         IndexCatalog* catalog = coll->getIndexCatalog();
 
         string idxName = "a";
@@ -584,7 +576,7 @@ public:
 
         AutoGetDb autoDb(&opCtx, nss.db(), MODE_X);
 
-        Collection* coll = autoDb.getDb()->getCollection(&opCtx, nss);
+        Collection* coll = CollectionCatalog::get(&opCtx).lookupCollectionByNamespace(nss);
         IndexCatalog* catalog = coll->getIndexCatalog();
 
         string idxName = "a";
@@ -637,7 +629,7 @@ public:
 
         AutoGetDb autoDb(&opCtx, nss.db(), MODE_X);
 
-        Collection* coll = autoDb.getDb()->getCollection(&opCtx, nss);
+        Collection* coll = CollectionCatalog::get(&opCtx).lookupCollectionByNamespace(nss);
         IndexCatalog* catalog = coll->getIndexCatalog();
 
         string idxName = "a";
@@ -700,7 +692,7 @@ public:
                 assertGet(CollectionOptions::parse(BSONObj(), CollectionOptions::parseForCommand));
             ASSERT_OK(ctx.db()->userCreateNS(&opCtx, nss, collectionOptions, false));
             ASSERT(collectionExists(&opCtx, &ctx, nss.ns()));
-            Collection* coll = ctx.db()->getCollection(&opCtx, nss);
+            Collection* coll = CollectionCatalog::get(&opCtx).lookupCollectionByNamespace(nss);
             IndexCatalog* catalog = coll->getIndexCatalog();
 
             ASSERT_OK(catalog->createIndexOnEmptyCollection(&opCtx, specA));

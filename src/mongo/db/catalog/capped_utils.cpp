@@ -71,7 +71,8 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
     Database* db = autoDb.getDb();
     uassert(ErrorCodes::NamespaceNotFound, "no such database", db);
 
-    Collection* collection = db->getCollection(opCtx, collectionName);
+    Collection* collection =
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(collectionName);
     uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << "emptycapped not supported on view: " << collectionName.ns(),
             collection || !ViewCatalog::get(db)->lookup(opCtx, collectionName.ns()));
@@ -117,7 +118,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
     NamespaceString fromNss(db->name(), shortFrom);
     NamespaceString toNss(db->name(), shortTo);
 
-    Collection* fromCollection = db->getCollection(opCtx, fromNss);
+    Collection* fromCollection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(fromNss);
     if (!fromCollection) {
         uassert(ErrorCodes::CommandNotSupportedOnView,
                 str::stream() << "cloneCollectionAsCapped not supported for views: " << fromNss,
@@ -135,7 +136,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
     uassert(ErrorCodes::NamespaceExists,
             str::stream() << "cloneCollectionAsCapped failed - destination collection " << toNss
                           << " already exists. source collection: " << fromNss,
-            !db->getCollection(opCtx, toNss));
+            !CollectionCatalog::get(opCtx).lookupCollectionByNamespace(toNss));
 
     // create new collection
     {
@@ -154,7 +155,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
         uassertStatusOK(createCollection(opCtx, toNss.db().toString(), cmd.done()));
     }
 
-    Collection* toCollection = db->getCollection(opCtx, toNss);
+    Collection* toCollection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(toNss);
     invariant(toCollection);  // we created above
 
     // how much data to ignore because it won't fit anyway

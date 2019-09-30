@@ -325,7 +325,7 @@ public:
 private:
     std::string _hashCollection(OperationContext* opCtx, Database* db, const NamespaceString& nss) {
 
-        Collection* collection = db->getCollection(opCtx, nss);
+        Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
         invariant(collection);
 
         boost::optional<Lock::CollectionLock> collLock;

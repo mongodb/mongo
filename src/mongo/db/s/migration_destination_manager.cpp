@@ -651,7 +651,7 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationCont
         AutoGetOrCreateDb autoCreateDb(opCtx, nss.db(), MODE_X);
         auto db = autoCreateDb.getDb();
 
-        auto collection = db->getCollection(opCtx, nss);
+        auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
         if (collection) {
             checkUUIDsMatch(collection);
         } else {
@@ -664,7 +664,7 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationCont
             uassertStatusOK(db->userCreateNS(
                 opCtx, nss, collectionOptions, createDefaultIndexes, donorIdIndexSpec));
             wuow.commit();
-            collection = db->getCollection(opCtx, nss);
+            collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
         }
 
         auto indexSpecs = checkEmptyOrGetMissingIndexesFromDonor(collection);

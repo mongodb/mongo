@@ -237,7 +237,8 @@ void createIndexForApplyOps(OperationContext* opCtx,
     // Check if collection exists.
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto db = databaseHolder->getDb(opCtx, indexNss.ns());
-    auto indexCollection = db ? db->getCollection(opCtx, indexNss) : nullptr;
+    auto indexCollection =
+        db ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(indexNss) : nullptr;
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Failed to create index due to missing collection: " << indexNss.ns(),
             indexCollection);
@@ -578,7 +579,8 @@ void createOplog(OperationContext* opCtx,
     const ReplSettings& replSettings = ReplicationCoordinator::get(opCtx)->getSettings();
 
     OldClientContext ctx(opCtx, oplogCollectionName.ns());
-    Collection* collection = ctx.db()->getCollection(opCtx, oplogCollectionName);
+    Collection* collection =
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(oplogCollectionName);
 
     if (collection) {
         if (replSettings.getOplogSizeBytes() != 0) {
@@ -1141,7 +1143,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
         dassert(opCtx->lockState()->isCollectionLockedForMode(
                     requestNss, supportsDocLocking() ? MODE_IX : MODE_X),
                 requestNss.ns());
-        collection = db->getCollection(opCtx, requestNss);
+        collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(requestNss);
     }
 
     BSONObj o = op.getObject();
@@ -1553,7 +1555,8 @@ Status applyCommand_inlock(OperationContext* opCtx,
         Lock::DBLock lock(opCtx, nss.db(), MODE_IS);
         auto databaseHolder = DatabaseHolder::get(opCtx);
         auto db = databaseHolder->getDb(opCtx, nss.ns());
-        if (db && !db->getCollection(opCtx, nss) && ViewCatalog::get(db)->lookup(opCtx, nss.ns())) {
+        if (db && !CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss) &&
+            ViewCatalog::get(db)->lookup(opCtx, nss.ns())) {
             return {ErrorCodes::CommandNotSupportedOnView,
                     str::stream() << "applyOps not supported on view:" << nss.ns()};
         }

@@ -62,7 +62,7 @@ UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& 
     invariant(!request.isExplain());
 
     const NamespaceString& nsString = request.getNamespaceString();
-    Collection* collection = db->getCollection(opCtx, nsString);
+    Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nsString);
 
     // The update stage does not create its own collection.  As such, if the update is
     // an upsert, create the collection that the update stage inserts into beforehand.

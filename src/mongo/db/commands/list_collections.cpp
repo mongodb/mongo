@@ -310,7 +310,8 @@ public:
                         }
 
                         Lock::CollectionLock clk(opCtx, nss, MODE_IS);
-                        Collection* collection = db->getCollection(opCtx, nss);
+                        Collection* collection =
+                            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
                         BSONObj collBson =
                             buildCollectionBson(opCtx, collection, includePendingDrops, nameOnly);
                         if (!collBson.isEmpty()) {

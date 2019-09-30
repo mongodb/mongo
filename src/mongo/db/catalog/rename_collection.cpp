@@ -115,7 +115,8 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
     if (!db)
         return Status(ErrorCodes::NamespaceNotFound, "source namespace does not exist");
 
-    Collection* const sourceColl = db->getCollection(opCtx, source);
+    Collection* const sourceColl =
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(source);
     if (!sourceColl) {
         if (ViewCatalog::get(db)->lookup(opCtx, source.ns()))
             return Status(ErrorCodes::CommandNotSupportedOnView,
@@ -126,7 +127,7 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
     BackgroundOperation::assertNoBgOpInProgForNs(source.ns());
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(sourceColl->uuid());
 
-    Collection* targetColl = db->getCollection(opCtx, target);
+    Collection* targetColl = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(target);
 
     if (!targetColl) {
         if (ViewCatalog::get(db)->lookup(opCtx, target.ns()))
@@ -311,8 +312,10 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
         return status;
 
     auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, source.db());
-    Collection* const sourceColl = db->getCollection(opCtx, source);
-    Collection* const targetColl = db->getCollection(opCtx, target);
+    Collection* const sourceColl =
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(source);
+    Collection* const targetColl =
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(target);
 
     AutoStatsTracker statsTracker(opCtx,
                                   source,
@@ -351,7 +354,8 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
         return status;
 
     auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, source.db());
-    Collection* const sourceColl = db->getCollection(opCtx, source);
+    Collection* const sourceColl =
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(source);
 
     AutoStatsTracker statsTracker(opCtx,
                                   source,
@@ -360,7 +364,7 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
                                   db->getProfilingLevel());
 
     return writeConflictRetry(opCtx, "renameCollection", target.ns(), [&] {
-        Collection* targetColl = db->getCollection(opCtx, target);
+        Collection* targetColl = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(target);
         WriteUnitOfWork wuow(opCtx);
         if (targetColl) {
             if (sourceColl->uuid() == targetColl->uuid()) {
@@ -404,7 +408,8 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
             auto collToDropBasedOnUUID = getNamespaceFromUUID(opCtx, uuidToDrop.get());
             if (collToDropBasedOnUUID && !collToDropBasedOnUUID->isDropPendingNamespace()) {
                 invariant(collToDropBasedOnUUID->db() == target.db());
-                targetColl = db->getCollection(opCtx, *collToDropBasedOnUUID);
+                targetColl = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
+                    *collToDropBasedOnUUID);
             }
         }
 
@@ -464,7 +469,8 @@ Status renameBetweenDBs(OperationContext* opCtx,
                                                    AutoStatsTracker::LogMode::kUpdateTopAndCurop,
                                                    sourceDB->getProfilingLevel());
 
-    Collection* const sourceColl = sourceDB->getCollection(opCtx, source);
+    Collection* const sourceColl =
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(source);
     if (!sourceColl) {
         if (sourceDB && ViewCatalog::get(sourceDB)->lookup(opCtx, source.ns()))
             return Status(ErrorCodes::CommandNotSupportedOnView,
@@ -490,7 +496,8 @@ Status renameBetweenDBs(OperationContext* opCtx,
     // Check if the target namespace exists and if dropTarget is true.
     // Return a non-OK status if target exists and dropTarget is not true or if the collection
     // is sharded.
-    Collection* targetColl = targetDB ? targetDB->getCollection(opCtx, target) : nullptr;
+    Collection* targetColl =
+        targetDB ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(target) : nullptr;
     if (targetColl) {
         if (sourceColl->uuid() == targetColl->uuid()) {
             invariant(source == target);

@@ -201,7 +201,7 @@ private:
             return collProperties;
         }
 
-        auto collection = db->getCollection(opCtx, nss);
+        auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
         if (!collection) {
             return collProperties;
         }
