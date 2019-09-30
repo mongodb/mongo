@@ -50,9 +50,12 @@ void PrepareConflictTracker::beginPrepareConflict() {
 void PrepareConflictTracker::endPrepareConflict() {
     // This function is called regardless whether there was a prepare conflict.
     if (_prepareConflictStartTime > 0) {
-        invariant(_prepareConflictStartTime <= static_cast<long long>(curTimeMicros64()));
-        _prepareConflictDuration +=
-            Microseconds{static_cast<long long>(curTimeMicros64()) - _prepareConflictStartTime};
+        auto curTimeMicros = curTimeMicros64();
+        invariant(_prepareConflictStartTime <= curTimeMicros,
+                  str::stream() << "Prepare conflict start time (" << _prepareConflictStartTime
+                                << ") is somehow greater than current time (" << curTimeMicros
+                                << ")");
+        _prepareConflictDuration += curTimeMicros - _prepareConflictStartTime;
     }
     _prepareConflictStartTime = 0;
 
@@ -60,7 +63,7 @@ void PrepareConflictTracker::endPrepareConflict() {
     _waitOnPrepareConflict.store(false);
 }
 
-Microseconds PrepareConflictTracker::getPrepareConflictDuration() {
+unsigned long long PrepareConflictTracker::getPrepareConflictDuration() {
     return _prepareConflictDuration;
 }
 

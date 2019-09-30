@@ -456,8 +456,8 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
         }
 
         // Gets the time spent blocked on prepare conflicts.
-        _debug.prepareConflictDurationMicros = durationCount<Microseconds>(
-            PrepareConflictTracker::get(opCtx).getPrepareConflictDuration());
+        _debug.prepareConflictDurationMicros =
+            PrepareConflictTracker::get(opCtx).getPrepareConflictDuration();
         log(component) << _debug.report(opCtx, (lockerInfo ? &lockerInfo->stats : nullptr));
     }
 
