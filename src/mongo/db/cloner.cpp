@@ -52,6 +52,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
@@ -369,20 +370,53 @@ void Cloner::copyIndexes(OperationContext* opCtx,
     // The code below throws, so ensure build cleanup occurs.
     ON_BLOCK_EXIT([&] { indexer.cleanUpAfterBuild(opCtx, collection); });
 
-    auto indexInfoObjs = uassertStatusOK(
-        indexer.init(opCtx, collection, indexesToBuild, MultiIndexBlock::kNoopOnInitFn));
+    // Emit startIndexBuild and commitIndexBuild oplog entries if supported by the current FCV.
+    auto opObserver = opCtx->getServiceContext()->getOpObserver();
+    auto fromMigrate = false;
+    auto buildUUID = serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+            serverGlobalParams.featureCompatibility.getVersion() ==
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44
+        ? boost::make_optional(UUID::gen())
+        : boost::none;
+
+    MultiIndexBlock::OnInitFn onInitFn;
+    if (opCtx->writesAreReplicated() && buildUUID) {
+        onInitFn = [&](std::vector<BSONObj>& specs) {
+            opObserver->onStartIndexBuild(
+                opCtx, to_collection, collection->uuid(), *buildUUID, specs, fromMigrate);
+            return Status::OK();
+        };
+    } else {
+        onInitFn = MultiIndexBlock::kNoopOnInitFn;
+    }
+
+    auto indexInfoObjs = uassertStatusOK(indexer.init(opCtx, collection, indexesToBuild, onInitFn));
     uassertStatusOK(indexer.insertAllDocumentsInCollection(opCtx, collection));
     uassertStatusOK(indexer.checkConstraints(opCtx));
 
     WriteUnitOfWork wunit(opCtx);
-    uassertStatusOK(indexer.commit(
-        opCtx, collection, MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn));
-    if (opCtx->writesAreReplicated()) {
-        for (auto&& infoObj : indexInfoObjs) {
-            getGlobalServiceContext()->getOpObserver()->onCreateIndex(
-                opCtx, collection->ns(), collection->uuid(), infoObj, false);
-        }
-    }
+    uassertStatusOK(
+        indexer.commit(opCtx,
+                       collection,
+                       [&](const BSONObj& spec) {
+                           // If two phase index builds are enabled, the index build will be
+                           // coordinated using startIndexBuild and commitIndexBuild oplog entries.
+                           if (opCtx->writesAreReplicated() &&
+                               !IndexBuildsCoordinator::get(opCtx)->supportsTwoPhaseIndexBuild()) {
+                               opObserver->onCreateIndex(
+                                   opCtx, collection->ns(), collection->uuid(), spec, fromMigrate);
+                           }
+                       },
+                       [&] {
+                           if (opCtx->writesAreReplicated() && buildUUID) {
+                               opObserver->onCommitIndexBuild(opCtx,
+                                                              collection->ns(),
+                                                              collection->uuid(),
+                                                              *buildUUID,
+                                                              indexInfoObjs,
+                                                              fromMigrate);
+                           }
+                       }));
     wunit.commit();
 }
 

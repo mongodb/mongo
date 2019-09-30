@@ -1,7 +1,14 @@
 /**
  * Verify that adding 'comment' field to any command shouldn't cause unexpected failures.
- * @tags: [requires_persistence, requires_capped, requires_wiredtiger, requires_journaling,
- * requires_replication, requires_sharding]
+ * @tags: [
+ *   requires_capped,
+ *   requires_journaling,
+ *   requires_persistence,
+ *   requires_replication,
+ *   requires_sharding,
+ *   requires_wiredtiger,
+ *   two_phase_index_builds_unsupported,
+ * ]
  */
 (function() {
 

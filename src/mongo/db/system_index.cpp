@@ -245,12 +245,35 @@ void createSystemIndexes(OperationContext* opCtx, Collection* collection) {
                 opCtx, v3SystemRolesIndexSpec.toBSON(), serverGlobalParams.featureCompatibility));
     }
     if (!indexSpec.isEmpty()) {
-        opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-            opCtx, ns, collection->uuid(), indexSpec, false /* fromMigrate */);
+        // Emit startIndexBuild and commitIndexBuild oplog entries if supported by the current FCV.
+        auto opObserver = opCtx->getServiceContext()->getOpObserver();
+        auto fromMigrate = false;
+        auto buildUUID = serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+                serverGlobalParams.featureCompatibility.getVersion() ==
+                    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44
+            ? boost::make_optional(UUID::gen())
+            : boost::none;
+
+        if (buildUUID) {
+            opObserver->onStartIndexBuild(
+                opCtx, ns, collection->uuid(), *buildUUID, {indexSpec}, fromMigrate);
+        }
+
+        // If two phase index builds are enabled, the index build will be coordinated using
+        // startIndexBuild and commitIndexBuild oplog entries.
+        if (!IndexBuildsCoordinator::get(opCtx)->supportsTwoPhaseIndexBuild()) {
+            opObserver->onCreateIndex(opCtx, ns, collection->uuid(), indexSpec, fromMigrate);
+        }
+
         // Note that the opObserver is called prior to creating the index.  This ensures the index
         // write gets the same storage timestamp as the oplog entry.
         fassert(40456,
                 collection->getIndexCatalog()->createIndexOnEmptyCollection(opCtx, indexSpec));
+
+        if (buildUUID) {
+            opObserver->onCommitIndexBuild(
+                opCtx, ns, collection->uuid(), *buildUUID, {indexSpec}, fromMigrate);
+        }
     }
 }
 

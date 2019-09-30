@@ -2614,8 +2614,10 @@ public:
             return;
         }
 
-        const LogicalTime indexCreateLt = futureLt.addTicks(1);
-        const Timestamp indexCreateTs = indexCreateLt.asTimestamp();
+        // The index build emits three oplog entries.
+        const Timestamp indexStartTs = futureLt.addTicks(1).asTimestamp();
+        const Timestamp indexCreateTs = futureLt.addTicks(2).asTimestamp();
+        const Timestamp indexCompleteTs = futureLt.addTicks(3).asTimestamp();
 
         NamespaceString nss("admin.system.users");
 
@@ -2638,7 +2640,9 @@ public:
         assertNamespaceInIdents(nss, pastTs, false);
         assertNamespaceInIdents(nss, presentTs, false);
         assertNamespaceInIdents(nss, futureTs, true);
+        assertNamespaceInIdents(nss, indexStartTs, true);
         assertNamespaceInIdents(nss, indexCreateTs, true);
+        assertNamespaceInIdents(nss, indexCompleteTs, true);
         assertNamespaceInIdents(nss, nullTs, true);
 
         result = queryOplog(BSON("op"
@@ -2655,7 +2659,11 @@ public:
         assertIdentsMissingAtTimestamp(durableCatalog, "", indexIdent, pastTs);
         assertIdentsMissingAtTimestamp(durableCatalog, "", indexIdent, presentTs);
         assertIdentsMissingAtTimestamp(durableCatalog, "", indexIdent, futureTs);
+        // This is the timestamp of the startIndexBuild oplog entry, which is timestamped before the
+        // index is created as part of the createIndexes oplog entry.
+        assertIdentsMissingAtTimestamp(durableCatalog, "", indexIdent, indexStartTs);
         assertIdentsExistAtTimestamp(durableCatalog, "", indexIdent, indexCreateTs);
+        assertIdentsExistAtTimestamp(durableCatalog, "", indexIdent, indexCompleteTs);
         assertIdentsExistAtTimestamp(durableCatalog, "", indexIdent, nullTs);
     }
 };
