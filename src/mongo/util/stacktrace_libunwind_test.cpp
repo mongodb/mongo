@@ -40,9 +40,9 @@
 
 #include <libunwind.h>
 
-#include "mongo/base/backtrace_visibility_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/stacktrace.h"
+#include "mongo/util/stacktrace_libunwind_test_functions.h"
 
 namespace mongo {
 
@@ -146,11 +146,11 @@ TEST(Unwind, Demangled) {
 }
 
 TEST(Unwind, Linkage) {
-    std::string stacktrace;
-
     // From backtrace_visibility_test.h. Calls a chain of functions and stores the backtrace at the
     // bottom in the "stacktrace" argument.
-    normal_function(stacktrace);
+    std::ostringstream os;
+    normalFunction(os);
+    std::string stacktrace = os.str();
 
     std::string_view view = stacktrace;
 
@@ -170,10 +170,10 @@ TEST(Unwind, Linkage) {
     // preceded our libunwind integration could *not* symbolize hidden/static_function.
     std::string frames[] = {
         "printStackTrace",
-        "static_function",
-        "anonymous_namespace_function",
-        "hidden_function",
-        "normal_function",
+        "staticFunction",
+        "anonymousNamespaceFunction",
+        "hiddenFunction",
+        "normalFunction",
     };
 
     for (const auto& name : frames) {

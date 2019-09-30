@@ -28,47 +28,16 @@
  */
 
 /**
- * This source file and its header are for testing that static, hidden, etc.
+ * This header and its source file are for testing that static, hidden, etc.
  * functions appear in backtraces, see unwind_test.cpp.
  */
 
-#include "backtrace_visibility_test.h"
+#include <ostream>
 
-#include "mongo/platform/compiler.h"
-#include "mongo/util/stacktrace.h"
+namespace mongo::unwind_test_detail {
 
-#include <sstream>
+// Generates a stack trace by calling functions of various visibility and linkage
+// Writes a stack trace to `s` from the deep call stack.
+void normalFunction(std::ostream& s);
 
-// "static" means internal linkage only for functions at namespace scope.
-MONGO_COMPILER_NOINLINE static void static_function(std::string& s) {
-    std::ostringstream ostream;
-    mongo::printStackTrace(ostream);
-    s = ostream.str();
-    // Prevent tail-call optimization.
-    asm volatile("");  // NOLINT
-}
-
-namespace {
-MONGO_COMPILER_NOINLINE void anonymous_namespace_function(std::string& s) {
-    static_function(s);
-    // Prevent tail-call optimization.
-    asm volatile("");  // NOLINT
-}
-}  // namespace
-
-MONGO_COMPILER_NOINLINE MONGO_COMPILER_API_HIDDEN_FUNCTION void hidden_function(std::string& s) {
-    anonymous_namespace_function(s);
-    // Prevent tail-call optimization.
-    asm volatile("");  // NOLINT
-}
-
-namespace mongo {
-
-namespace unwind_test_detail {
-MONGO_COMPILER_NOINLINE void normal_function(std::string& s) {
-    hidden_function(s);
-    // Prevent tail-call optimization.
-    asm volatile("");  // NOLINT
-}
-}  // namespace unwind_test_detail
-}  // namespace mongo
+}  // namespace mongo::unwind_test_detail

@@ -28,19 +28,43 @@
  */
 
 /**
- * This header and its source file are for testing that static, hidden, etc.
+ * This source file and its header are for testing that static, hidden, etc.
  * functions appear in backtraces, see unwind_test.cpp.
  */
 
-#include <string>
+#include "stacktrace_libunwind_test_functions.h"
+
+#include "mongo/platform/compiler.h"
+#include "mongo/util/stacktrace.h"
+
+#include <sstream>
+
+#define PREVENT_TAIL_CALL asm volatile("")  // NOLINT
+
+// "static" means internal linkage only for functions at namespace scope.
+MONGO_COMPILER_NOINLINE static void staticFunction(std::ostream& s) {
+    mongo::printStackTrace(s);
+    PREVENT_TAIL_CALL;
+}
+
+namespace {
+MONGO_COMPILER_NOINLINE void anonymousNamespaceFunction(std::ostream& s) {
+    staticFunction(s);
+    PREVENT_TAIL_CALL;
+}
+}  // namespace
+
+MONGO_COMPILER_NOINLINE MONGO_COMPILER_API_HIDDEN_FUNCTION void hiddenFunction(std::ostream& s) {
+    anonymousNamespaceFunction(s);
+    PREVENT_TAIL_CALL;
+}
 
 namespace mongo {
 
 namespace unwind_test_detail {
-
-// Store a stack trace in s.
-void normal_function(std::string& s);
-
+MONGO_COMPILER_NOINLINE void normalFunction(std::ostream& s) {
+    hiddenFunction(s);
+    PREVENT_TAIL_CALL;
+}
 }  // namespace unwind_test_detail
-
 }  // namespace mongo

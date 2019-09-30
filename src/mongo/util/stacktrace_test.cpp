@@ -38,7 +38,6 @@
 #include <sstream>
 #include <vector>
 
-#include "mongo/base/backtrace_visibility_test.h"
 #include "mongo/bson/json.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/stacktrace.h"

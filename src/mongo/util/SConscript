@@ -4,6 +4,7 @@ Import("endian")
 Import("env")
 Import("get_option")
 Import("has_option")
+Import("use_libunwind")
 Import("use_system_version_of_library")
 
 env = env.Clone()
@@ -636,3 +637,19 @@ env.CppUnitTest(
     LIBDEPS=[
     ],
 )
+
+if use_libunwind:
+    unwindTestEnv = env.Clone()
+    unwindTestEnv.InjectThirdParty(libraries=['unwind'])
+    unwindTestEnv.CppUnitTest(
+        target=[
+            'stacktrace_libunwind_test',
+        ],
+        source=[
+            'stacktrace_libunwind_test_functions.cpp',
+            'stacktrace_libunwind_test.cpp',
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/third_party/shim_unwind',
+        ],
+    )
