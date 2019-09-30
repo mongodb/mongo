@@ -122,6 +122,15 @@ cmdRes = db.runCommand({
 });
 assert.commandFailed(cmdRes);
 
+// Cannot use expressions in the projection part of findAndModify.
+cmdRes = db.runCommand({
+    findAndModify: "coll",
+    update: {a: 1},
+    fields: {b: {$ln: ['c']}},
+    upsert: true,
+});
+assert.commandFailedWithCode(cmdRes, ErrorCodes.BadValue);
+
 //
 // SERVER-17372
 //
