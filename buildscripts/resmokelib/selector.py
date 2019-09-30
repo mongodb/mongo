@@ -90,11 +90,12 @@ class TestFileExplorer(object):
 
     def list_dbtests(self, dbtest_binary):
         """List the available dbtests suites."""
-        returncode, stdout = self._run_program(dbtest_binary, ["--list"])
+        returncode, stdout, stderr = self._run_program(dbtest_binary, ["--list"])
 
         if returncode != 0:
-            raise errors.ResmokeError("Getting list of dbtest suites failed")
-
+            raise errors.ResmokeError("Getting list of dbtest suites failed"
+                                      ", dbtest_binary=`{}`: stdout=`{}`, stderr=`{}`".format(
+                                          dbtest_binary, stdout, stderr))
         return stdout.splitlines()
 
     @staticmethod
@@ -109,10 +110,9 @@ class TestFileExplorer(object):
         """
         command = [binary]
         command.extend(args)
-        program = subprocess.Popen(command, stdout=subprocess.PIPE)
-        stdout = program.communicate()[0]
-
-        return program.returncode, stdout.decode("utf-8")
+        program = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = program.communicate()
+        return program.returncode, stdout.decode("utf-8"), stderr.decode("utf-8")
 
     @staticmethod
     def parse_tag_file(test_kind):
