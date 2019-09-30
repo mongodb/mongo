@@ -56,15 +56,17 @@ ValidateState::ValidateState(OperationContext* opCtx,
                              bool background,
                              bool fullValidate)
     : _nss(nss), _background(background), _fullValidate(fullValidate) {
-    _databaseLock.emplace(opCtx, _nss.db(), MODE_IX);
-    _database = _databaseLock->getDb() ? _databaseLock->getDb() : nullptr;
 
     // Subsequent re-locks will use the UUID when 'background' is true.
     if (_background) {
-        _collectionLock.emplace(opCtx, _nss, MODE_IX);
+        _databaseLock.emplace(opCtx, _nss.db(), MODE_IS);
+        _collectionLock.emplace(opCtx, _nss, MODE_IS);
     } else {
+        _databaseLock.emplace(opCtx, _nss.db(), MODE_IX);
         _collectionLock.emplace(opCtx, _nss, MODE_X);
     }
+
+    _database = _databaseLock->getDb() ? _databaseLock->getDb() : nullptr;
     _collection = _database ? _database->getCollection(opCtx, _nss) : nullptr;
 
     if (!_collection) {
@@ -228,7 +230,7 @@ void ValidateState::_relockDatabaseAndCollection(OperationContext* opCtx) {
         << "Interrupted due to: database drop: " << _nss.db()
         << " while validating collection: " << _nss << " (" << *_uuid << ")";
 
-    _databaseLock.emplace(opCtx, _nss.db(), MODE_IX);
+    _databaseLock.emplace(opCtx, _nss.db(), MODE_IS);
     _database = DatabaseHolder::get(opCtx)->getDb(opCtx, _nss.db());
     uassert(ErrorCodes::Interrupted, dbErrMsg, _database);
     uassert(ErrorCodes::Interrupted, dbErrMsg, !_database->isDropPending(opCtx));
@@ -238,7 +240,7 @@ void ValidateState::_relockDatabaseAndCollection(OperationContext* opCtx) {
 
     try {
         NamespaceStringOrUUID nssOrUUID(std::string(_nss.db()), *_uuid);
-        _collectionLock.emplace(opCtx, nssOrUUID, MODE_IX);
+        _collectionLock.emplace(opCtx, nssOrUUID, MODE_IS);
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         uasserted(ErrorCodes::Interrupted, collErrMsg);
     }
