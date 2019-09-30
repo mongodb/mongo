@@ -704,7 +704,7 @@ functions:
       silent: true
       script: |
         cat <<EOF > win_mount.sh
-        net use X: '\\\\${win_scons_endpoint}\\share' /USER:${win_scons_user} '${win_scons_pass}'
+        net use X: '\\\\${win_scons_endpoint}\\share' /USER:"wincache.build.com\${win_scons_user}" '${win_scons_pass}'
         EOF
         chmod +x win_mount.sh
 
