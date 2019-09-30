@@ -32,6 +32,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/pipeline/expression_javascript.h"
+#include "mongo/db/query/query_knobs_gen.h"
 
 namespace mongo {
 
@@ -62,7 +63,8 @@ ExpressionInternalJsEmit::ExpressionInternalJsEmit(
     std::string funcSource)
     : Expression(expCtx, {std::move(thisRef)}),
       _thisRef(_children[0]),
-      _funcSource(std::move(funcSource)) {}
+      _funcSource(std::move(funcSource)),
+      _byteLimit(internalQueryMaxJsEmitBytes.load()) {}
 
 void ExpressionInternalJsEmit::_doAddDependencies(mongo::DepsTracker* deps) const {
     _children[0]->addDependencies(deps);
@@ -137,7 +139,13 @@ Value ExpressionInternalJsEmit::evaluate(const Document& root, Variables* variab
 
     std::vector<Value> output;
 
+    size_t bytesUsed = 0;
     for (const auto& obj : emittedObjects) {
+        bytesUsed += obj.objsize();
+        uassert(31292,
+                str::stream() << "Size of emitted values exceeds the set size limit of "
+                              << _byteLimit << " bytes",
+                bytesUsed < _byteLimit);
         output.push_back(Value(obj));
     }
 

@@ -36,6 +36,7 @@ const expectedParamDefaults = {
     internalDocumentSourceLookupCacheSizeBytes: 100 * 1024 * 1024,
     internalLookupStageIntermediateDocumentMaxSizeBytes: 100 * 1024 * 1024,
     internalDocumentSourceGroupMaxMemoryBytes: 100 * 1024 * 1024,
+    internalQueryMaxJsEmitBytes: 100 * 1024 * 1024,
     // Should be half the value of 'internalQueryExecYieldIterations' parameter.
     internalInsertMaxBatchSize: 64,
     internalQueryPlannerGenerateCoveredWholeIndexScans: false,
@@ -139,6 +140,10 @@ assertSetParameterFails("internalQueryFacetBufferSizeBytes", -1);
 assertSetParameterSucceeds("internalDocumentSourceGroupMaxMemoryBytes", 11);
 assertSetParameterFails("internalDocumentSourceGroupMaxMemoryBytes", 0);
 assertSetParameterFails("internalDocumentSourceGroupMaxMemoryBytes", -1);
+
+assertSetParameterSucceeds("internalQueryMaxJsEmitBytes", 10);
+assertSetParameterFails("internalQueryMaxJsEmitBytes", 0);
+assertSetParameterFails("internalQueryMaxJsEmitBytes", -1);
 
 // Internal BSON max object size is slightly larger than the max user object size, to
 // accommodate command metadata.

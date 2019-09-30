@@ -75,6 +75,8 @@ private:
     std::string _funcSource;
 
     static constexpr auto kExpressionName = "$_internalJsEmit"_sd;
+
+    size_t _byteLimit;
 };
 
 /**

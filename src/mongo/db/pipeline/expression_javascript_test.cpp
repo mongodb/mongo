@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/process_interface_standalone.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/unittest/unittest.h"
@@ -235,5 +236,16 @@ TEST_F(MapReduceFixture, ExpressionInternalJsEmitFailsIfEvalIsNotCorrectType) {
         31224);
 }
 
+TEST_F(MapReduceFixture, ExpressionInternalJsErrorsIfProducesTooManyDocumentsForNonDefaultValue) {
+    internalQueryMaxJsEmitBytes.store(1);
+    auto bsonExpr =
+        BSON("expr" << BSON("this"
+                            << "$$ROOT"
+                            << "eval"
+                            << "function() {for (var i = 0; i < this.val; ++i) {emit(i, 1);}}"));
+    auto expr = ExpressionInternalJsEmit::parse(getExpCtx(), bsonExpr.firstElement(), getVPS());
+    ASSERT_THROWS_CODE(
+        expr->evaluate(Document{BSON("val" << 1)}, getVariables()), AssertionException, 31292);
+}
 }  // namespace
 }  // namespace mongo
