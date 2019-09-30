@@ -229,9 +229,6 @@ selector:
   - jstests/core/max_time_ms.js
   - jstests/core/oro.js
 
-  # Expects certain number of operations in the system.profile collection.
-  - jstests/core/profile*.js
-
   # Parallel Shell - we do not signal the override to end a txn when a parallel shell closes.
   - jstests/core/awaitdata_getmore_cmd.js
   - jstests/core/background_validation.js
@@ -271,6 +268,7 @@ selector:
   - assumes_write_concern_unchanged
   # Transactions are not allowed to operate on capped collections.
   - requires_capped
+  - requires_profiling
   # Retrying a query can change whether a plan cache entry is active.
   - inspects_whether_plan_cache_entry_is_active
 

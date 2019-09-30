@@ -9,7 +9,6 @@ selector:
   # The following tests fail because a certain command or functionality is not supported by
   # mongos. This command or functionality is placed in a comment next to the failing test.
   - jstests/core/apitest_db.js  # serverStatus output doesn't have storageEngine.
-  - jstests/core/apitest_db_profile_level.js  # profiling.
   - jstests/core/apply_ops*.js  # applyOps, SERVER-1439.
   - jstests/core/awaitdata_getmore_cmd.js  # capped collections.
   - jstests/core/bypass_doc_validation.js  # sharded $out output not permitted
@@ -33,7 +32,6 @@ selector:
   - jstests/core/max_time_ms.js  # sleep, SERVER-2212.
   - jstests/core/mr_replaceIntoDB.js  # MapReduceResult, SERVER-20495.
   - jstests/core/notablescan.js  # notablescan.
-  - jstests/core/profile*.js  # profiling.
   - jstests/core/queryoptimizera.js  # "local" database.
   - jstests/core/rename*.js # renameCollection.
   - jstests/core/stages*.js  # stageDebug.
@@ -113,6 +111,8 @@ selector:
   - assumes_no_implicit_index_creation
   - assumes_unsharded_collection
   - cannot_create_unique_index_when_using_hashed_shard_key
+  # system.profile collection doesn't exist on mongos.
+  - requires_profiling
 
 executor:
   archive:

@@ -13,7 +13,6 @@ selector:
   # The following tests fail because a certain command or functionality is not supported by
   # mongos. This command or functionality is placed in a comment next to the failing test.
   - jstests/core/apitest_db.js  # serverStatus output doesn't have storageEngine.
-  - jstests/core/apitest_db_profile_level.js  # profiling.
   - jstests/core/apply_ops*.js  # applyOps, SERVER-1439.
   - jstests/core/bypass_doc_validation.js  # sharded $out output not permitted
   - jstests/core/capped*.js  # capped collections.
@@ -33,7 +32,6 @@ selector:
   - jstests/core/index_id_options.js  # "local" database.
   - jstests/core/index9.js  # "local" database.
   - jstests/core/mr_replaceIntoDB.js  # MapReduceResult, SERVER-20495.
-  - jstests/core/profile*.js  # profiling.
   - jstests/core/queryoptimizera.js  # "local" database.
   - jstests/core/rename*.js # renameCollection.
   - jstests/core/stages*.js  # stageDebug.
@@ -81,7 +79,6 @@ selector:
   - jstests/core/geo_mapreduce2.js
   - jstests/core/geo_big_polygon3.js
   - jstests/core/mr*.js
-  - jstests/core/profile_mapreduce.js
   - jstests/core/collation.js
   - jstests/core/loadserverscripts.js
   - jstests/core/commands_namespace_parsing.js
@@ -123,7 +120,6 @@ selector:
   # The in memory structures are not causally consistent. Details are in DOCS-10626
   - jstests/core/apitest_dbcollection.js
   - jstests/core/getmore_invalidated_cursors.js
-  - jstests/core/system_profile.js
   - jstests/core/orf.js #explain.executionStats is not CC
   # The `dbstats` command builds in-memory structures that are not causally consistent.
   - jstests/core/dbstats.js
@@ -151,6 +147,8 @@ selector:
   #  non-replicated collection: ..."
   - assumes_read_preference_unchanged
   - does_not_support_causal_consistency
+  # system.profile collection doesn't exist on mongos.
+  - requires_profiling
 
 executor:
   archive:

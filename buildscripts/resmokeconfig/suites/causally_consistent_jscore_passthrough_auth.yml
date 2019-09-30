@@ -18,7 +18,6 @@ selector:
   # Skip any tests that run with auth explicitly.
   - jstests/core/*[aA]uth*.js
   # Skip any tests that require privileges for non test databases.
-  - jstests/core/system_profile.js
   # Cannot specify afterClusterTime and afterOpTime.
   - jstests/core/read_after_optime.js
   # Not expected to pass with replica-sets.
@@ -29,7 +28,6 @@ selector:
   # The following tests fail because a certain command or functionality is not supported on
   # mongos. This command or functionality is placed in a comment next to the failing test.
   - jstests/core/apitest_db.js  # serverStatus output doesn't have storageEngine.
-  - jstests/core/apitest_db_profile_level.js  # profiling.
   - jstests/core/apply_ops*.js  # applyOps, SERVER-1439.
   - jstests/core/capped_convertToCapped1.js  # cloneCollectionAsCapped.
   - jstests/core/capped_empty.js  # emptycapped.
@@ -49,7 +47,6 @@ selector:
   - jstests/core/geo_update_btree2.js  # notablescan.
   - jstests/core/index_id_options.js  # "local" database.
   - jstests/core/index9.js  # "local" database.
-  - jstests/core/profile*.js  # profiling.
   - jstests/core/queryoptimizera.js  # "local" database.
   - jstests/core/stages*.js  # stageDebug.
   # The following tests fail because mongos behaves differently from mongod when testing certain
@@ -70,7 +67,6 @@ selector:
   - jstests/core/geo_mapreduce2.js
   - jstests/core/geo_big_polygon3.js
   - jstests/core/mr*.js
-  - jstests/core/profile_mapreduce.js
   - jstests/core/collation.js
   - jstests/core/loadserverscripts.js
   - jstests/core/bypass_doc_validation.js
@@ -147,6 +143,9 @@ selector:
   - creates_and_authenticates_user
   - does_not_support_causal_consistency
   - requires_collstats
+  # The system.profile collection is not replicated. So the reads from secondaries will not be
+  # consistent with primary.
+  - requires_profiling
 
 executor:
   archive:

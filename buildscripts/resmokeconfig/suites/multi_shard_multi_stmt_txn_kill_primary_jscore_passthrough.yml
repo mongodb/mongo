@@ -10,7 +10,6 @@ selector:
   # The following tests fail because a certain command or functionality is not supported by
   # mongos. This command or functionality is placed in a comment next to the failing test.
   - jstests/core/apitest_db.js  # serverStatus output doesn't have storageEngine.
-  - jstests/core/apitest_db_profile_level.js  # profiling.
   - jstests/core/apply_ops*.js  # applyOps, SERVER-1439.
   - jstests/core/awaitdata_getmore_cmd.js  # capped collections.
   - jstests/core/bypass_doc_validation.js  # sharded $out output not permitted
@@ -34,7 +33,6 @@ selector:
   - jstests/core/max_time_ms.js  # sleep, SERVER-2212.
   - jstests/core/mr_replaceIntoDB.js  # MapReduceResult, SERVER-20495.
   - jstests/core/notablescan.js  # notablescan.
-  - jstests/core/profile*.js  # profiling.
   - jstests/core/queryoptimizera.js  # "local" database.
   - jstests/core/rename*.js # renameCollection.
   - jstests/core/stages*.js  # stageDebug.
@@ -298,9 +296,6 @@ selector:
   - jstests/core/max_time_ms.js
   - jstests/core/oro.js
 
-  # Expects certain number of operations in the system.profile collection.
-  - jstests/core/profile*.js
-
   # Parallel Shell - we do not signal the override to end a txn when a parallel shell closes.
   - jstests/core/awaitdata_getmore_cmd.js
   - jstests/core/compact_keeps_indexes.js
@@ -410,7 +405,9 @@ selector:
   - requires_collstats
   # "Cowardly fail if unbounded dataSize is run with a mongod that had an unclean shutdown: ..."
   - requires_datasize
-
+  # system.profile collection doesn't exist on mongos. Also, transactions are not allowed to operate
+  # on capped collections.
+  - requires_profiling
   # Retrying a query can change whether a plan cache entry is active.
   - inspects_whether_plan_cache_entry_is_active
 
