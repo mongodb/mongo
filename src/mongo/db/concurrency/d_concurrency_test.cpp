@@ -2302,5 +2302,21 @@ TEST_F(DConcurrencyTestFixture, FailPointInLockDoesNotFailUninterruptibleNonInte
     locker1.unlockGlobal();
 }
 
+TEST_F(DConcurrencyTestFixture, PBWMRespectsMaxTimeMS) {
+    auto clientOpCtxPairs = makeKClientsWithLockers(2);
+    auto opCtx1 = clientOpCtxPairs[0].second.get();
+    auto opCtx2 = clientOpCtxPairs[1].second.get();
+
+    Lock::ResourceLock pbwm1(opCtx1->lockState(), resourceIdParallelBatchWriterMode);
+    pbwm1.lock(MODE_X);
+
+    opCtx2->setDeadlineAfterNowBy(Seconds{1}, ErrorCodes::ExceededTimeLimit);
+
+    Lock::ResourceLock pbwm2(opCtx2->lockState(), resourceIdParallelBatchWriterMode);
+
+    ASSERT_THROWS_CODE(
+        pbwm2.lock(opCtx2, MODE_X), AssertionException, ErrorCodes::ExceededTimeLimit);
+}
+
 }  // namespace
 }  // namespace mongo

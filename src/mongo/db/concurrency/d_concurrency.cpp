@@ -150,7 +150,7 @@ Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
 
     try {
         if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
-            _pbwm.lock(MODE_IS);
+            _pbwm.lock(opCtx, MODE_IS);
         }
         auto unlockPBWM = makeGuard([this] {
             if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
@@ -314,8 +314,12 @@ Lock::ParallelBatchWriterMode::ParallelBatchWriterMode(Locker* lockState)
       _shouldNotConflictBlock(lockState) {}
 
 void Lock::ResourceLock::lock(LockMode mode) {
+    lock(nullptr, mode);
+}
+
+void Lock::ResourceLock::lock(OperationContext* opCtx, LockMode mode) {
     invariant(_result == LOCK_INVALID);
-    _locker->lock(_rid, mode);
+    _locker->lock(opCtx, _rid, mode);
     _result = LOCK_OK;
 }
 

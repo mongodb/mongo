@@ -34,6 +34,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -91,6 +92,13 @@ public:
         }
     }
 
+    void _sleepInPBWM(mongo::OperationContext* opCtx, long long millis) {
+        Lock::ResourceLock pbwm(opCtx->lockState(), resourceIdParallelBatchWriterMode);
+        pbwm.lock(MODE_X);
+        opCtx->sleepFor(Milliseconds(millis));
+        pbwm.unlock();
+    }
+
     CmdSleep() : BasicCommand("sleep") {}
     bool run(OperationContext* opCtx,
              const std::string& ns,
@@ -142,6 +150,11 @@ public:
             StringData lockTarget;
             if (cmdObj["lockTarget"]) {
                 lockTarget = cmdObj["lockTarget"].checkAndGetStringData();
+            }
+
+            if (lockTarget == "ParallelBatchWriterMode") {
+                _sleepInPBWM(opCtx, msRemaining.count());
+                continue;
             }
 
             if (!cmdObj["lock"]) {

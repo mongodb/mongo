@@ -98,7 +98,8 @@ public:
             }
         }
 
-        void lock(LockMode mode);
+        void lock(LockMode mode);                           // Uninterruptible
+        void lock(OperationContext* opCtx, LockMode mode);  // Interruptible
         void unlock();
 
         bool isLocked() const {
