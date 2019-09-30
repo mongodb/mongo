@@ -204,12 +204,8 @@ Status SyncTailTest::runOpSteadyState(const OplogEntry& op) {
 }
 
 Status SyncTailTest::runOpsSteadyState(std::vector<OplogEntry> ops) {
-    SyncTail syncTail(nullptr,
-                      getConsistencyMarkers(),
-                      getStorageInterface(),
-                      SyncTail::MultiSyncApplyFunc(),
-                      nullptr,
-                      OplogApplier::Options(OplogApplication::Mode::kSecondary));
+    SyncTail syncTail(
+        nullptr, getStorageInterface(), OplogApplier::Options(OplogApplication::Mode::kSecondary));
     MultiApplier::OperationPtrs opsPtrs;
     for (auto& op : ops) {
         opsPtrs.push_back(&op);
@@ -224,10 +220,7 @@ Status SyncTailTest::runOpInitialSync(const OplogEntry& op) {
 
 Status SyncTailTest::runOpsInitialSync(std::vector<OplogEntry> ops) {
     SyncTail syncTail(nullptr,
-                      getConsistencyMarkers(),
                       getStorageInterface(),
-                      SyncTail::MultiSyncApplyFunc(),
-                      nullptr,
                       repl::OplogApplier::Options(repl::OplogApplication::Mode::kInitialSync));
     // Apply each operation in a batch of one because 'ops' may contain a mix of commands and CRUD
     // operations provided by idempotency tests.
@@ -245,10 +238,7 @@ Status SyncTailTest::runOpsInitialSync(std::vector<OplogEntry> ops) {
 
 Status SyncTailTest::runOpPtrsInitialSync(MultiApplier::OperationPtrs ops) {
     SyncTail syncTail(nullptr,
-                      getConsistencyMarkers(),
                       getStorageInterface(),
-                      SyncTail::MultiSyncApplyFunc(),
-                      nullptr,
                       repl::OplogApplier::Options(repl::OplogApplication::Mode::kInitialSync));
     // Apply each operation in a batch of one because 'ops' may contain a mix of commands and CRUD
     // operations provided by idempotency tests.

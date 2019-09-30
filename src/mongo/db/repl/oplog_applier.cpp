@@ -73,8 +73,6 @@ Future<void> OplogApplier::startup() {
 }
 
 void OplogApplier::shutdown() {
-    _shutdown();
-
     stdx::lock_guard<Latch> lock(_mutex);
     _inShutdown = true;
 }

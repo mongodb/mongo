@@ -500,6 +500,23 @@ env.Library(
     ],
 )
 
+
+env.Library(
+    target='oplog_applier_impl_test_fixture',
+    source=[
+        'oplog_applier_impl_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        'drop_pending_collection_reaper',
+        'oplog_application',
+        'replmocks',
+        'storage_interface_impl',
+        '$BUILD_DIR/mongo/db/catalog/document_validation',
+        '$BUILD_DIR/mongo/db/s/op_observer_sharding_impl',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+    ],
+)
+
 env.Library(
     target='oplog_application_interface',
     source=[
@@ -1231,6 +1248,7 @@ env.CppUnitTest(
         'isself_test.cpp',
         'member_config_test.cpp',
         'multiapplier_test.cpp',
+        'oplog_applier_impl_test.cpp',
         'oplog_applier_test.cpp',
         'oplog_buffer_collection_test.cpp',
         'oplog_buffer_proxy_test.cpp',
@@ -1304,6 +1322,7 @@ env.CppUnitTest(
         'multiapplier',
         'oplog',
         'oplog_application_interface',
+        'oplog_applier_impl_test_fixture',
         'oplog_buffer_collection',
         'oplog_buffer_proxy',
         'oplog_entry',

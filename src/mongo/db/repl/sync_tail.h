@@ -66,12 +66,6 @@ class OpTime;
  */
 class SyncTail {
 public:
-    using MultiSyncApplyFunc =
-        std::function<Status(OperationContext* opCtx,
-                             MultiApplier::OperationPtrs* ops,
-                             SyncTail* st,
-                             WorkerMultikeyPathInfo* workerMultikeyPathInfo)>;
-
     /**
      *
      * Constructs a SyncTail.
@@ -82,10 +76,7 @@ public:
      * of operations using 'func'. The writer thread pool is not owned by us.
      */
     SyncTail(OplogApplier::Observer* observer,
-             ReplicationConsistencyMarkers* consistencyMarkers,
              StorageInterface* storageInterface,
-             MultiSyncApplyFunc func,
-             ThreadPool* writerPool,
              const OplogApplier::Options& options);
     virtual ~SyncTail();
 
@@ -94,34 +85,7 @@ public:
      */
     const OplogApplier::Options& getOptions() const;
 
-    /**
-     * Shuts down oplogApplication() processing.
-     */
-    void shutdown();
-
-    /**
-     * Returns true if we are shutting down.
-     */
-    bool inShutdown() const;
-
-
     using BatchLimits = OplogApplier::BatchLimits;
-
-    /**
-     * Applies a batch of oplog entries by writing the oplog entries to the local oplog and then
-     * using a set of threads to apply the operations. It will only apply (but will
-     * still write to the oplog) oplog entries with a timestamp greater than or equal to the
-     * beginApplyingTimestamp.
-     *
-     * If the batch application is successful, returns the optime of the last op applied, which
-     * should be the last op in the batch.
-     * Returns ErrorCodes::CannotApplyOplogWhilePrimary if the node has become primary.
-     *
-     * To provide crash resilience, this function will advance the persistent value of 'minValid'
-     * to at least the last optime of the batch. If 'minValid' is already greater than or equal
-     * to the last optime of this batch, it will not be updated.
-     */
-    StatusWith<OpTime> multiApply(OperationContext* opCtx, MultiApplier::Operations ops);
 
     void fillWriterVectors(OperationContext* opCtx,
                            MultiApplier::Operations* ops,
@@ -130,7 +94,6 @@ public:
 
 private:
     OplogApplier::Observer* const _observer;
-    ReplicationConsistencyMarkers* const _consistencyMarkers;
     StorageInterface* const _storageInterface;
 
     void _deriveOpsAndFillWriterVectors(OperationContext* opCtx,
@@ -138,21 +101,12 @@ private:
                                         std::vector<MultiApplier::OperationPtrs>* writerVectors,
                                         std::vector<MultiApplier::Operations>* derivedOps,
                                         SessionUpdateTracker* sessionUpdateTracker) noexcept;
-    // Function to use during applyOps
-    MultiSyncApplyFunc _applyFunc;
-
-    // Pool of worker threads for writing ops to the databases.
-    // Not owned by us.
-    ThreadPool* const _writerPool;
 
     // Used to configure multiApply() behavior.
     const OplogApplier::Options _options;
 
     // Protects member data of SyncTail.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("SyncTail::_mutex");
-
-    // Set to true if shutdown() has been called.
-    bool _inShutdown = false;
 };
 
 /**

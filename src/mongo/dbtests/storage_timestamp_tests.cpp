@@ -1308,9 +1308,10 @@ public:
             nullptr,  // task executor. not required for multiApply().
             nullptr,  // oplog buffer. not required for multiApply().
             &observer,
-            nullptr,  // replication coordinator. not required for multiApply().
+            _coordinatorMock,
             _consistencyMarkers,
             storageInterface,
+            repl::multiSyncApply,
             repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
             writerPool.get());
         ASSERT_EQUALS(op2.getOpTime(), unittest::assertGet(oplogApplier.multiApply(_opCtx, ops)));
@@ -1392,9 +1393,10 @@ public:
             nullptr,  // task executor. not required for multiApply().
             nullptr,  // oplog buffer. not required for multiApply().
             &observer,
-            nullptr,  // replication coordinator. not required for multiApply().
+            _coordinatorMock,
             _consistencyMarkers,
             storageInterface,
+            repl::multiSyncApply,
             repl::OplogApplier::Options(repl::OplogApplication::Mode::kInitialSync),
             writerPool.get());
         auto lastTime = unittest::assertGet(oplogApplier.multiApply(_opCtx, ops));
@@ -2440,17 +2442,21 @@ public:
                                                    << "ns" << ns.ns() << "ui" << uuid << "wall"
                                                    << Date_t() << "o" << doc0));
 
+        DoNothingOplogApplierObserver observer;
         // Apply the operation.
         auto storageInterface = repl::StorageInterface::get(_opCtx);
         auto writerPool = repl::makeReplWriterPool(1);
-        repl::SyncTail syncTail(
-            nullptr,
+        repl::OplogApplierImpl oplogApplier(
+            nullptr,  // task executor. not required for multiApply().
+            nullptr,  // oplog buffer. not required for multiApply().
+            &observer,
+            _coordinatorMock,
             _consistencyMarkers,
             storageInterface,
             applyOperationFn,
-            writerPool.get(),
-            repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary));
-        auto lastOpTime = unittest::assertGet(syncTail.multiApply(_opCtx, {insertOp}));
+            repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+            writerPool.get());
+        auto lastOpTime = unittest::assertGet(oplogApplier.multiApply(_opCtx, {insertOp}));
         ASSERT_EQ(insertOp.getOpTime(), lastOpTime);
 
         joinGuard.dismiss();

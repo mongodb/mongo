@@ -360,9 +360,10 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
     OplogApplierImpl oplogApplier(nullptr,
                                   &oplogBuffer,
                                   &stats,
-                                  nullptr,
+                                  ReplicationCoordinator::get(opCtx),
                                   _consistencyMarkers,
                                   _storageInterface,
+                                  multiSyncApply,
                                   OplogApplier::Options(OplogApplication::Mode::kRecovering),
                                   writerPool.get());
 

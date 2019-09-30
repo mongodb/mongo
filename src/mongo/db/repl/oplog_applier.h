@@ -196,13 +196,6 @@ private:
     virtual void _run(OplogBuffer* oplogBuffer) = 0;
 
     /**
-     * Called from shutdown to signals oplog application loop to stop running.
-     * Currently applicable to steady state replication only.
-     * Implemented in subclasses but not visible otherwise.
-     */
-    virtual void _shutdown() = 0;
-
-    /**
      * Called from multiApply() to apply a batch of operations in parallel.
      * Implemented in subclasses but not visible otherwise.
      */

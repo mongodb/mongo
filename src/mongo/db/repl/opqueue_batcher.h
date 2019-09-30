@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/repl/initial_syncer.h"
-#include "mongo/db/repl/sync_tail.h"
+#include "mongo/db/repl/oplog_applier_impl.h"
 
 namespace mongo {
 namespace repl {
@@ -122,7 +122,7 @@ public:
     /**
      * Constructs an OpQueueBatcher
      */
-    OpQueueBatcher(SyncTail* syncTail,
+    OpQueueBatcher(OplogApplier* oplogApplier,
                    StorageInterface* storageInterface,
                    OplogBuffer* oplogBuffer,
                    OplogApplier::GetNextApplierBatchFn getNextApplierBatchFn);
@@ -143,7 +143,7 @@ private:
 
     void run();
 
-    SyncTail* const _syncTail;
+    OplogApplier* _oplogApplier;
     StorageInterface* const _storageInterface;
     OplogBuffer* const _oplogBuffer;
     OplogApplier::GetNextApplierBatchFn const _getNextApplierBatchFn;

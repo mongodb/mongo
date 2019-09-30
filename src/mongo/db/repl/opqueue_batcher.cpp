@@ -36,11 +36,11 @@ namespace mongo {
 namespace repl {
 
 
-OpQueueBatcher::OpQueueBatcher(SyncTail* syncTail,
+OpQueueBatcher::OpQueueBatcher(OplogApplier* oplogApplier,
                                StorageInterface* storageInterface,
                                OplogBuffer* oplogBuffer,
                                OplogApplier::GetNextApplierBatchFn getNextApplierBatchFn)
-    : _syncTail(syncTail),
+    : _oplogApplier(oplogApplier),
       _storageInterface(storageInterface),
       _oplogBuffer(oplogBuffer),
       _getNextApplierBatchFn(getNextApplierBatchFn),
@@ -126,7 +126,7 @@ void OpQueueBatcher::run() {
 
             // If we don't have anything in the queue, wait a bit for something to appear.
             if (oplogEntries.empty()) {
-                if (_syncTail->inShutdown()) {
+                if (_oplogApplier->inShutdown()) {
                     ops.setMustShutdownFlag();
                 } else {
                     // Block up to 1 second.

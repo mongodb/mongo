@@ -53,6 +53,11 @@ class OplogApplierImpl : public OplogApplier {
     OplogApplierImpl& operator=(const OplogApplierImpl&) = delete;
 
 public:
+    using MultiSyncApplyFunc =
+        std::function<Status(OperationContext* opCtx,
+                             MultiApplier::OperationPtrs* ops,
+                             SyncTail* st,
+                             WorkerMultikeyPathInfo* workerMultikeyPathInfo)>;
     /**
      * Constructs this OplogApplier with specific options.
      * Obtains batches of operations from the OplogBuffer to apply.
@@ -64,13 +69,12 @@ public:
                      ReplicationCoordinator* replCoord,
                      ReplicationConsistencyMarkers* consistencyMarkers,
                      StorageInterface* storageInterface,
+                     MultiSyncApplyFunc func,
                      const Options& options,
                      ThreadPool* writerPool);
 
 private:
     void _run(OplogBuffer* oplogBuffer) override;
-
-    void _shutdown() override;
 
     /**
      * Runs oplog application in a loop until shutdown() is called.
@@ -80,16 +84,37 @@ private:
     void _runLoop(OplogBuffer* oplogBuffer,
                   OplogApplier::GetNextApplierBatchFn getNextApplierBatchFn);
 
-    StatusWith<OpTime> _multiApply(OperationContext* opCtx, Operations ops) override;
+    /**
+     * Applies a batch of oplog entries by writing the oplog entries to the local oplog and then
+     * using a set of threads to apply the operations. It writes all entries to the oplog, but only
+     * applies entries with timestamp >= beginApplyingTimestamp.
+     *
+     * If the batch application is successful, returns the optime of the last op applied, which
+     * should be the last op in the batch.
+     * Returns ErrorCodes::CannotApplyOplogWhilePrimary if the node has become primary.
+     *
+     * To provide crash resilience, this function will advance the persistent value of 'minValid'
+     * to at least the last optime of the batch. If 'minValid' is already greater than or equal
+     * to the last optime of this batch, it will not be updated.
+     */
+    StatusWith<OpTime> _multiApply(OperationContext* opCtx, MultiApplier::Operations ops);
 
     // Not owned by us.
     ReplicationCoordinator* const _replCoord;
+
+    // Pool of worker threads for writing ops to the databases.
+    // Not owned by us.
+    ThreadPool* const _writerPool;
 
     StorageInterface* _storageInterface;
 
     ReplicationConsistencyMarkers* const _consistencyMarkers;
 
+    // Function to use during _multiApply
+    MultiSyncApplyFunc _applyFunc;
+
     // Used to run oplog application loop.
+    // TODO (SERVER-43651): Remove this member once sync_tail.cpp is fully merged in.
     SyncTail _syncTail;
 
     // Used to determine which operations should be applied during initial sync. If this is null,

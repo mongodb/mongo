@@ -382,10 +382,7 @@ void IdempotencyTest::testOpsAreIdempotent(std::vector<OplogEntry> ops, Sequence
     }
 
     SyncTail syncTail(nullptr,  // observer
-                      nullptr,  // consistency markers
                       nullptr,  // storage interface
-                      SyncTail::MultiSyncApplyFunc(),
-                      nullptr,  // writer pool
                       repl::OplogApplier::Options(repl::OplogApplication::Mode::kInitialSync));
     std::vector<MultiApplier::OperationPtrs> writerVectors(1);
     std::vector<MultiApplier::Operations> derivedOps;
