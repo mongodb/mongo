@@ -87,7 +87,7 @@ selector:
   - jstests/core/optimized_match_explain.js
   - jstests/core/sort_array.js
   # TODO: SERVER-16605 MapReduce into sharded collection with hashed index fails
-  - jstests/core/mr_correctness.js
+  - jstests/core/mr1.js
   - jstests/core/mr3.js
   - jstests/core/mr4.js
   # Create index command arbitrarily picks one of the errors if there are multiple errors from the
