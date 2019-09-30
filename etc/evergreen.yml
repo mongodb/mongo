@@ -7329,17 +7329,6 @@ tasks:
       fallback_num_sub_suites: 15
 
 - <<: *task_template
-  name: replica_sets_multiversion
-  tags: ["random_multiversion_replica_sets"]
-  commands:
-  - func: "do setup"
-  - func: "do multiversion setup"
-  - func: "run tests"
-    vars:
-      task_path_suffix: /data/multiversion
-      resmoke_args: --suites=replica_sets_multiversion --dryRun=tests --storageEngine=wiredTiger
-
-- <<: *task_template
   name: sasl
   commands:
   - func: "do setup"
@@ -8983,7 +8972,6 @@ buildvariants:
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: .multiversion_passthrough
-  - name: .random_multiversion_replica_sets
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
@@ -10818,7 +10806,6 @@ buildvariants:
   - name: .jstestfuzz !.flow_control
   - name: .logical_session_cache .repl
   - name: multiversion
-  - name: .random_multiversion_replica_sets
   - name: .read_write_concern .large
     distros:
     - rhel62-large
@@ -10997,7 +10984,6 @@ buildvariants:
     - name: multiversion
     - name: .multiversion_passthrough
     - name: .query_fuzzer
-    - name: .random_multiversion_replica_sets
     - name: .read_write_concern
     - name: .replica_sets
     - name: .read_only
@@ -12630,7 +12616,6 @@ buildvariants:
   - name: multiversion
   - name: .multiversion_passthrough
   - name: .query_fuzzer
-  - name: .random_multiversion_replica_sets
   - name: .read_write_concern
   - name: replica_sets_large_txns_format_gen
   - name: replica_sets_large_txns_format_jscore_passthrough
@@ -12718,7 +12703,6 @@ buildvariants:
   - name: .multi_shard .common
   - name: multiversion
   - name: .multiversion_passthrough
-  - name: .random_multiversion_replica_sets
   - name: .read_write_concern
   - name: replica_sets_large_txns_format_gen
   - name: replica_sets_large_txns_format_jscore_passthrough

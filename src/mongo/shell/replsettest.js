@@ -577,13 +577,6 @@ var ReplSetTest = function(opts) {
         }
 
         var nodes = [];
-
-        if (jsTest.options().randomBinVersions) {
-            // Set the random seed to the value passed in by TestData. The seed is undefined
-            // by default.
-            Random.setRandomSeed(jsTest.options().seed);
-        }
-
         for (var n = 0; n < this.ports.length; n++) {
             nodes.push(this.start(n, options, restart));
         }
@@ -2334,10 +2327,6 @@ var ReplSetTest = function(opts) {
             dbpath: "$set-$node"
         };
 
-        if (options && options.binVersion && jsTest.options().randomBinVersions) {
-            throw new Error("Can only specify one of binVersion and randomBinVersion, not both.");
-        }
-
         //
         // Note : this replaces the binVersion of the shared startSet() options the first time
         // through, so the full set is guaranteed to have different versions if size > 1.  If using
@@ -2361,13 +2350,6 @@ var ReplSetTest = function(opts) {
                 Object.merge(this.nodeOptions["n" + n], {rsConfig: options.rsConfig});
         }
         delete options.rsConfig;
-
-        if (jsTest.options().randomBinVersions) {
-            const rand = Random.rand();
-            const version = rand < 0.5 ? "latest" : "last-stable";
-            print("Randomly assigned binary version: " + version + " to node: " + n);
-            options.binVersion = version;
-        }
 
         options.restart = options.restart || restart;
 

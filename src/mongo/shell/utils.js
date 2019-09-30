@@ -342,8 +342,6 @@ jsTestOptions = function() {
             // This flag is currently a placeholder and only sets the replica set to last-stable
             // FCV. Randomized behavior will be implemented as part of SERVER-42774.
             randomBinVersions: TestData.randomBinVersions || false,
-            // Set a specific random seed to be used when randomBinVersions is true.
-            seed: TestData.seed || undefined,
         });
     }
     return _jsTestOptions;
