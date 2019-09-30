@@ -39,6 +39,12 @@ const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 // Fastcount reflects the insert of a prepared transaction.
 assert.eq(testColl.count(), 2);
 
+// Metrics reflect one inactive prepared transaction.
+let metrics = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+assert.eq(1, metrics.transactions.currentPrepared);
+assert.eq(1, metrics.transactions.currentInactive);
+assert.eq(1, metrics.transactions.currentOpen);
+
 jsTestLog("Do a majority write to advance the stable timestamp past the prepareTimestamp");
 // Doing a majority write after preparing the transaction ensures that the stable timestamp is
 // past the prepare timestamp because this write must be in the committed snapshot.
@@ -64,6 +70,12 @@ assert.eq(primary.getDB('config')['transactions'].find().itcount(), 1);
 // Fastcount reflects the insert of the prepared transaction because was put back into prepare
 // at the end of rollback.
 assert.eq(testColl.count(), 3);
+
+// Metrics still reflect one inactive prepared transaction.
+metrics = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+assert.eq(1, metrics.transactions.currentPrepared);
+assert.eq(1, metrics.transactions.currentInactive);
+assert.eq(1, metrics.transactions.currentOpen);
 
 // Make sure we cannot see the writes from the prepared transaction yet.
 arrayEq(testColl.find().toArray(), [{_id: 0}, {_id: 2}]);

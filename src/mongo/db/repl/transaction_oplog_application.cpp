@@ -222,7 +222,7 @@ Status applyAbortTransaction(OperationContext* opCtx,
 
     auto transaction = TransactionParticipant::get(opCtx);
     transaction.unstashTransactionResources(opCtx, "abortTransaction");
-    transaction.abortActiveTransaction(opCtx);
+    transaction.abortTransaction(opCtx);
     return Status::OK();
 }
 

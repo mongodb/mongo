@@ -298,16 +298,15 @@ public:
             {
                 MongoDOperationContextSession sessionTxnState(opCtx);
                 auto txnParticipant = TransactionParticipant::get(opCtx);
-
                 txnParticipant.beginOrContinue(opCtx,
                                                *opCtx->getTxnNumber(),
                                                false /* autocommit */,
                                                boost::none /* startTransaction */);
 
-                try {
-                    txnParticipant.abortTransactionIfNotPrepared(opCtx);
-                } catch (const ExceptionFor<ErrorCodes::TransactionCommitted>&) {
+                if (txnParticipant.transactionIsCommitted())
                     return;
+                if (txnParticipant.transactionIsInProgress()) {
+                    txnParticipant.abortTransaction(opCtx);
                 }
 
                 participantExitPrepareFuture = txnParticipant.onExitPrepare();

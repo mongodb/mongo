@@ -196,7 +196,7 @@ public:
                 opCtx, *opCtx->getLogicalSessionId(), *opCtx->getTxnNumber());
         }
 
-        txnParticipant.abortActiveTransaction(opCtx);
+        txnParticipant.abortTransaction(opCtx);
 
         if (MONGO_FAIL_POINT(participantReturnNetworkErrorForAbortAfterExecutingAbortLogic)) {
             uasserted(ErrorCodes::HostUnreachable,

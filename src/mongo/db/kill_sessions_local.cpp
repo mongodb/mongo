@@ -86,17 +86,21 @@ void killSessionsAction(
 void killSessionsAbortUnpreparedTransactions(OperationContext* opCtx,
                                              const SessionKiller::Matcher& matcher,
                                              ErrorCodes::Error reason) {
-    killSessionsAction(
-        opCtx,
-        matcher,
-        [](const ObservableSession& session) {
-            auto participant = TransactionParticipant::get(session);
-            return participant.transactionIsOpen() && !participant.transactionIsPrepared();
-        },
-        [](OperationContext* opCtx, const SessionToKill& session) {
-            TransactionParticipant::get(session).abortTransactionIfNotPrepared(opCtx);
-        },
-        reason);
+    killSessionsAction(opCtx,
+                       matcher,
+                       [](const ObservableSession& session) {
+                           auto participant = TransactionParticipant::get(session);
+                           return participant.transactionIsInProgress();
+                       },
+                       [](OperationContext* opCtx, const SessionToKill& session) {
+                           auto participant = TransactionParticipant::get(session);
+                           // This is the same test as in the filter, but we must check again now
+                           // that the session is checked out.
+                           if (participant.transactionIsInProgress()) {
+                               participant.abortTransaction(opCtx);
+                           }
+                       },
+                       reason);
 }
 
 SessionKiller::Result killSessionsLocal(OperationContext* opCtx,
@@ -114,22 +118,31 @@ SessionKiller::Result killSessionsLocal(OperationContext* opCtx,
 void killAllExpiredTransactions(OperationContext* opCtx) {
     SessionKiller::Matcher matcherAllSessions(
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-    killSessionsAction(
-        opCtx,
-        matcherAllSessions,
-        [when = opCtx->getServiceContext()->getPreciseClockSource()->now()](
-            const ObservableSession& session) {
-            return TransactionParticipant::get(session).expiredAsOf(when);
-        },
-        [](OperationContext* opCtx, const SessionToKill& session) {
-            auto txnParticipant = TransactionParticipant::get(session);
-            log()
-                << "Aborting transaction with txnNumber " << txnParticipant.getActiveTxnNumber()
-                << " on session " << session.getSessionId().getId()
-                << " because it has been running for longer than 'transactionLifetimeLimitSeconds'";
-            txnParticipant.abortTransactionIfNotPrepared(opCtx);
-        },
-        ErrorCodes::ExceededTimeLimit);
+    killSessionsAction(opCtx,
+                       matcherAllSessions,
+                       [when = opCtx->getServiceContext()->getPreciseClockSource()->now()](
+                           const ObservableSession& session) {
+                           return TransactionParticipant::get(session).expiredAsOf(when);
+                       },
+                       [](OperationContext* opCtx, const SessionToKill& session) {
+                           auto txnParticipant = TransactionParticipant::get(session);
+                           // If the transaction is aborted here, it means it was aborted after
+                           // the filter.  The most likely reason for this is that the transaction
+                           // was active and the session kill aborted it.  We still want to log
+                           // that as aborted due to transactionLifetimeLimitSessions.
+                           if (txnParticipant.transactionIsInProgress() ||
+                               txnParticipant.transactionIsAborted()) {
+                               log() << "Aborting transaction with txnNumber "
+                                     << txnParticipant.getActiveTxnNumber() << " on session "
+                                     << session.getSessionId().getId()
+                                     << " because it has been running for longer than "
+                                        "'transactionLifetimeLimitSeconds'";
+                               if (txnParticipant.transactionIsInProgress()) {
+                                   txnParticipant.abortTransaction(opCtx);
+                               }
+                           }
+                       },
+                       ErrorCodes::ExceededTimeLimit);
 }
 
 void killSessionsLocalShutdownAllTransactions(OperationContext* opCtx) {
@@ -156,10 +169,13 @@ void killSessionsAbortAllPreparedTransactions(OperationContext* opCtx) {
                            return TransactionParticipant::get(session).transactionIsPrepared();
                        },
                        [](OperationContext* opCtx, const SessionToKill& session) {
+                           // We're holding the RSTL, so the transaction shouldn't be otherwise
+                           // affected.
+                           invariant(TransactionParticipant::get(session).transactionIsPrepared());
                            // Abort the prepared transaction and invalidate the session it is
                            // associated with.
-                           TransactionParticipant::get(session).abortPreparedTransactionForRollback(
-                               opCtx);
+                           TransactionParticipant::get(session).abortTransaction(opCtx);
+                           TransactionParticipant::get(session).invalidate(opCtx);
                        });
 }
 

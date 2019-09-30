@@ -568,6 +568,13 @@ void TransactionParticipant::Participant::beginOrContinueTransactionUnconditiona
     if (o().activeTxnNumber != txnNumber) {
         _beginMultiDocumentTransaction(opCtx, txnNumber);
     }
+
+    // Assume we need to write an abort if we abort this transaction.  This method is called only
+    // on secondaries (in which case we never write anything) and when a new primary knows about
+    // an in-progress transaction.  If a new primary knows about an in-progress transaction, it
+    // needs an abort oplog entry to be written if aborted (because the new primary could not
+    // have found out if there wasn't an oplog entry for the new primary).
+    p().needToWriteAbortEntry = true;
 }
 
 SharedSemiFuture<void> TransactionParticipant::Participant::onExitPrepare() const {
@@ -1002,7 +1009,15 @@ void TransactionParticipant::Participant::unstashTransactionResources(OperationC
     // Global intent lock before starting a transaction.  We pessimistically acquire an intent
     // exclusive lock here because we might be doing writes in this transaction, and it is currently
     // not deadlock-safe to upgrade IS to IX.
-    Lock::GlobalLock globalLock(opCtx, MODE_IX);
+    boost::optional<Lock::GlobalLock> globalLock;
+    // If the global lock acquisition fails, we must release the write unit of work to avoid an
+    // invariant during _cleanUpTxnResourceOnOpCtx.
+    try {
+        globalLock.emplace(opCtx, MODE_IX);
+    } catch (const DBException&) {
+        opCtx->setWriteUnitOfWork(nullptr);
+        throw;
+    }
 
     // This begins the storage transaction and so we do it after acquiring the global lock.
     _setReadSnapshot(opCtx, repl::ReadConcernArgs::get(opCtx));
@@ -1054,11 +1069,11 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
 
         try {
             // This shouldn't cause deadlocks with other prepared txns, because the acquisition
-            // of RSTL lock inside abortActiveTransaction will be no-op since we already have it.
+            // of RSTL lock inside abortTransaction will be no-op since we already have it.
             // This abortGuard gets dismissed before we release the RSTL while transitioning to
             // prepared.
             UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-            abortActiveTransaction(opCtx);
+            abortTransaction(opCtx);
         } catch (...) {
             // It is illegal for aborting a prepared transaction to fail for any reason, so we crash
             // instead.
@@ -1146,6 +1161,7 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
     }
     opCtx->recoveryUnit()->setPrepareTimestamp(prepareOplogSlot.getTimestamp());
     opCtx->getWriteUnitOfWork()->prepare();
+    p().needToWriteAbortEntry = true;
     opCtx->getServiceContext()->getOpObserver()->onTransactionPrepare(
         opCtx, reservedSlots, completedTransactionOperations);
 
@@ -1456,26 +1472,22 @@ void TransactionParticipant::Participant::shutdown(OperationContext* opCtx) {
     o(lock).txnResourceStash = boost::none;
 }
 
-void TransactionParticipant::Participant::abortTransactionIfNotPrepared(OperationContext* opCtx) {
-    if (!o().txnState.isInProgress()) {
-        // We do not want to abort transactions that are prepared unless we get an
-        // 'abortTransaction' command.
-        return;
-    }
-
-    _abortTransactionOnSession(opCtx);
-}
-
 bool TransactionParticipant::Observer::expiredAsOf(Date_t when) const {
     return o().txnState.isInProgress() && o().transactionExpireDate &&
         o().transactionExpireDate < when;
 }
 
-void TransactionParticipant::Participant::abortActiveTransaction(OperationContext* opCtx) {
-    if (o().txnState.isPrepared()) {
+void TransactionParticipant::Participant::abortTransaction(OperationContext* opCtx) {
+    // Normally, absence of a transaction resource stash indicates an inactive transaction.
+    // However, in the case of a failed "unstash", an active transaction may exist without a stash
+    // and be killed externally.  In that case, the opCtx will not have a transaction number.
+    if (o().txnResourceStash || !opCtx->getTxnNumber()) {
+        // Aborting an inactive transaction.
+        _abortTransactionOnSession(opCtx);
+    } else if (o().txnState.isPrepared()) {
         _abortActivePreparedTransaction(opCtx);
     } else {
-        _abortActiveTransaction(opCtx, TransactionState::kInProgress, false);
+        _abortActiveTransaction(opCtx, TransactionState::kInProgress);
     }
 }
 
@@ -1498,38 +1510,11 @@ void TransactionParticipant::Participant::_abortActivePreparedTransaction(Operat
                 replCoord->canAcceptWritesForDatabase(opCtx, "admin"));
     }
 
-    _abortActiveTransaction(opCtx, TransactionState::kPrepared, true);
-}
-
-void TransactionParticipant::Participant::abortActiveUnpreparedOrStashPreparedTransaction(
-    OperationContext* opCtx) try {
-    if (o().txnState.isInSet(TransactionState::kNone | TransactionState::kCommitted |
-                             TransactionState::kExecutedRetryableWrite)) {
-        // If there is no active transaction, do nothing.
-        return;
-    }
-
-    // Stash the transaction if it's in prepared state.
-    if (o().txnState.isInSet(TransactionState::kPrepared)) {
-        _stashActiveTransaction(opCtx);
-        return;
-    }
-
-    _abortActiveTransaction(opCtx, TransactionState::kInProgress, false /* writeOplog */);
-} catch (...) {
-    // It is illegal for this to throw so we catch and log this here for diagnosability.
-    severe() << "Caught exception during transaction " << opCtx->getTxnNumber()
-             << " abort or stash on " << _sessionId().toBSON() << " in state " << o().txnState
-             << ": " << exceptionToStatus();
-    std::terminate();
-}
-
-void TransactionParticipant::Participant::abortTransactionForStepUp(OperationContext* opCtx) {
-    _abortActiveTransaction(opCtx, TransactionState::kInProgress, true);
+    _abortActiveTransaction(opCtx, TransactionState::kPrepared);
 }
 
 void TransactionParticipant::Participant::_abortActiveTransaction(
-    OperationContext* opCtx, TransactionState::StateSet expectedStates, bool writeOplog) {
+    OperationContext* opCtx, TransactionState::StateSet expectedStates) {
     invariant(!o().txnResourceStash);
 
     if (!o().txnState.isInRetryableWriteMode()) {
@@ -1543,7 +1528,7 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
     // OpObserver.
     boost::optional<OplogSlotReserver> oplogSlotReserver;
     boost::optional<OplogSlot> abortOplogSlot;
-    if (opCtx->writesAreReplicated() && writeOplog) {
+    if (opCtx->writesAreReplicated() && p().needToWriteAbortEntry) {
         oplogSlotReserver.emplace(opCtx);
         abortOplogSlot = oplogSlotReserver->getLastSlot();
     }
@@ -2069,6 +2054,7 @@ void TransactionParticipant::Participant::_resetTransactionState(
     o(wl).recoveryPrepareOpTime = repl::OpTime();
     p().multikeyPathInfo.clear();
     p().autoCommit = boost::none;
+    p().needToWriteAbortEntry = false;
 
     // Release any locks held by this participant and abort the storage transaction.
     o(wl).txnResourceStash = boost::none;
@@ -2085,23 +2071,6 @@ void TransactionParticipant::Participant::invalidate(OperationContext* opCtx) {
     // this participant.
     _invalidate(lg);
     _resetRetryableWriteState();
-    _resetTransactionState(lg, TransactionState::kNone);
-}
-
-void TransactionParticipant::Participant::abortPreparedTransactionForRollback(
-    OperationContext* opCtx) {
-    uassert(51030,
-            str::stream() << "Cannot call abortPreparedTransactionForRollback on unprepared "
-                          << "transaction.",
-            o().txnState.isPrepared());
-
-    stdx::lock_guard<Client> lg(*opCtx->getClient());
-
-    // It should be safe to clear transactionOperationBytes and transactionOperations because
-    // we only modify these variables when adding an operation to a transaction. Since this
-    // transaction is already prepared, we cannot add more operations to it. We will have this
-    // in the prepare oplog entry.
-    _invalidate(lg);
     _resetTransactionState(lg, TransactionState::kNone);
 }
 
