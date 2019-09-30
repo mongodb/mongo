@@ -430,7 +430,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
           << ") - renaming to drop-pending collection: " << dpns << " with drop optime "
           << dropOpTime;
     {
-        Lock::CollectionLock(opCtx, dpns, MODE_X);
+        Lock::CollectionLock collLk(opCtx, dpns, MODE_X);
         fassert(40464, renameCollection(opCtx, nss, dpns, stayTemp));
     }
 
