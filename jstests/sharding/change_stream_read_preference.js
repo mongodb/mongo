@@ -9,14 +9,6 @@ load('jstests/libs/profiler.js');  // For various profiler helpers.
 // For supportsMajorityReadConcern.
 load('jstests/multiVersion/libs/causal_consistency_helpers.js');
 
-// TODO (SERVER-38673): Remove this once BACKPORT-3428, BACKPORT-3429 are completed.
-if (!jsTestOptions().enableMajorityReadConcern &&
-    jsTestOptions().mongosBinVersion === 'last-stable') {
-    jsTestLog(
-        "Skipping test since 'last-stable' mongos doesn't support speculative majority update lookup queries.");
-    return;
-}
-
 // This test only works on storage engines that support committed reads, skip it if the
 // configured engine doesn't support it.
 if (!supportsMajorityReadConcern()) {
