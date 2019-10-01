@@ -34,7 +34,8 @@ __wt_page_is_empty(WT_PAGE *page)
 static inline bool
 __wt_page_evict_clean(WT_PAGE *page)
 {
-	return (page->modify == NULL || (page->modify->write_gen == 0 &&
+	return (page->modify == NULL ||
+	    (page->modify->page_state == WT_PAGE_CLEAN &&
 	    page->modify->rec_result == 0));
 }
 
@@ -45,7 +46,8 @@ __wt_page_evict_clean(WT_PAGE *page)
 static inline bool
 __wt_page_is_modified(WT_PAGE *page)
 {
-	return (page->modify != NULL && page->modify->write_gen != 0);
+	return (page->modify != NULL &&
+	    page->modify->page_state != WT_PAGE_CLEAN);
 }
 
 /*
@@ -494,19 +496,25 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_ASSERT(session, !F_ISSET(session->dhandle, WT_DHANDLE_DEAD));
 
 	last_running = 0;
-	if (page->modify->write_gen == 0)
+	if (page->modify->page_state == WT_PAGE_CLEAN)
 		last_running = S2C(session)->txn_global.last_running;
 
 	/*
-	 * We depend on atomic-add being a write barrier, that is, a barrier to
-	 * ensure all changes to the page are flushed before updating the page
-	 * write generation and/or marking the tree dirty, otherwise checkpoints
+	 * We depend on the atomic operation being a write barrier, that is, a
+	 * barrier to ensure all changes to the page are flushed before updating
+	 * the page state and/or marking the tree dirty, otherwise checkpoints
 	 * and/or page reconciliation might be looking at a clean page/tree.
 	 *
 	 * Every time the page transitions from clean to dirty, update the cache
 	 * and transactional information.
+	 *
+	 * The page state can only ever be incremented above dirty by the number
+	 * of concurrently running threads, so the counter will never approach
+	 * the point where it would wrap.
 	 */
-	if (__wt_atomic_add32(&page->modify->write_gen, 1) == 1) {
+	if (page->modify->page_state < WT_PAGE_DIRTY &&
+	    __wt_atomic_add32(&page->modify->page_state, 1) ==
+	    WT_PAGE_DIRTY_FIRST) {
 		__wt_cache_dirty_incr(session, page);
 
 		/*
@@ -577,7 +585,17 @@ __wt_page_modify_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Allow the call to be made on clean pages.
 	 */
 	if (__wt_page_is_modified(page)) {
-		page->modify->write_gen = 0;
+		/*
+		 * The only part where ordering matters is during
+		 * reconciliation where updates on other threads are performing
+		 * writes to the page state that need to be visible to the
+		 * reconciliation thread.
+		 *
+		 * Since clearing of the page state is not going to be happening
+		 * during reconciliation on a separate thread, there's no write
+		 * barrier needed here.
+		 */
+		page->modify->page_state = WT_PAGE_CLEAN;
 		__wt_cache_dirty_decr(session, page);
 	}
 }
@@ -1498,26 +1516,30 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	 * memory_page_max setting, when we see many deleted items, and when we
 	 * are attempting to scan without trashing the cache.
 	 *
-	 * Fast checks if eviction is disabled for this handle, operation or
-	 * tree, then perform a general check if eviction will be possible.
+	 * Checkpoint should not queue pages for urgent eviction if they require
+	 * dirty eviction: there is a special exemption that allows checkpoint
+	 * to evict dirty pages in a tree that is being checkpointed, and no
+	 * other thread can help with that. Checkpoints don't rely on this code
+	 * for dirty eviction: that is handled explicitly in __wt_sync_file.
 	 *
-	 * Checkpoint should not queue pages for urgent eviction if it cannot
-	 * evict them immediately: there is a special exemption that allows
-	 * checkpoint to evict dirty pages in a tree that is being
-	 * checkpointed, and no other thread can help with that.
+	 * If the operation has disabled eviction or splitting, or the session
+	 * is preventing from reconciling, then just queue the page for urgent
+	 * eviction.  Otherwise, attempt to release and evict it.
 	 */
 	page = ref->page;
 	if (WT_READGEN_EVICT_SOON(page->read_gen) &&
 	    btree->evict_disabled == 0 &&
-	    __wt_page_can_evict(session, ref, &inmem_split)) {
-		if (!__wt_page_evict_clean(page) &&
-		    (LF_ISSET(WT_READ_NO_SPLIT) || (!inmem_split &&
-		    F_ISSET(session, WT_SESSION_NO_RECONCILE)))) {
-			if (!WT_SESSION_BTREE_SYNC(session))
-				WT_IGNORE_RET(
-				    __wt_page_evict_urgent(session, ref));
-		} else {
-			WT_RET_BUSY_OK(__wt_page_release_evict(session, ref));
+	    __wt_page_can_evict(session, ref, &inmem_split) &&
+	    (!WT_SESSION_IS_CHECKPOINT(session) ||
+	    __wt_page_evict_clean(page))) {
+		if (LF_ISSET(WT_READ_NO_EVICT) ||
+		    (inmem_split ? LF_ISSET(WT_READ_NO_SPLIT) :
+		    F_ISSET(session, WT_SESSION_NO_RECONCILE)))
+			WT_IGNORE_RET(
+			    __wt_page_evict_urgent(session, ref));
+		else {
+			WT_RET_BUSY_OK(
+			    __wt_page_release_evict(session, ref));
 			return (0);
 		}
 	}

@@ -473,10 +473,21 @@ struct __wt_page_modify {
 	WT_SPINLOCK page_lock;		/* Page's spinlock */
 
 	/*
-	 * The write generation is incremented when a page is modified, a page
-	 * is clean if the write generation is 0.
+	 * The page state is incremented when a page is modified.
+	 *
+	 * WT_PAGE_CLEAN --
+	 *	The page is clean.
+	 * WT_PAGE_DIRTY_FIRST --
+	 *	The page is in this state after the first operation that marks a
+	 *	page dirty, or when reconciliation is checking to see if it has
+	 *	done enough work to be able to mark the page clean.
+	 * WT_PAGE_DIRTY --
+	 *	Two or more updates have been added to the page.
 	 */
-	uint32_t write_gen;
+#define	WT_PAGE_CLEAN		0
+#define	WT_PAGE_DIRTY_FIRST	1
+#define	WT_PAGE_DIRTY		2
+	uint32_t page_state;
 
 #define	WT_PM_REC_EMPTY		1	/* Reconciliation: no replacement */
 #define	WT_PM_REC_MULTIBLOCK	2	/* Reconciliation: multiple blocks */
@@ -577,6 +588,14 @@ struct __wt_page {
 	for (__refp = __pindex->index,					\
 	    __entries = __pindex->entries; __entries > 0; --__entries) {\
 		(ref) = *__refp++;
+#define	WT_INTL_FOREACH_REVERSE_BEGIN(session, page, ref) do {		\
+	WT_PAGE_INDEX *__pindex;					\
+	WT_REF **__refp;						\
+	uint32_t __entries;						\
+	WT_INTL_INDEX_GET(session, page, __pindex);			\
+	for (__refp = __pindex->index + __pindex->entries,		\
+	    __entries = __pindex->entries; __entries > 0; --__entries) {\
+		(ref) = *--__refp;
 #define	WT_INTL_FOREACH_END						\
 	}								\
 } while (0)

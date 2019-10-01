@@ -7,29 +7,6 @@
  */
 
 /*
- * __page_write_gen_wrapped_check --
- *	Confirm the page's write generation number won't wrap.
- */
-static inline int
-__page_write_gen_wrapped_check(WT_PAGE *page)
-{
-	/*
-	 * Check to see if the page's write generation is about to wrap (wildly
-	 * unlikely as it implies 4B updates between clean page reconciliations,
-	 * but technically possible), and fail the update.
-	 *
-	 * The check is outside of the serialization mutex because the page's
-	 * write generation is going to be a hot cache line, so technically it's
-	 * possible for the page's write generation to wrap between the test and
-	 * our subsequent modification of it.  However, the test is (4B-1M), and
-	 * there cannot be a million threads that have done the test but not yet
-	 * completed their modification.
-	 */
-	return (page->modify->write_gen >
-	    UINT32_MAX - WT_MILLION ? WT_RESTART : 0);
-}
-
-/*
  * __insert_simple_func --
  *	Worker function to add a WT_INSERT entry to the middle of a skiplist.
  */
@@ -163,9 +140,6 @@ __wt_col_append_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	new_ins = *new_insp;
 	*new_insp = NULL;
 
-	/* Check for page write generation wrap. */
-	WT_RET(__page_write_gen_wrapped_check(page));
-
 	/*
 	 * Acquire the page's spinlock unless we already have exclusive access.
 	 * Then call the worker function.
@@ -214,9 +188,6 @@ __wt_insert_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	/* Clear references to memory we now own and must free on error. */
 	new_ins = *new_insp;
 	*new_insp = NULL;
-
-	/* Check for page write generation wrap. */
-	WT_RET(__page_write_gen_wrapped_check(page));
 
 	simple = true;
 	for (i = 0; i < skipdepth; i++)
@@ -272,9 +243,6 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	/* Clear references to memory we now own and must free on error. */
 	upd = *updp;
 	*updp = NULL;
-
-	/* Check for page write generation wrap. */
-	WT_RET(__page_write_gen_wrapped_check(page));
 
 	/*
 	 * All structure setup must be flushed before the structure is entered
