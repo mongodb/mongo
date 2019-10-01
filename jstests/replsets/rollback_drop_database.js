@@ -26,8 +26,8 @@ assert.commandWorked(rollbackNode.getDB(oldDbName)["beforeRollback"].insert({"nu
 
 // Set a failpoint on the original primary, so that it blocks after it commits the last
 // 'dropCollection' entry but before the 'dropDatabase' entry is logged.
-assert.commandWorked(
-    rollbackNode.adminCommand({configureFailPoint: "dropDatabaseHangBeforeLog", mode: "alwaysOn"}));
+assert.commandWorked(rollbackNode.adminCommand(
+    {configureFailPoint: "dropDatabaseHangBeforeInMemoryDrop", mode: "alwaysOn"}));
 
 // Issue a 'dropDatabase' command.
 let dropDatabaseFn = function() {
@@ -40,7 +40,8 @@ let dropDatabaseFn = function() {
 let waitForDropDatabaseToFinish = startParallelShell(dropDatabaseFn, rollbackNode.port);
 
 // Ensure that we've hit the failpoint before moving on.
-checkLog.contains(rollbackNode, "dropDatabase - fail point dropDatabaseHangBeforeLog enabled");
+checkLog.contains(rollbackNode,
+                  "dropDatabase - fail point dropDatabaseHangBeforeInMemoryDrop enabled.");
 
 // Wait for the secondary to finish dropping the collection (the last replicated entry).
 // We use the default 10-minute timeout for this.
@@ -53,8 +54,8 @@ rollbackTest.transitionToRollbackOperations();
 
 // Allow the final 'dropDatabase' entry to be logged on the now isolated primary.
 // This is the rollback node's divergent oplog entry.
-assert.commandWorked(
-    rollbackNode.adminCommand({configureFailPoint: "dropDatabaseHangBeforeLog", mode: "off"}));
+assert.commandWorked(rollbackNode.adminCommand(
+    {configureFailPoint: "dropDatabaseHangBeforeInMemoryDrop", mode: "off"}));
 waitForDropDatabaseToFinish();
 assert.eq(false, rollbackNode.getDB(oldDbName).getCollectionNames().includes("beforeRollback"));
 jsTestLog("Database " + oldDbName + " successfully dropped on primary node " + rollbackNode.host);
