@@ -1311,14 +1311,16 @@ SSLConnectionInterface* SSLManagerOpenSSL::connect(Socket* socket) {
 
     const auto undotted = removeFQDNRoot(socket->remoteAddr().hostOrIp());
 
-    // only have TLS advertise host name if it is not an IP address
     int ret;
-    std::array<uint8_t, INET6_ADDRSTRLEN> unusedBuf;
-    if ((inet_pton(AF_INET, undotted.c_str(), unusedBuf.data()) == 0) &&
-        (inet_pton(AF_INET6, undotted.c_str(), unusedBuf.data()) == 0)) {
-        ret = ::SSL_set_tlsext_host_name(sslConn->ssl, undotted.c_str());
-        if (ret != 1) {
-            _handleSSLError(sslConn.get(), ret);
+    if (!undotted.empty()) {
+        // only have TLS advertise host name as SNI if it is not an IP address
+        std::array<uint8_t, INET6_ADDRSTRLEN> unusedBuf;
+        if ((inet_pton(AF_INET, undotted.c_str(), unusedBuf.data()) == 0) &&
+            (inet_pton(AF_INET6, undotted.c_str(), unusedBuf.data()) == 0)) {
+            ret = ::SSL_set_tlsext_host_name(sslConn->ssl, undotted.c_str());
+            if (ret != 1) {
+                _handleSSLError(sslConn.get(), ret);
+            }
         }
     }
 

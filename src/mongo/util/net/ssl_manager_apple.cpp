@@ -55,8 +55,6 @@
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_parameters_gen.h"
 
-#include <arpa/inet.h>
-
 using asio::ssl::apple::CFUniquePtr;
 
 /* This API appears in the Security framework even though
@@ -1073,13 +1071,13 @@ boost::optional<std::string> getRawSNIServerName(::SSLContextRef _ssl) {
         return boost::none;
     }
     std::string ret;
-    ret.resize(len + 1);
+    ret.resize(len);
     status = ::SSLCopyRequestedPeerName(_ssl, &ret[0], &len);
     if (status != ::errSecSuccess) {
         return boost::none;
     }
-    ret.resize(len);
-
+    // ::SSLCopyRequestedPeerName includes space for a null byte at the end of the string it writes.
+    // We do not want to include this null byte in the advertised SNI name
     while (!ret.empty() && ret.back() == '\0') {
         ret.pop_back();
     }
@@ -1115,9 +1113,7 @@ public:
         uassertOSStatusOK(::SSLSetProtocolVersionMin(_ssl.get(), ctx->protoMin));
         uassertOSStatusOK(::SSLSetProtocolVersionMax(_ssl.get(), ctx->protoMax));
 
-        std::array<uint8_t, INET6_ADDRSTRLEN> unusedBuf;
-        if (!hostname.empty() && (inet_pton(AF_INET, hostname.c_str(), unusedBuf.data()) == 0) &&
-            (inet_pton(AF_INET6, hostname.c_str(), unusedBuf.data()) == 0)) {
+        if (!hostname.empty()) {
             uassertOSStatusOK(
                 ::SSLSetPeerDomainName(_ssl.get(), hostname.c_str(), hostname.size()));
         }
