@@ -76,25 +76,6 @@ bool FindCommon::haveSpaceForNext(const BSONObj& nextDoc, long long numDocs, int
     return (bytesBuffered + nextDoc.objsize()) <= kMaxBytesToReturnToClientAtOnce;
 }
 
-BSONObj FindCommon::transformSortSpec(const BSONObj& sortSpec) {
-    BSONObjBuilder comparatorBob;
-
-    for (BSONElement elt : sortSpec) {
-        if (elt.isNumber()) {
-            comparatorBob.append(elt);
-        } else if (QueryRequest::isTextScoreMeta(elt)) {
-            // Sort text score decreasing by default. Field name doesn't matter but we choose
-            // something that a user shouldn't ever have.
-            comparatorBob.append("$metaTextScore", -1);
-        } else {
-            // Sort spec should have been validated before here.
-            fassertFailed(28784);
-        }
-    }
-
-    return comparatorBob.obj();
-}
-
 void FindCommon::waitInFindBeforeMakingBatch(OperationContext* opCtx, const CanonicalQuery& cq) {
     auto whileWaitingFunc = [&, hasLogged = false]() mutable {
         if (!std::exchange(hasLogged, true)) {

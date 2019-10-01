@@ -109,6 +109,8 @@ void SortExecutor::add(Value sortKey, WorkingSetMember data) {
     // Metadata should be attached directly to the WSM rather than inside the Document.
     invariant(!data.doc.value().metadata());
 
+    _totalDataSizeBytes += data.getMemUsage();
+
     if (!_sorter) {
         _sorter.reset(DocumentSorter::make(makeSortOptions(), Comparator(_sortPattern)));
     }
@@ -138,6 +140,17 @@ SortOptions SortExecutor::makeSortOptions() const {
     }
 
     return opts;
+}
+
+std::unique_ptr<SortStats> SortExecutor::stats() const {
+    auto stats = std::make_unique<SortStats>();
+    stats->sortPattern =
+        _sortPattern.serialize(SortPattern::SortKeySerialization::kForExplain).toBson();
+    stats->limit = _limit;
+    stats->maxMemoryUsageBytes = _maxMemoryUsageBytes;
+    stats->totalDataSizeBytes = _totalDataSizeBytes;
+    stats->wasDiskUsed = _wasDiskUsed;
+    return stats;
 }
 }  // namespace mongo
 

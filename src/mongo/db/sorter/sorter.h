@@ -61,8 +61,9 @@
  * // How much memory is used by your type? Include sizeof(*this) and any memory you reference.
  * int memUsageForSorter() const;
  *
- * // For types with owned and unowned states, such as BSON, return an owned version.
- * // Return *this if your type doesn't have an unowned state
+ * // For types with owned and unowned states, such as BSON, return an owned version. The Sorter
+ * // is responsible for converting any unowned data to an owned state if it needs to be buffered.
+ * // Return *this if your type doesn't have an unowned state.
  * Type getOwned() const;
  *
  * Comparators are functors that that compare std::pair<Key, Value> and return an
@@ -228,13 +229,14 @@ public:
 
     virtual ~Sorter() {}
 
-    bool usedDisk() {
+    bool usedDisk() const {
         return _usedDisk;
     }
 
 protected:
+    Sorter() {}  // can only be constructed as a base
+
     bool _usedDisk{false};  // Keeps track of whether the sorter used disk or not
-    Sorter() {}             // can only be constructed as a base
 };
 
 /**

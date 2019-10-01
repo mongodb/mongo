@@ -230,6 +230,12 @@ public:
         return getMemUsage();
     }
 
+    WorkingSetMember getOwned() const {
+        auto ret = *this;
+        ret.makeObjOwnedIfNeeded();
+        return ret;
+    }
+
 private:
     friend class WorkingSet;
 

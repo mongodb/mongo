@@ -390,6 +390,10 @@ public:
         // Use buffer capacity as a more accurate measure of memory usage.
         return sizeof(Value) + _buffer.capacity();
     }
+
+    Value getOwned() const {
+        return *this;
+    }
     /// Members for Sorter
 
 private:

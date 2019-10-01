@@ -85,6 +85,34 @@ static const int kPerDocumentOverheadBytesUpperBound = 10;
 const char kFindCmdName[] = "find";
 
 /**
+ * Transforms the raw sort spec into one suitable for use as the ordering specification in
+ * BSONObj::woCompare().
+ *
+ * In particular, eliminates text score meta-sort from 'sortSpec'.
+ *
+ * The input must be validated (each BSON element must be either a number or text score meta-sort
+ * specification).
+ */
+BSONObj transformSortSpec(const BSONObj& sortSpec) {
+    BSONObjBuilder comparatorBob;
+
+    for (BSONElement elt : sortSpec) {
+        if (elt.isNumber()) {
+            comparatorBob.append(elt);
+        } else if (QueryRequest::isTextScoreMeta(elt)) {
+            // Sort text score decreasing by default. Field name doesn't matter but we choose
+            // something that a user shouldn't ever have.
+            comparatorBob.append("$metaTextScore", -1);
+        } else {
+            // Sort spec should have been validated before here.
+            fassertFailed(28784);
+        }
+    }
+
+    return comparatorBob.obj();
+}
+
+/**
  * Given the QueryRequest 'qr' being executed by mongos, returns a copy of the query which is
  * suitable for forwarding to the targeted hosts.
  */
@@ -246,7 +274,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     // sort on mongos. Including a $natural anywhere in the sort spec results in the whole sort
     // being considered a hint to use a collection scan.
     if (!query.getQueryRequest().getSort().hasField("$natural")) {
-        params.sort = FindCommon::transformSortSpec(query.getQueryRequest().getSort());
+        params.sort = transformSortSpec(query.getQueryRequest().getSort());
     }
 
     bool appendGeoNearDistanceProjection = false;

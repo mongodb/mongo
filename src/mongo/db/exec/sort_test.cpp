@@ -109,8 +109,12 @@ public:
         auto sortKeyGen = std::make_unique<SortKeyGeneratorStage>(
             expCtx, std::move(queuedDataStage), &ws, sortPattern);
 
-        SortStage sort(
-            expCtx, &ws, sortPattern, limit, kMaxMemoryUsageBytes, std::move(sortKeyGen));
+        SortStage sort(expCtx,
+                       &ws,
+                       SortPattern{sortPattern, expCtx},
+                       limit,
+                       kMaxMemoryUsageBytes,
+                       std::move(sortKeyGen));
 
         WorkingSetID id = WorkingSet::INVALID_ID;
         PlanStage::StageState state = PlanStage::NEED_TIME;
@@ -170,7 +174,12 @@ TEST_F(SortStageTest, SortEmptyWorkingSet) {
     auto sortKeyGen =
         std::make_unique<SortKeyGeneratorStage>(expCtx, std::move(queuedDataStage), &ws, BSONObj());
     auto sortPattern = BSON("a" << 1);
-    SortStage sort(expCtx, &ws, sortPattern, 0u, kMaxMemoryUsageBytes, std::move(sortKeyGen));
+    SortStage sort(expCtx,
+                   &ws,
+                   SortPattern{sortPattern, expCtx},
+                   0u,
+                   kMaxMemoryUsageBytes,
+                   std::move(sortKeyGen));
 
     // Check initial EOF state.
     ASSERT_FALSE(sort.isEOF());

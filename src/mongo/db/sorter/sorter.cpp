@@ -542,7 +542,7 @@ public:
     void add(const Key& key, const Value& val) {
         invariant(!_done);
 
-        _data.push_back(std::make_pair(key, val));
+        _data.emplace_back(key.getOwned(), val.getOwned());
 
         _memUsed += key.memUsageForSorter();
         _memUsed += val.memUsageForSorter();
@@ -656,7 +656,7 @@ public:
             _haveData = true;
         }
 
-        _best = contender;
+        _best = {contender.first.getOwned(), contender.second.getOwned()};
     }
 
     Iterator* done() {
@@ -726,7 +726,7 @@ public:
             if (_haveCutoff && !less(contender, _cutoff))
                 return;
 
-            _data.push_back(contender);
+            _data.emplace_back(contender.first.getOwned(), contender.second.getOwned());
 
             _memUsed += key.memUsageForSorter();
             _memUsed += val.memUsageForSorter();
@@ -754,7 +754,7 @@ public:
         _memUsed -= _data.front().second.memUsageForSorter();
 
         std::pop_heap(_data.begin(), _data.end(), less);
-        _data.back() = contender;
+        _data.back() = {contender.first.getOwned(), contender.second.getOwned()};
         std::push_heap(_data.begin(), _data.end(), less);
 
         if (_memUsed > _opts.maxMemoryUsageBytes)

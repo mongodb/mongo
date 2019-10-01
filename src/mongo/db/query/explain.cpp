@@ -541,14 +541,15 @@ void Explain::statsToBSON(const PlanStageStats& stats,
     } else if (STAGE_SORT == stats.stageType) {
         SortStats* spec = static_cast<SortStats*>(stats.specific.get());
         bob->append("sortPattern", spec->sortPattern);
-
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-            bob->appendNumber("memUsage", spec->memUsage);
-            bob->appendNumber("memLimit", spec->memLimit);
-        }
+        bob->appendNumber("memLimit", spec->maxMemoryUsageBytes);
 
         if (spec->limit > 0) {
             bob->appendNumber("limitAmount", spec->limit);
+        }
+
+        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+            bob->appendNumber("totalDataSizeSorted", spec->totalDataSizeBytes);
+            bob->appendBool("usedDisk", spec->wasDiskUsed);
         }
     } else if (STAGE_SORT_MERGE == stats.stageType) {
         MergeSortStats* spec = static_cast<MergeSortStats*>(stats.specific.get());

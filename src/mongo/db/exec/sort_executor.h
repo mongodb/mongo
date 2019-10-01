@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sort_key_comparator.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/pipeline/expression.h"
@@ -98,6 +99,16 @@ public:
      */
     void add(Value, WorkingSetMember);
 
+    /**
+     * Returns true if the loading phase has been explicitly completed, and then the stream of
+     * documents has subsequently been exhausted by "get next" calls.
+     */
+    bool isEOF() const {
+        return _isEOF;
+    }
+
+    std::unique_ptr<SortStats> stats() const;
+
 private:
     using DocumentSorter = Sorter<Value, WorkingSetMember>;
     class Comparator {
@@ -125,5 +136,6 @@ private:
 
     bool _isEOF = false;
     bool _wasDiskUsed = false;
+    uint64_t _totalDataSizeBytes = 0u;
 };
 }  // namespace mongo

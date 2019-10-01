@@ -117,17 +117,6 @@ public:
     static bool haveSpaceForNext(const BSONObj& nextDoc, long long numDocs, int bytesBuffered);
 
     /**
-     * Transforms the raw sort spec into one suitable for use as the ordering specification in
-     * BSONObj::woCompare().
-     *
-     * In particular, eliminates text score meta-sort from 'sortSpec'.
-     *
-     * The input must be validated (each BSON element must be either a number or text score
-     * meta-sort specification).
-     */
-    static BSONObj transformSortSpec(const BSONObj& sortSpec);
-
-    /**
      * This function wraps waitWhileFailPointEnabled() on waitInFindBeforeMakingBatch.
      *
      * Since query processing happens in three different places, this function makes it easier to

@@ -615,17 +615,24 @@ struct SortStats : public SpecificStats {
         return sortPattern.objsize() + sizeof(*this);
     }
 
-    // What's our current memory usage?
-    size_t memUsage = 0u;
-
-    // What's our memory limit?
-    size_t memLimit = 0u;
-
-    // The number of results to return from the sort.
-    size_t limit = 0u;
-
     // The pattern according to which we are sorting.
     BSONObj sortPattern;
+
+    // The number of results to return from the sort.
+    uint64_t limit = 0u;
+
+    // The maximum number of bytes of memory we're willing to use during execution of the sort. If
+    // this limit is exceeded and 'allowDiskUse' is false, the query will fail at execution time. If
+    // 'allowDiskUse' is true, the data will be spilled to disk.
+    uint64_t maxMemoryUsageBytes = 0u;
+
+    // The amount of data we've sorted in bytes. At various times this data may be buffered in
+    // memory or disk-resident, depending on the configuration of 'maxMemoryUsageBytes' and whether
+    // disk use is allowed.
+    uint64_t totalDataSizeBytes = 0u;
+
+    // Whether we spilled data to disk during the execution of this query.
+    bool wasDiskUsed = false;
 };
 
 struct MergeSortStats : public SpecificStats {

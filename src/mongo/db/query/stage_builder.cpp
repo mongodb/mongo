@@ -124,7 +124,7 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
             auto childStage = buildStages(opCtx, collection, cq, qsol, sn->children[0], ws);
             return std::make_unique<SortStage>(cq.getExpCtx(),
                                                ws,
-                                               sn->pattern,
+                                               SortPattern{sn->pattern, cq.getExpCtx()},
                                                sn->limit,
                                                internalQueryExecMaxBlockingSortBytes.load(),
                                                std::move(childStage));

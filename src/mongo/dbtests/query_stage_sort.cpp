@@ -120,8 +120,12 @@ public:
         auto keyGenStage = std::make_unique<SortKeyGeneratorStage>(
             _expCtx, std::move(queuedDataStage), ws.get(), sortPattern);
 
-        auto ss = std::make_unique<SortStage>(
-            _expCtx, ws.get(), sortPattern, limit(), maxMemoryUsageBytes(), std::move(keyGenStage));
+        auto ss = std::make_unique<SortStage>(_expCtx,
+                                              ws.get(),
+                                              SortPattern{sortPattern, _expCtx},
+                                              limit(),
+                                              maxMemoryUsageBytes(),
+                                              std::move(keyGenStage));
 
         // The PlanExecutor will be automatically registered on construction due to the auto
         // yield policy, so it can receive invalidations when we remove documents later.
@@ -156,8 +160,12 @@ public:
         auto keyGenStage = std::make_unique<SortKeyGeneratorStage>(
             _expCtx, std::move(queuedDataStage), ws.get(), sortPattern);
 
-        auto sortStage = std::make_unique<SortStage>(
-            _expCtx, ws.get(), sortPattern, limit(), maxMemoryUsageBytes(), std::move(keyGenStage));
+        auto sortStage = std::make_unique<SortStage>(_expCtx,
+                                                     ws.get(),
+                                                     SortPattern{sortPattern, _expCtx},
+                                                     limit(),
+                                                     maxMemoryUsageBytes(),
+                                                     std::move(keyGenStage));
 
         auto fetchStage =
             std::make_unique<FetchStage>(&_opCtx, ws.get(), std::move(sortStage), nullptr, coll);
@@ -560,8 +568,12 @@ public:
         auto keyGenStage = std::make_unique<SortKeyGeneratorStage>(
             _expCtx, std::move(queuedDataStage), ws.get(), sortPattern);
 
-        auto sortStage = std::make_unique<SortStage>(
-            _expCtx, ws.get(), sortPattern, 0u, maxMemoryUsageBytes(), std::move(keyGenStage));
+        auto sortStage = std::make_unique<SortStage>(_expCtx,
+                                                     ws.get(),
+                                                     SortPattern{sortPattern, _expCtx},
+                                                     0u,
+                                                     maxMemoryUsageBytes(),
+                                                     std::move(keyGenStage));
 
         auto fetchStage =
             std::make_unique<FetchStage>(&_opCtx, ws.get(), std::move(sortStage), nullptr, coll);
