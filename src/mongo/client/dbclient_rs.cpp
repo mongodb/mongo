@@ -138,7 +138,7 @@ DBClientReplicaSet::DBClientReplicaSet(const string& name,
       _applicationName(applicationName.toString()),
       _so_timeout(so_timeout),
       _uri(std::move(uri)) {
-    if (uri.isValid()) {
+    if (_uri.isValid()) {
         _rsm = ReplicaSetMonitor::createIfNeeded(_uri);
     } else {
         _rsm = ReplicaSetMonitor::createIfNeeded(name,
