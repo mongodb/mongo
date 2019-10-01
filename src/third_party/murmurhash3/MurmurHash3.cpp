@@ -9,9 +9,11 @@
 
 #include "MurmurHash3.h"
 
-#include "mongo/base/data_type_endian.h"
-#include "mongo/base/data_view.h"
-#include "mongo/platform/endian.h"
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+
+namespace {
 
 //-----------------------------------------------------------------------------
 // Platform-specific functions and macros
@@ -22,25 +24,36 @@
 
 #define FORCE_INLINE	__forceinline
 
-#include <stdlib.h>
-
 #define ROTL32(x,y)	_rotl(x,y)
 #define ROTL64(x,y)	_rotl64(x,y)
 
 #define BIG_CONSTANT(x) (x)
 
+#if (defined(_M_IX86) || defined(_M_X64))
+constexpr bool kNativeIsLittle = true;
+#else
+#error "architecture has unknown byte order"
+#endif
+
+uint32_t bswap( uint32_t v ) {
+    return _byteswap_ulong(v);
+}
+uint64_t bswap( uint64_t v ) {
+    return _byteswap_uint64(v);
+}
+
 // Other compilers
 
 #else	// defined(_MSC_VER)
 
-#define	FORCE_INLINE __attribute__((always_inline))
+#define	FORCE_INLINE inline __attribute__((always_inline))
 
-inline uint32_t rotl32 ( uint32_t x, int8_t r )
+FORCE_INLINE uint32_t rotl32 ( uint32_t x, int8_t r )
 {
   return (x << r) | (x >> (32 - r));
 }
 
-inline uint64_t rotl64 ( uint64_t x, int8_t r )
+FORCE_INLINE uint64_t rotl64 ( uint64_t x, int8_t r )
 {
   return (x << r) | (x >> (64 - r));
 }
@@ -50,33 +63,58 @@ inline uint64_t rotl64 ( uint64_t x, int8_t r )
 
 #define BIG_CONSTANT(x) (x##LLU)
 
+constexpr bool kNativeIsLittle = (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__);
+
+FORCE_INLINE uint32_t bswap( uint32_t v ) {
+    return __builtin_bswap32(v);
+}
+FORCE_INLINE uint64_t bswap( uint64_t v ) {
+    return __builtin_bswap64(v);
+}
 #endif // !defined(_MSC_VER)
+
+template <typename T>
+FORCE_INLINE T nativeToLittle( T t )
+{
+    if constexpr (!kNativeIsLittle) {
+        t = bswap(t);
+    }
+    return t;
+}
 
 //-----------------------------------------------------------------------------
 // Block read - if your platform needs to do endian-swapping or can only
 // handle aligned reads, do the conversion here
-//
-// NOTE, MongoDB code: JC -
-// ConstDataView handles the byte swapping and avoids unaligned reads.  Note
-// that we need reversed versions because we actually want little endian
-// encoded blocks out of getblock, and our input data is in the native format.
-
-FORCE_INLINE inline uint32_t getblock ( const uint32_t * p, int i )
+template <typename T>
+FORCE_INLINE T getblock( const void* p, int i )
 {
-    return mongo::ConstDataView(reinterpret_cast<const char*>(p))
-        .read<mongo::ReverseLittleEndian<uint32_t>>(i * sizeof(uint32_t));
+    T t;
+    std::memcpy(&t, static_cast<const char*>(p) + i * sizeof(T), sizeof(T));
+    return nativeToLittle(t);
 }
 
-FORCE_INLINE inline uint64_t getblock ( const uint64_t * p, int i )
+FORCE_INLINE uint32_t getblock32( const void* p, int i )
 {
-    return mongo::ConstDataView(reinterpret_cast<const char*>(p))
-        .read<mongo::ReverseLittleEndian<uint64_t>>(i * sizeof(uint64_t));
+    return getblock<uint32_t>(p, i);
+}
+
+FORCE_INLINE uint64_t getblock64( const void* p, int i )
+{
+    return getblock<uint64_t>(p, i);
+}
+
+// Block write - opposite of getblock, force little endian and do unaligned write.
+template <typename T>
+FORCE_INLINE void putblock( void* p, int i, T t )
+{
+    t = nativeToLittle(t);
+    std::memcpy(static_cast<char*>(p) + i * sizeof(T), &t, sizeof(T));
 }
 
 //-----------------------------------------------------------------------------
 // Finalization mix - force all bits of a hash block to avalanche
 
-FORCE_INLINE inline uint32_t fmix ( uint32_t h )
+FORCE_INLINE uint32_t fmix ( uint32_t h )
 {
   h ^= h >> 16;
   h *= 0x85ebca6b;
@@ -89,7 +127,7 @@ FORCE_INLINE inline uint32_t fmix ( uint32_t h )
 
 //----------
 
-FORCE_INLINE inline uint64_t fmix ( uint64_t k )
+FORCE_INLINE uint64_t fmix ( uint64_t k )
 {
   k ^= k >> 33;
   k *= BIG_CONSTANT(0xff51afd7ed558ccd);
@@ -99,6 +137,8 @@ FORCE_INLINE inline uint64_t fmix ( uint64_t k )
 
   return k;
 }
+
+}  // namespace
 
 //-----------------------------------------------------------------------------
 
@@ -120,7 +160,7 @@ void MurmurHash3_x86_32 ( const void * key, int len,
 
   for(int i = -nblocks; i; i++)
   {
-    uint32_t k1 = getblock(blocks,i);
+    uint32_t k1 = getblock32(blocks,i);
 
     k1 *= c1;
     k1 = ROTL32(k1,15);
@@ -153,7 +193,7 @@ void MurmurHash3_x86_32 ( const void * key, int len,
 
   h1 = fmix(h1);
 
-  *(uint32_t*)out = mongo::endian::nativeToLittle(h1);
+  putblock(out, 0, h1);
 } 
 
 //-----------------------------------------------------------------------------
@@ -181,10 +221,10 @@ void MurmurHash3_x86_128 ( const void * key, const int len,
 
   for(int i = -nblocks; i; i++)
   {
-    uint32_t k1 = getblock(blocks,i*4+0);
-    uint32_t k2 = getblock(blocks,i*4+1);
-    uint32_t k3 = getblock(blocks,i*4+2);
-    uint32_t k4 = getblock(blocks,i*4+3);
+    uint32_t k1 = getblock32(blocks,i*4+0);
+    uint32_t k2 = getblock32(blocks,i*4+1);
+    uint32_t k3 = getblock32(blocks,i*4+2);
+    uint32_t k4 = getblock32(blocks,i*4+3);
 
     k1 *= c1; k1  = ROTL32(k1,15); k1 *= c2; h1 ^= k1;
 
@@ -255,10 +295,10 @@ void MurmurHash3_x86_128 ( const void * key, const int len,
   h1 += h2; h1 += h3; h1 += h4;
   h2 += h1; h3 += h1; h4 += h1;
 
-  ((uint32_t*)out)[0] = mongo::endian::nativeToLittle(h1);
-  ((uint32_t*)out)[1] = mongo::endian::nativeToLittle(h2);
-  ((uint32_t*)out)[2] = mongo::endian::nativeToLittle(h3);
-  ((uint32_t*)out)[3] = mongo::endian::nativeToLittle(h4);
+  putblock(out, 0, h1);
+  putblock(out, 1, h2);
+  putblock(out, 2, h3);
+  putblock(out, 3, h4);
 }
 
 //-----------------------------------------------------------------------------
@@ -282,8 +322,8 @@ void MurmurHash3_x64_128 ( const void * key, const int len,
 
   for(int i = 0; i < nblocks; i++)
   {
-    uint64_t k1 = getblock(blocks,i*2+0);
-    uint64_t k2 = getblock(blocks,i*2+1);
+    uint64_t k1 = getblock64(blocks,i*2+0);
+    uint64_t k2 = getblock64(blocks,i*2+1);
 
     k1 *= c1; k1  = ROTL64(k1,31); k1 *= c2; h1 ^= k1;
 
@@ -338,9 +378,8 @@ void MurmurHash3_x64_128 ( const void * key, const int len,
   h1 += h2;
   h2 += h1;
 
-  ((uint64_t*)out)[0] = mongo::endian::nativeToLittle(h1);
-  ((uint64_t*)out)[1] = mongo::endian::nativeToLittle(h2);
+  putblock(out, 0, h1);
+  putblock(out, 1, h2);
 }
 
 //-----------------------------------------------------------------------------
-
