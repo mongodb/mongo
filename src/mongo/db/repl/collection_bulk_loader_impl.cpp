@@ -154,9 +154,20 @@ Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::con
             }
 
             if (loc) {
-                // Inserts index entries into the external sorter. This will not update
-                // pre-existing indexes.
-                status = _addDocumentToIndexBlocks(doc, loc.get());
+                // Inserts index entries into the external sorter. This will not update pre-existing
+                // indexes. Wrap this in a WUOW since the index entry insertion may modify the
+                // durable record store which can throw a write conflict exception.
+                status =
+                    writeConflictRetry(_opCtx.get(), "_addDocumentToIndexBlocks", _nss.ns(), [&] {
+                        WriteUnitOfWork wunit(_opCtx.get());
+                        status = _addDocumentToIndexBlocks(doc, loc.get());
+                        // We only need to commit the unit of work if the index insertion was
+                        // successful.
+                        if (status.isOK()) {
+                            wunit.commit();
+                        }
+                        return status;
+                    });
             }
 
             if (!status.isOK()) {
