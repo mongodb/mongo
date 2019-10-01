@@ -7,7 +7,6 @@
  *   requires_replication,
  *   requires_sharding,
  *   requires_wiredtiger,
- *   two_phase_index_builds_unsupported,
  * ]
  */
 (function() {

@@ -14,7 +14,6 @@
  * @tags: [
  *     requires_persistence,
  *     requires_replication,
- *     two_phase_index_builds_unsupported,
  * ]
  */
 

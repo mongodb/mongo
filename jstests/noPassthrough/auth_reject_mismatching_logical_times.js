@@ -4,7 +4,6 @@
  * @tags: [
  *   requires_replication,
  *   requires_sharding,
- *   two_phase_index_builds_unsupported,
  * ]
  */
 (function() {

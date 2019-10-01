@@ -1015,6 +1015,18 @@ void IndexBuildsCoordinator::_buildIndex(
 
     if (supportsTwoPhaseIndexBuild() && indexBuildOptions.replSetAndNotPrimary &&
         IndexBuildProtocol::kTwoPhase == replState->protocol) {
+
+        log() << "Index build waiting for commit or abort before completing final phase: "
+              << replState->buildUUID;
+
+        // Yield locks and storage engine resources before blocking.
+        opCtx->recoveryUnit()->abandonSnapshot();
+        Lock::TempRelease release(opCtx->lockState());
+        invariant(!opCtx->lockState()->isLocked(),
+                  str::stream()
+                      << "failed to yield locks for index build while waiting for commit or abort: "
+                      << replState->buildUUID);
+
         stdx::unique_lock<Latch> lk(replState->mutex);
         auto isReadyToCommitOrAbort = [rs = replState] { return rs->isCommitReady || rs->aborted; };
         opCtx->waitForConditionOrInterrupt(replState->condVar, lk, isReadyToCommitOrAbort);
