@@ -91,7 +91,7 @@ selector:
   - jstests/core/sort_array.js
   # TODO: SERVER-16605
   - jstests/core/mr_index.js
-  - jstests/core/mr1.js
+  - jstests/core/mr_correctness.js
   - jstests/core/mr3.js
   - jstests/core/mr4.js
   - jstests/core/mr5.js

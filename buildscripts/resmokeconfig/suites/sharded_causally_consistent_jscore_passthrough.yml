@@ -63,7 +63,7 @@ selector:
   # collection is sharded on anything other than {_id: 1}.
   - jstests/core/mr_undef.js
   # TODO: SERVER-16605
-  - jstests/core/mr1.js
+  - jstests/core/mr_correctness.js
   - jstests/core/mr3.js
   - jstests/core/mr4.js
   # TODO: SERVER-30052
