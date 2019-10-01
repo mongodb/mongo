@@ -12,7 +12,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     const collName = "foo";
     const ns = dbName + "." + collName;
 
-    const st = new ShardingTest({shards: 2});
+    const st = new ShardingTest({shards: 2, other: {rs: true}});
 
     jsTest.log("Insert some data.");
     const nDocs = 100;
@@ -49,7 +49,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     assert.eq(nDocs, findRes.cursor.firstBatch.length);
 
     jsTest.log("Stopping " + st.shard0.shardName);
-    MongoRunner.stopMongod(st.shard0);
+    st.rs0.stopSet();
 
     jsTest.log("Without 'allowPartialResults', if some shard down, find fails.");
     assert.commandFailed(coll.runCommand({find: collName}));
@@ -57,11 +57,22 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     jsTest.log("With 'allowPartialResults: false', if some shard down, find fails.");
     assert.commandFailed(coll.runCommand({find: collName, allowPartialResults: false}));
 
-    jsTest.log(
-        "With 'allowPartialResults: true', if some shard down, find succeeds with partial results");
-    findRes = assert.commandWorked(coll.runCommand({find: collName, allowPartialResults: true}));
-    assert.commandWorked(findRes);
-    assert.eq(nDocs / 2, findRes.cursor.firstBatch.length);
+    if (jsTestOptions().mongosBinVersion == "last-stable") {
+        // In v3.6, mongos was updated to swallow FailedToSatisfyReadPreference errors if
+        // allowPartialResults is true, allowing allowPartialResults to work with replica set shards
+        // (see SERVER-33597 for details). So when the mongos version is v3.4, the command should
+        // fail.
+        jsTest.log(
+            "With 'allowPartialResults: true', if some shard down and mongos version is v3.4, find fails");
+        assert.commandFailedWithCode(coll.runCommand({find: collName, allowPartialResults: true}),
+                                     ErrorCodes.FailedToSatisfyReadPreference);
+    } else {
+        jsTest.log(
+            "With 'allowPartialResults: true', if some shard down, find succeeds with partial results");
+        findRes = coll.runCommand({find: collName, allowPartialResults: true});
+        assert.commandWorked(findRes);
+        assert.eq(nDocs / 2, findRes.cursor.firstBatch.length);
+    }
 
     jsTest.log("The allowPartialResults option does not currently apply to aggregation.");
     assert.commandFailedWithCode(coll.runCommand({

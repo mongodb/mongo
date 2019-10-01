@@ -118,13 +118,16 @@ StatusWith<std::vector<ClusterClientCursorParams::RemoteCursor>> establishCursor
             break;
         }
 
+        // Retriable errors are swallowed if 'allowPartialResults' is true. Targeting shard
+        // replica sets can also throw FailedToSatisfyReadPreference, so we swallow it too.
+        bool isEligibleException =
+            (std::find(RemoteCommandRetryScheduler::kAllRetriableErrors.begin(),
+                       RemoteCommandRetryScheduler::kAllRetriableErrors.end(),
+                       swCursorResponse.getStatus().code()) !=
+                 RemoteCommandRetryScheduler::kAllRetriableErrors.end() ||
+             swCursorResponse.getStatus().code() == ErrorCodes::FailedToSatisfyReadPreference);
 
-        // Retriable errors are swallowed if 'allowPartialResults' is true.
-        if (allowPartialResults &&
-            std::find(RemoteCommandRetryScheduler::kAllRetriableErrors.begin(),
-                      RemoteCommandRetryScheduler::kAllRetriableErrors.end(),
-                      swCursorResponse.getStatus().code()) !=
-                RemoteCommandRetryScheduler::kAllRetriableErrors.end()) {
+        if (allowPartialResults && isEligibleException) {
             continue;
         }
 
