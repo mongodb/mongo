@@ -191,7 +191,7 @@ Status RecordStore::updateRecord(OperationContext* opCtx,
                                  const char* data,
                                  int len) {
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
-    SizeAdjuster(opCtx, this);
+    SizeAdjuster adjuster(opCtx, this);
     {
         std::string key = createKey(_ident, oldLocation.repr());
         StringStore::const_iterator it = workingCopy->find(key);
