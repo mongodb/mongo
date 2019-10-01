@@ -57,8 +57,7 @@ function test(st, db, sharded, indexType) {
     assert.gt(res.cursor.firstBatch.length, 0, tojson(res));
 }
 
-// TODO: SERVER-33954 Remove shardAsReplicaSet: false
-var st = new ShardingTest({shards: 3, mongos: 1, other: {shardAsReplicaSet: false}});
+var st = new ShardingTest({shards: 3, mongos: 1});
 assert.commandWorked(st.s0.adminCommand({enablesharding: "test"}));
 st.ensurePrimaryShard('test', st.shard1.shardName);
 

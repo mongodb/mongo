@@ -228,8 +228,7 @@ function checkAllUpdateQueries(makeMongosStaleFunc) {
     doUpdate(multiPointQuery, oUpdate, multi, makeMongosStaleFunc);
 }
 
-// TODO: SERVER-33954 remove shardAsReplicaSet: false.
-const st = new ShardingTest({shards: 2, mongos: 2, other: {shardAsReplicaSet: false}});
+const st = new ShardingTest({shards: 2, mongos: 2});
 
 const dbName = 'test';
 const collNS = dbName + '.foo';
