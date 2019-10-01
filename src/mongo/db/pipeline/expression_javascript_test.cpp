@@ -90,22 +90,21 @@ TEST_F(MapReduceFixture, ExpressionInternalJsProducesExpectedResult) {
 
     Value result = expr->evaluate(Document{BSON("a" << 2)}, getVariables());
     ASSERT_VALUE_EQ(result, Value(6));
-}
 
-TEST_F(MapReduceFixture, ExpressionInternalJsFailsWithIncorrectNumberOfArguments) {
-    auto bsonExpr =
+    bsonExpr =
         BSON("expr" << BSON("eval"
                             << "function(first, second, third) {return first + second + third;};"
                             << "args" << BSON_ARRAY(1 << 2 << 4)));
-    auto expr = ExpressionInternalJs::parse(getExpCtx(), bsonExpr.firstElement(), getVPS());
-
-    ASSERT_THROWS_CODE(expr->evaluate({}, getVariables()), AssertionException, 31267);
+    expr = ExpressionInternalJs::parse(getExpCtx(), bsonExpr.firstElement(), getVPS());
+    result = expr->evaluate(Document{BSONObj{}}, getVariables());
+    ASSERT_VALUE_EQ(result, Value(7));
 
     bsonExpr = BSON("expr" << BSON("eval"
                                    << "function(first) {return first;};"
                                    << "args" << BSON_ARRAY(1)));
     expr = ExpressionInternalJs::parse(getExpCtx(), bsonExpr.firstElement(), getVPS());
-    ASSERT_THROWS_CODE(expr->evaluate({}, getVariables()), AssertionException, 31267);
+    result = expr->evaluate(Document{BSONObj{}}, getVariables());
+    ASSERT_VALUE_EQ(result, Value(1));
 }
 
 TEST_F(MapReduceFixture, ExpressionInternalJsFailsIfArgsDoesNotEvaluateToArray) {
