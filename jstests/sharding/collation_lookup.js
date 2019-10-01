@@ -216,8 +216,7 @@ function runTests(withDefaultCollationColl, withoutDefaultCollationColl, collati
                " up to ordering");
 
     // Test that the $lookup stage respects an explicit collation on the aggregation operation
-    // when
-    // it optimizes with an $unwind stage.
+    // when it optimizes with an $unwind stage.
     res = withoutDefaultCollationColl
                   .aggregate(
                       [
@@ -302,7 +301,9 @@ function runTests(withDefaultCollationColl, withoutDefaultCollationColl, collati
            "Expected " + tojson(expected) + " to equal " + tojson(res) + " up to ordering");
 
     // Test that the $lookup stage uses the "simple" collation if a collation isn't set on the
-    // collection or the aggregation operation.
+    // collection or the aggregation operation, even if the foreign collection has a collation.
+    // TODO SERVER-38830: when a pipeline $lookup is capable of serializing its 'let' variables to
+    // remote shards, add a test-case to exercise SERVER-43350.
     res = withoutDefaultCollationColl
                   .aggregate([
                       {$match: {_id: "lowercase"}},
