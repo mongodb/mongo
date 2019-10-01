@@ -10,10 +10,26 @@ LOGGER = structlog.get_logger(__name__)
 
 
 def _paths_for_iter(diff, iter_type):
-    return {change.a_path for change in diff.iter_change_type(iter_type)}
+    """
+    Get the set for all the files in the given diff for the specified type.
+
+    :param diff: git diff to query.
+    :param iter_type: Iter type ['M', 'A', 'R', 'D'].
+    :return: set of changed files.
+    """
+    a_path_changes = {change.a_path for change in diff.iter_change_type(iter_type)}
+    b_path_changes = {change.b_path for change in diff.iter_change_type(iter_type)}
+    return a_path_changes.union(b_path_changes)
 
 
 def _modified_files_for_diff(diff: DiffIndex, log: Any) -> Set:
+    """
+    Get the set of files modified in the given git diff.
+
+    :param diff: Git diff information.
+    :param log: Logger for logging.
+    :return: Set of files that were modified in diff.
+    """
     modified_files = _paths_for_iter(diff, 'M')
     log.debug("modified files", files=modified_files)
 
@@ -23,11 +39,10 @@ def _modified_files_for_diff(diff: DiffIndex, log: Any) -> Set:
     renamed_files = _paths_for_iter(diff, 'R')
     log.debug("renamed files", files=renamed_files)
 
-    # We don't care about delete files, but log them just in case.
     deleted_files = _paths_for_iter(diff, 'D')
     log.debug("deleted files", files=deleted_files)
 
-    return modified_files.union(added_files).union(renamed_files)
+    return modified_files.union(added_files).union(renamed_files).union(deleted_files)
 
 
 def find_changed_files(repo: Repo) -> Set[str]:
