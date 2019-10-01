@@ -207,6 +207,12 @@ DBClientBase* MongoURI::connect(StringData applicationName,
         return nullptr;
     }
 
+    if (!getSetName().empty()) {
+        // When performing initial topology discovery, don't bother authenticating
+        // since we will be immediately restarting our connect loop to a single node.
+        return ret.release();
+    }
+
     auto optAuthObj =
         _makeAuthObjFromOptions(ret->getMaxWireVersion(), ret->getIsMasterSaslMechanisms());
     if (optAuthObj) {
