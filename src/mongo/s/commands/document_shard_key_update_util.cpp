@@ -130,13 +130,12 @@ namespace documentShardKeyUpdateUtil {
 
 bool updateShardKeyForDocument(OperationContext* opCtx,
                                const NamespaceString& nss,
-                               const WouldChangeOwningShardInfo& documentKeyChangeInfo,
-                               int stmtId) {
+                               const WouldChangeOwningShardInfo& documentKeyChangeInfo) {
     auto updatePreImage = documentKeyChangeInfo.getPreImage().getOwned();
     auto updatePostImage = documentKeyChangeInfo.getPostImage().getOwned();
 
-    auto deleteCmdObj = constructShardKeyDeleteCmdObj(nss, updatePreImage, stmtId);
-    auto insertCmdObj = constructShardKeyInsertCmdObj(nss, updatePostImage, stmtId);
+    auto deleteCmdObj = constructShardKeyDeleteCmdObj(nss, updatePreImage);
+    auto insertCmdObj = constructShardKeyInsertCmdObj(nss, updatePostImage);
 
     return executeOperationsAsPartOfShardKeyUpdate(
         opCtx, deleteCmdObj, insertCmdObj, nss.db(), documentKeyChangeInfo.getShouldUpsert());
@@ -159,21 +158,13 @@ BSONObj commitShardKeyUpdateTransaction(OperationContext* opCtx) {
     return txnRouter.commitTransaction(opCtx, boost::none);
 }
 
-BSONObj constructShardKeyDeleteCmdObj(const NamespaceString& nss,
-                                      const BSONObj& updatePreImage,
-                                      int stmtId) {
+BSONObj constructShardKeyDeleteCmdObj(const NamespaceString& nss, const BSONObj& updatePreImage) {
     auto deleteOp = createShardKeyDeleteOp(nss, updatePreImage);
-    // TODO SERVER-40181: Do not set the stmtId once we remove stmtIds from txn oplog entries
-    deleteOp.getWriteCommandBase().setStmtId(stmtId);
     return deleteOp.toBSON({});
 }
 
-BSONObj constructShardKeyInsertCmdObj(const NamespaceString& nss,
-                                      const BSONObj& updatePostImage,
-                                      int stmtId) {
+BSONObj constructShardKeyInsertCmdObj(const NamespaceString& nss, const BSONObj& updatePostImage) {
     auto insertOp = createShardKeyInsertOp(nss, updatePostImage);
-    // TODO SERVER-40181: Do not set the stmtId once we remove stmtIds from txn oplog entries
-    insertOp.getWriteCommandBase().setStmtId(stmtId);
     return insertOp.toBSON({});
 }
 

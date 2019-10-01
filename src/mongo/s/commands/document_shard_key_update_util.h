@@ -72,8 +72,7 @@ static constexpr StringData kNonDuplicateKeyErrorContext =
  */
 bool updateShardKeyForDocument(OperationContext* opCtx,
                                const NamespaceString& nss,
-                               const WouldChangeOwningShardInfo& documentKeyChangeInfo,
-                               int stmtId);
+                               const WouldChangeOwningShardInfo& documentKeyChangeInfo);
 
 /**
  * Starts a transaction on this session. This method is called when WouldChangeOwningShard is thrown
@@ -94,9 +93,7 @@ BSONObj commitShardKeyUpdateTransaction(OperationContext* opCtx);
  * This method should not be called outside of this class. It is only temporarily exposed for
  * intermediary test coverage.
  */
-BSONObj constructShardKeyDeleteCmdObj(const NamespaceString& nss,
-                                      const BSONObj& updatePreImage,
-                                      int stmtId);
+BSONObj constructShardKeyDeleteCmdObj(const NamespaceString& nss, const BSONObj& updatePreImage);
 
 /*
  * Creates the BSONObj that will be used to insert the new document with the post-update image.
@@ -105,8 +102,6 @@ BSONObj constructShardKeyDeleteCmdObj(const NamespaceString& nss,
  * This method should not be called outside of this class. It is only temporarily exposed for
  * intermediary test coverage.
  */
-BSONObj constructShardKeyInsertCmdObj(const NamespaceString& nss,
-                                      const BSONObj& updatePostImage,
-                                      int stmtId);
+BSONObj constructShardKeyInsertCmdObj(const NamespaceString& nss, const BSONObj& updatePostImage);
 }  // namespace documentShardKeyUpdateUtil
 }  // namespace mongo

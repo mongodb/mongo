@@ -103,7 +103,7 @@ void updateShardKeyValueOnWouldChangeOwningShardError(OperationContext* opCtx,
 
     try {
         auto matchedDocOrUpserted = documentShardKeyUpdateUtil::updateShardKeyForDocument(
-            opCtx, nss, wouldChangeOwningShardExtraInfo, cmdObj.getIntField("stmtId"));
+            opCtx, nss, wouldChangeOwningShardExtraInfo);
         auto upserted = matchedDocOrUpserted && wouldChangeOwningShardExtraInfo.getShouldUpsert();
         auto updatedExistingDocument = matchedDocOrUpserted && !upserted;
 

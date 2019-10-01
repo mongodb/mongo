@@ -226,13 +226,9 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
             // If we do not get WouldChangeOwningShard when re-running the update, the document has
             // been modified or deleted concurrently and we do not need to delete it and insert a
             // new one.
-            updatedShardKey =
-                wouldChangeOwningShardErrorInfo &&
+            updatedShardKey = wouldChangeOwningShardErrorInfo &&
                 documentShardKeyUpdateUtil::updateShardKeyForDocument(
-                    opCtx,
-                    request.getNS(),
-                    wouldChangeOwningShardErrorInfo.get(),
-                    boost::get_optional_value_or(request.getWriteCommandBase().getStmtId(), 0));
+                                  opCtx, request.getNS(), wouldChangeOwningShardErrorInfo.get());
 
             // If the operation was an upsert, record the _id of the new document.
             if (updatedShardKey && wouldChangeOwningShardErrorInfo->getShouldUpsert()) {
@@ -276,10 +272,7 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
         try {
             // Delete the original document and insert the new one
             updatedShardKey = documentShardKeyUpdateUtil::updateShardKeyForDocument(
-                opCtx,
-                request.getNS(),
-                wouldChangeOwningShardErrorInfo.get(),
-                boost::get_optional_value_or(request.getWriteCommandBase().getStmtId(), 0));
+                opCtx, request.getNS(), wouldChangeOwningShardErrorInfo.get());
 
             // If the operation was an upsert, record the _id of the new document.
             if (updatedShardKey && wouldChangeOwningShardErrorInfo->getShouldUpsert()) {
