@@ -183,11 +183,19 @@ void PlanYieldPolicy::_yieldAllLocks(OperationContext* opCtx,
     // Track the number of yields in CurOp.
     CurOp::get(opCtx)->yielded();
 
-    setYieldAllLocksHang.executeIf([](auto&&) { setYieldAllLocksHang.pauseWhileSet(); },
-                                   [&](const BSONObj& config) {
-                                       StringData ns = config.getStringField("namespace");
-                                       return ns.empty() || ns == planExecNS.ns();
-                                   });
+    setYieldAllLocksHang.executeIf(
+        [opCtx](const BSONObj& config) {
+            setYieldAllLocksHang.pauseWhileSet();
+
+            if (config.getField("checkForInterruptAfterHang").trueValue()) {
+                // Throws.
+                opCtx->checkForInterrupt();
+            }
+        },
+        [&](const BSONObj& config) {
+            StringData ns = config.getStringField("namespace");
+            return ns.empty() || ns == planExecNS.ns();
+        });
     setYieldAllLocksWait.executeIf(
         [&](const BSONObj& data) { sleepFor(Milliseconds(data["waitForMillis"].numberInt())); },
         [&](const BSONObj& config) {

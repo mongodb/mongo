@@ -25,7 +25,7 @@ let res = assert.commandFailedWithCode(t.runCommand("aggregate", {
             {near: [0, 0], distanceField: "d", query: {geo: {$within: {$center: [[0, 0], 1]}}}}
     }],
 }),
-                                       ErrorCodes.BadValue);
+                                       ErrorCodes.NoQueryExecutionPlans);
 assert(res.errmsg.includes("unable to find index for $geoNear query"), tojson(res));
 
 // Spherical is specified so this does work.  Old style points are weird

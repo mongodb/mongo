@@ -71,6 +71,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
@@ -97,6 +98,27 @@ using std::unique_ptr;
 using write_ops::Insert;
 
 namespace {
+
+/**
+ * Return whether the given sort spec can be used in a find() sort.
+ */
+bool canSortBePushedDown(const SortPattern& sortPattern) {
+    for (auto&& patternPart : sortPattern) {
+        if (!patternPart.expression) {
+            continue;
+        }
+
+        // Technically sorting by {$meta: "textScore"} can be done in find() but requires a
+        // corresponding projection, so for simplicity we don't support pushing it down.
+        const auto metaType = patternPart.expression->getMetaType();
+        if (metaType == DocumentMetadataFields::kTextScore ||
+            metaType == DocumentMetadataFields::kRandVal) {
+            return false;
+        }
+    }
+    return true;
+}
+
 /**
  * Returns a PlanExecutor which uses a random cursor to sample documents if successful. Returns {}
  * if the storage engine doesn't support random cursors, or if 'sampleSize' is a large enough
@@ -233,7 +255,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
             return distinctExecutor.getStatus().withContext(
                 "Unable to use distinct scan to optimize $group stage");
         } else if (!distinctExecutor.getValue()) {
-            return {ErrorCodes::OperationFailed,
+            return {ErrorCodes::NoQueryExecutionPlans,
                     "Unable to use distinct scan to optimize $group stage"};
         } else {
             return distinctExecutor;
@@ -678,17 +700,16 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
             pipeline->addInitialSource(groupTransform);
 
             return swExecutorGrouped;
-        } else if (swExecutorGrouped == ErrorCodes::QueryPlanKilled) {
-            return {ErrorCodes::OperationFailed,
-                    str::stream() << "Failed to determine whether query system can provide a "
-                                     "DISTINCT_SCAN grouping: "
-                                  << swExecutorGrouped.getStatus().toString()};
+        } else if (swExecutorGrouped != ErrorCodes::NoQueryExecutionPlans) {
+            return swExecutorGrouped.getStatus().withContext(
+                "Failed to determine whether query system can provide a "
+                "DISTINCT_SCAN grouping");
         }
     }
 
     const BSONObj emptyProjection;
-    const BSONObj metaSortProjection = BSON("$meta"
-                                            << "sortKey");
+    const BSONObj metaSortProjection = BSON("$sortKey" << BSON("$meta"
+                                                               << "sortKey"));
 
     // The only way to get meta information (e.g. the text score) is to let the query system handle
     // the projection. In all other cases, unless the query system can do an index-covered
@@ -698,7 +719,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
         plannerOpts |= QueryPlannerParams::NO_UNCOVERED_PROJECTIONS;
     }
 
-    if (sortStage) {
+    SortPattern userSortPattern(*sortObj, expCtx);
+    if (sortStage && canSortBePushedDown(userSortPattern)) {
         // See if the query system can provide a non-blocking sort.
         auto swExecutorSort =
             attemptToGetExecutor(opCtx,
@@ -732,11 +754,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
             if (swExecutorSortAndProj.isOK()) {
                 // Success! We have a non-blocking sort and a covered projection.
                 exec = std::move(swExecutorSortAndProj.getValue());
-            } else if (swExecutorSortAndProj == ErrorCodes::QueryPlanKilled) {
-                return {ErrorCodes::OperationFailed,
-                        str::stream() << "Failed to determine whether query system can provide a "
-                                         "covered projection in addition to a non-blocking sort: "
-                                      << swExecutorSortAndProj.getStatus().toString()};
+            } else if (swExecutorSortAndProj != ErrorCodes::NoQueryExecutionPlans) {
+
+                return swExecutorSortAndProj.getStatus().withContext(
+                    "Failed to determine whether query system can provide a "
+                    "covered projection in addition to a non-blocking sort");
             } else {
                 // The query system couldn't cover the projection.
                 *projectionObj = BSONObj();
@@ -752,20 +774,15 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                     DocumentSourceLimit::create(expCtx, sortStage->getLimit()));
             }
             return std::move(exec);
-        } else if (swExecutorSort == ErrorCodes::QueryPlanKilled) {
-            return {
-                ErrorCodes::OperationFailed,
-                str::stream()
-                    << "Failed to determine whether query system can provide a non-blocking sort: "
-                    << swExecutorSort.getStatus().toString()};
+        } else if (swExecutorSort != ErrorCodes::NoQueryExecutionPlans) {
+            return swExecutorSort.getStatus().withContext(
+                "Failed to determine whether query system can provide a non-blocking sort");
         }
-        // The query system can't provide a non-blocking sort.
-        *sortObj = BSONObj();
     }
 
-    // Either there was no $sort stage, or the query system could not provide a non-blocking
-    // sort.
-    dassert(sortObj->isEmpty());
+    // Either there's no sort or the query system can't provide a non-blocking sort.
+    *sortObj = BSONObj();
+
     *projectionObj = removeSortKeyMetaProjection(*projectionObj);
     const auto metadataRequired = deps.getAllRequiredMetadataTypes();
     if (metadataRequired.size() == 1 &&
@@ -792,11 +809,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
     if (swExecutorProj.isOK()) {
         // Success! We have a covered projection.
         return std::move(swExecutorProj.getValue());
-    } else if (swExecutorProj == ErrorCodes::QueryPlanKilled) {
-        return {ErrorCodes::OperationFailed,
-                str::stream()
-                    << "Failed to determine whether query system can provide a covered projection: "
-                    << swExecutorProj.getStatus().toString()};
+    } else if (swExecutorProj != ErrorCodes::NoQueryExecutionPlans) {
+        return swExecutorProj.getStatus().withContext(
+            "Failed to determine whether query system can provide a covered projection");
     }
 
     // The query system couldn't provide a covered or simple uncovered projection.

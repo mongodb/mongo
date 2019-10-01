@@ -374,10 +374,10 @@ Status QueryPlanner::tagAccordingToCache(MatchExpression* filter,
                                          const PlanCacheIndexTree* const indexTree,
                                          const map<IndexEntry::Identifier, size_t>& indexMap) {
     if (nullptr == filter) {
-        return Status(ErrorCodes::BadValue, "Cannot tag tree: filter is NULL.");
+        return Status(ErrorCodes::NoQueryExecutionPlans, "Cannot tag tree: filter is NULL.");
     }
     if (nullptr == indexTree) {
-        return Status(ErrorCodes::BadValue, "Cannot tag tree: indexTree is NULL.");
+        return Status(ErrorCodes::NoQueryExecutionPlans, "Cannot tag tree: indexTree is NULL.");
     }
 
     // We're tagging the tree here, so it shouldn't have
@@ -389,7 +389,7 @@ Status QueryPlanner::tagAccordingToCache(MatchExpression* filter,
         ss << "Cache topology and query did not match: "
            << "query has " << filter->numChildren() << " children "
            << "and cache has " << indexTree->children.size() << " children.";
-        return Status(ErrorCodes::BadValue, ss);
+        return Status(ErrorCodes::NoQueryExecutionPlans, ss);
     }
 
     // Continue the depth-first tree traversal.
@@ -406,7 +406,7 @@ Status QueryPlanner::tagAccordingToCache(MatchExpression* filter,
         for (const auto& orPushdown : indexTree->orPushdowns) {
             auto index = indexMap.find(orPushdown.indexEntryId);
             if (index == indexMap.end()) {
-                return Status(ErrorCodes::BadValue,
+                return Status(ErrorCodes::NoQueryExecutionPlans,
                               str::stream() << "Did not find index: " << orPushdown.indexEntryId);
             }
             OrPushdownTag::Destination dest;
@@ -422,7 +422,7 @@ Status QueryPlanner::tagAccordingToCache(MatchExpression* filter,
         if (got == indexMap.end()) {
             str::stream ss;
             ss << "Did not find index with name: " << indexTree->entry->identifier.catalogName;
-            return Status(ErrorCodes::BadValue, ss);
+            return Status(ErrorCodes::NoQueryExecutionPlans, ss);
         }
         if (filter->getTag()) {
             OrPushdownTag* orPushdownTag = static_cast<OrPushdownTag*>(filter->getTag());
@@ -454,7 +454,7 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
         auto soln = buildWholeIXSoln(
             *winnerCacheData.tree->entry, query, params, winnerCacheData.wholeIXSolnDir);
         if (!soln) {
-            return Status(ErrorCodes::BadValue,
+            return Status(ErrorCodes::NoQueryExecutionPlans,
                           "plan cache error: soln that uses index to provide sort");
         } else {
             return {std::move(soln)};
@@ -464,7 +464,8 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
         // with tailable==true, hence the false below.
         auto soln = buildCollscanSoln(query, false, params);
         if (!soln) {
-            return Status(ErrorCodes::BadValue, "plan cache error: collection scan soln");
+            return Status(ErrorCodes::NoQueryExecutionPlans,
+                          "plan cache error: collection scan soln");
         } else {
             return {std::move(soln)};
         }
@@ -512,14 +513,14 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
         query, std::move(clone), expandedIndexes, params));
 
     if (!solnRoot) {
-        return Status(ErrorCodes::BadValue,
+        return Status(ErrorCodes::NoQueryExecutionPlans,
                       str::stream() << "Failed to create data access plan from cache. Query: "
                                     << query.toStringShort());
     }
 
     auto soln = QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot));
     if (!soln) {
-        return Status(ErrorCodes::BadValue,
+        return Status(ErrorCodes::NoQueryExecutionPlans,
                       str::stream()
                           << "Failed to analyze plan from cache. Query: " << query.toStringShort());
     }
@@ -728,7 +729,8 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
             LOG(5) << "Unable to find index for $geoNear query.";
             // Don't leave tags on query tree.
             query.root()->resetTag();
-            return Status(ErrorCodes::BadValue, "unable to find index for $geoNear query");
+            return Status(ErrorCodes::NoQueryExecutionPlans,
+                          "unable to find index for $geoNear query");
         }
 
         LOG(5) << "Rated tree after geonear processing:" << redact(query.root()->debugString());
@@ -751,14 +753,15 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         if (textIndexCount != 1) {
             // Don't leave tags on query tree.
             query.root()->resetTag();
-            return Status(ErrorCodes::BadValue, "need exactly one text index for $text query");
+            return Status(ErrorCodes::NoQueryExecutionPlans,
+                          "need exactly one text index for $text query");
         }
 
         // Error if the text node is tagged with zero indices.
         if (0 == tag->first.size() && 0 == tag->notFirst.size()) {
             // Don't leave tags on query tree.
             query.root()->resetTag();
-            return Status(ErrorCodes::BadValue,
+            return Status(ErrorCodes::NoQueryExecutionPlans,
                           "failed to use text index to satisfy $text query (if text index is "
                           "compound, are equality predicates given for all prefix fields?)");
         }
@@ -836,7 +839,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         MatchExpression* root = query.root();
         for (size_t i = 0; i < root->numChildren(); ++i) {
             if (textNode == root->getChild(i)) {
-                return Status(ErrorCodes::BadValue,
+                return Status(ErrorCodes::NoQueryExecutionPlans,
                               "Failed to produce a solution for TEXT under OR - "
                               "other non-TEXT clauses under OR have to be indexed as well.");
             }

@@ -87,5 +87,5 @@ assert.commandFailedWithCode(
     assert.throws(function() {
                      coll.find({$nor: [{$text: {$search: 'a'}}]}).itcount();
                  }),
-                 ErrorCodes.BadValue);
+                 ErrorCodes.NoQueryExecutionPlans);
 }());

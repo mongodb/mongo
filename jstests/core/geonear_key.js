@@ -62,7 +62,7 @@ assertGeoNearFails({near: [0, 0], key: ""}, ErrorCodes.BadValue);
 assertGeoNearFails({near: [0, 0]}, ErrorCodes.IndexNotFound);
 
 // Verify that the query system raises an error when an index is specified that doesn't exist.
-assertGeoNearFails({near: [0, 0], key: "a"}, ErrorCodes.BadValue);
+assertGeoNearFails({near: [0, 0], key: "a"}, ErrorCodes.NoQueryExecutionPlans);
 
 // Create a number of 2d and 2dsphere indexes.
 assert.commandWorked(coll.createIndex({a: "2d"}));
@@ -89,12 +89,13 @@ assertGeoNearSucceedsAndReturnsIds(
 
 // Verify that $geoNear fails when a GeoJSON point is used with a 'key' path that only has a 2d
 // index. GeoJSON points can only be used for spherical geometry.
-assertGeoNearFails({near: {type: "Point", coordinates: [0, 0]}, key: "b.c"}, ErrorCodes.BadValue);
+assertGeoNearFails({near: {type: "Point", coordinates: [0, 0]}, key: "b.c"},
+                   ErrorCodes.NoQueryExecutionPlans);
 
 // Verify that $geoNear fails when:
 //  -- The only index available over the 'key' path is 2dsphere.
 //  -- spherical=false.
 //  -- The search point is a legacy coordinate pair.
-assertGeoNearFails({near: [0, 0], key: "b.d"}, ErrorCodes.BadValue);
-assertGeoNearFails({near: [0, 0], key: "b.d", spherical: false}, ErrorCodes.BadValue);
+assertGeoNearFails({near: [0, 0], key: "b.d"}, ErrorCodes.NoQueryExecutionPlans);
+assertGeoNearFails({near: [0, 0], key: "b.d", spherical: false}, ErrorCodes.NoQueryExecutionPlans);
 }());

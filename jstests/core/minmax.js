@@ -70,12 +70,12 @@ assert.eq(error.code, 51176, error);
 error = assert.throws(function() {
     coll.find().min({a: 1}).hint({$natural: 1}).toArray();
 });
-assert.eq(error.code, ErrorCodes.BadValue, error);
+assert.eq(error.code, ErrorCodes.NoQueryExecutionPlans, error);
 
 error = assert.throws(function() {
     coll.find().max({a: 1}).hint({$natural: 1}).toArray();
 });
-assert.eq(error.code, ErrorCodes.BadValue);
+assert.eq(error.code, ErrorCodes.NoQueryExecutionPlans);
 
 coll.drop();
 assert.commandWorked(coll.ensureIndex({a: 1}));

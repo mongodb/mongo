@@ -324,6 +324,7 @@ error_codes:
     - {code: 289,name: WaitForMajorityServiceEarlierOpTimeAvailable}
 
     - {code: 290,name: TransactionExceededLifetimeLimitSeconds,categories: [ExceededTimeLimitError]}
+    - {code: 291,name: NoQueryExecutionPlans}
 
     # Error codes 4000-8999 are reserved.
 
