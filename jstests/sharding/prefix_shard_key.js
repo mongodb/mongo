@@ -9,8 +9,14 @@
 (function() {
 'use strict';
 
-// TODO: SERVER-33601 remove shardAsReplicaSet: false
-var s = new ShardingTest({shards: 2, other: {shardAsReplicaSet: false}});
+var checkDocCounts = function(expectedShardCount) {
+    for (var shardName in expectedShardCount) {
+        var shard = (shardName == s.shard0.shardName ? s.shard0 : s.shard1);
+        assert.eq(expectedShardCount[shardName], shard.getDB('test').user.find().count());
+    }
+};
+
+var s = new ShardingTest({shards: 2});
 
 var db = s.getDB("test");
 var admin = s.getDB("admin");
@@ -101,7 +107,7 @@ assert.commandWorked(admin.runCommand({
     _waitForDelete: true
 }));
 
-var expectedShardCount = {shard0000: 0, shard0001: 0};
+var expectedShardCount = {};
 config.chunks.find({ns: 'test.user'}).forEach(function(chunkDoc) {
     var min = chunkDoc.min.num;
     var max = chunkDoc.max.num;
@@ -114,18 +120,18 @@ config.chunks.find({ns: 'test.user'}).forEach(function(chunkDoc) {
         max = 1000;
     }
 
+    if (!(chunkDoc.shard in expectedShardCount)) {
+        expectedShardCount[chunkDoc.shard] = 0;
+    }
+
     if (max > 0) {
         expectedShardCount[chunkDoc.shard] += (max - min);
     }
 });
 
-assert.eq(expectedShardCount['shard0000'], s.shard0.getDB('test').user.find().count());
-assert.eq(expectedShardCount['shard0001'], s.shard1.getDB('test').user.find().count());
-
+checkDocCounts(expectedShardCount);
 assert.commandWorked(admin.runCommand({split: 'test.user', middle: {num: 70}}));
-
-assert.eq(expectedShardCount['shard0000'], s.shard0.getDB('test').user.find().count());
-assert.eq(expectedShardCount['shard0001'], s.shard1.getDB('test').user.find().count());
+checkDocCounts(expectedShardCount);
 
 //******************Part 3********************
 

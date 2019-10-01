@@ -3,8 +3,7 @@
 // @tags: [requires_sharding]
 //
 
-// TODO: SERVER-33601 remove shardAsReplicaSet: false
-var st = new ShardingTest({shards: 2, mongos: 1, other: {shardAsReplicaSet: false}});
+var st = new ShardingTest({shards: 2, mongos: 1});
 
 var mongos = st.s0;
 var coll = mongos.getCollection("foo.bar");
