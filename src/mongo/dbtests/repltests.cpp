@@ -147,6 +147,9 @@ public:
         wuow.commit();
 
         _opCtx.getServiceContext()->getStorageEngine()->setOldestTimestamp(_lastSetOldestTimestamp);
+
+        // Start with a fresh oplog.
+        deleteAll(cllNS());
     }
     ~Base() {
         // Replication is not supported by mobile SE.
@@ -200,9 +203,6 @@ protected:
                            << endl;
         }
         ASSERT_BSONOBJ_EQ(expected, got);
-    }
-    BSONObj oneOp() const {
-        return _client.findOne(cllNS(), BSONObj());
     }
     int count() const {
         Lock::GlobalWrite lk(&_opCtx);
@@ -346,9 +346,9 @@ public:
         if (mongo::storageGlobalParams.engine == "mobile") {
             return;
         }
-        ASSERT_EQUALS(1, opCount());
+        ASSERT_EQUALS(0, opCount());
         _client.insert(ns(), fromjson("{\"a\":\"b\"}"));
-        ASSERT_EQUALS(2, opCount());
+        ASSERT_EQUALS(1, opCount());
     }
 };
 
