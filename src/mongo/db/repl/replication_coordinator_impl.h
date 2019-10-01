@@ -1023,8 +1023,8 @@ private:
      *      _startVoteRequester_inlock()
      *      _onVoteRequestComplete()
      */
-    void _startElectSelfV1_inlock(TopologyCoordinator::StartElectionReason reason);
-    void _startElectSelfV1(TopologyCoordinator::StartElectionReason reason);
+    void _startElectSelfV1_inlock(StartElectionReasonEnum reason);
+    void _startElectSelfV1(StartElectionReasonEnum reason);
 
     /**
      * Callback called when the dryRun VoteRequester has completed; checks the results and
@@ -1032,15 +1032,13 @@ private:
      * "originalTerm" was the term during which the dry run began, if the term has since
      * changed, do not run for election.
      */
-    void _processDryRunResult(long long originalTerm,
-                              TopologyCoordinator::StartElectionReason reason);
+    void _processDryRunResult(long long originalTerm, StartElectionReasonEnum reason);
 
     /**
      * Begins executing a real election. This is called either a successful dry run, or when the
      * dry run was skipped (which may be specified for a ReplSetStepUp).
      */
-    void _startRealElection_inlock(long long originalTerm,
-                                   TopologyCoordinator::StartElectionReason reason);
+    void _startRealElection_inlock(long long originalTerm, StartElectionReasonEnum reason);
 
     /**
      * Writes the last vote in persistent storage after completing dry run successfully.
@@ -1048,13 +1046,12 @@ private:
      */
     void _writeLastVoteForMyElection(LastVote lastVote,
                                      const executor::TaskExecutor::CallbackArgs& cbData,
-                                     TopologyCoordinator::StartElectionReason reason);
+                                     StartElectionReasonEnum reason);
 
     /**
      * Starts VoteRequester to run the real election when last vote write has completed.
      */
-    void _startVoteRequester_inlock(long long newTerm,
-                                    TopologyCoordinator::StartElectionReason reason);
+    void _startVoteRequester_inlock(long long newTerm, StartElectionReasonEnum reason);
 
     /**
      * Callback called when the VoteRequester has completed; checks the results and
@@ -1062,8 +1059,7 @@ private:
      * "originalTerm" was the term during which the election began, if the term has since
      * changed, do not step up as primary.
      */
-    void _onVoteRequestComplete(long long originalTerm,
-                                TopologyCoordinator::StartElectionReason reason);
+    void _onVoteRequestComplete(long long originalTerm, StartElectionReasonEnum reason);
 
     /**
      * Removes 'host' from the sync source blacklist. If 'host' isn't found, it's simply
@@ -1281,7 +1277,7 @@ private:
     /**
      * Callback which starts an election if this node is electable and using protocolVersion 1.
      */
-    void _startElectSelfIfEligibleV1(TopologyCoordinator::StartElectionReason reason);
+    void _startElectSelfIfEligibleV1(StartElectionReasonEnum reason);
 
     /**
      * Schedules work to be run no sooner than 'when' and returns handle to callback.
