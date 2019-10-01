@@ -911,65 +911,6 @@ public:
 };
 
 template <bool full, bool background>
-class ValidateIndexOrdering : public ValidateBase {
-public:
-    ValidateIndexOrdering() : ValidateBase(full, background) {}
-
-    void run() {
-
-        // Cannot run validate with {background:true} if either
-        //  - the RecordStore cursor does not retrieve documents in RecordId order
-        //  - or the storage engine does not support checkpoints.
-        if (_background && (!_isInRecordIdOrder || !_engineSupportsCheckpoints)) {
-            return;
-        }
-
-        // Create a new collection, insert three records and check it's valid.
-        lockDb(MODE_X);
-        OpDebug* const nullOpDebug = nullptr;
-        Collection* coll;
-        RecordId id1;
-        {
-            WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            coll = _db->createCollection(&_opCtx, _nss);
-
-            ASSERT_OK(coll->insertDocument(
-                &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
-            id1 = coll->getCursor(&_opCtx)->next()->id;
-            ASSERT_OK(coll->insertDocument(
-                &_opCtx, InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
-            ASSERT_OK(coll->insertDocument(
-                &_opCtx, InsertStatement(BSON("_id" << 3 << "b" << 1)), nullOpDebug, true));
-            wunit.commit();
-        }
-
-        const std::string indexName = "bad_index";
-        auto status = dbtests::createIndexFromSpec(
-            &_opCtx,
-            coll->ns().ns(),
-            BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
-                        << static_cast<int>(kIndexVersion) << "background" << false));
-
-        ASSERT_OK(status);
-        releaseDb();
-        ensureValidateWorked();
-
-        lockDb(MODE_X);
-
-        // Change the IndexDescriptor's keyPattern to descending so the index ordering
-        // appears wrong.
-        IndexCatalog* indexCatalog = coll->getIndexCatalog();
-        IndexDescriptor* descriptor =
-            const_cast<IndexDescriptor*>(indexCatalog->findIndexByName(&_opCtx, indexName));
-        descriptor->setKeyPatternForTest(BSON("a" << -1));
-
-        releaseDb();
-        ensureValidateFailed();
-    }
-};
-
-template <bool full, bool background>
 class ValidateWildCardIndex : public ValidateBase {
 public:
     ValidateWildCardIndex() : ValidateBase(full, background) {}
@@ -1497,8 +1438,6 @@ public:
         // Tests for index validation.
         add<ValidateIndexEntry<false, false>>();
         add<ValidateIndexEntry<false, true>>();
-        add<ValidateIndexOrdering<false, false>>();
-        add<ValidateIndexOrdering<false, true>>();
 
         // Tests that the 'missingIndexEntries' and 'extraIndexEntries' field are populated
         // correctly.

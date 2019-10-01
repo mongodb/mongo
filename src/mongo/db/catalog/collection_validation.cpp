@@ -129,7 +129,7 @@ void _validateIndexes(OperationContext* opCtx,
 
         ValidateResults& curIndexResults = (*indexNsResultsMap)[descriptor->indexName()];
         int64_t numTraversedKeys;
-        indexValidator->traverseIndex(opCtx, descriptor, &numTraversedKeys, &curIndexResults);
+        indexValidator->traverseIndex(opCtx, index.get(), &numTraversedKeys, &curIndexResults);
 
         // If we are performing a full validation, we have information on the number of index keys
         // validated in _validateIndexesInternalStructure (when we validated the internal structure
@@ -207,7 +207,7 @@ void _gatherIndexEntryErrors(OperationContext* opCtx,
                                   << descriptor->indexName() << ".";
 
         indexValidator->traverseIndex(opCtx,
-                                      descriptor,
+                                      index.get(),
                                       /*numTraversedKeys=*/nullptr,
                                       /*ValidateResults=*/nullptr);
     }

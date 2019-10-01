@@ -71,7 +71,7 @@ public:
      * for index consistency.
      */
     void traverseIndex(OperationContext* opCtx,
-                       const IndexDescriptor* descriptor,
+                       const IndexCatalogEntry* index,
                        int64_t* numTraversedKeys,
                        ValidateResults* results);
 

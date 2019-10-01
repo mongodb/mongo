@@ -53,14 +53,6 @@ namespace {
 const long long kInterruptIntervalNumRecords = 4096;
 const long long kInterruptIntervalNumBytes = 50 * 1024 * 1024;  // 50MB.
 
-KeyString::Builder makeWildCardMultikeyMetadataKeyString(const BSONObj& indexKey) {
-    const auto multikeyMetadataOrd = Ordering::make(BSON("" << 1 << "" << 1));
-    const RecordId multikeyMetadataRecordId(RecordId::ReservedId::kWildcardMultikeyMetadataId);
-    return {KeyString::Version::kLatestVersion,
-            indexKey,
-            multikeyMetadataOrd,
-            multikeyMetadataRecordId};
-}
 }  // namespace
 
 Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
@@ -87,13 +79,9 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
         return status;
     }
 
-    for (auto& it : _indexConsistency->getIndexInfo()) {
-        IndexInfo& indexInfo = it.second;
-        const IndexDescriptor* descriptor = indexCatalog->findIndexByName(
-            opCtx, indexInfo.indexName, /*includeUnfinishedIndexes=*/false);
-        invariant(descriptor);
-
-        const IndexAccessMethod* iam = indexCatalog->getEntry(descriptor)->accessMethod();
+    for (const auto& index : _validateState->getIndexes()) {
+        const IndexDescriptor* descriptor = index->descriptor();
+        const IndexAccessMethod* iam = index->accessMethod();
 
         if (descriptor->isPartial()) {
             const IndexCatalogEntry* ice = indexCatalog->getEntry(descriptor);
@@ -125,14 +113,10 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
             curRecordResults.valid = false;
         }
 
+        IndexInfo& indexInfo = _indexConsistency->getIndexInfo(descriptor->indexName());
         for (const auto& keyString : multikeyMetadataKeys) {
             try {
-                auto key = KeyString::toBsonSafe(keyString.getBuffer(),
-                                                 keyString.getSize(),
-                                                 indexInfo.ord,
-                                                 keyString.getTypeBits());
-                _indexConsistency->addMultikeyMetadataPath(
-                    makeWildCardMultikeyMetadataKeyString(key), &indexInfo);
+                _indexConsistency->addMultikeyMetadataPath(keyString, &indexInfo);
             } catch (...) {
                 return exceptionToStatus();
             }
@@ -140,12 +124,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
 
         for (const auto& keyString : documentKeySet) {
             try {
-                auto key = KeyString::toBsonSafe(keyString.getBuffer(),
-                                                 keyString.getSize(),
-                                                 indexInfo.ord,
-                                                 keyString.getTypeBits());
-                indexInfo.ks->resetToKey(key, indexInfo.ord, recordId);
-                _indexConsistency->addDocKey(opCtx, *indexInfo.ks, &indexInfo, recordId, key);
+                _indexConsistency->addDocKey(opCtx, keyString, &indexInfo, recordId);
             } catch (...) {
                 return exceptionToStatus();
             }
@@ -155,34 +134,31 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
 }
 
 void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
-                                    const IndexDescriptor* descriptor,
+                                    const IndexCatalogEntry* index,
                                     int64_t* numTraversedKeys,
                                     ValidateResults* results) {
+    const IndexDescriptor* descriptor = index->descriptor();
     auto indexName = descriptor->indexName();
-    IndexInfo* indexInfo = &_indexConsistency->getIndexInfo(indexName);
+    IndexInfo& indexInfo = _indexConsistency->getIndexInfo(indexName);
     int64_t numKeys = 0;
 
-    const auto& key = descriptor->keyPattern();
-    const Ordering ord = Ordering::make(key);
     bool isFirstEntry = true;
 
-    // We want to use the latest version of KeyString here.
-    const KeyString::Version version = KeyString::Version::kLatestVersion;
-    std::unique_ptr<KeyString::Builder> indexKeyStringBuilder =
-        std::make_unique<KeyString::Builder>(version);
-    std::unique_ptr<KeyString::Builder> prevIndexKeyStringBuilder =
-        std::make_unique<KeyString::Builder>(version);
-
+    const KeyString::Version version =
+        index->accessMethod()->getSortedDataInterface()->getKeyStringVersion();
     KeyString::Builder firstKeyString(
-        version, BSONObj(), ord, KeyString::Discriminator::kExclusiveBefore);
+        version, BSONObj(), indexInfo.ord, KeyString::Discriminator::kExclusiveBefore);
+
+    KeyString::Value prevIndexKeyStringValue;
 
     // Ensure that this index has an open index cursor.
     const auto indexCursorIt = _validateState->getIndexCursors().find(indexName);
     invariant(indexCursorIt != _validateState->getIndexCursors().end());
 
     const std::unique_ptr<SortedDataInterfaceThrottleCursor>& indexCursor = indexCursorIt->second;
-    for (auto indexEntry = indexCursor->seek(opCtx, firstKeyString.getValueCopy()); indexEntry;
-         indexEntry = indexCursor->next(opCtx)) {
+    for (auto indexEntry = indexCursor->seekForKeyString(opCtx, firstKeyString.getValueCopy());
+         indexEntry;
+         indexEntry = indexCursor->nextKeyString(opCtx)) {
         if (numKeys % kInterruptIntervalNumRecords == 0) {
             opCtx->checkForInterrupt();
 
@@ -191,10 +167,9 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
                 _validateState->yieldLocks(opCtx);
             }
         }
-        indexKeyStringBuilder->resetToKey(indexEntry->key, ord, indexEntry->loc);
 
         // Ensure that the index entries are in increasing or decreasing order.
-        if (!isFirstEntry && *indexKeyStringBuilder < *prevIndexKeyStringBuilder) {
+        if (!isFirstEntry && indexEntry->keyString < prevIndexKeyStringValue) {
             if (results && results->valid) {
                 results->errors.push_back(
                     "one or more indexes are not in strictly ascending or descending order");
@@ -209,21 +184,18 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
             RecordId::ReservedId::kWildcardMultikeyMetadataId};
         if (descriptor->getIndexType() == IndexType::INDEX_WILDCARD &&
             indexEntry->loc == kWildcardMultikeyMetadataRecordId) {
-            _indexConsistency->removeMultikeyMetadataPath(
-                makeWildCardMultikeyMetadataKeyString(indexEntry->key), indexInfo);
+            _indexConsistency->removeMultikeyMetadataPath(indexEntry->keyString, &indexInfo);
             numKeys++;
             continue;
         }
 
-        _indexConsistency->addIndexKey(
-            *indexKeyStringBuilder, indexInfo, indexEntry->loc, indexEntry->key);
-
+        _indexConsistency->addIndexKey(indexEntry->keyString, &indexInfo, indexEntry->loc);
         numKeys++;
         isFirstEntry = false;
-        prevIndexKeyStringBuilder.swap(indexKeyStringBuilder);
+        prevIndexKeyStringValue = indexEntry->keyString;
     }
 
-    if (results && _indexConsistency->getMultikeyMetadataPathCount(indexInfo) > 0) {
+    if (results && _indexConsistency->getMultikeyMetadataPathCount(&indexInfo) > 0) {
         results->errors.push_back(str::stream()
                                   << "Index '" << descriptor->indexName()
                                   << "' has one or more missing multikey metadata index keys");

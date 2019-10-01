@@ -53,8 +53,6 @@ struct IndexInfo {
     const uint32_t indexNameHash;
     // More efficient representation of the ordering of the descriptor's key pattern.
     const Ordering ord;
-    // For conveniently building KeyStrings in a preallocated buffer.
-    std::unique_ptr<KeyString::Builder> ks;
     // The number of index entries belonging to the index.
     int64_t numKeys = 0;
     // The number of records that have a key in their document that referenced back to the this
@@ -85,10 +83,9 @@ public:
      * inconsistent hash buckets during the first phase of validation.
      */
     void addDocKey(OperationContext* opCtx,
-                   const KeyString::Builder& ks,
+                   const KeyString::Value& ks,
                    IndexInfo* indexInfo,
-                   RecordId recordId,
-                   const BSONObj& indexKey);
+                   RecordId recordId);
 
     /**
      * During the first phase of validation, given the index entry's KeyString, decrement the
@@ -96,10 +93,7 @@ public:
      * For the second phase of validation, try to match the index entry keys that hashed to
      * inconsistent hash buckets during the first phase of validation to document keys.
      */
-    void addIndexKey(const KeyString::Builder& ks,
-                     IndexInfo* indexInfo,
-                     RecordId recordId,
-                     const BSONObj& indexKey);
+    void addIndexKey(const KeyString::Value& ks, IndexInfo* indexInfo, RecordId recordId);
 
     /**
      * To validate $** multikey metadata paths, we first scan the collection and add a hash of all
@@ -107,8 +101,8 @@ public:
      * entries and remove any path encountered. As we expect the index to contain a super-set of
      * the collection paths, a non-empty set represents an invalid index.
      */
-    void addMultikeyMetadataPath(const KeyString::Builder& ks, IndexInfo* indexInfo);
-    void removeMultikeyMetadataPath(const KeyString::Builder& ks, IndexInfo* indexInfo);
+    void addMultikeyMetadataPath(const KeyString::Value& ks, IndexInfo* indexInfo);
+    void removeMultikeyMetadataPath(const KeyString::Value& ks, IndexInfo* indexInfo);
     size_t getMultikeyMetadataPathCount(IndexInfo* indexInfo);
 
     /**
@@ -195,7 +189,7 @@ private:
     /**
      * Returns a hashed value from the given KeyString and index namespace.
      */
-    uint32_t _hashKeyString(const KeyString::Builder& ks, uint32_t indexNameHash) const;
+    uint32_t _hashKeyString(const KeyString::Value& ks, uint32_t indexNameHash) const;
 
 };  // IndexConsistency
 }  // namespace mongo

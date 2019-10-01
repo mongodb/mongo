@@ -89,8 +89,8 @@ struct KeyStringEntry {
         invariant(loc == KeyString::decodeRecordIdAtEnd(ks.getBuffer(), ks.getSize()));
     }
 
-    const KeyString::Value keyString;
-    const RecordId loc;
+    KeyString::Value keyString;
+    RecordId loc;
 };
 
 /**

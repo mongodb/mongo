@@ -133,14 +133,6 @@ public:
         return _projection;
     }
 
-    /**
-     * Test only command for testing behavior resulting from an incorrect key
-     * pattern.
-     */
-    void setKeyPatternForTest(BSONObj newKeyPattern) {
-        _keyPattern = newKeyPattern;
-    }
-
     // How many fields do we index / are in the key pattern?
     int getNumFields() const {
         return _numFields;
