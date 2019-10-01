@@ -797,14 +797,21 @@ public:
     }
 
     boost::optional<IndexKeyEntry> next(RequestedInfo parts) override {
-        // Advance on a cursor at the end is a no-op
-        if (_eof)
+        if (!advanceNext()) {
             return {};
-
-        if (!_lastMoveSkippedKey)
-            advanceWTCursor();
-        updatePosition(true);
+        }
         return curr(parts);
+    }
+
+    boost::optional<KeyStringEntry> nextKeyString() override {
+        if (!advanceNext()) {
+            return {};
+        }
+        if (_eof) {
+            return {};
+        }
+
+        return getKeyStringEntry();
     }
 
     void setEndPosition(const BSONObj& key, bool inclusive) override {
@@ -842,19 +849,7 @@ public:
         dassert(!atOrPastEndPointAfterSeeking());
         dassert(!_id.isNull());
 
-        // Most keys will have a RecordId appeneded to the end, with the exception of the _id index
-        // and timestamp unsafe unique indexes. The contract of this function is to always return a
-        // KeyString with a RecordId, so append one if it does not exists already.
-        auto sizeWithoutRecordId = KeyString::getKeySize(
-            _key.getBuffer(), _key.getSize(), _idx.getOrdering(), _key.getTypeBits());
-        if (_key.getSize() == sizeWithoutRecordId) {
-            // Create a copy of _key with a RecordId. Because _key is used during cursor restore(),
-            // appending the RecordId would cause the cursor to be repositioned incorrectly.
-            KeyString::Builder keyWithRecordId(_key);
-            keyWithRecordId.appendRecordId(_id);
-            return KeyStringEntry(keyWithRecordId.getValueCopy(), _id);
-        }
-        return KeyStringEntry(_key.getValueCopy(), _id);
+        return getKeyStringEntry();
     }
 
     boost::optional<KeyStringEntry> seekExactForKeyString(const KeyString::Value& key) override {
@@ -1147,6 +1142,40 @@ protected:
         updateIdAndTypeBits();
     }
 
+    bool advanceNext() {
+        // Advance on a cursor at the end is a no-op.
+        if (_eof) {
+            return false;
+        }
+        if (!_lastMoveSkippedKey) {
+            advanceWTCursor();
+        }
+        updatePosition(true);
+        return true;
+    }
+
+    KeyStringEntry getKeyStringEntry() {
+        // Most keys will have a RecordId appended to the end, with the exception of the _id index
+        // and timestamp unsafe unique indexes. The contract of this function is to always return a
+        // KeyString with a RecordId, so append one if it does not exists already.
+        auto sizeWithoutRecordId =
+            KeyString::getKeySize(_key.getBuffer(), _key.getSize(), _idx.getOrdering(), _typeBits);
+        if (_key.getSize() == sizeWithoutRecordId) {
+            // Create a copy of _key with a RecordId. Because _key is used during cursor restore(),
+            // appending the RecordId would cause the cursor to be repositioned incorrectly.
+            KeyString::Builder keyWithRecordId(_key);
+            keyWithRecordId.appendRecordId(_id);
+            keyWithRecordId.setTypeBits(_typeBits);
+
+            TRACE_CURSOR << " returning " << keyWithRecordId << ' ' << _id;
+            return KeyStringEntry(keyWithRecordId.getValueCopy(), _id);
+        }
+
+        _key.setTypeBits(_typeBits);
+        TRACE_CURSOR << " returning " << _key << ' ' << _id;
+        return KeyStringEntry(_key.getValueCopy(), _id);
+    }
+
     OperationContext* _opCtx;
     boost::optional<WiredTigerCursor> _cursor;
     const WiredTigerIndex& _idx;  // not owned
@@ -1200,8 +1229,8 @@ public:
             return;
         }
 
-        auto keySize = KeyString::getKeySize(
-            _key.getBuffer(), _key.getSize(), _idx.getOrdering(), _key.getTypeBits());
+        auto keySize =
+            KeyString::getKeySize(_key.getBuffer(), _key.getSize(), _idx.getOrdering(), _typeBits);
 
         if (_key.getSize() == keySize) {
             _updateIdAndTypeBitsFromValue();
@@ -1237,7 +1266,7 @@ public:
 
             // Get the size of the prefix key
             auto keySize = KeyString::getKeySize(
-                _key.getBuffer(), _key.getSize(), _idx.getOrdering(), _key.getTypeBits());
+                _key.getBuffer(), _key.getSize(), _idx.getOrdering(), _typeBits);
 
             // This check is only to avoid returning the same key again after a restore. Keys
             // shorter than _key cannot have "prefix key" same as _key. Therefore we care only about

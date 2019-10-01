@@ -252,6 +252,7 @@ public:
          * If not positioned, returns boost::none.
          */
         virtual boost::optional<IndexKeyEntry> next(RequestedInfo parts = kKeyAndLoc) = 0;
+        virtual boost::optional<KeyStringEntry> nextKeyString() = 0;
 
         //
         // Seeking

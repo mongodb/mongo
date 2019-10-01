@@ -283,6 +283,18 @@ public:
             return *_it;
         }
 
+        boost::optional<KeyStringEntry> nextKeyString() override {
+            boost::optional<IndexKeyEntry> indexKeyEntry = next(RequestedInfo::kKeyAndLoc);
+            if (!indexKeyEntry) {
+                return {};
+            }
+
+            KeyString::Builder builder(
+                KeyString::Version::kLatestVersion, indexKeyEntry->key, _ordering);
+            builder.appendRecordId(indexKeyEntry->loc);
+            return KeyStringEntry(builder.getValueCopy(), indexKeyEntry->loc);
+        }
+
         void setEndPosition(const BSONObj& key, bool inclusive) override {
             if (key.isEmpty()) {
                 // This means scan to end of index.

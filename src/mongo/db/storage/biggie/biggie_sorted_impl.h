@@ -118,6 +118,7 @@ public:
                std::string KSForIdentEnd);
         virtual void setEndPosition(const BSONObj& key, bool inclusive) override;
         virtual boost::optional<IndexKeyEntry> next(RequestedInfo parts = kKeyAndLoc) override;
+        virtual boost::optional<KeyStringEntry> nextKeyString() override;
         virtual boost::optional<IndexKeyEntry> seek(const KeyString::Value& keyString,
                                                     RequestedInfo parts = kKeyAndLoc) override;
         virtual boost::optional<KeyStringEntry> seekForKeyString(
@@ -132,6 +133,7 @@ public:
         virtual void reattachToOperationContext(OperationContext* opCtx) override;
 
     private:
+        bool advanceNext();
         // This is a helper function to check if the cursor was explicitly set by the user or not.
         bool endPosSet();
         // This is a helper function to check if the cursor is valid or not.

@@ -609,6 +609,11 @@ public:
         return _buffer.len() == 0;
     }
 
+    void setTypeBits(const TypeBits& typeBits) {
+        invariant(_state != BuildState::kReleased);
+        _typeBits = typeBits;
+    }
+
     const TypeBits& getTypeBits() const {
         invariant(_state != BuildState::kReleased);
         return _typeBits;

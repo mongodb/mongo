@@ -373,14 +373,20 @@ public:
     virtual ~CursorBase() {}
 
     boost::optional<IndexKeyEntry> next(RequestedInfo parts) override {
+        if (!_advanceNext()) {
+            return {};
+        }
+        return getCurrentEntry(parts);
+    }
+
+    boost::optional<KeyStringEntry> nextKeyString() override {
+        if (!_advanceNext()) {
+            return {};
+        }
         if (_isEOF) {
             return {};
         }
-
-        _advance();
-        _updatePosition();
-
-        return getCurrentEntry(parts);
+        return _getKeyStringEntry();
     }
 
     void setEndPosition(const BSONObj& key, bool inclusive) override {
@@ -417,18 +423,7 @@ public:
         if (_isEOF) {
             return {};
         }
-        auto sizeWithoutRecordId = KeyString::getKeySize(_savedKey.getBuffer(),
-                                                         _savedKey.getSize(),
-                                                         _index.getOrdering(),
-                                                         _savedKey.getTypeBits());
-        if (_savedKey.getSize() == sizeWithoutRecordId) {
-            // Create a copy of _key with a RecordId. Because _key is used during cursor restore(),
-            // appending the RecordId would cause the cursor to be repositioned incorrectly.
-            KeyString::Builder keyWithRecordId(_savedKey);
-            keyWithRecordId.appendRecordId(_savedRecId);
-            return KeyStringEntry(keyWithRecordId.getValueCopy(), _savedRecId);
-        }
-        return KeyStringEntry(_savedKey.getValueCopy(), _savedRecId);
+        return _getKeyStringEntry();
     }
 
     boost::optional<IndexKeyEntry> seekExact(const KeyString::Value& keyStringValue,
@@ -516,6 +511,34 @@ public:
     }
 
 protected:
+    bool _advanceNext() {
+        if (_isEOF) {
+            return false;
+        }
+
+        _advance();
+        _updatePosition();
+        return true;
+    }
+
+    KeyStringEntry _getKeyStringEntry() {
+        auto sizeWithoutRecordId = KeyString::getKeySize(_savedKey.getBuffer(),
+                                                         _savedKey.getSize(),
+                                                         _index.getOrdering(),
+                                                         _savedKey.getTypeBits());
+        if (_savedKey.getSize() == sizeWithoutRecordId) {
+            // Create a copy of _key with a RecordId. Because _key is used during cursor restore(),
+            // appending the RecordId would cause the cursor to be repositioned incorrectly.
+            KeyString::Builder keyWithRecordId(_savedKey);
+            keyWithRecordId.appendRecordId(_savedRecId);
+            keyWithRecordId.setTypeBits(_savedTypeBits);
+            return KeyStringEntry(keyWithRecordId.getValueCopy(), _savedRecId);
+        }
+
+        _savedKey.setTypeBits(_savedTypeBits);
+        return KeyStringEntry(_savedKey.getValueCopy(), _savedRecId);
+    }
+
     /**
      * Advances the cursor and determines if end reached.
      */

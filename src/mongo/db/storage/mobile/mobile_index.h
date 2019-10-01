@@ -105,6 +105,10 @@ public:
     }
 
 protected:
+    bool _advanceNext();
+
+    KeyStringEntry _getKeyStringEntry();
+
     bool _isDup(OperationContext* opCtx, const KeyString::Value& key);
 
     /**

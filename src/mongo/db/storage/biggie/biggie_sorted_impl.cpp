@@ -597,6 +597,35 @@ SortedDataInterface::Cursor::Cursor(OperationContext* opCtx,
       _KSForIdentStart(_KSForIdentStart),
       _KSForIdentEnd(identEndBSON) {}
 
+bool SortedDataInterface::Cursor::advanceNext() {
+    if (!_atEOF) {
+        // If the last move was restore, then we don't need to advance the cursor, since the user
+        // never got the value the cursor was pointing to in the first place. However,
+        // _lastMoveWasRestore will go through extra logic on a unique index, since unique indexes
+        // are not allowed to return the same key twice.
+        if (_lastMoveWasRestore) {
+            _lastMoveWasRestore = false;
+        } else {
+            // We basically just check to make sure the cursor is in the ident.
+            if (_forward && checkCursorValid()) {
+                ++_forwardIt;
+            } else if (!_forward && checkCursorValid()) {
+                ++_reverseIt;
+            }
+            // We check here to make sure that we are on the correct side of the end position, and
+            // that the cursor is still in the ident after advancing.
+            if (!checkCursorValid()) {
+                _atEOF = true;
+                return false;
+            }
+        }
+    } else {
+        _lastMoveWasRestore = false;
+        return false;
+    }
+    return true;
+}
+
 // This function checks whether or not the cursor end position was set by the user or not.
 bool SortedDataInterface::Cursor::endPosSet() {
     return (_forward && _endPos != boost::none) || (!_forward && _endPosReverse != boost::none);
@@ -691,40 +720,25 @@ void SortedDataInterface::Cursor::setEndPosition(const BSONObj& key, bool inclus
 }
 
 boost::optional<IndexKeyEntry> SortedDataInterface::Cursor::next(RequestedInfo parts) {
-    if (!_atEOF) {
-        // If the last move was restore, then we don't need to advance the cursor, since the user
-        // never got the value the cursor was pointing to in the first place. However,
-        // _lastMoveWasRestore will go through extra logic on a unique index, since unique indexes
-        // are not allowed to return the same key twice.
-        if (_lastMoveWasRestore) {
-            _lastMoveWasRestore = false;
-        } else {
-            // We basically just check to make sure the cursor is in the ident.
-            if (_forward) {
-                if (checkCursorValid()) {
-                    ++_forwardIt;
-                }
-            } else {
-                if (checkCursorValid()) {
-                    ++_reverseIt;
-                }
-            }
-            // We check here to make sure that we are on the correct side of the end position, and
-            // that the cursor is still in the ident after advancing.
-            if (!checkCursorValid()) {
-                _atEOF = true;
-                return boost::none;
-            }
-        }
-    } else {
-        _lastMoveWasRestore = false;
-        return boost::none;
+    if (!advanceNext()) {
+        return {};
     }
 
     if (_forward) {
         return keyStringToIndexKeyEntry(_forwardIt->first, _forwardIt->second, _order);
     }
     return keyStringToIndexKeyEntry(_reverseIt->first, _reverseIt->second, _order);
+}
+
+boost::optional<KeyStringEntry> SortedDataInterface::Cursor::nextKeyString() {
+    if (!advanceNext()) {
+        return {};
+    }
+
+    if (_forward) {
+        return keyStringToKeyStringEntry(_forwardIt->first, _forwardIt->second, _order);
+    }
+    return keyStringToKeyStringEntry(_reverseIt->first, _reverseIt->second, _order);
 }
 
 boost::optional<IndexKeyEntry> SortedDataInterface::Cursor::seekAfterProcessing(BSONObj finalKey) {

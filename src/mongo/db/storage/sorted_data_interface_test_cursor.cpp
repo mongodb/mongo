@@ -129,6 +129,53 @@ TEST(SortedDataInterface, ExhaustCursor) {
     }
 }
 
+TEST(SortedDataInterface, ExhaustKeyStringCursor) {
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    std::vector<KeyString::Value> keyStrings;
+    int nToInsert = 10;
+    for (int i = 0; i < nToInsert; i++) {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            BSONObj key = BSON("" << i);
+            RecordId loc(42, i * 2);
+            KeyString::Value ks = makeKeyString(sorted.get(), key, loc);
+            keyStrings.push_back(ks);
+            ASSERT_OK(sorted->insert(opCtx.get(), ks, true));
+            uow.commit();
+        }
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+        for (int i = 0; i < nToInsert; i++) {
+            auto entry = i == 0 ? cursor->seekForKeyString(
+                                      makeKeyStringForSeek(sorted.get(), BSONObj(), true, true))
+                                : cursor->nextKeyString();
+            ASSERT(entry);
+            ASSERT_EQ(entry->keyString, keyStrings.at(i));
+        }
+        ASSERT(!cursor->nextKeyString());
+
+        // Cursor at EOF should remain at EOF when advanced
+        ASSERT(!cursor->nextKeyString());
+    }
+}
+
 // Call advance() on a reverse cursor until it is exhausted.
 // When a cursor positioned at EOF is advanced, it stays at EOF.
 TEST(SortedDataInterface, ExhaustCursorReversed) {
@@ -172,6 +219,54 @@ TEST(SortedDataInterface, ExhaustCursorReversed) {
 
         // Cursor at EOF should remain at EOF when advanced
         ASSERT(!cursor->next());
+    }
+}
+
+TEST(SortedDataInterface, ExhaustKeyStringCursorReversed) {
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    std::vector<KeyString::Value> keyStrings;
+    int nToInsert = 10;
+    for (int i = 0; i < nToInsert; i++) {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            BSONObj key = BSON("" << i);
+            RecordId loc(42, i * 2);
+            KeyString::Value ks = makeKeyString(sorted.get(), key, loc);
+            keyStrings.push_back(ks);
+            ASSERT_OK(sorted->insert(opCtx.get(), ks, true));
+            uow.commit();
+        }
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
+            sorted->newCursor(opCtx.get(), false));
+        for (int i = nToInsert - 1; i >= 0; i--) {
+            auto entry = (i == nToInsert - 1) ? cursor->seekForKeyString(makeKeyStringForSeek(
+                                                    sorted.get(), kMaxBSONKey, false, true))
+                                              : cursor->nextKeyString();
+            ASSERT(entry);
+            ASSERT_EQ(entry->keyString, keyStrings.at(i));
+        }
+        ASSERT(!cursor->nextKeyString());
+
+        // Cursor at EOF should remain at EOF when advanced
+        ASSERT(!cursor->nextKeyString());
     }
 }
 
