@@ -31,13 +31,13 @@
 
 #include "mongo/db/pipeline/document_source_sort.h"
 
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/pipeline/value.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/s/query/document_source_merge_cursors.h"

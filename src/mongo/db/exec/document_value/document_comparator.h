@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/pipeline/document.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 

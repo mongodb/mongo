@@ -31,8 +31,8 @@
 
 #include "mongo/db/repl/idempotency_document_structure.h"
 
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/pipeline/value.h"
 
 namespace mongo {
 

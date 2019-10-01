@@ -33,7 +33,7 @@
 
 #include "mongo/db/pipeline/document_source_geo_near.h"
 
-#include "mongo/db/pipeline/document.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/util/log.h"

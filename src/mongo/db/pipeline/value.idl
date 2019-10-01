@@ -29,7 +29,7 @@
 global:
   cpp_namespace: "mongo"
   cpp_includes:
-    - "mongo/db/pipeline/value.h"
+    - "mongo/db/exec/document_value/value.h"
 
 types:
   Value:

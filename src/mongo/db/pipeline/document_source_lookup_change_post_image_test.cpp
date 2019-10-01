@@ -36,15 +36,15 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_lookup_change_post_image.h"
 #include "mongo/db/pipeline/document_source_mock.h"
-#include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/stub_mongo_process_interface_lookup_single_document.h"
-#include "mongo/db/pipeline/value.h"
 
 namespace mongo {
 namespace {

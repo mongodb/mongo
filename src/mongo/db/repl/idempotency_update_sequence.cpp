@@ -34,9 +34,9 @@
 #include <algorithm>
 #include <memory>
 
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/pipeline/value.h"
 #include "mongo/db/repl/idempotency_document_structure.h"
 
 namespace mongo {

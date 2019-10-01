@@ -32,7 +32,7 @@
 #include <bitset>
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/pipeline/value.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/record_id.h"
 
 namespace mongo {

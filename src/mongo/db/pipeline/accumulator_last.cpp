@@ -31,8 +31,8 @@
 
 #include "mongo/db/pipeline/accumulator.h"
 
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
-#include "mongo/db/pipeline/value.h"
 
 namespace mongo {
 

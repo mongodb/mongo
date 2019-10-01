@@ -31,7 +31,7 @@
 
 #include "mongo/db/exec/projection_exec_agg.h"
 
-#include "mongo/db/pipeline/document.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/parsed_aggregation_projection.h"
 #include "mongo/db/query/projection_policies.h"

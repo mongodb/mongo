@@ -35,7 +35,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/pipeline/document.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/s/query/router_stage_mock.h"
 #include "mongo/unittest/unittest.h"
 

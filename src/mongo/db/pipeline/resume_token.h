@@ -34,8 +34,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/value.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

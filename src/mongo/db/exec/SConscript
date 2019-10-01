@@ -4,6 +4,15 @@ Import("env")
 
 env = env.Clone()
 
+env.SConscript(
+    dirs=[
+        "document_value",
+    ],
+    exports=[
+        "env",
+    ],
+)
+
 # WorkingSet target and associated test
 env.Library(
     target = "working_set",
@@ -13,8 +22,8 @@ env.Library(
     LIBDEPS = [
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/bson/dotted_path_support",
-        "$BUILD_DIR/mongo/db/pipeline/document_value",
         "$BUILD_DIR/mongo/db/service_context",
+        "document_value/document_value",
     ],
 )
 
@@ -63,6 +72,11 @@ env.Library(
 env.CppUnitTest(
     target='db_exec_test',
     source=[
+        "document_value/document_comparator_test.cpp",
+        "document_value/document_metadata_fields_test.cpp",
+        "document_value/document_value_test.cpp",
+        "document_value/document_value_test_util_self_test.cpp",
+        "document_value/value_comparator_test.cpp",
         "find_projection_executor_test.cpp",
         "projection_exec_agg_test.cpp",
         "projection_exec_test.cpp",
@@ -74,8 +88,6 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/auth/authmocks",
         "$BUILD_DIR/mongo/db/projection_exec_agg",
-        "$BUILD_DIR/mongo/db/pipeline/document_value",
-        "$BUILD_DIR/mongo/db/pipeline/document_value_test_util",
         "$BUILD_DIR/mongo/db/query/collation/collator_factory_mock",
         "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",
         "$BUILD_DIR/mongo/db/query/query_test_service_context",
@@ -84,6 +96,8 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
         "$BUILD_DIR/mongo/dbtests/mocklib",
         "$BUILD_DIR/mongo/util/clock_source_mock",
+        "document_value/document_value",
+        "document_value/document_value_test_util",
         "working_set",
     ],
 )

@@ -31,8 +31,8 @@
 
 #include <memory>
 
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/runtime_constants_gen.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/string_map.h"

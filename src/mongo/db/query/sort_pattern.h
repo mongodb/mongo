@@ -30,7 +30,7 @@
 
 #include <vector>
 
-#include "mongo/db/pipeline/document.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/expression.h"
 

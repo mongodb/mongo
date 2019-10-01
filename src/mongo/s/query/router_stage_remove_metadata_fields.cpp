@@ -34,7 +34,7 @@
 #include "mongo/s/query/router_stage_remove_metadata_fields.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/pipeline/document.h"
+#include "mongo/db/exec/document_value/document.h"
 
 namespace mongo {
 

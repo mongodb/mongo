@@ -32,7 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/pipeline/value.h"
+#include "mongo/db/exec/document_value/value.h"
 
 namespace mongo {
 namespace write_ops {

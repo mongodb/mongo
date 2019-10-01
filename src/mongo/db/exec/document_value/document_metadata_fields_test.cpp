@@ -31,8 +31,8 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/pipeline/document_metadata_fields.h"
-#include "mongo/db/pipeline/document_value_test_util.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/unittest.h"
 

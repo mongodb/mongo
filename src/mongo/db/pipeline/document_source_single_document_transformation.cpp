@@ -33,11 +33,11 @@
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include "mongo/db/pipeline/document.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/value.h"
 
 namespace mongo {
 

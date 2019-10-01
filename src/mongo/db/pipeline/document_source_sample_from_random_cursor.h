@@ -29,8 +29,8 @@
 
 #pragma once
 
+#include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/value_comparator.h"
 
 namespace mongo {
 

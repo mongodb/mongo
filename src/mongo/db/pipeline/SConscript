@@ -27,41 +27,13 @@ env.Library(
     )
 
 env.Library(
-    target='document_value',
-    source=[
-        'document.cpp',
-        'document_comparator.cpp',
-        'document_metadata_fields.cpp',
-        'document_path_support.cpp',
-        'value.cpp',
-        'value_comparator.cpp',
-        ],
-    LIBDEPS=[
-        'field_path',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/query/datetime/date_time_support',
-        '$BUILD_DIR/mongo/util/intrusive_counter',
-        ]
-    )
-
-env.Library(
-    target='document_value_test_util',
-    source=[
-        'document_value_test_util.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/unittest/unittest',
-        'document_value',
-    ],
-)
-
-env.Library(
     target='aggregation_request',
     source=[
         'aggregation_request.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/query/explain_options',
@@ -70,7 +42,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/db/write_concern_options',
         'document_sources_idl',
-        'document_value',
     ]
 )
 
@@ -94,7 +65,7 @@ env.Library(
         'dependencies.cpp',
         ],
     LIBDEPS=[
-        'document_value',
+        '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         'field_path',
     ]
 )
@@ -106,12 +77,12 @@ env.Library(
         'expression_trigonometric.cpp',
         ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         '$BUILD_DIR/mongo/db/query/datetime/date_time_support',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/util/regex_util',
         '$BUILD_DIR/mongo/util/summation',
         'dependencies',
-        'document_value',
         'expression_context',
     ]
 )
@@ -144,14 +115,13 @@ env.Library(
         'accumulator_sum.cpp',
         ],
     LIBDEPS=[
-        'document_value',
+        '$BUILD_DIR/mongo/db/exec/document_value/document_value',
+        '$BUILD_DIR/mongo/scripting/scripting_common',
         '$BUILD_DIR/mongo/util/summation',
         'expression',
         'field_path',
-        '$BUILD_DIR/mongo/scripting/scripting_common'
     ]
 )
-
 env.Library(
     target='granularity_rounder',
     source=[
@@ -160,7 +130,7 @@ env.Library(
         'granularity_rounder_preferred_numbers.cpp',
         ],
     LIBDEPS=[
-        'document_value',
+        '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         'expression',
         'field_path',
     ]
@@ -288,6 +258,16 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="document_path_support",
+    source=[
+        'document_path_support.cpp',
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/exec/document_value/document_value",
+    ],
+)
+
 pipelineEnv = env.Clone()
 pipelineEnv.InjectThirdParty(libraries=['snappy'])
 pipelineEnv.Library(
@@ -337,8 +317,8 @@ pipelineEnv.Library(
         'document_source_sort_by_count.cpp',
         'document_source_tee_consumer.cpp',
         'document_source_unwind.cpp',
-        'semantic_analysis.cpp',
         'pipeline.cpp',
+        'semantic_analysis.cpp',
         'sequential_document_cache.cpp',
         'stage_constraints.cpp',
         'tee_buffer.cpp',
@@ -349,6 +329,7 @@ pipelineEnv.Library(
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/curop_failpoint_helpers',
+        '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         '$BUILD_DIR/mongo/db/exec/scoped_timer',
         '$BUILD_DIR/mongo/db/exec/sort_executor',
         '$BUILD_DIR/mongo/db/generic_cursor',
@@ -373,8 +354,8 @@ pipelineEnv.Library(
         '$BUILD_DIR/third_party/shim_snappy',
         'accumulator',
         'dependencies',
+        'document_path_support',
         'document_sources_idl',
-        'document_value',
         'expression',
         'expression_context',
         'expression_javascript',
@@ -428,10 +409,10 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/s/common_s',
-        'document_value',
         'runtime_constants_idl',
     ],
 )
@@ -443,8 +424,6 @@ env.CppUnitTest(
         'accumulator_test.cpp',
         'aggregation_request_test.cpp',
         'dependencies_test.cpp',
-        'document_comparator_test.cpp',
-        'document_metadata_fields_test.cpp',
         'document_path_support_test.cpp',
         'document_source_add_fields_test.cpp',
         'document_source_bucket_auto_test.cpp',
@@ -478,8 +457,6 @@ env.CppUnitTest(
         'document_source_sort_by_count_test.cpp',
         'document_source_sort_test.cpp',
         'document_source_unwind_test.cpp',
-        'document_value_test.cpp',
-        'document_value_test_util_self_test.cpp',
         'expression_convert_test.cpp',
         'expression_date_test.cpp',
         'expression_find_internal_test.cpp',
@@ -504,18 +481,19 @@ env.CppUnitTest(
         'semantic_analysis_test.cpp',
         'sequential_document_cache_test.cpp',
         'tee_buffer_test.cpp',
-        'value_comparator_test.cpp',
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/db/service_context_d",
+        "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/exec/document_value/document_value',
+        '$BUILD_DIR/mongo/db/exec/document_value/document_value_test_util',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/repl/oplog_entry',
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/service_context',
-        "$BUILD_DIR/mongo/db/service_context_d",
-        "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         '$BUILD_DIR/mongo/s/is_mongos',
@@ -527,8 +505,6 @@ env.CppUnitTest(
         'aggregation_request',
         'document_source_mock',
         'document_sources_idl',
-        'document_value',
-        'document_value_test_util',
         'expression',
         'field_path',
         'granularity_rounder',

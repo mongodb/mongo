@@ -29,26 +29,28 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_comparator.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
 
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-bool DocumentComparator::evaluate(Document::DeferredComparison deferredComparison) const {
-    int cmp = Document::compare(deferredComparison.lhs, deferredComparison.rhs, _stringComparator);
+const ValueComparator ValueComparator::kInstance{};
+
+bool ValueComparator::evaluate(Value::DeferredComparison deferredComparison) const {
+    int cmp = Value::compare(deferredComparison.lhs, deferredComparison.rhs, _stringComparator);
     switch (deferredComparison.type) {
-        case Document::DeferredComparison::Type::kLT:
+        case Value::DeferredComparison::Type::kLT:
             return cmp < 0;
-        case Document::DeferredComparison::Type::kLTE:
+        case Value::DeferredComparison::Type::kLTE:
             return cmp <= 0;
-        case Document::DeferredComparison::Type::kEQ:
+        case Value::DeferredComparison::Type::kEQ:
             return cmp == 0;
-        case Document::DeferredComparison::Type::kGTE:
+        case Value::DeferredComparison::Type::kGTE:
             return cmp >= 0;
-        case Document::DeferredComparison::Type::kGT:
+        case Value::DeferredComparison::Type::kGT:
             return cmp > 0;
-        case Document::DeferredComparison::Type::kNE:
+        case Value::DeferredComparison::Type::kNE:
             return cmp != 0;
     }
 

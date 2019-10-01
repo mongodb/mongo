@@ -32,11 +32,11 @@
 #include <algorithm>
 #include <deque>
 
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source_graph_lookup.h"
 #include "mongo/db/pipeline/document_source_mock.h"
-#include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/stub_mongo_process_interface.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"

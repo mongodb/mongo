@@ -36,7 +36,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/fsync_locked.h"
 #include "mongo/db/commands/run_aggregate.h"
-#include "mongo/db/pipeline/document.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/stats/fill_locker_info.h"
 
 namespace mongo {

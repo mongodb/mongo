@@ -34,12 +34,12 @@
 #include <boost/optional.hpp>
 #include <memory>
 
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/pipeline/document.h"
 #include "mongo/db/record_id.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"

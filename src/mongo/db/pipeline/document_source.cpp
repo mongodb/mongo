@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/document_source.h"
 
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/pipeline/document_source_group.h"
@@ -41,7 +42,6 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
-#include "mongo/db/pipeline/value.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {

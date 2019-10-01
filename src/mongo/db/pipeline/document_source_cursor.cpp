@@ -34,8 +34,8 @@
 #include "mongo/db/pipeline/document_source_cursor.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/pipeline/document.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find_common.h"

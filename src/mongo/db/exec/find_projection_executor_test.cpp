@@ -29,9 +29,9 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/find_projection_executor.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"

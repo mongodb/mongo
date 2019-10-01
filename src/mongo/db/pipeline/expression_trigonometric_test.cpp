@@ -31,7 +31,7 @@
 
 #include "mongo/db/pipeline/expression_trigonometric.h"
 
-#include "mongo/db/pipeline/document_value_test_util.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
 

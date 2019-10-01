@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/value.h"
+#include "mongo/db/exec/document_value/value.h"
 
 #include <boost/functional/hash.hpp>
 #include <cmath>
@@ -40,8 +40,8 @@
 #include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/pipeline/document.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/hex.h"

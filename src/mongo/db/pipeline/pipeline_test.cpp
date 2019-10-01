@@ -33,10 +33,11 @@
 #include <string>
 #include <vector>
 
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/dependencies.h"
-#include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_facet.h"
@@ -50,7 +51,6 @@
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_test_optimizations.h"
-#include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/pipeline.h"

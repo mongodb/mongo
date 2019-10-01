@@ -35,7 +35,7 @@
 #include <boost/optional/optional_io.hpp>
 #include <random>
 
-#include "mongo/db/pipeline/document.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/hex.h"

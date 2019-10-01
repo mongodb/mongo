@@ -31,10 +31,10 @@
 
 #include <boost/intrusive_ptr.hpp>
 
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source_merge.h"
-#include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/process_interface_standalone.h"
 
 namespace mongo {

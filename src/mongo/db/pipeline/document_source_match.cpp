@@ -33,13 +33,13 @@
 
 #include <memory>
 
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"

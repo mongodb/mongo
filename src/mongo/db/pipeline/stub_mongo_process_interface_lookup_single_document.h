@@ -33,8 +33,8 @@
 #include <deque>
 #include <vector>
 
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/shard_filterer.h"
-#include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stub_mongo_process_interface.h"

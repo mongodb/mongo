@@ -35,8 +35,8 @@
 #include <boost/intrusive_ptr.hpp>
 
 #include "mongo/base/static_assert.h"
-#include "mongo/db/pipeline/document_metadata_fields.h"
-#include "mongo/db/pipeline/value.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {

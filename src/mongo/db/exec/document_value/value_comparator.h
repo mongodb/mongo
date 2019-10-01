@@ -33,7 +33,7 @@
 #include <set>
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/pipeline/value.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 

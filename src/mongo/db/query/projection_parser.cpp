@@ -30,7 +30,7 @@
 #include "mongo/db/query/projection_parser.h"
 
 #include "mongo/base/exact_cast.h"
-#include "mongo/db/pipeline/document.h"
+#include "mongo/db/exec/document_value/document.h"
 
 namespace mongo {
 namespace projection_ast {

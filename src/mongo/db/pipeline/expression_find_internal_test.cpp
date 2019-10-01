@@ -29,8 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/expression_find_internal.h"
 #include "mongo/db/pipeline/parsed_aggregation_projection.h"
 #include "mongo/unittest/unittest.h"

@@ -30,8 +30,8 @@
 #include "mongo/db/pipeline/expression_javascript.h"
 
 #include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_value_test_util.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/process_interface_standalone.h"
 #include "mongo/db/query/query_knobs_gen.h"

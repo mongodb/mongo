@@ -35,11 +35,11 @@
 
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/json.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_sort.h"
-#include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_request.h"

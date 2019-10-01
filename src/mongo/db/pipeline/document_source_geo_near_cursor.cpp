@@ -41,7 +41,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/pipeline/document.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context.h"

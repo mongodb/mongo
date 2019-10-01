@@ -35,9 +35,9 @@
 
 #include "mongo/base/parse_number.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/pipeline/document.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/value.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

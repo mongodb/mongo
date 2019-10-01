@@ -36,10 +36,10 @@
 #include <boost/math/distributions/beta.hpp>
 
 #include "mongo/db/client.h"
-#include "mongo/db/pipeline/document.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/value.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

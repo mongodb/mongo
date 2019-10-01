@@ -33,12 +33,12 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/dependencies.h"
-#include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
-#include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

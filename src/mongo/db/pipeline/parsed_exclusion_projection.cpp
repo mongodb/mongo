@@ -33,9 +33,9 @@
 
 #include <memory>
 
-#include "mongo/db/pipeline/document.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/value.h"
 
 namespace mongo {
 

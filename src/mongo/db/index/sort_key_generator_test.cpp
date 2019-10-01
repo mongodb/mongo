@@ -32,8 +32,8 @@
 #include <memory>
 
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/index/sort_key_generator.h"
-#include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/death_test.h"

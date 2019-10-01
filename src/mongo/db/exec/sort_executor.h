@@ -29,9 +29,9 @@
 
 #pragma once
 
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/sort_key_comparator.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/sorter/sorter.h"

@@ -33,7 +33,7 @@
 #include <stddef.h>
 #include <vector>
 
-#include "mongo/db/pipeline/document.h"
+#include "mongo/db/exec/document_value/document.h"
 
 #include "mongo/base/status.h"
 

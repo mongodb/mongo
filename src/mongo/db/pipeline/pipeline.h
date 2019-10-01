@@ -35,11 +35,11 @@
 
 #include <boost/intrusive_ptr.hpp>
 
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/dependencies.h"
-#include "mongo/db/pipeline/value.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/executor/task_executor.h"

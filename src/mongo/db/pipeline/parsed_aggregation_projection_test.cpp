@@ -36,10 +36,10 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/pipeline/document.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/parsed_inclusion_projection.h"
-#include "mongo/db/pipeline/value.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

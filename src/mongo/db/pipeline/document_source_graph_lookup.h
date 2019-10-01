@@ -29,11 +29,11 @@
 
 #pragma once
 
+#include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lookup_set_cache.h"
-#include "mongo/db/pipeline/value_comparator.h"
 
 namespace mongo {
 

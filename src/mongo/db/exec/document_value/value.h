@@ -31,7 +31,7 @@
 
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/pipeline/value_internal.h"
+#include "mongo/db/exec/document_value/value_internal.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

@@ -34,9 +34,9 @@
 #include <vector>
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/pipeline/document_comparator.h"
+#include "mongo/db/exec/document_value/document_comparator.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/lookup_set_cache.h"
-#include "mongo/db/pipeline/value_comparator.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
 

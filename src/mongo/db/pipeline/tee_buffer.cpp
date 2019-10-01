@@ -33,7 +33,7 @@
 
 #include <algorithm>
 
-#include "mongo/db/pipeline/document.h"
+#include "mongo/db/exec/document_value/document.h"
 
 namespace mongo {
 

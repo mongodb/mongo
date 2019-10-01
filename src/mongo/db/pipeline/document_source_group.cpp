@@ -32,16 +32,16 @@
 #include <boost/filesystem/operations.hpp>
 #include <memory>
 
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
-#include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/pipeline/value.h"
-#include "mongo/db/pipeline/value_comparator.h"
 #include "mongo/util/destructor_guard.h"
 
 namespace mongo {

@@ -34,13 +34,13 @@
 #include <memory>
 
 #include "mongo/base/init.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_algo.h"
-#include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/value.h"
 #include "mongo/db/query/query_knobs_gen.h"
 
 namespace mongo {

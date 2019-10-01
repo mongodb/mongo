@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/document_internal.h"
+#include "mongo/db/exec/document_value/document_internal.h"
 
 #include <boost/functional/hash.hpp>
 #include <boost/intrusive_ptr.hpp>

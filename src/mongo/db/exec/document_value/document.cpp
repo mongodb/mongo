@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/document.h"
+#include "mongo/db/exec/document_value/document.h"
 
 #include <boost/functional/hash.hpp>
 

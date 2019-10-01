@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/document.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/expression.h"
 

@@ -36,13 +36,13 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source_count.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
-#include "mongo/db/pipeline/document_value_test_util.h"
-#include "mongo/db/pipeline/value.h"
 
 namespace mongo {
 namespace {

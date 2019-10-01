@@ -34,12 +34,12 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_comparator.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_comparator.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_path_support.h"
-#include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/value.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

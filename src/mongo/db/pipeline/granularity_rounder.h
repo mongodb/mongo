@@ -33,9 +33,9 @@
 #include <vector>
 
 #include "mongo/base/init.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/value.h"
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {

@@ -35,7 +35,7 @@
 #include <boost/optional.hpp>
 #include <vector>
 
-#include "mongo/db/pipeline/document.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/expression_context.h"
 
 namespace mongo {

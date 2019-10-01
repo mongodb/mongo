@@ -31,12 +31,12 @@
 
 #include "mongo/db/pipeline/document_source_limit.h"
 
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/pipeline/value.h"
 
 namespace mongo {
 

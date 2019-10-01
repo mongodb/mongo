@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/client.h"
-#include "mongo/db/pipeline/value.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/scripting/engine.h"
 
 namespace mongo {

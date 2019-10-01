@@ -31,7 +31,7 @@
 
 #include "mongo/db/pipeline/document_source_mock.h"
 
-#include "mongo/db/pipeline/document.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 

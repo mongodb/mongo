@@ -32,11 +32,11 @@
 #include <functional>
 #include <vector>
 
-#include "mongo/db/pipeline/document.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/value.h"
-#include "mongo/db/pipeline/value_comparator.h"
 
 namespace mongo {
 namespace document_path_support {

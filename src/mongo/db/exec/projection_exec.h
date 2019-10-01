@@ -31,11 +31,11 @@
 
 #include "boost/optional.hpp"
 
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/pipeline/value.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {

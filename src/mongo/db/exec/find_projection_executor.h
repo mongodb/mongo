@@ -29,8 +29,8 @@
 
 #pragma once
 
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/field_path.h"
 
 namespace mongo {

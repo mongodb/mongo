@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_metadata_fields.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
 

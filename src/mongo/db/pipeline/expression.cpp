@@ -40,10 +40,10 @@
 #include <vector>
 
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/value.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/platform/bits.h"
 #include "mongo/platform/decimal128.h"
