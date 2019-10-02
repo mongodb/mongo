@@ -48,6 +48,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session_catalog_mongod.h"
@@ -289,6 +290,26 @@ public:
                 &res);
             CommandHelpers::appendCommandWCStatus(result, waitForWCStatus, res);
         });
+
+        const bool isReplSet = repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
+            repl::ReplicationCoordinator::modeReplSet;
+        if (!isReplSet) {
+            // Only allow changing the FCV on standalone nodes when the config.transactions table
+            // is empty.
+            const auto txnTableNss = NamespaceString::kSessionTransactionsTableNamespace;
+            const auto statusObj =
+                repl::StorageInterface::get(opCtx)->findSingleton(opCtx, txnTableNss);
+            const auto status = statusObj.getStatus();
+            const bool isStandaloneWithEmptyTransactionsTable =
+                (status == ErrorCodes::CollectionIsEmpty ||
+                 status == ErrorCodes::NamespaceNotFound);
+
+            uassert(ErrorCodes::IllegalOperation,
+                    "cannot change featureCompatibilityVersion when in standalone mode with a "
+                    "non-empty config.transactions table. Perform the upgrade/downgrade as "
+                    "a replica set member or empty the config.transactions table to retry.",
+                    isStandaloneWithEmptyTransactionsTable);
+        }
 
         // Only allow one instance of setFeatureCompatibilityVersion to run at a time.
         invariant(!opCtx->lockState()->isLocked());
