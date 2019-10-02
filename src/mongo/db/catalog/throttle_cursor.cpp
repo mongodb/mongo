@@ -132,7 +132,6 @@ void DataThrottle::awaitIfNeeded(OperationContext* opCtx, const int64_t dataSize
 
     int64_t currentMillis =
         opCtx->getServiceContext()->getFastClockSource()->now().toMillisSinceEpoch();
-    invariant(_startMillis <= currentMillis);
 
     // Reset the tracked information as the second has rolled over the starting point.
     if (currentMillis >= _startMillis + 1000) {
