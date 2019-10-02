@@ -98,6 +98,15 @@ std::set<std::string> DatabaseHolderImpl::getNamesWithConflictingCasing(StringDa
     return _getNamesWithConflictingCasing_inlock(name);
 }
 
+std::vector<std::string> DatabaseHolderImpl::getNames() {
+    stdx::lock_guard<SimpleMutex> lk(_m);
+    std::vector<std::string> names;
+    for (const auto& nameAndPointer : _dbs) {
+        names.push_back(nameAndPointer.first);
+    }
+    return names;
+}
+
 Database* DatabaseHolderImpl::openDb(OperationContext* opCtx, StringData ns, bool* justCreated) {
     const StringData dbname = _todb(ns);
     invariant(opCtx->lockState()->isDbLockedForMode(dbname, MODE_X));

@@ -202,6 +202,8 @@ public:
     /**
      * This functions gets all the database names. The result is sorted in alphabetical ascending
      * order.
+     *
+     * Unlike DatabaseHolder::getNames(), this does not return databases that are empty.
      */
     std::vector<std::string> getAllDbNames() const;
 

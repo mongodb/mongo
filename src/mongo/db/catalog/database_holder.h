@@ -103,6 +103,13 @@ public:
      * Returns the set of existing database names that differ only in casing.
      */
     virtual std::set<std::string> getNamesWithConflictingCasing(const StringData name) = 0;
+
+    /**
+     * Returns all the database names (including those which are empty).
+     *
+     * Unlike CollectionCatalog::getAllDbNames(), this returns databases that are empty.
+     */
+    virtual std::vector<std::string> getNames() = 0;
 };
 
 }  // namespace mongo

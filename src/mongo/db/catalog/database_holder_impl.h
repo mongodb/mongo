@@ -52,6 +52,8 @@ public:
 
     std::set<std::string> getNamesWithConflictingCasing(StringData name) override;
 
+    std::vector<std::string> getNames() override;
+
 private:
     std::set<std::string> _getNamesWithConflictingCasing_inlock(StringData name);
 

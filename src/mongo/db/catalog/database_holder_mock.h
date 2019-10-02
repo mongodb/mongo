@@ -54,6 +54,10 @@ public:
     std::set<std::string> getNamesWithConflictingCasing(StringData name) override {
         return std::set<std::string>();
     }
+
+    std::vector<std::string> getNames() override {
+        return {};
+    }
 };
 
 }  // namespace mongo

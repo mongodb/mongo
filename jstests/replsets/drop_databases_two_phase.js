@@ -128,19 +128,9 @@ assert.commandFailedWithCode(
     ErrorCodes.DatabaseDropPending,
     'collection creation should fail while we are in the process of dropping the database');
 
-// restartCatalog can only detect that a database is in a drop-pending state when 'system.drop'
-// namespaces are supported. Since 4.2, dropped collections are managed internally by the
-// storage engine. See serverStatus().
-if (supportsDropPendingNamespaces) {
-    assert.commandFailedWithCode(
-        dbToDrop.adminCommand('restartCatalog'),
-        ErrorCodes.DatabaseDropPending,
-        'restartCatalog should fail if any databases are marked drop-pending');
-} else {
-    // Drop-pending idents are known only to the storage engine and will be ignored by
-    // restartCatalog.
-    assert.commandWorked(dbToDrop.adminCommand('restartCatalog'));
-}
+assert.commandFailedWithCode(dbToDrop.adminCommand('restartCatalog'),
+                             ErrorCodes.DatabaseDropPending,
+                             'restartCatalog should fail if any databases are marked drop-pending');
 
 /**
  * DROP DATABASE 'Database' PHASE
