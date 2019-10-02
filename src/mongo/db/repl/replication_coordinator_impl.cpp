@@ -181,126 +181,73 @@ BSONObj incrementConfigVersionByRandom(BSONObj config) {
     return builder.obj();
 }
 
+Status futureGetNoThrowWithDeadline(OperationContext* opCtx,
+                                    SharedSemiFuture<void>& f,
+                                    Date_t deadline,
+                                    ErrorCodes::Error error) {
+    try {
+        return opCtx->runWithDeadline(deadline, error, [&] { return f.getNoThrow(opCtx); });
+    } catch (const DBException& e) {
+        return e.toStatus();
+    }
+}
+
 }  // namespace
 
-ReplicationCoordinatorImpl::Waiter::Waiter(OpTime _opTime, const WriteConcernOptions* _writeConcern)
-    : opTime(std::move(_opTime)), writeConcern(_writeConcern) {}
-
-BSONObj ReplicationCoordinatorImpl::Waiter::toBSON() const {
-    BSONObjBuilder bob;
-    bob.append("opTime", opTime.toBSON());
-    if (writeConcern) {
-        bob.append("writeConcern", writeConcern->toBSON());
-    }
-    return bob.obj();
-};
-
-std::string ReplicationCoordinatorImpl::Waiter::toString() const {
-    return toBSON().toString();
-};
-
-
-ReplicationCoordinatorImpl::ThreadWaiter::ThreadWaiter(OpTime _opTime,
-                                                       const WriteConcernOptions* _writeConcern,
-                                                       stdx::condition_variable* _condVar)
-    : Waiter(_opTime, _writeConcern), condVar(_condVar) {}
-
-void ReplicationCoordinatorImpl::ThreadWaiter::notify_inlock() {
-    invariant(condVar);
-    condVar->notify_all();
+void ReplicationCoordinatorImpl::WaiterList::add_inlock(const OpTime& opTime,
+                                                        SharedWaiterHandle waiter) {
+    _waiters.emplace(opTime, std::move(waiter));
 }
 
-ReplicationCoordinatorImpl::CallbackWaiter::CallbackWaiter(OpTime _opTime,
-                                                           FinishFunc _finishCallback)
-    : Waiter(_opTime, nullptr), finishCallback(std::move(_finishCallback)) {}
-
-void ReplicationCoordinatorImpl::CallbackWaiter::notify_inlock() {
-    invariant(finishCallback);
-    finishCallback();
+SharedSemiFuture<void> ReplicationCoordinatorImpl::WaiterList::add_inlock(
+    const OpTime& opTime, boost::optional<WriteConcernOptions> wc) {
+    auto pf = makePromiseFuture<void>();
+    _waiters.emplace(opTime, std::make_shared<Waiter>(std::move(pf.promise), std::move(wc)));
+    return std::move(pf.future);
 }
 
-
-class ReplicationCoordinatorImpl::WaiterGuard {
-public:
-    /**
-     * Constructor takes the list of waiters and enqueues itself on the list, removing itself
-     * in the destructor.
-     *
-     * Usually waiters will be signaled and removed when their criteria are satisfied, but
-     * wait_until() with timeout may signal waiters earlier and this guard will remove the waiter
-     * properly.
-     *
-     * _list is guarded by ReplicationCoordinatorImpl::_mutex, thus it is illegal to construct one
-     * of these without holding _mutex
-     */
-    WaiterGuard(const stdx::unique_lock<Latch>& lock, WaiterList* list, Waiter* waiter)
-        : _lock(lock), _list(list), _waiter(waiter) {
-        invariant(_lock.owns_lock());
-        list->add_inlock(_waiter);
-    }
-
-    ~WaiterGuard() {
-        invariant(_lock.owns_lock());
-        _list->remove_inlock(_waiter);
-    }
-
-private:
-    const stdx::unique_lock<Latch>& _lock;
-    WaiterList* _list;
-    Waiter* _waiter;
-};
-
-void ReplicationCoordinatorImpl::WaiterList::add_inlock(WaiterType waiter) {
-    _list.push_back(waiter);
-}
-
-void ReplicationCoordinatorImpl::WaiterList::signalIf_inlock(std::function<bool(WaiterType)> func) {
-    for (auto it = _list.begin(); it != _list.end();) {
-        if (!func(*it)) {
-            // This element doesn't match, so we advance the iterator to the next one.
-            ++it;
-            continue;
+bool ReplicationCoordinatorImpl::WaiterList::remove_inlock(SharedWaiterHandle waiter) {
+    for (auto iter = _waiters.begin(); iter != _waiters.end(); iter++) {
+        if (iter->second == waiter) {
+            _waiters.erase(iter);
+            return true;
         }
+    }
+    return false;
+}
 
-        if (!(*it)->runs_once()) {
-            (*it)->notify_inlock();
-            // Keep the waiter on the list and let the guard remove it instead. Advance the
-            // iterator since we are skipping the removal.
-            ++it;
-            continue;
+template <typename Func>
+void ReplicationCoordinatorImpl::WaiterList::setValueIf_inlock(Func&& func,
+                                                               boost::optional<OpTime> opTime) {
+    for (auto it = _waiters.begin(); it != _waiters.end() && (!opTime || it->first <= *opTime);) {
+        const auto& waiter = it->second;
+        try {
+            if (func(it->first, waiter)) {
+                waiter->promise.emplaceValue();
+                it = _waiters.erase(it);
+            } else {
+                ++it;
+            }
+        } catch (const DBException& e) {
+            waiter->promise.setError(e.toStatus());
+            it = _waiters.erase(it);
         }
-
-        // Remove the waiter from the list if it was only meant to be notified once.
-        WaiterType waiter = std::move(*it);
-
-        if (it == std::prev(_list.end())) {
-            // Iterator will be invalid after erasing the last element, so set it to the
-            // next one (i.e. end()).
-            it = _list.erase(it);
-        } else {
-            // Iterator is still valid after pop_back().
-            std::swap(*it, _list.back());
-            _list.pop_back();
-        }
-        // It's important to call notify() after the waiter has been removed from the list
-        // since notify() might remove the waiter itself.
-        waiter->notify_inlock();
     }
 }
 
-
-void ReplicationCoordinatorImpl::WaiterList::signalAll_inlock() {
-    this->signalIf_inlock([](Waiter* waiter) { return true; });
+void ReplicationCoordinatorImpl::WaiterList::setValueAll_inlock() {
+    for (auto& [opTime, waiter] : _waiters) {
+        waiter->promise.emplaceValue();
+    }
+    _waiters.clear();
 }
 
-bool ReplicationCoordinatorImpl::WaiterList::remove_inlock(WaiterType waiter) {
-    auto it = std::find(_list.begin(), _list.end(), waiter);
-    if (it == _list.end()) {
-        return false;
+void ReplicationCoordinatorImpl::WaiterList::setErrorAll_inlock(Status status) {
+    invariant(!status.isOK());
+    for (auto& [opTime, waiter] : _waiters) {
+        waiter->promise.setError(status);
     }
-    std::swap(*it, _list.back());
-    _list.pop_back();
-    return true;
+    _waiters.clear();
 }
 
 namespace {
@@ -774,8 +721,8 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
         // InitialSyncer::startup() must be called outside lock because it uses features (eg.
         // setting the initial sync flag) which depend on the ReplicationCoordinatorImpl.
         uassertStatusOK(initialSyncerCopy->startup(opCtx, numInitialSyncAttempts.load()));
-    } catch (...) {
-        auto status = exceptionToStatus();
+    } catch (const DBException& e) {
+        auto status = e.toStatus();
         log() << "Initial Sync failed to start: " << status;
         if (ErrorCodes::CallbackCanceled == status || ErrorCodes::isShutdownError(status.code())) {
             return;
@@ -882,9 +829,10 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx) {
             lk.lock();
             fassert(18823, _rsConfigState != kConfigStartingUp);
         }
-        _replicationWaiterList.signalAll_inlock();
-        _opTimeWaiterList.signalAll_inlock();
-        _wMajorityWriteAvailabilityWaiter.reset();
+        _replicationWaiterList.setErrorAll_inlock(
+            {ErrorCodes::ShutdownInProgress, "Replication is being shut down"});
+        _opTimeWaiterList.setErrorAll_inlock(
+            {ErrorCodes::ShutdownInProgress, "Replication is being shut down"});
         _currentCommittedSnapshotCond.notify_all();
         _initialSyncer.swap(initialSyncerCopy);
     }
@@ -1083,6 +1031,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
     // Must calculate the commit level again because firstOpTimeOfMyTerm wasn't set when we logged
     // our election in onTransitionToPrimary(), above.
     _updateLastCommittedOpTimeAndWallTime(lk);
+    _wakeReadyWaiters(lk);
 
     // Update _canAcceptNonLocalWrites
     _updateMemberStateFromTopologyCoordinator(lk, opCtx);
@@ -1226,10 +1175,15 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTimeAndWallTime(
     if (!_rsConfig.getWriteConcernMajorityShouldJournal()) {
         _updateLastCommittedOpTimeAndWallTime(lk);
     }
+    // No need to wake up replication waiters because there should not be any replication waiters
+    // waiting on our own lastApplied.
 
     // Signal anyone waiting on optime changes.
-    _opTimeWaiterList.signalIf_inlock(
-        [opTime](Waiter* waiter) { return waiter->opTime <= opTime; });
+    _opTimeWaiterList.setValueIf_inlock(
+        [opTime](const OpTime& waitOpTime, const SharedWaiterHandle& waiter) {
+            return waitOpTime <= opTime;
+        },
+        opTime);
 
     // Update the local snapshot before updating the stable timestamp on the storage engine. New
     // transactions reading from the local snapshot should start before the oldest timestamp is
@@ -1276,6 +1230,9 @@ void ReplicationCoordinatorImpl::_setMyLastDurableOpTimeAndWallTime(
     if (_rsConfig.getWriteConcernMajorityShouldJournal()) {
         _updateLastCommittedOpTimeAndWallTime(lk);
     }
+    // There could be replication waiters waiting for our lastDurable for {j: true}, wake up those
+    // that now have their write concern satisfied.
+    _wakeReadyWaiters(lk, opTimeAndWallTime.opTime);
 }
 
 OpTime ReplicationCoordinatorImpl::getMyLastAppliedOpTime() const {
@@ -1447,21 +1404,15 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
         }
 
         // We just need to wait for the opTime to catch up to what we need (not majority RC).
-        stdx::condition_variable condVar;
-        ThreadWaiter waiter(targetOpTime, nullptr, &condVar);
-        WaiterGuard guard(lock, &_opTimeWaiterList, &waiter);
+        auto future = _opTimeWaiterList.add_inlock(targetOpTime);
 
         LOG(3) << "waitUntilOpTime: OpID " << opCtx->getOpID() << " is waiting for OpTime "
-               << waiter << " until " << opCtx->getDeadline();
+               << targetOpTime << " until " << opCtx->getDeadline();
 
-        auto waitStatus = Status::OK();
-        if (deadline) {
-            auto waitUntilStatus =
-                opCtx->waitForConditionOrInterruptNoAssertUntil(condVar, lock, *deadline);
-            waitStatus = waitUntilStatus.getStatus();
-        } else {
-            waitStatus = opCtx->waitForConditionOrInterruptNoAssert(condVar, lock);
-        }
+        lock.unlock();
+        auto waitStatus = futureGetNoThrowWithDeadline(
+            opCtx, future, deadline.value_or(Date_t::max()), opCtx->getTimeoutError());
+        lock.lock();
 
         if (!waitStatus.isOK()) {
             return waitStatus.withContext(str::stream()
@@ -1579,7 +1530,6 @@ Status ReplicationCoordinatorImpl::setLastDurableOptime_forTest(long long cfgVer
         OpTime(), Date_t(), opTime, wallTime, cfgVer, memberId);
     long long configVersion;
     const auto status = _setLastOptime(lock, update, &configVersion);
-    _updateLastCommittedOpTimeAndWallTime(lock);
     return status;
 }
 
@@ -1598,7 +1548,6 @@ Status ReplicationCoordinatorImpl::setLastAppliedOptime_forTest(long long cfgVer
         opTime, wallTime, OpTime(), Date_t(), cfgVer, memberId);
     long long configVersion;
     const auto status = _setLastOptime(lock, update, &configVersion);
-    _updateLastCommittedOpTimeAndWallTime(lock);
     return status;
 }
 
@@ -1612,6 +1561,8 @@ Status ReplicationCoordinatorImpl::_setLastOptime(WithLock lk,
     // Only update committed optime if the remote optimes increased.
     if (advancedOpTime) {
         _updateLastCommittedOpTimeAndWallTime(lk);
+        // Wait up replication waiters on optime changes.
+        _wakeReadyWaiters(lk, std::max(args.appliedOpTime, args.durableOpTime));
     }
 
     _cancelAndRescheduleLivenessUpdate_inlock(args.memberId);
@@ -1622,10 +1573,7 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
     const OpTime& opTime, const WriteConcernOptions& writeConcern) {
     // The syncMode cannot be unset.
     invariant(writeConcern.syncMode != WriteConcernOptions::SyncMode::UNSET);
-    Status status = _checkIfWriteConcernCanBeSatisfied_inlock(writeConcern);
-    if (!status.isOK()) {
-        return true;
-    }
+    uassertStatusOK(_checkIfWriteConcernCanBeSatisfied_inlock(writeConcern));
 
     const bool useDurableOpTime = writeConcern.syncMode == WriteConcernOptions::SyncMode::JOURNAL;
 
@@ -1676,19 +1624,58 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
         patternName = writeConcern.wMode;
     }
 
-    StatusWith<ReplSetTagPattern> tagPattern = _rsConfig.findCustomWriteMode(patternName);
-    if (!tagPattern.isOK()) {
-        return true;
-    }
-    return _topCoord->haveTaggedNodesReachedOpTime(opTime, tagPattern.getValue(), useDurableOpTime);
+    auto tagPattern = uassertStatusOK(_rsConfig.findCustomWriteMode(patternName));
+    return _topCoord->haveTaggedNodesReachedOpTime(opTime, tagPattern, useDurableOpTime);
 }
 
 ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitReplication(
     OperationContext* opCtx, const OpTime& opTime, const WriteConcernOptions& writeConcern) {
     Timer timer;
     WriteConcernOptions fixedWriteConcern = populateUnsetWriteConcernOptionsSyncMode(writeConcern);
-    stdx::unique_lock<Latch> lock(_mutex);
-    auto status = _awaitReplication_inlock(&lock, opCtx, opTime, fixedWriteConcern);
+
+    // We should never wait for replication if we are holding any locks, because this can
+    // potentially block for long time while doing network activity.
+    invariant(!opCtx->lockState()->isLocked());
+
+    auto interruptStatus = opCtx->checkForInterruptNoAssert();
+    if (!interruptStatus.isOK()) {
+        return {interruptStatus, duration_cast<Milliseconds>(timer.elapsed())};
+    }
+
+    const auto wTimeoutDate = [&]() -> const Date_t {
+        auto clockSource = opCtx->getServiceContext()->getFastClockSource();
+        if (writeConcern.wDeadline != Date_t::max()) {
+            return writeConcern.wDeadline;
+        }
+        if (writeConcern.wTimeout == WriteConcernOptions::kNoTimeout) {
+            return Date_t::max();
+        }
+        return clockSource->now() + clockSource->getPrecision() +
+            Milliseconds{writeConcern.wTimeout};
+    }();
+
+    const auto opCtxDeadline = opCtx->getDeadline();
+    const auto timeoutError = opCtx->getTimeoutError();
+
+    auto future = [&] {
+        stdx::lock_guard lock(_mutex);
+        return _startWaitingForReplication(lock, opTime, fixedWriteConcern);
+    }();
+    auto status = futureGetNoThrowWithDeadline(opCtx, future, wTimeoutDate, timeoutError);
+
+    // If we get a timeout error and the opCtx deadline is >= the writeConcern wtimeout, then we
+    // know the timeout was due to wtimeout (not opCtx deadline) and thus we return
+    // ErrorCodes::WriteConcernFailed.
+    if (status.code() == timeoutError && opCtxDeadline >= wTimeoutDate) {
+        status = Status{ErrorCodes::WriteConcernFailed, "waiting for replication timed out"};
+    }
+
+    if (getTestCommandsEnabled() && !status.isOK()) {
+        stdx::lock_guard lock(_mutex);
+        log() << "Replication failed for write concern: " << writeConcern.toBSON()
+              << ", waiting for optime: " << opTime << ", opID: " << opCtx->getOpID()
+              << ", progress: " << _getReplicationProgress(lock);
+    }
     return {std::move(status), duration_cast<Milliseconds>(timer.elapsed())};
 }
 
@@ -1709,33 +1696,24 @@ BSONObj ReplicationCoordinatorImpl::_getReplicationProgress(WithLock wl) const {
     _topCoord->fillMemberData(&progress);
     return progress.obj();
 }
-Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
-    stdx::unique_lock<Latch>* lock,
-    OperationContext* opCtx,
-    const OpTime& opTime,
-    const WriteConcernOptions& writeConcern) {
 
-    // We should never wait for replication if we are holding any locks, because this can
-    // potentially block for long time while doing network activity.
-    if (opCtx->lockState()->isLocked()) {
-        return {ErrorCodes::IllegalOperation,
-                "Waiting for replication not allowed while holding a lock"};
-    }
+SharedSemiFuture<void> ReplicationCoordinatorImpl::_startWaitingForReplication(
+    WithLock wl, const OpTime& opTime, const WriteConcernOptions& writeConcern) {
 
     const Mode replMode = getReplicationMode();
     if (replMode == modeNone) {
         // no replication check needed (validated above)
-        return Status::OK();
+        return Future<void>::makeReady();
     }
 
     if (opTime.isNull()) {
         // If waiting for the empty optime, always say it's been replicated.
-        return Status::OK();
+        return Future<void>::makeReady();
     }
 
-    auto interruptStatus = opCtx->checkForInterruptNoAssert();
-    if (!interruptStatus.isOK()) {
-        return interruptStatus;
+    if (_inShutdown) {
+        return Future<void>::makeReady(
+            Status{ErrorCodes::ShutdownInProgress, "Replication is being shut down"});
     }
 
     auto checkForStepDown = [&]() -> Status {
@@ -1762,70 +1740,30 @@ Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
 
     Status stepdownStatus = checkForStepDown();
     if (!stepdownStatus.isOK()) {
-        return stepdownStatus;
+        return Future<void>::makeReady(stepdownStatus);
     }
 
-    if (writeConcern.wMode.empty()) {
-        if (writeConcern.wNumNodes < 1) {
-            return Status::OK();
-        } else if (writeConcern.wNumNodes == 1 && _getMyLastAppliedOpTime_inlock() >= opTime) {
-            return Status::OK();
+    try {
+        if (_doneWaitingForReplication_inlock(opTime, writeConcern)) {
+            return Future<void>::makeReady();
         }
+    } catch (const DBException& e) {
+        return Future<void>::makeReady(e.toStatus());
     }
 
-    auto clockSource = opCtx->getServiceContext()->getFastClockSource();
-    const auto wTimeoutDate = [&]() -> const Date_t {
-        if (writeConcern.wDeadline != Date_t::max()) {
-            return writeConcern.wDeadline;
-        }
-        if (writeConcern.wTimeout == WriteConcernOptions::kNoTimeout) {
-            return Date_t::max();
-        }
-        return clockSource->now() + clockSource->getPrecision() +
-            Milliseconds{writeConcern.wTimeout};
-    }();
-
-    // Must hold _mutex before constructing waitInfo as it will modify _replicationWaiterList
-    stdx::condition_variable condVar;
-    ThreadWaiter waiter(opTime, &writeConcern, &condVar);
-    WaiterGuard guard(*lock, &_replicationWaiterList, &waiter);
-
-    auto failGuard = makeGuard([&] {
-        if (getTestCommandsEnabled()) {
-            log() << "Replication failed for write concern: " << writeConcern.toBSON()
-                  << ", waitInfo: " << waiter << ", opID: " << opCtx->getOpID()
-                  << ", progress: " << _getReplicationProgress(*lock);
-        }
-    });
-
-    while (!_doneWaitingForReplication_inlock(opTime, writeConcern)) {
-
-        if (_inShutdown) {
-            return {ErrorCodes::ShutdownInProgress, "Replication is being shut down"};
-        }
-
-        auto status = opCtx->waitForConditionOrInterruptNoAssertUntil(condVar, *lock, wTimeoutDate);
-        if (!status.isOK()) {
-            return status.getStatus();
-        }
-
-        if (status.getValue() == stdx::cv_status::timeout) {
-            return {ErrorCodes::WriteConcernFailed, "waiting for replication timed out"};
-        }
-
-        stepdownStatus = checkForStepDown();
-        if (!stepdownStatus.isOK()) {
-            return stepdownStatus;
-        }
+    if (!writeConcern.shouldWaitForOtherNodes() &&
+        writeConcern.syncMode != WriteConcernOptions::SyncMode::JOURNAL) {
+        // We are only waiting for our own lastApplied, add this to _opTimeWaiterList instead. This
+        // is because waiters in _replicationWaiterList are not notified on self's lastApplied
+        // updates.
+        return _opTimeWaiterList.add_inlock(opTime);
     }
 
-    auto satisfiableStatus = _checkIfWriteConcernCanBeSatisfied_inlock(writeConcern);
-    if (!satisfiableStatus.isOK()) {
-        return satisfiableStatus;
-    }
-
-    failGuard.dismiss();
-    return Status::OK();
+    // From now on, we are either waiting for replication or local journaling. And waiters in
+    // _replicationWaiterList will be checked and notified on remote opTime updates and on self's
+    // lastDurable updates (but not on self's lastApplied updates, in which case use
+    // _opTimeWaiterList instead).
+    return _replicationWaiterList.add_inlock(opTime, writeConcern);
 }
 
 void ReplicationCoordinatorImpl::waitForStepDownAttempt_forTest() {
@@ -2057,59 +1995,60 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     auto waitTimeout = std::min(waitTime, stepdownTime);
     auto lastAppliedOpTime = _getMyLastAppliedOpTime_inlock();
 
-    {  // Add a scope to ensure that the WaiterGuard destructor runs before the mutex is released.
+    // Set up a waiter which will be signaled when we process a heartbeat or updatePosition
+    // and have a majority of nodes at our optime.
+    const WriteConcernOptions waiterWriteConcern(
+        WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::NONE, waitTimeout);
 
-        // Set up a waiter which will be signalled when we process a heartbeat or updatePosition
-        // and have a majority of nodes at our optime.
-        stdx::condition_variable condVar;
-        const WriteConcernOptions waiterWriteConcern(
-            WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::NONE, waitTimeout);
-        ThreadWaiter waiter(lastAppliedOpTime, &waiterWriteConcern, &condVar);
-        WaiterGuard guard(lk, &_replicationWaiterList, &waiter);
+    // If attemptStepDown() succeeds, we are guaranteed that no concurrent step up or
+    // step down can happen afterwards. So, it's safe to release the mutex before
+    // yieldLocksForPreparedTransactions().
+    while (!_topCoord->tryToStartStepDown(
+        termAtStart, _replExecutor->now(), waitUntil, stepDownUntil, force)) {
 
-        // If attemptStepDown() succeeds, we are guaranteed that no concurrent step up or
-        // step down can happen afterwards. So, it's safe to release the mutex before
-        // yieldLocksForPreparedTransactions().
-        while (!_topCoord->tryToStartStepDown(
-            termAtStart, _replExecutor->now(), waitUntil, stepDownUntil, force)) {
+        // The stepdown attempt failed. We now release the RSTL to allow secondaries to read the
+        // oplog, then wait until enough secondaries are caught up for us to finish stepdown.
+        arsd.rstlRelease();
+        invariant(!opCtx->lockState()->isLocked());
 
-            // The stepdown attempt failed. We now release the RSTL to allow secondaries to read the
-            // oplog, then wait until enough secondaries are caught up for us to finish stepdown.
-            arsd.rstlRelease();
-            invariant(!opCtx->lockState()->isLocked());
+        // Make sure we re-acquire the RSTL before returning so that we're always holding the
+        // RSTL when the onExitGuard set up earlier runs.
+        ON_BLOCK_EXIT([&] {
+            // Need to release _mutex before re-acquiring the RSTL to preserve lock acquisition
+            // order rules.
+            lk.unlock();
 
-            // Make sure we re-acquire the RSTL before returning so that we're always holding the
-            // RSTL when the onExitGuard set up earlier runs.
-            ON_BLOCK_EXIT([&] {
-                // Need to release _mutex before re-acquiring the RSTL to preserve lock acquisition
-                // order rules.
-                lk.unlock();
+            // Need to re-acquire the RSTL before re-attempting stepdown. We use no timeout here
+            // even though that means the lock acquisition could take longer than the stepdown
+            // window. Since we'll need the RSTL no matter what to clean up a failed stepdown
+            // attempt, we might as well spend whatever time we need to acquire it now.  For
+            // the same reason, we also disable lock acquisition interruption, to guarantee that
+            // we get the lock eventually.
+            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
 
-                // Need to re-acquire the RSTL before re-attempting stepdown. We use no timeout here
-                // even though that means the lock acquisition could take longer than the stepdown
-                // window. Since we'll need the RSTL no matter what to clean up a failed stepdown
-                // attempt, we might as well spend whatever time we need to acquire it now.  For
-                // the same reason, we also disable lock acquisition interruption, to guarantee that
-                // we get the lock eventually.
-                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+            // Since we have released the RSTL lock at this point, there can be some read
+            // operations sneaked in here, that might hold global lock in S mode or blocked on
+            // prepare conflict. We need to kill those operations to avoid 3-way deadlock
+            // between read, prepared transaction and step down thread. And, any write
+            // operations that gets sneaked in here will fail as we have updated
+            // _canAcceptNonLocalWrites to false after our first successful RSTL lock
+            // acquisition. So, we won't get into problems like SERVER-27534.
+            arsd.rstlReacquire();
+            lk.lock();
+        });
 
-                // Since we have released the RSTL lock at this point, there can be some read
-                // operations sneaked in here, that might hold global lock in S mode or blocked on
-                // prepare conflict. We need to kill those operations to avoid 3-way deadlock
-                // between read, prepared transaction and step down thread. And, any write
-                // operations that gets sneaked in here will fail as we have updated
-                // _canAcceptNonLocalWrites to false after our first successful RSTL lock
-                // acquisition. So, we won't get into problems like SERVER-27534.
-                arsd.rstlReacquire();
-                lk.lock();
-            });
+        auto future = _replicationWaiterList.add_inlock(lastAppliedOpTime, waiterWriteConcern);
 
-            // We ignore the case where waitForConditionOrInterruptUntil returns
-            // stdx::cv_status::timeout because in that case coming back around the loop and calling
-            // tryToStartStepDown again will cause tryToStartStepDown to return ExceededTimeLimit
-            // with the proper error message.
-            opCtx->waitForConditionOrInterruptUntil(
-                condVar, lk, std::min(stepDownUntil, waitUntil));
+        lk.unlock();
+        auto status = futureGetNoThrowWithDeadline(
+            opCtx, future, std::min(stepDownUntil, waitUntil), ErrorCodes::ExceededTimeLimit);
+        lk.lock();
+
+        // We ignore the case where runWithDeadline returns timeoutError because in that case
+        // coming back around the loop and calling tryToStartStepDown again will cause
+        // tryToStartStepDown to return ExceededTimeLimit with the proper error message.
+        if (!status.isOK() && status.code() != ErrorCodes::ExceededTimeLimit) {
+            opCtx->checkForInterrupt();
         }
     }
 
@@ -2125,7 +2064,6 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
 
     // Clear the node's election candidate metrics since it is no longer primary.
     ReplicationMetrics::get(opCtx).clearElectionCandidateMetrics();
-    _wMajorityWriteAvailabilityWaiter.reset();
 
     _topCoord->finishUnconditionalStepDown();
 
@@ -2707,7 +2645,6 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
 
             // Clear the node's election candidate metrics since it is no longer primary.
             ReplicationMetrics::get(opCtx).clearElectionCandidateMetrics();
-            _wMajorityWriteAvailabilityWaiter.reset();
         } else {
             // Release the rstl lock as the node might have stepped down due to
             // other unconditional step down code paths like learning new term via heartbeat &
@@ -2870,9 +2807,11 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
     PostMemberStateUpdateAction result;
     if (_memberState.primary() || newState.removed() || newState.rollback()) {
         // Wake up any threads blocked in awaitReplication, close connections, etc.
-        _replicationWaiterList.signalAll_inlock();
+        _replicationWaiterList.setErrorAll_inlock(
+            {ErrorCodes::PrimarySteppedDown, "Primary stepped down while waiting for replication"});
         // Wake up the optime waiter that is waiting for primary catch-up to finish.
-        _opTimeWaiterList.signalAll_inlock();
+        _opTimeWaiterList.setErrorAll_inlock(
+            {ErrorCodes::PrimarySteppedDown, "Primary stepped down while waiting for replication"});
 
         // _canAcceptNonLocalWrites should already be set above.
         invariant(!_readWriteAbility->canAcceptNonLocalWrites(lk));
@@ -3097,8 +3036,9 @@ void ReplicationCoordinatorImpl::CatchupState::abort_inlock(PrimaryCatchUpConclu
     if (_timeoutCbh) {
         _repl->_replExecutor->cancel(_timeoutCbh);
     }
-    if (_waiter) {
-        _repl->_opTimeWaiterList.remove_inlock(_waiter.get());
+    if (reason != PrimaryCatchUpConclusionReason::kSucceeded && _waiter) {
+        _repl->_opTimeWaiterList.remove_inlock(_waiter);
+        _waiter.reset();
     }
 
     // Enter primary drain mode.
@@ -3127,13 +3067,14 @@ void ReplicationCoordinatorImpl::CatchupState::signalHeartbeatUpdate_inlock() {
     }
 
     // Reset the target optime if it has changed.
-    if (_waiter && _waiter->opTime == *targetOpTime) {
+    if (_waiter && _targetOpTime == *targetOpTime) {
         return;
     }
+    _targetOpTime = *targetOpTime;
 
-    ReplicationMetrics::get(getGlobalServiceContext()).setTargetCatchupOpTime(targetOpTime.get());
+    ReplicationMetrics::get(getGlobalServiceContext()).setTargetCatchupOpTime(_targetOpTime);
 
-    log() << "Heartbeats updated catchup target optime to " << *targetOpTime;
+    log() << "Heartbeats updated catchup target optime to " << _targetOpTime;
     log() << "Latest known optime per replica set member:";
     auto opTimesPerMember = _repl->_topCoord->latestKnownOpTimeSinceHeartbeatRestartPerMember();
     for (auto&& pair : opTimesPerMember) {
@@ -3142,7 +3083,8 @@ void ReplicationCoordinatorImpl::CatchupState::signalHeartbeatUpdate_inlock() {
     }
 
     if (_waiter) {
-        _repl->_opTimeWaiterList.remove_inlock(_waiter.get());
+        _repl->_opTimeWaiterList.remove_inlock(_waiter);
+        _waiter.reset();
     } else {
         // Only increment the 'numCatchUps' election metric the first time we add a waiter, so that
         // we only increment it once each time a primary has to catch up. If there is already an
@@ -3150,20 +3092,22 @@ void ReplicationCoordinatorImpl::CatchupState::signalHeartbeatUpdate_inlock() {
         ReplicationMetrics::get(getGlobalServiceContext()).incrementNumCatchUps();
     }
 
-    auto targetOpTimeCB = [this, targetOpTime]() {
+    auto targetOpTimeCB = [this](Status status) {
         // Double check the target time since stepdown may signal us too.
         const auto myLastApplied = _repl->_getMyLastAppliedOpTime_inlock();
-        if (*targetOpTime <= myLastApplied) {
+        if (_targetOpTime <= myLastApplied) {
             log() << "Caught up to the latest known optime successfully after becoming primary. "
-                  << "Target optime: " << *targetOpTime << ". My Last Applied: " << myLastApplied;
+                  << "Target optime: " << _targetOpTime << ". My Last Applied: " << myLastApplied;
             // Report the number of ops applied during catchup in replSetGetStatus once the primary
             // is caught up.
             ReplicationMetrics::get(getGlobalServiceContext()).setNumCatchUpOps(_numCatchUpOps);
             abort_inlock(PrimaryCatchUpConclusionReason::kSucceeded);
         }
     };
-    _waiter = std::make_unique<CallbackWaiter>(*targetOpTime, targetOpTimeCB);
-    _repl->_opTimeWaiterList.add_inlock(_waiter.get());
+    auto pf = makePromiseFuture<void>();
+    _waiter = std::make_shared<Waiter>(std::move(pf.promise));
+    auto future = std::move(pf.future).onCompletion(targetOpTimeCB);
+    _repl->_opTimeWaiterList.add_inlock(_targetOpTime, _waiter);
 }
 
 void ReplicationCoordinatorImpl::CatchupState::incrementNumCatchUpOps_inlock(long numOps) {
@@ -3188,7 +3132,7 @@ void ReplicationCoordinatorImpl::incrementNumCatchUpOpsIfCatchingUp(long numOps)
 
 void ReplicationCoordinatorImpl::signalDropPendingCollectionsRemovedFromStorage() {
     stdx::lock_guard<Latch> lock(_mutex);
-    _wakeReadyWaiters(lock);
+    _wakeReadyWaiters(lock, _externalState->getEarliestDropPendingOpTime());
 }
 
 boost::optional<Timestamp> ReplicationCoordinatorImpl::getRecoveryTimestamp() {
@@ -3276,30 +3220,18 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
         _startHeartbeats_inlock();
     }
     _updateLastCommittedOpTimeAndWallTime(lk);
+    _wakeReadyWaiters(lk);
 
     return action;
 }
 
-void ReplicationCoordinatorImpl::_wakeReadyWaiters(WithLock lk) {
-    _replicationWaiterList.signalIf_inlock([this](Waiter* waiter) {
-        return _doneWaitingForReplication_inlock(waiter->opTime, *waiter->writeConcern);
-    });
-
-    if (_wMajorityWriteAvailabilityWaiter) {
-        WriteConcernOptions kMajorityWriteConcern(
-            WriteConcernOptions::kMajority,
-            WriteConcernOptions::SyncMode::UNSET,
-            // The timeout isn't used by _doneWaitingForReplication_inlock.
-            WriteConcernOptions::kNoTimeout);
-        kMajorityWriteConcern =
-            _populateUnsetWriteConcernOptionsSyncMode(lk, kMajorityWriteConcern);
-
-        if (_doneWaitingForReplication_inlock(_wMajorityWriteAvailabilityWaiter->opTime,
-                                              kMajorityWriteConcern)) {
-            _wMajorityWriteAvailabilityWaiter->notify_inlock();
-            _wMajorityWriteAvailabilityWaiter.reset();
-        }
-    }
+void ReplicationCoordinatorImpl::_wakeReadyWaiters(WithLock lk, boost::optional<OpTime> opTime) {
+    _replicationWaiterList.setValueIf_inlock(
+        [this](const OpTime& opTime, const SharedWaiterHandle& waiter) {
+            invariant(waiter->writeConcern);
+            return _doneWaitingForReplication_inlock(opTime, waiter->writeConcern.get());
+        },
+        opTime);
 }
 
 Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(const UpdatePositionArgs& updates,
@@ -3523,11 +3455,6 @@ void ReplicationCoordinatorImpl::_updateLastCommittedOpTimeAndWallTime(WithLock 
     if (_topCoord->updateLastCommittedOpTimeAndWallTime()) {
         _setStableTimestampForStorage(lk);
     }
-    // Wake up any threads waiting for replication that now have their replication
-    // check satisfied.  We must do this regardless of whether we updated the lastCommittedOpTime,
-    // as lastCommittedOpTime may be based on durable optimes whereas some waiters may be
-    // waiting on applied (but not necessarily durable) optimes.
-    _wakeReadyWaiters(lk);
 }
 
 boost::optional<OpTimeAndWallTime> ReplicationCoordinatorImpl::_chooseStableOpTimeFromCandidates(
@@ -3995,11 +3922,31 @@ size_t ReplicationCoordinatorImpl::getNumUncommittedSnapshots() {
 
 void ReplicationCoordinatorImpl::createWMajorityWriteAvailabilityDateWaiter(OpTime opTime) {
     stdx::lock_guard<Latch> lk(_mutex);
-    auto opTimeCB = [this, opTime]() {
-        ReplicationMetrics::get(getServiceContext())
-            .setWMajorityWriteAvailabilityDate(_replExecutor->now());
+
+    WriteConcernOptions writeConcern(WriteConcernOptions::kMajority,
+                                     WriteConcernOptions::SyncMode::UNSET,
+                                     // The timeout isn't used by _doneWaitingForReplication_inlock.
+                                     WriteConcernOptions::kNoTimeout);
+    writeConcern = _populateUnsetWriteConcernOptionsSyncMode(lk, writeConcern);
+
+    auto setOpTimeCB = [this](Status status) {
+        // Only setWMajorityWriteAvailabilityDate if the wait was successful.
+        if (status.isOK()) {
+            ReplicationMetrics::get(getServiceContext())
+                .setWMajorityWriteAvailabilityDate(_replExecutor->now());
+        }
     };
-    _wMajorityWriteAvailabilityWaiter = std::make_unique<CallbackWaiter>(opTime, opTimeCB);
+
+    if (_doneWaitingForReplication_inlock(opTime, writeConcern)) {
+        // Runs callback and returns early if the writeConcern is immediately satisfied.
+        setOpTimeCB(Status::OK());
+        return;
+    }
+
+    auto pf = makePromiseFuture<void>();
+    auto waiter = std::make_shared<Waiter>(std::move(pf.promise), writeConcern);
+    auto future = std::move(pf.future).onCompletion(setOpTimeCB);
+    _replicationWaiterList.add_inlock(opTime, waiter);
 }
 
 bool ReplicationCoordinatorImpl::_updateCommittedSnapshot(
@@ -4035,7 +3982,9 @@ bool ReplicationCoordinatorImpl::_updateCommittedSnapshot(
     _externalState->updateCommittedSnapshot(newCommittedSnapshot.opTime);
 
     // Wake up any threads waiting for read concern or write concern.
-    _wakeReadyWaiters(lk);
+    if (_externalState->snapshotsEnabled() && _currentCommittedSnapshot) {
+        _wakeReadyWaiters(lk, _currentCommittedSnapshot->opTime);
+    }
     return true;
 }
 

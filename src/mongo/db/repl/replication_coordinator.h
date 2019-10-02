@@ -853,8 +853,8 @@ public:
     virtual size_t getNumUncommittedSnapshots() = 0;
 
     /**
-     * Creates a CallbackWaiter that waits for w:majority write concern to be satisfied up to opTime
-     * before setting the 'wMajorityWriteAvailabilityDate' election candidate metric.
+     * Creates a waiter that waits for w:majority write concern to be satisfied up to opTime before
+     * setting the 'wMajorityWriteAvailabilityDate' election candidate metric.
      */
     virtual void createWMajorityWriteAvailabilityDateWaiter(OpTime opTime) = 0;
 

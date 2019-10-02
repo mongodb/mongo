@@ -223,6 +223,8 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         hbStatusResponse.getValue().getState() != MemberState::RS_PRIMARY &&
         action.getAdvancedOpTime()) {
         _updateLastCommittedOpTimeAndWallTime(lk);
+        // Wait up replication waiters on optime changes.
+        _wakeReadyWaiters(lk);
     }
 
     // Abort catchup if we have caught up to the latest known optime after heartbeat refreshing.
@@ -409,7 +411,6 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
 
     // Clear the node's election candidate metrics since it is no longer primary.
     ReplicationMetrics::get(opCtx.get()).clearElectionCandidateMetrics();
-    _wMajorityWriteAvailabilityWaiter.reset();
 
     _topCoord->finishUnconditionalStepDown();
 
@@ -636,7 +637,6 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
 
             // Clear the node's election candidate metrics since it is no longer primary.
             ReplicationMetrics::get(opCtx.get()).clearElectionCandidateMetrics();
-            _wMajorityWriteAvailabilityWaiter.reset();
         } else {
             // Release the rstl lock as the node might have stepped down due to
             // other unconditional step down code paths like learning new term via heartbeat &
