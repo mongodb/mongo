@@ -104,6 +104,11 @@ function doTest(storageEngine) {
         assert.soon(() => {
             return numInsertOplogEntry(secondaryOplog) === 2;
         }, "Timeout waiting for oplog to roll over on secondary");
+
+        const res = primary.getDB("test").runCommand({serverStatus: 1});
+        assert.commandWorked(res);
+        assert.eq(res.oplogTruncation.truncateCount, 1, tojson(res.oplogTruncation));
+        assert.gt(res.oplogTruncation.totalTimeTruncatingMicros, 0, tojson(res.oplogTruncation));
     } else {
         // Only test that oplog truncation will eventually happen.
         let numInserted = 2;

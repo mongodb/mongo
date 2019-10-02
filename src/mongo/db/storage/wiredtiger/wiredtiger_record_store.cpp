@@ -52,6 +52,7 @@
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/oplog_hack.h"
+#include "mongo/db/storage/wiredtiger/oplog_stone_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
@@ -165,10 +166,16 @@ WiredTigerRecordStore::OplogStones::OplogStones(OperationContext* opCtx, WiredTi
     invariant(rs->cappedMaxSize() > 0);
     unsigned long long maxSize = rs->cappedMaxSize();
 
-    const unsigned long long kMinStonesToKeep = 10ULL;
-    const unsigned long long kMaxStonesToKeep = 100ULL;
+    // The minimum oplog stone size should be BSONObjMaxInternalSize.
+    const unsigned int oplogStoneSize =
+        std::max(gOplogStoneSizeMB * 1024 * 1024, BSONObjMaxInternalSize);
 
-    unsigned long long numStones = maxSize / BSONObjMaxInternalSize;
+    // IDL does not support unsigned long long types.
+    const unsigned long long kMinStonesToKeep = static_cast<unsigned long long>(gMinOplogStones);
+    const unsigned long long kMaxStonesToKeep =
+        static_cast<unsigned long long>(gMaxOplogStonesDuringStartup);
+
+    unsigned long long numStones = maxSize / oplogStoneSize;
     size_t numStonesToKeep = std::min(kMaxStonesToKeep, std::max(kMinStonesToKeep, numStones));
     _minBytesPerStone = maxSize / numStonesToKeep;
     invariant(_minBytesPerStone > 0);
@@ -314,6 +321,12 @@ void WiredTigerRecordStore::OplogStones::setMinBytesPerStone(int64_t size) {
 
 void WiredTigerRecordStore::OplogStones::_calculateStones(OperationContext* opCtx,
                                                           size_t numStonesToKeep) {
+    const std::uint64_t startWaitTime = curTimeMicros64();
+    ON_BLOCK_EXIT([&] {
+        auto waitTime = curTimeMicros64() - startWaitTime;
+        log() << "WiredTiger record store oplog processing took " << waitTime / 1000 << "ms";
+        _totalTimeProcessing.fetchAndAdd(waitTime);
+    });
     long long numRecords = _rs->numRecords(opCtx);
     long long dataSize = _rs->dataSize(opCtx);
 
@@ -343,6 +356,7 @@ void WiredTigerRecordStore::OplogStones::_calculateStones(OperationContext* opCt
 }
 
 void WiredTigerRecordStore::OplogStones::_calculateStonesByScanning(OperationContext* opCtx) {
+    _processBySampling.store(false);  // process by scanning
     log() << "Scanning the oplog to determine where to place markers for truncation";
 
     long long numRecords = 0;
@@ -370,6 +384,8 @@ void WiredTigerRecordStore::OplogStones::_calculateStonesByScanning(OperationCon
 void WiredTigerRecordStore::OplogStones::_calculateStonesBySampling(OperationContext* opCtx,
                                                                     int64_t estRecordsPerStone,
                                                                     int64_t estBytesPerStone) {
+    log() << "Sampling the oplog to determine where to place markers for truncation";
+    _processBySampling.store(true);  // process by sampling
     Timestamp earliestOpTime;
     Timestamp latestOpTime;
 
@@ -458,10 +474,16 @@ void WiredTigerRecordStore::OplogStones::_pokeReclaimThreadIfNeeded() {
 
 void WiredTigerRecordStore::OplogStones::adjust(int64_t maxSize) {
     stdx::lock_guard<Latch> lk(_mutex);
-    const unsigned long long kMinStonesToKeep = 10ULL;
-    const unsigned long long kMaxStonesToKeep = 100ULL;
 
-    unsigned long long numStones = maxSize / BSONObjMaxInternalSize;
+    const unsigned int oplogStoneSize =
+        std::max(gOplogStoneSizeMB * 1024 * 1024, BSONObjMaxInternalSize);
+
+    // IDL does not support unsigned long long types.
+    const unsigned long long kMinStonesToKeep = static_cast<unsigned long long>(gMinOplogStones);
+    const unsigned long long kMaxStonesToKeep =
+        static_cast<unsigned long long>(gMaxOplogStonesAfterStartup);
+
+    unsigned long long numStones = maxSize / oplogStoneSize;
     size_t numStonesToKeep = std::min(kMaxStonesToKeep, std::max(kMinStonesToKeep, numStones));
     _minBytesPerStone = maxSize / numStonesToKeep;
     invariant(_minBytesPerStone > 0);
@@ -763,6 +785,14 @@ void WiredTigerRecordStore::postConstructorInit(OperationContext* opCtx) {
         invariant(_kvEngine);
         _kvEngine->startOplogManager(opCtx, _uri, this);
     }
+}
+
+void WiredTigerRecordStore::getOplogTruncateStats(BSONObjBuilder& builder) const {
+    if (_oplogStones) {
+        _oplogStones->getOplogStonesStats(builder);
+    }
+    builder.append("totalTimeTruncatingMicros", _totalTimeTruncating.load());
+    builder.append("truncateCount", _truncateCount.load());
 }
 
 const char* WiredTigerRecordStore::name() const {
@@ -1221,7 +1251,11 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp mayT
     LOG(1) << "Finished truncating the oplog, it now contains approximately "
            << _sizeInfo->numRecords.load() << " records totaling to " << _sizeInfo->dataSize.load()
            << " bytes";
-    log() << "WiredTiger record store oplog truncation finished in: " << timer.millis() << "ms";
+    auto elapsedMicros = timer.micros();
+    auto elapsedMillis = elapsedMicros / 1000;
+    _totalTimeTruncating.fetchAndAdd(elapsedMicros);
+    _truncateCount.fetchAndAdd(1);
+    log() << "WiredTiger record store oplog truncation finished in: " << elapsedMillis << "ms";
 }
 
 Status WiredTigerRecordStore::insertRecords(OperationContext* opCtx,

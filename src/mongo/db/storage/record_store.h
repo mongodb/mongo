@@ -521,6 +521,15 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    /**
+     * This should only be called if StorageEngine::supportsOplogStones() is true.
+     * Storage engines supporting oplog stones must implement this function.
+     * Populates `builder` with various statistics pertaining to oplog stones and oplog truncation.
+     */
+    virtual void getOplogTruncateStats(BSONObjBuilder& builder) const {
+        MONGO_UNREACHABLE;
+    }
+
 
 protected:
     std::string _ns;

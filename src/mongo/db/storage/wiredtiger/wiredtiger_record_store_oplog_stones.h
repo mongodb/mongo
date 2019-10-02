@@ -69,6 +69,11 @@ public:
 
     void awaitHasExcessStonesOrDead();
 
+    void getOplogStonesStats(BSONObjBuilder& builder) const {
+        builder.append("totalTimeProcessingMicros", _totalTimeProcessing.load());
+        builder.append("processingMethod", _processBySampling.load() ? "sampling" : "scanning");
+    }
+
     boost::optional<OplogStones::Stone> peekOldestStoneIfNeeded() const;
 
     void popOldestStone();
@@ -140,8 +145,11 @@ private:
     // deque of oplog stones.
     int64_t _minBytesPerStone;
 
-    AtomicWord<long long> _currentRecords;  // Number of records in the stone being filled.
-    AtomicWord<long long> _currentBytes;    // Number of bytes in the stone being filled.
+    AtomicWord<long long> _currentRecords;     // Number of records in the stone being filled.
+    AtomicWord<long long> _currentBytes;       // Number of bytes in the stone being filled.
+    AtomicWord<int64_t> _totalTimeProcessing;  // Amount of time spent scanning and/or sampling the
+                                               // oplog during start up, if any.
+    AtomicWord<bool> _processBySampling;       // Whether the oplog was sampled or scanned.
 
     // Protects against concurrent access to the deque of oplog stones.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("OplogStones::_mutex");
