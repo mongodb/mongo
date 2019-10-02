@@ -6,12 +6,7 @@
 (function() {
 "use strict";
 
-// TODO: SERVER-33830 remove shardAsReplicaSet: false
-var st = new ShardingTest({
-    name: 'migrateBig_balancer',
-    shards: 2,
-    other: {enableBalancer: true, shardAsReplicaSet: false}
-});
+var st = new ShardingTest({name: 'migrateBig_balancer', shards: 2, other: {enableBalancer: true}});
 var mongos = st.s;
 var admin = mongos.getDB("admin");
 var db = mongos.getDB("test");

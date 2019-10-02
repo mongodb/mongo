@@ -52,7 +52,9 @@ ShardedFixture = function() {
 };
 
 ShardedFixture.prototype.runLoadPhase = function runLoadPhase(test) {
-    // TODO: SERVER-33830 remove shardAsReplicaSet: false
+    // TODO: SERVER-43758 Tests where shards are started in read-only mode
+    // cannot use replica set shards, because replication requires doing writes
+    // to run an election.
     this.shardingTest =
         new ShardingTest({mongos: 1, shards: this.nShards, other: {shardAsReplicaSet: false}});
 

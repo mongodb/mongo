@@ -13,18 +13,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 (function() {
 "use strict";
 
-/**
- * Restarts the mongod backing the specified shard instance, without restarting the mongobridge.
- */
-function restartShard(shard, waitForConnect) {
-    MongoRunner.stopMongod(shard);
-    shard.restart = true;
-    shard.waitForConnect = waitForConnect;
-    MongoRunner.runMongod(shard);
-}
-
-// TODO: SERVER-33830 remove shardAsReplicaSet: false
-var st = new ShardingTest({shards: 2, other: {shardAsReplicaSet: false}});
+var st = new ShardingTest({shards: 2});
 
 jsTestLog("Setting up initial data");
 
@@ -57,7 +46,8 @@ assert.throws(function() {
 });
 
 jsTestLog("Restarting a shard while there are no config servers up");
-restartShard(st.shard1, false);
+st.rs1.stopSet(undefined, true);
+st.rs1.startSet({waitForConnect: false}, true);
 
 jsTestLog("Queries should fail because the shard can't initialize sharding state");
 var error = assert.throws(function() {
@@ -65,7 +55,8 @@ var error = assert.throws(function() {
 });
 
 assert(ErrorCodes.ReplicaSetNotFound == error.code || ErrorCodes.ExceededTimeLimit == error.code ||
-       ErrorCodes.HostUnreachable == error.code);
+       ErrorCodes.HostUnreachable == error.code ||
+       ErrorCodes.FailedToSatisfyReadPreference == error.code);
 
 jsTestLog("Restarting the config servers");
 for (var i = 0; i < st._configServers.length; i++) {

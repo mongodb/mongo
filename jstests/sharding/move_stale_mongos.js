@@ -2,8 +2,7 @@
 // Tests that stale mongoses can properly move chunks.
 //
 
-// TODO: SERVER-33830 remove shardAsReplicaSet: false
-var st = new ShardingTest({shards: 2, mongos: 2, other: {shardAsReplicaSet: false}});
+var st = new ShardingTest({shards: 2, mongos: 2});
 var admin = st.s0.getDB('admin');
 var testDb = 'test';
 var testNs = 'test.foo';
