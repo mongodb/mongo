@@ -9,3 +9,5 @@ $TEST_WRAPPER ./t $args file_type=fix
 $TEST_WRAPPER ./t $args file_type=row
 $TEST_WRAPPER ./t $args file_type=row data_source=lsm
 $TEST_WRAPPER ./t $args file_type=var
+# Force a rebalance to occur with statistics logging to test the utility
+$TEST_WRAPPER ./t $args file_type=row statistics_server=1 rebalance=1

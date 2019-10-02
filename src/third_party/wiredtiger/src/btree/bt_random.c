@@ -9,147 +9,332 @@
 #include "wt_internal.h"
 
 /*
- * __wt_row_random_leaf --
- *     Return a random key from a row-store leaf page.
+ * __random_insert_valid --
+ *     Check if the inserted key/value pair is valid.
  */
-int
-__wt_row_random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
+static int
+__random_insert_valid(
+  WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *ins_head, WT_INSERT *ins, WT_UPDATE **updp, bool *validp)
 {
-    WT_INSERT *ins, **start, **stop;
-    WT_INSERT_HEAD *ins_head;
-    WT_PAGE *page;
-    uint64_t samples;
-    uint32_t choice, entries, i;
-    int level;
-
-    page = cbt->ref->page;
-    start = stop = NULL; /* [-Wconditional-uninitialized] */
-    entries = 0;         /* [-Wconditional-uninitialized] */
+    *updp = NULL;
+    *validp = false;
 
     __cursor_pos_clear(cbt);
+    cbt->slot = 0;
+    cbt->ins_head = ins_head;
+    cbt->ins = ins;
+    cbt->compare = 0;
 
-    /* If the page has disk-based entries, select from them. */
-    if (page->entries != 0) {
-        cbt->compare = 0;
-        cbt->slot = __wt_random(&session->rnd) % page->entries;
+    return (__wt_cursor_valid(cbt, updp, validp));
+}
 
-        /*
-         * The real row-store search function builds the key, so we have to as well.
-         */
-        return (__wt_row_leaf_key(session, page, page->pg_row + cbt->slot, cbt->tmp, false));
-    }
+/*
+ * __random_slot_valid --
+ *     Check if the slot key/value pair is valid.
+ */
+static int
+__random_slot_valid(WT_CURSOR_BTREE *cbt, uint32_t slot, WT_UPDATE **updp, bool *validp)
+{
+    *updp = NULL;
+    *validp = false;
 
-    /*
-     * If the tree is new (and not empty), it might have a large insert
-     * list.
-     *
-     * Walk down the list until we find a level with at least 50 entries,
-     * that's where we'll start rolling random numbers. The value 50 is
-     * used to ignore levels with only a few entries, that is, levels which
-     * are potentially badly skewed.
-     */
-    F_SET(cbt, WT_CBT_SEARCH_SMALLEST);
-    if ((ins_head = WT_ROW_INSERT_SMALLEST(page)) == NULL)
-        return (WT_NOTFOUND);
+    __cursor_pos_clear(cbt);
+    cbt->slot = slot;
+    cbt->compare = 0;
+
+    return (__wt_cursor_valid(cbt, updp, validp));
+}
+
+/* Magic constant: 5000 entries in a skip list is enough to forcibly evict. */
+#define WT_RANDOM_SKIP_EVICT_SOON 5000
+/* Magic constant: 50 entries in a skip list is enough to predict the size. */
+#define WT_RANDOM_SKIP_PREDICT 50
+
+/*
+ * __random_skip_entries --
+ *     Return an estimate of how many entries are in a skip list.
+ */
+static uint32_t
+__random_skip_entries(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *ins_head)
+{
+    WT_INSERT **t;
+    uint32_t entries;
+    int level;
+
+    entries = 0; /* [-Wconditional-uninitialized] */
+
+    if (ins_head == NULL)
+        return (0);
+
+    /* Find a level with enough entries on it to predict the size of the list. */
     for (level = WT_SKIP_MAXDEPTH - 1; level >= 0; --level) {
-        start = &ins_head->head[level];
-        for (entries = 0, stop = start; *stop != NULL; stop = &(*stop)->next[level])
+        for (entries = 0, t = &ins_head->head[level]; *t != NULL; t = &(*t)->next[level])
             ++entries;
 
-        if (entries > 50)
+        if (entries > WT_RANDOM_SKIP_PREDICT)
             break;
     }
 
-    /*
-     * If it's a tiny list and we went all the way to level 0, correct the level; entries is
-     * correctly set.
-     */
-    if (level < 0)
-        level = 0;
-
-    /*
-     * Step down the skip list levels, selecting a random chunk of the name space at each level.
-     */
-    for (samples = entries; level > 0; samples += entries) {
-        /*
-         * There are (entries) or (entries + 1) chunks of the name space
-         * considered at each level. They are: between start and the 1st
-         * element, between the 1st and 2nd elements, and so on to the
-         * last chunk which is the name space after the stop element on
-         * the current level. This last chunk of name space may or may
-         * not be there: as we descend the levels of the skip list, this
-         * chunk may appear, depending if the next level down has
-         * entries logically after the stop point in the current level.
-         * We can't ignore those entries: because of the algorithm used
-         * to determine the depth of a skiplist, there may be a large
-         * number of entries "revealed" by descending a level.
-         *
-         * If the next level down has more items after the current stop
-         * point, there are (entries + 1) chunks to consider, else there
-         * are (entries) chunks.
-         */
-        if (*(stop - 1) == NULL)
-            choice = __wt_random(&session->rnd) % entries;
-        else
-            choice = __wt_random(&session->rnd) % (entries + 1);
-
-        if (choice == entries) {
-            /*
-             * We selected the name space after the stop element on this level. Set the start point
-             * to the current stop point, descend a level and move the stop element to the end of
-             * the list, that is, the end of the newly discovered name space, counting entries as we
-             * go.
-             */
-            start = stop;
-            --start;
-            --level;
-            for (entries = 0, stop = start; *stop != NULL; stop = &(*stop)->next[level])
-                ++entries;
-        } else {
-            /*
-             * We selected another name space on the level. Move the start pointer the selected
-             * number of entries forward to the start of the selected chunk (if the selected number
-             * is 0, start won't move). Set the stop pointer to the next element in the list and
-             * drop both start and stop down a level.
-             */
-            for (i = 0; i < choice; ++i)
-                start = &(*start)->next[level];
-            stop = &(*start)->next[level];
-
-            --start;
-            --stop;
-            --level;
-
-            /* Count the entries in the selected name space. */
-            for (entries = 0, ins = *start; ins != *stop; ins = ins->next[level])
-                ++entries;
-        }
-    }
-
-    /*
-     * When we reach the bottom level, entries will already be set. Select
-     * a random entry from the name space and return it.
-     *
-     * It should be impossible for the entries count to be 0 at this point,
-     * but check for it out of paranoia and to quiet static testing tools.
-     */
-    if (entries > 0)
-        entries = __wt_random(&session->rnd) % entries;
-    for (ins = *start; entries > 0; --entries)
-        ins = ins->next[0];
-
-    cbt->ins = ins;
-    cbt->ins_head = ins_head;
-    cbt->compare = 0;
+    /* Use the skiplist probability to estimate the size of the list. */
+    WT_ASSERT(session, WT_SKIP_PROBABILITY == UINT32_MAX >> 2);
+    while (--level >= 0)
+        entries *= 4;
 
     /*
      * Random lookups in newly created collections can be slow if a page consists of a large
-     * skiplist. Schedule the page for eviction if we encounter a large skiplist. This worthwhile
+     * skiplist. Schedule the page for eviction if we encounter a large skiplist. This is worthwhile
      * because applications that take a sample often take many samples, so the overhead of
      * traversing the skip list each time accumulates to real time.
      */
-    if (samples > 5000)
+    if (entries > WT_RANDOM_SKIP_EVICT_SOON)
         __wt_page_evict_soon(session, cbt->ref);
+
+    return (entries);
+}
+
+/* Magic constant: check 3 records before/after the selected record. */
+#define WT_RANDOM_SKIP_LOCAL 3
+/* Magic constant: retry 3 times in a skip list before giving up. */
+#define WT_RANDOM_SKIP_RETRY 3
+
+/*
+ * __random_leaf_skip --
+ *     Return a random key/value from a skip list.
+ */
+static int
+__random_leaf_skip(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *ins_head,
+  uint32_t entries, WT_UPDATE **updp, bool *validp)
+{
+    WT_INSERT *ins, *saved_ins;
+    uint32_t i;
+    int retry;
+
+    *updp = NULL;
+    *validp = false;
+
+    /* This is a relatively expensive test, try a few times then quit. */
+    for (retry = 0; retry < WT_RANDOM_SKIP_RETRY; ++retry) {
+        /*
+         * Randomly select a record in the skip list and walk to it. Remember the entry a few
+         * records before our target so we can look around in case our chosen record isn't valid.
+         */
+        saved_ins = NULL;
+        i = __wt_random(&session->rnd) % entries;
+        for (ins = WT_SKIP_FIRST(ins_head); ins != NULL; ins = WT_SKIP_NEXT(ins)) {
+            if (--i == 0)
+                break;
+            if (i == WT_RANDOM_SKIP_LOCAL * 2)
+                saved_ins = ins;
+        }
+
+        /* Try and return our selected record. */
+        if (ins != NULL) {
+            WT_RET(__random_insert_valid(cbt, ins_head, ins, updp, validp));
+            if (*validp)
+                return (0);
+        }
+
+        /* Check a few records before/after our selected record. */
+        i = WT_RANDOM_SKIP_LOCAL;
+        if (saved_ins != NULL) {
+            i = WT_RANDOM_SKIP_LOCAL * 2;
+            ins = saved_ins;
+        }
+        for (; --i > 0 && ins != NULL; ins = WT_SKIP_NEXT(ins)) {
+            WT_RET(__random_insert_valid(cbt, ins_head, ins, updp, validp));
+            if (*validp)
+                return (0);
+        }
+    }
+    return (0);
+}
+
+/* Magic constant: 100 entries in any randomly chosen skip list is enough to select from it. */
+#define WT_RANDOM_SKIP_INSERT_ENOUGH 100
+/* Magic constant: 1000 entries in an initial skip list is enough to always select from it. */
+#define WT_RANDOM_SKIP_INSERT_SMALLEST_ENOUGH 1000
+
+/*
+ * __random_leaf_insert --
+ *     Look for a large insert list from which we can select a random item.
+ */
+static int
+__random_leaf_insert(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE **updp, bool *validp)
+{
+    WT_INSERT_HEAD *ins_head;
+    WT_PAGE *page;
+    uint32_t entries, slot, start;
+
+    *updp = NULL;
+    *validp = false;
+
+    page = cbt->ref->page;
+
+    /* Check for a large insert list with no items, that's common when tables are newly created. */
+    ins_head = WT_ROW_INSERT_SMALLEST(page);
+    entries = __random_skip_entries(session, cbt, ins_head);
+    if (entries >= WT_RANDOM_SKIP_INSERT_SMALLEST_ENOUGH) {
+        WT_RET(__random_leaf_skip(session, cbt, ins_head, entries, updp, validp));
+        if (*validp)
+            return (0);
+    }
+
+    /*
+     * Look for any reasonably large insert list. We're selecting a random insert list and won't end
+     * up on the same insert list every time we search this page (unless there's only one list), so
+     * decrease the required number of records required to select from the list.
+     */
+    if (page->entries > 0) {
+        start = __wt_random(&session->rnd) % page->entries;
+        for (slot = start; slot < page->entries; ++slot) {
+            ins_head = WT_ROW_INSERT(page, &page->pg_row[slot]);
+            entries = __random_skip_entries(session, cbt, ins_head);
+            if (entries >= WT_RANDOM_SKIP_INSERT_ENOUGH) {
+                WT_RET(__random_leaf_skip(session, cbt, ins_head, entries, updp, validp));
+                if (*validp)
+                    return (0);
+            }
+        }
+        for (slot = 0; slot < start; ++slot) {
+            ins_head = WT_ROW_INSERT(page, &page->pg_row[slot]);
+            entries = __random_skip_entries(session, cbt, ins_head);
+            if (entries >= WT_RANDOM_SKIP_INSERT_ENOUGH) {
+                WT_RET(__random_leaf_skip(session, cbt, ins_head, entries, updp, validp));
+                if (*validp)
+                    return (0);
+            }
+        }
+    }
+
+    /* Fall back to the single insert list, if it's not tiny. */
+    ins_head = WT_ROW_INSERT_SMALLEST(page);
+    entries = __random_skip_entries(session, cbt, ins_head);
+    if (entries >= WT_RANDOM_SKIP_INSERT_ENOUGH) {
+        WT_RET(__random_leaf_skip(session, cbt, ins_head, entries, updp, validp));
+        if (*validp)
+            return (0);
+    }
+    return (0);
+}
+
+/* Magic constant: retry 10 times in the disk-based entries before giving up. */
+#define WT_RANDOM_DISK_RETRY 10
+
+/*
+ * __random_leaf_disk --
+ *     Return a random key/value from a page's on-disk entries.
+ */
+static int
+__random_leaf_disk(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE **updp, bool *validp)
+{
+    WT_PAGE *page;
+    uint32_t entries, slot;
+    int retry;
+
+    *updp = NULL;
+    *validp = false;
+
+    page = cbt->ref->page;
+    entries = cbt->ref->page->entries;
+
+    /* This is a relatively cheap test, so try several times. */
+    for (retry = 0; retry < WT_RANDOM_DISK_RETRY; ++retry) {
+        slot = __wt_random(&session->rnd) % entries;
+        WT_RET(__random_slot_valid(cbt, slot, updp, validp));
+        if (!*validp)
+            continue;
+
+        /* The row-store search function builds the key, so we have to as well. */
+        return (__wt_row_leaf_key(session, page, page->pg_row + slot, cbt->tmp, false));
+    }
+    return (0);
+}
+
+/* Magic constant: cursor up to 250 next/previous records before selecting a key. */
+#define WT_RANDOM_CURSOR_MOVE 250
+/* Magic constant: 1000 disk-based entries in a page is enough to always select from them. */
+#define WT_RANDOM_DISK_ENOUGH 1000
+
+/*
+ * __random_leaf --
+ *     Return a random key/value from a row-store leaf page.
+ */
+static int
+__random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
+{
+    WT_CURSOR *cursor;
+    WT_DECL_RET;
+    WT_UPDATE *upd;
+    uint32_t i;
+    bool next, valid;
+
+    cursor = (WT_CURSOR *)cbt;
+
+    /*
+     * If the page has a sufficiently large number of disk-based entries, randomly select from them.
+     * Ignoring large insert lists could skew the results, but enough disk-based entries should span
+     * a reasonable chunk of the name space.
+     */
+    if (cbt->ref->page->entries > WT_RANDOM_DISK_ENOUGH) {
+        WT_RET(__random_leaf_disk(session, cbt, &upd, &valid));
+        if (valid)
+            return (__cursor_kv_return(session, cbt, upd));
+    }
+
+    /* Look for any large insert list and select from it. */
+    WT_RET(__random_leaf_insert(session, cbt, &upd, &valid));
+    if (valid)
+        return (__cursor_kv_return(session, cbt, upd));
+
+    /*
+     * Try again if there are at least a few hundred disk-based entries: this may be a normal leaf
+     * page with big items.
+     */
+    if (cbt->ref->page->entries > WT_RANDOM_DISK_ENOUGH / 2) {
+        WT_RET(__random_leaf_disk(session, cbt, &upd, &valid));
+        if (valid)
+            return (__cursor_kv_return(session, cbt, upd));
+    }
+
+    /*
+     * We don't have many disk-based entries, we didn't find any large insert lists. Where we get
+     * into trouble is a small number of pages with large numbers of deleted items. Try and move out
+     * of the problematic namespace into something we can use by cursoring forward or backward. On a
+     * page with a sufficiently large group of deleted items where the randomly selected entries are
+     * all deleted, simply moving to the next or previous record likely means moving to the same
+     * record every time, so move the cursor a random number of items. Further, detect if we're
+     * about to return the same item twice in a row and try to avoid it. (If there's only a single
+     * record, or only a pair of records, we'll still end up in trouble, but at some point the tree
+     * is too small to do anything better.) All of this is slow and expensive, but the alternative
+     * is customer complaints.
+     */
+    __cursor_pos_clear(cbt);
+    cbt->slot = 0;
+    next = true; /* Forward from the beginning of the page. */
+    for (i = __wt_random(&session->rnd) % WT_RANDOM_CURSOR_MOVE;;) {
+        ret = next ? __wt_btcur_next(cbt, false) : __wt_btcur_prev(cbt, false);
+        if (ret == WT_NOTFOUND) {
+            next = false; /* Reverse direction from the end of the tree. */
+            ret = __wt_btcur_prev(cbt, false);
+            WT_RET(ret); /* An empty tree. */
+        }
+        if (i > 0)
+            --i;
+        else {
+            /*
+             * Skip the record we returned last time, once. Clear the tracking value so we don't
+             * skip that record twice, it just means the tree is too small for anything reasonable.
+             */
+            if (cursor->key.size == cbt->tmp->size &&
+              memcmp(cursor->key.data, cbt->tmp->data, cbt->tmp->size) == 0) {
+                cbt->tmp->size = 0;
+                i = __wt_random(&session->rnd) % WT_RANDOM_CURSOR_MOVE;
+            } else {
+                WT_RET(__wt_buf_set(session, cbt->tmp, cursor->key.data, cursor->key.size));
+                break;
+            }
+        }
+    }
 
     return (0);
 }
@@ -280,15 +465,14 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
     WT_CURSOR *cursor;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
-    WT_UPDATE *upd;
     wt_off_t size;
     uint64_t n, skip;
     uint32_t read_flags;
-    bool valid;
 
     btree = cbt->btree;
     cursor = &cbt->iface;
     session = (WT_SESSION_IMPL *)cbt->iface.session;
+
     read_flags = WT_READ_RESTART_OK;
     if (F_ISSET(cbt, WT_CBT_READ_ONCE))
         FLD_SET(read_flags, WT_READ_WONT_NEED);
@@ -319,8 +503,10 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
     if (cbt->ref == NULL || cbt->next_random_sample_size == 0) {
         WT_ERR(__cursor_func_init(cbt, true));
         WT_WITH_PAGE_INDEX(session, ret = __wt_random_descent(session, &cbt->ref, read_flags));
-        if (ret == 0)
-            goto random_page_entry;
+        if (ret == 0) {
+            WT_ERR(__random_leaf(session, cbt));
+            return (0);
+        }
 
         /*
          * Random descent may return not-found: the tree might be empty or have so many deleted
@@ -394,20 +580,9 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
     if (cbt->ref == NULL)
         WT_ERR(__wt_btcur_next(cbt, false));
 
-random_page_entry:
-    /*
-     * Select a random entry from the leaf page. If it's not valid, move to the next entry, if that
-     * doesn't work, move to the previous entry.
-     */
-    WT_ERR(__wt_row_random_leaf(session, cbt));
-    WT_ERR(__wt_cursor_valid(cbt, &upd, &valid));
-    if (valid)
-        WT_ERR(__cursor_kv_return(session, cbt, upd));
-    else {
-        if ((ret = __wt_btcur_next(cbt, false)) == WT_NOTFOUND)
-            ret = __wt_btcur_prev(cbt, false);
-        WT_ERR(ret);
-    }
+    /* Select a random entry from the leaf page. */
+    WT_ERR(__random_leaf(session, cbt));
+
     return (0);
 
 err:

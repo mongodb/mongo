@@ -49,6 +49,10 @@ main(int argc, char *argv[])
     uint64_t current_value;
     int i;
 
+    /* Bypass this test for valgrind */
+    if (testutil_is_flag_set("TESTUTIL_BYPASS_VALGRIND"))
+        return (EXIT_SUCCESS);
+
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));
     opts->nthreads = 20;

@@ -145,13 +145,15 @@ struct __wt_cursor_btree {
     WT_ROW *rip_saved; /* Last-returned key reference */
 
     /*
-     * A temporary buffer for caching RLE values for column-store files (if
-     * RLE is non-zero, then we don't unpack the value every time we move
-     * to the next cursor position, we re-use the unpacked value we stored
-     * here the first time we hit the value).
+     * A temporary buffer, used in a few different ways:
      *
-     * A temporary buffer for building on-page keys when searching row-store
-     * files.
+     * 1) For caching RLE values for column-store files (if RLE is non-zero, then we don't unpack
+     * the value every time we move to the next cursor position, we re-use the unpacked value we
+     * stored here the first time we hit the value).
+     *
+     * 2) For building on-page keys when searching row-store files.
+     *
+     * 3) For tracking random return values to avoid repetition.
      */
     WT_ITEM *tmp, _tmp;
 

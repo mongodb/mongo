@@ -79,12 +79,11 @@ pre:
 post:
   - command: shell.exec
     params:
+      working_dir: "wiredtiger"
       script: |
         set -o errexit
         set -o verbose
-        cd wiredtiger
         tar cfz ../wiredtiger.tgz .
-        cd ..
   - command: s3.put
     params:
       aws_secret: ${aws_secret}
@@ -95,15 +94,10 @@ post:
       content_type: application/tar
       display_name: Artifacts
       remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${task_id}.tgz
-  - command: shell.exec
-    params:
-      script: |
-        rm -rf "wiredtiger"
 
 tasks:
 ## Base compile task on posix flavours
   - name: compile
-    depends_on: []
     commands:
       - func: "fetch source"
       - command: git.apply_patch

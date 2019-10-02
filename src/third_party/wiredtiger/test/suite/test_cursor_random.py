@@ -95,48 +95,58 @@ class test_cursor_random(wttest.WiredTigerTestCase):
 
     # Check that next_random works in the presence of a larger set of values,
     # where the values are in an insert list.
-    def test_cursor_random_multiple_insert_records(self):
+    def cursor_random_multiple_insert_records(self, n):
         uri = self.type
-        ds = self.dataset(self, uri, 100,
+        ds = self.dataset(self, uri, n,
             config='allocation_size=512,leaf_page_max=512')
         ds.populate()
 
-        # In a insert list, next_random always selects the middle key/value
-        # pair, all we can do is confirm cursor.next works.
+        # Assert we only see 20% matches. We expect to see less than that, but we don't want
+        # to chase random test failures, either.
         cursor = self.session.open_cursor(uri, None, self.config)
-        self.assertEqual(cursor.next(), 0)
+        list=[]
+        for i in range(1,100):
+            self.assertEqual(cursor.next(), 0)
+            list.append(cursor.get_key())
+        self.assertGreater(len(set(list)), 80)
+
+    def test_cursor_random_multiple_insert_records_small(self):
+        self.cursor_random_multiple_insert_records(2000)
+    def test_cursor_random_multiple_insert_records_large(self):
+        self.cursor_random_multiple_insert_records(10000)
 
     # Check that next_random works in the presence of a larger set of values,
     # where the values are in a disk format page.
-    def cursor_random_multiple_page_records(self, reopen):
+    def cursor_random_multiple_page_records(self, n, reopen):
         uri = self.type
-        ds = self.dataset(self, uri, 10000,
+        ds = self.dataset(self, uri, n,
             config='allocation_size=512,leaf_page_max=512')
         ds.populate()
 
-        # Optionally close the connection so everything is forced to disk,
-        # insert lists are an entirely different path in the code.
+        # Optionally close the connection so everything is forced to disk, insert lists are an
+        # entirely different page format.
         if reopen:
             self.reopen_conn()
 
+        # Assert we only see 20% matches. We expect to see less than that, but we don't want
+        # to chase random test failures, either.
         cursor = self.session.open_cursor(uri, None, self.config)
-        last = ''
-        match = 0
-        for i in range(1,10):
+        list=[]
+        for i in range(1, 100):
             self.assertEqual(cursor.next(), 0)
-            current = cursor.get_key()
-            if current == last:
-                match += 1
-            last = current
-        self.assertLess(match, 5,
-            'next_random did not return random records, too many matches found')
+            list.append(cursor.get_key())
+        self.assertGreater(len(set(list)), 80)
 
-    def test_cursor_random_multiple_page_records_reopen(self):
-        self.cursor_random_multiple_page_records(1)
-    def test_cursor_random_multiple_page_records(self):
-        self.cursor_random_multiple_page_records(0)
+    def test_cursor_random_multiple_page_records_reopen_small(self):
+        self.cursor_random_multiple_page_records(2000, True)
+    def test_cursor_random_multiple_page_records_reopen_large(self):
+        self.cursor_random_multiple_page_records(10000, True)
+    def test_cursor_random_multiple_page_records_small(self):
+        self.cursor_random_multiple_page_records(2000, False)
+    def test_cursor_random_multiple_page_records_large(self):
+        self.cursor_random_multiple_page_records(10000, False)
 
-    # Check that next_random fails in the presence of a set of values, some of
+    # Check that next_random succeeds in the presence of a set of values, some of
     # which are deleted.
     def test_cursor_random_deleted_partial(self):
         uri = self.type

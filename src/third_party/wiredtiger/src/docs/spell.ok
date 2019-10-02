@@ -53,7 +53,7 @@ LIBS
 LLVM
 LOGREC
 LRU
-LRVv
+LRrVv
 LSB
 LSM
 LZ
@@ -79,6 +79,7 @@ RepMgr
 Riak
 RocksDB
 Roelofs
+RrVv
 Rrx
 SCons
 Seward's

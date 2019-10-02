@@ -3,7 +3,7 @@
 WiredTiger includes a command line utility, \c wt.
 
 @section util_global_synopsis SYNOPSIS
-<code>wt [-LRVv] [-C config] [-E secretkey ] [-h directory] command [command-specific arguments]</code>
+<code>wt [-LRrVv] [-C config] [-E secretkey ] [-h directory] command [command-specific arguments]</code>
 
 @section util_global_description DESCRIPTION
 The \c wt tool is a command-line utility that provides access to
@@ -22,6 +22,8 @@ Specify a database home directory.
 Forcibly turn off logging subsystem for debugging purposes.
 @par <code>-R</code>
 Run recovery if the underlying database is configured to do so.
+@par <code>-r</code>
+Access the database via a readonly connection
 @par <code>-V</code>
 Display WiredTiger version and exit.
 @par <code>-v</code>
@@ -34,7 +36,11 @@ The \c wt tool supports several commands.  If configured in the underlying
 database, some commands will run recovery when opening the database.  If
 the user wants to force recovery on any command, use the \c -R option.
 In general, commands that modify the database or tables will run recovery
-by default and commands that only read data will not run recovery.
+by default and commands that only read data will not run recovery. It is
+recommended when attempting to diagnose a corrupt database, that the -r
+flag be used. This flag will open the connection read-only and prevent
+utility commands from writing prevent utility commands from writing to
+any of the existing database objects.
 
 <hr>
 @section util_alter wt alter
@@ -142,7 +148,7 @@ which can be re-loaded into a new table using the \c load command.
 See @subpage dump_formats for details of the dump file formats.
 
 @subsection util_dump_synopsis Synopsis
-<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] dump [-jrx] [-c checkpoint] [-f output] uri</code>
+<code>wt [-RrVv] [-C config] [-E secretkey ] [-h directory] dump [-jrx] [-c checkpoint] [-f output] uri</code>
 
 @subsection util_dump_options Options
 The following are command-specific options for the \c dump command:
@@ -176,7 +182,7 @@ database.  If a URI is specified as an argument, only information about
 that data source is printed.
 
 @subsection util_list_synopsis Synopsis
-<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] list [-cv] [uri]</code>
+<code>wt [-RrVv] [-C config] [-E secretkey ] [-h directory] list [-cv] [uri]</code>
 
 @subsection util_list_options Options
 The following are command-specific options for the \c list command:
@@ -292,7 +298,7 @@ Display the database log.
 The \c printlog command outputs the database log.
 
 @subsection util_printlog_synopsis Synopsis
-<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] printlog [-x] [-f output]</code>
+<code>wt [-RrVv] [-C config] [-E secretkey ] [-h directory] printlog [-x] [-f output]</code>
 
 @subsection util_printlog_options Options
 The following are command-specific options for the \c printlog command:
@@ -316,7 +322,7 @@ with string or record number keys and string values.
 The \c read command exits non-zero if a specified record is not found.
 
 @subsection util_read_synopsis Synopsis
-<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] read uri key ...</code>
+<code>wt [-RrVv] [-C config] [-E secretkey ] [-h directory] read uri key ...</code>
 
 @subsection util_read_options Options
 The \c read command has no command-specific options.
@@ -404,7 +410,7 @@ The \c verify command verifies the specified table, exiting success if
 the data source is correct, and failure if the data source is corrupted.
 
 @subsection util_verify_synopsis Synopsis
-<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] verify uri</code>
+<code>wt [-RrVv] [-C config] [-E secretkey ] [-h directory] verify uri</code>
 
 @subsection util_verify_options Options
 The \c verify command has no command-specific options.
