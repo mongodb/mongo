@@ -16,7 +16,7 @@
  * index builds.
  *
  * @tags: [
- *   requires_majority_read_concern
+ *   requires_majority_read_concern,
  *   requires_persistence,
  *   requires_replication,
  *   two_phase_index_builds_unsupported,
