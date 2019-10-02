@@ -62,8 +62,9 @@ void testSetEndPosition_Next_Forward(bool unique, bool inclusive) {
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key2, loc1));
     if (inclusive) {
         ASSERT_EQ(cursor->next(), IndexKeyEntry(key3, loc1));
-        if (!unique)
+        if (!unique) {
             ASSERT_EQ(cursor->next(), IndexKeyEntry(key3, loc2));
+        }
     }
     ASSERT_EQ(cursor->next(), boost::none);
     ASSERT_EQ(cursor->next(), boost::none);  // don't resurrect.
@@ -105,8 +106,9 @@ void testSetEndPosition_Next_Reverse(bool unique, bool inclusive) {
               IndexKeyEntry(key5, loc1));
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key4, loc1));
     if (inclusive) {
-        if (!unique)
+        if (!unique) {
             ASSERT_EQ(cursor->next(), IndexKeyEntry(key3, loc2));
+        }
         ASSERT_EQ(cursor->next(), IndexKeyEntry(key3, loc1));
     }
     ASSERT_EQ(cursor->next(), boost::none);

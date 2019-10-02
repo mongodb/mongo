@@ -37,6 +37,7 @@
 
 #include <boost/preprocessor/cat.hpp>
 #include <cmath>
+#include <fmt/format.h>
 #include <functional>
 #include <sstream>
 #include <string>
@@ -63,8 +64,10 @@
  * Fails unless "EXPRESSION" is true.
  */
 #define ASSERT_TRUE(EXPRESSION) \
-    if (!(EXPRESSION))          \
-    FAIL("Expected: " #EXPRESSION)
+    if (EXPRESSION) {           \
+    } else                      \
+        FAIL("Expected: " #EXPRESSION)
+
 #define ASSERT(EXPRESSION) ASSERT_TRUE(EXPRESSION)
 
 /**
@@ -104,11 +107,15 @@
 /**
  * Binary comparison utility macro. Do not use directly.
  */
-#define ASSERT_COMPARISON_(OP, a, b)                                                           \
+#define ASSERT_COMPARISON_(OP, a, b) ASSERT_COMPARISON_STR_(OP, a, b, #a, #b)
+
+#define ASSERT_COMPARISON_STR_(OP, a, b, aExpr, bExpr)                                         \
     if (auto ca =                                                                              \
             ::mongo::unittest::ComparisonAssertion<::mongo::unittest::ComparisonOp::OP>::make( \
-                __FILE__, __LINE__, #a, #b, a, b))                                             \
-    ca.failure().stream()
+                __FILE__, __LINE__, aExpr, bExpr, a, b);                                       \
+        !ca) {                                                                                 \
+    } else                                                                                     \
+        ca.failure().stream()
 
 /**
  * Approximate equality assertion. Useful for comparisons on limited precision floating point
@@ -119,18 +126,20 @@
 /**
  * Assert a function call returns its input unchanged.
  */
-#define ASSERT_IDENTITY(INPUT, FUNCTION)                                                        \
-    [&](auto&& v) {                                                                             \
-        if (auto ca = ::mongo::unittest::ComparisonAssertion<                                   \
-                ::mongo::unittest::ComparisonOp::kEq>::make(__FILE__,                           \
-                                                            __LINE__,                           \
-                                                            #INPUT,                             \
-                                                            #FUNCTION "(" #INPUT ")",           \
-                                                            v,                                  \
-                                                            FUNCTION(                           \
-                                                                std::forward<decltype(v)>(v)))) \
-            ca.failure().stream();                                                              \
-    }(INPUT)
+#define ASSERT_IDENTITY(INPUT, FUNCTION)                                                  \
+    if (auto ca =                                                                         \
+            [&](const auto& v, const auto& fn) {                                          \
+                return ::mongo::unittest::ComparisonAssertion<                            \
+                    ::mongo::unittest::ComparisonOp::kEq>::make(__FILE__,                 \
+                                                                __LINE__,                 \
+                                                                #INPUT,                   \
+                                                                #FUNCTION "(" #INPUT ")", \
+                                                                v,                        \
+                                                                fn(v));                   \
+            }(INPUT, [&](auto&& x) { return FUNCTION(x); });                              \
+        !ca) {                                                                            \
+    } else                                                                                \
+        ca.failure().stream()
 
 /**
  * Verify that the evaluation of "EXPRESSION" throws an exception of type EXCEPTION_TYPE.
@@ -225,45 +234,48 @@
  * Behaves like ASSERT_THROWS, above, but also calls CHECK(caughtException) which may contain
  * additional assertions.
  */
-#define ASSERT_THROWS_WITH_CHECK(EXPRESSION, EXCEPTION_TYPE, CHECK)                              \
-    do {                                                                                         \
-        try {                                                                                    \
-            UNIT_TEST_INTERNALS_IGNORE_UNUSED_RESULT_WARNINGS(EXPRESSION);                       \
-        } catch (const EXCEPTION_TYPE& ex) {                                                     \
-            CHECK(ex);                                                                           \
-            break;                                                                               \
-        }                                                                                        \
-        /*                                                                                       \
-         * Fail outside of the try/catch, this way the code in the `FAIL` macro doesn't have the \
-         * potential to throw an exception which we might also be checking for.                  \
-         */                                                                                      \
-        FAIL("Expected expression " #EXPRESSION " to throw " #EXCEPTION_TYPE                     \
-             " but it threw nothing.");                                                          \
-    } while (false)
+#define ASSERT_THROWS_WITH_CHECK(EXPRESSION, EXCEPTION_TYPE, CHECK)                \
+    if ([&] {                                                                      \
+            try {                                                                  \
+                UNIT_TEST_INTERNALS_IGNORE_UNUSED_RESULT_WARNINGS(EXPRESSION);     \
+                return false;                                                      \
+            } catch (const EXCEPTION_TYPE& ex) {                                   \
+                CHECK(ex);                                                         \
+                return true;                                                       \
+            }                                                                      \
+        }()) {                                                                     \
+    } else                                                                         \
+        /* Fail outside of the try/catch, this way the code in the `FAIL` macro */ \
+        /* doesn't have the potential to throw an exception which we might also */ \
+        /* be checking for. */                                                     \
+        FAIL("Expected expression " #EXPRESSION " to throw " #EXCEPTION_TYPE       \
+             " but it threw nothing.")
 
-#define ASSERT_STRING_CONTAINS(BIG_STRING, CONTAINS)                                            \
-    do {                                                                                        \
-        std::string myString(BIG_STRING);                                                       \
-        std::string myContains(CONTAINS);                                                       \
-        if (myString.find(myContains) == std::string::npos) {                                   \
-            ::mongo::str::stream err;                                                           \
-            err << "Expected to find " #CONTAINS " (" << myContains << ") in " #BIG_STRING " (" \
-                << myString << ")";                                                             \
-            ::mongo::unittest::TestAssertionFailure(__FILE__, __LINE__, err).stream();          \
-        }                                                                                       \
-    } while (false)
+#define ASSERT_STRING_CONTAINS(BIG_STRING, CONTAINS)                            \
+    if (auto tup_ = std::tuple(std::string(BIG_STRING), std::string(CONTAINS)); \
+        std::get<0>(tup_).find(std::get<1>(tup_)) != std::string::npos) {       \
+    } else                                                                      \
+        FAIL(([&] {                                                             \
+            const auto& [haystack, sub] = tup_;                                 \
+            return format(FMT_STRING("Expected to find {} ({}) in {} ({})"),    \
+                          #CONTAINS,                                            \
+                          sub,                                                  \
+                          #BIG_STRING,                                          \
+                          haystack);                                            \
+        }()))
 
-#define ASSERT_STRING_OMITS(BIG_STRING, OMITS)                                                  \
-    do {                                                                                        \
-        std::string myString(BIG_STRING);                                                       \
-        std::string myOmits(OMITS);                                                             \
-        if (myString.find(myOmits) != std::string::npos) {                                      \
-            ::mongo::str::stream err;                                                           \
-            err << "Did not expect to find " #OMITS " (" << myOmits << ") in " #BIG_STRING " (" \
-                << myString << ")";                                                             \
-            ::mongo::unittest::TestAssertionFailure(__FILE__, __LINE__, err).stream();          \
-        }                                                                                       \
-    } while (false)
+#define ASSERT_STRING_OMITS(BIG_STRING, OMITS)                                     \
+    if (auto tup_ = std::tuple(std::string(BIG_STRING), std::string(OMITS));       \
+        std::get<0>(tup_).find(std::get<1>(tup_)) == std::string::npos) {          \
+    } else                                                                         \
+        FAIL(([&] {                                                                \
+            const auto& [haystack, omits] = tup_;                                  \
+            return format(FMT_STRING("Did not expect to find {} ({}) in {} ({})"), \
+                          #OMITS,                                                  \
+                          omits,                                                   \
+                          #BIG_STRING,                                             \
+                          haystack);                                               \
+        }()))
 
 /**
  * Construct a single test, named `TEST_NAME` within the test Suite `SUITE_NAME`.
@@ -413,7 +425,6 @@ public:
         return _tests;
     }
 
-protected:
     /**
      * Add an old-style test of type `T` to this Suite, saving any test constructor args
      * that would be needed at test run time.
@@ -671,10 +682,22 @@ private:
         if (comparator()(a, b)) {
             return;
         }
+        _assertion = std::make_unique<TestAssertionFailure>(
+            theFile,
+            theLine,
+            format(FMT_STRING("Expected {1} {0} {2} ({3} {0} {4})"),
+                   name(),
+                   aExpression,
+                   bExpression,
+                   _stringify(a),
+                   _stringify(b)));
+    }
+
+    template <typename T>
+    static std::string _stringify(const T& t) {
         std::ostringstream os;
-        os << "Expected " << aExpression << " " << name() << " " << bExpression << " (" << a << " "
-           << name() << " " << b << ")";
-        _assertion = std::make_unique<TestAssertionFailure>(theFile, theLine, os.str());
+        os << t;
+        return os.str();
     }
 
 public:

@@ -1442,12 +1442,15 @@ TEST_F(KeyStringBuilderTest, RecordIds) {
         for (int j = 0; j < 63; j++) {
             RecordId other = RecordId(1ll << j);
 
-            if (rid == other)
+            if (rid == other) {
                 ASSERT_EQ(KeyString::Builder(version, rid), KeyString::Builder(version, other));
-            if (rid < other)
+            }
+            if (rid < other) {
                 ASSERT_LT(KeyString::Builder(version, rid), KeyString::Builder(version, other));
-            if (rid > other)
+            }
+            if (rid > other) {
                 ASSERT_GT(KeyString::Builder(version, rid), KeyString::Builder(version, other));
+            }
 
             {
                 // Test concatenating RecordIds like in a unique index.

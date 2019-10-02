@@ -62,7 +62,8 @@ public:
     // For debugging and ASSERT_EQUALS in tests.
     template <typename OStream>
     friend OStream& operator<<(OStream& stream, Position p) {
-        return stream << p.index;
+        stream << p.index;
+        return stream;
     }
 
 private:

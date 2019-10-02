@@ -210,12 +210,14 @@ TEST(Future_EdgeCases, interrupted_wait_then_get_with_bgthread) {
     auto future = async([] {});
 
     auto res = future.waitNoThrow(&dummyInterruptable);
-    if (!res.isOK())
+    if (!res.isOK()) {
         ASSERT_EQ(res, ErrorCodes::Interrupted);
+    }
 
     res = future.getNoThrow(&dummyInterruptable);
-    if (!res.isOK())
+    if (!res.isOK()) {
         ASSERT_EQ(res, ErrorCodes::Interrupted);
+    }
 
     future.get();
 }
@@ -241,12 +243,14 @@ TEST(Future_EdgeCases, interrupted_wait_then_then_with_bgthread) {
     auto future = async([] {});
 
     auto res = future.waitNoThrow(&dummyInterruptable);
-    if (!res.isOK())
+    if (!res.isOK()) {
         ASSERT_EQ(res, ErrorCodes::Interrupted);
+    }
 
     res = future.getNoThrow(&dummyInterruptable);
-    if (!res.isOK())
+    if (!res.isOK()) {
         ASSERT_EQ(res, ErrorCodes::Interrupted);
+    }
 
     std::move(future).then([] {}).get();
 }

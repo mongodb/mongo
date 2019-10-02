@@ -86,7 +86,7 @@ TEST(StatusWith, nonDefaultConstructible) {
     };
 
     auto swND = makeStatusWith<NoDefault>(1);
-    ASSERT_TRUE(swND.getValue()._x = 1);
+    ASSERT_EQ(swND.getValue()._x, 1);
 
     auto swNDerror = StatusWith<NoDefault>(mongo::ErrorCodes::BadValue, "foo");
     ASSERT_FALSE(swNDerror.isOK());

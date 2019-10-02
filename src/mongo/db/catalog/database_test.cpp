@@ -293,7 +293,7 @@ void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationCont
         Collection* collection = nullptr;
         {
             WriteUnitOfWork wuow(opCtx);
-            ASSERT_TRUE(collection = db->createCollection(opCtx, nss));
+            ASSERT_TRUE((collection = db->createCollection(opCtx, nss)));
             wuow.commit();
         }
 

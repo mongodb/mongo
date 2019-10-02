@@ -228,6 +228,7 @@ env.Library(
         'collection',
         'index_build_block',
         'index_timestamp_helper',
+        'index_build_block',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/background',

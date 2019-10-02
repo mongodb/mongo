@@ -648,17 +648,22 @@ protected:
         ASSERT_EQ(output.metadata().hasSearchScore(), input.metadata().hasSearchScore());
         ASSERT_EQ(output.metadata().hasSearchHighlights(), input.metadata().hasSearchHighlights());
         ASSERT_EQ(output.metadata().hasIndexKey(), input.metadata().hasIndexKey());
-        if (input.metadata().hasTextScore())
+        if (input.metadata().hasTextScore()) {
             ASSERT_EQ(output.metadata().getTextScore(), input.metadata().getTextScore());
-        if (input.metadata().hasRandVal())
+        }
+        if (input.metadata().hasRandVal()) {
             ASSERT_EQ(output.metadata().getRandVal(), input.metadata().getRandVal());
-        if (input.metadata().hasSearchScore())
+        }
+        if (input.metadata().hasSearchScore()) {
             ASSERT_EQ(output.metadata().getSearchScore(), input.metadata().getSearchScore());
-        if (input.metadata().hasSearchHighlights())
+        }
+        if (input.metadata().hasSearchHighlights()) {
             ASSERT_VALUE_EQ(output.metadata().getSearchHighlights(),
                             input.metadata().getSearchHighlights());
-        if (input.metadata().hasIndexKey())
+        }
+        if (input.metadata().hasIndexKey()) {
             ASSERT_BSONOBJ_EQ(output.metadata().getIndexKey(), input.metadata().getIndexKey());
+        }
 
         ASSERT(output.toBson().binaryEqual(input.toBson()));
     }

@@ -460,10 +460,12 @@ void checkConsistency(const BigSimplePolygon& bigPoly,
                       const BigSimplePolygon& expandedBigPoly,
                       const TShape& shape) {
     // Contain() => Intersects()
-    if (bigPoly.Contains(shape))
+    if (bigPoly.Contains(shape)) {
         ASSERT(bigPoly.Intersects(shape));
-    if (expandedBigPoly.Contains(shape))
+    }
+    if (expandedBigPoly.Contains(shape)) {
         ASSERT(expandedBigPoly.Intersects(shape));
+    }
     // Relation doesn't change
     ASSERT_EQUALS(bigPoly.Contains(shape), expandedBigPoly.Contains(shape));
     ASSERT_EQUALS(bigPoly.Intersects(shape), expandedBigPoly.Intersects(shape));

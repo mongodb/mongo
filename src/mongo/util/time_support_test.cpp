@@ -70,9 +70,10 @@ TEST(TimeFormatting, DateAsISO8601UTCString) {
     ASSERT_EQUALS(std::string("1970-01-01T00:00:00.000Z"), dateToISOStringUTC(Date_t()));
     ASSERT_EQUALS(std::string("1970-06-30T01:06:40.981Z"),
                   dateToISOStringUTC(Date_t::fromMillisSinceEpoch(15556000981LL)));
-    if (!isTimeTSmall)
+    if (!isTimeTSmall) {
         ASSERT_EQUALS(std::string("2058-02-20T18:29:11.100Z"),
                       dateToISOStringUTC(Date_t::fromMillisSinceEpoch(2781455351100LL)));
+    }
     ASSERT_EQUALS(std::string("2013-02-20T18:29:11.100Z"),
                   dateToISOStringUTC(Date_t::fromMillisSinceEpoch(1361384951100LL)));
 }
@@ -81,9 +82,10 @@ TEST(TimeFormatting, DateAsISO8601LocalString) {
     ASSERT_EQUALS(std::string("1969-12-31T19:00:00.000-0500"), dateToISOStringLocal(Date_t()));
     ASSERT_EQUALS(std::string("1970-06-29T21:06:40.981-0400"),
                   dateToISOStringLocal(Date_t::fromMillisSinceEpoch(15556000981LL)));
-    if (!isTimeTSmall)
+    if (!isTimeTSmall) {
         ASSERT_EQUALS(std::string("2058-02-20T13:29:11.100-0500"),
                       dateToISOStringLocal(Date_t::fromMillisSinceEpoch(2781455351100LL)));
+    }
     ASSERT_EQUALS(std::string("2013-02-20T13:29:11.100-0500"),
                   dateToISOStringLocal(Date_t::fromMillisSinceEpoch(1361384951100LL)));
 }
@@ -92,9 +94,10 @@ TEST(TimeFormatting, DateAsCtimeString) {
     ASSERT_EQUALS(std::string("Wed Dec 31 19:00:00.000"), dateToCtimeString(Date_t()));
     ASSERT_EQUALS(std::string("Mon Jun 29 21:06:40.981"),
                   dateToCtimeString(Date_t::fromMillisSinceEpoch(15556000981LL)));
-    if (!isTimeTSmall)
+    if (!isTimeTSmall) {
         ASSERT_EQUALS(std::string("Wed Feb 20 13:29:11.100"),
                       dateToCtimeString(Date_t::fromMillisSinceEpoch(2781455351100LL)));
+    }
     ASSERT_EQUALS(std::string("Wed Feb 20 13:29:11.100"),
                   dateToCtimeString(Date_t::fromMillisSinceEpoch(1361384951100LL)));
 }
@@ -111,10 +114,11 @@ TEST(TimeFormatting, DateAsISO8601UTCStream) {
     ASSERT_EQUALS(
         std::string("1970-06-30T01:06:40.981Z"),
         stringstreamDate(outputDateAsISOStringUTC, Date_t::fromMillisSinceEpoch(15556000981LL)));
-    if (!isTimeTSmall)
+    if (!isTimeTSmall) {
         ASSERT_EQUALS(std::string("2058-02-20T18:29:11.100Z"),
                       stringstreamDate(outputDateAsISOStringUTC,
                                        Date_t::fromMillisSinceEpoch(2781455351100LL)));
+    }
     ASSERT_EQUALS(
         std::string("2013-02-20T18:29:11.100Z"),
         stringstreamDate(outputDateAsISOStringUTC, Date_t::fromMillisSinceEpoch(1361384951100LL)));
@@ -126,10 +130,11 @@ TEST(TimeFormatting, DateAsISO8601LocalStream) {
     ASSERT_EQUALS(
         std::string("1970-06-29T21:06:40.981-0400"),
         stringstreamDate(outputDateAsISOStringLocal, Date_t::fromMillisSinceEpoch(15556000981LL)));
-    if (!isTimeTSmall)
+    if (!isTimeTSmall) {
         ASSERT_EQUALS(std::string("2058-02-20T13:29:11.100-0500"),
                       stringstreamDate(outputDateAsISOStringLocal,
                                        Date_t::fromMillisSinceEpoch(2781455351100LL)));
+    }
     ASSERT_EQUALS(std::string("2013-02-20T13:29:11.100-0500"),
                   stringstreamDate(outputDateAsISOStringLocal,
                                    Date_t::fromMillisSinceEpoch(1361384951100LL)));
@@ -140,10 +145,11 @@ TEST(TimeFormatting, DateAsCtimeStream) {
                   stringstreamDate(outputDateAsCtime, Date_t::fromMillisSinceEpoch(0)));
     ASSERT_EQUALS(std::string("Mon Jun 29 21:06:40.981"),
                   stringstreamDate(outputDateAsCtime, Date_t::fromMillisSinceEpoch(15556000981LL)));
-    if (!isTimeTSmall)
+    if (!isTimeTSmall) {
         ASSERT_EQUALS(
             std::string("Wed Feb 20 13:29:11.100"),
             stringstreamDate(outputDateAsCtime, Date_t::fromMillisSinceEpoch(2781455351100LL)));
+    }
     ASSERT_EQUALS(
         std::string("Wed Feb 20 13:29:11.100"),
         stringstreamDate(outputDateAsCtime, Date_t::fromMillisSinceEpoch(1361384951100LL)));
