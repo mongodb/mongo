@@ -19,3 +19,13 @@ env.CppUnitTest(
         'overflow_arithmetic_test.cpp'
     ],
 )
+
+env.Benchmark(
+    target='endian_bm',
+    source=[
+        'endian_bm.cpp',
+    ],
+    LIBDEPS=[
+    ],
+)
+

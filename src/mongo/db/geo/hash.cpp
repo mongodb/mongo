@@ -41,6 +41,8 @@ namespace mongo {
 
 using std::stringstream;
 
+static constexpr bool kNativeLittle = (endian::Order::kNative == endian::Order::kLittle);
+
 std::ostream& operator<<(std::ostream& s, const GeoHash& h) {
     return s << h.toString();
 }
@@ -237,12 +239,7 @@ void GeoHash::unhash_fast(unsigned* x, unsigned* y) const {
         // 0x55 in binary is "01010101",
         // it's an odd bitmask that we use to turn off all the even bits
         unsigned t = (unsigned)(c[i]) & 0x55;
-        int leftShift;
-#if MONGO_CONFIG_BYTE_ORDER == MONGO_LITTLE_ENDIAN
-        leftShift = 4 * i;
-#else
-        leftShift = 28 - (4 * i);
-#endif
+        const int leftShift = 4 * (kNativeLittle ? i : (7 - i));
         *y |= geoBitSets.hashedToNormal[t] << leftShift;
 
         t = ((unsigned)(c[i]) >> 1) & 0x55;
@@ -262,11 +259,11 @@ void GeoHash::unhash_slow(unsigned* x, unsigned* y) const {
 }
 
 void GeoHash::unhash(unsigned* x, unsigned* y) const {
-#if MONGO_CONFIG_BYTE_ORDER == MONGO_LITTLE_ENDIAN
-    unhash_fast(x, y);
-#else
-    unhash_slow(x, y);
-#endif
+    if constexpr (kNativeLittle) {
+        unhash_fast(x, y);
+    } else {
+        unhash_slow(x, y);
+    }
 }
 
 /** Is the 'bit'-th most significant bit set?  (NOT the least significant) */
@@ -485,31 +482,31 @@ void GeoHash::clearUnusedBits() {
 
 static void appendHashToBuilder(long long hash, BSONObjBuilder* builder, const char* fieldName) {
     char buf[8];
-#if MONGO_CONFIG_BYTE_ORDER == MONGO_LITTLE_ENDIAN
-    // Reverse the order of bytes when copying between BinData and GeoHash.
-    // GeoHashes are meant to be compared from MSB to LSB, where the first 2 MSB indicate the
-    // quadrant.
-    // In BinData, the GeoHash of a 2D index is compared from LSB to MSB, so the bytes should be
-    // reversed on little-endian systems
-    copyAndReverse(buf, (char*)&hash);
-#else
-    std::memcpy(buf, reinterpret_cast<char*>(&hash), 8);
-#endif
+    if constexpr (kNativeLittle) {
+        // Reverse the order of bytes when copying between BinData and GeoHash.
+        // GeoHashes are meant to be compared from MSB to LSB, where the first 2 MSB indicate the
+        // quadrant.
+        // In BinData, the GeoHash of a 2D index is compared from LSB to MSB, so the bytes should be
+        // reversed on little-endian systems
+        copyAndReverse(buf, (char*)&hash);
+    } else {
+        std::memcpy(buf, reinterpret_cast<char*>(&hash), 8);
+    }
     builder->appendBinData(fieldName, 8, bdtCustom, buf);
 }
 
 static void appendHashToKeyString(long long hash, KeyString::Builder* ks) {
     char buf[8];
-#if MONGO_CONFIG_BYTE_ORDER == MONGO_LITTLE_ENDIAN
-    // Reverse the order of bytes when copying between BinData and GeoHash.
-    // GeoHashes are meant to be compared from MSB to LSB, where the first 2 MSB indicate the
-    // quadrant.
-    // In BinData, the GeoHash of a 2D index is compared from LSB to MSB, so the bytes should be
-    // reversed on little-endian systems
-    copyAndReverse(buf, (char*)&hash);
-#else
-    std::memcpy(buf, reinterpret_cast<char*>(&hash), 8);
-#endif
+    if constexpr (kNativeLittle) {
+        // Reverse the order of bytes when copying between BinData and GeoHash.
+        // GeoHashes are meant to be compared from MSB to LSB, where the first 2 MSB indicate the
+        // quadrant.
+        // In BinData, the GeoHash of a 2D index is compared from LSB to MSB, so the bytes should be
+        // reversed on little-endian systems
+        copyAndReverse(buf, (char*)&hash);
+    } else {
+        std::memcpy(buf, reinterpret_cast<char*>(&hash), 8);
+    }
     ks->appendBinData(BSONBinData(buf, 8, bdtCustom));
 }
 

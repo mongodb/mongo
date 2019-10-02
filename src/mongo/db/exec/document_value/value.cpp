@@ -1314,8 +1314,11 @@ Value Value::deserializeForSorter(BufReader& buf, const SorterDeserializeSetting
             return Value(buf.read<LittleEndian<long long>>().value);
         case NumberDouble:
             return Value(buf.read<LittleEndian<double>>().value);
-        case NumberDecimal:
-            return Value(Decimal128(buf.read<LittleEndian<Decimal128::Value>>().value));
+        case NumberDecimal: {
+            auto lo = buf.read<LittleEndian<std::uint64_t>>().value;
+            auto hi = buf.read<LittleEndian<std::uint64_t>>().value;
+            return Value(Decimal128{Decimal128::Value{lo, hi}});
+        }
         case Bool:
             return Value(bool(buf.read<char>()));
         case Date:
