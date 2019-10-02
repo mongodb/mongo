@@ -110,6 +110,7 @@ class IndexBuildTest {
      * Runs listIndexes command on collection.
      * If 'options' is provided, these will be sent along with the command request.
      * Asserts that all the indexes on this collection fit within the first batch of results.
+     * Returns a map of index specs keyed by name.
      */
     static assertIndexes(coll, numIndexes, readyIndexes, notReadyIndexes, options) {
         notReadyIndexes = notReadyIndexes || [];
@@ -158,6 +159,8 @@ class IndexBuildTest {
                        'unexpected buildUUID field in ' + name + ' index spec: ' + tojson(spec));
             }
         }
+
+        return indexMap;
     }
 
     /**
