@@ -10,8 +10,6 @@ load('./jstests/multiVersion/libs/multi_rs.js');
 const lastStableVersion = "last-stable";
 const latestVersion = "latest";
 
-TestData.randomBinVersions = true;
-
 const nodes = {
     0: {binVersion: latestVersion},
     1: {binVersion: lastStableVersion},

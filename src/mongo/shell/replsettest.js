@@ -577,6 +577,13 @@ var ReplSetTest = function(opts) {
         }
 
         var nodes = [];
+
+        if (jsTest.options().randomBinVersions) {
+            // Set the random seed to the value passed in by TestData. The seed is undefined
+            // by default.
+            Random.setRandomSeed(jsTest.options().seed);
+        }
+
         for (var n = 0; n < this.ports.length; n++) {
             nodes.push(this.start(n, options, restart));
         }
@@ -1024,7 +1031,15 @@ var ReplSetTest = function(opts) {
         // nodes are subsequently added to the set, since such nodes cannot set their FCV to
         // "latest". Therefore, we make sure the primary is "last-stable" FCV before adding in
         // nodes of different binary versions to the replica set.
-        if (jsTest.options().randomBinVersions) {
+        let isMultiversion = false;
+        Object.keys(this.nodeOptions).forEach(function(key, index) {
+            let val = self.nodeOptions[key];
+            if (typeof (val) === "object" && val.hasOwnProperty("binVersion") &&
+                MongoRunner.areBinVersionsTheSame(val.binVersion, lastStableFCV)) {
+                isMultiversion = true;
+            }
+        });
+        if (isMultiversion || jsTest.options().randomBinVersions) {
             assert.commandWorked(
                 self.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
             checkFCV(self.getPrimary().getDB("admin"), lastStableFCV);
@@ -2327,6 +2342,10 @@ var ReplSetTest = function(opts) {
             dbpath: "$set-$node"
         };
 
+        if (options && options.binVersion && jsTest.options().randomBinVersions) {
+            throw new Error("Can only specify one of binVersion and randomBinVersion, not both.");
+        }
+
         //
         // Note : this replaces the binVersion of the shared startSet() options the first time
         // through, so the full set is guaranteed to have different versions if size > 1.  If using
@@ -2350,6 +2369,13 @@ var ReplSetTest = function(opts) {
                 Object.merge(this.nodeOptions["n" + n], {rsConfig: options.rsConfig});
         }
         delete options.rsConfig;
+
+        if (jsTest.options().randomBinVersions) {
+            const rand = Random.rand();
+            const version = rand < 0.5 ? "latest" : "last-stable";
+            print("Randomly assigned binary version: " + version + " to node: " + n);
+            options.binVersion = version;
+        }
 
         options.restart = options.restart || restart;
 
