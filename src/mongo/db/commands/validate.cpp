@@ -69,6 +69,7 @@ stdx::condition_variable _validationNotifier;
  *   {
  *       validate: "collectionNameWithoutTheDBPart",
  *       full: <bool>  // If true, a more thorough (and slower) collection validation is performed.
+ *       background: <bool>  // If true, performs validation on the checkpoint of the collection.
  *   }
  */
 class ValidateCmd : public BasicCommand {
@@ -80,9 +81,11 @@ public:
     }
 
     std::string help() const override {
-        return "Validate contents of a namespace by scanning its data structures for correctness.  "
-               "Slow.\n"
-               "Add full:true option to do a more thorough check";
+        return str::stream() << "Validate contents of a namespace by scanning its data structures "
+                             << "for correctness.\nThis is a slow operation.\n"
+                             << "\tAdd {full: true} option to do a more thorough check.\n"
+                             << "\tAdd {background: true} to validate in the background.\n"
+                             << "Cannot specify both {full: true, background: true}.";
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
