@@ -45,7 +45,6 @@ class BSONObj;
 class OperationContext;
 
 namespace repl {
-
 /**
  * OpObserver for OplogApplierImpl test fixture.
  */
@@ -104,23 +103,23 @@ public:
 
 class OplogApplierImplTest : public ServiceContextMongoDTest {
 protected:
-    void _testSyncApplyCrudOperation(ErrorCodes::Error expectedError,
-                                     const OplogEntry& op,
-                                     bool expectedApplyOpCalled);
+    void _testApplyOplogEntryBatchCrudOperation(ErrorCodes::Error expectedError,
+                                                const OplogEntry& op,
+                                                bool expectedApplyOpCalled);
 
-    Status _syncApplyWrapper(OperationContext* opCtx,
-                             const OplogEntryBatch& batch,
-                             OplogApplication::Mode oplogApplicationMode);
+    Status _applyOplogEntryBatchWrapper(OperationContext* opCtx,
+                                        const OplogEntryBatch& batch,
+                                        OplogApplication::Mode oplogApplicationMode);
 
     ServiceContext::UniqueOperationContext _opCtx;
     std::unique_ptr<ReplicationConsistencyMarkers> _consistencyMarkers;
     ServiceContext* serviceContext;
     OplogApplierImplOpObserver* _opObserver = nullptr;
 
-    // Implements the OplogApplierImpl::MultiSyncApplyFn interface and does nothing.
+    // Implements the OplogApplierImpl::ApplyGroupFn interface and does nothing.
     static Status noopApplyOperationFn(OperationContext*,
                                        MultiApplier::OperationPtrs*,
-                                       SyncTail* st,
+                                       OplogApplierImpl* oai,
                                        WorkerMultikeyPathInfo*) {
         return Status::OK();
     }
@@ -147,9 +146,32 @@ protected:
     UUID kUuid{UUID::gen()};
 };
 
+// Utility class to allow easily scanning a collection.  Scans in forward order, returns
+// Status::CollectionIsEmpty when scan is exhausted.
+class CollectionReader {
+public:
+    CollectionReader(OperationContext* opCtx, const NamespaceString& nss);
+
+    StatusWith<BSONObj> next();
+
+private:
+    AutoGetCollectionForRead _collToScan;
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _exec;
+};
+
 Status failedApplyCommand(OperationContext* opCtx,
                           const BSONObj& theOperation,
                           OplogApplication::Mode);
+
+void checkTxnTable(OperationContext* opCtx,
+                   const LogicalSessionId& lsid,
+                   const TxnNumber& txnNum,
+                   const repl::OpTime& expectedOpTime,
+                   Date_t expectedWallClock,
+                   boost::optional<repl::OpTime> expectedStartOpTime,
+                   boost::optional<DurableTxnStateEnum> expectedState);
+
+bool docExists(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& doc);
 
 }  // namespace repl
 }  // namespace mongo

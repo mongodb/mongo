@@ -40,9 +40,9 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/sync_tail_test_fixture.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/uuid.h"
 
@@ -87,7 +87,7 @@ std::ostream& operator<<(std::ostream& stream, const CollectionState& state);
 StringBuilderImpl<SharedBufferAllocator>& operator<<(StringBuilderImpl<SharedBufferAllocator>& sb,
                                                      const CollectionState& state);
 
-class IdempotencyTest : public SyncTailTest {
+class IdempotencyTest : public OplogApplierImplTest {
 protected:
     enum class SequenceType : int { kEntireSequence, kAnyPrefix, kAnySuffix, kAnyPrefixOrSuffix };
     OplogEntry createCollection(CollectionUUID uuid = UUID::gen());

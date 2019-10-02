@@ -35,9 +35,9 @@
 namespace mongo {
 namespace repl {
 /**
- * This is a class for a single oplog entry or grouped inserts to be applied in syncApply. This
- * class is immutable and can only be initialized using either a single oplog entry or a range of
- * grouped inserts.
+ * This is a class for a single oplog entry or grouped inserts to be applied in
+ * applyOplogEntryBatch. This class is immutable and can only be initialized using either a single
+ * oplog entry or a range of grouped inserts.
  */
 class OplogEntryBatch {
 public:

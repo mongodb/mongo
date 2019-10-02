@@ -38,8 +38,8 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/repl/oplog_applier_impl.h"
 #include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/sync_tail.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -127,7 +127,7 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(ConstIt
     OplogEntryBatch groupedInsertBatch(it, endOfGroupableOpsIterator);
     try {
         // Apply the group of inserts by passing in groupedInsertBatch.
-        uassertStatusOK(syncApply(_opCtx, groupedInsertBatch, _mode));
+        uassertStatusOK(applyOplogEntryBatch(_opCtx, groupedInsertBatch, _mode));
         // It succeeded, advance the oplogEntriesIterator to the end of the
         // group of inserts.
         return endOfGroupableOpsIterator - 1;

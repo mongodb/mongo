@@ -45,7 +45,7 @@ assert.throws(function() {
 
 /**
  * Part 2: Issue a slow op and make sure that we *do* log it.
- * We use a failpoint in syncApply which blocks after we read the time at the start
+ * We use a failpoint in applyOplogEntryBatch which blocks after we read the time at the start
  * of the application of the op, and we wait there to simulate slowness.
  */
 
@@ -62,8 +62,9 @@ assert.commandWorked(secondary.adminCommand(
 
 // Issue a write and make sure we've hit the failpoint before moving on.
 assert.commandWorked(primary.getDB(name)["slowOp"].insert({"slow": "sloth"}));
-checkLog.contains(secondary,
-                  "syncApply - fail point hangAfterRecordingOpApplicationStartTime enabled");
+checkLog.contains(
+    secondary,
+    "applyOplogEntryBatch - fail point hangAfterRecordingOpApplicationStartTime enabled");
 
 // Wait for an amount of time safely above the "slowMS" we set.
 sleep(0.5 * 1000);

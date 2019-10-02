@@ -104,7 +104,9 @@ public:
 
     using Operations = std::vector<OplogEntry>;
 
-    // Used by SyncTail to access batching logic.
+    // TODO (SERVER-43001): This potentially violates layering as OpQueueBatcher calls an
+    // OplogApplier method.
+    // Used to access batching logic.
     using GetNextApplierBatchFn = std::function<StatusWith<OplogApplier::Operations>(
         OperationContext* opCtx, const BatchLimits& batchLimits)>;
 
@@ -181,6 +183,8 @@ public:
      * TODO: remove when enqueue() is implemented.
      */
     StatusWith<OpTime> multiApply(OperationContext* opCtx, Operations ops);
+
+    const Options& getOptions() const;
 
 private:
     /**

@@ -32,7 +32,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/repl/multiapplier.h"
-#include "mongo/db/repl/sync_tail.h"
+#include "mongo/db/repl/oplog_applier.h"
 
 namespace mongo {
 namespace repl {
@@ -68,7 +68,7 @@ private:
     // Used for constructing search bounds when grouping inserts.
     ConstIterator _end;
 
-    // Passed to _syncApply when applying grouped inserts.
+    // Passed to applyOplogEntryBatch when applying grouped inserts.
     OperationContext* _opCtx;
     Mode _mode;
 };

@@ -38,30 +38,36 @@
 #include "mongo/db/repl/opqueue_batcher.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/session_update_tracker.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/sync_tail.h"
 
 namespace mongo {
 namespace repl {
 
 /**
  * Applies oplog entries.
- * Reads from an OplogBuffer batches of operations that may be applied in parallel.
+ * Primarily used to apply batches of operations fetched from a sync source during steady state
+ * replication and initial sync.
+ *
+ * When used for steady state replication, runs a thread that reads batches of operations from
+ * an oplog buffer (through the BackgroundSync interface), writes them into the oplog collection,
+ * and applies the batch of operations.
  */
 class OplogApplierImpl : public OplogApplier {
     OplogApplierImpl(const OplogApplierImpl&) = delete;
     OplogApplierImpl& operator=(const OplogApplierImpl&) = delete;
 
 public:
-    using MultiSyncApplyFunc =
-        std::function<Status(OperationContext* opCtx,
-                             MultiApplier::OperationPtrs* ops,
-                             SyncTail* st,
-                             WorkerMultikeyPathInfo* workerMultikeyPathInfo)>;
+    using ApplyGroupFunc = std::function<Status(OperationContext* opCtx,
+                                                MultiApplier::OperationPtrs* ops,
+                                                OplogApplierImpl* oai,
+                                                WorkerMultikeyPathInfo* workerMultikeyPathInfo)>;
     /**
      * Constructs this OplogApplier with specific options.
-     * Obtains batches of operations from the OplogBuffer to apply.
-     * Reports oplog application progress using the Observer.
+     * During steady state replication, _run() obtains batches of operations to apply
+     * from the oplogBuffer. During the oplog application phase, the batch of operations is
+     * distributed across writer threads in 'writerPool'. Each writer thread applies its own vector
+     * of operations using 'func'. The writer thread pool is not owned by us.
      */
     OplogApplierImpl(executor::TaskExecutor* executor,
                      OplogBuffer* oplogBuffer,
@@ -69,20 +75,18 @@ public:
                      ReplicationCoordinator* replCoord,
                      ReplicationConsistencyMarkers* consistencyMarkers,
                      StorageInterface* storageInterface,
-                     MultiSyncApplyFunc func,
+                     ApplyGroupFunc func,
                      const Options& options,
                      ThreadPool* writerPool);
 
-private:
-    void _run(OplogBuffer* oplogBuffer) override;
 
+private:
     /**
      * Runs oplog application in a loop until shutdown() is called.
      * Retrieves operations from the OplogBuffer in batches that will be applied in parallel using
      * multiApply().
      */
-    void _runLoop(OplogBuffer* oplogBuffer,
-                  OplogApplier::GetNextApplierBatchFn getNextApplierBatchFn);
+    void _run(OplogBuffer* oplogBuffer) override;
 
     /**
      * Applies a batch of oplog entries by writing the oplog entries to the local oplog and then
@@ -99,6 +103,12 @@ private:
      */
     StatusWith<OpTime> _multiApply(OperationContext* opCtx, MultiApplier::Operations ops);
 
+    void _deriveOpsAndFillWriterVectors(OperationContext* opCtx,
+                                        MultiApplier::Operations* ops,
+                                        std::vector<MultiApplier::OperationPtrs>* writerVectors,
+                                        std::vector<MultiApplier::Operations>* derivedOps,
+                                        SessionUpdateTracker* sessionUpdateTracker) noexcept;
+
     // Not owned by us.
     ReplicationCoordinator* const _replCoord;
 
@@ -111,16 +121,36 @@ private:
     ReplicationConsistencyMarkers* const _consistencyMarkers;
 
     // Function to use during _multiApply
-    MultiSyncApplyFunc _applyFunc;
-
-    // Used to run oplog application loop.
-    // TODO (SERVER-43651): Remove this member once sync_tail.cpp is fully merged in.
-    SyncTail _syncTail;
+    ApplyGroupFunc _applyFunc;
 
     // Used to determine which operations should be applied during initial sync. If this is null,
     // we will apply all operations that were fetched.
     OpTime _beginApplyingOpTime = OpTime();
+
+protected:
+    // Marked as protected for use in unit tests.
+    void fillWriterVectors(OperationContext* opCtx,
+                           MultiApplier::Operations* ops,
+                           std::vector<MultiApplier::OperationPtrs>* writerVectors,
+                           std::vector<MultiApplier::Operations>* derivedOps) noexcept;
 };
 
+/**
+ * Applies a batch of operations.
+ */
+Status applyOplogEntryBatch(OperationContext* opCtx,
+                            const OplogEntryBatch& batch,
+                            OplogApplication::Mode oplogApplicationMode);
+
+/**
+ * This free function is used by the thread pool workers to write ops to the db.
+ * This consumes the passed in OperationPtrs and callers should not make any assumptions about the
+ * state of the container after calling. However, this function cannot modify the pointed-to
+ * operations because the OperationPtrs container contains const pointers.
+ */
+Status applyOplogGroup(OperationContext* opCtx,
+                       MultiApplier::OperationPtrs* ops,
+                       OplogApplierImpl* oai,
+                       WorkerMultikeyPathInfo* workerMultikeyPathInfo);
 }  // namespace repl
 }  // namespace mongo

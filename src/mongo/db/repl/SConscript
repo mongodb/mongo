@@ -500,23 +500,6 @@ env.Library(
     ],
 )
 
-
-env.Library(
-    target='oplog_applier_impl_test_fixture',
-    source=[
-        'oplog_applier_impl_test_fixture.cpp',
-    ],
-    LIBDEPS=[
-        'drop_pending_collection_reaper',
-        'oplog_application',
-        'replmocks',
-        'storage_interface_impl',
-        '$BUILD_DIR/mongo/db/catalog/document_validation',
-        '$BUILD_DIR/mongo/db/s/op_observer_sharding_impl',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
-    ],
-)
-
 env.Library(
     target='oplog_application_interface',
     source=[
@@ -542,7 +525,6 @@ env.Library(
         'oplog_applier_impl.cpp',
         'opqueue_batcher.cpp',
         'session_update_tracker.cpp',
-        'sync_tail.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
@@ -575,7 +557,7 @@ env.Library(
         'idempotency_test_fixture.cpp',
     ],
     LIBDEPS=[
-        'sync_tail_test_fixture',
+        'oplog_applier_impl_test_fixture',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/catalog/collection_validation',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
@@ -583,9 +565,9 @@ env.Library(
 )
 
 env.Library(
-    target='sync_tail_test_fixture',
+    target='oplog_applier_impl_test_fixture',
     source=[
-        'sync_tail_test_fixture.cpp',
+        'oplog_applier_impl_test_fixture.cpp',
     ],
     LIBDEPS=[
         'drop_pending_collection_reaper',
@@ -1274,7 +1256,6 @@ env.CppUnitTest(
         'split_horizon_test.cpp',
         'storage_interface_impl_test.cpp',
         'sync_source_resolver_test.cpp',
-        'sync_tail_test.cpp',
         'task_runner_test.cpp',
         'task_runner_test_fixture.cpp',
         'vote_requester_test.cpp',
@@ -1349,7 +1330,6 @@ env.CppUnitTest(
         'storage_interface_impl',
         'sync_source_resolver',
         'sync_source_selector_mock',
-        'sync_tail_test_fixture',
         'task_executor_mock',
         'task_runner',
     ],

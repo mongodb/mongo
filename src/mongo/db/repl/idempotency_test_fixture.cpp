@@ -53,6 +53,8 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_applier.h"
+#include "mongo/db/repl/oplog_applier_impl.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -95,6 +97,20 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                             boost::none,   // pre-image optime
                             boost::none);  // post-image optime
 }
+
+/**
+ * Test only subclass of OplogApplierImpl for using fillWriterVectors in tests.
+ */
+class OplogApplierImplForTest : public OplogApplierImpl {
+public:
+    OplogApplierImplForTest(const OplogApplier::Options& options);
+    using OplogApplierImpl::fillWriterVectors;
+};
+
+// Minimal constructor that takes options, the only member accessed in fillWriterVectors.
+OplogApplierImplForTest::OplogApplierImplForTest(const OplogApplier::Options& options)
+    : OplogApplierImpl(
+          nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, options, nullptr) {}
 
 }  // namespace
 
@@ -380,10 +396,8 @@ void IdempotencyTest::testOpsAreIdempotent(std::vector<OplogEntry> ops, Sequence
             {entry.toBSON(), entry.getOpTime().getTimestamp()},
             entry.getOpTime().getTerm()));
     }
-
-    SyncTail syncTail(nullptr,  // observer
-                      nullptr,  // storage interface
-                      repl::OplogApplier::Options(repl::OplogApplication::Mode::kInitialSync));
+    OplogApplier::Options option(OplogApplication::Mode::kInitialSync);
+    OplogApplierImplForTest oplogApplier(option);
     std::vector<MultiApplier::OperationPtrs> writerVectors(1);
     std::vector<MultiApplier::Operations> derivedOps;
 
@@ -394,7 +408,7 @@ void IdempotencyTest::testOpsAreIdempotent(std::vector<OplogEntry> ops, Sequence
         std::vector<OplogEntry> op;
         op.push_back(entry);
         singleOpVectors.emplace_back(op);
-        syncTail.fillWriterVectors(
+        oplogApplier.fillWriterVectors(
             _opCtx.get(), &singleOpVectors.back(), &writerVectors, &derivedOps);
     }
 

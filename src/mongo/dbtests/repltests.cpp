@@ -45,7 +45,6 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/transport/transport_layer_asio.h"

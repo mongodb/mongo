@@ -143,7 +143,7 @@ std::unique_ptr<OplogApplier> DataReplicatorExternalStateImpl::makeOplogApplier(
                                               _replicationCoordinator,
                                               consistencyMarkers,
                                               storageInterface,
-                                              multiSyncApply,
+                                              applyOplogGroup,
                                               options,
                                               writerPool);
 }

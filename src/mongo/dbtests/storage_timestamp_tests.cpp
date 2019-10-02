@@ -69,7 +69,6 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/replication_recovery_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
-#include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/service_context.h"
@@ -783,8 +782,8 @@ public:
         }
 
         repl::OplogEntryBatch groupedInsertBatch(opPtrs.cbegin(), opPtrs.cend());
-        ASSERT_OK(
-            repl::syncApply(_opCtx, groupedInsertBatch, repl::OplogApplication::Mode::kSecondary));
+        ASSERT_OK(repl::applyOplogEntryBatch(
+            _opCtx, groupedInsertBatch, repl::OplogApplication::Mode::kSecondary));
 
         for (std::int32_t idx = 0; idx < docsToInsert; ++idx) {
             OneOffRead oor(_opCtx, firstInsertTime.addTicks(idx).asTimestamp());
@@ -1312,7 +1311,7 @@ public:
             _coordinatorMock,
             _consistencyMarkers,
             storageInterface,
-            repl::multiSyncApply,
+            repl::applyOplogGroup,
             repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
             writerPool.get());
         ASSERT_EQUALS(op2.getOpTime(), unittest::assertGet(oplogApplier.multiApply(_opCtx, ops)));
@@ -1397,7 +1396,7 @@ public:
             _coordinatorMock,
             _consistencyMarkers,
             storageInterface,
-            repl::multiSyncApply,
+            repl::applyOplogGroup,
             repl::OplogApplier::Options(repl::OplogApplication::Mode::kInitialSync),
             writerPool.get());
         auto lastTime = unittest::assertGet(oplogApplier.multiApply(_opCtx, ops));
@@ -2413,7 +2412,7 @@ public:
         // threads can cleanly exit and this test case fails without crashing the entire suite.
         auto applyOperationFn = [&](OperationContext* opCtx,
                                     std::vector<const repl::OplogEntry*>* operationsToApply,
-                                    repl::SyncTail* st,
+                                    repl::OplogApplierImpl* oa,
                                     std::vector<MultikeyPathInfo>* pathInfo) -> Status {
             if (!_opCtx->lockState()->isLockHeldForMode(resourceIdParallelBatchWriterMode,
                                                         MODE_X)) {
@@ -2421,7 +2420,7 @@ public:
             }
 
             // Insert the document. A reader without a PBWM lock should not see it yet.
-            auto status = repl::multiSyncApply(opCtx, operationsToApply, st, pathInfo);
+            auto status = repl::applyOplogGroup(opCtx, operationsToApply, oa, pathInfo);
             if (!status.isOK()) {
                 return status;
             }

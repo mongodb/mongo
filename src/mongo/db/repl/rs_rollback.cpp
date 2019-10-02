@@ -1627,12 +1627,12 @@ void rollback(OperationContext* opCtx,
     // rolling back. If we successfully enter ROLLBACK we will only exit this function fatally or
     // after transitioning to RECOVERING. We always transition to RECOVERING regardless of success
     // or (recoverable) failure since we may be in an inconsistent state. If rollback failed before
-    // writing anything, SyncTail will quickly take us to SECONDARY since are are still at our
-    // original MinValid, which is fine because we may choose a sync source that doesn't require
-    // rollback. If it failed after we wrote to MinValid, then we will pick a sync source that will
-    // cause us to roll back to the same common point, which is fine. If we succeeded, we will be
-    // consistent as soon as we apply up to/through MinValid and SyncTail will make us SECONDARY
-    // then.
+    // writing anything, the Replication Coordinator will quickly take us to SECONDARY since we are
+    // still at our original MinValid, which is fine because we may choose a sync source that
+    // doesn't require rollback. If it failed after we wrote to MinValid, then we will pick a sync
+    // source that will cause us to roll back to the same common point, which is fine. If we
+    // succeeded, we will be consistent as soon as we apply up to/through MinValid and the
+    // Replication Coordinator will make us SECONDARY then.
 
     {
         ReplicationStateTransitionLockGuard transitionGuard(opCtx, MODE_X);

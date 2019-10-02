@@ -89,7 +89,6 @@ void OplogApplierImplOpObserver::onCreateCollection(OperationContext* opCtx,
     }
     onCreateCollectionFn(opCtx, coll, collectionName, options, idIndex);
 }
-
 void OplogApplierImplTest::setUp() {
     ServiceContextMongoDTest::setUp();
 
@@ -138,5 +137,200 @@ StorageInterface* OplogApplierImplTest::getStorageInterface() const {
     return StorageInterface::get(serviceContext);
 }
 
+// Since applyOplogEntryBatch is being tested outside of its calling function (applyOplogGroup), we
+// recreate the necessary calling context.
+Status OplogApplierImplTest::_applyOplogEntryBatchWrapper(
+    OperationContext* opCtx,
+    const OplogEntryBatch& batch,
+    OplogApplication::Mode oplogApplicationMode) {
+    UnreplicatedWritesBlock uwb(opCtx);
+    DisableDocumentValidation validationDisabler(opCtx);
+    return applyOplogEntryBatch(opCtx, batch, oplogApplicationMode);
+}
+
+void OplogApplierImplTest::_testApplyOplogEntryBatchCrudOperation(ErrorCodes::Error expectedError,
+                                                                  const OplogEntry& op,
+                                                                  bool expectedApplyOpCalled) {
+    bool applyOpCalled = false;
+
+    auto checkOpCtx = [](OperationContext* opCtx) {
+        ASSERT_TRUE(opCtx);
+        ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode("test", MODE_IX));
+        ASSERT_FALSE(opCtx->lockState()->isDbLockedForMode("test", MODE_X));
+        ASSERT_TRUE(
+            opCtx->lockState()->isCollectionLockedForMode(NamespaceString("test.t"), MODE_IX));
+        ASSERT_FALSE(opCtx->writesAreReplicated());
+        ASSERT_TRUE(documentValidationDisabled(opCtx));
+    };
+
+    _opObserver->onInsertsFn =
+        [&](OperationContext* opCtx, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
+            applyOpCalled = true;
+            checkOpCtx(opCtx);
+            ASSERT_EQUALS(NamespaceString("test.t"), nss);
+            ASSERT_EQUALS(1U, docs.size());
+            ASSERT_BSONOBJ_EQ(op.getObject(), docs[0]);
+            return Status::OK();
+        };
+
+    _opObserver->onDeleteFn = [&](OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  OptionalCollectionUUID uuid,
+                                  StmtId stmtId,
+                                  bool fromMigrate,
+                                  const boost::optional<BSONObj>& deletedDoc) {
+        applyOpCalled = true;
+        checkOpCtx(opCtx);
+        ASSERT_EQUALS(NamespaceString("test.t"), nss);
+        ASSERT(deletedDoc);
+        ASSERT_BSONOBJ_EQ(op.getObject(), *deletedDoc);
+        return Status::OK();
+    };
+
+    ASSERT_EQ(_applyOplogEntryBatchWrapper(_opCtx.get(), &op, OplogApplication::Mode::kSecondary),
+              expectedError);
+    ASSERT_EQ(applyOpCalled, expectedApplyOpCalled);
+}
+
+Status failedApplyCommand(OperationContext* opCtx,
+                          const BSONObj& theOperation,
+                          OplogApplication::Mode) {
+    FAIL("applyCommand unexpectedly invoked.");
+    return Status::OK();
+}
+
+Status OplogApplierImplTest::runOpSteadyState(const OplogEntry& op) {
+    return runOpsSteadyState({op});
+}
+
+Status OplogApplierImplTest::runOpsSteadyState(std::vector<OplogEntry> ops) {
+    OplogApplierImpl oplogApplier(
+        nullptr,  // executor
+        nullptr,  // oplogBuffer
+        nullptr,  // observer
+        nullptr,  // replCoord
+        getConsistencyMarkers(),
+        getStorageInterface(),
+        OplogApplierImpl::ApplyGroupFunc(),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        nullptr);
+    MultiApplier::OperationPtrs opsPtrs;
+    for (auto& op : ops) {
+        opsPtrs.push_back(&op);
+    }
+    WorkerMultikeyPathInfo pathInfo;
+    return applyOplogGroup(_opCtx.get(), &opsPtrs, &oplogApplier, &pathInfo);
+}
+
+Status OplogApplierImplTest::runOpInitialSync(const OplogEntry& op) {
+    return runOpsInitialSync({op});
+}
+
+Status OplogApplierImplTest::runOpsInitialSync(std::vector<OplogEntry> ops) {
+    OplogApplierImpl oplogApplier(
+        nullptr,  // executor
+        nullptr,  // oplogBuffer
+        nullptr,  // observer
+        nullptr,  // replCoord
+        getConsistencyMarkers(),
+        getStorageInterface(),
+        OplogApplierImpl::ApplyGroupFunc(),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kInitialSync),
+        nullptr);
+    // Apply each operation in a batch of one because 'ops' may contain a mix of commands and CRUD
+    // operations provided by idempotency tests.
+    for (auto& op : ops) {
+        MultiApplier::OperationPtrs opsPtrs;
+        opsPtrs.push_back(&op);
+        WorkerMultikeyPathInfo pathInfo;
+        auto status = applyOplogGroup(_opCtx.get(), &opsPtrs, &oplogApplier, &pathInfo);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status OplogApplierImplTest::runOpPtrsInitialSync(MultiApplier::OperationPtrs ops) {
+    OplogApplierImpl oplogApplier(
+        nullptr,  // executor
+        nullptr,  // oplogBuffer
+        nullptr,  // observer
+        nullptr,  // replCoord
+        getConsistencyMarkers(),
+        getStorageInterface(),
+        OplogApplierImpl::ApplyGroupFunc(),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kInitialSync),
+        nullptr);
+    // Apply each operation in a batch of one because 'ops' may contain a mix of commands and CRUD
+    // operations provided by idempotency tests.
+    for (auto& op : ops) {
+        MultiApplier::OperationPtrs opsPtrs;
+        opsPtrs.push_back(op);
+        WorkerMultikeyPathInfo pathInfo;
+        auto status = applyOplogGroup(_opCtx.get(), &opsPtrs, &oplogApplier, &pathInfo);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+void checkTxnTable(OperationContext* opCtx,
+                   const LogicalSessionId& lsid,
+                   const TxnNumber& txnNum,
+                   const repl::OpTime& expectedOpTime,
+                   Date_t expectedWallClock,
+                   boost::optional<repl::OpTime> expectedStartOpTime,
+                   boost::optional<DurableTxnStateEnum> expectedState) {
+    DBDirectClient client(opCtx);
+    auto result = client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+                                 {BSON(SessionTxnRecord::kSessionIdFieldName << lsid.toBSON())});
+    ASSERT_FALSE(result.isEmpty());
+
+    auto txnRecord =
+        SessionTxnRecord::parse(IDLParserErrorContext("parse txn record for test"), result);
+
+    ASSERT_EQ(txnNum, txnRecord.getTxnNum());
+    ASSERT_EQ(expectedOpTime, txnRecord.getLastWriteOpTime());
+    ASSERT_EQ(expectedWallClock, txnRecord.getLastWriteDate());
+    if (expectedStartOpTime) {
+        ASSERT(txnRecord.getStartOpTime());
+        ASSERT_EQ(*expectedStartOpTime, *txnRecord.getStartOpTime());
+    } else {
+        ASSERT(!txnRecord.getStartOpTime());
+    }
+    if (expectedState) {
+        ASSERT(*expectedState == txnRecord.getState());
+    }
+}
+
+CollectionReader::CollectionReader(OperationContext* opCtx, const NamespaceString& nss)
+    : _collToScan(opCtx, nss),
+      _exec(InternalPlanner::collectionScan(opCtx,
+                                            nss.ns(),
+                                            _collToScan.getCollection(),
+                                            PlanExecutor::NO_YIELD,
+                                            InternalPlanner::FORWARD)) {}
+
+StatusWith<BSONObj> CollectionReader::next() {
+    BSONObj obj;
+
+    auto state = _exec->getNext(&obj, nullptr);
+    if (state == PlanExecutor::IS_EOF) {
+        return {ErrorCodes::CollectionIsEmpty,
+                str::stream() << "no more documents in " << _collToScan.getNss()};
+    }
+
+    // PlanExecutors that do not yield should only return ADVANCED or EOF.
+    invariant(state == PlanExecutor::ADVANCED);
+    return obj;
+}
+
+bool docExists(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& doc) {
+    DBDirectClient client(opCtx);
+    auto result = client.findOne(nss.ns(), {doc});
+    return !result.isEmpty();
+}
 }  // namespace repl
 }  // namespace mongo
