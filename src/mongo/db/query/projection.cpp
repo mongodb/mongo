@@ -32,10 +32,27 @@
 #include "mongo/base/exact_cast.h"
 #include "mongo/db/query/projection_ast_path_tracking_visitor.h"
 #include "mongo/db/query/projection_ast_walker.h"
+#include "mongo/db/query/util/make_data_structure.h"
 
 namespace mongo {
 namespace projection_ast {
 namespace {
+/**
+ * Holds data used for dependency analysis while walking an AST tree. This struct is attached to
+ * 'PathTrackingVisitorContext' and can be accessed by projection AST visitors to track the current
+ * context.
+ */
+struct DepsAnalysisData {
+    DepsTracker fieldDependencyTracker{DepsTracker::kAllMetadataAvailable};
+
+    void addRequiredField(const std::string& fieldName) {
+        fieldDependencyTracker.fields.insert(fieldName);
+    }
+
+    std::vector<std::string> requiredFields() const {
+        return {fieldDependencyTracker.fields.begin(), fieldDependencyTracker.fields.end()};
+    }
+};
 
 /**
  * Does "broad" analysis on the projection, about whether the entire document, or details from the
@@ -43,183 +60,140 @@ namespace {
  */
 class ProjectionAnalysisVisitor final : public ProjectionASTVisitor {
 public:
-    void visit(MatchExpressionASTNode* node) {}
-    void visit(ProjectionPathASTNode* node) {
-        if (node->parent()) {
-            _deps.hasDottedPath = true;
-        }
-    }
-    void visit(ProjectionPositionalASTNode* node) {
-        _deps.requiresMatchDetails = true;
-        _deps.requiresDocument = true;
+    ProjectionAnalysisVisitor(ProjectionDependencies* deps) : _deps(deps) {
+        invariant(_deps);
     }
 
-    void visit(ProjectionSliceASTNode* node) {
-        _deps.requiresDocument = true;
+    void visit(ProjectionPathASTNode* node) final {
+        if (node->parent()) {
+            _deps->hasDottedPath = true;
+        }
     }
-    void visit(ProjectionElemMatchASTNode* node) {
-        _deps.requiresDocument = true;
+
+    void visit(ProjectionPositionalASTNode* node) final {
+        _deps->requiresMatchDetails = true;
+        _deps->requiresDocument = true;
     }
-    void visit(ExpressionASTNode* node) {
-        const Expression* expr = node->expression();
+
+    void visit(ProjectionSliceASTNode* node) final {
+        _deps->requiresDocument = true;
+    }
+
+    void visit(ProjectionElemMatchASTNode* node) final {
+        _deps->requiresDocument = true;
+    }
+
+    void visit(ExpressionASTNode* node) final {
+        const Expression* expr = node->expressionRaw();
         const ExpressionMeta* meta = dynamic_cast<const ExpressionMeta*>(expr);
 
         // Only {$meta: 'sortKey'} projections can be covered. Projections with any other expression
         // need the document.
         if (!(meta && meta->getMetaType() == DocumentMetadataFields::MetaType::kSortKey)) {
-            _deps.requiresDocument = true;
+            _deps->requiresDocument = true;
         }
     }
-    void visit(BooleanConstantASTNode* node) {}
 
-    ProjectionDependencies extractResult() {
-        return std::move(_deps);
-    }
+    void visit(BooleanConstantASTNode* node) final {}
+    void visit(MatchExpressionASTNode* node) final {}
 
 private:
-    ProjectionDependencies _deps;
+    ProjectionDependencies* _deps;
 };
 
 /**
  * Uses a DepsTracker to determine which fields are required from the projection.
+ *
+ * To track the current path in the projection, this visitor should be used with
+ * 'PathTrackingWalker' which will help to maintain the current path via
+ * 'PathTrackingVisitorContext'.
  */
-class DepsAnalysisPreVisitor final : public PathTrackingPreVisitor<DepsAnalysisPreVisitor> {
+class DepsAnalysisVisitor final : public ProjectionASTVisitor {
 public:
-    DepsAnalysisPreVisitor(PathTrackingVisitorContext<>* ctx)
-        : PathTrackingPreVisitor(ctx),
-          _fieldDependencyTracker(DepsTracker::kAllMetadataAvailable) {}
-
-    void doVisit(MatchExpressionASTNode* node) {
-        node->matchExpression()->addDependencies(&_fieldDependencyTracker);
+    DepsAnalysisVisitor(PathTrackingVisitorContext<DepsAnalysisData>* context) : _context{context} {
+        invariant(_context);
     }
 
-    void doVisit(ProjectionPathASTNode* node) {}
+    void visit(MatchExpressionASTNode* node) final {
+        node->matchExpression()->addDependencies(&_context->data().fieldDependencyTracker);
+    }
 
-    void doVisit(ProjectionPositionalASTNode* node) {
+    void visit(ProjectionPositionalASTNode* node) final {
         // Positional projection on a.b.c.$ may actually modify a, a.b, a.b.c, etc.
         // Treat the top-level field as a dependency.
-
         addTopLevelPathAsDependency();
     }
-    void doVisit(ProjectionSliceASTNode* node) {
+
+    void visit(ProjectionSliceASTNode* node) final {
         // find() $slice on a.b.c may modify a, a.b, and a.b.c if they're all arrays.
         // Treat the top-level field as a dependency.
         addTopLevelPathAsDependency();
     }
 
-    void doVisit(ProjectionElemMatchASTNode* node) {
-        const auto& fieldName = fullPath();
-        _fieldDependencyTracker.fields.insert(fieldName.fullPath());
+    void visit(ProjectionElemMatchASTNode* node) final {
+        addFullPathAsDependency();
     }
 
-    void doVisit(ExpressionASTNode* node) {
-        const auto fieldName = fullPath();
-
+    void visit(ExpressionASTNode* node) final {
         // The output of an expression on a dotted path depends on whether that field is an array.
         invariant(node->parent());
         if (!node->parent()->isRoot()) {
-            _fieldDependencyTracker.fields.insert(fieldName.fullPath());
+            addFullPathAsDependency();
         }
 
-        node->expression()->addDependencies(&_fieldDependencyTracker);
+        node->expression()->addDependencies(&_context->data().fieldDependencyTracker);
     }
 
-    void doVisit(BooleanConstantASTNode* node) {
+    void visit(BooleanConstantASTNode* node) final {
         // For inclusions, we depend on the field.
-        auto fieldName = fullPath();
         if (node->value()) {
-            _fieldDependencyTracker.fields.insert(fieldName.fullPath());
+            addFullPathAsDependency();
         }
     }
 
-    std::vector<std::string> requiredFields() {
-        return {_fieldDependencyTracker.fields.begin(), _fieldDependencyTracker.fields.end()};
-    }
-
-    DepsTracker* depsTracker() {
-        return &_fieldDependencyTracker;
-    }
+    void visit(ProjectionPathASTNode* node) final {}
 
 private:
     void addTopLevelPathAsDependency() {
-        FieldPath fp(fullPath());
-        _fieldDependencyTracker.fields.insert(fp.front().toString());
+        const auto& path = _context->fullPath();
+
+        _context->data().addRequiredField(path.front().toString());
     }
 
-    DepsTracker _fieldDependencyTracker;
+    void addFullPathAsDependency() {
+        const auto& path = _context->fullPath();
+
+        _context->data().addRequiredField(path.fullPath());
+    }
+
+    PathTrackingVisitorContext<DepsAnalysisData>* _context;
 };
 
-/**
- * Visitor which helps maintain the field path context for the deps analysis.
- */
-class DepsAnalysisPostVisitor final : public PathTrackingPostVisitor<DepsAnalysisPostVisitor> {
-public:
-    DepsAnalysisPostVisitor(PathTrackingVisitorContext<>* context)
-        : PathTrackingPostVisitor(context) {}
+auto analyzeProjection(ProjectionPathASTNode* root, ProjectType type) {
+    ProjectionDependencies deps;
+    PathTrackingVisitorContext<DepsAnalysisData> context;
+    DepsAnalysisVisitor depsAnalysisVisitor{&context};
+    ProjectionAnalysisVisitor projectionAnalysisVisitor{&deps};
+    PathTrackingWalker walker{&context, {&depsAnalysisVisitor, &projectionAnalysisVisitor}, {}};
 
-    void doVisit(MatchExpressionASTNode* node) {}
-    void doVisit(ProjectionPathASTNode* node) {}
-    void doVisit(ProjectionPositionalASTNode* node) {}
-    void doVisit(ProjectionSliceASTNode* node) {}
-    void doVisit(ProjectionElemMatchASTNode* node) {}
-    void doVisit(ExpressionASTNode* node) {}
-    void doVisit(BooleanConstantASTNode* node) {}
-};
-
-/**
- * Walker for doing dependency analysis on the projection.
- */
-class DepsWalker final {
-public:
-    DepsWalker(ProjectType type)
-        : _depsPreVisitor(&_context), _depsPostVisitor(&_context), _projectionType(type) {}
-
-    void preVisit(ASTNode* node) {
-        node->acceptVisitor(&_generalAnalysisVisitor);
-        node->acceptVisitor(&_depsPreVisitor);
-    }
-
-    void postVisit(ASTNode* node) {
-        node->acceptVisitor(&_depsPostVisitor);
-    }
-
-    void inVisit(long count, ASTNode* node) {}
-
-    ProjectionDependencies done() {
-        ProjectionDependencies res = _generalAnalysisVisitor.extractResult();
-
-        if (_projectionType == ProjectType::kInclusion) {
-            res.requiredFields = _depsPreVisitor.requiredFields();
-        } else {
-            invariant(_projectionType == ProjectType::kExclusion);
-            res.requiresDocument = true;
-        }
-
-        auto* depsTracker = _depsPreVisitor.depsTracker();
-        res.needsTextScore = depsTracker->getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE);
-        res.needsGeoPoint =
-            depsTracker->getNeedsMetadata(DepsTracker::MetadataType::GEO_NEAR_POINT);
-        res.needsGeoDistance =
-            depsTracker->getNeedsMetadata(DepsTracker::MetadataType::GEO_NEAR_DISTANCE);
-        res.needsSortKey = depsTracker->getNeedsMetadata(DepsTracker::MetadataType::SORT_KEY);
-
-        return res;
-    }
-
-private:
-    PathTrackingVisitorContext<> _context;
-    ProjectionAnalysisVisitor _generalAnalysisVisitor;
-
-    DepsAnalysisPreVisitor _depsPreVisitor;
-    DepsAnalysisPostVisitor _depsPostVisitor;
-
-    ProjectType _projectionType;
-};
-
-ProjectionDependencies analyzeProjection(ProjectionPathASTNode* root, ProjectType type) {
-    DepsWalker walker(type);
     projection_ast_walker::walk(&walker, root);
-    return walker.done();
+
+    const auto& userData = context.data();
+    const auto& tracker = userData.fieldDependencyTracker;
+
+    if (type == ProjectType::kInclusion) {
+        deps.requiredFields = userData.requiredFields();
+    } else {
+        invariant(type == ProjectType::kExclusion);
+        deps.requiresDocument = true;
+    }
+
+    deps.needsTextScore = tracker.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE);
+    deps.needsGeoPoint = tracker.getNeedsMetadata(DepsTracker::MetadataType::GEO_NEAR_POINT);
+    deps.needsGeoDistance = tracker.getNeedsMetadata(DepsTracker::MetadataType::GEO_NEAR_DISTANCE);
+    deps.needsSortKey = tracker.getNeedsMetadata(DepsTracker::MetadataType::SORT_KEY);
+
+    return deps;
 }
 }  // namespace
 

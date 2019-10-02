@@ -49,14 +49,18 @@ auto defineAndSetProjectionPostImageVariable(boost::intrusive_ptr<ExpressionCont
 
 class ExpressionInternalFindPositionalTest : public AggregationContextFixture {
 protected:
-    auto createExpression(const MatchExpression* matchExpr, const std::string& path) {
+    auto createExpression(BSONObj matchSpec, const std::string& path) {
+        auto matchExpr = CopyableMatchExpression{matchSpec,
+                                                 getExpCtx(),
+                                                 std::make_unique<ExtensionsCallbackNoop>(),
+                                                 MatchExpressionParser::kBanAllSpecialFeatures};
         auto expr = make_intrusive<ExpressionInternalFindPositional>(
             getExpCtx(),
             ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState),
             ExpressionFieldPath::parse(
                 getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
             path,
-            matchExpr);
+            std::move(matchExpr));
         return expr;
     }
 };
@@ -77,7 +81,12 @@ protected:
 
 class ExpressionInternalFindElemMatchTest : public AggregationContextFixture {
 protected:
-    auto createExpression(std::unique_ptr<MatchExpression> matchExpr, const std::string& path) {
+    auto createExpression(BSONObj matchSpec, const std::string& path) {
+        auto matchExpr = CopyableMatchExpression{matchSpec,
+                                                 getExpCtx(),
+                                                 std::make_unique<ExtensionsCallbackNoop>(),
+                                                 MatchExpressionParser::kBanAllSpecialFeatures};
+
         return make_intrusive<ExpressionInternalFindElemMatch>(
             getExpCtx(),
             ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState),
@@ -90,9 +99,7 @@ TEST_F(ExpressionInternalFindPositionalTest, AppliesProjectionToPostImage) {
     defineAndSetProjectionPostImageVariable(getExpCtx(),
                                             Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
 
-    auto matchSpec = fromjson("{bar: 1, foo: {$gte: 5}}");
-    auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(matchSpec, getExpCtx()));
-    auto expr = createExpression(matchExpr.get(), "foo");
+    auto expr = createExpression(fromjson("{bar: 1, foo: {$gte: 5}}"), "foo");
 
     ASSERT_DOCUMENT_EQ(
         Document{fromjson("{bar:1, foo: [6]}")},
@@ -103,9 +110,7 @@ TEST_F(ExpressionInternalFindPositionalTest, AppliesProjectionToPostImage) {
 TEST_F(ExpressionInternalFindPositionalTest, RecordsProjectionDependencies) {
     auto varId = defineAndSetProjectionPostImageVariable(
         getExpCtx(), Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
-    auto matchSpec = fromjson("{bar: 1, foo: {$gte: 5}}");
-    auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(matchSpec, getExpCtx()));
-    auto expr = createExpression(matchExpr.get(), "foo");
+    auto expr = createExpression(fromjson("{bar: 1, foo: {$gte: 5}}"), "foo");
 
     DepsTracker deps;
     expr->addDependencies(&deps);
@@ -122,9 +127,7 @@ TEST_F(ExpressionInternalFindPositionalTest, AddsArrayUndottedPathToComputedPath
     defineAndSetProjectionPostImageVariable(getExpCtx(),
                                             Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
 
-    auto matchSpec = fromjson("{bar: 1, foo: {$gte: 5}}");
-    auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(matchSpec, getExpCtx()));
-    auto expr = createExpression(matchExpr.get(), "foo");
+    auto expr = createExpression(fromjson("{bar: 1, foo: {$gte: 5}}"), "foo");
 
     DepsTracker deps;
     auto computedPaths = expr->getComputedPaths({});
@@ -139,9 +142,7 @@ TEST_F(ExpressionInternalFindPositionalTest,
     defineAndSetProjectionPostImageVariable(getExpCtx(),
                                             Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
 
-    auto matchSpec = fromjson("{bar: 1, 'foo.bar': {$gte: 5}}");
-    auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(matchSpec, getExpCtx()));
-    auto expr = createExpression(matchExpr.get(), "foo.bar");
+    auto expr = createExpression(fromjson("{bar: 1, 'foo.bar': {$gte: 5}}"), "foo.bar");
 
     DepsTracker deps;
     auto computedPaths = expr->getComputedPaths({});
@@ -206,9 +207,7 @@ TEST_F(ExpressionInternalFindSliceTest, AddsTopLevelFieldOfArrayDottedPathToComp
 }
 
 TEST_F(ExpressionInternalFindElemMatchTest, AppliesProjectionToRootDocument) {
-    auto matchSpec = fromjson("{foo: {$elemMatch: {bar: {$gte: 5}}}}");
-    auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(matchSpec, getExpCtx()));
-    auto expr = createExpression(std::move(matchExpr), "foo");
+    auto expr = createExpression(fromjson("{foo: {$elemMatch: {bar: {$gte: 5}}}}"), "foo");
 
     ASSERT_VALUE_EQ(Document{fromjson("{foo: [{bar: 6, z: 6}]}")}["foo"],
                     expr->evaluate(Document{fromjson("{foo: [{bar: 1, z: 1}, {bar: 2, z: 2}, "
@@ -217,9 +216,7 @@ TEST_F(ExpressionInternalFindElemMatchTest, AppliesProjectionToRootDocument) {
 }
 
 TEST_F(ExpressionInternalFindElemMatchTest, RecordsProjectionDependencies) {
-    auto matchSpec = fromjson("{foo: {$elemMatch: {bar: {$gte: 5}}}}");
-    auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(matchSpec, getExpCtx()));
-    auto expr = createExpression(std::move(matchExpr), "foo");
+    auto expr = createExpression(fromjson("{foo: {$elemMatch: {bar: {$gte: 5}}}}"), "foo");
 
     DepsTracker deps;
     expr->addDependencies(&deps);

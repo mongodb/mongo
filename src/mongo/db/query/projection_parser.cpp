@@ -222,15 +222,13 @@ Projection parse(boost::intrusive_ptr<ExpressionContext> expCtx,
                 BSONObj elemMatchObj = elem.wrap();
                 invariant(elemMatchObj.isOwned());
 
-                StatusWithMatchExpression statusWithMatcher =
-                    MatchExpressionParser::parse(elemMatchObj,
-                                                 expCtx,
-                                                 ExtensionsCallbackNoop(),
-                                                 MatchExpressionParser::kBanAllSpecialFeatures);
-                auto matcher = uassertStatusOK(std::move(statusWithMatcher));
-
-                auto matchNode =
-                    std::make_unique<MatchExpressionASTNode>(elemMatchObj, std::move(matcher));
+                auto matcher =
+                    CopyableMatchExpression{elemMatchObj,
+                                            expCtx,
+                                            std::make_unique<ExtensionsCallbackNoop>(),
+                                            MatchExpressionParser::kBanAllSpecialFeatures,
+                                            true /* optimize expression */};
+                auto matchNode = std::make_unique<MatchExpressionASTNode>(std::move(matcher));
 
                 addNodeAtPath(&root,
                               path,
@@ -291,13 +289,19 @@ Projection parse(boost::intrusive_ptr<ExpressionContext> expCtx,
                 StringData pathWithoutPositionalOperator =
                     elem.fieldNameStringData().substr(0, firstPositionalBegin);
 
+                auto matcher =
+                    CopyableMatchExpression{queryObj,
+                                            expCtx,
+                                            std::make_unique<ExtensionsCallbackNoop>(),
+                                            MatchExpressionParser::kBanAllSpecialFeatures,
+                                            true /* optimize expression */};
+
                 FieldPath path(pathWithoutPositionalOperator);
                 invariant(query);
-                addNodeAtPath(
-                    &root,
-                    path,
-                    std::make_unique<ProjectionPositionalASTNode>(
-                        std::make_unique<MatchExpressionASTNode>(queryObj, query->shallowClone())));
+                addNodeAtPath(&root,
+                              path,
+                              std::make_unique<ProjectionPositionalASTNode>(
+                                  std::make_unique<MatchExpressionASTNode>(matcher)));
 
                 hasPositional = true;
             }

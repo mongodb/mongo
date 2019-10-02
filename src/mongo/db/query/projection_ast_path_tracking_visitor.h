@@ -48,7 +48,10 @@ using PathTrackingDummyDefaultType = void*;
 template <class UserData = PathTrackingDummyDefaultType>
 class PathTrackingVisitorContext {
 public:
-    FieldPath fullPath() const {
+    PathTrackingVisitorContext() {}
+    PathTrackingVisitorContext(UserData data) : _data{std::move(data)} {}
+
+    auto fullPath() const {
         invariant(!_fieldNames.empty());
         invariant(!_fieldNames.top().empty());
 
@@ -59,7 +62,7 @@ public:
             FieldPath::getFullyQualifiedPath(_basePath->fullPath(), _fieldNames.top().front()));
     }
 
-    const boost::optional<FieldPath>& basePath() const {
+    const auto& basePath() const {
         return _basePath;
     }
 
@@ -80,7 +83,7 @@ public:
         _fieldNames.push(std::move(fields));
     }
 
-    UserData& data() {
+    auto& data() {
         return _data;
     }
 
@@ -96,88 +99,59 @@ private:
     boost::optional<FieldPath> _basePath;
 };
 
+namespace {
 /**
- * Base visitor used for maintaining field names while traversing the AST.
+ * A path tracking pre-visitor used for maintaining field names while traversing the AST.
  *
- * This is intended to be used with the projection AST walker (projection_ast::walk()). Users of
- * this class MUST use both the PathTrackingPreVisitor and PathTrackingPostVisitor in order to
- * correctly maintain the state about the current path being visited.
-
- * Derived classes can have custom behavior through doVisit() methods on each node type.
+ * This is intended to be used with the 'ProjectionPathTrackingWalker' only to correctly maintain
+ * the state about the current path being visited.
  */
-template <class Derived, class UserData = PathTrackingDummyDefaultType>
-class PathTrackingPreVisitor : public ProjectionASTVisitor {
+template <class UserData = PathTrackingDummyDefaultType>
+class PathTrackingPreVisitor final : public ProjectionASTVisitor {
 public:
-    PathTrackingPreVisitor(PathTrackingVisitorContext<UserData>* ctx) : _context(ctx) {}
-
-    void visit(MatchExpressionASTNode* node) override {
-        static_cast<Derived*>(this)->doVisit(node);
+    PathTrackingPreVisitor(PathTrackingVisitorContext<UserData>* context) : _context{context} {
+        invariant(_context);
     }
 
-    void visit(ProjectionPathASTNode* node) override {
+    void visit(ProjectionPathASTNode* node) final {
         if (node->parent()) {
             _context->setBasePath(_context->fullPath());
             _context->popFrontFieldName();
         }
 
         _context->pushFieldNames({node->fieldNames().begin(), node->fieldNames().end()});
-
-        static_cast<Derived*>(this)->doVisit(node);
     }
 
-    void visit(ProjectionPositionalASTNode* node) override {
-        static_cast<Derived*>(this)->doVisit(node);
-    }
-
-    void visit(ProjectionSliceASTNode* node) override {
-        static_cast<Derived*>(this)->doVisit(node);
-    }
-
-    void visit(ProjectionElemMatchASTNode* node) {
-        static_cast<Derived*>(this)->doVisit(node);
-    }
-
-    void visit(ExpressionASTNode* node) override {
-        static_cast<Derived*>(this)->doVisit(node);
-    }
-
-    void visit(BooleanConstantASTNode* node) override {
-        static_cast<Derived*>(this)->doVisit(node);
-    }
-
-protected:
-    const FieldPath fullPath() const {
-        return _context->fullPath();
-    }
-
-    UserData* data() const {
-        return _context->data;
-    }
+    void visit(MatchExpressionASTNode* node) final {}
+    void visit(ProjectionPositionalASTNode* node) final {}
+    void visit(ProjectionSliceASTNode* node) final {}
+    void visit(ProjectionElemMatchASTNode* node) final {}
+    void visit(ExpressionASTNode* node) final {}
+    void visit(BooleanConstantASTNode* node) final {}
 
 private:
     PathTrackingVisitorContext<UserData>* _context;
 };
 
 /**
- * Base post-visitor which helps maintain field names while traversing the AST.
+ * A path tracking post-visitor used for maintaining field names while traversing the AST.
+ *
+ * This is intended to be used with the 'PathTrackingWalker' only to correctly maintain the state
+ * about the current path being visited.
  */
-template <class Derived, class UserData = PathTrackingDummyDefaultType>
-class PathTrackingPostVisitor : public ProjectionASTVisitor {
+template <class UserData = PathTrackingDummyDefaultType>
+class PathTrackingPostVisitor final : public ProjectionASTVisitor {
 public:
-    PathTrackingPostVisitor(PathTrackingVisitorContext<UserData>* context) : _context(context) {}
-
-    void visit(MatchExpressionASTNode* node) override {
-        static_cast<Derived*>(this)->doVisit(node);
+    PathTrackingPostVisitor(PathTrackingVisitorContext<UserData>* context) : _context{context} {
+        invariant(_context);
     }
 
-    void visit(projection_ast::ProjectionPathASTNode* node) override {
-        static_cast<Derived*>(this)->doVisit(node);
-
+    void visit(projection_ast::ProjectionPathASTNode* node) final {
         _context->popFieldNames();
 
         if (_context->basePath()) {
             // Update the context variable tracking the current path being traversed.
-            const FieldPath& fp = *_context->basePath();
+            const auto& fp = *_context->basePath();
             if (fp.getPathLength() == 1) {
                 _context->setBasePath(boost::none);
             } else {
@@ -187,37 +161,75 @@ public:
         }
     }
 
-    void visit(ProjectionPositionalASTNode* node) override {
+    void visit(ProjectionPositionalASTNode* node) final {
         _context->popFrontFieldName();
-
-        static_cast<Derived*>(this)->doVisit(node);
     }
 
-    void visit(ProjectionSliceASTNode* node) override {
+    void visit(ProjectionSliceASTNode* node) final {
         _context->popFrontFieldName();
-
-        static_cast<Derived*>(this)->doVisit(node);
     }
 
-    void visit(ProjectionElemMatchASTNode* node) override {
+    void visit(ProjectionElemMatchASTNode* node) final {
         _context->popFrontFieldName();
-
-        static_cast<Derived*>(this)->doVisit(node);
     }
 
-    void visit(ExpressionASTNode* node) override {
+    void visit(ExpressionASTNode* node) final {
         _context->popFrontFieldName();
-        static_cast<Derived*>(this)->doVisit(node);
     }
 
-    void visit(BooleanConstantASTNode* node) override {
+    void visit(BooleanConstantASTNode* node) final {
         _context->popFrontFieldName();
-
-        static_cast<Derived*>(this)->doVisit(node);
     }
+
+    void visit(MatchExpressionASTNode* node) final {}
 
 private:
     PathTrackingVisitorContext<UserData>* _context;
+};
+}  // namespace
+
+/**
+ * A general path tracking walker to be used with projection AST visitors which need to track
+ * the current projection path. Visitors will be able to access the current path via
+ * 'PathTrackingVisitorContext', passed as 'context' parameter to the constructor of this class.
+ * The walker and the visitors must be initialized with the same 'context' pointer.
+ *
+ * The visitors specified in the 'preVisitors' and 'postVisitors' parameters will be visited in
+ * the same order as they were added to the vector.
+ */
+template <class UserData = PathTrackingDummyDefaultType>
+class PathTrackingWalker final {
+public:
+    PathTrackingWalker(PathTrackingVisitorContext<UserData>* context,
+                       std::vector<ProjectionASTVisitor*> preVisitors,
+                       std::vector<ProjectionASTVisitor*> postVisitors)
+        : _pathTrackingPreVisitor{context},
+          _pathTrackingPostVisitor{context},
+          _preVisitors{std::move(preVisitors)},
+          _postVisitors{std::move(postVisitors)} {
+        _preVisitors.insert(_preVisitors.begin(), &_pathTrackingPreVisitor);
+        _postVisitors.push_back(&_pathTrackingPostVisitor);
+    }
+
+    void preVisit(projection_ast::ASTNode* node) {
+        for (auto visitor : _preVisitors) {
+            node->acceptVisitor(visitor);
+        }
+    }
+
+    void postVisit(projection_ast::ASTNode* node) {
+        for (auto visitor : _postVisitors) {
+            node->acceptVisitor(visitor);
+        }
+    }
+
+    void inVisit(long count, projection_ast::ASTNode* node) {}
+
+private:
+    PathTrackingPreVisitor<UserData> _pathTrackingPreVisitor;
+    PathTrackingPostVisitor<UserData> _pathTrackingPostVisitor;
+    std::vector<ProjectionASTVisitor*> _preVisitors;
+    std::vector<ProjectionASTVisitor*> _postVisitors;
 };
 }  // namespace projection_ast
 }  // namespace mongo

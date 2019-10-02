@@ -56,12 +56,15 @@ public:
                             std::unique_ptr<const ExtensionsCallback> extensionsCallback =
                                 std::make_unique<ExtensionsCallbackNoop>(),
                             MatchExpressionParser::AllowedFeatureSet allowedFeatures =
-                                MatchExpressionParser::kDefaultSpecialFeatures)
+                                MatchExpressionParser::kDefaultSpecialFeatures,
+                            bool optimizeExpression = false)
         : _matchAST(matchAST), _extensionsCallback(std::move(extensionsCallback)) {
         StatusWithMatchExpression parseResult =
             MatchExpressionParser::parse(_matchAST, expCtx, *_extensionsCallback, allowedFeatures);
         uassertStatusOK(parseResult.getStatus());
-        _matchExpr = std::move(parseResult.getValue());
+        _matchExpr = optimizeExpression
+            ? MatchExpression::optimize(std::move(parseResult.getValue()))
+            : std::move(parseResult.getValue());
     }
 
     /**
@@ -75,7 +78,7 @@ public:
      * Overload * so that CopyableMatchExpression can be dereferenced as if it were a pointer to the
      * underlying MatchExpression.
      */
-    const MatchExpression& operator*() {
+    const MatchExpression& operator*() const {
         return *_matchExpr;
     }
 
@@ -83,7 +86,7 @@ public:
      * Overload -> so that CopyableMatchExpression can be dereferenced as if it were a pointer to
      * the underlying MatchExpression.
      */
-    const MatchExpression* operator->() {
+    const MatchExpression* operator->() const {
         return &(*_matchExpr);
     }
 

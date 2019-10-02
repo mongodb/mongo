@@ -1017,6 +1017,7 @@ env.Library(
         'exec/plan_stage.cpp',
         'exec/projection.cpp',
         'exec/projection_exec.cpp',
+        'exec/projection_executor.cpp',
         'exec/queued_data_stage.cpp',
         'exec/record_store_fast_count.cpp',
         'exec/requires_all_indices_stage.cpp',

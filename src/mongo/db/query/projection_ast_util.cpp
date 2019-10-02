@@ -49,7 +49,8 @@ public:
     BSONPreVisitor(BSONVisitorContext* context) : _context(context) {}
 
     virtual void visit(MatchExpressionASTNode* node) {
-        node->matchExpression()->serialize(&_context->builder());
+        static_cast<const MatchExpressionASTNode*>(node)->matchExpression()->serialize(
+            &_context->builder());
         _context->fieldNames.top().pop_front();
     }
     virtual void visit(ProjectionPathASTNode* node) {

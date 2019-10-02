@@ -102,8 +102,12 @@ public:
         return TransformerType::kInclusionProjection;
     }
 
-    const InclusionNode& getRoot() const {
-        return *_root;
+    const InclusionNode* getRoot() const {
+        return _root.get();
+    }
+
+    InclusionNode* getRoot() {
+        return _root.get();
     }
 
     /**

@@ -46,14 +46,17 @@ protected:
                          const std::string& path,
                          const Document& input) {
         auto proj = ParsedAggregationProjection::create(getExpCtx(), projSpec, {});
-        auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(matchSpec, getExpCtx()));
+        auto matchExpr = CopyableMatchExpression{matchSpec,
+                                                 getExpCtx(),
+                                                 std::make_unique<ExtensionsCallbackNoop>(),
+                                                 MatchExpressionParser::kBanAllSpecialFeatures};
         auto expr = make_intrusive<ExpressionInternalFindPositional>(
             getExpCtx(),
             ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState),
             ExpressionFieldPath::parse(
                 getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
             path,
-            matchExpr.get());
+            std::move(matchExpr));
         proj->setRootReplacementExpression(expr);
         return proj->applyTransformation(input);
     }
@@ -103,15 +106,18 @@ TEST_F(PositionalProjectionExecutionTest, AppliesProjectionToPreImage) {
 
 TEST_F(PositionalProjectionExecutionTest, ShouldAddInclusionFieldsAndWholeDocumentToDependencies) {
     auto proj = ParsedAggregationProjection::create(getExpCtx(), fromjson("{bar: 1, _id: 0}"), {});
-    auto match = fromjson("{bar: 1, 'foo.bar': {$gte: 5}}");
-    auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(match, getExpCtx()));
+    auto matchSpec = fromjson("{bar: 1, 'foo.bar': {$gte: 5}}");
+    auto matchExpr = CopyableMatchExpression{matchSpec,
+                                             getExpCtx(),
+                                             std::make_unique<ExtensionsCallbackNoop>(),
+                                             MatchExpressionParser::kBanAllSpecialFeatures};
     auto expr = make_intrusive<ExpressionInternalFindPositional>(
         getExpCtx(),
         ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState),
         ExpressionFieldPath::parse(
             getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
         "foo.bar",
-        matchExpr.get());
+        std::move(matchExpr));
     proj->setRootReplacementExpression(expr);
 
     DepsTracker deps;
@@ -125,15 +131,18 @@ TEST_F(PositionalProjectionExecutionTest, ShouldAddInclusionFieldsAndWholeDocume
 
 TEST_F(PositionalProjectionExecutionTest, ShouldConsiderAllPathsAsModified) {
     auto proj = ParsedAggregationProjection::create(getExpCtx(), fromjson("{bar: 1, _id: 0}"), {});
-    auto match = fromjson("{bar: 1, 'foo.bar': {$gte: 5}}");
-    auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(match, getExpCtx()));
+    auto matchSpec = fromjson("{bar: 1, 'foo.bar': {$gte: 5}}");
+    auto matchExpr = CopyableMatchExpression{matchSpec,
+                                             getExpCtx(),
+                                             std::make_unique<ExtensionsCallbackNoop>(),
+                                             MatchExpressionParser::kBanAllSpecialFeatures};
     auto expr = make_intrusive<ExpressionInternalFindPositional>(
         getExpCtx(),
         ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState),
         ExpressionFieldPath::parse(
             getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
         "foo.bar",
-        matchExpr.get());
+        std::move(matchExpr));
     proj->setRootReplacementExpression(expr);
 
     auto modifiedPaths = proj->getModifiedPaths();
@@ -166,14 +175,17 @@ TEST_F(SliceProjectionExecutionTest, AppliesProjectionToPostImage) {
 TEST_F(SliceProjectionExecutionTest, CanApplySliceAndPositionalProjectionsTogether) {
     auto proj = ParsedAggregationProjection::create(getExpCtx(), fromjson("{foo: 1, bar: 1}"), {});
     auto matchSpec = fromjson("{foo: {$gte: 3}}");
-    auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(matchSpec, getExpCtx()));
+    auto matchExpr = CopyableMatchExpression{matchSpec,
+                                             getExpCtx(),
+                                             std::make_unique<ExtensionsCallbackNoop>(),
+                                             MatchExpressionParser::kBanAllSpecialFeatures};
     auto positionalExpr = make_intrusive<ExpressionInternalFindPositional>(
         getExpCtx(),
         ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState),
         ExpressionFieldPath::parse(
             getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
         "foo",
-        matchExpr.get());
+        std::move(matchExpr));
     auto sliceExpr =
         make_intrusive<ExpressionInternalFindSlice>(getExpCtx(), positionalExpr, "bar", 1, 1);
     proj->setRootReplacementExpression(sliceExpr);

@@ -52,11 +52,7 @@ namespace parsed_aggregation_projection {
 class ExclusionNode final : public ProjectionNode {
 public:
     ExclusionNode(ProjectionPolicies policies, std::string pathToNode = "")
-        : ProjectionNode(policies, std::move(pathToNode)) {
-        // Computed fields are not supported by exclusion projections.
-        invariant(_policies.computedFieldsPolicy ==
-                  ProjectionPolicies::ComputedFieldsPolicy::kBanComputedFields);
-    }
+        : ProjectionNode(policies, std::move(pathToNode)) {}
 
     ExclusionNode* addOrGetChild(const std::string& field) {
         return static_cast<ExclusionNode*>(ProjectionNode::addOrGetChild(field));
@@ -93,19 +89,18 @@ class ParsedExclusionProjection : public ParsedAggregationProjection {
 public:
     ParsedExclusionProjection(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                               ProjectionPolicies policies)
-        : ParsedAggregationProjection(
-              expCtx,
-              {policies.idPolicy,
-               policies.arrayRecursionPolicy,
-               ProjectionPolicies::ComputedFieldsPolicy::kBanComputedFields}),
-          _root(new ExclusionNode(_policies)) {}
+        : ParsedAggregationProjection(expCtx, policies), _root(new ExclusionNode(_policies)) {}
 
     TransformerType getType() const final {
         return TransformerType::kExclusionProjection;
     }
 
-    const ExclusionNode& getRoot() const {
-        return *_root;
+    const ExclusionNode* getRoot() const {
+        return _root.get();
+    }
+
+    ExclusionNode* getRoot() {
+        return _root.get();
     }
 
     Document serializeTransformation(
