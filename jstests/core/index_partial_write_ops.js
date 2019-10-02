@@ -6,7 +6,7 @@
 var coll = db.index_partial_write_ops;
 
 var getNumKeys = function(idxName) {
-    var res = assert.commandWorked(coll.validate(true));
+    var res = assert.commandWorked(coll.validate({full: true}));
     var kpi;
 
     var isShardedNS = res.hasOwnProperty('raw');

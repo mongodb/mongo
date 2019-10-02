@@ -14,16 +14,16 @@ assert.commandWorked(coll.createIndex({'a.0.c': 1}));
 assert.commandFailedWithCode(coll.update({_id: 0}, {$set: {'a.0.0': 1}}), 16746);
 
 // Verify that the indexes were not affected.
-let res = assert.commandWorked(coll.validate(true));
+let res = assert.commandWorked(coll.validate({full: true}));
 assert(res.valid, tojson(res));
 
 assert.commandFailedWithCode(coll.update({_id: 0}, {$set: {'a.0.0.b': 1}}), 16746);
-res = assert.commandWorked(coll.validate(true));
+res = assert.commandWorked(coll.validate({full: true}));
 assert(res.valid, tojson(res));
 
 // An update which does not violate the ambiguous field name in array constraint should succeed.
 assert.commandWorked(coll.update({_id: 0}, {$set: {'a.1.b.0.0': 1}}));
 
-res = assert.commandWorked(coll.validate(true));
+res = assert.commandWorked(coll.validate({full: true}));
 assert(res.valid, tojson(res));
 })();

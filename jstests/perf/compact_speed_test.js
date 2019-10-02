@@ -49,7 +49,7 @@ if (1) {
         assert(res.ok);
 
         // print("validate");
-        var v = t.validate(true);
+        var v = t.validate({full: true});
 
         assert(v.ok);
         assert(t.getIndexes().length == 4);

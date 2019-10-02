@@ -15,7 +15,7 @@ assert.commandWorked(res);
 res = t.insert({non_indexed_field: 'x'});
 assert.commandWorked(res);
 
-res = t.validate(true);
+res = t.validate({full: true});
 assert.commandWorked(res);
 assert(res.valid, 'Validate failed with response:\n' + tojson(res));
 })();

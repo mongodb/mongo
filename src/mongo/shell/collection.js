@@ -776,13 +776,13 @@ DBCollection.prototype._printExtraInfo = function(action, startTime) {
     }
 };
 
-DBCollection.prototype.validate = function(full) {
-    var cmd = {validate: this.getName()};
+DBCollection.prototype.validate = function(options) {
+    if (typeof (options) != 'object' && typeof (options) != 'undefined') {
+        return "expected optional options to be of the following format: {full: <bool>, background: <bool>}.";
+    }
 
-    if (typeof (full) == 'object')  // support arbitrary options here
-        Object.extend(cmd, full);
-    else
-        cmd.full = full;
+    var cmd = {validate: this.getName()};
+    Object.assign(cmd, options || {});
 
     var res = this._db.runCommand(cmd);
 

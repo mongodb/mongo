@@ -24,8 +24,6 @@ function CollectionValidator() {
         assert.eq(typeof obj, 'object', 'The `obj` argument must be an object');
         assert(obj.hasOwnProperty('full'), 'Please specify whether to use full validation');
 
-        const full = obj.full;
-
         // Failed collection validation results are saved in failed_res.
         let full_res = {ok: 1, failed_res: []};
 
@@ -58,7 +56,7 @@ function CollectionValidator() {
         let collInfo = db.getCollectionInfos(filter);
         for (let collDocument of collInfo) {
             const coll = db.getCollection(collDocument['name']);
-            const res = coll.validate(full);
+            const res = coll.validate(obj);
 
             if (!res.ok || !res.valid) {
                 if (jsTest.options().skipValidationOnNamespaceNotFound &&

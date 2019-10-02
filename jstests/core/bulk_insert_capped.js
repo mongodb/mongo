@@ -18,7 +18,7 @@ t.insert([{_id: 1}, {_id: 2}]);
 assert.gleSuccess(db);
 
 // Ensure the collection is valid.
-var res = t.validate(true);
+var res = t.validate({full: true});
 assert(res.valid, tojson(res));
 
 // Ensure that various ways of iterating the collection only return one document.

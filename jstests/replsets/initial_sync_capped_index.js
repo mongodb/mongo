@@ -112,7 +112,7 @@ replTest.awaitReplication();
 
 // Make sure the indexes created during initial sync are valid.
 var secondaryCappedColl = secondary.getDB(dbName)[cappedCollName];
-var validate_result = secondaryCappedColl.validate(true);
+var validate_result = secondaryCappedColl.validate({full: true});
 var failMsg =
     "Index validation of '" + secondaryCappedColl.name + "' failed: " + tojson(validate_result);
 assert(validate_result.valid, failMsg);
