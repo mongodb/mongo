@@ -94,7 +94,7 @@ Status storeMongoeBenchOptions(const moe::Environment& params,
     }
 
     int64_t seed = params.count("seed") ? static_cast<int64_t>(params["seed"].as<long>())
-                                        : SecureRandom::create()->nextInt64();
+                                        : SecureRandom().nextInt64();
 
     if (mongoeBenchGlobalParams.preConfig) {
         mongoeBenchGlobalParams.preConfig->randomSeed = seed;

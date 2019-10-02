@@ -201,7 +201,7 @@ private:
  */
 class CmdGetNonce : public BasicCommand {
 public:
-    CmdGetNonce() : BasicCommand("getnonce"), _random(SecureRandom::create()) {}
+    CmdGetNonce() : BasicCommand("getnonce") {}
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
@@ -240,11 +240,11 @@ public:
 private:
     int64_t getNextNonce() {
         stdx::lock_guard<SimpleMutex> lk(_randMutex);
-        return _random->nextInt64();
+        return _random.nextInt64();
     }
 
     SimpleMutex _randMutex;  // Synchronizes accesses to _random.
-    std::unique_ptr<SecureRandom> _random;
+    SecureRandom _random;
 } cmdGetNonce;
 
 bool CmdAuthenticate::run(OperationContext* opCtx,

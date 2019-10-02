@@ -852,7 +852,7 @@ void setUpReplication(ServiceContext* serviceContext) {
         std::make_unique<repl::TopologyCoordinator>(topoCoordOptions),
         replicationProcess,
         storageInterface,
-        SecureRandom::create()->nextInt64());
+        SecureRandom().nextInt64());
     repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
     repl::setOplogCollectionName(serviceContext);
 

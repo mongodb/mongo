@@ -235,11 +235,7 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
     const int nonceLenQWords = 3;
     uint64_t binaryNonce[nonceLenQWords];
 
-    std::unique_ptr<SecureRandom> sr(SecureRandom::create());
-
-    binaryNonce[0] = sr->nextInt64();
-    binaryNonce[1] = sr->nextInt64();
-    binaryNonce[2] = sr->nextInt64();
+    SecureRandom().fill(binaryNonce, sizeof(binaryNonce));
 
     _nonce =
         clientNonce + base64::encode(reinterpret_cast<char*>(binaryNonce), sizeof(binaryNonce));

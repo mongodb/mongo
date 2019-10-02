@@ -152,13 +152,11 @@ std::unique_ptr<executor::TaskExecutor> makeShardingTaskExecutor(
 }
 
 std::string generateDistLockProcessId(OperationContext* opCtx) {
-    std::unique_ptr<SecureRandom> rng(SecureRandom::create());
-
     return str::stream()
         << HostAndPort(getHostName(), serverGlobalParams.port).toString() << ':'
         << durationCount<Seconds>(
                opCtx->getServiceContext()->getPreciseClockSource()->now().toDurationSinceEpoch())
-        << ':' << rng->nextInt64();
+        << ':' << SecureRandom().nextInt64();
 }
 
 Status initializeGlobalShardingState(OperationContext* opCtx,

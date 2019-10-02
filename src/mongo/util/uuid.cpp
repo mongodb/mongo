@@ -43,7 +43,7 @@ namespace mongo {
 namespace {
 
 Mutex uuidGenMutex;
-auto uuidGen = SecureRandom::create();
+SecureRandom uuidGen;
 
 // Regex to match valid version 4 UUIDs with variant bits set
 std::regex uuidRegex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
@@ -97,18 +97,11 @@ bool UUID::isRFC4122v4() const {
 }
 
 UUID UUID::gen() {
-    int64_t randomWords[2];
-
+    UUIDStorage randomBytes;
     {
         stdx::lock_guard<Latch> lk(uuidGenMutex);
-
-        // Generate 128 random bits
-        randomWords[0] = uuidGen->nextInt64();
-        randomWords[1] = uuidGen->nextInt64();
+        uuidGen.fill(&randomBytes, sizeof(randomBytes));
     }
-
-    UUIDStorage randomBytes;
-    memcpy(&randomBytes, randomWords, sizeof(randomBytes));
 
     // Set version in high 4 bits of byte 6 and variant in high 2 bits of byte 8, see RFC 4122,
     // section 4.1.1, 4.1.2 and 4.1.3.

@@ -48,12 +48,7 @@
 namespace mongo {
 namespace crypto {
 
-namespace {
-std::unique_ptr<SecureRandom> random;
-}  // namespace
-
 MONGO_INITIALIZER(CreateKeyEntropySource)(InitializerContext* context) {
-    random = std::unique_ptr<SecureRandom>(SecureRandom::create());
     return Status::OK();
 }
 
@@ -90,16 +85,8 @@ std::string getStringFromCipherMode(aesMode mode) {
 
 SymmetricKey aesGenerate(size_t keySize, SymmetricKeyId keyId) {
     invariant(keySize == sym256KeySize);
-
     SecureVector<uint8_t> key(keySize);
-
-    size_t offset = 0;
-    while (offset < keySize) {
-        std::uint64_t randomValue = random->nextInt64();
-        memcpy(key->data() + offset, &randomValue, sizeof(randomValue));
-        offset += sizeof(randomValue);
-    }
-
+    SecureRandom().fill(key->data(), key->size());
     return SymmetricKey(std::move(key), aesAlgorithm, std::move(keyId));
 }
 
