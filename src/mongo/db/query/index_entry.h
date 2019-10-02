@@ -35,6 +35,7 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/util/container_size_helper.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -111,6 +112,25 @@ struct IndexEntry {
     }
 
     std::string toString() const;
+
+    uint64_t estimateObjectSizeInBytes() const {
+
+        return  // For each element in 'multikeyPaths' add the 'length of the vector * size of the
+            // vector element'.
+            container_size_helper::estimateObjectSizeInBytes(
+                multikeyPaths,
+                [](const auto& keyPath) {
+                    // Calculate the size of each std::set in 'multiKeyPaths'.
+                    return container_size_helper::estimateObjectSizeInBytes(keyPath);
+                },
+                true) +
+            // Add the runtime BSONObj size of 'keyPattern' and capacity of 'name'.
+            keyPattern.objsize() + name.capacity() +
+            // The BSON size of the 'infoObj' is purposefully excluded since its ownership is shared
+            // with the index catalog.
+            // Add size of the object.
+            sizeof(*this);
+    }
 
     BSONObj keyPattern;
 

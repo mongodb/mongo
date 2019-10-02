@@ -33,6 +33,7 @@
 #include <boost/optional/optional.hpp>
 #include <set>
 
+#include "mongo/base/counter.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/index_tag.h"
@@ -41,6 +42,7 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/container_size_helper.h"
 
 namespace mongo {
 
@@ -62,6 +64,10 @@ struct PlanCacheEntryFeedback {
     // The "goodness" score produced by the plan ranker
     // corresponding to 'stats'.
     double score;
+
+    uint64_t estimateObjectSizeInBytes() const {
+        return stats->estimateObjectSizeInBytes() + sizeof(*this);
+    }
 };
 
 // TODO: Replace with opaque type.
@@ -96,6 +102,14 @@ struct PlanCacheIndexTree {
      */
     struct OrPushdown {
         std::string indexName;
+        uint64_t estimateObjectSizeInBytes() const {
+            return  // Add size of each element in 'route' vector.
+                container_size_helper::estimateObjectSizeInBytes(route) +
+                // Add size of each element in 'route' vector.
+                indexName.size() +
+                // Add size of the object.
+                sizeof(*this);
+        }
         size_t position;
         bool canCombineBounds;
         std::deque<size_t> route;
@@ -126,6 +140,22 @@ struct PlanCacheIndexTree {
      */
     std::string toString(int indents = 0) const;
 
+    uint64_t estimateObjectSizeInBytes() const {
+        return  // Recursively add size of each element in 'children' vector.
+            container_size_helper::estimateObjectSizeInBytes(
+                children,
+                [](const auto& child) { return child->estimateObjectSizeInBytes(); },
+                true) +
+            // Add size of each element in 'orPushdowns' vector.
+            container_size_helper::estimateObjectSizeInBytes(
+                orPushdowns,
+                [](const auto& orPushdown) { return orPushdown.estimateObjectSizeInBytes(); },
+                false) +
+            // Add size of 'entry' if present.
+            (entry ? entry->estimateObjectSizeInBytes() : 0) +
+            // Add size of the object.
+            sizeof(*this);
+    }
     // Children owned here.
     std::vector<PlanCacheIndexTree*> children;
 
@@ -160,6 +190,10 @@ struct SolutionCacheData {
 
     // For debugging.
     std::string toString() const;
+
+    uint64_t estimateObjectSizeInBytes() const {
+        return (tree ? tree->estimateObjectSizeInBytes() : 0) + sizeof(*this);
+    }
 
     // Owned here. If 'wholeIXSoln' is false, then 'tree'
     // can be used to tag an isomorphic match expression. If 'wholeIXSoln'
@@ -237,9 +271,12 @@ public:
     /**
      * Create a new PlanCacheEntry.
      * Grabs any planner-specific data required from the solutions.
-     * Takes ownership of the PlanRankingDecision that placed the plan in the cache.
      */
-    PlanCacheEntry(const std::vector<QuerySolution*>& solutions, PlanRankingDecision* why);
+    static std::unique_ptr<PlanCacheEntry> create(
+        const std::vector<QuerySolution*>& solutions,
+        std::unique_ptr<const PlanRankingDecision> decision,
+        const CanonicalQuery& query,
+        Date_t timeOfCreation);
 
     ~PlanCacheEntry();
 
@@ -258,30 +295,53 @@ public:
     // Data provided to the planner to allow it to recreate the solutions this entry
     // represents. Each SolutionCacheData is fully owned here, so in order to return
     // it from the cache a deep copy is made and returned inside CachedSolution.
-    std::vector<SolutionCacheData*> plannerData;
+    const std::vector<std::unique_ptr<const SolutionCacheData>> plannerData;
 
     // TODO: Do we really want to just hold a copy of the CanonicalQuery?  For now we just
     // extract the data we need.
     //
     // Used by the plan cache commands to display an example query
     // of the appropriate shape.
-    BSONObj query;
-    BSONObj sort;
-    BSONObj projection;
-    BSONObj collation;
-    Date_t timeOfCreation;
+    const BSONObj query;
+    const BSONObj sort;
+    const BSONObj projection;
+    const BSONObj collation;
+    const Date_t timeOfCreation;
 
     //
     // Performance stats
     //
 
-    // Information that went into picking the winning plan and also why
-    // the other plans lost.
-    std::unique_ptr<PlanRankingDecision> decision;
+    // Information that went into picking the winning plan and also why the other plans lost.
+    const std::unique_ptr<const PlanRankingDecision> decision;
 
     // Annotations from cached runs.  The CachedPlanStage provides these stats about its
     // runs when they complete.
     std::vector<PlanCacheEntryFeedback*> feedback;
+
+    /**
+     * Tracks the approximate cumulative size of the plan cache entries across all the collections.
+     */
+    static Counter64 planCacheTotalSizeEstimateBytes;
+
+private:
+    /**
+     * All arguments constructor.
+     */
+    PlanCacheEntry(std::vector<std::unique_ptr<const SolutionCacheData>> plannerData,
+                   const BSONObj& query,
+                   const BSONObj& sort,
+                   const BSONObj& projection,
+                   const BSONObj& collation,
+                   Date_t timeOfCreation,
+                   std::unique_ptr<const PlanRankingDecision> decision,
+                   std::vector<PlanCacheEntryFeedback*> feedback);
+
+    uint64_t _estimateObjectSizeInBytes() const;
+
+    // The total runtime size of the current object in bytes. This is the deep size, obtained by
+    // recursively following references to all owned objects.
+    const uint64_t _entireObjectSize;
 };
 
 /**
@@ -326,7 +386,7 @@ public:
      */
     Status add(const CanonicalQuery& query,
                const std::vector<QuerySolution*>& solns,
-               PlanRankingDecision* why,
+               std::unique_ptr<PlanRankingDecision> why,
                Date_t now);
 
     /**
@@ -380,7 +440,7 @@ public:
     /**
      * Returns a copy of a cache entry.
      * Used by planCacheListPlans to display plan details.
-      *
+     *
      * If there is no entry in the cache for the 'query', returns an error Status.
      *
      * If there is an entry in the cache, populates 'entryOut' and returns Status::OK().  Caller
