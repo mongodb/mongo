@@ -91,26 +91,18 @@ assert.commandFailedWithCode(
     db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}),
     ErrorCodes.JSInterpreterFailure);
 
-// Test that we fail if the 'args' field is not an array of length 2.
+// Test that we fail if the 'args' field is not an array.
 pipeline = [{
     $project: {
         newValue: {
             $_internalJs: {
-                'args': [1],
+                'args': "A string!",
                 'eval': f_finalize,
             },
         },
         _id: 0,
     }
 }];
-assert.commandFailedWithCode(
-    db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}), 31267);
-
-pipeline[0].$project.newValue.$_internalJs.args = [1, 2, 3];
-assert.commandFailedWithCode(
-    db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}), 31267);
-
-pipeline[0].$project.newValue.$_internalJs.args = "A string!";
 assert.commandFailedWithCode(
     db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}), 31266);
 })();
