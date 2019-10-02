@@ -187,7 +187,7 @@ boost::intrusive_ptr<Expression> ExpressionInternalJs::parse(
 
     uassert(31261, "The eval function must be specified.", evalField);
     uassert(31262,
-            "The eval function must be of type string or code",
+            "The eval function must be of type string, code, or code w/ scope",
             evalField.type() == BSONType::String || evalField.type() == BSONType::Code);
 
     BSONElement argsField = expr["args"];
@@ -216,9 +216,14 @@ Value ExpressionInternalJs::evaluate(const Document& root, Variables* variables)
     uassert(
         31266, "The args field must be of type array", argExpressions.getType() == BSONType::Array);
 
+    const auto& args = argExpressions.getArray();
+    uassert(31267,
+            str::stream() << kExpressionName << " args field must have length 2",
+            args.size() == 2);
+
     int argNum = 0;
     BSONObjBuilder bob;
-    for (const auto& arg : argExpressions.getArray()) {
+    for (const auto& arg : args) {
         arg.addToBsonObj(&bob, "arg" + std::to_string(argNum++));
     }
     return jsExec->callFunction(func, bob.done(), {});
