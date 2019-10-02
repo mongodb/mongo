@@ -471,11 +471,20 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
       _cache(pExpCtx->getValueComparator()),
       _unwind(unwindSrc) {
     const auto& resolvedNamespace = pExpCtx->getResolvedNamespace(_from);
-    _fromExpCtx = pExpCtx->copyWith(resolvedNamespace.ns);
-    _fromPipeline = resolvedNamespace.pipeline;
+
+    // We always set an explicit collator on the copied expression context, even if the collator is
+    // null (i.e. the simple collation). Otherwise, in the situation where the user did not specify
+    // a collation and the simple collation was inherited from the local collection, the execution
+    // machinery will incorrectly interpret the null collator and empty user collation as an
+    // indication that it should inherit the foreign collection's collation.
+    _fromExpCtx =
+        expCtx->copyWith(resolvedNamespace.ns,
+                         boost::none,
+                         expCtx->getCollator() ? expCtx->getCollator()->clone() : nullptr);
 
     // We append an additional BSONObj to '_fromPipeline' as a placeholder for the $match stage
     // we'll eventually construct from the input document.
+    _fromPipeline = resolvedNamespace.pipeline;
     _fromPipeline.reserve(_fromPipeline.size() + 1);
     _fromPipeline.push_back(BSONObj());
 }

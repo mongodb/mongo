@@ -80,7 +80,16 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
     const auto& resolvedNamespace = pExpCtx->getResolvedNamespace(_fromNs);
     _resolvedNs = resolvedNamespace.ns;
     _resolvedPipeline = resolvedNamespace.pipeline;
-    _fromExpCtx = pExpCtx->copyWith(_resolvedNs);
+
+    // We always set an explicit collator on the copied expression context, even if the collator is
+    // null (i.e. the simple collation). Otherwise, in the situation where the user did not specify
+    // a collation and the simple collation was inherited from the local collection, the execution
+    // machinery will incorrectly interpret the null collator and empty user collation as an
+    // indication that it should inherit the foreign collection's collation.
+    _fromExpCtx =
+        pExpCtx->copyWith(_resolvedNs,
+                          boost::none,
+                          pExpCtx->getCollator() ? pExpCtx->getCollator()->clone() : nullptr);
 
     _fromExpCtx->subPipelineDepth += 1;
     uassert(ErrorCodes::MaxSubPipelineDepthExceeded,
@@ -827,4 +836,4 @@ intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
                                         pExpCtx);
     }
 }
-}
+}  // namespace mongo
