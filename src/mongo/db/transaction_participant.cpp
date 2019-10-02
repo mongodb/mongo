@@ -369,7 +369,6 @@ TransactionParticipant::getOldestActiveTimestamp(Timestamp stableTimestamp) {
                 continue;
             }
             // A prepared transaction must have a start timestamp.
-            // TODO(SERVER-40013): Handle entries with state "prepared" and no "startTimestamp".
             invariant(txnRecord.getStartOpTime());
             auto ts = txnRecord.getStartOpTime()->getTimestamp();
             if (!oldestTxnTimestamp || ts < oldestTxnTimestamp.value()) {
