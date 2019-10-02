@@ -524,14 +524,30 @@ Status IndexBuildsCoordinator::_registerIndexBuild(
     if (collIndexBuildsIt != _collectionIndexBuilds.end()) {
         for (const auto& name : replIndexBuildState->indexNames) {
             if (collIndexBuildsIt->second->hasIndexBuildState(lk, name)) {
-                auto registeredIndexBuilds =
-                    collIndexBuildsIt->second->getIndexBuildState(lk, name);
-                return Status(ErrorCodes::IndexBuildAlreadyInProgress,
-                              str::stream()
-                                  << "There's already an index with name '" << name
-                                  << "' being built on the collection: "
-                                  << " ( " << replIndexBuildState->collectionUUID
-                                  << " ). Index build: " << registeredIndexBuilds->buildUUID);
+                auto existingIndexBuild = collIndexBuildsIt->second->getIndexBuildState(lk, name);
+                str::stream ss;
+                ss << "Index build conflict: " << replIndexBuildState->buildUUID
+                   << ": There's already an index with name '" << name
+                   << "' being built on the collection "
+                   << " ( " << replIndexBuildState->collectionUUID
+                   << " ) under an existing index build: " << existingIndexBuild->buildUUID;
+                {
+                    // We have to lock the mutex in order to read the committed/aborted state.
+                    stdx::unique_lock<Latch> lk(existingIndexBuild->mutex);
+                    if (existingIndexBuild->isCommitReady) {
+                        ss << " (ready to commit with timestamp: "
+                           << existingIndexBuild->commitTimestamp.toString() << ")";
+                    } else if (existingIndexBuild->aborted) {
+                        ss << " (aborted with reason: " << existingIndexBuild->abortReason
+                           << " and timestamp: " << existingIndexBuild->abortTimestamp.toString()
+                           << ")";
+                    } else {
+                        ss << " (in-progress)";
+                    }
+                }
+                std::string msg = ss;
+                log() << msg;
+                return Status(ErrorCodes::IndexBuildAlreadyInProgress, msg);
             }
         }
     }
