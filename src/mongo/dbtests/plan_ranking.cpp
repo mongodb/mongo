@@ -691,9 +691,9 @@ public:
     }
 };
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("query_plan_ranking") {}
+    All() : OldStyleSuiteSpecification("query_plan_ranking") {}
 
     void setupTests() {
         add<PlanRankingIntersectOverride>();
@@ -712,6 +712,6 @@ public:
     }
 };
 
-SuiteInstance<All> planRankingAll;
+OldStyleSuiteInitializer<All> planRankingAll;
 
 }  // namespace PlanRankingTests

@@ -1547,9 +1547,9 @@ public:
     }
 };
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("js") {}
+    All() : OldStyleSuiteSpecification("js") {}
 
     template <ScopeFactory scopeFactory>
     void setupTestsWithScopeFactory() {
@@ -1609,6 +1609,6 @@ public:
     }
 };
 
-SuiteInstance<All> myall;
+OldStyleSuiteInitializer<All> myall;
 
 }  // namespace JSTests

@@ -6354,9 +6354,10 @@ TEST(ExpressionRegexTest, InvalidUTF8InRegex) {
 
 }  // namespace ExpressionRegexTest
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("expression") {}
+    All() : OldStyleSuiteSpecification("expression") {}
+
     void setupTests() {
         add<Add::NullDocument>();
         add<Add::NoOperands>();
@@ -6559,7 +6560,7 @@ public:
     }
 };
 
-SuiteInstance<All> myall;
+OldStyleSuiteInitializer<All> myall;
 
 namespace NowAndClusterTime {
 TEST(NowAndClusterTime, BasicTest) {

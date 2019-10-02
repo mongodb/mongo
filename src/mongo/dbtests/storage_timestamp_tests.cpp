@@ -86,6 +86,7 @@
 
 namespace mongo {
 namespace {
+
 /**
  * RAII type for operating at a timestamp. Will remove any timestamping when the object destructs.
  */
@@ -3416,63 +3417,76 @@ public:
     }
 };
 
-class AllStorageTimestampTests : public unittest::Suite {
+class AllStorageTimestampTests : public unittest::OldStyleSuiteSpecification {
 public:
-    AllStorageTimestampTests() : unittest::Suite("StorageTimestampTests") {}
-    void setupTests() {
+    AllStorageTimestampTests() : unittest::OldStyleSuiteSpecification("StorageTimestampTests") {}
+
+    // Must be evaluated at test run() time, not static-init time.
+    static bool shouldSkip() {
         // Only run on storage engines that support snapshot reads.
         auto storageEngine = cc().getServiceContext()->getStorageEngine();
         if (!storageEngine->supportsReadConcernSnapshot() ||
             !mongo::serverGlobalParams.enableMajorityReadConcern) {
             unittest::log() << "Skipping this test suite because storage engine "
                             << storageGlobalParams.engine << " does not support timestamp writes.";
-            return;
+            return true;
         }
+        return false;
+    }
 
-        add<SecondaryInsertTimes>();
-        add<SecondaryArrayInsertTimes>();
-        add<SecondaryDeleteTimes>();
-        add<SecondaryUpdateTimes>();
-        add<SecondaryInsertToUpsert>();
-        add<SecondaryAtomicApplyOps>();
-        add<SecondaryAtomicApplyOpsWCEToNonAtomic>();
-        add<SecondaryCreateCollection>();
-        add<SecondaryCreateTwoCollections>();
-        add<SecondaryCreateCollectionBetweenInserts>();
-        add<PrimaryCreateCollectionInApplyOps>();
-        add<SecondarySetIndexMultikeyOnInsert>();
-        add<InitialSyncSetIndexMultikeyOnInsert>();
-        add<PrimarySetIndexMultikeyOnInsert>();
-        add<PrimarySetIndexMultikeyOnInsertUnreplicated>();
-        add<PrimarySetsMultikeyInsideMultiDocumentTransaction>();
-        add<InitializeMinValid>();
-        add<SetMinValidInitialSyncFlag>();
-        add<SetMinValidToAtLeast>();
-        add<SetMinValidAppliedThrough>();
+    template <typename T>
+    void addIf() {
+        addNameCallback(nameForTestClass<T>(), [] {
+            if (!shouldSkip())
+                T().run();
+        });
+    }
+
+    void setupTests() {
+        addIf<SecondaryInsertTimes>();
+        addIf<SecondaryArrayInsertTimes>();
+        addIf<SecondaryDeleteTimes>();
+        addIf<SecondaryUpdateTimes>();
+        addIf<SecondaryInsertToUpsert>();
+        addIf<SecondaryAtomicApplyOps>();
+        addIf<SecondaryAtomicApplyOpsWCEToNonAtomic>();
+        addIf<SecondaryCreateCollection>();
+        addIf<SecondaryCreateTwoCollections>();
+        addIf<SecondaryCreateCollectionBetweenInserts>();
+        addIf<PrimaryCreateCollectionInApplyOps>();
+        addIf<SecondarySetIndexMultikeyOnInsert>();
+        addIf<InitialSyncSetIndexMultikeyOnInsert>();
+        addIf<PrimarySetIndexMultikeyOnInsert>();
+        addIf<PrimarySetIndexMultikeyOnInsertUnreplicated>();
+        addIf<PrimarySetsMultikeyInsideMultiDocumentTransaction>();
+        addIf<InitializeMinValid>();
+        addIf<SetMinValidInitialSyncFlag>();
+        addIf<SetMinValidToAtLeast>();
+        addIf<SetMinValidAppliedThrough>();
         // KVDropDatabase<SimulatePrimary>
-        add<KVDropDatabase<false>>();
-        add<KVDropDatabase<true>>();
+        addIf<KVDropDatabase<false>>();
+        addIf<KVDropDatabase<true>>();
         // TimestampIndexBuilds<SimulatePrimary>
-        add<TimestampIndexBuilds<false>>();
-        add<TimestampIndexBuilds<true>>();
+        addIf<TimestampIndexBuilds<false>>();
+        addIf<TimestampIndexBuilds<true>>();
         // TODO (SERVER-40894): Make index builds timestamp drained writes
-        // add<TimestampIndexBuildDrain<false>>();
-        // add<TimestampIndexBuildDrain<true>>();
-        add<TimestampMultiIndexBuilds>();
-        add<TimestampMultiIndexBuildsDuringRename>();
-        add<TimestampIndexDrops>();
-        add<TimestampIndexBuilderOnPrimary>();
-        add<SecondaryReadsDuringBatchApplicationAreAllowed>();
-        add<ViewCreationSeparateTransaction>();
-        add<CreateCollectionWithSystemIndex>();
-        add<MultiDocumentTransaction>();
-        add<MultiOplogEntryTransaction>();
-        add<CommitPreparedMultiOplogEntryTransaction>();
-        add<AbortPreparedMultiOplogEntryTransaction>();
-        add<PreparedMultiDocumentTransaction>();
-        add<AbortedPreparedMultiDocumentTransaction>();
+        // addIf<TimestampIndexBuildDrain<false>>();
+        // addIf<TimestampIndexBuildDrain<true>>();
+        addIf<TimestampMultiIndexBuilds>();
+        addIf<TimestampMultiIndexBuildsDuringRename>();
+        addIf<TimestampIndexDrops>();
+        addIf<TimestampIndexBuilderOnPrimary>();
+        addIf<SecondaryReadsDuringBatchApplicationAreAllowed>();
+        addIf<ViewCreationSeparateTransaction>();
+        addIf<CreateCollectionWithSystemIndex>();
+        addIf<MultiDocumentTransaction>();
+        addIf<MultiOplogEntryTransaction>();
+        addIf<CommitPreparedMultiOplogEntryTransaction>();
+        addIf<AbortPreparedMultiOplogEntryTransaction>();
+        addIf<PreparedMultiDocumentTransaction>();
+        addIf<AbortedPreparedMultiDocumentTransaction>();
     }
 };
 
-unittest::SuiteInstance<AllStorageTimestampTests> allStorageTimestampTests;
+unittest::OldStyleSuiteInitializer<AllStorageTimestampTests> allStorageTimestampTests;
 }  // namespace mongo

@@ -289,9 +289,9 @@ private:
     }
 };
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("threading") {}
+    All() : OldStyleSuiteSpecification("threading") {}
 
     void setupTests() {
         // Slack is a test to see how long it takes for another thread to pick up
@@ -307,5 +307,5 @@ public:
     }
 };
 
-SuiteInstance<All> myall;
+OldStyleSuiteInitializer<All> myall;
 }  // namespace ThreadedTests

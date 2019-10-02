@@ -157,9 +157,9 @@ public:
     }
 };
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("count") {}
+    All() : OldStyleSuiteSpecification("count") {}
 
     void setupTests() {
         add<Basic>();
@@ -169,6 +169,6 @@ public:
     }
 };
 
-SuiteInstance<All> myall;
+OldStyleSuiteInitializer<All> myall;
 
 }  // namespace CountTests

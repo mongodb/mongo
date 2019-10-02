@@ -854,9 +854,10 @@ public:
     }
 };
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("DocumentSourceGroupTests") {}
+    All() : OldStyleSuiteSpecification("DocumentSourceGroupTests") {}
+
     void setupTests() {
         add<NonObject>();
         add<EmptySpec>();
@@ -910,7 +911,7 @@ public:
     }
 };
 
-SuiteInstance<All> myall;
+OldStyleSuiteInitializer<All> myall;
 
 }  // namespace
 }  // namespace mongo

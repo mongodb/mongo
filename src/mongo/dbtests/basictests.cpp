@@ -356,9 +356,9 @@ public:
     }
 };
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("basic") {}
+    All() : OldStyleSuiteSpecification("basic") {}
 
     void setupTests() {
         add<RarelyTest>();
@@ -382,6 +382,6 @@ public:
     }
 };
 
-SuiteInstance<All> myall;
+OldStyleSuiteInitializer<All> myall;
 
 }  // namespace BasicTests

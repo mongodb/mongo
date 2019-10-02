@@ -224,9 +224,9 @@ public:
     }
 };
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("query_stage_fetch") {}
+    All() : OldStyleSuiteSpecification("query_stage_fetch") {}
 
     void setupTests() {
         add<FetchStageAlreadyFetched>();
@@ -234,6 +234,6 @@ public:
     }
 };
 
-SuiteInstance<All> queryStageFetchAll;
+OldStyleSuiteInitializer<All> queryStageFetchAll;
 
 }  // namespace QueryStageFetch

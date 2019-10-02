@@ -231,9 +231,9 @@ private:
     Database* _db;
 };
 
-class IndexCatalogTests : public Suite {
+class IndexCatalogTests : public OldStyleSuiteSpecification {
 public:
-    IndexCatalogTests() : Suite("indexcatalogtests") {}
+    IndexCatalogTests() : OldStyleSuiteSpecification("indexcatalogtests") {}
     void setupTests() {
         add<IndexIteratorTests>();
         add<IndexCatalogEntryDroppedTest>();
@@ -241,5 +241,5 @@ public:
     }
 };
 
-SuiteInstance<IndexCatalogTests> indexCatalogTests;
+OldStyleSuiteInitializer<IndexCatalogTests> indexCatalogTests;
 }  // namespace IndexCatalogTests

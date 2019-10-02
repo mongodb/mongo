@@ -314,9 +314,9 @@ public:
     }
 };
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("query_stage_ixscan") {}
+    All() : OldStyleSuiteSpecification("query_stage_ixscan") {}
 
     void setupTests() {
         add<QueryStageIxscanInitializeStats>();
@@ -325,6 +325,8 @@ public:
         add<QueryStageIxscanInsertDuringSaveExclusive2>();
         add<QueryStageIxscanInsertDuringSaveReverse>();
     }
-} QueryStageIxscanAll;
+};
+
+OldStyleSuiteInitializer<All> aueryStageIxscanAll;
 
 }  // namespace QueryStageIxscan

@@ -1865,9 +1865,9 @@ public:
     }
 };
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("query") {}
+    All() : OldStyleSuiteSpecification("query") {}
 
     void setupTests() {
         add<FindingStart>();
@@ -1926,7 +1926,7 @@ public:
     }
 };
 
-SuiteInstance<All> myall;
+OldStyleSuiteInitializer<All> myall;
 
 }  // namespace QueryTests
 }  // namespace

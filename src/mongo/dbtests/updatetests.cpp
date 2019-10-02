@@ -1998,9 +1998,9 @@ class setswitchint : public Base {
 }  // namespace basic
 
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("update") {}
+    All() : OldStyleSuiteSpecification("update") {}
     void setupTests() {
         add<ModId>();
         add<ModNonmodMix>();
@@ -2118,6 +2118,6 @@ public:
     }
 };
 
-SuiteInstance<All> myall;
+OldStyleSuiteInitializer<All> myall;
 
 }  // namespace UpdateTests

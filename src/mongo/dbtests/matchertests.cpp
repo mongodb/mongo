@@ -300,9 +300,9 @@ public:
     }
 };
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("matcher") {}
+    All() : OldStyleSuiteSpecification("matcher") {}
 
 #define ADD_BOTH(TEST) add<TEST<Matcher>>();
 
@@ -325,6 +325,6 @@ public:
     }
 };
 
-SuiteInstance<All> dball;
+OldStyleSuiteInitializer<All> dball;
 
 }  // namespace MatcherTests

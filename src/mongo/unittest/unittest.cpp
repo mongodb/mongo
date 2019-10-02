@@ -33,6 +33,8 @@
 
 #include "mongo/unittest/unittest.h"
 
+#include <fmt/format.h>
+#include <fmt/printf.h>
 #include <functional>
 #include <iostream>
 #include <map>
@@ -60,27 +62,28 @@ bool stringContains(const std::string& haystack, const std::string& needle) {
     return haystack.find(needle) != std::string::npos;
 }
 
-logger::MessageLogDomain* unittestOutput = logger::globalLogManager()->getNamedDomain("unittest");
+logger::MessageLogDomain* unittestOutput() {
+    static const auto p = logger::globalLogManager()->getNamedDomain("unittest");
+    return p;
+}
 
-typedef std::map<std::string, std::shared_ptr<Suite>> SuiteMap;
-
-SuiteMap& _allSuites() {
-    static SuiteMap allSuites;
-    return allSuites;
+auto& suitesMap() {
+    static std::map<std::string, std::shared_ptr<Suite>> m;
+    return m;
 }
 
 }  // namespace
 
 logger::LogstreamBuilder log() {
-    return LogstreamBuilder(unittestOutput, getThreadName(), logger::LogSeverity::Log());
+    return LogstreamBuilder(unittestOutput(), getThreadName(), logger::LogSeverity::Log());
 }
 
 logger::LogstreamBuilder warning() {
-    return LogstreamBuilder(unittestOutput, getThreadName(), logger::LogSeverity::Warning());
+    return LogstreamBuilder(unittestOutput(), getThreadName(), logger::LogSeverity::Warning());
 }
 
 void setupTestLogger() {
-    unittestOutput->attachAppender(
+    unittestOutput()->attachAppender(
         std::make_unique<logger::ConsoleAppender<logger::MessageLogDomain::Event>>(
             std::make_unique<logger::MessageEventDetailsEncoder>()));
 }
@@ -97,23 +100,11 @@ public:
         : _name(name), _rc(0), _tests(0), _fails(), _asserts(0), _millis(0) {}
 
     std::string toString() const {
-        char result[144];
-        size_t numWritten = std::snprintf(
-            result,
-            sizeof(result),
-            "%-40s | tests: %4d | fails: %4d | assert calls: %10d | time secs: %6.3f\n",
-            _name.c_str(),
-            _tests,
-            static_cast<int>(_fails.size()),
-            _asserts,
-            _millis / 1000.0);
-
-        if (numWritten >= sizeof(result)) {
-            warning() << "Output for test " << _name << " was truncated";
-        }
-
-        std::stringstream ss;
-        ss << result;
+        std::ostringstream ss;
+        using namespace fmt::literals;
+        ss << "{:<40s} | tests: {:4d} | fails: {:4d} | "
+              "assert calls: {:10d} | time secs: {:6.3f}\n"
+              ""_format(_name, _tests, _fails.size(), _asserts, _millis * 1e-3);
 
         for (const auto& i : _messages) {
             ss << "\t" << i << '\n';
@@ -134,11 +125,7 @@ public:
     int _asserts;
     int _millis;
     std::vector<std::string> _messages;
-
-    static Result* cur;
 };
-
-Result* Result::cur = nullptr;
 
 namespace {
 
@@ -290,66 +277,57 @@ int64_t Test::countLogLinesContaining(const std::string& needle) {
         msgs.begin(), msgs.end(), [&](const std::string& s) { return stringContains(s, needle); });
 }
 
-Suite::Suite(const std::string& name) : _name(name) {
-    registerSuite(name, this);
+Suite::Suite(ConstructorEnable, std::string name) : _name(std::move(name)) {}
+
+void Suite::add(std::string name, std::function<void()> testFn) {
+    _tests.push_back({std::move(name), std::move(testFn)});
 }
 
-Suite::~Suite() {}
-
-void Suite::add(const std::string& name, const TestFunction& testFn) {
-    _tests.push_back(std::make_unique<TestHolder>(name, testFn));
-}
-
-Result* Suite::run(const std::string& filter, int runsPerTest) {
-    LOG(1) << "\t about to setupTests" << std::endl;
-    setupTests();
-    LOG(1) << "\t done setupTests" << std::endl;
-
+std::unique_ptr<Result> Suite::run(const std::string& filter, int runsPerTest) {
     Timer timer;
-    Result* r = new Result(_name);
-    Result::cur = r;
+    auto r = std::make_unique<Result>(_name);
 
     for (const auto& tc : _tests) {
-        if (filter.size() && tc->getName().find(filter) == std::string::npos) {
-            LOG(1) << "\t skipping test: " << tc->getName() << " because doesn't match filter"
+        if (filter.size() && tc.name.find(filter) == std::string::npos) {
+            LOG(1) << "\t skipping test: " << tc.name << " because doesn't match filter"
                    << std::endl;
             continue;
         }
 
-        r->_tests++;
+        ++r->_tests;
 
         bool passes = false;
 
-        std::stringstream err;
-        err << tc->getName() << "\t";
+        std::ostringstream err;
+        err << tc.name << "\t";
 
         try {
             for (int x = 0; x < runsPerTest; x++) {
-                std::stringstream runTimes;
+                std::ostringstream runTimes;
                 if (runsPerTest > 1) {
                     runTimes << "  (" << x + 1 << "/" << runsPerTest << ")";
                 }
 
-                log() << "\t going to run test: " << tc->getName() << runTimes.str();
+                log() << "\t going to run test: " << tc.name << runTimes.str();
                 TestSuiteEnvironment environment;
-                tc->run();
+                tc.fn();
             }
             passes = true;
         } catch (const TestAssertionFailureException& ae) {
-            err << ae.toString() << " in test " << tc->getName() << '\n' << ae.getStacktrace();
+            err << ae.toString() << " in test " << tc.name << '\n' << ae.getStacktrace();
         } catch (const DBException& e) {
-            err << "DBException: " << e.toString() << " in test " << tc->getName();
+            err << "DBException: " << e.toString() << " in test " << tc.name;
         } catch (const std::exception& e) {
-            err << "std::exception: " << e.what() << " in test " << tc->getName();
+            err << "std::exception: " << e.what() << " in test " << tc.name;
         } catch (int x) {
-            err << "caught int " << x << " in test " << tc->getName();
+            err << "caught int " << x << " in test " << tc.name;
         }
 
         if (!passes) {
             std::string s = err.str();
             // Don't truncate failure messages, e.g: stacktraces.
             log().setIsTruncatable(false) << "FAIL: " << s;
-            r->_fails.push_back(tc->getName());
+            r->_fails.push_back(tc.name);
             r->_messages.push_back(s);
         }
     }
@@ -365,13 +343,13 @@ Result* Suite::run(const std::string& filter, int runsPerTest) {
 }
 
 int Suite::run(const std::vector<std::string>& suites, const std::string& filter, int runsPerTest) {
-    if (_allSuites().empty()) {
+    if (suitesMap().empty()) {
         log() << "error: no suites registered.";
         return EXIT_FAILURE;
     }
 
     for (unsigned int i = 0; i < suites.size(); i++) {
-        if (_allSuites().count(suites[i]) == 0) {
+        if (suitesMap().count(suites[i]) == 0) {
             log() << "invalid test suite [" << suites[i] << "], use --list to see valid names"
                   << std::endl;
             return EXIT_FAILURE;
@@ -381,7 +359,7 @@ int Suite::run(const std::vector<std::string>& suites, const std::string& filter
     std::vector<std::string> torun(suites);
 
     if (torun.empty()) {
-        for (const auto& kv : _allSuites()) {
+        for (const auto& kv : suitesMap()) {
             torun.push_back(kv.first);
         }
     }
@@ -389,11 +367,11 @@ int Suite::run(const std::vector<std::string>& suites, const std::string& filter
     std::vector<std::unique_ptr<Result>> results;
 
     for (std::string name : torun) {
-        std::shared_ptr<Suite>& s = _allSuites()[name];
+        std::shared_ptr<Suite>& s = suitesMap()[name];
         fassert(16145, s != nullptr);
 
         log() << "going to run suite: " << name << std::endl;
-        results.emplace_back(s->run(filter, runsPerTest));
+        results.push_back(s->run(filter, runsPerTest));
     }
 
     log() << "**************************************************" << std::endl;
@@ -407,7 +385,6 @@ int Suite::run(const std::vector<std::string>& suites, const std::string& filter
     Result totals("TOTALS");
     std::vector<std::string> failedSuites;
 
-    Result::cur = nullptr;
     for (const auto& r : results) {
         log().setIsTruncatable(false) << r->toString();
         if (abs(r->rc()) > abs(rc))
@@ -446,23 +423,16 @@ int Suite::run(const std::vector<std::string>& suites, const std::string& filter
     return rc;
 }
 
-void Suite::registerSuite(const std::string& name, Suite* s) {
-    std::shared_ptr<Suite>& m = _allSuites()[name];
-    fassert(10162, !m);
-    m.reset(s);
-}
-
-Suite* Suite::getSuite(const std::string& name) {
-    std::shared_ptr<Suite>& result = _allSuites()[name];
-    if (!result) {
-        // Suites are self-registering.
-        new Suite(name);
+Suite& Suite::getSuite(const std::string& name) {
+    auto& map = suitesMap();
+    if (auto found = map.find(name); found != map.end()) {
+        return *found->second;
     }
-    invariant(result);
-    return result.get();
+    auto sp = std::make_shared<Suite>(ConstructorEnable{}, name);
+    auto [it, noCollision] = map.try_emplace(name, sp->shared_from_this());
+    fassert(10162, noCollision);
+    return *sp;
 }
-
-void Suite::setupTests() {}
 
 TestAssertionFailureException::TestAssertionFailureException(
     const std::string& theFile, unsigned theLine, const std::string& theFailingExpression)
@@ -515,7 +485,7 @@ std::ostream& TestAssertionFailure::stream() {
 
 std::vector<std::string> getAllSuiteNames() {
     std::vector<std::string> result;
-    for (const auto& kv : _allSuites()) {
+    for (const auto& kv : suitesMap()) {
         result.push_back(kv.first);
     }
     return result;

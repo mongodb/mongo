@@ -3478,9 +3478,10 @@ TEST(InvolvedNamespacesTest, IncludesAllCollectionsWhenResolvingViews) {
 
 }  // namespace
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("PipelineOptimizations") {}
+    All() : OldStyleSuiteSpecification("PipelineOptimizations") {}
+
     void setupTests() {
         add<Optimizations::Sharded::Empty>();
         add<Optimizations::Sharded::coalesceLookUpAndUnwind::ShouldCoalesceUnwindOnAs>();
@@ -3523,7 +3524,7 @@ public:
     }
 };
 
-SuiteInstance<All> myall;
+OldStyleSuiteInitializer<All> myall;
 
 }  // namespace
 }  // namespace mongo

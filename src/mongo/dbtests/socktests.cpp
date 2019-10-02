@@ -52,14 +52,14 @@ public:
     }
 };
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("sock") {}
+    All() : OldStyleSuiteSpecification("sock") {}
     void setupTests() {
         add<HostByName>();
     }
 };
 
-SuiteInstance<All> myall;
+OldStyleSuiteInitializer<All> myall;
 
 }  // namespace SockTests

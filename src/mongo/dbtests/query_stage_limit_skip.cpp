@@ -112,15 +112,15 @@ protected:
     OperationContext* const _opCtx = _uniqOpCtx.get();
 };
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("query_stage_limit_skip") {}
+    All() : OldStyleSuiteSpecification("query_stage_limit_skip") {}
 
     void setupTests() {
         add<QueryStageLimitSkipBasicTest>();
     }
 };
 
-SuiteInstance<All> queryStageLimitSkipAll;
+OldStyleSuiteInitializer<All> queryStageLimitSkipAll;
 
 }  // namespace

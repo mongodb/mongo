@@ -361,9 +361,9 @@ public:
     }
 };
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("commands") {}
+    All() : OldStyleSuiteSpecification("commands") {}
 
     void setupTests() {
         add<FileMD5::Type0>();
@@ -380,5 +380,5 @@ public:
     }
 };
 
-SuiteInstance<All> all;
+OldStyleSuiteInitializer<All> all;
 }  // namespace CommandTests

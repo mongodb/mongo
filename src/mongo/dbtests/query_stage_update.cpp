@@ -549,9 +549,9 @@ public:
     }
 };
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("query_stage_update") {}
+    All() : OldStyleSuiteSpecification("query_stage_update") {}
 
     void setupTests() {
         // Stage-specific tests below.
@@ -562,6 +562,6 @@ public:
     }
 };
 
-SuiteInstance<All> all;
+OldStyleSuiteInitializer<All> all;
 
 }  // namespace QueryStageUpdate

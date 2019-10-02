@@ -522,10 +522,10 @@ COMMON_EXECUTOR_TEST(CallbackHandleComparison) {
 }  // namespace
 
 void addTestsForExecutor(const std::string& suiteName, ExecutorFactory makeExecutor) {
-    auto suite = unittest::Suite::getSuite(suiteName);
+    auto& suite = unittest::Suite::getSuite(suiteName);
     for (auto testCase : executorTestCaseRegistry()) {
-        suite->add(str::stream() << suiteName << "::" << testCase.first,
-                   [testCase, makeExecutor] { testCase.second(makeExecutor)->run(); });
+        suite.add(str::stream() << suiteName << "::" << testCase.first,
+                  [testCase, makeExecutor] { testCase.second(makeExecutor)->run(); });
     }
 }
 

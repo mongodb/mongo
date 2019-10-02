@@ -40,11 +40,13 @@
 #include <functional>
 #include <sstream>
 #include <string>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <vector>
 
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/logger/logstream_builder.h"
 #include "mongo/logger/message_log_domain.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -191,13 +193,16 @@
  *     ASSERT_DOES_NOT_COMPILE(bool B = true, std::enable_if_t<B, int>{});
  *
  */
-#define ASSERT_DOES_NOT_COMPILE(Alias, /*expr*/...)                          \
-    static auto BOOST_PP_CAT(compileCheck_, __LINE__)(...)->std::true_type;  \
-    template <Alias>                                                         \
-    static auto BOOST_PP_CAT(compileCheck_, __LINE__)(int)                   \
-        ->std::conditional_t<true, std::false_type, decltype(__VA_ARGS__)>;  \
-    static_assert(decltype(BOOST_PP_CAT(compileCheck_, __LINE__)(0))::value, \
-                  "Expression '" #__VA_ARGS__ "' [with " #Alias "] shouldn't compile.");
+#define ASSERT_DOES_NOT_COMPILE(Alias, /*expr*/...) \
+    ASSERT_DOES_NOT_COMPILE_1_(                     \
+        BOOST_PP_CAT(compileCheck_, __LINE__), Alias, #Alias, (__VA_ARGS__), #__VA_ARGS__)
+
+#define ASSERT_DOES_NOT_COMPILE_1_(Id, Alias, AliasString, Expr, ExprString)        \
+    static auto Id(...)->std::true_type;                                            \
+    template <Alias>                                                                \
+    static auto Id(int)->std::conditional_t<true, std::false_type, decltype(Expr)>; \
+    static_assert(decltype(Id(0))::value,                                           \
+                  "Expression '" ExprString "' [with " AliasString "] shouldn't compile.");
 
 /**
  * This internal helper is used to ignore warnings about unused results.  Some unit tests which test
@@ -261,7 +266,7 @@
     } while (false)
 
 /**
- * Construct a single test, named "TEST_NAME" within the test case "CASE_NAME".
+ * Construct a single test, named `TEST_NAME` within the test Suite `SUITE_NAME`.
  *
  * Usage:
  *
@@ -269,22 +274,12 @@
  *     ASSERT_EQUALS(error_success, foo(invalidValue));
  * }
  */
-#define TEST(CASE_NAME, TEST_NAME)                                                                 \
-    class UNIT_TEST_DETAIL_TEST_TYPE_NAME(CASE_NAME, TEST_NAME) : public ::mongo::unittest::Test { \
-    private:                                                                                       \
-        virtual void _doTest();                                                                    \
-                                                                                                   \
-        static const RegistrationAgent<UNIT_TEST_DETAIL_TEST_TYPE_NAME(CASE_NAME, TEST_NAME)>      \
-            _agent;                                                                                \
-    };                                                                                             \
-    const ::mongo::unittest::Test::RegistrationAgent<UNIT_TEST_DETAIL_TEST_TYPE_NAME(CASE_NAME,    \
-                                                                                     TEST_NAME)>   \
-        UNIT_TEST_DETAIL_TEST_TYPE_NAME(CASE_NAME, TEST_NAME)::_agent(#CASE_NAME, #TEST_NAME);     \
-    void UNIT_TEST_DETAIL_TEST_TYPE_NAME(CASE_NAME, TEST_NAME)::_doTest()
+#define TEST(SUITE_NAME, TEST_NAME) \
+    UNIT_TEST_DETAIL_DEFINE_TEST_(SUITE_NAME, TEST_NAME, ::mongo::unittest::Test)
 
 /**
  * Construct a single test named TEST_NAME that has access to a common class (a "fixture")
- * named "FIXTURE_NAME".
+ * named "FIXTURE_NAME". FIXTURE_NAME will be the name of the Suite in which the test appears.
  *
  * Usage:
  *
@@ -298,29 +293,29 @@
  *     ASSERT_EQUALS(10, myVar);
  * }
  */
-#define TEST_F(FIXTURE_NAME, TEST_NAME)                                                            \
-    class UNIT_TEST_DETAIL_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME) : public FIXTURE_NAME {         \
-    private:                                                                                       \
-        virtual void _doTest();                                                                    \
-                                                                                                   \
-        static const RegistrationAgent<UNIT_TEST_DETAIL_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)>   \
-            _agent;                                                                                \
-    };                                                                                             \
-    const ::mongo::unittest::Test::RegistrationAgent<UNIT_TEST_DETAIL_TEST_TYPE_NAME(FIXTURE_NAME, \
-                                                                                     TEST_NAME)>   \
-        UNIT_TEST_DETAIL_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)::_agent(#FIXTURE_NAME,            \
-                                                                         #TEST_NAME);              \
-    void UNIT_TEST_DETAIL_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)::_doTest()
+#define TEST_F(FIXTURE_NAME, TEST_NAME) \
+    UNIT_TEST_DETAIL_DEFINE_TEST_(FIXTURE_NAME, TEST_NAME, FIXTURE_NAME)
+
+#define UNIT_TEST_DETAIL_DEFINE_TEST_(SUITE_NAME, TEST_NAME, TEST_BASE) \
+    UNIT_TEST_DETAIL_DEFINE_TEST_PRIMITIVE_(                            \
+        SUITE_NAME, TEST_NAME, UNIT_TEST_DETAIL_TEST_TYPE_NAME(SUITE_NAME, TEST_NAME), TEST_BASE)
+
+#define UNIT_TEST_DETAIL_DEFINE_TEST_PRIMITIVE_(FIXTURE_NAME, TEST_NAME, TEST_TYPE, TEST_BASE) \
+    class TEST_TYPE : public TEST_BASE {                                                       \
+    private:                                                                                   \
+        void _doTest() override;                                                               \
+        static inline const RegistrationAgent<TEST_TYPE> _agent{#FIXTURE_NAME, #TEST_NAME};    \
+    };                                                                                         \
+    void TEST_TYPE::_doTest()
 
 /**
- * Macro to construct a type name for a test, from its "CASE_NAME" and "TEST_NAME".
+ * Macro to construct a type name for a test, from its `SUITE_NAME` and `TEST_NAME`.
  * Do not use directly in test code.
  */
-#define UNIT_TEST_DETAIL_TEST_TYPE_NAME(CASE_NAME, TEST_NAME) \
-    UnitTest_CaseName##CASE_NAME##TestName##TEST_NAME
+#define UNIT_TEST_DETAIL_TEST_TYPE_NAME(SUITE_NAME, TEST_NAME) \
+    UnitTest_SuiteName##SUITE_NAME##TestName##TEST_NAME
 
-namespace mongo {
-namespace unittest {
+namespace mongo::unittest {
 
 class Result;
 
@@ -330,49 +325,155 @@ void setupTestLogger();
  * Gets a LogstreamBuilder for logging to the unittest log domain, which may have
  * different target from the global log domain.
  */
-mongo::logger::LogstreamBuilder log();
-mongo::logger::LogstreamBuilder warning();
+logger::LogstreamBuilder log();
+logger::LogstreamBuilder warning();
 
 /**
- * Type representing the function composing a test.
+ * Representation of a collection of tests.
+ *
+ * One Suite is constructed for each SUITE_NAME when using the TEST macro.
+ *
+ * See `OldStyleSuiteSpecification` which adapts dbtests into this framework.
  */
-typedef std::function<void(void)> TestFunction;
+class Suite : public std::enable_shared_from_this<Suite> {
+private:
+    struct SuiteTest {
+        std::string name;
+        std::function<void()> fn;
+    };
 
-/**
- * Container holding a test function and its name.  Suites
- * contain lists of these.
- */
-class TestHolder {
-    TestHolder(const TestHolder&) = delete;
-    TestHolder& operator=(const TestHolder&) = delete;
+    struct ConstructorEnable {
+        explicit ConstructorEnable() = default;
+    };
 
 public:
-    TestHolder(const std::string& name, const TestFunction& fn) : _name(name), _fn(fn) {}
+    explicit Suite(ConstructorEnable, std::string name);
+    Suite(const Suite&) = delete;
+    Suite& operator=(const Suite&) = delete;
 
-    ~TestHolder() {}
-    void run() const {
-        _fn();
-    }
-    std::string getName() const {
+    void add(std::string name, std::function<void()> testFn);
+
+    std::unique_ptr<Result> run(const std::string& filter, int runsPerTest);
+
+    static int run(const std::vector<std::string>& suites,
+                   const std::string& filter,
+                   int runsPerTest);
+
+    /**
+     * Get a suite with the given name, creating and registering it if necessary.
+     * This is the only way to make a Suite object.
+     *
+     * Safe to call during static initialization.
+     */
+    static Suite& getSuite(const std::string& name);
+
+private:
+    std::string _name;
+    std::vector<SuiteTest> _tests;
+};
+
+/**
+ * Adaptor to set up a Suite from a dbtest-style suite.
+ * Support for deprecated dbtest-style test suites. Tests are are added by overriding setupTests()
+ * in a subclass of OldStyleSuiteSpecification, and defining an OldStyleSuiteInstance<T> object.
+ * This approach is
+ * deprecated.
+ *
+ * Example:
+ *     class All : public OldStyleSuiteSpecification {
+ *     public:
+ *         All() : OldStyleSuiteSpecification("BunchaTests") {}
+ *         void setupTests() {
+ *            add<TestThis>();
+ *            add<TestThat>();
+ *            add<TestTheOtherThing>();
+ *         }
+ *     };
+ *     OldStyleSuiteInitializer<All> all;
+ */
+class OldStyleSuiteSpecification {
+public:
+    struct SuiteTest {
+        std::string name;
+        std::function<void()> fn;
+    };
+
+    OldStyleSuiteSpecification(std::string name) : _name(std::move(name)) {}
+    virtual ~OldStyleSuiteSpecification() = default;
+
+    // Note: setupTests() is run by a OldStyleSuiteInitializer at static initialization time.
+    // It should in most cases be just a simple sequence of add<T>() calls.
+    virtual void setupTests() = 0;
+
+    const std::string& name() const {
         return _name;
+    }
+
+    const std::vector<SuiteTest>& tests() const {
+        return _tests;
+    }
+
+protected:
+    /**
+     * Add an old-style test of type `T` to this Suite, saving any test constructor args
+     * that would be needed at test run time.
+     * The added test's name will be synthesized as the demangled typename of T.
+     * At test run time, the test will be created and run with `T(args...).run()`.
+     */
+    template <typename T, typename... Args>
+    void add(Args&&... args) {
+        addNameCallback(nameForTestClass<T>(), [=] { T(args...).run(); });
+    }
+
+    void addNameCallback(std::string name, std::function<void()> cb) {
+        _tests.push_back({std::move(name), std::move(cb)});
+    }
+
+    template <typename T>
+    static std::string nameForTestClass() {
+        return demangleName(typeid(T));
     }
 
 private:
     std::string _name;
-    TestFunction _fn;
+    std::vector<SuiteTest> _tests;
 };
+
+/**
+ * Define a namespace-scope instance of `OldStyleSuiteInitializer<T>` to properly create and
+ * initialize an instance of `T` (an `OldStyleSuiteSpecification`). See
+ * `OldStyleSuiteSpecification`.
+ */
+template <typename T>
+struct OldStyleSuiteInitializer {
+    template <typename... Args>
+    explicit OldStyleSuiteInitializer(Args&&... args) {
+        T t(std::forward<Args>(args)...);
+        init(t);
+    }
+
+    void init(OldStyleSuiteSpecification& suiteSpec) const {
+        log() << "\t about to setupTests" << std::endl;
+        suiteSpec.setupTests();
+        log() << "\t done setupTests" << std::endl;
+        auto& suite = Suite::getSuite(suiteSpec.name());
+        for (auto&& t : suiteSpec.tests()) {
+            suite.add(t.name, t.fn);
+        }
+    }
+};
+
 
 /**
  * Base type for unit test fixtures.  Also, the default fixture type used
  * by the TEST() macro.
  */
 class Test {
-    Test(const Test&) = delete;
-    Test& operator=(const Test&) = delete;
-
 public:
     Test();
     virtual ~Test();
+    Test(const Test&) = delete;
+    Test& operator=(const Test&) = delete;
 
     void run();
 
@@ -388,21 +489,27 @@ public:
 
 protected:
     /**
-     * Registration agent for adding tests to suites, used by TEST macro.
+     * Adds a Test to a Suite, used by TEST/TEST_F macros.
      */
     template <typename T>
     class RegistrationAgent {
-        RegistrationAgent(const RegistrationAgent&) = delete;
-        RegistrationAgent& operator=(const RegistrationAgent&) = delete;
-
     public:
-        RegistrationAgent(const std::string& suiteName, const std::string& testName);
-        std::string getSuiteName() const;
-        std::string getTestName() const;
+        RegistrationAgent(std::string suiteName, std::string testName)
+            : _suiteName(std::move(suiteName)), _testName(std::move(testName)) {
+            Suite::getSuite(_suiteName).add(_testName, [] { T{}.run(); });
+        }
+
+        const std::string& getSuiteName() const {
+            return _suiteName;
+        }
+
+        const std::string& getTestName() const {
+            return _testName;
+        }
 
     private:
-        const std::string _suiteName;
-        const std::string _testName;
+        std::string _suiteName;
+        std::string _testName;
     };
 
     /**
@@ -455,103 +562,6 @@ private:
     logger::MessageLogDomain::AppenderHandle _captureAppenderHandle;
     std::unique_ptr<logger::MessageLogDomain::EventAppender> _captureAppender;
 };
-
-/**
- * Representation of a collection of tests.
- *
- * One suite is constructed for each "CASE_NAME" when using the TEST macro.
- * Additionally, tests that are part of dbtests are manually assigned to suites
- * by the programmer by overriding setupTests() in a subclass of Suite.  This
- * approach is deprecated.
- */
-class Suite {
-    Suite(const Suite&) = delete;
-    Suite& operator=(const Suite&) = delete;
-
-public:
-    Suite(const std::string& name);
-    virtual ~Suite();
-
-    template <class T>
-    void add() {
-        add<T>(demangleName(typeid(T)));
-    }
-
-    template <class T, class A>
-    void add(const A& a) {
-        add(demangleName(typeid(T)), [a] {
-            T testObj(a);
-            testObj.run();
-        });
-    }
-
-    template <class T>
-    void add(const std::string& name) {
-        add(name, [] {
-            T testObj;
-            testObj.run();
-        });
-    }
-
-    void add(const std::string& name, const TestFunction& testFn);
-
-    Result* run(const std::string& filter, int runsPerTest);
-
-    static int run(const std::vector<std::string>& suites,
-                   const std::string& filter,
-                   int runsPerTest);
-
-    /**
-     * Get a suite with the given name, creating it if necessary.
-     *
-     * The implementation of this function must be safe to call during the global static
-     * initialization block before main() executes.
-     */
-    static Suite* getSuite(const std::string& name);
-
-protected:
-    virtual void setupTests();
-
-private:
-    typedef std::vector<std::unique_ptr<TestHolder>> TestHolderList;
-
-    std::string _name;
-    TestHolderList _tests;
-    bool _ran;
-
-    void registerSuite(const std::string& name, Suite* s);
-};
-
-// A type that makes it easy to declare a self registering suite for old style test
-// declarations. Suites are self registering so this is *not* a memory leak.
-template <typename T>
-struct SuiteInstance {
-    SuiteInstance() {
-        new T;
-    }
-
-    template <typename U>
-    SuiteInstance(const U& u) {
-        new T(u);
-    }
-};
-
-template <typename T>
-Test::RegistrationAgent<T>::RegistrationAgent(const std::string& suiteName,
-                                              const std::string& testName)
-    : _suiteName(suiteName), _testName(testName) {
-    Suite::getSuite(suiteName)->add<T>(testName);
-}
-
-template <typename T>
-std::string Test::RegistrationAgent<T>::getSuiteName() const {
-    return _suiteName;
-}
-
-template <typename T>
-std::string Test::RegistrationAgent<T>::getTestName() const {
-    return _testName;
-}
 
 /**
  * Exception thrown when a test assertion fails.
@@ -619,45 +629,36 @@ enum class ComparisonOp { kEq, kNe, kLt, kLe, kGt, kGe };
 template <ComparisonOp op>
 class ComparisonAssertion {
 private:
-    template <ComparisonOp val>
-    using OpTag = std::integral_constant<ComparisonOp, val>;
-
-    static auto comparator(OpTag<ComparisonOp::kEq>) {
-        return [](auto&& a, auto&& b) { return a == b; };
-    }
-    static auto comparator(OpTag<ComparisonOp::kNe>) {
-        return [](auto&& a, auto&& b) { return a != b; };
-    }
-    static auto comparator(OpTag<ComparisonOp::kLt>) {
-        return [](auto&& a, auto&& b) { return a < b; };
-    }
-    static auto comparator(OpTag<ComparisonOp::kLe>) {
-        return [](auto&& a, auto&& b) { return a <= b; };
-    }
-    static auto comparator(OpTag<ComparisonOp::kGt>) {
-        return [](auto&& a, auto&& b) { return a > b; };
-    }
-    static auto comparator(OpTag<ComparisonOp::kGe>) {
-        return [](auto&& a, auto&& b) { return a >= b; };
+    static constexpr auto comparator() {
+        if constexpr (op == ComparisonOp::kEq) {
+            return std::equal_to<>{};
+        } else if constexpr (op == ComparisonOp::kNe) {
+            return std::not_equal_to<>{};
+        } else if constexpr (op == ComparisonOp::kLt) {
+            return std::less<>{};
+        } else if constexpr (op == ComparisonOp::kLe) {
+            return std::less_equal<>{};
+        } else if constexpr (op == ComparisonOp::kGt) {
+            return std::greater<>{};
+        } else if constexpr (op == ComparisonOp::kGe) {
+            return std::greater_equal<>{};
+        }
     }
 
-    static constexpr StringData name(OpTag<ComparisonOp::kEq>) {
-        return "=="_sd;
-    }
-    static constexpr StringData name(OpTag<ComparisonOp::kNe>) {
-        return "!="_sd;
-    }
-    static constexpr StringData name(OpTag<ComparisonOp::kLt>) {
-        return "<"_sd;
-    }
-    static constexpr StringData name(OpTag<ComparisonOp::kLe>) {
-        return "<="_sd;
-    }
-    static constexpr StringData name(OpTag<ComparisonOp::kGt>) {
-        return ">"_sd;
-    }
-    static constexpr StringData name(OpTag<ComparisonOp::kGe>) {
-        return ">="_sd;
+    static constexpr StringData name() {
+        if constexpr (op == ComparisonOp::kEq) {
+            return "=="_sd;
+        } else if constexpr (op == ComparisonOp::kNe) {
+            return "!="_sd;
+        } else if constexpr (op == ComparisonOp::kLt) {
+            return "<"_sd;
+        } else if constexpr (op == ComparisonOp::kLe) {
+            return "<="_sd;
+        } else if constexpr (op == ComparisonOp::kGt) {
+            return ">"_sd;
+        } else if constexpr (op == ComparisonOp::kGe) {
+            return ">="_sd;
+        }
     }
 
     template <typename A, typename B>
@@ -667,13 +668,12 @@ private:
                                                 StringData bExpression,
                                                 const A& a,
                                                 const B& b) {
-        if (comparator(OpTag<op>{})(a, b)) {
+        if (comparator()(a, b)) {
             return;
         }
         std::ostringstream os;
-        StringData opName = name(OpTag<op>{});
-        os << "Expected " << aExpression << " " << opName << " " << bExpression << " (" << a << " "
-           << opName << " " << b << ")";
+        os << "Expected " << aExpression << " " << name() << " " << bExpression << " (" << a << " "
+           << name() << " " << b << ")";
         _assertion = std::make_unique<TestAssertionFailure>(theFile, theLine, os.str());
     }
 
@@ -722,61 +722,57 @@ private:
     std::unique_ptr<TestAssertionFailure> _assertion;
 };
 
+// Explicit instantiation of ComparisonAssertion ctor and factory, for "A OP B".
+#define TEMPLATE_COMPARISON_ASSERTION_CTOR_A_OP_B(EXTERN, OP, A, B)             \
+    EXTERN template ComparisonAssertion<ComparisonOp::OP>::ComparisonAssertion( \
+        const char*, unsigned, StringData, StringData, const A&, const B&);     \
+    EXTERN template ComparisonAssertion<ComparisonOp::OP>                       \
+    ComparisonAssertion<ComparisonOp::OP>::make(                                \
+        const char*, unsigned, StringData, StringData, const A&, const B&);
+
 // Explicit instantiation of ComparisonAssertion ctor and factory for a pair of types.
-#define TEMPLATE_COMPARISON_ASSERTION_CTOR_CROSS(EXTERN, OP, A, B)              \
-    EXTERN template ComparisonAssertion<ComparisonOp::OP>::ComparisonAssertion( \
-        const char*, unsigned, StringData, StringData, const A&, const B&);     \
-    EXTERN template ComparisonAssertion<ComparisonOp::OP>                       \
-    ComparisonAssertion<ComparisonOp::OP>::make(                                \
-        const char*, unsigned, StringData, StringData, const A&, const B&);     \
-    EXTERN template ComparisonAssertion<ComparisonOp::OP>::ComparisonAssertion( \
-        const char*, unsigned, StringData, StringData, const B&, const A&);     \
-    EXTERN template ComparisonAssertion<ComparisonOp::OP>                       \
-    ComparisonAssertion<ComparisonOp::OP>::make(                                \
-        const char*, unsigned, StringData, StringData, const B&, const A&)
+#define TEMPLATE_COMPARISON_ASSERTION_CTOR_SYMMETRIC(EXTERN, OP, A, B) \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_A_OP_B(EXTERN, OP, A, B)        \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_A_OP_B(EXTERN, OP, B, A)
 
 // Explicit instantiation of ComparisonAssertion ctor and factory for a single type.
-#define TEMPLATE_COMPARISON_ASSERTION_CTOR_SELF(EXTERN, OP, T)                  \
-    EXTERN template ComparisonAssertion<ComparisonOp::OP>::ComparisonAssertion( \
-        const char*, unsigned, StringData, StringData, const T&, const T&);     \
-    EXTERN template ComparisonAssertion<ComparisonOp::OP>                       \
-    ComparisonAssertion<ComparisonOp::OP>::make(                                \
-        const char*, unsigned, StringData, StringData, const T&, const T&)
+#define TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(EXTERN, OP, T) \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_A_OP_B(EXTERN, OP, T, T)
 
 // Call with `extern` to declace extern instantiations, and with no args to explicitly instantiate.
-#define INSTANTIATE_COMPARISON_ASSERTION_CTORS(...)                                          \
-    __VA_ARGS__ template class ComparisonAssertion<ComparisonOp::kEq>;                       \
-    __VA_ARGS__ template class ComparisonAssertion<ComparisonOp::kNe>;                       \
-    __VA_ARGS__ template class ComparisonAssertion<ComparisonOp::kGt>;                       \
-    __VA_ARGS__ template class ComparisonAssertion<ComparisonOp::kGe>;                       \
-    __VA_ARGS__ template class ComparisonAssertion<ComparisonOp::kLt>;                       \
-    __VA_ARGS__ template class ComparisonAssertion<ComparisonOp::kLe>;                       \
-                                                                                             \
-    TEMPLATE_COMPARISON_ASSERTION_CTOR_SELF(__VA_ARGS__, kEq, int);                          \
-    TEMPLATE_COMPARISON_ASSERTION_CTOR_SELF(__VA_ARGS__, kEq, long);                         \
-    TEMPLATE_COMPARISON_ASSERTION_CTOR_SELF(__VA_ARGS__, kEq, long long);                    \
-    TEMPLATE_COMPARISON_ASSERTION_CTOR_SELF(__VA_ARGS__, kEq, unsigned int);                 \
-    TEMPLATE_COMPARISON_ASSERTION_CTOR_SELF(__VA_ARGS__, kEq, unsigned long);                \
-    TEMPLATE_COMPARISON_ASSERTION_CTOR_SELF(__VA_ARGS__, kEq, unsigned long long);           \
-    TEMPLATE_COMPARISON_ASSERTION_CTOR_SELF(__VA_ARGS__, kEq, bool);                         \
-    TEMPLATE_COMPARISON_ASSERTION_CTOR_SELF(__VA_ARGS__, kEq, double);                       \
-    TEMPLATE_COMPARISON_ASSERTION_CTOR_SELF(__VA_ARGS__, kEq, OID);                          \
-    TEMPLATE_COMPARISON_ASSERTION_CTOR_SELF(__VA_ARGS__, kEq, BSONType);                     \
-    TEMPLATE_COMPARISON_ASSERTION_CTOR_SELF(__VA_ARGS__, kEq, Timestamp);                    \
-    TEMPLATE_COMPARISON_ASSERTION_CTOR_SELF(__VA_ARGS__, kEq, Date_t);                       \
-    TEMPLATE_COMPARISON_ASSERTION_CTOR_SELF(__VA_ARGS__, kEq, Status);                       \
-    TEMPLATE_COMPARISON_ASSERTION_CTOR_SELF(__VA_ARGS__, kEq, ErrorCodes::Error);            \
-                                                                                             \
-    TEMPLATE_COMPARISON_ASSERTION_CTOR_CROSS(__VA_ARGS__, kEq, int, long);                   \
-    TEMPLATE_COMPARISON_ASSERTION_CTOR_CROSS(__VA_ARGS__, kEq, int, long long);              \
-    TEMPLATE_COMPARISON_ASSERTION_CTOR_CROSS(__VA_ARGS__, kEq, long, long long);             \
-    TEMPLATE_COMPARISON_ASSERTION_CTOR_CROSS(__VA_ARGS__, kEq, unsigned int, unsigned long); \
-    TEMPLATE_COMPARISON_ASSERTION_CTOR_CROSS(__VA_ARGS__, kEq, Status, ErrorCodes::Error);   \
-    TEMPLATE_COMPARISON_ASSERTION_CTOR_CROSS(__VA_ARGS__, kEq, ErrorCodes::Error, int);      \
-                                                                                             \
-    /* These are the only types that are often used with ASSERT_NE*/                         \
-    TEMPLATE_COMPARISON_ASSERTION_CTOR_SELF(__VA_ARGS__, kNe, Status);                       \
-    TEMPLATE_COMPARISON_ASSERTION_CTOR_SELF(__VA_ARGS__, kNe, unsigned long);
+#define INSTANTIATE_COMPARISON_ASSERTION_CTORS(...)                                             \
+    __VA_ARGS__ template class ComparisonAssertion<ComparisonOp::kEq>;                          \
+    __VA_ARGS__ template class ComparisonAssertion<ComparisonOp::kNe>;                          \
+    __VA_ARGS__ template class ComparisonAssertion<ComparisonOp::kGt>;                          \
+    __VA_ARGS__ template class ComparisonAssertion<ComparisonOp::kGe>;                          \
+    __VA_ARGS__ template class ComparisonAssertion<ComparisonOp::kLt>;                          \
+    __VA_ARGS__ template class ComparisonAssertion<ComparisonOp::kLe>;                          \
+                                                                                                \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, int)                         \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, long)                        \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, long long)                   \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, unsigned int)                \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, unsigned long)               \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, unsigned long long)          \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, bool)                        \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, double)                      \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, OID)                         \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, BSONType)                    \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, Timestamp)                   \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, Date_t)                      \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, Status)                      \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, ErrorCodes::Error)           \
+                                                                                                \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_SYMMETRIC(__VA_ARGS__, kEq, int, long)                   \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_SYMMETRIC(__VA_ARGS__, kEq, int, long long)              \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_SYMMETRIC(__VA_ARGS__, kEq, long, long long)             \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_SYMMETRIC(__VA_ARGS__, kEq, unsigned int, unsigned long) \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_SYMMETRIC(__VA_ARGS__, kEq, Status, ErrorCodes::Error)   \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_SYMMETRIC(__VA_ARGS__, kEq, ErrorCodes::Error, int)      \
+                                                                                                \
+    /* These are the only types that are often used with ASSERT_NE*/                            \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kNe, Status)                      \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kNe, unsigned long)
 
 // Declare that these definitions will be provided in unittest.cpp.
 INSTANTIATE_COMPARISON_ASSERTION_CTORS(extern);
@@ -801,5 +797,4 @@ T assertGet(StatusWith<T>&& swt) {
  */
 std::vector<std::string> getAllSuiteNames();
 
-}  // namespace unittest
-}  // namespace mongo
+}  // namespace mongo::unittest

@@ -115,9 +115,9 @@ public:
     }
 };
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("gle") {}
+    All() : OldStyleSuiteSpecification("gle") {}
 
     void setupTests() {
         add<GetLastErrorClean>();
@@ -126,5 +126,5 @@ public:
     }
 };
 
-SuiteInstance<All> myall;
+OldStyleSuiteInitializer<All> myall;
 }  // namespace

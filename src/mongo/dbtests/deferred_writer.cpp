@@ -370,9 +370,9 @@ private:
     static const int kDocsPerWorker = 100;
 };
 
-class DeferredWriterTests : public Suite {
+class DeferredWriterTests : public OldStyleSuiteSpecification {
 public:
-    DeferredWriterTests() : Suite("deferred_writer_tests") {}
+    DeferredWriterTests() : OldStyleSuiteSpecification("deferred_writer_tests") {}
 
     void setupTests() {
         add<DeferredWriterTestEmpty>();
@@ -382,5 +382,8 @@ public:
         add<DeferredWriterTestCap>();
         add<DeferredWriterTestAsync>();
     }
-} deferredWriterTests;
+};
+
+OldStyleSuiteInitializer<DeferredWriterTests> deferredWriterTests;
+
 }  // namespace deferred_writer_tests

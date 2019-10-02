@@ -625,21 +625,32 @@ public:
     }
 };
 
-class IndexUpdateTests : public Suite {
+class IndexUpdateTests : public OldStyleSuiteSpecification {
 public:
-    IndexUpdateTests() : Suite("indexupdate") {}
+    IndexUpdateTests() : OldStyleSuiteSpecification("indexupdate") {}
+
+    // Must be evaluated at test run() time, not static-init time.
+    static bool shouldSkip() {
+        return mongo::storageGlobalParams.engine == "mobile";
+    }
+
+    template <typename T>
+    void addIf() {
+        addNameCallback(nameForTestClass<T>(), [] {
+            if (!shouldSkip())
+                T().run();
+        });
+    }
 
     void setupTests() {
+        // These tests check that index creation ignores the unique constraint when told to.
+        // The mobile storage engine does not support duplicate keys in unique indexes so these
+        // tests are disabled.
+        addIf<InsertBuildIgnoreUnique<true>>();
+        addIf<InsertBuildIgnoreUnique<false>>();
+        addIf<InsertBuildEnforceUnique<true>>();
+        addIf<InsertBuildEnforceUnique<false>>();
 
-        if (mongo::storageGlobalParams.engine != "mobile") {
-            // These tests check that index creation ignores the unique constraint when told to.
-            // The mobile storage engine does not support duplicate keys in unique indexes so these
-            // tests are disabled.
-            add<InsertBuildIgnoreUnique<true>>();
-            add<InsertBuildIgnoreUnique<false>>();
-            add<InsertBuildEnforceUnique<true>>();
-            add<InsertBuildEnforceUnique<false>>();
-        }
         add<InsertBuildIndexInterrupt>();
         add<InsertBuildIdIndexInterrupt>();
         add<SameSpecDifferentOption>();
@@ -661,6 +672,8 @@ public:
         add<BuildingIndexWithCollationWhenSymbolDataExistsShouldFail>();
         add<IndexingSymbolWithInheritedCollationShouldFail>();
     }
-} indexUpdateTests;
+};
+
+OldStyleSuiteInitializer<IndexUpdateTests> indexUpdateTests;
 
 }  // namespace IndexUpdateTests

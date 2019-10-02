@@ -1985,9 +1985,9 @@ public:
     }
 };
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("jsobj") {}
+    All() : OldStyleSuiteSpecification("jsobj") {}
 
     void setupTests() {
         add<BufBuilderBasic>();
@@ -2081,6 +2081,6 @@ public:
     }
 };
 
-SuiteInstance<All> myall;
+OldStyleSuiteInitializer<All> myall;
 
 }  // namespace JsobjTests

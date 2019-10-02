@@ -382,9 +382,9 @@ public:
     }
 };
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("client") {}
+    All() : OldStyleSuiteSpecification("client") {}
 
     void setupTests() {
         add<DropIndex>();
@@ -406,5 +406,5 @@ public:
     }
 };
 
-SuiteInstance<All> all;
+OldStyleSuiteInitializer<All> all;
 }  // namespace ClientTests

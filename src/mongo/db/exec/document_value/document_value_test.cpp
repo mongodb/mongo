@@ -2060,9 +2060,10 @@ TEST(ValueIntegral, CorrectlyIdentifiesInvalid64BitIntegralValues) {
 
 }  // namespace Value
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("document") {}
+    All() : OldStyleSuiteSpecification("document") {}
+
     void setupTests() {
         add<Document::AddField>();
         add<Document::GetValue>();
@@ -2165,6 +2166,6 @@ public:
     }
 };
 
-SuiteInstance<All> myall;
+OldStyleSuiteInitializer<All> myall;
 
 }  // namespace DocumentTests

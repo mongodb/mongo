@@ -88,13 +88,15 @@ private:
     int _max;
 };
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("remove") {}
+    All() : OldStyleSuiteSpecification("remove") {}
     void setupTests() {
         add<RemoveRange>();
     }
-} myall;
+};
+
+OldStyleSuiteInitializer<All> myall;
 
 }  // namespace
 }  // namespace mongo

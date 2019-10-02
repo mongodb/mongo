@@ -715,9 +715,9 @@ public:
 };
 
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("rollback") {}
+    All() : OldStyleSuiteSpecification("rollback") {}
 
     template <template <bool> class T>
     void addAll() {
@@ -759,6 +759,6 @@ public:
     }
 };
 
-SuiteInstance<All> all;
+OldStyleSuiteInitializer<All> all;
 
 }  // namespace RollbackTests

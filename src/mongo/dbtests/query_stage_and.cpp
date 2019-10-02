@@ -1339,9 +1339,9 @@ public:
 };
 
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("query_stage_and") {}
+    All() : OldStyleSuiteSpecification("query_stage_and") {}
 
     void setupTests() {
         add<QueryStageAndHashDeleteDuringYield>();
@@ -1366,6 +1366,6 @@ public:
     }
 };
 
-SuiteInstance<All> queryStageAndAll;
+OldStyleSuiteInitializer<All> queryStageAndAll;
 
 }  // namespace QueryStageAnd

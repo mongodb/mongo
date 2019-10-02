@@ -814,9 +814,10 @@ TEST_F(UnwindStageTest, ShouldRejectUnrecognizedOption) {
                        28811);
 }
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("DocumentSourceUnwindTests") {}
+    All() : OldStyleSuiteSpecification("DocumentSourceUnwindTests") {}
+
     void setupTests() {
         add<Empty>();
         add<EmptyArray>();
@@ -840,7 +841,7 @@ public:
     }
 };
 
-SuiteInstance<All> myall;
+OldStyleSuiteInitializer<All> myall;
 
 }  // namespace
 }  // namespace mongo

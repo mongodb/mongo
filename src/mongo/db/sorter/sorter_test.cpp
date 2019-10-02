@@ -578,9 +578,9 @@ class LotsOfDataWithLimit : public LotsOfDataLittleMemory<Random> {
 };
 }  // namespace SorterTests
 
-class SorterSuite : public mongo::unittest::Suite {
+class SorterSuite : public mongo::unittest::OldStyleSuiteSpecification {
 public:
-    SorterSuite() : Suite("sorter") {}
+    SorterSuite() : mongo::unittest::OldStyleSuiteSpecification("sorter") {}
 
     template <typename T>
     static constexpr uint64_t kMaxAsU64 = std::numeric_limits<T>::max();
@@ -619,5 +619,5 @@ public:
     }
 };
 
-mongo::unittest::SuiteInstance<SorterSuite> extSortTests;
+mongo::unittest::OldStyleSuiteInitializer<SorterSuite> extSortTests;
 }  // namespace mongo

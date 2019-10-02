@@ -871,9 +871,9 @@ public:
     }
 };
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("query_stage_merge_sort_test") {}
+    All() : OldStyleSuiteSpecification("query_stage_merge_sort_test") {}
 
     void setupTests() {
         add<QueryStageMergeSortPrefixIndex>();
@@ -889,6 +889,6 @@ public:
     }
 };
 
-SuiteInstance<All> queryStageMergeSortTest;
+OldStyleSuiteInitializer<All> queryStageMergeSortTest;
 
 }  // namespace QueryStageMergeSortTests

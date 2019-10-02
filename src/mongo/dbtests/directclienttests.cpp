@@ -190,9 +190,9 @@ public:
     }
 };
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("directclient") {}
+    All() : OldStyleSuiteSpecification("directclient") {}
     void setupTests() {
         add<Capped>();
         add<InsertMany>();
@@ -205,5 +205,5 @@ public:
     }
 };
 
-SuiteInstance<All> myall;
+OldStyleSuiteInitializer<All> myall;
 }  // namespace DirectClientTests

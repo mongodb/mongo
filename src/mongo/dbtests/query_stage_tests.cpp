@@ -227,9 +227,9 @@ public:
     }
 };
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("query_stage_tests") {}
+    All() : OldStyleSuiteSpecification("query_stage_tests") {}
 
     void setupTests() {
         add<QueryStageIXScanBasic>();
@@ -240,6 +240,6 @@ public:
     }
 };
 
-SuiteInstance<All> queryStageTestsAll;
+OldStyleSuiteInitializer<All> queryStageTestsAll;
 
 }  // namespace QueryStageTests

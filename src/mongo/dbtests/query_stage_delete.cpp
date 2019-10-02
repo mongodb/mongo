@@ -249,9 +249,9 @@ public:
     }
 };
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("query_stage_delete") {}
+    All() : OldStyleSuiteSpecification("query_stage_delete") {}
 
     void setupTests() {
         // Stage-specific tests below.
@@ -260,6 +260,6 @@ public:
     }
 };
 
-SuiteInstance<All> all;
+OldStyleSuiteInitializer<All> all;
 
 }  // namespace QueryStageDelete

@@ -359,9 +359,9 @@ public:
     }
 };
 
-class All : public Suite {
+class All : public OldStyleSuiteSpecification {
 public:
-    All() : Suite("query_stage_count") {}
+    All() : OldStyleSuiteSpecification("query_stage_count") {}
 
     void setupTests() {
         add<QueryStageCountNoChangeDuringYield>();
@@ -372,6 +372,8 @@ public:
         add<QueryStageCountUpdateDuringYield>();
         add<QueryStageCountMultiKeyDuringYield>();
     }
-} QueryStageCountAll;
+};
+
+OldStyleSuiteInitializer<All> queryStageCountAll;
 
 }  // namespace QueryStageCount
