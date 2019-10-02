@@ -49,7 +49,8 @@ rst.initiate(config);
 const rollbackSizeLimitMB = 300;
 const minDocSizeMB = 10;
 const largeString = 'x'.repeat(minDocSizeMB * 1024 * 1024);
-const numDocs = Math.floor(rollbackSizeLimitMB / minDocSizeMB) - 5;
+// TODO(SERVER-39774): Increase numDocs to Math.floor(rollbackSizeLimitMB / minDocSizeMB).
+const numDocs = 1;
 
 // Operations that will be present on both nodes, before the common point.
 const collName = 'test.t';
