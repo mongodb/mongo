@@ -82,10 +82,14 @@ StatusWith<bool> SaslSCRAMClientConversation::_firstStep(std::string* outputData
     }
 
     // Create text-based nonce as base64 encoding of a binary blob of length multiple of 3
-    static constexpr size_t nonceLenQWords = 3;
+    const int nonceLenQWords = 3;
     uint64_t binaryNonce[nonceLenQWords];
 
-    SecureRandom().fill(binaryNonce, sizeof(binaryNonce));
+    unique_ptr<SecureRandom> sr(SecureRandom::create());
+
+    binaryNonce[0] = sr->nextInt64();
+    binaryNonce[1] = sr->nextInt64();
+    binaryNonce[2] = sr->nextInt64();
 
     std::string user =
         _saslClientSession->getParameter(SaslClientSession::parameterUser).toString();

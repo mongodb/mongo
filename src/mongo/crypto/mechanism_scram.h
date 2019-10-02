@@ -102,9 +102,15 @@ public:
     }
 
     static std::vector<std::uint8_t> generateSecureRandomSalt() {
-        std::vector<std::uint8_t> salt(saltLength());
-        SecureRandom().fill(salt.data(), salt.size());
-        return salt;
+        // Express salt length as a number of quad words, rounded up.
+        constexpr auto qwords = (saltLength() + sizeof(std::int64_t) - 1) / sizeof(std::int64_t);
+        std::array<std::int64_t, qwords> userSalt;
+
+        std::unique_ptr<SecureRandom> sr(SecureRandom::create());
+        std::generate(userSalt.begin(), userSalt.end(), [&sr] { return sr->nextInt64(); });
+        return std::vector<std::uint8_t>(reinterpret_cast<std::uint8_t*>(userSalt.data()),
+                                         reinterpret_cast<std::uint8_t*>(userSalt.data()) +
+                                             saltLength());
     }
 
 private:

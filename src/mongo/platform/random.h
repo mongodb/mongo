@@ -29,142 +29,86 @@
 
 #pragma once
 
-#include <algorithm>
 #include <cstdint>
-#include <cstring>
 #include <limits>
 #include <memory>
-#include <random>
 
 namespace mongo {
 
 /**
- * A uniform random bit generator based on XorShift.
  * Uses http://en.wikipedia.org/wiki/Xorshift
  */
-class XorShift128 {
+class PseudoRandom {
 public:
-    using result_type = uint32_t;
+    PseudoRandom(int32_t seed);
 
-    static constexpr result_type min() {
-        return std::numeric_limits<result_type>::lowest();
-    }
+    PseudoRandom(uint32_t seed);
 
-    static constexpr result_type max() {
-        return std::numeric_limits<result_type>::max();
-    }
+    PseudoRandom(int64_t seed);
 
-    explicit XorShift128(uint32_t seed) : _x{seed} {}
+    int32_t nextInt32();
 
-    result_type operator()() {
-        uint32_t t = _x ^ (_x << 11);
-        _x = _y;
-        _y = _z;
-        _z = _w;
-        return _w = _w ^ (_w >> 19) ^ (t ^ (t >> 8));
-    }
+    int64_t nextInt64();
 
-private:
-    uint32_t _x;  // seed
-    uint32_t _y = 362436069;
-    uint32_t _z = 521288629;
-    uint32_t _w = 88675123;
-};
+    /**
+     * Returns a random number in the range [0, 1).
+     */
+    double nextCanonicalDouble();
 
-/** The SecureUrbg impls all produce the full range of uint64_t. */
-class SecureUrbg {
-public:
-    using result_type = uint64_t;
-    static constexpr result_type min() {
-        return std::numeric_limits<result_type>::lowest();
-    }
-    static constexpr result_type max() {
-        return std::numeric_limits<result_type>::max();
-    }
-
-    // Details including State vary by platform and are deferred to the .cpp file.
-    SecureUrbg();
-    ~SecureUrbg();
-    result_type operator()();
-
-private:
-    class State;
-    std::unique_ptr<State> _state;
-};
-
-// Provides mongo-traditional functions around a pluggable UniformRandomBitGenerator.
-template <typename Urbg>
-class RandomBase {
-public:
-    using urbg_type = Urbg;
-
-    RandomBase() : _urbg{} {}
-    explicit RandomBase(urbg_type u) : _urbg{std::move(u)} {}
-
-    /** The underlying generator */
-    urbg_type& urbg() {
-        return _urbg;
-    }
-
-    /** A random number in the range [0, 1). */
-    double nextCanonicalDouble() {
-        return std::uniform_real_distribution<double>{0, 1}(_urbg);
-    }
-
-    /** A number uniformly distributed over all possible values. */
-    int32_t nextInt32() {
-        return _nextAny<int32_t>();
-    }
-
-    /** A number uniformly distributed over all possible values. */
-    int64_t nextInt64() {
-        return _nextAny<int64_t>();
-    }
-
-    /** A number in the half-open interval [0, max) */
+    /**
+     * @return a number between 0 and max
+     */
     int32_t nextInt32(int32_t max) {
-        return std::uniform_int_distribution<int32_t>(0, max - 1)(_urbg);
+        return static_cast<uint32_t>(nextInt32()) % static_cast<uint32_t>(max);
     }
 
-    /** A number in the half-open interval [0, max) */
+    /**
+     * @return a number between 0 and max
+     */
     int64_t nextInt64(int64_t max) {
-        return std::uniform_int_distribution<int64_t>(0, max - 1)(_urbg);
+        return static_cast<uint64_t>(nextInt64()) % static_cast<uint64_t>(max);
     }
 
-    /** Fill array `buf` with `n` random bytes. */
-    void fill(void* buf, size_t n) {
-        const auto p = static_cast<uint8_t*>(buf);
-        size_t written = 0;
-        while (written < n) {
-            uint64_t t = nextInt64();
-            size_t w = std::min(n - written, sizeof(t));
-            std::memcpy(p + written, &t, w);
-            written += w;
-        }
+    /**
+     * This returns an object that adapts PseudoRandom such that it
+     * can be used as the third argument to std::shuffle. Note that
+     * the lifetime of the returned object must be a subset of the
+     * lifetime of the PseudoRandom object.
+     */
+    auto urbg() {
+
+        class URBG {
+        public:
+            explicit URBG(PseudoRandom* impl) : _impl(impl) {}
+
+            using result_type = uint64_t;
+
+            static constexpr result_type min() {
+                return std::numeric_limits<result_type>::min();
+            }
+
+            static constexpr result_type max() {
+                return std::numeric_limits<result_type>::max();
+            }
+
+            result_type operator()() {
+                return _impl->nextInt64();
+            }
+
+        private:
+            PseudoRandom* _impl;
+        };
+
+        return URBG(this);
     }
 
 private:
-    template <typename T>
-    T _nextAny() {
-        using Limits = std::numeric_limits<T>;
-        return std::uniform_int_distribution<T>(Limits::lowest(), Limits::max())(_urbg);
-    }
+    uint32_t nextUInt32();
 
-    urbg_type _urbg;
-};
-
-/**
- * A Pseudorandom generator that's not cryptographically secure, but very fast and small.
- */
-class PseudoRandom : public RandomBase<XorShift128> {
-    using Base = RandomBase<XorShift128>;
-
-public:
-    explicit PseudoRandom(uint32_t seed) : Base{XorShift128{seed}} {}
-    explicit PseudoRandom(int32_t seed) : PseudoRandom{static_cast<uint32_t>(seed)} {}
-    explicit PseudoRandom(uint64_t seed)
-        : PseudoRandom{static_cast<uint32_t>(seed ^ (seed >> 32))} {}
-    explicit PseudoRandom(int64_t seed) : PseudoRandom{static_cast<uint64_t>(seed)} {}
+    uint32_t _x;
+    uint32_t _y;
+    uint32_t _z;
+    uint32_t _w;
 };
 
 /**
@@ -172,11 +116,12 @@ public:
  * Suitable for nonce/crypto
  * Slower than PseudoRandom, so only use when really need
  */
-class SecureRandom : public RandomBase<SecureUrbg> {
-    using Base = RandomBase<SecureUrbg>;
-
+class SecureRandom {
 public:
-    using Base::Base;
-};
+    virtual ~SecureRandom();
 
+    virtual int64_t nextInt64() = 0;
+
+    static std::unique_ptr<SecureRandom> create();
+};
 }  // namespace mongo

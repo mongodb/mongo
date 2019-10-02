@@ -54,9 +54,9 @@ OID::InstanceUnique _instanceUnique;
 
 MONGO_INITIALIZER_GENERAL(OIDGeneration, MONGO_NO_PREREQUISITES, ("default"))
 (InitializerContext* context) {
-    SecureRandom entropy;
-    counter = std::make_unique<AtomicWord<int64_t>>(entropy.nextInt64());
-    _instanceUnique = OID::InstanceUnique::generate(entropy);
+    std::unique_ptr<SecureRandom> entropy(SecureRandom::create());
+    counter = std::make_unique<AtomicWord<int64_t>>(entropy->nextInt64());
+    _instanceUnique = OID::InstanceUnique::generate(*entropy);
     return Status::OK();
 }
 
@@ -72,8 +72,9 @@ OID::Increment OID::Increment::next() {
 }
 
 OID::InstanceUnique OID::InstanceUnique::generate(SecureRandom& entropy) {
+    int64_t rand = entropy.nextInt64();
     OID::InstanceUnique u;
-    entropy.fill(u.bytes, kInstanceUniqueSize);
+    std::memcpy(u.bytes, &rand, kInstanceUniqueSize);
     return u;
 }
 
@@ -118,8 +119,8 @@ size_t OID::Hasher::operator()(const OID& oid) const {
 }
 
 void OID::regenMachineId() {
-    SecureRandom entropy;
-    _instanceUnique = InstanceUnique::generate(entropy);
+    std::unique_ptr<SecureRandom> entropy(SecureRandom::create());
+    _instanceUnique = InstanceUnique::generate(*entropy);
 }
 
 unsigned OID::getMachineId() {

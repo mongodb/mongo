@@ -311,7 +311,8 @@ BSONObj JSSrand(const BSONObj& a, void* data) {
     if (a.nFields() == 1 && a.firstElement().isNumber())
         seed = static_cast<unsigned int>(a.firstElement().numberLong());
     else {
-        seed = static_cast<unsigned int>(SecureRandom().nextInt64());
+        std::unique_ptr<SecureRandom> rand(SecureRandom::create());
+        seed = static_cast<unsigned int>(rand->nextInt64());
     }
     _prng = PseudoRandom(seed);
     return BSON("" << static_cast<double>(seed));

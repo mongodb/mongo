@@ -134,13 +134,13 @@ TEST(RandomTest, NextCanonicalDistinctValues) {
 }
 
 /**
- * Test that nextCanonicalDouble() is at least very likely to return values in [0,1).
+ * Test that nextCanonicalDouble() always returns values between 0 and 1.
  */
 TEST(RandomTest, NextCanonicalWithinRange) {
     PseudoRandom prng(10);
-    for (size_t i = 0; i < 1'000'000; ++i) {
+    for (int i = 0; i < 100; i++) {
         double next = prng.nextCanonicalDouble();
-        ASSERT_GTE(next, 0.0);
+        ASSERT_LTE(0.0, next);
         ASSERT_LT(next, 1.0);
     }
 }
@@ -211,47 +211,12 @@ TEST(RandomTest, NextInt64InRange) {
     }
 }
 
-/**
- * Test uniformity of nextInt32(max)
- */
-TEST(RandomTest, NextInt32Uniformity) {
-    PseudoRandom prng(10);
-    /* Break the range into sections. */
-    /* Check that all sections get roughly equal # of hits */
-    constexpr int32_t kMax = (int32_t{3} << 29) - 1;
-    constexpr size_t kBuckets = 64;
-    constexpr size_t kNIter = 1'000'000;
-    constexpr double mu = kNIter / kBuckets;
-    constexpr double muSqInv = 1. / (mu * mu);
-    std::vector<size_t> hist(kBuckets);
-    for (size_t i = 0; i < kNIter; ++i) {
-        auto next = prng.nextInt32(kMax);
-        ASSERT_GTE(next, 0);
-        ASSERT_LTE(next, kMax);
-        ++hist[double(next) * kBuckets / (kMax + 1)];
-    }
-    if (kDebugBuild) {
-        for (size_t i = 0; i < hist.size(); ++i) {
-            double dev = std::pow(std::pow((hist[i] - mu) / mu, 2), .5);
-            unittest::log() << format(FMT_STRING("  [{:4}] count:{:4}, dev:{:6f}, {}"),
-                                      i,
-                                      hist[i],
-                                      dev,
-                                      std::string(hist[i] / 256, '*'));
-        }
-    }
-    for (size_t i = 0; i < hist.size(); ++i) {
-        double dev = std::pow(std::pow(hist[i] - mu, 2) * muSqInv, .5);
-        ASSERT_LT(dev, 0.1) << format(FMT_STRING("hist[{}]={}, mu={}"), i, hist[i], mu);
-    }
-}
-
 TEST(RandomTest, Secure1) {
-    auto a = SecureRandom();
-    auto b = SecureRandom();
+    auto a = SecureRandom::create();
+    auto b = SecureRandom::create();
 
     for (int i = 0; i < 100; i++) {
-        ASSERT_NOT_EQUALS(a.nextInt64(), b.nextInt64());
+        ASSERT_NOT_EQUALS(a->nextInt64(), b->nextInt64());
     }
 }
 }  // namespace mongo
