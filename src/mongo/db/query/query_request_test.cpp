@@ -35,7 +35,6 @@
 
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_mock.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
@@ -1082,10 +1081,6 @@ TEST(QueryRequestTest, DefaultQueryParametersCorrect) {
 }
 
 TEST(QueryRequestTest, ParseCommandAllowDiskUseTrue) {
-    const bool oldTestCommandsEnabledVal = getTestCommandsEnabled();
-    ON_BLOCK_EXIT([&] { setTestCommandsEnabled(oldTestCommandsEnabledVal); });
-    setTestCommandsEnabled(true);
-
     BSONObj cmdObj = fromjson("{find: 'testns', allowDiskUse: true}");
     const NamespaceString nss("test.testns");
     const bool isExplain = false;
@@ -1096,10 +1091,6 @@ TEST(QueryRequestTest, ParseCommandAllowDiskUseTrue) {
 }
 
 TEST(QueryRequestTest, ParseCommandAllowDiskUseFalse) {
-    const bool oldTestCommandsEnabledVal = getTestCommandsEnabled();
-    ON_BLOCK_EXIT([&] { setTestCommandsEnabled(oldTestCommandsEnabledVal); });
-    setTestCommandsEnabled(true);
-
     BSONObj cmdObj = fromjson("{find: 'testns', allowDiskUse: false}");
     const NamespaceString nss("test.testns");
     const bool isExplain = false;
@@ -1107,22 +1098,6 @@ TEST(QueryRequestTest, ParseCommandAllowDiskUseFalse) {
 
     ASSERT_OK(result.getStatus());
     ASSERT_EQ(false, result.getValue()->allowDiskUse());
-}
-
-TEST(QueryRequestTest, ParseCommandAllowDiskUseTestCommandsDisabled) {
-    const bool oldTestCommandsEnabledVal = getTestCommandsEnabled();
-    ON_BLOCK_EXIT([&] { setTestCommandsEnabled(oldTestCommandsEnabledVal); });
-    setTestCommandsEnabled(false);
-
-    BSONObj cmdObj = fromjson("{find: 'testns', allowDiskUse: true}");
-    const NamespaceString nss("test.testns");
-    const bool isExplain = false;
-    auto result = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
-
-    ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQ(ErrorCodes::FailedToParse, result.getStatus().code());
-    ASSERT_STRING_CONTAINS(result.getStatus().toString(),
-                           "allowDiskUse is not allowed unless test commands are enabled.");
 }
 
 //

@@ -263,10 +263,6 @@ StatusWith<unique_ptr<QueryRequest>> QueryRequest::parseFromFindCommand(unique_p
 
             qr->_wantMore = !el.boolean();
         } else if (fieldName == kAllowDiskUseField) {
-            if (!getTestCommandsEnabled()) {
-                return Status(ErrorCodes::FailedToParse,
-                              "allowDiskUse is not allowed unless test commands are enabled.");
-            }
             Status status = checkFieldType(el, Bool);
             if (!status.isOK()) {
                 return status;
