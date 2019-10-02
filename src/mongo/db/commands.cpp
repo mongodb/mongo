@@ -490,6 +490,10 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
         }
     }
 
+    if (!client->session()) {
+        return false;
+    }
+
     if (data.hasField("namespace") && nss != NamespaceString(data.getStringField("namespace"))) {
         return false;
     }
