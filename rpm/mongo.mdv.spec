@@ -6,7 +6,7 @@ Name:    %{name}
 Version: %{version}
 Release: %{release}
 Summary: MongoDB client shell and tools
-License: AGPL 3.0
+License: SSPL
 URL: http://www.mongodb.org
 Group: Databases
 
