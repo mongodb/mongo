@@ -42,11 +42,11 @@ namespace {
 using std::string;
 
 TEST(ShardKeyPattern, SingleFieldShardKeyPatternsValidityCheck) {
-    ShardKeyPattern(BSON("a" << 1));
-    ShardKeyPattern(BSON("a" << 1.0f));
-    ShardKeyPattern(BSON("a" << (long long)1L));
-    ShardKeyPattern(BSON("a"
-                         << "hashed"));
+    ShardKeyPattern s1(BSON("a" << 1));
+    ShardKeyPattern s2(BSON("a" << 1.0f));
+    ShardKeyPattern s3(BSON("a" << (long long)1L));
+    ShardKeyPattern s4(BSON("a"
+                            << "hashed"));
 
     ASSERT_THROWS(ShardKeyPattern(BSONObj()), DBException);
     ASSERT_THROWS(ShardKeyPattern(BSON("a" << -1)), DBException);
@@ -62,9 +62,9 @@ TEST(ShardKeyPattern, SingleFieldShardKeyPatternsValidityCheck) {
 }
 
 TEST(ShardKeyPattern, CompositeShardKeyPatternsValidityCheck) {
-    ShardKeyPattern(BSON("a" << 1 << "b" << 1));
-    ShardKeyPattern(BSON("a" << 1.0f << "b" << 1.0));
-    ShardKeyPattern(BSON("a" << 1 << "b" << 1.0 << "c" << 1.0f));
+    ShardKeyPattern s1(BSON("a" << 1 << "b" << 1));
+    ShardKeyPattern s2(BSON("a" << 1.0f << "b" << 1.0));
+    ShardKeyPattern s3(BSON("a" << 1 << "b" << 1.0 << "c" << 1.0f));
 
     ASSERT_THROWS(ShardKeyPattern(BSON("a" << 1 << "b" << -1)), DBException);
     ASSERT_THROWS(ShardKeyPattern(BSON("a" << 1 << "b"
@@ -75,10 +75,10 @@ TEST(ShardKeyPattern, CompositeShardKeyPatternsValidityCheck) {
 }
 
 TEST(ShardKeyPattern, NestedShardKeyPatternsValidtyCheck) {
-    ShardKeyPattern(BSON("a.b" << 1));
-    ShardKeyPattern(BSON("a.b.c.d" << 1.0));
-    ShardKeyPattern(BSON("a" << 1 << "c.d" << 1.0 << "e.f.g" << 1.0f));
-    ShardKeyPattern(BSON("a" << 1 << "a.b" << 1.0 << "a.b.c" << 1.0f));
+    ShardKeyPattern s1(BSON("a.b" << 1));
+    ShardKeyPattern s2(BSON("a.b.c.d" << 1.0));
+    ShardKeyPattern s3(BSON("a" << 1 << "c.d" << 1.0 << "e.f.g" << 1.0f));
+    ShardKeyPattern s4(BSON("a" << 1 << "a.b" << 1.0 << "a.b.c" << 1.0f));
 
     ASSERT_THROWS(ShardKeyPattern(BSON("a.b" << -1)), DBException);
     ASSERT_THROWS(ShardKeyPattern(BSON("a" << BSON("b" << 1))), DBException);
