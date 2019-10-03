@@ -328,15 +328,15 @@ TEST(MemberConfig, ParseHorizonFields) {
 TEST(MemberConfig, DuplicateHorizonNames) {
     ReplSetTagConfig tagConfig;
     try {
-        MemberConfig(BSON("_id" << 0 << "host"
-                                << "h"
-                                << "horizons"
-                                << BSON("goofyRepeatedHorizonName"
-                                        << "a.host:43"
-                                        << "goofyRepeatedHorizonName"
+        MemberConfig mem(BSON("_id" << 0 << "host"
+                                    << "h"
+                                    << "horizons"
+                                    << BSON("goofyRepeatedHorizonName"
+                                            << "a.host:43"
+                                            << "goofyRepeatedHorizonName"
 
-                                        << "b.host:256")),
-                     &tagConfig);
+                                            << "b.host:256")),
+                         &tagConfig);
         ASSERT_TRUE(false);  // Should not succeed.
     } catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {
         const Status& s = ex.toStatus();
@@ -344,7 +344,7 @@ TEST(MemberConfig, DuplicateHorizonNames) {
         ASSERT_NOT_EQUALS(s.reason().find("Duplicate horizon name found"), std::string::npos);
     }
     try {
-        MemberConfig(
+        MemberConfig mem(
             BSON("_id" << 0 << "host"
                        << "h"
                        << "horizons"
@@ -364,14 +364,14 @@ TEST(MemberConfig, DuplicateHorizonHostAndPort) {
     ReplSetTagConfig tagConfig;
     // Repeated `HostAndPort` within the horizon definition.
     try {
-        MemberConfig(BSON("_id" << 0 << "host"
-                                << "uniquehostname.example.com:42"
-                                << "horizons"
-                                << BSON("alpha"
-                                        << "duplicatedhostname.example.com:42"
-                                        << "beta"
-                                        << "duplicatedhostname.example.com:42")),
-                     &tagConfig);
+        MemberConfig mem(BSON("_id" << 0 << "host"
+                                    << "uniquehostname.example.com:42"
+                                    << "horizons"
+                                    << BSON("alpha"
+                                            << "duplicatedhostname.example.com:42"
+                                            << "beta"
+                                            << "duplicatedhostname.example.com:42")),
+                         &tagConfig);
         ASSERT_TRUE(false);  // Should not succeed.
     } catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {
         const Status& s = ex.toStatus();
@@ -382,14 +382,14 @@ TEST(MemberConfig, DuplicateHorizonHostAndPort) {
 
     // Repeated `HostAndPort` across the host and members.
     try {
-        MemberConfig(BSON("_id" << 0 << "host"
-                                << "duplicatedhostname.example.com:42"
-                                << "horizons"
-                                << BSON("alpha"
-                                        << "uniquehostname.example.com:42"
-                                        << "beta"
-                                        << "duplicatedhostname.example.com:42")),
-                     &tagConfig);
+        MemberConfig mem(BSON("_id" << 0 << "host"
+                                    << "duplicatedhostname.example.com:42"
+                                    << "horizons"
+                                    << BSON("alpha"
+                                            << "uniquehostname.example.com:42"
+                                            << "beta"
+                                            << "duplicatedhostname.example.com:42")),
+                         &tagConfig);
         ASSERT_TRUE(false);  // Should not succeed.
     } catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {
         const Status& s = ex.toStatus();
@@ -399,14 +399,14 @@ TEST(MemberConfig, DuplicateHorizonHostAndPort) {
 
     // Repeated hostname across host and horizons, with different ports should fail.
     try {
-        MemberConfig(BSON("_id" << 0 << "host"
-                                << "duplicatedhostname.example.com:42"
-                                << "horizons"
-                                << BSON("alpha"
-                                        << "uniquehostname.example.com:43"
-                                        << "beta"
-                                        << "duplicatedhostname.example.com:43")),
-                     &tagConfig);
+        MemberConfig mem(BSON("_id" << 0 << "host"
+                                    << "duplicatedhostname.example.com:42"
+                                    << "horizons"
+                                    << BSON("alpha"
+                                            << "uniquehostname.example.com:43"
+                                            << "beta"
+                                            << "duplicatedhostname.example.com:43")),
+                         &tagConfig);
         ASSERT_TRUE(false);  // Should not succeed.
     } catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {
         const Status& s = ex.toStatus();
@@ -416,14 +416,14 @@ TEST(MemberConfig, DuplicateHorizonHostAndPort) {
 
     // Repeated hostname within the horizons, with different ports should fail.
     try {
-        MemberConfig(BSON("_id" << 0 << "host"
-                                << "uniquehostname.example.com:42"
-                                << "horizons"
-                                << BSON("alpha"
-                                        << "duplicatedhostname.example.com:42"
-                                        << "beta"
-                                        << "duplicatedhostname.example.com:43")),
-                     &tagConfig);
+        MemberConfig mem(BSON("_id" << 0 << "host"
+                                    << "uniquehostname.example.com:42"
+                                    << "horizons"
+                                    << BSON("alpha"
+                                            << "duplicatedhostname.example.com:42"
+                                            << "beta"
+                                            << "duplicatedhostname.example.com:43")),
+                         &tagConfig);
         ASSERT_TRUE(false);  // Should not succeed.
     } catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {
         const Status& s = ex.toStatus();
@@ -448,12 +448,12 @@ TEST(MemberConfig, HorizonFieldsWithNoneInSpec) {
 TEST(MemberConfig, HorizonFieldWithEmptyStringIsRejected) {
     ReplSetTagConfig tagConfig;
     try {
-        MemberConfig(BSON("_id" << 0 << "host"
-                                << "h"
-                                << "horizons"
-                                << BSON(""
-                                        << "example.com:42")),
-                     &tagConfig);
+        MemberConfig mem(BSON("_id" << 0 << "host"
+                                    << "h"
+                                    << "horizons"
+                                    << BSON(""
+                                            << "example.com:42")),
+                         &tagConfig);
         ASSERT_TRUE(false);  // Never should get here
     } catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {
         ASSERT_NOT_EQUALS(ex.toStatus().reason().find("Horizons cannot have empty names"),
