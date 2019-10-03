@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kWrite
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/update/current_date_node.h"
@@ -34,6 +36,8 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/debug_util.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -41,6 +45,8 @@ namespace {
 constexpr StringData kType = "$type"_sd;
 constexpr StringData kDate = "date"_sd;
 constexpr StringData kTimestamp = "timestamp"_sd;
+
+Rarely currentDateDeprecationSampler;  // Used to occasionally log deprecation messages.
 
 void setValue(mutablebson::Element* element, bool typeIsDate) {
     if (typeIsDate) {
@@ -55,6 +61,12 @@ void setValue(mutablebson::Element* element, bool typeIsDate) {
 Status CurrentDateNode::init(BSONElement modExpr,
                              const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     invariant(modExpr.ok());
+
+    if (currentDateDeprecationSampler.tick()) {
+        warning() << "The $currentDate update operator is deprecated. As an alternative perform "
+                     "updates with an aggregation pipeline and either the 'NOW' or 'CLUSTER_TIME' "
+                     "system variables.";
+    }
 
     if (modExpr.type() == BSONType::Bool) {
         _typeIsDate = true;
