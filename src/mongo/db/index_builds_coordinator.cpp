@@ -531,6 +531,7 @@ Status IndexBuildsCoordinator::_registerIndexBuild(
                    << "' being built on the collection "
                    << " ( " << replIndexBuildState->collectionUUID
                    << " ) under an existing index build: " << existingIndexBuild->buildUUID;
+                auto aborted = false;
                 {
                     // We have to lock the mutex in order to read the committed/aborted state.
                     stdx::unique_lock<Latch> lk(existingIndexBuild->mutex);
@@ -541,12 +542,16 @@ Status IndexBuildsCoordinator::_registerIndexBuild(
                         ss << " (aborted with reason: " << existingIndexBuild->abortReason
                            << " and timestamp: " << existingIndexBuild->abortTimestamp.toString()
                            << ")";
+                        aborted = true;
                     } else {
                         ss << " (in-progress)";
                     }
                 }
                 std::string msg = ss;
                 log() << msg;
+                if (aborted) {
+                    return {ErrorCodes::IndexBuildAborted, msg};
+                }
                 return Status(ErrorCodes::IndexBuildAlreadyInProgress, msg);
             }
         }

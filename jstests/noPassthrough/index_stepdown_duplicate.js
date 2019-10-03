@@ -34,36 +34,42 @@ const createIdx =
 checkLog.contains(
     primary, 'index build: starting on ' + coll.getFullName() + ' properties: { v: 2, key: { a:');
 
-let newPrimary = rst.getSecondary();
-try {
-    // Step down the primary.
-    assert.commandWorked(primary.adminCommand({replSetStepDown: 60, force: true}));
+const newPrimary = rst.getSecondary();
 
-    // Build same index on new primary.
-    rst.stepUp(newPrimary);
-    const collOnNewPrimary = newPrimary.getCollection(coll.getFullName());
-    assert.commandWorked(collOnNewPrimary.createIndex({b: 1}, {name: 'myidx'}));
-    let indexSpecMap = IndexBuildTest.assertIndexes(collOnNewPrimary, 2, ['_id_', 'myidx']);
-    assert.eq({b: 1}, indexSpecMap['myidx'].key, 'unexpected key pattern: ' + tojson(indexSpecMap));
-} finally {
-    assert.commandWorked(
-        primary.adminCommand({configureFailPoint: 'hangAfterInitializingIndexBuild', mode: 'off'}));
-}
-
-// Wait for the index build to stop.
-IndexBuildTest.waitForIndexBuildToStop(coll.getDB());
-
+// Step down the primary. Confirm that the index build was aborted before we trigger a crash in the
+// primary.
+assert.commandWorked(primary.adminCommand({replSetStepDown: 60, force: true}));
 const exitCode = createIdx({checkExitSuccess: false});
 assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build being terminated');
+checkLog.contains(primary, 'Index build aborted: ');
 
-checkLog.contains(primary, 'IndexBuildAborted: Index build aborted: ');
+// Build same index on new primary. This will crash the old primary when replicated.
+rst.stepUp(newPrimary);
+const collOnNewPrimary = newPrimary.getCollection(coll.getFullName());
+assert.commandWorked(collOnNewPrimary.createIndex({b: 1}, {name: 'myidx'}));
+let indexSpecMap = IndexBuildTest.assertIndexes(collOnNewPrimary, 2, ['_id_', 'myidx']);
+assert.eq({b: 1}, indexSpecMap['myidx'].key, 'unexpected key pattern: ' + tojson(indexSpecMap));
+
+// Old primary should have aborted on trying to process the new createIndexes oplog entry while
+// an aborted index build, left over from before the node stepped down, is still running.
+assert.soon(() => {
+    return rawMongoProgramOutput().match(
+        'Fatal assertion 34437 IndexBuildAborted: Index build conflict:');
+}, 'Index build should have aborted on step down.');
+rst.stop(primary, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
+
+// Restart old primary so that it will try to process the failed createIndexes oplog entry
+// from the new primary that we stepped up.
+// Restarting the node invalidates 'coll' so we need to resolve the Collection object
+// using the connection to the restarted node.
+const oldPrimary = rst.start(primary, undefined, true);
+coll = oldPrimary.getCollection(coll.getFullName());
+rst.awaitReplication();
 
 // Even though the first index build was aborted on the stepped down primary, the new index build
 // started on the new primary should still be successfully replicated.
-// Unfortunately, if the aborted index build is still present, the new createIndexes oplog entry
-// will be ignored with a non-fatal IndexBuildAlreadyIn Progress error.
-IndexBuildTest.assertIndexes(coll, 1, ['_id_']);
-TestData.skipCheckDBHashes = true;
+indexSpecMap = IndexBuildTest.assertIndexes(coll, 2, ['_id_', 'myidx']);
+assert.eq({b: 1}, indexSpecMap['myidx'].key, 'unexpected key pattern: ' + tojson(indexSpecMap));
 
 rst.stopSet();
 })();
