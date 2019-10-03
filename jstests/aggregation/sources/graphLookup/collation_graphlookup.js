@@ -42,7 +42,8 @@
     assert.eq("erica", res[0].username);
     assert.eq(2, res[0].friendUsers.length);
 
-    // Negative test: ensure that we don't find any friends when the collation is simple.
+    // Negative test: The local collation does not have a default collation, and so we use the
+    // simple collation. Ensure that we don't find any friends when the collation is simple.
     res = coll.aggregate([
                   {$match: {username: "erica"}},
                   {
@@ -60,6 +61,39 @@
     assert.eq("erica", res[0].username);
     assert.eq(0, res[0].friendUsers.length);
 
+    // Create a foreign collection with a case-insensitive default collation.
+    foreignColl.drop();
+    assert.commandWorked(db.createCollection(foreignColl.getName(), caseInsensitiveUS));
+    assert.writeOK(foreignColl.insert([{username: "JEREMY"}, {username: "JIMMY"}]));
+
+    // Insert some more documents into the local collection.
+    assert.writeOK(coll.insert({username: "fiona", friends: ["jeremy"]}));
+    assert.writeOK(coll.insert({username: "gretchen", friends: ["jimmy"]}));
+
+    // Test that $graphLookup uses the simple collation in the case where the collection on which it
+    // is run does not have a default collation, and that this collation is used instead of the
+    // default collation of the foreign collection. Exercises the fix for SERVER-43350.
+    res = coll.aggregate([
+                  {$match: {username: {$in: ["erica", "fiona", "gretchen"]}}},
+                  {
+                    $graphLookup: {
+                        from: foreignColl.getName(),
+                        startWith: "$friends",
+                        connectFromField: "friends",
+                        connectToField: "username",
+                        as: "friendUsers"
+                    }
+                  }
+              ])
+              .toArray();
+    assert.eq(3, res.length, tojson(res));
+    for (let i = 0; i < res.length; ++i) {
+        assert(["erica", "fiona", "gretchen"].includes(res[i].username));
+        assert.eq(0, res[i].friendUsers.length);
+    }
+
+    // Recreate the local collection with a case-insensitive default collation, and the foreign
+    // collection with a case-sensitive default collation.
     coll.drop();
     assert.commandWorked(db.createCollection(coll.getName(), caseInsensitiveUS));
     assert.writeOK(coll.insert({username: "erica", friends: ["jeremy", "jimmy"]}));
