@@ -846,6 +846,15 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
+- name: parallel_insert
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "parallel_insert"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
 
 #######################################
 #               Modules               #
@@ -991,6 +1000,7 @@ buildvariants:
     - name: big_update
     - name: create_big_index
     - name: create_index
+    - name: parallel_insert
 
 - name: linux-standalone
   display_name: Linux Standalone
@@ -1248,6 +1258,7 @@ buildvariants:
     - name: tpcc
     - name: linkbench
     - name: big_update
+    - name: parallel_insert
 
 - name: linux-3-node-replSet-noflowcontrol
   display_name: Linux 3-Node ReplSet (Flow Control off)
@@ -1278,6 +1289,7 @@ buildvariants:
     - name: tpcc
     - name: linkbench
     - name: big_update
+    - name: parallel_insert
 
 - name: linux-3-node-replSet-ssl
   display_name: Linux 3-Node ReplSet (SSL)
@@ -1388,6 +1400,7 @@ buildvariants:
     # - name: tpcc # TPCC with SSL currently broken https://jira.mongodb.org/browse/TIG-1681
     - name: linkbench
     # - name: big_update
+    - name: parallel_insert
 
 
 #######################################
