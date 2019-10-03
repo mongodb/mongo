@@ -24,7 +24,18 @@ const dbName = "test";
 const collName = "foo";
 const ns = dbName + '.' + collName;
 
-const st = new ShardingTest({shards: 3, mongos: 1, config: 1});
+const st = new ShardingTest({
+    shards: 3,
+    mongos: 1,
+    config: 1,
+    other: {
+        // Disable expiring old chunk history to ensure the transactions are able to read from a
+        // shard that has donated a chunk, even if the migration takes longer than the amount of
+        // time for which a chunk's history is normally stored (see SERVER-39763).
+        configOptions:
+            {setParameter: {"failpoint.skipExpiringOldChunkHistory": "{mode: 'alwaysOn'}"}}
+    }
+});
 
 // Set up one sharded collection with 2 chunks, both on the primary shard.
 
