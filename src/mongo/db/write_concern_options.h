@@ -93,7 +93,7 @@ public:
      * Return true if the server needs to wait for other secondary nodes to satisfy this
      * write concern setting. Errs on the false positive for non-empty wMode.
      */
-    bool shouldWaitForOtherNodes() const;
+    bool needToWaitForOtherNodes() const;
 
     void reset() {
         syncMode = SyncMode::UNSET;

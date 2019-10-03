@@ -1758,7 +1758,7 @@ SharedSemiFuture<void> ReplicationCoordinatorImpl::_startWaitingForReplication(
         return Future<void>::makeReady(e.toStatus());
     }
 
-    if (!writeConcern.shouldWaitForOtherNodes() &&
+    if (!writeConcern.needToWaitForOtherNodes() &&
         writeConcern.syncMode != WriteConcernOptions::SyncMode::JOURNAL) {
         // We are only waiting for our own lastApplied, add this to _opTimeWaiterList instead. This
         // is because waiters in _replicationWaiterList are not notified on self's lastApplied

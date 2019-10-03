@@ -852,7 +852,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
                         batchNumCloned);
                     _clonedBytes += batchClonedBytes;
                 }
-                if (_writeConcern.shouldWaitForOtherNodes()) {
+                if (_writeConcern.needToWaitForOtherNodes()) {
                     repl::ReplicationCoordinator::StatusAndDuration replStatus =
                         repl::ReplicationCoordinator::get(opCtx)->awaitReplication(
                             opCtx,

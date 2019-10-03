@@ -279,6 +279,18 @@ public:
 
         WriteConcernResult wcResult;
         status = waitForWriteConcern(opCtx, lastOpTime, writeConcern, &wcResult);
+        // getLastError command returns a document that contains the writtenTo array. So we compute
+        // the writtenTo array here if we have waited for replication before. The call to
+        // getHostsWrittenTo needs to lock the ReplicationCoordinator mutex to guard against
+        // topology changes. Thus, we only compute this array here for the getLastError command
+        // (instead of in waitForWriteConcern for every single write) to avoid a serialization point
+        // for all writes.
+        if (!lastOpTime.isNull() && writeConcern.needToWaitForOtherNodes()) {
+            wcResult.writtenTo = replCoord->getHostsWrittenTo(
+                lastOpTime,
+                replCoord->populateUnsetWriteConcernOptionsSyncMode(writeConcern).syncMode ==
+                    WriteConcernOptions::SyncMode::JOURNAL);
+        }
         wcResult.appendTo(writeConcern, &result);
 
         // For backward compatibility with 2.4, wtimeout returns ok : 1.0

@@ -218,8 +218,7 @@ Status waitForWriteConcern(OperationContext* opCtx,
     }
 
     // needed to avoid incrementing gleWtimeStats SERVER-9005
-    if (writeConcernWithPopulatedSyncMode.wNumNodes <= 1 &&
-        writeConcernWithPopulatedSyncMode.wMode.empty()) {
+    if (!writeConcernWithPopulatedSyncMode.needToWaitForOtherNodes()) {
         // no desired replication check
         return Status::OK();
     }
@@ -233,10 +232,6 @@ Status waitForWriteConcern(OperationContext* opCtx,
         result->wTimedOut = true;
     }
 
-    // Add stats
-    result->writtenTo = replCoord->getHostsWrittenTo(replOpTime,
-                                                     writeConcernWithPopulatedSyncMode.syncMode ==
-                                                         WriteConcernOptions::SyncMode::JOURNAL);
     gleWtimeStats.recordMillis(durationCount<Milliseconds>(replStatus.duration));
     result->wTime = durationCount<Milliseconds>(replStatus.duration);
 

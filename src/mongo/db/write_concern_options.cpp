@@ -242,7 +242,7 @@ BSONObj WriteConcernOptions::toBSON() const {
     return builder.obj();
 }
 
-bool WriteConcernOptions::shouldWaitForOtherNodes() const {
+bool WriteConcernOptions::needToWaitForOtherNodes() const {
     return !wMode.empty() || wNumNodes > 1;
 }
 
