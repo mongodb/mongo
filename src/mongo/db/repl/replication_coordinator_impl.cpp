@@ -3805,7 +3805,8 @@ void ReplicationCoordinatorImpl::_prepareOplogQueryMetadata_inlock(int rbid,
 }
 
 bool ReplicationCoordinatorImpl::getWriteConcernMajorityShouldJournal() {
-    return getConfig().getWriteConcernMajorityShouldJournal();
+    stdx::unique_lock lock(_mutex);
+    return getWriteConcernMajorityShouldJournal_inlock();
 }
 
 bool ReplicationCoordinatorImpl::getWriteConcernMajorityShouldJournal_inlock() const {
