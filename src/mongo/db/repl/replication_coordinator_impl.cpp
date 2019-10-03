@@ -1573,7 +1573,6 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
     const OpTime& opTime, const WriteConcernOptions& writeConcern) {
     // The syncMode cannot be unset.
     invariant(writeConcern.syncMode != WriteConcernOptions::SyncMode::UNSET);
-    uassertStatusOK(_checkIfWriteConcernCanBeSatisfied_inlock(writeConcern));
 
     const bool useDurableOpTime = writeConcern.syncMode == WriteConcernOptions::SyncMode::JOURNAL;
 
@@ -1741,6 +1740,14 @@ SharedSemiFuture<void> ReplicationCoordinatorImpl::_startWaitingForReplication(
     Status stepdownStatus = checkForStepDown();
     if (!stepdownStatus.isOK()) {
         return Future<void>::makeReady(stepdownStatus);
+    }
+
+    // Check if the given write concern is satisfiable before we add ourself to
+    // _replicationWaiterList. On replSetReconfig, waiters that are no longer satisfiable will be
+    // notified. See _setCurrentRSConfig.
+    auto satisfiableStatus = _checkIfWriteConcernCanBeSatisfied_inlock(writeConcern);
+    if (!satisfiableStatus.isOK()) {
+        return Future<void>::makeReady(satisfiableStatus);
     }
 
     try {
@@ -3208,6 +3215,18 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
     } else {
         log() << "This node is not a member of the config";
     }
+
+    // Wake up writeConcern waiters that are no longer satisfiable due to the rsConfig change.
+    _replicationWaiterList.setValueIf_inlock(
+        [this](const OpTime& opTime, const SharedWaiterHandle& waiter) {
+            invariant(waiter->writeConcern);
+            // This throws if a waiter's writeConcern is no longer satisfiable, in which case
+            // setValueIf_inlock will fulfill the waiter's promise with the error status.
+            uassertStatusOK(_checkIfWriteConcernCanBeSatisfied_inlock(waiter->writeConcern.get()));
+            // Return false meaning that the waiter is still satisfiable and thus can remain in the
+            // waiter list.
+            return false;
+        });
 
     _cancelCatchupTakeover_inlock();
     _cancelPriorityTakeover_inlock();
