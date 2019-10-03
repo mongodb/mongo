@@ -115,6 +115,10 @@ configs:
         validator:
             callback: validateSystemLogDestinationSetting
 
+    logv2:
+        description: "logging gets directed to the logv2 backend"
+        arg_vartype: Switch
+        source: [ cli, ini ]
     syslog:
         description: "Log to system's syslog facility instead of file or stdout"
         arg_vartype: Switch

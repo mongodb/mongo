@@ -3335,6 +3335,7 @@ def doConfigure(myenv):
             "BOOST_MATH_NO_LONG_DOUBLE_MATH_FUNCTIONS",
             "BOOST_ENABLE_ASSERT_DEBUG_HANDLER",
             "BOOST_LOG_NO_SHORTHAND_NAMES",
+            "BOOST_LOG_USE_NATIVE_SYSLOG",
             "ABSL_FORCE_ALIGNED_ACCESS",
         ]
     )

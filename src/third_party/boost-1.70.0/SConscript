@@ -142,6 +142,7 @@ loglib_env.Library(
         'libs/log/src/record_ostream.cpp',
         'libs/log/src/severity_level.cpp',
         'libs/log/src/spirit_encoding.cpp',
+        'libs/log/src/syslog_backend.cpp' if not env.TargetOSIs('windows') else [],
         'libs/log/src/text_file_backend.cpp',
         'libs/log/src/text_multifile_backend.cpp',
         'libs/log/src/text_ostream_backend.cpp',

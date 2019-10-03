@@ -44,6 +44,8 @@
 #else  // MONGO_UTIL_LOGV2_H_
 #define MONGO_UTIL_LOGV2_H_
 
+#include <boost/preprocessor/variadic/size.hpp>
+
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/logv2/attribute_argument_set.h"
@@ -51,8 +53,6 @@
 #include "mongo/logv2/log_domain.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/util/errno_util.h"
-
-#include <boost/preprocessor/variadic/size.hpp>
 
 // Provide log component in global scope so that MONGO_LOG will always have a valid component.
 // Global log component will be kDefault unless overridden by MONGO_LOGV2_DEFAULT_COMPONENT.
@@ -65,52 +65,11 @@ const ::mongo::logv2::LogComponent MongoLogV2DefaultComponent_component =
        "Please see http://www.mongodb.org/about/contributors/reference/server-logging-rules/ "
 #endif  // MONGO_LOGV2_DEFAULT_COMPONENT
 
+// include log_detail.h and log_options.h after MONGO_LOGV2_DEFAULT_COMPONENT gets set
+#include "mongo/logv2/log_detail.h"
 #include "mongo/logv2/log_options.h"
 
 namespace mongo {
-namespace logv2 {
-namespace detail {
-void doLogImpl(LogSeverity const& severity,
-               LogOptions const& options,
-               StringData stable_id,
-               StringData message,
-               AttributeArgumentSet const& attrs);
-
-void doLogRecordImpl(LogRecord&& debugRecord,
-                     LogDomain& domain,
-                     StringData message,
-                     AttributeArgumentSet const& attrs);
-
-template <typename S, typename... Args>
-void doLog(LogSeverity const& severity,
-           LogOptions const& options,
-           StringData stable_id,
-           S const& message,
-           fmt::internal::named_arg<Args, char>&&... args) {
-    AttributeArgumentSet attr_set;
-    auto arg_store = fmt::internal::make_args_checked(message, (args.value)...);
-    attr_set._values = arg_store;
-    (attr_set._names.push_back(::mongo::StringData(args.name.data(), args.name.size())), ...);
-    auto msg = static_cast<fmt::string_view>(message);
-    doLogImpl(severity, options, stable_id, ::mongo::StringData(msg.data(), msg.size()), attr_set);
-}
-
-template <typename S, typename... Args>
-void doLogRecord(LogRecord&& record,
-                 LogDomain& domain,
-                 S const& message,
-                 fmt::internal::named_arg<Args, char>&&... args) {
-    AttributeArgumentSet attr_set;
-    auto arg_store = fmt::internal::make_args_checked(message, (args.value)...);
-    attr_set._values = arg_store;
-    (attr_set._names.push_back(::mongo::StringData(args.name.data(), args.name.size())), ...);
-    auto msg = static_cast<fmt::string_view>(message);
-    doLogRecordImpl(
-        std::move(record), domain, ::mongo::StringData(msg.data(), msg.size()), attr_set);
-}
-
-}  // namespace detail
-}  // namespace logv2
 
 #define LOGV2_IMPL_0(SEVERITY, OPTIONS, ID, MESSAGE)                      \
     do {                                                                  \
@@ -244,10 +203,6 @@ void doLogRecord(LogRecord&& record,
     (__VA_ARGS__)
 
 #endif  // BOOST_PP_VARIADICS_MSVC
-
-inline fmt::internal::udl_arg<char> operator"" _attr(const char* s, std::size_t) {
-    return {s};
-}
 
 }  // namespace mongo
 

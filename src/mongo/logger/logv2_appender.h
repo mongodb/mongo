@@ -29,47 +29,53 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/logger/appender.h"
+#include "mongo/logv2/attribute_argument_set.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/logv2/log_manager.h"
-#include "mongo/logv2/log_tag.h"
+#include "mongo/logv2/log_detail.h"
+#include "mongo/logv2/log_domain.h"
 
 namespace mongo {
-namespace logv2 {
+namespace logger {
 
-class LogOptions {
+/**
+ * Appender for writing to a logv2 domain
+ */
+template <typename Event>
+class LogV2Appender : public Appender<Event> {
 public:
-    LogOptions() {}
+    LogV2Appender(const LogV2Appender&) = delete;
+    LogV2Appender& operator=(const LogV2Appender&) = delete;
 
-    LogOptions(LogComponent component) : _component(component) {}
+    explicit LogV2Appender(logv2::LogDomain* domain) : _domain(domain) {}
 
-    LogOptions(LogDomain* domain) : _domain(domain) {}
+    Status append(const Event& event) override {
+        logv2::detail::doLog(
 
-    LogOptions(LogTag tags) : _tags(tags) {}
+            // We need to cast from the v1 logging severity to the equivalent v2 severity
+            logv2::LogSeverity::cast(event.getSeverity().toInt()),
 
-    LogOptions(LogComponent component, LogDomain* domain, LogTag tags)
-        : _domain(domain), _tags(tags), _component(component) {}
+            // Similarly, we need to transcode the options. They don't offer a cast
+            // operator, so we need to do some metaprogramming on the types.
+            logv2::LogOptions{logv2::LogComponent(static_cast<logv2::LogComponent::Value>(
+                                  static_cast<std::underlying_type_t<LogComponent::Value>>(
+                                      static_cast<LogComponent::Value>(event.getComponent())))),
+                              _domain,
+                              logv2::LogTag{}},
 
-    LogComponent component() const {
-        return _component;
-    }
+            // stable id doesn't exist in logv1
+            StringData{},
 
-    LogDomain& domain() const {
-        return *_domain;
-    }
-
-    LogTag tags() const {
-        return _tags;
+            "{} {}",  // TODO remove this lv2 when it's no longer fun to have
+            "engine"_attr = "lv2",
+            "message"_attr = event.getMessage());
+        return Status::OK();
     }
 
 private:
-    LogDomain* _domain = &LogManager::global().getGlobalDomain();
-    LogTag _tags;
-#ifdef MONGO_LOGV2_DEFAULT_COMPONENT
-    LogComponent _component = MongoLogV2DefaultComponent_component;
-#else
-    LogComponent _component = LogComponent::kDefault;
-#endif  // MONGO_LOGV2_DEFAULT_COMPONENT
+    logv2::LogDomain* _domain;
 };
 
-}  // namespace logv2
+}  // namespace logger
 }  // namespace mongo

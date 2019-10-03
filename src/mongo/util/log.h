@@ -235,7 +235,7 @@ inline bool shouldLog(logger::LogSeverity severity) {
  * We expect logrotate to rename the existing file before we rotate, and so the next open
  * we do should result in a file create.
  */
-bool rotateLogs(bool renameFiles);
+bool rotateLogs(bool renameFiles, bool useLogV2);
 
 extern Tee* const warnings;            // Things put here go in serverStatus
 extern Tee* const startupWarningsLog;  // Things put here get reported in MMS

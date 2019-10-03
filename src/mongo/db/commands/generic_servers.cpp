@@ -198,7 +198,7 @@ public:
                      const string& ns,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        bool didRotate = rotateLogs(serverGlobalParams.logRenameOnRotate);
+        bool didRotate = rotateLogs(serverGlobalParams.logRenameOnRotate, serverGlobalParams.logV2);
         if (didRotate)
             logProcessDetailsForLogRotate(opCtx->getServiceContext());
         return didRotate;

@@ -50,6 +50,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/logger/console_appender.h"
 #include "mongo/logger/logger.h"
+#include "mongo/logger/logv2_appender.h"
 #include "mongo/logger/message_event.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/logger/ramlog.h"
@@ -219,25 +220,41 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
 
     // Hook up this global into our logging encoder
     MessageEventDetailsEncoder::setMaxLogSizeKBSource(gMaxLogSizeKB);
+    LogManager* manager = logger::globalLogManager();
+    auto& lv2Manager = logv2::LogManager::global();
 
     if (serverGlobalParams.logWithSyslog) {
 #ifdef _WIN32
         return Status(ErrorCodes::InternalError,
                       "Syslog requested in Windows build; command line processor logic error");
 #else
-        using logger::SyslogAppender;
+        std::unique_ptr<logger::Appender<MessageEventEphemeral>> appender;
 
-        StringBuilder sb;
-        sb << serverGlobalParams.binaryName << "." << serverGlobalParams.port;
-        openlog(strdup(sb.str().c_str()), LOG_PID | LOG_CONS, serverGlobalParams.syslogFacility);
-        LogManager* manager = logger::globalLogManager();
+        if (serverGlobalParams.logV2) {
+
+            appender = std::make_unique<logger::LogV2Appender<MessageEventEphemeral>>(
+                &(lv2Manager.getGlobalDomain()));
+
+            lv2Manager.detachConsoleBackend();
+            lv2Manager.setupSyslogBackend(serverGlobalParams.syslogFacility);
+            lv2Manager.reattachSyslogBackend();
+
+        } else {
+
+            using logger::SyslogAppender;
+            StringBuilder sb;
+            sb << serverGlobalParams.binaryName << "." << serverGlobalParams.port;
+            openlog(
+                strdup(sb.str().c_str()), LOG_PID | LOG_CONS, serverGlobalParams.syslogFacility);
+            appender = std::make_unique<SyslogAppender<MessageEventEphemeral>>(
+                std::make_unique<logger::MessageEventDetailsEncoder>());
+            manager->getNamedDomain("javascriptOutput")
+                ->attachAppender(std::make_unique<SyslogAppender<MessageEventEphemeral>>(
+                    std::make_unique<logger::MessageEventDetailsEncoder>()));
+        }
         manager->getGlobalDomain()->clearAppenders();
-        manager->getGlobalDomain()->attachAppender(
-            std::make_unique<SyslogAppender<MessageEventEphemeral>>(
-                std::make_unique<logger::MessageEventDetailsEncoder>()));
-        manager->getNamedDomain("javascriptOutput")
-            ->attachAppender(std::make_unique<SyslogAppender<MessageEventEphemeral>>(
-                std::make_unique<logger::MessageEventDetailsEncoder>()));
+        manager->getGlobalDomain()->attachAppender(std::move(appender));
+
 #endif  // defined(_WIN32)
     } else if (!serverGlobalParams.logpath.empty()) {
         fassert(16448, !serverGlobalParams.logWithSyslog);
@@ -280,32 +297,59 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
             }
         }
 
-        StatusWithRotatableFileWriter writer = logger::globalRotatableFileManager()->openFile(
-            absoluteLogpath, serverGlobalParams.logAppend);
-        if (!writer.isOK()) {
-            return writer.getStatus();
+        std::unique_ptr<logger::Appender<MessageEventEphemeral>> appender;
+
+        if (serverGlobalParams.logV2) {
+
+            appender = std::make_unique<logger::LogV2Appender<MessageEventEphemeral>>(
+                &(lv2Manager.getGlobalDomain()));
+
+            lv2Manager.detachConsoleBackend();
+            lv2Manager.setupRotatableFileBackend(absoluteLogpath, serverGlobalParams.logAppend);
+            lv2Manager.reattachRotatableFileBackend();
+
+            if (serverGlobalParams.logAppend && exists) {
+                log() << "***** SERVER RESTARTED *****";
+                // FIXME rewrite for logv2
+                // Status status = logger::RotatableFileWriter::Use(writer.getValue()).status();
+                // if (!status.isOK())
+                //    return status;
+            }
+
+        } else {
+            StatusWithRotatableFileWriter writer = logger::globalRotatableFileManager()->openFile(
+                absoluteLogpath, serverGlobalParams.logAppend);
+            if (!writer.isOK()) {
+                return writer.getStatus();
+            }
+            appender = std::make_unique<RotatableFileAppender<MessageEventEphemeral>>(
+                std::make_unique<MessageEventDetailsEncoder>(), writer.getValue());
+            manager->getNamedDomain("javascriptOutput")
+                ->attachAppender(std::make_unique<RotatableFileAppender<MessageEventEphemeral>>(
+                    std::make_unique<MessageEventDetailsEncoder>(), writer.getValue()));
+            if (serverGlobalParams.logAppend && exists) {
+                log() << "***** SERVER RESTARTED *****";
+                Status status = logger::RotatableFileWriter::Use(writer.getValue()).status();
+                if (!status.isOK())
+                    return status;
+            }
         }
 
-        LogManager* manager = logger::globalLogManager();
         manager->getGlobalDomain()->clearAppenders();
-        manager->getGlobalDomain()->attachAppender(
-            std::make_unique<RotatableFileAppender<MessageEventEphemeral>>(
-                std::make_unique<MessageEventDetailsEncoder>(), writer.getValue()));
-        manager->getNamedDomain("javascriptOutput")
-            ->attachAppender(std::make_unique<RotatableFileAppender<MessageEventEphemeral>>(
-                std::make_unique<MessageEventDetailsEncoder>(), writer.getValue()));
+        manager->getGlobalDomain()->attachAppender(std::move(appender));
 
-        if (serverGlobalParams.logAppend && exists) {
-            log() << "***** SERVER RESTARTED *****";
-            Status status = logger::RotatableFileWriter::Use(writer.getValue()).status();
-            if (!status.isOK())
-                return status;
-        }
     } else {
-        logger::globalLogManager()
-            ->getNamedDomain("javascriptOutput")
-            ->attachAppender(std::make_unique<logger::ConsoleAppender<MessageEventEphemeral>>(
-                std::make_unique<MessageEventDetailsEncoder>()));
+        if (serverGlobalParams.logV2) {
+            manager->getGlobalDomain()->clearAppenders();
+            manager->getGlobalDomain()->attachAppender(
+                std::make_unique<logger::LogV2Appender<MessageEventEphemeral>>(
+                    &(lv2Manager.getGlobalDomain())));
+        } else {
+            logger::globalLogManager()
+                ->getNamedDomain("javascriptOutput")
+                ->attachAppender(std::make_unique<logger::ConsoleAppender<MessageEventEphemeral>>(
+                    std::make_unique<MessageEventDetailsEncoder>()));
+        }
     }
 
     logger::globalLogDomain()->attachAppender(

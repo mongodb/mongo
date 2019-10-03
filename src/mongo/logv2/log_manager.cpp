@@ -39,21 +39,61 @@
 #include "mongo/logv2/ramlog_sink.h"
 #include "mongo/logv2/tagged_severity_filter.h"
 #include "mongo/logv2/text_formatter.h"
-
+#include "mongo/util/time_support.h"
 
 #include <boost/core/null_deleter.hpp>
+#include <boost/filesystem/operations.hpp>
 #include <boost/log/core.hpp>
 #include <boost/log/sinks.hpp>
+#include <iostream>
+#include <string>
 
+#ifndef _WIN32
+#include <boost/log/sinks/syslog_backend.hpp>
+#endif
 
 namespace mongo {
 namespace logv2 {
 
+namespace {
+
+class RotateCollector : public boost::log::sinks::file::collector {
+public:
+    explicit RotateCollector(bool renameOnRotate) : _renameOnRotate{renameOnRotate} {}
+
+    void store_file(boost::filesystem::path const& file) override {
+        if (_renameOnRotate) {
+            auto renameTarget = file.string() + "." + terseCurrentTime(false);
+            boost::system::error_code ec;
+            boost::filesystem::rename(file, renameTarget, ec);
+            if (ec) {
+                // throw here or propagate this error in another way?
+            }
+        }
+    }
+
+    uintmax_t scan_for_files(boost::log::sinks::file::scan_method,
+                             boost::filesystem::path const&,
+                             unsigned int*) override {
+        return 0;
+    }
+
+private:
+    bool _renameOnRotate;
+};
+
+}  // namespace
+
+
 struct LogManager::Impl {
     typedef boost::log::sinks::synchronous_sink<boost::log::sinks::text_ostream_backend>
         ConsoleBackend;
-
     typedef boost::log::sinks::unlocked_sink<RamLogSink> RamLogBackend;
+#ifndef _WIN32
+    typedef boost::log::sinks::synchronous_sink<boost::log::sinks::syslog_backend> SyslogBackend;
+#endif
+    typedef boost::log::sinks::synchronous_sink<boost::log::sinks::text_file_backend>
+        RotatableFileBackend;
 
     Impl() {
         _consoleBackend = boost::make_shared<ConsoleBackend>();
@@ -75,13 +115,56 @@ struct LogManager::Impl {
         _startupWarningsBackend->set_formatter(TextFormatter());
     }
 
+    void setupSyslogBackend(int syslogFacility) {
+#ifndef _WIN32
+        // Create a backend
+        auto backend = boost::make_shared<boost::log::sinks::syslog_backend>(
+            boost::log::keywords::facility =
+                boost::log::sinks::syslog::make_facility(syslogFacility),
+            boost::log::keywords::use_impl = boost::log::sinks::syslog::native);
+
+        // // Set the straightforward level translator for the "Severity" attribute of type int
+        // backend->set_severity_mapper(
+        //     boost::log::sinks::syslog::direct_severity_mapping<int>("Severity"));
+        _syslogBackend = boost::make_shared<SyslogBackend>(backend);
+        _syslogBackend->set_filter(ComponentSettingsFilter(_globalDomain.settings()));
+        _syslogBackend->set_formatter(TextFormatter());
+#endif
+    }
+
+    void setupRotatableFileBackend(std::string path, bool append) {
+
+        auto backend = boost::make_shared<boost::log::sinks::text_file_backend>(
+            boost::log::keywords::file_name = path);
+        backend->auto_flush(true);
+
+        backend->set_file_collector(boost::make_shared<RotateCollector>(!append));
+
+        _rotatableFileBackend = boost::make_shared<RotatableFileBackend>(backend);
+        _rotatableFileBackend->set_filter(ComponentSettingsFilter(_globalDomain.settings()));
+        _rotatableFileBackend->set_formatter(TextFormatter());
+    }
+
     LogDomain _globalDomain{std::make_unique<LogDomainGlobal>()};
+    // I think that, technically, these are logging front ends
+    // and that they get to hold or wrap a backend
     boost::shared_ptr<ConsoleBackend> _consoleBackend;
+    boost::shared_ptr<RotatableFileBackend> _rotatableFileBackend;
+#ifndef _WIN32
+    boost::shared_ptr<SyslogBackend> _syslogBackend;
+#endif
     boost::shared_ptr<RamLogBackend> _globalLogCacheBackend;
     boost::shared_ptr<RamLogBackend> _startupWarningsBackend;
     bool _defaultBackendsAttached{false};
 };
 
+
+void LogManager::rotate() {
+    if (_impl->_rotatableFileBackend) {
+        auto backend = _impl->_rotatableFileBackend->locked_backend();
+        backend->rotate_file();
+    }
+}
 
 LogManager::LogManager() {
     _impl = std::make_unique<Impl>();
@@ -106,6 +189,32 @@ void LogManager::detachDefaultBackends() {
     _impl->_globalDomain.impl().core()->remove_sink(_impl->_globalLogCacheBackend);
     _impl->_globalDomain.impl().core()->remove_sink(_impl->_consoleBackend);
     _impl->_defaultBackendsAttached = false;
+}
+
+void LogManager::detachConsoleBackend() {
+    _impl->_globalDomain.impl().core()->remove_sink(_impl->_consoleBackend);
+}
+
+void LogManager::setupRotatableFileBackend(std::string path, bool append) {
+    _impl->setupRotatableFileBackend(path, append);
+}
+
+void LogManager::setupSyslogBackend(int syslogFacility) {
+    _impl->setupSyslogBackend(syslogFacility);
+}
+
+void LogManager::reattachSyslogBackend() {
+#ifndef _WIN32
+    _impl->_globalDomain.impl().core()->add_sink(_impl->_syslogBackend);
+#endif
+}
+
+void LogManager::reattachRotatableFileBackend() {
+    _impl->_globalDomain.impl().core()->add_sink(_impl->_rotatableFileBackend);
+}
+
+void LogManager::reattachConsoleBackend() {
+    _impl->_globalDomain.impl().core()->add_sink(_impl->_consoleBackend);
 }
 
 void LogManager::reattachDefaultBackends() {

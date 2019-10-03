@@ -321,6 +321,9 @@ Status storeBaseOptions(const moe::Environment& params) {
             return Status(ErrorCodes::BadValue, sb.str());
         }
     }
+    if (params.count("logv2")) {
+        serverGlobalParams.logV2 = true;
+    }
     if (params.count("systemLog.destination")) {
         std::string systemLogDestination = params["systemLog.destination"].as<std::string>();
         if (systemLogDestination == "file") {
