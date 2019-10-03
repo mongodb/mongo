@@ -3939,6 +3939,7 @@ tasks:
 
 ## clang_tidy - run clang_tidy
 - name: clang_tidy
+  exec_timeout_secs: 14400
   commands:
     - func: "scons compile"
       vars:
@@ -3947,6 +3948,7 @@ tasks:
           --detect-odr-violations
     - command: shell.exec
       type: test
+      timeout_secs: 14400
       params:
         working_dir: "src"
         script: |
