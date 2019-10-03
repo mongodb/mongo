@@ -51,7 +51,7 @@
 #include "mongo/util/background.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/timer.h"

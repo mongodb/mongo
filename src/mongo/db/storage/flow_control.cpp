@@ -45,7 +45,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/flow_control_parameters_gen.h"
 #include "mongo/util/background.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

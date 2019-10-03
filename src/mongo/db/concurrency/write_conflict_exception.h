@@ -34,7 +34,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/curop.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 

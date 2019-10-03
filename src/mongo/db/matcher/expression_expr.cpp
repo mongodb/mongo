@@ -31,7 +31,7 @@
 
 #include "mongo/db/matcher/expression_expr.h"
 
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 

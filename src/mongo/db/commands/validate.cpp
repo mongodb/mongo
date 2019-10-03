@@ -38,7 +38,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 

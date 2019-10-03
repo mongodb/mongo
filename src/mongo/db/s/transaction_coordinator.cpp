@@ -38,7 +38,7 @@
 #include "mongo/db/s/wait_for_majority_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/s/grid.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

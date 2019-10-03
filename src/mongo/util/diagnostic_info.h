@@ -33,7 +33,7 @@
 #include "mongo/db/client.h"
 #include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

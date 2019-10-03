@@ -41,7 +41,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
 #include "mongo/util/text.h"

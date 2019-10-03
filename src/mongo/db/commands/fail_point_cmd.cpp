@@ -37,7 +37,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -48,19 +48,24 @@ namespace mongo {
  * Format
  * {
  *    configureFailPoint: <string>, // name of the fail point.
- *    mode: <string|Object>, // the new mode to set. Can have one of the
- *        following format:
  *
- *        1. 'off' - disable fail point.
- *        2. 'alwaysOn' - fail point is always active.
- *        3. { activationProbability: <n> } - n should be a double between 0 and 1,
- *           representing the probability that the fail point will fire.  0 means never,
- *           1 means (nearly) always.
- *        4. { times: <n> } - n should be positive and within the range of a 32 bit
- *            signed integer and this is the number of passes on the fail point will
- *            remain activated.
+ *    mode: <string|Object>, // the new mode to set. Can have one of the following format:
  *
- *    data: <Object> // optional arbitrary object to store.
+ *        - 'off' - disable fail point.
+ *
+ *        - 'alwaysOn' - fail point is always active.
+ *
+ *        - { activationProbability: <n> } - double n. [0 <= n <= 1]
+ *          n: the probability that the fail point will fire.  0=never, 1=always.
+ *
+ *        - { times: <n> } - int32 n. n > 0. n: # of passes the fail point remains active.
+ *
+ *        - { skip: <n> } - int32 n. n > 0. n: # of passes before the fail point activates
+ *          and remains active.
+ *
+ *    data: <Object> // optional arbitrary object to inject into the failpoint.
+ *        When activated, the FailPoint can read this data and it can be used to inform
+ *        the specific action taken by the code under test.
  * }
  */
 class FaultInjectCmd : public BasicCommand {

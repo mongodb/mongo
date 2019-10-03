@@ -63,7 +63,7 @@
 #include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/db/transaction_participant_gen.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/socket_utils.h"
 

@@ -42,7 +42,7 @@
 #include "mongo/transport/transport_layer_asio.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 
 #include "asio.hpp"

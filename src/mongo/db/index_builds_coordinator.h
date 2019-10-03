@@ -46,7 +46,7 @@
 #include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/string_map.h"

@@ -146,8 +146,6 @@ env.Library(
     target="fail_point",
     source=[
         "fail_point.cpp",
-        "fail_point_registry.cpp",
-        "fail_point_service.cpp",
         env.Idlc('fail_point_server_parameter.idl')[0],
     ],
     LIBDEPS=[

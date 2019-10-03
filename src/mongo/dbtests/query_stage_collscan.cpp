@@ -50,7 +50,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 
 namespace query_stage_collection_scan {
 

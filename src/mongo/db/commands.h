@@ -49,7 +49,7 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {

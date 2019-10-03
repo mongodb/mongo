@@ -39,7 +39,7 @@
 #include "mongo/db/repl/abstract_oplog_fetcher.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/repl_set_config.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 namespace repl {

@@ -61,7 +61,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 using repl::MutableOplogEntry;

@@ -88,7 +88,7 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/scripting/engine.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/scopeguard.h"

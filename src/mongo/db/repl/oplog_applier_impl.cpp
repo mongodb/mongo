@@ -46,7 +46,7 @@
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/platform/basic.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "third_party/murmurhash3/MurmurHash3.h"
 

@@ -55,7 +55,7 @@
 #include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {

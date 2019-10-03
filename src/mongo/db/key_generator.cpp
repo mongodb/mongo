@@ -36,7 +36,7 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 

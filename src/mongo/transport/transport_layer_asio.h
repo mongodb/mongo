@@ -41,7 +41,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_mode.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_types.h"

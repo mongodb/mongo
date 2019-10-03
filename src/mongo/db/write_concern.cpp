@@ -46,7 +46,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/rpc/protocol.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

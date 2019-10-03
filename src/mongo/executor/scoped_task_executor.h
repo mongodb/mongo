@@ -37,7 +37,7 @@
 #include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 

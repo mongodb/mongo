@@ -35,7 +35,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/views/view_catalog.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 namespace {

@@ -33,7 +33,6 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/fail_point_service.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

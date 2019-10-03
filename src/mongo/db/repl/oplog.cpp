@@ -94,7 +94,7 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/elapsed_tracker.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"

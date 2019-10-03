@@ -47,7 +47,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/record_id.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 

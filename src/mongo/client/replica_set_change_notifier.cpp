@@ -33,7 +33,7 @@
 
 #include "mongo/client/replica_set_change_notifier.h"
 
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/stacktrace.h"
 

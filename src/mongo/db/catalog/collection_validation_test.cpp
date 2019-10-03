@@ -36,7 +36,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 

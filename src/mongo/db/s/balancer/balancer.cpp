@@ -54,7 +54,7 @@
 #include "mongo/s/shard_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/version.h"

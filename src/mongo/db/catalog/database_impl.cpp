@@ -75,7 +75,7 @@
 #include "mongo/platform/random.h"
 #include "mongo/s/cannot_implicitly_create_collection_info.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

@@ -29,7 +29,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 
@@ -42,7 +42,7 @@ public:
     static std::string updateCurOpMsg(OperationContext* opCtx, const std::string& newMsg);
 
     /**
-     * This helper function works much like MONGO_FAIL_POINT_PAUSE_WHILE_SET, but additionally
+     * This helper function works much like FailPoint::pauseWhileSet(opCtx), but additionally
      * calls whileWaiting() at regular intervals. Finally, it also sets the 'msg' field of the
      * opCtx's CurOp to the given string while the failpoint is active.
      *

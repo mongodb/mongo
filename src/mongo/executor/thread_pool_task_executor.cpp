@@ -45,7 +45,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/transport/baton.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 

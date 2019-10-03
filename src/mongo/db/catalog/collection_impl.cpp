@@ -72,7 +72,7 @@
 
 #include "mongo/db/auth/user_document_parser.h"  // XXX-ANDY
 #include "mongo/rpc/object_check.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

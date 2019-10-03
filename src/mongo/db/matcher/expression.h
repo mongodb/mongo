@@ -38,7 +38,7 @@
 #include "mongo/db/matcher/match_details.h"
 #include "mongo/db/matcher/matchable.h"
 #include "mongo/db/pipeline/dependencies.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 

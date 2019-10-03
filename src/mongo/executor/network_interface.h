@@ -35,7 +35,7 @@
 
 #include "mongo/executor/task_executor.h"
 #include "mongo/transport/baton.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 

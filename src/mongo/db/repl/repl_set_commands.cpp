@@ -64,7 +64,7 @@
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/decimal_counter.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/scopeguard.h"

@@ -18,7 +18,7 @@
 #include "asio/detail/config.hpp"
 
 #include "asio/write.hpp"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/net/ssl/detail/engine.hpp"
 #include "mongo/util/net/ssl/detail/stream_core.hpp"
 

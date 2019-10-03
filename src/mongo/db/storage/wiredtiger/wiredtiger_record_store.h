@@ -46,7 +46,7 @@
 #include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 
 /**
  * Either executes the specified operation and returns it's value or randomly throws a write

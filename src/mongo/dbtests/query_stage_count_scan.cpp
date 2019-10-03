@@ -44,8 +44,6 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/fail_point_registry.h"
-#include "mongo/util/fail_point_service.h"
 
 namespace QueryStageCountScan {
 

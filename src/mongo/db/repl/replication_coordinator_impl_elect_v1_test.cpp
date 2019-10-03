@@ -45,7 +45,7 @@
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 
 #include <boost/optional/optional_io.hpp>

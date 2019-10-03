@@ -50,7 +50,7 @@
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/router_transactions_metrics.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/socket_utils.h"
 

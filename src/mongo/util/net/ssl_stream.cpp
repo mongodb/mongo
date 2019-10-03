@@ -31,7 +31,7 @@
 
 #include "mongo/config.h"
 
-#include "mongo/util/fail_point_service.h"
+#include "mongo/util/fail_point.h"
 
 #ifdef MONGO_CONFIG_SSL
 #include "mongo/util/net/ssl/impl/src.hpp"
