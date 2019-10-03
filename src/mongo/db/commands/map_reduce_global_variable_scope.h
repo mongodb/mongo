@@ -52,6 +52,10 @@ public:
         builder->append(fieldName, obj);
     }
 
+    BSONObj getObj() const {
+        return obj;
+    }
+
 private:
     // Initializers for global variables. These will be directly executed as Javascript. This is
     // left as a BSONObj for that API.

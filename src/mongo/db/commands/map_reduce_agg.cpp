@@ -206,6 +206,11 @@ auto makeExpressionContext(OperationContext* opCtx, const MapReduce& parsedMr) {
     auto uuid =
         ctx.getCollection() ? boost::make_optional(ctx.getCollection()->uuid()) : boost::none;
 
+    auto runtimeConstants = Variables::generateRuntimeConstants(opCtx);
+    if (parsedMr.getScope()) {
+        runtimeConstants.setJsScope(parsedMr.getScope()->getObj());
+    }
+
     // Manually build an ExpressionContext with the desired options for the translated
     // aggregation. The one option worth noting here is allowDiskUse, which is required to allow
     // the $group stage of the translated pipeline to spill to disk.
@@ -218,7 +223,7 @@ auto makeExpressionContext(OperationContext* opCtx, const MapReduce& parsedMr) {
         parsedMr.getBypassDocumentValidation().get_value_or(false),
         parsedMr.getNamespace(),
         parsedMr.getCollation().get_value_or(BSONObj()),
-        boost::none,  // runtimeConstants
+        runtimeConstants,
         std::move(resolvedCollator),
         MongoProcessInterface::create(opCtx),
         StringMap<ExpressionContext::ResolvedNamespace>{},  // resolvedNamespaces

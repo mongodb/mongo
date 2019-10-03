@@ -10,6 +10,7 @@ selector:
   - jstests/core/mr_sort.js
   - jstests/core/mr_tolerates_js_exception.js
   - jstests/core/mr_undef.js
+  - jstests/core/mr4.js
   - jstests/core/mr5.js
 executor:
   archive:
