@@ -502,6 +502,16 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
+- name: crud_workloads_majority
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "crud_workloads_majority"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
 - name: cursor_manager
   priority: 5
   commands:
@@ -1233,6 +1243,7 @@ buildvariants:
     - name: ycsb_60GB
     - name: industry_benchmarks_secondary_reads
     - name: crud_workloads
+    - name: crud_workloads_majority
     - name: jasper_smoke
     - name: insert_big_docs
     - name: insert_remove
@@ -1280,6 +1291,7 @@ buildvariants:
     - name: industry_benchmarks
     - name: industry_benchmarks_secondary_reads
     - name: crud_workloads
+    - name: crud_workloads_majority
     - name: service_architecture_workloads
     - name: mixed_workloads
     - name: smoke_test
@@ -1378,6 +1390,7 @@ buildvariants:
     - name: ycsb_60GB
     - name: industry_benchmarks_secondary_reads
     - name: crud_workloads
+    - name: crud_workloads_majority
     - name: jasper_smoke
     # - name: insert_remove
     # - name: service_architecture_workloads
