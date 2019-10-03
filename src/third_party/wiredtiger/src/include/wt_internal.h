@@ -430,6 +430,7 @@ typedef uint64_t wt_timestamp_t;
 #include "packing.i"
 #include "reconcile.i"
 #include "serial.i"
+#include "time.i"
 
 #if defined(__cplusplus)
 }

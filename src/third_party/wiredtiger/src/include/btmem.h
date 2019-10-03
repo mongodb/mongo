@@ -230,21 +230,31 @@ struct __wt_ovfl_reuse {
 
 /*
  * WT_PAGE_LOOKASIDE --
- *	Related information for on-disk pages with lookaside entries.
+ *	Information for on-disk pages with lookaside entries.
+ *
+ * This information is used to decide whether history evicted to lookaside is
+ * needed for a read, and when it is no longer needed at all. We track the
+ * newest update written to the disk image in `max_ondisk_ts`, and the oldest
+ * update skipped to choose the on-disk version in `min_skipped_ts`.  If no
+ * updates were skipped, then the disk image contains the newest versions of
+ * all updates and `min_skipped_ts == WT_TS_MAX`.
+ *
+ * For reads without a timestamp, we check that there are no skipped updates
+ * and that the reader's snapshot can see everything on disk.
+ *
+ * For readers with a timestamp, it is safe to ignore lookaside if either
+ * (a) there are no skipped updates and everything on disk is visible, or
+ * (b) everything on disk is visible, and the minimum skipped update is in
+ * the future of the reader.
  */
 struct __wt_page_lookaside {
-    uint64_t las_pageid;               /* Page ID in lookaside */
-    uint64_t max_txn;                  /* Maximum transaction ID */
-    uint64_t unstable_txn;             /* First transaction ID not on page */
-    wt_timestamp_t max_timestamp;      /* Maximum timestamp */
-    wt_timestamp_t unstable_timestamp; /* First timestamp not on page */
-    wt_timestamp_t unstable_durable_timestamp;
-    /* First durable timestamp not on
-     * page */
-    bool eviction_to_lookaside; /* Revert to lookaside on eviction */
-    bool has_prepares;          /* One or more updates are prepared */
-    bool resolved;              /* History has been read into cache */
-    bool skew_newest;           /* Page image has newest versions */
+    uint64_t las_pageid;           /* Page ID in lookaside */
+    uint64_t max_txn;              /* Maximum transaction ID */
+    wt_timestamp_t max_ondisk_ts;  /* Maximum timestamp on disk */
+    wt_timestamp_t min_skipped_ts; /* Skipped in favor of disk version */
+    bool eviction_to_lookaside;    /* Revert to lookaside on eviction */
+    bool has_prepares;             /* One or more updates are prepared */
+    bool resolved;                 /* History has been read into cache */
 };
 
 /*
@@ -909,7 +919,7 @@ struct __wt_ref {
         WT_SESSION_IMPL *session;
         const char *name;
         const char *func;
-        uint32_t time_sec; /* DEBUGGING field for rare hang. */
+        uint32_t time_sec;
         uint16_t line;
         uint16_t state;
     } hist[WT_REF_SAVE_STATE_MAX];

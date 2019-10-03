@@ -180,17 +180,15 @@ __wt_row_leaf_key_work(
         copy = WT_ROW_KEY_COPY(rip);
 #ifdef HAVE_DIAGNOSTIC
         /*
-         * Debugging added to detect and gather information for rare hang. Detect and abort if the
-         * current operation takes too long.
+         * Debugging added to detect and gather information for rare hang, WT-5043. Detect and abort
+         * if the current function call or operation takes too long (and 5 minutes is an eternity).
          */
         __wt_seconds32(session, &current);
         WT_ERR_ASSERT(session, (current - start) < WT_MINUTE * 5, EINVAL,
-          "Current function call taking too long: current %" PRIu32 " func started %" PRIu32,
-          current, start);
+          "call tracking for WT-5043: %s took longer than 5 minutes", __func__);
         WT_ERR_ASSERT(session,
-          session->op_start == 0 || ((current - session->op_start) < WT_MINUTE * 5), EINVAL,
-          "Operation taking too long: current %" PRIu32 " started %" PRIu32, current,
-          session->op_start);
+          (session->op_5043_seconds == 0 || (current - session->op_5043_seconds) < WT_MINUTE * 5),
+          EINVAL, "operation tracking for WT-5043: %s took longer than 5 minutes", session->name);
 #endif
 
         /*

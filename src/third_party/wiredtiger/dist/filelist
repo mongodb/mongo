@@ -205,7 +205,6 @@ src/support/rand.c
 src/support/scratch.c
 src/support/stat.c
 src/support/thread_group.c
-src/support/time.c
 src/txn/txn.c
 src/txn/txn_ckpt.c
 src/txn/txn_ext.c

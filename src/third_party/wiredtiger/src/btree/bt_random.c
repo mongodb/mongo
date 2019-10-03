@@ -314,8 +314,8 @@ __random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
     for (i = __wt_random(&session->rnd) % WT_RANDOM_CURSOR_MOVE;;) {
         ret = next ? __wt_btcur_next(cbt, false) : __wt_btcur_prev(cbt, false);
         if (ret == WT_NOTFOUND) {
-            next = false; /* Reverse direction from the end of the tree. */
-            ret = __wt_btcur_prev(cbt, false);
+            next = !next; /* Reverse direction. */
+            ret = next ? __wt_btcur_next(cbt, false) : __wt_btcur_prev(cbt, false);
             WT_RET(ret); /* An empty tree. */
         }
         if (i > 0)
@@ -324,8 +324,14 @@ __random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
             /*
              * Skip the record we returned last time, once. Clear the tracking value so we don't
              * skip that record twice, it just means the tree is too small for anything reasonable.
+             *
+             * Testing WT_DATA_IN_ITEM requires explanation: the cursor temporary buffer is used to
+             * build keys for row-store searches and can point into the row-store page (which might
+             * have been freed subsequently). If a previous random call set the temporary buffer,
+             * then it will be local data. If it's local data for some other reason than a previous
+             * random call, we don't care: it won't match, and if it does we just retry.
              */
-            if (cursor->key.size == cbt->tmp->size &&
+            if (WT_DATA_IN_ITEM(cbt->tmp) && cursor->key.size == cbt->tmp->size &&
               memcmp(cursor->key.data, cbt->tmp->data, cbt->tmp->size) == 0) {
                 cbt->tmp->size = 0;
                 i = __wt_random(&session->rnd) % WT_RANDOM_CURSOR_MOVE;

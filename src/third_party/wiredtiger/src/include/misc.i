@@ -30,49 +30,6 @@ __wt_hex(int c)
 }
 
 /*
- * __wt_rdtsc --
- *     Get a timestamp from CPU registers.
- */
-static inline uint64_t
-__wt_rdtsc(void)
-{
-#if defined(__i386)
-    {
-        uint64_t x;
-
-        __asm__ volatile("rdtsc" : "=A"(x));
-        return (x);
-    }
-#elif defined(__amd64)
-    {
-        uint64_t a, d;
-
-        __asm__ volatile("rdtsc" : "=a"(a), "=d"(d));
-        return ((d << 32) | a);
-    }
-#else
-    return (0);
-#endif
-}
-
-/*
- * __wt_clock --
- *     Obtain a timestamp via either a CPU register or via a system call on platforms where
- *     obtaining it directly from the hardware register is not supported.
- */
-static inline uint64_t
-__wt_clock(WT_SESSION_IMPL *session)
-{
-    struct timespec tsp;
-
-    if (__wt_process.use_epochtime) {
-        __wt_epoch(session, &tsp);
-        return ((uint64_t)(tsp.tv_sec * WT_BILLION + tsp.tv_nsec));
-    }
-    return (__wt_rdtsc());
-}
-
-/*
  * __wt_strdup --
  *     ANSI strdup function.
  */

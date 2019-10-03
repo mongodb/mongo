@@ -54,7 +54,8 @@ functions:
         set -o errexit
         set -o verbose
         if [ "Windows_NT" = "$OS" ]; then
-          scons.bat --enable-python=c:\\swigwin-3.0.2\\swig.exe --enable-diagnostic ${smp_command|}
+          pip install scons==3.1.1
+          scons-3.1.1.bat --enable-python=c:\\swigwin-3.0.2\\swig.exe --enable-diagnostic ${smp_command|}
         else
           cd build_posix
           sh ./reconf
@@ -991,7 +992,8 @@ tasks:
             set -o errexit
             set -o verbose
 
-            scons.bat ${smp_command|} "CFLAGS=/Gv /wd4090 /wd4996 /we4047 /we4024 /TC /we4100 /we4133" wiredtiger.dll libwiredtiger.lib
+            pip install scons==3.1.1
+            scons-3.1.1.bat ${smp_command|} "CFLAGS=/Gv /wd4090 /wd4996 /we4047 /we4024 /TC /we4100 /we4133" wiredtiger.dll libwiredtiger.lib
 
   - name: fops
     depends_on:
@@ -1025,9 +1027,6 @@ tasks:
             cmd.exe /c "cd test\\format && ..\\..\\t_format.exe reverse=0 encryption=none logging_compression=none runs=20"
 
   - name: million-collection-test
-    depends_on: []
-    run_on:
-      - rhel62-large
     commands:
       - func: "fetch source"
       - func: "fetch mongo-tests repo"
@@ -1035,6 +1034,7 @@ tasks:
         params:
           working_dir: mongo-tests
           script: |
+            sudo su
             set -o errexit
             set -o verbose
             ulimit -n 1000000
@@ -1176,10 +1176,10 @@ tasks:
 
 
 buildvariants:
-- name: ubuntu1404
-  display_name: Ubuntu 14.04
+- name: ubuntu1804
+  display_name: Ubuntu 18.04
   run_on:
-  - ubuntu1404-test
+  - ubuntu1804-test
   expansions:
     # It's ugly, but we need the absolute path here, not the relative
     test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
@@ -1244,10 +1244,10 @@ buildvariants:
     - name: unit-test-bucket07
     - name: fops
 
-- name: ubuntu1404-python3
-  display_name: Ubuntu 14.04 (Python3)
+- name: ubuntu1804-python3
+  display_name: Ubuntu 18.04 (Python3)
   run_on:
-  - ubuntu1404-test
+  - ubuntu1804-test
   expansions:
     test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
@@ -1270,7 +1270,7 @@ buildvariants:
   display_name: Large scale testing
   batchtime: 1440 # 1 day
   run_on:
-  - rhel62-large
+  - rhel80-build
   expansions:
     configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++
   tasks:
@@ -1280,14 +1280,14 @@ buildvariants:
   display_name: Compatibility tests
   batchtime: 10080 # 7 days
   run_on:
-  - ubuntu1404-test
+  - ubuntu1804-test
   tasks:
     - name: compatibility-test-for-mongodb-releases
 
 - name: windows-64
   display_name: Windows 64-bit
   run_on:
-  - windows-64-vs2013-test
+  - windows-64-vs2017-test
   tasks:
     - name: compile
     - name: compile-windows-alt
@@ -1337,7 +1337,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - ubuntu1604-zseries-small
+  - ubuntu1804-zseries-build
   batchtime: 10080 # 7 days
   expansions:
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)

@@ -536,7 +536,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
     r.session = session;
     WT_MAX_LSN(&r.max_ckpt_lsn);
     WT_MAX_LSN(&r.max_rec_lsn);
-    conn->txn_global.recovery_timestamp = conn->txn_global.meta_ckpt_timestamp = 0;
+    conn->txn_global.recovery_timestamp = conn->txn_global.meta_ckpt_timestamp = WT_TS_NONE;
 
     F_SET(conn, WT_CONN_RECOVERING);
     WT_ERR(__wt_metadata_search(session, WT_METAFILE_URI, &config));

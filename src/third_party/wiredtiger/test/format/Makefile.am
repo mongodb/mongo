@@ -4,7 +4,7 @@ AM_CPPFLAGS +=-I$(top_srcdir)/test/utility
 
 noinst_PROGRAMS = t
 t_SOURCES =\
-	backup.c bulk.c compact.c config.c lrt.c ops.c rebalance.c \
+	backup.c bulk.c compact.c config.c lrt.c ops.c random.c rebalance.c \
 	salvage.c snap.c t.c util.c wts.c
 
 t_LDADD = $(top_builddir)/test/utility/libtest_util.la

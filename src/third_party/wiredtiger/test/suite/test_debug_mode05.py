@@ -43,9 +43,11 @@ class test_debug_mode05(wttest.WiredTigerTestCase):
 
     def test_table_logging_rollback_to_stable(self):
         self.session.create(self.uri, 'key_format=i,value_format=u')
+
         cursor = self.session.open_cursor(self.uri, None)
 
         self.conn.set_timestamp('stable_timestamp=' + timestamp_str(100))
+        self.session.checkpoint()
 
         # Try doing a normal prepared txn and then rollback to stable.
         self.session.begin_transaction()

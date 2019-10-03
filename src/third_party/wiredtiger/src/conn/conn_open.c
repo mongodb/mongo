@@ -82,10 +82,12 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
     F_SET(conn, WT_CONN_CLOSING);
     WT_FULL_BARRIER();
 
+    /* The default session is used to access data handles during close. */
+    F_CLR(session, WT_SESSION_NO_DATA_HANDLES);
+
     /*
-     * Shut down server threads other than the eviction server, which is needed later to close btree
-     * handles. Some of these threads access btree handles, so take care in ordering shutdown to
-     * make sure they exit before files are closed.
+     * Shut down server threads. Some of these threads access btree handles and eviction, shut them
+     * down before the eviction server, and shut all servers down before closing open data handles.
      */
     WT_TRET(__wt_capacity_server_destroy(session));
     WT_TRET(__wt_checkpoint_server_destroy(session));

@@ -1723,6 +1723,12 @@ struct __wt_session {
 	 * \c "read-committed"\, \c "snapshot"; default empty.}
 	 * @config{name, name of the transaction for tracing and debugging., a string; default
 	 * empty.}
+	 * @config{operation_timeout_ms, when non-zero\, a requested limit on the number of elapsed
+	 * real time milliseconds taken to complete database operations in this transaction.  Time
+	 * is measured from the start of each WiredTiger API call.  There is no guarantee any
+	 * operation will not take longer than this amount of time.  If WiredTiger notices the limit
+	 * has been exceeded\, an operation may return a WT_ROLLBACK error.  Default is to have no
+	 * limit., an integer greater than or equal to 1; default \c 0.}
 	 * @config{priority, priority of the transaction for resolving conflicts.  Transactions with
 	 * higher values are less likely to abort., an integer between -100 and 100; default \c 0.}
 	 * @config{read_timestamp, read using the specified timestamp.  The supplied value must not
@@ -1906,16 +1912,17 @@ struct __wt_session {
 	 * "to=<checkpoint>" to drop all checkpoints before and including the named checkpoint.
 	 * Checkpoints cannot be dropped while a hot backup is in progress or if open in a cursor.,
 	 * a list of strings; default empty.}
-	 * @config{force, by default\, checkpoints may be skipped if the underlying object has not
-	 * been modified\, this option forces the checkpoint., a boolean flag; default \c false.}
+	 * @config{force, if false (the default)\, checkpoints may be skipped if the underlying
+	 * object has not been modified\, if true\, this option forces the checkpoint., a boolean
+	 * flag; default \c false.}
 	 * @config{name, if set\, specify a name for the checkpoint (note that checkpoints including
 	 * LSM trees may not be named)., a string; default empty.}
 	 * @config{target, if non-empty\, checkpoint the list of objects., a list of strings;
 	 * default empty.}
-	 * @config{use_timestamp, by default\, create the checkpoint as of the last stable timestamp
-	 * if timestamps are in use\, or all current updates if there is no stable timestamp set.
-	 * If false\, this option generates a checkpoint with all updates including those later than
-	 * the timestamp., a boolean flag; default \c true.}
+	 * @config{use_timestamp, if true (the default)\, create the checkpoint as of the last
+	 * stable timestamp if timestamps are in use\, or all current updates if there is no stable
+	 * timestamp set.  If false\, this option generates a checkpoint with all updates including
+	 * those later than the timestamp., a boolean flag; default \c true.}
 	 * @configend
 	 * @errors
 	 */
@@ -2259,6 +2266,12 @@ struct __wt_connection {
 	 * database.  Each worker thread uses a session handle from the configured session_max., an
 	 * integer between 3 and 20; default \c 4.}
 	 * @config{ ),,}
+	 * @config{operation_timeout_ms, when non-zero\, a requested limit on the number of elapsed
+	 * real time milliseconds application threads will take to complete database operations.
+	 * Time is measured from the start of each WiredTiger API call.  There is no guarantee any
+	 * operation will not take longer than this amount of time.  If WiredTiger notices the limit
+	 * has been exceeded\, an operation may return a WT_ROLLBACK error.  Default is to have no
+	 * limit., an integer greater than or equal to 1; default \c 0.}
 	 * @config{operation_tracking = (, enable tracking of performance-critical functions.  See
 	 * @ref operation_tracking for more information., a set of related configuration options
 	 * defined below.}
@@ -2493,18 +2506,16 @@ struct __wt_connection {
 	/*!
 	 * Rollback in-memory non-logged state to an earlier point in time.
 	 *
-	 * This method uses a timestamp to define the rollback point, and thus
-	 * requires that the application uses timestamps and that the
-	 * stable_timestamp must have been set via a call to
-	 * WT_CONNECTION::set_timestamp. Any updates to checkpoint durable
-	 * tables that are more recent than the stable timestamp are removed.
+	 * This method uses a timestamp to define the rollback point, and requires the application
+	 * use timestamps, the stable_timestamp have been set via a call to
+	 * WT_CONNECTION::set_timestamp, and a checkpoint operating on the last stable timestamp
+	 * to have completed. Any updates to checkpoint durable tables that are more recent than
+	 * the stable timestamp are removed.
 	 *
-	 * This method requires that there are no active operations for the
-	 * duration of the call.
+	 * This method requires that there are no active operations for the duration of the call.
 	 *
-	 * Any updates made to logged tables will not be rolled back. Any
-	 * updates made without an associated timestamp will not be rolled
-	 * back. See @ref transaction_timestamps.
+	 * Any updates made to logged tables will not be rolled back. Any updates made without an
+	 * associated timestamp will not be rolled back. See @ref transaction_timestamps.
 	 *
 	 * @snippet ex_all.c rollback to stable
 	 *
@@ -2912,6 +2923,12 @@ struct __wt_connection {
  * @config{multiprocess, permit sharing between processes (will automatically start an RPC server
  * for primary processes and use RPC for secondary processes). <b>Not yet supported in
  * WiredTiger</b>., a boolean flag; default \c false.}
+ * @config{operation_timeout_ms, when non-zero\, a requested limit on the number of elapsed real
+ * time milliseconds application threads will take to complete database operations.  Time is
+ * measured from the start of each WiredTiger API call.  There is no guarantee any operation will
+ * not take longer than this amount of time.  If WiredTiger notices the limit has been exceeded\, an
+ * operation may return a WT_ROLLBACK error.  Default is to have no limit., an integer greater than
+ * or equal to 1; default \c 0.}
  * @config{operation_tracking = (, enable tracking of performance-critical functions.  See @ref
  * operation_tracking for more information., a set of related configuration options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable operation tracking subsystem., a boolean flag;

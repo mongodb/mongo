@@ -654,8 +654,7 @@ worker(void *arg)
          */
         measure_latency = opts->sample_interval != 0 && trk != NULL && trk->ops != 0 &&
           (trk->ops % opts->sample_rate == 0);
-        if (measure_latency)
-            __wt_epoch(NULL, &start);
+        __wt_epoch(NULL, &start); /* [-Werror=maybe-uninitialized] */
 
         cursor->set_key(cursor, key_buf);
         switch (*op) {

@@ -277,10 +277,12 @@ __wt_evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
     conn = S2C(session);
     cache = conn->cache;
 
-    /*
-     * The thread group code calls us repeatedly. So each call is one pass through eviction.
-     */
-    WT_TRACK_TIME(session);
+/*
+ * The thread group code calls us repeatedly. So each call is one pass through eviction.
+ */
+#ifdef HAVE_DIAGNOSTIC
+    __wt_seconds32(session, &session->op_5043_seconds);
+#endif
     if (conn->evict_server_running && __wt_spin_trylock(session, &cache->evict_pass_lock) == 0) {
         /*
          * Cannot use WT_WITH_PASS_LOCK because this is a try lock. Fix when that is supported. We
@@ -2295,21 +2297,23 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, d
     if (timer)
         time_start = __wt_clock(session);
 
-    WT_TRACK_TIME(session);
+#ifdef HAVE_DIAGNOSTIC
+    __wt_seconds32(session, &session->op_5043_seconds);
+#endif
     for (initial_progress = cache->eviction_progress;; ret = 0) {
         /*
-         * A pathological case: if we're the oldest transaction in the
-         * system and the eviction server is stuck trying to find space
-         * (and we're not in recovery, because those transactions can't
-         * be rolled back), abort the transaction to give up all hazard
-         * pointers before trying again.
+         * If eviction is stuck, check if this thread is likely causing problems and should be
+         * rolled back. Ignore if in recovery, those transactions can't be rolled back.
          */
-        if (__wt_cache_stuck(session) && __wt_txn_am_oldest(session) &&
-          !F_ISSET(conn, WT_CONN_RECOVERING)) {
-            --cache->evict_aggressive_score;
-            WT_STAT_CONN_INCR(session, txn_fail_cache);
-            WT_ERR(
-              __wt_txn_rollback_required(session, "oldest transaction rolled back for eviction"));
+        if (!F_ISSET(conn, WT_CONN_RECOVERING) && __wt_cache_stuck(session)) {
+            ret = __wt_txn_is_blocking_old(session);
+            if (ret == 0)
+                ret = __wt_txn_is_blocking_pin(session);
+            if (ret == WT_ROLLBACK) {
+                --cache->evict_aggressive_score;
+                WT_STAT_CONN_INCR(session, txn_fail_cache);
+            }
+            WT_ERR(ret);
         }
 
         /*

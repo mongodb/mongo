@@ -1010,7 +1010,6 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
     WT_SESSION *wt_session;
     WT_SESSION_IMPL *s, *session;
     uint32_t i;
-    const char *ckpt_cfg;
 
     conn = (WT_CONNECTION_IMPL *)wt_conn;
 
@@ -1074,47 +1073,24 @@ err:
     WT_TRET(__wt_lsm_manager_destroy(session));
 
     /*
-     * After the async and LSM threads have exited, we shouldn't opening any more files.
+     * After the async and LSM threads have exited, we won't open more files for the application.
+     * However, the sweep server is still running and it can close file handles at the same time the
+     * final checkpoint is reviewing open data handles (forcing checkpoint to reopen handles). Shut
+     * down the sweep server and then flag the system should not open anything new.
      */
+    WT_TRET(__wt_sweep_destroy(session));
     F_SET(conn, WT_CONN_CLOSING_NO_MORE_OPENS);
     WT_FULL_BARRIER();
 
-    /* The default session is used to access data handles during close. */
-    F_CLR(session, WT_SESSION_NO_DATA_HANDLES);
-
     /*
-     * Perform a system-wide checkpoint so that all tables are consistent with each other. All
-     * transactions are resolved but ignore timestamps to make sure all data gets to disk. Do this
-     * before shutting down all the subsystems. We have shut down all user sessions, but send in
-     * true for waiting for internal races.
+     * Shut down the checkpoint and capacity server threads: we don't want to throttle writes and
+     * we're about to do a final checkpoint separately from the checkpoint server.
      */
-    WT_TRET(__wt_config_gets(session, cfg, "use_timestamp", &cval));
-    ckpt_cfg = "use_timestamp=false";
-    if (cval.val != 0) {
-        ckpt_cfg = "use_timestamp=true";
-        if (conn->txn_global.has_stable_timestamp)
-            F_SET(conn, WT_CONN_CLOSING_TIMESTAMP);
-    }
-    if (!F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY)) {
-        s = NULL;
-        WT_TRET(__wt_open_internal_session(conn, "close_ckpt", true, 0, &s));
-        if (s != NULL) {
-            const char *checkpoint_cfg[] = {
-              WT_CONFIG_BASE(session, WT_SESSION_checkpoint), ckpt_cfg, NULL};
-            wt_session = &s->iface;
-            WT_TRET(__wt_txn_checkpoint(s, checkpoint_cfg, true));
+    WT_TRET(__wt_capacity_server_destroy(session));
+    WT_TRET(__wt_checkpoint_server_destroy(session));
 
-            /*
-             * Mark the metadata dirty so we flush it on close, allowing recovery to be skipped.
-             */
-            WT_WITH_DHANDLE(s, WT_SESSION_META_DHANDLE(s), __wt_tree_modify_set(s));
-
-            WT_TRET(wt_session->close(wt_session, config));
-        }
-    }
-
-    /* Shut down the global transaction state. */
-    __wt_txn_global_shutdown(session);
+    /* Perform a final checkpoint and shut down the global transaction state. */
+    WT_TRET(__wt_txn_global_shutdown(session, config, cfg));
 
     if (ret != 0) {
         __wt_err(session, ret, "failure during close, disabling further writes");
@@ -2573,6 +2549,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
 
     WT_ERR(__wt_config_gets(session, cfg, "mmap", &cval));
     conn->mmap = cval.val != 0;
+
+    WT_ERR(__wt_config_gets(session, cfg, "operation_timeout_ms", &cval));
+    conn->operation_timeout_us = (uint64_t)(cval.val * WT_THOUSAND);
 
     WT_ERR(__wt_config_gets(session, cfg, "salvage", &cval));
     if (cval.val) {

@@ -94,10 +94,7 @@ __rec_child_deleted(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref, WT_C
     if (F_ISSET(r, WT_REC_EVICT))
         return (__wt_set_return(session, EBUSY));
 
-    /*
-     * If there are deleted child pages we can't discard immediately, keep the page dirty so they
-     * are eventually freed.
-     */
+    /* If the page cannot be marked clean. */
     r->leave_dirty = true;
 
     /*

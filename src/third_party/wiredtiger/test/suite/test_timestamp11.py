@@ -83,6 +83,7 @@ class test_timestamp11(wttest.WiredTigerTestCase, suite_subprocess):
         #
         stable_ts = timestamp_str(2)
         self.conn.set_timestamp('stable_timestamp=' + stable_ts)
+        self.session.checkpoint()
         self.conn.rollback_to_stable()
 
         c = self.session.open_cursor(uri)

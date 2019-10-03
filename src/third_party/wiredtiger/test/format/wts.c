@@ -162,7 +162,8 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
       ",cache_size=%" PRIu32
       "MB"
       ",checkpoint_sync=false"
-      ",error_prefix=\"%s\"",
+      ",error_prefix=\"%s\""
+      ",operation_timeout_ms=2000",
       g.c_cache, progname);
 
     /* In-memory configuration. */

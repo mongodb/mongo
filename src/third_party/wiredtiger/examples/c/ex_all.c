@@ -928,6 +928,8 @@ transaction_ops(WT_SESSION *session_arg)
     error_check(conn->set_timestamp(conn, "stable_timestamp=2a"));
     /*! [set stable timestamp] */
 
+    /* WT_CONNECTION.rollback_to_stable requires a timestamped checkpoint. */
+    error_check(session->checkpoint(session, NULL));
     /*! [rollback to stable] */
     error_check(conn->rollback_to_stable(conn, NULL));
     /*! [rollback to stable] */

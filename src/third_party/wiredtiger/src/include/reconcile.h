@@ -33,12 +33,9 @@ struct __wt_reconcile {
 
     /* Track the page's min/maximum transactions. */
     uint64_t max_txn;
-    wt_timestamp_t max_timestamp;
-
-    /* Lookaside boundary tracking. */
-    uint64_t unstable_txn;
-    wt_timestamp_t unstable_durable_timestamp;
-    wt_timestamp_t unstable_timestamp;
+    wt_timestamp_t max_ts;
+    wt_timestamp_t max_ondisk_ts;
+    wt_timestamp_t min_skipped_ts;
 
     u_int updates_seen;     /* Count of updates seen. */
     u_int updates_unstable; /* Count of updates not visible_all. */

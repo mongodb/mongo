@@ -61,7 +61,12 @@ struct __wt_session_impl {
     const char *name;   /* Name */
     const char *lastop; /* Last operation */
     uint32_t id;        /* UID, offset in session array */
-    uint32_t op_start;  /* DEBUGGING: Operation start time (seconds) */
+
+    uint64_t operation_start_us;   /* Operation start */
+    uint64_t operation_timeout_us; /* Maximum operation period before rollback */
+#ifdef HAVE_DIAGNOSTIC
+    uint32_t op_5043_seconds; /* Temporary debugging to catch WT-5043, discard after 01/2020. */
+#endif
 
     WT_EVENT_HANDLER *event_handler; /* Application's event handlers */
 

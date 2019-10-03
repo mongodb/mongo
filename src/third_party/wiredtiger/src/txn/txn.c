@@ -468,6 +468,12 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
           WT_STRING_MATCH("read-committed", cval.str, cval.len) ? WT_ISO_READ_COMMITTED :
                                                                   WT_ISO_READ_UNCOMMITTED;
 
+    /* Retrieve the maximum operation time, defaulting to the database-wide configuration. */
+    WT_RET(__wt_config_gets(session, cfg, "operation_timeout_ms", &cval));
+    session->operation_timeout_us = (uint64_t)(cval.val * WT_THOUSAND);
+    if (session->operation_timeout_us == 0)
+        session->operation_timeout_us = S2C(session)->operation_timeout_us;
+
     /*
      * The default sync setting is inherited from the connection, but can
      * be overridden by an explicit "sync" setting for this transaction.
@@ -615,6 +621,9 @@ __wt_txn_release(WT_SESSION_IMPL *session)
      */
     txn->flags = 0;
     txn->prepare_timestamp = WT_TS_NONE;
+
+    /* Clear operation timer. */
+    session->operation_timeout_us = 0;
 }
 
 /*
@@ -1501,19 +1510,143 @@ __wt_txn_activity_drain(WT_SESSION_IMPL *session)
  * __wt_txn_global_shutdown --
  *     Shut down the global transaction state.
  */
-void
-__wt_txn_global_shutdown(WT_SESSION_IMPL *session)
+int
+__wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char *config, const char **cfg)
 {
+    WT_CONFIG_ITEM cval;
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
+    WT_SESSION *wt_session;
+    WT_SESSION_IMPL *s;
+    const char *ckpt_cfg;
+
+    conn = S2C(session);
+
     /*
-     * All application transactions have completed, ignore the pinned
-     * timestamp so that updates can be evicted from the cache during
-     * connection close.
-     *
-     * Note that we are relying on a special case in __wt_txn_visible_all
-     * that returns true during close when there is no pinned timestamp
-     * set.
+     * Perform a system-wide checkpoint so that all tables are consistent with each other. All
+     * transactions are resolved but ignore timestamps to make sure all data gets to disk. Do this
+     * before shutting down all the subsystems. We have shut down all user sessions, but send in
+     * true for waiting for internal races.
      */
-    S2C(session)->txn_global.has_pinned_timestamp = false;
+    WT_TRET(__wt_config_gets(session, cfg, "use_timestamp", &cval));
+    ckpt_cfg = "use_timestamp=false";
+    if (cval.val != 0) {
+        ckpt_cfg = "use_timestamp=true";
+        if (conn->txn_global.has_stable_timestamp)
+            F_SET(conn, WT_CONN_CLOSING_TIMESTAMP);
+    }
+    if (!F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY)) {
+        s = NULL;
+        WT_TRET(__wt_open_internal_session(conn, "close_ckpt", true, 0, &s));
+        if (s != NULL) {
+            const char *checkpoint_cfg[] = {
+              WT_CONFIG_BASE(session, WT_SESSION_checkpoint), ckpt_cfg, NULL};
+            wt_session = &s->iface;
+            WT_TRET(__wt_txn_checkpoint(s, checkpoint_cfg, true));
+
+            /*
+             * Mark the metadata dirty so we flush it on close, allowing recovery to be skipped.
+             */
+            WT_WITH_DHANDLE(s, WT_SESSION_META_DHANDLE(s), __wt_tree_modify_set(s));
+
+            WT_TRET(wt_session->close(wt_session, config));
+        }
+    }
+
+    /*
+     * All application transactions have completed, ignore the pinned timestamp so that updates can
+     * be evicted from the cache during connection close.
+     *
+     * Note that we are relying on a special case in __wt_txn_visible_all that returns true during
+     * close when there is no pinned timestamp set.
+     */
+    conn->txn_global.has_pinned_timestamp = false;
+
+    return (ret);
+}
+
+/*
+ * __wt_txn_is_blocking_old --
+ *     Return if this transaction is the oldest transaction in the system, called by eviction to
+ *     determine if a worker thread should be released from eviction.
+ */
+int
+__wt_txn_is_blocking_old(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_TXN *txn;
+    WT_TXN_GLOBAL *txn_global;
+    WT_TXN_STATE *state;
+    uint64_t id;
+    uint32_t i, session_cnt;
+
+    conn = S2C(session);
+    txn = &session->txn;
+    txn_global = &conn->txn_global;
+
+    if (txn->id == WT_TXN_NONE || F_ISSET(txn, WT_TXN_PREPARE))
+        return (false);
+
+    WT_ORDERED_READ(session_cnt, conn->session_cnt);
+
+    /*
+     * Check if the transaction is oldest one in the system. It's safe to ignore sessions allocating
+     * transaction IDs, since we already have an ID, they are guaranteed to be newer.
+     */
+    for (i = 0, state = txn_global->states; i < session_cnt; i++, state++) {
+        if (state->is_allocating)
+            continue;
+
+        WT_ORDERED_READ(id, state->id);
+        if (id != WT_TXN_NONE && WT_TXNID_LT(id, txn->id))
+            break;
+    }
+    return (i == session_cnt ?
+        __wt_txn_rollback_required(session, "oldest transaction ID rolled back for eviction") :
+        0);
+}
+
+/*
+ * __wt_txn_is_blocking_pin --
+ *     Return if this transaction is likely blocking eviction because of a pinned transaction ID,
+ *     called by eviction to determine if a worker thread should be released from eviction.
+ */
+int
+__wt_txn_is_blocking_pin(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_SESSION_IMPL *s;
+    WT_TXN *txn;
+    uint64_t snap_min;
+    uint32_t i, session_cnt;
+
+    conn = S2C(session);
+    txn = &session->txn;
+
+    /*
+     * Check if we hold the oldest pinned transaction ID in the system. This potentially means
+     * rolling back a read-only transaction, which MongoDB can't (yet) handle. For this reason,
+     * don't check unless we're configured to time out thread operations, a way to confirm our
+     * caller is prepared for rollback.
+     */
+    if (!F_ISSET(txn, WT_TXN_HAS_SNAPSHOT) || txn->snap_min == WT_TXN_NONE)
+        return (0);
+    if (!__wt_op_timer_fired(session))
+        return (0);
+
+    WT_ORDERED_READ(session_cnt, conn->session_cnt);
+
+    for (s = conn->sessions, i = 0; i < session_cnt; ++s, ++i) {
+        if (F_ISSET(s, WT_SESSION_INTERNAL) || !F_ISSET(&s->txn, WT_TXN_HAS_SNAPSHOT))
+            continue;
+
+        WT_ORDERED_READ(snap_min, s->txn.snap_min);
+        if (snap_min != WT_TXN_NONE && snap_min < txn->snap_min)
+            break;
+    }
+    return (i == session_cnt ? __wt_txn_rollback_required(
+                                 session, "oldest pinned transaction ID rolled back for eviction") :
+                               0);
 }
 
 /*
