@@ -253,14 +253,14 @@ TEST_F(FetcherTest, InvalidConstruction) {
 TEST_F(FetcherTest, NonFindCommand) {
     TaskExecutor& executor = getExecutor();
 
-    Fetcher(&executor,
-            source,
-            "db",
-            BSON("listIndexes"
-                 << "coll"),
-            unreachableCallback);
-    Fetcher(&executor, source, "db", BSON("listCollections" << 1), unreachableCallback);
-    Fetcher(&executor, source, "db", BSON("a" << 1), unreachableCallback);
+    Fetcher f1(&executor,
+               source,
+               "db",
+               BSON("listIndexes"
+                    << "coll"),
+               unreachableCallback);
+    Fetcher f2(&executor, source, "db", BSON("listCollections" << 1), unreachableCallback);
+    Fetcher f3(&executor, source, "db", BSON("a" << 1), unreachableCallback);
 }
 
 TEST_F(FetcherTest, RemoteCommandRequestShouldContainCommandParametersPassedToConstructor) {
