@@ -1284,7 +1284,7 @@ buildvariants:
 
 - name: linux-3-node-replSet-noflowcontrol
   display_name: Linux 3-Node ReplSet (Flow Control off)
-  batchtime: 1440  # 24 hours
+  batchtime: 10080  # 7 days
   modules: *modules
   expansions:
     setup: replica-noflowcontrol
