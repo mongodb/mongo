@@ -1,6 +1,7 @@
 /**
  * Tests that standalone nodes with replica set data are unable to upgrade or downgrade FCV while
  * the config.transactions collection is non-empty.
+ * @tags: [uses_transactions, requires_persistence]
  */
 (function() {
 
