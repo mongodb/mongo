@@ -342,9 +342,15 @@ void AWSConnection::connect(const HostAndPort& host) {
             str::stream() << "AWS KMS server address " << host.host() << " is invalid.",
             server.isValid());
 
+    int attempt = 0;
+    bool connected = false;
+    while ((connected == false) && (attempt < 3)) {
+        connected = _socket->connect(server);
+        attempt++;
+    }
     uassert(51137,
             str::stream() << "Could not connect to AWS KMS server " << server.toString(),
-            _socket->connect(server));
+            connected);
 
     uassert(51138,
             str::stream() << "Failed to perform SSL handshake with the AWS KMS server "
