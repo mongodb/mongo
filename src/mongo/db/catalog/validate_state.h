@@ -117,16 +117,14 @@ public:
      * dropped. In addition, if any indexes that were being validated are removed, validation will
      * be interrupted. A collection that was renamed across the same database can continue to be
      * validated, but a cross database collection rename will interrupt validation. If the locks
-     * cannot be re-acquired, then this is guranteed to throw.
+     * cannot be re-acquired, throws the error.
      *
-     * Before yielding locks:
-     *     - Save all the SortedDataInterface and SeekableRecord cursors.
+     * Throws if validation cannot continue.
      *
      * After locks are reacquired:
      *     - Check if the database exists.
      *     - Check if the collection exists.
      *     - Check if any indexes that were being validated have been removed.
-     *     - Restore all the SortedDataInterface and SeekableRecord cursors.
      */
     void yieldLocks(OperationContext* opCtx);
 

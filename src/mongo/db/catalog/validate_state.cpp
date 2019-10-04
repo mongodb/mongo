@@ -86,14 +86,6 @@ ValidateState::ValidateState(OperationContext* opCtx,
 void ValidateState::yieldLocks(OperationContext* opCtx) {
     invariant(_background);
 
-    // Save all the cursors.
-    for (const auto& indexCursor : _indexCursors) {
-        indexCursor.second->save();
-    }
-
-    _traverseRecordStoreCursor->save();
-    _seekRecordStoreCursor->save();
-
     // Drop and reacquire the locks.
     _relockDatabaseAndCollection(opCtx);
 
@@ -106,23 +98,6 @@ void ValidateState::yieldLocks(OperationContext* opCtx) {
                     << _nss << " (" << *_uuid << "), index: " << index->descriptor()->indexName(),
                 !index->isDropped());
     }
-
-    // Restore all the cursors.
-    for (const auto& indexCursor : _indexCursors) {
-        indexCursor.second->restore();
-    }
-
-    uassert(
-        ErrorCodes::Interrupted,
-        str::stream() << "Interrupted due to: cursor cannot be restored after yield on collection: "
-                      << _nss.db() << " (" << *_uuid << ")",
-        _traverseRecordStoreCursor->restore());
-
-    uassert(
-        ErrorCodes::Interrupted,
-        str::stream() << "Interrupted due to: cursor cannot be restored after yield on collection: "
-                      << _nss.db() << " (" << *_uuid << ")",
-        _seekRecordStoreCursor->restore());
 };
 
 void ValidateState::initializeCursors(OperationContext* opCtx) {
