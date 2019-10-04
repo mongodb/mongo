@@ -72,6 +72,12 @@ public:
 
     virtual BSONCollectionCatalogEntry::MetaData getMetaData(OperationContext* opCtx,
                                                              const NamespaceString& nss) const = 0;
+
+    /**
+     * Updates the catalog entry for the collection 'nss' with the fields specified in 'md'. If
+     * 'md.indexes' contains a new index entry, then this method generates a new index ident and
+     * adds it to the catalog entry.
+     */
     virtual void putMetaData(OperationContext* opCtx,
                              const NamespaceString& nss,
                              BSONCollectionCatalogEntry::MetaData& md) = 0;
@@ -162,6 +168,10 @@ public:
                                NamespaceString ns,
                                StringData indexName) = 0;
 
+    /**
+     * Updates the persisted catalog entry for 'ns' with the new index and creates the index on
+     * disk.
+     */
     virtual Status prepareForIndexBuild(OperationContext* opCtx,
                                         NamespaceString ns,
                                         const IndexDescriptor* spec,

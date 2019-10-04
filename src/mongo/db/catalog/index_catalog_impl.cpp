@@ -348,15 +348,15 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
         fassertFailedNoTrace(28782);
     }
 
-    auto* const descriptorPtr = descriptor.get();
-    auto entry = std::make_shared<IndexCatalogEntryImpl>(
-        opCtx, std::move(descriptor), &CollectionQueryInfo::get(_collection));
-
-    IndexDescriptor* desc = entry->descriptor();
-
     auto engine = opCtx->getServiceContext()->getStorageEngine();
     std::string ident =
-        engine->getCatalog()->getIndexIdent(opCtx, _collection->ns(), desc->indexName());
+        engine->getCatalog()->getIndexIdent(opCtx, _collection->ns(), descriptor->indexName());
+
+    auto* const descriptorPtr = descriptor.get();
+    auto entry = std::make_shared<IndexCatalogEntryImpl>(
+        opCtx, ident, std::move(descriptor), &CollectionQueryInfo::get(_collection));
+
+    IndexDescriptor* desc = entry->descriptor();
 
     std::unique_ptr<SortedDataInterface> sdi =
         engine->getEngine()->getGroupedSortedDataInterface(opCtx, ident, desc, entry->getPrefix());

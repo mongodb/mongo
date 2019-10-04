@@ -58,6 +58,7 @@ class IndexCatalogEntryImpl : public IndexCatalogEntry {
 
 public:
     IndexCatalogEntryImpl(OperationContext* opCtx,
+                          const std::string& ident,
                           std::unique_ptr<IndexDescriptor> descriptor,  // ownership passes to me
                           CollectionQueryInfo* queryInfo);              // not owned, optional
 
@@ -66,6 +67,10 @@ public:
     const NamespaceString& ns() const final;
 
     void init(std::unique_ptr<IndexAccessMethod> accessMethod) final;
+
+    const std::string& getIdent() const final {
+        return _ident;
+    }
 
     IndexDescriptor* descriptor() final {
         return _descriptor.get();
@@ -193,6 +198,8 @@ private:
     KVPrefix _catalogGetPrefix(OperationContext* opCtx) const;
 
     // -----
+
+    const std::string _ident;
 
     std::unique_ptr<IndexDescriptor> _descriptor;  // owned here
 

@@ -64,6 +64,8 @@ public:
 
     virtual void init(std::unique_ptr<IndexAccessMethod> accessMethod) = 0;
 
+    virtual const std::string& getIdent() const = 0;
+
     virtual IndexDescriptor* descriptor() = 0;
 
     virtual const IndexDescriptor* descriptor() const = 0;

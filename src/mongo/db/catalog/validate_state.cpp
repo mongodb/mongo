@@ -175,18 +175,34 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
 
     const IndexCatalog* indexCatalog = _collection->getIndexCatalog();
     const std::unique_ptr<IndexCatalog::IndexIterator> it =
-        indexCatalog->getIndexIterator(opCtx, false);
+        indexCatalog->getIndexIterator(opCtx, /*includeUnfinished*/ false);
     while (it->more()) {
         const IndexCatalogEntry* entry = it->next();
         const IndexDescriptor* desc = entry->descriptor();
 
-        // Filter out any index that is not in the checkpoint's MDB catalog table.
+        // Filter out any in-memory index in the collection that is not in our PIT view of the MDB
+        // catalog. This is only important when background:true because we are then reading from the
+        // checkpoint's view of the MDB catalog and data.
         bool isIndexDurable =
             std::find(readyDurableIndexes.begin(), readyDurableIndexes.end(), desc->indexName()) !=
             readyDurableIndexes.end();
         if (_background && !isIndexDurable) {
             log() << "Skipping validation on index '" << desc->indexName() << "' in collection '"
                   << _nss << "' because the index is not yet in a checkpoint.";
+            continue;
+        }
+
+        // Read the index's ident from disk (the checkpoint if background:true). If it does not
+        // match the in-memory ident saved in the IndexCatalogEntry, then our PIT view of the index
+        // is old and the index has been dropped and recreated. In this case we will skip it since
+        // there is no utility in checking a dropped index (we also cannot currently access it
+        // because its in-memory representation is gone).
+        auto diskIndexIdent =
+            opCtx->getServiceContext()->getStorageEngine()->getCatalog()->getIndexIdent(
+                opCtx, _nss, desc->indexName());
+        if (entry->getIdent() != diskIndexIdent) {
+            log() << "Skipping validation on index '" << desc->indexName() << "' in collection '"
+                  << _nss << "' because the index was recreated and is not yet in a checkpoint.";
             continue;
         }
 

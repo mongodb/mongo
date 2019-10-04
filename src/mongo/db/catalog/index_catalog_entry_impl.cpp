@@ -60,9 +60,11 @@ namespace mongo {
 using std::string;
 
 IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
+                                             const std::string& ident,
                                              std::unique_ptr<IndexDescriptor> descriptor,
                                              CollectionQueryInfo* const queryInfo)
-    : _descriptor(std::move(descriptor)),
+    : _ident(ident),
+      _descriptor(std::move(descriptor)),
       _queryInfo(queryInfo),
       _ordering(Ordering::make(_descriptor->keyPattern())),
       _isReady(false),
