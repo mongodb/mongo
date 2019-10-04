@@ -29,7 +29,7 @@ function runTests(ServerType) {
     // the reported query error code is the cryptic 'BadValue'.
     assert.commandFailedWithCode(
         primaryDB.runCommand({find: collName, filter: {any_nonexistent_field: {$exists: true}}}),
-        ErrorCodes.BadValue);
+        ErrorCodes.NoQueryExecutionPlans);
 
     s.stop();
 }

@@ -882,9 +882,10 @@ void Explain::explainStages(PlanExecutor* exec,
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
         executePlanStatus = exec->executePlan();
 
-        // If executing the query failed because it was killed, then the collection may no longer be
-        // valid. We indicate this by setting our collection pointer to null.
-        if (executePlanStatus == ErrorCodes::QueryPlanKilled) {
+        // If executing the query failed, for any number of reasons other than a planning failure,
+        // then the collection may no longer be valid. We conservatively set our collection pointer
+        // to null in case it is invalid.
+        if (executePlanStatus != ErrorCodes::NoQueryExecutionPlans) {
             collection = nullptr;
         }
     }

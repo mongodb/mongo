@@ -73,7 +73,7 @@ assert.commandWorked(coll.createIndex({"c.$**": 1}));
 // Hint on path that is not in query argument.
 assert.commandFailedWithCode(
     db.runCommand({find: coll.getName(), filter: {"a": 1}, hint: {"c.$**": 1}}),
-    ErrorCodes.BadValue);
+    ErrorCodes.NoQueryExecutionPlans);
 
 // Hint on a path specified $** index.
 assertExpectedIndexAnswersQueryWithHint(

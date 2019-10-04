@@ -188,6 +188,11 @@ void PlanYieldPolicy::_yieldAllLocks(OperationContext* opCtx,
         if (ns.empty() || ns == planExecNS.ns()) {
             MONGO_FAIL_POINT_PAUSE_WHILE_SET(setYieldAllLocksHang);
         }
+
+        if (config.getData().getField("checkForInterruptAfterHang").trueValue()) {
+            // Throws.
+            opCtx->checkForInterrupt();
+        }
     }
 
     MONGO_FAIL_POINT_BLOCK(setYieldAllLocksWait, customWait) {

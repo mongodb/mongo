@@ -14,7 +14,8 @@
 db.fs.chunks.drop();
 assert.writeOK(db.fs.chunks.insert({files_id: 1, n: 0, data: new BinData(0, "test")}));
 
-assert.commandFailedWithCode(db.runCommand({filemd5: 1, root: "fs"}), ErrorCodes.BadValue);
+assert.commandFailedWithCode(db.runCommand({filemd5: 1, root: "fs"}),
+                             ErrorCodes.NoQueryExecutionPlans);
 
 db.fs.chunks.ensureIndex({files_id: 1, n: 1});
 assert.commandWorked(db.runCommand({filemd5: 1, root: "fs"}));

@@ -517,7 +517,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
     // We cannot figure out how to answer the query.  Perhaps it requires an index
     // we do not have?
     if (0 == solutions.size()) {
-        return Status(ErrorCodes::BadValue,
+        return Status(ErrorCodes::NoQueryExecutionPlans,
                       str::stream() << "error processing query: " << canonicalQuery->toString()
                                     << " No query solutions");
     }

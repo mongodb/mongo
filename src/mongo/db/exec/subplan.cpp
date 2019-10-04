@@ -196,13 +196,13 @@ Status tagOrChildAccordingToCache(PlanCacheIndexTree* compositeCacheData,
         // For example, we don't cache things for 2d indices.
         str::stream ss;
         ss << "No cache data for subchild " << orChild->debugString();
-        return Status(ErrorCodes::BadValue, ss);
+        return Status(ErrorCodes::NoQueryExecutionPlans, ss);
     }
 
     if (SolutionCacheData::USE_INDEX_TAGS_SOLN != branchCacheData->solnType) {
         str::stream ss;
         ss << "No indexed cache data for subchild " << orChild->debugString();
-        return Status(ErrorCodes::BadValue, ss);
+        return Status(ErrorCodes::NoQueryExecutionPlans, ss);
     }
 
     // Add the index assignments to our original query.
@@ -212,7 +212,7 @@ Status tagOrChildAccordingToCache(PlanCacheIndexTree* compositeCacheData,
     if (!tagStatus.isOK()) {
         str::stream ss;
         ss << "Failed to extract indices from subchild " << orChild->debugString();
-        return Status(ErrorCodes::BadValue, ss);
+        return tagStatus.withContext(ss);
     }
 
     // Add the child's cache data to the cache data we're creating for the main query.
@@ -293,7 +293,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
                 str::stream ss;
                 ss << "Failed to pick best plan for subchild "
                    << branchResult->canonicalQuery->toString();
-                return Status(ErrorCodes::BadValue, ss);
+                return Status(ErrorCodes::NoQueryExecutionPlans, ss);
             }
 
             QuerySolution* bestSoln = multiPlanStage->bestSolution();
@@ -303,13 +303,13 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
             if (NULL == bestSoln->cacheData.get()) {
                 str::stream ss;
                 ss << "No cache data for subchild " << orChild->debugString();
-                return Status(ErrorCodes::BadValue, ss);
+                return Status(ErrorCodes::NoQueryExecutionPlans, ss);
             }
 
             if (SolutionCacheData::USE_INDEX_TAGS_SOLN != bestSoln->cacheData->solnType) {
                 str::stream ss;
                 ss << "No indexed cache data for subchild " << orChild->debugString();
-                return Status(ErrorCodes::BadValue, ss);
+                return Status(ErrorCodes::NoQueryExecutionPlans, ss);
             }
 
             // Add the index assignments to our original query.
@@ -319,7 +319,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
             if (!tagStatus.isOK()) {
                 str::stream ss;
                 ss << "Failed to extract indices from subchild " << orChild->debugString();
-                return Status(ErrorCodes::BadValue, ss);
+                return tagStatus.withContext(ss);
             }
 
             cacheData->children.push_back(bestSoln->cacheData->tree->clone());
@@ -336,7 +336,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
     if (!solnRoot) {
         str::stream ss;
         ss << "Failed to build indexed data path for subplanned query\n";
-        return Status(ErrorCodes::BadValue, ss);
+        return Status(ErrorCodes::NoQueryExecutionPlans, ss);
     }
 
     LOG(5) << "Subplanner: fully tagged tree is " << redact(solnRoot->toString());
@@ -348,7 +348,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
     if (NULL == _compositeSolution.get()) {
         str::stream ss;
         ss << "Failed to analyze subplanned query";
-        return Status(ErrorCodes::BadValue, ss);
+        return Status(ErrorCodes::NoQueryExecutionPlans, ss);
     }
 
     LOG(5) << "Subplanner: Composite solution is " << redact(_compositeSolution->toString());
@@ -382,7 +382,7 @@ Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
     // We cannot figure out how to answer the query.  Perhaps it requires an index
     // we do not have?
     if (0 == solutions.size()) {
-        return Status(ErrorCodes::BadValue,
+        return Status(ErrorCodes::NoQueryExecutionPlans,
                       str::stream() << "error processing query: " << _query->toString()
                                     << " No query solutions");
     }
@@ -453,11 +453,10 @@ Status SubplanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     // the overall winning plan from the resulting index tags.
     Status subplanSelectStat = choosePlanForSubqueries(yieldPolicy);
     if (!subplanSelectStat.isOK()) {
-        if (subplanSelectStat == ErrorCodes::QueryPlanKilled ||
-            subplanSelectStat == ErrorCodes::MaxTimeMSExpired) {
-            // Query planning cannot continue if the plan for one of the subqueries was killed
-            // because the collection or a candidate index may have been dropped, or if we've
-            // exceeded the operation's time limit.
+        if (subplanSelectStat != ErrorCodes::NoQueryExecutionPlans) {
+            // Query planning can continue if we failed to find a solution for one of the
+            // children. Otherwise, it cannot, as it may no longer be safe to access the collection
+            // (and index may have been dropped, we may have exceeded the time limit, etc).
             return subplanSelectStat;
         }
         return choosePlanWholeQuery(yieldPolicy);

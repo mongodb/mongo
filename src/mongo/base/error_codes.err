@@ -290,6 +290,8 @@ error_code("TransactionCoordinatorDeadlineTaskCanceled", 287)
 error_code("ChecksumMismatch", 288)
 # Internal only code used by WaitForMajorityService.
 error_code("WaitForMajorityServiceEarlierOpTimeAvailable", 289)
+# 290 is TransactionExceededLifetimeLimitSeconds, but not used.
+error_code("NoQueryExecutionPlans", 291)
 
 # Error codes 4000-8999 are reserved.
 

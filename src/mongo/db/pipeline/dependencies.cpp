@@ -102,6 +102,11 @@ BSONObj DepsTracker::toProjection() const {
         }
 
         last = field + '.';
+
+        // We should only have dependencies on fields that are valid in aggregation. Create a
+        // FieldPath to check this.
+        FieldPath fieldPath(field);
+
         bb.append(field, 1);
     }
 
