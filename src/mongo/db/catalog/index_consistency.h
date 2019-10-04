@@ -30,11 +30,8 @@
 #pragma once
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/catalog/collection_validation.h"
-#include "mongo/db/catalog/throttle_cursor.h"
 #include "mongo/db/catalog/validate_state.h"
 #include "mongo/db/storage/key_string.h"
-#include "mongo/db/storage/record_store.h"
 
 namespace mongo {
 

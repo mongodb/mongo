@@ -29,11 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/catalog/collection_validation.h"
-#include "mongo/db/catalog/throttle_cursor.h"
 #include "mongo/db/catalog/validate_state.h"
-#include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/sorted_data_interface.h"
 
 namespace mongo {
 
@@ -42,8 +38,8 @@ class IndexDescriptor;
 class OperationContext;
 
 /**
- * The record store validate adaptor is used to keep track of the index consistency during
- * a validation that's running.
+ * The validate adaptor is used to keep track of collection and index consistency during a running
+ * collection validation operation.
  */
 class ValidateAdaptor {
     using ValidateResultsMap = std::map<std::string, ValidateResults>;
@@ -84,15 +80,18 @@ public:
                              BSONObjBuilder* output);
 
     /**
-     * Validate that the number of document keys matches the number of index keys.
+     * Validates that the number of document keys matches the number of index keys previously
+     * traversed in traverseIndex().
      */
-    void validateIndexKeyCount(const IndexDescriptor* idx,
-                               int64_t numRecs,
-                               ValidateResults& results);
+    void validateIndexKeyCount(const IndexDescriptor* idx, ValidateResults& results);
 
 private:
     IndexConsistency* _indexConsistency;
     CollectionValidation::ValidateState* _validateState;
     ValidateResultsMap* _indexNsResultsMap;
+
+    // Saves the record count from the record store traversal to be used later to validate the index
+    // entries count. Reset every time traverseRecordStore() is called.
+    long long _numRecords = 0;
 };
 }  // namespace mongo

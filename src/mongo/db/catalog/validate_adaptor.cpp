@@ -37,12 +37,14 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_consistency.h"
+#include "mongo/db/catalog/throttle_cursor.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/rpc/object_check.h"
 #include "mongo/util/log.h"
 
@@ -210,7 +212,7 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
 void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                           ValidateResults* results,
                                           BSONObjBuilder* output) {
-    long long nrecords = 0;
+    _numRecords = 0;  // need to reset it because this function can be called more than once.
     long long dataSizeTotal = 0;
     long long interruptIntervalNumBytes = 0;
     long long nInvalid = 0;
@@ -224,9 +226,9 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
              traverseRecordStoreCursor->seekExact(opCtx, _validateState->getFirstRecordId());
          record;
          record = traverseRecordStoreCursor->next(opCtx)) {
-        ++nrecords;
+        ++_numRecords;
         interruptIntervalNumBytes += record->data.size();
-        if (nrecords % kInterruptIntervalNumRecords == 0 ||
+        if (_numRecords % kInterruptIntervalNumRecords == 0 ||
             interruptIntervalNumBytes >= kInterruptIntervalNumBytes) {
             opCtx->checkForInterrupt();
 
@@ -281,29 +283,29 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
     // checkpoint and it may not have the most up-to-date changes.
     if (results->valid && !_validateState->isBackground()) {
         _validateState->getCollection()->getRecordStore()->updateStatsAfterRepair(
-            opCtx, nrecords, dataSizeTotal);
+            opCtx, _numRecords, dataSizeTotal);
     }
 
     output->appendNumber("nInvalidDocuments", nInvalid);
-    output->appendNumber("nrecords", nrecords);
+    output->appendNumber("nrecords", _numRecords);
 }
 
-void ValidateAdaptor::validateIndexKeyCount(const IndexDescriptor* idx,
-                                            int64_t numRecs,
-                                            ValidateResults& results) {
+void ValidateAdaptor::validateIndexKeyCount(const IndexDescriptor* idx, ValidateResults& results) {
+    // Fetch the total number of index entries we previously found traversing the index.
     const std::string indexName = idx->indexName();
     IndexInfo* indexInfo = &_indexConsistency->getIndexInfo(indexName);
     auto numTotalKeys = indexInfo->numKeys;
 
+    // Do not fail on finding too few index entries compared to collection entries when full:false.
     bool hasTooFewKeys = false;
     bool noErrorOnTooFewKeys = !_validateState->isFullValidate();
 
-    if (idx->isIdIndex() && numTotalKeys != numRecs) {
-        hasTooFewKeys = numTotalKeys < numRecs ? true : hasTooFewKeys;
+    if (idx->isIdIndex() && numTotalKeys != _numRecords) {
+        hasTooFewKeys = numTotalKeys < _numRecords ? true : hasTooFewKeys;
         std::string msg = str::stream()
             << "number of _id index entries (" << numTotalKeys
-            << ") does not match the number of documents in the index (" << numRecs << ")";
-        if (noErrorOnTooFewKeys && (numTotalKeys < numRecs)) {
+            << ") does not match the number of documents in the index (" << _numRecords << ")";
+        if (noErrorOnTooFewKeys && (numTotalKeys < _numRecords)) {
             results.warnings.push_back(msg);
         } else {
             results.errors.push_back(msg);
@@ -316,21 +318,22 @@ void ValidateAdaptor::validateIndexKeyCount(const IndexDescriptor* idx,
     // produce an index key per array entry) and not $** indexes which can produce index keys for
     // multiple paths within a single document.
     if (results.valid && !idx->isMultikey() && idx->getIndexType() != IndexType::INDEX_WILDCARD &&
-        numTotalKeys > numRecs) {
+        numTotalKeys > _numRecords) {
         std::string err = str::stream()
             << "index " << idx->indexName() << " is not multi-key, but has more entries ("
-            << numTotalKeys << ") than documents in the index (" << numRecs << ")";
+            << numTotalKeys << ") than documents in the index (" << _numRecords << ")";
         results.errors.push_back(err);
         results.valid = false;
     }
+
     // Ignore any indexes with a special access method. If an access method name is given, the
     // index may be a full text, geo or special index plugin with different semantics.
     if (results.valid && !idx->isSparse() && !idx->isPartial() && !idx->isIdIndex() &&
-        idx->getAccessMethodName() == "" && numTotalKeys < numRecs) {
+        idx->getAccessMethodName() == "" && numTotalKeys < _numRecords) {
         hasTooFewKeys = true;
         std::string msg = str::stream()
             << "index " << idx->indexName() << " is not sparse or partial, but has fewer entries ("
-            << numTotalKeys << ") than documents in the index (" << numRecs << ")";
+            << numTotalKeys << ") than documents in the index (" << _numRecords << ")";
         if (noErrorOnTooFewKeys) {
             results.warnings.push_back(msg);
         } else {

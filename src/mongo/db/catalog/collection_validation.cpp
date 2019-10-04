@@ -226,10 +226,7 @@ void _validateIndexKeyCount(OperationContext* opCtx,
         ValidateResults& curIndexResults = (*indexNsResultsMap)[descriptor->indexName()];
 
         if (curIndexResults.valid) {
-            indexValidator->validateIndexKeyCount(
-                descriptor,
-                validateState->getCollection()->getRecordStore()->numRecords(opCtx),
-                curIndexResults);
+            indexValidator->validateIndexKeyCount(descriptor, curIndexResults);
         }
     }
 }
