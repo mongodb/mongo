@@ -141,7 +141,6 @@ protected:
     Status runOpsSteadyState(std::vector<OplogEntry> ops);
     Status runOpInitialSync(const OplogEntry& entry);
     Status runOpsInitialSync(std::vector<OplogEntry> ops);
-    Status runOpPtrsInitialSync(MultiApplier::OperationPtrs ops);
 
     UUID kUuid{UUID::gen()};
 };

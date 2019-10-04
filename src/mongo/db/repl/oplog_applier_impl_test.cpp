@@ -2117,10 +2117,6 @@ TEST_F(IdempotencyTest, CreateCollectionWithCollation) {
     CollectionUUID uuid = UUID::gen();
 
     auto runOpsAndValidate = [this, uuid]() {
-        auto insertOp1 = insert(fromjson("{ _id: 'foo' }"));
-        auto insertOp2 = insert(fromjson("{ _id: 'Foo', x: 1 }"));
-        auto updateOp = update("foo", BSON("$set" << BSON("x" << 2)));
-        auto dropColl = makeCommandOplogEntry(nextOpTime(), nss, BSON("drop" << nss.coll()));
         auto options = BSON("collation"
                             << BSON("locale"
                                     << "en"
@@ -2134,6 +2130,9 @@ TEST_F(IdempotencyTest, CreateCollectionWithCollation) {
                                     << "57.1")
                             << "uuid" << uuid);
         auto createColl = makeCreateCollectionOplogEntry(nextOpTime(), nss, options);
+        auto insertOp1 = insert(fromjson("{ _id: 'foo' }"));
+        auto insertOp2 = insert(fromjson("{ _id: 'Foo', x: 1 }"));
+        auto updateOp = update("foo", BSON("$set" << BSON("x" << 2)));
 
         // We don't drop and re-create the collection since we don't have ways
         // to wait until second-phase drop to completely finish.

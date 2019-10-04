@@ -142,7 +142,7 @@ protected:
     std::string computeDataHash(Collection* collection);
     virtual std::string getStatesString(const std::vector<CollectionState>& state1,
                                         const std::vector<CollectionState>& state2,
-                                        const MultiApplier::OperationPtrs& opPtrs);
+                                        const std::vector<OplogEntry>& ops);
     /**
      * Validate data and indexes. Return the MD5 hash of the documents ordered by _id.
      */

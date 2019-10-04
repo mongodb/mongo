@@ -227,51 +227,41 @@ Status OplogApplierImplTest::runOpInitialSync(const OplogEntry& op) {
 }
 
 Status OplogApplierImplTest::runOpsInitialSync(std::vector<OplogEntry> ops) {
+    NoopOplogApplierObserver observer;
+    auto storageInterface = getStorageInterface();
+    auto writerPool = makeReplWriterPool();
     OplogApplierImpl oplogApplier(
         nullptr,  // executor
         nullptr,  // oplogBuffer
-        nullptr,  // observer
-        nullptr,  // replCoord
+        &observer,
+        ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
-        getStorageInterface(),
-        OplogApplierImpl::ApplyGroupFunc(),
+        storageInterface,
+        applyOplogGroup,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kInitialSync),
-        nullptr);
+        writerPool.get());
+    // Idempotency tests apply the same batch of oplog entries multiple times in a loop, which would
+    // result in out-of-order oplog inserts. So we truncate the oplog collection first before
+    // calling multiApply.
+    ASSERT_OK(
+        storageInterface->truncateCollection(_opCtx.get(), NamespaceString::kRsOplogNamespace));
     // Apply each operation in a batch of one because 'ops' may contain a mix of commands and CRUD
-    // operations provided by idempotency tests.
+    // operations provided by idempotency tests. Applying operations in a batch of one is also
+    // necessary to work around oplog visibility issues. For example, idempotency tests may contain
+    // a prepare and a commit that we don't apply both in the same batch in production oplog
+    // application because the commit needs to read the prepare entry. So we apply each operation in
+    // its own batch and update oplog visibility after each batch to make sure all previously
+    // applied entries are visible to subsequent batches.
     for (auto& op : ops) {
-        MultiApplier::OperationPtrs opsPtrs;
-        opsPtrs.push_back(&op);
-        WorkerMultikeyPathInfo pathInfo;
-        auto status = applyOplogGroup(_opCtx.get(), &opsPtrs, &oplogApplier, &pathInfo);
+        auto status = oplogApplier.multiApply(_opCtx.get(), {op});
         if (!status.isOK()) {
-            return status;
+            return status.getStatus();
         }
-    }
-    return Status::OK();
-}
-
-Status OplogApplierImplTest::runOpPtrsInitialSync(MultiApplier::OperationPtrs ops) {
-    OplogApplierImpl oplogApplier(
-        nullptr,  // executor
-        nullptr,  // oplogBuffer
-        nullptr,  // observer
-        nullptr,  // replCoord
-        getConsistencyMarkers(),
-        getStorageInterface(),
-        OplogApplierImpl::ApplyGroupFunc(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kInitialSync),
-        nullptr);
-    // Apply each operation in a batch of one because 'ops' may contain a mix of commands and CRUD
-    // operations provided by idempotency tests.
-    for (auto& op : ops) {
-        MultiApplier::OperationPtrs opsPtrs;
-        opsPtrs.push_back(op);
-        WorkerMultikeyPathInfo pathInfo;
-        auto status = applyOplogGroup(_opCtx.get(), &opsPtrs, &oplogApplier, &pathInfo);
-        if (!status.isOK()) {
-            return status;
-        }
+        auto lastApplied = status.getValue();
+        const bool orderedCommit = true;
+        // Update oplog visibility by notifying the storage engine of the new oplog entries.
+        storageInterface->oplogDiskLocRegister(
+            _opCtx.get(), lastApplied.getTimestamp(), orderedCommit);
     }
     return Status::OK();
 }
