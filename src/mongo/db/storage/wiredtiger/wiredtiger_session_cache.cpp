@@ -235,6 +235,10 @@ void WiredTigerSessionCache::shuttingDown() {
     closeAll();
 }
 
+bool WiredTigerSessionCache::isShuttingDown() {
+    return _shuttingDown.load() & kShuttingDownMask;
+}
+
 void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
                                               bool forceCheckpoint,
                                               bool stableCheckpoint) {

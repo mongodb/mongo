@@ -1059,6 +1059,10 @@ Status WiredTigerKVEngine::beginBackup(OperationContext* opCtx) {
 }
 
 void WiredTigerKVEngine::endBackup(OperationContext* opCtx) {
+    if (_sessionCache->isShuttingDown()) {
+        // There could be a race with clean shutdown which unconditionally closes all the sessions.
+        _backupSession->_session = nullptr;  // Prevent calling _session->close() in destructor.
+    }
     _backupSession.reset();
 }
 

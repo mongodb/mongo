@@ -175,6 +175,7 @@ public:
 
 private:
     friend class WiredTigerSessionCache;
+    friend class WiredTigerKVEngine;
 
     // The cursor cache is a list of pairs that contain an ID and cursor
     typedef std::list<WiredTigerCachedCursor> CursorCache;
@@ -263,6 +264,11 @@ public:
      * lock in exclusive mode to avoid races with getSession.
      */
     void shuttingDown();
+
+    /**
+     * True when in the process of shutting down.
+     */
+    bool isShuttingDown();
 
     bool isEphemeral();
 
