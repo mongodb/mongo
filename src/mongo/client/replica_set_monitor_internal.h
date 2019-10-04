@@ -195,9 +195,9 @@ public:
     ConnectionString possibleConnectionString() const;
 
     /**
-     * Call this to notify waiters after a scan processes a valid reply or finishes.
+     * Call this to notify waiters after a scan processes a valid reply, rescans, or finishes.
      */
-    void notify(bool finishedScan);
+    void notify();
 
     Date_t now() const {
         return executor ? executor->now() : Date_t::now();

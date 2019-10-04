@@ -39,6 +39,7 @@
 #include "mongo/client/replica_set_change_notifier.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -60,6 +61,9 @@ class ReplicaSetMonitor {
 
 public:
     class Refresher;
+
+    static constexpr auto kExpeditedRefreshPeriod = Milliseconds(500);
+    static constexpr auto kCheckTimeout = Seconds(5);
 
     /**
      * Initializes local state from a MongoURI.

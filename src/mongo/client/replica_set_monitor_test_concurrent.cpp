@@ -178,7 +178,7 @@ TEST_F(ReplicaSetMonitorConcurrentTest, RechecksAvailableNodesUntilExpiration) {
     // ends, even if the future expires sooner. Thus timeouts don't matter so long as they're less
     // than the scan's duration, which is socketTimeoutSecs = 5 seconds.
     const auto primaryFuture = monitor->getHostOrRefresh(primaryOnly, Seconds(4));
-    const auto secondaryFuture = monitor->getHostOrRefresh(secondaryOnly, Seconds(4));
+    const auto secondaryFuture = monitor->getHostOrRefresh(secondaryOnly, Milliseconds(4800));
 
     // Monitor rechecks Node 0 every 500ms, Node 1 times out after 5 seconds.
     while (elapsed() <= Seconds(20)) {
@@ -199,14 +199,12 @@ TEST_F(ReplicaSetMonitorConcurrentTest, RechecksAvailableNodesUntilExpiration) {
             ASSERT_EQ(primaryFuture.get(), node0);
         }
 
+        // After 5 seconds, getHostOrRefresh(secondaryOnly) receives its timeout.
         if (elapsed() < Milliseconds(5000)) {
             ASSERT(!secondaryFuture.isReady());
             ASSERT_EQ(getNumChecks(node0), 1 + (elapsedMS() / 500));
             ASSERT_EQ(getNumChecks(node1), 1);
-        }
-
-        // After 5 seconds, Node 1 times out and getHostOrRefresh(secondaryOnly) fails.
-        if (elapsed() == Milliseconds(5000)) {
+        } else {
             ASSERT(secondaryFuture.isReady());
             ASSERT_NOT_OK(secondaryFuture.getNoThrow());
         }
@@ -243,7 +241,7 @@ TEST_F(ReplicaSetMonitorConcurrentTest, StepdownAndElection) {
     monitor->init();
 
     auto primaryFuture = monitor->getHostOrRefresh(primaryOnly, Seconds(4));
-    auto unsatisfiableFuture = monitor->getHostOrRefresh(secondaryWithTags, Seconds(4));
+    auto unsatisfiableFuture = monitor->getHostOrRefresh(secondaryWithTags, Milliseconds(4250));
 
     // Receive first isMasters in any order. Nodes 0 and 1 respond, Node 2 doesn't.
     // Then monitor rechecks Node 0 and 1 every 500ms, Node 2 times out after 5 seconds.
@@ -287,18 +285,19 @@ TEST_F(ReplicaSetMonitorConcurrentTest, StepdownAndElection) {
             ASSERT_EQ(primaryFuture.get(), node1);
         }
 
-        if (elapsed() < Milliseconds(5000)) {
+        // At 4.5 seconds, getHostOrRefresh(secondaryWithTags) receives its timeout.
+        if (elapsed() < Milliseconds(4500)) {
             ASSERT(!unsatisfiableFuture.isReady());
+        } else {
+            ASSERT(unsatisfiableFuture.isReady());
+            ASSERT_NOT_OK(unsatisfiableFuture.getNoThrow());
+        }
+
+        if (elapsed() < Milliseconds(5000)) {
             // New getHostOrRefresh calls can trigger checks faster than every 500ms, so "+ 2".
             ASSERT_LTE(getNumChecks(node0), elapsedMS() / 500 + 2);
             ASSERT_LTE(getNumChecks(node1), elapsedMS() / 500 + 2);
             ASSERT_EQ(getNumChecks(node2), 1);
-        }
-
-        // At 5 seconds, Node 2 times out and getHostOrRefresh(secondaryWithTags) fails.
-        if (elapsed() == Milliseconds(5000)) {
-            ASSERT(unsatisfiableFuture.isReady());
-            ASSERT_NOT_OK(unsatisfiableFuture.getNoThrow());
         }
 
         advanceTime(Milliseconds(100));
@@ -369,6 +368,50 @@ TEST_F(ReplicaSetMonitorConcurrentTest, IsMasterFrequency) {
     for (auto& future : primaryFutures) {
         ASSERT(future.isReady());
     }
+}
+
+// Check that requests actually experience timeout despite in-flight isMasters
+TEST_F(ReplicaSetMonitorConcurrentTest, RecheckUntilTimeout) {
+    MockReplicaSet replSet("test", 2, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
+    const auto node0 = HostAndPort(replSet.getSecondaries()[0]);
+    const auto node1 = HostAndPort(replSet.getSecondaries()[1]);
+
+    auto state = std::make_shared<ReplicaSetMonitor::SetState>(
+        replSet.getURI(), &getNotifier(), &getExecutor());
+    auto monitor = std::make_shared<ReplicaSetMonitor>(state);
+
+    // Node 1 is unresponsive.
+    replSet.kill(replSet.getSecondaries()[1]);
+    monitor->init();
+
+    // Set the timeout to be more than 500ms before the third timeout on node 1. This way the
+    // isMaster to node 1 is in flight and the timeout occurs at 14500 when the isMaster to node
+    // 0 succeeds.
+    auto hostFuture = monitor->getHostOrRefresh(primaryOnly, Milliseconds(14250));
+
+    auto checkUntil = [&](auto timeToStop, auto func) {
+        while (elapsed() < timeToStop) {
+            processReadyRequests(replSet);
+            func();
+            advanceTime(Milliseconds(100));
+        }
+
+        processReadyRequests(replSet);
+    };
+
+    // Every 500ms, the monitor rechecks node 0 after the previous successful isMaster.
+    // Every 5s, the monitor rechecks node 1 after the previous isMaster experiences timeout.
+    constexpr auto kTimeoutPeriodMS = Milliseconds(ReplicaSetMonitor::kCheckTimeout).count() +
+        ReplicaSetMonitor::kExpeditedRefreshPeriod.count();
+    checkUntil(Milliseconds(14500), [&]() {
+        ASSERT_EQ(getNumChecks(node0),
+                  elapsedMS() / ReplicaSetMonitor::kExpeditedRefreshPeriod.count() + 1);
+        ASSERT_EQ(getNumChecks(node1), elapsedMS() / kTimeoutPeriodMS + 1);
+        ASSERT(!hostFuture.isReady());
+    });
+
+
+    ASSERT(hostFuture.isReady());
 }
 }  // namespace
 }  // namespace mongo

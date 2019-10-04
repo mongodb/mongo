@@ -83,8 +83,6 @@ using executor::TaskExecutor;
 using CallbackArgs = TaskExecutor::CallbackArgs;
 using CallbackHandle = TaskExecutor::CallbackHandle;
 
-const double socketTimeoutSecs = 5;
-
 // Intentionally chosen to compare worse than all known latencies.
 const int64_t unknownLatency = numeric_limits<int64_t>::max();
 
@@ -241,7 +239,7 @@ auto ReplicaSetMonitor::SetState::scheduleWorkAt(Date_t when, Callback&& cb) con
 void ReplicaSetMonitor::SetState::rescheduleRefresh(SchedulingStrategy strategy) {
     // Reschedule the refresh
 
-    if (!executor) {
+    if (!executor || isMocked) {
         // Without an executor, we can't do refreshes -- we're in a test
         return;
     }
@@ -276,6 +274,10 @@ void ReplicaSetMonitor::SetState::rescheduleRefresh(SchedulingStrategy strategy)
     auto swHandle = scheduleWorkAt(nextScanTime, [this](const CallbackArgs& cbArgs) {
         if (cbArgs.myHandle != refresherHandle)
             return;  // We've been replaced!
+
+        // It is possible that a waiter will have already expired by the point of this rescan.
+        // Thus we notify here to trigger that logic.
+        notify();
 
         _ensureScanInProgress(shared_from_this());
 
@@ -566,7 +568,7 @@ void Refresher::scheduleIsMaster(const HostAndPort& host) {
         // MockReplicaSet only works with DBClient-style access since it injects itself into the
         // ScopedDbConnection pool connection creation.
         try {
-            ScopedDbConnection conn(ConnectionString(host), socketTimeoutSecs);
+            ScopedDbConnection conn(ConnectionString(host), kCheckTimeout.count());
 
             auto timer = Timer();
             auto reply = BSONObj();
@@ -582,11 +584,8 @@ void Refresher::scheduleIsMaster(const HostAndPort& host) {
         return;
     }
 
-    auto request = executor::RemoteCommandRequest(host,
-                                                  "admin",
-                                                  BSON("isMaster" << 1),
-                                                  nullptr,
-                                                  Milliseconds(int64_t(socketTimeoutSecs * 1000)));
+    auto request = executor::RemoteCommandRequest(
+        host, "admin", BSON("isMaster" << 1), nullptr, kCheckTimeout);
     request.sslMode = _set->setUri.getSSLMode();
     auto status =
         _set->executor
@@ -691,7 +690,7 @@ Refresher::NextStep Refresher::getNextStep() {
 
         // Makes sure all other Refreshers in this round return DONE
         _set->currentScan.reset();
-        _set->notify(/*finishedScan*/ true);
+        _set->notify();
 
         LOG(1) << "Refreshing replica set " << _set->name << " took " << _scan->timer.millis()
                << "ms";
@@ -755,7 +754,6 @@ void Refresher::receivedIsMaster(const HostAndPort& from,
     if (_scan->foundUpMaster) {
         // We only update a Node if a master has confirmed it is in the set.
         _set->updateNodeIfInNodes(reply);
-        _set->notify(/*finishedScan*/ false);
     } else {
         // Populate possibleNodes.
         _scan->possibleNodes.insert(reply.members.begin(), reply.members.end());
@@ -765,6 +763,8 @@ void Refresher::receivedIsMaster(const HostAndPort& from,
     // _set->nodes may still not have any nodes with isUp==true, but we have at least found a
     // connectible host that is that claims to be in the set.
     _scan->foundAnyUpNodes = true;
+
+    _set->notify();
 
     if (kDebugBuild)
         _set->checkInvariants();
@@ -776,6 +776,12 @@ void Refresher::failedHost(const HostAndPort& host, const Status& status) {
     Node* node = _set->findNode(host);
     if (node)
         node->markFailed(status);
+
+    if (_scan->waitingFor.empty()) {
+        // If this was the last host that needed a response, we should notify the SetState so that
+        // we can fail any waiters that have timed out.
+        _set->notify();
+    }
 }
 
 void Refresher::startNewScan() {
@@ -981,16 +987,18 @@ void Node::markFailed(const Status& status) {
 }
 
 bool Node::matches(const ReadPreference pref) const {
-    if (!isUp)
+    if (!isUp) {
+        LOG(3) << "Host " << host << " is not up";
         return false;
+    }
 
+    LOG(3) << "Host " << host << " is " << (isMaster ? "primary" : "not primary");
     if (pref == ReadPreference::PrimaryOnly) {
         return isMaster;
     }
 
     if (pref == ReadPreference::SecondaryOnly) {
-        if (isMaster)
-            return false;
+        return !isMaster;
     }
 
     return true;
@@ -1290,8 +1298,13 @@ ConnectionString SetState::possibleConnectionString() const {
     return ConnectionString::forReplicaSet(name, std::move(hosts));
 }
 
-void SetState::notify(bool finishedScan) {
+void SetState::notify() {
+    if (!waiters.size()) {
+        return;
+    }
+
     const auto cachedNow = now();
+    auto shouldQuickFail = areRefreshRetriesDisabledForTest.load() && !currentScan;
 
     for (auto it = waiters.begin(); it != waiters.end();) {
         if (isDropped) {
@@ -1306,10 +1319,13 @@ void SetState::notify(bool finishedScan) {
             // match;
             it->promise.emplaceValue(std::move(match));
             waiters.erase(it++);
-        } else if (finishedScan &&
-                   (it->deadline <= cachedNow || areRefreshRetriesDisabledForTest.load())) {
-            // To preserve prior behavior, we only examine deadlines at the end of a scan.
-            // This ensures that we only report failure after trying to contact all hosts.
+        } else if (it->deadline <= cachedNow) {
+            LOG(1) << "Unable to statisfy read preference " << it->criteria << " by deadline "
+                   << it->deadline;
+            it->promise.setError(makeUnsatisfedReadPrefError(it->criteria));
+            waiters.erase(it++);
+        } else if (shouldQuickFail) {
+            LOG(1) << "Unable to statisfy read preference because tests fail quickly";
             it->promise.setError(makeUnsatisfedReadPrefError(it->criteria));
             waiters.erase(it++);
         } else {
@@ -1339,7 +1355,7 @@ void SetState::drop() {
     isDropped = true;
 
     currentScan.reset();
-    notify(/*finishedScan*/ true);
+    notify();
 
     // No point in notifying if we never started
     if (workingConnStr.isValid()) {

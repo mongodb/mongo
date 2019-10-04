@@ -86,10 +86,11 @@ protected:
     }
 
     void tearDown() {
-        ReplicaSetMonitor::cleanup();
         _replSet.reset();
 
         mongo::ScopedDbConnection::clearPool();
+
+        ReplicaSetMonitor::shutdown();
     }
 
     MockReplicaSet* getReplSet() {
