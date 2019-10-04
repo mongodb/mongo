@@ -415,6 +415,16 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
+- name: background_validate_cmd
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "background_validate_cmd"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
 - name: validate_cmd
   priority: 5
   commands:
@@ -1049,6 +1059,7 @@ buildvariants:
     - name: bestbuy_query
     - name: big_update
     - name: validate_cmd
+    - name: background_validate_cmd
 
 - name: linux-standalone-audit
   display_name: Linux Standalone Audit
