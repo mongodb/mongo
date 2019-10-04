@@ -73,6 +73,7 @@ selector:
   # Starts a parallel shell but won't restart it after unclean shutdown.
   # TODO SERVER-33229: Remove these exclusions
   - jstests/core/compact_keeps_indexes.js
+  - jstests/core/crud_ops_do_not_throw_locktimeout.js
   - jstests/core/find_and_modify_concurrent_update.js
   - jstests/core/shellstartparallel.js
 

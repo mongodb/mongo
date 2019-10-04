@@ -229,6 +229,7 @@ selector:
   - jstests/core/count10.js
   - jstests/core/count_plan_summary.js
   - jstests/core/coveredIndex3.js
+  - jstests/core/crud_ops_do_not_throw_locktimeout.js
   - jstests/core/currentop.js
   - jstests/core/distinct3.js
   - jstests/core/find_and_modify_concurrent_update.js

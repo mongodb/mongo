@@ -43,6 +43,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/command_generic_argument.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
@@ -268,7 +269,8 @@ Status _collModInternal(OperationContext* opCtx,
     Collection* coll =
         db ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss) : nullptr;
 
-    hangAfterDatabaseLock.pauseWhileSet();
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &hangAfterDatabaseLock, opCtx, "hangAfterDatabaseLock", []() {}, false, nss);
 
     // May also modify a view instead of a collection.
     boost::optional<ViewDefinition> view;
