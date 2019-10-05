@@ -11,7 +11,7 @@ selector:
   - jstests/core/read_after_optime.js
   - jstests/core/capped_update.js
   # The following tests perform a write with a writeConcern of w=2 when 'testingReplication' is
-  # true. This causes the test to hang because the secondary is running with the "rsSyncStopApply"
+  # true. This causes the test to hang because the secondary is running with the "rsSyncApplyStop"
   # failpoint enabled.
   - jstests/core/geo_update_btree.js
   # The following tests create large oplog entries, which can cause the secondary to fall off the

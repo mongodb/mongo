@@ -393,15 +393,7 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
         if (MONGO_unlikely(rsSyncApplyStop.shouldFail())) {
             log() << "Oplog Applier - rsSyncApplyStop fail point enabled. Blocking until fail "
                      "point is disabled.";
-            while (MONGO_unlikely(rsSyncApplyStop.shouldFail())) {
-                // Tests should not trigger clean shutdown while that failpoint is active. If we
-                // think we need this, we need to think hard about what the behavior should be.
-                if (inShutdown()) {
-                    severe() << "Turn off rsSyncApplyStop before attempting clean shutdown";
-                    fassertFailedNoTrace(40304);
-                }
-                sleepmillis(10);
-            }
+            rsSyncApplyStop.pauseWhileSet(&opCtx);
         }
 
         // Transition to SECONDARY state, if possible.
