@@ -590,7 +590,6 @@ bool ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext* 
         // Make sure that if the command has a write concern that it is w:1 or w:majority, and
         // convert w:1 or no write concern to w:majority before sending.
         WriteConcernOptions writeConcern;
-        writeConcern.reset();
 
         BSONElement writeConcernElement = cmdObj[WriteConcernOptions::kWriteConcernField];
         bool initialCmdHadWriteConcern = !writeConcernElement.eoo();

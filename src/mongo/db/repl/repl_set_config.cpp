@@ -325,8 +325,7 @@ Status ReplSetConfig::_parseSettingsSubdocument(const BSONObj& settings) {
             return status;
     } else if (status == ErrorCodes::NoSuchKey) {
         // Default write concern is w: 1.
-        _defaultWriteConcern.reset();
-        _defaultWriteConcern.wNumNodes = 1;
+        _defaultWriteConcern = WriteConcernOptions();
     } else {
         return status;
     }
