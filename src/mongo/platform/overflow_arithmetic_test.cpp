@@ -173,6 +173,18 @@ TEST(OverflowArithmetic, UnsignedSubtractionTests) {
     ASSERT(testOflow<T>(f, 0, kMax<T>));
 }
 
+TEST(OverflowArithmetic, SafeModTests) {
+    // Mod -1 should not overflow for LLONG_MIN or INT_MIN.
+    auto minLong = std::numeric_limits<long long>::min();
+    auto minInt = std::numeric_limits<int>::min();
+    ASSERT_EQ(overflow::safeMod(minLong, -1LL), 0);
+    ASSERT_EQ(overflow::safeMod(minInt, -1), 0);
+
+    // A divisor of 0 throws a user assertion.
+    ASSERT_THROWS_CODE(overflow::safeMod(minLong, 0LL), AssertionException, 51259);
+    ASSERT_THROWS_CODE(overflow::safeMod(minInt, 0), AssertionException, 51259);
+}
+
 TEST(OverflowArithmetic, HeterogeneousArguments) {
     {
         int r;
