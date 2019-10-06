@@ -57,12 +57,12 @@ Status _dropView(OperationContext* opCtx,
                  const NamespaceString& collectionName,
                  BSONObjBuilder& result) {
     if (!db) {
-        return Status(ErrorCodes::NamespaceNotFound, "ns not found");
+        return Status(ErrorCodes::NamespaceNotFound, "Namespace not found");
     }
     auto view =
         ViewCatalog::get(db)->lookupWithoutValidatingDurableViews(opCtx, collectionName.ns());
     if (!view) {
-        return Status(ErrorCodes::NamespaceNotFound, "ns not found");
+        return Status(ErrorCodes::NamespaceNotFound, "Namespace not found");
     }
 
     // Validates the view or throws an "invalid view" error.
@@ -110,7 +110,7 @@ Status _dropCollection(OperationContext* opCtx,
     Lock::CollectionLock collLock(opCtx, collectionName, MODE_X);
     Collection* coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(collectionName);
     if (!coll) {
-        return Status(ErrorCodes::NamespaceNotFound, "ns not found");
+        return Status(ErrorCodes::NamespaceNotFound, "Namespace not found");
     }
 
     if (MONGO_unlikely(hangDuringDropCollection.shouldFail())) {
@@ -169,7 +169,7 @@ Status dropCollection(OperationContext* opCtx,
         AutoGetDb autoDb(opCtx, collectionName.db(), MODE_IX);
         Database* db = autoDb.getDb();
         if (!db) {
-            return Status(ErrorCodes::NamespaceNotFound, "ns not found");
+            return Status(ErrorCodes::NamespaceNotFound, "Namespace not found");
         }
 
         Collection* coll =
