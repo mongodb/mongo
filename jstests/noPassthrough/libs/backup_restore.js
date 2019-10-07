@@ -150,6 +150,7 @@ var BackupRestoreTest = function(options) {
                 'rename_collection_dbname_chain.js',
                 'rename_collection_dbname_droptarget.js',
                 'rename_collection_droptarget.js',
+                'toggle_feature_compatibility.js',
                 'update_rename.js',
                 'update_rename_noindex.js',
                 'yield_sort.js',
