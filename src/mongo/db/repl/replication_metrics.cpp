@@ -264,7 +264,7 @@ long ReplicationMetrics::getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_f
 void ReplicationMetrics::setElectionCandidateMetrics(
     const StartElectionReasonEnum reason,
     const Date_t lastElectionDate,
-    const long long termAtElection,
+    const long long electionTerm,
     const OpTime lastCommittedOpTime,
     const OpTime lastSeenOpTime,
     const int numVotesNeeded,
@@ -277,7 +277,7 @@ void ReplicationMetrics::setElectionCandidateMetrics(
     _nodeIsCandidateOrPrimary = true;
     _electionCandidateMetrics.setLastElectionReason(reason);
     _electionCandidateMetrics.setLastElectionDate(lastElectionDate);
-    _electionCandidateMetrics.setTermAtElection(termAtElection);
+    _electionCandidateMetrics.setElectionTerm(electionTerm);
     _electionCandidateMetrics.setLastCommittedOpTimeAtElection(lastCommittedOpTime);
     _electionCandidateMetrics.setLastSeenOpTimeAtElection(lastSeenOpTime);
     _electionCandidateMetrics.setNumVotesNeeded(numVotesNeeded);
@@ -324,6 +324,35 @@ BSONObj ReplicationMetrics::getElectionCandidateMetricsBSON() {
     stdx::lock_guard<Latch> lk(_mutex);
     if (_nodeIsCandidateOrPrimary) {
         return _electionCandidateMetrics.toBSON();
+    }
+    return BSONObj();
+}
+
+void ReplicationMetrics::setElectionParticipantMetrics(const bool votedForCandidate,
+                                                       const long long electionTerm,
+                                                       const Date_t lastVoteDate,
+                                                       const int electionCandidateMemberId,
+                                                       const std::string voteReason,
+                                                       const OpTime lastAppliedOpTime,
+                                                       const OpTime maxAppliedOpTimeInSet,
+                                                       const double priorityAtElection) {
+    stdx::lock_guard<Latch> lk(_mutex);
+
+    _nodeHasVotedInElection = true;
+    _electionParticipantMetrics.setVotedForCandidate(votedForCandidate);
+    _electionParticipantMetrics.setElectionTerm(electionTerm);
+    _electionParticipantMetrics.setLastVoteDate(lastVoteDate);
+    _electionParticipantMetrics.setElectionCandidateMemberId(electionCandidateMemberId);
+    _electionParticipantMetrics.setVoteReason(voteReason);
+    _electionParticipantMetrics.setLastAppliedOpTimeAtElection(lastAppliedOpTime);
+    _electionParticipantMetrics.setMaxAppliedOpTimeInSet(maxAppliedOpTimeInSet);
+    _electionParticipantMetrics.setPriorityAtElection(priorityAtElection);
+}
+
+BSONObj ReplicationMetrics::getElectionParticipantMetricsBSON() {
+    stdx::lock_guard<Latch> lk(_mutex);
+    if (_nodeHasVotedInElection) {
+        return _electionParticipantMetrics.toBSON();
     }
     return BSONObj();
 }

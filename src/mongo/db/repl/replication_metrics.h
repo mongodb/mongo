@@ -83,7 +83,7 @@ public:
     // consistent state.
     void setElectionCandidateMetrics(const StartElectionReasonEnum reason,
                                      const Date_t lastElectionDate,
-                                     const long long termAtElection,
+                                     const long long electionTerm,
                                      const OpTime lastCommittedOpTime,
                                      const OpTime lastSeenOpTime,
                                      const int numVotesNeeded,
@@ -101,6 +101,22 @@ public:
     BSONObj getElectionCandidateMetricsBSON();
     void clearElectionCandidateMetrics();
 
+    // Election participant metrics
+
+    // All the election participant metrics that should be set when a node votes in an election are
+    // set in this one function, so that the 'electionParticipantMetrics' section of replSetStatus
+    // shows a consistent state.
+    void setElectionParticipantMetrics(const bool votedForCandidate,
+                                       const long long electionTerm,
+                                       const Date_t lastVoteDate,
+                                       const int electionCandidateMemberId,
+                                       const std::string voteReason,
+                                       const OpTime lastAppliedOpTime,
+                                       const OpTime maxAppliedOpTimeInSet,
+                                       const double priorityAtElection);
+
+    BSONObj getElectionParticipantMetricsBSON();
+
 private:
     class ElectionMetricsSSS;
 
@@ -112,6 +128,7 @@ private:
     ElectionParticipantMetrics _electionParticipantMetrics;
 
     bool _nodeIsCandidateOrPrimary = false;
+    bool _nodeHasVotedInElection = false;
 
     // This field is a double so that the division result in _updateAverageCatchUpOps will be a
     // double without any casting.

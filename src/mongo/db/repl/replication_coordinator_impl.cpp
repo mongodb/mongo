@@ -2336,6 +2336,8 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
 
     BSONObj electionCandidateMetrics =
         ReplicationMetrics::get(getServiceContext()).getElectionCandidateMetricsBSON();
+    BSONObj electionParticipantMetrics =
+        ReplicationMetrics::get(getServiceContext()).getElectionParticipantMetricsBSON();
 
     stdx::lock_guard<Latch> lk(_mutex);
     Status result(ErrorCodes::InternalError, "didn't set status in prepareStatusResponse");
@@ -2346,6 +2348,7 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
             _getCurrentCommittedSnapshotOpTimeAndWallTime_inlock(),
             initialSyncProgress,
             electionCandidateMetrics,
+            electionParticipantMetrics,
             _storage->getLastStableRecoveryTimestamp(_service),
             _externalState->tooStale()},
         response,
@@ -3750,14 +3753,39 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
         _topCoord->processReplSetRequestVotes(args, response);
     }
 
-    if (!args.isADryRun() && response->getVoteGranted()) {
-        LastVote lastVote{args.getTerm(), args.getCandidateIndex()};
+    if (!args.isADryRun()) {
+        const int candidateIndex = args.getCandidateIndex();
+        LastVote lastVote{args.getTerm(), candidateIndex};
 
-        Status status = _externalState->storeLocalLastVoteDocument(opCtx, lastVote);
-        if (!status.isOK()) {
-            error() << "replSetRequestVotes failed to store LastVote document; " << status;
-            return status;
+        if (response->getVoteGranted()) {
+            Status status = _externalState->storeLocalLastVoteDocument(opCtx, lastVote);
+            if (!status.isOK()) {
+                error() << "replSetRequestVotes failed to store LastVote document; " << status;
+                return status;
+            }
         }
+
+        // If the vote was not granted to the candidate, we still want to track metrics around the
+        // node's participation in the election.
+        const bool votedForCandidate = response->getVoteGranted();
+        const long long electionTerm = args.getTerm();
+        const Date_t lastVoteDate = _replExecutor->now();
+        const int electionCandidateMemberId =
+            _rsConfig.getMemberAt(candidateIndex).getId().getData();
+        const std::string voteReason = response->getReason();
+        const OpTime lastAppliedOpTime = _topCoord->getMyLastAppliedOpTime();
+        const OpTime maxAppliedOpTime = _topCoord->latestKnownOpTime();
+        const double priorityAtElection = _rsConfig.getMemberAt(_selfIndex).getPriority();
+
+        ReplicationMetrics::get(getServiceContext())
+            .setElectionParticipantMetrics(votedForCandidate,
+                                           electionTerm,
+                                           lastVoteDate,
+                                           electionCandidateMemberId,
+                                           voteReason,
+                                           lastAppliedOpTime,
+                                           maxAppliedOpTime,
+                                           priorityAtElection);
     }
     return Status::OK();
 }
