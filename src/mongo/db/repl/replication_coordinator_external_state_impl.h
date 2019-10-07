@@ -167,7 +167,8 @@ private:
     // replication.
     SyncSourceFeedback _syncSourceFeedback;
 
-    // The OplogBuffer is used to hold operations read from the sync source.
+    // TODO (SERVER-43001): The ownership of this will pass to either OplogApplier or
+    // OpQueueBatcher. The OplogBuffer is used to hold operations read from the sync source.
     // BackgroundSync adds operations to the OplogBuffer while the applier thread consumes these
     // operations in batches during oplog application.
     std::unique_ptr<OplogBuffer> _oplogBuffer;

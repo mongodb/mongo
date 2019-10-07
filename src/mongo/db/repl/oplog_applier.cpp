@@ -87,6 +87,10 @@ bool OplogApplier::inShutdown() const {
     return _inShutdown;
 }
 
+void OplogApplier::waitForSpace(OperationContext* opCtx, std::size_t size) {
+    _oplogBuffer->waitForSpace(opCtx, size);
+}
+
 /**
  * Pushes operations read from sync source into oplog buffer.
  */

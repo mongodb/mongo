@@ -495,13 +495,11 @@ Status BackgroundSync::_enqueueDocuments(Fetcher::Documents::const_iterator begi
     auto opCtx = cc().makeOperationContext();
 
     // Wait for enough space.
-    _oplogApplier->getBuffer()->waitForSpace(opCtx.get(), info.toApplyDocumentBytes);
+    _oplogApplier->waitForSpace(opCtx.get(), info.toApplyDocumentBytes);
 
     {
         // Don't add more to the buffer if we are in shutdown. Continue holding the lock until we
-        // are done to prevent going into shutdown. This avoids a race where shutdown() clears the
-        // buffer between the time we check _inShutdown and the point where we finish writing to the
-        // buffer.
+        // are done to prevent going into shutdown.
         stdx::unique_lock<Latch> lock(_mutex);
         if (_state != ProducerState::Running) {
             return Status::OK();

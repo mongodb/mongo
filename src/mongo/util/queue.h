@@ -60,34 +60,35 @@ public:
     BlockingQueue(size_t size) : BlockingQueue(size, [](const T&) { return 1; }) {}
     BlockingQueue(size_t size, GetSizeFn f) : _maxSize(size), _getSize(f) {}
 
-    void pushEvenIfFull(T const& t) {
-        stdx::unique_lock<Latch> lk(_lock);
-        pushImpl_inlock(t, _getSize(t));
-    }
-
-    void push(T const& t) {
-        stdx::unique_lock<Latch> lk(_lock);
-        _clearing = false;
-        size_t tSize = _getSize(t);
-        _waitForSpace_inlock(tSize, lk);
-        pushImpl_inlock(t, tSize);
-    }
-
     /**
-     * Caller must ensure the BlockingQueue hasSpace before pushing since this function won't block.
+     * Returns when enough space is available.
      *
      * NOTE: Should only be used in a single producer case.
      */
-    template <typename Container>
-    void pushAllNonBlocking(const Container& objs) {
-        pushAllNonBlocking(std::begin(objs), std::end(objs));
+    void waitForSpace(size_t size) {
+        stdx::unique_lock<Latch> lk(_lock);
+        _waitForSpace_inlock(size, lk);
     }
 
+    /**
+     * Pushes all entries.
+     *
+     * If enough space is not available, this method will block.
+     *
+     * NOTE: Should only be used in a single producer case.
+     */
     template <typename Iterator>
-    void pushAllNonBlocking(Iterator begin, Iterator end) {
+    void pushAllBlocking(Iterator begin, Iterator end) {
         if (begin == end) {
             return;
         }
+
+        size_t size = 0;
+        for (auto i = begin; i != end; ++i) {
+            size += _getSize(*i);
+        }
+        // Block until enough space is available.
+        waitForSpace(size);
 
         stdx::unique_lock<Latch> lk(_lock);
         const auto startedEmpty = _queue.empty();
@@ -103,16 +104,6 @@ public:
         if (startedEmpty) {
             _cvNoLongerEmpty.notify_one();
         }
-    }
-
-    /**
-     * Returns when enough space is available.
-     *
-     * NOTE: Should only be used in a single producer case.
-     */
-    void waitForSpace(size_t size) {
-        stdx::unique_lock<Latch> lk(_lock);
-        _waitForSpace_inlock(size, lk);
     }
 
     bool empty() const {
@@ -258,14 +249,6 @@ private:
         while (_currentSize + size > _maxSize) {
             _cvNoLongerFull.wait(lk);
         }
-    }
-
-    void pushImpl_inlock(const T& obj, size_t objSize) {
-        _clearing = false;
-        _queue.push(obj);
-        _currentSize += objSize;
-        if (_queue.size() == 1)  // We were empty.
-            _cvNoLongerEmpty.notify_one();
     }
 
     mutable Mutex _lock = MONGO_MAKE_LATCH("BlockingQueue::_lock");

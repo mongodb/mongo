@@ -64,7 +64,8 @@ void OplogBufferBlockingQueue::shutdown(OperationContext* opCtx) {
 void OplogBufferBlockingQueue::push(OperationContext*,
                                     Batch::const_iterator begin,
                                     Batch::const_iterator end) {
-    _queue.pushAllNonBlocking(begin, end);
+    _queue.pushAllBlocking(begin, end);
+
     if (_counters) {
         for (auto i = begin; i != end; ++i) {
             _counters->increment(*i);

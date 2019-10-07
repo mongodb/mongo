@@ -145,6 +145,11 @@ public:
     bool inShutdown() const;
 
     /**
+     * Blocks until enough space is available.
+     */
+    void waitForSpace(OperationContext* opCtx, std::size_t size);
+
+    /**
      * Pushes operations read into oplog buffer.
      * Accepts both Operations (OplogEntry) and OplogBuffer::Batch (BSONObj) iterators.
      * This supports current implementations of OplogFetcher and OplogBuffer which work in terms of

@@ -622,8 +622,10 @@ private:
     HostAndPort _syncSource;                               // (M)
     OpTime _lastFetched;                                   // (MX)
     OpTimeAndWallTime _lastApplied;                        // (MX)
-    std::unique_ptr<OplogBuffer> _oplogBuffer;             // (M)
-    std::unique_ptr<OplogApplier> _oplogApplier;           // (M)
+    // TODO (SERVER-43001): The ownership of this will pass to either OplogApplier or
+    // OpQueueBatcher.
+    std::unique_ptr<OplogBuffer> _oplogBuffer;    // (M)
+    std::unique_ptr<OplogApplier> _oplogApplier;  // (M)
 
     // Used to signal changes in _state.
     mutable stdx::condition_variable _stateCondition;
