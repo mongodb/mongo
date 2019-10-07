@@ -139,6 +139,11 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
             primary = self.configsvr.get_primary().mongo_client()
             primary.admin.command({"refreshLogicalSessionCacheNow": 1})
 
+        for shard in self.shards:
+            primary = (shard.mongo_client() if self.num_rs_nodes_per_shard is None else
+                       shard.get_primary().mongo_client())
+            primary.admin.command({"refreshLogicalSessionCacheNow": 1})
+
     def _auth_to_db(self, client):
         """Authenticate client for the 'authenticationDatabase'."""
         if self.auth_options is not None:
