@@ -1207,6 +1207,7 @@ Status translateObjectKeywords(StringMap<BSONElement>& keywordMap,
  *  - minLength
  *  - maxLength
  *  - pattern
+ *  - multipleOf
  */
 Status translateScalarKeywords(StringMap<BSONElement>& keywordMap,
                                StringData path,
