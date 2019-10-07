@@ -36,6 +36,8 @@
 #include <safeint.h>
 #endif
 
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
 
 /**
@@ -177,5 +179,18 @@ inline bool mongoUnsignedSubtractOverflow64(unsigned long long lhs,
 }
 
 #endif
+
+/**
+ * Safe mod function which throws if the divisor is 0 and avoids potential overflow in cases where
+ * the divisor is -1. If the absolute value of the divisor is 1, mod will always return 0. We fast-
+ * path this to avoid the scenario where the dividend is the smallest negative long or int value and
+ * the divisor is -1. Naively performing this % may result in an overflow when the -2^N value is
+ * divided and becomes 2^N. See SERVER-43699.
+ */
+template <typename T>
+constexpr T mongoSafeMod(T dividend, T divisor) {
+    uassert(51259, "can't mod by zero", divisor != 0);
+    return (divisor == 1 || divisor == -1 ? 0 : dividend % divisor);
+}
 
 }  // namespace mongo
