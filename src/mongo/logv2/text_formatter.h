@@ -56,6 +56,10 @@ public:
     // the formatting_ostream.
     TextFormatter(TextFormatter const&) {}
 
+    TextFormatter& operator=(TextFormatter const&) {
+        return *this;
+    }
+
     static bool binary() {
         return false;
     };
