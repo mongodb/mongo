@@ -532,7 +532,7 @@ public:
         client.insert(_ns, BSON("a" << BSONSymbol("mySymbol")));
         ASSERT_EQUALS(client.getLastErrorDetailed()["code"].numberInt(),
                       ErrorCodes::CannotBuildIndexKeys);
-        ASSERT_EQUALS(client.count(_ns), 0U);
+        ASSERT_EQUALS(client.count(_nss), 0U);
     }
 };
 
@@ -547,7 +547,7 @@ public:
         client.createIndex(_ns, indexSpec);
         client.insert(_ns, BSON("a" << BSONSymbol("mySymbol")));
         ASSERT(client.getLastError().empty());
-        ASSERT_EQUALS(client.count(_ns), 1U);
+        ASSERT_EQUALS(client.count(_nss), 1U);
     }
 };
 
@@ -564,7 +564,7 @@ public:
         client.insert(_ns, BSON("a" << BSON("b" << 99 << "c" << BSONSymbol("mySymbol"))));
         ASSERT_EQUALS(client.getLastErrorDetailed()["code"].numberInt(),
                       ErrorCodes::CannotBuildIndexKeys);
-        ASSERT_EQUALS(client.count(_ns), 0U);
+        ASSERT_EQUALS(client.count(_nss), 0U);
     }
 };
 
@@ -581,7 +581,7 @@ public:
         client.insert(_ns, BSON("a" << BSON_ARRAY(99 << BSONSymbol("mySymbol"))));
         ASSERT_EQUALS(client.getLastErrorDetailed()["code"].numberInt(),
                       ErrorCodes::CannotBuildIndexKeys);
-        ASSERT_EQUALS(client.count(_ns), 0U);
+        ASSERT_EQUALS(client.count(_nss), 0U);
     }
 };
 
@@ -592,7 +592,7 @@ public:
         DBDirectClient client(opCtx.get());
         client.dropCollection(_ns);
         client.insert(_ns, BSON("a" << BSON_ARRAY(99 << BSONSymbol("mySymbol"))));
-        ASSERT_EQUALS(client.count(_ns), 1U);
+        ASSERT_EQUALS(client.count(_nss), 1U);
         IndexSpec indexSpec;
         indexSpec.addKey("a").addOptions(BSON("collation" << BSON("locale"
                                                                   << "fr")));

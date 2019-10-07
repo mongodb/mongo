@@ -32,6 +32,7 @@
 #include "mongo/executor/task_executor_cursor.h"
 
 #include "mongo/client/dbclient_base.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -84,7 +85,7 @@ TEST_F(TaskExecutorCursorFixture, Basic) {
     }
     dbclient->dropCollection("test.test");
     dbclient->insert("test.test", docs);
-    ASSERT_EQUALS(dbclient->count("test.test"), numDocs);
+    ASSERT_EQUALS(dbclient->count(NamespaceString("test.test")), numDocs);
 
     RemoteCommandRequest rcr(unittest::getFixtureConnectionString().getServers().front(),
                              "test",

@@ -359,7 +359,7 @@ void MongoInterfaceStandalone::renameIfOptionsAndIndexesHaveNotChanged(
             SimpleBSONObjComparator::kInstance.evaluate(originalCollectionOptions ==
                                                         getCollectionOptions(targetNs)));
 
-    auto currentIndexes = _client.getIndexSpecs(targetNs.ns());
+    auto currentIndexes = _client.getIndexSpecs(targetNs);
     uassert(ErrorCodes::CommandFailed,
             str::stream() << "indexes of target collection " << targetNs.ns()
                           << " changed during processing.",

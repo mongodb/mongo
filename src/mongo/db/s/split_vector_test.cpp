@@ -59,7 +59,7 @@ public:
             BSONObj obj = builder.obj();
             dbclient.insert(kNss.toString(), obj);
         }
-        ASSERT_EQUALS(100ULL, dbclient.count(kNss.toString()));
+        ASSERT_EQUALS(100ULL, dbclient.count(kNss));
     }
 
     const long long& getDocSizeBytes() {
@@ -320,7 +320,7 @@ public:
         for (int i = 0; i < 1000; i++) {
             dbclient.insert(kJumboNss.toString(), obj);
         }
-        ASSERT_EQUALS(1000ULL, dbclient.count(kJumboNss.toString()));
+        ASSERT_EQUALS(1000ULL, dbclient.count(kJumboNss));
     }
 
     const long long& getDocSizeBytes() {
@@ -377,7 +377,7 @@ public:
             BSONObj obj = builder.obj();
             dbclient.insert(kMaxResponseNss.toString(), obj);
         }
-        ASSERT_EQUALS(numDocs, (int)dbclient.count(kMaxResponseNss.toString()));
+        ASSERT_EQUALS(numDocs, (int)dbclient.count(kMaxResponseNss));
     }
 
     std::string createUniqueHalfMegabyteString(int uniqueInt) {

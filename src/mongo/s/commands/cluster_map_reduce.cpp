@@ -533,7 +533,7 @@ bool runMapReduce(OperationContext* opCtx,
                 // collection is empty in order to decide whether we should drop and re-shard
                 // it.
                 // We don't want to do this if the collection is not empty.
-                shouldDropAndShard = (conn->count(outputCollNss.ns()) == 0);
+                shouldDropAndShard = (conn->count(outputCollNss) == 0);
             }
 
             conn.done();

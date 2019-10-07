@@ -105,12 +105,12 @@ public:
         client.dropCollection(ns);
         client.insert(ns, objs);
         ASSERT_EQUALS(client.getLastErrorDetailed()["code"].numberInt(), 11000);
-        ASSERT_EQUALS((int)client.count(ns), 1);
+        ASSERT_EQUALS((int)client.count(NamespaceString(ns)), 1);
 
         client.dropCollection(ns);
         client.insert(ns, objs, InsertOption_ContinueOnError);
         ASSERT_EQUALS(client.getLastErrorDetailed()["code"].numberInt(), 11000);
-        ASSERT_EQUALS((int)client.count(ns), 2);
+        ASSERT_EQUALS((int)client.count(NamespaceString(ns)), 2);
     }
 };
 

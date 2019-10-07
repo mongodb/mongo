@@ -71,7 +71,7 @@ Status SessionsCollectionStandalone::setupSessionsCollection(OperationContext* o
 Status SessionsCollectionStandalone::checkSessionsCollectionExists(OperationContext* opCtx) {
     DBDirectClient client(opCtx);
 
-    auto indexes = client.getIndexSpecs(NamespaceString::kLogicalSessionsNamespace.toString());
+    auto indexes = client.getIndexSpecs(NamespaceString::kLogicalSessionsNamespace);
 
     if (indexes.size() == 0u) {
         return Status{ErrorCodes::NamespaceNotFound, "config.system.sessions does not exist"};

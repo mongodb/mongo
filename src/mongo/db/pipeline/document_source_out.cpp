@@ -112,7 +112,7 @@ void DocumentSourceOut::initialize() {
     // Save the original collection options and index specs so we can check they didn't change
     // during computation.
     _originalOutOptions = pExpCtx->mongoProcessInterface->getCollectionOptions(outputNs);
-    _originalIndexes = conn->getIndexSpecs(outputNs.ns());
+    _originalIndexes = conn->getIndexSpecs(outputNs);
 
     // Check if it's capped to make sure we have a chance of succeeding before we do all the work.
     // If the collection becomes capped during processing, the collection options will have changed,

@@ -1218,7 +1218,7 @@ void State::finalReduce(OperationContext* opCtx, CurOp* curOp) {
     BSONObj prev;
     BSONList all;
 
-    const auto count = _db.count(_config.incLong.ns(), BSONObj(), QueryOption_SlaveOk);
+    const auto count = _db.count(_config.incLong, BSONObj(), QueryOption_SlaveOk);
     ProgressMeterHolder pm;
     {
         stdx::unique_lock<Client> lk(*opCtx->getClient());

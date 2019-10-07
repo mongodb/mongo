@@ -46,7 +46,7 @@ TEST(WriteOpsDocSeq, InsertDocStreamWorks) {
 
     NamespaceString ns("test", "doc_seq");
     conn->dropCollection(ns.ns());
-    ASSERT_EQ(conn->count(ns.ns()), 0u);
+    ASSERT_EQ(conn->count(ns), 0u);
 
     OpMsgRequest request;
     request.body = BSON("insert" << ns.coll() << "$db" << ns.db());
@@ -64,7 +64,7 @@ TEST(WriteOpsDocSeq, InsertDocStreamWorks) {
     auto body = reply->getCommandReply();
     ASSERT_OK(getStatusFromCommandResult(body));
     ASSERT_EQ(body["n"].Int(), 5);
-    ASSERT_EQ(conn->count(ns.ns()), 5u);
+    ASSERT_EQ(conn->count(ns), 5u);
 }
 
 }  // namespace mongo

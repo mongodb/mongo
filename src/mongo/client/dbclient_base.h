@@ -351,7 +351,7 @@ public:
     /** count number of objects in collection ns that match the query criteria specified
         throws UserAssertion if database returns an error
     */
-    virtual unsigned long long count(const std::string& ns,
+    virtual unsigned long long count(NamespaceStringOrUUID nsOrUuid,
                                      const BSONObj& query = BSONObj(),
                                      int options = 0,
                                      int limit = 0,
@@ -500,7 +500,8 @@ public:
      */
     virtual void createIndexes(StringData ns, const std::vector<BSONObj>& specs);
 
-    virtual std::list<BSONObj> getIndexSpecs(const std::string& ns, int options = 0);
+    virtual std::list<BSONObj> getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
+                                             int options = 0);
 
     virtual void dropIndex(const std::string& ns, BSONObj keys);
     virtual void dropIndex(const std::string& ns, const std::string& indexName);
@@ -687,8 +688,11 @@ protected:
     /** if the element contains a not master error */
     bool isNotMasterErrorString(const BSONElement& e);
 
-    BSONObj _countCmd(
-        const std::string& ns, const BSONObj& query, int options, int limit, int skip);
+    BSONObj _countCmd(const NamespaceStringOrUUID nsOrUuid,
+                      const BSONObj& query,
+                      int options,
+                      int limit,
+                      int skip);
 
     /**
      * Look up the options available on this client.  Caches the answer from

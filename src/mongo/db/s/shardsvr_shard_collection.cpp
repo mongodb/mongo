@@ -219,7 +219,7 @@ void createCollectionOrValidateExisting(OperationContext* opCtx,
     // 5. If the collection is empty, and it's still possible to create an index
     //    on the proposed key, we go ahead and do so.
     DBDirectClient localClient(opCtx);
-    std::list<BSONObj> indexes = localClient.getIndexSpecs(nss.ns());
+    std::list<BSONObj> indexes = localClient.getIndexSpecs(nss);
 
     // 1. Verify consistency with existing unique indexes
     for (const auto& idx : indexes) {

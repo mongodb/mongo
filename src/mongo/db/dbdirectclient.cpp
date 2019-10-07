@@ -173,14 +173,14 @@ unique_ptr<DBClientCursor> DBDirectClient::query(const NamespaceStringOrUUID& ns
 }
 
 unsigned long long DBDirectClient::count(
-    const string& ns, const BSONObj& query, int options, int limit, int skip) {
+    const NamespaceStringOrUUID nsOrUuid, const BSONObj& query, int options, int limit, int skip) {
     DirectClientScope directClientScope(_opCtx);
-    BSONObj cmdObj = _countCmd(ns, query, options, limit, skip);
+    BSONObj cmdObj = _countCmd(nsOrUuid, query, options, limit, skip);
 
-    NamespaceString nsString(ns);
+    auto dbName = (nsOrUuid.uuid() ? nsOrUuid.dbname() : (*nsOrUuid.nss()).db().toString());
 
     auto result = CommandHelpers::runCommandDirectly(
-        _opCtx, OpMsgRequest::fromDBAndBody(nsString.db(), std::move(cmdObj)));
+        _opCtx, OpMsgRequest::fromDBAndBody(dbName, std::move(cmdObj)));
 
     uassertStatusOK(getStatusFromCommandResult(result));
     return static_cast<unsigned long long>(result["n"].numberLong());

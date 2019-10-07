@@ -467,7 +467,7 @@ bool Cloner::copyCollection(OperationContext* opCtx,
     }
     BSONObj options = optionsBob.obj();
 
-    auto sourceIndexes = _conn->getIndexSpecs(nss.ns(), QueryOption_SlaveOk);
+    auto sourceIndexes = _conn->getIndexSpecs(nss, QueryOption_SlaveOk);
     auto idIndexSpec = getIdIndexSpec(sourceIndexes);
 
     Lock::DBLock dbWrite(opCtx, dbname, MODE_X);
@@ -752,8 +752,7 @@ Status Cloner::copyDb(OperationContext* opCtx,
         Lock::TempRelease tempRelease(opCtx->lockState());
         for (auto&& params : createCollectionParams) {
             const NamespaceString nss(opts.fromDB, params.collectionName);
-            auto indexSpecs =
-                _conn->getIndexSpecs(nss.ns(), opts.slaveOk ? QueryOption_SlaveOk : 0);
+            auto indexSpecs = _conn->getIndexSpecs(nss, opts.slaveOk ? QueryOption_SlaveOk : 0);
 
             collectionIndexSpecs[params.collectionName] = indexSpecs;
 

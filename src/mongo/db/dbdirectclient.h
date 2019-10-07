@@ -81,7 +81,7 @@ public:
 
     virtual void say(Message& toSend, bool isRetry = false, std::string* actualServer = nullptr);
 
-    virtual unsigned long long count(const std::string& ns,
+    virtual unsigned long long count(const NamespaceStringOrUUID nsOrUuid,
                                      const BSONObj& query = BSONObj(),
                                      int options = 0,
                                      int limit = 0,

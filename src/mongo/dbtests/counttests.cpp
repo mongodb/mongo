@@ -123,7 +123,7 @@ public:
     void run() {
         insert("{\"a\":\"b\"}");
         insert("{\"c\":\"d\"}");
-        ASSERT_EQUALS(2ULL, _client.count(ns(), fromjson("{}")));
+        ASSERT_EQUALS(2ULL, _client.count(nss(), fromjson("{}")));
     }
 };
 
@@ -133,7 +133,7 @@ public:
         insert("{\"a\":\"b\"}");
         insert("{\"a\":\"b\",\"x\":\"y\"}");
         insert("{\"a\":\"c\"}");
-        ASSERT_EQUALS(2ULL, _client.count(ns(), fromjson("{\"a\":\"b\"}")));
+        ASSERT_EQUALS(2ULL, _client.count(nss(), fromjson("{\"a\":\"b\"}")));
     }
 };
 
@@ -143,7 +143,7 @@ public:
         insert("{\"a\":\"b\"}");
         insert("{\"a\":\"c\"}");
         insert("{\"d\":\"e\"}");
-        ASSERT_EQUALS(1ULL, _client.count(ns(), fromjson("{\"a\":\"b\"}")));
+        ASSERT_EQUALS(1ULL, _client.count(nss(), fromjson("{\"a\":\"b\"}")));
     }
 };
 
@@ -153,7 +153,7 @@ public:
         insert("{\"a\":\"c\"}");
         insert("{\"a\":\"b\"}");
         insert("{\"a\":\"d\"}");
-        ASSERT_EQUALS(1ULL, _client.count(ns(), fromjson("{\"a\":/^b/}")));
+        ASSERT_EQUALS(1ULL, _client.count(nss(), fromjson("{\"a\":/^b/}")));
     }
 };
 

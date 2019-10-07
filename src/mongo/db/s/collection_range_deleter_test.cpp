@@ -178,7 +178,7 @@ TEST_F(CollectionRangeDeleterTest, OneDocumentInOneRangeToClean) {
 
     ASSERT_TRUE(dbclient.findOne(kNss.toString(), QUERY(kShardKey << 5)).isEmpty());
     ASSERT_FALSE(next(rangeDeleter, 1));
-    ASSERT_EQUALS(0ULL, dbclient.count(kAdminSysVer.ns(), BSON(kShardKey << "startRangeDeletion")));
+    ASSERT_EQUALS(0ULL, dbclient.count(kAdminSysVer, BSON(kShardKey << "startRangeDeletion")));
 }
 
 // Tests the case that there are multiple documents within a range to clean.
@@ -188,7 +188,7 @@ TEST_F(CollectionRangeDeleterTest, MultipleDocumentsInOneRangeToClean) {
     dbclient.insert(kNss.toString(), BSON(kShardKey << 1));
     dbclient.insert(kNss.toString(), BSON(kShardKey << 2));
     dbclient.insert(kNss.toString(), BSON(kShardKey << 3));
-    ASSERT_EQUALS(3ULL, dbclient.count(kNss.toString(), BSON(kShardKey << LT << 5)));
+    ASSERT_EQUALS(3ULL, dbclient.count(kNss, BSON(kShardKey << LT << 5)));
 
     std::list<Deletion> ranges;
     auto deletion = Deletion{ChunkRange(BSON(kShardKey << 0), BSON(kShardKey << 10)), Date_t{}};
@@ -198,9 +198,9 @@ TEST_F(CollectionRangeDeleterTest, MultipleDocumentsInOneRangeToClean) {
 
     ASSERT_TRUE(next(rangeDeleter, 100));
     ASSERT_TRUE(next(rangeDeleter, 100));
-    ASSERT_EQUALS(0ULL, dbclient.count(kNss.toString(), BSON(kShardKey << LT << 5)));
+    ASSERT_EQUALS(0ULL, dbclient.count(kNss, BSON(kShardKey << LT << 5)));
     ASSERT_FALSE(next(rangeDeleter, 100));
-    ASSERT_EQUALS(0ULL, dbclient.count(kAdminSysVer.ns(), BSON(kShardKey << "startRangeDeletion")));
+    ASSERT_EQUALS(0ULL, dbclient.count(kAdminSysVer, BSON(kShardKey << "startRangeDeletion")));
 }
 
 // Tests the case that there are multiple documents within a range to clean, and the range deleter
@@ -211,7 +211,7 @@ TEST_F(CollectionRangeDeleterTest, MultipleCleanupNextRangeCalls) {
     dbclient.insert(kNss.toString(), BSON(kShardKey << 1));
     dbclient.insert(kNss.toString(), BSON(kShardKey << 2));
     dbclient.insert(kNss.toString(), BSON(kShardKey << 3));
-    ASSERT_EQUALS(3ULL, dbclient.count(kNss.toString(), BSON(kShardKey << LT << 5)));
+    ASSERT_EQUALS(3ULL, dbclient.count(kNss, BSON(kShardKey << LT << 5)));
 
     std::list<Deletion> ranges;
     auto deletion = Deletion{ChunkRange(BSON(kShardKey << 0), BSON(kShardKey << 10)), Date_t{}};
@@ -220,16 +220,16 @@ TEST_F(CollectionRangeDeleterTest, MultipleCleanupNextRangeCalls) {
     ASSERT(when && *when == Date_t{});
 
     ASSERT_TRUE(next(rangeDeleter, 1));
-    ASSERT_EQUALS(2ULL, dbclient.count(kNss.toString(), BSON(kShardKey << LT << 5)));
+    ASSERT_EQUALS(2ULL, dbclient.count(kNss, BSON(kShardKey << LT << 5)));
 
     ASSERT_TRUE(next(rangeDeleter, 1));
-    ASSERT_EQUALS(1ULL, dbclient.count(kNss.toString(), BSON(kShardKey << LT << 5)));
+    ASSERT_EQUALS(1ULL, dbclient.count(kNss, BSON(kShardKey << LT << 5)));
 
     ASSERT_TRUE(next(rangeDeleter, 1));
     ASSERT_TRUE(next(rangeDeleter, 1));
-    ASSERT_EQUALS(0ULL, dbclient.count(kNss.toString(), BSON(kShardKey << LT << 5)));
+    ASSERT_EQUALS(0ULL, dbclient.count(kNss, BSON(kShardKey << LT << 5)));
     ASSERT_FALSE(next(rangeDeleter, 1));
-    ASSERT_EQUALS(0ULL, dbclient.count(kAdminSysVer.ns(), BSON(kShardKey << "startRangeDeletion")));
+    ASSERT_EQUALS(0ULL, dbclient.count(kAdminSysVer, BSON(kShardKey << "startRangeDeletion")));
 }
 
 // Tests the case that there are two ranges to clean, each containing multiple documents.
@@ -242,7 +242,7 @@ TEST_F(CollectionRangeDeleterTest, MultipleDocumentsInMultipleRangesToClean) {
     dbclient.insert(kNss.toString(), BSON(kShardKey << 4));
     dbclient.insert(kNss.toString(), BSON(kShardKey << 5));
     dbclient.insert(kNss.toString(), BSON(kShardKey << 6));
-    ASSERT_EQUALS(6ULL, dbclient.count(kNss.toString(), BSON(kShardKey << LT << 10)));
+    ASSERT_EQUALS(6ULL, dbclient.count(kNss, BSON(kShardKey << LT << 10)));
 
     std::list<Deletion> ranges;
     auto later = Date_t::now();
@@ -284,20 +284,20 @@ TEST_F(CollectionRangeDeleterTest, MultipleDocumentsInMultipleRangesToClean) {
     ASSERT_FALSE(notifn1 != *optNotifn1);
 
     // no op log entry yet
-    ASSERT_EQUALS(0ULL, dbclient.count(kAdminSysVer.ns(), BSON(kShardKey << "startRangeDeletion")));
+    ASSERT_EQUALS(0ULL, dbclient.count(kAdminSysVer, BSON(kShardKey << "startRangeDeletion")));
 
-    ASSERT_EQUALS(6ULL, dbclient.count(kNss.ns(), BSON(kShardKey << LT << 7)));
+    ASSERT_EQUALS(6ULL, dbclient.count(kNss, BSON(kShardKey << LT << 7)));
 
     // catch range3, [3..4) only
     auto next1 = next(rangeDeleter, 100);
     ASSERT_TRUE(next1);
 
     // no op log entry for immediate deletions
-    ASSERT_EQUALS(0ULL, dbclient.count(kAdminSysVer.ns(), BSON(kShardKey << "startRangeDeletion")));
+    ASSERT_EQUALS(0ULL, dbclient.count(kAdminSysVer, BSON(kShardKey << "startRangeDeletion")));
 
     // 3 gone
-    ASSERT_EQUALS(5ULL, dbclient.count(kNss.ns(), BSON(kShardKey << LT << 7)));
-    ASSERT_EQUALS(2ULL, dbclient.count(kNss.ns(), BSON(kShardKey << LT << 4)));
+    ASSERT_EQUALS(5ULL, dbclient.count(kNss, BSON(kShardKey << LT << 7)));
+    ASSERT_EQUALS(2ULL, dbclient.count(kNss, BSON(kShardKey << LT << 4)));
 
     ASSERT_FALSE(notifn1.ready());  // no trigger yet
     ASSERT_FALSE(notifn2.ready());  // no trigger yet
@@ -308,11 +308,11 @@ TEST_F(CollectionRangeDeleterTest, MultipleDocumentsInMultipleRangesToClean) {
     ASSERT_TRUE(next2);
 
     // still no op log entry, because not delayed
-    ASSERT_EQUALS(0ULL, dbclient.count(kAdminSysVer.ns(), BSON(kShardKey << "startRangeDeletion")));
+    ASSERT_EQUALS(0ULL, dbclient.count(kAdminSysVer, BSON(kShardKey << "startRangeDeletion")));
 
     // deleted 1, 5 left
-    ASSERT_EQUALS(2ULL, dbclient.count(kNss.ns(), BSON(kShardKey << LT << 4)));
-    ASSERT_EQUALS(5ULL, dbclient.count(kNss.ns(), BSON(kShardKey << LT << 10)));
+    ASSERT_EQUALS(2ULL, dbclient.count(kNss, BSON(kShardKey << LT << 4)));
+    ASSERT_EQUALS(5ULL, dbclient.count(kNss, BSON(kShardKey << LT << 10)));
 
     ASSERT_FALSE(notifn1.ready());  // no trigger yet
     ASSERT_FALSE(notifn2.ready());  // no trigger yet
@@ -328,9 +328,9 @@ TEST_F(CollectionRangeDeleterTest, MultipleDocumentsInMultipleRangesToClean) {
     ASSERT_FALSE(notifn2.ready());  // no trigger yet
 
     // deleted 3, 3 left
-    ASSERT_EQUALS(3ULL, dbclient.count(kNss.ns(), BSON(kShardKey << LT << 10)));
+    ASSERT_EQUALS(3ULL, dbclient.count(kNss, BSON(kShardKey << LT << 10)));
 
-    ASSERT_EQUALS(1ULL, dbclient.count(kAdminSysVer.ns(), BSON(kShardKey << "startRangeDeletion")));
+    ASSERT_EQUALS(1ULL, dbclient.count(kAdminSysVer, BSON(kShardKey << "startRangeDeletion")));
     // clang-format off
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << "startRangeDeletion" << "ns" << kNss.ns()
@@ -355,7 +355,7 @@ TEST_F(CollectionRangeDeleterTest, MultipleDocumentsInMultipleRangesToClean) {
     // clang-format on
 
     // still 3 left
-    ASSERT_EQUALS(3ULL, dbclient.count(kNss.ns(), BSON(kShardKey << LT << 10)));
+    ASSERT_EQUALS(3ULL, dbclient.count(kNss, BSON(kShardKey << LT << 10)));
 
     // delete the remaining documents
     auto next5 = next(rangeDeleter, 100);
@@ -372,7 +372,7 @@ TEST_F(CollectionRangeDeleterTest, MultipleDocumentsInMultipleRangesToClean) {
     // clang-format on
 
     // all docs gone
-    ASSERT_EQUALS(0ULL, dbclient.count(kNss.ns(), BSON(kShardKey << LT << 10)));
+    ASSERT_EQUALS(0ULL, dbclient.count(kNss, BSON(kShardKey << LT << 10)));
 
     // discover there are no more, pop range 2
     auto next6 = next(rangeDeleter, 100);
@@ -393,7 +393,7 @@ TEST_F(CollectionRangeDeleterTest, RetryOnWriteConflictException) {
     dbclient.insert(kNss.toString(), BSON(kShardKey << 1));
     dbclient.insert(kNss.toString(), BSON(kShardKey << 2));
     dbclient.insert(kNss.toString(), BSON(kShardKey << 3));
-    ASSERT_EQUALS(3ULL, dbclient.count(kNss.toString(), BSON(kShardKey << LT << 5)));
+    ASSERT_EQUALS(3ULL, dbclient.count(kNss, BSON(kShardKey << LT << 5)));
 
     std::list<Deletion> ranges;
     auto deletion = Deletion{ChunkRange(BSON(kShardKey << 0), BSON(kShardKey << 10)), Date_t{}};
@@ -405,13 +405,13 @@ TEST_F(CollectionRangeDeleterTest, RetryOnWriteConflictException) {
     rangeDeleter.setDoDeletionShouldThrowWriteConflictForTest(true);
 
     ASSERT_TRUE(next(rangeDeleter, 1));
-    ASSERT_EQUALS(3ULL, dbclient.count(kNss.toString(), BSON(kShardKey << LT << 5)));
+    ASSERT_EQUALS(3ULL, dbclient.count(kNss, BSON(kShardKey << LT << 5)));
 
     // TODO SERVER-41606: Remove this function when we refactor CollectionRangeDeleter.
     rangeDeleter.setDoDeletionShouldThrowWriteConflictForTest(false);
 
     ASSERT_TRUE(next(rangeDeleter, 1));
-    ASSERT_EQUALS(2ULL, dbclient.count(kNss.toString(), BSON(kShardKey << LT << 5)));
+    ASSERT_EQUALS(2ULL, dbclient.count(kNss, BSON(kShardKey << LT << 5)));
 }
 
 }  // namespace

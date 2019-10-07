@@ -320,19 +320,24 @@ bool DBClientBase::runPseudoCommand(StringData db,
 }
 
 unsigned long long DBClientBase::count(
-    const string& myns, const BSONObj& query, int options, int limit, int skip) {
-    BSONObj cmd = _countCmd(myns, query, options, limit, skip);
+    const NamespaceStringOrUUID nsOrUuid, const BSONObj& query, int options, int limit, int skip) {
+    auto dbName = (nsOrUuid.uuid() ? nsOrUuid.dbname() : (*nsOrUuid.nss()).db().toString());
+    BSONObj cmd = _countCmd(nsOrUuid, query, options, limit, skip);
     BSONObj res;
-    if (!runCommand(nsToDatabase(myns), cmd, res, options))
+    if (!runCommand(dbName, cmd, res, options))
         uasserted(11010, string("count fails:") + res.toString());
     return res["n"].numberLong();
 }
 
 BSONObj DBClientBase::_countCmd(
-    const string& myns, const BSONObj& query, int options, int limit, int skip) {
-    NamespaceString ns(myns);
+    const NamespaceStringOrUUID nsOrUuid, const BSONObj& query, int options, int limit, int skip) {
     BSONObjBuilder b;
-    b.append("count", ns.coll());
+    if (nsOrUuid.uuid()) {
+        const auto uuid = *nsOrUuid.uuid();
+        uuid.appendToBuilder(&b, "count");
+    } else {
+        b.append("count", (*nsOrUuid.nss()).coll());
+    }
     b.append("query", query);
     if (limit)
         b.append("limit", limit);
@@ -785,13 +790,24 @@ void DBClientBase::killCursor(const NamespaceString& ns, long long cursorId) {
         OpMsgRequest::fromDBAndBody(ns.db(), KillCursorsRequest(ns, {cursorId}).toBSON()));
 }
 
-list<BSONObj> DBClientBase::getIndexSpecs(const string& ns, int options) {
+list<BSONObj> DBClientBase::getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid, int options) {
     list<BSONObj> specs;
 
-    BSONObj cmd = BSON("listIndexes" << nsToCollectionSubstring(ns) << "cursor" << BSONObj());
+    BSONObjBuilder bob;
+    if (nsOrUuid.nss()) {
+        bob.append("listIndexes", (*nsOrUuid.nss()).coll());
+        bob.append("cursor", BSONObj());
+    } else {
+        const auto uuid = (*nsOrUuid.uuid());
+        uuid.appendToBuilder(&bob, "listIndexes");
+        bob.append("cursor", BSONObj());
+    }
+
+    BSONObj cmd = bob.obj();
+    auto dbName = (nsOrUuid.uuid() ? nsOrUuid.dbname() : (*nsOrUuid.nss()).db().toString());
 
     BSONObj res;
-    if (runCommand(nsToDatabase(ns), cmd, res, options)) {
+    if (runCommand(dbName, cmd, res, options)) {
         BSONObj cursorObj = res["cursor"].Obj();
         BSONObjIterator i(cursorObj["firstBatch"].Obj());
         while (i.more()) {
@@ -801,8 +817,11 @@ list<BSONObj> DBClientBase::getIndexSpecs(const string& ns, int options) {
         const long long id = cursorObj["id"].Long();
 
         if (id != 0) {
-            invariant(ns == cursorObj["ns"].String());
-            unique_ptr<DBClientCursor> cursor = getMore(ns, id, 0, 0);
+            const auto cursorNs = cursorObj["ns"].String();
+            if (nsOrUuid.nss()) {
+                invariant((*nsOrUuid.nss()).toString() == cursorNs);
+            }
+            unique_ptr<DBClientCursor> cursor = getMore(cursorNs, id, 0, 0);
             while (cursor->more()) {
                 specs.push_back(cursor->nextSafe().getOwned());
             }

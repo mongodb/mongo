@@ -50,7 +50,7 @@ TEST(CommandTests, InputDocumentSequeceWorksEndToEnd) {
     NamespaceString nss("test", "doc_seq");
     DBDirectClient db(opCtx);
     db.dropCollection(nss.ns());
-    ASSERT_EQ(db.count(nss.ns()), 0u);
+    ASSERT_EQ(db.count(nss), 0u);
 
     OpMsgRequest request;
     request.body = BSON("insert" << nss.coll() << "$db" << nss.db());
@@ -66,7 +66,7 @@ TEST(CommandTests, InputDocumentSequeceWorksEndToEnd) {
     const auto reply = db.runCommand(std::move(request));
     ASSERT_EQ(int(reply->getProtocol()), int(rpc::Protocol::kOpMsg));
     ASSERT_BSONOBJ_EQ(reply->getCommandReply(), BSON("n" << 5 << "ok" << 1.0));
-    ASSERT_EQ(db.count(nss.ns()), 5u);
+    ASSERT_EQ(db.count(nss), 5u);
 }
 
 using std::string;

@@ -129,7 +129,7 @@ struct ShardMetadataUtilTest : public ShardServerTestFixture {
     void checkCollectionIsEmpty(const NamespaceString& nss) {
         try {
             DBDirectClient client(operationContext());
-            ASSERT_EQUALS(client.count(nss.ns()), 0ULL);
+            ASSERT_EQUALS(client.count(nss), 0ULL);
         } catch (const DBException&) {
             ASSERT(false);
         }

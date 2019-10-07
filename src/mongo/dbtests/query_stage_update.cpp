@@ -94,7 +94,7 @@ public:
     }
 
     size_t count(const BSONObj& query) {
-        return _client.count(nss.ns(), query, 0, 0, 0);
+        return _client.count(nss, query, 0, 0, 0);
     }
 
     unique_ptr<CanonicalQuery> canonicalize(const BSONObj& query) {

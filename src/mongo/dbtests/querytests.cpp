@@ -809,7 +809,8 @@ public:
 
 private:
     void count(unsigned long long c) {
-        ASSERT_EQUALS(c, _client.count("unittests.querytests.BasicCount", BSON("a" << 4)));
+        ASSERT_EQUALS(
+            c, _client.count(NamespaceString("unittests.querytests.BasicCount"), BSON("a" << 4)));
     }
 };
 
@@ -904,11 +905,14 @@ public:
     static const char* ns() {
         return "unittests.querytests.AutoResetIndexCache";
     }
+    static const NamespaceString nss() {
+        return NamespaceString(ns());
+    }
     void index() {
-        ASSERT_EQUALS(2u, _client.getIndexSpecs(ns()).size());
+        ASSERT_EQUALS(2u, _client.getIndexSpecs(nss()).size());
     }
     void noIndex() {
-        ASSERT_EQUALS(0u, _client.getIndexSpecs(ns()).size());
+        ASSERT_EQUALS(0u, _client.getIndexSpecs(nss()).size());
     }
     void checkIndex() {
         ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), BSON("a" << 1)));
@@ -934,15 +938,16 @@ public:
     }
     void run() {
         const char* ns = "unittests.querytests.UniqueIndex";
+        const NamespaceString nss = NamespaceString(ns);
         ASSERT_OK(dbtests::createIndex(&_opCtx, ns, BSON("a" << 1), true));
         _client.insert(ns, BSON("a" << 4 << "b" << 2));
         _client.insert(ns, BSON("a" << 4 << "b" << 3));
-        ASSERT_EQUALS(1U, _client.count(ns, BSONObj()));
+        ASSERT_EQUALS(1U, _client.count(nss, BSONObj()));
         _client.dropCollection(ns);
         ASSERT_OK(dbtests::createIndex(&_opCtx, ns, BSON("b" << 1), true));
         _client.insert(ns, BSON("a" << 4 << "b" << 2));
         _client.insert(ns, BSON("a" << 4 << "b" << 3));
-        ASSERT_EQUALS(2U, _client.count(ns, BSONObj()));
+        ASSERT_EQUALS(2U, _client.count(nss, BSONObj()));
     }
 };
 
@@ -1129,7 +1134,7 @@ BSONObj MinMax::empty_;
 
 class MatchCodeCodeWScope : public ClientBase {
 public:
-    MatchCodeCodeWScope() : _ns("unittests.querytests.MatchCodeCodeWScope") {}
+    MatchCodeCodeWScope() : _ns("unittests.querytests.MatchCodeCodeWScope"), _nss(_ns) {}
     ~MatchCodeCodeWScope() {
         _client.dropCollection("unittests.querytests.MatchCodeCodeWScope");
     }
@@ -1146,11 +1151,11 @@ private:
         _client.insert(_ns, code());
         _client.insert(_ns, codeWScope());
 
-        ASSERT_EQUALS(1U, _client.count(_ns, code()));
-        ASSERT_EQUALS(1U, _client.count(_ns, codeWScope()));
+        ASSERT_EQUALS(1U, _client.count(_nss, code()));
+        ASSERT_EQUALS(1U, _client.count(_nss, codeWScope()));
 
-        ASSERT_EQUALS(1U, _client.count(_ns, BSON("a" << BSON("$type" << (int)Code))));
-        ASSERT_EQUALS(1U, _client.count(_ns, BSON("a" << BSON("$type" << (int)CodeWScope))));
+        ASSERT_EQUALS(1U, _client.count(_nss, BSON("a" << BSON("$type" << (int)Code))));
+        ASSERT_EQUALS(1U, _client.count(_nss, BSON("a" << BSON("$type" << (int)CodeWScope))));
     }
     BSONObj code() const {
         BSONObjBuilder codeBuilder;
@@ -1163,11 +1168,12 @@ private:
         return codeWScopeBuilder.obj();
     }
     const char* _ns;
+    const NamespaceString _nss;
 };
 
 class MatchDBRefType : public ClientBase {
 public:
-    MatchDBRefType() : _ns("unittests.querytests.MatchDBRefType") {}
+    MatchDBRefType() : _ns("unittests.querytests.MatchDBRefType"), _nss(_ns) {}
     ~MatchDBRefType() {
         _client.dropCollection("unittests.querytests.MatchDBRefType");
     }
@@ -1181,8 +1187,8 @@ private:
     void checkMatch() {
         _client.remove(_ns, BSONObj());
         _client.insert(_ns, dbref());
-        ASSERT_EQUALS(1U, _client.count(_ns, dbref()));
-        ASSERT_EQUALS(1U, _client.count(_ns, BSON("a" << BSON("$type" << (int)DBRef))));
+        ASSERT_EQUALS(1U, _client.count(_nss, dbref()));
+        ASSERT_EQUALS(1U, _client.count(_nss, BSON("a" << BSON("$type" << (int)DBRef))));
     }
     BSONObj dbref() const {
         BSONObjBuilder b;
@@ -1191,6 +1197,7 @@ private:
         return b.obj();
     }
     const char* _ns;
+    const NamespaceString _nss;
 };
 
 class DirectLocking : public ClientBase {
@@ -1215,7 +1222,7 @@ public:
                        BSON("i"
                             << "a"));
         ASSERT_OK(dbtests::createIndex(&_opCtx, ns, BSON("i" << 1)));
-        ASSERT_EQUALS(1U, _client.count(ns, fromjson("{i:{$in:['a']}}")));
+        ASSERT_EQUALS(1U, _client.count(NamespaceString(ns), fromjson("{i:{$in:['a']}}")));
     }
 };
 
@@ -1231,11 +1238,11 @@ public:
         _client.insert(ns, fromjson("{bar:['spam']}"));
         _client.insert(ns, fromjson("{bar:['spam','eggs']}"));
         ASSERT_EQUALS(2U,
-                      _client.count(ns,
+                      _client.count(NamespaceString(ns),
                                     BSON("bar"
                                          << "spam")));
         ASSERT_EQUALS(2U,
-                      _client.count(ns,
+                      _client.count(NamespaceString(ns),
                                     BSON("foo.bar"
                                          << "spam")));
     }
@@ -1305,7 +1312,7 @@ public:
     }
 
     int count() {
-        return (int)_client.count(ns());
+        return (int)_client.count(nss());
     }
 
     size_t numCursorsOpen() {
@@ -1756,6 +1763,63 @@ public:
     }
 };
 
+class CountByUUID : public CollectionBase {
+public:
+    CountByUUID() : CollectionBase("CountByUUID") {}
+
+    void run() {
+        CollectionOptions coll_opts;
+        coll_opts.uuid = UUID::gen();
+        {
+            Lock::GlobalWrite lk(&_opCtx);
+            OldClientContext context(&_opCtx, ns());
+            WriteUnitOfWork wunit(&_opCtx);
+            context.db()->createCollection(&_opCtx, nss(), coll_opts, false);
+            wunit.commit();
+        }
+        insert(ns(), BSON("a" << 1));
+
+        auto count = _client.count(NamespaceStringOrUUID("unittests", *coll_opts.uuid), BSONObj());
+        ASSERT_EQUALS(1U, count);
+
+        insert(ns(), BSON("a" << 2));
+        insert(ns(), BSON("a" << 3));
+
+        count = _client.count(NamespaceStringOrUUID("unittests", *coll_opts.uuid), BSONObj());
+        ASSERT_EQUALS(3U, count);
+    }
+};
+
+class GetIndexSpecsByUUID : public CollectionBase {
+public:
+    GetIndexSpecsByUUID() : CollectionBase("GetIndexSpecsByUUID") {}
+
+    void run() {
+        CollectionOptions coll_opts;
+        coll_opts.uuid = UUID::gen();
+        {
+            Lock::GlobalWrite lk(&_opCtx);
+            OldClientContext context(&_opCtx, ns());
+            WriteUnitOfWork wunit(&_opCtx);
+            context.db()->createCollection(&_opCtx, nss(), coll_opts, true);
+            wunit.commit();
+        }
+        insert(ns(), BSON("a" << 1));
+        insert(ns(), BSON("a" << 2));
+        insert(ns(), BSON("a" << 3));
+
+        auto specsWithIdIndexOnly =
+            _client.getIndexSpecs(NamespaceStringOrUUID(nss().db().toString(), *coll_opts.uuid));
+        ASSERT_EQUALS(1U, specsWithIdIndexOnly.size());
+
+        ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), BSON("a" << 1), true));
+
+        auto specsWithBothIndexes =
+            _client.getIndexSpecs(NamespaceStringOrUUID(nss().db().toString(), *coll_opts.uuid));
+        ASSERT_EQUALS(2U, specsWithBothIndexes.size());
+    }
+};
+
 class CollectionInternalBase : public CollectionBase {
 public:
     CollectionInternalBase(const char* nsLeaf)
@@ -1918,6 +1982,7 @@ public:
         add<FindingStartStale>();
         add<WhatsMyUri>();
         add<QueryByUuid>();
+        add<GetIndexSpecsByUUID>();
         add<Exhaust>();
         add<QueryReadsAll>();
         add<queryobjecttests::names1>();

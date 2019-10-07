@@ -1321,13 +1321,13 @@ public:
         insert(BSON("_id" << 1 << "a" << 11));
         insert(BSON("_id" << 3 << "a" << 10));
         _client.remove(ns(), BSON("a" << 10));
-        ASSERT_EQUALS(1U, _client.count(ns(), BSONObj()));
+        ASSERT_EQUALS(1U, _client.count(nss(), BSONObj()));
         insert(BSON("_id" << 0 << "a" << 11));
         insert(BSON("_id" << 2 << "a" << 10));
         insert(BSON("_id" << 3 << "a" << 10));
 
         applyAllOperations();
-        ASSERT_EQUALS(2U, _client.count(ns(), BSONObj()));
+        ASSERT_EQUALS(2U, _client.count(nss(), BSONObj()));
         ASSERT(!one(BSON("_id" << 1)).isEmpty());
         ASSERT(!one(BSON("_id" << 2)).isEmpty());
     }

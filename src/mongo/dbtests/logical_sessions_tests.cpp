@@ -199,7 +199,7 @@ public:
         ASSERT(resRefresh.isOK());
 
         // Ensure that the right number of timestamps were updated.
-        auto n = db.count(ns(), BSON("lastUse" << now));
+        auto n = db.count(NamespaceString(ns()), BSON("lastUse" << now));
         ASSERT_EQ(n, notRefreshed);
     }
 };
