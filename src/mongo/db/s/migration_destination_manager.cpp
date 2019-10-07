@@ -375,7 +375,7 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
     return Status::OK();
 }
 
-void MigrationDestinationManager::cloneDocumentsFromDonor(
+repl::OpTime MigrationDestinationManager::cloneDocumentsFromDonor(
     OperationContext* opCtx,
     stdx::function<void(OperationContext*, BSONObj)> insertBatchFn,
     stdx::function<BSONObj(OperationContext*)> fetchBatchFn) {
@@ -384,11 +384,16 @@ void MigrationDestinationManager::cloneDocumentsFromDonor(
     options.maxQueueDepth = 1;
 
     SingleProducerSingleConsumerQueue<BSONObj> batches(options);
+    repl::OpTime lastOpApplied;
 
     stdx::thread inserterThread{[&] {
         ThreadClient tc("chunkInserter", opCtx->getServiceContext());
         auto inserterOpCtx = Client::getCurrent()->makeOperationContext();
-        auto consumerGuard = makeGuard([&] { batches.closeConsumerEnd(); });
+        auto consumerGuard = makeGuard([&] {
+            batches.closeConsumerEnd();
+            lastOpApplied = repl::ReplClientInfo::forClient(inserterOpCtx->getClient()).getLastOp();
+        });
+
         try {
             while (true) {
                 auto nextBatch = batches.pop(inserterOpCtx.get());
@@ -424,6 +429,8 @@ void MigrationDestinationManager::cloneDocumentsFromDonor(
             break;
         }
     }
+
+    return lastOpApplied;
 }
 
 Status MigrationDestinationManager::abort(const MigrationSessionId& sessionId) {
@@ -765,6 +772,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(migrateThreadHangAtStep2);
     }
 
+    repl::OpTime lastOpApplied;
     {
         // 3. Initial bulk clone
         setState(CLONE);
@@ -853,7 +861,9 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
             return res.response;
         };
 
-        cloneDocumentsFromDonor(opCtx, insertBatchFn, fetchBatchFn);
+        // If running on a replicated system, we'll need to flush the docs we cloned to the
+        // secondaries
+        lastOpApplied = cloneDocumentsFromDonor(opCtx, insertBatchFn, fetchBatchFn);
 
         timing.done(3);
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(migrateThreadHangAtStep3);
@@ -864,10 +874,6 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
             return;
         }
     }
-
-    // If running on a replicated system, we'll need to flush the docs we cloned to the
-    // secondaries
-    repl::OpTime lastOpApplied = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
 
     const BSONObj xferModsRequest = createTransferModsRequest(_nss, *_sessionId);
 

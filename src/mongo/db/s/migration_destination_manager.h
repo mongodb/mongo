@@ -111,7 +111,7 @@ public:
     /**
      * Clones documents from a donor shard.
      */
-    static void cloneDocumentsFromDonor(
+    static repl::OpTime cloneDocumentsFromDonor(
         OperationContext* opCtx,
         stdx::function<void(OperationContext*, BSONObj)> insertBatchFn,
         stdx::function<BSONObj(OperationContext*)> fetchBatchFn);
