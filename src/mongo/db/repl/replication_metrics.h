@@ -48,6 +48,7 @@ public:
     ReplicationMetrics();
     ~ReplicationMetrics();
 
+    // Election metrics
     void incrementNumElectionsCalledForReason(TopologyCoordinator::StartElectionReason reason);
     void incrementNumElectionsSuccessfulForReason(TopologyCoordinator::StartElectionReason reason);
     void incrementNumStepDownsCausedByHigherTerm();
@@ -75,7 +76,19 @@ public:
     int getNumCatchUpsFailedWithNewTerm_forTesting();
     int getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_forTesting();
 
+    // Election candidate metrics
+
+    // All the election candidate metrics that should be set when a node calls an election are set
+    // in this one function, so that the 'electionCandidateMetrics' section of replSetStatus shows a
+    // consistent state.
+    void setElectionCandidateMetrics(Date_t lastElectionDate);
+    void setTargetCatchupOpTime(OpTime opTime);
+
+    boost::optional<OpTime> getTargetCatchupOpTime_forTesting();
+
     BSONObj getElectionMetricsBSON();
+    BSONObj getElectionCandidateMetricsBSON();
+    void clearElectionCandidateMetrics();
 
 private:
     class ElectionMetricsSSS;
@@ -84,6 +97,8 @@ private:
     ElectionMetrics _electionMetrics;
     ElectionCandidateMetrics _electionCandidateMetrics;
     ElectionParticipantMetrics _electionParticipantMetrics;
+
+    bool _nodeIsCandidateOrPrimary = false;
 };
 
 }  // namespace repl

@@ -2009,6 +2009,7 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
     const OpTime lastOpApplied = getMyLastAppliedOpTime();
     const OpTime lastOpDurable = getMyLastDurableOpTime();
     const BSONObj& initialSyncStatus = rsStatusArgs.initialSyncStatus;
+    const BSONObj& electionCandidateMetrics = rsStatusArgs.electionCandidateMetrics;
     const boost::optional<Timestamp>& lastStableCheckpointTimestamp =
         rsStatusArgs.lastStableCheckpointTimestamp;
 
@@ -2193,6 +2194,10 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
 
     if (!initialSyncStatus.isEmpty()) {
         response->append("initialSyncStatus", initialSyncStatus);
+    }
+
+    if (!electionCandidateMetrics.isEmpty()) {
+        response->append("electionCandidateMetrics", electionCandidateMetrics);
     }
 
     response->append("members", membersOut);

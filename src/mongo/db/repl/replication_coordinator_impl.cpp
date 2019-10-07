@@ -1871,6 +1871,9 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
         return e.toStatus();
     }
 
+    // Clear the node's election candidate metrics since it is no longer primary.
+    ReplicationMetrics::get(opCtx).clearElectionCandidateMetrics();
+
     // Stepdown success!
     onExitGuard.Dismiss();
     updateMemberState();
@@ -2134,6 +2137,9 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
         }
     }
 
+    BSONObj electionCandidateMetrics =
+        ReplicationMetrics::get(getServiceContext()).getElectionCandidateMetricsBSON();
+
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     Status result(ErrorCodes::InternalError, "didn't set status in prepareStatusResponse");
     _topCoord->prepareStatusResponse(
@@ -2142,6 +2148,7 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
             static_cast<unsigned>(time(0) - serverGlobalParams.started),
             _getCurrentCommittedSnapshotOpTime_inlock(),
             initialSyncProgress,
+            electionCandidateMetrics,
             _storage->getLastStableCheckpointTimestamp(_service)},
         response,
         &result);
@@ -2686,6 +2693,9 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock(
         }
         _applierState = ApplierState::Running;
         _externalState->startProducerIfStopped();
+
+        // Clear the node's election candidate metrics since it is no longer primary.
+        ReplicationMetrics::get(getGlobalServiceContext()).clearElectionCandidateMetrics();
     }
 
     if (_memberState.secondary() && !newState.primary()) {
@@ -2917,6 +2927,8 @@ void ReplicationCoordinatorImpl::CatchupState::signalHeartbeatUpdate_inlock() {
     if (_waiter && _waiter->opTime == *targetOpTime) {
         return;
     }
+
+    ReplicationMetrics::get(getGlobalServiceContext()).setTargetCatchupOpTime(targetOpTime.get());
 
     log() << "Heartbeats updated catchup target optime to " << *targetOpTime;
     if (_waiter) {

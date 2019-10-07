@@ -120,6 +120,16 @@
                                   newNewPrimaryStatus.electionMetrics,
                                   'numCatchUpsAlreadyCaughtUp');
 
+    // Check that the 'electionCandidateMetrics' section of the replSetGetStatus response does not
+    // have a 'targetCatchupOpTime' field if the target opTime for catchup is not set.
+    let res = assert.commandWorked(newPrimary.adminCommand({replSetGetStatus: 1}));
+    assert(res.electionCandidateMetrics,
+           () => "Response should have an 'electionCandidateMetrics' field: " + tojson(res));
+    assert(
+        !res.electionCandidateMetrics.targetCatchupOpTime,
+        () => "Response should not have an 'electionCandidateMetrics.targetCatchupOpTime' field: " +
+            tojson(res.electionCandidateMetrics));
+
     jsTest.log("Case 2: The primary needs to catch up, succeeds in time.");
     initialNewPrimaryStatus =
         assert.commandWorked(rst.getSecondaries()[0].adminCommand({serverStatus: 1}));
@@ -143,6 +153,20 @@
     verifyCatchUpConclusionReason(initialNewPrimaryStatus.electionMetrics,
                                   newNewPrimaryStatus.electionMetrics,
                                   'numCatchUpsSucceeded');
+
+    // Check that the 'electionCandidateMetrics' section of the replSetGetStatus response has a
+    // 'targetCatchupOpTime' field once heartbeats have updated the target opTime for catchup, and
+    // that it has the correct value.
+    res = assert.commandWorked(stepUpResults.newPrimary.adminCommand({replSetGetStatus: 1}));
+    assert(res.electionCandidateMetrics,
+           () => "Response should have an 'electionCandidateMetrics' field: " + tojson(res));
+    assert(res.electionCandidateMetrics.targetCatchupOpTime,
+           () => "Response should have an 'electionCandidateMetrics.targetCatchupOpTime' field: " +
+               tojson(res.electionCandidateMetrics));
+    assert.eq(res.electionCandidateMetrics.targetCatchupOpTime.ts,
+              stepUpResults.latestOpOnOldPrimary.ts);
+    assert.eq(res.electionCandidateMetrics.targetCatchupOpTime.t,
+              stepUpResults.latestOpOnOldPrimary.t);
 
     // Wait for all secondaries to catch up
     rst.awaitReplication();

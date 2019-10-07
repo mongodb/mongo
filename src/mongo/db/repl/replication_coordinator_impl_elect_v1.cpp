@@ -64,6 +64,10 @@ public:
         if (_replCoord->_electionFinishedEvent.isValid()) {
             _replCoord->_replExecutor->signalEvent(_replCoord->_electionFinishedEvent);
         }
+
+        // Clear the node's election candidate metrics if it loses either the dry-run or actual
+        // election, since it will not become primary.
+        ReplicationMetrics::get(getGlobalServiceContext()).clearElectionCandidateMetrics();
     }
 
     void dismiss() {
@@ -140,6 +144,9 @@ void ReplicationCoordinatorImpl::_startElectSelfV1_inlock(
 
     long long term = _topCoord->getTerm();
     int primaryIndex = -1;
+
+    Date_t now = _replExecutor->now();
+    ReplicationMetrics::get(getServiceContext()).setElectionCandidateMetrics(now);
 
     if (reason == TopologyCoordinator::StartElectionReason::kStepUpRequestSkipDryRun) {
         long long newTerm = term + 1;
