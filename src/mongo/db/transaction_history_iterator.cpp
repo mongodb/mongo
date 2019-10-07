@@ -103,7 +103,7 @@ BSONObj findOneOplogEntry(OperationContext* opCtx,
                                    "PlanExecutor error in TransactionHistoryIterator");
     }
 
-    return oplogBSON;
+    return oplogBSON.getOwned();
 }
 
 }  // namespace
