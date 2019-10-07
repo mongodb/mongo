@@ -154,6 +154,10 @@ StatusWith<Message> MessageCompressorManager::decompressMessage(const Message& m
 
     LOG(3) << "Decompressing message with " << compressor->getName();
 
+    if (compressionHeader.uncompressedSize < 0) {
+        return {ErrorCodes::BadValue, "Decompressed message would be negative in size"};
+    }
+
     size_t bufferSize = compressionHeader.uncompressedSize + MsgData::MsgDataHeaderSize;
     if (bufferSize > MaxMessageSizeBytes) {
         return {ErrorCodes::BadValue,
