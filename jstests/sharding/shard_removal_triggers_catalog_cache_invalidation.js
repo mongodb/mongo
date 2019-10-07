@@ -5,91 +5,143 @@
 (function() {
 'use strict';
 
+// Checking UUID consistency involves talking to shards, but this test shuts down shards.
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 const dbName = 'TestDB';
-const shardedCollName = 'Coll';
-const shardedCollNs = dbName + '.' + shardedCollName;
-const unshardedCollName = 'UnshardedColl';
-const unshardedCollNs = dbName + '.' + unshardedCollName;
 
-var st = new ShardingTest({shards: 2, mongos: 2});
-let router0DB = st.s0.getDB(dbName);
-let router1DB = st.s1.getDB(dbName);
+/**
+ * Test that sharded collections with data on a shard that gets removed are correctly invalidated in
+ * a router's catalog cache.
+ *
+ * 1. Create 2 shards and 2 routers. Make shard0 the primary shard for a database.
+ * 2. Put data for a sharded collection on shard0.
+ * 3. Ensure both routers have up-to-date routing info.
+ * 4. Remove shard0 by sending removeShard through router 0. All data will be migrated to shard1.
+ * 5. Send a query through router 1 to target the sharded collection. This should correctly target
+ *    shard1.
+ */
+(() => {
+    jsTestLog(
+        "Test that sharded collections with data on a shard that gets removed are correctly invalidated in a router's catalog cache.");
 
-let router0ShardedColl = router0DB[shardedCollName];
-let router1ShardedColl = router1DB[shardedCollName];
+    const shardedCollName = 'Coll';
+    const shardedCollNs = dbName + '.' + shardedCollName;
 
-let router0UnshardedColl = router0DB[unshardedCollName];
-let router1UnshardedColl = router1DB[unshardedCollName];
+    var st = new ShardingTest({shards: 2, mongos: 2});
+    let router0ShardedColl = st.s0.getDB(dbName)[shardedCollName];
+    let router1ShardedColl = st.s1.getDB(dbName)[shardedCollName];
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
-assert.commandWorked(st.s0.adminCommand({shardCollection: shardedCollNs, key: {_id: 1}}));
-assert.commandWorked(st.s0.adminCommand({split: shardedCollNs, middle: {_id: 0}}));
+    assert.commandWorked(st.s0.adminCommand({enableSharding: dbName}));
+    st.ensurePrimaryShard(dbName, st.shard1.shardName);
+    assert.commandWorked(st.s0.adminCommand({shardCollection: shardedCollNs, key: {_id: 1}}));
 
-// Insert some documents into the sharded collection and make sure there are documents on both
-// shards.
-router0ShardedColl.insert({_id: -1, value: 'Negative value'});
-router0ShardedColl.insert({_id: 1, value: 'Positive value'});
-assert.commandWorked(st.s0.adminCommand(
-    {moveChunk: shardedCollNs, find: {_id: -1}, to: st.shard0.shardName, _waitForDelete: true}));
-assert.commandWorked(st.s0.adminCommand(
-    {moveChunk: shardedCollNs, find: {_id: 1}, to: st.shard1.shardName, _waitForDelete: true}));
+    // Make sure data is inserted into shard0
+    assert.commandWorked(st.s0.adminCommand({
+        moveChunk: shardedCollNs,
+        find: {_id: -1},
+        to: st.shard0.shardName,
+        _waitForDelete: true
+    }));
 
-// Insert some documents into the unsharded collection whose primary is the to-be-removed shard0.
-router0UnshardedColl.insert({_id: 1, value: 'Positive value'});
+    // Insert some documents into the sharded collection on shard0.
+    router0ShardedColl.insert({_id: -1});
+    router0ShardedColl.insert({_id: 1});
 
-// Force s0 and s1 to load the database and collection cache entries for both the sharded and
-// unsharded collections.
-assert.eq(2, router0ShardedColl.find({}).itcount());
-assert.eq(2, router1ShardedColl.find({}).itcount());
-assert.eq(1, router0UnshardedColl.find({}).itcount());
-assert.eq(1, router1UnshardedColl.find({}).itcount());
+    // Force s0 and s1 to load the database and collection cache entries for the sharded collection.
+    assert.eq(2, router0ShardedColl.find({}).itcount());
+    assert.eq(2, router1ShardedColl.find({}).itcount());
 
-// Add new shard.
-var newshard = MongoRunner.runMongod({'shardsvr': ''});
-assert.commandWorked(st.s0.adminCommand({addShard: newshard.host, name: 'zzz-shard'}));
-assert.commandWorked(st.s0.adminCommand({movePrimary: dbName, to: 'zzz-shard'}));
+    // Start the balancer here so that it can drain shard0 when it's removed but also won't conflict
+    // with the above moveChunk command.
+    st.startBalancer();
 
-// Start the balancer here so that it can drain shards when they're removed but also won't conflict
-// with the above moveChunk commands.
-st.startBalancer();
+    // Remove shard0.
+    assert.soon(() => {
+        const removeRes =
+            assert.commandWorked(st.s0.adminCommand({removeShard: st.shard0.shardName}));
+        return removeRes.state === 'completed';
+    });
 
-// Remove shard1.
-assert.soon(() => {
-    const removeRes = assert.commandWorked(st.s0.adminCommand({removeShard: st.shard1.shardName}));
-    return 'completed' === removeRes.state;
-});
+    // Stop the replica set so that future requests to this shard will be unsuccessful.
+    st.rs0.stopSet();
 
-// Remove shard0.
-assert.soon(() => {
-    const removeRes = assert.commandWorked(st.s0.adminCommand({removeShard: st.shard0.shardName}));
-    return 'completed' === removeRes.state;
-});
+    // Ensure that s1, the router which did not run removeShard, eventually stops targeting chunks
+    // for the sharded collection which previously resided on a shard that no longer exists.
+    assert.soon(() => {
+        try {
+            const count = router1ShardedColl.count({_id: 1});
+            return true;
+        } catch (e) {
+            print(e);
+            return false;
+        }
+    });
 
-// Ensure that s1, the router which did not run removeShard, eventually stops targeting chunks for
-// the sharded collection which previously resided on shards that no longer exists.
-assert.soon(() => {
-    try {
-        const response = router1ShardedColl.explain().count({_id: 1});
-        return response.ok;
-    } catch (e) {
-        print(e);
-        return false;
-    }
-});
+    st.stop();
+})();
 
-// Ensure that s1, the router which did not run removeShard, eventually stops targeting data for
-// the unsharded collection which previously had as primary a shard that no longer exist.
-assert.soon(() => {
-    try {
-        const response = router1UnshardedColl.explain().count({_id: 1});
-        return response.ok;
-    } catch (e) {
-        print(e);
-        return false;
-    }
-});
+/**
+ * Test that entries for a database whose original primary shard gets removed are correctly
+ * invalidated in a router's catalog cache.
+ *
+ * 1. Create 2 shards and 2 routers. Make shard0 the primary shard for a database.
+ * 2. Put data for an unsharded collection on shard0.
+ * 3. Ensure both routers have up-to-date routing info.
+ * 4. movePrimary for the database to shard1.
+ * 4. Remove shard0 by sending removeShard through router 0.
+ * 5. Send a query through router 1 to target the sharded and unsharded collections. This should
+ *    correctly target shard1.
+ */
+(() => {
+    jsTestLog(
+        "Test that entries for a database whose original primary shard gets removed are correctly invalidated in a router's catalog cache.");
 
-st.stop();
-MongoRunner.stopMongod(newshard);
+    const unshardedCollName = 'UnshardedColl';
+    const unshardedCollNs = dbName + '.' + unshardedCollName;
+
+    var st = new ShardingTest({shards: 2, mongos: 2, other: {enableBalancer: true}});
+
+    let router0UnshardedColl = st.s0.getDB(dbName)[unshardedCollName];
+    let router1UnshardedColl = st.s1.getDB(dbName)[unshardedCollName];
+
+    assert.commandWorked(st.s0.adminCommand({enableSharding: dbName}));
+    st.ensurePrimaryShard(dbName, st.shard0.shardName);
+
+    // Insert some documents into the unsharded collection whose primary is the to-be-removed
+    // shard0.
+    router0UnshardedColl.insert({_id: 1});
+
+    // Force s0 and s1 to load the database and collection cache entries for the unsharded
+    // collection.
+    assert.eq(1, router0UnshardedColl.find({}).itcount());
+    assert.eq(1, router1UnshardedColl.find({}).itcount());
+
+    // Call movePrimary for the database so that shard0 can be removed.
+    assert.commandWorked(st.s0.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
+
+    // Remove shard0. We need assert.soon since chunks in the sessions collection may need to be
+    // migrated off by the balancer.
+    assert.soon(() => {
+        const removeRes =
+            assert.commandWorked(st.s0.adminCommand({removeShard: st.shard0.shardName}));
+        return removeRes.state === 'completed';
+    });
+
+    // Stop the replica set so that future requests to this shard will be unsuccessful.
+    st.rs0.stopSet();
+
+    // Ensure that s1, the router which did not run removeShard, eventually stops targeting data for
+    // the unsharded collection which previously had as primary a shard that no longer exists.
+    assert.soon(() => {
+        try {
+            const count = router1UnshardedColl.count({_id: 1});
+            return true;
+        } catch (e) {
+            print(e);
+            return false;
+        }
+    });
+    st.stop();
+})();
 })();
