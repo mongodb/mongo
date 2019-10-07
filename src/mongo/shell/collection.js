@@ -691,7 +691,7 @@ DBCollection.prototype.drop = function(options = {}) {
     const cmdObj = Object.assign({drop: this.getName()}, options);
     ret = this._db.runCommand(cmdObj);
     if (!ret.ok) {
-        if (ret.errmsg == "ns not found")
+        if (ret.errmsg == "Namespace not found")
             return false;
         throw _getErrorWithCode(ret, "drop failed: " + tojson(ret));
     }

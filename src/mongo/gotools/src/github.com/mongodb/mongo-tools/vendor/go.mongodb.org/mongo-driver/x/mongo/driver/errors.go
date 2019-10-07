@@ -278,7 +278,7 @@ func (e Error) NotMaster() bool {
 
 // NamespaceNotFound returns true if this errors is a NamespaceNotFound error.
 func (e Error) NamespaceNotFound() bool {
-	return e.Code == 26 || e.Message == "ns not found"
+	return e.Code == 26 || e.Message == "Namespace not found"
 }
 
 // helper method to extract an error from a reader if there is one; first returned item is the

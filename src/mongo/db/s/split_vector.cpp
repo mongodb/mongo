@@ -81,7 +81,7 @@ StatusWith<std::vector<BSONObj>> splitVector(OperationContext* opCtx,
 
         Collection* const collection = autoColl.getCollection();
         if (!collection) {
-            return {ErrorCodes::NamespaceNotFound, "ns not found"};
+            return {ErrorCodes::NamespaceNotFound, "Namespace not found"};
         }
 
         // Allow multiKey based on the invariant that shard keys must be single-valued. Therefore,

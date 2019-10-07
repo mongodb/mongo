@@ -96,7 +96,7 @@ public:
 
         Collection* const collection = autoColl.getCollection();
         if (!collection) {
-            errmsg = "ns not found";
+            errmsg = "Namespace not found";
             return false;
         }
 

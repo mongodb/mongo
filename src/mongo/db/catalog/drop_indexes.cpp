@@ -216,7 +216,7 @@ Status dropIndexes(OperationContext* opCtx,
                               str::stream() << "Cannot drop indexes on view " << nss);
             }
 
-            return Status(ErrorCodes::NamespaceNotFound, "ns not found");
+            return Status(ErrorCodes::NamespaceNotFound, "Namespace not found");
         }
 
         BackgroundOperation::assertNoBgOpInProgForNs(nss);

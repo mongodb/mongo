@@ -46,7 +46,7 @@ const (
 const (
 	ErrLostConnection     = "lost connection to server"
 	ErrNoReachableServers = "no reachable servers"
-	ErrNsNotFound         = "ns not found"
+	ErrNsNotFound         = "Namespace not found"
 	// replication errors list the replset name if we are talking to a mongos,
 	// so we can only check for this universal prefix
 	ErrReplTimeoutPrefix            = "waiting for replication timed out"
