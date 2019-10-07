@@ -169,6 +169,9 @@ private:
     RecordId _firstRecordId;
 
     DataThrottle _dataThrottle;
+
+    // Used to detect when the catalog is re-opened while yielding locks.
+    uint64_t _catalogGeneration;
 };
 
 }  // namespace CollectionValidation

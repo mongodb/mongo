@@ -81,6 +81,7 @@ ValidateState::ValidateState(OperationContext* opCtx,
     }
 
     _uuid = _collection->uuid();
+    _catalogGeneration = opCtx->getServiceContext()->getCatalogGeneration();
 }
 
 void ValidateState::yieldLocks(OperationContext* opCtx) {
@@ -88,6 +89,11 @@ void ValidateState::yieldLocks(OperationContext* opCtx) {
 
     // Drop and reacquire the locks.
     _relockDatabaseAndCollection(opCtx);
+
+    uassert(ErrorCodes::Interrupted,
+            str::stream() << "Interrupted due to: catalog restart: " << _nss << " (" << *_uuid
+                          << ") while validating the collection",
+            _catalogGeneration == opCtx->getServiceContext()->getCatalogGeneration());
 
     // Check if any of the indexes we were validating were dropped. Indexes created while
     // yielding will be ignored.

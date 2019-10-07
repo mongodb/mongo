@@ -189,6 +189,7 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
     // Opening CollectionCatalog: The collection catalog is now in sync with the storage engine
     // catalog. Clear the pre-closing state.
     CollectionCatalog::get(opCtx).onOpenCatalog(opCtx);
+    opCtx->getServiceContext()->incrementCatalogGeneration();
     log() << "openCatalog: finished reloading collection catalog";
 }
 }  // namespace catalog

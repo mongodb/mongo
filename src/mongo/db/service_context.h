@@ -510,6 +510,14 @@ public:
      */
     BatonHandle makeBaton(OperationContext* opCtx) const;
 
+    uint64_t getCatalogGeneration() const {
+        return _catalogGeneration.load();
+    }
+
+    void incrementCatalogGeneration() {
+        _catalogGeneration.fetchAndAdd(1);
+    }
+
 private:
     class ClientObserverHolder {
     public:
@@ -591,6 +599,9 @@ private:
 
     // Counter for assigning operation ids.
     AtomicWord<unsigned> _nextOpId{1};
+
+    // When the catalog is restarted, the generation goes up by one each time.
+    AtomicWord<uint64_t> _catalogGeneration{0};
 
     bool _startupComplete = false;
     stdx::condition_variable _startupCompleteCondVar;
