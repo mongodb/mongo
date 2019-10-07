@@ -7827,7 +7827,7 @@ tasks:
       crash_options: --crashMethod=kill --crashWaitTime=45 --jitterForCrashWaitTime=5 --instanceId=${instance_id}
       mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --setParameter logComponentVerbosity='{storage:{recovery:2}}' --storageEngine wiredTiger\"
 
-- name: powercycle_fcv4.0
+- name: powercycle_fcv4.2
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
@@ -7847,7 +7847,7 @@ tasks:
     vars:
       <<: *powercycle_test
       client_options: --numCrudClients=20 --numFsmClients=20
-      mongod_options: --mongodUsablePorts ${standard_port} ${secret_port} --dbPath=${db_path} --logPath=${log_path} --fcv=4.0
+      mongod_options: --mongodUsablePorts ${standard_port} ${secret_port} --dbPath=${db_path} --logPath=${log_path} --fcv=4.2
       mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1  --setParameter logComponentVerbosity='{storage:{recovery:2}}' --storageEngine wiredTiger\"
 
 - name: powercycle_replication
