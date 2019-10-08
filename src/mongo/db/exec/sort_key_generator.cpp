@@ -68,15 +68,15 @@ PlanStage::StageState SortKeyGeneratorStage::doWork(WorkingSetID* out) {
     if (stageState == PlanStage::ADVANCED) {
         WorkingSetMember* member = _ws->get(*out);
 
-        try {
-            auto sortKey = _sortKeyGen.computeSortKey(*member);
-
-            // Add the sort key to the WSM as metadata.
-            member->metadata().setSortKey(std::move(sortKey), _sortKeyGen.isSingleElementKey());
-        } catch (const DBException& computeSortKeyException) {
-            *out = WorkingSetCommon::allocateStatusMember(_ws, computeSortKeyException.toStatus());
+        auto sortKey = _sortKeyGen.computeSortKey(*member);
+        if (!sortKey.isOK()) {
+            *out = WorkingSetCommon::allocateStatusMember(_ws, sortKey.getStatus());
             return PlanStage::FAILURE;
         }
+
+        // Add the sort key to the WSM as metadata.
+        member->metadata().setSortKey(std::move(sortKey.getValue()),
+                                      _sortKeyGen.isSingleElementKey());
 
         return PlanStage::ADVANCED;
     }

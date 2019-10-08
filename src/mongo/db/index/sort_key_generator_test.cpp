@@ -266,14 +266,16 @@ TEST_F(SortKeyGeneratorWorkingSetTest, CanGetSortKeyFromWorkingSetMemberWithObj)
     auto sortKeyGen = makeSortKeyGen(BSON("a" << 1), nullptr);
     setRecordIdAndObj(BSON("x" << 1 << "a" << 2 << "y" << 3));
     auto sortKey = sortKeyGen->computeSortKey(member());
-    ASSERT_VALUE_EQ(Value(2), sortKey);
+    ASSERT_OK(sortKey);
+    ASSERT_VALUE_EQ(Value(2), sortKey.getValue());
 }
 
 TEST_F(SortKeyGeneratorWorkingSetTest, CanGetSortKeyFromWorkingSetMemberWithOwnedObj) {
     auto sortKeyGen = makeSortKeyGen(BSON("a" << 1), nullptr);
     setOwnedObj(BSON("x" << 1 << "a" << 2 << "y" << 3));
     auto sortKey = sortKeyGen->computeSortKey(member());
-    ASSERT_VALUE_EQ(Value(2), sortKey);
+    ASSERT_OK(sortKey);
+    ASSERT_VALUE_EQ(Value(2), sortKey.getValue());
 }
 
 TEST_F(SortKeyGeneratorWorkingSetTest, CanGenerateKeyFromWSMForTextScoreMetaSort) {
@@ -282,14 +284,16 @@ TEST_F(SortKeyGeneratorWorkingSetTest, CanGenerateKeyFromWSMForTextScoreMetaSort
     setOwnedObj(BSON("x" << 1 << "a" << 2 << "y" << 3 << "c" << BSON_ARRAY(4 << 5 << 6)));
     member().metadata().setTextScore(9.9);
     auto sortKey = sortKeyGen->computeSortKey(member());
-    ASSERT_VALUE_EQ(Value({Value(2), Value(9.9), Value(6)}), sortKey);
+    ASSERT_OK(sortKey);
+    ASSERT_VALUE_EQ(Value({Value(2), Value(9.9), Value(6)}), sortKey.getValue());
 }
 
 TEST_F(SortKeyGeneratorWorkingSetTest, CanGenerateSortKeyFromWSMInIndexKeyState) {
     auto sortKeyGen = makeSortKeyGen(BSON("a" << 1), nullptr);
     setRecordIdAndIdx(BSON("a" << 1 << "b" << 1), BSON("" << 2 << "" << 3));
     auto sortKey = sortKeyGen->computeSortKey(member());
-    ASSERT_VALUE_EQ(Value(2), sortKey);
+    ASSERT_OK(sortKey);
+    ASSERT_VALUE_EQ(Value(2), sortKey.getValue());
 }
 
 TEST_F(SortKeyGeneratorWorkingSetTest, CanGenerateSortKeyFromWSMInIndexKeyStateWithCollator) {
@@ -301,7 +305,8 @@ TEST_F(SortKeyGeneratorWorkingSetTest, CanGenerateSortKeyFromWSMInIndexKeyStateW
                            << ""
                            << "string2"));
     auto sortKey = sortKeyGen->computeSortKey(member());
-    ASSERT_VALUE_EQ(Value("1gnirts"_sd), sortKey);
+    ASSERT_OK(sortKey);
+    ASSERT_VALUE_EQ(Value("1gnirts"_sd), sortKey.getValue());
 }
 
 DEATH_TEST_F(SortKeyGeneratorWorkingSetTest,
