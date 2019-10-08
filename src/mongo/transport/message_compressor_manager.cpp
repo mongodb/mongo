@@ -143,6 +143,10 @@ StatusWith<Message> MessageCompressorManager::decompressMessage(const Message& m
                 "Compression algorithm specified in message is not available"};
     }
 
+    if (compressionHeader.uncompressedSize < 0) {
+        return {ErrorCodes::BadValue, "Decompressed message would be negative in size"};
+    }
+
     size_t bufferSize = compressionHeader.uncompressedSize + MsgData::MsgDataHeaderSize;
     if (bufferSize > MaxMessageSizeBytes) {
         return {ErrorCodes::BadValue,
@@ -192,7 +196,7 @@ void MessageCompressorManager::clientBegin(BSONObjBuilder* output) {
 
 void MessageCompressorManager::clientFinish(const BSONObj& input) {
     auto elem = input.getField("compression");
-    LOG(3) << "Finishing client-side compreession negotiation";
+    LOG(3) << "Finishing client-side compression negotiation";
 
     // We've just called clientBegin, so the list of compressors should be empty.
     invariant(_negotiated.empty());
