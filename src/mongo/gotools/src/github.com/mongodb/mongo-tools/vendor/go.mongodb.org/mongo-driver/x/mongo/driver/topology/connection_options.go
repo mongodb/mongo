@@ -35,10 +35,6 @@ var DefaultDialer Dialer = &net.Dialer{}
 // initialization. Implementations must be goroutine safe.
 type Handshaker = driver.Handshaker
 
-// HandshakerFunc is an adapter to allow the use of ordinary functions as
-// connection handshakers.
-type HandshakerFunc = driver.HandshakerFunc
-
 type connectionConfig struct {
 	appName        string
 	connectTimeout time.Duration

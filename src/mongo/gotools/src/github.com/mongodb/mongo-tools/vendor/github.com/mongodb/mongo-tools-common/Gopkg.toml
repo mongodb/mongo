@@ -26,11 +26,7 @@
 
 [[constraint]]
   name = "go.mongodb.org/mongo-driver"
-  version = "v1.1"
-
-[[constraint]]
-  name = "github.com/howeyc/gopass"
-  revision = "44476384cd4721b68705e72f19e95d1a3a504370"
+  version = "^v1.1.2"
 
 [[constraint]]
   name = "github.com/jessevdk/go-flags"

@@ -150,7 +150,12 @@ func main() {
 	// we have to check this here, otherwise the user will be prompted
 	// for a password for each discovered node
 	if opts.Auth.ShouldAskForPassword() {
-		opts.Auth.Password = password.Prompt()
+		pass, err := password.Prompt()
+		if err != nil {
+			log.Logvf(log.Always, "Failed: %v", err)
+			os.Exit(util.ExitFailure)
+		}
+		opts.Auth.Password = pass
 	}
 
 	var factory stat_consumer.FormatterConstructor

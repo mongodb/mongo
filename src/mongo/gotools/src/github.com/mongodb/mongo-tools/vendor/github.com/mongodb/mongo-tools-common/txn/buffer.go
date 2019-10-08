@@ -15,6 +15,7 @@ import (
 
 	"github.com/mongodb/mongo-tools-common/bsonutil"
 	"github.com/mongodb/mongo-tools-common/db"
+	"github.com/mongodb/mongo-tools-common/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -22,6 +23,8 @@ import (
 var ErrBufferClosed = errors.New("transaction buffer already closed")
 var ErrTxnAborted = errors.New("transaction aborted")
 var ErrNotTransaction = errors.New("oplog entry is not a transaction")
+
+var zeroTimestamp = primitive.Timestamp{}
 
 type txnTask struct {
 	meta Meta
@@ -37,15 +40,17 @@ type txnState struct {
 	ingestDone chan struct{}
 	ingestErr  error
 	stopChan   chan struct{}
+	startTime  primitive.Timestamp
 	wg         sync.WaitGroup
 }
 
-func newTxnState() *txnState {
+func newTxnState(op db.Oplog) *txnState {
 	return &txnState{
 		ingestChan: make(chan txnTask),
 		ingestDone: make(chan struct{}),
 		stopChan:   make(chan struct{}),
 		buffer:     make([]db.Oplog, 0),
+		startTime:  op.Timestamp,
 	}
 }
 
@@ -107,7 +112,7 @@ func (b *Buffer) AddOp(m Meta, op db.Oplog) error {
 	// Get or initialize transaction state
 	state, ok := b.txns[m.id]
 	if !ok {
-		state = newTxnState()
+		state = newTxnState(op)
 		b.txns[m.id] = state
 		b.wg.Add(1)
 		state.wg.Add(1)
@@ -209,6 +214,21 @@ LOOP:
 	close(errChan)
 	state.wg.Done()
 	b.wg.Done()
+}
+
+// OldestTimestamp returns the timestamp of the oldest buffered transaction, or
+// a zero-value timestamp if no transactions are buffered.  This will include
+// committed transactions until they are purged.
+func (b *Buffer) OldestTimestamp() primitive.Timestamp {
+	b.Lock()
+	defer b.Unlock()
+	oldest := zeroTimestamp
+	for _, v := range b.txns {
+		if oldest == zeroTimestamp || util.TimestampLessThan(v.startTime, oldest) {
+			oldest = v.startTime
+		}
+	}
+	return oldest
 }
 
 // PurgeTxn closes any transaction streams in progress and deletes all oplog

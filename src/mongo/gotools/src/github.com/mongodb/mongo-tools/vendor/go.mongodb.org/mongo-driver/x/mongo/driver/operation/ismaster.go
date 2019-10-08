@@ -28,6 +28,8 @@ type IsMaster struct {
 	res bsoncore.Document
 }
 
+var _ driver.Handshaker = (*IsMaster)(nil)
+
 // NewIsMaster constructs an IsMaster.
 func NewIsMaster() *IsMaster { return &IsMaster{} }
 
@@ -401,8 +403,9 @@ func (im *IsMaster) Execute(ctx context.Context) error {
 	}.Execute(ctx, nil)
 }
 
-// Handshake implements the Handshaker interface.
-func (im *IsMaster) Handshake(ctx context.Context, _ address.Address, c driver.Connection) (description.Server, error) {
+// GetDescription retrieves the server description for the given connection. This function implements the Handshaker
+// interface.
+func (im *IsMaster) GetDescription(ctx context.Context, _ address.Address, c driver.Connection) (description.Server, error) {
 	err := driver.Operation{
 		Clock:      im.clock,
 		CommandFn:  im.handshakeCommand,
@@ -417,4 +420,10 @@ func (im *IsMaster) Handshake(ctx context.Context, _ address.Address, c driver.C
 		return description.Server{}, err
 	}
 	return im.Result(c.Address()), nil
+}
+
+// FinishHandshake implements the Handshaker interface. This is a no-op function because a non-authenticated connection
+// does not do anything besides the initial isMaster for a handshake.
+func (im *IsMaster) FinishHandshake(context.Context, driver.Connection) error {
+	return nil
 }

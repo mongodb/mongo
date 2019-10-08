@@ -8,8 +8,9 @@ package db
 
 import (
 	"fmt"
-	"go.mongodb.org/mongo-driver/bson"
 	"io"
+
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 // BSONSource reads documents from the underlying io.ReadCloser, Stream which
@@ -18,6 +19,7 @@ type BSONSource struct {
 	reusableBuf []byte
 	Stream      io.ReadCloser
 	err         error
+	MaxBSONSize int32
 }
 
 // DecodedBSONSource reads documents from the underlying io.ReadCloser, Stream which
@@ -36,12 +38,12 @@ type RawDocSource interface {
 
 // NewBSONSource creates a BSONSource with a reusable I/O buffer
 func NewBSONSource(in io.ReadCloser) *BSONSource {
-	return &BSONSource{make([]byte, MaxBSONSize), in, nil}
+	return &BSONSource{make([]byte, MaxBSONSize), in, nil, MaxBSONSize}
 }
 
 // NewBufferlessBSONSource creates a BSONSource without a reusable I/O buffer
 func NewBufferlessBSONSource(in io.ReadCloser) *BSONSource {
-	return &BSONSource{nil, in, nil}
+	return &BSONSource{nil, in, nil, MaxBSONSize}
 }
 
 // Close closes the BSONSource, rendering it unusable for I/O.
@@ -112,7 +114,7 @@ func (bs *BSONSource) LoadNext() []byte {
 	// actually fit into the buffer that was provided. If not, either the BSON is
 	// invalid, or the buffer passed in is too small.
 	// Verify that we do not have an invalid BSON document with size < 5.
-	if bsonSize > MaxBSONSize || bsonSize < 5 {
+	if bsonSize > bs.MaxBSONSize || bsonSize < 5 {
 		bs.err = fmt.Errorf("invalid BSONSize: %v bytes", bsonSize)
 		return nil
 	}
@@ -143,4 +145,8 @@ func (bs *BSONSource) LoadNext() []byte {
 
 func (bs *BSONSource) Err() error {
 	return bs.err
+}
+
+func (bs *BSONSource) SetMaxBSONSize(size int32) {
+	bs.MaxBSONSize = size
 }

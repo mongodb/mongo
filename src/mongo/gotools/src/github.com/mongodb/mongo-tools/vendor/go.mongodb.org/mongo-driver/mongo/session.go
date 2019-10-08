@@ -185,14 +185,14 @@ func (s *sessionImpl) AbortTransaction(ctx context.Context) error {
 	selector := makePinnedSelector(s.clientSession, description.WriteSelector())
 
 	s.clientSession.Aborting = true
-	err = operation.NewAbortTransaction().Session(s.clientSession).ClusterClock(s.client.clock).Database("admin").
+	_ = operation.NewAbortTransaction().Session(s.clientSession).ClusterClock(s.client.clock).Database("admin").
 		Deployment(s.topo).WriteConcern(s.clientSession.CurrentWc).ServerSelector(selector).
 		Retry(driver.RetryOncePerCommand).CommandMonitor(s.client.monitor).RecoveryToken(bsoncore.Document(s.clientSession.RecoveryToken)).Execute(ctx)
 
 	s.clientSession.Aborting = false
 	_ = s.clientSession.AbortTransaction()
 
-	return replaceErrors(err)
+	return nil
 }
 
 // CommitTransaction commits the sesson's transaction.

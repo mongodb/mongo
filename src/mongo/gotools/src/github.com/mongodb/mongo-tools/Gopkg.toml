@@ -29,11 +29,11 @@ required = ["github.com/3rf/mongo-lint"]
 
 [[constraint]]
   name = "github.com/mongodb/mongo-tools-common"
-  branch = "master"
+  version = "^v1.0.2"
 
 [[constraint]]
   name = "go.mongodb.org/mongo-driver"
-  version = "v1.1"
+  version = "^v1.1.2"
 
 [[constraint]]
   name = "github.com/10gen/escaper"

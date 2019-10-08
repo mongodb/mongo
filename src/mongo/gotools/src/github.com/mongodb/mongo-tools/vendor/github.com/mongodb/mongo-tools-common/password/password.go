@@ -27,30 +27,34 @@ const (
 
 // Prompt displays a prompt asking for the password and returns the
 // password the user enters as a string.
-func Prompt() string {
+func Prompt() (string, error) {
 	var pass string
+	var err error
 	if IsTerminal() {
 		log.Logv(log.DebugLow, "standard input is a terminal; reading password from terminal")
 		fmt.Fprintf(os.Stderr, "Enter password:")
-		pass = GetPass()
+		pass, err = GetPass()
 	} else {
 		log.Logv(log.Always, "reading password from standard input")
 		fmt.Fprintf(os.Stderr, "Enter password:")
-		pass = readPassFromStdin()
+		pass, err = readPassFromStdin()
+	}
+	if err != nil {
+		return "", err
 	}
 	fmt.Fprintln(os.Stderr)
-	return pass
+	return pass, nil
 }
 
 // readPassFromStdin pipes in a password from stdin if
 // we aren't using a terminal for standard input
-func readPassFromStdin() string {
+func readPassFromStdin() (string, error) {
 	pass := []byte{}
 	for {
 		var chBuf [1]byte
 		n, err := os.Stdin.Read(chBuf[:])
 		if err != nil {
-			panic(err)
+			return "", err
 		}
 		if n == 0 {
 			break
@@ -66,5 +70,5 @@ func readPassFromStdin() string {
 			pass = append(pass, ch)
 		}
 	}
-	return string(pass)
+	return string(pass), nil
 }

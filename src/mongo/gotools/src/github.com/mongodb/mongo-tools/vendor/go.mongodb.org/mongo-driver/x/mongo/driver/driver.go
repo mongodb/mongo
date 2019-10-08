@@ -59,16 +59,8 @@ type ErrorProcessor interface {
 // handshake over a provided driver.Connection. This is used during connection
 // initialization. Implementations must be goroutine safe.
 type Handshaker interface {
-	Handshake(context.Context, address.Address, Connection) (description.Server, error)
-}
-
-// HandshakerFunc is an adapter to allow the use of ordinary functions as
-// connection handshakers.
-type HandshakerFunc func(context.Context, address.Address, Connection) (description.Server, error)
-
-// Handshake implements the Handshaker interface.
-func (hf HandshakerFunc) Handshake(ctx context.Context, addr address.Address, conn Connection) (description.Server, error) {
-	return hf(ctx, addr, conn)
+	GetDescription(context.Context, address.Address, Connection) (description.Server, error)
+	FinishHandshake(context.Context, Connection) error
 }
 
 // SingleServerDeployment is an implementation of Deployment that always returns a single server.

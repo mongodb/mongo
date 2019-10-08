@@ -75,13 +75,14 @@ func (iv IndexView) List(ctx context.Context, opts ...*options.ListIndexesOption
 		return nil, err
 	}
 
-	readSelector := description.CompositeSelector([]description.ServerSelector{
+	selector := description.CompositeSelector([]description.ServerSelector{
 		description.ReadPrefSelector(readpref.Primary()),
 		description.LatencySelector(iv.coll.client.localThreshold),
 	})
+	selector = makeReadPrefSelector(sess, selector, iv.coll.client.localThreshold)
 	op := operation.NewListIndexes().
 		Session(sess).CommandMonitor(iv.coll.client.monitor).
-		ServerSelector(readSelector).ClusterClock(iv.coll.client.clock).
+		ServerSelector(selector).ClusterClock(iv.coll.client.clock).
 		Database(iv.coll.db.name).Collection(iv.coll.name).
 		Deployment(iv.coll.client.topology)
 
@@ -197,10 +198,7 @@ func (iv IndexView) CreateMany(ctx context.Context, models []IndexModel, opts ..
 		return nil, err
 	}
 
-	selector := iv.coll.writeSelector
-	if sess != nil && sess.PinnedServer != nil {
-		selector = sess.PinnedServer
-	}
+	selector := makePinnedSelector(sess, iv.coll.writeSelector)
 
 	option := options.MergeCreateIndexesOptions(opts...)
 
@@ -332,10 +330,7 @@ func (iv IndexView) drop(ctx context.Context, name string, opts ...*options.Drop
 		sess = nil
 	}
 
-	selector := iv.coll.writeSelector
-	if sess != nil && sess.PinnedServer != nil {
-		selector = sess.PinnedServer
-	}
+	selector := makePinnedSelector(sess, iv.coll.writeSelector)
 
 	dio := options.MergeDropIndexesOptions(opts...)
 	op := operation.NewDropIndexes(name).

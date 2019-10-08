@@ -591,6 +591,8 @@ func (t *Topology) addServer(addr address.Address) error {
 func (t *Topology) String() string {
 	desc := t.Description()
 	str := fmt.Sprintf("Type: %s\nServers:\n", desc.Kind)
+	t.serversLock.Lock()
+	defer t.serversLock.Unlock()
 	for _, s := range t.servers {
 		str += s.String() + "\n"
 	}

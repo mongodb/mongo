@@ -56,40 +56,59 @@ type HandshakeOptions struct {
 	PerformAuthentication func(description.Server) bool
 }
 
+type authHandshaker struct {
+	wrapped driver.Handshaker
+	options *HandshakeOptions
+}
+
+// GetDescription performs an isMaster to retrieve the initial description for conn.
+func (ah *authHandshaker) GetDescription(ctx context.Context, addr address.Address, conn driver.Connection) (description.Server, error) {
+	if ah.wrapped != nil {
+		return ah.wrapped.GetDescription(ctx, addr, conn)
+	}
+
+	desc, err := operation.NewIsMaster().
+		AppName(ah.options.AppName).
+		Compressors(ah.options.Compressors).
+		SASLSupportedMechs(ah.options.DBUser).
+		GetDescription(ctx, addr, conn)
+	if err != nil {
+		return description.Server{}, newAuthError("handshake failure", err)
+	}
+	return desc, nil
+}
+
+// FinishHandshake performs authentication for conn if necessary.
+func (ah *authHandshaker) FinishHandshake(ctx context.Context, conn driver.Connection) error {
+	performAuth := ah.options.PerformAuthentication
+	if performAuth == nil {
+		performAuth = func(serv description.Server) bool {
+			return serv.Kind == description.RSPrimary ||
+				serv.Kind == description.RSSecondary ||
+				serv.Kind == description.Mongos ||
+				serv.Kind == description.Standalone
+		}
+	}
+	desc := conn.Description()
+	if performAuth(desc) && ah.options.Authenticator != nil {
+		err := ah.options.Authenticator.Auth(ctx, desc, conn)
+		if err != nil {
+			return newAuthError("auth error", err)
+		}
+	}
+
+	if ah.wrapped == nil {
+		return nil
+	}
+	return ah.wrapped.FinishHandshake(ctx, conn)
+}
+
 // Handshaker creates a connection handshaker for the given authenticator.
 func Handshaker(h driver.Handshaker, options *HandshakeOptions) driver.Handshaker {
-	return driver.HandshakerFunc(func(ctx context.Context, addr address.Address, conn driver.Connection) (description.Server, error) {
-		desc, err := operation.NewIsMaster().
-			AppName(options.AppName).
-			Compressors(options.Compressors).
-			SASLSupportedMechs(options.DBUser).
-			Handshake(ctx, addr, conn)
-
-		if err != nil {
-			return description.Server{}, newAuthError("handshake failure", err)
-		}
-
-		performAuth := options.PerformAuthentication
-		if performAuth == nil {
-			performAuth = func(serv description.Server) bool {
-				return serv.Kind == description.RSPrimary ||
-					serv.Kind == description.RSSecondary ||
-					serv.Kind == description.Mongos ||
-					serv.Kind == description.Standalone
-			}
-		}
-		if performAuth(desc) && options.Authenticator != nil {
-			err = options.Authenticator.Auth(ctx, desc, conn)
-			if err != nil {
-				return description.Server{}, newAuthError("auth error", err)
-			}
-
-		}
-		if h == nil {
-			return desc, nil
-		}
-		return h.Handshake(ctx, addr, conn)
-	})
+	return &authHandshaker{
+		wrapped: h,
+		options: options,
+	}
 }
 
 // Authenticator handles authenticating a connection.

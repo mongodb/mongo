@@ -105,6 +105,9 @@ func MergeListIndexesOptions(opts ...*ListIndexesOptions) *ListIndexesOptions {
 		if opt == nil {
 			continue
 		}
+		if opt.BatchSize != nil {
+			c.BatchSize = opt.BatchSize
+		}
 		if opt.MaxTime != nil {
 			c.MaxTime = opt.MaxTime
 		}

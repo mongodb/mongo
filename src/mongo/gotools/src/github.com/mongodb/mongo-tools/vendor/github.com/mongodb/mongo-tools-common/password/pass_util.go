@@ -9,9 +9,11 @@
 package password
 
 import (
-	"github.com/howeyc/gopass"
-	"golang.org/x/crypto/ssh/terminal"
+	"io"
+	"os"
 	"syscall"
+
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 // This file contains all the calls needed to properly
@@ -22,7 +24,22 @@ func IsTerminal() bool {
 	return terminal.IsTerminal(int(syscall.Stdin))
 }
 
-func GetPass() string {
-	pass, _ := gopass.GetPasswd()
-	return string(pass)
+func GetPass() (string, error) {
+	oldState, err := terminal.MakeRaw(0)
+	if err != nil {
+		return "", err
+	}
+	defer terminal.Restore(0, oldState)
+
+	screen := struct {
+		io.Reader
+		io.Writer
+	}{os.Stdin, os.Stderr}
+
+	t := terminal.NewTerminal(screen, "")
+	pass, err := t.ReadPassword("")
+	if err != nil {
+		return "", err
+	}
+	return string(pass), nil
 }
