@@ -292,7 +292,7 @@ Status ModMatchExpression::init(StringData path, int divisor, int remainder) {
 bool ModMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
     if (!e.isNumber())
         return false;
-    return e.numberLong() % _divisor == _remainder;
+    return mongoSafeMod(e.numberLong(), static_cast<long long>(_divisor)) == _remainder;
 }
 
 void ModMatchExpression::debugString(StringBuilder& debug, int level) const {
@@ -789,4 +789,4 @@ bool BitTestMatchExpression::equivalent(const MatchExpression* other) const {
 
     return path() == realOther->path() && myBitPositions == otherBitPositions;
 }
-}
+}  // namespace mongo

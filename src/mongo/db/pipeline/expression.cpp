@@ -792,7 +792,7 @@ static const CmpLookup cmpLookup[7] = {
     // CMP is special. Only name is used.
     /* CMP */ {{false, false, false}, ExpressionCompare::CMP, "$cmp"},
 };
-}
+}  // namespace
 
 
 Value ExpressionCompare::evaluate(const Document& root, Variables* variables) const {
@@ -2404,17 +2404,19 @@ Value ExpressionMod::evaluate(const Document& root, Variables* variables) const 
 
             double left = lhs.coerceToDouble();
             return Value(fmod(left, right));
-        } else if (leftType == NumberLong || rightType == NumberLong) {
+        }
+
+        if (leftType == NumberLong || rightType == NumberLong) {
             // if either is long, return long
             long long left = lhs.coerceToLong();
             long long rightLong = rhs.coerceToLong();
-            return Value(left % rightLong);
+            return Value(mongoSafeMod(left, rightLong));
         }
 
         // lastly they must both be ints, return int
         int left = lhs.coerceToInt();
         int rightInt = rhs.coerceToInt();
-        return Value(left % rightInt);
+        return Value(mongoSafeMod(left, rightInt));
     } else if (lhs.nullish() || rhs.nullish()) {
         return Value(BSONNULL);
     } else {
@@ -3132,7 +3134,7 @@ bool representableAsLong(long long base, long long exp) {
 
     return base >= kBaseLimits[exp].min && base <= kBaseLimits[exp].max;
 };
-}
+}  // namespace
 
 /* ----------------------- ExpressionPow ---------------------------- */
 
@@ -3443,7 +3445,7 @@ ValueSet arrayToSet(const Value& val, const ValueComparator& valueComparator) {
     valueSet.insert(array.begin(), array.end());
     return valueSet;
 }
-}
+}  // namespace
 
 /* ----------------------- ExpressionSetDifference ---------------------------- */
 
@@ -3589,7 +3591,7 @@ Value setIsSubsetHelper(const vector<Value>& lhs, const ValueSet& rhs) {
     }
     return Value(true);
 }
-}
+}  // namespace
 
 Value ExpressionSetIsSubset::evaluate(const Document& root, Variables* variables) const {
     const Value lhs = vpOperand[0]->evaluate(root, variables);

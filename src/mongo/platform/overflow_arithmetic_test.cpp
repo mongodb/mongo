@@ -181,5 +181,17 @@ TEST(OverflowArithmetic, UnsignedSubtractionTests) {
     assertUnsignedSubtractWithOverflow(0, limits::max());
 }
 
+TEST(OverflowArithmetic, SafeModTests) {
+    // Mod -1 should not overflow for LLONG_MIN or INT_MIN.
+    auto minLong = std::numeric_limits<long long>::min();
+    auto minInt = std::numeric_limits<int>::min();
+    ASSERT_EQ(mongoSafeMod(minLong, -1LL), 0);
+    ASSERT_EQ(mongoSafeMod(minInt, -1), 0);
+
+    // A divisor of 0 throws a user assertion.
+    ASSERT_THROWS_CODE(mongoSafeMod(minLong, 0LL), AssertionException, 51259);
+    ASSERT_THROWS_CODE(mongoSafeMod(minInt, 0), AssertionException, 51259);
+}
+
 }  // namespace
 }  // namespace mongo
