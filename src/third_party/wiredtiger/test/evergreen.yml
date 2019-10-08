@@ -1320,7 +1320,7 @@ buildvariants:
 - name: little-endian
   display_name: Little-endian (x86)
   run_on:
-  - ubuntu1404-test
+  - ubuntu1804-test
   batchtime: 10080 # 7 days
   expansions:
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)

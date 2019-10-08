@@ -502,6 +502,7 @@ __las_remove_block(WT_CURSOR *cursor, uint64_t pageid, bool lock_wait, uint64_t 
     bool local_txn;
 
     *remove_cntp = 0;
+    saved_isolation = 0; /*[-Wconditional-uninitialized] */
 
     session = (WT_SESSION_IMPL *)cursor->session;
     conn = S2C(session);
@@ -513,8 +514,8 @@ __las_remove_block(WT_CURSOR *cursor, uint64_t pageid, bool lock_wait, uint64_t 
     else
         WT_RET(__wt_try_writelock(session, &conn->cache->las_sweepwalk_lock));
 
-    __las_set_isolation(session, &saved_isolation);
     WT_ERR(__wt_txn_begin(session, NULL));
+    __las_set_isolation(session, &saved_isolation);
     local_txn = true;
 
     /*
@@ -539,9 +540,9 @@ err:
             ret = __wt_txn_commit(session, NULL);
         else
             WT_TRET(__wt_txn_rollback(session, NULL));
+        __las_restore_isolation(session, saved_isolation);
     }
 
-    __las_restore_isolation(session, saved_isolation);
     __wt_writeunlock(session, &conn->cache->las_sweepwalk_lock);
     return (ret);
 }
@@ -628,6 +629,7 @@ __wt_las_insert_block(
     session = (WT_SESSION_IMPL *)cursor->session;
     conn = S2C(session);
     WT_CLEAR(las_value);
+    saved_isolation = 0; /*[-Wconditional-uninitialized] */
     insert_cnt = prepared_insert_cnt = 0;
     btree_id = btree->id;
     local_txn = false;
@@ -649,8 +651,8 @@ __wt_las_insert_block(
 #endif
 
     /* Wrap all the updates in a transaction. */
-    __las_set_isolation(session, &saved_isolation);
     WT_ERR(__wt_txn_begin(session, NULL));
+    __las_set_isolation(session, &saved_isolation);
     local_txn = true;
 
     /* Enter each update in the boundary's list into the lookaside store. */
@@ -775,6 +777,7 @@ err:
             ret = __wt_txn_commit(session, NULL);
         else
             WT_TRET(__wt_txn_rollback(session, NULL));
+        __las_restore_isolation(session, saved_isolation);
 
         /* Adjust the entry count. */
         if (ret == 0) {
@@ -783,8 +786,6 @@ err:
               session, txn_prepared_updates_lookaside_inserts, prepared_insert_cnt);
         }
     }
-
-    __las_restore_isolation(session, saved_isolation);
 
     if (ret == 0 && insert_cnt > 0) {
         multi->page_las.las_pageid = las_pageid;
@@ -1039,6 +1040,7 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
     cache = S2C(session)->cache;
     cursor = NULL;
     sweep_key = &cache->las_sweep_key;
+    saved_isolation = 0; /*[-Wconditional-uninitialized] */
     remove_cnt = 0;
     session_flags = 0; /* [-Werror=maybe-uninitialized] */
     local_txn = locked = removing_key_block = false;
@@ -1058,8 +1060,8 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
      */
     __wt_las_cursor(session, &cursor, &session_flags);
     WT_ASSERT(session, cursor->session == &session->iface);
-    __las_set_isolation(session, &saved_isolation);
     WT_ERR(__wt_txn_begin(session, NULL));
+    __las_set_isolation(session, &saved_isolation);
     local_txn = true;
 
     /* Encourage a race */
@@ -1241,11 +1243,11 @@ err:
             ret = __wt_txn_commit(session, NULL);
         else
             WT_TRET(__wt_txn_rollback(session, NULL));
+        __las_restore_isolation(session, saved_isolation);
         if (ret == 0)
             (void)__wt_atomic_add64(&cache->las_remove_count, remove_cnt);
     }
 
-    __las_restore_isolation(session, saved_isolation);
     WT_TRET(__wt_las_cursor_close(session, &cursor, session_flags));
 
     if (locked)

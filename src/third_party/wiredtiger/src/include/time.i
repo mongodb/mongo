@@ -161,6 +161,14 @@ static inline void
 __wt_op_timer_start(WT_SESSION_IMPL *session)
 {
     session->operation_start_us = session->operation_timeout_us == 0 ? 0 : __wt_clock(session);
+#ifdef HAVE_DIAGNOSTIC
+    /*
+     * This is called at the beginning of each API call. We need to clear out any old values from
+     * this debugging field so that we don't leave a stale value in there that may then give a false
+     * positive.
+     */
+    session->op_5043_seconds = 0;
+#endif
 }
 
 /*

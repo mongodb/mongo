@@ -837,7 +837,6 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
         /* Free the backing block and address. */
         WT_TRET(__wt_ref_block_free(session, next_ref));
 
-        WT_ASSERT(session, __wt_hazard_check_assert(session, next_ref, false));
         WT_TRET(__split_safe_free(session, split_gen, exclusive, next_ref, sizeof(WT_REF)));
         parent_decr += sizeof(WT_REF);
     }

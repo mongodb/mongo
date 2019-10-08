@@ -54,7 +54,7 @@ __cursor_state_restore(WT_CURSOR *cursor, WT_CURFILE_STATE *state)
  *     Return if we have a page pinned.
  */
 static inline bool
-__cursor_page_pinned(WT_CURSOR_BTREE *cbt)
+__cursor_page_pinned(WT_CURSOR_BTREE *cbt, bool search_operation)
 {
     WT_CURSOR *cursor;
     WT_SESSION_IMPL *session;
@@ -72,11 +72,25 @@ __cursor_page_pinned(WT_CURSOR_BTREE *cbt)
     }
 
     /*
-     * Check if the key references the page. When returning from search, the page is active and the
-     * key is internal. After the application sets a key, the key is external, and the page is
-     * useless.
+     * Check if the key references an item on a page. When returning from search, the page is pinned
+     * and the key is internal. After the application sets a key, the key becomes external. For the
+     * search and search-near operations, we assume locality and check any pinned page first on each
+     * new search operation. For operations other than search and search-near, check if we have an
+     * internal key. If the page is pinned and we're pointing into the page, we don't need to search
+     * at all, we can proceed with the operation. However, if the key has been set, that is, it's an
+     * external key, we're going to have to do a full search.
      */
-    if (!F_ISSET(cursor, WT_CURSTD_KEY_INT))
+    if (!search_operation && !F_ISSET(cursor, WT_CURSTD_KEY_INT))
+        return (false);
+
+    /*
+     * XXX No fast-path searches at read-committed isolation. Underlying transactional functions
+     * called by the fast and slow path search code handle transaction IDs differently, resulting in
+     * different search results at read-committed isolation. This makes no difference for the update
+     * functions, but in the case of a search, we will see different results based on the cursor's
+     * initial location. See WT-5134 for the details.
+     */
+    if (search_operation && session->txn.isolation == WT_ISO_READ_COMMITTED)
         return (false);
 
     /*
@@ -541,7 +555,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
      * pinned page doesn't find an exact match, search from the root.
      */
     valid = false;
-    if (__cursor_page_pinned(cbt)) {
+    if (__cursor_page_pinned(cbt, true)) {
         __wt_txn_cursor_op(session);
 
         WT_ERR(btree->type == BTREE_ROW ? __cursor_row_search(session, cbt, cbt->ref, false) :
@@ -642,7 +656,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
      * existing record.
      */
     valid = false;
-    if (btree->type == BTREE_ROW && __cursor_page_pinned(cbt)) {
+    if (btree->type == BTREE_ROW && __cursor_page_pinned(cbt, true)) {
         __wt_txn_cursor_op(session);
 
         WT_ERR(__cursor_row_search(session, cbt, cbt->ref, true));
@@ -793,7 +807,7 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
      * because the cursor may not be positioned to the correct record in the
      * case of implicit records in the append list.
      */
-    if (btree->type != BTREE_COL_FIX && __cursor_page_pinned(cbt) &&
+    if (btree->type != BTREE_COL_FIX && __cursor_page_pinned(cbt, false) &&
       F_ISSET(cursor, WT_CURSTD_OVERWRITE) && !append_key) {
         WT_ERR(__wt_txn_autocommit_check(session));
         /*
@@ -1019,7 +1033,7 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt, bool positioned)
      * because the cursor may not be positioned to the correct record in the
      * case of implicit records in the append list.
      */
-    if (btree->type != BTREE_COL_FIX && __cursor_page_pinned(cbt)) {
+    if (btree->type != BTREE_COL_FIX && __cursor_page_pinned(cbt, false)) {
         WT_ERR(__wt_txn_autocommit_check(session));
 
         /*
@@ -1201,7 +1215,7 @@ __btcur_update(WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
      * because the cursor may not be positioned to the correct record in the
      * case of implicit records in the append list.
      */
-    if (btree->type != BTREE_COL_FIX && __cursor_page_pinned(cbt)) {
+    if (btree->type != BTREE_COL_FIX && __cursor_page_pinned(cbt, false)) {
         WT_ERR(__wt_txn_autocommit_check(session));
 
         /*
