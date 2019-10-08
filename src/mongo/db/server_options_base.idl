@@ -132,7 +132,11 @@ configs:
         arg_vartype: String
         condition:
             preprocessor: '!defined(_WIN32)'
-
+    'systemLog.logFormat':
+        description: 'Set the log output format (default|text|json)'
+        short_name: logFormat
+        arg_vartype: String
+        default: "default"
     'systemLog.logAppend':
         description: 'Append to logpath instead of over-writing'
         short_name: logappend

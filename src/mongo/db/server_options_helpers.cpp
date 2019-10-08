@@ -378,6 +378,24 @@ Status storeBaseOptions(const moe::Environment& params) {
     }
 #endif  // _WIN32
 
+    if (params.count("systemLog.logFormat")) {
+        std::string formatStr = params["systemLog.logFormat"].as<string>();
+        if (!serverGlobalParams.logV2 && formatStr != "default")
+            return Status(ErrorCodes::BadValue,
+                          "Can only use systemLog.logFormat if logv2 is enabled.");
+        if (formatStr == "default") {
+            serverGlobalParams.logFormat = logv2::LogFormat::kDefault;
+        } else if (formatStr == "text") {
+            serverGlobalParams.logFormat = logv2::LogFormat::kText;
+        } else if (formatStr == "json") {
+            serverGlobalParams.logFormat = logv2::LogFormat::kJson;
+        } else {
+            return Status(ErrorCodes::BadValue,
+                          "Unsupported value for logFormat: " + formatStr +
+                              ". Valid values are: default, text or json");
+        }
+    }
+
     if (params.count("systemLog.logAppend") && params["systemLog.logAppend"].as<bool>() == true) {
         serverGlobalParams.logAppend = true;
     }

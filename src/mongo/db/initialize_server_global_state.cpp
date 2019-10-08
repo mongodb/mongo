@@ -355,6 +355,9 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
     logger::globalLogDomain()->attachAppender(
         std::make_unique<RamLogAppender>(RamLog::get("global")));
 
+    if (serverGlobalParams.logV2)
+        lv2Manager.setOutputFormat(serverGlobalParams.logFormat);
+
     return Status::OK();
 }
 

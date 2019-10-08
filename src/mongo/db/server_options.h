@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/jsobj.h"
+#include "mongo/logv2/log_format.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/stdx/variant.h"
@@ -96,7 +97,8 @@ struct ServerGlobalParams {
     std::string pidFile;           // Path to pid file, or empty if none.
     std::string timeZoneInfoPath;  // Path to time zone info directory, or empty if none.
 
-    std::string logpath;            // Path to log file, if logging to a file; otherwise, empty.
+    std::string logpath;  // Path to log file, if logging to a file; otherwise, empty.
+    logv2::LogFormat logFormat = logv2::LogFormat::kDefault;  // Log format to output to
     bool logAppend = false;         // True if logging to a file in append mode.
     bool logRenameOnRotate = true;  // True if logging should rename log files on rotate
     bool logWithSyslog = false;     // True if logging to syslog; must not be set if logpath is set.

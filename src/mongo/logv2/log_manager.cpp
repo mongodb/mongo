@@ -145,6 +145,19 @@ struct LogManager::Impl {
         _rotatableFileBackend->set_formatter(TextFormatter());
     }
 
+    template <class Formatter>
+    void setFormatterToAllBackends() {
+        _consoleBackend->set_formatter(Formatter());
+        _globalLogCacheBackend->set_formatter(Formatter());
+        _startupWarningsBackend->set_formatter(Formatter());
+        if (_rotatableFileBackend)
+            _rotatableFileBackend->set_formatter(Formatter());
+#ifndef _WIN32
+        if (_syslogBackend)
+            _syslogBackend->set_formatter(Formatter());
+#endif
+    }
+
     LogDomain _globalDomain{std::make_unique<LogDomainGlobal>()};
     // I think that, technically, these are logging front ends
     // and that they get to hold or wrap a backend
@@ -155,6 +168,7 @@ struct LogManager::Impl {
 #endif
     boost::shared_ptr<RamLogBackend> _globalLogCacheBackend;
     boost::shared_ptr<RamLogBackend> _startupWarningsBackend;
+    LogFormat _format{LogFormat::kDefault};
     bool _defaultBackendsAttached{false};
 };
 
@@ -180,6 +194,24 @@ LogManager& LogManager::global() {
 
 LogDomain& LogManager::getGlobalDomain() {
     return _impl->_globalDomain;
+}
+
+void LogManager::setOutputFormat(LogFormat format) {
+    if (_impl->_format != format) {
+        switch (format) {
+            case LogFormat::kText:
+                _impl->setFormatterToAllBackends<TextFormatter>();
+                break;
+
+            case LogFormat::kJson:
+                _impl->setFormatterToAllBackends<JsonFormatter>();
+                break;
+
+            default:
+                break;
+        };
+        _impl->_format = format;
+    }
 }
 
 void LogManager::detachDefaultBackends() {

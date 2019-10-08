@@ -29,71 +29,8 @@
 
 #pragma once
 
-#include "mongo/logv2/log_format.h"
-
-#include <memory>
-#include <string>
-
 namespace mongo {
 namespace logv2 {
-
-class LogDomain;
-
-/**
- * Container for managing log domains.
- *
- * Use this while setting up the logging system, before launching any threads.
- */
-class LogManager {
-public:
-    LogManager(const LogManager&) = delete;
-    LogManager& operator=(const LogManager&) = delete;
-
-    LogManager();
-    ~LogManager();
-
-    static LogManager& global();
-
-    /**
-     * Gets the global domain for this manager.  It has no name.
-     * Will attach a default console log appender.
-     */
-    LogDomain& getGlobalDomain();
-
-    void setOutputFormat(LogFormat format);
-
-    /**
-     * Detaches the default log backends
-     *
-     * @note This function is not thread safe.
-     */
-    void detachDefaultBackends();
-    void detachConsoleBackend();
-
-    /**
-     * Reattaches the default log backends
-     *
-     * @note This function is not thread safe.
-     */
-    void reattachDefaultBackends();
-    void reattachConsoleBackend();
-
-    void setupSyslogBackend(int syslogFacility);
-    void reattachSyslogBackend();
-
-    void setupRotatableFileBackend(std::string path, bool append);
-    void reattachRotatableFileBackend();
-    void rotate();
-
-    /**
-     * Checks if the default log backends are attached
-     */
-    bool isDefaultBackendsAttached() const;
-
-private:
-    struct Impl;
-    std::unique_ptr<Impl> _impl;
-};
-
+enum class LogFormat { kDefault, kText, kJson };
 }  // namespace logv2
 }  // namespace mongo
