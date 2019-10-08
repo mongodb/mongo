@@ -288,10 +288,11 @@ bool IndexBuildsManager::interruptIndexBuild(OperationContext* opCtx,
 
 void IndexBuildsManager::tearDownIndexBuild(OperationContext* opCtx,
                                             Collection* collection,
-                                            const UUID& buildUUID) {
+                                            const UUID& buildUUID,
+                                            OnCleanUpFn onCleanUpFn) {
     // TODO verify that the index builder is in a finished state before allowing its destruction.
     auto builder = _getBuilder(buildUUID);
-    builder->cleanUpAfterBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn);
+    builder->cleanUpAfterBuild(opCtx, collection, onCleanUpFn);
     _unregisterIndexBuild(buildUUID);
 }
 

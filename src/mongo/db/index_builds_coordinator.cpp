@@ -712,7 +712,8 @@ IndexBuildsCoordinator::_registerAndSetUpIndexBuild(
         return boost::none;
     }
 
-    _indexBuildsManager.tearDownIndexBuild(opCtx, collection, replIndexBuildState->buildUUID);
+    _indexBuildsManager.tearDownIndexBuild(
+        opCtx, collection, replIndexBuildState->buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
 
     // Unregister the index build before setting the promise, so callers do not see the build again.
     _unregisterIndexBuild(lk, replIndexBuildState);
@@ -906,9 +907,11 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
 
             Lock::CollectionLock collLock(opCtx, nss, MODE_X);
 
-            _indexBuildsManager.tearDownIndexBuild(opCtx, collection, replState->buildUUID);
+            _indexBuildsManager.tearDownIndexBuild(
+                opCtx, collection, replState->buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
         } else {
-            _indexBuildsManager.tearDownIndexBuild(opCtx, collection, replState->buildUUID);
+            _indexBuildsManager.tearDownIndexBuild(
+                opCtx, collection, replState->buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
         }
     }
 
@@ -1184,7 +1187,8 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
     if (status.isOK()) {
         // A successful index build means that all the requested indexes are now part of the
         // catalog.
-        _indexBuildsManager.tearDownIndexBuild(opCtx, collection, buildUUID);
+        _indexBuildsManager.tearDownIndexBuild(
+            opCtx, collection, buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
     } else {
         // An index build failure during recovery is fatal.
         logFailure(status, nss, replState);

@@ -175,7 +175,11 @@ public:
     /**
      * Cleans up the index build state and unregisters it from the manager.
      */
-    void tearDownIndexBuild(OperationContext* opCtx, Collection* collection, const UUID& buildUUID);
+    using OnCleanUpFn = MultiIndexBlock::OnCleanUpFn;
+    void tearDownIndexBuild(OperationContext* opCtx,
+                            Collection* collection,
+                            const UUID& buildUUID,
+                            OnCleanUpFn onCleanUpFn);
 
     /**
      * Returns true if the index build supports background writes while building an index. This is
