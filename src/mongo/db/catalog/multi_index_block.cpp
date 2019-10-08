@@ -63,22 +63,6 @@
 
 namespace mongo {
 
-namespace {
-
-/**
- * We do not need synchronization with step up and step down. Dropping the RSTL is important because
- * otherwise if we held the RSTL it would create deadlocks with prepared transactions on step up and
- * step down.  A deadlock could result if the index build was attempting to acquire a Collection S
- * or X lock while a prepared transaction held a Collection IX lock, and a step down was waiting to
- * acquire the RSTL in mode X.
- */
-void _unlockRSTLForIndexCleanup(OperationContext* opCtx) {
-    opCtx->lockState()->unlockRSTLforPrepare();
-    invariant(!opCtx->lockState()->isRSTLLocked());
-}
-
-}  // namespace
-
 MONGO_FAIL_POINT_DEFINE(hangAfterSettingUpIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuildUnlocked);
@@ -130,7 +114,6 @@ void MultiIndexBlock::cleanUpAfterBuild(OperationContext* opCtx, Collection* col
     auto nss = collection->ns();
 
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X), nss.toString());
-    _unlockRSTLForIndexCleanup(opCtx);
 
     while (true) {
         try {
