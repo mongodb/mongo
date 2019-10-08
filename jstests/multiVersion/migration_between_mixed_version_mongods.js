@@ -20,7 +20,7 @@ var options = {
         {binVersion: "latest"}
     ],
     mongos: 1,
-    other: {mongosOptions: {binVersion: "last-stable"}, shardAsReplicaSet: false}
+    other: {mongosOptions: {binVersion: "last-stable"}}
 };
 
 var st = new ShardingTest(options);

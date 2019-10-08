@@ -8,8 +8,7 @@ var options = {
     mongosOptions: {verbose: 1, useLogFiles: true},
     configOptions: {},
     shardOptions: {binVersion: ["latest", "last-stable"]},
-    enableBalancer: true,
-    other: {shardAsReplicaSet: false}
+    enableBalancer: true
 };
 
 var st = new ShardingTest({shards: 3, mongos: 1, other: options});

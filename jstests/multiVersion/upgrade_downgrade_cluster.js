@@ -42,6 +42,7 @@ var runTest = function(isRSCluster) {
         assert.eq(null, db.foo.findOne());
     };
 
+    // TODO: SERVER-43852 Make upgrade_downgrade_cluster.js start shards as replica sets.
     var st = new ShardingTest({
         shards: 2,
         mongos: 1,

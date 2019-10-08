@@ -6,6 +6,8 @@
 (function() {
 "use strict";
 
+// TODO: SERVER-43881 Make migration_between_mixed_FCV_mixed_version_mongods.js start shards as
+// replica sets.
 let st = new ShardingTest({
     shards: [{binVersion: "latest"}, {binVersion: "last-stable"}],
     mongos: {binVersion: "latest"},
