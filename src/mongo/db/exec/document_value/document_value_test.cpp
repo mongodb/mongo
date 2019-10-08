@@ -857,9 +857,11 @@ public:
     }
 };
 
-/** SERVER-43205: Constructing a Value with a very large BSONElement string causes the Value
+/**
+ * SERVER-43205: Constructing a Value with a very large BSONElement string causes the Value
  * constructor to throw before it can completely initialize its ValueStorage member, which has the
- * potential to lead to incorrect state. */
+ * potential to lead to incorrect state.
+ */
 class LongString {
 public:
     void run() {

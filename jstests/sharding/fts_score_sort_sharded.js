@@ -34,11 +34,11 @@ assert.commandWorked(coll.ensureIndex({a: "text"}));
 var results = coll.find({$text: {$search: "pizza"}}, {s: {$meta: "textScore"}})
                   .sort({s: {$meta: "textScore"}})
                   .toArray();
-assert.eq(results.length, 4);
-assert.eq(results[0]._id, -2);
-assert.eq(results[1]._id, 2);
-assert.eq(results[2]._id, -1);
-assert.eq(results[3]._id, 1);
+assert.eq(results.length, 4, results);
+assert.eq(results[0]._id, -2, results);
+assert.eq(results[1]._id, 2, results);
+assert.eq(results[2]._id, -1, results);
+assert.eq(results[3]._id, 1, results);
 
 //
 // Verify that mongos requires the text metadata sort to be specified in the projection.
@@ -68,6 +68,36 @@ assert.throws(function() {
     cursor.next();
 });
 
-// TODO Test sort on compound key.
+//
+// Execute query with a compound sort that includes the text score along with a multikey field.
+//
+
+coll.drop();
+assert.commandWorked(coll.insert({_id: 0, a: "pizza", b: [1, 4]}));
+assert.commandWorked(coll.insert({_id: 1, a: "pizza pizza", b: [6, 7]}));
+assert.commandWorked(coll.insert({_id: 2, a: "pizza", b: [2, 3]}));
+assert.commandWorked(coll.insert({_id: 3, a: "pizza pizza", b: [5, 8]}));
+assert.commandWorked(coll.ensureIndex({a: "text"}));
+
+results = coll.find({$text: {$search: "pizza"}}, {s: {$meta: "textScore"}})
+              .sort({s: {$meta: "textScore"}, b: 1})
+              .toArray();
+assert.eq(results.length, 4, results);
+assert.eq(results[0]._id, 3, results);
+assert.eq(results[1]._id, 1, results);
+assert.eq(results[2]._id, 0, results);
+assert.eq(results[3]._id, 2, results);
+
+//
+// Repeat the query with an aggregation pipeline and verify that the result is the same.
+//
+
+var aggResults = coll.aggregate([
+                         {$match: {$text: {$search: "pizza"}}},
+                         {$addFields: {s: {$meta: "textScore"}}},
+                         {$sort: {s: {$meta: "textScore"}, b: 1}}
+                     ])
+                     .toArray();
+assert.eq(results, aggResults);
 
 st.stop();
