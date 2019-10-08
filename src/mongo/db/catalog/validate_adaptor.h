@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/catalog/validate_state.h"
+#include "mongo/util/progress_meter.h"
 
 namespace mongo {
 
@@ -93,5 +94,12 @@ private:
     // Saves the record count from the record store traversal to be used later to validate the index
     // entries count. Reset every time traverseRecordStore() is called.
     long long _numRecords = 0;
+
+    // For reporting progress during record store and index traversal.
+    ProgressMeterHolder _progress;
+
+    // The total number of index keys is stored during the first validation phase, since this
+    // count may change during a second phase.
+    uint64_t _totalIndexKeys = 0;
 };
 }  // namespace mongo

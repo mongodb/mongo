@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_consistency.h"
 #include "mongo/db/catalog/throttle_cursor.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/wildcard_access_method.h"
@@ -126,6 +127,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
 
         for (const auto& keyString : documentKeySet) {
             try {
+                _totalIndexKeys++;
                 _indexConsistency->addDocKey(opCtx, keyString, &indexInfo, recordId);
             } catch (...) {
                 return exceptionToStatus();
@@ -145,6 +147,14 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
     int64_t numKeys = 0;
 
     bool isFirstEntry = true;
+
+    // The progress meter will be inactive after traversing the record store to allow the message
+    // and the total to be set to different values.
+    if (!_progress->isActive()) {
+        const char* curopMessage = "Validate: scanning index entries";
+        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        _progress.set(CurOp::get(opCtx)->setProgress_inlock(curopMessage, _totalIndexKeys));
+    }
 
     const KeyString::Version version =
         index->accessMethod()->getSortedDataInterface()->getKeyStringVersion();
@@ -187,11 +197,13 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
         if (descriptor->getIndexType() == IndexType::INDEX_WILDCARD &&
             indexEntry->loc == kWildcardMultikeyMetadataRecordId) {
             _indexConsistency->removeMultikeyMetadataPath(indexEntry->keyString, &indexInfo);
+            _progress->hit();
             numKeys++;
             continue;
         }
 
         _indexConsistency->addIndexKey(indexEntry->keyString, &indexInfo, indexEntry->loc);
+        _progress->hit();
         numKeys++;
         isFirstEntry = false;
         prevIndexKeyStringValue = indexEntry->keyString;
@@ -220,12 +232,27 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
     results->valid = true;
     RecordId prevRecordId;
 
+    // In case validation occurs twice and the progress meter persists after index traversal
+    if (_progress.get() && _progress->isActive()) {
+        _progress->finished();
+    }
+
+    // Because the progress meter is intended as an approximation, it's sufficient to get the number
+    // of records when we begin traversing, even if this number may deviate from the final number.
+    const char* curopMessage = "Validate: scanning documents";
+    const auto totalRecords = _validateState->getCollection()->getRecordStore()->numRecords(opCtx);
+    {
+        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        _progress.set(CurOp::get(opCtx)->setProgress_inlock(curopMessage, totalRecords));
+    }
+
     const std::unique_ptr<SeekableRecordThrottleCursor>& traverseRecordStoreCursor =
         _validateState->getTraverseRecordStoreCursor();
     for (auto record =
              traverseRecordStoreCursor->seekExact(opCtx, _validateState->getFirstRecordId());
          record;
          record = traverseRecordStoreCursor->next(opCtx)) {
+        _progress->hit();
         ++_numRecords;
         interruptIntervalNumBytes += record->data.size();
         if (_numRecords % kInterruptIntervalNumRecords == 0 ||
@@ -285,6 +312,8 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         _validateState->getCollection()->getRecordStore()->updateStatsAfterRepair(
             opCtx, _numRecords, dataSizeTotal);
     }
+
+    _progress->finished();
 
     output->appendNumber("nInvalidDocuments", nInvalid);
     output->appendNumber("nrecords", _numRecords);
