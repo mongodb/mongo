@@ -432,28 +432,28 @@ StatusWithMatchExpression parseExpr(StringData name,
     return {std::make_unique<ExprMatchExpression>(std::move(elem), expCtx)};
 }
 
-StatusWithMatchExpression parseMOD(StringData name, BSONElement e) {
-    if (e.type() != BSONType::Array)
+StatusWithMatchExpression parseMOD(StringData name, BSONElement elem) {
+    if (elem.type() != BSONType::Array)
         return {Status(ErrorCodes::BadValue, "malformed mod, needs to be an array")};
 
-    BSONObjIterator i(e.Obj());
+    BSONObjIterator iter(elem.Obj());
 
-    if (!i.more())
+    if (!iter.more())
         return {Status(ErrorCodes::BadValue, "malformed mod, not enough elements")};
-    auto d = i.next();
-    if (!d.isNumber())
+    auto divisor = iter.next();
+    if (!divisor.isNumber())
         return {Status(ErrorCodes::BadValue, "malformed mod, divisor not a number")};
 
-    if (!i.more())
+    if (!iter.more())
         return {Status(ErrorCodes::BadValue, "malformed mod, not enough elements")};
-    auto r = i.next();
-    if (!d.isNumber())
+    auto remainder = iter.next();
+    if (!remainder.isNumber())
         return {Status(ErrorCodes::BadValue, "malformed mod, remainder not a number")};
 
-    if (i.more())
+    if (iter.more())
         return {Status(ErrorCodes::BadValue, "malformed mod, too many elements")};
 
-    return {std::make_unique<ModMatchExpression>(name, d.numberInt(), r.numberInt())};
+    return {std::make_unique<ModMatchExpression>(name, divisor.numberInt(), remainder.numberInt())};
 }
 
 StatusWithMatchExpression parseRegexDocument(StringData name, const BSONObj& doc) {
