@@ -288,7 +288,8 @@ def _make_parser():  # pylint: disable=too-many-statements
         "--mixedBinVersions", type="string", dest="mixed_bin_versions",
         metavar="version1-version2-..-versionN", help="Runs the test with the provided replica set"
         " binary version configuration. Specify 'old-new' to configure a replica set with a"
-        " 'last-stable' version primary and 'latest' version secondary.")
+        " 'last-stable' version primary and 'latest' version secondary. For a sharded cluster"
+        " with two shards and two replica set nodes each, specify 'old-new-old-new'.")
 
     evergreen_options = optparse.OptionGroup(
         parser, title=_EVERGREEN_OPTIONS_TITLE,

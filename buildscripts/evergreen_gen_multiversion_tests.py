@@ -32,10 +32,12 @@ REQUIRED_CONFIG_KEYS = {
 
 DEFAULT_CONFIG_VALUES = generate_resmoke.DEFAULT_CONFIG_VALUES
 CONFIG_DIR = DEFAULT_CONFIG_VALUES["generated_config_dir"]
+DEFAULT_CONFIG_VALUES["is_sharded"] = False
 TEST_SUITE_DIR = DEFAULT_CONFIG_VALUES["test_suites_dir"]
 CONFIG_FILE = generate_resmoke.CONFIG_FILE
 CONFIG_FORMAT_FN = generate_resmoke.CONFIG_FORMAT_FN
 MIXED_VERSION_CONFIGS = ["new-old-new", "new-new-old", "old-new-new"]
+SHARDED_MIXED_VERSION_CONFIGS = ["new-old-old-new"]
 
 
 def prepare_directory_for_suite(directory):
@@ -44,10 +46,41 @@ def prepare_directory_for_suite(directory):
         os.makedirs(directory)
 
 
-def update_suite_config_for_multiversion(suite_config):
-    """Update the suite_config with arguments for mixed version replica set testing."""
+def update_suite_config_for_multiversion_replset(suite_config):
+    """Update suite_config with arguments for multiversion tests using ReplicaSetFixture."""
     suite_config["executor"]["fixture"]["num_nodes"] = 3
     suite_config["executor"]["fixture"]["linear_chain"] = True
+
+
+def update_suite_config_for_multiversion_sharded(suite_config):
+    """Update suite_config with arguments for multiversion tests using ShardedClusterFixture."""
+
+    fixture_config = suite_config["executor"]["fixture"]
+    default_shards = "default_shards"
+    default_num_nodes = "default_nodes"
+    base_num_shards = (default_shards
+                       if "num_shards" not in fixture_config else fixture_config["num_shards"])
+    base_num_rs_nodes_per_shard = (default_num_nodes
+                                   if "num_rs_nodes_per_shard" not in fixture_config else
+                                   fixture_config["num_rs_nodes_per_shard"])
+
+    if base_num_shards is not default_shards or base_num_rs_nodes_per_shard is not default_num_nodes:
+        num_shard_num_nodes_pair = "{}-{}".format(base_num_shards, base_num_rs_nodes_per_shard)
+        assert num_shard_num_nodes_pair in {"default_shards-2"}, \
+               "The multiversion suite runs sharded clusters with 2 shards and 2 nodes per shard. "\
+               " acceptable, please add '{}' to this assert.".format(num_shard_num_nodes_pair)
+
+    suite_config["executor"]["fixture"]["num_shards"] = 2
+    suite_config["executor"]["fixture"]["num_rs_nodes_per_shard"] = 2
+
+
+class MultiversionConfig(object):
+    """An object containing the configurations to generate and run the multiversion tests with."""
+
+    def __init__(self, update_yaml, version_configs):
+        """Create new MultiversionConfig object."""
+        self.update_yaml = update_yaml
+        self.version_configs = version_configs
 
 
 class EvergreenConfigGenerator(object):
@@ -114,10 +147,15 @@ class EvergreenConfigGenerator(object):
         start_date = end_date - datetime.timedelta(days=generate_resmoke.LOOKBACK_DURATION_DAYS)
         suites = gen_suites.calculate_suites(start_date, end_date)
         # Render the given suites into yml files that can be used by resmoke.py.
+        if self.options.is_sharded:
+            config = MultiversionConfig(update_suite_config_for_multiversion_sharded,
+                                        SHARDED_MIXED_VERSION_CONFIGS)
+        else:
+            config = MultiversionConfig(update_suite_config_for_multiversion_replset,
+                                        MIXED_VERSION_CONFIGS)
         config_file_dict = generate_resmoke.render_suite_files(
-            suites, self.options.suite, gen_suites.test_list, TEST_SUITE_DIR,
-            update_suite_config_for_multiversion)
-        for version_config in MIXED_VERSION_CONFIGS:
+            suites, self.options.suite, gen_suites.test_list, TEST_SUITE_DIR, config.update_yaml)
+        for version_config in config.version_configs:
             for suite in suites:
                 # Generate the newly divided test suites
                 source_suite = os.path.join(CONFIG_DIR, suite.name + ".yml")
@@ -155,8 +193,10 @@ def main(expansion_file, evergreen_config=None):
     """
     Create a configuration for generate tasks to create sub suites for the specified resmoke suite.
 
-    Tests will be generated to use 3 nodes and linear_chain=True.
-    The different binary version configurations tested are stored in MIXED_VERSION_CONFIGS.
+    Tests using ReplicaSetFixture will be generated to use 3 nodes and linear_chain=True.
+    Tests using ShardedClusterFixture will be generated to use 2 shards with 2 nodes each.
+    The different binary version configurations tested are stored in MIXED_VERSION_CONFIGS
+    and SHARDED_MIXED_VERSION_CONFIGS.
 
     The `--expansion-file` should contain all the configuration needed to generate the tasks.
     \f

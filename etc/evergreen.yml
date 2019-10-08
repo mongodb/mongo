@@ -7567,6 +7567,18 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 15
 
+- <<: *multiversion_template
+  name: sharded_causally_consistent_jscore_multiversion_passthrough_gen
+  tags: ["multiversion_passthrough"]
+  commands:
+  - func: "generate multiversion tasks"
+    vars:
+      suite: replica_sets_jscore_passthrough
+      resmoke_args: --storageEngine=wiredTiger
+      task_path_suffix: /data/multiversion
+      fallback_num_sub_suites: 4
+      is_sharded: true
+
 - name: retryable_writes_jscore_passthrough_gen
   tags: ["retry"]
   depends_on:

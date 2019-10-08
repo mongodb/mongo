@@ -22,11 +22,6 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
     # Error response codes copied from mongo/base/error_codes.err.
     _NODE_NOT_FOUND = 74
 
-    _LAST_STABLE_FCV = "4.2"
-    _LATEST_FCV = "4.4"
-
-    _LAST_STABLE_BIN_VERSION = "4.2"
-
     def __init__(  # pylint: disable=too-many-arguments, too-many-locals
             self, logger, job_num, mongod_options=None, dbpath_prefix=None, preserve_dbpath=False,
             num_nodes=2, start_initial_sync_node=False, write_concern_majority_journal_default=None,
@@ -56,13 +51,21 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             latest_mongod = mongod_executable
             last_stable_mongod = mongod_executable + "-" \
                                 + ReplicaSetFixture._LAST_STABLE_BIN_VERSION
-            self.mixed_bin_versions = [
-                latest_mongod if x == "new" else last_stable_mongod for x in self.mixed_bin_versions
-            ]
+            is_config_svr = "configsvr" in self.replset_config_options and self.replset_config_options[
+                "configsvr"]
+            if not is_config_svr:
+                self.mixed_bin_versions = [
+                    latest_mongod if (x == "new") else last_stable_mongod
+                    for x in self.mixed_bin_versions
+                ]
+            else:
+                # Our documented recommended path for upgrading shards lets us assume that config
+                # server secondaries will always be upgraded before the primary.
+                self.mixed_bin_versions = [last_stable_mongod, latest_mongod]
             num_versions = len(self.mixed_bin_versions)
-            if num_versions != num_nodes:
-                msg = (("The number of binary versions: {} do not match the number of nodes: "\
-                        "{}.")).format(num_versions, num_nodes)
+            if num_versions != num_nodes and not is_config_svr:
+                msg = (("The number of binary versions specified: {} do not match the number of"\
+                        " nodes in the replica set: {}.")).format(num_versions, num_nodes)
                 raise errors.ServerFailure(msg)
 
         # If voting_secondaries has not been set, set a default. By default, secondaries have zero
