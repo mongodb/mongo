@@ -5076,7 +5076,9 @@ TEST_F(ReplCoordTest,
                                                   << "node2:12345"
                                                   << "_id" << 1))),
                        HostAndPort("node1", 12345));
-
+    // Disable randomized election timeouts so that we know exactly when an election will be
+    // scheduled.
+    getExternalState()->setElectionTimeoutOffsetLimitFraction(0);
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
     ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
 
