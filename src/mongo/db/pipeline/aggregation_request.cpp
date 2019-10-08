@@ -283,7 +283,6 @@ NamespaceString AggregationRequest::parseNs(const std::string& dbname, const BSO
 }
 
 Document AggregationRequest::serializeToCommandObj() const {
-    MutableDocument serialized;
     return Document{
         {kCommandName, (_nss.isCollectionlessAggregateNS() ? Value(1) : Value(_nss.coll()))},
         {kPipelineName, _pipeline},

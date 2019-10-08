@@ -104,15 +104,6 @@ public:
                                    const PrivilegeVector& privileges,
                                    BSONObjBuilder* result,
                                    unsigned numberRetries = 0);
-
-private:
-    static Status aggPassthrough(OperationContext*,
-                                 const Namespaces&,
-                                 const CachedDatabaseInfo&,
-                                 const AggregationRequest&,
-                                 const LiteParsedPipeline&,
-                                 const PrivilegeVector& privileges,
-                                 BSONObjBuilder* result);
 };
 
 }  // namespace mongo

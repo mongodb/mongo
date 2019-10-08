@@ -140,10 +140,9 @@ public:
     /**
      * Perform checks that verify that the LitePipe is valid. Note that this function must be called
      * before forwarding an aggregation command on an unsharded collection, in order to verify that
-     * the involved namespaces are allowed to be sharded. Returns true if any involved namespace is
-     * sharded.
+     * the involved namespaces are allowed to be sharded.
      */
-    bool verifyIsSupported(
+    void verifyIsSupported(
         OperationContext* opCtx,
         const std::function<bool(OperationContext*, const NamespaceString&)> isSharded,
         const boost::optional<ExplainOptions::Verbosity> explain,

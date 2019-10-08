@@ -45,34 +45,6 @@ namespace mongo {
  */
 class MongoSInterface : public MongoProcessCommon {
 public:
-    static BSONObj createPassthroughCommandForShard(OperationContext* opCtx,
-                                                    const AggregationRequest& request,
-                                                    const boost::optional<ShardId>& shardId,
-                                                    Pipeline* pipeline,
-                                                    BSONObj collationObj);
-
-    /**
-     * Appends information to the command sent to the shards which should be appended both if this
-     * is a passthrough sent to a single shard and if this is a split pipeline.
-     */
-    static BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
-                                             OperationContext* opCtx,
-                                             const boost::optional<ShardId>& shardId,
-                                             const AggregationRequest& request,
-                                             BSONObj collationObj);
-
-    static BSONObj createCommandForTargetedShards(
-        OperationContext* opCtx,
-        const AggregationRequest& request,
-        const LiteParsedPipeline& litePipe,
-        const cluster_aggregation_planner::SplitPipeline& splitPipeline,
-        const BSONObj collationObj,
-        const boost::optional<cluster_aggregation_planner::ShardedExchangePolicy> exchangeSpec,
-        bool needsMerge);
-
-    static StatusWith<CachedCollectionRoutingInfo> getExecutionNsRoutingInfo(
-        OperationContext* opCtx, const NamespaceString& execNss);
-
     MongoSInterface() = default;
 
     virtual ~MongoSInterface() = default;

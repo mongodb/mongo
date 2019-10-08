@@ -479,12 +479,12 @@ SplitPipeline splitPipeline(std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
 }
 
 void addMergeCursorsSource(Pipeline* mergePipeline,
-                           const LiteParsedPipeline& liteParsedPipeline,
                            BSONObj cmdSentToShards,
                            std::vector<OwnedRemoteCursor> ownedCursors,
                            const std::vector<ShardId>& targetedShards,
                            boost::optional<BSONObj> shardCursorsSortSpec,
-                           std::shared_ptr<executor::TaskExecutor> executor) {
+                           std::shared_ptr<executor::TaskExecutor> executor,
+                           bool hasChangeStream) {
     auto* opCtx = mergePipeline->getContext()->opCtx;
     AsyncResultsMergerParams armParams;
     armParams.setSort(shardCursorsSortSpec);
@@ -524,7 +524,7 @@ void addMergeCursorsSource(Pipeline* mergePipeline,
     auto mergeCursorsStage = DocumentSourceMergeCursors::create(
         std::move(executor), std::move(armParams), mergePipeline->getContext());
 
-    if (liteParsedPipeline.hasChangeStream()) {
+    if (hasChangeStream) {
         mergePipeline->addInitialSource(DocumentSourceUpdateOnAddShard::create(
             mergePipeline->getContext(),
             Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),

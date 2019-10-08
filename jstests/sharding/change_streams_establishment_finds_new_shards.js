@@ -40,13 +40,13 @@ assert.commandWorked(mongos.adminCommand({split: mongosColl.getFullName(), middl
 
 // Enable the failpoint.
 assert.commandWorked(mongos.adminCommand(
-    {configureFailPoint: "clusterAggregateHangBeforeEstablishingShardCursors", mode: "alwaysOn"}));
+    {configureFailPoint: "shardedAggregateHangBeforeEstablishingShardCursors", mode: "alwaysOn"}));
 
 // While opening the cursor, wait for the failpoint and add the new shard.
 const awaitNewShard = startParallelShell(`
         load("jstests/libs/check_log.js");
         checkLog.contains(db,
-            "clusterAggregateHangBeforeEstablishingShardCursors fail point enabled");
+            "shardedAggregateHangBeforeEstablishingShardCursors fail point enabled");
         assert.commandWorked(
             db.adminCommand({addShard: "${newShard.getURL()}", name: "${newShard.name}"}));
         // Migrate the [10, MaxKey] chunk to "newShard".
@@ -56,7 +56,7 @@ const awaitNewShard = startParallelShell(`
                                               _waitForDelete: true}));
         assert.commandWorked(
             db.adminCommand(
-                {configureFailPoint: "clusterAggregateHangBeforeEstablishingShardCursors",
+                {configureFailPoint: "shardedAggregateHangBeforeEstablishingShardCursors",
                  mode: "off"}));`,
                                              mongos.port);
 

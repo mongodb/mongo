@@ -49,6 +49,7 @@ selector:
   - jstests/sharding/track_unsharded_collections_rename_collection.js
   - jstests/sharding/banned_txn_databases_sharded.js
   - jstests/sharding/split_large_key.js
+  - jstests/sharding/change_streams_establishment_finds_new_shards.js
   # Enable if SERVER-41813 is backported or 4.4 becomes last-stable
   - jstests/sharding/invalid_system_views_sharded_collection.js
 

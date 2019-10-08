@@ -4,8 +4,16 @@ test_kind: js_test
 
 selector:
   roots:
-  # Placeholder test to avoid failing in resmoke.
-  - jstests/sharding/accurate_count_with_predicate.js
+  - jstests/sharding/auth.js
+  - jstests/sharding/authCommands.js
+  - jstests/sharding/authmr.js
+  - jstests/sharding/causal_consistency_shell_support.js
+  - jstests/sharding/localhostAuthBypass.js
+  - jstests/sharding/max_time_ms_sharded.js
+  - jstests/sharding/mr_and_agg_versioning.js
+  - jstests/sharding/mr_shard_version.js
+  - jstests/sharding/query_config.js
+  - jstests/sharding/shard_targeting.js
 
 executor:
   config:

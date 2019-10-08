@@ -88,7 +88,7 @@ try {
 try {
     // Enable the failpoint to fail on establishing a merging shard cursor.
     assert.commandWorked(mongosDB.adminCommand({
-        configureFailPoint: "clusterAggregateFailToEstablishMergingShardCursor",
+        configureFailPoint: "shardedAggregateFailToEstablishMergingShardCursor",
         mode: "alwaysOn"
     }));
 
@@ -103,13 +103,13 @@ try {
 
 } finally {
     assert.commandWorked(mongosDB.adminCommand(
-        {configureFailPoint: "clusterAggregateFailToEstablishMergingShardCursor", mode: "off"}));
+        {configureFailPoint: "shardedAggregateFailToEstablishMergingShardCursor", mode: "off"}));
 }
 
 // Test that aggregations involving $exchange correctly clean up the producer cursors.
 try {
     assert.commandWorked(mongosDB.adminCommand({
-        configureFailPoint: "clusterAggregateFailToDispatchExchangeConsumerPipeline",
+        configureFailPoint: "shardedAggregateFailToDispatchExchangeConsumerPipeline",
         mode: "alwaysOn"
     }));
 
@@ -133,7 +133,7 @@ try {
 
 } finally {
     assert.commandWorked(mongosDB.adminCommand({
-        configureFailPoint: "clusterAggregateFailToDispatchExchangeConsumerPipeline",
+        configureFailPoint: "shardedAggregateFailToDispatchExchangeConsumerPipeline",
         mode: "off"
     }));
 }

@@ -33,19 +33,11 @@
 #include <vector>
 
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/map_reduce_gen.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 
-namespace mongo {
-
-namespace mr {
-
-enum class OutputType {
-    kReplace,  // Atomically replace the collection.
-    kMerge,    // Merge keys, override dups.
-    kReduce,   // Merge keys, reduce dups.
-    kInMemory  // Only store in memory, limited in size.
-};
+namespace mongo::map_reduce_common {
 
 struct OutputOptions {
     std::string outDB;
@@ -68,6 +60,11 @@ void addPrivilegesRequiredForMapReduce(const BasicCommand* commandTemplate,
  */
 bool mrSupportsWriteConcern(const BSONObj& cmd);
 
+/**
+ * Accepts a parsed mapReduce command and returns the equivalent aggregation pipeline. Note that the
+ * returned pipeline does *not* contain a $cursor stage and thus is not runnable.
+ */
+std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
+    MapReduce parsedMr, boost::intrusive_ptr<ExpressionContext> expCtx);
 
-}  // namespace mr
-}  // namespace mongo
+}  // namespace mongo::map_reduce_common

@@ -47,7 +47,4 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                              std::string& errmsg,
                              BSONObjBuilder& result);
 
-std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
-    MapReduce parsedMr, boost::intrusive_ptr<ExpressionContext> expCtx);
-
 }  // namespace mongo::map_reduce_agg

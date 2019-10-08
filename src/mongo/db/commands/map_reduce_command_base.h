@@ -45,7 +45,7 @@ public:
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return mr::mrSupportsWriteConcern(cmd);
+        return map_reduce_common::mrSupportsWriteConcern(cmd);
     }
 
     bool allowsAfterClusterTime(const BSONObj& cmd) const override {
@@ -62,7 +62,7 @@ public:
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) const {
-        mr::addPrivilegesRequiredForMapReduce(this, dbname, cmdObj, out);
+        map_reduce_common::addPrivilegesRequiredForMapReduce(this, dbname, cmdObj, out);
     }
 
     bool errmsgRun(OperationContext* opCtx,

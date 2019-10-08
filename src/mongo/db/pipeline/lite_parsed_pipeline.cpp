@@ -73,7 +73,7 @@ void LiteParsedPipeline::assertSupportsMultiDocumentTransaction(
     }
 }
 
-bool LiteParsedPipeline::verifyIsSupported(
+void LiteParsedPipeline::verifyIsSupported(
     OperationContext* opCtx,
     const std::function<bool(OperationContext*, const NamespaceString&)> isSharded,
     const boost::optional<ExplainOptions::Verbosity> explain,
@@ -85,14 +85,11 @@ bool LiteParsedPipeline::verifyIsSupported(
     // Verify litePipe can be run at the given read concern.
     assertSupportsReadConcern(opCtx, explain, enableMajorityReadConcern);
     // Verify that no involved namespace is sharded unless allowed by the pipeline.
-    auto sharded = false;
     for (const auto& nss : getInvolvedNamespaces()) {
-        sharded = isSharded(opCtx, nss);
         uassert(28769,
                 str::stream() << nss.ns() << " cannot be sharded",
-                allowShardedForeignCollection(nss) || !sharded);
+                allowShardedForeignCollection(nss) || !isSharded(opCtx, nss));
     }
-    return sharded;
 }
 
 }  // namespace mongo

@@ -224,7 +224,7 @@ public:
     NamespaceString incLong;
     NamespaceString tempNamespace;
 
-    mr::OutputOptions outputOptions;
+    map_reduce_common::OutputOptions outputOptions;
 
     // max number of keys allowed in JS map before switching mode
     long jsMaxKeys;

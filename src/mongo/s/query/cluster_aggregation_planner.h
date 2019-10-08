@@ -81,12 +81,12 @@ SplitPipeline splitPipeline(std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
  * front of 'mergePipeline'.
  */
 void addMergeCursorsSource(Pipeline* mergePipeline,
-                           const LiteParsedPipeline&,
                            BSONObj cmdSentToShards,
-                           std::vector<OwnedRemoteCursor> remoteCursors,
+                           std::vector<OwnedRemoteCursor> ownedCursors,
                            const std::vector<ShardId>& targetedShards,
                            boost::optional<BSONObj> shardCursorsSortSpec,
-                           std::shared_ptr<executor::TaskExecutor> executor);
+                           std::shared_ptr<executor::TaskExecutor> executor,
+                           bool hasChangeStream);
 
 /**
  * Builds a ClusterClientCursor which will execute 'pipeline'. If 'pipeline' consists entirely of

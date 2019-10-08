@@ -46,6 +46,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/map_reduce_gen.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
@@ -425,17 +426,17 @@ Config::Config(const string& _dbname, const BSONObj& cmdObj) {
 
     uassert(13602, "outType is no longer a valid option", cmdObj["outType"].eoo());
 
-    outputOptions = mr::parseOutputOptions(dbname, cmdObj);
+    outputOptions = map_reduce_common::parseOutputOptions(dbname, cmdObj);
 
     shardedFirstPass = false;
     if (cmdObj.hasField("shardedFirstPass") && cmdObj["shardedFirstPass"].trueValue()) {
         massert(16054,
                 "shardedFirstPass should only use replace outType",
-                outputOptions.outType == mr::OutputType::kReplace);
+                outputOptions.outType == OutputType::Replace);
         shardedFirstPass = true;
     }
 
-    if (outputOptions.outType != mr::OutputType::kInMemory) {
+    if (outputOptions.outType != OutputType::InMemory) {
         // Create names for the temp collection and the incremental collection. The incremental
         // collection goes in the "local" database, so that it doesn't get replicated.
         const std::string& outDBName = outputOptions.outDB.empty() ? dbname : outputOptions.outDB;
@@ -739,7 +740,7 @@ void State::appendResults(BSONObjBuilder& final) {
  * This may involve replacing, merging or reducing.
  */
 long long State::postProcessCollection(OperationContext* opCtx, CurOp* curOp) {
-    if (_onDisk == false || _config.outputOptions.outType == mr::OutputType::kInMemory)
+    if (_onDisk == false || _config.outputOptions.outType == OutputType::InMemory)
         return numInMemKeys();
 
     bool holdingGlobalLock = false;
@@ -763,7 +764,7 @@ long long State::postProcessCollectionNonAtomic(OperationContext* opCtx,
     if (_config.outputOptions.finalNamespace == _config.tempNamespace)
         return collectionCount(opCtx, _config.outputOptions.finalNamespace, callerHoldsGlobalLock);
 
-    if (_config.outputOptions.outType == mr::OutputType::kReplace ||
+    if (_config.outputOptions.outType == OutputType::Replace ||
         collectionCount(opCtx, _config.outputOptions.finalNamespace, callerHoldsGlobalLock) == 0) {
         // This must be global because we may write across different databases.
         Lock::GlobalWrite lock(opCtx);
@@ -780,7 +781,7 @@ long long State::postProcessCollectionNonAtomic(OperationContext* opCtx,
         }
 
         _db.dropCollection(_config.tempNamespace.ns());
-    } else if (_config.outputOptions.outType == mr::OutputType::kMerge) {
+    } else if (_config.outputOptions.outType == OutputType::Merge) {
         // merge: upsert new docs into old collection
         const auto count = collectionCount(opCtx, _config.tempNamespace, callerHoldsGlobalLock);
 
@@ -799,7 +800,7 @@ long long State::postProcessCollectionNonAtomic(OperationContext* opCtx,
         }
         _db.dropCollection(_config.tempNamespace.ns());
         pm.finished();
-    } else if (_config.outputOptions.outType == mr::OutputType::kReduce) {
+    } else if (_config.outputOptions.outType == OutputType::Reduce) {
         // reduce: apply reduce op on new result and existing one
         BSONList values;
 
@@ -926,7 +927,7 @@ State::State(OperationContext* opCtx, const Config& c)
       _dupCount(0),
       _numEmits(0) {
     _temp.reset(new InMemory());
-    _onDisk = _config.outputOptions.outType != mr::OutputType::kInMemory;
+    _onDisk = _config.outputOptions.outType != OutputType::InMemory;
 }
 
 bool State::sourceExists() {
@@ -1747,7 +1748,7 @@ bool runMapReduceShardedFinish(OperationContext* opCtx,
 
     std::vector<Chunk> chunks;
 
-    if (config.outputOptions.outType != mr::OutputType::kInMemory) {
+    if (config.outputOptions.outType != OutputType::InMemory) {
         auto outRoutingInfoStatus = Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
             opCtx, config.outputOptions.finalNamespace);
         uassertStatusOK(outRoutingInfoStatus.getStatus());
