@@ -184,10 +184,6 @@ Status ReplicationCoordinatorEmbedded::setFollowerModeStrict(OperationContext* o
     UASSERT_NOT_IMPLEMENTED;
 }
 
-ReplicationCoordinator::ApplierState ReplicationCoordinatorEmbedded::getApplierState() {
-    UASSERT_NOT_IMPLEMENTED;
-}
-
 void ReplicationCoordinatorEmbedded::signalDrainComplete(OperationContext*, long long) {
     UASSERT_NOT_IMPLEMENTED;
 }

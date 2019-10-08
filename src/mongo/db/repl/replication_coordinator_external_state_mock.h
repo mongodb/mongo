@@ -36,6 +36,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/last_vote.h"
+#include "mongo/db/repl/oplog_applier_impl.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
@@ -99,6 +100,8 @@ public:
     virtual bool isReadConcernSnapshotSupportedByStorageEngine(OperationContext* opCtx) const;
     virtual std::size_t getOplogFetcherSteadyStateMaxFetcherRestarts() const override;
     virtual std::size_t getOplogFetcherInitialSyncMaxFetcherRestarts() const override;
+    virtual OplogApplier::ApplierState getApplierState() const override;
+    virtual void setApplierState(const OplogApplier::ApplierState st) override;
 
     /**
      * Adds "host" to the list of hosts that this mock will match when responding to "isSelf"
@@ -209,6 +212,7 @@ private:
     OpTime _firstOpTimeOfMyTerm;
     double _electionTimeoutOffsetLimitFraction = 0.15;
     Timestamp _globalTimestamp;
+    std::unique_ptr<OplogApplier> _oplogApplier;
 };
 
 }  // namespace repl

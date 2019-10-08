@@ -154,7 +154,7 @@ void OpQueueBatcher::run() {
             // Draining state guarantees the producer has already been fully stopped and no more
             // operations will be pushed in to the oplog buffer until the applier state changes.
             auto isDraining =
-                replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Draining;
+                _oplogApplier->getApplierState() == OplogApplier::ApplierState::Draining;
             // Check the oplog buffer after the applier state to ensure the producer is stopped.
             if (isDraining && _oplogBuffer->isEmpty()) {
                 ops.setTermWhenExhausted(termWhenBufferIsEmpty);

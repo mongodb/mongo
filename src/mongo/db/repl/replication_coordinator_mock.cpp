@@ -296,10 +296,6 @@ Status ReplicationCoordinatorMock::setFollowerModeStrict(OperationContext* opCtx
     return setFollowerMode(newState);
 }
 
-ReplicationCoordinator::ApplierState ReplicationCoordinatorMock::getApplierState() {
-    return ApplierState::Running;
-}
-
 void ReplicationCoordinatorMock::signalDrainComplete(OperationContext*, long long) {}
 
 Status ReplicationCoordinatorMock::waitForDrainFinish(Milliseconds timeout) {

@@ -166,8 +166,6 @@ public:
 
     virtual Status setFollowerModeStrict(OperationContext* opCtx, const MemberState& newState);
 
-    virtual ApplierState getApplierState();
-
     virtual void signalDrainComplete(OperationContext*, long long);
 
     virtual Status waitForDrainFinish(Milliseconds timeout) override;

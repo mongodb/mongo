@@ -910,6 +910,15 @@ std::size_t ReplicationCoordinatorExternalStateImpl::getOplogFetcherInitialSyncM
     return oplogFetcherInitialSyncMaxFetcherRestarts.load();
 }
 
+
+OplogApplier::ApplierState ReplicationCoordinatorExternalStateImpl::getApplierState() const {
+    return _oplogApplier.get()->getApplierState();
+}
+
+void ReplicationCoordinatorExternalStateImpl::setApplierState(const OplogApplier::ApplierState st) {
+    _oplogApplier.get()->setApplierState(st);
+}
+
 JournalListener::Token ReplicationCoordinatorExternalStateImpl::getToken() {
     return repl::ReplicationCoordinator::get(_service)->getMyLastAppliedOpTimeAndWallTime();
 }

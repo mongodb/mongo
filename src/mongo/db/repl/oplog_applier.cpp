@@ -287,6 +287,16 @@ void OplogApplier::_consume(OperationContext* opCtx, OplogBuffer* oplogBuffer) {
     invariant(oplogBuffer->tryPop(opCtx, &opToPopAndDiscard) || inShutdown());
 }
 
+OplogApplier::ApplierState OplogApplier::getApplierState() const {
+    stdx::lock_guard<Latch> lock(_mutex);
+    return _applierState;
+}
+
+void OplogApplier::setApplierState(ApplierState st) {
+    stdx::lock_guard<Latch> lock(_mutex);
+    _applierState = st;
+}
+
 std::unique_ptr<ThreadPool> makeReplWriterPool() {
     return makeReplWriterPool(replWriterThreadCount);
 }

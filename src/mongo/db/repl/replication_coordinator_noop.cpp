@@ -177,10 +177,6 @@ Status ReplicationCoordinatorNoOp::setFollowerModeStrict(OperationContext* opCtx
     MONGO_UNREACHABLE;
 }
 
-ReplicationCoordinator::ApplierState ReplicationCoordinatorNoOp::getApplierState() {
-    MONGO_UNREACHABLE;
-}
-
 void ReplicationCoordinatorNoOp::signalDrainComplete(OperationContext*, long long) {
     MONGO_UNREACHABLE;
 }

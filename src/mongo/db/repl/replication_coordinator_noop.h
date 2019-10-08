@@ -147,8 +147,6 @@ public:
 
     Status setFollowerModeStrict(OperationContext* opCtx, const MemberState&) final;
 
-    ApplierState getApplierState() final;
-
     void signalDrainComplete(OperationContext*, long long) final;
 
     Status waitForDrainFinish(Milliseconds) final;
