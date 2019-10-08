@@ -113,6 +113,18 @@ void abortIndexBuild(WithLock lk,
 }
 
 /**
+ * We do not need synchronization with step up and step down. Dropping the RSTL is important because
+ * otherwise if we held the RSTL it would create deadlocks with prepared transactions on step up and
+ * step down.  A deadlock could result if the index build was attempting to acquire a Collection S
+ * or X lock while a prepared transaction held a Collection IX lock, and a step down was waiting to
+ * acquire the RSTL in mode X.
+ */
+void unlockRSTLForIndexCleanup(OperationContext* opCtx) {
+    opCtx->lockState()->unlockRSTLforPrepare();
+    invariant(!opCtx->lockState()->isRSTLLocked());
+}
+
+/**
  * Logs the index build failure error in a standard format.
  */
 void logFailure(Status status,
@@ -899,11 +911,7 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
 
             Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
 
-            // Since DBLock implicitly acquires RSTL, we release the RSTL after acquiring the
-            // database lock. Additionally, the RSTL has to be released before acquiring a strong
-            // lock (MODE_X) on the collection to avoid potential deadlocks.
-            opCtx->lockState()->unlockRSTLforPrepare();
-            invariant(!opCtx->lockState()->isRSTLLocked());
+            unlockRSTLForIndexCleanup(opCtx);
 
             Lock::CollectionLock collLock(opCtx, nss, MODE_X);
 
