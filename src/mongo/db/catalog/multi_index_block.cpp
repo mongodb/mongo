@@ -75,7 +75,11 @@ MultiIndexBlock::~MultiIndexBlock() {
     invariant(_buildIsCleanedUp);
 }
 
-void MultiIndexBlock::cleanUpAfterBuild(OperationContext* opCtx, Collection* collection) {
+MultiIndexBlock::OnCleanUpFn MultiIndexBlock::kNoopOnCleanUpFn = []() {};
+
+void MultiIndexBlock::cleanUpAfterBuild(OperationContext* opCtx,
+                                        Collection* collection,
+                                        OnCleanUpFn onCleanUp) {
     if (_collectionUUID) {
         // init() was previously called with a collection pointer, so ensure that the same
         // collection is being provided for clean up and the interface in not being abused.
@@ -140,6 +144,9 @@ void MultiIndexBlock::cleanUpAfterBuild(OperationContext* opCtx, Collection* col
                     log() << "Did not timestamp index abort write.";
                 }
             }
+
+            onCleanUp();
+
             wunit.commit();
             _buildIsCleanedUp = true;
             return;

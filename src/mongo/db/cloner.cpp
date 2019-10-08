@@ -368,7 +368,8 @@ void Cloner::copyIndexes(OperationContext* opCtx,
     MultiIndexBlock indexer;
 
     // The code below throws, so ensure build cleanup occurs.
-    ON_BLOCK_EXIT([&] { indexer.cleanUpAfterBuild(opCtx, collection); });
+    ON_BLOCK_EXIT(
+        [&] { indexer.cleanUpAfterBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn); });
 
     // Emit startIndexBuild and commitIndexBuild oplog entries if supported by the current FCV.
     auto opObserver = opCtx->getServiceContext()->getOpObserver();

@@ -76,7 +76,9 @@ protected:
         try {
             MultiIndexBlock indexer;
 
-            ON_BLOCK_EXIT([&] { indexer.cleanUpAfterBuild(&_opCtx, collection()); });
+            ON_BLOCK_EXIT([&] {
+                indexer.cleanUpAfterBuild(&_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn);
+            });
 
             uassertStatusOK(
                 indexer.init(&_opCtx, collection(), key, MultiIndexBlock::kNoopOnInitFn));
@@ -138,7 +140,8 @@ public:
                                   << static_cast<int>(kIndexVersion) << "unique" << true
                                   << "background" << background);
 
-        ON_BLOCK_EXIT([&] { indexer.cleanUpAfterBuild(&_opCtx, coll); });
+        ON_BLOCK_EXIT(
+            [&] { indexer.cleanUpAfterBuild(&_opCtx, coll, MultiIndexBlock::kNoopOnCleanUpFn); });
 
         ASSERT_OK(indexer.init(&_opCtx, coll, spec, MultiIndexBlock::kNoopOnInitFn).getStatus());
         ASSERT_OK(indexer.insertAllDocumentsInCollection(&_opCtx, coll));
@@ -186,7 +189,8 @@ public:
                                   << static_cast<int>(kIndexVersion) << "unique" << true
                                   << "background" << background);
 
-        ON_BLOCK_EXIT([&] { indexer.cleanUpAfterBuild(&_opCtx, coll); });
+        ON_BLOCK_EXIT(
+            [&] { indexer.cleanUpAfterBuild(&_opCtx, coll, MultiIndexBlock::kNoopOnCleanUpFn); });
 
         ASSERT_OK(indexer.init(&_opCtx, coll, spec, MultiIndexBlock::kNoopOnInitFn).getStatus());
 
@@ -282,7 +286,9 @@ public:
 
 Status IndexBuildBase::createIndex(const std::string& dbname, const BSONObj& indexSpec) {
     MultiIndexBlock indexer;
-    ON_BLOCK_EXIT([&] { indexer.cleanUpAfterBuild(&_opCtx, collection()); });
+    ON_BLOCK_EXIT([&] {
+        indexer.cleanUpAfterBuild(&_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn);
+    });
     Status status =
         indexer.init(&_opCtx, collection(), indexSpec, MultiIndexBlock::kNoopOnInitFn).getStatus();
     if (status == ErrorCodes::IndexAlreadyExists) {

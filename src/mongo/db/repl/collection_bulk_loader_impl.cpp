@@ -315,12 +315,14 @@ Status CollectionBulkLoaderImpl::commit() {
 void CollectionBulkLoaderImpl::_releaseResources() {
     invariant(&cc() == _opCtx->getClient());
     if (_secondaryIndexesBlock) {
-        _secondaryIndexesBlock->cleanUpAfterBuild(_opCtx.get(), _collection);
+        _secondaryIndexesBlock->cleanUpAfterBuild(
+            _opCtx.get(), _collection, MultiIndexBlock::kNoopOnCleanUpFn);
         _secondaryIndexesBlock.reset();
     }
 
     if (_idIndexBlock) {
-        _idIndexBlock->cleanUpAfterBuild(_opCtx.get(), _collection);
+        _idIndexBlock->cleanUpAfterBuild(
+            _opCtx.get(), _collection, MultiIndexBlock::kNoopOnCleanUpFn);
         _idIndexBlock.reset();
     }
 

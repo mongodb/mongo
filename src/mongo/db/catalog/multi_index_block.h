@@ -85,8 +85,17 @@ public:
      *
      * By only requiring this call after init(), we allow owners of the object to exit without
      * further handling if they never use the object.
+     *
+     * `onCleanUp` will be called after all indexes have been removed from the catalog.
      */
-    void cleanUpAfterBuild(OperationContext* opCtx, Collection* collection);
+    using OnCleanUpFn = std::function<void()>;
+    void cleanUpAfterBuild(OperationContext* opCtx, Collection* collection, OnCleanUpFn onCleanUp);
+
+    /**
+     * Not all index aborts need this function, in particular index builds that do not need
+     * to timestamp catalog writes. This is a no-op.
+     */
+    static OnCleanUpFn kNoopOnCleanUpFn;
 
     static bool areHybridIndexBuildsEnabled();
 

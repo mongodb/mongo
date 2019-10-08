@@ -291,7 +291,7 @@ void IndexBuildsManager::tearDownIndexBuild(OperationContext* opCtx,
                                             const UUID& buildUUID) {
     // TODO verify that the index builder is in a finished state before allowing its destruction.
     auto builder = _getBuilder(buildUUID);
-    builder->cleanUpAfterBuild(opCtx, collection);
+    builder->cleanUpAfterBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn);
     _unregisterIndexBuild(buildUUID);
 }
 

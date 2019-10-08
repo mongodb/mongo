@@ -499,7 +499,7 @@ bool runCreateIndexesForMobile(OperationContext* opCtx,
             // commit() clears the state.
             indexer.abortWithoutCleanup(opCtx);
         }
-        indexer.cleanUpAfterBuild(opCtx, collection);
+        indexer.cleanUpAfterBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn);
     });
 
     std::vector<BSONObj> indexInfoObjs =

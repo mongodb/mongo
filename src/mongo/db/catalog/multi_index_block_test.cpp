@@ -85,7 +85,7 @@ void MultiIndexBlockTest::tearDown() {
     auto service = getServiceContext();
     repl::ReplicationCoordinator::set(service, {});
 
-    _indexer->cleanUpAfterBuild(getOpCtx(), getCollection());
+    _indexer->cleanUpAfterBuild(getOpCtx(), getCollection(), MultiIndexBlock::kNoopOnCleanUpFn);
     _indexer = {};
 
     _collection = {};

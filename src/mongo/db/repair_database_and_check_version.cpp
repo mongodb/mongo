@@ -156,7 +156,8 @@ bool checkIdIndexExists(OperationContext* opCtx, const NamespaceString& nss) {
 
 Status buildMissingIdIndex(OperationContext* opCtx, Collection* collection) {
     MultiIndexBlock indexer;
-    ON_BLOCK_EXIT([&] { indexer.cleanUpAfterBuild(opCtx, collection); });
+    ON_BLOCK_EXIT(
+        [&] { indexer.cleanUpAfterBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn); });
 
     const auto indexCatalog = collection->getIndexCatalog();
     const auto idIndexSpec = indexCatalog->getDefaultIdIndexSpec();

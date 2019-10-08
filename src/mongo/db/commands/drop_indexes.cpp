@@ -207,7 +207,9 @@ public:
                                                             "Uninitialized");
 
         // The 'indexer' can throw, so ensure build cleanup occurs.
-        ON_BLOCK_EXIT([&] { indexer->cleanUpAfterBuild(opCtx, collection); });
+        ON_BLOCK_EXIT([&] {
+            indexer->cleanUpAfterBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn);
+        });
 
         {
             writeConflictRetry(opCtx, "dropAllIndexes", toReIndexNss.ns(), [&] {

@@ -103,7 +103,9 @@ protected:
         auto specObj = builder.obj();
 
         MultiIndexBlock indexer;
-        ON_BLOCK_EXIT([&] { indexer.cleanUpAfterBuild(&_opCtx, _collection); });
+        ON_BLOCK_EXIT([&] {
+            indexer.cleanUpAfterBuild(&_opCtx, _collection, MultiIndexBlock::kNoopOnCleanUpFn);
+        });
         {
             WriteUnitOfWork wunit(&_opCtx);
             uassertStatusOK(

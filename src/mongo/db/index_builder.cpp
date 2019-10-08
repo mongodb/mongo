@@ -91,7 +91,8 @@ Status IndexBuilder::buildInForeground(OperationContext* opCtx,
     MultiIndexBlock indexer;
 
     // The 'indexer' can throw, so ensure build cleanup occurs.
-    ON_BLOCK_EXIT([&] { indexer.cleanUpAfterBuild(opCtx, coll); });
+    ON_BLOCK_EXIT(
+        [&] { indexer.cleanUpAfterBuild(opCtx, coll, MultiIndexBlock::kNoopOnCleanUpFn); });
 
     return _build(opCtx, coll, indexer);
 }
