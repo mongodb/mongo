@@ -81,6 +81,13 @@ void Client::initThread(StringData desc,
     currentClient = service->makeClient(fullDesc, std::move(session));
 }
 
+void Client::initKillableThread(StringData desc, ServiceContext* service) {
+    initThread(desc, service, nullptr);
+
+    stdx::lock_guard lk(*currentClient);
+    currentClient->setSystemOperationKillable(lk);
+}
+
 namespace {
 int64_t generateSeed(const std::string& desc) {
     size_t seed = 0;
