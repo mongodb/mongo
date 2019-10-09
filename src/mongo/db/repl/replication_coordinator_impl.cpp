@@ -167,13 +167,13 @@ void lockAndCall(stdx::unique_lock<Latch>* lk, const std::function<void()>& fn) 
  */
 BSONObj incrementConfigVersionByRandom(BSONObj config) {
     BSONObjBuilder builder;
+    SecureRandom generator;
     for (BSONObjIterator iter(config); iter.more(); iter.next()) {
         BSONElement elem = *iter;
         if (elem.fieldNameStringData() == ReplSetConfig::kVersionFieldName && elem.isNumber()) {
-            std::unique_ptr<SecureRandom> generator(SecureRandom::create());
-            const int random = std::abs(static_cast<int>(generator->nextInt64()) % 100000);
+            const int random = generator.nextInt32(100'000);
             builder.appendIntOrLL(ReplSetConfig::kVersionFieldName,
-                                  elem.numberLong() + 10000 + random);
+                                  elem.numberLong() + 10'000 + random);
         } else {
             builder.append(elem);
         }

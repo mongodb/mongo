@@ -397,7 +397,7 @@ DurableCatalogImpl::~DurableCatalogImpl() {
 }
 
 std::string DurableCatalogImpl::_newRand() {
-    return str::stream() << std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64();
+    return str::stream() << SecureRandom().nextInt64();
 }
 
 bool DurableCatalogImpl::_hasEntryCollidingWithRand() const {

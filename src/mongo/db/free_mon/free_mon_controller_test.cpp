@@ -74,7 +74,7 @@ namespace mongo {
 namespace {
 
 auto makeRandom() {
-    auto seed = SecureRandom::create()->nextInt64();
+    auto seed = SecureRandom().nextInt64();
     unittest::log() << "PseudoRandom(" << std::showbase << std::hex << seed << std::dec
                     << std::noshowbase << ")";
     return PseudoRandom(seed);

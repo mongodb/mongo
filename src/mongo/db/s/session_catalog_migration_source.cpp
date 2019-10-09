@@ -52,7 +52,7 @@
 namespace mongo {
 namespace {
 
-PseudoRandom hashGenerator(std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64());
+PseudoRandom hashGenerator(SecureRandom().nextInt64());
 
 boost::optional<repl::OplogEntry> fetchPrePostImageOplog(OperationContext* opCtx,
                                                          const repl::OplogEntry& oplog) {

@@ -165,7 +165,7 @@ void RandomizedIdempotencyTest::runIdempotencyTestCase() {
     const double kDocProbability = 0.375;
     const double kArrProbability = 0.0;
 
-    this->seed = SecureRandom::create()->nextInt64();
+    this->seed = SecureRandom().nextInt64();
     PseudoRandom seedGenerator(this->seed);
     RandomizedScalarGenerator scalarGenerator{PseudoRandom(seedGenerator.nextInt64())};
     UpdateSequenceGenerator updateGenerator(

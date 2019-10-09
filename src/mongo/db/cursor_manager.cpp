@@ -100,7 +100,7 @@ std::pair<Status, int> CursorManager::killCursorsWithMatchingSessions(
 }
 
 CursorManager::CursorManager()
-    : _random(std::make_unique<PseudoRandom>(SecureRandom::create()->nextInt64())),
+    : _random(std::make_unique<PseudoRandom>(SecureRandom().nextInt64())),
       _cursorMap(std::make_unique<Partitioned<stdx::unordered_map<CursorId, ClientCursor*>>>()) {}
 
 CursorManager::~CursorManager() {
