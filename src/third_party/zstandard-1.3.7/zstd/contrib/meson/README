@@ -1,3 +1,0 @@
-This Meson project is provided with no guarantee and maintained by Dima Krasner <dima@dimakrasner.com>.
-
-It outputs one libzstd, either shared or static, depending on default_library.

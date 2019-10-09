@@ -1,0 +1,36 @@
+# #############################################################################
+# Copyright (c) 2018-present     Dima Krasner <dima@dimakrasner.com>
+#                                lzutao <taolzu(at)gmail.com>
+# All rights reserved.
+#
+# This source code is licensed under both the BSD-style license (found in the
+# LICENSE file in the root directory of this source tree) and the GPLv2 (found
+# in the COPYING file in the root directory of this source tree).
+# #############################################################################
+
+# Read guidelines from https://wiki.gnome.org/Initiatives/GnomeGoals/MesonPorting
+
+option('legacy_level', type: 'integer', min: 0, max: 7, value: '5',
+  description: 'Support any legacy format: 7 to 1 for v0.7+ to v0.1+')
+option('debug_level', type: 'integer', min: 0, max: 9, value: 1,
+  description: 'Enable run-time debug. See lib/common/debug.h')
+option('backtrace', type: 'boolean', value: false,
+  description: 'Display a stack backtrace when execution generates a runtime exception')
+option('static_runtime', type: 'boolean', value: false,
+  description: 'Link to static run-time libraries on MSVC')
+
+option('bin_programs', type: 'boolean', value: true,
+  description: 'Enable programs build')
+option('bin_tests', type: 'boolean', value: false,
+  description: 'Enable tests build')
+option('bin_contrib', type: 'boolean', value: false,
+  description: 'Enable contrib build')
+
+option('multi_thread', type: 'feature', value: 'enabled',
+  description: 'Enable multi-threading when pthread is detected')
+option('zlib', type: 'feature', value: 'auto',
+  description: 'Enable zlib support')
+option('lzma', type: 'feature', value: 'auto',
+  description: 'Enable lzma support')
+option('lz4', type: 'feature', value: 'auto',
+  description: 'Enable lz4 support')

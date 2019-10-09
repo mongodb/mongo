@@ -1,3 +1,0 @@
-option('multithread', type: 'boolean', value: false)
-option('legacy_support', type: 'string', value: '4',
-    description: 'True or false, or 7 to 1 for v0.7+ to v0.1+.')

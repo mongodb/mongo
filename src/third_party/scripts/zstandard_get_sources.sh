@@ -18,7 +18,7 @@ if grep -q Microsoft /proc/version; then
 fi
 
 NAME=zstandard
-REVISION=v1.3.7
+REVISION=1.4.3
 if grep -q Microsoft /proc/version; then
     SRC_ROOT=$(wslpath -u $(powershell.exe -Command "Get-ChildItem Env:TEMP | Get-Content | Write-Host"))
     SRC_ROOT+="$(mktemp -u /zstandard.XXXXXX)"
@@ -32,8 +32,8 @@ CLONE_DEST=$SRC
 if grep -q Microsoft /proc/version; then
     CLONE_DEST=$(wslpath -m $SRC)
 fi
-DEST_DIR=$($GIT_EXE rev-parse --show-toplevel)/src/third_party/$NAME-1.3.7
-PATCH_DIR=$($GIT_EXE rev-parse --show-toplevel)/src/third_party/$NAME-1.3.7/patches
+DEST_DIR=$($GIT_EXE rev-parse --show-toplevel)/src/third_party/$NAME-$REVISION
+PATCH_DIR=$($GIT_EXE rev-parse --show-toplevel)/src/third_party/$NAME-$REVISION/patches
 if grep -q Microsoft /proc/version; then
     DEST_DIR=$(wslpath -u "$DEST_DIR")
     PATCH_DIR=$(wslpath -w $(wslpath -u "$PATCH_DIR"))
@@ -46,7 +46,7 @@ if [ ! -d $SRC ]; then
     $GIT_EXE clone https://github.com/facebook/zstd.git $CLONE_DEST
 
     pushd $SRC
-    $GIT_EXE checkout $REVISION
+    $GIT_EXE checkout v$REVISION
     
     popd
 fi
