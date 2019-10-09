@@ -933,12 +933,30 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
 
             Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
 
-            unlockRSTLForIndexCleanup(opCtx);
-
-            Lock::CollectionLock collLock(opCtx, nss, MODE_X);
-
-            _indexBuildsManager.tearDownIndexBuild(
-                opCtx, collection, replState->buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
+            if (!replSetAndNotPrimary) {
+                auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+                if (replCoord->getSettings().usingReplSets() &&
+                    replCoord->canAcceptWritesFor(opCtx, nss)) {
+                    // We are currently a primary node. Notify downstream nodes to abort their index
+                    // builds with the same build UUID.
+                    Lock::CollectionLock collLock(opCtx, nss, MODE_X);
+                    auto onCleanUpFn = [&] { onAbortIndexBuild(opCtx, nss, *replState, status); };
+                    _indexBuildsManager.tearDownIndexBuild(
+                        opCtx, collection, replState->buildUUID, onCleanUpFn);
+                } else {
+                    // This index build was aborted because we are stepping down from primary.
+                    unlockRSTLForIndexCleanup(opCtx);
+                    Lock::CollectionLock collLock(opCtx, nss, MODE_X);
+                    _indexBuildsManager.tearDownIndexBuild(
+                        opCtx, collection, replState->buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
+                }
+            } else {
+                // We started this index build during oplog application as a secondary node.
+                unlockRSTLForIndexCleanup(opCtx);
+                Lock::CollectionLock collLock(opCtx, nss, MODE_X);
+                _indexBuildsManager.tearDownIndexBuild(
+                    opCtx, collection, replState->buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
+            }
         } else {
             _indexBuildsManager.tearDownIndexBuild(
                 opCtx, collection, replState->buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
@@ -957,19 +975,6 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
             fassert(51101,
                     status.withContext(str::stream() << "Index build: " << replState->buildUUID
                                                      << "; Database: " << replState->dbName));
-        }
-
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-        Lock::GlobalLock lock(opCtx, MODE_IX);
-
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        if (replCoord->getSettings().usingReplSets() && replCoord->canAcceptWritesFor(opCtx, nss)) {
-            writeConflictRetry(
-                opCtx, "onAbortIndexBuild", NamespaceString::kRsOplogNamespace.ns(), [&] {
-                    WriteUnitOfWork wuow(opCtx);
-                    onAbortIndexBuild(opCtx, nss, *replState, status);
-                    wuow.commit();
-                });
         }
 
         uassertStatusOK(status);

@@ -2298,6 +2298,90 @@ public:
     }
 };
 
+/**
+ * This test asserts that the catalog updates that represent the beginning and end of an aborted
+ * index build are timestamped. The oplog should contain two entries startIndexBuild and
+ * abortIndexBuild. We will inspect the catalog at the timestamp corresponding to each of these
+ * oplog entries.
+ */
+class TimestampAbortIndexBuild : public StorageTimestampTest {
+public:
+    void run() {
+        auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
+        auto durableCatalog = storageEngine->getCatalog();
+
+        NamespaceString nss("unittests.timestampAbortIndexBuild");
+        reset(nss);
+
+        std::vector<std::string> origIdents;
+        {
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
+
+            auto insertTimestamp1 = _clock->reserveTicks(1);
+            auto insertTimestamp2 = _clock->reserveTicks(1);
+
+            // Insert two documents with the same value for field 'a' so that
+            // we will fail to create a unique index.
+            WriteUnitOfWork wuow(_opCtx);
+            insertDocument(autoColl.getCollection(),
+                           InsertStatement(BSON("_id" << 0 << "a" << 1),
+                                           insertTimestamp1.asTimestamp(),
+                                           presentTerm));
+            insertDocument(autoColl.getCollection(),
+                           InsertStatement(BSON("_id" << 1 << "a" << 1),
+                                           insertTimestamp2.asTimestamp(),
+                                           presentTerm));
+            wuow.commit();
+            ASSERT_EQ(2, itCount(autoColl.getCollection()));
+
+            // Save the pre-state idents so we can capture the specific ident related to index
+            // creation.
+            origIdents = durableCatalog->getAllIdents(_opCtx);
+        }
+
+        {
+            DBDirectClient client(_opCtx);
+
+            IndexSpec index1;
+            // Name this index for easier querying.
+            index1.addKeys(BSON("a" << 1)).name("a_1").unique();
+
+            std::vector<const IndexSpec*> indexes;
+            indexes.push_back(&index1);
+            ASSERT_THROWS_CODE(
+                client.createIndexes(nss.ns(), indexes), DBException, ErrorCodes::DuplicateKey);
+        }
+
+        // Confirm that startIndexBuild and abortIndexBuild oplog entries have been written to the
+        // oplog.
+        auto indexStartDocument =
+            queryOplog(BSON("ns" << nss.db() + ".$cmd"
+                                 << "o.startIndexBuild" << nss.coll() << "o.indexes.0.name"
+                                 << "a_1"));
+        auto indexStartTs = indexStartDocument["ts"].timestamp();
+        auto indexAbortDocument =
+            queryOplog(BSON("ns" << nss.db() + ".$cmd"
+                                 << "o.abortIndexBuild" << nss.coll() << "o.indexes.0.name"
+                                 << "a_1"));
+        auto indexAbortTs = indexAbortDocument["ts"].timestamp();
+
+        // Check index state in catalog at oplog entry times for both startIndexBuild and
+        // abortIndexBuild.
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
+
+        // We expect one new one new index ident during this index build.
+        assertRenamedCollectionIdentsAtTimestamp(
+            durableCatalog, origIdents, /*expectedNewIndexIdents*/ 1, indexStartTs);
+        ASSERT_FALSE(
+            getIndexMetaData(getMetaDataAtTime(durableCatalog, nss, indexStartTs), "a_1").ready);
+
+        // We expect all new idents to be removed after the index build has aborted.
+        assertRenamedCollectionIdentsAtTimestamp(
+            durableCatalog, origIdents, /*expectedNewIndexIdents*/ 0, indexAbortTs);
+        assertIndexMetaDataMissing(getMetaDataAtTime(durableCatalog, nss, indexAbortTs), "a_1");
+    }
+};
+
 class TimestampIndexDrops : public StorageTimestampTest {
 public:
     void run() {
@@ -3480,6 +3564,7 @@ public:
         // addIf<TimestampIndexBuildDrain<true>>();
         addIf<TimestampMultiIndexBuilds>();
         addIf<TimestampMultiIndexBuildsDuringRename>();
+        addIf<TimestampAbortIndexBuild>();
         addIf<TimestampIndexDrops>();
         addIf<TimestampIndexBuilderOnPrimary>();
         addIf<SecondaryReadsDuringBatchApplicationAreAllowed>();
