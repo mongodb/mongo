@@ -46,6 +46,9 @@ namespace mongo {
  *
  * The current implementer of Waitable is the transport layer baton type, which performs delayed IO
  * when it would otherwise block.
+ *
+ * Note that every Waitable should be level-triggered like its base class, Notifyable. See
+ * mongo/stdx/condition_variable.h for more details.
  */
 class Waitable : public Notifyable {
 public:

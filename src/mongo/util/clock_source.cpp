@@ -35,61 +35,59 @@
 
 namespace mongo {
 stdx::cv_status ClockSource::waitForConditionUntil(stdx::condition_variable& cv,
-                                                   BasicLockableAdapter m,
+                                                   BasicLockableAdapter bla,
                                                    Date_t deadline,
                                                    Waitable* waitable) {
     if (_tracksSystemClock) {
         if (deadline == Date_t::max()) {
-            Waitable::wait(waitable, this, cv, m);
+            Waitable::wait(waitable, this, cv, bla);
             return stdx::cv_status::no_timeout;
         }
 
-        return Waitable::wait_until(waitable, this, cv, m, deadline.toSystemTimePoint());
+        return Waitable::wait_until(waitable, this, cv, bla, deadline.toSystemTimePoint());
     }
 
     // The rest of this function only runs during testing, when the clock source is virtualized and
     // does not track the system clock.
 
-    if (deadline <= now()) {
+    auto currentTime = now();
+    if (deadline <= currentTime) {
         return stdx::cv_status::timeout;
     }
 
     struct AlarmInfo {
-        Mutex controlMutex = MONGO_MAKE_LATCH("AlarmInfo::controlMutex");
-        boost::optional<BasicLockableAdapter> waitLock;
-        stdx::condition_variable* waitCV;
-        stdx::cv_status cvWaitResult = stdx::cv_status::no_timeout;
+        stdx::mutex mutex;  // NOLINT
+
+        stdx::condition_variable* cv;
+        stdx::cv_status result = stdx::cv_status::no_timeout;
     };
     auto alarmInfo = std::make_shared<AlarmInfo>();
-    alarmInfo->waitCV = &cv;
-    alarmInfo->waitLock = m;
-    const auto waiterThreadId = stdx::this_thread::get_id();
-    bool invokedAlarmInline = false;
-    invariant(setAlarm(deadline, [alarmInfo, waiterThreadId, &invokedAlarmInline] {
-        stdx::lock_guard<Latch> controlLk(alarmInfo->controlMutex);
-        alarmInfo->cvWaitResult = stdx::cv_status::timeout;
-        if (!alarmInfo->waitLock) {
+    alarmInfo->cv = &cv;
+
+    invariant(setAlarm(deadline, [alarmInfo] {
+        // Set an alarm to hit our virtualized deadline
+        stdx::lock_guard infoLk(alarmInfo->mutex);
+        auto cv = std::exchange(alarmInfo->cv, nullptr);
+        if (!cv) {
             return;
         }
-        if (stdx::this_thread::get_id() == waiterThreadId) {
-            // In NetworkInterfaceMock, setAlarm may invoke its callback immediately if the deadline
-            // has expired, so we detect that case and avoid self-deadlock by returning early, here.
-            // It is safe to set invokedAlarmInline without synchronization in this case, because it
-            // is exactly the case where the same thread is writing and consulting the value.
-            invokedAlarmInline = true;
-            return;
-        }
-        stdx::lock_guard<BasicLockableAdapter> waitLk(*alarmInfo->waitLock);
-        alarmInfo->waitCV->notify_all();
+
+        alarmInfo->result = stdx::cv_status::timeout;
+        cv->notify_all();
     }));
-    if (!invokedAlarmInline) {
-        Waitable::wait(waitable, this, cv, m);
+
+    if (stdx::lock_guard infoLk(alarmInfo->mutex); !alarmInfo->cv) {
+        // If setAlarm() ran inline, then we've timed out
+        return alarmInfo->result;
     }
-    m.unlock();
-    stdx::lock_guard<Latch> controlLk(alarmInfo->controlMutex);
-    m.lock();
-    alarmInfo->waitLock = boost::none;
-    alarmInfo->waitCV = nullptr;
-    return alarmInfo->cvWaitResult;
+
+    // This is a wait_until because theoretically setAlarm could run out of line before this cv
+    // joins the wait list. Then it could completely miss the notification and block until a lucky
+    // renotify or spurious wakeup.
+    Waitable::wait_until(waitable, this, cv, bla, currentTime + kMaxTimeoutForArtificialClocks);
+
+    stdx::lock_guard infoLk(alarmInfo->mutex);
+    alarmInfo->cv = nullptr;
+    return alarmInfo->result;
 }
 }  // namespace mongo

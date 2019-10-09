@@ -55,6 +55,8 @@ class ClockSource {
                                       std::is_function<std::remove_pointer_t<PredicateT>>::value> {
     };
 
+    static constexpr auto kMaxTimeoutForArtificialClocks = Seconds(1);
+
 public:
     virtual ~ClockSource() = default;
 
@@ -90,6 +92,10 @@ public:
     /**
      * Like cv.wait_until(m, deadline), but uses this ClockSource instead of
      * stdx::chrono::system_clock to measure the passage of time.
+     *
+     * Note that this can suffer spurious wakeups like cw.wait_until() and, when used with a mocked
+     * clock source, may sleep in system time for kMaxTimeoutForArtificialClocks due to unfortunate
+     * implementation details.
      */
     stdx::cv_status waitForConditionUntil(stdx::condition_variable& cv,
                                           BasicLockableAdapter m,
