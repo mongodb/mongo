@@ -38,6 +38,7 @@
 #include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/query/projection.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -49,6 +50,7 @@ const char kEncodeChildrenEnd = ']';
 const char kEncodeChildrenSeparator = ',';
 const char kEncodeCollationSection = '#';
 const char kEncodeProjectionSection = '|';
+const char kEncodeProjectionRequirementSeparator = '-';
 const char kEncodeRegexFlagsSeparator = '/';
 const char kEncodeSortSection = '~';
 
@@ -65,6 +67,7 @@ void encodeUserString(StringData s, StringBuilder* keyBuilder) {
             case kEncodeChildrenSeparator:
             case kEncodeCollationSection:
             case kEncodeProjectionSection:
+            case kEncodeProjectionRequirementSeparator:
             case kEncodeRegexFlagsSeparator:
             case kEncodeSortSection:
             case '\\':
@@ -463,51 +466,48 @@ void encodeKeyForSort(const BSONObj& sortObj, StringBuilder* keyBuilder) {
 }
 
 /**
- * Encodes parsed projection into cache key.
- * Does a simple toString() on each projected field
- * in the BSON object.
- * Orders the encoded elements in the projection by field name.
- * This handles all the special projection types ($meta, $elemMatch, etc.)
+ * Encodes projection AST into a cache key.
+ *
+ * For projections which have a finite set of required fields (inclusion-only projections), encodes
+ * those field names in order.
+ *
+ * For projections which require the entire document (exclusion projections, projections with
+ * expressions), the projection section is empty.
  */
-void encodeKeyForProj(const BSONObj& projObj, StringBuilder* keyBuilder) {
-    // Sorts the BSON elements by field name using a map.
-    std::map<StringData, BSONElement> elements;
+void encodeKeyForProj(const projection_ast::Projection* proj, StringBuilder* keyBuilder) {
+    if (!proj || proj->requiresDocument()) {
+        // Don't encode anything for the projection section to indicate the entire document is
+        // required.
+        return;
+    }
 
-    BSONObjIterator it(projObj);
-    while (it.more()) {
-        BSONElement elt = it.next();
-        StringData fieldName = elt.fieldNameStringData();
+    std::vector<std::string> requiredFields = proj->getRequiredFields();
+    invariant(!requiredFields.empty());
 
-        // Internal callers may add $-prefixed fields to the projection. These are not part of a
-        // user query, and therefore are not considered part of the cache key.
-        if (fieldName[0] == '$') {
+    // Keep track of whether we appended the character marking the beginning of the projection
+    // section. We may not have to if all of the fields in the projection are $-prefixed.
+    bool appendedStart = false;
+
+    // Encode the fields required by the projection in order.
+    std::sort(requiredFields.begin(), requiredFields.end());
+    for (auto&& requiredField : requiredFields) {
+        invariant(!requiredField.empty());
+
+        // Internal callers (e.g, from mongos) may add "$sortKey" to the projection. This is not
+        // part of the user query, and therefore are not considered part of the cache key.
+        if (requiredField == "$sortKey") {
             continue;
         }
 
-        elements[fieldName] = elt;
-    }
+        const bool isFirst = !appendedStart;
 
-    if (!elements.empty()) {
-        *keyBuilder << kEncodeProjectionSection;
-    }
-
-    // Read elements in order of field name
-    for (std::map<StringData, BSONElement>::const_iterator i = elements.begin();
-         i != elements.end();
-         ++i) {
-        const BSONElement& elt = (*i).second;
-
-        if (elt.type() != BSONType::Object) {
-            // For inclusion/exclusion projections, we encode as "i" or "e".
-            *keyBuilder << (elt.trueValue() ? "i" : "e");
+        if (isFirst) {
+            *keyBuilder << kEncodeProjectionSection;
+            appendedStart = true;
         } else {
-            // For projection operators, we use the verbatim string encoding of the element.
-            encodeUserString(elt.toString(false,   // includeFieldName
-                                          false),  // full
-                             keyBuilder);
+            *keyBuilder << kEncodeProjectionRequirementSeparator;
         }
-
-        encodeUserString(elt.fieldName(), keyBuilder);
+        encodeUserString(requiredField, keyBuilder);
     }
 }
 }  // namespace
@@ -518,7 +518,7 @@ CanonicalQuery::QueryShapeString encode(const CanonicalQuery& cq) {
     StringBuilder keyBuilder;
     encodeKeyForMatch(cq.root(), &keyBuilder);
     encodeKeyForSort(cq.getQueryRequest().getSort(), &keyBuilder);
-    encodeKeyForProj(cq.getQueryRequest().getProj(), &keyBuilder);
+    encodeKeyForProj(cq.getProj(), &keyBuilder);
     encodeCollation(cq.getCollator(), &keyBuilder);
 
     return keyBuilder.str();
