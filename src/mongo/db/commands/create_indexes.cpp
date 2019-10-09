@@ -499,7 +499,17 @@ bool runCreateIndexesForMobile(OperationContext* opCtx,
             // commit() clears the state.
             indexer.abortWithoutCleanup(opCtx);
         }
-        indexer.cleanUpAfterBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn);
+
+        if (!indexer.isCommitted()) {
+            opCtx->recoveryUnit()->abandonSnapshot();
+            exclusiveCollectionLock.reset();
+            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+            Lock::DBLock dbLock(opCtx, ns.db(), MODE_IX);
+            Lock::CollectionLock colLock(opCtx, {dbName, collectionUUID}, MODE_X);
+            indexer.cleanUpAfterBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn);
+        } else {
+            indexer.cleanUpAfterBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn);
+        }
     });
 
     std::vector<BSONObj> indexInfoObjs =
