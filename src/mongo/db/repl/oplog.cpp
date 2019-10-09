@@ -225,6 +225,7 @@ Status abortIndexBuild(OperationContext* opCtx,
         opCtx,
         indexBuildUUID,
         str::stream() << "abortIndexBuild oplog entry encountered: " << cause);
+    IndexBuildsCoordinator::get(opCtx)->joinIndexBuild(opCtx, indexBuildUUID);
     return Status::OK();
 }
 

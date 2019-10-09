@@ -48,6 +48,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/server_options.h"
@@ -952,8 +953,22 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
                 }
             } else {
                 // We started this index build during oplog application as a secondary node.
+                Timestamp abortIndexBuildTimestamp;
+                if (status == ErrorCodes::IndexBuildAborted) {
+                    // We are on a secondary. We should be able to obtain the timestamp for cleaning
+                    // up the index build from the oplog entry unless the index build did not fail
+                    // due to processing an abortIndexBuild oplog entry. For example, a unique index
+                    // key violation would result in the index build failing on the secondary.
+                    stdx::unique_lock<Latch> lk(replState->mutex);
+                    invariant(replState->aborted, replState->buildUUID.toString());
+                    abortIndexBuildTimestamp = replState->abortTimestamp;
+                }
+
                 unlockRSTLForIndexCleanup(opCtx);
                 Lock::CollectionLock collLock(opCtx, nss, MODE_X);
+
+                // TimestampBlock is a no-op if the abort timestamp is unset.
+                TimestampBlock tsBlock(opCtx, abortIndexBuildTimestamp);
                 _indexBuildsManager.tearDownIndexBuild(
                     opCtx, collection, replState->buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
             }
