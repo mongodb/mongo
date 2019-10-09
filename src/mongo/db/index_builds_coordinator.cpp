@@ -829,15 +829,14 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
                                                  std::shared_ptr<ReplIndexBuildState> replState,
                                                  const IndexBuildOptions& indexBuildOptions) {
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-    // 'status' should always be set to something else before this function exits.
-    Status status{ErrorCodes::InternalError,
-                  "Uninitialized status value in IndexBuildsCoordinator"};
 
     // TODO(SERVER-39484): Since 'replSetAndNotPrimary' is derived from the replication state at the
     // start of the index build, this value is not resilient to member state changes like
     // stepup/stepdown.
     auto replSetAndNotPrimary = indexBuildOptions.replSetAndNotPrimary;
 
+    // This Status stays unchanged unless we catch an exception in the following try-catch block.
+    auto status = Status::OK();
     try {
         // Lock acquisition might throw, and we would still need to clean up the index build state,
         // so do it in the try-catch block
@@ -877,7 +876,6 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
             CollectionCatalog::get(opCtx).lookupCollectionByUUID(replState->collectionUUID);
         invariant(collection);
         replState->stats.numIndexesAfter = _getNumIndexesTotal(opCtx, collection);
-        status = Status::OK();
     } catch (const DBException& ex) {
         status = ex.toStatus();
     }
