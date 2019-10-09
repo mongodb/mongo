@@ -93,6 +93,31 @@ void checkShardKeyRestrictions(OperationContext* opCtx,
 }
 
 /**
+ * Signal downstream secondary nodes to abort index build.
+ */
+void onAbortIndexBuild(OperationContext* opCtx,
+                       const NamespaceString& nss,
+                       const ReplIndexBuildState& replState,
+                       const Status& cause) {
+    if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+        return;
+    }
+
+    if (serverGlobalParams.featureCompatibility.getVersion() !=
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+        return;
+    }
+
+    invariant(opCtx->lockState()->isWriteLocked(), replState.buildUUID.toString());
+
+    auto opObserver = opCtx->getServiceContext()->getOpObserver();
+    auto collUUID = replState.collectionUUID;
+    auto fromMigrate = false;
+    opObserver->onAbortIndexBuild(
+        opCtx, nss, collUUID, replState.buildUUID, replState.indexSpecs, cause, fromMigrate);
+}
+
+/**
  * Aborts the index build identified by the provided 'replIndexBuildState'.
  *
  * Sets a signal on the coordinator's repl index build state if the builder does not yet exist in
@@ -934,24 +959,16 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
                                                      << "; Database: " << replState->dbName));
         }
 
-        // Signal downstream secondary nodes to abort index build.
-        if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-            serverGlobalParams.featureCompatibility.getVersion() ==
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
-            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-            Lock::GlobalLock lock(opCtx, MODE_IX);
-            auto collUUID = replState->collectionUUID;
-            auto fromMigrate = false;
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+        Lock::GlobalLock lock(opCtx, MODE_IX);
+
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        if (replCoord->getSettings().usingReplSets() && replCoord->canAcceptWritesFor(opCtx, nss)) {
             writeConflictRetry(
                 opCtx, "onAbortIndexBuild", NamespaceString::kRsOplogNamespace.ns(), [&] {
-                    opCtx->getServiceContext()->getOpObserver()->onAbortIndexBuild(
-                        opCtx,
-                        nss,
-                        collUUID,
-                        replState->buildUUID,
-                        replState->indexSpecs,
-                        status,
-                        fromMigrate);
+                    WriteUnitOfWork wuow(opCtx);
+                    onAbortIndexBuild(opCtx, nss, *replState, status);
+                    wuow.commit();
                 });
         }
 
