@@ -237,6 +237,13 @@ public:
         return _tableId;
     }
 
+    /*
+     * Check the size information for this RecordStore. This function opens a cursor on the
+     * RecordStore to determine if it is empty. If it is empty, it will mark the collection as
+     * needing size adjustment as a result of a rollback or storage recovery event.
+     */
+    void checkSize(OperationContext* opCtx);
+
     void setSizeStorer(WiredTigerSizeStorer* ss) {
         _sizeStorer = ss;
     }
@@ -286,10 +293,17 @@ private:
                           const Timestamp* timestamps,
                           size_t nRecords);
 
-    RecordId _nextId();
-    void _setId(RecordId id);
+    RecordId _nextId(OperationContext* opCtx);
     bool cappedAndNeedDelete() const;
     RecordData _getData(const WiredTigerCursor& cursor) const;
+
+
+    /**
+     * Initialize the largest known RecordId if it is not already. This is designed to be called
+     * immediately before operations that may need this Recordid. This is to support lazily
+     * initializing the value instead of all at once during startup.
+     */
+    void _initNextIdIfNeeded(OperationContext* opCtx);
 
     /**
      * Position the cursor at the first key. The previously known first key is
@@ -358,7 +372,9 @@ private:
     int _cappedDeleteCheckCount;
     mutable stdx::timed_mutex _cappedDeleterMutex;
 
-    AtomicWord<long long> _nextIdNum;
+    // Protects initialization of the _nextIdNum.
+    mutable stdx::mutex _initNextIdMutex;
+    AtomicWord<long long> _nextIdNum{0};
 
     WiredTigerSizeStorer* _sizeStorer;  // not owned, can be NULL
     std::shared_ptr<WiredTigerSizeStorer::SizeInfo> _sizeInfo;
