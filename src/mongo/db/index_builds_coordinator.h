@@ -207,9 +207,9 @@ public:
     /**
      * Aborts a given index build by index build UUID.
      */
-    Future<void> abortIndexBuildByBuildUUID(OperationContext* opCtx,
-                                            const UUID& buildUUID,
-                                            const std::string& reason);
+    void abortIndexBuildByBuildUUID(OperationContext* opCtx,
+                                    const UUID& buildUUID,
+                                    const std::string& reason);
 
     /**
      * TODO: This is not yet implemented.

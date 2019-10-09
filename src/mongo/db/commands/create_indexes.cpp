@@ -717,24 +717,22 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
             // with the assumption that if the index build was already in the midst of tearing down,
             // this be a no-op.
             log() << "Index build interrupted: " << buildUUID << ": aborting index build.";
-            auto abortIndexFuture = indexBuildsCoord->abortIndexBuildByBuildUUID(
+            indexBuildsCoord->abortIndexBuildByBuildUUID(
                 opCtx,
                 buildUUID,
                 str::stream() << "Index build interrupted: " << buildUUID << ": "
                               << interruptionEx.toString());
-            log() << "Index build aborted: " << buildUUID << ": "
-                  << abortIndexFuture.getNoThrow(opCtx);
+            log() << "Index build aborted: " << buildUUID;
             throw;
         } catch (const ExceptionForCat<ErrorCategory::NotMasterError>& ex) {
             log() << "Index build interrupted: " << buildUUID
                   << ": aborting index build due to change in replication state.";
-            auto abortIndexFuture = indexBuildsCoord->abortIndexBuildByBuildUUID(
+            indexBuildsCoord->abortIndexBuildByBuildUUID(
                 opCtx,
                 buildUUID,
                 str::stream() << "Index build interrupted due to change in replication state: "
                               << buildUUID << ": " << ex.toString());
-            log() << "Index build aborted due to NotMaster error: " << buildUUID << ": "
-                  << abortIndexFuture.getNoThrow(opCtx);
+            log() << "Index build aborted due to NotMaster error: " << buildUUID;
             throw;
         }
 

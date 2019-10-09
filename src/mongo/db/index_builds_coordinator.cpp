@@ -355,9 +355,9 @@ Status IndexBuildsCoordinator::commitIndexBuild(OperationContext* opCtx,
     return Status::OK();
 }
 
-Future<void> IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
-                                                                const UUID& buildUUID,
-                                                                const std::string& reason) {
+void IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
+                                                        const UUID& buildUUID,
+                                                        const std::string& reason) {
     _indexBuildsManager.abortIndexBuild(buildUUID, reason);
 
     auto replStateResult = _getIndexBuild(buildUUID);
@@ -370,11 +370,6 @@ Future<void> IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext
         replState->abortReason = reason;
         replState->condVar.notify_all();
     }
-
-    auto pf = makePromiseFuture<void>();
-    auto promise = std::move(pf.promise);
-    promise.setWith([] {});
-    return std::move(pf.future);
 }
 
 void IndexBuildsCoordinator::recoverIndexBuilds() {

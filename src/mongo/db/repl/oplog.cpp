@@ -221,11 +221,11 @@ Status abortIndexBuild(OperationContext* opCtx,
                        const Status& cause,
                        OplogApplication::Mode mode) {
     // Wait until the index build finishes aborting.
-    Future<void> abort = IndexBuildsCoordinator::get(opCtx)->abortIndexBuildByBuildUUID(
+    IndexBuildsCoordinator::get(opCtx)->abortIndexBuildByBuildUUID(
         opCtx,
         indexBuildUUID,
         str::stream() << "abortIndexBuild oplog entry encountered: " << cause);
-    return abort.waitNoThrow();
+    return Status::OK();
 }
 
 void createIndexForApplyOps(OperationContext* opCtx,
