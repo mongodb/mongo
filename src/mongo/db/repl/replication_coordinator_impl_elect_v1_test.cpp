@@ -57,7 +57,7 @@ namespace {
 using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
-using ApplierState = OplogApplier::ApplierState;
+using ApplierState = ReplicationCoordinator::ApplierState;
 
 TEST_F(ReplCoordTest, RandomizedElectionOffsetWithinProperBounds) {
     BSONObj configObj = BSON("_id"
@@ -153,7 +153,7 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
     ASSERT(getReplCoord()->getMemberState().primary())
         << getReplCoord()->getMemberState().toString();
     simulateCatchUpAbort();
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Draining);
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
 
     const auto opCtxPtr = makeOperationContext();
     auto& opCtx = *opCtxPtr;
@@ -209,7 +209,7 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyNode) {
     getReplCoord()->waitForElectionFinish_forTest();
     ASSERT(getReplCoord()->getMemberState().primary())
         << getReplCoord()->getMemberState().toString();
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Draining);
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
 
     const auto opCtxPtr = makeOperationContext();
     auto& opCtx = *opCtxPtr;
@@ -2250,7 +2250,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryDoesNotNeedToCatchUp) {
 
     // Get 2 heartbeats from secondaries.
     ASSERT_EQUALS(2, count);
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Draining);
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
     stopCapturingLogMessages();
     ASSERT_EQ(1, countLogLinesContaining("Caught up to the latest optime known via heartbeats"));
     auto opCtx = makeOperationContext();
@@ -2302,9 +2302,9 @@ TEST_F(PrimaryCatchUpTest, CatchupSucceeds) {
     ASSERT_EQUALS(time2,
                   ReplicationMetrics::get(getServiceContext()).getTargetCatchupOpTime_forTesting());
 
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
     advanceMyLastAppliedOpTime(time2, Date_t() + Seconds(time2.getSecs()));
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Draining);
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Caught up to the latest known optime successfully"));
     auto opCtx = makeOperationContext();
@@ -2338,7 +2338,7 @@ TEST_F(PrimaryCatchUpTest, CatchupTimeout) {
         // Other nodes are ahead of me.
         getNet()->scheduleResponse(noi, getNet()->now(), makeHeartbeatResponse(time2));
     });
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Draining);
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Catchup timed out"));
     auto opCtx = makeOperationContext();
@@ -2377,7 +2377,7 @@ TEST_F(PrimaryCatchUpTest, CannotSeeAllNodes) {
             getNet()->scheduleResponse(noi, getNet()->now(), makeHeartbeatResponse(time1));
         }
     });
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Draining);
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
     stopCapturingLogMessages();
     ASSERT_EQ(1, countLogLinesContaining("Caught up to the latest optime known via heartbeats"));
     auto opCtx = makeOperationContext();
@@ -2417,7 +2417,7 @@ TEST_F(PrimaryCatchUpTest, HeartbeatTimeout) {
             getNet()->scheduleResponse(noi, getNet()->now(), makeHeartbeatResponse(time1));
         }
     });
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Draining);
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
     stopCapturingLogMessages();
     ASSERT_EQ(1, countLogLinesContaining("Caught up to the latest optime known via heartbeats"));
     auto opCtx = makeOperationContext();
@@ -2448,13 +2448,13 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownBeforeHeartbeatRefreshing) {
     OpTime time2(Timestamp(100, 2), 0);
     ReplSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
     // Step down immediately.
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
     TopologyCoordinator::UpdateTermResult updateTermResult;
     auto evh = getReplCoord()->updateTerm_forTest(2, &updateTermResult);
     ASSERT_TRUE(evh.isValid());
     getReplExec()->waitForEvent(evh);
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Exited primary catch-up mode"));
     ASSERT_EQUALS(0, countLogLinesContaining("Caught up to the latest"));
@@ -2495,14 +2495,14 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringCatchUp) {
     ASSERT_EQUALS(time2,
                   ReplicationMetrics::get(getServiceContext()).getTargetCatchupOpTime_forTesting());
 
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
     TopologyCoordinator::UpdateTermResult updateTermResult;
     auto evh = getReplCoord()->updateTerm_forTest(2, &updateTermResult);
     ASSERT_TRUE(evh.isValid());
     getReplExec()->waitForEvent(evh);
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
     //    replyHeartbeatsAndRunUntil(getNet()->now() + config.getCatchUpTimeoutPeriod());
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Exited primary catch-up mode"));
     ASSERT_EQUALS(0, countLogLinesContaining("Caught up to the latest"));
@@ -2544,9 +2544,9 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
         net->scheduleResponse(noi, net->now(), makeHeartbeatResponse(time2));
     });
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
     advanceMyLastAppliedOpTime(time2, Date_t() + Seconds(time2.getSecs()));
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Draining);
+    ASSERT(replCoord->getApplierState() == ApplierState::Draining);
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Caught up to the latest"));
 
@@ -2573,7 +2573,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
     ASSERT_TRUE(replCoord->getMemberState().secondary());
 
     // Step up again
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Running);
+    ASSERT(replCoord->getApplierState() == ApplierState::Running);
     simulateSuccessfulV1Voting();
     ASSERT_TRUE(replCoord->getMemberState().primary());
 
@@ -2582,14 +2582,14 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
         auto net = getNet();
         net->scheduleResponse(noi, net->now(), makeHeartbeatResponse(time2));
     });
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Draining);
+    ASSERT(replCoord->getApplierState() == ApplierState::Draining);
     {
         Lock::GlobalLock lock(opCtx.get(), MODE_IX);
         ASSERT_FALSE(replCoord->canAcceptWritesForDatabase(opCtx.get(), "test"));
     }
     signalDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Stopped);
+    ASSERT(replCoord->getApplierState() == ApplierState::Stopped);
     ASSERT_TRUE(replCoord->canAcceptWritesForDatabase(opCtx.get(), "test"));
 
     // Check that the number of elections requiring primary catchup was not incremented again.
@@ -2631,7 +2631,7 @@ TEST_F(PrimaryCatchUpTest, FreshestNodeBecomesAvailableLater) {
         }
     });
     // The node is still in catchup mode, but the target optime has been set.
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
     stopCapturingLogMessages();
     ASSERT_EQ(1, countLogLinesContaining("Heartbeats updated catchup target optime"));
     ASSERT_EQUALS(time3,
@@ -2639,7 +2639,7 @@ TEST_F(PrimaryCatchUpTest, FreshestNodeBecomesAvailableLater) {
 
     // 3) Advancing its applied optime to time 2 isn't enough.
     advanceMyLastAppliedOpTime(time2, Date_t() + Seconds(time2.getSecs()));
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
 
     // 4) After a while, the other node at time 4 becomes available. Time 4 becomes the new target.
     startCapturingLogMessages();
@@ -2653,7 +2653,7 @@ TEST_F(PrimaryCatchUpTest, FreshestNodeBecomesAvailableLater) {
         }
     });
     // The node is still in catchup mode, but the target optime has been updated.
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
     stopCapturingLogMessages();
     ASSERT_EQ(1, countLogLinesContaining("Heartbeats updated catchup target optime"));
     ASSERT_EQUALS(time4,
@@ -2661,12 +2661,12 @@ TEST_F(PrimaryCatchUpTest, FreshestNodeBecomesAvailableLater) {
 
     // 5) Advancing to time 3 isn't enough now.
     advanceMyLastAppliedOpTime(time3, Date_t() + Seconds(time3.getSecs()));
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
 
     // 6) The node catches up time 4 eventually.
     startCapturingLogMessages();
     advanceMyLastAppliedOpTime(time4, Date_t() + Seconds(time4.getSecs()));
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Draining);
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
     stopCapturingLogMessages();
     ASSERT_EQ(1, countLogLinesContaining("Caught up to the latest"));
     auto opCtx = makeOperationContext();
@@ -2718,13 +2718,13 @@ TEST_F(PrimaryCatchUpTest, InfiniteTimeoutAndAbort) {
         ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &response));
     });
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
 
     // Simulate a user initiated abort.
     ASSERT_OK(getReplCoord()->abortCatchupIfNeeded(
         ReplicationCoordinator::PrimaryCatchUpConclusionReason::
             kFailedWithReplSetAbortPrimaryCatchUpCmd));
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Draining);
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
 
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Exited primary catch-up mode"));
@@ -2756,7 +2756,7 @@ TEST_F(PrimaryCatchUpTest, ZeroTimeout) {
 
     OpTime time1(Timestamp(100, 1), 0);
     ReplSetConfig config = setUp3NodeReplSetAndRunForElection(time1, 0);
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Draining);
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Skipping primary catchup"));
     auto opCtx = makeOperationContext();
@@ -2791,12 +2791,12 @@ TEST_F(PrimaryCatchUpTest, CatchUpFailsDueToPrimaryStepDown) {
         // Other nodes are ahead of me.
         getNet()->scheduleResponse(noi, getNet()->now(), makeHeartbeatResponse(time2));
     });
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
 
     auto opCtx = makeOperationContext();
     getReplCoord()->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000));
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
 
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Exited primary catch-up mode"));

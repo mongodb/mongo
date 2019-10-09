@@ -153,6 +153,8 @@ public:
 
     Status setFollowerModeStrict(OperationContext* opCtx, const repl::MemberState&) override;
 
+    ApplierState getApplierState() override;
+
     void signalDrainComplete(OperationContext*, long long) override;
 
     Status waitForDrainFinish(Milliseconds) override;

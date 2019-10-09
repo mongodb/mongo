@@ -62,7 +62,6 @@ namespace repl {
 using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
-using ApplierState = OplogApplier::ApplierState;
 
 executor::TaskExecutor* ReplCoordTest::getReplExec() {
     return _replExec;
@@ -360,7 +359,7 @@ void ReplCoordTest::simulateSuccessfulV1ElectionWithoutExitingDrainMode(Date_t e
         hasReadyRequests = net->hasReadyRequests();
         getNet()->exitNetwork();
     }
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Draining);
+    ASSERT(replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Draining);
     ASSERT(replCoord->getMemberState().primary()) << replCoord->getMemberState().toString();
 
     IsMasterResponse imResponse;
@@ -377,7 +376,7 @@ void ReplCoordTest::simulateSuccessfulV1ElectionAt(Date_t electionTime) {
         auto opCtx = makeOperationContext();
         signalDrainComplete(opCtx.get());
     }
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Stopped);
+    ASSERT(replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Stopped);
     IsMasterResponse imResponse;
     replCoord->fillIsMasterForReplSet(&imResponse, {});
     ASSERT_TRUE(imResponse.isMaster()) << imResponse.toBSON().toString();
@@ -400,7 +399,7 @@ void ReplCoordTest::runSingleNodeElection(OperationContext* opCtx) {
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     getReplCoord()->waitForElectionFinish_forTest();
 
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Draining);
+    ASSERT(getReplCoord()->getApplierState() == ReplicationCoordinator::ApplierState::Draining);
     ASSERT(getReplCoord()->getMemberState().primary())
         << getReplCoord()->getMemberState().toString();
 

@@ -722,7 +722,6 @@ env.Library(
         'storage_interface_mock.cpp',
     ],
     LIBDEPS=[
-        'oplog_application_interface',
         'oplog_buffer_blocking_queue',
         'repl_coordinator_interface',
         'repl_settings',

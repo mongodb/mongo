@@ -484,6 +484,64 @@ public:
     virtual Status setFollowerModeStrict(OperationContext* opCtx, const MemberState& newState) = 0;
 
     /**
+     * Step-up
+     * =======
+     * On stepup, repl coord enters catch-up mode. It's the same as the secondary mode from
+     * the perspective of producer and applier, so there's nothing to do with them.
+     * When a node enters drain mode, producer state = Stopped, applier state = Draining.
+     *
+     * If the applier state is Draining, it will signal repl coord when there's nothing to apply.
+     * The applier goes into Stopped state at the same time.
+     *
+     * The states go like the following:
+     * - secondary and during catchup mode
+     * (producer: Running, applier: Running)
+     *      |
+     *      | finish catch-up, enter drain mode
+     *      V
+     * - drain mode
+     * (producer: Stopped, applier: Draining)
+     *      |
+     *      | applier signals drain is complete
+     *      V
+     * - primary is in master mode
+     * (producer: Stopped, applier: Stopped)
+     *
+     *
+     * Step-down
+     * =========
+     * The state transitions become:
+     * - primary is in master mode
+     * (producer: Stopped, applier: Stopped)
+     *      |
+     *      | step down
+     *      V
+     * - secondary mode, starting bgsync
+     * (producer: Starting, applier: Running)
+     *      |
+     *      | bgsync runs start()
+     *      V
+     * - secondary mode, normal
+     * (producer: Running, applier: Running)
+     *
+     * When a node steps down during draining mode, it's OK to change from (producer: Stopped,
+     * applier: Draining) to (producer: Starting, applier: Running).
+     *
+     * When a node steps down during catchup mode, the states remain the same (producer: Running,
+     * applier: Running).
+     */
+    enum class ApplierState { Running, Draining, Stopped };
+
+    /**
+     * In normal cases: Running -> Draining -> Stopped -> Running.
+     * Draining -> Running is also possible if a node steps down during drain mode.
+     *
+     * Only the applier can make the transition from Draining to Stopped by calling
+     * signalDrainComplete().
+     */
+    virtual ApplierState getApplierState() = 0;
+
+    /**
      * Signals that a previously requested pause and drain of the applier buffer
      * has completed.
      *

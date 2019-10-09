@@ -86,7 +86,6 @@ using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 using unittest::assertGet;
 using unittest::EnsureFCV;
-using ApplierState = OplogApplier::ApplierState;
 
 typedef ReplicationCoordinator::ReplSetReconfigArgs ReplSetReconfigArgs;
 // Helper class to wrap Timestamp as an OpTime with term 1.
@@ -1735,7 +1734,7 @@ TEST_F(StepDownTest, StepDownFailureRestoresDrainState) {
     auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
     simulateSuccessfulV1ElectionWithoutExitingDrainMode(electionTimeoutWhen);
     ASSERT_TRUE(repl->getMemberState().primary());
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Draining);
+    ASSERT(repl->getApplierState() == ReplicationCoordinator::ApplierState::Draining);
 
     {
         // We can't take writes yet since we're still in drain mode.
@@ -1760,7 +1759,7 @@ TEST_F(StepDownTest, StepDownFailureRestoresDrainState) {
     ASSERT(stepDownStatus == ErrorCodes::PrimarySteppedDown ||
            stepDownStatus == ErrorCodes::Interrupted);
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Draining);
+    ASSERT(repl->getApplierState() == ReplicationCoordinator::ApplierState::Draining);
 
     // Ensure that the failed stepdown attempt didn't make us able to take writes since we're still
     // in drain mode.
@@ -1773,7 +1772,7 @@ TEST_F(StepDownTest, StepDownFailureRestoresDrainState) {
     // Now complete drain mode and ensure that we become capable of taking writes.
     auto opCtx = makeOperationContext();
     signalDrainComplete(opCtx.get());
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Stopped);
+    ASSERT(repl->getApplierState() == ReplicationCoordinator::ApplierState::Stopped);
 
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
@@ -5696,7 +5695,7 @@ TEST_F(ReplCoordTest, WaitForDrainFinish) {
     auto timeout = Milliseconds(1);
     ASSERT_OK(replCoord->waitForMemberState(MemberState::RS_PRIMARY, timeout));
 
-    ASSERT(getExternalState()->getApplierState() == ApplierState::Draining);
+    ASSERT(replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Draining);
     ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, replCoord->waitForDrainFinish(timeout));
 
     ASSERT_EQUALS(ErrorCodes::BadValue, replCoord->waitForDrainFinish(Milliseconds(-1)));

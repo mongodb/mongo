@@ -46,31 +46,7 @@
 
 namespace mongo {
 namespace repl {
-namespace {
-/**
- * Minimal implementation of OplogApplier for testing.
- */
-class OplogApplierMock : public OplogApplier {
-    OplogApplierMock(const OplogApplierMock&) = delete;
-    OplogApplierMock& operator=(const OplogApplierMock&) = delete;
 
-public:
-    explicit OplogApplierMock(OplogApplier::Options options);
-
-    void _run(OplogBuffer* oplogBuffer) final;
-    StatusWith<OpTime> _multiApply(OperationContext* opCtx, Operations ops) final;
-};
-
-OplogApplierMock::OplogApplierMock(OplogApplier::Options options)
-    : OplogApplier(nullptr, nullptr, nullptr, options) {}
-
-void OplogApplierMock::_run(OplogBuffer* oplogBuffer) {}
-
-StatusWith<OpTime> OplogApplierMock::_multiApply(OperationContext* opCtx, Operations ops) {
-    return OpTime();
-}
-
-}  // namespace
 ReplicationCoordinatorExternalStateMock::ReplicationCoordinatorExternalStateMock()
     : _localRsConfigDocument(ErrorCodes::NoMatchingDocument, "No local config document"),
       _localRsLastVoteDocument(ErrorCodes::NoMatchingDocument, "No local lastVote document"),
@@ -81,9 +57,7 @@ ReplicationCoordinatorExternalStateMock::ReplicationCoordinatorExternalStateMock
       _storeLocalLastVoteDocumentStatus(Status::OK()),
       _storeLocalLastVoteDocumentShouldHang(false),
       _connectionsClosed(false),
-      _threadsStarted(false),
-      _oplogApplier(std::make_unique<OplogApplierMock>(
-          repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary))) {}
+      _threadsStarted(false) {}
 
 ReplicationCoordinatorExternalStateMock::~ReplicationCoordinatorExternalStateMock() {}
 
@@ -317,14 +291,6 @@ std::size_t ReplicationCoordinatorExternalStateMock::getOplogFetcherInitialSyncM
 
 void ReplicationCoordinatorExternalStateMock::setIsReadCommittedEnabled(bool val) {
     _isReadCommittedSupported = val;
-}
-
-void ReplicationCoordinatorExternalStateMock::setApplierState(const OplogApplier::ApplierState st) {
-    _oplogApplier->setApplierState(st);
-}
-
-OplogApplier::ApplierState ReplicationCoordinatorExternalStateMock::getApplierState() const {
-    return _oplogApplier->getApplierState();
 }
 
 void ReplicationCoordinatorExternalStateMock::onDrainComplete(OperationContext* opCtx) {}

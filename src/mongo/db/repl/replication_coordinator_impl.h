@@ -198,6 +198,8 @@ public:
     virtual Status setFollowerModeStrict(OperationContext* opCtx,
                                          const MemberState& newState) override;
 
+    virtual ApplierState getApplierState() override;
+
     virtual void signalDrainComplete(OperationContext* opCtx,
                                      long long termWhenBufferIsEmpty) override;
 
@@ -1376,6 +1378,8 @@ private:
 
     // Used to signal threads waiting for changes to _memberState.
     stdx::condition_variable _drainFinishedCond;  // (M)
+
+    ReplicationCoordinator::ApplierState _applierState = ApplierState::Running;  // (M)
 
     // Used to signal threads waiting for changes to _rsConfigState.
     stdx::condition_variable _rsConfigStateChange;  // (M)

@@ -35,7 +35,6 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/member_state.h"
-#include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -300,16 +299,6 @@ public:
      * tailing query on non-cancellation errors during initial sync.
      */
     virtual std::size_t getOplogFetcherInitialSyncMaxFetcherRestarts() const = 0;
-
-    /*
-     * Returns the OplogApplier's current state.
-     */
-    virtual OplogApplier::ApplierState getApplierState() const = 0;
-
-    /*
-     * Updates the OplogApplier's current state.
-     */
-    virtual void setApplierState(const OplogApplier::ApplierState st) = 0;
 
     /*
      * Creates noop writer instance. Setting the _noopWriter member is not protected by a guard,
