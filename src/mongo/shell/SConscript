@@ -43,7 +43,6 @@ js_header = env.JSHeader(
         "explainable.js",
         "explain_query.js",
         "mongo.js",
-        "mr.js",
         "query.js",
         "session.js",
         "types.js",
