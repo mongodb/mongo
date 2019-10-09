@@ -39,7 +39,27 @@
 #include "mongo/platform/windows_basic.h"  // for CONTEXT
 #endif
 
+#include "mongo/base/string_data.h"
+
 namespace mongo {
+
+/** Abstract sink onto which stacktrace is piecewise emitted. */
+class StackTraceSink {
+public:
+    StackTraceSink& operator<<(StringData v) {
+        doWrite(v);
+        return *this;
+    }
+
+    StackTraceSink& operator<<(uint64_t v) {
+        doWrite(v);
+        return *this;
+    }
+
+private:
+    virtual void doWrite(StringData v) = 0;
+    virtual void doWrite(uint64_t v) = 0;
+};
 
 // Print stack trace information to "os", default to the log stream.
 void printStackTrace(std::ostream& os);

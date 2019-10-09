@@ -153,6 +153,7 @@ baseEnv.Library(
         'util/signal_handlers_synchronous.cpp',
         'util/stacktrace.cpp',
         'util/stacktrace_${TARGET_OS_FAMILY}.cpp',
+        'util/stacktrace_json.cpp',
         'util/stacktrace_somap.cpp',
         'util/str.cpp',
         'util/system_clock_source.cpp',

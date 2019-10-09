@@ -37,15 +37,12 @@ namespace mongo {
 class SharedObjectMapInfo {
 public:
     explicit SharedObjectMapInfo(BSONObj obj);
-
-    // Optional string containing extra unwinding information in JSON form.
-    const std::string& json() const {
-        return _json;
+    const BSONObj& obj() const {
+        return _obj;
     }
 
 private:
     BSONObj _obj;
-    std::string _json;
 };
 
 // Available after the MONGO_INITIALIZER has run.

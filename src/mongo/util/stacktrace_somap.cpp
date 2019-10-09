@@ -136,12 +136,13 @@ void processNoteSegment(const dl_phdr_info& info, const ElfW(Phdr) & phdr, BSONO
 void processLoadSegment(const dl_phdr_info& info, const ElfW(Phdr) & phdr, BSONObjBuilder* soInfo) {
     if (phdr.p_offset)
         return;
-    if (phdr.p_memsz < sizeof(ElfW(Ehdr)))
+
+    ElfW(Ehdr) eHeader;
+    if (phdr.p_memsz < sizeof(eHeader))
         return;
 
     // Segment includes beginning of file and is large enough to hold the ELF header
-    ElfW(Ehdr) eHeader;
-    memcpy(&eHeader, reinterpret_cast<const char*>(info.dlpi_addr) + phdr.p_vaddr, sizeof(eHeader));
+    memcpy(&eHeader, (char*)(info.dlpi_addr + phdr.p_vaddr), sizeof(eHeader));
 
     std::string quotedFileName = "\"" + str::escape(info.dlpi_name) + "\"";
 
@@ -196,9 +197,6 @@ void processLoadSegment(const dl_phdr_info& info, const ElfW(Phdr) & phdr, BSONO
  * the "backtrace" displayed in printStackTrace to get detailed unwind information.
  */
 int outputSOInfo(dl_phdr_info* info, size_t sz, void* data) {
-    auto isSegmentMappedReadable = [](const ElfW(Phdr) & phdr) -> bool {
-        return phdr.p_flags & PF_R;
-    };
     BSONObjBuilder soInfo(reinterpret_cast<BSONArrayBuilder*>(data)->subobjStart());
     if (info->dlpi_addr)
         soInfo.append("b", integerToHex(ElfW(Addr)(info->dlpi_addr)));
@@ -207,8 +205,8 @@ int outputSOInfo(dl_phdr_info* info, size_t sz, void* data) {
 
     for (ElfW(Half) i = 0; i < info->dlpi_phnum; ++i) {
         const ElfW(Phdr) & phdr(info->dlpi_phdr[i]);
-        if (!isSegmentMappedReadable(phdr))
-            continue;
+        if (!(phdr.p_flags & PF_R))
+            continue;  // skip non-readable segments
         switch (phdr.p_type) {
             case PT_NOTE:
                 processNoteSegment(*info, phdr, &soInfo);
@@ -324,14 +322,13 @@ MONGO_INITIALIZER(ExtractSOMap)(InitializerContext*) {
     soMap << "compiledModules" << vii.modules();
 
     addOSComponentsToSoMap(&soMap);
-    _globalSharedObjectMapInfo = new SharedObjectMapInfo(soMap.done());
+    _globalSharedObjectMapInfo = new SharedObjectMapInfo(soMap.obj());
     return Status::OK();
 }
 
 }  // namespace
 
-SharedObjectMapInfo::SharedObjectMapInfo(BSONObj obj)
-    : _obj(std::move(obj)), _json(_obj.jsonString(Strict)) {}
+SharedObjectMapInfo::SharedObjectMapInfo(BSONObj obj) : _obj(std::move(obj)) {}
 
 SharedObjectMapInfo* globalSharedObjectMapInfo() {
     return _globalSharedObjectMapInfo;

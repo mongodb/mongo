@@ -48,6 +48,7 @@
 #include "mongo/platform/compiler_gcc.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/stacktrace_json.h"
 #include "mongo/util/version.h"
 
 #define MONGO_STACKTRACE_BACKEND_LIBUNWIND 1
@@ -70,15 +71,32 @@
 
 namespace mongo {
 namespace stacktrace_detail {
+namespace {
 
 constexpr int kFrameMax = 100;
 constexpr size_t kSymbolMax = 512;
 constexpr StringData kUnknownFileName = "???"_sd;
 
+class OstreamJsonSink : public StackTraceSink {
+public:
+    explicit OstreamJsonSink(std::ostream& os) : _os(os) {}
+
+private:
+    void doWrite(StringData v) override {
+        _os << v;
+    }
+    void doWrite(uint64_t v) override {
+        _os << v;
+    }
+    std::ostream& _os;
+};
+
 struct StackTraceOptions {
     bool withProcessInfo = true;
     bool withHumanReadable = true;
+    bool trimSoMap = true;  // only include the somap entries relevant to the backtrace
 };
+
 
 // E.g., for "/foo/bar/my.txt", returns "my.txt".
 StringData getBaseName(StringData path) {
@@ -116,19 +134,163 @@ public:
     virtual void advance() = 0;
 };
 
-template <typename T>
-struct Quoted {
-    explicit Quoted(const T& v) : v(v) {}
+// World's dumbest "vector". Doesn't allocate.
+template <typename T, size_t N>
+struct ArrayAndSize {
+    using iterator = typename std::array<T, N>::iterator;
+    using reference = typename std::array<T, N>::reference;
+    using const_reference = typename std::array<T, N>::const_reference;
 
-    friend std::ostream& operator<<(std::ostream& os, const Quoted& q) {
-        return os << "\"" << q.v << "\"";
+    auto begin() {
+        return _arr.begin();
+    }
+    auto end() {
+        return _arr.begin() + _n;
+    }
+    reference operator[](size_t i) {
+        return _arr[i];
     }
 
-    const T& v;
+    auto begin() const {
+        return _arr.begin();
+    }
+    auto end() const {
+        return _arr.begin() + _n;
+    }
+    const_reference operator[](size_t i) const {
+        return _arr[i];
+    }
+
+    void push_back(const T& v) {
+        _arr[_n++] = v;
+    }
+
+    std::array<T, N> _arr;
+    size_t _n = 0;
 };
 
 /**
- * Prints a stack backtrace for the current thread to the specified ostream.
+ * Iterates through the stacktrace to extract the bases addresses for each address in the
+ * stacktrace. Returns a sorted, unique sequence of these base addresses.
+ */
+ArrayAndSize<uint64_t, kFrameMax> uniqueBases(IterationIface& source) {
+    ArrayAndSize<uint64_t, kFrameMax> bases;
+    for (source.start(source.kSymbolic); !source.done(); source.advance()) {
+        const auto& f = source.deref();
+        if (f.soFile) {
+            uintptr_t base = f.soFile->base;
+            // Push base into bases keeping it sorted and unique.
+            auto ins = std::lower_bound(bases.begin(), bases.end(), base);
+            if (ins != bases.end() && *ins == base) {
+                continue;
+            } else {
+                bases.push_back(base);
+                std::rotate(ins, bases.end() - 1, bases.end());
+            }
+        }
+    }
+    return bases;
+}
+
+void printRawAddrsLine(IterationIface& source,
+                       StackTraceSink& sink,
+                       const StackTraceOptions& options) {
+    for (source.start(source.kRaw); !source.done(); source.advance()) {
+        sink << " " << Hex(source.deref().address).str();
+    }
+}
+
+void appendJsonBacktrace(IterationIface& source,
+                         CheapJson::Value& jsonRoot,
+                         const StackTraceOptions& options) {
+    CheapJson::Value frames = jsonRoot.appendKey("backtrace").appendArr();
+    for (source.start(source.kSymbolic); !source.done(); source.advance()) {
+        const auto& f = source.deref();
+        uint64_t base = f.soFile ? f.soFile->base : 0;
+        CheapJson::Value frameObj = frames.appendObj();
+        frameObj.appendKey("b").append(Hex(base).str());
+        frameObj.appendKey("o").append(Hex(f.address - base).str());
+        if (f.symbol) {
+            frameObj.appendKey("s").append(f.symbol->name);
+        }
+    }
+}
+
+/**
+ * Most elements of `bsonProcInfo` are copied verbatim into the `jsonProcInfo` Json
+ * object. But if `bases` is non-null, The "somap" BSON Array is filtered to only
+ * include elements corresponding to the addresses in `bases`.
+ */
+void printJsonProcessInfoCommon(const BSONObj& bsonProcInfo,
+                                CheapJson::Value& jsonProcInfo,
+                                const ArrayAndSize<uint64_t, kFrameMax>* bases) {
+    for (const BSONElement& be : bsonProcInfo) {
+        if (bases && be.type() == BSONType::Array) {
+            if (StringData key = be.fieldNameStringData(); key == "somap") {
+                CheapJson::Value jsonArr = jsonProcInfo.appendKey(key).appendArr();
+                for (const BSONElement& ae : be.Array()) {
+                    BSONObj bRec = ae.embeddedObject();
+                    uint64_t soBase = Hex::fromHex(bRec.getStringField("b"));
+                    if (std::binary_search(bases->begin(), bases->end(), soBase))
+                        jsonArr.append(ae);
+                }
+                continue;
+            }
+        }
+        jsonProcInfo.append(be);
+    }
+}
+
+void printJsonProcessInfoTrimmed(IterationIface& source,
+                                 const BSONObj& bsonProcInfo,
+                                 CheapJson::Value& jsonProcInfo) {
+    auto bases = uniqueBases(source);
+    printJsonProcessInfoCommon(bsonProcInfo, jsonProcInfo, &bases);
+}
+
+void appendJsonProcessInfo(IterationIface& source,
+                           CheapJson::Value& jsonRoot,
+                           const StackTraceOptions& options) {
+    if (!options.withProcessInfo)
+        return;
+    auto bsonSoMap = globalSharedObjectMapInfo();
+    if (!bsonSoMap)
+        return;
+    const BSONObj& bsonProcInfo = bsonSoMap->obj();
+    CheapJson::Value jsonProcInfo = jsonRoot.appendKey("processInfo").appendObj();
+    if (options.trimSoMap) {
+        printJsonProcessInfoTrimmed(source, bsonProcInfo, jsonProcInfo);
+    } else {
+        printJsonProcessInfoCommon(bsonProcInfo, jsonProcInfo, nullptr);
+    }
+}
+
+void printHumanReadable(IterationIface& source,
+                        StackTraceSink& sink,
+                        const StackTraceOptions& options) {
+    for (source.start(source.kSymbolic); !source.done(); source.advance()) {
+        const auto& f = source.deref();
+        sink << " ";
+        if (f.soFile) {
+            sink << getBaseName(f.soFile->name);
+            sink << "(";
+            if (f.symbol) {
+                sink << f.symbol->name << "+0x" << Hex(f.address - f.symbol->base).str();
+            } else {
+                // No symbol, so fall back to the `soFile` offset.
+                sink << "+0x" << Hex(f.address - f.soFile->base).str();
+            }
+            sink << ")";
+        } else {
+            // Not even shared object information, just punt with unknown filename (SERVER-43551)
+            sink << kUnknownFileName;
+        }
+        sink << " [0x" << Hex(f.address).str() << "]\n";
+    }
+}
+
+/**
+ * Prints a stack backtrace for the current thread to the specified sink.
  *
  * The format of the backtrace is:
  *
@@ -148,83 +310,23 @@ struct Quoted {
  * the objects referenced in the "b" fields of the "backtrace" list.
  */
 void printStackTraceGeneric(IterationIface& source,
-                            std::ostream& os,
+                            StackTraceSink& sink,
                             const StackTraceOptions& options) {
-    // TODO: make this signal-safe.
-    os << std::hex << std::uppercase;
-    auto sg = makeGuard([&] { os << std::dec << std::nouppercase; });
-    // First, just the raw backtrace addresses.
-    for (source.start(source.kRaw); !source.done(); source.advance()) {
-        const auto& f = source.deref();
-        os << ' ' << f.address;
-    }
-
-    os << "\n----- BEGIN BACKTRACE -----\n";
-
-    // Display the JSON backtrace
+    // TODO(SERVER-42670): make this asynchronous signal safe.
+    printRawAddrsLine(source, sink, options);
+    sink << "\n----- BEGIN BACKTRACE -----\n";
     {
-        os << "{";
-        os << Quoted("backtrace") << ":";
-        {
-            os << "[";
-            StringData frameComma;
-            for (source.start(source.kSymbolic); !source.done(); source.advance()) {
-                const auto& f = source.deref();
-                os << frameComma;
-                frameComma = ","_sd;
-                {
-                    os << "{";
-                    StringData fieldSep = "";
-                    auto addField = [&](StringData k, auto&& v) {
-                        os << fieldSep << Quoted(k) << ":" << Quoted(v);
-                        fieldSep = ","_sd;
-                    };
-                    if (f.soFile) {
-                        // Cast because integers obey `uppercase` and pointers don't.
-                        addField("b", f.soFile->base);
-                        addField("o", (f.address - f.soFile->base));
-                        if (f.symbol) {
-                            addField("s", f.symbol->name);
-                        }
-                    } else {
-                        addField("b", uintptr_t{0});
-                        addField("o", f.address);
-                    }
-                    os << "}";
-                }
-            }
-            os << "]";
-        }
-        if (options.withProcessInfo) {
-            if (auto soMap = globalSharedObjectMapInfo())
-                os << "," << Quoted("processInfo") << ":" << soMap->json();
-        }
-        os << "}";
+        CheapJson json{sink};
+        CheapJson::Value doc = json.doc();
+        CheapJson::Value jsonRootObj = doc.appendObj();
+        appendJsonBacktrace(source, jsonRootObj, options);
+        appendJsonProcessInfo(source, jsonRootObj, options);
     }
-    os << "\n";
-    // Display the human-readable trace
+    sink << "\n";
     if (options.withHumanReadable) {
-        for (source.start(source.kSymbolic); !source.done(); source.advance()) {
-            const auto& f = source.deref();
-            os << " ";
-            if (f.soFile) {
-                os << getBaseName(f.soFile->name);
-                os << "(";
-                if (f.symbol) {
-                    os << f.symbol->name << "+0x" << (f.address - f.symbol->base);
-                } else {
-                    // No symbol, so fall back to the `soFile` offset.
-                    os << "+0x" << (f.address - f.soFile->base);
-                }
-                os << ")";
-            } else {
-                // Not even shared object information, just punt with unknown filename.
-                os << kUnknownFileName;
-            }
-            os << " [0x" << f.address << "]\n";
-        }
+        printHumanReadable(source, sink, options);
     }
-    os << "-----  END BACKTRACE  -----\n";
+    sink << "-----  END BACKTRACE  -----\n";
 }
 
 void mergeDlInfo(AddressMetadata& f) {
@@ -252,7 +354,8 @@ void mergeDlInfo(AddressMetadata& f) {
 
 class Iteration : public IterationIface {
 public:
-    explicit Iteration(std::ostream& os, bool fromSignal) : _os(os), _fromSignal(fromSignal) {
+    explicit Iteration(StackTraceSink& sink, bool fromSignal)
+        : _sink(sink), _fromSignal(fromSignal) {
         if (int r = unw_getcontext(&_context); r < 0) {
             _os << "unw_getcontext: " << unw_strerror(r) << std::endl;
             _failed = true;
@@ -270,7 +373,7 @@ private:
         }
         int r = unw_init_local2(&_cursor, &_context, _fromSignal ? UNW_INIT_SIGNAL_FRAME : 0);
         if (r < 0) {
-            _os << "unw_init_local2: " << unw_strerror(r) << std::endl;
+            _sink << "unw_init_local2: " << unw_strerror(r) << "\n";
             _end = true;
             return;
         }
@@ -289,7 +392,7 @@ private:
         int r = unw_step(&_cursor);
         if (r <= 0) {
             if (r < 0) {
-                _os << "error: unw_step: " << unw_strerror(r) << std::endl;
+                _sink << "error: unw_step: " << unw_strerror(r) << "\n";
             }
             _end = true;
         }
@@ -302,7 +405,7 @@ private:
         _f = {};
         unw_word_t pc;
         if (int r = unw_get_reg(&_cursor, UNW_REG_IP, &pc); r < 0) {
-            _os << "unw_get_reg: " << unw_strerror(r) << std::endl;
+            _sink << "unw_get_reg: " << unw_strerror(r) << "\n";
             _end = true;
             return;
         }
@@ -315,7 +418,7 @@ private:
             unw_word_t offset;
             if (int r = unw_get_proc_name(&_cursor, _symbolBuf, sizeof(_symbolBuf), &offset);
                 r < 0) {
-                _os << "unw_get_proc_name(" << _f.address << "): " << unw_strerror(r) << std::endl;
+                _sink << "unw_get_proc_name(" << _f.address << "): " << unw_strerror(r) << "\n";
             } else {
                 _f.symbol = NameBase{_symbolBuf, _f.address - offset};
             }
@@ -323,7 +426,7 @@ private:
         }
     }
 
-    std::ostream& _os;
+    StackTraceSink& _sink;
     bool _fromSignal;
 
     Flags _flags;
@@ -339,21 +442,21 @@ private:
 };
 
 MONGO_COMPILER_NOINLINE
-void printStackTrace(std::ostream& os, bool fromSignal) {
-    Iteration iteration(os, fromSignal);
-    printStackTraceGeneric(iteration, os, StackTraceOptions{});
+void printStackTrace(StackTraceSink& sink, bool fromSignal) {
+    Iteration iteration(sink, fromSignal);
+    printStackTraceGeneric(iteration, sink, StackTraceOptions{});
 }
 
 #elif MONGO_STACKTRACE_BACKEND == MONGO_STACKTRACE_BACKEND_EXECINFO
 
 class Iteration : public IterationIface {
 public:
-    explicit Iteration(std::ostream& os, bool fromSignal) {
+    explicit Iteration(StackTraceSink& sink, bool fromSignal) {
         _n = ::backtrace(_addresses.data(), _addresses.size());
         if (_n == 0) {
             int err = errno;
-            os << "Unable to collect backtrace addresses (errno: " << err << ' ' << strerror(err)
-               << ')' << std::endl;
+            sink << "Unable to collect backtrace addresses (errno: " << err << " " << strerror(err)
+                 << ")\n";
             return;
         }
     }
@@ -394,30 +497,33 @@ private:
 };
 
 MONGO_COMPILER_NOINLINE
-void printStackTrace(std::ostream& os, bool fromSignal) {
-    Iteration iteration(os, fromSignal);
-    printStackTraceGeneric(iteration, os, StackTraceOptions{});
+void printStackTrace(StackTraceSink& sink, bool fromSignal) {
+    Iteration iteration(sink, fromSignal);
+    printStackTraceGeneric(iteration, sink, StackTraceOptions{});
 }
 
 #elif MONGO_STACKTRACE_BACKEND == MONGO_STACKTRACE_BACKEND_NONE
 
 MONGO_COMPILER_NOINLINE
-void printStackTrace(std::ostream& os, bool fromSignal) {
-    os << "This platform does not support printing stacktraces" << std::endl;
+void printStackTrace(StackTraceSink& sink, bool fromSignal) {
+    sink << "This platform does not support printing stacktraces\n";
 }
 
 #endif  // MONGO_STACKTRACE_BACKEND
 
+}  // namespace
 }  // namespace stacktrace_detail
 
 MONGO_COMPILER_NOINLINE
 void printStackTrace(std::ostream& os) {
-    stacktrace_detail::printStackTrace(os, false);
+    stacktrace_detail::OstreamJsonSink sink{os};
+    stacktrace_detail::printStackTrace(sink, false);
 }
 
 MONGO_COMPILER_NOINLINE
 void printStackTraceFromSignal(std::ostream& os) {
-    stacktrace_detail::printStackTrace(os, true);
+    stacktrace_detail::OstreamJsonSink sink{os};
+    stacktrace_detail::printStackTrace(sink, true);
 }
 
 }  // namespace mongo
