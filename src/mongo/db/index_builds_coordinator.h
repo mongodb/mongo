@@ -139,10 +139,9 @@ public:
         const UUID& buildUUID);
 
     /**
-     * TODO: not yet implemented.
+     * Waits for the index build identified by 'buildUUID' to complete.
      */
-    Future<void> joinIndexBuilds(const NamespaceString& nss,
-                                 const std::vector<BSONObj>& indexSpecs);
+    void joinIndexBuild(OperationContext* opCtx, const UUID& buildUUID);
 
     /**
      * Commits the index build identified by 'buildUUID'.

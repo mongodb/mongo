@@ -279,12 +279,14 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::startIndexRe
     return _runIndexRebuildForRecovery(opCtx, collection, indexCatalogStats, buildUUID);
 }
 
-Future<void> IndexBuildsCoordinator::joinIndexBuilds(const NamespaceString& nss,
-                                                     const std::vector<BSONObj>& indexSpecs) {
-    // TODO: implement. This code is just to make it compile.
-    auto pf = makePromiseFuture<void>();
-    auto promise = std::move(pf.promise);
-    return std::move(pf.future);
+void IndexBuildsCoordinator::joinIndexBuild(OperationContext* opCtx, const UUID& buildUUID) {
+    auto replStateResult = _getIndexBuild(buildUUID);
+    if (!replStateResult.isOK()) {
+        return;
+    }
+    auto replState = replStateResult.getValue();
+    auto fut = replState->sharedPromise.getFuture();
+    log() << "Index build joined: " << buildUUID << ": " << fut.waitNoThrow(opCtx);
 }
 
 void IndexBuildsCoordinator::waitForAllIndexBuildsToStopForShutdown() {
