@@ -5,7 +5,6 @@
  * @tags: [
  *   requires_document_locking,
  *   requires_replication,
- *   two_phase_index_builds_unsupported,
  *   uses_prepare_transaction,
  *   uses_transactions,
  *   ]

@@ -324,14 +324,24 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
     // This will prevent hybrid index builds from corrupting an index on secondary nodes if a
     // prepared transaction becomes prepared during a build but commits after the index build
     // commits.
-    for (const auto& op : ops) {
-        auto ns = op.getNss();
-        auto uuid = *op.getUuid();
-        if (BackgroundOperation::inProgForNs(ns)) {
-            warning() << "blocking replication until index builds are finished on "
-                      << redact(ns.toString()) << ", due to prepared transaction";
-            BackgroundOperation::awaitNoBgOpInProgForNs(ns);
-            IndexBuildsCoordinator::get(opCtx)->awaitNoIndexBuildInProgressForCollection(uuid);
+    // When two-phase index builds are in use, this is both unnecessary and unsafe. Due to locking,
+    // we can guarantee that a transaction prepared on a primary during an index build will always
+    // commit before that index build completes. Because two-phase index builds replicate start and
+    // commit oplog entries, it will never be possible to replicate a prepared transaction, commit
+    // an index build, then commit the transaction, the bug described above.
+    // This blocking behavior can also introduce a deadlock with two-phase index builds on
+    // a secondary if a prepared transaction blocks on an index build, but the index build can't
+    // re-acquire its X lock because of the transaction.
+    if (!IndexBuildsCoordinator::get(opCtx)->supportsTwoPhaseIndexBuild()) {
+        for (const auto& op : ops) {
+            auto ns = op.getNss();
+            auto uuid = *op.getUuid();
+            if (BackgroundOperation::inProgForNs(ns)) {
+                warning() << "blocking replication until index builds are finished on "
+                          << redact(ns.toString()) << ", due to prepared transaction";
+                BackgroundOperation::awaitNoBgOpInProgForNs(ns);
+                IndexBuildsCoordinator::get(opCtx)->awaitNoIndexBuildInProgressForCollection(uuid);
+            }
         }
     }
 
