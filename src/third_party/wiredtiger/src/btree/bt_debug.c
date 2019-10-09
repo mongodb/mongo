@@ -722,7 +722,7 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
 		}
 	if (mod != NULL)
 		WT_RET(
-		    ds->f(ds, ", write generation=%" PRIu32, mod->write_gen));
+		    ds->f(ds, ", page-state=%" PRIu32, mod->page_state));
 	WT_RET(ds->f(ds, "\n"));
 
 	return (0);
