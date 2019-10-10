@@ -2252,8 +2252,10 @@ TEST_F(TransactionCoordinatorMetricsTest, SlowLogLineIncludesTerminationCauseFor
     stopCapturingLogMessages();
 
     ASSERT_EQUALS(1, countLogLinesContaining("terminationCause:aborted"));
-    ASSERT_EQUALS(1,
-                  countLogLinesContaining("terminationDetails: NoSuchTransaction: from shard s2"));
+    ASSERT_EQUALS(
+        1,
+        countLogLinesContaining("terminationDetails: NoSuchTransaction: from shard s1") +
+            countLogLinesContaining("terminationDetails: NoSuchTransaction: from shard s2"));
 }
 
 TEST_F(TransactionCoordinatorMetricsTest, SlowLogLineIncludesNumParticipants) {
