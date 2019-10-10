@@ -1075,6 +1075,7 @@ void IndexBuildsCoordinator::_buildIndex(
         hangAfterIndexBuildSecondDrain.pauseWhileSet();
     }
 
+    Timestamp commitIndexBuildTimestamp;
     if (supportsTwoPhaseIndexBuild() && indexBuildOptions.replSetAndNotPrimary &&
         IndexBuildProtocol::kTwoPhase == replState->protocol) {
 
@@ -1097,6 +1098,7 @@ void IndexBuildsCoordinator::_buildIndex(
             log() << "Committing index build: " << replState->buildUUID
                   << ", timestamp: " << replState->commitTimestamp
                   << ", collection UUID: " << replState->collectionUUID;
+            commitIndexBuildTimestamp = replState->commitTimestamp;
             invariant(!replState->aborted, replState->buildUUID.toString());
         } else if (replState->aborted) {
             log() << "Aborting index build: " << replState->buildUUID
@@ -1165,6 +1167,7 @@ void IndexBuildsCoordinator::_buildIndex(
     };
 
     // Commit index build.
+    TimestampBlock tsBlock(opCtx, commitIndexBuildTimestamp);
     uassertStatusOK(_indexBuildsManager.commitIndexBuild(
         opCtx, collection, collection->ns(), replState->buildUUID, onCreateEachFn, onCommitFn));
 

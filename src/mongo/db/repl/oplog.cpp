@@ -214,6 +214,7 @@ Status commitIndexBuild(OperationContext* opCtx,
     }
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     indexBuildsCoord->commitIndexBuild(opCtx, statusWithIndexes.getValue(), indexBuildUUID);
+    indexBuildsCoord->joinIndexBuild(opCtx, indexBuildUUID);
     return Status::OK();
 }
 
