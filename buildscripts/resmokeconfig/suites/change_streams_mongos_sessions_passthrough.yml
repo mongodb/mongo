@@ -54,7 +54,6 @@ executor:
         enableTestCommands: 1
         periodicNoopIntervalSecs: 1
         writePeriodicNoops: true
-    num_rs_nodes_per_shard: 1
     # This test suite doesn't actually shard any collections, but enabling sharding will prevent
     # read commands against non-existent databases from unconditionally returning a CursorId of 0.
     enable_sharding:

@@ -40,4 +40,7 @@ executor:
         enableTestCommands: 1
         writePeriodicNoops: 1
       verbose: ''
+    # TODO: SERVER-43927 Make jstestfuzz_sharded and jstestfuzz_sharded_session suite start
+    # shards as replica sets.
+    num_rs_nodes_per_shard: null
     num_shards: 2

@@ -24,7 +24,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
 
     def __init__(  # pylint: disable=too-many-arguments,too-many-locals
             self, logger, job_num, mongos_executable=None, mongos_options=None, mongod_options=None,
-            dbpath_prefix=None, preserve_dbpath=False, num_shards=1, num_rs_nodes_per_shard=None,
+            dbpath_prefix=None, preserve_dbpath=False, num_shards=1, num_rs_nodes_per_shard=1,
             num_mongos=1, enable_sharding=None, enable_balancer=True, enable_autosplit=True,
             auth_options=None, configsvr_options=None, shard_options=None, mixed_bin_versions=None):
         """Initialize ShardedClusterFixture with different options for the cluster processes."""

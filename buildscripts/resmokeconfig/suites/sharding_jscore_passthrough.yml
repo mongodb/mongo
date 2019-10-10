@@ -84,5 +84,8 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+    # TODO: SERVER-43892 Make sharding_jscore_op_query_passthrough and sharding_jscore_passthrough start
+    # shards as replica sets by default.
+    num_rs_nodes_per_shard: null
     enable_sharding:
     - test
