@@ -541,7 +541,10 @@ class EvergreenConfigGenerator(object):
         self.task_names.append(sub_task_name)
         task = self.evg_config.task(sub_task_name)
 
-        target_suite_file = os.path.join(target_dir, os.path.basename(sub_suite_name))
+        # Evergreen always uses a unix shell, even on Windows, so instead of using os.path.join
+        # here, just use the forward slash; otherwise the path separator will be treated as
+        # the escape character on Windows.
+        target_suite_file = '/'.join([target_dir, os.path.basename(sub_suite_name)])
         run_tests_vars = self._get_run_tests_vars(target_suite_file)
 
         use_multiversion = self.options.use_multiversion

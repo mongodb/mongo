@@ -557,6 +557,7 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
         options.use_multiversion = False
         options.is_patch = True
         options.repeat_suites = 1
+        options.generated_config_dir = "config_dir"
 
         return options
 
