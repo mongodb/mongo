@@ -36,7 +36,6 @@ assertChangeStreamNotSupportedOnConnection(conn);
 assert.eq(0, MongoRunner.stopMongod(conn));
 
 // Test a sharded cluster with standalone shards.
-// TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
 const clusterWithStandalones = new ShardingTest({
     shards: 2,
     other: {shardOptions: {enableMajorityReadConcern: ""}},

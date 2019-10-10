@@ -115,7 +115,8 @@ function mixedShardTest(options1, options2, shouldSucceed) {
         // authorized to do if auth is enabled.
         //
         // Once SERVER-14017 is fixed the "enableBalancer" line can be removed.
-        // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
+        // TODO: SERVER-43899 Make sharding_with_x509.js and mixed_mode_sharded_transition.js start
+        // shards as replica sets.
         var st = new ShardingTest({
             mongos: [options1],
             config: [options1],

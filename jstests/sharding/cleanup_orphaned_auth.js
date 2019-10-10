@@ -23,11 +23,7 @@ function assertUnauthorized(res, msg) {
     doassert(finalMsg);
 }
 
-// TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
-var st = new ShardingTest({
-    auth: true,
-    other: {keyFile: 'jstests/libs/key1', useHostname: false, shardAsReplicaSet: false}
-});
+var st = new ShardingTest({auth: true, other: {keyFile: 'jstests/libs/key1', useHostname: false}});
 
 var shardAdmin = st.shard0.getDB('admin');
 shardAdmin.createUser({user: 'admin', pwd: 'x', roles: ['clusterAdmin', 'userAdminAnyDatabase']});

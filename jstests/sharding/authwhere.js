@@ -27,13 +27,8 @@ function assertInsert(collection, obj) {
     assert.commandWorked(collection.insert(obj));
 }
 
-// TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
-var cluster = new ShardingTest({
-    name: "authwhere",
-    shards: 1,
-    mongos: 1,
-    other: {keyFile: 'jstests/libs/key1', shardAsReplicaSet: false}
-});
+var cluster = new ShardingTest(
+    {name: "authwhere", shards: 1, mongos: 1, other: {keyFile: 'jstests/libs/key1'}});
 
 // Set up the test data.
 (function() {

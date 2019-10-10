@@ -108,7 +108,6 @@ jsTestLog("2. Testing disabling x.509 auth with roles");
 
 print("3. Testing x.509 auth to mongos");
 {
-    // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
     let st = new ShardingTest({
         shards: 1,
         mongos: 1,
@@ -117,8 +116,7 @@ print("3. Testing x.509 auth to mongos");
             configOptions: x509_options,
             mongosOptions: x509_options,
             shardOptions: x509_options,
-            useHostname: false,
-            shardAsReplicaSet: false
+            useHostname: false
         }
     });
 
@@ -131,7 +129,6 @@ print("4. Testing x.509 auth to mongos with x509 roles disabled");
 {
     const localOptions =
         Object.merge(x509_options, {setParameter: "allowRolesFromX509Certificates=false"});
-    // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
     let st = new ShardingTest({
         shards: 1,
         mongos: 1,
@@ -140,8 +137,7 @@ print("4. Testing x.509 auth to mongos with x509 roles disabled");
             configOptions: localOptions,
             mongosOptions: localOptions,
             shardOptions: localOptions,
-            useHostname: false,
-            shardAsReplicaSet: false
+            useHostname: false
         }
     });
 

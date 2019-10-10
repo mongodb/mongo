@@ -16,11 +16,8 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 (function() {
 'use strict';
 
-// TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
-var st = new ShardingTest({
-    shards: 2,
-    other: {keyFile: 'jstests/libs/key1', useHostname: true, chunkSize: 1, shardAsReplicaSet: false}
-});
+var st = new ShardingTest(
+    {shards: 2, other: {keyFile: 'jstests/libs/key1', useHostname: true, chunkSize: 1}});
 
 var mongos = st.s;
 var adminDB = mongos.getDB('admin');
@@ -31,7 +28,7 @@ adminDB.createUser({user: 'admin', pwd: 'password', roles: jsTest.adminUserRoles
 adminDB.auth('admin', 'password');
 
 adminDB.runCommand({enableSharding: "test"});
-st.ensurePrimaryShard('test', 'shard0001');
+st.ensurePrimaryShard('test', st.shard1.shardName);
 adminDB.runCommand({shardCollection: "test.foo", key: {x: 1}});
 
 for (var i = 0; i < 100; i++) {
@@ -45,8 +42,8 @@ adminDB.runCommand({moveChunk: "test.foo", find: {x: 25}, to: otherShard, _waitF
 
 st.printShardingStatus();
 
-MongoRunner.stopMongod(st.shard0);
-st.shard0 = MongoRunner.runMongod({restart: st.shard0});
+st.rs0.stopSet(undefined, true);
+st.rs0.startSet({}, true);
 
 // May fail the first couple times due to socket exceptions
 assert.soon(function() {

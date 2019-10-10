@@ -19,8 +19,6 @@ load("jstests/replsets/rslib.js");
 // briefly authenticates as __system and recieves clusterTime metadata then will fail trying to
 // gossip that time later in setup.
 //
-// TODO SERVER-32672: remove this flag.
-TestData.skipGossipingClusterTime = true;
 
 /**
  * Checks if a query to the given collection will be routed to the secondary. Returns true if
@@ -39,9 +37,7 @@ function doesRouteToSec(coll, query) {
 }
 
 var rsOpts = {oplogSize: 50};
-// TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
-var st = new ShardingTest(
-    {shards: 1, rs: rsOpts, other: {keyFile: 'jstests/libs/key1', shardAsReplicaSet: false}});
+var st = new ShardingTest({shards: 1, rs: rsOpts, other: {keyFile: 'jstests/libs/key1'}});
 
 var mongos = st.s;
 var replTest = st.rs0;

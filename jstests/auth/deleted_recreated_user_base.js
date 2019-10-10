@@ -1,10 +1,8 @@
-// Test that sessions can not be resumed by deleted and recreated user.
-
-(function() {
 'use strict';
 
 const kInvalidationIntervalSecs = 5;
 
+// Test that sessions cannot be resumed by deleted and recreated user.
 function runTest(s0, s1) {
     assert(s0);
     assert(s1);
@@ -51,24 +49,3 @@ function runTest(s0, s1) {
         assert.throws(() => admin.mycoll.find({}).toArray(), [], "Able to find after recreate");
     assert.eq(thrown.code, ErrorCodes.Unauthorized, "Threw something other than unauthorized");
 }
-
-const mongod = MongoRunner.runMongod({auth: ''});
-runTest(mongod, mongod);
-MongoRunner.stopMongod(mongod);
-
-// TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
-const st = new ShardingTest({
-    shards: 1,
-    mongos: 2,
-    config: 1,
-    other: {
-        keyFile: 'jstests/libs/key1',
-        shardAsReplicaSet: false,
-        mongosOptions: {
-            setParameter: 'userCacheInvalidationIntervalSecs=' + kInvalidationIntervalSecs,
-        },
-    },
-});
-runTest(st.s0, st.s1);
-st.stop();
-})();

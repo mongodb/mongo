@@ -1,11 +1,9 @@
 (function() {
 'use strict';
 
-// TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
 var st = new ShardingTest({
     shards: 2,
-    other:
-        {chunkSize: 1, useHostname: true, keyFile: 'jstests/libs/key1', shardAsReplicaSet: false},
+    other: {chunkSize: 1, useHostname: true, keyFile: 'jstests/libs/key1'},
 });
 
 var mongos = st.s;

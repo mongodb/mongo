@@ -32,12 +32,8 @@ function assertAcceptsValidLogicalTime(db) {
 }
 
 // Start the sharding test with auth on.
-// TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
-const st = new ShardingTest({
-    mongos: 1,
-    manualAddShard: true,
-    other: {keyFile: "jstests/libs/key1", shardAsReplicaSet: false}
-});
+const st =
+    new ShardingTest({mongos: 1, manualAddShard: true, other: {keyFile: "jstests/libs/key1"}});
 
 // Create admin user and authenticate as them.
 st.s.getDB("admin").createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles});
@@ -47,7 +43,6 @@ st.s.getDB("admin").auth("foo", "bar");
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet({keyFile: "jstests/libs/key1", shardsvr: ""});
 
-// TODO: Wait for stable recovery timestamp when SERVER-32672 is fixed.
 rst.initiateWithAnyNodeAsPrimary(
     null, "replSetInitiate", {doNotWaitForStableRecoveryTimestamp: true});
 assert.commandWorked(st.s.adminCommand({addShard: rst.getURL()}));

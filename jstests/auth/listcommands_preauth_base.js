@@ -1,8 +1,6 @@
-// Make sure that listCommands doesn't require authentication.
-
-(function() {
 'use strict';
 
+// Make sure that listCommands doesn't require authentication.
 function runTest(conn) {
     const admin = conn.getDB('admin');
 
@@ -19,18 +17,3 @@ function runTest(conn) {
     // listCommands should STILL work, because it does not require auth.
     assert.commandWorked(admin.runCommand({listCommands: 1}), "listCommands should work pre-auth");
 }
-
-const mongod = MongoRunner.runMongod({auth: ""});
-runTest(mongod);
-MongoRunner.stopMongod(mongod);
-
-// TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
-const st = new ShardingTest({
-    shards: 1,
-    mongos: 1,
-    config: 1,
-    other: {keyFile: 'jstests/libs/key1', shardAsReplicaSet: false}
-});
-runTest(st.s0);
-st.stop();
-})();

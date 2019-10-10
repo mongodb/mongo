@@ -15,8 +15,6 @@ load("jstests/replsets/rslib.js");
 // briefly authenticates as __system and recieves clusterTime metadata then will fail trying to
 // gossip that time later in setup.
 //
-// TODO SERVER-32672: remove this flag.
-TestData.skipGossipingClusterTime = true;
 
 var st = new ShardingTest({
     shards: 2,

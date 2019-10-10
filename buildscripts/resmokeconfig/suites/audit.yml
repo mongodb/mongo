@@ -3,9 +3,6 @@ test_kind: js_test
 selector:
   roots:
   - src/mongo/db/modules/*/jstests/audit/*.js
-  exclude_files:
-  # TODO SERVER-32672: ShardingTest with keyfile and replica set shards fails.
-  - src/mongo/db/modules/*/jstests/audit/audit_read_from_sharded_secondaries.js
 
 # audit tests start their own mongod's.
 executor:

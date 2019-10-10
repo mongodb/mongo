@@ -21,8 +21,6 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 // authenticates as __system and recieves clusterTime metadata then will fail trying to gossip that
 // time later in setup.
 //
-// TODO SERVER-32672: remove this flag.
-TestData.skipGossipingClusterTime = true;
 
 // TODO SERVER-35447: Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;

@@ -1,8 +1,6 @@
-// Auth tests for the listDatabases command.
-
-(function() {
 'use strict';
 
+// Auth test the listDatabases command.
 function runTest(mongod) {
     const admin = mongod.getDB('admin');
     admin.createUser({user: 'admin', pwd: 'pass', roles: jsTest.adminUserRoles});
@@ -148,20 +146,3 @@ function runTest(mongod) {
         admin.logout();
     });
 }
-
-const mongod = MongoRunner.runMongod({auth: ""});
-runTest(mongod);
-MongoRunner.stopMongod(mongod);
-
-if (jsTest.options().storageEngine !== "mobile") {
-    // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
-    const st = new ShardingTest({
-        shards: 1,
-        mongos: 1,
-        config: 1,
-        other: {keyFile: 'jstests/libs/key1', shardAsReplicaSet: false}
-    });
-    runTest(st.s0);
-    st.stop();
-}
-})();

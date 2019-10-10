@@ -15,8 +15,6 @@ TestData.disableImplicitSessions = true;
 
 load("jstests/multiVersion/libs/multi_rs.js");
 
-// TODO SERVER-32672: remove this flag.
-TestData.skipGossipingClusterTime = true;
 const keyFile = 'jstests/libs/key1';
 const adminUser = {
     db: "admin",

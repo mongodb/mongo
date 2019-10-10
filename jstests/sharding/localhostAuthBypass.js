@@ -178,7 +178,6 @@ var setupSharding = function(shardingTest) {
 };
 
 var start = function() {
-    // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
     return new ShardingTest({
         auth: "",
         shards: numShards,
@@ -187,7 +186,6 @@ var start = function() {
             chunkSize: 1,
             useHostname:
                 false,  // Must use localhost to take advantage of the localhost auth bypass
-            shardAsReplicaSet: false
         }
     });
 };
@@ -208,10 +206,7 @@ var shutdown = function(st) {
     }
 
     for (var i = 0; i < st._connections.length; i++) {
-        var conn = st["shard" + i];
-        MongoRunner.stopMongod(conn,
-                               /*signal*/ false,
-                               {auth: {user: username, pwd: password}});
+        st["rs" + i].stopSet(/*signal*/ false, {auth: {user: username, pwd: password}});
     }
 
     for (var i = 0; i < st._configServers.length; i++) {

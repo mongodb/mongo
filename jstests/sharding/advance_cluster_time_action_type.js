@@ -8,14 +8,7 @@
 // TODO SERVER-35447: Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 
-// TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
-let st = new ShardingTest({
-    mongos: 1,
-    config: 1,
-    shards: 1,
-    keyFile: 'jstests/libs/key1',
-    other: {shardAsReplicaSet: false}
-});
+let st = new ShardingTest({mongos: 1, config: 1, shards: 1, keyFile: 'jstests/libs/key1'});
 
 let adminDB = st.s.getDB('admin');
 

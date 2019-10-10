@@ -5,7 +5,7 @@
 
 "use strict";
 
-// TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
+// TODO: SERVER-43938 Make auth_sharding_cmd_metadata.js start shards as replica sets.
 var st =
     new ShardingTest({shards: 1, other: {keyFile: 'jstests/libs/key1', shardAsReplicaSet: false}});
 

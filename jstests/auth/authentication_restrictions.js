@@ -194,7 +194,6 @@ testConnection(rst.getPrimary(), rst.getSecondary(), awaitReplication, awaitRepl
 rst.stopSet();
 
 print("Testing sharded cluster");
-// TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
 var st = new ShardingTest({
     mongos: 2,
     config: 3,
@@ -203,8 +202,7 @@ var st = new ShardingTest({
     other: {
         mongosOptions: {bind_ip_all: "", auth: null},
         configOptions: {auth: null},
-        shardOptions: {auth: null},
-        shardAsReplicaSet: false
+        shardOptions: {auth: null}
     }
 });
 testConnection(st.s0,

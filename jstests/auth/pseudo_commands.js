@@ -17,6 +17,8 @@ function runTest(conn) {
     admin.createUser({user: 'spencer', pwd: 'pwd', roles: ['myRole']});
 
     var db = conn.getDB('admin');
+    db.auth('admin', 'pwd');
+    var arbitraryShard = db.getSiblingDB("config").shards.findOne();
     db.auth('spencer', 'pwd');
 
     /**
@@ -115,7 +117,7 @@ function runTest(conn) {
             try {
                 var opid;
                 if (isMongos(db)) {  // opid format different between mongos and mongod
-                    opid = "shard0000:1234";
+                    opid = arbitraryShard._id + ":1234";
                 } else {
                     opid = 1234;
                 }
@@ -191,8 +193,6 @@ runTest(conn);
 MongoRunner.stopMongod(conn);
 
 jsTest.log('Test sharding');
-// TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
-var st = new ShardingTest(
-    {shards: 2, config: 3, keyFile: 'jstests/libs/key1', other: {shardAsReplicaSet: false}});
+var st = new ShardingTest({shards: 2, config: 3, keyFile: 'jstests/libs/key1'});
 runTest(st.s);
 st.stop();

@@ -1,6 +1,3 @@
-// All tests for the $listLocalSessions aggregation stage.
-
-(function() {
 'use strict';
 load('jstests/aggregation/extras/utils.js');
 
@@ -8,6 +5,7 @@ load('jstests/aggregation/extras/utils.js');
 // implicit sessions.
 TestData.disableImplicitSessions = true;
 
+// All tests for the $listLocalSessions aggregation stage.
 function runListLocalSessionsTest(mongod) {
     assert(mongod);
     const admin = mongod.getDB('admin');
@@ -58,18 +56,3 @@ function runListLocalSessionsTest(mongod) {
                     [{'$listLocalSessions': {users: [{user: "user1", db: "test"}]}}],
                     ErrorCodes.Unauthorized);
 }
-
-const mongod = MongoRunner.runMongod({auth: ""});
-runListLocalSessionsTest(mongod);
-MongoRunner.stopMongod(mongod);
-
-// TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
-const st = new ShardingTest({
-    shards: 1,
-    mongos: 1,
-    config: 1,
-    other: {keyFile: 'jstests/libs/key1', shardAsReplicaSet: false}
-});
-runListLocalSessionsTest(st.s0);
-st.stop();
-})();

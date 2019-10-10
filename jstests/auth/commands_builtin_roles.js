@@ -162,7 +162,8 @@ authCommandsLib.runTests(conn, impls);
 MongoRunner.stopMongod(conn);
 
 // run all tests sharded
-// TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
+// TODO: SERVER-43897 Make commands_user_defined_roles.js and commands_builtin_roles.js start shards
+// as replica sets.
 conn = new ShardingTest({
     shards: 2,
     mongos: 1,

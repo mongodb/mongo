@@ -8,9 +8,6 @@
 
 load("jstests/libs/fixture_helpers.js");  // For isMongos.
 
-// TODO SERVER-32672: remove the 'skipGossipingClusterTime' flag.
-TestData.skipGossipingClusterTime = true;
-
 // Create a new sharded cluster for testing and enable auth.
 const key = "jstests/libs/key1";
 const st = new ShardingTest({name: jsTestName(), keyFile: key, shards: 1});

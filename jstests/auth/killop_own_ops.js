@@ -145,9 +145,7 @@ var conn = MongoRunner.runMongod({auth: ""});
 runTest(conn, "setYieldAllLocksHang");
 MongoRunner.stopMongod(conn);
 
-// TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
-var st =
-    new ShardingTest({shards: 1, keyFile: 'jstests/libs/key1', other: {shardAsReplicaSet: false}});
+var st = new ShardingTest({shards: 1, keyFile: 'jstests/libs/key1'});
 // Use a different failpoint in the sharded version, since the mongos does not have a
 // setYieldAlllocksHang failpoint.
 runTest(st.s, "waitInFindBeforeMakingBatch");
