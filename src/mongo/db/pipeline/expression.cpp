@@ -145,9 +145,9 @@ intrusive_ptr<Expression> Expression::parseExpression(
     // version.
     auto& entry = it->second;
     uassert(ErrorCodes::QueryFeatureNotAllowed,
-            // TODO SERVER-31968 we would like to include the current version and the required
-            // minimum version in this error message, but using
-            // FeatureCompatibilityVersion::toString() would introduce a dependency cycle.
+            // We would like to include the current version and the required minimum version in this
+            // error message, but using FeatureCompatibilityVersion::toString() would introduce a
+            // dependency cycle (see SERVER-31968).
             str::stream() << opName
                           << " is not allowed in the current feature compatibility version. See "
                           << feature_compatibility_version_documentation::kCompatibilityLink
