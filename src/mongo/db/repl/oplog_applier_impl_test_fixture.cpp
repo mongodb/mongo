@@ -204,22 +204,16 @@ Status OplogApplierImplTest::runOpSteadyState(const OplogEntry& op) {
 }
 
 Status OplogApplierImplTest::runOpsSteadyState(std::vector<OplogEntry> ops) {
-    OplogApplierImpl oplogApplier(
-        nullptr,  // executor
-        nullptr,  // oplogBuffer
-        nullptr,  // observer
-        nullptr,  // replCoord
+    TestApplyOplogGroupApplier oplogApplier(
         getConsistencyMarkers(),
         getStorageInterface(),
-        OplogApplierImpl::ApplyGroupFunc(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
-        nullptr);
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary));
     MultiApplier::OperationPtrs opsPtrs;
     for (auto& op : ops) {
         opsPtrs.push_back(&op);
     }
     WorkerMultikeyPathInfo pathInfo;
-    return applyOplogGroup(_opCtx.get(), &opsPtrs, &oplogApplier, &pathInfo);
+    return oplogApplier.applyOplogGroup(_opCtx.get(), &opsPtrs, &pathInfo);
 }
 
 Status OplogApplierImplTest::runOpInitialSync(const OplogEntry& op) {
@@ -237,7 +231,6 @@ Status OplogApplierImplTest::runOpsInitialSync(std::vector<OplogEntry> ops) {
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         storageInterface,
-        applyOplogGroup,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kInitialSync),
         writerPool.get());
     // Idempotency tests apply the same batch of oplog entries multiple times in a loop, which would

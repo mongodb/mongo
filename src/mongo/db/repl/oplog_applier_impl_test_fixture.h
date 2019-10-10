@@ -45,6 +45,26 @@ class BSONObj;
 class OperationContext;
 
 namespace repl {
+
+/**
+ * Test only subclass of OplogApplierImpl that makes applyOplogGroup a public method.
+ */
+class TestApplyOplogGroupApplier : public OplogApplierImpl {
+public:
+    TestApplyOplogGroupApplier(ReplicationConsistencyMarkers* consistencyMarkers,
+                               StorageInterface* storageInterface,
+                               const OplogApplier::Options& options)
+        : OplogApplierImpl(nullptr,
+                           nullptr,
+                           nullptr,
+                           nullptr,
+                           consistencyMarkers,
+                           storageInterface,
+                           options,
+                           nullptr) {}
+    using OplogApplierImpl::applyOplogGroup;
+};
+
 /**
  * OpObserver for OplogApplierImpl test fixture.
  */
@@ -115,14 +135,6 @@ protected:
     std::unique_ptr<ReplicationConsistencyMarkers> _consistencyMarkers;
     ServiceContext* serviceContext;
     OplogApplierImplOpObserver* _opObserver = nullptr;
-
-    // Implements the OplogApplierImpl::ApplyGroupFn interface and does nothing.
-    static Status noopApplyOperationFn(OperationContext*,
-                                       MultiApplier::OperationPtrs*,
-                                       OplogApplierImpl* oai,
-                                       WorkerMultikeyPathInfo*) {
-        return Status::OK();
-    }
 
     OpTime nextOpTime() {
         static long long lastSecond = 1;

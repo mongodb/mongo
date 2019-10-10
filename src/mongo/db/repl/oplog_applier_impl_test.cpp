@@ -99,27 +99,6 @@ OplogEntry makeOplogEntry(OpTypeEnum opType, NamespaceString nss, OptionalCollec
 }
 
 /**
- * Testing-only OplogApplierImpl
- */
-
-class OplogApplierImplForTest : public OplogApplierImpl {
-public:
-    OplogApplierImplForTest();
-};
-
-// Minimal constructor that takes options, the only member accessed in fillWriterVectors.
-OplogApplierImplForTest::OplogApplierImplForTest()
-    : OplogApplierImpl(nullptr,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       repl::OplogApplier::Options(repl::OplogApplication::Mode::kInitialSync),
-                       nullptr) {}
-
-/**
  * Creates collection options suitable for oplog.
  */
 CollectionOptions createOplogCollectionOptions() {
@@ -308,17 +287,38 @@ TEST_F(OplogApplierImplTest, applyOplogEntryBatchCommand) {
     ASSERT_TRUE(applyCmdCalled);
 }
 
+/**
+ * Test only subclass of OplogApplierImpl that does not apply oplog entries, but tracks ops.
+ */
+class TrackOpsAppliedApplier : public OplogApplierImpl {
+public:
+    using OplogApplierImpl::OplogApplierImpl;
+
+    Status applyOplogGroup(OperationContext* opCtx,
+                           MultiApplier::OperationPtrs* ops,
+                           WorkerMultikeyPathInfo* workerMultikeyPathInfo) override;
+    MultiApplier::Operations operationsApplied;
+};
+
+Status TrackOpsAppliedApplier::applyOplogGroup(OperationContext* opCtx,
+                                               MultiApplier::OperationPtrs* ops,
+                                               WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
+    for (auto&& opPtr : *ops) {
+        operationsApplied.push_back(*opPtr);
+    }
+    return Status::OK();
+}
+
 DEATH_TEST_F(OplogApplierImplTest, MultiApplyAbortsWhenNoOperationsAreGiven, "!ops.empty()") {
     auto writerPool = makeReplWriterPool();
     NoopOplogApplierObserver observer;
-    OplogApplierImpl oplogApplier(
+    TrackOpsAppliedApplier oplogApplier(
         nullptr,  // executor
         nullptr,  // oplogBuffer
         &observer,
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        noopApplyOperationFn,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
         writerPool.get());
     oplogApplier.multiApply(_opCtx.get(), {}).getStatus().ignore();
@@ -331,37 +331,26 @@ bool _testOplogEntryIsForCappedCollection(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const CollectionOptions& options) {
     auto writerPool = makeReplWriterPool();
-    MultiApplier::Operations operationsApplied;
-    auto applyOperationFn = [&operationsApplied](OperationContext* opCtx,
-                                                 MultiApplier::OperationPtrs* operationsToApply,
-                                                 OplogApplierImpl* oai,
-                                                 WorkerMultikeyPathInfo*) -> Status {
-        for (auto&& opPtr : *operationsToApply) {
-            operationsApplied.push_back(*opPtr);
-        }
-        return Status::OK();
-    };
     createCollection(opCtx, nss, options);
 
     auto op = makeInsertDocumentOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, BSON("a" << 1));
     ASSERT_FALSE(op.isForCappedCollection);
 
     NoopOplogApplierObserver observer;
-    OplogApplierImpl oplogApplier(
+    TrackOpsAppliedApplier oplogApplier(
         nullptr,  // executor
         nullptr,  // oplogBuffer
         &observer,
         replCoord,
         consistencyMarkers,
         storageInterface,
-        applyOperationFn,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
         writerPool.get());
     auto lastOpTime = unittest::assertGet(oplogApplier.multiApply(opCtx, {op}));
     ASSERT_EQUALS(op.getOpTime(), lastOpTime);
 
-    ASSERT_EQUALS(1U, operationsApplied.size());
-    const auto& opApplied = operationsApplied.front();
+    ASSERT_EQUALS(1U, oplogApplier.operationsApplied.size());
+    const auto& opApplied = oplogApplier.operationsApplied.front();
     ASSERT_EQUALS(op, opApplied);
     // "isForCappedCollection" is not parsed from raw oplog entry document.
     return opApplied.isForCappedCollection;
@@ -397,16 +386,9 @@ TEST_F(OplogApplierImplTest, ApplyGroupUsesApplyOplogEntryBatchToApplyOperation)
     MultiApplier::OperationPtrs ops = {&op};
     WorkerMultikeyPathInfo pathInfo;
 
-    OplogApplierImpl oplogApplier(nullptr,
-                                  nullptr,
-                                  nullptr,
-                                  nullptr,
-                                  nullptr,
-                                  nullptr,
-                                  nullptr,
-                                  OplogApplier::Options(OplogApplication::Mode::kSecondary),
-                                  nullptr);
-    ASSERT_OK(applyOplogGroup(_opCtx.get(), &ops, &oplogApplier, &pathInfo));
+    TestApplyOplogGroupApplier oplogApplier(
+        nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kSecondary));
+    ASSERT_OK(oplogApplier.applyOplogGroup(_opCtx.get(), &ops, &pathInfo));
     // Collection should be created after applyOplogEntryBatch() processes operation.
     ASSERT_TRUE(AutoGetCollectionForReadCommand(_opCtx.get(), nss).getCollection());
 }
@@ -523,7 +505,6 @@ TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyUnpreparedTransactionSepar
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        applyOplogGroup,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
         _writerPool.get());
 
@@ -586,7 +567,6 @@ TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyUnpreparedTransactionAllAt
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        applyOplogGroup,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kRecovering),
         _writerPool.get());
 
@@ -644,7 +624,6 @@ TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyUnpreparedTransactionTwoBa
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        applyOplogGroup,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
         _writerPool.get());
 
@@ -765,7 +744,6 @@ TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyTwoTransactionsOneBatch) {
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        applyOplogGroup,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
         _writerPool.get());
 
@@ -877,7 +855,6 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionStea
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        applyOplogGroup,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
         _writerPool.get());
 
@@ -936,7 +913,6 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyAbortPreparedTransactio
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        applyOplogGroup,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
         _writerPool.get());
 
@@ -986,7 +962,6 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionInit
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        applyOplogGroup,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kInitialSync),
         _writerPool.get());
     // Apply a batch with the insert operations.  This should result in the oplog entries
@@ -1055,7 +1030,6 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionReco
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        applyOplogGroup,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kRecovering),
         _writerPool.get());
 
@@ -1109,7 +1083,6 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplySingleApplyOpsPreparedT
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        applyOplogGroup,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
         _writerPool.get());
     const auto expectedStartOpTime = _singlePrepareApplyOp->getOpTime();
@@ -1150,7 +1123,6 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyEmptyApplyOpsPreparedTr
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        applyOplogGroup,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
         _writerPool.get());
 
@@ -1200,7 +1172,6 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyAbortSingleApplyOpsPrep
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        applyOplogGroup,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
         _writerPool.get());
 
@@ -1239,7 +1210,6 @@ TEST_F(MultiOplogEntryPreparedTransactionTest,
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        applyOplogGroup,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kInitialSync),
         _writerPool.get());
 
@@ -1294,7 +1264,6 @@ TEST_F(MultiOplogEntryPreparedTransactionTest,
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        applyOplogGroup,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kRecovering),
         _writerPool.get());
 
@@ -1330,19 +1299,11 @@ TEST_F(MultiOplogEntryPreparedTransactionTest,
 void testWorkerMultikeyPaths(OperationContext* opCtx,
                              const OplogEntry& op,
                              unsigned long numPaths) {
-
-    OplogApplierImpl oplogApplier(nullptr,
-                                  nullptr,
-                                  nullptr,
-                                  nullptr,
-                                  nullptr,
-                                  nullptr,
-                                  nullptr,
-                                  OplogApplier::Options(OplogApplication::Mode::kSecondary),
-                                  nullptr);
+    TestApplyOplogGroupApplier oplogApplier(
+        nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kSecondary));
     WorkerMultikeyPathInfo pathInfo;
     MultiApplier::OperationPtrs ops = {&op};
-    ASSERT_OK(applyOplogGroup(opCtx, &ops, &oplogApplier, &pathInfo));
+    ASSERT_OK(oplogApplier.applyOplogGroup(opCtx, &ops, &pathInfo));
     ASSERT_EQ(pathInfo.size(), numPaths);
 }
 
@@ -1396,18 +1357,11 @@ TEST_F(OplogApplierImplTest, ApplyGroupAddsMultipleWorkerMultikeyPathInfo) {
         auto docB = BSON("_id" << 2 << "b" << BSON_ARRAY(6 << 7));
         auto opB = makeInsertDocumentOplogEntry({Timestamp(Seconds(5), 0), 1LL}, nss, docB);
 
-        OplogApplierImpl oplogApplier(nullptr,
-                                      nullptr,
-                                      nullptr,
-                                      nullptr,
-                                      nullptr,
-                                      nullptr,
-                                      nullptr,
-                                      OplogApplier::Options(OplogApplication::Mode::kSecondary),
-                                      nullptr);
+        TestApplyOplogGroupApplier oplogApplier(
+            nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kSecondary));
         WorkerMultikeyPathInfo pathInfo;
         MultiApplier::OperationPtrs ops = {&opA, &opB};
-        ASSERT_OK(applyOplogGroup(_opCtx.get(), &ops, &oplogApplier, &pathInfo));
+        ASSERT_OK(oplogApplier.applyOplogGroup(_opCtx.get(), &ops, &pathInfo));
         ASSERT_EQ(pathInfo.size(), 2UL);
     }
 }
@@ -1448,18 +1402,11 @@ TEST_F(OplogApplierImplTest, ApplyGroupFailsWhenCollectionCreationTriesToMakeUUI
 
     auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss);
 
-    OplogApplierImpl oplogApplier(nullptr,
-                                  nullptr,
-                                  nullptr,
-                                  nullptr,
-                                  nullptr,
-                                  nullptr,
-                                  nullptr,
-                                  OplogApplier::Options(OplogApplication::Mode::kSecondary),
-                                  nullptr);
+    TestApplyOplogGroupApplier oplogApplier(
+        nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kSecondary));
     MultiApplier::OperationPtrs ops = {&op};
     ASSERT_EQUALS(ErrorCodes::InvalidOptions,
-                  applyOplogGroup(_opCtx.get(), &ops, &oplogApplier, nullptr));
+                  oplogApplier.applyOplogGroup(_opCtx.get(), &ops, nullptr));
 }
 
 TEST_F(OplogApplierImplTest, ApplyGroupDisablesDocumentValidationWhileApplyingOperations) {
@@ -1821,7 +1768,8 @@ TEST_F(OplogApplierImplTest,
 }
 
 TEST_F(OplogApplierImplTest, ApplyGroupIgnoresUpdateOperationIfDocumentIsMissingFromSyncSource) {
-    OplogApplierImplForTest oplogApplier;
+    TestApplyOplogGroupApplier oplogApplier(
+        nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kInitialSync));
     NamespaceString nss("test.t");
     {
         Lock::GlobalWrite globalLock(_opCtx.get());
@@ -1835,7 +1783,7 @@ TEST_F(OplogApplierImplTest, ApplyGroupIgnoresUpdateOperationIfDocumentIsMissing
         {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), BSON("_id" << 0 << "x" << 2));
     MultiApplier::OperationPtrs ops = {&op};
     WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(applyOplogGroup(_opCtx.get(), &ops, &oplogApplier, &pathInfo));
+    ASSERT_OK(oplogApplier.applyOplogGroup(_opCtx.get(), &ops, &pathInfo));
 
     // Since the document was missing when we cloned data from the sync source, the collection
     // referenced by the failed operation should not be automatically created.
@@ -1844,7 +1792,8 @@ TEST_F(OplogApplierImplTest, ApplyGroupIgnoresUpdateOperationIfDocumentIsMissing
 
 TEST_F(OplogApplierImplTest, ApplyGroupSkipsDocumentOnNamespaceNotFoundDuringInitialSync) {
     BSONObj emptyDoc;
-    OplogApplierImplForTest oplogApplier;
+    TestApplyOplogGroupApplier oplogApplier(
+        nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kInitialSync));
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
     NamespaceString badNss("local." + _agent.getSuiteName() + "_" + _agent.getTestName() + "bad");
     auto doc1 = BSON("_id" << 1);
@@ -1856,7 +1805,7 @@ TEST_F(OplogApplierImplTest, ApplyGroupSkipsDocumentOnNamespaceNotFoundDuringIni
     auto op3 = makeInsertDocumentOplogEntry({Timestamp(Seconds(4), 0), 1LL}, nss, doc3);
     MultiApplier::OperationPtrs ops = {&op0, &op1, &op2, &op3};
     WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(applyOplogGroup(_opCtx.get(), &ops, &oplogApplier, &pathInfo));
+    ASSERT_OK(oplogApplier.applyOplogGroup(_opCtx.get(), &ops, &pathInfo));
 
     CollectionReader collectionReader(_opCtx.get(), nss);
     ASSERT_BSONOBJ_EQ(doc1, unittest::assertGet(collectionReader.next()));
@@ -1866,7 +1815,8 @@ TEST_F(OplogApplierImplTest, ApplyGroupSkipsDocumentOnNamespaceNotFoundDuringIni
 
 TEST_F(OplogApplierImplTest, ApplyGroupSkipsIndexCreationOnNamespaceNotFoundDuringInitialSync) {
     BSONObj emptyDoc;
-    OplogApplierImplForTest oplogApplier;
+    TestApplyOplogGroupApplier oplogApplier(
+        nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kInitialSync));
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
     NamespaceString badNss("local." + _agent.getSuiteName() + "_" + _agent.getTestName() + "bad");
     auto doc1 = BSON("_id" << 1);
@@ -1880,7 +1830,7 @@ TEST_F(OplogApplierImplTest, ApplyGroupSkipsIndexCreationOnNamespaceNotFoundDuri
     auto op3 = makeInsertDocumentOplogEntry({Timestamp(Seconds(4), 0), 1LL}, nss, doc3);
     MultiApplier::OperationPtrs ops = {&op0, &op1, &op2, &op3};
     WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(applyOplogGroup(_opCtx.get(), &ops, &oplogApplier, &pathInfo));
+    ASSERT_OK(oplogApplier.applyOplogGroup(_opCtx.get(), &ops, &pathInfo));
 
     CollectionReader collectionReader(_opCtx.get(), nss);
     ASSERT_BSONOBJ_EQ(doc1, unittest::assertGet(collectionReader.next()));
@@ -2478,7 +2428,6 @@ TEST_F(OplogApplierImplTxnTableTest, SimpleWriteWithTxn) {
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        applyOplogGroup,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
         writerPool.get());
 
@@ -2519,7 +2468,6 @@ TEST_F(OplogApplierImplTxnTableTest, WriteWithTxnMixedWithDirectWriteToTxnTable)
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        applyOplogGroup,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
         writerPool.get());
 
@@ -2574,7 +2522,6 @@ TEST_F(OplogApplierImplTxnTableTest, InterleavedWriteWithTxnMixedWithDirectDelet
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        applyOplogGroup,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
         writerPool.get());
 
@@ -2616,7 +2563,6 @@ TEST_F(OplogApplierImplTxnTableTest, InterleavedWriteWithTxnMixedWithDirectUpdat
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        applyOplogGroup,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
         writerPool.get());
 
@@ -2681,7 +2627,6 @@ TEST_F(OplogApplierImplTxnTableTest, RetryableWriteThenMultiStatementTxnWriteOnS
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        applyOplogGroup,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
         writerPool.get());
 
@@ -2751,7 +2696,6 @@ TEST_F(OplogApplierImplTxnTableTest, MultiStatementTxnWriteThenRetryableWriteOnS
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        applyOplogGroup,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
         writerPool.get());
 
@@ -2824,7 +2768,6 @@ TEST_F(OplogApplierImplTxnTableTest, MultiApplyUpdatesTheTransactionTable) {
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        applyOplogGroup,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
         writerPool.get());
 
@@ -2908,7 +2851,6 @@ TEST_F(OplogApplierImplTxnTableTest, SessionMigrationNoOpEntriesShouldUpdateTxnT
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        applyOplogGroup,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
         writerPool.get());
 
@@ -2941,7 +2883,6 @@ TEST_F(OplogApplierImplTxnTableTest, PreImageNoOpEntriesShouldNotUpdateTxnTable)
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        applyOplogGroup,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
         writerPool.get());
 
@@ -2976,7 +2917,6 @@ TEST_F(OplogApplierImplTxnTableTest, NonMigrateNoOpEntriesShouldNotUpdateTxnTabl
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        applyOplogGroup,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
         writerPool.get());
 

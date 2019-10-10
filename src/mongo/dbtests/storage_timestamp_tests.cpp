@@ -59,6 +59,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_applier_impl.h"
+#include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -1312,7 +1313,6 @@ public:
             _coordinatorMock,
             _consistencyMarkers,
             storageInterface,
-            repl::applyOplogGroup,
             repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
             writerPool.get());
         ASSERT_EQUALS(op2.getOpTime(), unittest::assertGet(oplogApplier.multiApply(_opCtx, ops)));
@@ -1397,7 +1397,6 @@ public:
             _coordinatorMock,
             _consistencyMarkers,
             storageInterface,
-            repl::applyOplogGroup,
             repl::OplogApplier::Options(repl::OplogApplication::Mode::kInitialSync),
             writerPool.get());
         auto lastTime = unittest::assertGet(oplogApplier.multiApply(_opCtx, ops));
@@ -2460,6 +2459,76 @@ public:
     }
 };
 
+/**
+ * Test specific OplogApplierImpl subclass that allows for custom applyOplogGroup to be run during
+ * multiApply.
+ */
+class SecondaryReadsDuringBatchApplicationAreAllowedApplier : public repl::OplogApplierImpl {
+public:
+    SecondaryReadsDuringBatchApplicationAreAllowedApplier(
+        executor::TaskExecutor* executor,
+        repl::OplogBuffer* oplogBuffer,
+        Observer* observer,
+        repl::ReplicationCoordinator* replCoord,
+        repl::ReplicationConsistencyMarkers* consistencyMarkers,
+        repl::StorageInterface* storageInterface,
+        const OplogApplier::Options& options,
+        ThreadPool* writerPool,
+        OperationContext* opCtx,
+        Promise<bool>* promise,
+        stdx::future<bool>* taskFuture)
+        : repl::OplogApplierImpl(executor,
+                                 oplogBuffer,
+                                 observer,
+                                 replCoord,
+                                 consistencyMarkers,
+                                 storageInterface,
+                                 options,
+                                 writerPool),
+          _testOpCtx(opCtx),
+          _promise(promise),
+          _taskFuture(taskFuture) {}
+
+    Status applyOplogGroup(OperationContext* opCtx,
+                           repl::MultiApplier::OperationPtrs* operationsToApply,
+                           WorkerMultikeyPathInfo* pathInfo) override;
+
+private:
+    // Pointer to the test's op context. This is distinct from the op context used in
+    // applyOplogGroup.
+    OperationContext* _testOpCtx;
+    Promise<bool>* _promise;
+    stdx::future<bool>* _taskFuture;
+};
+
+
+// This apply operation function will block until the reader has tried acquiring a collection lock.
+// This returns BadValue statuses instead of asserting so that the worker threads can cleanly exit
+// and this test case fails without crashing the entire suite.
+Status SecondaryReadsDuringBatchApplicationAreAllowedApplier::applyOplogGroup(
+    OperationContext* opCtx,
+    repl::MultiApplier::OperationPtrs* operationsToApply,
+    WorkerMultikeyPathInfo* pathInfo) {
+    if (!_testOpCtx->lockState()->isLockHeldForMode(resourceIdParallelBatchWriterMode, MODE_X)) {
+        return {ErrorCodes::BadValue, "Batch applied was not holding PBWM lock in MODE_X"};
+    }
+
+    // Insert the document. A reader without a PBWM lock should not see it yet.
+    auto status = OplogApplierImpl::applyOplogGroup(opCtx, operationsToApply, pathInfo);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    // Signals the reader to acquire a collection read lock.
+    _promise->emplaceValue(true);
+
+    // Block while holding the PBWM lock until the reader is done.
+    if (!_taskFuture->get()) {
+        return {ErrorCodes::BadValue, "Client was holding PBWM lock in MODE_IS"};
+    }
+    return Status::OK();
+}
+
 class SecondaryReadsDuringBatchApplicationAreAllowed : public StorageTimestampTest {
 public:
     void run() {
@@ -2498,55 +2567,28 @@ public:
             taskThread.join();
         });
 
-        // This apply operation function will block until the reader has tried acquiring a
-        // collection lock. This returns BadValue statuses instead of asserting so that the worker
-        // threads can cleanly exit and this test case fails without crashing the entire suite.
-        auto applyOperationFn = [&](OperationContext* opCtx,
-                                    std::vector<const repl::OplogEntry*>* operationsToApply,
-                                    repl::OplogApplierImpl* oa,
-                                    std::vector<MultikeyPathInfo>* pathInfo) -> Status {
-            if (!_opCtx->lockState()->isLockHeldForMode(resourceIdParallelBatchWriterMode,
-                                                        MODE_X)) {
-                return {ErrorCodes::BadValue, "Batch applied was not holding PBWM lock in MODE_X"};
-            }
-
-            // Insert the document. A reader without a PBWM lock should not see it yet.
-            auto status = repl::applyOplogGroup(opCtx, operationsToApply, oa, pathInfo);
-            if (!status.isOK()) {
-                return status;
-            }
-
-            // Signals the reader to acquire a collection read lock.
-            batchInProgress.promise.emplaceValue(true);
-
-            // Block while holding the PBWM lock until the reader is done.
-            if (!taskFuture.get()) {
-                return {ErrorCodes::BadValue, "Client was holding PBWM lock in MODE_IS"};
-            }
-            return Status::OK();
-        };
-
         // Make a simple insert operation.
         BSONObj doc0 = BSON("_id" << 0 << "a" << 0);
         auto insertOp = repl::OplogEntry(BSON("ts" << futureTs << "t" << 1LL << "v" << 2 << "op"
                                                    << "i"
                                                    << "ns" << ns.ns() << "ui" << uuid << "wall"
                                                    << Date_t() << "o" << doc0));
-
         DoNothingOplogApplierObserver observer;
         // Apply the operation.
         auto storageInterface = repl::StorageInterface::get(_opCtx);
         auto writerPool = repl::makeReplWriterPool(1);
-        repl::OplogApplierImpl oplogApplier(
+        SecondaryReadsDuringBatchApplicationAreAllowedApplier oplogApplier(
             nullptr,  // task executor. not required for multiApply().
             nullptr,  // oplog buffer. not required for multiApply().
             &observer,
             _coordinatorMock,
             _consistencyMarkers,
             storageInterface,
-            applyOperationFn,
             repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
-            writerPool.get());
+            writerPool.get(),
+            _opCtx,
+            &(batchInProgress.promise),
+            &taskFuture);
         auto lastOpTime = unittest::assertGet(oplogApplier.multiApply(_opCtx, {insertOp}));
         ASSERT_EQ(insertOp.getOpTime(), lastOpTime);
 

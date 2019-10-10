@@ -363,7 +363,6 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
                                   ReplicationCoordinator::get(opCtx),
                                   _consistencyMarkers,
                                   _storageInterface,
-                                  applyOplogGroup,
                                   OplogApplier::Options(OplogApplication::Mode::kRecovering),
                                   writerPool.get());
 

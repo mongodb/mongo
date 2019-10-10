@@ -235,6 +235,13 @@ void addDerivedOps(OperationContext* opCtx,
     }
 }
 
+void stableSortByNamespace(MultiApplier::OperationPtrs* oplogEntryPointers) {
+    auto nssComparator = [](const OplogEntry* l, const OplogEntry* r) {
+        return l->getNss() < r->getNss();
+    };
+    std::stable_sort(oplogEntryPointers->begin(), oplogEntryPointers->end(), nssComparator);
+}
+
 }  // namespace
 
 
@@ -351,7 +358,6 @@ OplogApplierImpl::OplogApplierImpl(executor::TaskExecutor* executor,
                                    ReplicationCoordinator* replCoord,
                                    ReplicationConsistencyMarkers* consistencyMarkers,
                                    StorageInterface* storageInterface,
-                                   ApplyGroupFunc func,
                                    const OplogApplier::Options& options,
                                    ThreadPool* writerPool)
     : OplogApplier(executor, oplogBuffer, observer, options),
@@ -359,7 +365,6 @@ OplogApplierImpl::OplogApplierImpl(executor::TaskExecutor* executor,
       _writerPool(writerPool),
       _storageInterface(storageInterface),
       _consistencyMarkers(consistencyMarkers),
-      _applyFunc(func),
       _beginApplyingOpTime(options.beginApplyingOpTime) {}
 
 void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
@@ -636,9 +641,8 @@ StatusWith<OpTime> OplogApplierImpl::_multiApply(OperationContext* opCtx,
                         // so it is safe to exclude any writes from Flow Control.
                         opCtx->setShouldParticipateInFlowControl(false);
 
-                        status = opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&] {
-                            return _applyFunc(opCtx.get(), &writer, this, &multikeyVector);
-                        });
+                        status = opCtx->runWithoutInterruptionExceptAtGlobalShutdown(
+                            [&] { return applyOplogGroup(opCtx.get(), &writer, &multikeyVector); });
                     });
             }
 
@@ -832,6 +836,90 @@ void OplogApplierImpl::fillWriterVectors(
     }
 }
 
+Status OplogApplierImpl::applyOplogGroup(OperationContext* opCtx,
+                                         MultiApplier::OperationPtrs* ops,
+                                         WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
+
+    UnreplicatedWritesBlock uwb(opCtx);
+    DisableDocumentValidation validationDisabler(opCtx);
+    // Since we swap the locker in stash / unstash transaction resources,
+    // ShouldNotConflictWithSecondaryBatchApplicationBlock will touch the locker that has been
+    // destroyed by unstash in its destructor. Thus we set the flag explicitly.
+    opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
+
+    // Explicitly start future read transactions without a timestamp.
+    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+
+    // When querying indexes, we return the record matching the key if it exists, or an adjacent
+    // document. This means that it is possible for us to hit a prepare conflict if we query for an
+    // incomplete key and an adjacent key is prepared.
+    // We ignore prepare conflicts on secondaries because they may encounter prepare conflicts that
+    // did not occur on the primary.
+    opCtx->recoveryUnit()->setPrepareConflictBehavior(
+        PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+
+    stableSortByNamespace(ops);
+
+    const auto oplogApplicationMode = getOptions().mode;
+
+    InsertGroup insertGroup(ops, opCtx, oplogApplicationMode);
+
+    {  // Ensure that the MultikeyPathTracker stops tracking paths.
+        ON_BLOCK_EXIT([opCtx] { MultikeyPathTracker::get(opCtx).stopTrackingMultikeyPathInfo(); });
+        MultikeyPathTracker::get(opCtx).startTrackingMultikeyPathInfo();
+
+        for (auto it = ops->cbegin(); it != ops->cend(); ++it) {
+            const OplogEntry& entry = **it;
+
+            // If we are successful in grouping and applying inserts, advance the current iterator
+            // past the end of the inserted group of entries.
+            auto groupResult = insertGroup.groupAndApplyInserts(it);
+            if (groupResult.isOK()) {
+                it = groupResult.getValue();
+                continue;
+            }
+
+            // If we didn't create a group, try to apply the op individually.
+            try {
+                const Status status = applyOplogEntryBatch(opCtx, &entry, oplogApplicationMode);
+
+                if (!status.isOK()) {
+                    // Tried to apply an update operation but the document is missing, there must be
+                    // a delete operation for the document later in the oplog.
+                    if (status == ErrorCodes::UpdateOperationFailed &&
+                        oplogApplicationMode == OplogApplication::Mode::kInitialSync) {
+                        continue;
+                    }
+
+                    severe() << "Error applying operation (" << redact(entry.toBSON())
+                             << "): " << causedBy(redact(status));
+                    return status;
+                }
+            } catch (const DBException& e) {
+                // SERVER-24927 If we have a NamespaceNotFound exception, then this document will be
+                // dropped before initial sync or recovery ends anyways and we should ignore it.
+                if (e.code() == ErrorCodes::NamespaceNotFound && entry.isCrudOpType() &&
+                    getOptions().allowNamespaceNotFoundErrorsOnCrudOps) {
+                    continue;
+                }
+
+                severe() << "writer worker caught exception: " << redact(e)
+                         << " on: " << redact(entry.toBSON());
+                return e.toStatus();
+            }
+        }
+    }
+
+    invariant(!MultikeyPathTracker::get(opCtx).isTrackingMultikeyPathInfo());
+    invariant(workerMultikeyPathInfo->empty());
+    auto newPaths = MultikeyPathTracker::get(opCtx).getMultikeyPathInfo();
+    if (!newPaths.empty()) {
+        workerMultikeyPathInfo->swap(newPaths);
+    }
+
+    return Status::OK();
+}
+
 Status applyOplogEntryBatch(OperationContext* opCtx,
                             const OplogEntryBatch& batch,
                             OplogApplication::Mode oplogApplicationMode) {
@@ -922,108 +1010,6 @@ Status applyOplogEntryBatch(OperationContext* opCtx,
     }
 
     MONGO_UNREACHABLE;
-}
-
-void stableSortByNamespace(MultiApplier::OperationPtrs* oplogEntryPointers) {
-    if (oplogEntryPointers->size() < 1U) {
-        return;
-    }
-    auto nssComparator = [](const OplogEntry* l, const OplogEntry* r) {
-        return l->getNss() < r->getNss();
-    };
-    std::stable_sort(oplogEntryPointers->begin(), oplogEntryPointers->end(), nssComparator);
-}
-
-/**
- * This free function is used by the thread pool workers to write ops to the db.
- * This consumes the passed in OperationPtrs and callers should not make any assumptions about the
- * state of the container after calling. However, this function cannot modify the pointed-to
- * operations because the OperationPtrs container contains const pointers.
- */
-Status applyOplogGroup(OperationContext* opCtx,
-                       MultiApplier::OperationPtrs* ops,
-                       OplogApplierImpl* oai,
-                       WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
-    invariant(oai);
-
-    UnreplicatedWritesBlock uwb(opCtx);
-    DisableDocumentValidation validationDisabler(opCtx);
-    // Since we swap the locker in stash / unstash transaction resources,
-    // ShouldNotConflictWithSecondaryBatchApplicationBlock will touch the locker that has been
-    // destroyed by unstash in its destructor. Thus we set the flag explicitly.
-    opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
-
-    // Explicitly start future read transactions without a timestamp.
-    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
-
-    // When querying indexes, we return the record matching the key if it exists, or an adjacent
-    // document. This means that it is possible for us to hit a prepare conflict if we query for an
-    // incomplete key and an adjacent key is prepared.
-    // We ignore prepare conflicts on secondaries because they may encounter prepare conflicts that
-    // did not occur on the primary.
-    opCtx->recoveryUnit()->setPrepareConflictBehavior(
-        PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
-
-    stableSortByNamespace(ops);
-
-    const auto oplogApplicationMode = oai->getOptions().mode;
-
-    InsertGroup insertGroup(ops, opCtx, oplogApplicationMode);
-
-    {  // Ensure that the MultikeyPathTracker stops tracking paths.
-        ON_BLOCK_EXIT([opCtx] { MultikeyPathTracker::get(opCtx).stopTrackingMultikeyPathInfo(); });
-        MultikeyPathTracker::get(opCtx).startTrackingMultikeyPathInfo();
-
-        for (auto it = ops->cbegin(); it != ops->cend(); ++it) {
-            const OplogEntry& entry = **it;
-
-            // If we are successful in grouping and applying inserts, advance the current iterator
-            // past the end of the inserted group of entries.
-            auto groupResult = insertGroup.groupAndApplyInserts(it);
-            if (groupResult.isOK()) {
-                it = groupResult.getValue();
-                continue;
-            }
-
-            // If we didn't create a group, try to apply the op individually.
-            try {
-                const Status status = applyOplogEntryBatch(opCtx, &entry, oplogApplicationMode);
-
-                if (!status.isOK()) {
-                    // Tried to apply an update operation but the document is missing, there must be
-                    // a delete operation for the document later in the oplog.
-                    if (status == ErrorCodes::UpdateOperationFailed &&
-                        oplogApplicationMode == OplogApplication::Mode::kInitialSync) {
-                        continue;
-                    }
-
-                    severe() << "Error applying operation (" << redact(entry.toBSON())
-                             << "): " << causedBy(redact(status));
-                    return status;
-                }
-            } catch (const DBException& e) {
-                // SERVER-24927 If we have a NamespaceNotFound exception, then this document will be
-                // dropped before initial sync or recovery ends anyways and we should ignore it.
-                if (e.code() == ErrorCodes::NamespaceNotFound && entry.isCrudOpType() &&
-                    oai->getOptions().allowNamespaceNotFoundErrorsOnCrudOps) {
-                    continue;
-                }
-
-                severe() << "writer worker caught exception: " << redact(e)
-                         << " on: " << redact(entry.toBSON());
-                return e.toStatus();
-            }
-        }
-    }
-
-    invariant(!MultikeyPathTracker::get(opCtx).isTrackingMultikeyPathInfo());
-    invariant(workerMultikeyPathInfo->empty());
-    auto newPaths = MultikeyPathTracker::get(opCtx).getMultikeyPathInfo();
-    if (!newPaths.empty()) {
-        workerMultikeyPathInfo->swap(newPaths);
-    }
-
-    return Status::OK();
 }
 
 

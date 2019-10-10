@@ -58,10 +58,6 @@ class OplogApplierImpl : public OplogApplier {
     OplogApplierImpl& operator=(const OplogApplierImpl&) = delete;
 
 public:
-    using ApplyGroupFunc = std::function<Status(OperationContext* opCtx,
-                                                MultiApplier::OperationPtrs* ops,
-                                                OplogApplierImpl* oai,
-                                                WorkerMultikeyPathInfo* workerMultikeyPathInfo)>;
     /**
      * Constructs this OplogApplier with specific options.
      * During steady state replication, _run() obtains batches of operations to apply
@@ -75,7 +71,6 @@ public:
                      ReplicationCoordinator* replCoord,
                      ReplicationConsistencyMarkers* consistencyMarkers,
                      StorageInterface* storageInterface,
-                     ApplyGroupFunc func,
                      const Options& options,
                      ThreadPool* writerPool);
 
@@ -120,9 +115,6 @@ private:
 
     ReplicationConsistencyMarkers* const _consistencyMarkers;
 
-    // Function to use during _multiApply
-    ApplyGroupFunc _applyFunc;
-
     // Used to determine which operations should be applied during initial sync. If this is null,
     // we will apply all operations that were fetched.
     OpTime _beginApplyingOpTime = OpTime();
@@ -133,6 +125,19 @@ protected:
                            MultiApplier::Operations* ops,
                            std::vector<MultiApplier::OperationPtrs>* writerVectors,
                            std::vector<MultiApplier::Operations>* derivedOps) noexcept;
+
+    /**
+     * This function is used by the thread pool workers to write ops to the db.
+     * This consumes the passed in OperationPtrs and callers should not make any assumptions about
+     * the state of the container after calling. However, this function cannot modify the pointed-to
+     * operations because the OperationPtrs container contains const pointers.
+     *
+     * This function has been marked as virtual to allow certain unit tests to skip oplog
+     * application.
+     */
+    virtual Status applyOplogGroup(OperationContext* opCtx,
+                                   MultiApplier::OperationPtrs* ops,
+                                   WorkerMultikeyPathInfo* workerMultikeyPathInfo);
 };
 
 /**
@@ -142,15 +147,5 @@ Status applyOplogEntryBatch(OperationContext* opCtx,
                             const OplogEntryBatch& batch,
                             OplogApplication::Mode oplogApplicationMode);
 
-/**
- * This free function is used by the thread pool workers to write ops to the db.
- * This consumes the passed in OperationPtrs and callers should not make any assumptions about the
- * state of the container after calling. However, this function cannot modify the pointed-to
- * operations because the OperationPtrs container contains const pointers.
- */
-Status applyOplogGroup(OperationContext* opCtx,
-                       MultiApplier::OperationPtrs* ops,
-                       OplogApplierImpl* oai,
-                       WorkerMultikeyPathInfo* workerMultikeyPathInfo);
 }  // namespace repl
 }  // namespace mongo

@@ -223,7 +223,6 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
         replCoord,
         _replicationProcess->getConsistencyMarkers(),
         _storageInterface,
-        applyOplogGroup,
         OplogApplier::Options(OplogApplication::Mode::kSecondary),
         _writerPool.get());
 
