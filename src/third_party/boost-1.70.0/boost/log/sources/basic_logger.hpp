@@ -135,17 +135,6 @@ public:
         m_pCore(core::get())
     {
     }
-
-    /*!
-     * Constructor. Initializes internal data structures of the basic logger class,
-     * acquires reference to the provided logging core.
-     */
-    basic_logger(core_ptr c) :
-		threading_model(),
-		m_pCore(boost::move(c))
-	{
-	}
-    
     /*!
      * Copy constructor. Copies all attributes from the source logger.
      *

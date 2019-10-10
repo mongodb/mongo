@@ -90,12 +90,6 @@ public:
     BOOST_LOG_API static core_ptr get();
 
     /*!
-     * \return The method returns a pointer to a new logging core instance.
-     * MONGODB MODIFICATION
-     */
-    BOOST_LOG_API static core_ptr create();
-
-    /*!
      * The method enables or disables logging.
      *
      * Setting this status to \c false allows you to completely wipe out any logging activity, including
