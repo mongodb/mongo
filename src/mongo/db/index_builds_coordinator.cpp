@@ -46,7 +46,6 @@
 #include "mongo/db/index_build_entry_helpers.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/ops/insert.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/timestamp_block.h"
@@ -644,10 +643,6 @@ IndexBuildsCoordinator::_registerAndSetUpIndexBuild(
     AutoGetCollection autoColl(opCtx, nssOrUuid, MODE_X);
     auto collection = autoColl.getCollection();
     const auto& nss = collection->ns();
-
-    if (auto status = userAllowedWriteNS(nss); !status.isOK()) {
-        return status;
-    }
 
     // TODO (SERVER-40807): disabling the following code for the v4.2 release so it does not have
     // downstream impact.
