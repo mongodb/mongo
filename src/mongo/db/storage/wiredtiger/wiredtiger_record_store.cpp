@@ -675,6 +675,13 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
         sizeRecoveryState(getGlobalServiceContext())
             .markCollectionAsAlwaysNeedsSizeAdjustment(_uri);
     }
+
+    // If no SizeStorer is in use, start counting at zero. In practice, this will only ever be the
+    // the case for temporary RecordStores (those not associated with any collection) and in unit
+    // tests. Persistent size information is not required in either case. If a RecordStore needs
+    // persistent size information, we require it to use a SizeStorer.
+    _sizeInfo = _sizeStorer ? _sizeStorer->load(_uri)
+                            : std::make_shared<WiredTigerSizeStorer::SizeInfo>(0, 0);
 }
 
 WiredTigerRecordStore::~WiredTigerRecordStore() {
@@ -695,29 +702,9 @@ WiredTigerRecordStore::~WiredTigerRecordStore() {
     }
 }
 
-void WiredTigerRecordStore::postConstructorInit(OperationContext* opCtx) {
-    // Find the largest RecordId currently in use and estimate the number of records.
-    std::unique_ptr<SeekableRecordCursor> cursor = getCursor(opCtx, /*forward=*/false);
-    _sizeInfo =
-        _sizeStorer ? _sizeStorer->load(_uri) : std::make_shared<WiredTigerSizeStorer::SizeInfo>();
-
-    if (auto record = cursor->next()) {
-        int64_t max = record->id.repr();
-        _nextIdNum.store(1 + max);
-
-        if (!_sizeStorer) {
-            LOG(1) << "Doing scan of collection " << ns() << " to get size and count info";
-
-            int64_t numRecords = 0;
-            int64_t dataSize = 0;
-            do {
-                numRecords++;
-                dataSize += record->data.size();
-            } while ((record = cursor->next()));
-            _sizeInfo->numRecords.store(numRecords);
-            _sizeInfo->dataSize.store(dataSize);
-        }
-    } else {
+void WiredTigerRecordStore::checkSize(OperationContext* opCtx) {
+    std::unique_ptr<SeekableRecordCursor> cursor = getCursor(opCtx, /*forward=*/true);
+    if (!cursor->next()) {
         // We found no records in this collection; however, there may actually be documents present
         // if writes to this collection were not included in the stable checkpoint the last time
         // this node shut down. We set the data size and the record count to zero, but will adjust
@@ -736,14 +723,13 @@ void WiredTigerRecordStore::postConstructorInit(OperationContext* opCtx) {
             .markCollectionAsAlwaysNeedsSizeAdjustment(_uri);
         _sizeInfo->dataSize.store(0);
         _sizeInfo->numRecords.store(0);
-
-        // Need to start at 1 so we are always higher than RecordId::min()
-        _nextIdNum.store(1);
     }
 
     if (_sizeStorer)
         _sizeStorer->store(_uri, _sizeInfo);
+}
 
+void WiredTigerRecordStore::postConstructorInit(OperationContext* opCtx) {
     if (WiredTigerKVEngine::initRsOplogBackgroundThread(ns())) {
         _oplogStones = std::make_shared<OplogStones>(opCtx, this);
     }
@@ -1231,10 +1217,8 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
             if (!status.isOK())
                 return status.getStatus();
             record.id = status.getValue();
-        } else if (_isCapped) {
-            record.id = _nextId();
         } else {
-            record.id = _nextId();
+            record.id = _nextId(opCtx);
         }
         dassert(record.id > highestId);
         highestId = record.id;
@@ -1606,7 +1590,7 @@ void WiredTigerRecordStore::appendCustomStats(OperationContext* opCtx,
 
     std::string type, sourceURI;
     WiredTigerUtil::fetchTypeAndSourceURI(opCtx, _uri, &type, &sourceURI);
-    StatusWith<std::string> metadataResult = WiredTigerUtil::getMetadata(opCtx, sourceURI);
+    StatusWith<std::string> metadataResult = WiredTigerUtil::getMetadataCreate(opCtx, sourceURI);
     StringData creationStringName("creationString");
     if (!metadataResult.isOK()) {
         BSONObjBuilder creationString(bob.subobjStart(creationStringName));
@@ -1686,8 +1670,35 @@ void WiredTigerRecordStore::updateStatsAfterRepair(OperationContext* opCtx,
         _sizeStorer->store(_uri, _sizeInfo);
 }
 
-RecordId WiredTigerRecordStore::_nextId() {
+void WiredTigerRecordStore::_initNextIdIfNeeded(OperationContext* opCtx) {
+    // In the normal case, this will already be initialized, so use a weak load. Since this value
+    // will only change from 0 to a positive integer, the only risk is reading an outdated value, 0,
+    // and having to take the mutex.
+    if (_nextIdNum.loadRelaxed() > 0) {
+        return;
+    }
+
+    // Only one thread needs to do this.
+    stdx::lock_guard<stdx::mutex> lk(_initNextIdMutex);
+    if (_nextIdNum.load() > 0) {
+        return;
+    }
+
+    // Need to start at 1 so we are always higher than RecordId::min()
+    int64_t nextId = 1;
+
+    // Find the largest RecordId currently in use.
+    std::unique_ptr<SeekableRecordCursor> cursor = getCursor(opCtx, /*forward=*/false);
+    if (auto record = cursor->next()) {
+        nextId = record->id.repr() + 1;
+    }
+
+    _nextIdNum.store(nextId);
+}
+
+RecordId WiredTigerRecordStore::_nextId(OperationContext* opCtx) {
     invariant(!_isOplog);
+    _initNextIdIfNeeded(opCtx);
     RecordId out = RecordId(_nextIdNum.fetchAndAdd(1));
     invariant(out.isNormal());
     return out;

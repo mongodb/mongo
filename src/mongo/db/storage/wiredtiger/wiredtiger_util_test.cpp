@@ -139,6 +139,31 @@ private:
     std::unique_ptr<OperationContext> _opCtx;
 };
 
+TEST_F(WiredTigerUtilMetadataTest, GetMetadataCreateInvalid) {
+    StatusWith<std::string> result =
+        WiredTigerUtil::getMetadataCreate(getOperationContext(), getURI());
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey, result.getStatus().code());
+}
+
+TEST_F(WiredTigerUtilMetadataTest, GetMetadataCreateNull) {
+    const char* config = nullptr;
+    createSession(config);
+    StatusWith<std::string> result =
+        WiredTigerUtil::getMetadataCreate(getOperationContext(), getURI());
+    ASSERT_OK(result.getStatus());
+    ASSERT_FALSE(result.getValue().empty());
+}
+
+TEST_F(WiredTigerUtilMetadataTest, GetMetadataCreateStringSimple) {
+    const char* config = "app_metadata=(abc=123)";
+    createSession(config);
+    StatusWith<std::string> result =
+        WiredTigerUtil::getMetadataCreate(getOperationContext(), getURI());
+    ASSERT_OK(result.getStatus());
+    ASSERT_STRING_CONTAINS(result.getValue(), config);
+}
+
 TEST_F(WiredTigerUtilMetadataTest, GetConfigurationStringInvalidURI) {
     StatusWith<std::string> result = WiredTigerUtil::getMetadata(getOperationContext(), getURI());
     ASSERT_NOT_OK(result.getStatus());

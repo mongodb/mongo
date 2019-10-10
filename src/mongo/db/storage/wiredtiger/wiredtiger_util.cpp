@@ -87,7 +87,7 @@ void WiredTigerUtil::fetchTypeAndSourceURI(OperationContext* opCtx,
     const size_t colon = tableUri.find(':');
     invariant(colon != string::npos);
     colgroupUri += tableUri.substr(colon);
-    StatusWith<std::string> colgroupResult = getMetadata(opCtx, colgroupUri);
+    StatusWith<std::string> colgroupResult = getMetadataCreate(opCtx, colgroupUri);
     invariant(colgroupResult.getStatus());
     WiredTigerConfigParser parser(colgroupResult.getValue());
 
@@ -102,12 +102,8 @@ void WiredTigerUtil::fetchTypeAndSourceURI(OperationContext* opCtx,
     *source = std::string(sourceItem.str, sourceItem.len);
 }
 
-StatusWith<std::string> WiredTigerUtil::getMetadataRaw(WT_SESSION* session, StringData uri) {
-    WT_CURSOR* cursor;
-    invariantWTOK(session->open_cursor(session, "metadata:create", nullptr, "", &cursor));
-    invariant(cursor);
-    ON_BLOCK_EXIT([cursor] { invariantWTOK(cursor->close(cursor)); });
-
+namespace {
+StatusWith<std::string> _getMetadata(WT_CURSOR* cursor, StringData uri) {
     std::string strUri = uri.toString();
     cursor->set_key(cursor, strUri.c_str());
     int ret = cursor->search(cursor);
@@ -125,33 +121,48 @@ StatusWith<std::string> WiredTigerUtil::getMetadataRaw(WT_SESSION* session, Stri
     invariant(metadata);
     return StatusWith<std::string>(metadata);
 }
+}  // namespace
+
+StatusWith<std::string> WiredTigerUtil::getMetadataCreate(WT_SESSION* session, StringData uri) {
+    WT_CURSOR* cursor;
+    invariantWTOK(session->open_cursor(session, "metadata:create", nullptr, "", &cursor));
+    invariant(cursor);
+    ON_BLOCK_EXIT([cursor] { invariantWTOK(cursor->close(cursor)); });
+
+    return _getMetadata(cursor, uri);
+}
+
+StatusWith<std::string> WiredTigerUtil::getMetadataCreate(OperationContext* opCtx, StringData uri) {
+    invariant(opCtx);
+
+    auto session = WiredTigerRecoveryUnit::get(opCtx)->getSessionNoTxn();
+    WT_CURSOR* cursor =
+        session->getCursor("metadata:create", WiredTigerSession::kMetadataCreateTableId, false);
+
+    auto releaser = MakeGuard(
+        [&] { session->releaseCursor(WiredTigerSession::kMetadataCreateTableId, cursor); });
+
+    return _getMetadata(cursor, uri);
+}
+
+StatusWith<std::string> WiredTigerUtil::getMetadata(WT_SESSION* session, StringData uri) {
+    WT_CURSOR* cursor;
+    invariantWTOK(session->open_cursor(session, "metadata:", nullptr, "", &cursor));
+    invariant(cursor);
+    ON_BLOCK_EXIT([cursor] { invariantWTOK(cursor->close(cursor)); });
+
+    return _getMetadata(cursor, uri);
+}
 
 StatusWith<std::string> WiredTigerUtil::getMetadata(OperationContext* opCtx, StringData uri) {
     invariant(opCtx);
 
     auto session = WiredTigerRecoveryUnit::get(opCtx)->getSessionNoTxn();
-    WT_CURSOR* cursor =
-        session->getCursor("metadata:create", WiredTigerSession::kMetadataTableId, false);
-    invariant(cursor);
+    WT_CURSOR* cursor = session->getCursor("metadata:", WiredTigerSession::kMetadataTableId, false);
     auto releaser =
         MakeGuard([&] { session->releaseCursor(WiredTigerSession::kMetadataTableId, cursor); });
 
-    std::string strUri = uri.toString();
-    cursor->set_key(cursor, strUri.c_str());
-    int ret = cursor->search(cursor);
-    if (ret == WT_NOTFOUND) {
-        return StatusWith<std::string>(ErrorCodes::NoSuchKey,
-                                       str::stream() << "Unable to find metadata for " << uri);
-    } else if (ret != 0) {
-        return StatusWith<std::string>(wtRCToStatus(ret));
-    }
-    const char* metadata = NULL;
-    ret = cursor->get_value(cursor, &metadata);
-    if (ret != 0) {
-        return StatusWith<std::string>(wtRCToStatus(ret));
-    }
-    invariant(metadata);
-    return StatusWith<std::string>(metadata);
+    return _getMetadata(cursor, uri);
 }
 
 Status WiredTigerUtil::getApplicationMetadata(OperationContext* opCtx,
@@ -460,7 +471,7 @@ WT_EVENT_HANDLER defaultEventHandlers() {
     handlers.handle_progress = mdb_handle_progress;
     return handlers;
 }
-}
+}  // namespace
 
 WiredTigerEventHandler::WiredTigerEventHandler() {
     WT_EVENT_HANDLER* handler = static_cast<WT_EVENT_HANDLER*>(this);
@@ -574,7 +585,7 @@ Status WiredTigerUtil::setTableLogging(WT_SESSION* session, const std::string& u
     //
     // If the settings need to be changed (only expected at startup), the alter table call must
     // succeed.
-    std::string existingMetadata = getMetadataRaw(session, uri).getValue();
+    std::string existingMetadata = getMetadataCreate(session, uri).getValue();
     if (existingMetadata.find("log=(enabled=true)") != std::string::npos &&
         existingMetadata.find("log=(enabled=false)") != std::string::npos) {
         // Sanity check against a table having multiple logging specifications.
