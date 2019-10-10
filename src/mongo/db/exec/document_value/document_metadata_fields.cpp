@@ -234,4 +234,37 @@ Value DocumentMetadataFields::deserializeSortKey(bool isSingleElementKey,
     return Value{std::move(keys)};
 }
 
+const char* DocumentMetadataFields::typeNameToDebugString(DocumentMetadataFields::MetaType type) {
+    switch (type) {
+        case DocumentMetadataFields::kGeoNearDist:
+            return "$geoNear distance";
+        case DocumentMetadataFields::kGeoNearPoint:
+            return "$geoNear point";
+        case DocumentMetadataFields::kIndexKey:
+            return "index key";
+        case DocumentMetadataFields::kRandVal:
+            return "rand val";
+        case DocumentMetadataFields::kRecordId:
+            return "record ID";
+        case DocumentMetadataFields::kSearchHighlights:
+            return "$searchBeta highlights";
+        case DocumentMetadataFields::kSearchScore:
+            return "$searchBeta score";
+        case DocumentMetadataFields::kSortKey:
+            return "sort key";
+        case DocumentMetadataFields::kTextScore:
+            return "text score";
+        default:
+            MONGO_UNREACHABLE;
+    }
+}  // namespace
+
+
+std::ostream& operator<<(std::ostream& stream, DocumentMetadataFields::MetaType type) {
+    return stream << DocumentMetadataFields::typeNameToDebugString(type);
+}
+
+StringBuilder& operator<<(StringBuilder& stream, DocumentMetadataFields::MetaType type) {
+    return stream << DocumentMetadataFields::typeNameToDebugString(type);
+}
 }  // namespace mongo

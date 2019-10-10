@@ -82,7 +82,7 @@ private:
     /**
      * Transforms 'obj' into a Document, calculating the distance.
      */
-    Document transformBSONObjToDocument(const BSONObj& obj) const final;
+    Document transformDoc(Document&& obj) const override final;
 
     // The output field in which to store the computed distance.
     FieldPath _distanceField;

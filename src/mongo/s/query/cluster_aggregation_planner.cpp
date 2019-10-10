@@ -210,17 +210,13 @@ void propagateDocLimitToShards(Pipeline* shardPipe, Pipeline* mergePipe) {
  * Documents.
  */
 void limitFieldsSentFromShardsToMerger(Pipeline* shardPipe, Pipeline* mergePipe) {
-    DepsTracker mergeDeps(mergePipe->getDependencies(DepsTracker::kAllMetadataAvailable));
+    DepsTracker mergeDeps(mergePipe->getDependencies(DepsTracker::kAllMetadata));
     if (mergeDeps.needWholeDocument)
         return;  // the merge needs all fields, so nothing we can do.
 
     // Empty project is "special" so if no fields are needed, we just ask for _id instead.
     if (mergeDeps.fields.empty())
         mergeDeps.fields.insert("_id");
-
-    // Remove metadata from dependencies since it automatically flows through projection and we
-    // don't want to project it in to the document.
-    mergeDeps.setNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE, false);
 
     // HEURISTIC: only apply optimization if none of the shard stages have an exhaustive list of
     // field dependencies. While this may not be 100% ideal in all cases, it is simple and
@@ -232,13 +228,14 @@ void limitFieldsSentFromShardsToMerger(Pipeline* shardPipe, Pipeline* mergePipe)
     // 2) Optimization IS NOT applied immediately following a $project or $group since it would
     //    add an unnecessary project (and therefore a deep-copy).
     for (auto&& source : shardPipe->getSources()) {
-        DepsTracker dt(DepsTracker::kAllMetadataAvailable);
+        DepsTracker dt(DepsTracker::kAllMetadata);
         if (source->getDependencies(&dt) & DepsTracker::State::EXHAUSTIVE_FIELDS)
             return;
     }
     // if we get here, add the project.
     boost::intrusive_ptr<DocumentSource> project = DocumentSourceProject::createFromBson(
-        BSON("$project" << mergeDeps.toProjection()).firstElement(), shardPipe->getContext());
+        BSON("$project" << mergeDeps.toProjectionWithoutMetadata()).firstElement(),
+        shardPipe->getContext());
     shardPipe->pushBack(project);
 }
 

@@ -277,10 +277,15 @@ public:
             // If an awaitData getMore is killed during this process due to our max time expiring at
             // an interrupt point, we just continue as normal and return rather than reporting a
             // timeout to the user.
-            BSONObj obj;
+            Document doc;
             try {
                 while (!FindCommon::enoughForGetMore(request.batchSize.value_or(0), *numResults) &&
-                       PlanExecutor::ADVANCED == (*state = exec->getNext(&obj, nullptr))) {
+                       PlanExecutor::ADVANCED == (*state = exec->getNext(&doc, nullptr))) {
+                    auto* expCtx = exec->getExpCtx().get();
+                    BSONObj obj = cursor->needsMerge()
+                        ? doc.toBsonWithMetaData(expCtx ? expCtx->use42ChangeStreamSortKeys : false)
+                        : doc.toBson();
+
                     // If adding this object will cause us to exceed the message size limit, then we
                     // stash it for later.
                     if (!FindCommon::haveSpaceForNext(obj, *numResults, nextBatch->bytesUsed())) {
@@ -305,7 +310,7 @@ public:
             switch (*state) {
                 case PlanExecutor::FAILURE: {
                     // We should always have a valid status member object at this point.
-                    auto status = WorkingSetCommon::getMemberObjectStatus(obj);
+                    auto status = WorkingSetCommon::getMemberObjectStatus(doc);
                     invariant(!status.isOK());
                     // Log an error message and then perform the cleanup.
                     warning() << "GetMore command executor error: "

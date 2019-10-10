@@ -493,6 +493,10 @@ constexpr StringData Document::metaFieldSearchHighlights;
 BSONObj Document::toBsonWithMetaData(bool use42ChangeStreamSortKeys) const {
     BSONObjBuilder bb;
     toBson(&bb);
+    if (!metadata()) {
+        return bb.obj();
+    }
+
     if (metadata().hasTextScore())
         bb.append(metaFieldTextScore, metadata().getTextScore());
     if (metadata().hasRandVal())

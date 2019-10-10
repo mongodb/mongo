@@ -133,6 +133,20 @@ public:
     }
 
     /**
+     * Returns a bitset indicating what metadata has been requested in the query.
+     */
+    const QueryMetadataBitSet& metadataDeps() const {
+        return _metadataDeps;
+    }
+
+    /**
+     * Allows callers to request metadata in addition to that needed as part of the query.
+     */
+    void requestAdditionalMetadata(const QueryMetadataBitSet& additionalDeps) {
+        _metadataDeps |= additionalDeps;
+    }
+
+    /**
      * Compute the "shape" of this query by encoding the match, projection and sort, and stripping
      * out the appropriate values.
      */
@@ -209,6 +223,9 @@ private:
     std::unique_ptr<MatchExpression> _root;
 
     boost::optional<projection_ast::Projection> _proj;
+
+    // Keeps track of what metadata has been explicitly requested.
+    QueryMetadataBitSet _metadataDeps;
 
     std::unique_ptr<CollatorInterface> _collator;
 

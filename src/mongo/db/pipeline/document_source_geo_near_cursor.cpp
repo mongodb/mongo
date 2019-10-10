@@ -83,14 +83,14 @@ const char* DocumentSourceGeoNearCursor::getSourceName() const {
     return DocumentSourceGeoNearCursor::kStageName.rawData();
 }
 
-Document DocumentSourceGeoNearCursor::transformBSONObjToDocument(const BSONObj& obj) const {
-    MutableDocument output(Document::fromBsonWithMetaData(obj));
+Document DocumentSourceGeoNearCursor::transformDoc(Document&& objInput) const {
+    MutableDocument output(std::move(objInput));
 
     // Scale the distance by the requested factor.
     invariant(output.peek().metadata().hasGeoNearDistance(),
               str::stream()
                   << "Query returned a document that is unexpectedly missing the geoNear distance: "
-                  << obj.jsonString());
+                  << output.peek().toString());
     const auto distance = output.peek().metadata().getGeoNearDistance() * _distanceMultiplier;
 
     output.setNestedField(_distanceField, Value(distance));
@@ -99,7 +99,7 @@ Document DocumentSourceGeoNearCursor::transformBSONObjToDocument(const BSONObj& 
             output.peek().metadata().hasGeoNearPoint(),
             str::stream()
                 << "Query returned a document that is unexpectedly missing the geoNear point: "
-                << obj.jsonString());
+                << output.peek().toString());
         output.setNestedField(*_locationField, output.peek().metadata().getGeoNearPoint());
     }
 

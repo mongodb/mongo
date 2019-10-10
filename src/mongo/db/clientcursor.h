@@ -82,7 +82,8 @@ struct ClientCursorParams {
                        repl::ReadConcernArgs readConcernArgs,
                        BSONObj originatingCommandObj,
                        LockPolicy lockPolicy,
-                       PrivilegeVector originatingPrivileges)
+                       PrivilegeVector originatingPrivileges,
+                       bool needsMerge)
         : exec(std::move(planExecutor)),
           nss(std::move(nss)),
           writeConcernOptions(std::move(writeConcernOptions)),
@@ -92,7 +93,8 @@ struct ClientCursorParams {
                            : 0),
           originatingCommandObj(originatingCommandObj.getOwned()),
           lockPolicy(lockPolicy),
-          originatingPrivileges(std::move(originatingPrivileges)) {
+          originatingPrivileges(std::move(originatingPrivileges)),
+          needsMerge(needsMerge) {
         while (authenticatedUsersIter.more()) {
             authenticatedUsers.emplace_back(authenticatedUsersIter.next());
         }
@@ -121,6 +123,7 @@ struct ClientCursorParams {
     BSONObj originatingCommandObj;
     const LockPolicy lockPolicy;
     PrivilegeVector originatingPrivileges;
+    const bool needsMerge;
 };
 
 /**
@@ -170,6 +173,10 @@ public:
 
     WriteConcernOptions getWriteConcernOptions() const {
         return _writeConcernOptions;
+    }
+
+    bool needsMerge() const {
+        return _needsMerge;
     }
 
     /**
@@ -400,6 +407,13 @@ private:
     const int _queryOptions = 0;
 
     const ClientCursorParams::LockPolicy _lockPolicy;
+
+    // The value of a flag specified on the originating command which indicates whether the result
+    // of this cursor will be consumed by a merging node (mongos or a mongod selected to perform a
+    // merge). Note that this flag is only set for aggregate() commands, and not for find()
+    // commands. It is therefore possible that 'needsMerge' is false when in fact there will be a
+    // merge performed.
+    const bool _needsMerge;
 
     // Unused maxTime budget for this cursor.
     Microseconds _leftoverMaxTimeMicros = Microseconds::max();

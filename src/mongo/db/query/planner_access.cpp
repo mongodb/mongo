@@ -285,20 +285,17 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
             auto ret = std::make_unique<GeoNear2DNode>(index);
             ret->nq = &nearExpr->getData();
             ret->baseBounds.fields.resize(index.keyPattern.nFields());
-            if (nullptr != query.getProj()) {
-                ret->addPointMeta = query.getProj()->wantGeoNearPoint();
-                ret->addDistMeta = query.getProj()->wantGeoNearDistance();
-            }
+            ret->addPointMeta = query.metadataDeps()[DocumentMetadataFields::kGeoNearPoint];
+            ret->addDistMeta = query.metadataDeps()[DocumentMetadataFields::kGeoNearDist];
 
             return std::move(ret);
         } else {
             auto ret = std::make_unique<GeoNear2DSphereNode>(index);
             ret->nq = &nearExpr->getData();
             ret->baseBounds.fields.resize(index.keyPattern.nFields());
-            if (nullptr != query.getProj()) {
-                ret->addPointMeta = query.getProj()->wantGeoNearPoint();
-                ret->addDistMeta = query.getProj()->wantGeoNearDistance();
-            }
+            ret->addPointMeta = query.metadataDeps()[DocumentMetadataFields::kGeoNearPoint];
+            ret->addDistMeta = query.metadataDeps()[DocumentMetadataFields::kGeoNearDist];
+
             return std::move(ret);
         }
     } else if (MatchExpression::TEXT == expr->matchType()) {

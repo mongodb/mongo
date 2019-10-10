@@ -199,13 +199,14 @@ public:
                 opCtx, std::move(ws), std::move(root), nullptr, PlanExecutor::NO_YIELD, nss));
 
             for (long long objCount = 0; objCount < batchSize; objCount++) {
-                BSONObj next;
-                PlanExecutor::ExecState state = exec->getNext(&next, nullptr);
+                Document nextDoc;
+                PlanExecutor::ExecState state = exec->getNext(&nextDoc, nullptr);
                 if (state == PlanExecutor::IS_EOF) {
                     break;
                 }
                 invariant(state == PlanExecutor::ADVANCED);
 
+                BSONObj next = nextDoc.toBson();
                 // If we can't fit this result inside the current batch, then we stash it for later.
                 if (!FindCommon::haveSpaceForNext(next, objCount, firstBatch.len())) {
                     exec->enqueue(next);
@@ -227,14 +228,17 @@ public:
 
         const auto pinnedCursor = CursorManager::get(opCtx)->registerCursor(
             opCtx,
-            {std::move(exec),
-             nss,
-             AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
-             opCtx->getWriteConcern(),
-             repl::ReadConcernArgs::get(opCtx),
-             cmdObj,
-             ClientCursorParams::LockPolicy::kLocksInternally,
-             {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::listIndexes)}});
+            {
+                std::move(exec),
+                nss,
+                AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
+                opCtx->getWriteConcern(),
+                repl::ReadConcernArgs::get(opCtx),
+                cmdObj,
+                ClientCursorParams::LockPolicy::kLocksInternally,
+                {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::listIndexes)},
+                false  // needsMerge always 'false' for listIndexes.
+            });
 
         appendCursorResponseObject(
             pinnedCursor.getCursor()->cursorid(), nss.ns(), firstBatch.arr(), &result);

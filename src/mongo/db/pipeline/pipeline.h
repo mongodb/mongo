@@ -251,7 +251,7 @@ public:
      * Returns the dependencies needed by this pipeline. 'metadataAvailable' should reflect what
      * metadata is present on documents that are input to the front of the pipeline.
      */
-    DepsTracker getDependencies(DepsTracker::MetadataAvailable metadataAvailable) const;
+    DepsTracker getDependencies(QueryMetadataBitSet metadataAvailable) const;
 
     const SourceContainer& getSources() const {
         return _sources;

@@ -172,15 +172,15 @@ bool handleCursorCommand(OperationContext* opCtx,
     auto exec = cursor->getExecutor();
     invariant(exec);
 
-    BSONObj next;
     bool stashedResult = false;
     for (int objCount = 0; objCount < batchSize; objCount++) {
         // The initial getNext() on a PipelineProxyStage may be very expensive so we don't
         // do it when batchSize is 0 since that indicates a desire for a fast return.
         PlanExecutor::ExecState state;
+        Document nextDoc;
 
         try {
-            state = exec->getNext(&next, nullptr);
+            state = exec->getNext(&nextDoc, nullptr);
         } catch (const ExceptionFor<ErrorCodes::CloseChangeStream>&) {
             // This exception is thrown when a $changeStream stage encounters an event
             // that invalidates the cursor. We should close the cursor and return without
@@ -201,7 +201,7 @@ bool handleCursorCommand(OperationContext* opCtx,
 
         if (PlanExecutor::ADVANCED != state) {
             // We should always have a valid status member object at this point.
-            auto status = WorkingSetCommon::getMemberObjectStatus(next);
+            auto status = WorkingSetCommon::getMemberObjectStatus(nextDoc);
             invariant(!status.isOK());
             warning() << "Aggregate command executor error: " << PlanExecutor::statestr(state)
                       << ", status: " << status
@@ -212,8 +212,13 @@ bool handleCursorCommand(OperationContext* opCtx,
 
         // If adding this object will cause us to exceed the message size limit, then we stash it
         // for later.
+
+        auto* expCtx = exec->getExpCtx().get();
+        BSONObj next = expCtx->needsMerge
+            ? nextDoc.toBsonWithMetaData(expCtx ? expCtx->use42ChangeStreamSortKeys : false)
+            : nextDoc.toBson();
         if (!FindCommon::haveSpaceForNext(next, objCount, responseBuilder.bytesUsed())) {
-            exec->enqueue(next);
+            exec->enqueue(nextDoc);
             stashedResult = true;
             break;
         }
@@ -720,7 +725,8 @@ Status runAggregate(OperationContext* opCtx,
             repl::ReadConcernArgs::get(opCtx),
             cmdObj,
             lockPolicy,
-            privileges);
+            privileges,
+            expCtx->needsMerge);
         if (expCtx->tailableMode == TailableModeEnum::kTailable) {
             cursorParams.setTailable(true);
         } else if (expCtx->tailableMode == TailableModeEnum::kTailableAndAwaitData) {

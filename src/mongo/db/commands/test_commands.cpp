@@ -161,7 +161,7 @@ public:
                 opCtx, fullNs.ns(), collection, PlanExecutor::NO_YIELD, InternalPlanner::BACKWARD);
 
             for (int i = 0; i < n + 1; ++i) {
-                PlanExecutor::ExecState state = exec->getNext(nullptr, &end);
+                PlanExecutor::ExecState state = exec->getNext(static_cast<BSONObj*>(nullptr), &end);
                 if (PlanExecutor::ADVANCED != state) {
                     uasserted(ErrorCodes::IllegalOperation,
                               str::stream() << "invalid n, collection contains fewer than " << n

@@ -265,7 +265,7 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
             // practice, this means that it is illegal to use the StageBuilder on a QuerySolution
             // created by planning a query that contains "no-op" expressions.
             params.query = static_cast<FTSQueryImpl&>(*node->ftsQuery);
-            params.wantTextScore = (cq.getProj() && cq.getProj()->wantTextScore());
+            params.wantTextScore = cq.metadataDeps()[DocumentMetadataFields::kTextScore];
             return std::make_unique<TextStage>(opCtx, params, ws, node->filter.get());
         }
         case STAGE_SHARDING_FILTER: {

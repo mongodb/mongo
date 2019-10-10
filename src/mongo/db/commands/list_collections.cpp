@@ -362,14 +362,15 @@ public:
                 opCtx, std::move(ws), std::move(root), nullptr, PlanExecutor::NO_YIELD, cursorNss));
 
             for (long long objCount = 0; objCount < batchSize; objCount++) {
-                BSONObj next;
-                PlanExecutor::ExecState state = exec->getNext(&next, nullptr);
+                Document nextDoc;
+                PlanExecutor::ExecState state = exec->getNext(&nextDoc, nullptr);
                 if (state == PlanExecutor::IS_EOF) {
                     break;
                 }
                 invariant(state == PlanExecutor::ADVANCED);
 
                 // If we can't fit this result inside the current batch, then we stash it for later.
+                BSONObj next = nextDoc.toBson();
                 if (!FindCommon::haveSpaceForNext(next, objCount, firstBatch.len())) {
                     exec->enqueue(next);
                     break;
@@ -387,15 +388,18 @@ public:
 
         auto pinnedCursor = CursorManager::get(opCtx)->registerCursor(
             opCtx,
-            {std::move(exec),
-             cursorNss,
-             AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
-             opCtx->getWriteConcern(),
-             repl::ReadConcernArgs::get(opCtx),
-             jsobj,
-             ClientCursorParams::LockPolicy::kLocksInternally,
-             uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
-                                 ->checkAuthorizedToListCollections(dbname, jsobj))});
+            {
+                std::move(exec),
+                cursorNss,
+                AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
+                opCtx->getWriteConcern(),
+                repl::ReadConcernArgs::get(opCtx),
+                jsobj,
+                ClientCursorParams::LockPolicy::kLocksInternally,
+                uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
+                                    ->checkAuthorizedToListCollections(dbname, jsobj)),
+                false  // needsMerge always 'false' for listCollections.
+            });
 
         appendCursorResponseObject(
             pinnedCursor.getCursor()->cursorid(), cursorNss.ns(), firstBatch.arr(), &result);

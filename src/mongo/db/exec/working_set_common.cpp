@@ -100,7 +100,7 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
     return true;
 }
 
-BSONObj WorkingSetCommon::buildMemberStatusObject(const Status& status) {
+Document WorkingSetCommon::buildMemberStatusObject(const Status& status) {
     BSONObjBuilder bob;
     bob.append("ok", status.isOK() ? 1.0 : 0.0);
     bob.append("code", status.code());
@@ -109,7 +109,7 @@ BSONObj WorkingSetCommon::buildMemberStatusObject(const Status& status) {
         extraInfo->serialize(&bob);
     }
 
-    return bob.obj();
+    return Document{bob.obj()};
 }
 
 WorkingSetID WorkingSetCommon::allocateStatusMember(WorkingSet* ws, const Status& status) {
@@ -117,14 +117,19 @@ WorkingSetID WorkingSetCommon::allocateStatusMember(WorkingSet* ws, const Status
 
     WorkingSetID wsid = ws->allocate();
     WorkingSetMember* member = ws->get(wsid);
-    member->resetDocument(SnapshotId(), buildMemberStatusObject(status));
+    member->doc = {SnapshotId(), buildMemberStatusObject(status)};
     member->transitionToOwnedObj();
 
     return wsid;
 }
 
+bool WorkingSetCommon::isValidStatusMemberObject(const Document& obj) {
+    return !obj["ok"].missing() && obj["code"].getType() == BSONType::NumberInt &&
+        obj["errmsg"].getType() == BSONType::String;
+}
+
 bool WorkingSetCommon::isValidStatusMemberObject(const BSONObj& obj) {
-    return obj.hasField("ok") && obj["code"].type() == NumberInt && obj["errmsg"].type() == String;
+    return isValidStatusMemberObject(Document{obj});
 }
 
 boost::optional<Document> WorkingSetCommon::getStatusMemberDocument(const WorkingSet& ws,
@@ -136,8 +141,8 @@ boost::optional<Document> WorkingSetCommon::getStatusMemberDocument(const Workin
     if (!member->hasOwnedObj()) {
         return boost::none;
     }
-    BSONObj obj = member->doc.value().toBson();
-    if (!isValidStatusMemberObject(obj)) {
+
+    if (!isValidStatusMemberObject(member->doc.value())) {
         return boost::none;
     }
     return member->doc.value();
@@ -150,17 +155,22 @@ Status WorkingSetCommon::getMemberObjectStatus(const BSONObj& memberObj) {
                   memberObj);
 }
 
+Status WorkingSetCommon::getMemberObjectStatus(const Document& doc) {
+    return getMemberObjectStatus(doc.toBson());
+}
+
 Status WorkingSetCommon::getMemberStatus(const WorkingSetMember& member) {
     invariant(member.hasObj());
     return getMemberObjectStatus(member.doc.value().toBson());
 }
 
 std::string WorkingSetCommon::toStatusString(const BSONObj& obj) {
-    if (!isValidStatusMemberObject(obj)) {
+    Document doc{obj};
+    if (!isValidStatusMemberObject(doc)) {
         Status unknownStatus(ErrorCodes::UnknownError, "no details available");
         return unknownStatus.toString();
     }
-    return getMemberObjectStatus(obj).toString();
+    return getMemberObjectStatus(doc).toString();
 }
 
 }  // namespace mongo

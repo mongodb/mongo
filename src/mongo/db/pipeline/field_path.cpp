@@ -47,17 +47,12 @@ const StringDataSet kAllowedDollarPrefixedFields = {
 
     // Metadata fields.
 
-    // TODO SERVER-42560: It may be possible to eliminate some of these, if they're only used for
-    // creating the "dependency" projection. Some of them ($dis and $sortKey) may be used in
-    // sharded queries and are necessary.
+    // This is necessary for sharded query execution of find() commands. mongos may attach a
+    // $sortKey field to the projection sent to shards so that it can merge the results correctly.
     "$sortKey",
-    "$pt",
-    "$dis",
-    "$textScore",
-    "$recordId",
 
-    // Used internally for forcing projections to be of a certain type.
-    "$__INTERNAL_QUERY_PROJECTION_RESERVED"};
+    // This is necessary for the "showRecordId" feature.
+    "$recordId"};
 
 }  // namespace
 

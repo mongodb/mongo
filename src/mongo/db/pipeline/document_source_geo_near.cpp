@@ -225,8 +225,8 @@ DepsTracker::State DocumentSourceGeoNear::getDependencies(DepsTracker* deps) con
     // produced by this stage, and we could inform the query system that it need not include it in
     // its response. For now, assume that we require the entire document as well as the appropriate
     // geoNear metadata.
-    deps->setNeedsMetadata(DepsTracker::MetadataType::GEO_NEAR_DISTANCE, true);
-    deps->setNeedsMetadata(DepsTracker::MetadataType::GEO_NEAR_POINT, needsGeoNearPoint());
+    deps->setNeedsMetadata(DocumentMetadataFields::kGeoNearDist, true);
+    deps->setNeedsMetadata(DocumentMetadataFields::kGeoNearPoint, needsGeoNearPoint());
 
     deps->needWholeDocument = true;
     return DepsTracker::State::EXHAUSTIVE_FIELDS;

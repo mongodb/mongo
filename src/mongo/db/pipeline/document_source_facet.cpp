@@ -305,14 +305,14 @@ DepsTracker::State DocumentSourceFacet::getDependencies(DepsTracker* deps) const
 
         // The text score is the only type of metadata that could be needed by $facet.
         deps->setNeedsMetadata(
-            DepsTracker::MetadataType::TEXT_SCORE,
-            deps->getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE) ||
-                subDepsTracker.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));
+            DocumentMetadataFields::kTextScore,
+            deps->getNeedsMetadata(DocumentMetadataFields::kTextScore) ||
+                subDepsTracker.getNeedsMetadata(DocumentMetadataFields::kTextScore));
 
         // If there are variables defined at this stage's scope, there may be dependencies upon
         // them in subsequent pipelines. Keep enumerating.
-        if (deps->needWholeDocument &&
-            deps->getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE) && !scopeHasVariables) {
+        if (deps->needWholeDocument && deps->getNeedsMetadata(DocumentMetadataFields::kTextScore) &&
+            !scopeHasVariables) {
             break;
         }
     }

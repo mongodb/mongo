@@ -73,13 +73,6 @@ DocumentSource::GetNextResult DocumentSourceCursor::doGetNext() {
     return std::move(out);
 }
 
-Document DocumentSourceCursor::transformBSONObjToDocument(const BSONObj& obj) const {
-    // Aggregation assumes ownership of underlying BSON.
-    return _dependencies ? _dependencies->extractFields(obj)
-                         : (_inputHasMetadata ? Document::fromBsonWithMetaData(obj.getOwned())
-                                              : Document(obj.getOwned()));
-}
-
 void DocumentSourceCursor::loadBatch() {
     if (!_exec || _exec->isDisposed()) {
         // No more documents.
@@ -92,7 +85,7 @@ void DocumentSourceCursor::loadBatch() {
     }
 
     PlanExecutor::ExecState state;
-    BSONObj resultObj;
+    Document resultObj;
     {
         AutoGetCollectionForRead autoColl(pExpCtx->opCtx, _exec->nss());
         uassertStatusOK(repl::ReplicationCoordinator::get(pExpCtx->opCtx)
@@ -108,7 +101,7 @@ void DocumentSourceCursor::loadBatch() {
                 if (_shouldProduceEmptyDocs) {
                     _currentBatch.push_back(Document());
                 } else {
-                    _currentBatch.push_back(transformBSONObjToDocument(resultObj));
+                    _currentBatch.push_back(transformDoc(resultObj.getOwned()));
                 }
 
                 if (_limit) {
@@ -227,9 +220,6 @@ Value DocumentSourceCursor::serialize(boost::optional<ExplainOptions::Verbosity>
 
     if (_limit)
         out["limit"] = Value(_limit->getLimit());
-
-    if (!_projection.isEmpty())
-        out["fields"] = Value(_projection);
 
     BSONObjBuilder explainStatsBuilder;
 

@@ -36,7 +36,6 @@
 #include "mongo/db/record_id.h"
 
 namespace mongo {
-
 /**
  * This class represents the metadata that the query execution engine can associate with a
  * particular intermediate result (either index key or document) passing between execution stages.
@@ -55,7 +54,8 @@ namespace mongo {
 class DocumentMetadataFields {
 public:
     enum MetaType : char {
-        kGeoNearDist,
+        // Start from 1 so that these values can be stored in a bitset.
+        kGeoNearDist = 1,
         kGeoNearPoint,
         kIndexKey,
         kRandVal,
@@ -89,6 +89,11 @@ public:
      * in-memory comparisons. BSONObj {'': 1, '': [2, 3]} becomes Value [1, [2, 3]].
      */
     static Value deserializeSortKey(bool isSingleElementKey, const BSONObj& bsonSortKey);
+
+    /**
+     * Given a metadata type, return a (debug) string representation.
+     */
+    static const char* typeNameToDebugString(DocumentMetadataFields::MetaType type);
 
     /**
      * Constructs a new DocumentMetadataFields in an uninitialized state.
@@ -324,4 +329,9 @@ private:
     std::unique_ptr<MetadataHolder> _holder;
 };
 
+using QueryMetadataBitSet = std::bitset<DocumentMetadataFields::MetaType::kNumFields>;
+
+// Prints the metadata's name to the given stream.
+std::ostream& operator<<(std::ostream& stream, DocumentMetadataFields::MetaType type);
+StringBuilder& operator<<(StringBuilder& sb, DocumentMetadataFields::MetaType type);
 }  // namespace mongo

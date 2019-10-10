@@ -731,7 +731,7 @@ DepsTracker::State DocumentSourceLookUp::getDependencies(DepsTracker* deps) cons
         // subpipeline for the top-level pipeline. So without knowledge of what metadata is in fact
         // available, we "lie" and say that all metadata is available to avoid tripping any
         // assertions.
-        DepsTracker subDeps(DepsTracker::kAllMetadataAvailable);
+        DepsTracker subDeps(DepsTracker::kAllMetadata);
 
         // Get the subpipeline dependencies. Subpipeline stages may reference both 'let' variables
         // declared by this $lookup and variables declared externally.

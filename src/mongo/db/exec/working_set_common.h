@@ -56,9 +56,9 @@ public:
                       unowned_ptr<SeekableRecordCursor> cursor);
 
     /**
-     * Build a BSONObj which represents a Status to return in a WorkingSet.
+     * Build a Document which represents a Status to return in a WorkingSet.
      */
-    static BSONObj buildMemberStatusObject(const Status& status);
+    static Document buildMemberStatusObject(const Status& status);
 
     /**
      * Allocate a new WSM and initialize it with
@@ -75,6 +75,7 @@ public:
     /**
      * Returns true if object was created by allocateStatusMember().
      */
+    static bool isValidStatusMemberObject(const Document& obj);
     static bool isValidStatusMemberObject(const BSONObj& obj);
 
     /**
@@ -89,6 +90,7 @@ public:
      * Assumes isValidStatusMemberObject().
      */
     static Status getMemberObjectStatus(const BSONObj& memberObj);
+    static Status getMemberObjectStatus(const Document& memberObj);
 
     /**
      * Returns status from working set member created with allocateStatusMember().

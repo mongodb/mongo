@@ -324,6 +324,10 @@ OperationContext* PlanExecutorImpl::getOpCtx() const {
     return _opCtx;
 }
 
+const boost::intrusive_ptr<ExpressionContext>& PlanExecutorImpl::getExpCtx() const {
+    return _expCtx;
+}
+
 void PlanExecutorImpl::saveState() {
     invariant(_currentState == kUsable || _currentState == kSaved);
 
@@ -377,7 +381,16 @@ void PlanExecutorImpl::reattachToOperationContext(OperationContext* opCtx) {
 }
 
 PlanExecutor::ExecState PlanExecutorImpl::getNext(BSONObj* objOut, RecordId* dlOut) {
-    Snapshotted<BSONObj> snapshotted;
+    Document doc;
+    const auto state = getNext(&doc, dlOut);
+    if (objOut) {
+        *objOut = doc.toBson();
+    }
+    return state;
+}
+
+PlanExecutor::ExecState PlanExecutorImpl::getNext(Document* objOut, RecordId* dlOut) {
+    Snapshotted<Document> snapshotted;
     ExecState state = _getNextImpl(objOut ? &snapshotted : nullptr, dlOut);
 
     if (objOut) {
@@ -387,11 +400,23 @@ PlanExecutor::ExecState PlanExecutorImpl::getNext(BSONObj* objOut, RecordId* dlO
     return state;
 }
 
-PlanExecutor::ExecState PlanExecutorImpl::getNextSnapshotted(Snapshotted<BSONObj>* objOut,
+PlanExecutor::ExecState PlanExecutorImpl::getNextSnapshotted(Snapshotted<Document>* objOut,
                                                              RecordId* dlOut) {
     // Detaching from the OperationContext means that the returned snapshot ids could be invalid.
     invariant(!_everDetachedFromOperationContext);
     return _getNextImpl(objOut, dlOut);
+}
+
+PlanExecutor::ExecState PlanExecutorImpl::getNextSnapshotted(Snapshotted<BSONObj>* objOut,
+                                                             RecordId* dlOut) {
+    // Detaching from the OperationContext means that the returned snapshot ids could be invalid.
+    invariant(!_everDetachedFromOperationContext);
+    Snapshotted<Document> docOut;
+    const auto status = _getNextImpl(&docOut, dlOut);
+    if (objOut) {
+        *objOut = {docOut.snapshotId(), docOut.value().toBson()};
+    }
+    return status;
 }
 
 bool PlanExecutorImpl::_shouldListenForInserts() {
@@ -438,7 +463,7 @@ std::shared_ptr<CappedInsertNotifier> PlanExecutorImpl::_getCappedInsertNotifier
 }
 
 PlanExecutor::ExecState PlanExecutorImpl::_waitForInserts(CappedInsertNotifierData* notifierData,
-                                                          Snapshotted<BSONObj>* errorObj) {
+                                                          Snapshotted<Document>* errorObj) {
     invariant(notifierData->notifier);
 
     // The notifier wait() method will not wait unless the version passed to it matches the
@@ -463,19 +488,19 @@ PlanExecutor::ExecState PlanExecutorImpl::_waitForInserts(CappedInsertNotifierDa
     }
 
     if (errorObj) {
-        *errorObj = Snapshotted<BSONObj>(SnapshotId(),
-                                         WorkingSetCommon::buildMemberStatusObject(yieldResult));
+        *errorObj = Snapshotted<Document>(SnapshotId(),
+                                          WorkingSetCommon::buildMemberStatusObject(yieldResult));
     }
     return FAILURE;
 }
 
-PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<BSONObj>* objOut,
+PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* objOut,
                                                        RecordId* dlOut) {
     if (MONGO_unlikely(planExecutorAlwaysFails.shouldFail())) {
         Status status(ErrorCodes::InternalError,
                       str::stream() << "PlanExecutor hit planExecutorAlwaysFails fail point");
         *objOut =
-            Snapshotted<BSONObj>(SnapshotId(), WorkingSetCommon::buildMemberStatusObject(status));
+            Snapshotted<Document>(SnapshotId(), WorkingSetCommon::buildMemberStatusObject(status));
 
         return PlanExecutor::FAILURE;
     }
@@ -483,8 +508,8 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<BSONObj>* obj
     invariant(_currentState == kUsable);
     if (isMarkedAsKilled()) {
         if (nullptr != objOut) {
-            *objOut = Snapshotted<BSONObj>(SnapshotId(),
-                                           WorkingSetCommon::buildMemberStatusObject(_killStatus));
+            *objOut = Snapshotted<Document>(SnapshotId(),
+                                            WorkingSetCommon::buildMemberStatusObject(_killStatus));
         }
         return PlanExecutor::FAILURE;
     }
@@ -517,7 +542,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<BSONObj>* obj
             auto yieldStatus = _yieldPolicy->yieldOrInterrupt();
             if (!yieldStatus.isOK()) {
                 if (objOut) {
-                    *objOut = Snapshotted<BSONObj>(
+                    *objOut = Snapshotted<Document>(
                         SnapshotId(), WorkingSetCommon::buildMemberStatusObject(yieldStatus));
                 }
                 return PlanExecutor::FAILURE;
@@ -542,15 +567,11 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<BSONObj>* obj
                     } else {
                         // TODO: currently snapshot ids are only associated with documents, and
                         // not with index keys.
-                        *objOut = Snapshotted<BSONObj>(SnapshotId(), member->keyData[0].keyData);
+                        *objOut = Snapshotted<Document>(SnapshotId(),
+                                                        Document{member->keyData[0].keyData});
                     }
                 } else if (member->hasObj()) {
-                    *objOut = Snapshotted<BSONObj>(
-                        member->doc.snapshotId(),
-                        member->metadata() && member->doc.value().metadata()
-                            ? member->doc.value().toBsonWithMetaData(
-                                  _expCtx ? _expCtx->use42ChangeStreamSortKeys : false)
-                            : member->doc.value().toBson());
+                    *objOut = member->doc;
                 } else {
                     _workingSet->free(id);
                     hasRequestedData = false;
@@ -567,6 +588,12 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<BSONObj>* obj
             }
 
             if (hasRequestedData) {
+                // transfer the metadata from the WSM to Document.
+                invariant(objOut);
+                MutableDocument md(std::move(objOut->value()));
+                md.setMetadata(member->releaseMetadata());
+                objOut->setValue(md.freeze());
+
                 _workingSet->free(id);
                 return PlanExecutor::ADVANCED;
             }
@@ -609,9 +636,8 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<BSONObj>* obj
 
             if (nullptr != objOut) {
                 invariant(WorkingSet::INVALID_ID != id);
-                BSONObj statusObj =
-                    WorkingSetCommon::getStatusMemberDocument(*_workingSet, id)->toBson();
-                *objOut = Snapshotted<BSONObj>(SnapshotId(), statusObj);
+                auto statusObj = WorkingSetCommon::getStatusMemberDocument(*_workingSet, id);
+                *objOut = Snapshotted<Document>(SnapshotId(), *statusObj);
             }
 
             return PlanExecutor::FAILURE;
@@ -643,7 +669,7 @@ void PlanExecutorImpl::dispose(OperationContext* opCtx) {
 
 Status PlanExecutorImpl::executePlan() {
     invariant(_currentState == kUsable);
-    BSONObj obj;
+    Document obj;
     PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
     while (PlanExecutor::ADVANCED == state) {
         state = this->getNext(&obj, nullptr);
@@ -666,8 +692,12 @@ Status PlanExecutorImpl::executePlan() {
 }
 
 
-void PlanExecutorImpl::enqueue(const BSONObj& obj) {
+void PlanExecutorImpl::enqueue(const Document& obj) {
     _stash.push(obj.getOwned());
+}
+
+void PlanExecutorImpl::enqueue(const BSONObj& obj) {
+    enqueue(Document{obj});
 }
 
 bool PlanExecutorImpl::isMarkedAsKilled() const {
@@ -701,8 +731,11 @@ BSONObj PlanExecutorImpl::getPostBatchResumeToken() const {
     return {};
 }
 
-Status PlanExecutorImpl::getMemberObjectStatus(const BSONObj& memberObj) const {
+Status PlanExecutorImpl::getMemberObjectStatus(const Document& memberObj) const {
     return WorkingSetCommon::getMemberObjectStatus(memberObj);
 }
 
+Status PlanExecutorImpl::getMemberObjectStatus(const BSONObj& memberObj) const {
+    return WorkingSetCommon::getMemberObjectStatus(memberObj);
+}
 }  // namespace mongo

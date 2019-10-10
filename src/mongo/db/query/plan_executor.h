@@ -289,6 +289,11 @@ public:
      */
     virtual OperationContext* getOpCtx() const = 0;
 
+    /**
+     * Return the ExpressionContext that the plan is currently executing with.
+     */
+    virtual const boost::intrusive_ptr<ExpressionContext>& getExpCtx() const = 0;
+
     //
     // Methods that just pass down to the PlanStage tree.
     //
@@ -352,10 +357,19 @@ public:
      * For write operations, the return depends on the particulars of the write stage.
      *
      * If a YIELD_AUTO policy is set, then this method may yield.
+     *
+     * The Documents returned by this method may not be owned. If the caller wants to ensure a
+     * returned Document is preserved across a yield, getOwned() should be called.
      */
+    virtual ExecState getNextSnapshotted(Snapshotted<Document>* objOut, RecordId* dlOut) = 0;
     virtual ExecState getNextSnapshotted(Snapshotted<BSONObj>* objOut, RecordId* dlOut) = 0;
 
-    virtual ExecState getNext(BSONObj* objOut, RecordId* dlOut) = 0;
+    virtual ExecState getNext(Document* objOut, RecordId* dlOut) = 0;
+
+    /**
+     * Will perform the Document -> BSON conversion for the caller.
+     */
+    virtual ExecState getNext(BSONObj* out, RecordId* dlOut) = 0;
 
     /**
      * Returns 'true' if the plan is done producing results (or writing), 'false' otherwise.
@@ -421,6 +435,7 @@ public:
      * If used in combination with getNextSnapshotted(), then the SnapshotId associated with
      * 'obj' will be null when 'obj' is dequeued.
      */
+    virtual void enqueue(const Document& obj) = 0;
     virtual void enqueue(const BSONObj& obj) = 0;
 
     virtual bool isMarkedAsKilled() const = 0;
@@ -442,8 +457,9 @@ public:
     virtual BSONObj getPostBatchResumeToken() const = 0;
 
     /**
-     * Turns a BSONObj representing an error status produced by getNext() into a Status.
+     * Turns a Document representing an error status produced by getNext() into a Status.
      */
+    virtual Status getMemberObjectStatus(const Document& memberObj) const = 0;
     virtual Status getMemberObjectStatus(const BSONObj& memberObj) const = 0;
 };
 

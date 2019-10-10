@@ -44,9 +44,6 @@ namespace {
 using std::set;
 using std::string;
 
-static const BSONObj metaTextScore = BSON("$meta"
-                                          << "textScore");
-
 template <size_t ArrayLen>
 set<string> arrayToSet(const char* (&array)[ArrayLen]) {
     set<string> out;
@@ -55,53 +52,64 @@ set<string> arrayToSet(const char* (&array)[ArrayLen]) {
     return out;
 }
 
+TEST(DependenciesTest, CheckClassConstants) {
+    ASSERT_TRUE(DepsTracker::kAllGeoNearData[DocumentMetadataFields::kGeoNearPoint]);
+    ASSERT_TRUE(DepsTracker::kAllGeoNearData[DocumentMetadataFields::kGeoNearDist]);
+    ASSERT_EQ(DepsTracker::kAllGeoNearData.count(), 2);
+    ASSERT_TRUE(DepsTracker::kAllMetadata.all());
+    ASSERT_EQ(DepsTracker::kOnlyTextScore.count(), 1);
+    ASSERT_TRUE(DepsTracker::kOnlyTextScore[DocumentMetadataFields::kTextScore]);
+}
+
 TEST(DependenciesToProjectionTest, ShouldIncludeAllFieldsAndExcludeIdIfNotSpecified) {
     const char* array[] = {"a", "b"};
     DepsTracker deps;
     deps.fields = arrayToSet(array);
-    ASSERT_BSONOBJ_EQ(deps.toProjection(), BSON("a" << 1 << "b" << 1 << "_id" << 0));
+    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSON("a" << 1 << "b" << 1 << "_id" << 0));
 }
 
 TEST(DependenciesToProjectionTest, ShouldIncludeFieldEvenIfSuffixOfAnotherIncludedField) {
     const char* array[] = {"a", "ab"};
     DepsTracker deps;
     deps.fields = arrayToSet(array);
-    ASSERT_BSONOBJ_EQ(deps.toProjection(), BSON("a" << 1 << "ab" << 1 << "_id" << 0));
+    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(),
+                      BSON("a" << 1 << "ab" << 1 << "_id" << 0));
 }
 
 TEST(DependenciesToProjectionTest, ShouldNotIncludeSubFieldIfTopLevelAlreadyIncluded) {
     const char* array[] = {"a", "b", "a.b"};  // a.b included by a
     DepsTracker deps;
     deps.fields = arrayToSet(array);
-    ASSERT_BSONOBJ_EQ(deps.toProjection(), BSON("a" << 1 << "b" << 1 << "_id" << 0));
+    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSON("a" << 1 << "b" << 1 << "_id" << 0));
 }
 
 TEST(DependenciesToProjectionTest, ShouldIncludeIdIfNeeded) {
     const char* array[] = {"a", "_id"};
     DepsTracker deps;
     deps.fields = arrayToSet(array);
-    ASSERT_BSONOBJ_EQ(deps.toProjection(), BSON("a" << 1 << "_id" << 1));
+    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSON("a" << 1 << "_id" << 1));
 }
 
 TEST(DependenciesToProjectionTest, ShouldIncludeEntireIdEvenIfOnlyASubFieldIsNeeded) {
     const char* array[] = {"a", "_id.a"};  // still include whole _id (SERVER-7502)
     DepsTracker deps;
     deps.fields = arrayToSet(array);
-    ASSERT_BSONOBJ_EQ(deps.toProjection(), BSON("a" << 1 << "_id" << 1));
+    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSON("a" << 1 << "_id" << 1));
 }
 
 TEST(DependenciesToProjectionTest, ShouldNotIncludeSubFieldOfIdIfIdIncluded) {
     const char* array[] = {"a", "_id", "_id.a"};  // handle both _id and subfield
     DepsTracker deps;
     deps.fields = arrayToSet(array);
-    ASSERT_BSONOBJ_EQ(deps.toProjection(), BSON("a" << 1 << "_id" << 1));
+    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSON("a" << 1 << "_id" << 1));
 }
 
 TEST(DependenciesToProjectionTest, ShouldIncludeFieldPrefixedById) {
     const char* array[] = {"a", "_id", "_id_a"};  // _id prefixed but non-subfield
     DepsTracker deps;
     deps.fields = arrayToSet(array);
-    ASSERT_BSONOBJ_EQ(deps.toProjection(), BSON("_id_a" << 1 << "a" << 1 << "_id" << 1));
+    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(),
+                      BSON("_id_a" << 1 << "a" << 1 << "_id" << 1));
 }
 
 TEST(DependenciesToProjectionTest, ShouldOutputEmptyObjectIfEntireDocumentNeeded) {
@@ -109,55 +117,59 @@ TEST(DependenciesToProjectionTest, ShouldOutputEmptyObjectIfEntireDocumentNeeded
     DepsTracker deps;
     deps.fields = arrayToSet(array);
     deps.needWholeDocument = true;
-    ASSERT_BSONOBJ_EQ(deps.toProjection(), BSONObj());
+    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSONObj());
 }
 
 TEST(DependenciesToProjectionTest, ShouldOnlyRequestTextScoreIfEntireDocumentAndTextScoreNeeded) {
     const char* array[] = {"a"};  // needTextScore with needWholeDocument
-    DepsTracker deps(DepsTracker::MetadataAvailable::kTextScore);
+    DepsTracker deps(DepsTracker::kOnlyTextScore);
     deps.fields = arrayToSet(array);
     deps.needWholeDocument = true;
-    deps.setNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE, true);
-    ASSERT_BSONOBJ_EQ(deps.toProjection(), BSON(Document::metaFieldTextScore << metaTextScore));
+    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
+    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSONObj());
+    ASSERT_EQ(deps.metadataDeps().count(), 1u);
+    ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kTextScore]);
 }
 
 TEST(DependenciesToProjectionTest,
      ShouldRequireFieldsAndTextScoreIfTextScoreNeededWithoutWholeDocument) {
     const char* array[] = {"a"};  // needTextScore without needWholeDocument
-    DepsTracker deps(DepsTracker::MetadataAvailable::kTextScore);
+    DepsTracker deps(DepsTracker::kOnlyTextScore);
     deps.fields = arrayToSet(array);
-    deps.setNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE, true);
-    ASSERT_BSONOBJ_EQ(
-        deps.toProjection(),
-        BSON(Document::metaFieldTextScore << metaTextScore << "a" << 1 << "_id" << 0));
+    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
+    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSON("a" << 1 << "_id" << 0));
+    ASSERT_EQ(deps.metadataDeps().count(), 1u);
+    ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kTextScore]);
 }
 
 TEST(DependenciesToProjectionTest, ShouldProduceEmptyObjectIfThereAreNoDependencies) {
-    DepsTracker deps(DepsTracker::MetadataAvailable::kTextScore);
+    DepsTracker deps(DepsTracker::kOnlyTextScore);
     deps.fields = {};
     deps.needWholeDocument = false;
-    deps.setNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE, false);
-    ASSERT_BSONOBJ_EQ(deps.toProjection(), BSONObj());
+    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, false);
+    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSONObj());
 }
 
-TEST(DependenciesToProjectionTest, ShouldAttemptToExcludeOtherFieldsIfOnlyTextScoreIsNeeded) {
-    DepsTracker deps(DepsTracker::MetadataAvailable::kTextScore);
+TEST(DependenciesToProjectionTest, ShouldReturnEmptyObjectIfOnlyTextScoreIsNeeded) {
+    DepsTracker deps(DepsTracker::kOnlyTextScore);
     deps.fields = {};
     deps.needWholeDocument = false;
-    deps.setNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE, true);
-    ASSERT_BSONOBJ_EQ(deps.toProjection(),
-                      BSON(Document::metaFieldTextScore << metaTextScore << "_id" << 0
-                                                        << "$__INTERNAL_QUERY_PROJECTION_RESERVED"
-                                                        << 1));
+    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
+    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSONObj());
+
+    ASSERT_EQ(deps.metadataDeps().count(), 1u);
+    ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kTextScore]);
 }
 
 TEST(DependenciesToProjectionTest,
      ShouldRequireTextScoreIfNoFieldsPresentButWholeDocumentIsNeeded) {
-    DepsTracker deps(DepsTracker::MetadataAvailable::kTextScore);
+    DepsTracker deps(DepsTracker::kOnlyTextScore);
     deps.fields = {};
     deps.needWholeDocument = true;
-    deps.setNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE, true);
-    ASSERT_BSONOBJ_EQ(deps.toProjection(), BSON(Document::metaFieldTextScore << metaTextScore));
+    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
+    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSONObj());
+    ASSERT_EQ(deps.metadataDeps().count(), 1u);
+    ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kTextScore]);
 }
 
 }  // namespace

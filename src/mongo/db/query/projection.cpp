@@ -43,7 +43,7 @@ namespace {
  * context.
  */
 struct DepsAnalysisData {
-    DepsTracker fieldDependencyTracker{DepsTracker::kAllMetadataAvailable};
+    DepsTracker fieldDependencyTracker{DepsTracker::kAllMetadata};
 
     void addRequiredField(const std::string& fieldName) {
         fieldDependencyTracker.fields.insert(fieldName);
@@ -188,11 +188,7 @@ auto analyzeProjection(ProjectionPathASTNode* root, ProjectType type) {
         deps.requiresDocument = true;
     }
 
-    deps.needsTextScore = tracker.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE);
-    deps.needsGeoPoint = tracker.getNeedsMetadata(DepsTracker::MetadataType::GEO_NEAR_POINT);
-    deps.needsGeoDistance = tracker.getNeedsMetadata(DepsTracker::MetadataType::GEO_NEAR_DISTANCE);
-    deps.needsSortKey = tracker.getNeedsMetadata(DepsTracker::MetadataType::SORT_KEY);
-
+    deps.metadataRequested = tracker.metadataDeps();
     return deps;
 }
 }  // namespace

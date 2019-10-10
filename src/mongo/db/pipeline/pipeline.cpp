@@ -501,7 +501,7 @@ void Pipeline::addFinalSource(intrusive_ptr<DocumentSource> source) {
     _sources.push_back(source);
 }
 
-DepsTracker Pipeline::getDependencies(DepsTracker::MetadataAvailable metadataAvailable) const {
+DepsTracker Pipeline::getDependencies(QueryMetadataBitSet metadataAvailable) const {
     DepsTracker deps(metadataAvailable);
     const bool scopeHasVariables = pCtx->variablesParseState.hasDefinedVariables();
     bool skipFieldsAndMetadataDeps = false;
@@ -533,9 +533,7 @@ DepsTracker Pipeline::getDependencies(DepsTracker::MetadataAvailable metadataAva
         }
 
         if (!knowAllMeta) {
-            for (auto&& req : localDeps.getAllRequiredMetadataTypes()) {
-                deps.setNeedsMetadata(req, true);
-            }
+            deps.requestMetadata(localDeps.metadataDeps());
             knowAllMeta = status & DepsTracker::State::EXHAUSTIVE_META;
         }
 
@@ -549,15 +547,15 @@ DepsTracker Pipeline::getDependencies(DepsTracker::MetadataAvailable metadataAva
     if (!knowAllFields)
         deps.needWholeDocument = true;  // don't know all fields we need
 
-    if (metadataAvailable & DepsTracker::MetadataAvailable::kTextScore) {
+    if (metadataAvailable[DocumentMetadataFields::kTextScore]) {
         // If there is a text score, assume we need to keep it if we can't prove we don't. If we are
         // the first half of a pipeline which has been split, future stages might need it.
         if (!knowAllMeta) {
-            deps.setNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE, true);
+            deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
         }
     } else {
         // If there is no text score available, then we don't need to ask for it.
-        deps.setNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE, false);
+        deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, false);
     }
 
     return deps;

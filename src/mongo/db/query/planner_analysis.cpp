@@ -328,7 +328,7 @@ auto produceCoveredKeyObj(QuerySolutionNode* solnRoot) {
  */
 std::unique_ptr<QuerySolutionNode> addSortKeyGeneratorStageIfNeeded(
     const CanonicalQuery& query, bool hasSortStage, std::unique_ptr<QuerySolutionNode> solnRoot) {
-    if (!hasSortStage && query.getProj() && query.getProj()->wantSortKey()) {
+    if (!hasSortStage && query.metadataDeps()[DocumentMetadataFields::kSortKey]) {
         auto keyGenNode = std::make_unique<SortKeyGeneratorNode>();
         keyGenNode->sortSpec = query.getQueryRequest().getSort();
         keyGenNode->children.push_back(solnRoot.release());
@@ -803,6 +803,9 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
         if (solnRoot->fetched() && params.options & QueryPlannerParams::NO_UNCOVERED_PROJECTIONS)
             return nullptr;
     } else {
+        // Even if there's no projection, the client may want sort key metadata.
+        solnRoot = addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot));
+
         // If there's no projection, we must fetch, as the user wants the entire doc.
         if (!solnRoot->fetched() && !(params.options & QueryPlannerParams::IS_COUNT)) {
             FetchNode* fetch = new FetchNode();

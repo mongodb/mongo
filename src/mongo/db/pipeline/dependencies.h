@@ -37,7 +37,6 @@
 #include "mongo/db/pipeline/variables.h"
 
 namespace mongo {
-class ParsedDeps;
 
 /**
  * This struct allows components in an agg pipeline to report what they need from their input.
@@ -69,56 +68,40 @@ struct DepsTracker {
     };
 
     /**
-     * Represents the type of metadata a pipeline might request.
-     */
-    enum class MetadataType {
-        // The score associated with a text match.
-        TEXT_SCORE,
-
-        // The key to use for sorting.
-        SORT_KEY,
-
-        // The computed distance for a near query.
-        GEO_NEAR_DISTANCE,
-
-        // The point used in the computation of the GEO_NEAR_DISTANCE.
-        GEO_NEAR_POINT,
-    };
-
-    /**
-     * Represents what metadata is available on documents that are input to the pipeline.
-     */
-    enum MetadataAvailable {
-        kNoMetadata = 0,
-        kTextScore = 1 << 1,
-        kGeoNearDistance = 1 << 2,
-        kGeoNearPoint = 1 << 3,
-    };
-
-    /**
      * Represents a state where all geo metadata is available.
      */
-    static constexpr auto kAllGeoNearDataAvailable =
-        MetadataAvailable(MetadataAvailable::kGeoNearDistance | MetadataAvailable::kGeoNearPoint);
+    static constexpr auto kAllGeoNearData = QueryMetadataBitSet(
+        (1 << DocumentMetadataFields::kGeoNearDist) | (1 << DocumentMetadataFields::kGeoNearPoint));
 
     /**
      * Represents a state where all metadata is available.
      */
-    static constexpr auto kAllMetadataAvailable =
-        MetadataAvailable(kTextScore | kGeoNearDistance | kGeoNearPoint);
+    static constexpr auto kAllMetadata =
+        QueryMetadataBitSet(~(1 << DocumentMetadataFields::kNumFields));
 
-    DepsTracker(MetadataAvailable metadataAvailable = kNoMetadata)
+    /**
+     * Represents a state where only text score metadata is available.
+     */
+    static constexpr auto kOnlyTextScore =
+        QueryMetadataBitSet(1 << DocumentMetadataFields::kTextScore);
+
+    /**
+     * Represents a state where no metadata is available.
+     */
+    static constexpr auto kNoMetadata = QueryMetadataBitSet();
+
+
+    DepsTracker(QueryMetadataBitSet metadataAvailable = kNoMetadata)
         : _metadataAvailable(metadataAvailable) {}
 
     /**
-     * Returns a projection object covering the dependencies tracked by this class.
+     * Returns a projection object covering the non-metadata dependencies tracked by this class, or
+     * empty BSONObj if the entire document is required.
      */
-    BSONObj toProjection() const;
-
-    boost::optional<ParsedDeps> toParsedDeps() const;
+    BSONObj toProjectionWithoutMetadata() const;
 
     bool hasNoRequirements() const {
-        return fields.empty() && !needWholeDocument && !_needTextScore;
+        return fields.empty() && !needWholeDocument && !_metadataDeps.any();
     }
 
     /**
@@ -134,7 +117,7 @@ struct DepsTracker {
     /**
      * Returns a value with bits set indicating the types of metadata available.
      */
-    MetadataAvailable getMetadataAvailable() const {
+    QueryMetadataBitSet getMetadataAvailable() const {
         return _metadataAvailable;
     }
 
@@ -143,7 +126,9 @@ struct DepsTracker {
      * illegal to call this with MetadataType::SORT_KEY, since the sort key will always be available
      * if needed.
      */
-    bool isMetadataAvailable(MetadataType type) const;
+    bool isMetadataAvailable(DocumentMetadataFields::MetaType type) const {
+        return _metadataAvailable[type];
+    }
 
     /**
      * Sets whether or not metadata 'type' is required. Throws if 'required' is true but that
@@ -151,58 +136,49 @@ struct DepsTracker {
      *
      * Except for MetadataType::SORT_KEY, once 'type' is required, it cannot be unset.
      */
-    void setNeedsMetadata(MetadataType type, bool required);
+    void setNeedsMetadata(DocumentMetadataFields::MetaType type, bool required);
 
     /**
      * Returns true if the DepsTracker requires that metadata of type 'type' is present.
      */
-    bool getNeedsMetadata(MetadataType type) const;
+    bool getNeedsMetadata(DocumentMetadataFields::MetaType type) const {
+        return _metadataDeps[type];
+    }
 
     /**
      * Returns true if there exists a type of metadata required by the DepsTracker.
      */
     bool getNeedsAnyMetadata() const {
-        return _needTextScore || _needSortKey || _needGeoNearDistance || _needGeoNearPoint;
+        return _metadataDeps.any();
     }
 
     /**
-     * Returns a vector containing all the types of metadata required by this DepsTracker.
+     * Return all of the metadata dependencies.
      */
-    std::vector<MetadataType> getAllRequiredMetadataTypes() const;
+    QueryMetadataBitSet& metadataDeps() {
+        return _metadataDeps;
+    }
+    const QueryMetadataBitSet& metadataDeps() const {
+        return _metadataDeps;
+    }
+
+    /**
+     * Request that all metadata in the given QueryMetadataBitSet be added as dependencies.
+     */
+    void requestMetadata(const QueryMetadataBitSet& metadata) {
+        _metadataDeps |= metadata;
+    }
 
     std::set<std::string> fields;    // Names of needed fields in dotted notation.
     std::set<Variables::Id> vars;    // IDs of referenced variables.
     bool needWholeDocument = false;  // If true, ignore 'fields'; the whole document is needed.
 
 private:
-    /**
-     * Appends the meta projections for the sort key and/or text score to 'bb' if necessary. Returns
-     * true if either type of metadata was needed, and false otherwise.
-     */
-    bool _appendMetaProjections(BSONObjBuilder* bb) const;
+    // Represents all metadata available to the pipeline.
+    QueryMetadataBitSet _metadataAvailable;
 
-    MetadataAvailable _metadataAvailable;
-
-    // Each member variable influences a different $meta projection.
-    bool _needTextScore = false;        // {$meta: "textScore"}
-    bool _needSortKey = false;          // {$meta: "sortKey"}
-    bool _needGeoNearDistance = false;  // {$meta: "geoNearDistance"}
-    bool _needGeoNearPoint = false;     // {$meta: "geoNearPoint"}
-};
-
-/**
- * This class is designed to quickly extract the needed fields from a BSONObj into a Document.
- * It should only be created by a call to DepsTracker::ParsedDeps
- */
-class ParsedDeps {
-public:
-    Document extractFields(const BSONObj& input) const;
-
-private:
-    friend struct DepsTracker;  // so it can call constructor
-    explicit ParsedDeps(Document&& fields) : _fields(std::move(fields)), _nFields(_fields.size()) {}
-
-    Document _fields;
-    int _nFields;  // Cache the number of top-level fields needed.
+    // Represents which metadata is used by the pipeline. This is populated while performing
+    // dependency analysis.
+    QueryMetadataBitSet _metadataDeps;
 };
 }  // namespace mongo

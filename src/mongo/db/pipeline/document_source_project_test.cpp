@@ -171,7 +171,7 @@ TEST_F(ProjectStageTest, InclusionShouldAddDependenciesOfIncludedAndComputedFiel
         fromjson("{a: true, x: '$b', y: {$and: ['$c','$d']}, z: {$meta: 'textScore'}}"),
         getExpCtx(),
         "$project"_sd);
-    DepsTracker dependencies(DepsTracker::MetadataAvailable::kTextScore);
+    DepsTracker dependencies(DepsTracker::kOnlyTextScore);
     ASSERT_EQUALS(DepsTracker::State::EXHAUSTIVE_FIELDS, project->getDependencies(&dependencies));
     ASSERT_EQUALS(5U, dependencies.fields.size());
 
@@ -188,7 +188,7 @@ TEST_F(ProjectStageTest, InclusionShouldAddDependenciesOfIncludedAndComputedFiel
     ASSERT_EQUALS(1U, dependencies.fields.count("c"));
     ASSERT_EQUALS(1U, dependencies.fields.count("d"));
     ASSERT_EQUALS(false, dependencies.needWholeDocument);
-    ASSERT_EQUALS(true, dependencies.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));
+    ASSERT_EQUALS(true, dependencies.getNeedsMetadata(DocumentMetadataFields::kTextScore));
 }
 
 TEST_F(ProjectStageTest, ExclusionShouldNotAddDependencies) {
@@ -200,7 +200,7 @@ TEST_F(ProjectStageTest, ExclusionShouldNotAddDependencies) {
 
     ASSERT_EQUALS(0U, dependencies.fields.size());
     ASSERT_EQUALS(false, dependencies.needWholeDocument);
-    ASSERT_EQUALS(false, dependencies.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));
+    ASSERT_EQUALS(false, dependencies.getNeedsMetadata(DocumentMetadataFields::kTextScore));
 }
 
 TEST_F(ProjectStageTest, InclusionProjectionReportsIncludedPathsFromGetModifiedPaths) {
@@ -446,7 +446,7 @@ TEST_F(UnsetTest, UnsetShouldNotAddDependencies) {
 
     ASSERT_EQUALS(0U, dependencies.fields.size());
     ASSERT_EQUALS(false, dependencies.needWholeDocument);
-    ASSERT_EQUALS(false, dependencies.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));
+    ASSERT_EQUALS(false, dependencies.getNeedsMetadata(DocumentMetadataFields::kTextScore));
 }
 
 TEST_F(UnsetTest, UnsetReportsExcludedPathsAsModifiedPaths) {

@@ -491,12 +491,13 @@ public:
             CursorResponseBuilder::Options options;
             options.isInitialResponse = true;
             CursorResponseBuilder firstBatch(result, options);
-            BSONObj obj;
+            Document doc;
             PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
             std::uint64_t numResults = 0;
             while (!FindCommon::enoughForFirstBatch(originalQR, numResults) &&
-                   PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr))) {
+                   PlanExecutor::ADVANCED == (state = exec->getNext(&doc, nullptr))) {
                 // If we can't fit this result inside the current batch, then we stash it for later.
+                BSONObj obj = doc.toBson();
                 if (!FindCommon::haveSpaceForNext(obj, numResults, firstBatch.bytesUsed())) {
                     exec->enqueue(obj);
                     break;
@@ -512,7 +513,7 @@ public:
                 firstBatch.abandon();
 
                 // We should always have a valid status member object at this point.
-                auto status = WorkingSetCommon::getMemberObjectStatus(obj);
+                auto status = WorkingSetCommon::getMemberObjectStatus(doc);
                 invariant(!status.isOK());
                 warning() << "Plan executor error during find command: "
                           << PlanExecutor::statestr(state) << ", status: " << status
@@ -535,7 +536,8 @@ public:
                      repl::ReadConcernArgs::get(opCtx),
                      _request.body,
                      ClientCursorParams::LockPolicy::kLockExternally,
-                     {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)}});
+                     {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)},
+                     expCtx->needsMerge});
                 cursorId = pinnedCursor.getCursor()->cursorid();
 
                 invariant(!exec);

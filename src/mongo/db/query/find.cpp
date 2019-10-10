@@ -181,9 +181,11 @@ void generateBatch(int ntoreturn,
                    PlanExecutor::ExecState* state) {
     PlanExecutor* exec = cursor->getExecutor();
 
-    BSONObj obj;
+    Document doc;
     while (!FindCommon::enoughForGetMore(ntoreturn, *numResults) &&
-           PlanExecutor::ADVANCED == (*state = exec->getNext(&obj, nullptr))) {
+           PlanExecutor::ADVANCED == (*state = exec->getNext(&doc, nullptr))) {
+        BSONObj obj = doc.toBson();
+
         // If we can't fit this result inside the current batch, then we stash it for later.
         if (!FindCommon::haveSpaceForNext(obj, *numResults, bb->len())) {
             exec->enqueue(obj);
@@ -204,7 +206,7 @@ void generateBatch(int ntoreturn,
             error() << "getMore executor error, stats: "
                     << redact(Explain::getWinningPlanStats(exec));
             // We should always have a valid status object by this point.
-            auto status = WorkingSetCommon::getMemberObjectStatus(obj);
+            auto status = WorkingSetCommon::getMemberObjectStatus(doc);
             invariant(!status.isOK());
             uassertStatusOK(status);
         }
@@ -684,7 +686,10 @@ std::string runQuery(OperationContext* opCtx,
         curOp.setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
     }
 
-    while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr))) {
+    Document doc;
+    while (PlanExecutor::ADVANCED == (state = exec->getNext(&doc, nullptr))) {
+        obj = doc.toBson();
+
         // If we can't fit this result inside the current batch, then we stash it for later.
         if (!FindCommon::haveSpaceForNext(obj, numResults, bb.len())) {
             exec->enqueue(obj);
@@ -709,7 +714,7 @@ std::string runQuery(OperationContext* opCtx,
     if (PlanExecutor::FAILURE == state) {
         error() << "Plan executor error during find: " << PlanExecutor::statestr(state)
                 << ", stats: " << redact(Explain::getWinningPlanStats(exec.get()));
-        uassertStatusOKWithContext(WorkingSetCommon::getMemberObjectStatus(obj),
+        uassertStatusOKWithContext(WorkingSetCommon::getMemberObjectStatus(doc),
                                    "Executor error during OP_QUERY find");
         MONGO_UNREACHABLE;
     }
@@ -727,14 +732,17 @@ std::string runQuery(OperationContext* opCtx,
         // Allocate a new ClientCursor and register it with the cursor manager.
         ClientCursorPin pinnedCursor = CursorManager::get(opCtx)->registerCursor(
             opCtx,
-            {std::move(exec),
-             nss,
-             AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
-             opCtx->getWriteConcern(),
-             readConcernArgs,
-             upconvertedQuery,
-             ClientCursorParams::LockPolicy::kLockExternally,
-             {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)}});
+            {
+                std::move(exec),
+                nss,
+                AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
+                opCtx->getWriteConcern(),
+                readConcernArgs,
+                upconvertedQuery,
+                ClientCursorParams::LockPolicy::kLockExternally,
+                {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)},
+                false  // needsMerge always 'false' for find().
+            });
         ccId = pinnedCursor.getCursor()->cursorid();
 
         LOG(5) << "caching executor with cursorid " << ccId << " after returning " << numResults

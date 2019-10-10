@@ -115,7 +115,7 @@ Pipeline::SourceContainer::iterator DocumentSourceSequentialDocumentCache::doOpt
     // elsewhere. So without knowledge of what metadata is in fact available, here
     // we "lie" and say that all metadata is available to avoid tripping any
     // assertions.
-    DepsTracker deps(DepsTracker::kAllMetadataAvailable);
+    DepsTracker deps(DepsTracker::kAllMetadata);
 
     // Iterate through the pipeline stages until we find one which references an external variable.
     for (; prefixSplit != container->end(); ++prefixSplit) {

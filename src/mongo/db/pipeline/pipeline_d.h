@@ -202,8 +202,7 @@ private:
                                 boost::intrusive_ptr<DocumentSourceCursor> cursor,
                                 DepsTracker deps,
                                 const BSONObj& queryObj = BSONObj(),
-                                const BSONObj& sortObj = BSONObj(),
-                                const BSONObj& projectionObj = BSONObj());
+                                const BSONObj& sortObj = BSONObj());
 };
 
 }  // namespace mongo

@@ -450,19 +450,19 @@ TEST_F(BucketAutoTests, ShouldAddDependenciesOfGroupByFieldAndComputedFields) {
     ASSERT_EQUALS(1U, dependencies.fields.count("b"));
 
     ASSERT_EQUALS(false, dependencies.needWholeDocument);
-    ASSERT_EQUALS(false, dependencies.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));
+    ASSERT_EQUALS(false, dependencies.getNeedsMetadata(DocumentMetadataFields::kTextScore));
 }
 
 TEST_F(BucketAutoTests, ShouldNeedTextScoreInDependenciesFromGroupByField) {
     auto bucketAuto =
         createBucketAuto(fromjson("{$bucketAuto : {groupBy : {$meta: 'textScore'}, buckets : 2}}"));
 
-    DepsTracker dependencies(DepsTracker::MetadataAvailable::kTextScore);
+    DepsTracker dependencies(DepsTracker::kOnlyTextScore);
     ASSERT_EQUALS(DepsTracker::State::EXHAUSTIVE_ALL, bucketAuto->getDependencies(&dependencies));
     ASSERT_EQUALS(0U, dependencies.fields.size());
 
     ASSERT_EQUALS(false, dependencies.needWholeDocument);
-    ASSERT_EQUALS(true, dependencies.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));
+    ASSERT_EQUALS(true, dependencies.getNeedsMetadata(DocumentMetadataFields::kTextScore));
 }
 
 TEST_F(BucketAutoTests, ShouldNeedTextScoreInDependenciesFromOutputField) {
@@ -470,7 +470,7 @@ TEST_F(BucketAutoTests, ShouldNeedTextScoreInDependenciesFromOutputField) {
         createBucketAuto(fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2, output: {avg : "
                                   "{$avg : {$meta : 'textScore'}}}}}"));
 
-    DepsTracker dependencies(DepsTracker::MetadataAvailable::kTextScore);
+    DepsTracker dependencies(DepsTracker::kOnlyTextScore);
     ASSERT_EQUALS(DepsTracker::State::EXHAUSTIVE_ALL, bucketAuto->getDependencies(&dependencies));
     ASSERT_EQUALS(1U, dependencies.fields.size());
 
@@ -478,7 +478,7 @@ TEST_F(BucketAutoTests, ShouldNeedTextScoreInDependenciesFromOutputField) {
     ASSERT_EQUALS(1U, dependencies.fields.count("x"));
 
     ASSERT_EQUALS(false, dependencies.needWholeDocument);
-    ASSERT_EQUALS(true, dependencies.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));
+    ASSERT_EQUALS(true, dependencies.getNeedsMetadata(DocumentMetadataFields::kTextScore));
 }
 
 TEST_F(BucketAutoTests, SerializesDefaultAccumulatorIfOutputFieldIsNotSpecified) {

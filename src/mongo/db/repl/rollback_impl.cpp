@@ -587,7 +587,8 @@ void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
                 opCtx, PlanExecutor::INTERRUPT_ONLY, Collection::ScanDirection::kForward);
             long long countFromScan = 0;
             PlanExecutor::ExecState state;
-            while (PlanExecutor::ADVANCED == (state = exec->getNext(nullptr, nullptr))) {
+            while (PlanExecutor::ADVANCED ==
+                   (state = exec->getNext(static_cast<BSONObj*>(nullptr), nullptr))) {
                 ++countFromScan;
             }
             if (PlanExecutor::IS_EOF != state) {

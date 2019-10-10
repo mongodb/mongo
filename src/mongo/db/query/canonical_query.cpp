@@ -271,9 +271,12 @@ Status CanonicalQuery::init(OperationContext* opCtx,
         if (!newParserStatus.isOK()) {
             return newParserStatus;
         }
+
+        _metadataDeps = _proj->metadataDeps();
     }
 
-    if (_proj && _proj->wantSortKey() && _qr->getSort().isEmpty()) {
+    if (_proj && _proj->metadataDeps()[DocumentMetadataFields::kSortKey] &&
+        _qr->getSort().isEmpty()) {
         return Status(ErrorCodes::BadValue, "cannot use sortKey $meta projection without a sort");
     }
 

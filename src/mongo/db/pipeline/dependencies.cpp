@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/field_path.h"
@@ -36,50 +37,17 @@
 
 namespace mongo {
 
-constexpr DepsTracker::MetadataAvailable DepsTracker::kAllGeoNearDataAvailable;
-
-bool DepsTracker::_appendMetaProjections(BSONObjBuilder* projectionBuilder) const {
-    if (_needTextScore) {
-        projectionBuilder->append(Document::metaFieldTextScore,
-                                  BSON("$meta"
-                                       << "textScore"));
-    }
-    if (_needSortKey) {
-        projectionBuilder->append(Document::metaFieldSortKey,
-                                  BSON("$meta"
-                                       << "sortKey"));
-    }
-    if (_needGeoNearDistance) {
-        projectionBuilder->append(Document::metaFieldGeoNearDistance,
-                                  BSON("$meta"
-                                       << "geoNearDistance"));
-    }
-    if (_needGeoNearPoint) {
-        projectionBuilder->append(Document::metaFieldGeoNearPoint,
-                                  BSON("$meta"
-                                       << "geoNearPoint"));
-    }
-    return (_needTextScore || _needSortKey || _needGeoNearDistance || _needGeoNearPoint);
-}
-
-BSONObj DepsTracker::toProjection() const {
+BSONObj DepsTracker::toProjectionWithoutMetadata() const {
     BSONObjBuilder bb;
-
-    const bool needsMetadata = _appendMetaProjections(&bb);
 
     if (needWholeDocument) {
         return bb.obj();
     }
 
     if (fields.empty()) {
-        if (needsMetadata) {
-            // We only need metadata, but there is no easy way to express this in the query
-            // projection language. We use $noFieldsNeeded with a meta-projection since this is an
-            // inclusion projection which will exclude all existing fields but add the metadata.
-            bb.append("_id", 0);
-            bb.append("$__INTERNAL_QUERY_PROJECTION_RESERVED", 1);
-        }
-        // We either need nothing (as we would if this was logically a count), or only the metadata.
+        // We need no user-level fields (as we would if this was logically a count). Since there is
+        // no way of expressing a projection that indicates no depencies, we return an empty
+        // projection.
         return bb.obj();
     }
 
@@ -103,10 +71,11 @@ BSONObj DepsTracker::toProjection() const {
 
         last = field + '.';
 
-        // We should only have dependencies on fields that are valid in aggregation. Create a
-        // FieldPath to check this.
-        FieldPath fieldPath(field);
-
+        {
+            // Check that the field requested is a valid field name in the agg language. This
+            // constructor will throw if it isn't.
+            FieldPath fp(field);
+        }
         bb.append(field, 1);
     }
 
@@ -118,173 +87,21 @@ BSONObj DepsTracker::toProjection() const {
     return bb.obj();
 }
 
-// ParsedDeps::_fields is a simple recursive look-up table. For each field:
-//      If the value has type==Bool, the whole field is needed
-//      If the value has type==Object, the fields in the subobject are needed
-//      All other fields should be missing which means not needed
-boost::optional<ParsedDeps> DepsTracker::toParsedDeps() const {
-    MutableDocument md;
+void DepsTracker::setNeedsMetadata(DocumentMetadataFields::MetaType type, bool required) {
+    // For everything but sortKey/randval metadata, check that it's available. A pipeline can
+    // generate those types of metadata.
 
-    if (needWholeDocument || _needTextScore) {
-        // can't use ParsedDeps in this case
-        return boost::none;
+    if (type != DocumentMetadataFields::MetaType::kSortKey &&
+        type != DocumentMetadataFields::MetaType::kRandVal) {
+        uassert(40218,
+                str::stream() << "pipeline requires " << type
+                              << " metadata, but it is not available",
+                !required || isMetadataAvailable(type));
     }
 
-    std::string last;
-    for (const auto& field : fields) {
-        if (!last.empty() && str::startsWith(field, last)) {
-            // we are including a parent of *it so we don't need to include this field
-            // explicitly. In fact, if we included this field, the parent wouldn't be fully
-            // included.  This logic relies on on set iterators going in lexicographic order so
-            // that a string is always directly before of all fields it prefixes.
-            continue;
-        }
-        last = field + '.';
-        md.setNestedField(field, Value(true));
-    }
-
-    return ParsedDeps(md.freeze());
-}
-
-bool DepsTracker::getNeedsMetadata(MetadataType type) const {
-    switch (type) {
-        case MetadataType::TEXT_SCORE:
-            return _needTextScore;
-        case MetadataType::SORT_KEY:
-            return _needSortKey;
-        case MetadataType::GEO_NEAR_DISTANCE:
-            return _needGeoNearDistance;
-        case MetadataType::GEO_NEAR_POINT:
-            return _needGeoNearPoint;
-    }
-    MONGO_UNREACHABLE;
-}
-
-bool DepsTracker::isMetadataAvailable(MetadataType type) const {
-    switch (type) {
-        case MetadataType::TEXT_SCORE:
-            return _metadataAvailable & MetadataAvailable::kTextScore;
-        case MetadataType::SORT_KEY:
-            MONGO_UNREACHABLE;
-        case MetadataType::GEO_NEAR_DISTANCE:
-            return _metadataAvailable & MetadataAvailable::kGeoNearDistance;
-        case MetadataType::GEO_NEAR_POINT:
-            return _metadataAvailable & MetadataAvailable::kGeoNearPoint;
-    }
-    MONGO_UNREACHABLE;
-}
-
-void DepsTracker::setNeedsMetadata(MetadataType type, bool required) {
-    switch (type) {
-        case MetadataType::TEXT_SCORE:
-            uassert(40218,
-                    "pipeline requires text score metadata, but there is no text score available",
-                    !required || isMetadataAvailable(type));
-            _needTextScore = required;
-            return;
-        case MetadataType::SORT_KEY:
-            invariant(required || !_needSortKey);
-            _needSortKey = required;
-            return;
-        case MetadataType::GEO_NEAR_DISTANCE:
-            uassert(50860,
-                    "pipeline requires $geoNear distance metadata, but it is not available",
-                    !required || isMetadataAvailable(type));
-            invariant(required || !_needGeoNearDistance);
-            _needGeoNearDistance = required;
-            return;
-        case MetadataType::GEO_NEAR_POINT:
-            uassert(50859,
-                    "pipeline requires $geoNear point metadata, but it is not available",
-                    !required || isMetadataAvailable(type));
-            invariant(required || !_needGeoNearPoint);
-            _needGeoNearPoint = required;
-            return;
-    }
-    MONGO_UNREACHABLE;
-}
-
-std::vector<DepsTracker::MetadataType> DepsTracker::getAllRequiredMetadataTypes() const {
-    std::vector<MetadataType> reqs;
-    if (_needTextScore) {
-        reqs.push_back(MetadataType::TEXT_SCORE);
-    }
-    if (_needSortKey) {
-        reqs.push_back(MetadataType::SORT_KEY);
-    }
-    if (_needGeoNearDistance) {
-        reqs.push_back(MetadataType::GEO_NEAR_DISTANCE);
-    }
-    if (_needGeoNearPoint) {
-        reqs.push_back(MetadataType::GEO_NEAR_POINT);
-    }
-    return reqs;
-}
-
-namespace {
-// Mutually recursive with arrayHelper
-Document documentHelper(const BSONObj& bson, const Document& neededFields, int nFieldsNeeded = -1);
-
-// Handles array-typed values for ParsedDeps::extractFields
-Value arrayHelper(const BSONObj& bson, const Document& neededFields) {
-    BSONObjIterator it(bson);
-
-    std::vector<Value> values;
-    while (it.more()) {
-        BSONElement bsonElement(it.next());
-        if (bsonElement.type() == Object) {
-            Document sub = documentHelper(bsonElement.embeddedObject(), neededFields);
-            values.push_back(Value(sub));
-        }
-
-        if (bsonElement.type() == Array) {
-            values.push_back(arrayHelper(bsonElement.embeddedObject(), neededFields));
-        }
-    }
-
-    return Value(std::move(values));
-}
-
-// Handles object-typed values including the top-level for ParsedDeps::extractFields
-Document documentHelper(const BSONObj& bson, const Document& neededFields, int nFieldsNeeded) {
-    // We cache the number of top level fields, so don't need to re-compute it every time. For
-    // sub-documents, just scan for the number of fields.
-    if (nFieldsNeeded == -1) {
-        nFieldsNeeded = neededFields.size();
-    }
-    MutableDocument md(nFieldsNeeded);
-
-    BSONObjIterator it(bson);
-    while (it.more() && nFieldsNeeded > 0) {
-        auto bsonElement = it.next();
-        StringData fieldName = bsonElement.fieldNameStringData();
-        Value isNeeded = neededFields[fieldName];
-
-        if (isNeeded.missing())
-            continue;
-
-        --nFieldsNeeded;  // Found a needed field.
-        if (isNeeded.getType() == Bool) {
-            md.addField(fieldName, Value(bsonElement));
-        } else {
-            dassert(isNeeded.getType() == Object);
-
-            if (bsonElement.type() == BSONType::Object) {
-                md.addField(
-                    fieldName,
-                    Value(documentHelper(bsonElement.embeddedObject(), isNeeded.getDocument())));
-            } else if (bsonElement.type() == BSONType::Array) {
-                md.addField(fieldName,
-                            arrayHelper(bsonElement.embeddedObject(), isNeeded.getDocument()));
-            }
-        }
-    }
-
-    return md.freeze();
-}
-}  // namespace
-
-Document ParsedDeps::extractFields(const BSONObj& input) const {
-    return documentHelper(input, _fields, _nFields);
+    // If the metadata type is not required, then it should not be recorded as a metadata
+    // dependency.
+    invariant(required || !_metadataDeps[type]);
+    _metadataDeps[type] = required;
 }
 }  // namespace mongo

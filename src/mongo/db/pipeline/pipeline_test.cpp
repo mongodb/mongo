@@ -2793,13 +2793,13 @@ using PipelineDependenciesTest = AggregationContextFixture;
 TEST_F(PipelineDependenciesTest, EmptyPipelineShouldRequireWholeDocument) {
     auto pipeline = unittest::assertGet(Pipeline::create({}, getExpCtx()));
 
-    auto depsTracker = pipeline->getDependencies(DepsTracker::MetadataAvailable::kNoMetadata);
+    auto depsTracker = pipeline->getDependencies(DepsTracker::kNoMetadata);
     ASSERT_TRUE(depsTracker.needWholeDocument);
-    ASSERT_FALSE(depsTracker.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));
+    ASSERT_FALSE(depsTracker.getNeedsMetadata(DocumentMetadataFields::kTextScore));
 
-    depsTracker = pipeline->getDependencies(DepsTracker::MetadataAvailable::kTextScore);
+    depsTracker = pipeline->getDependencies(DepsTracker::kOnlyTextScore);
     ASSERT_TRUE(depsTracker.needWholeDocument);
-    ASSERT_TRUE(depsTracker.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));
+    ASSERT_TRUE(depsTracker.getNeedsMetadata(DocumentMetadataFields::kTextScore));
 }
 
 //
@@ -2861,7 +2861,7 @@ public:
 class DocumentSourceNeedsOnlyTextScore : public DocumentSourceDependencyDummy {
 public:
     DepsTracker::State getDependencies(DepsTracker* deps) const final {
-        deps->setNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE, true);
+        deps->setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
         return DepsTracker::State::EXHAUSTIVE_META;
     }
 
@@ -2887,15 +2887,15 @@ TEST_F(PipelineDependenciesTest, ShouldRequireWholeDocumentIfAnyStageDoesNotSupp
     auto notSupported = DocumentSourceDependenciesNotSupported::create();
     auto pipeline = unittest::assertGet(Pipeline::create({needsASeeNext, notSupported}, ctx));
 
-    auto depsTracker = pipeline->getDependencies(DepsTracker::MetadataAvailable::kNoMetadata);
+    auto depsTracker = pipeline->getDependencies(DepsTracker::kNoMetadata);
     ASSERT_TRUE(depsTracker.needWholeDocument);
     // The inputs did not have a text score available, so we should not require a text score.
-    ASSERT_FALSE(depsTracker.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));
+    ASSERT_FALSE(depsTracker.getNeedsMetadata(DocumentMetadataFields::kTextScore));
 
     // Now in the other order.
     pipeline = unittest::assertGet(Pipeline::create({notSupported, needsASeeNext}, ctx));
 
-    depsTracker = pipeline->getDependencies(DepsTracker::MetadataAvailable::kNoMetadata);
+    depsTracker = pipeline->getDependencies(DepsTracker::kNoMetadata);
     ASSERT_TRUE(depsTracker.needWholeDocument);
 }
 
@@ -2904,7 +2904,7 @@ TEST_F(PipelineDependenciesTest, ShouldRequireWholeDocumentIfNoStageReturnsExhau
     auto needsASeeNext = DocumentSourceNeedsASeeNext::create();
     auto pipeline = unittest::assertGet(Pipeline::create({needsASeeNext}, ctx));
 
-    auto depsTracker = pipeline->getDependencies(DepsTracker::MetadataAvailable::kNoMetadata);
+    auto depsTracker = pipeline->getDependencies(DepsTracker::kNoMetadata);
     ASSERT_TRUE(depsTracker.needWholeDocument);
 }
 
@@ -2914,7 +2914,7 @@ TEST_F(PipelineDependenciesTest, ShouldNotRequireWholeDocumentIfAnyStageReturnsE
     auto needsOnlyB = DocumentSourceNeedsOnlyB::create();
     auto pipeline = unittest::assertGet(Pipeline::create({needsASeeNext, needsOnlyB}, ctx));
 
-    auto depsTracker = pipeline->getDependencies(DepsTracker::MetadataAvailable::kNoMetadata);
+    auto depsTracker = pipeline->getDependencies(DepsTracker::kNoMetadata);
     ASSERT_FALSE(depsTracker.needWholeDocument);
     ASSERT_EQ(depsTracker.fields.size(), 2UL);
     ASSERT_EQ(depsTracker.fields.count("a"), 1UL);
@@ -2927,9 +2927,9 @@ TEST_F(PipelineDependenciesTest, ShouldNotAddAnyRequiredFieldsAfterFirstStageWit
     auto needsASeeNext = DocumentSourceNeedsASeeNext::create();
     auto pipeline = unittest::assertGet(Pipeline::create({needsOnlyB, needsASeeNext}, ctx));
 
-    auto depsTracker = pipeline->getDependencies(DepsTracker::MetadataAvailable::kNoMetadata);
+    auto depsTracker = pipeline->getDependencies(DepsTracker::kNoMetadata);
     ASSERT_FALSE(depsTracker.needWholeDocument);
-    ASSERT_FALSE(depsTracker.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));
+    ASSERT_FALSE(depsTracker.getNeedsMetadata(DocumentMetadataFields::kTextScore));
 
     // 'needsOnlyB' claims to know all its field dependencies, so we shouldn't add any from
     // 'needsASeeNext'.
@@ -2941,8 +2941,8 @@ TEST_F(PipelineDependenciesTest, ShouldNotRequireTextScoreIfThereIsNoScoreAvaila
     auto ctx = getExpCtx();
     auto pipeline = unittest::assertGet(Pipeline::create({}, ctx));
 
-    auto depsTracker = pipeline->getDependencies(DepsTracker::MetadataAvailable::kNoMetadata);
-    ASSERT_FALSE(depsTracker.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));
+    auto depsTracker = pipeline->getDependencies(DepsTracker::kNoMetadata);
+    ASSERT_FALSE(depsTracker.getNeedsMetadata(DocumentMetadataFields::kTextScore));
 }
 
 TEST_F(PipelineDependenciesTest, ShouldThrowIfTextScoreIsNeededButNotPresent) {
@@ -2950,21 +2950,20 @@ TEST_F(PipelineDependenciesTest, ShouldThrowIfTextScoreIsNeededButNotPresent) {
     auto needsText = DocumentSourceNeedsOnlyTextScore::create();
     auto pipeline = unittest::assertGet(Pipeline::create({needsText}, ctx));
 
-    ASSERT_THROWS(pipeline->getDependencies(DepsTracker::MetadataAvailable::kNoMetadata),
-                  AssertionException);
+    ASSERT_THROWS(pipeline->getDependencies(DepsTracker::kNoMetadata), AssertionException);
 }
 
 TEST_F(PipelineDependenciesTest, ShouldRequireTextScoreIfAvailableAndNoStageReturnsExhaustiveMeta) {
     auto ctx = getExpCtx();
     auto pipeline = unittest::assertGet(Pipeline::create({}, ctx));
 
-    auto depsTracker = pipeline->getDependencies(DepsTracker::MetadataAvailable::kTextScore);
-    ASSERT_TRUE(depsTracker.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));
+    auto depsTracker = pipeline->getDependencies(DepsTracker::kOnlyTextScore);
+    ASSERT_TRUE(depsTracker.getNeedsMetadata(DocumentMetadataFields::kTextScore));
 
     auto needsASeeNext = DocumentSourceNeedsASeeNext::create();
     pipeline = unittest::assertGet(Pipeline::create({needsASeeNext}, ctx));
-    depsTracker = pipeline->getDependencies(DepsTracker::MetadataAvailable::kTextScore);
-    ASSERT_TRUE(depsTracker.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));
+    depsTracker = pipeline->getDependencies(DepsTracker::kOnlyTextScore);
+    ASSERT_TRUE(depsTracker.getNeedsMetadata(DocumentMetadataFields::kTextScore));
 }
 
 TEST_F(PipelineDependenciesTest, ShouldNotRequireTextScoreIfAvailableButDefinitelyNotNeeded) {
@@ -2973,11 +2972,11 @@ TEST_F(PipelineDependenciesTest, ShouldNotRequireTextScoreIfAvailableButDefinite
     auto needsText = DocumentSourceNeedsOnlyTextScore::create();
     auto pipeline = unittest::assertGet(Pipeline::create({stripsTextScore, needsText}, ctx));
 
-    auto depsTracker = pipeline->getDependencies(DepsTracker::MetadataAvailable::kTextScore);
+    auto depsTracker = pipeline->getDependencies(DepsTracker::kOnlyTextScore);
 
     // 'stripsTextScore' claims that no further stage will need metadata information, so we
     // shouldn't have the text score as a dependency.
-    ASSERT_FALSE(depsTracker.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));
+    ASSERT_FALSE(depsTracker.getNeedsMetadata(DocumentMetadataFields::kTextScore));
 }
 
 }  // namespace Dependencies

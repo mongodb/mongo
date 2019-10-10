@@ -390,8 +390,8 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
                 std::move(root));
         }
 
-        // Add a SortKeyGeneratorStage if there is a $meta sortKey projection.
-        if (canonicalQuery->getProj() && canonicalQuery->getProj()->wantSortKey()) {
+        // Add a SortKeyGeneratorStage if the query requested sortKey metadata.
+        if (canonicalQuery->metadataDeps()[DocumentMetadataFields::kSortKey]) {
             root = std::make_unique<SortKeyGeneratorStage>(
                 canonicalQuery->getExpCtx(),
                 std::move(root),
@@ -675,8 +675,10 @@ StatusWith<unique_ptr<PlanStage>> applyProjection(OperationContext* opCtx,
                 "cannot use a positional projection and return the new document"};
     }
 
+    cq->requestAdditionalMetadata(proj.metadataDeps());
+
     // $meta sortKey is not allowed to be projected in findAndModify commands.
-    if (proj.wantSortKey()) {
+    if (cq->metadataDeps()[DocumentMetadataFields::kSortKey]) {
         return {ErrorCodes::BadValue,
                 "Cannot use a $meta sortKey projection in findAndModify commands."};
     }

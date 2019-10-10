@@ -272,7 +272,7 @@ TEST_F(ReplaceRootBasics, OnlyDependentFieldIsNewRoot) {
 
     // Should not need any other fields.
     ASSERT_EQUALS(false, dependencies.needWholeDocument);
-    ASSERT_EQUALS(false, dependencies.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));
+    ASSERT_EQUALS(false, dependencies.getNeedsMetadata(DocumentMetadataFields::kTextScore));
 }
 
 TEST_F(ReplaceRootBasics, ReplaceRootModifiesAllFields) {

@@ -486,7 +486,7 @@ DepsTracker::State DocumentSourceMatch::getDependencies(DepsTracker* deps) const
         // A $text aggregation field should return EXHAUSTIVE_FIELDS, since we don't necessarily
         // know what field it will be searching without examining indices.
         deps->needWholeDocument = true;
-        deps->setNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE, true);
+        deps->setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
         return DepsTracker::State::EXHAUSTIVE_FIELDS;
     }
 
@@ -504,8 +504,9 @@ void DocumentSourceMatch::rebuild(BSONObj filter) {
     _expression = uassertStatusOK(MatchExpressionParser::parse(
         _predicate, pExpCtx, ExtensionsCallbackNoop(), Pipeline::kAllowedMatcherFeatures));
     _isTextQuery = isTextQuery(_predicate);
-    _dependencies = DepsTracker(_isTextQuery ? DepsTracker::MetadataAvailable::kTextScore
-                                             : DepsTracker::MetadataAvailable::kNoMetadata);
+    _dependencies =
+        DepsTracker(_isTextQuery ? QueryMetadataBitSet().set(DocumentMetadataFields::kTextScore)
+                                 : DepsTracker::kNoMetadata);
     getDependencies(&_dependencies);
 }
 

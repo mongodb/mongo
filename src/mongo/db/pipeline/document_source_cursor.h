@@ -115,21 +115,6 @@ public:
     }
 
     /**
-     * Informs this object of projection and dependency information.
-     *
-     * @param projection The projection that has been passed down to the query system.
-     * @param deps The output of DepsTracker::toParsedDeps.
-     * @param inputHasMetadata Indicates whether the input BSON object contains metadata fields.
-     */
-    void setProjection(const BSONObj& projection,
-                       const boost::optional<ParsedDeps>& deps,
-                       bool inputHasMetadata) {
-        _projection = projection;
-        _dependencies = deps;
-        _inputHasMetadata = inputHasMetadata;
-    }
-
-    /**
      * Returns the limit associated with this cursor, or -1 if there is no limit.
      */
     long long getLimit() const {
@@ -182,9 +167,11 @@ protected:
      * If '_shouldProduceEmptyDocs' is false, this function hook is called on each 'obj' returned by
      * '_exec' when loading a batch and returns a Document to be added to '_currentBatch'.
      *
-     * The default implementation is a dependency-aware BSONObj-to-Document transformation.
+     * The default implementation is the identity function.
      */
-    virtual Document transformBSONObjToDocument(const BSONObj& obj) const;
+    virtual Document transformDoc(Document&& doc) const {
+        return std::move(doc);
+    }
 
 private:
     /**
@@ -213,10 +200,7 @@ private:
     // BSONObj members must outlive _projection and cursor.
     BSONObj _query;
     BSONObj _sort;
-    BSONObj _projection;
     bool _shouldProduceEmptyDocs = false;
-    bool _inputHasMetadata = false;
-    boost::optional<ParsedDeps> _dependencies;
     boost::intrusive_ptr<DocumentSourceLimit> _limit;
     long long _docsAddedToBatches;  // for _limit enforcement
 

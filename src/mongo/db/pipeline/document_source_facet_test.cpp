@@ -618,8 +618,7 @@ TEST_F(DocumentSourceFacetTest, ShouldUnionDependenciesOfInnerPipelines) {
     auto needsA = DocumentSourceNeedsA::create();
     auto firstPipeline = unittest::assertGet(Pipeline::createFacetPipeline({needsA}, ctx));
 
-    auto firstPipelineDeps =
-        firstPipeline->getDependencies(DepsTracker::MetadataAvailable::kNoMetadata);
+    auto firstPipelineDeps = firstPipeline->getDependencies(DepsTracker::kNoMetadata);
     ASSERT_FALSE(firstPipelineDeps.needWholeDocument);
     ASSERT_EQ(firstPipelineDeps.fields.size(), 1UL);
     ASSERT_EQ(firstPipelineDeps.fields.count("a"), 1UL);
@@ -627,8 +626,7 @@ TEST_F(DocumentSourceFacetTest, ShouldUnionDependenciesOfInnerPipelines) {
     auto needsB = DocumentSourceNeedsB::create();
     auto secondPipeline = unittest::assertGet(Pipeline::createFacetPipeline({needsB}, ctx));
 
-    auto secondPipelineDeps =
-        secondPipeline->getDependencies(DepsTracker::MetadataAvailable::kNoMetadata);
+    auto secondPipelineDeps = secondPipeline->getDependencies(DepsTracker::kNoMetadata);
     ASSERT_FALSE(secondPipelineDeps.needWholeDocument);
     ASSERT_EQ(secondPipelineDeps.fields.size(), 1UL);
     ASSERT_EQ(secondPipelineDeps.fields.count("b"), 1UL);
@@ -638,10 +636,10 @@ TEST_F(DocumentSourceFacetTest, ShouldUnionDependenciesOfInnerPipelines) {
     facets.emplace_back("needsB", std::move(secondPipeline));
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
 
-    DepsTracker deps(DepsTracker::MetadataAvailable::kNoMetadata);
+    DepsTracker deps(DepsTracker::kNoMetadata);
     ASSERT_EQ(facetStage->getDependencies(&deps), DepsTracker::State::EXHAUSTIVE_ALL);
     ASSERT_FALSE(deps.needWholeDocument);
-    ASSERT_FALSE(deps.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));
+    ASSERT_FALSE(deps.getNeedsMetadata(DocumentMetadataFields::kTextScore));
     ASSERT_EQ(deps.fields.size(), 2UL);
     ASSERT_EQ(deps.fields.count("a"), 1UL);
     ASSERT_EQ(deps.fields.count("b"), 1UL);
@@ -676,10 +674,10 @@ TEST_F(DocumentSourceFacetTest, ShouldRequireWholeDocumentIfAnyPipelineRequiresW
     facets.emplace_back("needsWholeDocument", std::move(secondPipeline));
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
 
-    DepsTracker deps(DepsTracker::MetadataAvailable::kNoMetadata);
+    DepsTracker deps(DepsTracker::kNoMetadata);
     ASSERT_EQ(facetStage->getDependencies(&deps), DepsTracker::State::EXHAUSTIVE_ALL);
     ASSERT_TRUE(deps.needWholeDocument);
-    ASSERT_FALSE(deps.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));
+    ASSERT_FALSE(deps.getNeedsMetadata(DocumentMetadataFields::kTextScore));
 }
 
 /**
@@ -688,7 +686,7 @@ TEST_F(DocumentSourceFacetTest, ShouldRequireWholeDocumentIfAnyPipelineRequiresW
 class DocumentSourceNeedsOnlyTextScore : public DocumentSourcePassthrough {
 public:
     DepsTracker::State getDependencies(DepsTracker* deps) const override {
-        deps->setNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE, true);
+        deps->setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
         return DepsTracker::State::EXHAUSTIVE_ALL;
     }
     static boost::intrusive_ptr<DocumentSourceNeedsOnlyTextScore> create() {
@@ -715,10 +713,10 @@ TEST_F(DocumentSourceFacetTest, ShouldRequireTextScoreIfAnyPipelineRequiresTextS
     facets.emplace_back("needsTextScore", std::move(thirdPipeline));
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
 
-    DepsTracker deps(DepsTracker::MetadataAvailable::kTextScore);
+    DepsTracker deps(DepsTracker::kOnlyTextScore);
     ASSERT_EQ(facetStage->getDependencies(&deps), DepsTracker::State::EXHAUSTIVE_ALL);
     ASSERT_TRUE(deps.needWholeDocument);
-    ASSERT_TRUE(deps.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));
+    ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kTextScore));
 }
 
 TEST_F(DocumentSourceFacetTest, ShouldThrowIfAnyPipelineRequiresTextScoreButItIsNotAvailable) {
@@ -735,7 +733,7 @@ TEST_F(DocumentSourceFacetTest, ShouldThrowIfAnyPipelineRequiresTextScoreButItIs
     facets.emplace_back("needsTextScore", std::move(secondPipeline));
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
 
-    DepsTracker deps(DepsTracker::MetadataAvailable::kNoMetadata);
+    DepsTracker deps(DepsTracker::kNoMetadata);
     ASSERT_THROWS(facetStage->getDependencies(&deps), AssertionException);
 }
 
