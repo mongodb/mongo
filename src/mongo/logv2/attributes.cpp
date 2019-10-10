@@ -33,43 +33,48 @@ namespace mongo {
 namespace logv2 {
 namespace attributes {
 
+const boost::log::attribute_name& domain() {
+    static const boost::log::attribute_name attr("domain");
+    return attr;
+}
+
 const boost::log::attribute_name& severity() {
-    static boost::log::attribute_name attr("severity");
+    static const boost::log::attribute_name attr("severity");
     return attr;
 }
 
 const boost::log::attribute_name& component() {
-    static boost::log::attribute_name attr("component");
+    static const boost::log::attribute_name attr("component");
     return attr;
 }
 
 const boost::log::attribute_name& timeStamp() {
-    static boost::log::attribute_name attr("time_stamp");
+    static const boost::log::attribute_name attr("time_stamp");
     return attr;
 }
 
 const boost::log::attribute_name& threadName() {
-    static boost::log::attribute_name attr("thread_name");
+    static const boost::log::attribute_name attr("thread_name");
     return attr;
 }
 
 const boost::log::attribute_name& tags() {
-    static boost::log::attribute_name attr("tags");
+    static const boost::log::attribute_name attr("tags");
     return attr;
 }
 
 const boost::log::attribute_name& stableId() {
-    static boost::log::attribute_name attr("id");
+    static const boost::log::attribute_name attr("id");
     return attr;
 }
 
 const boost::log::attribute_name& message() {
-    static boost::log::attribute_name attr("message");
+    static const boost::log::attribute_name attr("message");
     return attr;
 }
 
 const boost::log::attribute_name& attributes() {
-    static boost::log::attribute_name attr("attributes");
+    static const boost::log::attribute_name attr("attributes");
     return attr;
 }
 

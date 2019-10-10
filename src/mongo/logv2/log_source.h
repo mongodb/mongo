@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/log/attributes/constant.hpp>
 #include <boost/log/attributes/function.hpp>
 #include <boost/log/attributes/mutable_constant.hpp>
 #include <boost/log/keywords/channel.hpp>
@@ -38,6 +39,7 @@
 
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_domain.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_tag.h"
 #include "mongo/util/time_support.h"
@@ -49,20 +51,17 @@ namespace logv2 {
 class LogSource : public boost::log::sources::
                       basic_logger<char, LogSource, boost::log::sources::single_thread_model> {
 private:
-private:
-    typedef boost::log::sources::
-        basic_logger<char, LogSource, boost::log::sources::single_thread_model>
-            base_type;
+    using Base = boost::log::sources::
+        basic_logger<char, LogSource, boost::log::sources::single_thread_model>;
 
 public:
-    LogSource() : LogSource(boost::log::core::get()) {}
-
-    LogSource(boost::log::core_ptr core)
-        : base_type(core),
+    LogSource(const LogDomain::Internal* domain)
+        : _domain(domain),
           _severity(LogSeverity::Log()),
           _component(LogComponent::kDefault),
           _tags(LogTag::kNone),
           _id(StringData{}) {
+        add_attribute_unlocked(attributes::domain(), _domain);
         add_attribute_unlocked(attributes::severity(), _severity);
         add_attribute_unlocked(attributes::component(), _component);
         add_attribute_unlocked(attributes::tags(), _tags);
@@ -85,13 +84,13 @@ public:
             _component.set(component);
             _tags.set(tags);
             _id.set(stable_id);
-            return base_type::open_record_unlocked();
+            return Base::open_record_unlocked();
         } else
             return boost::log::record();
     }
 
     void push_record(BOOST_RV_REF(boost::log::record) rec) {
-        base_type::push_record_unlocked(boost::move(rec));
+        Base::push_record_unlocked(boost::move(rec));
         _severity.set(LogSeverity::Log());
         _component.set(LogComponent::kDefault);
         _tags.set(LogTag::kNone);
@@ -99,6 +98,7 @@ public:
     }
 
 private:
+    boost::log::attributes::constant<const LogDomain::Internal*> _domain;
     boost::log::attributes::mutable_constant<LogSeverity> _severity;
     boost::log::attributes::mutable_constant<LogComponent> _component;
     boost::log::attributes::mutable_constant<LogTag> _tags;

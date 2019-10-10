@@ -89,10 +89,8 @@ struct formatter<TypeWithCustomFormatting> : public mongo::logv2::FormatterBase 
 };
 }  // namespace fmt
 
-
-using namespace mongo::logv2;
-
 namespace mongo {
+namespace logv2 {
 namespace {
 class LogTestBackend
     : public boost::log::sinks::
@@ -135,15 +133,14 @@ public:
     LogDuringInitTester() {
         std::vector<std::string> lines;
         auto sink = LogTestBackend::create(lines);
-        sink->set_filter(
-            ComponentSettingsFilter(LogManager::global().getGlobalDomain().settings()));
+        sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain()));
         sink->set_formatter(PlainFormatter());
-        LogManager::global().getGlobalDomain().impl().core()->add_sink(sink);
+        boost::log::core::get()->add_sink(sink);
 
         LOGV2("log during init");
         ASSERT(lines.back() == "log during init");
 
-        LogManager::global().getGlobalDomain().impl().core()->remove_sink(sink);
+        boost::log::core::get()->remove_sink(sink);
     }
 };
 
@@ -152,7 +149,7 @@ LogDuringInitTester logDuringInit;
 TEST_F(LogTestV2, Basic) {
     std::vector<std::string> lines;
     auto sink = LogTestBackend::create(lines);
-    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain().settings()));
+    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain()));
     sink->set_formatter(PlainFormatter());
     attach(sink);
 
@@ -188,7 +185,7 @@ TEST_F(LogTestV2, Basic) {
 TEST_F(LogTestV2, TextFormat) {
     std::vector<std::string> lines;
     auto sink = LogTestBackend::create(lines);
-    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain().settings()));
+    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain()));
     sink->set_formatter(TextFormatter());
     attach(sink);
 
@@ -210,7 +207,7 @@ TEST_F(LogTestV2, TextFormat) {
 TEST_F(LogTestV2, JSONFormat) {
     std::vector<std::string> lines;
     auto sink = LogTestBackend::create(lines);
-    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain().settings()));
+    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain()));
     sink->set_formatter(JsonFormatter());
     attach(sink);
 
@@ -263,22 +260,19 @@ TEST_F(LogTestV2, JSONFormat) {
 TEST_F(LogTestV2, Threads) {
     std::vector<std::string> linesPlain;
     auto plainSink = LogTestBackend::create(linesPlain);
-    plainSink->set_filter(
-        ComponentSettingsFilter(LogManager::global().getGlobalDomain().settings()));
+    plainSink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain()));
     plainSink->set_formatter(PlainFormatter());
     attach(plainSink);
 
     std::vector<std::string> linesText;
     auto textSink = LogTestBackend::create(linesText);
-    textSink->set_filter(
-        ComponentSettingsFilter(LogManager::global().getGlobalDomain().settings()));
+    textSink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain()));
     textSink->set_formatter(TextFormatter());
     attach(textSink);
 
     std::vector<std::string> linesJson;
     auto jsonSink = LogTestBackend::create(linesJson);
-    jsonSink->set_filter(
-        ComponentSettingsFilter(LogManager::global().getGlobalDomain().settings()));
+    jsonSink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain()));
     jsonSink->set_formatter(JsonFormatter());
     attach(jsonSink);
 
@@ -318,14 +312,13 @@ TEST_F(LogTestV2, Ramlog) {
     RamLog* ramlog = RamLog::get("test_ramlog");
 
     auto sink = RamLogSink::create(ramlog);
-    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain().settings()));
+    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain()));
     sink->set_formatter(PlainFormatter());
     attach(sink);
 
     std::vector<std::string> lines;
     auto testSink = LogTestBackend::create(lines);
-    testSink->set_filter(
-        ComponentSettingsFilter(LogManager::global().getGlobalDomain().settings()));
+    testSink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain()));
     testSink->set_formatter(PlainFormatter());
     attach(testSink);
 
@@ -345,36 +338,27 @@ TEST_F(LogTestV2, Ramlog) {
 TEST_F(LogTestV2, MultipleDomains) {
     std::vector<std::string> global_lines;
     auto sink = LogTestBackend::create(global_lines);
-    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain().settings()));
+    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain()));
     sink->set_formatter(PlainFormatter());
     attach(sink);
 
-    // Example how a second domain can be created. This method requires multiple boost log core
-    // instances (MongoDB customization)
-    class OtherDomainImpl : public LogDomainImpl {
+    // Example how a second domain can be created.
+    class OtherDomainImpl : public LogDomain::Internal {
     public:
-        OtherDomainImpl() : _core(boost::log::core::create()) {}
+        OtherDomainImpl() {}
 
         LogSource& source() override {
-            thread_local LogSource lg(_core);
+            thread_local LogSource lg(this);
             return lg;
         }
-        boost::shared_ptr<boost::log::core> core() override {
-            return _core;
-        }
-
-    private:
-        boost::shared_ptr<boost::log::core> _core;
     };
 
     LogDomain other_domain(std::make_unique<OtherDomainImpl>());
     std::vector<std::string> other_lines;
     auto other_sink = LogTestBackend::create(other_lines);
-    other_sink->set_filter(
-        ComponentSettingsFilter(LogManager::global().getGlobalDomain().settings()));
+    other_sink->set_filter(ComponentSettingsFilter(other_domain));
     other_sink->set_formatter(PlainFormatter());
-    other_domain.impl().core()->add_sink(other_sink);
-
+    attach(other_sink);
 
     LOGV2_OPTIONS({&other_domain}, "test");
     ASSERT(global_lines.empty());
@@ -383,98 +367,6 @@ TEST_F(LogTestV2, MultipleDomains) {
     LOGV2("global domain log");
     ASSERT(global_lines.back() == "global domain log");
     ASSERT(other_lines.back() == "test");
-}
-
-TEST_F(LogTestV2, MultipleDomainsFiltering) {
-    std::vector<std::string> global_lines;
-    auto sink = LogTestBackend::create(global_lines);
-    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain().settings()));
-    sink->set_formatter(PlainFormatter());
-    attach(sink);
-
-    // Example on how we could instead support multiple domains using just a single boost::log::core
-    // (no modifications needed)
-    enum DomainId { Domain1, Domain2 };
-
-    // Log source that add an attribute for domain
-    class FilteringLogSource : public LogSource {
-    public:
-        FilteringLogSource(DomainId domainId) : _component(domainId) {
-            add_attribute_unlocked("domain", _component);
-        }
-
-    private:
-        boost::log::attributes::constant<DomainId> _component;
-    };
-
-    // Domains with different value of the above attribute
-    class OtherDomainImpl1 : public LogDomainImpl {
-    public:
-        OtherDomainImpl1() {}
-
-        LogSource& source() override {
-            thread_local FilteringLogSource lg(DomainId::Domain1);
-            return lg;
-        }
-        boost::shared_ptr<boost::log::core> core() override {
-            return boost::log::core::get();
-        }
-    };
-
-    class OtherDomainImpl2 : public LogDomainImpl {
-    public:
-        OtherDomainImpl2() {}
-
-        LogSource& source() override {
-            thread_local FilteringLogSource lg(DomainId::Domain2);
-            return lg;
-        }
-        boost::shared_ptr<boost::log::core> core() override {
-            return boost::log::core::get();
-        }
-    };
-
-    // Filtering function to check the domain attribute
-    class MultipleDomainFiltering : public ComponentSettingsFilter {
-    public:
-        MultipleDomainFiltering(DomainId domainId, LogComponentSettings& settings)
-            : ComponentSettingsFilter(settings), _domainId(domainId) {}
-
-        bool operator()(boost::log::attribute_value_set const& attrs) {
-            using namespace boost::log;
-
-            return extract<DomainId>("domain", attrs).get() == _domainId &&
-                ComponentSettingsFilter::operator()(attrs);
-        }
-
-    private:
-        DomainId _domainId;
-    };
-
-    LogDomain domain1(std::make_unique<OtherDomainImpl1>());
-    std::vector<std::string> domain1_lines;
-    auto domain1_sink = LogTestBackend::create(domain1_lines);
-    domain1_sink->set_filter(MultipleDomainFiltering(
-        DomainId::Domain1, LogManager::global().getGlobalDomain().settings()));
-    domain1_sink->set_formatter(PlainFormatter());
-    domain1.impl().core()->add_sink(domain1_sink);
-
-    LogDomain domain2(std::make_unique<OtherDomainImpl2>());
-    std::vector<std::string> domain2_lines;
-    auto domain2_sink = LogTestBackend::create(domain2_lines);
-    domain2_sink->set_filter(MultipleDomainFiltering(
-        DomainId::Domain2, LogManager::global().getGlobalDomain().settings()));
-    domain2_sink->set_formatter(PlainFormatter());
-    domain2.impl().core()->add_sink(domain2_sink);
-
-
-    LOGV2_OPTIONS({&domain1}, "test domain1");
-    ASSERT(domain1_lines.back() == "test domain1");
-    ASSERT(domain2_lines.empty());
-
-    LOGV2_OPTIONS({&domain2}, "test domain2");
-    ASSERT(domain1_lines.back() == "test domain1");
-    ASSERT(domain2_lines.back() == "test domain2");
 }
 
 TEST_F(LogTestV2, FileLogging) {
@@ -494,7 +386,7 @@ TEST_F(LogTestV2, FileLogging) {
 
     auto sink = boost::make_shared<
         boost::log::sinks::synchronous_sink<boost::log::sinks::text_file_backend>>(backend);
-    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain().settings()));
+    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain()));
     sink->set_formatter(PlainFormatter());
     attach(sink);
 
@@ -535,4 +427,5 @@ TEST_F(LogTestV2, FileLogging) {
 }
 
 }  // namespace
+}  // namespace logv2
 }  // namespace mongo

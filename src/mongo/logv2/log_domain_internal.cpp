@@ -27,25 +27,10 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include <boost/log/attributes/attribute_name.hpp>
+#include "log_domain_internal.h"
 
 namespace mongo {
 namespace logv2 {
-namespace attributes {
-
-// Reusable attribute names, so they only need to be constructed once.
-const boost::log::attribute_name& domain();
-const boost::log::attribute_name& severity();
-const boost::log::attribute_name& component();
-const boost::log::attribute_name& timeStamp();
-const boost::log::attribute_name& threadName();
-const boost::log::attribute_name& tags();
-const boost::log::attribute_name& stableId();
-const boost::log::attribute_name& message();
-const boost::log::attribute_name& attributes();
-
-}  // namespace attributes
+LogDomain::Internal::~Internal() = default;
 }  // namespace logv2
 }  // namespace mongo

@@ -33,6 +33,7 @@
 #include <boost/log/attributes/value_extraction.hpp>
 
 #include "mongo/logv2/attributes.h"
+#include "mongo/logv2/domain_filter.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_tag.h"
 
@@ -40,11 +41,12 @@ namespace mongo {
 namespace logv2 {
 
 // Boost::log filter that enables logging if Tag exists with Severity over threshold
-class TaggedSeverityFilter {
+class TaggedSeverityFilter : public DomainFilter<TaggedSeverityFilter> {
 public:
-    TaggedSeverityFilter(LogTag tag, LogSeverity severity) : _tag(tag), _severity(severity) {}
-    bool operator()(boost::log::attribute_value_set const& attrs) {
-        using namespace boost::log;
+    TaggedSeverityFilter(const LogDomain& domain, LogTag tag, LogSeverity severity)
+        : DomainFilter(domain), _tag(tag), _severity(severity) {}
+    bool filter(boost::log::attribute_value_set const& attrs) const {
+        using boost::log::extract;
 
         return _tag.has(extract<LogTag>(attributes::tags(), attrs).get()) &&
             extract<LogSeverity>(attributes::severity(), attrs).get() <= _severity;

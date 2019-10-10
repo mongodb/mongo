@@ -36,22 +36,28 @@
 
 namespace mongo {
 namespace logv2 {
-class LogDomainImpl;
 class LogComponentSettings;
 
 // Log domain class, implemented with the pimpl idiom to not leak out boost::log types
 class LogDomain {
 public:
-    LogDomain(std::unique_ptr<LogDomainImpl> impl);
-    LogDomainImpl& impl() {
-        return *_impl;
+    class Internal;
+
+    explicit LogDomain(std::unique_ptr<Internal> internalDomain);
+    ~LogDomain();
+
+    Internal& internal() {
+        return *_internal;
+    }
+    const Internal& internal() const {
+        return *_internal;
     }
 
-    LogComponentSettings& settings();
+    const LogComponentSettings& settings() const;
     LogRecord openRecord(LogSeverity severity, LogComponent component, LogTag tags);
 
 private:
-    std::unique_ptr<LogDomainImpl> _impl;
+    std::unique_ptr<Internal> _internal;
 };
 
 }  // namespace logv2

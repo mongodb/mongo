@@ -34,7 +34,7 @@
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_domain.h"
-#include "mongo/logv2/log_domain_impl.h"
+#include "mongo/logv2/log_domain_internal.h"
 #include "mongo/logv2/log_options.h"
 #include "mongo/logv2/log_record_impl.h"
 #include "mongo/logv2/log_source.h"
@@ -48,7 +48,7 @@ void doLogImpl(LogSeverity const& severity,
                StringData stable_id,
                StringData message,
                AttributeArgumentSet const& attrs) {
-    auto& source = options.domain().impl().source();
+    auto& source = options.domain().internal().source();
     auto record = source.open_record(severity, options.component(), options.tags(), stable_id);
     if (record) {
         record.attribute_values().insert(
@@ -69,7 +69,7 @@ void doLogRecordImpl(LogRecord&& record,
                      LogDomain& domain,
                      StringData message,
                      AttributeArgumentSet const& attrs) {
-    auto& source = domain.impl().source();
+    auto& source = domain.internal().source();
     auto rec = std::move(record.impl()->_record);
     if (rec) {
         rec.attribute_values().insert(

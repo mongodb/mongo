@@ -29,14 +29,13 @@
 
 #pragma once
 
-#include "mongo/logv2/log_domain_impl.h"
+#include "mongo/logv2/log_domain_internal.h"
 
 namespace mongo {
 namespace logv2 {
-class LogDomainGlobal : public LogDomainImpl {
+class LogDomainGlobal : public LogDomain::Internal {
 public:
     LogSource& source() override;
-    boost::shared_ptr<boost::log::core> core() override;
 };
 }  // namespace logv2
 }  // namespace mongo

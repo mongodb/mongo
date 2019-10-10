@@ -35,12 +35,9 @@ namespace mongo {
 namespace logv2 {
 LogSource& LogDomainGlobal::source() {
     // Use a thread_local logger so we don't need to have locking
-    thread_local LogSource lg;
+    thread_local LogSource lg(this);
     return lg;
 }
 
-boost::shared_ptr<boost::log::core> LogDomainGlobal::core() {
-    return boost::log::core::get();
-}
 }  // namespace logv2
 }  // namespace mongo

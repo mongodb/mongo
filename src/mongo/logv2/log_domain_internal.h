@@ -30,20 +30,19 @@
 #pragma once
 
 #include "mongo/logv2/log_component_settings.h"
+#include "mongo/logv2/log_domain.h"
 #include "mongo/logv2/log_source.h"
-#include <boost/log/core.hpp>
 
 namespace mongo {
 namespace logv2 {
-class LogDomainImpl {
+class LogDomain::Internal {
 public:
-    LogDomainImpl() {}
-    virtual ~LogDomainImpl() {}
+    Internal() = default;
+    virtual ~Internal();
 
     virtual LogSource& source() = 0;
-    virtual boost::shared_ptr<boost::log::core> core() = 0;
 
-    LogComponentSettings& settings() {
+    const LogComponentSettings& settings() const {
         return _settings;
     }
 

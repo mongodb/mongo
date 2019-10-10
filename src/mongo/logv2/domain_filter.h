@@ -29,23 +29,32 @@
 
 #pragma once
 
-#include <boost/log/attributes/attribute_name.hpp>
+#include <boost/log/attributes/attribute_value_set.hpp>
+#include <boost/log/attributes/value_extraction.hpp>
+
+#include "mongo/logv2/attributes.h"
+#include "mongo/logv2/log_domain.h"
 
 namespace mongo {
 namespace logv2 {
-namespace attributes {
 
-// Reusable attribute names, so they only need to be constructed once.
-const boost::log::attribute_name& domain();
-const boost::log::attribute_name& severity();
-const boost::log::attribute_name& component();
-const boost::log::attribute_name& timeStamp();
-const boost::log::attribute_name& threadName();
-const boost::log::attribute_name& tags();
-const boost::log::attribute_name& stableId();
-const boost::log::attribute_name& message();
-const boost::log::attribute_name& attributes();
+// Boost::log filter that enables logging if domain match. Using CRTP, users should inherit from
+// this and provide the concrete type as the template argument to this class.
+template <class Filter>
+class DomainFilter {
+public:
+    DomainFilter(const LogDomain& domain) : _domain(&domain.internal()) {}
 
-}  // namespace attributes
+    bool operator()(boost::log::attribute_value_set const& attrs) {
+        using boost::log::extract;
+
+        return extract<const LogDomain::Internal*>(attributes::domain(), attrs).get() == _domain &&
+            static_cast<const Filter*>(this)->filter(attrs);
+    }
+
+private:
+    const LogDomain::Internal* _domain;
+};
+
 }  // namespace logv2
 }  // namespace mongo

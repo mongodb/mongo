@@ -97,7 +97,7 @@ struct LogManager::Impl {
 
     Impl() {
         _consoleBackend = boost::make_shared<ConsoleBackend>();
-        _consoleBackend->set_filter(ComponentSettingsFilter(_globalDomain.settings()));
+        _consoleBackend->set_filter(ComponentSettingsFilter(_globalDomain));
         _consoleBackend->set_formatter(TextFormatter());
 
         _consoleBackend->locked_backend()->add_stream(
@@ -106,12 +106,12 @@ struct LogManager::Impl {
         _consoleBackend->locked_backend()->auto_flush();
 
         _globalLogCacheBackend = RamLogSink::create(RamLog::get("global"));
-        _globalLogCacheBackend->set_filter(ComponentSettingsFilter(_globalDomain.settings()));
+        _globalLogCacheBackend->set_filter(ComponentSettingsFilter(_globalDomain));
         _globalLogCacheBackend->set_formatter(TextFormatter());
 
         _startupWarningsBackend = RamLogSink::create(RamLog::get("startupWarnings"));
-        _startupWarningsBackend->set_filter(
-            TaggedSeverityFilter({LogTag::kStartupWarnings}, LogSeverity::Warning()));
+        _startupWarningsBackend->set_filter(TaggedSeverityFilter(
+            _globalDomain, {LogTag::kStartupWarnings}, LogSeverity::Warning()));
         _startupWarningsBackend->set_formatter(TextFormatter());
     }
 
@@ -127,7 +127,7 @@ struct LogManager::Impl {
         // backend->set_severity_mapper(
         //     boost::log::sinks::syslog::direct_severity_mapping<int>("Severity"));
         _syslogBackend = boost::make_shared<SyslogBackend>(backend);
-        _syslogBackend->set_filter(ComponentSettingsFilter(_globalDomain.settings()));
+        _syslogBackend->set_filter(ComponentSettingsFilter(_globalDomain));
         _syslogBackend->set_formatter(TextFormatter());
 #endif
     }
@@ -141,7 +141,7 @@ struct LogManager::Impl {
         backend->set_file_collector(boost::make_shared<RotateCollector>(!append));
 
         _rotatableFileBackend = boost::make_shared<RotatableFileBackend>(backend);
-        _rotatableFileBackend->set_filter(ComponentSettingsFilter(_globalDomain.settings()));
+        _rotatableFileBackend->set_filter(ComponentSettingsFilter(_globalDomain));
         _rotatableFileBackend->set_formatter(TextFormatter());
     }
 
@@ -217,14 +217,15 @@ void LogManager::setOutputFormat(LogFormat format) {
 void LogManager::detachDefaultBackends() {
     invariant(isDefaultBackendsAttached());
 
-    _impl->_globalDomain.impl().core()->remove_sink(_impl->_startupWarningsBackend);
-    _impl->_globalDomain.impl().core()->remove_sink(_impl->_globalLogCacheBackend);
-    _impl->_globalDomain.impl().core()->remove_sink(_impl->_consoleBackend);
+    auto logCore = boost::log::core::get();
+    logCore->remove_sink(_impl->_startupWarningsBackend);
+    logCore->remove_sink(_impl->_globalLogCacheBackend);
+    logCore->remove_sink(_impl->_consoleBackend);
     _impl->_defaultBackendsAttached = false;
 }
 
 void LogManager::detachConsoleBackend() {
-    _impl->_globalDomain.impl().core()->remove_sink(_impl->_consoleBackend);
+    boost::log::core::get()->remove_sink(_impl->_consoleBackend);
 }
 
 void LogManager::setupRotatableFileBackend(std::string path, bool append) {
@@ -237,24 +238,25 @@ void LogManager::setupSyslogBackend(int syslogFacility) {
 
 void LogManager::reattachSyslogBackend() {
 #ifndef _WIN32
-    _impl->_globalDomain.impl().core()->add_sink(_impl->_syslogBackend);
+    boost::log::core::get()->add_sink(_impl->_syslogBackend);
 #endif
 }
 
 void LogManager::reattachRotatableFileBackend() {
-    _impl->_globalDomain.impl().core()->add_sink(_impl->_rotatableFileBackend);
+    boost::log::core::get()->add_sink(_impl->_rotatableFileBackend);
 }
 
 void LogManager::reattachConsoleBackend() {
-    _impl->_globalDomain.impl().core()->add_sink(_impl->_consoleBackend);
+    boost::log::core::get()->add_sink(_impl->_consoleBackend);
 }
 
 void LogManager::reattachDefaultBackends() {
     invariant(!isDefaultBackendsAttached());
 
-    _impl->_globalDomain.impl().core()->add_sink(_impl->_consoleBackend);
-    _impl->_globalDomain.impl().core()->add_sink(_impl->_globalLogCacheBackend);
-    _impl->_globalDomain.impl().core()->add_sink(_impl->_startupWarningsBackend);
+    auto logCore = boost::log::core::get();
+    logCore->add_sink(_impl->_consoleBackend);
+    logCore->add_sink(_impl->_globalLogCacheBackend);
+    logCore->add_sink(_impl->_startupWarningsBackend);
     _impl->_defaultBackendsAttached = true;
 }
 
