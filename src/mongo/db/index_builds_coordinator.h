@@ -146,9 +146,9 @@ public:
     /**
      * Commits the index build identified by 'buildUUID'.
      */
-    Status commitIndexBuild(OperationContext* opCtx,
-                            const std::vector<BSONObj>& specs,
-                            const UUID& buildUUID);
+    void commitIndexBuild(OperationContext* opCtx,
+                          const std::vector<BSONObj>& specs,
+                          const UUID& buildUUID);
 
     /**
      * Waits for all index builds to stop after they have been interrupted during shutdown.

@@ -369,9 +369,9 @@ void IndexBuildsCoordinator::abortDatabaseIndexBuilds(StringData db, const std::
     dbIndexBuilds->waitUntilNoIndexBuildsRemain(lk);
 }
 
-Status IndexBuildsCoordinator::commitIndexBuild(OperationContext* opCtx,
-                                                const std::vector<BSONObj>& specs,
-                                                const UUID& buildUUID) {
+void IndexBuildsCoordinator::commitIndexBuild(OperationContext* opCtx,
+                                              const std::vector<BSONObj>& specs,
+                                              const UUID& buildUUID) {
     auto replState = uassertStatusOK(_getIndexBuild(buildUUID));
 
     stdx::unique_lock<Latch> lk(replState->mutex);
@@ -379,8 +379,6 @@ Status IndexBuildsCoordinator::commitIndexBuild(OperationContext* opCtx,
     replState->commitTimestamp = opCtx->recoveryUnit()->getCommitTimestamp();
     invariant(!replState->commitTimestamp.isNull(), buildUUID.toString());
     replState->condVar.notify_all();
-
-    return Status::OK();
 }
 
 void IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,

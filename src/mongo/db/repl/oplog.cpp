@@ -212,8 +212,9 @@ Status commitIndexBuild(OperationContext* opCtx,
     if (!statusWithIndexes.isOK()) {
         return statusWithIndexes.getStatus();
     }
-    return IndexBuildsCoordinator::get(opCtx)->commitIndexBuild(
-        opCtx, statusWithIndexes.getValue(), indexBuildUUID);
+    auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
+    indexBuildsCoord->commitIndexBuild(opCtx, statusWithIndexes.getValue(), indexBuildUUID);
+    return Status::OK();
 }
 
 Status abortIndexBuild(OperationContext* opCtx,
