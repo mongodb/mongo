@@ -162,6 +162,7 @@ private:
 // 7. At 2.5 seconds the monitor rechecks Node 0 and discovers it's primary. Assert that
 //    getHostOrRefresh(primaryOnly) succeeds.
 // 8. At 5 seconds the Node 1 check times out, assert getHostOrRefresh(secondaryOnly) fails
+#if 0
 TEST_F(ReplicaSetMonitorConcurrentTest, RechecksAvailableNodesUntilExpiration) {
     MockReplicaSet replSet("test", 2, false /* hasPrimary */, false /* dollarPrefixHosts */);
     const auto node0 = HostAndPort(replSet.getSecondaries()[0]);
@@ -218,6 +219,7 @@ TEST_F(ReplicaSetMonitorConcurrentTest, RechecksAvailableNodesUntilExpiration) {
         advanceTime(Milliseconds(100));
     }
 }
+#endif  // 0
 
 // Like previous test, but simulate a stepdown and election while waiting for unresponsive node.
 //
