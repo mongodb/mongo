@@ -45,6 +45,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/shell/shell_utils.h"
+#include "mongo/transport/message_compressor_options_client_gen.h"
 #include "mongo/transport/message_compressor_registry.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/socket_utils.h"
@@ -282,7 +283,8 @@ Status storeMongoShellOptions(const moe::Environment& params,
             } else if (shellGlobalParams.gssapiServiceName != saslDefaultServiceName &&
                        uriOptions.count("gssapiServiceName")) {
                 sb << "the GSSAPI service name";
-            } else if (!shellGlobalParams.networkMessageCompressors.empty() &&
+            } else if (shellGlobalParams.networkMessageCompressors !=
+                           kNet_compression_compressorsDefault &&
                        uriOptions.count("compressors") &&
                        uriOptions["compressors"] != shellGlobalParams.networkMessageCompressors) {
                 sb << "different network message compressors";
