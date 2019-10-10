@@ -6,7 +6,6 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   requires_replication,
- *   two_phase_index_builds_unsupported,
  * ]
  */
 (function() {
@@ -85,12 +84,22 @@ function startIndexBuildOnSecondaryAndLeaveUnfinished(primaryDB, writeConcern, s
         let res = assert.commandWorked(primaryDB.runCommand(
             {createIndexes: collName, indexes: indexesToBuild, writeConcern: {w: writeConcern}}));
 
-        // Wait till all four index builds hang.
+        // Before two phase index builds, index creation requests are replicated using a single
+        // createIndexes for each index spec. When two phase index builds are in effect, all four
+        // index specs are built using the same builder, so we should expect to see only one fail
+        // point log message instead of four.
+        const enableTwoPhaseIndexBuild = assert
+                                             .commandWorked(primaryDB.adminCommand(
+                                                 {getParameter: 1, enableTwoPhaseIndexBuild: 1}))
+                                             .enableTwoPhaseIndexBuild;
+        const expectedFailPointMessageCount = enableTwoPhaseIndexBuild ? 1 : 4;
+
+        // Wait till all index builds hang.
         checkLog.containsWithCount(
             secondaryDB,
             "Index build interrupted due to \'leaveIndexBuildUnfinishedForShutdown\' " +
                 "failpoint. Mimicing shutdown error code.",
-            4);
+            expectedFailPointMessageCount);
 
         // Wait until the secondary has a recovery timestamp beyond the index oplog entry. On
         // restart, replication recovery will not replay the createIndex oplog entries.
