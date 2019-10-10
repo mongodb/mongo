@@ -14,6 +14,7 @@ load("jstests/libs/analyze_plan.js");  // For 'aggPlanHasStages' and other expla
 
 const coll = db.server39788;
 coll.drop();
+assert.commandWorked(db.runCommand({create: coll.getName()}));
 
 function testPipeline(pipeline, expectedResult, optimizedAwayStages) {
     const explainOutput = coll.explain().aggregate(pipeline);
@@ -75,27 +76,54 @@ testPipeline([{$sort: {x: -1}}, {$skip: 1}, {$limit: NumberLong("922337203685477
 // absorb the limit and skip stages.
 // Note that we cannot specify limit == 0, so we expect an error in this case.
 testPipeline([{$sort: {x: -1}}, {$skip: 0}, {$limit: NumberLong("9223372036854775807")}],
-             {"$cursor.limit": [NumberLong("9223372036854775807")]},
+             {"$sort.limit": [NumberLong("9223372036854775807")]},
              ["$skip", "$limit"]);
 
 // Case where limit + skip do not overflow. One value is MAX_LONG - 1 and another one is 1.
 // Should be able to absorb the limit stage.
 testPipeline([{$sort: {x: -1}}, {$skip: NumberLong("9223372036854775806")}, {$limit: 1}],
              {
-                 "$cursor.limit": [NumberLong("9223372036854775807")],
+                 "$sort.limit": [NumberLong("9223372036854775807")],
                  "$skip": [NumberLong("9223372036854775806")]
              },
              ["$limit"]);
 testPipeline([{$sort: {x: -1}}, {$skip: 1}, {$limit: NumberLong("9223372036854775806")}],
-             {"$cursor.limit": [NumberLong("9223372036854775807")], "$skip": [NumberLong(1)]},
+             {"$sort.limit": [NumberLong("9223372036854775807")], "$skip": [NumberLong(1)]},
              ["$limit"]);
+
+// Case where the first $limit can be pushed down, but the second overflows and thus remains in
+// place.
+testPipeline(
+    [
+        {$sort: {x: -1}},
+        {$skip: NumberLong("9223372036854775800")},
+        {$limit: 7},
+        {$skip: 10},
+        {$limit: 1}
+    ],
+    {"$sort.limit": [NumberLong("9223372036854775807")], "$limit": [NumberLong(1)]});
+
+// Case with multiple $limit and $skip stages where the second $limit ends up being the smallest.
+// There is no overflow in this case.
+testPipeline(
+    [
+        {$sort: {x: -1}},
+        {$skip: NumberLong("9223372036854775800")},
+        {$limit: 7},
+        {$skip: 3},
+        {$limit: 1}
+    ],
+    {
+        "$sort.limit": [NumberLong("9223372036854775804")],
+        "$skip": [NumberLong("9223372036854775803")]
+    });
 
 // Case where limit + skip do not overflow. Both values are < MAX_LONG.
 testPipeline([{$sort: {x: -1}}, {$skip: 674761616283}, {$limit: 35361718}],
-             {"$cursor.limit": [NumberLong(674796978001)], "$skip": [NumberLong(674761616283)]},
+             {"$sort.limit": [NumberLong(674796978001)], "$skip": [NumberLong(674761616283)]},
              ["$limit"]);
 testPipeline([{$sort: {x: -1}}, {$skip: 35361718}, {$limit: 674761616283}],
-             {"$cursor.limit": [NumberLong(674796978001)], "$skip": [NumberLong(35361718)]},
+             {"$sort.limit": [NumberLong(674796978001)], "$skip": [NumberLong(35361718)]},
              ["$limit"]);
 
 // Case where where overflow of limit + skip + skip prevents limit stage from being absorbed.

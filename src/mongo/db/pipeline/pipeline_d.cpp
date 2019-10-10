@@ -195,6 +195,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     BSONObj projectionObj,
     const QueryMetadataBitSet& metadataRequested,
     BSONObj sortObj,
+    boost::optional<long long> limit,
     boost::optional<std::string> groupIdForDistinctScan,
     const AggregationRequest* aggRequest,
     const size_t plannerOpts,
@@ -204,6 +205,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     qr->setFilter(queryObj);
     qr->setProj(projectionObj);
     qr->setSort(sortObj);
+    qr->setLimit(limit);
     if (aggRequest) {
         qr->setExplain(static_cast<bool>(aggRequest->getExplain()));
         qr->setHint(aggRequest->getHint());
@@ -448,6 +450,20 @@ getSortAndGroupStagesFromPipeline(const Pipeline::SourceContainer& sources) {
     return std::make_pair(sortStage, groupStage);
 }
 
+boost::optional<long long> extractLimitForPushdown(Pipeline* pipeline) {
+    auto&& sources = pipeline->getSources();
+    auto limit = DocumentSourceSort::extractLimitForPushdown(sources.begin(), &sources);
+    if (limit) {
+        // Removing $limit stages may have produced the opportunity for additional optimizations.
+        //
+        // In addition, since a stage was removed from the middle of the pipeline, we need to
+        // re-stitch the pipeline in order to ensure that each stage has a valid pointer to the
+        // previous document source. 'optimizePipeline()' will take care of re-stitching for us.
+        pipeline->optimizePipeline();
+    }
+    return limit;
+}
+
 }  // namespace
 
 std::pair<PipelineD::AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
@@ -497,6 +513,23 @@ PipelineD::buildInnerQueryExecutorGeneric(Collection* collection,
         rewrittenGroupStage = groupStage->rewriteGroupAsTransformOnFirstDocument();
     }
 
+    // If there is a $limit stage (or multiple $limit stages) that could be pushed down into the
+    // PlanStage layer, obtain the value of the limit and remove the $limit stages from the
+    // pipeline.
+    //
+    // This analysis is done here rather than in 'optimizePipeline()' because swapping $limit before
+    // stages such as $project is not always useful, and can sometimes defeat other optimizations.
+    // In particular, in a sharded scenario a pipeline such as [$project, $limit] is preferable to
+    // [$limit, $project]. The former permits the execution of the projection operation to be
+    // parallelized across all targeted shards, whereas the latter would bring all of the data to a
+    // merging shard first, and then apply the projection serially. See SERVER-24981 for a more
+    // detailed discussion.
+    //
+    // This only handles the case in which the the $limit can logically be swapped to the front of
+    // the pipeline. We can also push down a $limit which comes after a $sort into the PlanStage
+    // layer, but that is handled elsewhere.
+    const auto limit = extractLimitForPushdown(pipeline);
+
     // Create the PlanExecutor.
     auto exec = uassertStatusOK(prepareExecutor(expCtx->opCtx,
                                                 collection,
@@ -507,6 +540,7 @@ PipelineD::buildInnerQueryExecutorGeneric(Collection* collection,
                                                 std::move(rewrittenGroupStage),
                                                 deps,
                                                 queryObj,
+                                                limit,
                                                 aggRequest,
                                                 Pipeline::kAllowedMatcherFeatures,
                                                 &sortObj,
@@ -576,6 +610,7 @@ PipelineD::buildInnerQueryExecutorGeoNear(Collection* collection,
                                                 nullptr, /* rewrittenGroupStage */
                                                 deps,
                                                 std::move(fullQuery),
+                                                boost::none, /* limit */
                                                 aggRequest,
                                                 Pipeline::kGeoNearMatcherFeatures,
                                                 &sortFromQuerySystem,
@@ -616,6 +651,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
     std::unique_ptr<GroupFromFirstDocumentTransformation> rewrittenGroupStage,
     const DepsTracker& deps,
     const BSONObj& queryObj,
+    boost::optional<long long> limit,
     const AggregationRequest* aggRequest,
     const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
     BSONObj* sortObj,
@@ -672,6 +708,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                                                       *projectionObj,
                                                       deps.metadataDeps(),
                                                       sortObj ? *sortObj : emptySort,
+                                                      boost::none, /* limit */
                                                       rewrittenGroupStage->groupId(),
                                                       aggRequest,
                                                       plannerOpts,
@@ -719,6 +756,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
     if (sortStage && canSortBePushedDown(userSortPattern)) {
         QueryMetadataBitSet needsSortKey;
         needsSortKey.set(DocumentMetadataFields::MetaType::kSortKey);
+
+        // If the $sort has a coalesced $limit, then we push it down as well. Since the $limit was
+        // after a $sort in the pipeline, it should not have been provided by the caller.
+        invariant(!limit);
+        auto limitFollowingSort = sortStage->getLimit();
+
         // See if the query system can provide a non-blocking sort.
         auto swExecutorSort =
             attemptToGetExecutor(opCtx,
@@ -729,6 +772,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                                  BSONObj(),  // empty projection
                                  expCtx->needsMerge ? needsSortKey : DepsTracker::kNoMetadata,
                                  *sortObj,
+                                 limitFollowingSort,
                                  boost::none, /* groupIdForDistinctScan */
                                  aggRequest,
                                  plannerOpts,
@@ -745,6 +789,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                                      *projectionObj,
                                      deps.metadataDeps(),
                                      *sortObj,
+                                     limitFollowingSort,
                                      boost::none, /* groupIdForDistinctScan */
                                      aggRequest,
                                      plannerOpts,
@@ -765,14 +810,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                 exec = std::move(swExecutorSort.getValue());
             }
 
-            // We know the sort is being handled by the query system, so remove the $sort stage.
+            // We know the sort (and any $limit which coalesced with the $sort) is being handled by
+            // the query system, so remove the $sort stage.
             pipeline->_sources.pop_front();
 
-            if (sortStage->hasLimit()) {
-                // We need to reinsert the coalesced $limit after removing the $sort.
-                pipeline->_sources.push_front(
-                    DocumentSourceLimit::create(expCtx, sortStage->getLimit()));
-            }
             return std::move(exec);
         } else if (swExecutorSort != ErrorCodes::NoQueryExecutionPlans) {
             return swExecutorSort.getStatus().withContext(
@@ -805,6 +846,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                                                *projectionObj,
                                                metadataDepsWithoutSortKey,
                                                *sortObj,
+                                               limit,
                                                boost::none, /* groupIdForDistinctScan */
                                                aggRequest,
                                                plannerOpts,
@@ -829,6 +871,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                                 *projectionObj,
                                 DepsTracker::kNoMetadata,
                                 *sortObj,
+                                limit,
                                 boost::none, /* groupIdForDistinctScan */
                                 aggRequest,
                                 plannerOpts,

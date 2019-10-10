@@ -128,15 +128,12 @@ boost::optional<long long> getPipelineLimit(Pipeline* pipeline) {
 
         auto sortStage = dynamic_cast<DocumentSourceSort*>(source);
         if (sortStage) {
-            return (sortStage->getLimit() >= 0) ? boost::optional<long long>(sortStage->getLimit())
-                                                : boost::none;
+            return sortStage->getLimit();
         }
 
         auto cursorStage = dynamic_cast<DocumentSourceSort*>(source);
         if (cursorStage) {
-            return (cursorStage->getLimit() >= 0)
-                ? boost::optional<long long>(cursorStage->getLimit())
-                : boost::none;
+            return cursorStage->getLimit();
         }
 
         // If this stage is one that can swap with a $limit stage, then we can look at the previous

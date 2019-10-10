@@ -188,6 +188,7 @@ private:
         std::unique_ptr<GroupFromFirstDocumentTransformation> rewrittenGroupStage,
         const DepsTracker& deps,
         const BSONObj& queryObj,
+        boost::optional<long long> limit,
         const AggregationRequest* aggRequest,
         const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
         BSONObj* sortObj,

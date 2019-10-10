@@ -216,41 +216,6 @@ private:
     mutable stdx::condition_variable _condition;
 };
 
-
-/** Test coalescing a limit into a cursor */
-TEST_F(DocumentSourceCursorTest, LimitCoalesce) {
-    client.insert(nss.ns(), BSON("a" << 1));
-    client.insert(nss.ns(), BSON("a" << 2));
-    client.insert(nss.ns(), BSON("a" << 3));
-    createSource();
-
-    Pipeline::SourceContainer container;
-    container.push_back(source());
-    container.push_back(DocumentSourceLimit::create(ctx(), 10));
-    source()->optimizeAt(container.begin(), &container);
-
-    // initial limit becomes limit of cursor
-    ASSERT_EQUALS(container.size(), 1U);
-    ASSERT_EQUALS(source()->getLimit(), 10);
-
-    container.push_back(DocumentSourceLimit::create(ctx(), 2));
-    source()->optimizeAt(container.begin(), &container);
-    // smaller limit lowers cursor limit
-    ASSERT_EQUALS(container.size(), 1U);
-    ASSERT_EQUALS(source()->getLimit(), 2);
-
-    container.push_back(DocumentSourceLimit::create(ctx(), 3));
-    source()->optimizeAt(container.begin(), &container);
-    // higher limit doesn't effect cursor limit
-    ASSERT_EQUALS(container.size(), 1U);
-    ASSERT_EQUALS(source()->getLimit(), 2);
-
-    // The cursor allows exactly 2 documents through
-    ASSERT(source()->getNext().isAdvanced());
-    ASSERT(source()->getNext().isAdvanced());
-    ASSERT(source()->getNext().isEOF());
-}
-
 TEST_F(DocumentSourceCursorTest, SerializationNoExplainLevel) {
     // Nothing serialized when no explain mode specified.
     createSource();

@@ -104,13 +104,6 @@ void DocumentSourceCursor::loadBatch() {
                     _currentBatch.push_back(transformDoc(resultObj.getOwned()));
                 }
 
-                if (_limit) {
-                    if (++_docsAddedToBatches == _limit->getLimit()) {
-                        break;
-                    }
-                    verify(_docsAddedToBatches < _limit->getLimit());
-                }
-
                 memUsageBytes += _currentBatch.back().getApproximateSize();
 
                 // As long as we're waiting for inserts, we shouldn't do any batching at this level
@@ -166,29 +159,6 @@ void DocumentSourceCursor::_updateOplogTimestamp() {
     _latestOplogTimestamp = _exec->getLatestOplogTimestamp();
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceCursor::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
-    invariant(*itr == this);
-
-    if (std::next(itr) == container->end()) {
-        return container->end();
-    }
-
-    auto nextLimit = dynamic_cast<DocumentSourceLimit*>((*std::next(itr)).get());
-
-    if (nextLimit) {
-        if (_limit) {
-            // We already have an internal limit, set it to the more restrictive of the two.
-            _limit->setLimit(std::min(_limit->getLimit(), nextLimit->getLimit()));
-        } else {
-            _limit = nextLimit;
-        }
-        container->erase(std::next(itr));
-        return itr;
-    }
-    return std::next(itr);
-}
-
 void DocumentSourceCursor::recordPlanSummaryStats() {
     invariant(_exec);
     // Aggregation handles in-memory sort outside of the query sub-system. Given that we need to
@@ -217,9 +187,6 @@ Value DocumentSourceCursor::serialize(boost::optional<ExplainOptions::Verbosity>
 
     if (!_sort.isEmpty())
         out["sort"] = Value(_sort);
-
-    if (_limit)
-        out["limit"] = Value(_limit->getLimit());
 
     BSONObjBuilder explainStatsBuilder;
 
@@ -298,10 +265,7 @@ DocumentSourceCursor::DocumentSourceCursor(
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
     const intrusive_ptr<ExpressionContext>& pCtx,
     bool trackOplogTimestamp)
-    : DocumentSource(kStageName, pCtx),
-      _docsAddedToBatches(0),
-      _exec(std::move(exec)),
-      _trackOplogTS(trackOplogTimestamp) {
+    : DocumentSource(kStageName, pCtx), _exec(std::move(exec)), _trackOplogTS(trackOplogTimestamp) {
     // Later code in the DocumentSourceCursor lifecycle expects that '_exec' is in a saved state.
     _exec->saveState();
 

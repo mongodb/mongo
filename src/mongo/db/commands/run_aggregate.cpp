@@ -668,10 +668,6 @@ Status runAggregate(OperationContext* opCtx,
                                                           std::move(attachExecutorCallback.second),
                                                           pipeline.get());
 
-            // Optimize again, since there may be additional optimizations that can be done after
-            // adding the initial cursor stage.
-            pipeline->optimizePipeline();
-
             auto pipelines =
                 createExchangePipelinesIfNeeded(opCtx, expCtx, request, std::move(pipeline), uuid);
             for (auto&& pipelineIt : pipelines) {

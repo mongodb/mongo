@@ -44,6 +44,18 @@ class DocumentSourceSort final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$sort"_sd;
 
+    /**
+     * If there are any $limit stages that could be logically swapped forward to the position of the
+     * pipeline pointed to by 'itr' without changing the meaning of the query, removes these $limit
+     * stages from the Pipeline and returns the resulting limit. A single limit value is computed by
+     * taking the minimum after swapping each individual $limit stage forward.
+     *
+     * This method also implements the ability to swap a $limit before a $skip, by adding the value
+     * of the $skip to the value of the $limit.
+     */
+    static boost::optional<long long> extractLimitForPushdown(
+        Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container);
+
     const char* getSourceName() const final {
         return kStageName.rawData();
     }
@@ -102,9 +114,10 @@ public:
         boost::optional<uint64_t> maxMemoryUsageBytes = boost::none);
 
     /**
-     * Returns -1 for no limit.
+     * Returns the the limit, if a subsequent $limit stage has been coalesced with this $sort stage.
+     * Otherwise, returns boost::none.
      */
-    long long getLimit() const;
+    boost::optional<long long> getLimit() const;
 
     /**
      * Loads a document to be sorted. This can be used to sort a stream of documents that are not

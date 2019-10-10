@@ -122,7 +122,7 @@ TEST_F(DocumentSourceSortTest, SortWithLimit) {
     auto expCtx = getExpCtx();
     createSort(BSON("a" << 1));
 
-    ASSERT_EQUALS(sort()->getLimit(), -1);
+    ASSERT(!sort()->getLimit());
     Pipeline::SourceContainer container;
     container.push_back(sort());
 
@@ -139,25 +139,23 @@ TEST_F(DocumentSourceSortTest, SortWithLimit) {
     container.push_back(DocumentSourceLimit::create(expCtx, 10));
     sort()->optimizeAt(container.begin(), &container);
     ASSERT_EQUALS(container.size(), 1U);
-    ASSERT_EQUALS(sort()->getLimit(), 10);
+    ASSERT_EQUALS(*sort()->getLimit(), 10);
 
     // unchanged
     container.push_back(DocumentSourceLimit::create(expCtx, 15));
     sort()->optimizeAt(container.begin(), &container);
     ASSERT_EQUALS(container.size(), 1U);
-    ASSERT_EQUALS(sort()->getLimit(), 10);
+    ASSERT_EQUALS(*sort()->getLimit(), 10);
 
     // reduced
     container.push_back(DocumentSourceLimit::create(expCtx, 5));
     sort()->optimizeAt(container.begin(), &container);
     ASSERT_EQUALS(container.size(), 1U);
-    ASSERT_EQUALS(sort()->getLimit(), 5);
+    ASSERT_EQUALS(*sort()->getLimit(), 5);
 
     vector<Value> arr;
     sort()->serializeToArray(arr);
-    ASSERT_VALUE_EQ(
-        Value(arr),
-        DOC_ARRAY(DOC("$sort" << DOC("a" << 1)) << DOC("$limit" << sort()->getLimit())));
+    ASSERT_VALUE_EQ(Value(arr), DOC_ARRAY(DOC("$sort" << DOC("a" << 1)) << DOC("$limit" << 5)));
 
     ASSERT(sort()->distributedPlanLogic());
     ASSERT(sort()->distributedPlanLogic()->shardsStage != nullptr);

@@ -13,7 +13,7 @@ const kNumDocs = 10;
 
 // Return whether or not explain() was successful and contained the appropriate fields given the
 // requested verbosity.
-function checkResults(results, verbosity) {
+function checkResults(results, verbosity, expectedNumResults = kNumDocs) {
     let cursorSubdocs = getAggPlanStages(results, "$cursor");
     let nReturned = 0;
     let nExamined = 0;
@@ -22,14 +22,14 @@ function checkResults(results, verbosity) {
         const result = stageResult.$cursor;
         if (verbosity === "queryPlanner") {
             assert(!result.hasOwnProperty("executionStats"), tojson(results));
-        } else {
-            nReturned += result.executionStats.nReturned;
-            nExamined += result.executionStats.totalDocsExamined;
+        } else if (cursorSubdocs.length === 1) {
+            // If there was a single shard, then we can assert that 'nReturned' and
+            // 'totalDocsExamined' are as expected. If there are multiple shards, these assertions
+            // might not hold, since each shard enforces the limit on its own and then the merging
+            // node enforces the limit again to obtain the final result set.
+            assert.eq(result.executionStats.nReturned, expectedNumResults, tojson(results));
+            assert.eq(result.executionStats.totalDocsExamined, expectedNumResults, tojson(results));
         }
-    }
-    if (verbosity != "queryPlanner") {
-        assert.eq(nReturned, kNumDocs, tojson(results));
-        assert.eq(nExamined, kNumDocs, tojson(results));
     }
 }
 
@@ -53,9 +53,9 @@ for (let verbosity of ["queryPlanner", "executionStats", "allPlansExecution"]) {
     checkResults(coll.explain(verbosity).aggregate(pipeline), verbosity);
 
     pipeline = [{$project: {a: 1}}, {$limit: 5}, {$sort: {a: 1}}];
-    checkResults(coll.explain(verbosity).aggregate(pipeline), verbosity);
+    checkResults(coll.explain(verbosity).aggregate(pipeline), verbosity, 5);
 
     pipeline = [{$project: {_id: 1}}, {$limit: 5}];
-    checkResults(coll.explain(verbosity).aggregate(pipeline), verbosity);
+    checkResults(coll.explain(verbosity).aggregate(pipeline), verbosity, 5);
 }
 })();

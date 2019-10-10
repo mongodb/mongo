@@ -161,20 +161,21 @@ function getAggPlanStages(root, stage) {
         return results;
     }
 
-    function getStagesFromInsideCursorStage(cursorStage) {
+    function getStagesFromQueryLayerOutput(queryLayerOutput) {
         let results = [];
 
-        assert(cursorStage.hasOwnProperty("queryPlanner"));
-        assert(cursorStage.queryPlanner.hasOwnProperty("winningPlan"));
+        assert(queryLayerOutput.hasOwnProperty("queryPlanner"));
+        assert(queryLayerOutput.queryPlanner.hasOwnProperty("winningPlan"));
 
         // If execution stats are available, then use the execution stats tree. Otherwise use the
         // plan info from the "queryPlanner" section.
-        if (cursorStage.hasOwnProperty("executionStats")) {
-            assert(cursorStage.executionStats.hasOwnProperty("executionStages"));
-            results =
-                results.concat(getPlanStages(cursorStage.executionStats.executionStages, stage));
+        if (queryLayerOutput.hasOwnProperty("executionStats")) {
+            assert(queryLayerOutput.executionStats.hasOwnProperty("executionStages"));
+            results = results.concat(
+                getPlanStages(queryLayerOutput.executionStats.executionStages, stage));
         } else {
-            results = results.concat(getPlanStages(cursorStage.queryPlanner.winningPlan, stage));
+            results =
+                results.concat(getPlanStages(queryLayerOutput.queryPlanner.winningPlan, stage));
         }
 
         return results;
@@ -186,14 +187,24 @@ function getAggPlanStages(root, stage) {
         results = results.concat(getDocumentSources(root.stages));
 
         if (root.stages[0].hasOwnProperty("$cursor")) {
-            results = results.concat(getStagesFromInsideCursorStage(root.stages[0].$cursor));
+            results = results.concat(getStagesFromQueryLayerOutput(root.stages[0].$cursor));
         } else if (root.stages[0].hasOwnProperty("$geoNearCursor")) {
-            results = results.concat(getStagesFromInsideCursorStage(root.stages[0].$geoNearCursor));
+            results = results.concat(getStagesFromQueryLayerOutput(root.stages[0].$geoNearCursor));
         }
     }
 
     if (root.hasOwnProperty("shards")) {
         for (let elem in root.shards) {
+            if (root.shards[elem].hasOwnProperty("queryPlanner")) {
+                // The shard was able to optimize away the pipeline, which means that the format of
+                // the explain output doesn't have the "stages" array.
+                assert.eq(true, root.shards[elem].queryPlanner.optimizedPipeline);
+                results = results.concat(getStagesFromQueryLayerOutput(root.shards[elem]));
+
+                // Move onto the next shard.
+                continue;
+            }
+
             if (!root.shards[elem].hasOwnProperty("stages")) {
                 continue;
             }
@@ -204,11 +215,18 @@ function getAggPlanStages(root, stage) {
 
             const firstStage = root.shards[elem].stages[0];
             if (firstStage.hasOwnProperty("$cursor")) {
-                results = results.concat(getStagesFromInsideCursorStage(firstStage.$cursor));
+                results = results.concat(getStagesFromQueryLayerOutput(firstStage.$cursor));
             } else if (firstStage.hasOwnProperty("$geoNearCursor")) {
-                results = results.concat(getStagesFromInsideCursorStage(firstStage.$geoNearCursor));
+                results = results.concat(getStagesFromQueryLayerOutput(firstStage.$geoNearCursor));
             }
         }
+    }
+
+    // If the agg pipeline was completely optimized away, then the agg explain output will be
+    // formatted like the explain output for a find command.
+    if (root.hasOwnProperty("queryPlanner")) {
+        assert.eq(true, root.queryPlanner.optimizedPipeline);
+        results = results.concat(getStagesFromQueryLayerOutput(root));
     }
 
     return results;

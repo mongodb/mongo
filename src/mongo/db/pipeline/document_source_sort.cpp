@@ -31,6 +31,9 @@
 
 #include "mongo/db/pipeline/document_source_sort.h"
 
+#include <algorithm>
+
+#include "mongo/base/exact_cast.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/jsobj.h"
@@ -112,8 +115,42 @@ void DocumentSourceSort::serializeToArray(
     }
 }
 
-long long DocumentSourceSort::getLimit() const {
-    return _sortExecutor->hasLimit() ? _sortExecutor->getLimit() : -1;
+boost::optional<long long> DocumentSourceSort::getLimit() const {
+    return _sortExecutor->hasLimit() ? boost::optional<long long>{_sortExecutor->getLimit()}
+                                     : boost::none;
+}
+
+boost::optional<long long> DocumentSourceSort::extractLimitForPushdown(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    int64_t skipSum = 0;
+    boost::optional<long long> minLimit;
+    while (itr != container->end()) {
+        auto nextStage = (*itr).get();
+        auto nextSkip = exact_pointer_cast<DocumentSourceSkip*>(nextStage);
+        auto nextLimit = exact_pointer_cast<DocumentSourceLimit*>(nextStage);
+        int64_t safeSum = 0;
+
+        // The skip and limit values can be very large, so we need to make sure the sum doesn't
+        // overflow before applying an optimization to swap the $limit with the $skip.
+        if (nextSkip && !overflow::add(skipSum, nextSkip->getSkip(), &safeSum)) {
+            skipSum = safeSum;
+            ++itr;
+        } else if (nextLimit && !overflow::add(nextLimit->getLimit(), skipSum, &safeSum)) {
+            if (!minLimit) {
+                minLimit = safeSum;
+            } else {
+                minLimit = std::min(static_cast<long long>(safeSum), *minLimit);
+            }
+
+            itr = container->erase(itr);
+        } else if (!nextStage->constraints().canSwapWithLimitAndSample) {
+            break;
+        } else {
+            ++itr;
+        }
+    }
+
+    return minLimit;
 }
 
 Pipeline::SourceContainer::iterator DocumentSourceSort::doOptimizeAt(
@@ -121,28 +158,9 @@ Pipeline::SourceContainer::iterator DocumentSourceSort::doOptimizeAt(
     invariant(*itr == this);
 
     auto stageItr = std::next(itr);
-    int64_t skipSum = 0;
-    while (stageItr != container->end()) {
-        auto nextStage = (*stageItr).get();
-        auto nextSkip = dynamic_cast<DocumentSourceSkip*>(nextStage);
-        auto nextLimit = dynamic_cast<DocumentSourceLimit*>(nextStage);
-        int64_t safeSum = 0;
-
-        // The skip and limit values can be very large, so we need to make sure the sum doesn't
-        // overflow before applying an optimization to pull the limit into the sort stage.
-        if (nextSkip && !overflow::add(skipSum, nextSkip->getSkip(), &safeSum)) {
-            skipSum = safeSum;
-            ++stageItr;
-        } else if (nextLimit && !overflow::add(nextLimit->getLimit(), skipSum, &safeSum)) {
-            _sortExecutor->setLimit(safeSum);
-            container->erase(stageItr);
-            stageItr = std::next(itr);
-            skipSum = 0;
-        } else if (!nextStage->constraints().canSwapWithLimitAndSample) {
-            return std::next(itr);
-        } else {
-            ++stageItr;
-        }
+    auto limit = extractLimitForPushdown(stageItr, container);
+    if (limit) {
+        _sortExecutor->setLimit(*limit);
     }
 
     return std::next(itr);
@@ -235,8 +253,8 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSort::distri
     split.inputSortPattern = _sortExecutor->sortPattern()
                                  .serialize(SortPattern::SortKeySerialization::kForSortKeyMerging)
                                  .toBson();
-    if (_sortExecutor->hasLimit()) {
-        split.mergingStage = DocumentSourceLimit::create(pExpCtx, getLimit());
+    if (auto limit = getLimit()) {
+        split.mergingStage = DocumentSourceLimit::create(pExpCtx, *limit);
     }
     return split;
 }
