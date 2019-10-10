@@ -84,7 +84,15 @@ ValidateState::ValidateState(OperationContext* opCtx,
     _catalogGeneration = opCtx->getServiceContext()->getCatalogGeneration();
 }
 
-void ValidateState::yieldLocks(OperationContext* opCtx) {
+void ValidateState::yield(OperationContext* opCtx) {
+    if (_background) {
+        _yieldLocks(opCtx);
+    } else {
+        _yieldCursors(opCtx);
+    }
+}
+
+void ValidateState::_yieldLocks(OperationContext* opCtx) {
     invariant(_background);
 
     // Drop and reacquire the locks.
@@ -105,6 +113,32 @@ void ValidateState::yieldLocks(OperationContext* opCtx) {
                 !index->isDropped());
     }
 };
+
+void ValidateState::_yieldCursors(OperationContext* opCtx) {
+    invariant(!_background);
+
+    // Mobile does not support saving and restoring cursors, so we skip yielding cursors for it.
+    if (storageGlobalParams.engine == "mobile") {
+        return;
+    }
+
+    // Save all the cursors.
+    for (const auto& indexCursor : _indexCursors) {
+        indexCursor.second->save();
+    }
+
+    _traverseRecordStoreCursor->save();
+    _seekRecordStoreCursor->save();
+
+    // Restore all the cursors.
+    for (const auto& indexCursor : _indexCursors) {
+        indexCursor.second->restore();
+    }
+
+    // Restore cannot fail while holding an exclusive collection lock.
+    invariant(_traverseRecordStoreCursor->restore());
+    invariant(_seekRecordStoreCursor->restore());
+}
 
 void ValidateState::initializeCursors(OperationContext* opCtx) {
     invariant(!_traverseRecordStoreCursor && !_seekRecordStoreCursor && _indexCursors.size() == 0 &&

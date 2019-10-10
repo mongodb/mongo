@@ -171,15 +171,6 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
     for (auto indexEntry = indexCursor->seekForKeyString(opCtx, firstKeyString.getValueCopy());
          indexEntry;
          indexEntry = indexCursor->nextKeyString(opCtx)) {
-        if (numKeys % kInterruptIntervalNumRecords == 0) {
-            opCtx->checkForInterrupt();
-
-            // Periodically yield locks.
-            if (_validateState->isBackground()) {
-                _validateState->yieldLocks(opCtx);
-            }
-        }
-
         // Ensure that the index entries are in increasing or decreasing order.
         if (!isFirstEntry && indexEntry->keyString < prevIndexKeyStringValue) {
             if (results && results->valid) {
@@ -207,6 +198,12 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
         numKeys++;
         isFirstEntry = false;
         prevIndexKeyStringValue = indexEntry->keyString;
+
+        if (numKeys % kInterruptIntervalNumRecords == 0) {
+            // Periodically checks for interrupts and yields.
+            opCtx->checkForInterrupt();
+            _validateState->yield(opCtx);
+        }
     }
 
     if (results && _indexConsistency->getMultikeyMetadataPathCount(&indexInfo) > 0) {
@@ -254,22 +251,8 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
          record = traverseRecordStoreCursor->next(opCtx)) {
         _progress->hit();
         ++_numRecords;
-        interruptIntervalNumBytes += record->data.size();
-        if (_numRecords % kInterruptIntervalNumRecords == 0 ||
-            interruptIntervalNumBytes >= kInterruptIntervalNumBytes) {
-            opCtx->checkForInterrupt();
-
-            // Periodically yield locks.
-            if (_validateState->isBackground()) {
-                _validateState->yieldLocks(opCtx);
-            }
-
-            if (interruptIntervalNumBytes >= kInterruptIntervalNumBytes) {
-                interruptIntervalNumBytes = 0;
-            }
-        }
-
         auto dataSize = record->data.size();
+        interruptIntervalNumBytes += dataSize;
         dataSizeTotal += dataSize;
         size_t validatedSize;
         Status status = validateRecord(opCtx, record->id, record->data, &validatedSize);
@@ -304,6 +287,17 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         }
 
         prevRecordId = record->id;
+
+        if (_numRecords % kInterruptIntervalNumRecords == 0 ||
+            interruptIntervalNumBytes >= kInterruptIntervalNumBytes) {
+            // Periodically checks for interrupts and yields.
+            opCtx->checkForInterrupt();
+            _validateState->yield(opCtx);
+
+            if (interruptIntervalNumBytes >= kInterruptIntervalNumBytes) {
+                interruptIntervalNumBytes = 0;
+            }
+        }
     }
 
     // Do not update the record store stats if we're in the background as we've validated a

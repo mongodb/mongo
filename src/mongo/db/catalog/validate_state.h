@@ -111,22 +111,14 @@ public:
     }
 
     /**
-     * Yields both the database and collection locks temporarily in order to allow concurrent DDL
-     * operations to passthrough. After both the database and collection locks have been restored,
-     * check if validation can resume. Validation cannot be resumed if the database or collection is
-     * dropped. In addition, if any indexes that were being validated are removed, validation will
-     * be interrupted. A collection that was renamed across the same database can continue to be
-     * validated, but a cross database collection rename will interrupt validation. If the locks
-     * cannot be re-acquired, throws the error.
+     * Yields locks for background validation; or cursors for foreground validation. Locks are
+     * yielded to allow DDL ops to run concurrently with background validation. Cursors are yielded
+     * for foreground validation in order to avoid building cache pressure caused by holding a
+     * snapshot too long.
      *
-     * Throws if validation cannot continue.
-     *
-     * After locks are reacquired:
-     *     - Check if the database exists.
-     *     - Check if the collection exists.
-     *     - Check if any indexes that were being validated have been removed.
+     * See _yieldLocks() and _yieldCursors() for details. Throws on interruptions.
      */
-    void yieldLocks(OperationContext* opCtx);
+    void yield(OperationContext* opCtx);
 
     /**
      * Initializes all the cursors to be used during validation and moves the traversal record
@@ -143,6 +135,32 @@ private:
      * This should only be called when '_background' is set to true.
      */
     void _relockDatabaseAndCollection(OperationContext* opCtx);
+
+    /**
+     * Yields both the database and collection locks temporarily in order to allow concurrent DDL
+     * operations to passthrough. After both the database and collection locks have been restored,
+     * check if validation can resume. Validation cannot be resumed if the database or collection is
+     * dropped. In addition, if any indexes that were being validated are removed, validation will
+     * be interrupted. A collection that was renamed across the same database can continue to be
+     * validated, but a cross database collection rename will interrupt validation. If the locks
+     * cannot be re-acquired, throws the error.
+     *
+     * Throws if validation cannot continue.
+     *
+     * After locks are reacquired:
+     *     - Check if the database exists.
+     *     - Check if the collection exists.
+     *     - Check if any indexes that were being validated have been removed.
+     */
+    void _yieldLocks(OperationContext* opCtx);
+
+    /**
+     * Saves and restores the open cursors to release snapshots and minimize cache pressure for
+     * foreground validation.
+     *
+     * This cannot be called for background validation or we risk losing our PIT view of the data.
+     */
+    void _yieldCursors(OperationContext* opCtx);
 
     NamespaceString _nss;
     bool _background;
