@@ -32,23 +32,25 @@ login(adminUser);
 assert.eq(1, st.config.shards.count(), "initial server count wrong");
 
 // start a mongod with NO keyfile
-// TODO: SERVER-43921 Make auth_add_shard.js start shards as replica sets.
-var conn = MongoRunner.runMongod({shardsvr: ""});
-print(conn);
+var rst = new ReplSetTest({nodes: 1});
+rst.startSet({shardsvr: ""});
+rst.initiateWithAnyNodeAsPrimary();
 
 // --------------- Test 1 --------------------
 // Add shard to the existing cluster (should fail because it was added without a keyfile)
-printjson(assert.commandFailed(admin.runCommand({addShard: conn.host})));
+printjson(assert.commandFailed(admin.runCommand({addShard: rst.getURL()})));
 
 // stop mongod
-MongoRunner.stopMongod(conn);
+rst.stopSet();
 
 //--------------- Test 2 --------------------
 // start mongod again, this time with keyfile
-// TODO: SERVER-43921 Make auth_add_shard.js start shards as replica sets.
-var conn = MongoRunner.runMongod({keyFile: "jstests/libs/key1", shardsvr: ""});
+rst = new ReplSetTest({nodes: 1});
+rst.startSet({keyFile: "jstests/libs/key1", shardsvr: ""});
+rst.initiateWithAnyNodeAsPrimary();
+
 // try adding the new shard
-var addShardRes = admin.runCommand({addShard: conn.host});
+var addShardRes = admin.runCommand({addShard: rst.getURL()});
 assert.commandWorked(addShardRes);
 
 // Add some data
@@ -82,11 +84,11 @@ st.startBalancer();
 
 //--------------- Test 3 --------------------
 // now drain the shard
-assert.commandWorked(admin.runCommand({removeShard: conn.host}));
+assert.commandWorked(admin.runCommand({removeShard: rst.getURL()}));
 
 // give it some time to drain
 assert.soon(function() {
-    var result = admin.runCommand({removeShard: conn.host});
+    var result = admin.runCommand({removeShard: rst.getURL()});
     printjson(result);
 
     return result.ok && result.state == "completed";
@@ -94,7 +96,7 @@ assert.soon(function() {
 
 assert.eq(1, st.config.shards.count(), "removed server still appears in count");
 
-MongoRunner.stopMongod(conn);
+rst.stopSet();
 
 st.stop();
 })();
