@@ -2,9 +2,14 @@
  * Starts a replica set, builds an index in background.  Kills the secondary with a failpoint once
  * the index build starts.  It should *not* build an index on the secondary on restart due to
  * `--noIndexBuildRetry` option being supplied.
+ *
+ * @tags: [
+ *   requires_persistence,
+ *   requires_journaling,
+ *   requires_replication,
+ *   two_phase_index_builds_unsupported,
+ * ]
  */
-
-// @tags: [requires_persistence, requires_journaling, requires_replication]
 (function() {
 'use strict';
 

@@ -6,6 +6,8 @@
 (function() {
 'use strict';
 
+load('jstests/noPassthrough/libs/index_build.js');
+
 const dbName = "test";
 const collName = "coll";
 
@@ -49,15 +51,17 @@ assert.commandWorked(primaryDB.runCommand(
 replSet.waitForAllIndexBuildsToFinish(dbName, collName);
 
 // Start hanging index builds on the secondary.
-assert.commandWorked(secondaryDB.adminCommand(
-    {configureFailPoint: "hangAfterStartingIndexBuild", mode: "alwaysOn"}));
+IndexBuildTest.pauseIndexBuilds(secondary);
 
 // Build and hang on the second index.
 assert.commandWorked(primaryDB.runCommand({
     createIndexes: collName,
     indexes: [{key: {j: 1}, name: secondIndexName, background: true}],
-    writeConcern: {w: 2}
 }));
+
+// Wait for index builds to start on the secondary.
+const opId = IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
+jsTestLog('Index builds started on secondary. Op ID of one of the builds: ' + opId);
 
 // Check the listIndexes() output.
 let res = secondaryDB.runCommand({listIndexes: collName, includeBuildUUIDs: true});
@@ -74,8 +78,7 @@ assert.eq(indexes[2].spec.name, "second");
 assert(indexes[2].hasOwnProperty("buildUUID"));
 
 // Allow the secondary to finish the index build.
-assert.commandWorked(
-    secondaryDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "off"}));
+IndexBuildTest.resumeIndexBuilds(secondary);
 
 replSet.stopSet();
 }());

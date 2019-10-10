@@ -25,6 +25,8 @@
 (function() {
 "use strict";
 
+load('jstests/noPassthrough/libs/index_build.js');
+
 const rst = new ReplSetTest({
     name: "timestampingIndexBuilds",
     nodes: 2,
@@ -74,7 +76,7 @@ for (let nodeIdx = 0; nodeIdx < 2; ++nodeIdx) {
                   nodeIdentity);
         let conn = rst.start(nodeIdx, {noReplSet: true, noCleanData: true});
         assert.neq(null, conn, "failed to restart node");
-        assert.eq(1, getColl(conn).getIndexes().length);
+        IndexBuildTest.assertIndexes(getColl(conn), 1, ['_id_']);
         rst.stop(nodeIdx);
     }
 
@@ -84,7 +86,7 @@ for (let nodeIdx = 0; nodeIdx < 2; ++nodeIdx) {
         jsTestLog("Starting as a replica set. Both indexes should exist. Node: " + nodeIdentity);
         let conn = rst.start(nodeIdx, {startClean: false}, true);
         conn.setSlaveOk();
-        assert.eq(2, getColl(conn).getIndexes().length);
+        IndexBuildTest.assertIndexes(getColl(conn), 2, ['_id_', 'foo_1']);
         rst.stop(nodeIdx);
     }
 
@@ -95,7 +97,7 @@ for (let nodeIdx = 0; nodeIdx < 2; ++nodeIdx) {
             nodeIdentity);
         let conn = rst.start(nodeIdx, {noReplSet: true, noCleanData: true});
         assert.neq(null, conn, "failed to restart node");
-        assert.eq(1, getColl(conn).getIndexes().length);
+        IndexBuildTest.assertIndexes(getColl(conn), 1, ['_id_']);
         rst.stop(nodeIdx);
     }
 }

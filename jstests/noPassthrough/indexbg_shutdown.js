@@ -65,7 +65,6 @@ const indexSpecs = [
 assert.commandWorked(masterDB.runCommand({
     createIndexes: collection,
     indexes: indexSpecs,
-    writeConcern: {w: 2},
 }));
 const indexes = masterColl.getIndexes();
 // Number of indexes passed to createIndexes plus one for the _id index.
@@ -87,6 +86,9 @@ checkLog.containsWithCount(
 jsTest.log("Restarting secondary to retry replication");
 
 // Secondary should restart cleanly.
+assert.commandWorked(second.adminCommand(
+    {configureFailPoint: 'leaveIndexBuildUnfinishedForShutdown', mode: 'alwaysOn'}));
+IndexBuildTest.resumeIndexBuilds(second);
 replTest.restart(secondaryId, {}, /*wait=*/true);
 
 // There should again be a message for each index we tried to create, because the server
