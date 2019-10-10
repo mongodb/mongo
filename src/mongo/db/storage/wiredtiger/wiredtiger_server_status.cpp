@@ -34,12 +34,15 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/assert_util.h"
+
 
 namespace mongo {
 
@@ -84,5 +87,27 @@ BSONObj WiredTigerServerStatusSection::generateSection(OperationContext* opCtx,
 
     return bob.obj();
 }
+
+OplogStonesServerStatusSection::OplogStonesServerStatusSection()
+    : ServerStatusSection("oplogTruncation") {}
+
+bool OplogStonesServerStatusSection::includeByDefault() const {
+    return true;
+}
+
+BSONObj OplogStonesServerStatusSection::generateSection(OperationContext* opCtx,
+                                                        const BSONElement& configElement) const {
+    BSONObjBuilder builder;
+    {
+        AutoGetCollectionForReadCommand ctx(opCtx, NamespaceString::kRsOplogNamespace);
+        Collection* oplogColl = ctx.getCollection();
+        if (oplogColl) {
+            auto oplogRS = checked_cast<WiredTigerRecordStore*>(oplogColl->getRecordStore());
+            oplogRS->getOplogTruncateStats(builder);
+        }
+    }
+    return builder.obj();
+}
+
 
 }  // namespace mongo

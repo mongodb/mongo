@@ -1,0 +1,59 @@
+# Copyright (C) 2019-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+global:
+    cpp_namespace: "mongo"
+
+server_parameters:
+    maxOplogTruncationPointsAfterStartup:
+        description: 'Maximum allowable number of oplog truncation points after startup has finished'
+        set_at: [ startup ]
+        cpp_vartype: 'long long'
+        cpp_varname: gMaxOplogStonesAfterStartup
+        default: 100
+        validator: { gt: 0 }
+    maxOplogTruncationPointsDuringStartup:
+        description: 'Maximum allowable number of oplog truncation points during startup'
+        set_at: [ startup ]
+        cpp_vartype: 'long long'
+        cpp_varname: gMaxOplogStonesDuringStartup
+        default: 100
+        validator: { gt: 0 }
+    minOplogTruncationPoints:
+        description: 'Minimum allowable number of oplog truncation points'
+        set_at: [ startup ]
+        cpp_vartype: 'long long'
+        cpp_varname: gMinOplogStones
+        default: 10
+        validator: { gt: 0 }
+    oplogTruncationPointSizeMB:
+        description: 'Oplog truncation point size in MB used to determine the number of oplog truncation points for an oplog of a given size. The size will be rounded up to the maximum size of an internal BSON object.'
+        set_at: [ startup ]
+        cpp_vartype: 'int'
+        cpp_varname: gOplogStoneSizeMB
+        default: 0
+        validator: { gte: 0 }

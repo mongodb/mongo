@@ -49,4 +49,15 @@ private:
     WiredTigerKVEngine* _engine;
 };
 
+/**
+ * Adds oplog stones statistics to the results of db.serverStatus().
+ */
+class OplogStonesServerStatusSection : public ServerStatusSection {
+public:
+    OplogStonesServerStatusSection();
+    bool includeByDefault() const override;
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override;
+};
+
 }  // namespace mongo

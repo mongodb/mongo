@@ -83,6 +83,9 @@ if wiredtiger:
             'storage_wiredtiger_customization_hooks',
             ],
         LIBDEPS_PRIVATE= [
+            'oplog_stone_parameters',
+            '$BUILD_DIR/mongo/db/db_raii',
+            '$BUILD_DIR/mongo/db/commands/server_status',
             '$BUILD_DIR/mongo/db/snapshot_window_options',
             '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
             '$BUILD_DIR/mongo/util/options_parser/options_parser',
@@ -180,6 +183,16 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/storage/durable_catalog_impl',
             '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness',
             'storage_wiredtiger_mock',
+        ],
+    )
+
+    wtEnv.Library(
+        target='oplog_stone_parameters',
+        source=[
+            env.Idlc('oplog_stone_parameters.idl')[0],
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/idl/server_parameter',
         ],
     )
 

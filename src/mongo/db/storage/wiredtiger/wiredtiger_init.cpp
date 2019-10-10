@@ -118,6 +118,7 @@ public:
         kv->setSortedDataInterfaceExtraOptions(wiredTigerGlobalOptions.indexConfig);
         // Intentionally leaked.
         new WiredTigerServerStatusSection(kv);
+        new OplogStonesServerStatusSection();
         auto* param = new WiredTigerEngineRuntimeConfigParameter("wiredTigerEngineRuntimeConfig",
                                                                  ServerParameterType::kRuntimeOnly);
         param->_data.second = kv;
