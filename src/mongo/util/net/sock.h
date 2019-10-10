@@ -54,6 +54,7 @@
 #include "mongo/logger/log_severity.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/net/sockaddr.h"
 
 namespace mongo {
@@ -88,7 +89,7 @@ class Socket {
 public:
     static const int errorPollIntervalSecs;
 
-    Socket(int sock, const SockAddr& farEnd);
+    Socket(int sock, const SockAddr& remote);
 
     /** In some cases the timeout will actually be 2x this value - eg we do a partial send,
         then the timeout fires, then we try to send again, then the timeout fires again with
@@ -108,7 +109,12 @@ public:
      *  an error, or due to a timeout on connection, or due to the system socket deciding the
      *  socket is invalid.
      */
-    bool connect(SockAddr& farEnd);
+    bool connect(SockAddr& remote, Milliseconds connectTimeoutMillis);
+
+    /**
+     * Connect using a default connect timeout of min(_timeout * 1000, kMaxConnectTimeoutMS)
+     */
+    bool connect(SockAddr& remote);
 
     void close();
     void send(const char* data, int len, const char* context);

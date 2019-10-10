@@ -270,6 +270,12 @@ std::string Socket::getSNIServerName() const {
 #endif
 
 bool Socket::connect(SockAddr& remote) {
+    const Milliseconds connectTimeoutMillis(static_cast<int64_t>(
+        _timeout > 0 ? std::min(kMaxConnectTimeoutMS, (_timeout * 1000)) : kMaxConnectTimeoutMS));
+    return connect(remote, connectTimeoutMillis);
+}
+
+bool Socket::connect(SockAddr& remote, Milliseconds connectTimeoutMillis) {
     _remote = remote;
 
     _fd = ::socket(remote.getType(), SOCK_STREAM, 0);
@@ -283,10 +289,7 @@ bool Socket::connect(SockAddr& remote) {
         return false;
     }
 
-    const Milliseconds connectTimeoutMillis(static_cast<int64_t>(
-        _timeout > 0 ? std::min(kMaxConnectTimeoutMS, (_timeout * 1000)) : kMaxConnectTimeoutMS));
     const Date_t expiration = Date_t::now() + connectTimeoutMillis;
-
     bool connectSucceeded = ::connect(_fd, _remote.raw(), _remote.addressSize) == 0;
 
     if (!connectSucceeded) {
