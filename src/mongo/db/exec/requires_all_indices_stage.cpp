@@ -36,9 +36,10 @@ namespace mongo {
 void RequiresAllIndicesStage::doRestoreStateRequiresCollection() {
     size_t i = 0;
     for (auto&& index : _indexCatalogEntries) {
+        auto indexCatalogEntry = index.lock();
         uassert(ErrorCodes::QueryPlanKilled,
                 str::stream() << "query plan killed :: index '" << _indexNames[i] << "' dropped",
-                index.lock());
+                indexCatalogEntry && !indexCatalogEntry->isDropped());
         ++i;
     }
 }

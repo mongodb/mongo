@@ -71,8 +71,9 @@ protected:
 private:
     // This stage holds weak pointers to all of the index catalog entries known at the time of
     // construction. During yield recovery, we attempt to lock each weak pointer in order to
-    // determine whether an index we rely on has been destroyed. If any index has been destroyed,
-    // then we throw a query-fatal exception during restore.
+    // determine whether an index we rely on has been destroyed. If we can lock the weak pointer, we
+    // need to check the 'isDropped()' flag on the index catalog entry. If any index has been
+    // destroyed, then we throw a query-fatal exception during restore.
     std::vector<std::weak_ptr<const IndexCatalogEntry>> _indexCatalogEntries;
 
     // The names of the indices above. Used for error reporting.

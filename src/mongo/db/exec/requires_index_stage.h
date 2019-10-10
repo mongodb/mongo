@@ -82,17 +82,13 @@ protected:
     }
 
 private:
-    // We keep a weak_ptr to the index catalog entry in order to detect when the underlying catalog
-    // object has been destroyed, e.g. due to an index drop. In this scenario, the
-    // RequiresIndexStage will throw a query-fatal exception after an attempt to lock the weak_ptr
-    // indicates that the pointed-to object was deleted.
-    //
     // This is necessary to protect against that case that our index is dropped and then recreated
     // during yield. Such an event should cause the query to be killed, since index cursors may have
     // pointers into catalog objects that no longer exist. Since indices do not have UUIDs,
-    // different epochs of the index cannot be distinguished. The weak_ptr allows us to safely.
+    // different epochs of the index cannot be distinguished. The weak_ptr allows us to safely
     // determine whether the pointed-to object has been destroyed during yield recovery via the
-    // shared_ptr control block.
+    // shared_ptr control block. We need to call `isDropped()` on the index catalog entry after
+    // locking the weak_ptr to determine whether the index was dropped or destructed during yield.
     std::weak_ptr<const IndexCatalogEntry> _weakIndexCatalogEntry;
 
     const IndexDescriptor* _indexDescriptor;

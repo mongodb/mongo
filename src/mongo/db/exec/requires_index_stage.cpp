@@ -58,11 +58,12 @@ void RequiresIndexStage::doSaveStateRequiresCollection() {
 
 void RequiresIndexStage::doRestoreStateRequiresCollection() {
     // Attempt to lock the weak_ptr. If the resulting shared_ptr is null, then our index is no
-    // longer valid and the query should die.
+    // longer valid and the query should die. We must also check the `isDropped()` flag on the index
+    // catalog entry if we are able lock the weak_ptr.
     auto indexCatalogEntry = _weakIndexCatalogEntry.lock();
     uassert(ErrorCodes::QueryPlanKilled,
             str::stream() << "query plan killed :: index '" << _indexName << "' dropped",
-            indexCatalogEntry);
+            indexCatalogEntry && !indexCatalogEntry->isDropped());
 
     // Re-obtain catalog pointers that were set to null during yield preparation. It is safe to
     // access the catalog entry by raw pointer when the query is active, as its validity is
