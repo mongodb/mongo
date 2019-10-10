@@ -107,12 +107,29 @@ public:
                     str::stream() << "Collection " << nss.ns() << " is not sharded.",
                     cachedCollInfo.cm());
             const auto cm = cachedCollInfo.cm();
-
-            for (const auto& chunk : cm->chunks()) {
-                log() << redact(chunk.toString());
-            }
-
             cm->getVersion().appendLegacyWithField(&result, "version");
+
+            if (cmdObj["fullMetadata"].trueValue()) {
+                BSONArrayBuilder chunksArrBuilder;
+                bool exceedsSizeLimit = false;
+
+                for (const auto& chunk : cm->chunks()) {
+                    log() << redact(chunk.toString());
+                    if (!exceedsSizeLimit) {
+                        BSONArrayBuilder chunkBB(chunksArrBuilder.subarrayStart());
+                        chunkBB.append(chunk.getMin());
+                        chunkBB.append(chunk.getMax());
+                        chunkBB.done();
+                        if (chunksArrBuilder.len() + result.len() > BSONObjMaxUserSize) {
+                            exceedsSizeLimit = true;
+                        }
+                    }
+                }
+
+                if (!exceedsSizeLimit) {
+                    result.append("chunks", chunksArrBuilder.arr());
+                }
+            }
         }
 
         return true;
