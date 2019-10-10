@@ -123,9 +123,22 @@ struct LogManager::Impl {
                 boost::log::sinks::syslog::make_facility(syslogFacility),
             boost::log::keywords::use_impl = boost::log::sinks::syslog::native);
 
-        // // Set the straightforward level translator for the "Severity" attribute of type int
-        // backend->set_severity_mapper(
-        //     boost::log::sinks::syslog::direct_severity_mapping<int>("Severity"));
+        boost::log::sinks::syslog::custom_severity_mapping<LogSeverity> mapping(
+            attributes::severity());
+
+        mapping[LogSeverity::Debug(5)] = boost::log::sinks::syslog::debug;
+        mapping[LogSeverity::Debug(4)] = boost::log::sinks::syslog::debug;
+        mapping[LogSeverity::Debug(3)] = boost::log::sinks::syslog::debug;
+        mapping[LogSeverity::Debug(2)] = boost::log::sinks::syslog::debug;
+        mapping[LogSeverity::Debug(1)] = boost::log::sinks::syslog::debug;
+        mapping[LogSeverity::Log()] = boost::log::sinks::syslog::debug;
+        mapping[LogSeverity::Info()] = boost::log::sinks::syslog::info;
+        mapping[LogSeverity::Warning()] = boost::log::sinks::syslog::warning;
+        mapping[LogSeverity::Error()] = boost::log::sinks::syslog::critical;
+        mapping[LogSeverity::Severe()] = boost::log::sinks::syslog::alert;
+
+        backend->set_severity_mapper(mapping);
+
         _syslogBackend = boost::make_shared<SyslogBackend>(backend);
         _syslogBackend->set_filter(ComponentSettingsFilter(_globalDomain));
         _syslogBackend->set_formatter(TextFormatter());
