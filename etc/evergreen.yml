@@ -1739,8 +1739,8 @@ functions:
         # SCons multiple times on the same machine by allowing SCons
         # to assume that implicit dependencies are cacheable across
         # runs.
-        if [ "${is_patch|false}" = "true" ] || [ -z "${push_bucket|}" ]; then
-          extra_args="$extra_args --implicit-cache"
+        if [ "${is_patch|false}" = "true" ] || [ -z "${push_bucket|}" ] || [ "${compiling_for_test|false}" = "true" ]; then
+          extra_args="$extra_args --implicit-cache --build-fast-and-loose=on"
         else
           extra_args="$extra_args --release"
         fi
@@ -3898,6 +3898,7 @@ tasks:
     - func: "scons compile"
       vars:
         targets: core tools ${mh_target|}
+        compiling_for_test: true
         task_compile_flags: >-
           --use-new-tools
           --build-mongoreplay="${build_mongoreplay}"
@@ -3905,6 +3906,7 @@ tasks:
     - func: "scons compile"
       vars:
         targets: archive-dist
+        compiling_for_test: true
         additional_targets: ""
         task_compile_flags: >-
           --use-new-tools
@@ -3920,6 +3922,7 @@ tasks:
     - func: "scons compile"
       vars:
         targets: all
+        compiling_for_test: true
         task_compile_flags: >-
           --use-new-tools
           --build-mongoreplay="${build_mongoreplay}"
@@ -3945,6 +3948,7 @@ tasks:
         targets: generated-sources compiledb
         task_compile_flags: >-
           --detect-odr-violations
+        compiling_for_test: true
     - command: shell.exec
       type: test
       timeout_secs: 14400
@@ -3964,6 +3968,7 @@ tasks:
         targets: unittests
         task_compile_flags: >-
           --detect-odr-violations
+        compiling_for_test: true
     - func: "run diskstats"
     - func: "monitor process threads"
     - func: "collect system resource info"
@@ -3979,6 +3984,7 @@ tasks:
         targets: libfuzzer_tests
         task_compile_flags: >-
           --detect-odr-violations
+        compiling_for_test: true
     - command: shell.exec
       params:
         working_dir: "src"
@@ -4015,6 +4021,7 @@ tasks:
         targets: dbtest
         task_compile_flags: >-
           --detect-odr-violations
+        compiling_for_test: true
     # Tar unstripped dbtest, to be archived in case of failure
     - command: archive.targz_pack
       params:
@@ -4192,6 +4199,7 @@ tasks:
     - func: "scons compile"
       vars:
         targets: install-embedded-test
+        compiling_for_test: true
         task_compile_flags: *embedded_sdk_compile_flags
         task_compile_flags_extra: >-
           --link-model=dynamic
@@ -4957,6 +4965,7 @@ tasks:
     - func: "scons compile"
       vars:
         targets: install-stitch-support-test
+        compiling_for_test: true
         task_compile_flags: >-
           --install-mode=hygienic
           --dbg=off
@@ -4997,6 +5006,7 @@ tasks:
     - func: "scons compile"
       vars:
         targets: benchmarks
+        compiling_for_test: true
     - command: archive.targz_pack
       params:
         target: "benchmarks.tgz"
@@ -6280,6 +6290,7 @@ tasks:
   - func: "scons compile"
     vars:
       targets: integration_tests
+      compiling_for_test: true
       bypass_compile: false
       task_compile_flags: >-
         --detect-odr-violations
@@ -6300,6 +6311,7 @@ tasks:
   - func: "scons compile"
     vars:
       targets: integration_tests
+      compiling_for_test: true
       bypass_compile: false
       task_compile_flags: >-
         --detect-odr-violations
@@ -6320,6 +6332,7 @@ tasks:
   - func: "scons compile"
     vars:
       targets: integration_tests
+      compiling_for_test: true
       bypass_compile: false
       task_compile_flags: >-
         --detect-odr-violations
@@ -6340,6 +6353,7 @@ tasks:
   - func: "scons compile"
     vars:
       targets: integration_tests
+      compiling_for_test: true
       bypass_compile: false
       task_compile_flags: >-
         --detect-odr-violations
