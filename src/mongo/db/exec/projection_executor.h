@@ -40,6 +40,6 @@ namespace mongo::projection_executor {
  */
 std::unique_ptr<parsed_aggregation_projection::ParsedAggregationProjection> buildProjectionExecutor(
     boost::intrusive_ptr<ExpressionContext> expCtx,
-    projection_ast::Projection* projection,
+    const projection_ast::Projection* projection,
     ProjectionPolicies policies);
 }  // namespace mongo::projection_executor

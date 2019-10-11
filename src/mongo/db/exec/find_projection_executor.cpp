@@ -128,17 +128,19 @@ Value applySliceProjectionHelper(const Document& input,
                                  size_t fieldPathIndex) {
     invariant(fieldPathIndex < params.path.getPathLength());
 
-    auto fieldName = params.path.getFieldName(fieldPathIndex);
+    auto fieldName = params.path.getFieldName(fieldPathIndex++);
     Value val{input[fieldName]};
 
     switch (val.getType()) {
         case BSONType::Array:
-            val = (fieldPathIndex + 1 == params.path.getPathLength())
+            val = (fieldPathIndex == params.path.getPathLength())
                 ? sliceArray(val.getArray(), params.skip, params.limit)
-                : applySliceProjectionToArray(val.getArray(), params, fieldPathIndex + 1);
+                : applySliceProjectionToArray(val.getArray(), params, fieldPathIndex);
             break;
         case BSONType::Object:
-            val = applySliceProjectionHelper(val.getDocument(), params, fieldPathIndex + 1);
+            if (fieldPathIndex < params.path.getPathLength()) {
+                val = applySliceProjectionHelper(val.getDocument(), params, fieldPathIndex);
+            }
             break;
         default:
             break;

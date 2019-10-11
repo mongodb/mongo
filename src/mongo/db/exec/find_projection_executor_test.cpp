@@ -270,6 +270,10 @@ TEST(SliceProjection, CorrectlyProjectsSimplePath) {
     doc = Document{fromjson("{a: 1}")};
     ASSERT_DOCUMENT_EQ(Document{fromjson("{a: 1}")},
                        applySliceProjection(doc, "a", boost::none, 2));
+
+    doc = Document{fromjson("{a: {b: 1}}")};
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: {b: 1}}")},
+                       applySliceProjection(doc, "a", boost::none, 2));
 }
 
 TEST(SliceProjection, CorrectlyProjectsDottedPath) {
@@ -291,6 +295,10 @@ TEST(SliceProjection, CorrectlyProjectsDottedPath) {
 
     doc = Document{fromjson("{a: {b: 1}}")};
     ASSERT_DOCUMENT_EQ(Document{fromjson("{a: {b: 1}}")},
+                       applySliceProjection(doc, "a.b", boost::none, 2));
+
+    doc = Document{fromjson("{a: {b: {c: 1}}}")};
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: {b: {c: 1}}}")},
                        applySliceProjection(doc, "a.b", boost::none, 2));
 
     doc = Document{fromjson("{a: [{b: [1,2,3], c: 1}]}")};

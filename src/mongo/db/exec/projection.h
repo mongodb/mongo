@@ -30,15 +30,13 @@
 #pragma once
 
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/projection_exec.h"
+#include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/projection_ast.h"
 #include "mongo/db/record_id.h"
 
 namespace mongo {
-
-class CollatorInterface;
-
 /**
  * This stage computes a projection. This is an abstract base class for various projection
  * implementations.
@@ -101,12 +99,11 @@ public:
     /**
      * ProjectionNodeDefault should use this for construction.
      */
-    ProjectionStageDefault(OperationContext* opCtx,
+    ProjectionStageDefault(boost::intrusive_ptr<ExpressionContext> expCtx,
                            const BSONObj& projObj,
+                           const projection_ast::Projection* projection,
                            WorkingSet* ws,
-                           std::unique_ptr<PlanStage> child,
-                           const MatchExpression& fullExpression,
-                           const CollatorInterface* collator);
+                           std::unique_ptr<PlanStage> child);
 
     StageType stageType() const final {
         return STAGE_PROJECTION_DEFAULT;
@@ -115,8 +112,10 @@ public:
 private:
     Status transform(WorkingSetMember* member) const final;
 
-    // Fully-general heavy execution object.
-    ProjectionExec _exec;
+    // True, if the projection contains a recordId $meta expression.
+    const bool _wantRecordId;
+    const projection_ast::ProjectType _projectType;
+    std::unique_ptr<parsed_aggregation_projection::ParsedAggregationProjection> _executor;
 };
 
 /**

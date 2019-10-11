@@ -59,7 +59,11 @@ struct ProjectionDependencies {
 enum class ProjectType { kInclusion, kExclusion };
 class Projection {
 public:
-    Projection(ProjectionPathASTNode root, ProjectType type, const BSONObj& bson);
+    Projection(ProjectionPathASTNode root, ProjectType type);
+
+    const ProjectionPathASTNode* root() const {
+        return &_root;
+    }
 
     ProjectionPathASTNode* root() {
         return &_root;
@@ -105,15 +109,6 @@ public:
     bool isFieldRetainedExactly(StringData path);
 
     /**
-     * TODO SERVER-42423: Delete this method and _bson.
-     *
-     * This method is deprecated and new call sites should not be added.
-     */
-    BSONObj getProjObj() const {
-        return _bson;
-    }
-
-    /**
      * A projection is considered "simple" if it doesn't require the full document, operates only
      * on top-level fields, has no positional projection, and doesn't require the sort key.
      */
@@ -125,11 +120,7 @@ public:
 private:
     ProjectionPathASTNode _root;
     ProjectType _type;
-
     ProjectionDependencies _deps;
-
-    // Do NOT add new usages of this.
-    BSONObj _bson;
 };
 
 }  // namespace projection_ast

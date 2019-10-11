@@ -43,6 +43,8 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_factory_mock.h"
+#include "mongo/db/query/projection_ast_util.h"
+#include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/unittest/unittest.h"
@@ -617,7 +619,13 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
             return false;
         }
 
-        return SimpleBSONObjComparator::kInstance.evaluate(spec.Obj() == pn->proj.getProjObj()) &&
+        // Create an empty/dummy expression context without access to the operation context and
+        // collator. This should be sufficient to parse a projection.
+        auto expCtx = make_intrusive<ExpressionContext>(nullptr, nullptr);
+        auto projection = projection_ast::parse(expCtx, spec.Obj(), {});
+        auto specProjObj = projection_ast::astToDebugBSON(projection.root());
+        auto solnProjObj = projection_ast::astToDebugBSON(pn->proj.root());
+        return SimpleBSONObjComparator::kInstance.evaluate(specProjObj == solnProjObj) &&
             solutionMatches(child.Obj(), pn->children[0], relaxBoundsCheck);
     } else if (STAGE_SORT == trueSoln->getType()) {
         const SortNode* sn = static_cast<const SortNode*>(trueSoln);

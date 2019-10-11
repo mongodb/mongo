@@ -44,16 +44,17 @@ struct BSONVisitorContext {
     }
 };
 
-class BSONPreVisitor : public ProjectionASTVisitor {
+class BSONPreVisitor : public ProjectionASTConstVisitor {
 public:
     BSONPreVisitor(BSONVisitorContext* context) : _context(context) {}
 
-    virtual void visit(MatchExpressionASTNode* node) {
+    virtual void visit(const MatchExpressionASTNode* node) {
         static_cast<const MatchExpressionASTNode*>(node)->matchExpression()->serialize(
             &_context->builder());
         _context->fieldNames.top().pop_front();
     }
-    virtual void visit(ProjectionPathASTNode* node) {
+
+    virtual void visit(const ProjectionPathASTNode* node) {
         if (!node->parent()) {
             // No root of the tree, thus this node has no field name.
             _context->builders.push(BSONObjBuilder());
@@ -65,7 +66,8 @@ public:
         _context->fieldNames.push(
             std::list<std::string>(node->fieldNames().begin(), node->fieldNames().end()));
     }
-    virtual void visit(ProjectionPositionalASTNode* node) {
+
+    virtual void visit(const ProjectionPositionalASTNode* node) {
         // ProjectionPositional always has the original query's match expression node as its
         // child. Serialize as: {"positional.projection.field.$": <original match expression>}.
         _context->builders.push(_context->builder().subobjStart(getFieldName() + ".$"));
@@ -74,7 +76,8 @@ public:
         // been put on the stack (just like every other node), and will pop it.
         _context->fieldNames.push({"<dummy>"});
     }
-    virtual void visit(ProjectionSliceASTNode* node) {
+
+    virtual void visit(const ProjectionSliceASTNode* node) {
         BSONObjBuilder sub(_context->builder().subobjStart(getFieldName()));
         if (node->skip()) {
             sub.appendArray("$slice", BSON_ARRAY(*node->skip() << node->limit()));
@@ -82,13 +85,16 @@ public:
             sub.appendNumber("$slice", node->limit());
         }
     }
-    virtual void visit(ProjectionElemMatchASTNode* node) {
+
+    virtual void visit(const ProjectionElemMatchASTNode* node) {
         // Defer to the child, match expression node.
     }
-    virtual void visit(ExpressionASTNode* node) {
+
+    virtual void visit(const ExpressionASTNode* node) {
         node->expression()->serialize(false).addToBsonObj(&_context->builder(), getFieldName());
     }
-    virtual void visit(BooleanConstantASTNode* node) {
+
+    virtual void visit(const BooleanConstantASTNode* node) {
         _context->builders.top().append(getFieldName(), node->value());
     }
 
@@ -104,12 +110,11 @@ private:
     BSONVisitorContext* _context;
 };
 
-class BSONPostVisitor : public ProjectionASTVisitor {
+class BSONPostVisitor : public ProjectionASTConstVisitor {
 public:
     BSONPostVisitor(BSONVisitorContext* context) : _context(context) {}
 
-    virtual void visit(MatchExpressionASTNode* node) {}
-    virtual void visit(ProjectionPathASTNode* node) {
+    virtual void visit(const ProjectionPathASTNode* node) {
         // Don't pop the top builder.
         if (node->parent()) {
             // Pop the BSONObjBuilder that was added in the pre visitor.
@@ -120,15 +125,17 @@ public:
         invariant(_context->fieldNames.top().empty());
         _context->fieldNames.pop();
     }
-    virtual void visit(ProjectionPositionalASTNode* node) {
+
+    virtual void visit(const ProjectionPositionalASTNode* node) {
         _context->builders.pop();
         _context->fieldNames.pop();
     }
 
-    virtual void visit(ProjectionSliceASTNode* node) {}
-    virtual void visit(ProjectionElemMatchASTNode* node) {}
-    virtual void visit(ExpressionASTNode* node) {}
-    virtual void visit(BooleanConstantASTNode* node) {}
+    virtual void visit(const MatchExpressionASTNode* node) {}
+    virtual void visit(const ProjectionSliceASTNode* node) {}
+    virtual void visit(const ProjectionElemMatchASTNode* node) {}
+    virtual void visit(const ExpressionASTNode* node) {}
+    virtual void visit(const BooleanConstantASTNode* node) {}
 
 private:
     BSONVisitorContext* _context;
@@ -138,15 +145,15 @@ class BSONWalker {
 public:
     BSONWalker() : _preVisitor(&_context), _postVisitor(&_context) {}
 
-    void preVisit(ASTNode* node) {
+    void preVisit(const ASTNode* node) {
         node->acceptVisitor(&_preVisitor);
     }
 
-    void postVisit(ASTNode* node) {
+    void postVisit(const ASTNode* node) {
         node->acceptVisitor(&_postVisitor);
     }
 
-    void inVisit(long count, ASTNode* node) {
+    void inVisit(long count, const ASTNode* node) {
         // No op.
     }
 
@@ -165,7 +172,7 @@ private:
 };
 }  // namespace
 
-BSONObj astToDebugBSON(ASTNode* root) {
+BSONObj astToDebugBSON(const ASTNode* root) {
     BSONWalker walker;
     projection_ast_walker::walk(&walker, root);
 

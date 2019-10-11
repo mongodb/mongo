@@ -44,9 +44,12 @@ namespace mongo::projection_ast_walker {
  * * walker.postVisit() once after walking to each child.
  * Each of the ASTNode's child ASTNode is recursively walked and the same three methods are
  * called for it.
+ *
+ * If the caller doesn't intend to modify the AST, then the template argument 'IsConst' should be
+ * set to 'true'. In this case the 'node' pointer will be qualified with 'const'.
  */
-template <typename Walker>
-void walk(Walker* walker, projection_ast::ASTNode* node) {
+template <typename Walker, bool IsConst = true>
+void walk(Walker* walker, projection_ast::MaybeConstPtr<IsConst, projection_ast::ASTNode> node) {
     if (node) {
         walker->preVisit(node);
 
@@ -55,7 +58,7 @@ void walk(Walker* walker, projection_ast::ASTNode* node) {
             if (count)
                 walker->inVisit(count, node);
             ++count;
-            walk(walker, child.get());
+            walk<Walker, IsConst>(walker, child.get());
         }
 
         walker->postVisit(node);

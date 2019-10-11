@@ -31,7 +31,6 @@
 
 namespace mongo {
 namespace projection_ast {
-
 class MatchExpressionASTNode;
 class ProjectionPathASTNode;
 class ProjectionPositionalASTNode;
@@ -41,20 +40,34 @@ class ExpressionASTNode;
 class BooleanConstantASTNode;
 
 /**
+ * A template type which resolves to 'const T*' if 'IsConst' argument is 'true', and to 'T*'
+ * otherwise.
+ */
+template <bool IsConst, typename T>
+using MaybeConstPtr = typename std::conditional<IsConst, const T*, T*>::type;
+
+/**
  * Visitor pattern for ProjectionAST.
  *
  * This code is not responsible for traversing the AST, only for performing the double-dispatch.
+ *
+ * If the visitor doesn't intend to modify the AST, then the template argument 'IsConst' should be
+ * set to 'true'. In this case all 'visit()' methods will take a const pointer to a visiting node.
  */
+template <bool IsConst = false>
 class ProjectionASTVisitor {
 public:
     virtual ~ProjectionASTVisitor() = default;
-    virtual void visit(MatchExpressionASTNode* node) = 0;
-    virtual void visit(ProjectionPathASTNode* node) = 0;
-    virtual void visit(ProjectionPositionalASTNode* node) = 0;
-    virtual void visit(ProjectionSliceASTNode* node) = 0;
-    virtual void visit(ProjectionElemMatchASTNode* node) = 0;
-    virtual void visit(ExpressionASTNode* node) = 0;
-    virtual void visit(BooleanConstantASTNode* node) = 0;
+    virtual void visit(MaybeConstPtr<IsConst, MatchExpressionASTNode> node) = 0;
+    virtual void visit(MaybeConstPtr<IsConst, ProjectionPathASTNode> node) = 0;
+    virtual void visit(MaybeConstPtr<IsConst, ProjectionPositionalASTNode> node) = 0;
+    virtual void visit(MaybeConstPtr<IsConst, ProjectionSliceASTNode> node) = 0;
+    virtual void visit(MaybeConstPtr<IsConst, ProjectionElemMatchASTNode> node) = 0;
+    virtual void visit(MaybeConstPtr<IsConst, ExpressionASTNode> node) = 0;
+    virtual void visit(MaybeConstPtr<IsConst, BooleanConstantASTNode> node) = 0;
 };
+
+using ProjectionASTMutableVisitor = ProjectionASTVisitor<false>;
+using ProjectionASTConstVisitor = ProjectionASTVisitor<true>;
 }  // namespace projection_ast
 }  // namespace mongo

@@ -36,6 +36,6 @@ namespace projection_ast {
 /**
  * This is intended to be used for debug output, not for serialization.
  */
-BSONObj astToDebugBSON(ASTNode* root);
+BSONObj astToDebugBSON(const ASTNode* root);
 }  // namespace projection_ast
 }  // namespace mongo

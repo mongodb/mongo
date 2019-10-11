@@ -41,7 +41,7 @@ namespace mongo {
 template <class DerivedPtr, class Base>
 auto exact_pointer_cast(Base* b) -> DerivedPtr {
     static_assert(std::is_pointer<DerivedPtr>::value);
-    using Derived = typename std::remove_pointer<DerivedPtr>::type;
+    using Derived = typename std::remove_cv<typename std::remove_pointer<DerivedPtr>::type>::type;
     static_assert(std::is_final<Derived>::value);
 
     if (b == nullptr) {

@@ -106,14 +106,14 @@ namespace {
  * This is intended to be used with the 'ProjectionPathTrackingWalker' only to correctly maintain
  * the state about the current path being visited.
  */
-template <class UserData = PathTrackingDummyDefaultType>
-class PathTrackingPreVisitor final : public ProjectionASTVisitor {
+template <class UserData = PathTrackingDummyDefaultType, bool IsConst = true>
+class PathTrackingPreVisitor final : public ProjectionASTVisitor<IsConst> {
 public:
     PathTrackingPreVisitor(PathTrackingVisitorContext<UserData>* context) : _context{context} {
         invariant(_context);
     }
 
-    void visit(ProjectionPathASTNode* node) final {
+    void visit(MaybeConstPtr<IsConst, ProjectionPathASTNode> node) final {
         if (node->parent()) {
             _context->setBasePath(_context->fullPath());
             _context->popFrontFieldName();
@@ -122,12 +122,12 @@ public:
         _context->pushFieldNames({node->fieldNames().begin(), node->fieldNames().end()});
     }
 
-    void visit(MatchExpressionASTNode* node) final {}
-    void visit(ProjectionPositionalASTNode* node) final {}
-    void visit(ProjectionSliceASTNode* node) final {}
-    void visit(ProjectionElemMatchASTNode* node) final {}
-    void visit(ExpressionASTNode* node) final {}
-    void visit(BooleanConstantASTNode* node) final {}
+    void visit(MaybeConstPtr<IsConst, MatchExpressionASTNode> node) final {}
+    void visit(MaybeConstPtr<IsConst, ProjectionPositionalASTNode> node) final {}
+    void visit(MaybeConstPtr<IsConst, ProjectionSliceASTNode> node) final {}
+    void visit(MaybeConstPtr<IsConst, ProjectionElemMatchASTNode> node) final {}
+    void visit(MaybeConstPtr<IsConst, ExpressionASTNode> node) final {}
+    void visit(MaybeConstPtr<IsConst, BooleanConstantASTNode> node) final {}
 
 private:
     PathTrackingVisitorContext<UserData>* _context;
@@ -139,14 +139,14 @@ private:
  * This is intended to be used with the 'PathTrackingWalker' only to correctly maintain the state
  * about the current path being visited.
  */
-template <class UserData = PathTrackingDummyDefaultType>
-class PathTrackingPostVisitor final : public ProjectionASTVisitor {
+template <class UserData = PathTrackingDummyDefaultType, bool IsConst = true>
+class PathTrackingPostVisitor final : public ProjectionASTVisitor<IsConst> {
 public:
     PathTrackingPostVisitor(PathTrackingVisitorContext<UserData>* context) : _context{context} {
         invariant(_context);
     }
 
-    void visit(projection_ast::ProjectionPathASTNode* node) final {
+    void visit(MaybeConstPtr<IsConst, ProjectionPathASTNode> node) final {
         _context->popFieldNames();
 
         if (_context->basePath()) {
@@ -161,27 +161,27 @@ public:
         }
     }
 
-    void visit(ProjectionPositionalASTNode* node) final {
+    void visit(MaybeConstPtr<IsConst, ProjectionPositionalASTNode> node) final {
         _context->popFrontFieldName();
     }
 
-    void visit(ProjectionSliceASTNode* node) final {
+    void visit(MaybeConstPtr<IsConst, ProjectionSliceASTNode> node) final {
         _context->popFrontFieldName();
     }
 
-    void visit(ProjectionElemMatchASTNode* node) final {
+    void visit(MaybeConstPtr<IsConst, ProjectionElemMatchASTNode> node) final {
         _context->popFrontFieldName();
     }
 
-    void visit(ExpressionASTNode* node) final {
+    void visit(MaybeConstPtr<IsConst, ExpressionASTNode> node) final {
         _context->popFrontFieldName();
     }
 
-    void visit(BooleanConstantASTNode* node) final {
+    void visit(MaybeConstPtr<IsConst, BooleanConstantASTNode> node) final {
         _context->popFrontFieldName();
     }
 
-    void visit(MatchExpressionASTNode* node) final {}
+    void visit(MaybeConstPtr<IsConst, MatchExpressionASTNode> node) final {}
 
 private:
     PathTrackingVisitorContext<UserData>* _context;
@@ -197,12 +197,12 @@ private:
  * The visitors specified in the 'preVisitors' and 'postVisitors' parameters will be visited in
  * the same order as they were added to the vector.
  */
-template <class UserData = PathTrackingDummyDefaultType>
+template <class UserData = PathTrackingDummyDefaultType, bool IsConst = true>
 class PathTrackingWalker final {
 public:
     PathTrackingWalker(PathTrackingVisitorContext<UserData>* context,
-                       std::vector<ProjectionASTVisitor*> preVisitors,
-                       std::vector<ProjectionASTVisitor*> postVisitors)
+                       std::vector<ProjectionASTVisitor<IsConst>*> preVisitors,
+                       std::vector<ProjectionASTVisitor<IsConst>*> postVisitors)
         : _pathTrackingPreVisitor{context},
           _pathTrackingPostVisitor{context},
           _preVisitors{std::move(preVisitors)},
@@ -211,25 +211,25 @@ public:
         _postVisitors.push_back(&_pathTrackingPostVisitor);
     }
 
-    void preVisit(projection_ast::ASTNode* node) {
+    void preVisit(MaybeConstPtr<IsConst, projection_ast::ASTNode> node) {
         for (auto visitor : _preVisitors) {
             node->acceptVisitor(visitor);
         }
     }
 
-    void postVisit(projection_ast::ASTNode* node) {
+    void postVisit(MaybeConstPtr<IsConst, projection_ast::ASTNode> node) {
         for (auto visitor : _postVisitors) {
             node->acceptVisitor(visitor);
         }
     }
 
-    void inVisit(long count, projection_ast::ASTNode* node) {}
+    void inVisit(long count, MaybeConstPtr<IsConst, ASTNode> node) {}
 
 private:
-    PathTrackingPreVisitor<UserData> _pathTrackingPreVisitor;
-    PathTrackingPostVisitor<UserData> _pathTrackingPostVisitor;
-    std::vector<ProjectionASTVisitor*> _preVisitors;
-    std::vector<ProjectionASTVisitor*> _postVisitors;
+    PathTrackingPreVisitor<UserData, IsConst> _pathTrackingPreVisitor;
+    PathTrackingPostVisitor<UserData, IsConst> _pathTrackingPostVisitor;
+    std::vector<ProjectionASTVisitor<IsConst>*> _preVisitors;
+    std::vector<ProjectionASTVisitor<IsConst>*> _postVisitors;
 };
 }  // namespace projection_ast
 }  // namespace mongo

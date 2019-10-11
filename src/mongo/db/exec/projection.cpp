@@ -50,68 +50,68 @@ static const char* kIdField = "_id";
 
 namespace {
 
-BSONObj indexKey(const WorkingSetMember& member) {
-    return member.metadata().getIndexKey();
-}
-
-BSONObj sortKey(const WorkingSetMember& member) {
-    return DocumentMetadataFields::serializeSortKey(member.metadata().isSingleElementKey(),
-                                                    member.metadata().getSortKey());
-}
-
-double geoDistance(const WorkingSetMember& member) {
-    return member.metadata().getGeoNearDistance();
-}
-
-Value geoPoint(const WorkingSetMember& member) {
-    return member.metadata().getGeoNearPoint();
-}
-
-double textScore(const WorkingSetMember& member) {
-    auto&& metadata = member.metadata();
-    if (metadata.hasTextScore()) {
-        return metadata.getTextScore();
-    } else {
-        // It is permitted to request a text score when none has been computed. Zero is returned as
-        // an empty value in this case.
-        return 0.0;
-    }
-}
-
-void transitionMemberToOwnedObj(const BSONObj& bo, WorkingSetMember* member) {
+void transitionMemberToOwnedObj(Document&& doc, WorkingSetMember* member) {
     member->keyData.clear();
-    member->recordId = RecordId();
-    member->resetDocument(SnapshotId(), bo);
+    member->recordId = {};
+    member->doc = {{}, std::move(doc)};
     member->transitionToOwnedObj();
 }
 
-StatusWith<BSONObj> provideMetaFieldsAndPerformExec(const ProjectionExec& exec,
-                                                    const WorkingSetMember& member) {
-    if (exec.needsGeoNearDistance() && !member.metadata().hasGeoNearDistance())
-        return Status(ErrorCodes::InternalError, "near loc dist requested but no data available");
+void transitionMemberToOwnedObj(const BSONObj& bo, WorkingSetMember* member) {
+    transitionMemberToOwnedObj(Document{bo}, member);
+}
 
-    if (exec.needsGeoNearPoint() && !member.metadata().hasGeoNearPoint())
-        return Status(ErrorCodes::InternalError, "near loc proj requested but no data available");
+/**
+ * Moves document metadata fields from the WSM into the given document 'doc', and returns the same
+ * document but with populated metadata.
+ */
+auto attachMetadataToDocument(Document&& doc, WorkingSetMember* member) {
+    MutableDocument md{std::move(doc)};
+    md.setMetadata(member->releaseMetadata());
+    return md.freeze();
+}
 
-    return member.hasObj()
-        ? exec.project(member.doc.value().toBson(),
-                       exec.needsGeoNearDistance()
-                           ? boost::optional<const double>(geoDistance(member))
-                           : boost::none,
-                       exec.needsGeoNearPoint() ? geoPoint(member) : Value{},
-                       exec.needsSortKey() ? sortKey(member) : BSONObj(),
-                       exec.needsTextScore() ? boost::optional<const double>(textScore(member))
-                                             : boost::none,
-                       member.recordId.repr())
-        : exec.projectCovered(
-              member.keyData,
-              exec.needsGeoNearDistance() ? boost::optional<const double>(geoDistance(member))
-                                          : boost::none,
-              exec.needsGeoNearPoint() ? geoPoint(member) : Value{},
-              exec.needsSortKey() ? sortKey(member) : BSONObj(),
-              exec.needsTextScore() ? boost::optional<const double>(textScore(member))
-                                    : boost::none,
-              member.recordId.repr());
+/**
+ * Moves document metadata fields from the document 'doc' into the WSM, and returns the same
+ * document but without metadata.
+ */
+auto attachMetadataToWorkingSetMember(Document&& doc, WorkingSetMember* member) {
+    MutableDocument md{std::move(doc)};
+    member->setMetadata(md.releaseMetadata());
+    return md.freeze();
+}
+
+/**
+ * Given an index key 'dehyratedKey' with no field names, returns a new Document representing the
+ * index key after adding field names according to 'keyPattern'.
+ *
+ * For example, given:
+ *    - the 'keyPatern' of {'a.b': 1, c: 1}
+ *    - the 'dehydratedKey' of {'': 'abc', '': 10}
+ *
+ * The resulting document will be: {a: {b: 'abc'}, c: 10}
+ */
+auto rehydrateIndexKey(const BSONObj& keyPattern, const BSONObj& dehydratedKey) {
+    MutableDocument md;
+    BSONObjIterator keyIter{keyPattern};
+    BSONObjIterator valueIter{dehydratedKey};
+
+    while (keyIter.more() && valueIter.more()) {
+        auto fieldName = keyIter.next().fieldNameStringData();
+        auto value = valueIter.next();
+
+        // Skip the $** index virtual field, as it's not part of the actual index key.
+        if (fieldName == "$_path") {
+            continue;
+        }
+
+        md.setNestedField(fieldName, Value{value});
+    }
+
+    invariant(!keyIter.more());
+    invariant(!valueIter.more());
+
+    return md.freeze();
 }
 }  // namespace
 
@@ -191,26 +191,52 @@ std::unique_ptr<PlanStageStats> ProjectionStage::getStats() {
     return ret;
 }
 
-ProjectionStageDefault::ProjectionStageDefault(OperationContext* opCtx,
+ProjectionStageDefault::ProjectionStageDefault(boost::intrusive_ptr<ExpressionContext> expCtx,
                                                const BSONObj& projObj,
+                                               const projection_ast::Projection* projection,
                                                WorkingSet* ws,
-                                               std::unique_ptr<PlanStage> child,
-                                               const MatchExpression& fullExpression,
-                                               const CollatorInterface* collator)
-    : ProjectionStage(opCtx, projObj, ws, std::move(child), "PROJECTION_DEFAULT"),
-      _exec(opCtx, projObj, &fullExpression, collator) {}
+                                               std::unique_ptr<PlanStage> child)
+    : ProjectionStage{expCtx->opCtx, projObj, ws, std::move(child), "PROJECTION_DEFAULT"},
+      _wantRecordId{projection->metadataDeps()[DocumentMetadataFields::kRecordId]},
+      _projectType{projection->type()},
+      _executor{projection_executor::buildProjectionExecutor(expCtx, projection, {})} {}
 
 Status ProjectionStageDefault::transform(WorkingSetMember* member) const {
-    // The default no-fast-path case.
-    if (_exec.needsSortKey() && !member->metadata().hasSortKey())
-        return Status(ErrorCodes::InternalError,
-                      "sortKey meta-projection requested but no data available");
+    Document input;
 
-    auto projected = provideMetaFieldsAndPerformExec(_exec, *member);
-    if (!projected.isOK())
-        return projected.getStatus();
+    // Most metadata should have already been stored within the WSM when we project out a document.
+    // The recordId metadata is different though, because it's a fundamental part of the WSM and
+    // we store it within the WSM itself rather than WSM metadata, so we need to transfer it into
+    // the metadata object if the projection has a recordId $meta expression.
+    if (_wantRecordId && !member->metadata().hasRecordId()) {
+        member->metadata().setRecordId(member->recordId);
+    }
 
-    transitionMemberToOwnedObj(projected.getValue(), member);
+    if (member->hasObj()) {
+        input = std::move(member->doc.value());
+    } else {
+        // We have a covered projection, which is only supported in inclusion mode.
+        invariant(_projectType == projection_ast::ProjectType::kInclusion);
+        // We're pulling data from an index key, so there must be exactly one key entry in the WSM
+        // as the planner guarantees that it will never generate a covered plan in the case of index
+        // intersection.
+        invariant(member->keyData.size() == 1);
+
+        // For covered projection we will rehydrate in index key into a Document and then pass it
+        // through the projection executor to include only required fields, including metadata
+        // fields.
+        input = rehydrateIndexKey(member->keyData[0].indexKeyPattern, member->keyData[0].keyData);
+    }
+
+    // Before applying the projection we will move document metadata from the WSM into the document
+    // itself, in case the projection contains $meta expressions and needs this data, and will move
+    // it back to the WSM once the projection has been applied.
+    auto projected = attachMetadataToWorkingSetMember(
+        _executor->applyTransformation(attachMetadataToDocument(std::move(input), member)), member);
+    // An exclusion projection can return an unowned object since the output document is
+    // constructed from the input one backed by BSON which is owned by the storage system, so we
+    // need to  make sure we transition an owned document.
+    transitionMemberToOwnedObj(projected.getOwned(), member);
 
     return Status::OK();
 }

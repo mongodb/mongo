@@ -42,6 +42,7 @@
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
+#include "mongo/db/query/projection_ast_util.h"
 #include "mongo/db/query/query_planner_common.h"
 
 namespace mongo {
@@ -878,7 +879,7 @@ void ProjectionNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "PROJ\n";
     addIndent(ss, indent + 1);
-    *ss << "proj = " << proj.getProjObj().toString() << '\n';
+    *ss << "proj = " << projection_ast::astToDebugBSON(proj.root()).toString() << '\n';
     addIndent(ss, indent + 1);
     *ss << "type = " << projectionImplementationTypeToString() << '\n';
     addCommon(ss, indent);

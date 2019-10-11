@@ -417,15 +417,14 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
             // Stuff the right data into the params depending on what proj impl we use.
             if (!canonicalQuery->getProj()->isSimple()) {
                 root = std::make_unique<ProjectionStageDefault>(
-                    opCtx,
-                    canonicalQuery->getProj()->getProjObj(),
+                    canonicalQuery->getExpCtx(),
+                    canonicalQuery->getQueryRequest().getProj(),
+                    canonicalQuery->getProj(),
                     ws,
-                    std::move(root),
-                    *canonicalQuery->root(),
-                    canonicalQuery->getCollator());
+                    std::move(root));
             } else {
                 root = std::make_unique<ProjectionStageSimple>(
-                    opCtx, canonicalQuery->getProj()->getProjObj(), ws, std::move(root));
+                    opCtx, canonicalQuery->getQueryRequest().getProj(), ws, std::move(root));
             }
         }
 
@@ -683,12 +682,8 @@ StatusWith<unique_ptr<PlanStage>> applyProjection(OperationContext* opCtx,
                 "Cannot use a $meta sortKey projection in findAndModify commands."};
     }
 
-    return {std::make_unique<ProjectionStageDefault>(opCtx,
-                                                     projObj,
-                                                     ws,
-                                                     std::unique_ptr<PlanStage>(root.release()),
-                                                     *cq->root(),
-                                                     cq->getCollator())};
+    return {std::make_unique<ProjectionStageDefault>(
+        cq->getExpCtx(), projObj, &proj, ws, std::unique_ptr<PlanStage>(root.release()))};
 }
 
 }  // namespace

@@ -97,7 +97,7 @@ auto makeProjectionPostImageExpression(const ProjectionExecutorVisitorData<Execu
  * a field path expressions will be created to access a projection post-image document.
  */
 template <typename Executor>
-auto createFindPositionalExpression(projection_ast::ProjectionPositionalASTNode* node,
+auto createFindPositionalExpression(const projection_ast::ProjectionPositionalASTNode* node,
                                     const ProjectionExecutorVisitorData<Executor>& data,
                                     const FieldPath& path) {
     invariant(node);
@@ -123,7 +123,7 @@ auto createFindPositionalExpression(projection_ast::ProjectionPositionalASTNode*
  * a field path expressions will be created to access a projection post-image document.
  */
 template <typename Executor>
-auto createFindSliceExpression(projection_ast::ProjectionSliceASTNode* node,
+auto createFindSliceExpression(const projection_ast::ProjectionSliceASTNode* node,
                                const ProjectionExecutorVisitorData<Executor>& data,
                                const FieldPath& path) {
     invariant(node);
@@ -137,7 +137,7 @@ auto createFindSliceExpression(projection_ast::ProjectionSliceASTNode* node,
  * 'path' on the input document.
  */
 template <typename Executor>
-auto createFindElemMatchExpression(projection_ast::ProjectionElemMatchASTNode* node,
+auto createFindElemMatchExpression(const projection_ast::ProjectionElemMatchASTNode* node,
                                    const ProjectionExecutorVisitorData<Executor>& data,
                                    const FieldPath& path) {
     invariant(node);
@@ -166,14 +166,14 @@ auto createFindElemMatchExpression(projection_ast::ProjectionElemMatchASTNode* n
  * 'PathTrackingVisitorContext'.
  */
 template <typename Executor>
-class ProjectionExecutorVisitor final : public projection_ast::ProjectionASTVisitor {
+class ProjectionExecutorVisitor final : public projection_ast::ProjectionASTConstVisitor {
 public:
     ProjectionExecutorVisitor(ProjectionExecutorVisitorContext<Executor>* context)
         : _context{context} {
         invariant(_context);
     }
 
-    void visit(projection_ast::ProjectionPositionalASTNode* node) final {
+    void visit(const projection_ast::ProjectionPositionalASTNode* node) final {
         constexpr auto isInclusion = std::is_same_v<Executor, ParsedInclusionProjection>;
         invariant(isInclusion);
 
@@ -184,7 +184,7 @@ public:
         userData.setRootReplacementExpression(createFindPositionalExpression(node, userData, path));
     }
 
-    void visit(projection_ast::ProjectionSliceASTNode* node) final {
+    void visit(const projection_ast::ProjectionSliceASTNode* node) final {
         const auto& path = _context->fullPath();
         auto& userData = _context->data();
 
@@ -198,7 +198,7 @@ public:
         userData.setRootReplacementExpression(createFindSliceExpression(node, userData, path));
     }
 
-    void visit(projection_ast::ProjectionElemMatchASTNode* node) final {
+    void visit(const projection_ast::ProjectionElemMatchASTNode* node) final {
         const auto& path = _context->fullPath();
         const auto& userData = _context->data();
 
@@ -206,14 +206,14 @@ public:
             path.fullPath(), createFindElemMatchExpression(node, userData, path));
     }
 
-    void visit(projection_ast::ExpressionASTNode* node) final {
+    void visit(const projection_ast::ExpressionASTNode* node) final {
         const auto& path = _context->fullPath();
         const auto& userData = _context->data();
 
         userData.rootNode()->addExpressionForPath(path.fullPath(), node->expression());
     }
 
-    void visit(projection_ast::BooleanConstantASTNode* node) final {
+    void visit(const projection_ast::BooleanConstantASTNode* node) final {
         const auto& path = _context->fullPath();
         const auto& userData = _context->data();
 
@@ -231,8 +231,8 @@ public:
         userData.rootNode()->addProjectionForPath(path.fullPath());
     }
 
-    void visit(projection_ast::ProjectionPathASTNode* node) final {}
-    void visit(projection_ast::MatchExpressionASTNode* node) final {}
+    void visit(const projection_ast::ProjectionPathASTNode* node) final {}
+    void visit(const projection_ast::MatchExpressionASTNode* node) final {}
 
 private:
     ProjectionExecutorVisitorContext<Executor>* _context;
@@ -245,7 +245,7 @@ private:
  */
 template <typename Executor>
 auto buildProjectionExecutor(boost::intrusive_ptr<ExpressionContext> expCtx,
-                             projection_ast::ProjectionPathASTNode* root,
+                             const projection_ast::ProjectionPathASTNode* root,
                              const ProjectionPolicies policies) {
     ProjectionExecutorVisitorContext<Executor> context{
         {std::make_unique<Executor>(expCtx, policies), expCtx}};
@@ -258,7 +258,7 @@ auto buildProjectionExecutor(boost::intrusive_ptr<ExpressionContext> expCtx,
 
 std::unique_ptr<ParsedAggregationProjection> buildProjectionExecutor(
     boost::intrusive_ptr<ExpressionContext> expCtx,
-    projection_ast::Projection* projection,
+    const projection_ast::Projection* projection,
     const ProjectionPolicies policies) {
     invariant(projection);
 

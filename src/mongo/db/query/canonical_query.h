@@ -128,6 +128,11 @@ public:
     const projection_ast::Projection* getProj() const {
         return _proj.get_ptr();
     }
+
+    projection_ast::Projection* getProj() {
+        return _proj.get_ptr();
+    }
+
     const CollatorInterface* getCollator() const {
         return _collator.get();
     }

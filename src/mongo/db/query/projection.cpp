@@ -58,32 +58,32 @@ struct DepsAnalysisData {
  * Does "broad" analysis on the projection, about whether the entire document, or details from the
  * match expression are needed and so on.
  */
-class ProjectionAnalysisVisitor final : public ProjectionASTVisitor {
+class ProjectionAnalysisVisitor final : public ProjectionASTConstVisitor {
 public:
     ProjectionAnalysisVisitor(ProjectionDependencies* deps) : _deps(deps) {
         invariant(_deps);
     }
 
-    void visit(ProjectionPathASTNode* node) final {
+    void visit(const ProjectionPathASTNode* node) final {
         if (node->parent()) {
             _deps->hasDottedPath = true;
         }
     }
 
-    void visit(ProjectionPositionalASTNode* node) final {
+    void visit(const ProjectionPositionalASTNode* node) final {
         _deps->requiresMatchDetails = true;
         _deps->requiresDocument = true;
     }
 
-    void visit(ProjectionSliceASTNode* node) final {
+    void visit(const ProjectionSliceASTNode* node) final {
         _deps->requiresDocument = true;
     }
 
-    void visit(ProjectionElemMatchASTNode* node) final {
+    void visit(const ProjectionElemMatchASTNode* node) final {
         _deps->requiresDocument = true;
     }
 
-    void visit(ExpressionASTNode* node) final {
+    void visit(const ExpressionASTNode* node) final {
         const Expression* expr = node->expressionRaw();
         const ExpressionMeta* meta = dynamic_cast<const ExpressionMeta*>(expr);
 
@@ -94,8 +94,8 @@ public:
         }
     }
 
-    void visit(BooleanConstantASTNode* node) final {}
-    void visit(MatchExpressionASTNode* node) final {}
+    void visit(const BooleanConstantASTNode* node) final {}
+    void visit(const MatchExpressionASTNode* node) final {}
 
 private:
     ProjectionDependencies* _deps;
@@ -108,33 +108,33 @@ private:
  * 'PathTrackingWalker' which will help to maintain the current path via
  * 'PathTrackingVisitorContext'.
  */
-class DepsAnalysisVisitor final : public ProjectionASTVisitor {
+class DepsAnalysisVisitor final : public ProjectionASTConstVisitor {
 public:
     DepsAnalysisVisitor(PathTrackingVisitorContext<DepsAnalysisData>* context) : _context{context} {
         invariant(_context);
     }
 
-    void visit(MatchExpressionASTNode* node) final {
+    void visit(const MatchExpressionASTNode* node) final {
         node->matchExpression()->addDependencies(&_context->data().fieldDependencyTracker);
     }
 
-    void visit(ProjectionPositionalASTNode* node) final {
+    void visit(const ProjectionPositionalASTNode* node) final {
         // Positional projection on a.b.c.$ may actually modify a, a.b, a.b.c, etc.
         // Treat the top-level field as a dependency.
         addTopLevelPathAsDependency();
     }
 
-    void visit(ProjectionSliceASTNode* node) final {
+    void visit(const ProjectionSliceASTNode* node) final {
         // find() $slice on a.b.c may modify a, a.b, and a.b.c if they're all arrays.
         // Treat the top-level field as a dependency.
         addTopLevelPathAsDependency();
     }
 
-    void visit(ProjectionElemMatchASTNode* node) final {
+    void visit(const ProjectionElemMatchASTNode* node) final {
         addFullPathAsDependency();
     }
 
-    void visit(ExpressionASTNode* node) final {
+    void visit(const ExpressionASTNode* node) final {
         // The output of an expression on a dotted path depends on whether that field is an array.
         invariant(node->parent());
         if (!node->parent()->isRoot()) {
@@ -144,14 +144,14 @@ public:
         node->expression()->addDependencies(&_context->data().fieldDependencyTracker);
     }
 
-    void visit(BooleanConstantASTNode* node) final {
+    void visit(const BooleanConstantASTNode* node) final {
         // For inclusions, we depend on the field.
         if (node->value()) {
             addFullPathAsDependency();
         }
     }
 
-    void visit(ProjectionPathASTNode* node) final {}
+    void visit(const ProjectionPathASTNode* node) final {}
 
 private:
     void addTopLevelPathAsDependency() {
@@ -169,7 +169,7 @@ private:
     PathTrackingVisitorContext<DepsAnalysisData>* _context;
 };
 
-auto analyzeProjection(ProjectionPathASTNode* root, ProjectType type) {
+auto analyzeProjection(const ProjectionPathASTNode* root, ProjectType type) {
     ProjectionDependencies deps;
     PathTrackingVisitorContext<DepsAnalysisData> context;
     DepsAnalysisVisitor depsAnalysisVisitor{&context};
@@ -194,8 +194,8 @@ auto analyzeProjection(ProjectionPathASTNode* root, ProjectType type) {
 }  // namespace
 
 
-Projection::Projection(ProjectionPathASTNode root, ProjectType type, const BSONObj& bson)
-    : _root(std::move(root)), _type(type), _deps(analyzeProjection(&_root, type)), _bson(bson) {}
+Projection::Projection(ProjectionPathASTNode root, ProjectType type)
+    : _root(std::move(root)), _type(type), _deps(analyzeProjection(&_root, type)) {}
 
 namespace {
 

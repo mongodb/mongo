@@ -67,7 +67,8 @@ public:
 
     virtual std::unique_ptr<ASTNode> clone() const = 0;
 
-    virtual void acceptVisitor(ProjectionASTVisitor* visitor) = 0;
+    virtual void acceptVisitor(ProjectionASTMutableVisitor* visitor) = 0;
+    virtual void acceptVisitor(ProjectionASTConstVisitor* visitor) const = 0;
 
     const ASTNodeVector& children() const {
         return _children;
@@ -103,7 +104,11 @@ public:
         return std::make_unique<MatchExpressionASTNode>(*this);
     }
 
-    void acceptVisitor(ProjectionASTVisitor* visitor) override {
+    void acceptVisitor(ProjectionASTMutableVisitor* visitor) override {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(ProjectionASTConstVisitor* visitor) const override {
         visitor->visit(this);
     }
 
@@ -124,7 +129,11 @@ public:
         invariant(_children.size() == _fieldNames.size());
     }
 
-    void acceptVisitor(ProjectionASTVisitor* visitor) override {
+    void acceptVisitor(ProjectionASTMutableVisitor* visitor) override {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(ProjectionASTConstVisitor* visitor) const override {
         visitor->visit(this);
     }
 
@@ -163,7 +172,11 @@ public:
         addChildToInternalVector(std::move(child));
     }
 
-    void acceptVisitor(ProjectionASTVisitor* visitor) override {
+    void acceptVisitor(ProjectionASTMutableVisitor* visitor) override {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(ProjectionASTConstVisitor* visitor) const override {
         visitor->visit(this);
     }
 
@@ -176,7 +189,11 @@ class ProjectionSliceASTNode final : public ASTNode {
 public:
     ProjectionSliceASTNode(boost::optional<int> skip, int limit) : _skip(skip), _limit(limit) {}
 
-    void acceptVisitor(ProjectionASTVisitor* visitor) override {
+    void acceptVisitor(ProjectionASTMutableVisitor* visitor) override {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(ProjectionASTConstVisitor* visitor) const override {
         visitor->visit(this);
     }
 
@@ -204,7 +221,11 @@ public:
         addChildToInternalVector(std::move(child));
     }
 
-    void acceptVisitor(ProjectionASTVisitor* visitor) override {
+    void acceptVisitor(ProjectionASTMutableVisitor* visitor) override {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(ProjectionASTConstVisitor* visitor) const override {
         visitor->visit(this);
     }
 
@@ -228,7 +249,11 @@ public:
         _expr = clonedExpr;
     }
 
-    void acceptVisitor(ProjectionASTVisitor* visitor) override {
+    void acceptVisitor(ProjectionASTMutableVisitor* visitor) override {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(ProjectionASTConstVisitor* visitor) const override {
         visitor->visit(this);
     }
 
@@ -252,7 +277,11 @@ class BooleanConstantASTNode final : public ASTNode {
 public:
     BooleanConstantASTNode(bool val) : _val(val) {}
 
-    void acceptVisitor(ProjectionASTVisitor* visitor) override {
+    void acceptVisitor(ProjectionASTMutableVisitor* visitor) override {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(ProjectionASTConstVisitor* visitor) const override {
         visitor->visit(this);
     }
 
