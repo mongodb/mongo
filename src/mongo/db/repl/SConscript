@@ -1276,6 +1276,9 @@ env.Library(
         '$BUILD_DIR/mongo/executor/task_executor_interface',
         '$BUILD_DIR/mongo/rpc/command_status',
     ],
+    LIBDEPS_PRIVATE={
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
+    }
 )
 
 env.CppUnitTest(

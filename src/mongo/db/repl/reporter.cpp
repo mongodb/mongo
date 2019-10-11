@@ -33,7 +33,9 @@
 
 #include "mongo/db/repl/reporter.h"
 
+#include "mongo/base/counter.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
@@ -46,6 +48,11 @@ namespace repl {
 namespace {
 
 const char kConfigVersionFieldName[] = "configVersion";
+
+// The number of replSetUpdatePosition commands a node sent to its sync source.
+Counter64 numUpdatePosition;
+ServerStatusMetricField<Counter64> displayNumUpdatePosition(
+    "repl.network.replSetUpdatePosition.num", &numUpdatePosition);
 
 /**
  * Returns configuration version in update command object.
@@ -232,6 +239,8 @@ void Reporter::_sendCommand_inlock(BSONObj commandRequest, Milliseconds netTimeo
         }
         return;
     }
+
+    numUpdatePosition.increment(1);
 
     _remoteCommandCallbackHandle = scheduleResult.getValue();
 }
