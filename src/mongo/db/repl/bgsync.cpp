@@ -74,6 +74,31 @@ const int kSleepToAllowBatchingMillis = 2;
 const int kSmallBatchLimitBytes = 40000;
 const Milliseconds kRollbackOplogSocketTimeout(10 * 60 * 1000);
 
+// The number of times a node attempted to choose a node to sync from among the available sync
+// source options. This occurs if we re-evaluate our sync source, receive an error from the source,
+// or step down.
+Counter64 numSyncSourceSelections;
+ServerStatusMetricField<Counter64> displayNumSyncSourceSelections("repl.syncSource.numSelections",
+                                                                  &numSyncSourceSelections);
+
+// The number of times a node kept it's original sync source after re-evaluating if its current sync
+// source was optimal.
+Counter64 numTimesChoseSameSyncSource;
+ServerStatusMetricField<Counter64> displayNumTimesChoseSameSyncSource(
+    "repl.syncSource.numTimesChoseSame", &numTimesChoseSameSyncSource);
+
+// The number of times a node chose a new sync source after re-evaluating if its current sync source
+// was optimal.
+Counter64 numTimesChoseDifferentSyncSource;
+ServerStatusMetricField<Counter64> displayNumTimesChoseDifferentSyncSource(
+    "repl.syncSource.numTimesChoseDifferent", &numTimesChoseDifferentSyncSource);
+
+// The number of times a node could not find a sync source when choosing a node to sync from among
+// the available options.
+Counter64 numTimesCouldNotFindSyncSource;
+ServerStatusMetricField<Counter64> displayNumTimesCouldNotFindSyncSource(
+    "repl.syncSource.numTimesCouldNotFind", &numTimesCouldNotFindSyncSource);
+
 /**
  * Extends DataReplicatorExternalStateImpl to be member state aware.
  */
@@ -298,6 +323,8 @@ void BackgroundSync::_produce() {
         _syncSourceResolver.reset();
     }
 
+    numSyncSourceSelections.increment(1);
+
     if (syncSourceResp.syncSourceStatus == ErrorCodes::OplogStartMissing) {
         // All (accessible) sync sources are too far ahead of us.
         if (_replCoord->getMemberState().primary()) {
@@ -351,11 +378,13 @@ void BackgroundSync::_produce() {
             log() << "Chose same sync source candidate as last time, " << source
                   << ". Sleeping for 1 second to avoid immediately choosing a new sync source for "
                      "the same reason as last time.";
+            numTimesChoseSameSyncSource.increment(1);
             sleepsecs(1);
         } else {
             log() << "Changed sync source from "
                   << (oldSource.empty() ? std::string("empty") : oldSource.toString()) << " to "
                   << source;
+            numTimesChoseDifferentSyncSource.increment(1);
         }
     } else {
         if (!syncSourceResp.isOK()) {
@@ -363,6 +392,9 @@ void BackgroundSync::_produce() {
                   << syncSourceResp.syncSourceStatus.getStatus();
         }
         // No sync source found.
+        LOG(1) << "Could not find a sync source. Sleeping for 1 second before trying again.";
+        numTimesCouldNotFindSyncSource.increment(1);
+
         sleepsecs(1);
         return;
     }

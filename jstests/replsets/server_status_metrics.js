@@ -1,9 +1,16 @@
+
+(function() {
+"use strict";
+
+load("jstests/libs/check_log.js");
+load("jstests/libs/write_concern_util.js");
+
 /**
  * Test replication metrics
  */
 function testSecondaryMetrics(secondary, opCount, baseOpsApplied, baseOpsReceived) {
     var ss = secondary.getDB("test").serverStatus();
-    printjson(ss.metrics);
+    jsTestLog(`Secondary ${secondary.host} metrics: ${tojson(ss.metrics)}`);
 
     assert(ss.metrics.repl.network.readersCreated > 0, "no (oplog) readers created");
     assert(ss.metrics.repl.network.getmores.num > 0, "no getmores");
@@ -18,6 +25,11 @@ function testSecondaryMetrics(secondary, opCount, baseOpsApplied, baseOpsReceive
         ss.metrics.repl.network.ops, opCount + baseOpsApplied, "wrong number of ops retrieved");
     assert(ss.metrics.repl.network.bytes > 0, "zero or missing network bytes");
 
+    assert.gt(
+        ss.metrics.repl.network.replSetUpdatePosition.num, 0, "no update position commands sent");
+    assert.gt(ss.metrics.repl.syncSource.numSelections, 0, "num selections not incremented");
+    assert.gt(ss.metrics.repl.syncSource.numTimesChoseDifferent, 0, "no new sync source chosen");
+
     assert(ss.metrics.repl.buffer.count >= 0, "buffer count missing");
     assert(ss.metrics.repl.buffer.sizeBytes >= 0, "size (bytes)] missing");
     assert(ss.metrics.repl.buffer.maxSizeBytes >= 0, "maxSize (bytes) missing");
@@ -30,9 +42,16 @@ function testSecondaryMetrics(secondary, opCount, baseOpsApplied, baseOpsReceive
     assert.eq(ss.metrics.repl.apply.ops, opCount + baseOpsApplied, "wrong number of applied ops");
 }
 
-var rt = new ReplSetTest({name: "server_status_metrics", nodes: 2, oplogSize: 100});
+var rt = new ReplSetTest({
+    name: "server_status_metrics",
+    nodes: 2,
+    oplogSize: 100,
+    // Write periodic noops to aid sync source selection. ReplSetTest.initiate() requires at least a
+    // 2 second noop writer interval to converge on a lastApplied optime.
+    nodeOptions: {setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 2}}
+});
 rt.startSet();
-rt.initiate();
+rt.initiateWithHighElectionTimeout();
 
 rt.awaitSecondaryNodes();
 
@@ -52,7 +71,7 @@ var secondaryBaseOplogOpsReceived = ss.metrics.repl.apply.batchSize;
 
 // add test docs
 var bulk = testDB.a.initializeUnorderedBulkOp();
-for (x = 0; x < 1000; x++) {
+for (let x = 0; x < 1000; x++) {
     bulk.insert({});
 }
 assert.commandWorked(bulk.execute({w: 2}));
@@ -68,7 +87,8 @@ testSecondaryMetrics(secondary, 2000, secondaryBaseOplogOpsApplied, secondaryBas
 var startMillis = testDB.serverStatus().metrics.getLastError.wtime.totalMillis;
 var startNum = testDB.serverStatus().metrics.getLastError.wtime.num;
 
-printjson(primary.getDB("test").serverStatus().metrics);
+jsTestLog(
+    `Primary ${primary.host} metrics #1: ${tojson(primary.getDB("test").serverStatus().metrics)}`);
 
 assert.commandWorked(testDB.a.insert({x: 1}, {writeConcern: {w: 1, wtimeout: 5000}}));
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.totalMillis, startMillis);
@@ -86,6 +106,49 @@ assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum + 1);
 assert.writeError(testDB.a.insert({x: 1}, {writeConcern: {w: 3, wtimeout: 50}}));
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum + 2);
 
-printjson(primary.getDB("test").serverStatus().metrics);
+jsTestLog(
+    `Primary ${primary.host} metrics #2: ${tojson(primary.getDB("test").serverStatus().metrics)}`);
+
+let ssOld = secondary.getDB("test").serverStatus().metrics.repl.syncSource;
+jsTestLog(`Secondary ${secondary.host} metrics before restarting replication: ${tojson(ssOld)}`);
+
+// Repeatedly restart replication and wait for the sync source to be rechosen. If the sync source
+// gets set to empty between stopping and restarting replication, then the secondary won't
+// increment numTimesChoseSame, so we do this in a loop.
+let ssNew;
+assert.soon(
+    function() {
+        stopServerReplication(secondary);
+        restartServerReplication(secondary);
+
+        // Do a dummy write to choose a new sync source and replicate the write to block on that.
+        assert.commandWorked(
+            primary.getDB("test").bar.insert({"dummy_write": 3}, {writeConcern: {w: 2}}));
+        ssNew = secondary.getDB("test").serverStatus().metrics.repl.syncSource;
+        jsTestLog(
+            `Secondary ${secondary.host} metrics after restarting replication: ${tojson(ssNew)}`);
+        return ssNew.numTimesChoseSame > ssOld.numTimesChoseSame;
+    },
+    "timed out waiting to re-choose same sync source",
+    null,
+    3 * 1000 /* 3sec interval to wait for noop */);
+
+assert.gt(ssNew.numSelections, ssOld.numSelections, "num selections not incremented");
+assert.gt(ssNew.numTimesChoseSame, ssOld.numTimesChoseSame, "same sync source not chosen");
+
+// Stop the primary so the secondary cannot choose a sync source.
+ssOld = ssNew;
+rt.stop(primary);
+stopServerReplication(secondary);
+restartServerReplication(secondary);
+assert.soon(function() {
+    ssNew = secondary.getDB("test").serverStatus().metrics.repl.syncSource;
+    jsTestLog(`Secondary ${secondary.host} metrics after stopping primary: ${tojson(ssNew)}`);
+    return ssNew.numTimesCouldNotFind > ssOld.numTimesCouldNotFind;
+});
+
+assert.gt(ssNew.numSelections, ssOld.numSelections, "num selections not incremented");
+assert.gt(ssNew.numTimesCouldNotFind, ssOld.numTimesCouldNotFind, "found new sync source");
 
 rt.stopSet();
+})();
