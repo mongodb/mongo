@@ -233,6 +233,15 @@ const uint8_t kGreater = 254;
 
 // some utility functions
 namespace {
+
+void keyStringAssert(const int msgid, const std::string msg, const bool expr) {
+    uassert(msgid, str::stream() << "KeyString format error: " << msg, expr);
+}
+
+void keyStringAsserted(const int msgid, const std::string msg) {
+    uasserted(msgid, str::stream() << "KeyString format error: " << msg);
+}
+
 void memcpy_flipBits(void* dst, const void* src, size_t bytes) {
     const char* input = static_cast<const char*>(src);
     char* output = static_cast<char*>(dst);
@@ -254,7 +263,7 @@ T readType(BufReader* reader, bool inverted) {
 StringData readCString(BufReader* reader) {
     const char* start = static_cast<const char*>(reader->pos());
     const char* end = static_cast<const char*>(memchr(start, 0x0, reader->remaining()));
-    uassert(50816, "Failed to find null terminator in string.", end);
+    keyStringAssert(50816, "Failed to find null terminator in string.", end);
     size_t actualBytes = end - start;
     reader->skip(1 + actualBytes);
     return StringData(start, actualBytes);
@@ -286,7 +295,7 @@ StringData readCStringWithNuls(BufReader* reader, std::string* scratch) {
 string readInvertedCString(BufReader* reader) {
     const char* start = static_cast<const char*>(reader->pos());
     const char* end = static_cast<const char*>(memchr(start, 0xFF, reader->remaining()));
-    uassert(50817, "Failed to find '0xFF' in inverted string.", end);
+    keyStringAssert(50817, "Failed to find '0xFF' in inverted string.", end);
     size_t actualBytes = end - start;
     string s(start, actualBytes);
     for (size_t i = 0; i < s.size(); i++) {
@@ -311,7 +320,7 @@ string readInvertedCStringWithNuls(BufReader* reader) {
 
         const char* start = static_cast<const char*>(reader->pos());
         const char* end = static_cast<const char*>(memchr(start, 0xFF, reader->remaining()));
-        uassert(50820, "Failed to find '0xFF' in inverted string.", end);
+        keyStringAssert(50820, "Failed to find '0xFF' in inverted string.", end);
         size_t actualBytes = end - start;
 
         out.append(start, actualBytes);
@@ -929,7 +938,7 @@ void BuilderBase<BufferT>::_appendBsonValue(const BSONElement& elem,
             break;
         case Symbol:
             if (f) {
-                uasserted(
+                keyStringAsserted(
                     ErrorCodes::CannotBuildIndexKeys,
                     str::stream()
                         << "Cannot index type Symbol with a collation. Failed to index element: "
@@ -1258,13 +1267,14 @@ Decimal128 readDecimalContinuation(BufReader* reader, bool inverted, Decimal128 
     uint32_t flags = Decimal128::kNoFlag;
     uint64_t continuation = endian::bigToNative(readType<uint64_t>(reader, inverted));
     num = num.normalize();
-    uassert(50850,
-            "Invalid decimal continuation.",
-            Decimal128::isValid(num.isNegative(), num.getBiasedExponent(), 0, continuation));
+    keyStringAssert(
+        50850,
+        "Invalid decimal continuation.",
+        Decimal128::isValid(num.isNegative(), num.getBiasedExponent(), 0, continuation));
     num = num.add(Decimal128(num.isNegative(), num.getBiasedExponent(), 0, continuation), &flags);
-    uassert(50815,
-            "Unexpected inexact flag set after Decimal addition.",
-            !(Decimal128::hasFlag(flags, Decimal128::kInexact)));
+    keyStringAssert(50815,
+                    "Unexpected inexact flag set after Decimal addition.",
+                    !(Decimal128::hasFlag(flags, Decimal128::kInexact)));
     return num;
 }
 
@@ -1275,9 +1285,9 @@ void toBsonValue(uint8_t ctype,
                  Version version,
                  BSONObjBuilderValueStream* stream,
                  uint32_t depth) {
-    uassert(ErrorCodes::Overflow,
-            "KeyString encoding exceeded maximum allowable BSON nesting depth",
-            depth <= BSONDepth::getMaxAllowableDepth());
+    keyStringAssert(ErrorCodes::Overflow,
+                    "KeyString encoding exceeded maximum allowable BSON nesting depth",
+                    depth <= BSONDepth::getMaxAllowableDepth());
 
     // This is only used by the kNumeric.*ByteInt types, but needs to be declared up here
     // since it is used across a fallthrough.
@@ -1329,9 +1339,9 @@ void toBsonValue(uint8_t ctype,
                 if (originalType == TypeBits::kString) {
                     *stream << readInvertedCStringWithNuls(reader);
                 } else {
-                    uassert(50827,
-                            "Expected original type to be Symbol.",
-                            originalType == TypeBits::kSymbol);
+                    keyStringAssert(50827,
+                                    "Expected original type to be Symbol.",
+                                    originalType == TypeBits::kSymbol);
                     *stream << BSONSymbol(readInvertedCStringWithNuls(reader));
                 }
 
@@ -1340,9 +1350,9 @@ void toBsonValue(uint8_t ctype,
                 if (originalType == TypeBits::kString) {
                     *stream << readCStringWithNuls(reader, &scratch);
                 } else {
-                    uassert(50828,
-                            "Expected original type to be Symbol.",
-                            originalType == TypeBits::kSymbol);
+                    keyStringAssert(50828,
+                                    "Expected original type to be Symbol.",
+                                    originalType == TypeBits::kSymbol);
                     *stream << BSONSymbol(readCStringWithNuls(reader, &scratch));
                 }
             }
@@ -1455,9 +1465,9 @@ void toBsonValue(uint8_t ctype,
             if (type == TypeBits::kDouble) {
                 *stream << std::numeric_limits<double>::quiet_NaN();
             } else {
-                uassert(50819,
-                        "Invalid type bits for numeric NaN",
-                        type == TypeBits::kDecimal && version == Version::V1);
+                keyStringAssert(50819,
+                                "Invalid type bits for numeric NaN",
+                                type == TypeBits::kDecimal && version == Version::V1);
                 *stream << Decimal128::kPositiveNaN;
             }
             break;
@@ -1484,9 +1494,9 @@ void toBsonValue(uint8_t ctype,
                     const uint32_t biasedExponent =
                         isNegative ? whichZero - (Decimal128::kMaxBiasedExponent + 1) : whichZero;
 
-                    uassert(50846,
-                            "Invalid numeric zero decimal.",
-                            Decimal128::isValid(isNegative, biasedExponent, 0, 0));
+                    keyStringAssert(50846,
+                                    "Invalid numeric zero decimal.",
+                                    Decimal128::isValid(isNegative, biasedExponent, 0, 0));
                     *stream << Decimal128(isNegative, biasedExponent, 0, 0);
                     break;
             }
@@ -1499,9 +1509,9 @@ void toBsonValue(uint8_t ctype,
         // fallthrough (format is the same as positive, but inverted)
         case CType::kNumericPositiveLargeMagnitude: {
             const uint8_t originalType = typeBits->readNumeric();
-            uassert(31231,
-                    "Unexpected decimal encoding for V0 KeyString.",
-                    version > Version::V0 || originalType != TypeBits::kDecimal);
+            keyStringAssert(31231,
+                            "Unexpected decimal encoding for V0 KeyString.",
+                            version > Version::V0 || originalType != TypeBits::kDecimal);
             uint64_t encoded = readType<uint64_t>(reader, inverted);
             encoded = endian::bigToNative(encoded);
             bool hasDecimalContinuation = false;
@@ -1521,9 +1531,9 @@ void toBsonValue(uint8_t ctype,
                 bin = isNegative ? -std::numeric_limits<double>::infinity()
                                  : std::numeric_limits<double>::infinity();
             } else {  // Huge decimal number, directly output
-                uassert(50818,
-                        "Invalid type bits for decimal number.",
-                        originalType == TypeBits::kDecimal);
+                keyStringAssert(50818,
+                                "Invalid type bits for decimal number.",
+                                originalType == TypeBits::kDecimal);
                 uint64_t highbits = encoded & ~(1ULL << 63);
                 uint64_t lowbits = endian::bigToNative(readType<uint64_t>(reader, inverted));
                 Decimal128 dec(Decimal128::Value{lowbits, highbits});
@@ -1540,14 +1550,14 @@ void toBsonValue(uint8_t ctype,
                 *stream << bin;
             } else if (originalType == TypeBits::kLong) {
                 // This can only happen for a single number.
-                uassert(50821,
-                        "Unexpected value for large number.",
-                        bin == static_cast<double>(std::numeric_limits<long long>::min()));
+                keyStringAssert(50821,
+                                "Unexpected value for large number.",
+                                bin == static_cast<double>(std::numeric_limits<long long>::min()));
                 *stream << std::numeric_limits<long long>::min();
             } else {
-                uassert(50826,
-                        "Unexpected type of large number.",
-                        originalType == TypeBits::kDecimal && version != Version::V0);
+                keyStringAssert(50826,
+                                "Unexpected type of large number.",
+                                originalType == TypeBits::kDecimal && version != Version::V0);
                 const auto roundAwayFromZero = isNegative ? Decimal128::kRoundTowardNegative
                                                           : Decimal128::kRoundTowardPositive;
                 Decimal128 dec(bin, Decimal128::kRoundTo34Digits, roundAwayFromZero);
@@ -1572,9 +1582,9 @@ void toBsonValue(uint8_t ctype,
 
             if (version == Version::V0) {
                 // for these, the raw double was stored intact, including sign bit.
-                uassert(50812,
-                        "Invalid type bits for small number.",
-                        originalType == TypeBits::kDouble);
+                keyStringAssert(50812,
+                                "Invalid type bits for small number.",
+                                originalType == TypeBits::kDouble);
                 double d;
                 memcpy(&d, &encoded, sizeof(d));
                 *stream << d;
@@ -1606,14 +1616,15 @@ void toBsonValue(uint8_t ctype,
                     double scaledBin;
                     memcpy(&scaledBin, &encoded, sizeof(scaledBin));
                     if (originalType == TypeBits::kDouble) {
-                        uassert(50822, "Unexpected decimal continuation.", !hasDecimalContinuation);
+                        keyStringAssert(
+                            50822, "Unexpected decimal continuation.", !hasDecimalContinuation);
                         double bin = scaledBin * kTinyDoubleExponentDownshiftFactor;
                         *stream << (isNegative ? -bin : bin);
                         break;
                     }
-                    uassert(50823,
-                            "Expected decimal continuation.",
-                            originalType == TypeBits::kDecimal && hasDecimalContinuation);
+                    keyStringAssert(50823,
+                                    "Expected decimal continuation.",
+                                    originalType == TypeBits::kDecimal && hasDecimalContinuation);
 
                     // If the actual double would be subnormal, scale in decimal domain.
                     Decimal128 dec;
@@ -1644,15 +1655,16 @@ void toBsonValue(uint8_t ctype,
                     double bin;
                     memcpy(&bin, &encoded, sizeof(bin));
                     if (originalType == TypeBits::kDouble) {
-                        uassert(50824, "Decimal contuation mismatch.", dcm == kDCMEqualToDouble);
+                        keyStringAssert(
+                            50824, "Decimal contuation mismatch.", dcm == kDCMEqualToDouble);
                         *stream << (isNegative ? -bin : bin);
                         break;
                     }
 
                     // Deal with decimal cases
-                    uassert(50825,
-                            "Unexpected type for small number, expected decimal.",
-                            originalType == TypeBits::kDecimal);
+                    keyStringAssert(50825,
+                                    "Unexpected type for small number, expected decimal.",
+                                    originalType == TypeBits::kDecimal);
                     Decimal128 dec;
                     switch (dcm) {
                         case kDCMEqualToDoubleRoundedUpTo15Digits:
@@ -1734,19 +1746,19 @@ void toBsonValue(uint8_t ctype,
                         *stream << adjustDecimalExponent(typeBits, Decimal128(integerPart));
                         break;
                     default:
-                        uasserted(50831, "Unexpected type for positive int.");
+                        keyStringAsserted(50831, "Unexpected type for positive int.");
                 }
                 break;
             }
 
             // KeyString V0: anything fractional is a double
             if (version == Version::V0) {
-                uassert(50832,
-                        "Expected type double for fractional part.",
-                        originalType == TypeBits::kDouble);
-                uassert(31209,
-                        "Integer part is too big to be a double.",
-                        integerPart < kMaxIntForDouble);
+                keyStringAssert(50832,
+                                "Expected type double for fractional part.",
+                                originalType == TypeBits::kDouble);
+                keyStringAssert(31209,
+                                "Integer part is too big to be a double.",
+                                integerPart < kMaxIntForDouble);
 
                 const uint64_t exponent = (64 - countLeadingZeros64(integerPart)) - 1;
                 const size_t fractionalBits = (52 - exponent);
@@ -1792,7 +1804,7 @@ void toBsonValue(uint8_t ctype,
                 : kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits;
 
             // Deal with decimal cases
-            uassert(50810, "Expected type Decimal.", originalType == TypeBits::kDecimal);
+            keyStringAssert(50810, "Expected type Decimal.", originalType == TypeBits::kDecimal);
             Decimal128 dec;
             switch (dcm) {
                 case kDCMEqualToDoubleRoundedUpTo15Digits:
@@ -1815,7 +1827,7 @@ void toBsonValue(uint8_t ctype,
             break;
         }
         default:
-            uasserted(50811, str::stream() << "Unknown type: " << ctype);
+            keyStringAsserted(50811, str::stream() << "Unknown type: " << ctype);
     }
 }
 
@@ -2108,7 +2120,7 @@ Decimal128 adjustDecimalExponent(TypeBits::Reader* typeBits, Decimal128 num) {
     // possible, we must be able to scale up. Scaling always must be exact and not change the value.
     const uint32_t kMaxExpAdjust = 33;
     const uint32_t kMaxExpIncrementForZeroHighCoefficient = 19;
-    uassert(50829, "Expected non-zero number for decimal.", !num.isZero());
+    keyStringAssert(50829, "Expected non-zero number for decimal.", !num.isZero());
     const uint32_t origExp = num.getBiasedExponent();
     const uint8_t storedBits = typeBits->readDecimalExponent();
 
@@ -2129,26 +2141,26 @@ Decimal128 adjustDecimalExponent(TypeBits::Reader* typeBits, Decimal128 num) {
          highExp <= origExp + kMaxExpIncrementForZeroHighCoefficient)) {
         // Increase exponent and decrease (right shift) coefficient.
         uint32_t flags = Decimal128::SignalingFlag::kNoFlag;
-        uassert(50845,
-                "Unexpected exponent values after adjusting Decimal.",
-                Decimal128::isValid(0, highExp, 0, 0));
+        keyStringAssert(50845,
+                        "Unexpected exponent values after adjusting Decimal.",
+                        Decimal128::isValid(0, highExp, 0, 0));
         auto quantized = num.quantize(Decimal128(0, highExp, 0, 1), &flags);
-        uassert(50813,
-                "Unexpected signaling flag for Decimal quantization.",
-                flags == Decimal128::SignalingFlag::kNoFlag);  // must be exact
+        keyStringAssert(50813,
+                        "Unexpected signaling flag for Decimal quantization.",
+                        flags == Decimal128::SignalingFlag::kNoFlag);  // must be exact
         num = quantized;
     } else {
         // Decrease exponent and increase (left shift) coefficient.
         uint32_t lowExp = highExp - (1U << TypeBits::kStoredDecimalExponentBits);
-        uassert(50814,
-                "Unexpected exponent values after adjusting Decimal.",
-                lowExp >= origExp - kMaxExpAdjust && Decimal128::isValid(0, lowExp, 0, 0));
+        keyStringAssert(50814,
+                        "Unexpected exponent values after adjusting Decimal.",
+                        lowExp >= origExp - kMaxExpAdjust && Decimal128::isValid(0, lowExp, 0, 0));
         num = num.add(Decimal128(0, lowExp, 0, 0));
     }
-    uassert(50830,
-            "Unexpected biased exponent in decimal.",
-            (num.getBiasedExponent() & TypeBits::kStoredDecimalExponentMask) ==
-                (highExp & TypeBits::kStoredDecimalExponentMask));
+    keyStringAssert(50830,
+                    "Unexpected biased exponent in decimal.",
+                    (num.getBiasedExponent() & TypeBits::kStoredDecimalExponentMask) ==
+                        (highExp & TypeBits::kStoredDecimalExponentMask));
     return num;
 }
 
@@ -2202,7 +2214,7 @@ uint32_t TypeBits::readSizeFromBuffer(BufReader* reader) {
     if (firstByte == 0x80) {
         // The next 4 bytes represent the size in little endian order.
         uint32_t s = reader->read<LittleEndian<uint32_t>>();
-        uassert(50910, "Invalid overlong encoding.", s > kMaxBytesForShortEncoding);
+        keyStringAssert(50910, "Invalid overlong encoding.", s > kMaxBytesForShortEncoding);
         return s;
     }
 
@@ -2314,7 +2326,7 @@ uint8_t TypeBits::Reader::readBit() {
     const uint8_t offsetInByte = _curBit % 8;
     _curBit++;
 
-    uassert(50615, "Invalid size byte(s).", byte < _typeBits.getDataBufferLen());
+    keyStringAssert(50615, "Invalid size byte(s).", byte < _typeBits.getDataBufferLen());
 
     return (_typeBits.getDataBuffer()[byte] & (1 << offsetInByte)) ? 1 : 0;
 }
