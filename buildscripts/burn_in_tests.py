@@ -547,6 +547,10 @@ def create_generate_tasks_config(evg_config: Configuration, tests_by_task: Dict,
         test_list = tests_by_task[task]["tests"]
         distro = tests_by_task[task].get("distro", generate_config.distro)
         for index, test in enumerate(test_list):
+            # Evergreen always uses a unix shell, even on Windows, so instead of using os.path.join
+            # here, just use the forward slash; otherwise the path separator will be treated as
+            # the escape character on Windows.
+            test = test.replace('\\', '/')
             sub_task_name = name_generated_task(f"{task_prefix}:{task}", index, len(test_list),
                                                 generate_config.run_build_variant)
             LOGGER.debug("Generating sub-task", sub_task=sub_task_name)
