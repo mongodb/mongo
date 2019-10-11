@@ -149,8 +149,8 @@ if deb
     # All versions of Debian 10 will use /usr/sbin/nologin for service
     # account shells
     its('shell') {
-      if ((os[:family] == 'debian' and os[:release].split('.')[0] == '10') or
-          (os[:family] == 'ubuntu' and os[:release] == '18.04'))
+      if ((os[:name] == 'debian' and os[:release].split('.')[0] == '10') or
+          (os[:name] == 'ubuntu' and os[:release] == '18.04'))
         should eq '/usr/sbin/nologin'
       else
         should eq '/bin/false'
