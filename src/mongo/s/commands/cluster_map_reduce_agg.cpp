@@ -47,6 +47,7 @@
 #include "mongo/db/query/map_reduce_output_format.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/commands/cluster_map_reduce_agg.h"
+#include "mongo/s/query/cluster_cursor_manager.h"
 
 namespace mongo {
 namespace {
@@ -151,6 +152,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                                                        involvedNamespaces,
                                                        false,   // hasChangeStream
                                                        true));  // allowedToPassthrough
+
     switch (targeter.policy) {
         case sharded_agg_helpers::AggregationTargeter::TargetingPolicy::kPassthrough: {
             // For the passthrough case, the targeter will not build a pipeline since its not needed
@@ -192,6 +194,15 @@ bool runAggregationMapReduce(OperationContext* opCtx,
 
     auto aggResults = tempResults.done();
     if (parsedMr.getOutOptions().getOutputType() == OutputType::InMemory) {
+        // If the inline results could not fit into a single batch, then kill the remote
+        // operation(s) and return an error since mapReduce does not support a cursor-style
+        // response.
+        if (aggResults["cursor"]["id"].Long() != 0) {
+            uassertStatusOK(Grid::get(opCtx)->getCursorManager()->killCursor(
+                opCtx, parsedMr.getNamespace(), aggResults["cursor"]["id"].Long()));
+            uasserted(31301, "MapReduce inline results are greater than the allowed 16MB limit");
+        }
+
         auto exhaustedResults = [&]() {
             BSONArrayBuilder bab;
             for (auto&& elem : aggResults["cursor"]["firstBatch"].Obj())
