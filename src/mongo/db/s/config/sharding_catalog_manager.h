@@ -204,6 +204,14 @@ public:
                                              const ShardId& toShard,
                                              const boost::optional<Timestamp>& validAfter);
 
+    /**
+     * Removes the jumbo flag from the specified chunk.
+     */
+    void clearJumboFlag(OperationContext* opCtx,
+                        const NamespaceString& nss,
+                        const OID& collectionEpoch,
+                        const ChunkRange& chunk);
+
     //
     // Database Operations
     //

@@ -60,6 +60,8 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(migrationCommitVersionError);
 MONGO_FAIL_POINT_DEFINE(skipExpiringOldChunkHistory);
 
+const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
+
 /**
  * Append min, max and version information from chunk to the buffer for logChange purposes.
  */
@@ -872,6 +874,109 @@ StatusWith<ChunkVersion> ShardingCatalogManager::_findCollectionVersion(
     }
 
     return currentCollectionVersion;
+}
+
+void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
+                                            const NamespaceString& nss,
+                                            const OID& collectionEpoch,
+                                            const ChunkRange& chunk) {
+    auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+
+    // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
+    // migrations.
+    //
+    // ConfigSvrClearJumboFlag commands must be run serially because the new ChunkVersions
+    // for the modified chunks are generated within the command and must be committed to the
+    // database before another chunk operation generates new ChunkVersions in the same manner.
+    //
+    // TODO(SERVER-25359): Replace with a collection-specific lock map to allow splits/merges/
+    // move chunks on different collections to proceed in parallel.
+    // (Note: This is not needed while we have a global lock, taken here only for consistency.)
+    Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
+
+    auto targetChunkResult = uassertStatusOK(configShard->exhaustiveFindOnConfig(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        repl::ReadConcernLevel::kLocalReadConcern,
+        ChunkType::ConfigNS,
+        BSON(ChunkType::ns(nss.ns())
+             << ChunkType::min(chunk.getMin()) << ChunkType::max(chunk.getMax())),
+        {},
+        1));
+
+    const auto targetChunkVector = std::move(targetChunkResult.docs);
+    uassert(51262,
+            str::stream() << "Unable to locate chunk " << chunk.toString()
+                          << " from ns: " << nss.ns(),
+            !targetChunkVector.empty());
+
+    const auto targetChunk = uassertStatusOK(ChunkType::fromConfigBSON(targetChunkVector.front()));
+
+    if (!targetChunk.getJumbo()) {
+        return;
+    }
+
+    // Must use local read concern because we will perform subsequent writes.
+    auto findResponse = uassertStatusOK(
+        configShard->exhaustiveFindOnConfig(opCtx,
+                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                            repl::ReadConcernLevel::kLocalReadConcern,
+                                            ChunkType::ConfigNS,
+                                            BSON(ChunkType::ns(nss.ns())),
+                                            BSON(ChunkType::lastmod << -1),
+                                            1));
+
+    const auto chunksVector = std::move(findResponse.docs);
+    uassert(ErrorCodes::IncompatibleShardingMetadata,
+            str::stream() << "Tried to find max chunk version for collection '" << nss.ns()
+                          << ", but found no chunks",
+            !chunksVector.empty());
+
+    const auto highestVersionChunk =
+        uassertStatusOK(ChunkType::fromConfigBSON(chunksVector.front()));
+    const auto currentCollectionVersion = highestVersionChunk.getVersion();
+
+    // It is possible for a migration to end up running partly without the protection of the
+    // distributed lock if the config primary stepped down since the start of the migration and
+    // failed to recover the migration. Check that the collection has not been dropped and recreated
+    // since the migration began, unbeknown to the shard when the command was sent.
+    uassert(ErrorCodes::StaleEpoch,
+            str::stream() << "The collection '" << nss.ns()
+                          << "' has been dropped and recreated since the migration began."
+                             " The config server's collection version epoch is now '"
+                          << currentCollectionVersion.epoch().toString() << "', but the shard's is "
+                          << collectionEpoch.toString() << "'. Aborting clear jumbo on chunk ("
+                          << chunk.toString() << ").",
+            currentCollectionVersion.epoch() == collectionEpoch);
+
+    ChunkVersion newVersion(
+        currentCollectionVersion.majorVersion() + 1, 0, currentCollectionVersion.epoch());
+
+    BSONObj chunkQuery(BSON(ChunkType::ns(nss.ns())
+                            << ChunkType::epoch(collectionEpoch) << ChunkType::min(chunk.getMin())
+                            << ChunkType::max(chunk.getMax())));
+
+    BSONObjBuilder updateBuilder;
+    updateBuilder.append("$unset", BSON(ChunkType::jumbo() << ""));
+
+    BSONObjBuilder updateVersionClause(updateBuilder.subobjStart("$set"));
+    newVersion.appendLegacyWithField(&updateVersionClause, ChunkType::lastmod());
+    updateVersionClause.doneFast();
+
+    auto chunkUpdate = updateBuilder.obj();
+
+    auto didUpdate = uassertStatusOK(
+        Grid::get(opCtx)->catalogClient()->updateConfigDocument(opCtx,
+                                                                ChunkType::ConfigNS,
+                                                                chunkQuery,
+                                                                chunkUpdate,
+                                                                false /* upsert */,
+                                                                kNoWaitWriteConcern));
+
+    uassert(51263,
+            str::stream() << "failed to clear jumbo flag due to " << chunkQuery
+                          << " not matching any existing chunks",
+            didUpdate);
 }
 
 }  // namespace mongo

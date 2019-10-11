@@ -178,6 +178,7 @@ env.Library(
         env.Idlc('chunk_version.idl')[0],
         env.Idlc('database_version.idl')[0],
         env.Idlc('request_types/clone_catalog_data.idl')[0],
+        env.Idlc('request_types/clear_jumbo_flag.idl')[0],
         env.Idlc('request_types/create_collection.idl')[0],
         env.Idlc('request_types/create_database.idl')[0],
         env.Idlc('request_types/flush_database_cache_updates.idl')[0],

@@ -75,6 +75,7 @@ let viewsCommandTests = {
     _configsvrBalancerStart: {skip: isAnInternalCommand},
     _configsvrBalancerStatus: {skip: isAnInternalCommand},
     _configsvrBalancerStop: {skip: isAnInternalCommand},
+    _configsvrClearJumboFlag: {skip: isAnInternalCommand},
     _configsvrCommitChunkMerge: {skip: isAnInternalCommand},
     _configsvrCommitChunkMigration: {skip: isAnInternalCommand},
     _configsvrCommitChunkSplit: {skip: isAnInternalCommand},
@@ -134,6 +135,13 @@ let viewsCommandTests = {
     checkShardingIndex: {skip: isUnrelated},
     cleanupOrphaned: {
         skip: "Tested in views/views_sharded.js",
+    },
+    clearJumboFlag: {
+        command: {clearJumboFlag: "test.view"},
+        skipStandalone: true,
+        isAdminCommand: true,
+        expectFailure: true,
+        expectedErrorCode: ErrorCodes.NamespaceNotSharded,
     },
     clearLog: {skip: isUnrelated},
     cloneCollectionAsCapped: {
