@@ -26,7 +26,7 @@ secondary = replSet.start(secondary, {
 
 // Wait for everything to be synced.
 jsTest.log("Waiting for initial sync to succeed");
-replSet.waitForState(secondary, ReplSetTest.State.SECONDARY);
+replSet.awaitSecondaryNodes();
 
 // If the index table contains any entries pointing to invalid document(RecordID), then
 // validateCollections called during replica stopSet will capture the index corruption and throw
