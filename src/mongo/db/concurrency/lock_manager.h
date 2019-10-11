@@ -183,7 +183,8 @@ private:
     /**
      * Prints the contents of a bucket to the log.
      */
-    void _dumpBucket(const LockBucket* bucket) const;
+    void _dumpBucket(const std::map<LockerId, BSONObj>& lockToClientMap,
+                     const LockBucket* bucket) const;
 
     /**
      * Dump the contents of a bucket to the BSON.
