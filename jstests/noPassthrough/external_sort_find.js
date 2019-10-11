@@ -96,5 +96,16 @@ assert.eq(sortStats.usedDisk, true);
 assert.eq(kNumDocsWithinMemLimit,
           collection.find().sort({sequenceNumber: -1}).limit(kNumDocsWithinMemLimit).itcount());
 
+// Create a view on top of the collection. When a find command is run against the view without disk
+// use allowed, the command should fail with the expected error code. When the find command allows
+// disk use, however, the command should succeed.
+assert.commandWorked(testDb.createView("identityView", collection.getName(), []));
+const identityView = testDb.identityView;
+assert.commandFailedWithCode(
+    testDb.runCommand({find: identityView.getName(), sort: {sequenceNumber: -1}}),
+    kMemoryLimitExceededErrCode);
+assert.eq(kNumDocsExceedingMemLimit,
+          identityView.find().sort({sequenceNumber: -1}).allowDiskUse().itcount());
+
 MongoRunner.stopMongod(conn);
 }());
