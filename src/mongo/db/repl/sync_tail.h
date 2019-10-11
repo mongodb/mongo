@@ -241,7 +241,7 @@ public:
     void fillWriterVectors(OperationContext* opCtx,
                            MultiApplier::Operations* ops,
                            std::vector<MultiApplier::OperationPtrs>* writerVectors,
-                           std::vector<MultiApplier::Operations>* derivedOps);
+                           std::vector<MultiApplier::Operations>* derivedOps) noexcept;
 
 private:
     class OpQueueBatcher;
@@ -252,7 +252,7 @@ private:
                             MultiApplier::Operations* ops,
                             std::vector<MultiApplier::OperationPtrs>* writerVectors,
                             std::vector<MultiApplier::Operations>* derivedOps,
-                            SessionUpdateTracker* sessionUpdateTracker);
+                            SessionUpdateTracker* sessionUpdateTracker) noexcept;
 
     /**
      * Doles out all the work to the writer pool threads. Does not modify writerVectors, but passes

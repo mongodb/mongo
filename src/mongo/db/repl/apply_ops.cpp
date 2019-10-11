@@ -494,14 +494,13 @@ Status applyOps(OperationContext* opCtx,
 // static
 MultiApplier::Operations ApplyOps::extractOperations(const OplogEntry& applyOpsOplogEntry) {
     MultiApplier::Operations result;
-    extractOperationsTo(applyOpsOplogEntry, applyOpsOplogEntry.toBSON(), &result, boost::none);
+    extractOperationsTo(applyOpsOplogEntry, applyOpsOplogEntry.toBSON(), &result);
     return result;
 }
 
 void ApplyOps::extractOperationsTo(const OplogEntry& applyOpsOplogEntry,
                                    const BSONObj& topLevelDoc,
-                                   MultiApplier::Operations* operations,
-                                   boost::optional<Timestamp> commitOplogEntryTS) {
+                                   MultiApplier::Operations* operations) {
     uassert(ErrorCodes::TypeMismatch,
             str::stream() << "ApplyOps::extractOperations(): not a command: "
                           << redact(applyOpsOplogEntry.toBSON()),
@@ -521,14 +520,8 @@ void ApplyOps::extractOperationsTo(const OplogEntry& applyOpsOplogEntry,
 
     for (const auto& elem : operationDocs) {
         auto operationDoc = elem.Obj();
+
         BSONObjBuilder builder(operationDoc);
-
-        // Apply the ts field first if we have a commitOplogEntryTS so that appendElementsUnique
-        // will not overwrite this value.
-        if (commitOplogEntryTS) {
-            builder.append("ts", *commitOplogEntryTS);
-        }
-
         builder.appendElementsUnique(topLevelDoc);
         auto operation = builder.obj();
 

@@ -388,8 +388,17 @@ void IdempotencyTest::testOpsAreIdempotent(std::vector<OplogEntry> ops, Sequence
                       SyncTailTest::makeInitialSyncOptions());
     std::vector<MultiApplier::OperationPtrs> writerVectors(1);
     std::vector<MultiApplier::Operations> derivedOps;
-    // Derive ops for transactions if necessary.
-    syncTail.fillWriterVectors(_opCtx.get(), &ops, &writerVectors, &derivedOps);
+
+    // Keeps all operations in scope for the lifetime of this function.
+    std::vector<MultiApplier::Operations> singleOpVectors;
+    for (auto&& entry : ops) {
+        // Derive ops for transactions if necessary.
+        std::vector<OplogEntry> op;
+        op.push_back(entry);
+        singleOpVectors.emplace_back(op);
+        syncTail.fillWriterVectors(
+            _opCtx.get(), &singleOpVectors.back(), &writerVectors, &derivedOps);
+    }
 
     const auto& opPtrs = writerVectors[0];
     ASSERT_OK(runOpPtrsInitialSync(opPtrs));
