@@ -607,6 +607,7 @@ public:
 
 private:
     void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
+        opCtx->lockState()->setDebugInfo(redact(_request->body));
         BSONObjBuilder bob = result->getBodyBuilder();
         bool ok = _command->run(opCtx, _dbName, _request->body, bob);
         if (!ok)
