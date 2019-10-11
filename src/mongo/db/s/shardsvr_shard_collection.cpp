@@ -584,16 +584,19 @@ void createCollectionOnShardsReceivingChunks(OperationContext* opCtx,
         // If any shards fail to create the collection, fail the entire shardCollection command
         // (potentially leaving incomplely created sharded collection)
         for (const auto& response : responses) {
-            auto shardResponse = uassertStatusOKWithContext(
-                std::move(response.swResponse),
-                str::stream() << "Unable to create collection on " << response.shardId);
+            auto shardResponse =
+                uassertStatusOKWithContext(std::move(response.swResponse),
+                                           str::stream() << "Unable to create collection "
+                                                         << nss.ns() << " on " << response.shardId);
             auto status = getStatusFromCommandResult(shardResponse.data);
-            uassertStatusOK(status.withContext(str::stream() << "Unable to create collection on "
-                                                             << response.shardId));
+            uassertStatusOK(status.withContext(str::stream()
+                                               << "Unable to create collection " << nss.ns()
+                                               << " on " << response.shardId));
 
             auto wcStatus = getWriteConcernStatusFromCommandResult(shardResponse.data);
-            uassertStatusOK(wcStatus.withContext(str::stream() << "Unable to create collection on "
-                                                               << response.shardId));
+            uassertStatusOK(wcStatus.withContext(str::stream()
+                                                 << "Unable to create collection " << nss.ns()
+                                                 << " on " << response.shardId));
         }
     }
 }
