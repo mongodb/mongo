@@ -657,7 +657,7 @@ TEST(MongoURI, CloneURIForServer) {
     auto& uriOptions = uri.getOptions();
     ASSERT_EQ(uriOptions.at("ssl"), "true");
 
-    auto clonedURI = uri.cloneURIForServer(HostAndPort{"localhost:27020"});
+    auto clonedURI = uri.cloneURIForServer(HostAndPort{"localhost:27020"}, StringData());
 
     ASSERT_EQ(clonedURI.type(), kMaster);
     ASSERT_TRUE(clonedURI.getSetName().empty());

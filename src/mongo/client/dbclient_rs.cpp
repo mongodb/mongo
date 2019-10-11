@@ -295,7 +295,7 @@ DBClientConnection* DBClientReplicaSet::checkMaster() {
 
     _masterHost = h;
 
-    MongoURI masterUri = _uri.cloneURIForServer(_masterHost);
+    MongoURI masterUri = _uri.cloneURIForServer(_masterHost, _applicationName);
 
     string errmsg;
     DBClientConnection* newConn = nullptr;
@@ -726,8 +726,8 @@ DBClientConnection* DBClientReplicaSet::selectNodeUsingTags(
     // Needs to perform a dynamic_cast because we need to set the replSet
     // callback. We should eventually not need this after we remove the
     // callback.
-    DBClientConnection* newConn = dynamic_cast<DBClientConnection*>(
-        globalConnPool.get(_uri.cloneURIForServer(_lastSlaveOkHost), _so_timeout));
+    DBClientConnection* newConn = dynamic_cast<DBClientConnection*>(globalConnPool.get(
+        _uri.cloneURIForServer(_lastSlaveOkHost, _applicationName), _so_timeout));
 
     // Assert here instead of returning NULL since the contract of this method is such
     // that returning NULL means none of the nodes were good, which is not the case here.
