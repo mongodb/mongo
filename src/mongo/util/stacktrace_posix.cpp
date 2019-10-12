@@ -357,7 +357,7 @@ public:
     explicit Iteration(StackTraceSink& sink, bool fromSignal)
         : _sink(sink), _fromSignal(fromSignal) {
         if (int r = unw_getcontext(&_context); r < 0) {
-            _os << "unw_getcontext: " << unw_strerror(r) << std::endl;
+            _sink << "unw_getcontext: " << unw_strerror(r) << "\n";
             _failed = true;
         }
     }
