@@ -449,8 +449,8 @@ Status CollectionImpl::insertDocumentForBulkLoader(OperationContext* opCtx,
 
     dassert(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_IX));
 
-    // TODO SERVER-30638: using timestamp 0 for these inserts, which are non-oplog so we don't yet
-    // care about their correct timestamps.
+    // Using timestamp 0 for these inserts, which are non-oplog so we don't have an appropriate
+    // timestamp to use.
     StatusWith<RecordId> loc =
         _recordStore->insertRecord(opCtx, doc.objdata(), doc.objsize(), Timestamp());
 
