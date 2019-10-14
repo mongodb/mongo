@@ -83,19 +83,13 @@ printjson({
     minValidDoc: minValidDoc,
     oplogTruncateAfterPointDoc: oplogTruncateAfterPointDoc
 });
-try {
-    assert.eq(collDoc._id, oplogDoc.o._id);
-    assert(!('begin' in minValidDoc), 'begin in minValidDoc');
-    if (storageEngine !== "wiredTiger") {
-        assert.eq(minValidDoc.ts, oplogDoc.ts);
-    }
-    assert.eq(oplogTruncateAfterPointDoc.oplogTruncateAfterPoint, Timestamp());
-} catch (e) {
-    // TODO remove once SERVER-25777 is resolved.
-    jsTest.log("Look above and make sure clean shutdown finished without resorting to SIGKILL." +
-               "\nUnfortunately that currently doesn't fail the test.");
-    throw e;
+
+assert.eq(collDoc._id, oplogDoc.o._id);
+assert(!('begin' in minValidDoc), 'begin in minValidDoc');
+if (storageEngine !== "wiredTiger") {
+    assert.eq(minValidDoc.ts, oplogDoc.ts);
 }
+assert.eq(oplogTruncateAfterPointDoc.oplogTruncateAfterPoint, Timestamp());
 
 rst.stopSet();
 })();
