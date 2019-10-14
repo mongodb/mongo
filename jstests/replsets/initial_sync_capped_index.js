@@ -27,6 +27,7 @@
 "use strict";
 
 load("jstests/libs/check_log.js");
+load("jstests/replsets/rslib.js");  // for waitForState
 
 /**
  * Overflow a capped collection 'coll' by continuously inserting a given document,
@@ -109,6 +110,10 @@ assert.commandWorked(secondary.adminCommand(
 
 // Wait until initial sync completes.
 replTest.awaitReplication();
+
+// Before validating the secondary, confirm that it is in the SECONDARY state. Otherwise, the
+// validate command will fail.
+waitForState(secondary, ReplSetTest.State.SECONDARY);
 
 // Make sure the indexes created during initial sync are valid.
 var secondaryCappedColl = secondary.getDB(dbName)[cappedCollName];
