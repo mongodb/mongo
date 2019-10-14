@@ -65,8 +65,7 @@ enum class AccumulatorDocumentsNeeded {
 
 class Accumulator : public RefCountable {
 public:
-    using Factory = boost::intrusive_ptr<Accumulator> (*)(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    using Factory = std::function<boost::intrusive_ptr<Accumulator>()>;
 
     Accumulator(const boost::intrusive_ptr<ExpressionContext>& expCtx) : _expCtx(expCtx) {}
 
@@ -121,6 +120,19 @@ private:
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 };
 
+/**
+ * A default parser for any accumulator that only takes a single expression as an argument. Returns
+ * the expression to be evaluated by the accumulator and an Accumulator::Factory.
+ */
+template <class AccName>
+std::pair<boost::intrusive_ptr<Expression>, Accumulator::Factory>
+genericParseSingleExpressionAccumulator(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                        BSONElement elem,
+                                        VariablesParseState vps) {
+    auto exprValue = Expression::parseOperand(expCtx, elem, vps);
+    return {exprValue, [expCtx]() { return AccName::create(expCtx); }};
+}
+
 
 class AccumulatorAddToSet final : public Accumulator {
 public:
@@ -145,7 +157,6 @@ public:
 private:
     ValueUnorderedSet _set;
 };
-
 
 class AccumulatorFirst final : public Accumulator {
 public:
@@ -302,7 +313,6 @@ private:
     Decimal128 _decimalTotal;
     long long _count;
 };
-
 
 class AccumulatorStdDev : public Accumulator {
 public:

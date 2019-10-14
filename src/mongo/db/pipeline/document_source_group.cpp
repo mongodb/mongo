@@ -242,7 +242,7 @@ Value DocumentSourceGroup::serialize(boost::optional<ExplainOptions::Verbosity> 
 
     // Add the remaining fields.
     for (auto&& accumulatedField : _accumulatedFields) {
-        intrusive_ptr<Accumulator> accum = accumulatedField.makeAccumulator(pExpCtx);
+        intrusive_ptr<Accumulator> accum = accumulatedField.makeAccumulator();
         insides[accumulatedField.fieldName] =
             Value(DOC(accum->getOpName()
                       << accumulatedField.expression->serialize(static_cast<bool>(explain))));
@@ -497,7 +497,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
             // Add the accumulators
             group.reserve(numAccumulators);
             for (auto&& accumulatedField : _accumulatedFields) {
-                group.push_back(accumulatedField.makeAccumulator(pExpCtx));
+                group.push_back(accumulatedField.makeAccumulator());
             }
         } else {
             for (auto&& groupObj : group) {
@@ -557,7 +557,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
                 // prepare current to accumulate data
                 _currentAccumulators.reserve(numAccumulators);
                 for (auto&& accumulatedField : _accumulatedFields) {
-                    _currentAccumulators.push_back(accumulatedField.makeAccumulator(pExpCtx));
+                    _currentAccumulators.push_back(accumulatedField.makeAccumulator());
                 }
 
                 verify(_sorterIterator->more());  // we put data in, we should get something out.
@@ -769,7 +769,7 @@ DocumentSourceGroup::rewriteGroupAsTransformOnFirstDocument() const {
     // We can't do this transformation if there are any non-$first accumulators.
     for (auto&& accumulator : _accumulatedFields) {
         if (AccumulatorDocumentsNeeded::kFirstDocument !=
-            accumulator.makeAccumulator(pExpCtx)->documentsNeeded()) {
+            accumulator.makeAccumulator()->documentsNeeded()) {
             return nullptr;
         }
     }

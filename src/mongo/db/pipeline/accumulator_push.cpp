@@ -40,7 +40,7 @@ namespace mongo {
 using boost::intrusive_ptr;
 using std::vector;
 
-REGISTER_ACCUMULATOR(push, AccumulatorPush::create);
+REGISTER_ACCUMULATOR(push, genericParseSingleExpressionAccumulator<AccumulatorPush>);
 
 const char* AccumulatorPush::getOpName() const {
     return "$push";

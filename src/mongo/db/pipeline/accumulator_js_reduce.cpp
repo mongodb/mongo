@@ -37,7 +37,8 @@
 
 namespace mongo {
 
-REGISTER_ACCUMULATOR(_internalJsReduce, AccumulatorInternalJsReduce::create);
+REGISTER_ACCUMULATOR(_internalJsReduce,
+                     genericParseSingleExpressionAccumulator<AccumulatorInternalJsReduce>);
 
 void AccumulatorInternalJsReduce::processInternal(const Value& input, bool merging) {
     if (input.missing()) {
@@ -143,5 +144,4 @@ void AccumulatorInternalJsReduce::reset() {
     _memUsageBytes = sizeof(*this);
     _key = Value{};
 }
-
 }  // namespace mongo

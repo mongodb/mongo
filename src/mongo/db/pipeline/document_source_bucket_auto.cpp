@@ -311,7 +311,7 @@ DocumentSourceBucketAuto::Bucket::Bucket(
     : _min(min), _max(max) {
     _accums.reserve(accumulationStatements.size());
     for (auto&& accumulationStatement : accumulationStatements) {
-        _accums.push_back(accumulationStatement.makeAccumulator(expCtx));
+        _accums.push_back(accumulationStatement.makeAccumulator());
     }
 }
 
@@ -382,7 +382,7 @@ Value DocumentSourceBucketAuto::serialize(
 
     MutableDocument outputSpec(_accumulatedFields.size());
     for (auto&& accumulatedField : _accumulatedFields) {
-        intrusive_ptr<Accumulator> accum = accumulatedField.makeAccumulator(pExpCtx);
+        intrusive_ptr<Accumulator> accum = accumulatedField.makeAccumulator();
         outputSpec[accumulatedField.fieldName] =
             Value{Document{{accum->getOpName(),
                             accumulatedField.expression->serialize(static_cast<bool>(explain))}}};
@@ -407,7 +407,7 @@ intrusive_ptr<DocumentSourceBucketAuto> DocumentSourceBucketAuto::create(
     if (accumulationStatements.empty()) {
         accumulationStatements.emplace_back("count",
                                             ExpressionConstant::create(pExpCtx, Value(1)),
-                                            AccumulationStatement::getFactory("$sum"));
+                                            [pExpCtx] { return AccumulatorSum::create(pExpCtx); });
     }
     return new DocumentSourceBucketAuto(pExpCtx,
                                         groupByExpression,

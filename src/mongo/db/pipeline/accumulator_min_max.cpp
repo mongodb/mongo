@@ -39,8 +39,8 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
-REGISTER_ACCUMULATOR(max, AccumulatorMax::create);
-REGISTER_ACCUMULATOR(min, AccumulatorMin::create);
+REGISTER_ACCUMULATOR(max, genericParseSingleExpressionAccumulator<AccumulatorMax>);
+REGISTER_ACCUMULATOR(min, genericParseSingleExpressionAccumulator<AccumulatorMin>);
 REGISTER_EXPRESSION(max, ExpressionFromAccumulator<AccumulatorMax>::parse);
 REGISTER_EXPRESSION(min, ExpressionFromAccumulator<AccumulatorMin>::parse);
 

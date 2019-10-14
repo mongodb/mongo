@@ -43,7 +43,7 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
-REGISTER_ACCUMULATOR(sum, AccumulatorSum::create);
+REGISTER_ACCUMULATOR(sum, genericParseSingleExpressionAccumulator<AccumulatorSum>);
 REGISTER_EXPRESSION(sum, ExpressionFromAccumulator<AccumulatorSum>::parse);
 
 const char* AccumulatorSum::getOpName() const {

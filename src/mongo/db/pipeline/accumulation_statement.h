@@ -58,6 +58,8 @@ namespace mongo {
  */
 class AccumulationStatement {
 public:
+    using Parser = std::function<std::pair<boost::intrusive_ptr<Expression>, Accumulator::Factory>(
+        boost::intrusive_ptr<ExpressionContext>, BSONElement, VariablesParseState)>;
     AccumulationStatement(std::string fieldName,
                           boost::intrusive_ptr<Expression> expression,
                           Accumulator::Factory factory)
@@ -84,13 +86,13 @@ public:
      * DO NOT call this method directly. Instead, use the REGISTER_ACCUMULATOR macro defined in this
      * file.
      */
-    static void registerAccumulator(std::string name, Accumulator::Factory factory);
+    static void registerAccumulator(std::string name, Parser parser);
 
     /**
-     * Retrieves the Factory for the accumulator specified by the given name, and raises an error if
+     * Retrieves the Parser for the accumulator specified by the given name, and raises an error if
      * there is no such Accumulator registered.
      */
-    static Accumulator::Factory getFactory(StringData name);
+    static Parser& getParser(StringData name);
 
     // The field name is used to store the results of the accumulation in a result document.
     std::string fieldName;
@@ -99,8 +101,7 @@ public:
     boost::intrusive_ptr<Expression> expression;
 
     // Constructs an Accumulator to do actual accumulation.
-    boost::intrusive_ptr<Accumulator> makeAccumulator(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx) const;
+    boost::intrusive_ptr<Accumulator> makeAccumulator() const;
 
 private:
     Accumulator::Factory _factory;

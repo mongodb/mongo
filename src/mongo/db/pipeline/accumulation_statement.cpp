@@ -46,27 +46,27 @@ using std::string;
 
 namespace {
 // Used to keep track of which Accumulators are registered under which name.
-static StringMap<Accumulator::Factory> factoryMap;
+static StringMap<AccumulationStatement::Parser> parserMap;
 }  // namespace
 
-void AccumulationStatement::registerAccumulator(std::string name, Accumulator::Factory factory) {
-    auto it = factoryMap.find(name);
+void AccumulationStatement::registerAccumulator(std::string name,
+                                                AccumulationStatement::Parser parser) {
+    auto it = parserMap.find(name);
     massert(28722,
             str::stream() << "Duplicate accumulator (" << name << ") registered.",
-            it == factoryMap.end());
-    factoryMap[name] = factory;
+            it == parserMap.end());
+    parserMap[name] = parser;
 }
 
-Accumulator::Factory AccumulationStatement::getFactory(StringData name) {
-    auto it = factoryMap.find(name);
+AccumulationStatement::Parser& AccumulationStatement::getParser(StringData name) {
+    auto it = parserMap.find(name);
     uassert(
-        15952, str::stream() << "unknown group operator '" << name << "'", it != factoryMap.end());
+        15952, str::stream() << "unknown group operator '" << name << "'", it != parserMap.end());
     return it->second;
 }
 
-boost::intrusive_ptr<Accumulator> AccumulationStatement::makeAccumulator(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
-    return _factory(expCtx);
+boost::intrusive_ptr<Accumulator> AccumulationStatement::makeAccumulator() const {
+    return _factory();
 }
 
 AccumulationStatement AccumulationStatement::parseAccumulationStatement(
@@ -97,9 +97,10 @@ AccumulationStatement AccumulationStatement::parseAccumulationStatement(
             str::stream() << "The " << accName << " accumulator is a unary operator",
             specElem.type() != BSONType::Array);
 
-    return {fieldName.toString(),
-            Expression::parseOperand(expCtx, specElem, vps),
-            AccumulationStatement::getFactory(accName)};
+    auto&& parser = AccumulationStatement::getParser(accName);
+    auto [expression, factory] = parser(expCtx, specElem, vps);
+
+    return AccumulationStatement(fieldName.toString(), expression, factory);
 }
 
 }  // namespace mongo

@@ -41,7 +41,8 @@ using boost::intrusive_ptr;
 
 /* ------------------------- AccumulatorMergeObjects ----------------------------- */
 
-REGISTER_ACCUMULATOR(mergeObjects, AccumulatorMergeObjects::create);
+REGISTER_ACCUMULATOR(mergeObjects,
+                     genericParseSingleExpressionAccumulator<AccumulatorMergeObjects>);
 REGISTER_EXPRESSION(mergeObjects, ExpressionFromAccumulator<AccumulatorMergeObjects>::parse);
 
 const char* AccumulatorMergeObjects::getOpName() const {
@@ -89,5 +90,4 @@ void AccumulatorMergeObjects::processInternal(const Value& input, bool merging) 
 Value AccumulatorMergeObjects::getValue(bool toBeMerged) {
     return _output.freezeToValue();
 }
-
 }  // namespace mongo

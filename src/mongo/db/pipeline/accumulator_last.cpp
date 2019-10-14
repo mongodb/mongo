@@ -38,7 +38,7 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
-REGISTER_ACCUMULATOR(last, AccumulatorLast::create);
+REGISTER_ACCUMULATOR(last, genericParseSingleExpressionAccumulator<AccumulatorLast>);
 
 const char* AccumulatorLast::getOpName() const {
     return "$last";
