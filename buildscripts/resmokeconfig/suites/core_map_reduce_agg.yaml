@@ -4,6 +4,7 @@ test_kind: js_test
 
 selector:
   roots:
+  - jstests/core/commands_namespace_parsing.js
   - jstests/core/mr_index.js
   - jstests/core/mr_merge2.js
   - jstests/core/mr_mutable_properties.js
@@ -12,6 +13,7 @@ selector:
   - jstests/core/mr_undef.js
   - jstests/core/mr4.js
   - jstests/core/mr5.js
+
 executor:
   archive:
     hooks:

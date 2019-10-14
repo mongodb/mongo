@@ -187,6 +187,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceOut::create(
             "{} cannot be used with a 'linearizable' read concern level"_format(kStageName),
             readConcernLevel != repl::ReadConcernLevel::kLinearizableReadConcern);
 
+    uassert(ErrorCodes::InvalidNamespace,
+            "Invalid {} target namespace, {}"_format(kStageName, outputNs.ns()),
+            outputNs.isValid());
+
     uassert(17017,
             "{} is not supported to an existing *sharded* output collection"_format(kStageName),
             !expCtx->mongoProcessInterface->isSharded(expCtx->opCtx, outputNs));

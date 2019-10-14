@@ -273,10 +273,6 @@ DocumentSourceMergeSpec parseMergeSpecAndResolveTargetNamespace(const BSONElemen
         }
     }
 
-    uassert(ErrorCodes::InvalidNamespace,
-            "Invalid {} target namespace: '{}'"_format(kStageName, targetNss.ns()),
-            targetNss.isValid());
-
     mergeSpec.setTargetNss(std::move(targetNss));
 
     return mergeSpec;
@@ -293,6 +289,11 @@ std::unique_ptr<DocumentSourceMerge::LiteParsed> DocumentSourceMerge::LiteParsed
     auto mergeSpec =
         parseMergeSpecAndResolveTargetNamespace(spec, request.getNamespaceString().db());
     auto targetNss = mergeSpec.getTargetNss();
+
+    uassert(ErrorCodes::InvalidNamespace,
+            "Invalid {} target namespace: '{}'"_format(kStageName, targetNss.ns()),
+            targetNss.isValid());
+
     auto whenMatched =
         mergeSpec.getWhenMatched() ? mergeSpec.getWhenMatched()->mode : kDefaultWhenMatched;
     auto whenNotMatched = mergeSpec.getWhenNotMatched().value_or(kDefaultWhenNotMatched);
@@ -362,6 +363,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::create(
             "{} is not supported when the output collection is the same as "
             "the aggregation collection"_format(kStageName),
             expCtx->ns != outputNs);
+
+    uassert(ErrorCodes::InvalidNamespace,
+            "Invalid {} target namespace: '{}'"_format(kStageName, outputNs.ns()),
+            outputNs.isValid());
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             "{} cannot be used in a transaction"_format(kStageName),

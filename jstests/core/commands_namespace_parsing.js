@@ -63,6 +63,19 @@ assert.commandWorked(db.commands_namespace_parsing.insert({a: 1}));
 assertFailsWithInvalidNamespacesForField(
     "aggregate", {aggregate: "", pipeline: []}, isNotFullyQualified, isNotAdminCommand);
 
+// Test aggregate with stages which involve foreign collections fail with an invalid collection
+// name.
+assertFailsWithInvalidNamespacesForField(
+    "pipeline.$out",
+    {aggregate: "commands_namespace_parsing", pipeline: [{$out: ""}], cursor: {}},
+    isNotFullyQualified,
+    isNotAdminCommand);
+assertFailsWithInvalidNamespacesForField(
+    "pipeline.$merge",
+    {aggregate: "commands_namespace_parsing", pipeline: [{$merge: ""}], cursor: {}},
+    isNotFullyQualified,
+    isNotAdminCommand);
+
 // Test count fails with an invalid collection name.
 assertFailsWithInvalidNamespacesForField(
     "count", {count: ""}, isNotFullyQualified, isNotAdminCommand);
@@ -96,6 +109,32 @@ assertFailsWithInvalidNamespacesForField("out",
                                                  return Array.sum(values);
                                              },
                                              out: ""
+                                         },
+                                         isNotFullyQualified,
+                                         isNotAdminCommand);
+assertFailsWithInvalidNamespacesForField("out.merge",
+                                         {
+                                             mapreduce: "commands_namespace_parsing",
+                                             map: function() {
+                                                 emit(this.a, 1);
+                                             },
+                                             reduce: function(key, values) {
+                                                 return Array.sum(values);
+                                             },
+                                             out: {merge: ""}
+                                         },
+                                         isNotFullyQualified,
+                                         isNotAdminCommand);
+assertFailsWithInvalidNamespacesForField("out.reduce",
+                                         {
+                                             mapreduce: "commands_namespace_parsing",
+                                             map: function() {
+                                                 emit(this.a, 1);
+                                             },
+                                             reduce: function(key, values) {
+                                                 return Array.sum(values);
+                                             },
+                                             out: {reduce: ""}
                                          },
                                          isNotFullyQualified,
                                          isNotAdminCommand);
