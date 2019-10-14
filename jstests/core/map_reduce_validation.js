@@ -6,7 +6,8 @@
 (function() {
 "use strict";
 
-load('jstests/libs/fixture_helpers.js');  // For 'FixtureHelpers'
+load("jstests/libs/collection_drop_recreate.js");  // For assertDropCollection
+load('jstests/libs/fixture_helpers.js');           // For 'FixtureHelpers'
 
 const source = db.mr_validation;
 source.drop();
@@ -91,7 +92,7 @@ assert.commandFailed(db.runCommand({
 }));
 
 // Test that mapReduce fails when run against a view.
-db.sourceView.drop();
+assertDropCollection(db, source.getName());
 assert.commandWorked(db.createView("sourceView", source.getName(), [{$project: {_id: 0}}]));
 assert.commandFailedWithCode(
     db.runCommand({mapReduce: "sourceView", map: mapFunc, reduce: reduceFunc, out: "foo"}),
