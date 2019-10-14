@@ -3757,7 +3757,9 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
         const int candidateIndex = args.getCandidateIndex();
         LastVote lastVote{args.getTerm(), candidateIndex};
 
-        if (response->getVoteGranted()) {
+        const bool votedForCandidate = response->getVoteGranted();
+
+        if (votedForCandidate) {
             Status status = _externalState->storeLocalLastVoteDocument(opCtx, lastVote);
             if (!status.isOK()) {
                 error() << "replSetRequestVotes failed to store LastVote document; " << status;
@@ -3767,7 +3769,6 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
 
         // If the vote was not granted to the candidate, we still want to track metrics around the
         // node's participation in the election.
-        const bool votedForCandidate = response->getVoteGranted();
         const long long electionTerm = args.getTerm();
         const Date_t lastVoteDate = _replExecutor->now();
         const int electionCandidateMemberId =
@@ -3926,6 +3927,10 @@ EventHandle ReplicationCoordinatorImpl::_updateTerm_inlock(
     auto now = _replExecutor->now();
     TopologyCoordinator::UpdateTermResult localUpdateTermResult = _topCoord->updateTerm(term, now);
     if (localUpdateTermResult == TopologyCoordinator::UpdateTermResult::kUpdatedTerm) {
+        // When the node discovers a new term, the new term date metrics are now out-of-date, so we
+        // clear them.
+        ReplicationMetrics::get(getServiceContext()).clearParticipantNewTermDates();
+
         _termShadow.store(term);
         _cancelPriorityTakeover_inlock();
         _cancelAndRescheduleElectionTimeout_inlock();

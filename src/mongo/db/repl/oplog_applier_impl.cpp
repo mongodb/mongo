@@ -43,6 +43,7 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/insert_group.h"
+#include "mongo/db/repl/replication_metrics.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/platform/basic.h"
@@ -972,6 +973,16 @@ Status applyOplogEntryBatch(OperationContext* opCtx,
 
     if (opType == OpTypeEnum::kNoop) {
         incrementOpsAppliedStats();
+
+        auto opObj = op.getObject();
+        if (opObj.hasField(ReplicationCoordinator::newPrimaryMsgField) &&
+            opObj.getField(ReplicationCoordinator::newPrimaryMsgField).str() ==
+                ReplicationCoordinator::newPrimaryMsg) {
+
+            ReplicationMetrics::get(opCtx).setParticipantNewTermDates(op.getWallClockTime(),
+                                                                      applyStartTime);
+        }
+
         return Status::OK();
     } else if (OplogEntry::isCrudOpType(opType)) {
         return finishApply(writeConflictRetry(opCtx, "applyOplogEntryBatch_CRUD", nss.ns(), [&] {
