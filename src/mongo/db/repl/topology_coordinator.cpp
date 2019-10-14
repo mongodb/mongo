@@ -65,8 +65,7 @@ namespace mongo {
 namespace repl {
 
 MONGO_FAIL_POINT_DEFINE(forceSyncSourceCandidate);
-MONGO_FAIL_POINT_DEFINE(voteNoInElection);
-MONGO_FAIL_POINT_DEFINE(voteYesInDryRunButNoInRealElection);
+MONGO_FAIL_POINT_DEFINE(forceVoteInElection);
 
 // If this fail point is enabled, TopologyCoordinator::shouldChangeSyncSource() will ignore
 // the option TopologyCoordinator::Options::maxSyncSourceLagSecs. The sync source will not be
@@ -2695,25 +2694,13 @@ void TopologyCoordinator::processReplSetRequestVotes(const ReplSetRequestVotesAr
                                                      ReplSetRequestVotesResponse* response) {
     response->setTerm(_term);
 
-    if (MONGO_unlikely(voteNoInElection.shouldFail())) {
-        log() << "failpoint voteNoInElection enabled";
-        response->setVoteGranted(false);
-        response->setReason(str::stream() << "forced to vote no during dry run election due to "
-                                             "failpoint voteNoInElection set");
-        return;
-    }
-
-    if (MONGO_unlikely(voteYesInDryRunButNoInRealElection.shouldFail())) {
-        log() << "failpoint voteYesInDryRunButNoInRealElection enabled";
+    if (MONGO_unlikely(forceVoteInElection.shouldFail())) {
         if (args.isADryRun()) {
             response->setVoteGranted(true);
-            response->setReason(str::stream() << "forced to vote yes in dry run due to failpoint "
-                                                 "voteYesInDryRunButNoInRealElection set");
         } else {
             response->setVoteGranted(false);
             response->setReason(str::stream()
-                                << "forced to vote no in real election due to failpoint "
-                                   "voteYesInDryRunButNoInRealElection set");
+                                << "forced to vote no due to failpoint forceVoteInElection set");
         }
         return;
     }

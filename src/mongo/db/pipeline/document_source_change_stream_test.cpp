@@ -1423,8 +1423,8 @@ TEST_F(ChangeStreamStageTest, MatchFiltersCreateCollection) {
 TEST_F(ChangeStreamStageTest, MatchFiltersNoOp) {
     auto noOp = makeOplogEntry(OpTypeEnum::kNoop,  // op type
                                {},                 // namespace
-                               BSON(repl::ReplicationCoordinator::newPrimaryMsgField
-                                    << repl::ReplicationCoordinator::newPrimaryMsg));  // o
+                               BSON("msg"
+                                    << "new primary"));  // o
 
     checkTransformation(noOp, boost::none);
 }
@@ -2024,8 +2024,8 @@ TEST_F(ChangeStreamStageDBTest, RenameFromUserToSystemCollectionShouldIncludeNot
 TEST_F(ChangeStreamStageDBTest, MatchFiltersNoOp) {
     OplogEntry noOp = makeOplogEntry(OpTypeEnum::kNoop,
                                      NamespaceString(),
-                                     BSON(repl::ReplicationCoordinator::newPrimaryMsgField
-                                          << repl::ReplicationCoordinator::newPrimaryMsg));
+                                     BSON("msg"
+                                          << "new primary"));
     checkTransformation(noOp, boost::none);
 }
 

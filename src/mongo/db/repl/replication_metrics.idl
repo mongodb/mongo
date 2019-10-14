@@ -208,17 +208,8 @@ structs:
                 description: "Latest applied OpTime at the time of voting"
                 type: optime
             maxAppliedOpTimeInSet:
-                description: "Highest applied time of any node in this replica set, as currently
-                              known by this node"
+                description: "Highest applied time of any node in this replica set, as currently known by this node"
                 type: optime
             priorityAtElection:
                 description: "The node's priority at the time of the election"
                 type: double
-            newTermStartDate:
-                description: "Time the new term oplog entry was written by the primary"
-                type: date
-                optional: true
-            newTermAppliedDate:
-                description: "Time this node applied the new term oplog entry"
-                type: date
-                optional: true

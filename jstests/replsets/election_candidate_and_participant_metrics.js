@@ -7,7 +7,8 @@
 
 (function() {
 "use strict";
-
+load("jstests/libs/check_log.js");
+load("jstests/replsets/libs/election_metrics.js");
 load("jstests/replsets/libs/election_handoff.js");
 
 const testName = jsTestName();
@@ -203,8 +204,8 @@ assert.eq(newPrimaryElectionParticipantMetrics.priorityAtElection, 1);
 
 // Since the election participant metrics are only set in the real election, set up a failpoint that
 // tells a voting node to vote yes in the dry run election and no in the real election.
-assert.commandWorked(originalPrimary.adminCommand(
-    {configureFailPoint: "voteYesInDryRunButNoInRealElection", mode: "alwaysOn"}));
+assert.commandWorked(
+    originalPrimary.adminCommand({configureFailPoint: "forceVoteInElection", mode: "alwaysOn"}));
 
 // Attempt to step up the new primary a second time. Due to the failpoint, the current primary
 // should vote no, and as a result the election should fail.
@@ -221,9 +222,8 @@ originalPrimaryElectionParticipantMetrics =
 assert.eq(originalPrimaryElectionParticipantMetrics.votedForCandidate, false);
 assert.eq(originalPrimaryElectionParticipantMetrics.electionTerm, 4);
 assert.eq(originalPrimaryElectionParticipantMetrics.electionCandidateMemberId, 1);
-assert.eq(
-    originalPrimaryElectionParticipantMetrics.voteReason,
-    "forced to vote no in real election due to failpoint voteYesInDryRunButNoInRealElection set");
+assert.eq(originalPrimaryElectionParticipantMetrics.voteReason,
+          "forced to vote no due to failpoint forceVoteInElection set");
 assert.eq(originalPrimaryElectionParticipantMetrics.priorityAtElection, 1);
 
 rst.stopSet();
