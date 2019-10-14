@@ -95,6 +95,12 @@ function runTest(st, badViewDefinition) {
                          makeErrorMessage("drop"));
     assert.commandWorked(db.runCommand({drop: staticCollection.getName()}),
                          makeErrorMessage("drop"));
+
+    // An invalid view in the view catalog should not interfere with attempting to run operations on
+    // nonexistent collections.
+    assert.commandWorked(db.runCommand({drop: staticCollection.getName()}),
+                         makeErrorMessage("drop"));
+
     assert.commandWorked(db.runCommand({drop: unshardedColl.getName()}), makeErrorMessage("drop"));
 
     // Drop the offending view so that the validate hook succeeds.
