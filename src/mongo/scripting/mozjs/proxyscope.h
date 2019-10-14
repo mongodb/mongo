@@ -186,7 +186,7 @@ private:
     void runOnImplThread(unique_function<void()> f);
 
     void shutdownThread();
-    static void implThread(void* proxy);
+    static void implThread(MozJSProxyScope* proxy);
 
     MozJSScriptEngine* const _engine;
     MozJSImplScope* _implScope;
@@ -203,7 +203,7 @@ private:
 
     stdx::condition_variable _proxyCondvar;
     stdx::condition_variable _implCondvar;
-    PRThread* _thread;
+    stdx::thread _thread;
 };
 
 }  // namespace mozjs

@@ -379,7 +379,7 @@ private:
     public:
         MozRuntime(const MozJSScriptEngine* engine);
 
-        std::unique_ptr<PRThread, std::function<void(PRThread*)>> _thread;
+        std::thread _thread;
         std::unique_ptr<JSRuntime, std::function<void(JSRuntime*)>> _runtime;
         std::unique_ptr<JSContext, std::function<void(JSContext*)>> _context;
     };

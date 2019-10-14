@@ -1,19 +1,14 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=8 sts=4 et sw=4 tw=99:
- * This Source Code Form is subject to the terms of the Mozilla Public
+/* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/**
- * This file was copied out of the firefox 38.0.1esr source tree from
- * js/src/vm/PosixNSPR.cpp and modified to use the MongoDB threading
- * primitives.
+/*
+ * This file was originally copied out of the firefox 38.0.1esr source tree from
+ * `js/src/vm/PosixNSPR.cpp` and modified to use the MongoDB threading primitives.
  *
- * The point of this file is to shim the posix emulation of nspr that Mozilla
- * ships with firefox. We force configuration such that the SpiderMonkey build
- * looks for these symbols and we provide them from within our object code
- * rather than attempting to build it in there's so we can take advantage of
- * the cross platform abstractions that we rely upon.
+ * The point of this file is to provide dummy implementations such that when the SpiderMonkey build
+ * looks for these symbols it will find symbols, thus permitting linkage.  No code uses these
+ * entrypoints.
  */
 
 #include "mongo/platform/basic.h"
@@ -29,291 +24,75 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/time_support.h"
 
-class nspr::Thread {
-    mongo::stdx::thread thread_;
-    void (*start)(void* arg);
-    void* arg;
-    bool joinable;
-
-public:
-    Thread(void (*start)(void* arg), void* arg, bool joinable)
-        : start(start), arg(arg), joinable(joinable) {}
-
-    static void* ThreadRoutine(void* arg);
-
-    mongo::stdx::thread& thread() {
-        return thread_;
+#define MONGO_MOZ_UNIMPLEMENTED(ReturnType, funcName, ...) \
+    ReturnType funcName(__VA_ARGS__) {                     \
+        MOZ_CRASH(#funcName " unimplemented");             \
     }
-};
 
-namespace {
-thread_local nspr::Thread* kCurrentThread = nullptr;
-}  // namespace
+MONGO_MOZ_UNIMPLEMENTED(void, mongo::mozjs::PR_BindThread, PRThread*);
+MONGO_MOZ_UNIMPLEMENTED(PRThread*, mongo::mozjs::PR_CreateFakeThread);
+MONGO_MOZ_UNIMPLEMENTED(void, mongo::mozjs::PR_DestroyFakeThread, PRThread*);
 
-void* nspr::Thread::ThreadRoutine(void* arg) {
-    Thread* self = static_cast<Thread*>(arg);
-    kCurrentThread = self;
-    self->start(self->arg);
-    if (!self->joinable)
-        js_delete(self);
-    return nullptr;
-}
+MONGO_MOZ_UNIMPLEMENTED(PRThread*,
+                        PR_CreateThread,
+                        PRThreadType,
+                        void (*)(void*),
+                        void*,
+                        PRThreadPriority,
+                        PRThreadScope,
+                        PRThreadState,
+                        uint32_t);
 
-namespace mongo {
-namespace mozjs {
+MONGO_MOZ_UNIMPLEMENTED(PRStatus, PR_JoinThread, PRThread*);
 
-void PR_BindThread(PRThread* thread) {
-    kCurrentThread = thread;
-}
+MONGO_MOZ_UNIMPLEMENTED(PRThread*, PR_GetCurrentThread);
 
-PRThread* PR_CreateFakeThread() {
-    return new PRThread(nullptr, nullptr, true);
-}
+MONGO_MOZ_UNIMPLEMENTED(PRStatus, PR_SetCurrentThreadName, const char*);
 
-void PR_DestroyFakeThread(PRThread* thread) {
-    delete thread;
-}
-}  // namespace mozjs
-}  // namespace mongo
+MONGO_MOZ_UNIMPLEMENTED(PRStatus, PR_NewThreadPrivateIndex, unsigned*, PRThreadPrivateDTOR);
 
+MONGO_MOZ_UNIMPLEMENTED(PRStatus, PR_SetThreadPrivate, unsigned, void*);
 
-// In mozjs-45, js_delete takes a const pointer which is incompatible with std::unique_ptr.
-template <class T>
-static MOZ_ALWAYS_INLINE void js_delete_nonconst(T* p) {
-    if (p) {
-        p->~T();
-        js_free(p);
-    }
-}
+MONGO_MOZ_UNIMPLEMENTED(void*, PR_GetThreadPrivate, unsigned);
 
-PRThread* PR_CreateThread(PRThreadType type,
-                          void (*start)(void* arg),
-                          void* arg,
-                          PRThreadPriority priority,
-                          PRThreadScope scope,
-                          PRThreadState state,
-                          uint32_t stackSize) {
-    MOZ_ASSERT(type == PR_USER_THREAD);
-    MOZ_ASSERT(priority == PR_PRIORITY_NORMAL);
+MONGO_MOZ_UNIMPLEMENTED(PRStatus, PR_CallOnce, PRCallOnceType*, PRCallOnceFN);
 
-    try {
-        // We can't use the nspr allocator to allocate this thread, because under asan we
-        // instrument the allocator so that asan can track the pointers correctly. This
-        // instrumentation
-        // requires that pointers be deleted in the same thread that they were allocated in.
-        // The threads created in PR_CreateThread are not always freed in the same thread
-        // that they were created in. So, we use the standard allocator here.
-        auto t = std::make_unique<nspr::Thread>(start, arg, state != PR_UNJOINABLE_THREAD);
+MONGO_MOZ_UNIMPLEMENTED(PRStatus, PR_CallOnceWithArg, PRCallOnceType*, PRCallOnceWithArgFN, void*);
 
-        t->thread() = mongo::stdx::thread(&nspr::Thread::ThreadRoutine, t.get());
+MONGO_MOZ_UNIMPLEMENTED(PRLock*, PR_NewLock);
 
-        if (state == PR_UNJOINABLE_THREAD) {
-            t->thread().detach();
-        }
+MONGO_MOZ_UNIMPLEMENTED(void, PR_DestroyLock, PRLock*);
 
-        return t.release();
-    } catch (...) {
-        return nullptr;
-    }
-}
+MONGO_MOZ_UNIMPLEMENTED(void, PR_Lock, PRLock*);
 
-PRStatus PR_JoinThread(PRThread* thread) {
-    try {
-        thread->thread().join();
+MONGO_MOZ_UNIMPLEMENTED(PRStatus, PR_Unlock, PRLock*);
 
-        delete thread;
+MONGO_MOZ_UNIMPLEMENTED(PRCondVar*, PR_NewCondVar, PRLock*);
 
-        return PR_SUCCESS;
-    } catch (...) {
-        return PR_FAILURE;
-    }
-}
+MONGO_MOZ_UNIMPLEMENTED(void, PR_DestroyCondVar, PRCondVar*);
 
-PRThread* PR_GetCurrentThread() {
-    return kCurrentThread;
-}
+MONGO_MOZ_UNIMPLEMENTED(PRStatus, PR_NotifyCondVar, PRCondVar*);
 
-PRStatus PR_SetCurrentThreadName(const char* name) {
-    mongo::setThreadName(name);
+MONGO_MOZ_UNIMPLEMENTED(PRStatus, PR_NotifyAllCondVar, PRCondVar*);
 
-    return PR_SUCCESS;
-}
+MONGO_MOZ_UNIMPLEMENTED(uint32_t, PR_MillisecondsToInterval, uint32_t);
 
-namespace {
+MONGO_MOZ_UNIMPLEMENTED(uint32_t, PR_MicrosecondsToInterval, uint32_t);
 
-const size_t MaxTLSKeyCount = 32;
-size_t gTLSKeyCount;
-thread_local std::array<void*, MaxTLSKeyCount> gTLSArray;
+MONGO_MOZ_UNIMPLEMENTED(uint32_t, PR_TicksPerSecond);
 
-}  // namespace
+MONGO_MOZ_UNIMPLEMENTED(PRStatus, PR_WaitCondVar, PRCondVar*, uint32_t);
 
-PRStatus PR_NewThreadPrivateIndex(unsigned* newIndex, PRThreadPrivateDTOR destructor) {
-    /*
-     * We only call PR_NewThreadPrivateIndex from the main thread, so there's no
-     * need to lock the table of TLS keys.
-     */
-    MOZ_ASSERT(gTLSKeyCount + 1 < MaxTLSKeyCount);
+MONGO_MOZ_UNIMPLEMENTED(int32_t, PR_FileDesc2NativeHandle, PRFileDesc*);
 
-    *newIndex = gTLSKeyCount;
-    gTLSKeyCount++;
+MONGO_MOZ_UNIMPLEMENTED(PRStatus, PR_GetOpenFileInfo, PRFileDesc*, PRFileInfo*);
 
-    return PR_SUCCESS;
-}
+MONGO_MOZ_UNIMPLEMENTED(int32_t, PR_Seek, PRFileDesc*, int32_t, PRSeekWhence);
 
-PRStatus PR_SetThreadPrivate(unsigned index, void* priv) {
-    if (index >= gTLSKeyCount)
-        return PR_FAILURE;
+MONGO_MOZ_UNIMPLEMENTED(PRFileMap*, PR_CreateFileMap, PRFileDesc*, int64_t, PRFileMapProtect);
 
-    gTLSArray[index] = priv;
+MONGO_MOZ_UNIMPLEMENTED(void*, PR_MemMap, PRFileMap*, int64_t, uint32_t);
 
-    return PR_SUCCESS;
-}
+MONGO_MOZ_UNIMPLEMENTED(PRStatus, PR_MemUnmap, void*, uint32_t);
 
-void* PR_GetThreadPrivate(unsigned index) {
-    if (index >= gTLSKeyCount)
-        return nullptr;
-
-    return gTLSArray[index];
-}
-
-PRStatus PR_CallOnce(PRCallOnceType* once, PRCallOnceFN func) {
-    MOZ_CRASH("PR_CallOnce unimplemented");
-}
-
-PRStatus PR_CallOnceWithArg(PRCallOnceType* once, PRCallOnceWithArgFN func, void* arg) {
-    MOZ_CRASH("PR_CallOnceWithArg unimplemented");
-}
-
-class nspr::Lock {
-    mongo::Mutex mutex_;
-
-public:
-    Lock() {}
-    mongo::Mutex& mutex() {
-        return mutex_;
-    }
-};
-
-PRLock* PR_NewLock() {
-    return js_new<nspr::Lock>();
-}
-
-void PR_DestroyLock(PRLock* lock) {
-    js_delete(lock);
-}
-
-void PR_Lock(PRLock* lock) {
-    lock->mutex().lock();
-}
-
-PRStatus PR_Unlock(PRLock* lock) {
-    lock->mutex().unlock();
-
-    return PR_SUCCESS;
-}
-
-class nspr::CondVar {
-    mongo::stdx::condition_variable cond_;
-    nspr::Lock* lock_;
-
-public:
-    CondVar(nspr::Lock* lock) : lock_(lock) {}
-    mongo::stdx::condition_variable& cond() {
-        return cond_;
-    }
-    nspr::Lock* lock() {
-        return lock_;
-    }
-};
-
-PRCondVar* PR_NewCondVar(PRLock* lock) {
-    return js_new<nspr::CondVar>(lock);
-}
-
-void PR_DestroyCondVar(PRCondVar* cvar) {
-    js_delete(cvar);
-}
-
-PRStatus PR_NotifyCondVar(PRCondVar* cvar) {
-    cvar->cond().notify_one();
-
-    return PR_SUCCESS;
-}
-
-PRStatus PR_NotifyAllCondVar(PRCondVar* cvar) {
-    cvar->cond().notify_all();
-
-    return PR_SUCCESS;
-}
-
-uint32_t PR_MillisecondsToInterval(uint32_t milli) {
-    return milli;
-}
-
-uint32_t PR_MicrosecondsToInterval(uint32_t micro) {
-    return (micro + 999) / 1000;
-}
-
-static const uint64_t TicksPerSecond = 1000;
-static const uint64_t NanoSecondsInSeconds = 1000000000;
-static const uint64_t MicroSecondsInSeconds = 1000000;
-
-uint32_t PR_TicksPerSecond() {
-    return TicksPerSecond;
-}
-
-PRStatus PR_WaitCondVar(PRCondVar* cvar, uint32_t timeout) {
-    if (timeout == PR_INTERVAL_NO_TIMEOUT) {
-        try {
-            mongo::stdx::unique_lock<mongo::Mutex> lk(cvar->lock()->mutex(),
-                                                      mongo::stdx::adopt_lock_t());
-
-            cvar->cond().wait(lk);
-            lk.release();
-
-            return PR_SUCCESS;
-        } catch (...) {
-            return PR_FAILURE;
-        }
-    } else {
-        try {
-            mongo::stdx::unique_lock<mongo::Mutex> lk(cvar->lock()->mutex(),
-                                                      mongo::stdx::adopt_lock_t());
-
-            cvar->cond().wait_for(lk, mongo::Microseconds(timeout).toSystemDuration());
-            lk.release();
-
-            return PR_SUCCESS;
-        } catch (...) {
-            return PR_FAILURE;
-        }
-    }
-}
-
-int32_t PR_FileDesc2NativeHandle(PRFileDesc* fd) {
-    MOZ_CRASH("PR_FileDesc2NativeHandle");
-}
-
-PRStatus PR_GetOpenFileInfo(PRFileDesc* fd, PRFileInfo* info) {
-    MOZ_CRASH("PR_GetOpenFileInfo");
-}
-
-int32_t PR_Seek(PRFileDesc* fd, int32_t offset, PRSeekWhence whence) {
-    MOZ_CRASH("PR_Seek");
-}
-
-PRFileMap* PR_CreateFileMap(PRFileDesc* fd, int64_t size, PRFileMapProtect prot) {
-    MOZ_CRASH("PR_CreateFileMap");
-}
-
-void* PR_MemMap(PRFileMap* fmap, int64_t offset, uint32_t len) {
-    MOZ_CRASH("PR_MemMap");
-}
-
-PRStatus PR_MemUnmap(void* addr, uint32_t len) {
-    MOZ_CRASH("PR_MemUnmap");
-}
-
-PRStatus PR_CloseFileMap(PRFileMap* fmap) {
-    MOZ_CRASH("PR_CloseFileMap");
-}
+MONGO_MOZ_UNIMPLEMENTED(PRStatus, PR_CloseFileMap, PRFileMap*);
