@@ -82,7 +82,7 @@ public:
 
     /**
      * Controls what can popped from the oplog buffer into a single batch of operations that can be
-     * applied using multiApply().
+     * applied using applyOplogBatch().
      */
     class BatchLimits {
     public:
@@ -187,7 +187,7 @@ public:
      *
      * TODO: remove when enqueue() is implemented.
      */
-    StatusWith<OpTime> multiApply(OperationContext* opCtx, Operations ops);
+    StatusWith<OpTime> applyOplogBatch(OperationContext* opCtx, Operations ops);
 
     const Options& getOptions() const;
 
@@ -205,10 +205,10 @@ private:
     virtual void _run(OplogBuffer* oplogBuffer) = 0;
 
     /**
-     * Called from multiApply() to apply a batch of operations in parallel.
+     * Called from applyOplogBatch() to apply a batch of operations in parallel.
      * Implemented in subclasses but not visible otherwise.
      */
-    virtual StatusWith<OpTime> _multiApply(OperationContext* opCtx, Operations ops) = 0;
+    virtual StatusWith<OpTime> _applyOplogBatch(OperationContext* opCtx, Operations ops) = 0;
 
     // Used to schedule task for oplog application loop.
     // Not owned by us.
@@ -267,7 +267,8 @@ std::unique_ptr<ThreadPool> makeReplWriterPool();
 std::unique_ptr<ThreadPool> makeReplWriterPool(int threadCount);
 
 /**
- * Returns maximum number of operations in each batch that can be applied using multiApply().
+ * Returns maximum number of operations in each batch that can be applied using
+ * applyOplogBatch().
  */
 std::size_t getBatchLimitOplogEntries();
 

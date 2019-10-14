@@ -47,7 +47,7 @@ class OperationContext;
 namespace repl {
 
 /**
- * Test only subclass of OplogApplierImpl that makes applyOplogGroup a public method.
+ * Test only subclass of OplogApplierImpl that makes applyOplogBatchPerWorker a public method.
  */
 class TestApplyOplogGroupApplier : public OplogApplierImpl {
 public:
@@ -62,7 +62,7 @@ public:
                            storageInterface,
                            options,
                            nullptr) {}
-    using OplogApplierImpl::applyOplogGroup;
+    using OplogApplierImpl::applyOplogBatchPerWorker;
 };
 
 /**
@@ -123,13 +123,13 @@ public:
 
 class OplogApplierImplTest : public ServiceContextMongoDTest {
 protected:
-    void _testApplyOplogEntryBatchCrudOperation(ErrorCodes::Error expectedError,
-                                                const OplogEntry& op,
-                                                bool expectedApplyOpCalled);
+    void _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::Error expectedError,
+                                                           const OplogEntry& op,
+                                                           bool expectedApplyOpCalled);
 
-    Status _applyOplogEntryBatchWrapper(OperationContext* opCtx,
-                                        const OplogEntryBatch& batch,
-                                        OplogApplication::Mode oplogApplicationMode);
+    Status _applyOplogEntryOrGroupedInsertsWrapper(OperationContext* opCtx,
+                                                   const OplogEntryOrGroupedInserts& batch,
+                                                   OplogApplication::Mode oplogApplicationMode);
 
     ServiceContext::UniqueOperationContext _opCtx;
     std::unique_ptr<ReplicationConsistencyMarkers> _consistencyMarkers;

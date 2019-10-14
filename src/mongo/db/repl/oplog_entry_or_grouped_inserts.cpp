@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/db/repl/oplog_entry_batch.h"
+#include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
 #include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {
 namespace repl {
-BSONObj OplogEntryBatch::toBSON() const {
+BSONObj OplogEntryOrGroupedInserts::toBSON() const {
     if (!isGroupedInserts())
         return getOp().toBSON();
 
@@ -54,14 +54,14 @@ BSONObj OplogEntryBatch::toBSON() const {
     // Populate the "ts" field with an array of all the grouped inserts' timestamps.
     {
         BSONArrayBuilder tsArrayBuilder(groupedInsertBuilder.subarrayStart("ts"));
-        for (auto op : _batch) {
+        for (auto op : _entryOrGroupedInserts) {
             tsArrayBuilder.append(op->getTimestamp());
         }
     }
     // Populate the "t" (term) field with an array of all the grouped inserts' terms.
     {
         BSONArrayBuilder tArrayBuilder(groupedInsertBuilder.subarrayStart("t"));
-        for (auto op : _batch) {
+        for (auto op : _entryOrGroupedInserts) {
             long long term = OpTime::kUninitializedTerm;
             auto parsedTerm = op->getTerm();
             if (parsedTerm)
@@ -72,7 +72,7 @@ BSONObj OplogEntryBatch::toBSON() const {
     // Populate the "o" field with an array of all the grouped inserts.
     {
         BSONArrayBuilder oArrayBuilder(groupedInsertBuilder.subarrayStart("o"));
-        for (auto op : _batch) {
+        for (auto op : _entryOrGroupedInserts) {
             oArrayBuilder.append(op->getObject());
         }
     }

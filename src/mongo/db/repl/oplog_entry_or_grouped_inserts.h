@@ -36,43 +36,44 @@ namespace mongo {
 namespace repl {
 /**
  * This is a class for a single oplog entry or grouped inserts to be applied in
- * applyOplogEntryBatch. This class is immutable and can only be initialized using either a single
- * oplog entry or a range of grouped inserts.
+ * applyOplogEntryOrGroupedInserts. This class is immutable and can only be initialized using
+ * either a single oplog entry or a range of grouped inserts.
  */
-class OplogEntryBatch {
+class OplogEntryOrGroupedInserts {
 public:
     using OperationPtrs = std::vector<const OplogEntry*>;
     using ConstIterator = OperationPtrs::const_iterator;
 
-    OplogEntryBatch() = delete;
+    OplogEntryOrGroupedInserts() = delete;
 
     // This initializes it as a single oplog entry.
-    OplogEntryBatch(const OplogEntry* op) : _batch({op}) {}
+    OplogEntryOrGroupedInserts(const OplogEntry* op) : _entryOrGroupedInserts({op}) {}
 
     // This initializes it as grouped inserts.
-    OplogEntryBatch(ConstIterator begin, ConstIterator end) : _batch(begin, end) {
+    OplogEntryOrGroupedInserts(ConstIterator begin, ConstIterator end)
+        : _entryOrGroupedInserts(begin, end) {
         // Performs sanity checks to confirm that the batch is valid.
-        invariant(!_batch.empty());
-        for (auto op : _batch) {
+        invariant(!_entryOrGroupedInserts.empty());
+        for (auto op : _entryOrGroupedInserts) {
             // Every oplog entry must be an insert.
             invariant(op->getOpType() == OpTypeEnum::kInsert);
             // Every oplog entry must be in the same namespace.
-            invariant(op->getNss() == _batch.front()->getNss());
+            invariant(op->getNss() == _entryOrGroupedInserts.front()->getNss());
         }
     }
 
     // Return the oplog entry to be applied or the first oplog entry of the grouped inserts.
     const OplogEntry& getOp() const {
-        return *(_batch.front());
+        return *(_entryOrGroupedInserts.front());
     }
 
     bool isGroupedInserts() const {
-        return _batch.size() > 1;
+        return _entryOrGroupedInserts.size() > 1;
     }
 
     const OperationPtrs& getGroupedInserts() const {
         invariant(isGroupedInserts());
-        return _batch;
+        return _entryOrGroupedInserts;
     }
 
     // Returns a BSONObj for message logging purpose.
@@ -80,7 +81,7 @@ public:
 
 private:
     // A single oplog entry or a batch of grouped insert oplog entries to be applied.
-    OperationPtrs _batch;
+    OperationPtrs _entryOrGroupedInserts;
 };
 }  // namespace repl
 }  // namespace mongo

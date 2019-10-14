@@ -49,10 +49,10 @@ namespace repl {
 namespace {
 
 // Must not create too large an object.
-const auto kInsertGroupMaxBatchSize = write_ops::insertVectorMaxBytes;
+const auto kInsertGroupMaxGroupSize = write_ops::insertVectorMaxBytes;
 
 // Limit number of ops in a single group.
-constexpr auto kInsertGroupMaxBatchCount = 64;
+constexpr auto kInsertGroupMaxOpCount = 64;
 
 }  // namespace
 
@@ -84,13 +84,13 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(ConstIt
     // Attempt to group 'insert' ops if possible.
     std::vector<BSONObj> toInsert;
 
-    // Make sure to include the first op in the batch size.
-    size_t batchSize = entry.getObject().objsize();
-    auto batchCount = MultiApplier::OperationPtrs::size_type(1);
-    auto batchNamespace = entry.getNss();
+    // Make sure to include the first op in the group size.
+    size_t groupSize = entry.getObject().objsize();
+    auto opCount = MultiApplier::OperationPtrs::size_type(1);
+    auto groupNamespace = entry.getNss();
 
     /**
-     * Search for the op that delimits this insert batch, and save its position
+     * Search for the op that delimits this insert group, and save its position
      * in endOfGroupableOpsIterator. For example, given the following list of oplog
      * entries with a sequence of groupable inserts:
      *
@@ -106,15 +106,14 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(ConstIt
     auto endOfGroupableOpsIterator =
         std::find_if(it + 1, _end, [&](const OplogEntry* nextEntry) -> bool {
             auto opNamespace = nextEntry->getNss();
-            batchSize += nextEntry->getObject().objsize();
-            batchCount += 1;
+            groupSize += nextEntry->getObject().objsize();
+            opCount += 1;
 
-            // Only add the op to this batch if it passes the criteria.
+            // Only add the op to this group if it passes the criteria.
             return nextEntry->getOpType() != OpTypeEnum::kInsert  // Must be an insert.
-                || opNamespace != batchNamespace                  // Must be in the same namespace.
-                || batchSize > kInsertGroupMaxBatchSize  // Must not create too large an object.
-                ||
-                batchCount > kInsertGroupMaxBatchCount;  // Limit number of ops in a single group.
+                || opNamespace != groupNamespace                  // Must be in the same namespace.
+                || groupSize > kInsertGroupMaxGroupSize  // Must not create too large an object.
+                || opCount > kInsertGroupMaxOpCount;     // Limit number of ops in a single group.
         });
 
     // See if we were able to create a group that contains more than a single op.
@@ -123,11 +122,11 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(ConstIt
                       "Not able to create a group with more than a single insert operation");
     }
 
-    // Create an oplog entry batch for grouped inserts.
-    OplogEntryBatch groupedInsertBatch(it, endOfGroupableOpsIterator);
+    // Create an oplog entry group for grouped inserts.
+    OplogEntryOrGroupedInserts groupedInserts(it, endOfGroupableOpsIterator);
     try {
-        // Apply the group of inserts by passing in groupedInsertBatch.
-        uassertStatusOK(applyOplogEntryBatch(_opCtx, groupedInsertBatch, _mode));
+        // Apply the group of inserts by passing in groupedInserts.
+        uassertStatusOK(applyOplogEntryOrGroupedInserts(_opCtx, groupedInserts, _mode));
         // It succeeded, advance the oplogEntriesIterator to the end of the
         // group of inserts.
         return endOfGroupableOpsIterator - 1;
@@ -135,8 +134,7 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(ConstIt
         // The group insert failed, log an error and fall through to the
         // application of an individual op.
         auto status = exceptionToStatus().withContext(
-            str::stream() << "Error applying inserts in bulk: "
-                          << redact(groupedInsertBatch.toBSON())
+            str::stream() << "Error applying inserts in bulk: " << redact(groupedInserts.toBSON())
                           << ". Trying first insert as a lone insert: " << redact(entry.getRaw()));
 
         // It's not an error during initial sync to encounter DuplicateKey errors.

@@ -68,7 +68,7 @@ private:
     // Used for constructing search bounds when grouping inserts.
     ConstIterator _end;
 
-    // Passed to applyOplogEntryBatch when applying grouped inserts.
+    // Passed to applyOplogEntryOrGroupedInserts when applying grouped inserts.
     OperationContext* _opCtx;
     Mode _mode;
 };

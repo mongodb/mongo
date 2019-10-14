@@ -87,10 +87,10 @@ public:
     // Returned by shouldStopFetching.
     bool shouldStopFetchingResult = false;
 
-    // Override to change multiApply behavior.
-    using MultiApplyFn = std::function<StatusWith<OpTime>(
+    // Override to change applyOplogBatch behavior.
+    using ApplyOplogBatchFn = std::function<StatusWith<OpTime>(
         OperationContext*, MultiApplier::Operations, OplogApplier::Observer*)>;
-    MultiApplyFn multiApplyFn;
+    ApplyOplogBatchFn applyOplogBatchFn;
 
     StatusWith<ReplSetConfig> replSetConfigResult = ReplSetConfig();
 };

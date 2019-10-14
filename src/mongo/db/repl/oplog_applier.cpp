@@ -162,7 +162,7 @@ bool isUnpreparedApplyOps(const OplogEntry& entry) {
  * Process updates to 'admin.system.version' individually as well so the secondary's FCV when
  * processing each operation matches the primary's when committing that operation.
  */
-bool mustProcessStandalone(const OplogEntry& entry) {
+bool mustProcessIndividually(const OplogEntry& entry) {
     if (entry.isCommand()) {
         if (isUnpreparedCommit(entry)) {
             return false;
@@ -230,7 +230,7 @@ StatusWith<OplogApplier::Operations> OplogApplier::getNextApplierBatch(
             }
         }
 
-        if (mustProcessStandalone(entry)) {
+        if (mustProcessIndividually(entry)) {
             if (ops.empty()) {
                 ops.push_back(std::move(entry));
                 _consume(opCtx, _oplogBuffer);
@@ -265,9 +265,9 @@ StatusWith<OplogApplier::Operations> OplogApplier::getNextApplierBatch(
     return std::move(ops);
 }
 
-StatusWith<OpTime> OplogApplier::multiApply(OperationContext* opCtx, Operations ops) {
+StatusWith<OpTime> OplogApplier::applyOplogBatch(OperationContext* opCtx, Operations ops) {
     _observer->onBatchBegin(ops);
-    auto lastApplied = _multiApply(opCtx, std::move(ops));
+    auto lastApplied = _applyOplogBatch(opCtx, std::move(ops));
     _observer->onBatchEnd(lastApplied, {});
     return lastApplied;
 }

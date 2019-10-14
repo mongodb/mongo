@@ -94,12 +94,12 @@ NamespaceStringOrUUID getNsOrUUID(const NamespaceString& nss, const OplogEntry& 
 
 /**
  * Used for logging a report of ops that take longer than "slowMS" to apply. This is called
- * right before returning from applyOplogEntryBatch, and it returns the same status.
+ * right before returning from applyOplogEntryOrGroupedInserts, and it returns the same status.
  */
 Status finishAndLogApply(ClockSource* clockSource,
                          Status finalStatus,
                          Date_t applyStartTime,
-                         const OplogEntryBatch& batch) {
+                         const OplogEntryOrGroupedInserts& entryOrGroupedInserts) {
 
     if (finalStatus.isOK()) {
         auto applyEndTime = clockSource->now();
@@ -111,13 +111,13 @@ Status finishAndLogApply(ClockSource* clockSource,
             StringBuilder s;
             s << "applied op: ";
 
-            if (batch.getOp().getOpType() == OpTypeEnum::kCommand) {
+            if (entryOrGroupedInserts.getOp().getOpType() == OpTypeEnum::kCommand) {
                 s << "command ";
             } else {
                 s << "CRUD ";
             }
 
-            s << redact(batch.toBSON());
+            s << redact(entryOrGroupedInserts.toBSON());
             s << ", took " << diffMS << "ms";
 
             log() << s.str();
@@ -446,10 +446,10 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
         // Don't allow the fsync+lock thread to see intermediate states of batch application.
         stdx::lock_guard<SimpleMutex> fsynclk(filesLockedFsync);
 
-        // Apply the operations in this batch. '_multiApply' returns the optime of the last op that
-        // was applied, which should be the last optime in the batch.
+        // Apply the operations in this batch. '_applyOplogBatch' returns the optime of the
+        // last op that was applied, which should be the last optime in the batch.
         auto lastOpTimeAppliedInBatch =
-            fassertNoTrace(34437, _multiApply(&opCtx, ops.releaseBatch()));
+            fassertNoTrace(34437, _applyOplogBatch(&opCtx, ops.releaseBatch()));
         invariant(lastOpTimeAppliedInBatch == lastOpTimeInBatch);
 
         // Update various things that care about our last applied optime. Tests rely on 1 happening
@@ -552,8 +552,8 @@ void scheduleWritesToOplog(OperationContext* opCtx,
     }
 }
 
-StatusWith<OpTime> OplogApplierImpl::_multiApply(OperationContext* opCtx,
-                                                 MultiApplier::Operations ops) {
+StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
+                                                      MultiApplier::Operations ops) {
     invariant(!ops.empty());
 
     LOG(2) << "replication batch size is " << ops.size();
@@ -622,7 +622,7 @@ StatusWith<OpTime> OplogApplierImpl::_multiApply(OperationContext* opCtx,
             std::vector<Status> statusVector(_writerPool->getStats().numThreads, Status::OK());
 
             // Doles out all the work to the writer pool threads. writerVectors is not modified,
-            // but  applyOplogGroup will modify the vectors that it contains.
+            // but  applyOplogBatchPerWorker will modify the vectors that it contains.
             invariant(writerVectors.size() == statusVector.size());
             for (size_t i = 0; i < writerVectors.size(); i++) {
                 if (writerVectors[i].empty())
@@ -641,8 +641,9 @@ StatusWith<OpTime> OplogApplierImpl::_multiApply(OperationContext* opCtx,
                         // so it is safe to exclude any writes from Flow Control.
                         opCtx->setShouldParticipateInFlowControl(false);
 
-                        status = opCtx->runWithoutInterruptionExceptAtGlobalShutdown(
-                            [&] { return applyOplogGroup(opCtx.get(), &writer, &multikeyVector); });
+                        status = opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&] {
+                            return applyOplogBatchPerWorker(opCtx.get(), &writer, &multikeyVector);
+                        });
                     });
             }
 
@@ -836,10 +837,106 @@ void OplogApplierImpl::fillWriterVectors(
     }
 }
 
-Status OplogApplierImpl::applyOplogGroup(OperationContext* opCtx,
-                                         MultiApplier::OperationPtrs* ops,
-                                         WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
+Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
+                                       const OplogEntryOrGroupedInserts& entryOrGroupedInserts,
+                                       OplogApplication::Mode oplogApplicationMode) {
+    // Guarantees that applyOplogEntryOrGroupedInserts' context matches that of its calling
+    // function, applyOplogBatchPerWorker.
+    invariant(!opCtx->writesAreReplicated());
+    invariant(documentValidationDisabled(opCtx));
 
+    auto op = entryOrGroupedInserts.getOp();
+    // Count each log op application as a separate operation, for reporting purposes
+    CurOp individualOp(opCtx);
+
+    const NamespaceString nss(op.getNss());
+
+    auto incrementOpsAppliedStats = [] { opsAppliedStats.increment(1); };
+
+    auto clockSource = opCtx->getServiceContext()->getFastClockSource();
+    auto applyStartTime = clockSource->now();
+
+    if (MONGO_unlikely(hangAfterRecordingOpApplicationStartTime.shouldFail())) {
+        log() << "applyOplogEntryOrGroupedInserts - fail point "
+                 "hangAfterRecordingOpApplicationStartTime "
+                 "enabled. "
+              << "Blocking until fail point is disabled. ";
+        hangAfterRecordingOpApplicationStartTime.pauseWhileSet();
+    }
+
+    auto opType = op.getOpType();
+
+    if (opType == OpTypeEnum::kNoop) {
+        incrementOpsAppliedStats();
+        return Status::OK();
+    } else if (OplogEntry::isCrudOpType(opType)) {
+        auto status =
+            writeConflictRetry(opCtx, "applyOplogEntryOrGroupedInserts_CRUD", nss.ns(), [&] {
+                // Need to throw instead of returning a status for it to be properly ignored.
+                try {
+                    AutoGetCollection autoColl(opCtx,
+                                               getNsOrUUID(nss, op),
+                                               fixLockModeForSystemDotViewsChanges(nss, MODE_IX));
+                    auto db = autoColl.getDb();
+                    uassert(ErrorCodes::NamespaceNotFound,
+                            str::stream() << "missing database (" << nss.db() << ")",
+                            db);
+                    OldClientContext ctx(opCtx, autoColl.getNss().ns(), db);
+
+                    // We convert updates to upserts when not in initial sync because after rollback
+                    // and during startup we may replay an update after a delete and crash since we
+                    // do not ignore errors. In initial sync we simply ignore these update errors so
+                    // there is no reason to upsert.
+                    //
+                    // TODO (SERVER-21700): Never upsert during oplog application unless an external
+                    // applyOps wants to. We should ignore these errors intelligently while in
+                    // RECOVERING and STARTUP mode (similar to initial sync) instead so we do not
+                    // accidentally ignore real errors.
+                    bool shouldAlwaysUpsert =
+                        (oplogApplicationMode != OplogApplication::Mode::kInitialSync);
+                    Status status = applyOperation_inlock(opCtx,
+                                                          db,
+                                                          entryOrGroupedInserts,
+                                                          shouldAlwaysUpsert,
+                                                          oplogApplicationMode,
+                                                          incrementOpsAppliedStats);
+                    if (!status.isOK() && status.code() == ErrorCodes::WriteConflict) {
+                        throw WriteConflictException();
+                    }
+                    return status;
+                } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
+                    // Delete operations on non-existent namespaces can be treated as successful for
+                    // idempotency reasons.
+                    // During RECOVERING mode, we ignore NamespaceNotFound for all CRUD ops since
+                    // storage does not wait for drops to be checkpointed (SERVER-33161).
+                    if (opType == OpTypeEnum::kDelete ||
+                        oplogApplicationMode == OplogApplication::Mode::kRecovering) {
+                        return Status::OK();
+                    }
+
+                    ex.addContext(str::stream() << "Failed to apply operation: "
+                                                << redact(entryOrGroupedInserts.toBSON()));
+                    throw;
+                }
+            });
+        return finishAndLogApply(clockSource, status, applyStartTime, entryOrGroupedInserts);
+    } else if (opType == OpTypeEnum::kCommand) {
+        auto status =
+            writeConflictRetry(opCtx, "applyOplogEntryOrGroupedInserts_command", nss.ns(), [&] {
+                // A special case apply for commands to avoid implicit database creation.
+                Status status = applyCommand_inlock(opCtx, op, oplogApplicationMode);
+                incrementOpsAppliedStats();
+                return status;
+            });
+        return finishAndLogApply(clockSource, status, applyStartTime, entryOrGroupedInserts);
+    }
+
+    MONGO_UNREACHABLE;
+}
+
+Status OplogApplierImpl::applyOplogBatchPerWorker(OperationContext* opCtx,
+                                                  MultiApplier::OperationPtrs* ops,
+                                                  WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
     UnreplicatedWritesBlock uwb(opCtx);
     DisableDocumentValidation validationDisabler(opCtx);
     // Since we swap the locker in stash / unstash transaction resources,
@@ -881,7 +978,8 @@ Status OplogApplierImpl::applyOplogGroup(OperationContext* opCtx,
 
             // If we didn't create a group, try to apply the op individually.
             try {
-                const Status status = applyOplogEntryBatch(opCtx, &entry, oplogApplicationMode);
+                const Status status =
+                    applyOplogEntryOrGroupedInserts(opCtx, &entry, oplogApplicationMode);
 
                 if (!status.isOK()) {
                     // Tried to apply an update operation but the document is missing, there must be
@@ -918,98 +1016,6 @@ Status OplogApplierImpl::applyOplogGroup(OperationContext* opCtx,
     }
 
     return Status::OK();
-}
-
-Status applyOplogEntryBatch(OperationContext* opCtx,
-                            const OplogEntryBatch& batch,
-                            OplogApplication::Mode oplogApplicationMode) {
-    // Guarantees that applyOplogEntryBatch's context matches that of its calling function,
-    // applyOplogGroup.
-    invariant(!opCtx->writesAreReplicated());
-    invariant(documentValidationDisabled(opCtx));
-
-    auto op = batch.getOp();
-    // Count each log op application as a separate operation, for reporting purposes
-    CurOp individualOp(opCtx);
-
-    const NamespaceString nss(op.getNss());
-
-    auto incrementOpsAppliedStats = [] { opsAppliedStats.increment(1); };
-
-    auto applyOp = [&](Database* db) {
-        // We convert updates to upserts when not in initial sync because after rollback and during
-        // startup we may replay an update after a delete and crash since we do not ignore
-        // errors. In initial sync we simply ignore these update errors so there is no reason to
-        // upsert.
-        //
-        // TODO (SERVER-21700): Never upsert during oplog application unless an external applyOps
-        // wants to. We should ignore these errors intelligently while in RECOVERING and STARTUP
-        // mode (similar to initial sync) instead so we do not accidentally ignore real errors.
-        bool shouldAlwaysUpsert = (oplogApplicationMode != OplogApplication::Mode::kInitialSync);
-        Status status = applyOperation_inlock(
-            opCtx, db, batch, shouldAlwaysUpsert, oplogApplicationMode, incrementOpsAppliedStats);
-        if (!status.isOK() && status.code() == ErrorCodes::WriteConflict) {
-            throw WriteConflictException();
-        }
-        return status;
-    };
-
-    auto clockSource = opCtx->getServiceContext()->getFastClockSource();
-    auto applyStartTime = clockSource->now();
-
-    if (MONGO_unlikely(hangAfterRecordingOpApplicationStartTime.shouldFail())) {
-        log() << "applyOplogEntryBatch - fail point hangAfterRecordingOpApplicationStartTime "
-                 "enabled. "
-              << "Blocking until fail point is disabled. ";
-        hangAfterRecordingOpApplicationStartTime.pauseWhileSet();
-    }
-
-    auto opType = op.getOpType();
-
-    auto finishApply = [&](Status status) {
-        return finishAndLogApply(clockSource, status, applyStartTime, batch);
-    };
-
-    if (opType == OpTypeEnum::kNoop) {
-        incrementOpsAppliedStats();
-        return Status::OK();
-    } else if (OplogEntry::isCrudOpType(opType)) {
-        return finishApply(writeConflictRetry(opCtx, "applyOplogEntryBatch_CRUD", nss.ns(), [&] {
-            // Need to throw instead of returning a status for it to be properly ignored.
-            try {
-                AutoGetCollection autoColl(
-                    opCtx, getNsOrUUID(nss, op), fixLockModeForSystemDotViewsChanges(nss, MODE_IX));
-                auto db = autoColl.getDb();
-                uassert(ErrorCodes::NamespaceNotFound,
-                        str::stream() << "missing database (" << nss.db() << ")",
-                        db);
-                OldClientContext ctx(opCtx, autoColl.getNss().ns(), db);
-                return applyOp(ctx.db());
-            } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
-                // Delete operations on non-existent namespaces can be treated as successful for
-                // idempotency reasons.
-                // During RECOVERING mode, we ignore NamespaceNotFound for all CRUD ops since
-                // storage does not wait for drops to be checkpointed (SERVER-33161).
-                if (opType == OpTypeEnum::kDelete ||
-                    oplogApplicationMode == OplogApplication::Mode::kRecovering) {
-                    return Status::OK();
-                }
-
-                ex.addContext(str::stream()
-                              << "Failed to apply operation: " << redact(batch.toBSON()));
-                throw;
-            }
-        }));
-    } else if (opType == OpTypeEnum::kCommand) {
-        return finishApply(writeConflictRetry(opCtx, "applyOplogEntryBatch_command", nss.ns(), [&] {
-            // A special case apply for commands to avoid implicit database creation.
-            Status status = applyCommand_inlock(opCtx, op, oplogApplicationMode);
-            incrementOpsAppliedStats();
-            return status;
-        }));
-    }
-
-    MONGO_UNREACHABLE;
 }
 
 

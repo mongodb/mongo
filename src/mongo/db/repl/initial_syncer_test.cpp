@@ -3641,9 +3641,9 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughMultiApplierCallbackError) {
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
 
-    getExternalState()->multiApplyFn =
+    getExternalState()->applyOplogBatchFn =
         [](OperationContext*, const MultiApplier::Operations&, OplogApplier::Observer*) {
-            return Status(ErrorCodes::OperationFailed, "multiApply failed");
+            return Status(ErrorCodes::OperationFailed, "applyOplogBatch failed");
         };
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));

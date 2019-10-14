@@ -39,7 +39,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/oplog_entry_batch.h"
+#include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 
@@ -202,7 +202,7 @@ inline std::ostream& operator<<(std::ostream& s, OplogApplication::Mode mode) {
  */
 Status applyOperation_inlock(OperationContext* opCtx,
                              Database* db,
-                             const OplogEntryBatch& opOrGroupedInserts,
+                             const OplogEntryOrGroupedInserts& opOrGroupedInserts,
                              bool alwaysUpsert,
                              OplogApplication::Mode mode,
                              IncrementOpsAppliedStatsFn incrementOpsAppliedStats = {});

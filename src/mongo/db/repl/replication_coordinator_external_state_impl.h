@@ -197,7 +197,7 @@ private:
     // Task executor used to run replication tasks.
     std::unique_ptr<executor::TaskExecutor> _taskExecutor;
 
-    // Used by repl::multiApply() to apply the sync source's operations in parallel.
+    // Used by repl::applyOplogBatch() to apply the sync source's operations in parallel.
     // Also used by database and collection cloners to perform storage operations.
     // Cloners and oplog application run in separate phases of initial sync so it is fine to share
     // this thread pool.

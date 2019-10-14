@@ -1102,7 +1102,7 @@ StatusWith<OplogApplication::Mode> OplogApplication::parseMode(const std::string
 // See replset initial sync code.
 Status applyOperation_inlock(OperationContext* opCtx,
                              Database* db,
-                             const OplogEntryBatch& opOrGroupedInserts,
+                             const OplogEntryOrGroupedInserts& opOrGroupedInserts,
                              bool alwaysUpsert,
                              OplogApplication::Mode mode,
                              IncrementOpsAppliedStatsFn incrementOpsAppliedStats) {

@@ -79,7 +79,7 @@ private:
     /**
      * Runs oplog application in a loop until shutdown() is called.
      * Retrieves operations from the OplogBuffer in batches that will be applied in parallel using
-     * multiApply().
+     * applyOplogBatch().
      */
     void _run(OplogBuffer* oplogBuffer) override;
 
@@ -96,7 +96,7 @@ private:
      * to at least the last optime of the batch. If 'minValid' is already greater than or equal
      * to the last optime of this batch, it will not be updated.
      */
-    StatusWith<OpTime> _multiApply(OperationContext* opCtx, MultiApplier::Operations ops);
+    StatusWith<OpTime> _applyOplogBatch(OperationContext* opCtx, MultiApplier::Operations ops);
 
     void _deriveOpsAndFillWriterVectors(OperationContext* opCtx,
                                         MultiApplier::Operations* ops,
@@ -119,13 +119,13 @@ private:
     // we will apply all operations that were fetched.
     OpTime _beginApplyingOpTime = OpTime();
 
-protected:
-    // Marked as protected for use in unit tests.
     void fillWriterVectors(OperationContext* opCtx,
                            MultiApplier::Operations* ops,
                            std::vector<MultiApplier::OperationPtrs>* writerVectors,
                            std::vector<MultiApplier::Operations>* derivedOps) noexcept;
 
+protected:
+    // Marked as protected for use in unit tests.
     /**
      * This function is used by the thread pool workers to write ops to the db.
      * This consumes the passed in OperationPtrs and callers should not make any assumptions about
@@ -135,17 +135,17 @@ protected:
      * This function has been marked as virtual to allow certain unit tests to skip oplog
      * application.
      */
-    virtual Status applyOplogGroup(OperationContext* opCtx,
-                                   MultiApplier::OperationPtrs* ops,
-                                   WorkerMultikeyPathInfo* workerMultikeyPathInfo);
+    virtual Status applyOplogBatchPerWorker(OperationContext* opCtx,
+                                            MultiApplier::OperationPtrs* ops,
+                                            WorkerMultikeyPathInfo* workerMultikeyPathInfo);
 };
 
 /**
- * Applies a batch of operations.
+ * Applies either a single oplog entry or a set of grouped insert operations.
  */
-Status applyOplogEntryBatch(OperationContext* opCtx,
-                            const OplogEntryBatch& batch,
-                            OplogApplication::Mode oplogApplicationMode);
+Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
+                                       const OplogEntryOrGroupedInserts& entryOrGroupedInserts,
+                                       OplogApplication::Mode oplogApplicationMode);
 
 }  // namespace repl
 }  // namespace mongo

@@ -783,9 +783,9 @@ public:
             opPtrs.push_back(&(oplogEntries.back()));
         }
 
-        repl::OplogEntryBatch groupedInsertBatch(opPtrs.cbegin(), opPtrs.cend());
-        ASSERT_OK(repl::applyOplogEntryBatch(
-            _opCtx, groupedInsertBatch, repl::OplogApplication::Mode::kSecondary));
+        repl::OplogEntryOrGroupedInserts groupedInserts(opPtrs.cbegin(), opPtrs.cend());
+        ASSERT_OK(repl::applyOplogEntryOrGroupedInserts(
+            _opCtx, groupedInserts, repl::OplogApplication::Mode::kSecondary));
 
         for (std::int32_t idx = 0; idx < docsToInsert; ++idx) {
             OneOffRead oor(_opCtx, firstInsertTime.addTicks(idx).asTimestamp());
@@ -1307,15 +1307,16 @@ public:
         auto storageInterface = repl::StorageInterface::get(_opCtx);
         auto writerPool = repl::makeReplWriterPool();
         repl::OplogApplierImpl oplogApplier(
-            nullptr,  // task executor. not required for multiApply().
-            nullptr,  // oplog buffer. not required for multiApply().
+            nullptr,  // task executor. not required for applyOplogBatch().
+            nullptr,  // oplog buffer. not required for applyOplogBatch().
             &observer,
             _coordinatorMock,
             _consistencyMarkers,
             storageInterface,
             repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
             writerPool.get());
-        ASSERT_EQUALS(op2.getOpTime(), unittest::assertGet(oplogApplier.multiApply(_opCtx, ops)));
+        ASSERT_EQUALS(op2.getOpTime(),
+                      unittest::assertGet(oplogApplier.applyOplogBatch(_opCtx, ops)));
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
         assertMultikeyPaths(
@@ -1391,15 +1392,15 @@ public:
         auto writerPool = repl::makeReplWriterPool();
 
         repl::OplogApplierImpl oplogApplier(
-            nullptr,  // task executor. not required for multiApply().
-            nullptr,  // oplog buffer. not required for multiApply().
+            nullptr,  // task executor. not required for applyOplogBatch().
+            nullptr,  // oplog buffer. not required for applyOplogBatch().
             &observer,
             _coordinatorMock,
             _consistencyMarkers,
             storageInterface,
             repl::OplogApplier::Options(repl::OplogApplication::Mode::kInitialSync),
             writerPool.get());
-        auto lastTime = unittest::assertGet(oplogApplier.multiApply(_opCtx, ops));
+        auto lastTime = unittest::assertGet(oplogApplier.applyOplogBatch(_opCtx, ops));
         ASSERT_EQ(lastTime.getTimestamp(), insertTime2.asTimestamp());
 
         // Wait for the index build to finish before making any assertions.
@@ -2460,8 +2461,8 @@ public:
 };
 
 /**
- * Test specific OplogApplierImpl subclass that allows for custom applyOplogGroup to be run during
- * multiApply.
+ * Test specific OplogApplierImpl subclass that allows for custom applyOplogBatchPerWorker to be run
+ * during multiApply.
  */
 class SecondaryReadsDuringBatchApplicationAreAllowedApplier : public repl::OplogApplierImpl {
 public:
@@ -2489,13 +2490,13 @@ public:
           _promise(promise),
           _taskFuture(taskFuture) {}
 
-    Status applyOplogGroup(OperationContext* opCtx,
-                           repl::MultiApplier::OperationPtrs* operationsToApply,
-                           WorkerMultikeyPathInfo* pathInfo) override;
+    Status applyOplogBatchPerWorker(OperationContext* opCtx,
+                                    repl::MultiApplier::OperationPtrs* operationsToApply,
+                                    WorkerMultikeyPathInfo* pathInfo) override;
 
 private:
     // Pointer to the test's op context. This is distinct from the op context used in
-    // applyOplogGroup.
+    // applyOplogBatchPerWorker.
     OperationContext* _testOpCtx;
     Promise<bool>* _promise;
     stdx::future<bool>* _taskFuture;
@@ -2505,7 +2506,7 @@ private:
 // This apply operation function will block until the reader has tried acquiring a collection lock.
 // This returns BadValue statuses instead of asserting so that the worker threads can cleanly exit
 // and this test case fails without crashing the entire suite.
-Status SecondaryReadsDuringBatchApplicationAreAllowedApplier::applyOplogGroup(
+Status SecondaryReadsDuringBatchApplicationAreAllowedApplier::applyOplogBatchPerWorker(
     OperationContext* opCtx,
     repl::MultiApplier::OperationPtrs* operationsToApply,
     WorkerMultikeyPathInfo* pathInfo) {
@@ -2514,7 +2515,7 @@ Status SecondaryReadsDuringBatchApplicationAreAllowedApplier::applyOplogGroup(
     }
 
     // Insert the document. A reader without a PBWM lock should not see it yet.
-    auto status = OplogApplierImpl::applyOplogGroup(opCtx, operationsToApply, pathInfo);
+    auto status = OplogApplierImpl::applyOplogBatchPerWorker(opCtx, operationsToApply, pathInfo);
     if (!status.isOK()) {
         return status;
     }
@@ -2589,7 +2590,7 @@ public:
             _opCtx,
             &(batchInProgress.promise),
             &taskFuture);
-        auto lastOpTime = unittest::assertGet(oplogApplier.multiApply(_opCtx, {insertOp}));
+        auto lastOpTime = unittest::assertGet(oplogApplier.applyOplogBatch(_opCtx, {insertOp}));
         ASSERT_EQ(insertOp.getOpTime(), lastOpTime);
 
         joinGuard.dismiss();
