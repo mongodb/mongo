@@ -567,6 +567,7 @@ var ReplSetTest = function(opts) {
      */
     this.startSet = function(options, restart) {
         print("ReplSetTest starting set");
+        let startTime = new Date();  // Measure the execution time of this function.
 
         if (options && options.keyFile) {
             self.keyFile = options.keyFile;
@@ -589,6 +590,8 @@ var ReplSetTest = function(opts) {
         }
 
         this.nodes = nodes;
+        print("ReplSetTest startSet took " + (new Date() - startTime) + "ms for " +
+              this.nodes.length + " nodes.");
         return this.nodes;
     };
 
@@ -995,6 +998,7 @@ var ReplSetTest = function(opts) {
     this.initiateWithAnyNodeAsPrimary = function(cfg, initCmd, {
         doNotWaitForStableRecoveryTimestamp: doNotWaitForStableRecoveryTimestamp = false
     } = {}) {
+        let startTime = new Date();  // Measure the execution time of this function.
         var master = this.nodes[0].getDB("admin");
         var config = cfg || this.getReplSetConfig();
         var cmd = {};
@@ -1148,6 +1152,8 @@ var ReplSetTest = function(opts) {
         if (!doNotWaitForStableRecoveryTimestamp) {
             self.awaitLastStableRecoveryTimestamp();
         }
+        print("ReplSetTest initiateWithAnyNodeAsPrimary took " + (new Date() - startTime) +
+              "ms for " + this.nodes.length + " nodes.");
     };
 
     /**
@@ -1156,6 +1162,7 @@ var ReplSetTest = function(opts) {
      * ReplSetTest to be authorized to run replSetGetStatus.
      */
     this.initiateWithNodeZeroAsPrimary = function(cfg, initCmd) {
+        let startTime = new Date();  // Measure the execution time of this function.
         this.initiateWithAnyNodeAsPrimary(cfg, initCmd);
 
         // stepUp() calls awaitReplication() which requires all nodes to be authorized to run
@@ -1163,6 +1170,8 @@ var ReplSetTest = function(opts) {
         asCluster(this.nodes, function() {
             self.stepUp(self.nodes[0]);
         });
+        print("ReplSetTest initiateWithNodeZeroAsPrimary took " + (new Date() - startTime) +
+              "ms for " + this.nodes.length + " nodes.");
     };
 
     /**
@@ -2592,6 +2601,7 @@ var ReplSetTest = function(opts) {
     this.stopSet = function(signal, forRestart, opts) {
         // Check to make sure data is the same on all nodes.
         if (!jsTest.options().skipCheckDBHashes) {
+            let startTime = new Date();  // Measure the execution time of consistency checks.
             print("ReplSetTest stopSet going to run data consistency checks.");
             // To skip this check add TestData.skipCheckDBHashes = true;
             // Reasons to skip this test include:
@@ -2612,7 +2622,8 @@ var ReplSetTest = function(opts) {
                     "ReplSetTest stopSet skipped data consistency checks. Number of _liveNodes: " +
                     this._liveNodes.length + ", _callIsMaster response: " + master);
             }
-            print("ReplSetTest stopSet finished data consistency checks.");
+            print("ReplSetTest stopSet data consistency checks finished, took " +
+                  (new Date() - startTime) + "ms for " + this.nodes.length + " nodes.");
         }
 
         // Make shutdown faster in tests, especially when election handoff has no viable candidate.
@@ -2637,10 +2648,12 @@ var ReplSetTest = function(opts) {
         }
 
         print("ReplSetTest stopSet stopping all replica set nodes.");
+        let startTime = new Date();  // Measure the execution time of shutting down nodes.
         for (var i = 0; i < this.ports.length; i++) {
             this.stop(i, signal, opts);
         }
-        print("ReplSetTest stopSet stopped all replica set nodes.");
+        print("ReplSetTest stopSet stopped all replica set nodes, took " +
+              (new Date() - startTime) + "ms for " + this.ports.length + " nodes.");
 
         if (forRestart) {
             print("ReplSetTest stopSet returning since forRestart=true.");

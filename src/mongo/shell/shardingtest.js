@@ -391,6 +391,7 @@ var ShardingTest = function(params) {
 
         this.stopAllMongos(opts);
 
+        let startTime = new Date();  // Measure the execution time of shutting down shards.
         for (var i = 0; i < this._connections.length; i++) {
             if (this._rs[i]) {
                 this._rs[i].test.stopSet(15, undefined, opts);
@@ -398,6 +399,8 @@ var ShardingTest = function(params) {
                 this.stopMongod(i, opts);
             }
         }
+        print("ShardingTest stopped all shards, took " + (new Date() - startTime) + "ms for " +
+              this._connections.length + " shards.");
 
         if (this.configRS) {
             this.configRS.stopSet(undefined, undefined, opts);
@@ -1196,6 +1199,7 @@ var ShardingTest = function(params) {
         otherParams.migrationLockAcquisitionMaxWaitMS || 30000;
 
     // Start the MongoD servers (shards)
+    let startTime = new Date();  // Measure the execution time of startup and initiate.
     for (var i = 0; i < numShards; i++) {
         if (otherParams.rs || otherParams["rs" + i] || startShardsAsRS) {
             var setName = testName + "-rs" + i;
@@ -1275,12 +1279,14 @@ var ShardingTest = function(params) {
                 settings: rsSettings
             });
 
+            print("ShardingTest starting replica set for shard: " + setName);
             this._rs[i] =
                 {setName: setName, test: rs, nodes: rs.startSet(rsDefaults), url: rs.getURL()};
 
             // ReplSetTest.initiate() requires all nodes to be to be authorized to run
             // replSetGetStatus.
             // TODO(SERVER-14017): Remove this in favor of using initiate() everywhere.
+            print("ShardingTest initiating replica set for shard: " + setName);
             rs.initiateWithAnyNodeAsPrimary();
 
             this["rs" + i] = rs;
@@ -1390,6 +1396,9 @@ var ShardingTest = function(params) {
         rsConn.rs = rs;
     }
 
+    print("ShardingTest startup and initiation for all shards took " + (new Date() - startTime) +
+          "ms for " + numShards + " shards.");
+
     this._configServers = [];
 
     // Using replica set for config servers
@@ -1427,6 +1436,8 @@ var ShardingTest = function(params) {
 
     rstOptions.nodes = nodeOptions;
 
+    startTime = new Date();  // Measure the execution time of config server startup and initiate.
+
     // Start the config server's replica set
     this.configRS = new ReplSetTest(rstOptions);
     this.configRS.startSet(startOptions);
@@ -1441,6 +1452,9 @@ var ShardingTest = function(params) {
 
     // Wait for master to be elected before starting mongos
     var csrsPrimary = this.configRS.getPrimary();
+
+    print("ShardingTest startup and initiation for the config server took " +
+          (new Date() - startTime) + "ms with " + this.configRS.nodeList().length + " nodes.");
 
     // If 'otherParams.mongosOptions.binVersion' is an array value, then we'll end up constructing a
     // version iterator.
