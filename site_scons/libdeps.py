@@ -282,9 +282,12 @@ def make_libdeps_emitter(dependency_builder, dependency_map=dependency_visibilit
             dependency(l, dependency_map[dependency.Private])
             for l in env.get(libdeps_env_var + '_PRIVATE', []) if l)
 
+        lib_builder_prefix = lib_builder.get_prefix(env)
+        lib_builder_suffix = lib_builder.get_suffix(env)
+
         for prereq in prereqs:
-            prereqWithIxes = SCons.Util.adjustixes(prereq.target_node, lib_builder.get_prefix(env),
-                                                   lib_builder.get_suffix(env))
+            prereqWithIxes = SCons.Util.adjustixes(prereq.target_node, lib_builder_prefix,
+                                                   lib_builder_suffix)
             prereq.target_node = lib_node_factory(prereqWithIxes)
 
         for t in target:
@@ -301,11 +304,14 @@ def make_libdeps_emitter(dependency_builder, dependency_map=dependency_visibilit
                 visibility = dependent[1]
                 dependent = dependent[0]
 
-            dependentWithIxes = SCons.Util.adjustixes(dependent, lib_builder.get_prefix(env),
-                                                      lib_builder.get_suffix(env))
+            dependentWithIxes = SCons.Util.adjustixes(dependent, lib_builder_prefix,
+                                                      lib_builder_suffix)
             dependentNode = lib_node_factory(dependentWithIxes)
             __append_direct_libdeps(dependentNode,
                                     [dependency(target[0], dependency_map[visibility])])
+
+        prog_builder_prefix = prog_builder.get_prefix(env)
+        prog_builder_suffix = prog_builder.get_suffix(env)
 
         if not ignore_progdeps:
             for dependent in env.get('PROGDEPS_DEPENDENTS', []):
@@ -318,8 +324,8 @@ def make_libdeps_emitter(dependency_builder, dependency_map=dependency_visibilit
                     visibility = dependent[1]
                     dependent = dependent[0]
 
-                dependentWithIxes = SCons.Util.adjustixes(dependent, prog_builder.get_prefix(env),
-                                                          prog_builder.get_suffix(env))
+                dependentWithIxes = SCons.Util.adjustixes(dependent, prog_builder_prefix,
+                                                          prog_builder_suffix)
                 dependentNode = prog_node_factory(dependentWithIxes)
                 __append_direct_libdeps(dependentNode,
                                         [dependency(target[0], dependency_map[visibility])])

@@ -30,6 +30,12 @@ import mongo.generators as mongo_generators
 EnsurePythonVersion(3, 6)
 EnsureSConsVersion(3, 1, 1)
 
+# Monkey patch SCons.FS.File.release_target_info to be a no-op.
+# See https://github.com/SCons/scons/issues/3454
+def release_target_info_noop(self):
+    pass
+SCons.Node.FS.File.release_target_info = release_target_info_noop
+
 from buildscripts import utils
 from buildscripts import moduleconfig
 

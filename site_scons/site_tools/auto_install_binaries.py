@@ -107,6 +107,10 @@ RoleInfo = namedtuple(
     [
         'alias_name',
         'alias',
+        'components',
+        'roles',
+        'actions',
+        'dependencies'
     ],
 )
 
@@ -225,6 +229,22 @@ def generate_alias(env, component, role, target="install"):
         role="" if env[ROLE_DECLARATIONS][role].silent else "-" + role,
     )
 
+def get_alias_map_entry(env, component, role):
+    c_entry = env[ALIAS_MAP][component]
+    try:
+        return c_entry[role]
+    except KeyError:
+        alias_name = generate_alias(env, component, role)
+        r_entry = RoleInfo(
+            alias_name=alias_name,
+            alias=[],
+            components=set(),
+            roles=set(),
+            actions=[],
+            dependencies=[]
+        )
+        c_entry[role] = r_entry
+        return r_entry
 
 def get_package_name(env, component, role):
     """Return the package file name for the component and role combination."""
@@ -392,6 +412,9 @@ def archive_builder(source, target, env, for_signature):
     # will properly quote paths that have spaces in them on Posix
     # platforms and handle \ / on Windows.
     escape_func = env.get("ESCAPE", lambda x: x)
+
+    # TODO: relpath is costly, and we do it for every file in the archive here. We should
+    # find a way to avoid the repeated relpath invocation, probably by bucketing by directory.
     relative_files = " ".join([
         escape_func(os.path.relpath(path, common_ancestor))
         for path in paths
@@ -477,27 +500,30 @@ def auto_install(env, target, source, **kwargs):
 
     actions = env.Flatten(actions)
     for component, role in itertools.product(components, roles):
-        alias_name = generate_alias(env, component, role)
-        alias = env.Alias(alias_name, actions)
-        setattr(alias[0].attributes, COMPONENTS, components)
-        setattr(alias[0].attributes, ROLES, roles)
+
+        entry = get_alias_map_entry(env, component, role)
+        entry.components.update(components)
+        entry.roles.update(roles)
+        entry.actions.extend(actions)
 
         # TODO: this hard codes behavior that should be done configurably
         if component != "common":
-            # We have to call env.Alias just in case the
-            # generated_alias does not already exist.
-            env.Depends(alias, env.Alias(generate_alias(env, "common", role)))
-
-        env[ALIAS_MAP][component][role] = RoleInfo(
-            alias_name=alias_name,
-            alias=alias,
-        )
+            dentry = get_alias_map_entry(env, "common", role)
+            entry.dependencies.append(dentry)
 
     return actions
 
 
 def finalize_install_dependencies(env):
     """Generates package aliases and wires install dependencies."""
+
+    for component, rolemap in env[ALIAS_MAP].items():
+        for role, info in rolemap.items():
+            info.alias.extend(env.Alias(info.alias_name, info.actions))
+            setattr(info.alias[0].attributes, COMPONENTS, info.components)
+            setattr(info.alias[0].attributes, ROLES, info.roles)
+            env.Depends(info.alias, [d.alias for d in info.dependencies])
+
     common_rolemap = env[ALIAS_MAP].get("common")
     default_rolemap = env[ALIAS_MAP].get("default")
 
@@ -515,10 +541,8 @@ def finalize_install_dependencies(env):
     for component, rolemap in env[ALIAS_MAP].items():
         for role, info in rolemap.items():
 
-            aliases = [info.alias]
             if common_rolemap and component != "common" and role in common_rolemap:
                 env.Depends(info.alias, common_rolemap[role].alias)
-                aliases.extend(common_rolemap[role].alias)
 
             role_decl = env[ROLE_DECLARATIONS].get(role)
             for dependency in role_decl.dependencies:
@@ -537,7 +561,7 @@ def finalize_install_dependencies(env):
 
                 archive = env.__AibArchive(
                     target="#{}.{}".format(pkg_name, pkg_suffix),
-                    source=[make_archive_script] + aliases,
+                    source=[make_archive_script] + info.alias,
                     __AIB_ARCHIVE_TYPE=fmt,
                     AIB_COMPONENT=component,
                     AIB_ROLE=role,
