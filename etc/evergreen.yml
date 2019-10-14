@@ -5048,7 +5048,7 @@ tasks:
 ## Standalone generational fuzzer for aggregation pipelines ##
 - <<: *jstestfuzz_template
   name: aggregation_multiversion_fuzzer_gen
-  tags: ["aggfuzzer", "common"]
+  tags: ["aggfuzzer", "common", "multiversion"]
   commands:
   - func: "generate fuzzer tasks"
     vars:
@@ -11536,7 +11536,7 @@ buildvariants:
   - name: compile_all_run_unittests_TG
     distros:
     - suse15-build
-  - name: .aggfuzzer .common
+  - name: .aggfuzzer .common !.multiversion
   - name: aggregation
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
@@ -11550,7 +11550,6 @@ buildvariants:
   - name: .jscore .common !.decimal
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
-  - name: multiversion
   - name: replica_sets
   - name: .replica_sets .common
   - name: .sharding .txns
