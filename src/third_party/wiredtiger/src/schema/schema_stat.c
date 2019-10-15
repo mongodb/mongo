@@ -150,9 +150,8 @@ __wt_curstat_table_init(
     /*
      * Process the column groups.
      *
-     * Set the cursor to reference the data source statistics; we don't
-     * initialize it, instead we copy (rather than aggregate), the first
-     * column's statistics, which has the same effect.
+     * Set the cursor to reference the data source statistics; we don't initialize it, instead we
+     * copy (rather than aggregate), the first column's statistics, which has the same effect.
      */
     stats = &cst->u.dsrc_stats;
     for (i = 0; i < WT_COLGROUPS(table); i++) {

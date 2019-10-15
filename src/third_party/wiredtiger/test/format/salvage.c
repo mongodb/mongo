@@ -61,12 +61,11 @@ corrupt(void)
     char buf[8 * 1024], copycmd[2 * 1024];
 
     /*
-     * If it's a single Btree file (not LSM), open the file, and corrupt
-     * roughly 2% of the file at a random spot, including the beginning
-     * of the file and overlapping the end.
+     * If it's a single Btree file (not LSM), open the file, and corrupt roughly 2% of the file at a
+     * random spot, including the beginning of the file and overlapping the end.
      *
-     * It's a little tricky: if the data source is a file, we're looking
-     * for "wt", if the data source is a table, we're looking for "wt.wt".
+     * It's a little tricky: if the data source is a file, we're looking for "wt", if the data
+     * source is a table, we're looking for "wt.wt".
      */
     testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", g.home, WT_NAME));
     if ((fd = open(buf, O_RDWR)) != -1) {

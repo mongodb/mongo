@@ -63,16 +63,15 @@ struct __wt_async {
     WT_ASYNC_OP_IMPL **async_queue; /* Async ops work queue */
     uint32_t async_qsize;           /* Async work queue size */
                                     /*
-                                     * We need to have two head and tail values.  All but one is
+                                     * We need to have two head and tail values. All but one is
                                      * maintained as an ever increasing value to ease wrap around.
                                      *
-                                     * alloc_head: the next one to allocate for producers.
-                                     * head: the current head visible to consumers.
-                                     * head is always <= alloc_head.
-                                     * alloc_tail: the next slot for consumers to dequeue.
-                                     * alloc_tail is always <= head.
-                                     * tail_slot: the last slot consumed.
-                                     * A producer may need wait for tail_slot to advance.
+                                     * alloc_head: the next one to allocate for producers. head: the
+                                     * current head visible to consumers. head is always <=
+                                     * alloc_head. alloc_tail: the next slot for consumers to
+                                     * dequeue. alloc_tail is always <= head. tail_slot: the last
+                                     * slot consumed. A producer may need wait for tail_slot to
+                                     * advance.
                                      */
     uint64_t alloc_head;            /* Next slot to enqueue */
     uint64_t head;                  /* Head visible to worker */

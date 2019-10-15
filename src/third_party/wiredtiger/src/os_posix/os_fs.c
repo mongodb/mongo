@@ -372,13 +372,11 @@ __posix_file_lock(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, bool lock
     pfh = (WT_FILE_HANDLE_POSIX *)file_handle;
 
     /*
-     * WiredTiger requires this function be able to acquire locks past
-     * the end of file.
+     * WiredTiger requires this function be able to acquire locks past the end of file.
      *
-     * Note we're using fcntl(2) locking: all fcntl locks associated with a
-     * file for a given process are removed when any file descriptor for the
-     * file is closed by the process, even if a lock was never requested for
-     * that file descriptor.
+     * Note we're using fcntl(2) locking: all fcntl locks associated with a file for a given process
+     * are removed when any file descriptor for the file is closed by the process, even if a lock
+     * was never requested for that file descriptor.
      */
     fl.l_start = 0;
     fl.l_len = 1;

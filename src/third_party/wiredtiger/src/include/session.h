@@ -246,11 +246,11 @@ struct __wt_session_impl {
 /*
  * Hazard pointers.
  *
- * Hazard information persists past session close because it's accessed
- * by threads of control other than the thread owning the session.
+ * Hazard information persists past session close because it's accessed by threads of control other
+ * than the thread owning the session.
  *
- * Use the non-NULL state of the hazard field to know if the session has
- * previously been initialized.
+ * Use the non-NULL state of the hazard field to know if the session has previously been
+ * initialized.
  */
 #define WT_SESSION_FIRST_USE(s) ((s)->hazard == NULL)
 

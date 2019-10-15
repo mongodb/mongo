@@ -190,20 +190,18 @@ lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session, uint8_t *src, siz
     }
 
     /*
-     * Decompress, starting after the prefix bytes. Use safe decompression:
-     * we rely on decompression to detect corruption.
+     * Decompress, starting after the prefix bytes. Use safe decompression: we rely on decompression
+     * to detect corruption.
      *
-     * Two code paths, one with and one without a bounce buffer. When doing
-     * raw compression, we compress to a target size irrespective of row
-     * boundaries, and return to our caller a "useful" compression length
-     * based on the last complete row that was compressed. Our caller stores
-     * that length, not the length of bytes actually compressed by LZ4. In
-     * other words, our caller doesn't know how many bytes will result from
-     * decompression, likely hasn't provided us a large enough buffer, and
-     * we have to allocate a scratch buffer.
+     * Two code paths, one with and one without a bounce buffer. When doing raw compression, we
+     * compress to a target size irrespective of row boundaries, and return to our caller a "useful"
+     * compression length based on the last complete row that was compressed. Our caller stores that
+     * length, not the length of bytes actually compressed by LZ4. In other words, our caller
+     * doesn't know how many bytes will result from decompression, likely hasn't provided us a large
+     * enough buffer, and we have to allocate a scratch buffer.
      *
-     * Even though raw compression has been removed from WiredTiger, this
-     * code remains for backward compatibility with existing objects.
+     * Even though raw compression has been removed from WiredTiger, this code remains for backward
+     * compatibility with existing objects.
      */
     if (dst_len < prefix.uncompressed_len) {
         if ((dst_tmp = wt_api->scr_alloc(wt_api, session, (size_t)prefix.uncompressed_len)) == NULL)

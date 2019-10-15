@@ -16,13 +16,12 @@ void
 __wt_stream_set_line_buffer(FILE *fp)
 {
     /*
-     * This function exists because MSVC doesn't support buffer sizes of 0
-     * to the setvbuf call. To avoid re-introducing the bug, we have helper
-     * functions and disallow calling setvbuf directly in WiredTiger code.
+     * This function exists because MSVC doesn't support buffer sizes of 0 to the setvbuf call. To
+     * avoid re-introducing the bug, we have helper functions and disallow calling setvbuf directly
+     * in WiredTiger code.
      *
-     * Additionally, MSVC doesn't support line buffering, the result is the
-     * same as full-buffering. We assume our caller wants immediate output,
-     * set no-buffering instead.
+     * Additionally, MSVC doesn't support line buffering, the result is the same as full-buffering.
+     * We assume our caller wants immediate output, set no-buffering instead.
      */
     __wt_stream_set_no_buffer(fp);
 }

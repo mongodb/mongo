@@ -134,11 +134,10 @@ main(int argc, char *argv[])
     }
 
     /*
-     * If we weren't given a configuration file, set values from "CONFIG",
-     * if it exists.
+     * If we weren't given a configuration file, set values from "CONFIG", if it exists.
      *
-     * Small hack to ignore any CONFIG file named ".", that just makes it
-     * possible to ignore any local CONFIG file, used when running checks.
+     * Small hack to ignore any CONFIG file named ".", that just makes it possible to ignore any
+     * local CONFIG file, used when running checks.
      */
     if (config == NULL && access("CONFIG", R_OK) == 0)
         config = "CONFIG";
@@ -213,12 +212,10 @@ main(int argc, char *argv[])
                 wts_ops(reps == FORMAT_OPERATION_REPS);
 
                 /*
-                 * Copy out the run's statistics after the last
-                 * set of operations.
+                 * Copy out the run's statistics after the last set of operations.
                  *
-                 * XXX
-                 * Verify closes the underlying handle and
-                 * discards the statistics, read them first.
+                 * XXX Verify closes the underlying handle and discards the statistics, read them
+                 * first.
                  */
                 if (reps == FORMAT_OPERATION_REPS)
                     wts_stats();

@@ -30,10 +30,9 @@ __search_insert_append(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_INSERT
     if ((ins = WT_SKIP_LAST(ins_head)) == NULL)
         return (0);
     /*
-     * Since the head of the skip list doesn't get mutated within this
-     * function, the compiler may move this assignment above within the
-     * loop below if it needs to (and may read a different value on each
-     * loop due to other threads mutating the skip list).
+     * Since the head of the skip list doesn't get mutated within this function, the compiler may
+     * move this assignment above within the loop below if it needs to (and may read a different
+     * value on each loop due to other threads mutating the skip list).
      *
      * Place a read barrier here to avoid this issue.
      */
@@ -171,11 +170,10 @@ __check_leaf_key_range(
         return (0);
 
     /*
-     * Check if the search key is smaller than the parent's starting key for
-     * this page.
+     * Check if the search key is smaller than the parent's starting key for this page.
      *
-     * We can't compare against slot 0 on a row-store internal page because
-     * reconciliation doesn't build it, it may not be a valid key.
+     * We can't compare against slot 0 on a row-store internal page because reconciliation doesn't
+     * build it, it may not be a valid key.
      */
     if (indx != 0) {
         __wt_ref_key(leaf->home, leaf, &item->data, &item->size);
@@ -241,12 +239,11 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *srch_key, WT_REF *leaf, WT_CU
     skiphigh = skiplow = 0;
 
     /*
-     * If a cursor repeatedly appends to the tree, compare the search key
-     * against the last key on each internal page during insert before
-     * doing the full binary search.
+     * If a cursor repeatedly appends to the tree, compare the search key against the last key on
+     * each internal page during insert before doing the full binary search.
      *
-     * Track if the descent is to the right-side of the tree, used to set
-     * the cursor's append history.
+     * Track if the descent is to the right-side of the tree, used to set the cursor's append
+     * history.
      */
     append_check = insert && cbt->append_tree;
     descend_right = true;
@@ -297,17 +294,14 @@ restart:
         /*
          * Fast-path appends.
          *
-         * The 0th key on an internal page is a problem for a couple of
-         * reasons.  First, we have to force the 0th key to sort less
-         * than any application key, so internal pages don't have to be
-         * updated if the application stores a new, "smallest" key in
-         * the tree.  Second, reconciliation is aware of this and will
-         * store a byte of garbage in the 0th key, so the comparison of
-         * an application key and a 0th key is meaningless (but doing
-         * the comparison could still incorrectly modify our tracking
-         * of the leading bytes in each key that we can skip during the
-         * comparison). For these reasons, special-case the 0th key, and
-         * never pass it to a collator.
+         * The 0th key on an internal page is a problem for a couple of reasons. First, we have to
+         * force the 0th key to sort less than any application key, so internal pages don't have to
+         * be updated if the application stores a new, "smallest" key in the tree. Second,
+         * reconciliation is aware of this and will store a byte of garbage in the 0th key, so the
+         * comparison of an application key and a 0th key is meaningless (but doing the comparison
+         * could still incorrectly modify our tracking of the leading bytes in each key that we can
+         * skip during the comparison). For these reasons, special-case the 0th key, and never pass
+         * it to a collator.
          */
         if (append_check) {
             descent = pindex->index[pindex->entries - 1];
@@ -420,16 +414,13 @@ descend:
         WT_DIAGNOSTIC_YIELD;
 
         /*
-         * Swap the current page for the child page. If the page splits
-         * while we're retrieving it, restart the search at the root.
-         * We cannot restart in the "current" page; for example, if a
-         * thread is appending to the tree, the page it's waiting for
-         * did an insert-split into the parent, then the parent split
-         * into its parent, the name space we are searching for may have
-         * moved above the current page in the tree.
+         * Swap the current page for the child page. If the page splits while we're retrieving it,
+         * restart the search at the root. We cannot restart in the "current" page; for example, if
+         * a thread is appending to the tree, the page it's waiting for did an insert-split into the
+         * parent, then the parent split into its parent, the name space we are searching for may
+         * have moved above the current page in the tree.
          *
-         * On other error, simply return, the swap call ensures we're
-         * holding nothing on failure.
+         * On other error, simply return, the swap call ensures we're holding nothing on failure.
          */
         read_flags = WT_READ_RESTART_OK;
         if (F_ISSET(cbt, WT_CBT_READ_ONCE))
@@ -458,21 +449,17 @@ leaf_only:
     current = NULL;
 
     /*
-     * In the case of a right-side tree descent during an insert, do a fast
-     * check for an append to the page, try to catch cursors appending data
-     * into the tree.
+     * In the case of a right-side tree descent during an insert, do a fast check for an append to
+     * the page, try to catch cursors appending data into the tree.
      *
-     * It's tempting to make this test more rigorous: if a cursor inserts
-     * randomly into a two-level tree (a root referencing a single child
-     * that's empty except for an insert list), the right-side descent flag
-     * will be set and this comparison wasted.  The problem resolves itself
-     * as the tree grows larger: either we're no longer doing right-side
-     * descent, or we'll avoid additional comparisons in internal pages,
-     * making up for the wasted comparison here.  Similarly, the cursor's
-     * history is set any time it's an insert and a right-side descent,
-     * both to avoid a complicated/expensive test, and, in the case of
-     * multiple threads appending to the tree, we want to mark them all as
-     * appending, even if this test doesn't work.
+     * It's tempting to make this test more rigorous: if a cursor inserts randomly into a two-level
+     * tree (a root referencing a single child that's empty except for an insert list), the
+     * right-side descent flag will be set and this comparison wasted. The problem resolves itself
+     * as the tree grows larger: either we're no longer doing right-side descent, or we'll avoid
+     * additional comparisons in internal pages, making up for the wasted comparison here.
+     * Similarly, the cursor's history is set any time it's an insert and a right-side descent, both
+     * to avoid a complicated/expensive test, and, in the case of multiple threads appending to the
+     * tree, we want to mark them all as appending, even if this test doesn't work.
      */
     if (insert && descend_right) {
         cbt->append_tree = 1;

@@ -207,10 +207,9 @@ __rename_table(WT_SESSION_IMPL *session, const char *uri, const char *newuri, co
     /*
      * Open the table so we can rename its column groups and indexes.
      *
-     * Ideally we would keep the table locked exclusive across the rename,
-     * but for now we rely on the global table lock to prevent the table
-     * being reopened while it is being renamed.  One issue is that the
-     * WT_WITHOUT_LOCKS macro can drop and reacquire the global table lock,
+     * Ideally we would keep the table locked exclusive across the rename, but for now we rely on
+     * the global table lock to prevent the table being reopened while it is being renamed. One
+     * issue is that the WT_WITHOUT_LOCKS macro can drop and reacquire the global table lock,
      * avoiding deadlocks while waiting for LSM operation to quiesce.
      */
     WT_RET(__wt_schema_get_table(session, oldname, strlen(oldname), false, 0, &table));

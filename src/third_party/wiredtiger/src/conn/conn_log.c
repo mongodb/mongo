@@ -97,13 +97,11 @@ __logmgr_version(WT_SESSION_IMPL *session, bool reconfig)
         return (0);
 
     /*
-     * Set the log file format versions based on compatibility versions
-     * set in the connection.  We must set this before we call log_open
-     * to open or create a log file.
+     * Set the log file format versions based on compatibility versions set in the connection. We
+     * must set this before we call log_open to open or create a log file.
      *
-     * Note: downgrade in this context means the new version is not the
-     * latest possible version. It does not mean the direction of change
-     * from the release we may be running currently.
+     * Note: downgrade in this context means the new version is not the latest possible version. It
+     * does not mean the direction of change from the release we may be running currently.
      */
     if (conn->compat_major < WT_LOG_V2_MAJOR) {
         new_version = 1;
@@ -148,15 +146,12 @@ __logmgr_version(WT_SESSION_IMPL *session, bool reconfig)
     if (log->log_version == new_version)
         return (0);
     /*
-     * If we are reconfiguring and at a new version we need to force
-     * the log file to advance so that we write out a log file at the
-     * correct version.  When we are downgrading we must force a checkpoint
-     * and finally archive, even if disabled, so that all new version log
-     * files are gone.
+     * If we are reconfiguring and at a new version we need to force the log file to advance so that
+     * we write out a log file at the correct version. When we are downgrading we must force a
+     * checkpoint and finally archive, even if disabled, so that all new version log files are gone.
      *
-     * All of the version changes must be handled with locks on reconfigure
-     * because other threads may be changing log files, using pre-allocated
-     * files.
+     * All of the version changes must be handled with locks on reconfigure because other threads
+     * may be changing log files, using pre-allocated files.
      */
     /*
      * Set the version. If it is a live change the logging subsystem will do other work as well to
@@ -180,22 +175,20 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp, bool rec
     bool enabled;
 
     /*
-     * A note on reconfiguration: the standard "is this configuration string
-     * allowed" checks should fail if reconfiguration has invalid strings,
-     * for example, "log=(enabled)", or "statistics_log=(path=XXX)", because
-     * the connection reconfiguration method doesn't allow those strings.
-     * Additionally, the base configuration values during reconfiguration
-     * are the currently configured values (so we don't revert to default
-     * values when repeatedly reconfiguring), and configuration processing
-     * of a currently set value should not change the currently set value.
+     * A note on reconfiguration: the standard "is this configuration string allowed" checks should
+     * fail if reconfiguration has invalid strings, for example, "log=(enabled)", or
+     * "statistics_log=(path=XXX)", because the connection reconfiguration method doesn't allow
+     * those strings. Additionally, the base configuration values during reconfiguration are the
+     * currently configured values (so we don't revert to default values when repeatedly
+     * reconfiguring), and configuration processing of a currently set value should not change the
+     * currently set value.
      *
-     * In this code path, log server reconfiguration does not stop/restart
-     * the log server, so there's no point in re-evaluating configuration
-     * strings that cannot be reconfigured, risking bugs in configuration
-     * setup, and depending on evaluation of currently set values to always
-     * result in the currently set value. Skip tests for any configuration
-     * strings which don't make sense during reconfiguration, but don't
-     * worry about error reporting because it should never happen.
+     * In this code path, log server reconfiguration does not stop/restart the log server, so
+     * there's no point in re-evaluating configuration strings that cannot be reconfigured, risking
+     * bugs in configuration setup, and depending on evaluation of currently set values to always
+     * result in the currently set value. Skip tests for any configuration strings which don't make
+     * sense during reconfiguration, but don't worry about error reporting because it should never
+     * happen.
      */
 
     conn = S2C(session);
@@ -204,11 +197,10 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp, bool rec
     enabled = cval.val != 0;
 
     /*
-     * If we're reconfiguring, enabled must match the already
-     * existing setting.
+     * If we're reconfiguring, enabled must match the already existing setting.
      *
-     * If it is off and the user it turning it on, or it is on
-     * and the user is turning it off, return an error.
+     * If it is off and the user it turning it on, or it is on and the user is turning it off,
+     * return an error.
      *
      * See above: should never happen.
      */
@@ -230,9 +222,8 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp, bool rec
     *runp = enabled;
 
     /*
-     * Setup a log path and compression even if logging is disabled in case
-     * we are going to print a log.  Only do this on creation.  Once a
-     * compressor or log path are set they cannot be changed.
+     * Setup a log path and compression even if logging is disabled in case we are going to print a
+     * log. Only do this on creation. Once a compressor or log path are set they cannot be changed.
      *
      * See above: should never happen.
      */
@@ -254,9 +245,9 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp, bool rec
         FLD_SET(conn->log_flags, WT_CONN_LOG_ARCHIVE);
 
     /*
-     * The file size cannot be reconfigured. The amount of memory allocated
-     * to the log slots may be based on the log file size at creation and we
-     * don't want to re-allocate that memory while running.
+     * The file size cannot be reconfigured. The amount of memory allocated to the log slots may be
+     * based on the log file size at creation and we don't want to re-allocate that memory while
+     * running.
      *
      * See above: should never happen.
      */
@@ -286,8 +277,8 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp, bool rec
         conn->log_prealloc = 1;
 
     /*
-     * Note it's meaningless to reconfigure this value during runtime, it
-     * only matters on create before recovery runs.
+     * Note it's meaningless to reconfigure this value during runtime, it only matters on create
+     * before recovery runs.
      *
      * See above: should never happen.
      */
@@ -598,13 +589,11 @@ __log_file_server(void *arg)
              */
             min_lsn = log->write_lsn;
             /*
-             * We have to wait until the LSN we asked for is
-             * written.  If it isn't signal the wrlsn thread
-             * to get it written.
+             * We have to wait until the LSN we asked for is written. If it isn't signal the wrlsn
+             * thread to get it written.
              *
-             * We also have to wait for the written LSN and the
-             * sync LSN to be in the same file so that we know we
-             * have synchronized all earlier log files.
+             * We also have to wait for the written LSN and the sync LSN to be in the same file so
+             * that we know we have synchronized all earlier log files.
              */
             if (__wt_log_cmp(&log->bg_sync_lsn, &min_lsn) <= 0) {
                 /*

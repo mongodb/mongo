@@ -4,7 +4,7 @@
 #
 
 functions:
-  "fetch source" :
+  "get project" :
     command: git.get_project
     params:
       directory: wiredtiger
@@ -13,7 +13,7 @@ functions:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${build_id}.tgz
+        remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${dependent_task|compile}_${build_id}.tgz
         bucket: build_external
         extract_to: wiredtiger
   "fetch artifacts from little-endian" :
@@ -55,11 +55,12 @@ functions:
         set -o verbose
         if [ "Windows_NT" = "$OS" ]; then
           pip install scons==3.1.1
-          scons-3.1.1.bat --enable-python=c:\\swigwin-3.0.2\\swig.exe --enable-diagnostic ${smp_command|}
+          scons-3.1.1.bat ${win_configure_flags|--enable-python=c:\\swigwin-3.0.2\\swig.exe --enable-diagnostic} ${smp_command|}
         else
           cd build_posix
           sh ./reconf
-          ${configure_env_vars|} ../configure ${configure_python_setting|} --enable-diagnostic --enable-python --enable-zlib --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
+          ${configure_env_vars|} ../configure ${configure_python_setting|} \
+            ${posix_configure_flags|--enable-diagnostic --enable-python --enable-zlib --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL}
           ${make_command|make} ${smp_command|} 2>&1
 
           # On macOS, change the binary location with install_name_tool since DYLD_LIBRARY_PATH
@@ -71,62 +72,59 @@ functions:
             install_name_tool -change /usr/local/lib/libwiredtiger-$WT_VERSION.dylib $(pwd)/.libs/libwiredtiger-$WT_VERSION.dylib .libs/wt
           fi
         fi
-
-pre:
-  - command: shell.exec
+  "make check directory":
+    command: shell.exec
     params:
-      script: |
-        rm -rf "wiredtiger"
-post:
-  - command: shell.exec
-    params:
-      working_dir: "wiredtiger"
+      working_dir: "wiredtiger/build_posix"
       script: |
         set -o errexit
         set -o verbose
-        tar cfz ../wiredtiger.tgz .
-  - command: s3.put
+
+        ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C ${directory}  ${smp_command|} 2>&1
+  "upload artifact":
+    - command: archive.targz_pack
+      params:
+        target: "wiredtiger.tgz"
+        source_dir: "wiredtiger"
+        include:
+          - "./**"
+    - command: s3.put
+      params:
+        aws_secret: ${aws_secret}
+        aws_key: ${aws_key}
+        local_file: wiredtiger.tgz
+        bucket: build_external
+        permissions: public-read
+        content_type: application/tar
+        display_name: Artifacts
+        remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${task_name}_${build_id}.tgz
+  "cleanup":
+    command: shell.exec
     params:
-      aws_secret: ${aws_secret}
-      aws_key: ${aws_key}
-      local_file: wiredtiger.tgz
-      bucket: build_external
-      permissions: public-read
-      content_type: application/tar
-      display_name: Artifacts
-      remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${task_id}.tgz
+      script: |
+        rm -rf "wiredtiger"
+        rm -rf "wiredtiger.tgz"
+
+pre:
+  - func: "cleanup"
+post:
+  - func: "upload artifact"
+  - func: "cleanup"
 
 tasks:
 ## Base compile task on posix flavours
   - name: compile
     commands:
-      - func: "fetch source"
-      - command: git.apply_patch
-        params:
-          directory: wiredtiger
+      - func: "get project"
       - func: "compile wiredtiger"
-      - command: archive.targz_pack
-        params:
-          target: "wiredtiger.tgz"
-          source_dir: "wiredtiger"
-          include:
-            - "./**"
-      - command: s3.put
-        params:
-          aws_secret: ${aws_secret}
-          aws_key: ${aws_key}
-          local_file: wiredtiger.tgz
-          bucket: build_external
-          permissions: public-read
-          content_type: application/tar
-          display_name: Artifacts_compile
-          remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${build_id}.tgz
-      # Remove the artifacts here so the later post commands won't perform duplicated archiving.
-      - command: shell.exec
-        params:
-          script: |
-            rm -rf "wiredtiger"
-            rm -rf "wiredtiger.tgz"
+
+  - name: compile-asan
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:disable_coredump=0 ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer CFLAGS=-fsanitize=address
+          posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic --disable-static
 
   - name: make-check-test
     depends_on:
@@ -151,14 +149,9 @@ tasks:
     commands:
       - func: "fetch artifacts"
       - func: "compile wiredtiger"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C lang/python ${smp_command|} 2>&1
+      - func: "make check directory"
+        vars:
+          directory: lang/python
 
   - name: examples-c-test
     depends_on:
@@ -166,14 +159,24 @@ tasks:
     commands:
       - func: "fetch artifacts"
       - func: "compile wiredtiger"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix"
-          script: |
-            set -o errexit
-            set -o verbose
+      - func: "make check directory"
+        vars:
+          directory: examples/c
 
-            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C examples/c  ${smp_command|} 2>&1
+  - name: examples-c-test-asan
+    depends_on:
+      - name: compile-asan
+    commands:
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: compile-asan
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:disable_coredump=0 ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer CFLAGS=-fsanitize=address
+          posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic --disable-static
+      - func: "make check directory"
+        vars:
+          directory: examples/c
 
   - name: bloom-test
     depends_on:
@@ -181,14 +184,9 @@ tasks:
     commands:
       - func: "fetch artifacts"
       - func: "compile wiredtiger"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C test/bloom  ${smp_command|} 2>&1
+      - func: "make check directory"
+        vars:
+          directory: test/bloom
 
   - name: checkpoint-test
     depends_on:
@@ -196,14 +194,9 @@ tasks:
     commands:
       - func: "fetch artifacts"
       - func: "compile wiredtiger"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C test/checkpoint ${smp_command|} 2>&1
+      - func: "make check directory"
+        vars:
+          directory: test/checkpoint
 
   - name: cursor-order-test
     depends_on:
@@ -211,14 +204,9 @@ tasks:
     commands:
       - func: "fetch artifacts"
       - func: "compile wiredtiger"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C test/cursor_order ${smp_command|} 2>&1
+      - func: "make check directory"
+        vars:
+          directory: test/cursor_order
 
   - name: fops-test
     depends_on:
@@ -226,14 +214,9 @@ tasks:
     commands:
       - func: "fetch artifacts"
       - func: "compile wiredtiger"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C test/fops ${smp_command|} 2>&1
+      - func: "make check directory"
+        vars:
+          directory: test/fops
 
   - name: format-test
     depends_on:
@@ -241,14 +224,9 @@ tasks:
     commands:
       - func: "fetch artifacts"
       - func: "compile wiredtiger"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C test/format ${smp_command|} 2>&1
+      - func: "make check directory"
+        vars:
+          directory: test/format
 
   - name: huge-test
     depends_on:
@@ -256,14 +234,9 @@ tasks:
     commands:
       - func: "fetch artifacts"
       - func: "compile wiredtiger"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C test/huge ${smp_command|} 2>&1
+      - func: "make check directory"
+        vars:
+          directory: test/huge
 
   - name: manydbs-test
     depends_on:
@@ -271,14 +244,9 @@ tasks:
     commands:
       - func: "fetch artifacts"
       - func: "compile wiredtiger"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C test/manydbs ${smp_command|} 2>&1
+      - func: "make check directory"
+        vars:
+          directory: test/manydbs
 
   - name: packing-test
     depends_on:
@@ -286,14 +254,9 @@ tasks:
     commands:
       - func: "fetch artifacts"
       - func: "compile wiredtiger"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C test/packing ${smp_command|} 2>&1
+      - func: "make check directory"
+        vars:
+          directory: test/packing
 
   - name: readonly-test
     depends_on:
@@ -301,14 +264,9 @@ tasks:
     commands:
       - func: "fetch artifacts"
       - func: "compile wiredtiger"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C test/readonly ${smp_command|} 2>&1
+      - func: "make check directory"
+        vars:
+          directory: test/readonly
 
   - name: salvage-test
     depends_on:
@@ -316,14 +274,9 @@ tasks:
     commands:
       - func: "fetch artifacts"
       - func: "compile wiredtiger"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C test/salvage ${smp_command|} 2>&1
+      - func: "make check directory"
+        vars:
+          directory: test/salvage
 
   - name: thread-test
     depends_on:
@@ -331,14 +284,9 @@ tasks:
     commands:
       - func: "fetch artifacts"
       - func: "compile wiredtiger"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C test/thread ${smp_command|} 2>&1
+      - func: "make check directory"
+        vars:
+          directory: test/thread
 
   - name: bench-wtperf-test
     depends_on:
@@ -346,14 +294,9 @@ tasks:
     commands:
       - func: "fetch artifacts"
       - func: "compile wiredtiger"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C bench/wtperf ${smp_command|} 2>&1
+      - func: "make check directory"
+        vars:
+          directory: bench/wtperf
 
   # End of normal make check test tasks
 
@@ -857,7 +800,7 @@ tasks:
             # Avoid /usr/bin/python, at least on macOS: with System Integrity
             # Protection enabled, it ignores DYLD_LIBRARY_PATH and hence
             # doesn't find the WiredTiger library in the local tree.
-            ${test_env_vars|} python ../test/suite/run.py -v 2 ${smp_command|} 2>&1
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py -v 2 ${smp_command|} 2>&1
 
   # Break out Python unit tests into multiple buckets/tasks based on test name and runtime
   # The test/suite/run.py script can work out test names by casting each command argument
@@ -1028,7 +971,7 @@ tasks:
 
   - name: million-collection-test
     commands:
-      - func: "fetch source"
+      - func: "get project"
       - func: "fetch mongo-tests repo"
       - command: shell.exec
         params:
@@ -1043,7 +986,7 @@ tasks:
 
   - name: compatibility-test-for-mongodb-releases
     commands:
-      - func: "fetch source"
+      - func: "get project"
       - command: shell.exec
         params:
           working_dir: "wiredtiger"
@@ -1243,6 +1186,8 @@ buildvariants:
     - name: unit-test-bucket06
     - name: unit-test-bucket07
     - name: fops
+    - name: compile-asan
+    - name: examples-c-test-asan
 
 - name: ubuntu1804-python3
   display_name: Ubuntu 18.04 (Python3)
@@ -1265,6 +1210,21 @@ buildvariants:
     - name: unit-test-bucket05
     - name: unit-test-bucket06
     - name: unit-test-bucket07
+
+- name: rhel80
+  display_name: RHEL 8.0
+  run_on:
+  - rhel80-test
+  expansions:
+    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
+    smp_command: -j $(grep -c ^processor /proc/cpuinfo)
+    configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+    make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
+  tasks:
+    - name: compile
+    - name: make-check-test
+    - name: unit-test
+    - name: fops
 
 - name: large-scale-test
   display_name: Large scale testing

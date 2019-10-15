@@ -154,13 +154,11 @@ fill_db(void)
     save_lsn.l.file = 0;
 
     /*
-     * Write data into the table until we move to log file 2.
-     * We do the calculation below so that we don't have to walk the
-     * log for every record.
+     * Write data into the table until we move to log file 2. We do the calculation below so that we
+     * don't have to walk the log for every record.
      *
-     * Calculate about how many records should fit in the log file.
-     * Subtract a bunch for metadata and file creation records.
-     * Then subtract out a few more records to be conservative.
+     * Calculate about how many records should fit in the log file. Subtract a bunch for metadata
+     * and file creation records. Then subtract out a few more records to be conservative.
      */
     units = (K_SIZE + V_SIZE) / 128 + 1;
     min_key = 90000 / (units * 128) - 15;

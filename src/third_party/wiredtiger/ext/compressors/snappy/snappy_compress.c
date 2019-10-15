@@ -128,9 +128,8 @@ snappy_compression(WT_COMPRESSOR *compressor, WT_SESSION *session, uint8_t *src,
         *compression_failed = 0;
 
         /*
-         * On decompression, snappy requires an exact compressed byte
-         * count (the current value of snaplen). WiredTiger does not
-         * preserve that value, so save snaplen at the beginning of
+         * On decompression, snappy requires an exact compressed byte count (the current value of
+         * snaplen). WiredTiger does not preserve that value, so save snaplen at the beginning of
          * the destination buffer.
          *
          * Store the value in little-endian format.

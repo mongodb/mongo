@@ -289,13 +289,12 @@ __wt_lsm_tree_setup_chunk(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LS
     WT_RET(__wt_lsm_tree_chunk_name(session, lsm_tree, chunk->id, chunk->generation, &chunk->uri));
 
     /*
-     * If the underlying file exists, drop the chunk first - there may be
-     * some content hanging over from an aborted merge or checkpoint.
+     * If the underlying file exists, drop the chunk first - there may be some content hanging over
+     * from an aborted merge or checkpoint.
      *
-     * Don't do this for the very first chunk: we are called during
-     * WT_SESSION::create, and doing a drop inside there does interesting
-     * things with handle locks and metadata tracking.  It can never have
-     * been the result of an interrupted merge, anyway.
+     * Don't do this for the very first chunk: we are called during WT_SESSION::create, and doing a
+     * drop inside there does interesting things with handle locks and metadata tracking. It can
+     * never have been the result of an interrupted merge, anyway.
      */
     if (chunk->id > 1)
         WT_RET(__lsm_tree_cleanup_old(session, chunk->uri));
@@ -660,8 +659,7 @@ __wt_lsm_tree_throttle(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool dec
     /*
      * Merge throttling, based on the number of on-disk, level 0 chunks.
      *
-     * Don't throttle if the tree has less than a single level's number
-     * of chunks.
+     * Don't throttle if the tree has less than a single level's number of chunks.
      */
     if (F_ISSET(lsm_tree, WT_LSM_TREE_MERGES)) {
         if (lsm_tree->nchunks < lsm_tree->merge_max)

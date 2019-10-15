@@ -87,8 +87,7 @@ typedef struct __wt_huffman_obj {
 /*
  * Queue element data structure.
  *
- * Consists of a pointer to a huffman tree node, and a pointer to the next
- * element in the queue.
+ * Consists of a pointer to a huffman tree node, and a pointer to the next element in the queue.
  */
 typedef struct node_queue_elem {
     WT_FREQTREE_NODE *node;
@@ -98,8 +97,8 @@ typedef struct node_queue_elem {
 /*
  * Queue of huffman tree nodes.
  *
- * Contains a pointer to the beginning and the end of the queue, which is
- * implemented as a linked list.
+ * Contains a pointer to the beginning and the end of the queue, which is implemented as a linked
+ * list.
  */
 typedef struct node_queue {
     NODE_QUEUE_ELEM *first;
@@ -381,9 +380,8 @@ __wt_huffman_open(
     /*
      * Adding the leaves to the queue.
      *
-     * Discard symbols with a frequency of 0; this assumes these symbols
-     * never occur in the source stream, and the purpose is to reduce the
-     * huffman tree's size.
+     * Discard symbols with a frequency of 0; this assumes these symbols never occur in the source
+     * stream, and the purpose is to reduce the huffman tree's size.
      */
     for (i = 0; i < symcnt; ++i)
         if (indexed_freqs[i].frequency > 0) {

@@ -168,9 +168,8 @@ __wt_las_create(WT_SESSION_IMPL *session, const char **cfg)
         return (0);
 
     /*
-     * Done at startup: we cannot do it on demand because we require the
-     * schema lock to create and drop the table, and it may not always be
-     * available.
+     * Done at startup: we cannot do it on demand because we require the schema lock to create and
+     * drop the table, and it may not always be available.
      *
      * Discard any previous incarnation of the table.
      */
@@ -262,13 +261,11 @@ __wt_las_cursor_open(WT_SESSION_IMPL *session)
         S2C(session)->cache->las_fileid = btree->id;
 
     /*
-     * Set special flags for the lookaside table: the lookaside flag (used,
-     * for example, to avoid writing records during reconciliation), also
-     * turn off checkpoints and logging.
+     * Set special flags for the lookaside table: the lookaside flag (used, for example, to avoid
+     * writing records during reconciliation), also turn off checkpoints and logging.
      *
-     * Test flags before setting them so updates can't race in subsequent
-     * opens (the first update is safe because it's single-threaded from
-     * wiredtiger_open).
+     * Test flags before setting them so updates can't race in subsequent opens (the first update is
+     * safe because it's single-threaded from wiredtiger_open).
      */
     if (!F_ISSET(btree, WT_BTREE_LOOKASIDE))
         F_SET(btree, WT_BTREE_LOOKASIDE);
@@ -296,13 +293,11 @@ __wt_las_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp, uint32_t *session
     *cursorp = NULL;
 
     /*
-     * We don't want to get tapped for eviction after we start using the
-     * lookaside cursor; save a copy of the current eviction state, we'll
-     * turn eviction off before we return.
+     * We don't want to get tapped for eviction after we start using the lookaside cursor; save a
+     * copy of the current eviction state, we'll turn eviction off before we return.
      *
-     * Don't cache lookaside table pages, we're here because of eviction
-     * problems and there's no reason to believe lookaside pages will be
-     * useful more than once.
+     * Don't cache lookaside table pages, we're here because of eviction problems and there's no
+     * reason to believe lookaside pages will be useful more than once.
      */
     *session_flags = F_MASK(session, WT_LAS_SESSION_FLAGS);
 
@@ -400,21 +395,19 @@ __wt_las_page_skip_locked(WT_SESSION_IMPL *session, WT_REF *ref)
     txn = &session->txn;
 
     /*
-     * Skip lookaside pages if reading without a timestamp and all the
-     * updates in lookaside are in the past.
+     * Skip lookaside pages if reading without a timestamp and all the updates in lookaside are in
+     * the past.
      *
-     * Lookaside eviction preferentially chooses the newest updates when
-     * creating page images with no stable timestamp. If a stable timestamp
-     * has been set, we have to visit the page because eviction chooses old
-     * version of records in that case.
+     * Lookaside eviction preferentially chooses the newest updates when creating page images with
+     * no stable timestamp. If a stable timestamp has been set, we have to visit the page because
+     * eviction chooses old version of records in that case.
      *
-     * One case where we may need to visit the page is if lookaside eviction
-     * is active in tree 2 when a checkpoint has started and is working its
-     * way through tree 1. In that case, lookaside may have created a page
-     * image with updates in the future of the checkpoint.
+     * One case where we may need to visit the page is if lookaside eviction is active in tree 2
+     * when a checkpoint has started and is working its way through tree 1. In that case, lookaside
+     * may have created a page image with updates in the future of the checkpoint.
      *
-     * We also need to instantiate a lookaside page if this is an update
-     * operation in progress or transaction is in prepared state.
+     * We also need to instantiate a lookaside page if this is an update operation in progress or
+     * transaction is in prepared state.
      */
     if (F_ISSET(txn, WT_TXN_PREPARE | WT_TXN_UPDATE))
         return (false);
@@ -437,16 +430,14 @@ __wt_las_page_skip_locked(WT_SESSION_IMPL *session, WT_REF *ref)
         return (!ref->page_las->has_prepares && ref->page_las->min_skipped_ts == WT_TS_MAX);
 
     /*
-     * Skip lookaside history if reading as of a timestamp, we evicted new
-     * versions of data and all the updates are in the past.  This is not
-     * possible for prepared updates, because the commit timestamp was not
-     * known when the page was evicted.
+     * Skip lookaside history if reading as of a timestamp, we evicted new versions of data and all
+     * the updates are in the past. This is not possible for prepared updates, because the commit
+     * timestamp was not known when the page was evicted.
      *
-     * Otherwise, skip reading lookaside history if everything on the page
-     * is older than the read timestamp, and the oldest update in lookaside
-     * newer than the page is in the future of the reader.  This seems
-     * unlikely, but is exactly what eviction tries to do when a checkpoint
-     * is running.
+     * Otherwise, skip reading lookaside history if everything on the page is older than the read
+     * timestamp, and the oldest update in lookaside newer than the page is in the future of the
+     * reader. This seems unlikely, but is exactly what eviction tries to do when a checkpoint is
+     * running.
      */
     if (!ref->page_las->has_prepares && ref->page_las->min_skipped_ts == WT_TS_MAX &&
       txn->read_timestamp >= ref->page_las->max_ondisk_ts)
@@ -830,13 +821,12 @@ __wt_las_cursor_position(WT_CURSOR *cursor, uint64_t pageid)
             WT_RET(cursor->next(cursor));
 
         /*
-         * Because of the special visibility rules for lookaside, a new
-         * block can appear in between our search and the block of
-         * interest. Keep trying while we have a key lower than we
+         * Because of the special visibility rules for lookaside, a new block can appear in between
+         * our search and the block of interest. Keep trying while we have a key lower than we
          * expect.
          *
-         * There may be no block of lookaside entries if they have been
-         * removed by WT_CONNECTION::rollback_to_stable.
+         * There may be no block of lookaside entries if they have been removed by
+         * WT_CONNECTION::rollback_to_stable.
          */
         WT_RET(cursor->get_key(cursor, &las_pageid, &las_id, &las_counter, &las_key));
         if (las_pageid >= pageid)
@@ -935,20 +925,17 @@ __las_sweep_count(WT_CACHE *cache)
     uint64_t las_entry_count;
 
     /*
-     * The sweep server is a slow moving thread. Try to review the entire
-     * lookaside table once every 5 minutes.
+     * The sweep server is a slow moving thread. Try to review the entire lookaside table once every
+     * 5 minutes.
      *
-     * The reason is because the lookaside table exists because we're seeing
-     * cache/eviction pressure (it allows us to trade performance and disk
-     * space for cache space), and it's likely lookaside blocks are being
-     * evicted, and reading them back in doesn't help things. A trickier,
-     * but possibly better, alternative might be to review all lookaside
-     * blocks in the cache in order to get rid of them, and slowly review
-     * lookaside blocks that have already been evicted.
+     * The reason is because the lookaside table exists because we're seeing cache/eviction pressure
+     * (it allows us to trade performance and disk space for cache space), and it's likely lookaside
+     * blocks are being evicted, and reading them back in doesn't help things. A trickier, but
+     * possibly better, alternative might be to review all lookaside blocks in the cache in order to
+     * get rid of them, and slowly review lookaside blocks that have already been evicted.
      *
-     * Put upper and lower bounds on the calculation: since reads of pages
-     * with lookaside entries are blocked during sweep, make sure we do
-     * some work but don't block reads for too long.
+     * Put upper and lower bounds on the calculation: since reads of pages with lookaside entries
+     * are blocked during sweep, make sure we do some work but don't block reads for too long.
      */
     las_entry_count = __las_entry_count(cache);
     return (
@@ -973,22 +960,17 @@ __las_sweep_init(WT_SESSION_IMPL *session)
     /*
      * If no files have been dropped and the lookaside file is empty, there's nothing to do.
      */
-    if (cache->las_dropped_next == 0) {
-        if (__wt_las_empty(session))
-            ret = WT_NOTFOUND;
-        goto err;
-    }
+    if (cache->las_dropped_next == 0 && __wt_las_empty(session))
+        WT_ERR(WT_NOTFOUND);
 
     /*
      * Record the current page ID: sweep will stop after this point.
      *
-     * Since the btree IDs we're scanning are closed, any eviction must
-     * have already completed, so we won't miss anything with this
-     * approach.
+     * Since the btree IDs we're scanning are closed, any eviction must have already completed, so
+     * we won't miss anything with this approach.
      *
-     * Also, if a tree is reopened and there is lookaside activity before
-     * this sweep completes, it will have a higher page ID and should not
-     * be removed.
+     * Also, if a tree is reopened and there is lookaside activity before this sweep completes, it
+     * will have a higher page ID and should not be removed.
      */
     cache->las_sweep_max_pageid = cache->las_pageid;
 
@@ -1068,12 +1050,10 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
     __wt_timing_stress(session, WT_TIMING_STRESS_LOOKASIDE_SWEEP);
 
     /*
-     * When continuing a sweep, position the cursor using the key from the
-     * last call (we don't care if we're before or after the key, either
-     * side is fine).
+     * When continuing a sweep, position the cursor using the key from the last call (we don't care
+     * if we're before or after the key, either side is fine).
      *
-     * Otherwise, we're starting a new sweep, gather the list of trees to
-     * sweep.
+     * Otherwise, we're starting a new sweep, gather the list of trees to sweep.
      */
     if (sweep_key->size != 0) {
         __wt_cursor_set_raw_key(cursor, sweep_key);
@@ -1134,10 +1114,9 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
         /*
          * If the entry belongs to a dropped tree, discard it.
          *
-         * Cursor opened overwrite=true: won't return WT_NOTFOUND
-         * should another thread remove the record before we do (not
-         * expected for dropped trees), and the cursor remains
-         * positioned in that case.
+         * Cursor opened overwrite=true: won't return WT_NOTFOUND should another thread remove the
+         * record before we do (not expected for dropped trees), and the cursor remains positioned
+         * in that case.
          */
         if (las_id >= cache->las_sweep_dropmin && las_id <= cache->las_sweep_dropmax &&
           __bit_test(cache->las_sweep_dropmap, las_id - cache->las_sweep_dropmin)) {
@@ -1158,13 +1137,11 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
           &prepare_state, &upd_type, &las_value));
 
         /*
-         * Check to see if the page or key has changed this iteration,
-         * and if they have, setup context for safely removing obsolete
-         * updates.
+         * Check to see if the page or key has changed this iteration, and if they have, setup
+         * context for safely removing obsolete updates.
          *
-         * It's important to check for page boundaries explicitly
-         * because it is possible for the same key to be at the start
-         * of the next block. See WT-3982 for details.
+         * It's important to check for page boundaries explicitly because it is possible for the
+         * same key to be at the start of the next block. See WT-3982 for details.
          */
         if (las_pageid != saved_pageid || saved_key->size != las_key.size ||
           memcmp(saved_key->data, las_key.data, las_key.size) != 0) {

@@ -495,11 +495,10 @@ __curtable_insert(WT_CURSOR *cursor)
     /*
      * Split out the first insert, it may be allocating a recno.
      *
-     * If the table has indices, we also need to know whether this record
-     * is replacing an existing record so that the existing index entries
-     * can be removed.  We discover if this is an overwrite by configuring
-     * the primary cursor for no-overwrite, and checking if the insert
-     * detects a duplicate key.
+     * If the table has indices, we also need to know whether this record is replacing an existing
+     * record so that the existing index entries can be removed. We discover if this is an overwrite
+     * by configuring the primary cursor for no-overwrite, and checking if the insert detects a
+     * duplicate key.
      */
     cp = ctable->cg_cursors;
     primary = *cp++;
@@ -675,12 +674,12 @@ __curtable_reserve(WT_CURSOR *cursor)
     JOINABLE_CURSOR_UPDATE_API_CALL(cursor, session, update);
 
     /*
-     * We don't have to open the indices here, but it makes the code similar
-     * to other cursor functions, and it's odd for a reserve call to succeed
-     * but the subsequent update fail opening indices.
+     * We don't have to open the indices here, but it makes the code similar to other cursor
+     * functions, and it's odd for a reserve call to succeed but the subsequent update fail opening
+     * indices.
      *
-     * Check for a transaction before index open, opening the indices will
-     * start a transaction if one isn't running.
+     * Check for a transaction before index open, opening the indices will start a transaction if
+     * one isn't running.
      */
     WT_ERR(__wt_txn_context_check(session, true));
     WT_ERR(__curtable_open_indices(ctable));
@@ -731,10 +730,9 @@ __wt_table_range_truncate(WT_CURSOR_TABLE *start, WT_CURSOR_TABLE *stop)
     /*
      * Step through the cursor range, removing the index entries.
      *
-     * If there are indices, copy the key we're using to step through the
-     * cursor range (so we can reset the cursor to its original position),
-     * then remove all of the index records in the truncated range.  Copy
-     * the raw key because the memory is only valid until the cursor moves.
+     * If there are indices, copy the key we're using to step through the cursor range (so we can
+     * reset the cursor to its original position), then remove all of the index records in the
+     * truncated range. Copy the raw key because the memory is only valid until the cursor moves.
      */
     if (ctable->table->nindices > 0) {
         if (start == NULL) {

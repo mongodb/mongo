@@ -153,13 +153,12 @@ static WT_EVENT_HANDLER event_handler = {
 };
 
 /*
- * The following are various schema-related functions to have some threads
- * performing during the test. The goal is to make sure that after a random
- * abort, the database is left in a recoverable state. Yield during the
- * schema operations to increase chance of abort during them.
+ * The following are various schema-related functions to have some threads performing during the
+ * test. The goal is to make sure that after a random abort, the database is left in a recoverable
+ * state. Yield during the schema operations to increase chance of abort during them.
  *
- * TODO: Currently only verifies insert data, it would be ideal to modify the
- * schema operations so that we can verify the state of the schema too.
+ * TODO: Currently only verifies insert data, it would be ideal to modify the schema operations so
+ * that we can verify the state of the schema too.
  */
 
 static void

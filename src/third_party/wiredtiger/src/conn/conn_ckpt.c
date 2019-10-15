@@ -140,8 +140,8 @@ __ckpt_server_start(WT_CONNECTION_IMPL *conn)
     /*
      * The checkpoint server gets its own session.
      *
-     * Checkpoint does enough I/O it may be called upon to perform slow
-     * operations for the block manager.
+     * Checkpoint does enough I/O it may be called upon to perform slow operations for the block
+     * manager.
      */
     session_flags = WT_SESSION_CAN_WAIT;
     WT_RET(__wt_open_internal_session(

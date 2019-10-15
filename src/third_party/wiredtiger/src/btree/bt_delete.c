@@ -11,51 +11,42 @@
 /*
  * Fast-delete support.
  *
- * This file contains most of the code that allows WiredTiger to delete pages
- * of data without reading them into the cache.  (This feature is currently
- * only available for row-store objects.)
+ * This file contains most of the code that allows WiredTiger to delete pages of data without
+ * reading them into the cache. (This feature is currently only available for row-store objects.)
  *
- * The way cursor truncate works in a row-store object is it explicitly reads
- * the first and last pages of the truncate range, then walks the tree with a
- * flag so the tree walk code skips reading eligible pages within the range
- * and instead just marks them as deleted, by changing their WT_REF state to
- * WT_REF_DELETED. Pages ineligible for this fast path include pages already
- * in the cache, having overflow items, or requiring lookaside records.
- * Ineligible pages are read and have their rows updated/deleted individually.
- * The transaction for the delete operation is stored in memory referenced by
- * the WT_REF.page_del field.
+ * The way cursor truncate works in a row-store object is it explicitly reads the first and last
+ * pages of the truncate range, then walks the tree with a flag so the tree walk code skips reading
+ * eligible pages within the range and instead just marks them as deleted, by changing their WT_REF
+ * state to WT_REF_DELETED. Pages ineligible for this fast path include pages already in the cache,
+ * having overflow items, or requiring lookaside records. Ineligible pages are read and have their
+ * rows updated/deleted individually. The transaction for the delete operation is stored in memory
+ * referenced by the WT_REF.page_del field.
  *
- * Future cursor walks of the tree will skip the deleted page based on the
- * transaction stored for the delete, but it gets more complicated if a read is
- * done using a random key, or a cursor walk is done with a transaction where
- * the delete is not visible.  In those cases, we read the original contents of
- * the page.  The page-read code notices a deleted page is being read, and as
- * part of the read instantiates the contents of the page, creating a WT_UPDATE
- * with a deleted operation, in the same transaction as deleted the page.  In
- * other words, the read process makes it appear as if the page was read and
- * each individual row deleted, exactly as would have happened if the page had
+ * Future cursor walks of the tree will skip the deleted page based on the transaction stored for
+ * the delete, but it gets more complicated if a read is done using a random key, or a cursor walk
+ * is done with a transaction where the delete is not visible. In those cases, we read the original
+ * contents of the page. The page-read code notices a deleted page is being read, and as part of the
+ * read instantiates the contents of the page, creating a WT_UPDATE with a deleted operation, in the
+ * same transaction as deleted the page. In other words, the read process makes it appear as if the
+ * page was read and each individual row deleted, exactly as would have happened if the page had
  * been in the cache all along.
  *
- * There's an additional complication to support rollback of the page delete.
- * When the page was marked deleted, a pointer to the WT_REF was saved in the
- * deleting session's transaction list and the delete is unrolled by resetting
- * the WT_REF_DELETED state back to WT_REF_DISK.  However, if the page has been
- * instantiated by some reading thread, that's not enough, each individual row
- * on the page must have the delete operation reset.  If the page split, the
- * WT_UPDATE lists might have been saved/restored during reconciliation and
- * appear on multiple pages, and the WT_REF stored in the deleting session's
- * transaction list is no longer useful.  For this reason, when the page is
- * instantiated by a read, a list of the WT_UPDATE structures on the page is
- * stored in the WT_REF.page_del field, with the transaction ID, that way the
- * session committing/unrolling the delete can find all WT_UPDATE structures
- * that require update.
+ * There's an additional complication to support rollback of the page delete. When the page was
+ * marked deleted, a pointer to the WT_REF was saved in the deleting session's transaction list and
+ * the delete is unrolled by resetting the WT_REF_DELETED state back to WT_REF_DISK. However, if the
+ * page has been instantiated by some reading thread, that's not enough, each individual row on the
+ * page must have the delete operation reset. If the page split, the WT_UPDATE lists might have been
+ * saved/restored during reconciliation and appear on multiple pages, and the WT_REF stored in the
+ * deleting session's transaction list is no longer useful. For this reason, when the page is
+ * instantiated by a read, a list of the WT_UPDATE structures on the page is stored in the
+ * WT_REF.page_del field, with the transaction ID, that way the session committing/unrolling the
+ * delete can find all WT_UPDATE structures that require update.
  *
- * One final note: pages can also be marked deleted if emptied and evicted.  In
- * that case, the WT_REF state will be set to WT_REF_DELETED but there will not
- * be any associated WT_REF.page_del field.  These pages are always skipped
- * during cursor traversal (the page could not have been evicted if there were
- * updates that weren't globally visible), and if read is forced to instantiate
- * such a page, it simply creates an empty page from scratch.
+ * One final note: pages can also be marked deleted if emptied and evicted. In that case, the WT_REF
+ * state will be set to WT_REF_DELETED but there will not be any associated WT_REF.page_del field.
+ * These pages are always skipped during cursor traversal (the page could not have been evicted if
+ * there were updates that weren't globally visible), and if read is forced to instantiate such a
+ * page, it simply creates an empty page from scratch.
  */
 
 /*
@@ -102,12 +93,10 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
         return (0);
 
     /*
-     * If this WT_REF was previously part of a truncate operation, there
-     * may be existing page-delete information. The structure is only read
-     * while the state is locked, free the previous version.
+     * If this WT_REF was previously part of a truncate operation, there may be existing page-delete
+     * information. The structure is only read while the state is locked, free the previous version.
      *
-     * Note: changes have been made, we must publish any state change from
-     * this point on.
+     * Note: changes have been made, we must publish any state change from this point on.
      */
     if (ref->page_del != NULL) {
         WT_ASSERT(session, ref->page_del->txnid == WT_TXN_ABORTED);
@@ -116,18 +105,15 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
     }
 
     /*
-     * We cannot truncate pages that have overflow key/value items as the
-     * overflow blocks have to be discarded.  The way we figure that out is
-     * to check the page's cell type, cells for leaf pages without overflow
-     * items are special.
+     * We cannot truncate pages that have overflow key/value items as the overflow blocks have to be
+     * discarded. The way we figure that out is to check the page's cell type, cells for leaf pages
+     * without overflow items are special.
      *
-     * To look at an on-page cell, we need to look at the parent page, and
-     * that's dangerous, our parent page could change without warning if
-     * the parent page were to split, deepening the tree. We can look at
-     * the parent page itself because the page can't change underneath us.
-     * However, if the parent page splits, our reference address can change;
-     * we don't care what version of it we read, as long as we don't read
-     * it twice.
+     * To look at an on-page cell, we need to look at the parent page, and that's dangerous, our
+     * parent page could change without warning if the parent page were to split, deepening the
+     * tree. We can look at the parent page itself because the page can't change underneath us.
+     * However, if the parent page splits, our reference address can change; we don't care what
+     * version of it we read, as long as we don't read it twice.
      */
     WT_ORDERED_READ(ref_addr, ref->addr);
     if (ref_addr != NULL && (__wt_off_page(ref->home, ref_addr) ?
@@ -219,15 +205,12 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
     }
 
     /*
-     * We can't use the normal read path to get a copy of the page
-     * because the session may have closed the cursor, we no longer
-     * have the reference to the tree required for a hazard
-     * pointer.  We're safe because with unresolved transactions,
-     * the page isn't going anywhere.
+     * We can't use the normal read path to get a copy of the page because the session may have
+     * closed the cursor, we no longer have the reference to the tree required for a hazard pointer.
+     * We're safe because with unresolved transactions, the page isn't going anywhere.
      *
-     * The page is in an in-memory state, which means it
-     * was instantiated at some point. Walk any list of
-     * update structures and abort them.
+     * The page is in an in-memory state, which means it was instantiated at some point. Walk any
+     * list of update structures and abort them.
      */
     WT_ASSERT(session, locked);
     if ((updp = ref->page_del->update_list) != NULL)
@@ -255,22 +238,19 @@ __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all)
     bool skip;
 
     /*
-     * Deleted pages come from two sources: either it's a truncate as
-     * described above, or the page has been emptied by other operations
-     * and eviction deleted it.
+     * Deleted pages come from two sources: either it's a truncate as described above, or the page
+     * has been emptied by other operations and eviction deleted it.
      *
-     * In both cases, the WT_REF state will be WT_REF_DELETED.  In the case
-     * of a truncated page, there will be a WT_PAGE_DELETED structure with
-     * the transaction ID of the transaction that deleted the page, and the
-     * page is visible if that transaction ID is visible.  In the case of an
-     * empty page, there will be no WT_PAGE_DELETED structure and the delete
-     * is by definition visible, eviction could not have deleted the page if
-     * there were changes on it that were not globally visible.
+     * In both cases, the WT_REF state will be WT_REF_DELETED. In the case of a truncated page,
+     * there will be a WT_PAGE_DELETED structure with the transaction ID of the transaction that
+     * deleted the page, and the page is visible if that transaction ID is visible. In the case of
+     * an empty page, there will be no WT_PAGE_DELETED structure and the delete is by definition
+     * visible, eviction could not have deleted the page if there were changes on it that were not
+     * globally visible.
      *
-     * We're here because we found a WT_REF state set to WT_REF_DELETED.  It
-     * is possible the page is being read into memory right now, though, and
-     * the page could switch to an in-memory state at any time.  Lock down
-     * the structure, just to be safe.
+     * We're here because we found a WT_REF state set to WT_REF_DELETED. It is possible the page is
+     * being read into memory right now, though, and the page could switch to an in-memory state at
+     * any time. Lock down the structure, just to be safe.
      */
     if (ref->page_del == NULL && ref->page_las == NULL)
         return (true);
@@ -362,26 +342,22 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
     }
 
     /*
-     * An operation is accessing a "deleted" page, and we're building an
-     * in-memory version of the page (making it look like all entries in
-     * the page were individually updated by a remove operation).  There
-     * are two cases where we end up here:
+     * An operation is accessing a "deleted" page, and we're building an in-memory version of the
+     * page (making it look like all entries in the page were individually updated by a remove
+     * operation). There are two cases where we end up here:
      *
-     * First, a running transaction used a truncate call to delete the page
-     * without reading it, in which case the page reference includes a
-     * structure with a transaction ID; the page we're building might split
-     * in the future, so we update that structure to include references to
-     * all of the update structures we create, so the transaction can abort.
+     * First, a running transaction used a truncate call to delete the page without reading it, in
+     * which case the page reference includes a structure with a transaction ID; the page we're
+     * building might split in the future, so we update that structure to include references to all
+     * of the update structures we create, so the transaction can abort.
      *
-     * Second, a truncate call deleted a page and the truncate committed,
-     * but an older transaction in the system forced us to keep the old
-     * version of the page around, then we crashed and recovered or we're
-     * running inside a checkpoint, and now we're being forced to read that
-     * page.
+     * Second, a truncate call deleted a page and the truncate committed, but an older transaction
+     * in the system forced us to keep the old version of the page around, then we crashed and
+     * recovered or we're running inside a checkpoint, and now we're being forced to read that page.
      *
-     * Expect a page-deleted structure if there's a running transaction that
-     * needs to be resolved, otherwise, there may not be one (and, if the
-     * transaction has resolved, we can ignore the page-deleted structure).
+     * Expect a page-deleted structure if there's a running transaction that needs to be resolved,
+     * otherwise, there may not be one (and, if the transaction has resolved, we can ignore the
+     * page-deleted structure).
      */
     page_del = __wt_page_del_active(session, ref, true) ? ref->page_del : NULL;
 

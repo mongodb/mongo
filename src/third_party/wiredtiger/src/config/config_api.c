@@ -160,8 +160,7 @@ __conn_foc_add(WT_SESSION_IMPL *session, const void *p)
     conn = S2C(session);
 
     /*
-     * Callers of this function are expected to be holding the connection's
-     * api_lock.
+     * Callers of this function are expected to be holding the connection's api_lock.
      *
      * All callers of this function currently ignore errors.
      */
@@ -255,8 +254,7 @@ __wt_configure_method(WT_SESSION_IMPL *session, const char *method, const char *
     /*
      * Allocate new configuration entry and fill it in.
      *
-     * The new base value is the previous base value, a separator and the
-     * new configuration string.
+     * The new base value is the previous base value, a separator and the new configuration string.
      */
     WT_ERR(__wt_calloc_one(session, &entry));
     entry->method = (*epp)->method;

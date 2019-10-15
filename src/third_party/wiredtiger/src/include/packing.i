@@ -9,9 +9,9 @@
 /*
  * Throughout this code we have to be aware of default argument conversion.
  *
- * Refer to Chapter 8 of "Expert C Programming" by Peter van der Linden for the
- * gory details.  The short version is that we have less cases to deal with
- * because the compiler promotes shorter types to int or unsigned int.
+ * Refer to Chapter 8 of "Expert C Programming" by Peter van der Linden for the gory details. The
+ * short version is that we have less cases to deal with because the compiler promotes shorter types
+ * to int or unsigned int.
  */
 typedef struct {
     union {

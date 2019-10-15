@@ -60,15 +60,14 @@
 /*
  * Pad a structure so an array of structures get separate cache lines.
  *
- * Note that we avoid compiler structure alignment because that requires
- * allocating aligned blocks of memory, and alignment pollutes any other type
- * that contains an aligned field.  It is possible that a hot field positioned
- * before this one will be on the same cache line, but not if it is also
+ * Note that we avoid compiler structure alignment because that requires allocating aligned blocks
+ * of memory, and alignment pollutes any other type that contains an aligned field. It is possible
+ * that a hot field positioned before this one will be on the same cache line, but not if it is also
  * padded.
  *
- * This alignment has a small impact on portability as well, as we are using an
- * anonymous union here which is supported under C11, earlier versions of
- * the GNU standard, and MSVC versions as early as 2003.
+ * This alignment has a small impact on portability as well, as we are using an anonymous union here
+ * which is supported under C11, earlier versions of the GNU standard, and MSVC versions as early as
+ * 2003.
  */
 #define WT_CACHE_LINE_PAD_BEGIN \
     union {                     \

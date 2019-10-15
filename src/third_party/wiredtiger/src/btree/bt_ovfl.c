@@ -21,11 +21,11 @@ __ovfl_read(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size, WT_
     btree = S2BT(session);
 
     /*
-     * Read the overflow item from the block manager, then reference the
-     * start of the data and set the data's length.
+     * Read the overflow item from the block manager, then reference the start of the data and set
+     * the data's length.
      *
-     * Overflow reads are synchronous. That may bite me at some point, but
-     * WiredTiger supports large page sizes, overflow items should be rare.
+     * Overflow reads are synchronous. That may bite me at some point, but WiredTiger supports large
+     * page sizes, overflow items should be rare.
      */
     WT_RET(__wt_bt_read(session, store, addr, addr_size));
     dsk = store->data;
@@ -60,13 +60,11 @@ __wt_ovfl_read(
         return (__ovfl_read(session, unpack->data, unpack->size, store));
 
     /*
-     * WT_CELL_VALUE_OVFL_RM cells: If reconciliation deleted an overflow
-     * value, but there was still a reader in the system that might need it,
-     * the on-page cell type will have been reset to WT_CELL_VALUE_OVFL_RM
-     * and we will be passed a page so we can check the on-page cell.
+     * WT_CELL_VALUE_OVFL_RM cells: If reconciliation deleted an overflow value, but there was still
+     * a reader in the system that might need it, the on-page cell type will have been reset to
+     * WT_CELL_VALUE_OVFL_RM and we will be passed a page so we can check the on-page cell.
      *
-     * Acquire the overflow lock, and retest the on-page cell's value inside
-     * the lock.
+     * Acquire the overflow lock, and retest the on-page cell's value inside the lock.
      */
     __wt_readlock(session, &S2BT(session)->ovfl_lock);
     if (__wt_cell_type_raw(unpack->cell) == WT_CELL_VALUE_OVFL_RM) {
@@ -188,12 +186,11 @@ __wt_ovfl_remove(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack
         WT_RET(__ovfl_cache(session, page, unpack));
 
     /*
-     * The second problem is to only remove the underlying blocks once,
-     * solved by the WT_CELL_VALUE_OVFL_RM flag.
+     * The second problem is to only remove the underlying blocks once, solved by the
+     * WT_CELL_VALUE_OVFL_RM flag.
      *
-     * Queue the on-page cell to be set to WT_CELL_VALUE_OVFL_RM and the
-     * underlying overflow value's blocks to be freed when reconciliation
-     * completes.
+     * Queue the on-page cell to be set to WT_CELL_VALUE_OVFL_RM and the underlying overflow value's
+     * blocks to be freed when reconciliation completes.
      */
     return (__wt_ovfl_discard_add(session, page, unpack->cell));
 }
@@ -216,15 +213,13 @@ __wt_ovfl_discard(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell)
     __wt_cell_unpack(session, page, cell, unpack);
 
     /*
-     * Finally remove overflow key/value objects, called when reconciliation
-     * finishes after successfully writing a page.
+     * Finally remove overflow key/value objects, called when reconciliation finishes after
+     * successfully writing a page.
      *
-     * Keys must have already been instantiated and value objects must have
-     * already been cached (if they might potentially still be read by any
-     * running transaction).
+     * Keys must have already been instantiated and value objects must have already been cached (if
+     * they might potentially still be read by any running transaction).
      *
-     * Acquire the overflow lock to avoid racing with a thread reading the
-     * backing overflow blocks.
+     * Acquire the overflow lock to avoid racing with a thread reading the backing overflow blocks.
      */
     __wt_writelock(session, &btree->ovfl_lock);
 

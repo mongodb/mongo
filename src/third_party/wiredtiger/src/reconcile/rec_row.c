@@ -343,14 +343,12 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
     /* For each entry in the in-memory page... */
     WT_INTL_FOREACH_BEGIN (session, page, ref) {
         /*
-         * There are different paths if the key is an overflow item vs.
-         * a straight-forward on-page value. If an overflow item, we
-         * would have instantiated it, and we can use that fact to set
-         * things up.
+         * There are different paths if the key is an overflow item vs. a straight-forward on-page
+         * value. If an overflow item, we would have instantiated it, and we can use that fact to
+         * set things up.
          *
-         * Note the cell reference and unpacked key cell are available
-         * only in the case of an instantiated, off-page key, we don't
-         * bother setting them if that's not possible.
+         * Note the cell reference and unpacked key cell are available only in the case of an
+         * instantiated, off-page key, we don't bother setting them if that's not possible.
          */
         if (F_ISSET_ATOMIC(page, WT_PAGE_OVERFLOW_KEYS)) {
             cell = NULL;
@@ -372,11 +370,10 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
             /*
              * Ignored child.
              *
-             * Overflow keys referencing pages we're not writing are
-             * no longer useful, schedule them for discard.  Don't
-             * worry about instantiation, internal page keys are
-             * always instantiated.  Don't worry about reuse,
-             * reusing this key in this reconciliation is unlikely.
+             * Overflow keys referencing pages we're not writing are no longer useful, schedule them
+             * for discard. Don't worry about instantiation, internal page keys are always
+             * instantiated. Don't worry about reuse, reusing this key in this reconciliation is
+             * unlikely.
              */
             if (key_onpage_ovfl)
                 WT_ERR(__wt_ovfl_discard_add(session, page, kpack->cell));
@@ -758,13 +755,11 @@ __wt_rec_row_leaf(
         dictionary = false;
         if (upd == NULL) {
             /*
-             * When the page was read into memory, there may not
-             * have been a value item.
+             * When the page was read into memory, there may not have been a value item.
              *
-             * If there was a value item, check if it's a dictionary
-             * cell (a copy of another item on the page).  If it's a
-             * copy, we have to create a new value item as the old
-             * item might have been discarded from the page.
+             * If there was a value item, check if it's a dictionary cell (a copy of another item on
+             * the page). If it's a copy, we have to create a new value item as the old item might
+             * have been discarded from the page.
              */
             if (vpack->raw == WT_CELL_VALUE_COPY) {
                 /* If the item is Huffman encoded, decode it. */
@@ -782,36 +777,28 @@ __wt_rec_row_leaf(
                 dictionary = true;
             } else if (vpack->raw == WT_CELL_VALUE_OVFL_RM) {
                 /*
-                 * If doing an update save and restore, and the
-                 * underlying value is a removed overflow value,
-                 * we end up here.
+                 * If doing an update save and restore, and the underlying value is a removed
+                 * overflow value, we end up here.
                  *
-                 * If necessary, when the overflow value was
-                 * originally removed, reconciliation appended
-                 * a globally visible copy of the value to the
-                 * key's update list, meaning the on-page item
-                 * isn't accessed after page re-instantiation.
+                 * If necessary, when the overflow value was originally removed, reconciliation
+                 * appended a globally visible copy of the value to the key's update list, meaning
+                 * the on-page item isn't accessed after page re-instantiation.
                  *
                  * Assert the case.
                  */
                 WT_ASSERT(session, F_ISSET(r, WT_REC_UPDATE_RESTORE));
 
                 /*
-                 * If the key is also a removed overflow item,
-                 * don't write anything at all.
+                 * If the key is also a removed overflow item, don't write anything at all.
                  *
-                 * We don't have to write anything because the
-                 * code re-instantiating the page gets the key
-                 * to match the saved list of updates from the
-                 * original page.  By not putting the key on
-                 * the page, we'll move the key/value set from
-                 * a row-store leaf page slot to an insert list,
-                 * but that shouldn't matter.
+                 * We don't have to write anything because the code re-instantiating the page gets
+                 * the key to match the saved list of updates from the original page. By not putting
+                 * the key on the page, we'll move the key/value set from a row-store leaf page slot
+                 * to an insert list, but that shouldn't matter.
                  *
-                 * The reason we bother with the test is because
-                 * overflows are expensive to write.  It's hard
-                 * to imagine a real workload where this test is
-                 * worth the effort, but it's a simple test.
+                 * The reason we bother with the test is because overflows are expensive to write.
+                 * It's hard to imagine a real workload where this test is worth the effort, but
+                 * it's a simple test.
                  */
                 if (kpack != NULL && kpack->raw == WT_CELL_KEY_OVFL_RM)
                     goto leaf_insert;
@@ -855,14 +842,11 @@ __wt_rec_row_leaf(
                 break;
             case WT_UPDATE_TOMBSTONE:
                 /*
-                 * If this key/value pair was deleted, we're
-                 * done.
+                 * If this key/value pair was deleted, we're done.
                  *
-                 * Overflow keys referencing discarded values
-                 * are no longer useful, discard the backing
-                 * blocks.  Don't worry about reuse, reusing
-                 * keys from a row-store page reconciliation
-                 * seems unlikely enough to ignore.
+                 * Overflow keys referencing discarded values are no longer useful, discard the
+                 * backing blocks. Don't worry about reuse, reusing keys from a row-store page
+                 * reconciliation seems unlikely enough to ignore.
                  */
                 if (kpack != NULL && kpack->ovfl && kpack->raw != WT_CELL_KEY_OVFL_RM) {
                     /*
@@ -892,8 +876,7 @@ __wt_rec_row_leaf(
         /*
          * Build key cell.
          *
-         * If the key is an overflow key that hasn't been removed, use
-         * the original backing blocks.
+         * If the key is an overflow key that hasn't been removed, use the original backing blocks.
          */
         key_onpage_ovfl = kpack != NULL && kpack->ovfl && kpack->raw != WT_CELL_KEY_OVFL_RM;
         if (key_onpage_ovfl) {
@@ -930,14 +913,11 @@ __wt_rec_row_leaf(
                 WT_ASSERT(session, tmpkey->size != 0);
 
                 /*
-                 * Grow the buffer as necessary, ensuring data
-                 * data has been copied into local buffer space,
-                 * then append the suffix to the prefix already
-                 * in the buffer.
+                 * Grow the buffer as necessary, ensuring data data has been copied into local
+                 * buffer space, then append the suffix to the prefix already in the buffer.
                  *
-                 * Don't grow the buffer unnecessarily or copy
-                 * data we don't need, truncate the item's data
-                 * length to the prefix bytes.
+                 * Don't grow the buffer unnecessarily or copy data we don't need, truncate the
+                 * item's data length to the prefix bytes.
                  */
                 tmpkey->size = kpack->prefix;
                 WT_ERR(__wt_buf_grow(session, tmpkey, tmpkey->size + kpack->size));

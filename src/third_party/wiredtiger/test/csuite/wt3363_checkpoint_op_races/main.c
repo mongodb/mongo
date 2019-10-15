@@ -30,16 +30,15 @@
 /*
  * JIRA ticket reference: WT-3363
  *
- * Test case description: There are a number of operations that we run that we
- * expect not to conflict with or block against a running checkpoint. This test
- * aims to run repeated checkpoints in a thread, while running an assortment
- * of operations that we expect to execute quickly on further threads. To
- * ensure that we catch any blockages we introduce a very large delay into the
+ * Test case description: There are a number of operations that we run that we expect not to
+ * conflict with or block against a running checkpoint. This test aims to run repeated checkpoints
+ * in a thread, while running an assortment of operations that we expect to execute quickly on
+ * further threads. To ensure that we catch any blockages we introduce a very large delay into the
  * checkpoint and measure that no operation takes 1/2 the length of this delay.
  *
- * Failure mode: We monitor the execution time of all operations and if we find
- * any operation taking longer than 1/2 the delay time, we abort dumping a core
- * file which can be used to determine what operation was blocked.
+ * Failure mode: We monitor the execution time of all operations and if we find any operation taking
+ * longer than 1/2 the delay time, we abort dumping a core file which can be used to determine what
+ * operation was blocked.
  */
 static WT_THREAD_RET do_checkpoints(void *);
 static WT_THREAD_RET do_ops(void *);

@@ -50,18 +50,15 @@ __conn_dhandle_config_set(WT_SESSION_IMPL *session)
     }
 
     /*
-     * The defaults are included because persistent configuration
-     * information is stored in the metadata file and it may be from an
-     * earlier version of WiredTiger.  If defaults are included in the
-     * configuration, we can add new configuration strings without
-     * upgrading the metadata file or writing special code in case a
-     * configuration string isn't initialized, as long as the new
-     * configuration string has an appropriate default value.
+     * The defaults are included because persistent configuration information is stored in the
+     * metadata file and it may be from an earlier version of WiredTiger. If defaults are included
+     * in the configuration, we can add new configuration strings without upgrading the metadata
+     * file or writing special code in case a configuration string isn't initialized, as long as the
+     * new configuration string has an appropriate default value.
      *
-     * The error handling is a little odd, but be careful: we're holding a
-     * chunk of allocated memory in metaconf.  If we fail before we copy a
-     * reference to it into the object's configuration array, we must free
-     * it, after the copy, we don't want to free it.
+     * The error handling is a little odd, but be careful: we're holding a chunk of allocated memory
+     * in metaconf. If we fail before we copy a reference to it into the object's configuration
+     * array, we must free it, after the copy, we don't want to free it.
      */
     WT_ERR(__wt_calloc_def(session, 3, &dhandle->cfg));
     switch (dhandle->type) {
@@ -155,12 +152,11 @@ __wt_conn_dhandle_alloc(WT_SESSION_IMPL *session, const char *uri, const char *c
     WT_ERR(__wt_spin_init(session, &dhandle->close_lock, "data handle close"));
 
     /*
-     * We are holding the data handle list lock, which protects most
-     * threads from seeing the new handle until that lock is released.
+     * We are holding the data handle list lock, which protects most threads from seeing the new
+     * handle until that lock is released.
      *
-     * However, the sweep server scans the list of handles without holding
-     * that lock, so we need a write barrier here to ensure the sweep
-     * server doesn't see a partially filled in structure.
+     * However, the sweep server scans the list of handles without holding that lock, so we need a
+     * write barrier here to ensure the sweep server doesn't see a partially filled in structure.
      */
     WT_WRITE_BARRIER();
 
@@ -294,19 +290,15 @@ __wt_conn_dhandle_close(WT_SESSION_IMPL *session, bool final, bool mark_dead)
             marked_dead = true;
 
         /*
-         * Flush dirty data from any durable trees we couldn't mark
-         * dead.  That involves writing a checkpoint, which can fail if
-         * an update cannot be written, causing the close to fail: if
-         * not the final close, return the EBUSY error to our caller
-         * for eventual retry.
+         * Flush dirty data from any durable trees we couldn't mark dead. That involves writing a
+         * checkpoint, which can fail if an update cannot be written, causing the close to fail: if
+         * not the final close, return the EBUSY error to our caller for eventual retry.
          *
-         * We can't discard non-durable trees yet: first we have to
-         * close the underlying btree handle, then we can mark the
-         * data handle dead.
+         * We can't discard non-durable trees yet: first we have to close the underlying btree
+         * handle, then we can mark the data handle dead.
          *
-         * If we are closing with timestamps enforced, then we have
-         * already checkpointed as of the timestamp as needed and any
-         * remaining dirty data should be discarded.
+         * If we are closing with timestamps enforced, then we have already checkpointed as of the
+         * timestamp as needed and any remaining dirty data should be discarded.
          */
         if (!discard && !marked_dead) {
             if (F_ISSET(conn, WT_CONN_CLOSING_TIMESTAMP) || F_ISSET(conn, WT_CONN_IN_MEMORY) ||
@@ -407,16 +399,14 @@ __wt_conn_dhandle_open(WT_SESSION_IMPL *session, const char *cfg[], uint32_t fla
         WT_RET(__wt_evict_file_exclusive_on(session));
 
     /*
-     * If the handle is already open, it has to be closed so it can be
-     * reopened with a new configuration.
+     * If the handle is already open, it has to be closed so it can be reopened with a new
+     * configuration.
      *
-     * This call can return EBUSY if there's an update in the tree that's
-     * not yet globally visible. That's not a problem because it can only
-     * happen when we're switching from a normal handle to a "special" one,
-     * so we're returning EBUSY to an attempt to verify or do other special
-     * operations. The reverse won't happen because when the handle from a
-     * verify or other special operation is closed, there won't be updates
-     * in the tree that can block the close.
+     * This call can return EBUSY if there's an update in the tree that's not yet globally visible.
+     * That's not a problem because it can only happen when we're switching from a normal handle to
+     * a "special" one, so we're returning EBUSY to an attempt to verify or do other special
+     * operations. The reverse won't happen because when the handle from a verify or other special
+     * operation is closed, there won't be updates in the tree that can block the close.
      */
     if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
         WT_ERR(__wt_conn_dhandle_close(session, false, false));

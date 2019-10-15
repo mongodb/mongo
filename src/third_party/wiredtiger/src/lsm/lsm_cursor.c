@@ -67,13 +67,12 @@ __wt_clsm_await_switch(WT_CURSOR_LSM *clsm)
     session = (WT_SESSION_IMPL *)clsm->iface.session;
 
     /*
-     * If there is no primary chunk, or a chunk has overflowed the hard
-     * limit, which either means a worker thread has fallen behind or there
-     * has just been a user-level checkpoint, wait until the tree changes.
+     * If there is no primary chunk, or a chunk has overflowed the hard limit, which either means a
+     * worker thread has fallen behind or there has just been a user-level checkpoint, wait until
+     * the tree changes.
      *
-     * We used to switch chunks in the application thread here, but that is
-     * problematic because there is a transaction in progress and it could
-     * roll back, leaving the metadata inconsistent.
+     * We used to switch chunks in the application thread here, but that is problematic because
+     * there is a transaction in progress and it could roll back, leaving the metadata inconsistent.
      */
     for (waited = 0; lsm_tree->nchunks == 0 || clsm->dsk_gen == lsm_tree->dsk_gen; ++waited) {
         if (waited % WT_THOUSAND == 0)
@@ -112,15 +111,13 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
     }
 
     /*
-     * In LSM there are multiple btrees active at one time. The tree
-     * switch code needs to use btree API methods, and it wants to
-     * operate on the btree for the primary chunk. Set that up now.
+     * In LSM there are multiple btrees active at one time. The tree switch code needs to use btree
+     * API methods, and it wants to operate on the btree for the primary chunk. Set that up now.
      *
-     * If the primary chunk has grown too large, set a flag so the worker
-     * thread will switch when it gets a chance to avoid introducing high
-     * latency into application threads.  Don't do this indefinitely: if a
-     * chunk grows twice as large as the configured size, block until it
-     * can be switched.
+     * If the primary chunk has grown too large, set a flag so the worker thread will switch when it
+     * gets a chance to avoid introducing high latency into application threads. Don't do this
+     * indefinitely: if a chunk grows twice as large as the configured size, block until it can be
+     * switched.
      */
     hard_limit = lsm_tree->need_switch;
 
@@ -200,19 +197,14 @@ __clsm_enter(WT_CURSOR_LSM *clsm, bool reset, bool update)
                 __wt_txn_cursor_op(session);
 
             /*
-             * Figure out how many updates are required for
-             * snapshot isolation.
+             * Figure out how many updates are required for snapshot isolation.
              *
-             * This is not a normal visibility check on the maximum
-             * transaction ID in each chunk: any transaction ID
-             * that overlaps with our snapshot is a potential
-             * conflict.
+             * This is not a normal visibility check on the maximum transaction ID in each chunk:
+             * any transaction ID that overlaps with our snapshot is a potential conflict.
              *
-             * Note that the pinned ID is correct here: it tracks
-             * concurrent transactions excluding special
-             * transactions such as checkpoint (which we can't
-             * conflict with because checkpoint only writes the
-             * metadata, which is not an LSM tree).
+             * Note that the pinned ID is correct here: it tracks concurrent transactions excluding
+             * special transactions such as checkpoint (which we can't conflict with because
+             * checkpoint only writes the metadata, which is not an LSM tree).
              */
             clsm->nupdates = 1;
             if (txn->isolation == WT_ISO_SNAPSHOT && F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT)) {
@@ -557,9 +549,8 @@ retry:
         /*
          * Close any cursors we no longer need.
          *
-         * Drop the LSM tree lock while we do this: if the cache is
-         * full, we may block while closing a cursor.  Save the
-         * generation number and retry if it has changed under us.
+         * Drop the LSM tree lock while we do this: if the cache is full, we may block while closing
+         * a cursor. Save the generation number and retry if it has changed under us.
          */
         if (clsm->chunks != NULL && ngood < clsm->nchunks) {
             close_range_start = ngood;
@@ -651,19 +642,16 @@ retry:
         btree = ((WT_CURSOR_BTREE *)primary)->btree;
 
         /*
-         * If the primary is not yet set as the primary, do that now.
-         * Note that eviction was configured off when the underlying
-         * object was created, which is what we want, leave it alone.
+         * If the primary is not yet set as the primary, do that now. Note that eviction was
+         * configured off when the underlying object was created, which is what we want, leave it
+         * alone.
          *
-         * We don't have to worry about races here: every thread that
-         * modifies the tree will have to come through here, at worse
-         * we set the flag repeatedly.  We don't use a WT_BTREE handle
-         * flag, however, we could race doing the read-modify-write of
-         * the flags field.
+         * We don't have to worry about races here: every thread that modifies the tree will have to
+         * come through here, at worse we set the flag repeatedly. We don't use a WT_BTREE handle
+         * flag, however, we could race doing the read-modify-write of the flags field.
          *
-         * If something caused the chunk to be closed and reopened
-         * since it was created, we can no longer use it as a primary
-         * chunk and we need to force a switch. We detect the tree was
+         * If something caused the chunk to be closed and reopened since it was created, we can no
+         * longer use it as a primary chunk and we need to force a switch. We detect the tree was
          * created when it was opened by checking the "original" flag.
          */
         if (!btree->lsm_primary && btree->original)
@@ -837,12 +825,11 @@ __clsm_position_chunk(WT_CURSOR_LSM *clsm, WT_CURSOR *c, bool forward, int *cmpp
         WT_RET(forward ? c->next(c) : c->prev(c));
 
         /*
-         * With higher isolation levels, where we have stable reads,
-         * we're done: the cursor is now positioned as expected.
+         * With higher isolation levels, where we have stable reads, we're done: the cursor is now
+         * positioned as expected.
          *
-         * With read-uncommitted isolation, a new record could have
-         * appeared in between the search and stepping forward / back.
-         * In that case, keep going until we see a key in the expected
+         * With read-uncommitted isolation, a new record could have appeared in between the search
+         * and stepping forward / back. In that case, keep going until we see a key in the expected
          * range.
          */
         if (session->txn.isolation != WT_ISO_READ_UNCOMMITTED)
@@ -1270,14 +1257,13 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
     F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 
     /*
-     * search_near is somewhat fiddly: we can't just use a nearby key from
-     * the in-memory chunk because there could be a closer key on disk.
+     * search_near is somewhat fiddly: we can't just use a nearby key from the in-memory chunk
+     * because there could be a closer key on disk.
      *
-     * As we search down the chunks, we stop as soon as we find an exact
-     * match.  Otherwise, we maintain the smallest cursor larger than the
-     * search key and the largest cursor smaller than the search key.  At
-     * the end, we prefer the larger cursor, but if no record is larger,
-     * position on the last record in the tree.
+     * As we search down the chunks, we stop as soon as we find an exact match. Otherwise, we
+     * maintain the smallest cursor larger than the search key and the largest cursor smaller than
+     * the search key. At the end, we prefer the larger cursor, but if no record is larger, position
+     * on the last record in the tree.
      */
     WT_FORALL_CURSORS(clsm, c, i)
     {
@@ -1435,13 +1421,12 @@ __clsm_put(WT_SESSION_IMPL *session, WT_CURSOR_LSM *clsm, const WT_ITEM *key, co
     }
 
     /*
-     * Update the record count.  It is in a shared structure, but it's only
-     * approximate, so don't worry about protecting access.
+     * Update the record count. It is in a shared structure, but it's only approximate, so don't
+     * worry about protecting access.
      *
-     * Throttle if necessary.  Every 100 update operations on each cursor,
-     * check if throttling is required.  Don't rely only on the shared
-     * counter because it can race, and because for some workloads, there
-     * may not be enough records per chunk to get effective throttling.
+     * Throttle if necessary. Every 100 update operations on each cursor, check if throttling is
+     * required. Don't rely only on the shared counter because it can race, and because for some
+     * workloads, there may not be enough records per chunk to get effective throttling.
      */
     if ((++clsm->primary_chunk->count % 100 == 0 || ++clsm->update_count >= 100) &&
       lsm_tree->merge_throttle + lsm_tree->ckpt_throttle > 0) {

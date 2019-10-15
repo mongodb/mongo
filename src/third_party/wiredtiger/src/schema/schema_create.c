@@ -98,13 +98,12 @@ __create_file(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const c
     }
 
     /*
-     * Open the file to check that it was setup correctly. We don't need to
-     * pass the configuration, we just wrote the collapsed configuration
-     * into the metadata file, and it's going to be read/used by underlying
-     * functions.
+     * Open the file to check that it was setup correctly. We don't need to pass the configuration,
+     * we just wrote the collapsed configuration into the metadata file, and it's going to be
+     * read/used by underlying functions.
      *
-     * Keep the handle exclusive until it is released at the end of the
-     * call, otherwise we could race with a drop.
+     * Keep the handle exclusive until it is released at the end of the call, otherwise we could
+     * race with a drop.
      */
     WT_ERR(__wt_session_get_dhandle(session, uri, NULL, NULL, WT_DHANDLE_EXCLUSIVE));
     if (WT_META_TRACKING(session))
@@ -371,18 +370,15 @@ __create_index(WT_SESSION_IMPL *session, const char *name, bool exclusive, const
           name);
 
     /*
-     * Note: it would be better to keep the table exclusive here, while
-     * changing its indexes.  We don't because some operation we perform
-     * below reacquire the table handle (such as opening a cursor on the
-     * table in order to fill the index).  If we keep the handle exclusive
-     * here, those operations wanting ordinary access will conflict,
-     * leading to errors.  At the same time, we don't want to allow
-     * table cursors that have already been fully opened to remain open
-     * across this call.
+     * Note: it would be better to keep the table exclusive here, while changing its indexes. We
+     * don't because some operation we perform below reacquire the table handle (such as opening a
+     * cursor on the table in order to fill the index). If we keep the handle exclusive here, those
+     * operations wanting ordinary access will conflict, leading to errors. At the same time, we
+     * don't want to allow table cursors that have already been fully opened to remain open across
+     * this call.
      *
-     * Temporarily getting the table exclusively serves the purpose
-     * of ensuring that cursors on the table that are already open
-     * must at least be closed before this call proceeds.
+     * Temporarily getting the table exclusively serves the purpose of ensuring that cursors on the
+     * table that are already open must at least be closed before this call proceeds.
      */
     tlen = (size_t)(idxname++ - tablename);
     if ((ret = __wt_schema_get_table(

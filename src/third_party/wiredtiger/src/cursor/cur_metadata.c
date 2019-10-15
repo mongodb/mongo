@@ -264,13 +264,11 @@ __curmetadata_next(WT_CURSOR *cursor)
         WT_ERR(__curmetadata_metadata_search(session, cursor));
     else {
         /*
-         * When applications open metadata cursors, they expect to see
-         * all schema-level operations reflected in the results.  Query
-         * at read-uncommitted to avoid confusion caused by the current
-         * transaction state.
+         * When applications open metadata cursors, they expect to see all schema-level operations
+         * reflected in the results. Query at read-uncommitted to avoid confusion caused by the
+         * current transaction state.
          *
-         * Don't exit from the scan if we find an incomplete entry:
-         * just skip over it.
+         * Don't exit from the scan if we find an incomplete entry: just skip over it.
          */
         for (;;) {
             WT_WITH_TXN_ISOLATION(

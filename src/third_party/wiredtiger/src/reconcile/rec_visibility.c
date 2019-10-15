@@ -68,13 +68,11 @@ __rec_append_orig_value(
     }
 
     /*
-     * We need the original on-page value for some reader: get a copy and
-     * append it to the end of the update list with a transaction ID that
-     * guarantees its visibility.
+     * We need the original on-page value for some reader: get a copy and append it to the end of
+     * the update list with a transaction ID that guarantees its visibility.
      *
-     * If we don't have a value cell, it's an insert/append list key/value
-     * pair which simply doesn't exist for some reader; place a deleted
-     * record at the end of the update list.
+     * If we don't have a value cell, it's an insert/append list key/value pair which simply doesn't
+     * exist for some reader; place a deleted record at the end of the update list.
      */
     append = NULL; /* -Wconditional-uninitialized */
     size = 0;      /* -Wconditional-uninitialized */
@@ -87,12 +85,11 @@ __rec_append_orig_value(
     }
 
     /*
-     * If we're saving the original value for a birthmark, transfer over
-     * the transaction ID and clear out the birthmark update.
+     * If we're saving the original value for a birthmark, transfer over the transaction ID and
+     * clear out the birthmark update.
      *
-     * Else, set the entry's transaction information to the lowest possible
-     * value. Cleared memory matches the lowest possible transaction ID and
-     * timestamp, do nothing.
+     * Else, set the entry's transaction information to the lowest possible value. Cleared memory
+     * matches the lowest possible transaction ID and timestamp, do nothing.
      */
     if (upd->type == WT_UPDATE_BIRTHMARK) {
         append->txnid = upd->txnid;
@@ -236,9 +233,8 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
             /*
              * Track the oldest update not on the page.
              *
-             * This is used to decide whether reads can use the
-             * page image, hence using the start rather than the
-             * durable timestamp.
+             * This is used to decide whether reads can use the page image, hence using the start
+             * rather than the durable timestamp.
              */
             if (upd_select->upd == NULL && upd->start_ts < r->min_skipped_ts)
                 r->min_skipped_ts = upd->start_ts;

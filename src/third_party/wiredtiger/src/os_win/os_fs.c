@@ -184,9 +184,9 @@ __win_file_close(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session)
     /*
      * Close the primary and secondary handles.
      *
-     * We don't open Windows system handles when opening directories for
-     * flushing, as it's not necessary (or possible) to flush a directory
-     * on Windows. Confirm the file handle is open before closing it.
+     * We don't open Windows system handles when opening directories for flushing, as it's not
+     * necessary (or possible) to flush a directory on Windows. Confirm the file handle is open
+     * before closing it.
      */
     if (win_fh->filehandle != INVALID_HANDLE_VALUE && CloseHandle(win_fh->filehandle) == 0) {
         windows_error = __wt_getlasterror();
@@ -486,12 +486,10 @@ __win_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char 
         desired_access |= GENERIC_WRITE;
 
     /*
-     * Security:
-     * The application may spawn a new process, and we don't want another
-     * process to have access to our file handles.
+     * Security: The application may spawn a new process, and we don't want another process to have
+     * access to our file handles.
      *
-     * TODO: Set tighter file permissions but set bInheritHandle to false
-     * to prevent inheritance
+     * TODO: Set tighter file permissions but set bInheritHandle to false to prevent inheritance
      */
     f = FILE_ATTRIBUTE_NORMAL;
 

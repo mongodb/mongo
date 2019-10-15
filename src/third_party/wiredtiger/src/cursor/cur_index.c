@@ -222,15 +222,14 @@ __curindex_search(WT_CURSOR *cursor)
         WT_ERR(child->next(child));
 
     /*
-     * We expect partial matches, and want the smallest record with a key
-     * greater than or equal to the search key.
+     * We expect partial matches, and want the smallest record with a key greater than or equal to
+     * the search key.
      *
-     * If the key we find is shorter than the search key, it can't possibly
-     * match.
+     * If the key we find is shorter than the search key, it can't possibly match.
      *
-     * The only way for the key to be exactly equal is if there is an index
-     * on the primary key, because otherwise the primary key columns will
-     * be appended to the index key, but we don't disallow that (odd) case.
+     * The only way for the key to be exactly equal is if there is an index on the primary key,
+     * because otherwise the primary key columns will be appended to the index key, but we don't
+     * disallow that (odd) case.
      */
     found_key = child->key;
     if (found_key.size < cursor->key.size)
@@ -301,14 +300,14 @@ __curindex_search_near(WT_CURSOR *cursor, int *exact)
     }
 
     /*
-     * We expect partial matches, and want the smallest record with a key
-     * greater than or equal to the search key.
+     * We expect partial matches, and want the smallest record with a key greater than or equal to
+     * the search key.
      *
-     * If the found key starts with the search key, we indicate a match by
-     * setting exact equal to zero.
+     * If the found key starts with the search key, we indicate a match by setting exact equal to
+     * zero.
      *
-     * The compare function expects application-supplied keys to come first
-     * so we flip the sign of the result to match what callers expect.
+     * The compare function expects application-supplied keys to come first so we flip the sign of
+     * the result to match what callers expect.
      */
     found_key = child->key;
     if (found_key.size > cursor->key.size) {

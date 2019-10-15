@@ -290,9 +290,8 @@ __lsm_meta_read_v1(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, const char *
     /*
      * Set up the config for each chunk.
      *
-     * Make the memory_page_max double the chunk size, so application
-     * threads don't immediately try to force evict the chunk when the
-     * worker thread clears the NO_EVICTION flag.
+     * Make the memory_page_max double the chunk size, so application threads don't immediately try
+     * to force evict the chunk when the worker thread clears the NO_EVICTION flag.
      */
     file_cfg[1] = lsmconf;
     WT_ERR(__wt_scr_alloc(session, 0, &buf));

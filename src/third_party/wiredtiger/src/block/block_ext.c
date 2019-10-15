@@ -63,14 +63,14 @@ __block_off_srch(WT_EXT **head, wt_off_t off, WT_EXT ***stack, bool skip_off)
     int i;
 
     /*
-     * Start at the highest skip level, then go as far as possible at each
-     * level before stepping down to the next.
+     * Start at the highest skip level, then go as far as possible at each level before stepping
+     * down to the next.
      *
      * Return a stack for an exact match or the next-largest item.
      *
-     * The WT_EXT structure contains two skiplists, the primary one and the
-     * per-size bucket one: if the skip_off flag is set, offset the skiplist
-     * array by the depth specified in this particular structure.
+     * The WT_EXT structure contains two skiplists, the primary one and the per-size bucket one: if
+     * the skip_off flag is set, offset the skiplist array by the depth specified in this particular
+     * structure.
      */
     for (i = WT_SKIP_MAXDEPTH - 1, extp = &head[i]; i >= 0;)
         if (*extp != NULL && (*extp)->off < off)
@@ -113,8 +113,8 @@ __block_size_srch(WT_SIZE **head, wt_off_t size, WT_SIZE ***stack)
     int i;
 
     /*
-     * Start at the highest skip level, then go as far as possible at each
-     * level before stepping down to the next.
+     * Start at the highest skip level, then go as far as possible at each level before stepping
+     * down to the next.
      *
      * Return a stack for an exact match or the next-largest item.
      */
@@ -451,8 +451,8 @@ static inline int
 __block_extend(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t *offp, wt_off_t size)
 {
     /*
-     * Callers of this function are expected to have already acquired any
-     * locks required to extend the file.
+     * Callers of this function are expected to have already acquired any locks required to extend
+     * the file.
      *
      * We should never be allocating from an empty file.
      */
@@ -502,14 +502,12 @@ __wt_block_alloc(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t *offp, wt_o
           (intmax_t)size, block->allocsize);
 
     /*
-     * Allocation is either first-fit (lowest offset), or best-fit (best
-     * size).  If it's first-fit, walk the offset list linearly until we
-     * find an entry that will work.
+     * Allocation is either first-fit (lowest offset), or best-fit (best size). If it's first-fit,
+     * walk the offset list linearly until we find an entry that will work.
      *
-     * If it's best-fit by size, search the by-size skiplist for the size
-     * and take the first entry on the by-size offset list.  This means we
-     * prefer best-fit over lower offset, but within a size we'll prefer an
-     * offset appearing earlier in the file.
+     * If it's best-fit by size, search the by-size skiplist for the size and take the first entry
+     * on the by-size offset list. This means we prefer best-fit over lower offset, but within a
+     * size we'll prefer an offset appearing earlier in the file.
      *
      * If we don't have anything big enough, extend the file.
      */
@@ -603,13 +601,12 @@ __wt_block_off_free(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t offset, 
     WT_ASSERT(session, WT_SESSION_BTREE_SYNC_SAFE(session, S2BT(session)));
 
     /*
-     * Callers of this function are expected to have already acquired any
-     * locks required to manipulate the extent lists.
+     * Callers of this function are expected to have already acquired any locks required to
+     * manipulate the extent lists.
      *
-     * We can reuse this extent immediately if it was allocated during this
-     * checkpoint, merge it into the avail list (which slows file growth in
-     * workloads including repeated overflow record modification).  If this
-     * extent is referenced in a previous checkpoint, merge into the discard
+     * We can reuse this extent immediately if it was allocated during this checkpoint, merge it
+     * into the avail list (which slows file growth in workloads including repeated overflow record
+     * modification). If this extent is referenced in a previous checkpoint, merge into the discard
      * list.
      */
     if ((ret = __wt_block_off_remove_overlap(session, block, &block->live.alloc, offset, size)) ==
@@ -914,13 +911,12 @@ __block_append(
     WT_ASSERT(session, el->track_size == 0);
 
     /*
-     * Identical to __block_merge, when we know the file is being extended,
-     * that is, the information is either going to be used to extend the
-     * last object on the list, or become a new object ending the list.
+     * Identical to __block_merge, when we know the file is being extended, that is, the information
+     * is either going to be used to extend the last object on the list, or become a new object
+     * ending the list.
      *
-     * The terminating element of the list is cached, check it; otherwise,
-     * get a stack for the last object in the skiplist, check for a simple
-     * extension, and otherwise append a new structure.
+     * The terminating element of the list is cached, check it; otherwise, get a stack for the last
+     * object in the skiplist, check for a simple extension, and otherwise append a new structure.
      */
     if ((ext = el->last) != NULL && ext->off + ext->size == off)
         ext->size += size;
@@ -955,15 +951,13 @@ __wt_block_insert_ext(
   WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, wt_off_t off, wt_off_t size)
 {
     /*
-     * There are currently two copies of this function (this code is a one-
-     * liner that calls the internal version of the function, which means
-     * the compiler should compress out the function call).  It's that way
-     * because the interface is still fluid, I'm not convinced there won't
-     * be a need for a functional split between the internal and external
-     * versions in the future.
+     * There are currently two copies of this function (this code is a one- liner that calls the
+     * internal version of the function, which means the compiler should compress out the function
+     * call). It's that way because the interface is still fluid, I'm not convinced there won't be a
+     * need for a functional split between the internal and external versions in the future.
      *
-     * Callers of this function are expected to have already acquired any
-     * locks required to manipulate the extent list.
+     * Callers of this function are expected to have already acquired any locks required to
+     * manipulate the extent list.
      */
     return (__block_merge(session, block, el, off, size));
 }
@@ -1180,12 +1174,10 @@ __wt_block_extlist_write(
     }
 
     /*
-     * Get a scratch buffer, clear the page's header and data, initialize
-     * the header.
+     * Get a scratch buffer, clear the page's header and data, initialize the header.
      *
-     * Allocate memory for the extent list entries plus two additional
-     * entries: the initial WT_BLOCK_EXTLIST_MAGIC/0 pair and the list-
-     * terminating WT_BLOCK_INVALID_OFFSET/0 pair.
+     * Allocate memory for the extent list entries plus two additional entries: the initial
+     * WT_BLOCK_EXTLIST_MAGIC/0 pair and the list- terminating WT_BLOCK_INVALID_OFFSET/0 pair.
      */
     size = ((size_t)entries + 2) * 2 * WT_INTPACK64_MAXSIZE;
     WT_RET(__wt_block_write_size(session, block, &size));

@@ -397,30 +397,27 @@ __wt_conn_reconfig(WT_SESSION_IMPL *session, const char **cfg)
     F_SET(conn, WT_CONN_RECONFIGURING);
 
     /*
-     * The configuration argument has been checked for validity, update the
-     * previous connection configuration.
+     * The configuration argument has been checked for validity, update the previous connection
+     * configuration.
      *
-     * DO NOT merge the configuration before the reconfigure calls.  Some
-     * of the underlying reconfiguration functions do explicit checks with
-     * the second element of the configuration array, knowing the defaults
-     * are in slot #1 and the application's modifications are in slot #2.
+     * DO NOT merge the configuration before the reconfigure calls. Some of the underlying
+     * reconfiguration functions do explicit checks with the second element of the configuration
+     * array, knowing the defaults are in slot #1 and the application's modifications are in slot
+     * #2.
      *
-     * Replace the base configuration set up by CONNECTION_API_CALL with
-     * the current connection configuration, otherwise reconfiguration
-     * functions will find the base value instead of previously configured
-     * value.
+     * Replace the base configuration set up by CONNECTION_API_CALL with the current connection
+     * configuration, otherwise reconfiguration functions will find the base value instead of
+     * previously configured value.
      */
     cfg[0] = conn->cfg;
 
     /*
      * Reconfigure the system.
      *
-     * The compatibility version check is special: upgrade / downgrade
-     * cannot be done with transactions active, and checkpoints must not
-     * span a version change.  Hold the checkpoint lock to avoid conflicts
-     * with WiredTiger's checkpoint thread, and rely on the documentation
-     * specifying that no new operations can start until the upgrade /
-     * downgrade completes.
+     * The compatibility version check is special: upgrade / downgrade cannot be done with
+     * transactions active, and checkpoints must not span a version change. Hold the checkpoint lock
+     * to avoid conflicts with WiredTiger's checkpoint thread, and rely on the documentation
+     * specifying that no new operations can start until the upgrade / downgrade completes.
      */
     WT_WITH_CHECKPOINT_LOCK(session, ret = __wt_conn_compat_config(session, cfg, true));
     WT_ERR(ret);

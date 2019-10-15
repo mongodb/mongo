@@ -185,8 +185,8 @@ u64_to_string(uint64_t n, char **pp)
     char *p;
 
     /*
-     * The argument pointer references the last element of a buffer (which
-     * must be large enough to hold any possible value).
+     * The argument pointer references the last element of a buffer (which must be large enough to
+     * hold any possible value).
      *
      * Nul-terminate the buffer.
      */

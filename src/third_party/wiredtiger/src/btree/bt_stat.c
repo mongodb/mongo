@@ -290,13 +290,11 @@ __stat_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS **st
     }
 
     /*
-     * Overflow keys are hard: we have to walk the disk image to count them,
-     * the in-memory representation of the page doesn't necessarily contain
-     * a reference to the original cell.
+     * Overflow keys are hard: we have to walk the disk image to count them, the in-memory
+     * representation of the page doesn't necessarily contain a reference to the original cell.
      *
-     * Zero-length values are the same, we have to look at the disk image to
-     * know. They aren't stored but we know they exist if there are two keys
-     * in a row, or a key as the last item.
+     * Zero-length values are the same, we have to look at the disk image to know. They aren't
+     * stored but we know they exist if there are two keys in a row, or a key as the last item.
      */
     if (page->dsk != NULL) {
         key = false;

@@ -430,12 +430,10 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
     WT_CLEAR(tmp);
 
     /*
-     * Attempt to set the state to WT_REF_READING for normal reads, or
-     * WT_REF_LOCKED, for deleted pages or pages with lookaside entries.
-     * The difference is that checkpoints can skip over clean pages that
-     * are being read into cache, but need to wait for deletes or lookaside
-     * updates to be resolved (in order for checkpoint to write the correct
-     * version of the page).
+     * Attempt to set the state to WT_REF_READING for normal reads, or WT_REF_LOCKED, for deleted
+     * pages or pages with lookaside entries. The difference is that checkpoints can skip over clean
+     * pages that are being read into cache, but need to wait for deletes or lookaside updates to be
+     * resolved (in order for checkpoint to write the correct version of the page).
      *
      * If successful, we've won the race, read the page.
      */
@@ -489,15 +487,13 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
     }
 
     /*
-     * Build the in-memory version of the page. Clear our local reference to
-     * the allocated copy of the disk image on return, the in-memory object
-     * steals it.
+     * Build the in-memory version of the page. Clear our local reference to the allocated copy of
+     * the disk image on return, the in-memory object steals it.
      *
-     * If a page is read with eviction disabled, we don't count evicting it
-     * as progress. Since disabling eviction allows pages to be read even
-     * when the cache is full, we want to avoid workloads repeatedly reading
-     * a page with eviction disabled (e.g., a metadata page), then evicting
-     * that page and deciding that is a sign that eviction is unstuck.
+     * If a page is read with eviction disabled, we don't count evicting it as progress. Since
+     * disabling eviction allows pages to be read even when the cache is full, we want to avoid
+     * workloads repeatedly reading a page with eviction disabled (e.g., a metadata page), then
+     * evicting that page and deciding that is a sign that eviction is unstuck.
      */
     page_flags = WT_DATA_IN_ITEM(&tmp) ? WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED;
     if (LF_ISSET(WT_READ_IGNORE_CACHE_SIZE))
@@ -683,9 +679,8 @@ read:
             /*
              * The page is in memory.
              *
-             * Get a hazard pointer if one is required. We cannot
-             * be evicting if no hazard pointer is required, we're
-             * done.
+             * Get a hazard pointer if one is required. We cannot be evicting if no hazard pointer
+             * is required, we're done.
              */
             if (F_ISSET(btree, WT_BTREE_IN_MEMORY))
                 goto skip_evict;
@@ -761,14 +756,11 @@ read:
 
         skip_evict:
             /*
-             * If we read the page and are configured to not trash
-             * the cache, and no other thread has already used the
-             * page, set the read generation so the page is evicted
-             * soon.
+             * If we read the page and are configured to not trash the cache, and no other thread
+             * has already used the page, set the read generation so the page is evicted soon.
              *
-             * Otherwise, if we read the page, or, if configured to
-             * update the page's read generation and the page isn't
-             * already flagged for forced eviction, update the page
+             * Otherwise, if we read the page, or, if configured to update the page's read
+             * generation and the page isn't already flagged for forced eviction, update the page
              * read generation.
              */
             page = ref->page;
@@ -781,17 +773,13 @@ read:
                 __wt_cache_read_gen_bump(session, page);
 
             /*
-             * Check if we need an autocommit transaction.
-             * Starting a transaction can trigger eviction, so skip
-             * it if eviction isn't permitted.
+             * Check if we need an autocommit transaction. Starting a transaction can trigger
+             * eviction, so skip it if eviction isn't permitted.
              *
-             * The logic here is a little weird: some code paths do
-             * a blanket ban on checking the cache size in
-             * sessions, but still require a transaction (e.g.,
-             * when updating metadata or lookaside).  If
-             * WT_READ_IGNORE_CACHE_SIZE was passed in explicitly,
-             * we're done. If we set WT_READ_IGNORE_CACHE_SIZE
-             * because it was set in the session then make sure we
+             * The logic here is a little weird: some code paths do a blanket ban on checking the
+             * cache size in sessions, but still require a transaction (e.g., when updating metadata
+             * or lookaside). If WT_READ_IGNORE_CACHE_SIZE was passed in explicitly, we're done. If
+             * we set WT_READ_IGNORE_CACHE_SIZE because it was set in the session then make sure we
              * start a transaction.
              */
             return (LF_ISSET(WT_READ_IGNORE_CACHE_SIZE) &&

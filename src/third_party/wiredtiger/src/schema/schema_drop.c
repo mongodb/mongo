@@ -113,15 +113,13 @@ __drop_table(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
     /*
      * Open the table so we can drop its column groups and indexes.
      *
-     * Ideally we would keep the table locked exclusive across the drop,
-     * but for now we rely on the global table lock to prevent the table
-     * being reopened while it is being dropped.  One issue is that the
-     * WT_WITHOUT_LOCKS macro can drop and reacquire the global table lock,
-     * avoiding deadlocks while waiting for LSM operation to quiesce.
+     * Ideally we would keep the table locked exclusive across the drop, but for now we rely on the
+     * global table lock to prevent the table being reopened while it is being dropped. One issue is
+     * that the WT_WITHOUT_LOCKS macro can drop and reacquire the global table lock, avoiding
+     * deadlocks while waiting for LSM operation to quiesce.
      *
-     * Temporarily getting the table exclusively serves the purpose
-     * of ensuring that cursors on the table that are already open
-     * must at least be closed before this call proceeds.
+     * Temporarily getting the table exclusively serves the purpose of ensuring that cursors on the
+     * table that are already open must at least be closed before this call proceeds.
      */
     WT_ERR(__wt_schema_get_table_uri(session, uri, true, WT_DHANDLE_EXCLUSIVE, &table));
     WT_ERR(__wt_schema_release_table(session, &table));

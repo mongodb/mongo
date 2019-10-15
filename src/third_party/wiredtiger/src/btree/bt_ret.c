@@ -137,9 +137,8 @@ __wt_value_return_upd(
     allocated_bytes = 0;
 
     /*
-     * We're passed a "standard" or "modified"  update that's visible to us.
-     * Our caller should have already checked for deleted items (we're too
-     * far down the call stack to return not-found).
+     * We're passed a "standard" or "modified" update that's visible to us. Our caller should have
+     * already checked for deleted items (we're too far down the call stack to return not-found).
      *
      * Fast path if it's a standard item, assert our caller's behavior.
      */

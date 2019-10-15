@@ -55,12 +55,12 @@ __recovery_cursor(
     if (WT_LOGOP_IS_IGNORED(id))
         return (0);
     /*
-     * Metadata operations have an id of 0.  Match operations based
-     * on the id and the current pass of recovery for metadata.
+     * Metadata operations have an id of 0. Match operations based on the id and the current pass of
+     * recovery for metadata.
      *
-     * Only apply operations in the correct metadata phase, and if the LSN
-     * is more recent than the last checkpoint.  If there is no entry for a
-     * file, assume it was dropped or missing after a hot backup.
+     * Only apply operations in the correct metadata phase, and if the LSN is more recent than the
+     * last checkpoint. If there is no entry for a file, assume it was dropped or missing after a
+     * hot backup.
      */
     metadata_op = id == WT_METAFILE_ID;
     if (r->metadata_only != metadata_op)
@@ -575,15 +575,13 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
     }
 
     /*
-     * First, do a pass through the log to recover the metadata, and
-     * establish the last checkpoint LSN.  Skip this when opening a hot
-     * backup: we already have the correct metadata in that case.
+     * First, do a pass through the log to recover the metadata, and establish the last checkpoint
+     * LSN. Skip this when opening a hot backup: we already have the correct metadata in that case.
      *
-     * If we're running with salvage and we hit an error, we ignore it
-     * and continue. In salvage we want to recover whatever part of the
-     * data we can from the last checkpoint up until whatever problem we
-     * detect in the log file. In salvage, we ignore errors from scanning
-     * the log so recovery can continue. Other errors remain errors.
+     * If we're running with salvage and we hit an error, we ignore it and continue. In salvage we
+     * want to recover whatever part of the data we can from the last checkpoint up until whatever
+     * problem we detect in the log file. In salvage, we ignore errors from scanning the log so
+     * recovery can continue. Other errors remain errors.
      */
     if (!was_backup) {
         r.metadata_only = true;

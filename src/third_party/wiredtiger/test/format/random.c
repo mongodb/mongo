@@ -70,7 +70,16 @@ random_kv(void *arg)
 
         /* This is just a smoke-test, get some key/value pairs. */
         for (i = mmrand(NULL, 0, 1000); i > 0; --i) {
-            testutil_check(cursor->next(cursor));
+            switch (ret = cursor->next(cursor)) {
+            case 0:
+                break;
+            case WT_NOTFOUND:
+            case WT_ROLLBACK:
+            case WT_PREPARE_CONFLICT:
+                continue;
+            default:
+                testutil_check(ret);
+            }
             testutil_check(cursor->get_key(cursor, &key));
             testutil_check(cursor->get_value(cursor, &value));
         }

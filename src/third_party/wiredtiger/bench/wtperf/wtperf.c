@@ -226,9 +226,9 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
     /*
      * Either we have success and we track it, or failure and panic.
      *
-     * Reads and updates can fail with WT_NOTFOUND: we may be searching
-     * in a random range, or an insert op might have updated the
-     * last record in the table but not yet finished the actual insert.
+     * Reads and updates can fail with WT_NOTFOUND: we may be searching in a random range, or an
+     * insert op might have updated the last record in the table but not yet finished the actual
+     * insert.
      */
     if (type == WT_AOP_COMPACT)
         return (0);

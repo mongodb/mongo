@@ -36,10 +36,9 @@ __wt_block_manager_create(WT_SESSION_IMPL *session, const char *filename, uint32
     /*
      * Create the underlying file and open a handle.
      *
-     * Since WiredTiger schema operations are (currently) non-transactional,
-     * it's possible to see a partially-created file left from a previous
-     * create. Further, there's nothing to prevent users from creating files
-     * in our space. Move any existing files out of the way and complain.
+     * Since WiredTiger schema operations are (currently) non-transactional, it's possible to see a
+     * partially-created file left from a previous create. Further, there's nothing to prevent users
+     * from creating files in our space. Move any existing files out of the way and complain.
      */
     for (;;) {
         if ((ret = __wt_open(session, filename, WT_FS_OPEN_FILE_TYPE_DATA,
@@ -162,9 +161,9 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename, const char *cfg[
     /*
      * Basic structure allocation, initialization.
      *
-     * Note: set the block's name-hash value before any work that can fail
-     * because cleanup calls the block destroy code which uses that hash
-     * value to remove the block from the underlying linked lists.
+     * Note: set the block's name-hash value before any work that can fail because cleanup calls the
+     * block destroy code which uses that hash value to remove the block from the underlying linked
+     * lists.
      */
     WT_ERR(__wt_calloc_one(session, &block));
     block->ref = 1;
@@ -215,8 +214,8 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename, const char *cfg[
     /*
      * Read the description information from the first block.
      *
-     * Salvage is a special case: if we're forcing the salvage, we don't
-     * look at anything, including the description information.
+     * Salvage is a special case: if we're forcing the salvage, we don't look at anything, including
+     * the description information.
      */
     if (!forced_salvage)
         WT_ERR(__desc_read(session, allocsize, block));

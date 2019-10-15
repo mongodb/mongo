@@ -1351,12 +1351,11 @@ __conn_config_file(
     len = (size_t)size;
 
     /*
-     * Copy the configuration file into memory, with a little slop, I'm not
-     * interested in debugging off-by-ones.
+     * Copy the configuration file into memory, with a little slop, I'm not interested in debugging
+     * off-by-ones.
      *
-     * The beginning of a file is the same as if we run into an unquoted
-     * newline character, simplify the parsing loop by pretending that's
-     * what we're doing.
+     * The beginning of a file is the same as if we run into an unquoted newline character, simplify
+     * the parsing loop by pretending that's what we're doing.
      */
     WT_ERR(__wt_buf_init(session, cbuf, len + 10));
     WT_ERR(__wt_read(session, fh, (wt_off_t)0, len, ((uint8_t *)cbuf->mem) + 1));
@@ -1405,11 +1404,10 @@ __conn_config_file(
         }
 
         /*
-         * Replace any newline characters with commas (and strings of
-         * commas are safe).
+         * Replace any newline characters with commas (and strings of commas are safe).
          *
-         * After any newline, skip to a non-white-space character; if
-         * the next character is a hash mark, skip to the next newline.
+         * After any newline, skip to a non-white-space character; if the next character is a hash
+         * mark, skip to the next newline.
          */
         for (;;) {
             for (*t++ = ','; --len > 0 && __wt_isspace((u_char) * ++p);)
@@ -1472,8 +1470,8 @@ __conn_env_var(WT_SESSION_IMPL *session, const char *cfg[], const char *name, co
     /*
      * Security stuff:
      *
-     * Don't use the environment variable if the process has additional
-     * privileges, unless "use_environment_priv" is configured.
+     * Don't use the environment variable if the process has additional privileges, unless
+     * "use_environment_priv" is configured.
      */
     if (!__wt_has_priv())
         return (0);
@@ -1632,14 +1630,12 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
       is_create || exist ? WT_FS_OPEN_CREATE : 0, &conn->lock_fh);
 
     /*
-     * If this is a read-only connection and we cannot grab the lock file,
-     * check if it is because there's no write permission or if the file
-     * does not exist. If so, then ignore the error.
-     * XXX Ignoring the error does allow multiple read-only connections to
-     * exist at the same time on a read-only directory.
+     * If this is a read-only connection and we cannot grab the lock file, check if it is because
+     * there's no write permission or if the file does not exist. If so, then ignore the error. XXX
+     * Ignoring the error does allow multiple read-only connections to exist at the same time on a
+     * read-only directory.
      *
-     * If we got an expected permission or non-existence error then skip
-     * the byte lock.
+     * If we got an expected permission or non-existence error then skip the byte lock.
      */
     if (F_ISSET(conn, WT_CONN_READONLY) && (ret == EACCES || ret == ENOENT)) {
         bytelock = false;
@@ -1658,15 +1654,13 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
               "another process");
 
 /*
- * If the size of the lock file is non-zero, we created it (or
- * won a locking race with the thread that created it, it
- * doesn't matter).
+ * If the size of the lock file is non-zero, we created it (or won a locking race with the thread
+ * that created it, it doesn't matter).
  *
- * Write something into the file, zero-length files make me
- * nervous.
+ * Write something into the file, zero-length files make me nervous.
  *
- * The test against the expected length is sheer paranoia (the
- * length should be 0 or correct), but it shouldn't hurt.
+ * The test against the expected length is sheer paranoia (the length should be 0 or correct), but
+ * it shouldn't hurt.
  */
 #define WT_SINGLETHREAD_STRING "WiredTiger lock file\n"
         WT_ERR(__wt_filesize(session, conn->lock_fh, &size));
@@ -2027,26 +2021,22 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
       "# or create a WiredTiger.config file to override them."));
 
     /*
-     * The base configuration file contains all changes to default settings
-     * made at create, and we include the user-configuration file in that
-     * list, even though we don't expect it to change. Of course, an
-     * application could leave that file as it is right now and not remove
-     * a configuration we need, but applications can also guarantee all
-     * database users specify consistent environment variables and
-     * wiredtiger_open configuration arguments -- if we protect against
-     * those problems, might as well include the application's configuration
-     * file in that protection.
+     * The base configuration file contains all changes to default settings made at create, and we
+     * include the user-configuration file in that list, even though we don't expect it to change.
+     * Of course, an application could leave that file as it is right now and not remove a
+     * configuration we need, but applications can also guarantee all database users specify
+     * consistent environment variables and wiredtiger_open configuration arguments -- if we protect
+     * against those problems, might as well include the application's configuration file in that
+     * protection.
      *
-     * We were passed the configuration items specified by the application.
-     * That list includes configuring the default settings, presumably if
-     * the application configured it explicitly, that setting should survive
-     * even if the default changes.
+     * We were passed the configuration items specified by the application. That list includes
+     * configuring the default settings, presumably if the application configured it explicitly,
+     * that setting should survive even if the default changes.
      *
-     * When writing the base configuration file, we write the version and
-     * any configuration information set by the application (in other words,
-     * the stack except for cfg[0]). However, some configuration values need
-     * to be stripped out from the base configuration file; do that now, and
-     * merge the rest to be written.
+     * When writing the base configuration file, we write the version and any configuration
+     * information set by the application (in other words, the stack except for cfg[0]). However,
+     * some configuration values need to be stripped out from the base configuration file; do that
+     * now, and merge the rest to be written.
      */
     WT_ERR(__wt_config_merge(session, cfg + 1,
       "compatibility=(release=),"
@@ -2313,14 +2303,13 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     WT_ERR(__conn_config_env(session, cfg, i1));
 
     /*
-     * We need to know if configured for read-only or in-memory behavior
-     * before reading/writing the filesystem. The only way the application
-     * can configure that before we touch the filesystem is the wiredtiger
-     * config string or the WIREDTIGER_CONFIG environment variable.
+     * We need to know if configured for read-only or in-memory behavior before reading/writing the
+     * filesystem. The only way the application can configure that before we touch the filesystem is
+     * the wiredtiger config string or the WIREDTIGER_CONFIG environment variable.
      *
-     * The environment isn't trusted by default, for security reasons; if
-     * the application wants us to trust the environment before reading
-     * the filesystem, the wiredtiger_open config string is the only way.
+     * The environment isn't trusted by default, for security reasons; if the application wants us
+     * to trust the environment before reading the filesystem, the wiredtiger_open config string is
+     * the only way.
      */
     WT_ERR(__wt_config_gets(session, cfg, "in_memory", &cval));
     if (cval.val != 0)
@@ -2445,14 +2434,12 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     /*
      * Configuration ...
      *
-     * We can't open sessions yet, so any configurations that cause
-     * sessions to be opened must be handled inside __wt_connection_open.
+     * We can't open sessions yet, so any configurations that cause sessions to be opened must be
+     * handled inside __wt_connection_open.
      *
-     * The error message configuration might have changed (if set in a
-     * configuration file, and not in the application's configuration
-     * string), get it again. Do it first, make error messages correct.
-     * Ditto verbose configuration so we dump everything the application
-     * wants to see.
+     * The error message configuration might have changed (if set in a configuration file, and not
+     * in the application's configuration string), get it again. Do it first, make error messages
+     * correct. Ditto verbose configuration so we dump everything the application wants to see.
      */
     WT_ERR(__wt_config_gets(session, cfg, "error_prefix", &cval));
     if (cval.len != 0) {

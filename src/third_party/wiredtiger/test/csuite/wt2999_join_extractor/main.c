@@ -30,14 +30,12 @@
 /*
  * JIRA ticket reference: WT-2999
  *
- * Test case description: Create a table that stores ~4K size blobs;
- * two indices are defined using a pair of custom extractors
- * that pull the first and second 32-bit integers from the blob.
- * A simple join is created using the two indices, and iterated.
+ * Test case description: Create a table that stores ~4K size blobs; two indices are defined using a
+ * pair of custom extractors that pull the first and second 32-bit integers from the blob. A simple
+ * join is created using the two indices, and iterated.
  *
- * Failure mode: When a custom extractor is used with cursor
- * joins, there are memory leaks at the point where the extractor
- * sets the key.
+ * Failure mode: When a custom extractor is used with cursor joins, there are memory leaks at the
+ * point where the extractor sets the key.
  */
 static int
 custom_extract1(WT_EXTRACTOR *extractor, WT_SESSION *session, const WT_ITEM *key,

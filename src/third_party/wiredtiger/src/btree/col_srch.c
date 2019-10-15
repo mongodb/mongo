@@ -176,16 +176,13 @@ descend:
         WT_DIAGNOSTIC_YIELD;
 
         /*
-         * Swap the current page for the child page. If the page splits
-         * while we're retrieving it, restart the search at the root.
-         * We cannot restart in the "current" page; for example, if a
-         * thread is appending to the tree, the page it's waiting for
-         * did an insert-split into the parent, then the parent split
-         * into its parent, the name space we are searching for may have
-         * moved above the current page in the tree.
+         * Swap the current page for the child page. If the page splits while we're retrieving it,
+         * restart the search at the root. We cannot restart in the "current" page; for example, if
+         * a thread is appending to the tree, the page it's waiting for did an insert-split into the
+         * parent, then the parent split into its parent, the name space we are searching for may
+         * have moved above the current page in the tree.
          *
-         * On other error, simply return, the swap call ensures we're
-         * holding nothing on failure.
+         * On other error, simply return, the swap call ensures we're holding nothing on failure.
          */
         read_flags = WT_READ_RESTART_OK;
         if (F_ISSET(cbt, WT_CBT_READ_ONCE))
@@ -220,15 +217,13 @@ leaf_only:
     /*
      * Search the leaf page.
      *
-     * Search after a page is pinned does a search of the pinned page before
-     * doing a full tree search, in which case we might be searching for a
-     * record logically before the page. Return failure, and there's nothing
-     * else to do, the record isn't going to be on this page.
+     * Search after a page is pinned does a search of the pinned page before doing a full tree
+     * search, in which case we might be searching for a record logically before the page. Return
+     * failure, and there's nothing else to do, the record isn't going to be on this page.
      *
-     * We don't check inside the search path for a record greater than the
-     * maximum record in the tree; in that case, we get here with a record
-     * that's impossibly large for the page. We do have additional setup to
-     * do in that case, the record may be appended to the page.
+     * We don't check inside the search path for a record greater than the maximum record in the
+     * tree; in that case, we get here with a record that's impossibly large for the page. We do
+     * have additional setup to do in that case, the record may be appended to the page.
      */
     if (page->type == WT_PAGE_COL_FIX) {
         if (recno < current->ref_recno) {

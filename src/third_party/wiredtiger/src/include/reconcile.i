@@ -20,19 +20,16 @@ static inline bool
 __wt_rec_need_split(WT_RECONCILE *r, size_t len)
 {
     /*
-     * In the case of a row-store leaf page, trigger a split if a threshold
-     * number of saved updates is reached. This allows pages to split for
-     * update/restore and lookaside eviction when there is no visible data
-     * causing the disk image to grow.
+     * In the case of a row-store leaf page, trigger a split if a threshold number of saved updates
+     * is reached. This allows pages to split for update/restore and lookaside eviction when there
+     * is no visible data causing the disk image to grow.
      *
-     * In the case of small pages or large keys, we might try to split when
-     * a page has no updates or entries, which isn't possible. To consider
-     * update/restore or lookaside information, require either page entries
-     * or updates that will be attached to the image. The limit is one of
-     * either, but it doesn't make sense to create pages or images with few
-     * entries or updates, even where page sizes are small (especially as
-     * updates that will eventually become overflow items can throw off our
-     * calculations). Bound the combination at something reasonable.
+     * In the case of small pages or large keys, we might try to split when a page has no updates or
+     * entries, which isn't possible. To consider update/restore or lookaside information, require
+     * either page entries or updates that will be attached to the image. The limit is one of
+     * either, but it doesn't make sense to create pages or images with few entries or updates, even
+     * where page sizes are small (especially as updates that will eventually become overflow items
+     * can throw off our calculations). Bound the combination at something reasonable.
      */
     if (r->page->type == WT_PAGE_ROW_LEAF && r->entries + r->supd_next > 10)
         len += r->supd_memsize;
@@ -128,12 +125,11 @@ __wt_rec_image_copy(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_KV *kv)
     uint8_t *p, *t;
 
     /*
-     * If there's only one chunk of data to copy (because the cell and data
-     * are being copied from the original disk page), the cell length won't
-     * be set, the WT_ITEM data/length will reference the data to be copied.
+     * If there's only one chunk of data to copy (because the cell and data are being copied from
+     * the original disk page), the cell length won't be set, the WT_ITEM data/length will reference
+     * the data to be copied.
      *
-     * WT_CELLs are typically small, 1 or 2 bytes -- don't call memcpy, do
-     * the copy in-line.
+     * WT_CELLs are typically small, 1 or 2 bytes -- don't call memcpy, do the copy in-line.
      */
     for (p = r->first_free, t = (uint8_t *)&kv->cell, len = kv->cell_len; len > 0; --len)
         *p++ = *t++;
@@ -257,18 +253,15 @@ __wt_rec_dict_replace(WT_SESSION_IMPL *session, WT_RECONCILE *r, wt_timestamp_t 
     uint64_t offset;
 
     /*
-     * We optionally create a dictionary of values and only write a unique
-     * value once per page, using a special "copy" cell for all subsequent
-     * copies of the value.  We have to do the cell build and resolution at
-     * this low level because we need physical cell offsets for the page.
+     * We optionally create a dictionary of values and only write a unique value once per page,
+     * using a special "copy" cell for all subsequent copies of the value. We have to do the cell
+     * build and resolution at this low level because we need physical cell offsets for the page.
      *
-     * Sanity check: short-data cells can be smaller than dictionary-copy
-     * cells.  If the data is already small, don't bother doing the work.
-     * This isn't just work avoidance: on-page cells can't grow as a result
-     * of writing a dictionary-copy cell, the reconciliation functions do a
-     * split-boundary test based on the size required by the value's cell;
-     * if we grow the cell after that test we'll potentially write off the
-     * end of the buffer's memory.
+     * Sanity check: short-data cells can be smaller than dictionary-copy cells. If the data is
+     * already small, don't bother doing the work. This isn't just work avoidance: on-page cells
+     * can't grow as a result of writing a dictionary-copy cell, the reconciliation functions do a
+     * split-boundary test based on the size required by the value's cell; if we grow the cell after
+     * that test we'll potentially write off the end of the buffer's memory.
      */
     if (val->buf.size <= WT_INTPACK32_MAXSIZE)
         return (0);
@@ -277,11 +270,10 @@ __wt_rec_dict_replace(WT_SESSION_IMPL *session, WT_RECONCILE *r, wt_timestamp_t 
         return (0);
 
     /*
-     * If the dictionary offset isn't set, we're creating a new entry in the
-     * dictionary, set its location.
+     * If the dictionary offset isn't set, we're creating a new entry in the dictionary, set its
+     * location.
      *
-     * If the dictionary offset is set, we have a matching value. Create a
-     * copy cell instead.
+     * If the dictionary offset is set, we have a matching value. Create a copy cell instead.
      */
     if (dp->offset == 0)
         dp->offset = WT_PTRDIFF32(r->first_free, r->cur_ptr->image.mem);

@@ -93,14 +93,12 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp)
     /*
      * Skip files where we can't recover at least 1MB.
      *
-     * If at least 20% of the total file is available and in the first 80%
-     * of the file, we'll try compaction on the last 20% of the file; else,
-     * if at least 10% of the total file is available and in the first 90%
-     * of the file, we'll try compaction on the last 10% of the file.
+     * If at least 20% of the total file is available and in the first 80% of the file, we'll try
+     * compaction on the last 20% of the file; else, if at least 10% of the total file is available
+     * and in the first 90% of the file, we'll try compaction on the last 10% of the file.
      *
-     * We could push this further, but there's diminishing returns, a mostly
-     * empty file can be processed quickly, so more aggressive compaction is
-     * less useful.
+     * We could push this further, but there's diminishing returns, a mostly empty file can be
+     * processed quickly, so more aggressive compaction is less useful.
      */
     if (avail_eighty > WT_MEGABYTE && avail_eighty >= ((block->size / 10) * 2)) {
         *skipp = false;

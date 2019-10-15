@@ -111,17 +111,15 @@ __modify_apply_one(WT_SESSION_IMPL *session, WT_ITEM *value, WT_MODIFY *modify, 
     size = modify->size;
 
     /*
-     * Grow the buffer to the maximum size we'll need. This is pessimistic
-     * because it ignores replacement bytes, but it's a simpler calculation.
+     * Grow the buffer to the maximum size we'll need. This is pessimistic because it ignores
+     * replacement bytes, but it's a simpler calculation.
      *
-     * Grow the buffer first. This function is often called using a cursor
-     * buffer referencing on-page memory and it's easy to overwrite a page.
-     * A side-effect of growing the buffer is to ensure the buffer's value
-     * is in buffer-local memory.
+     * Grow the buffer first. This function is often called using a cursor buffer referencing
+     * on-page memory and it's easy to overwrite a page. A side-effect of growing the buffer is to
+     * ensure the buffer's value is in buffer-local memory.
      *
-     * Because the buffer may reference an overflow item, the data may not
-     * start at the start of the buffer's memory and we have to correct for
-     * that.
+     * Because the buffer may reference an overflow item, the data may not start at the start of the
+     * buffer's memory and we have to correct for that.
      */
     item_offset = WT_DATA_IN_ITEM(value) ? WT_PTRDIFF(value->data, value->mem) : 0;
     WT_RET(__wt_buf_grow(
@@ -217,15 +215,12 @@ __modify_fast_path(WT_ITEM *value, const size_t *p, int nentries, int *nappliedp
     WT_CLEAR(prev); /* [-Werror=maybe-uninitialized] */
 
     /*
-     * If the modifications are sorted and don't overlap in the old or new
-     * values, we can do a fast application of all the modifications
-     * modifications in a single pass.
+     * If the modifications are sorted and don't overlap in the old or new values, we can do a fast
+     * application of all the modifications modifications in a single pass.
      *
-     * The requirement for ordering is unfortunate, but modifications are
-     * performed in order, and applications specify byte offsets based on
-     * that. In other words, byte offsets are cumulative, modifications
-     * that shrink or grow the data affect subsequent modification's byte
-     * offsets.
+     * The requirement for ordering is unfortunate, but modifications are performed in order, and
+     * applications specify byte offsets based on that. In other words, byte offsets are cumulative,
+     * modifications that shrink or grow the data affect subsequent modification's byte offsets.
      */
     fastpath = first = true;
     *nappliedp = 0;
@@ -348,14 +343,12 @@ __wt_modify_apply(WT_CURSOR *cursor, const void *modify)
     nentries = (int)tmp;
 
     /*
-     * Grow the buffer first. This function is often called using a cursor
-     * buffer referencing on-page memory and it's easy to overwrite a page.
-     * A side-effect of growing the buffer is to ensure the buffer's value
-     * is in buffer-local memory.
+     * Grow the buffer first. This function is often called using a cursor buffer referencing
+     * on-page memory and it's easy to overwrite a page. A side-effect of growing the buffer is to
+     * ensure the buffer's value is in buffer-local memory.
      *
-     * Because the buffer may reference an overflow item, the data may not
-     * start at the start of the buffer's memory and we have to correct for
-     * that.
+     * Because the buffer may reference an overflow item, the data may not start at the start of the
+     * buffer's memory and we have to correct for that.
      */
     item_offset = WT_DATA_IN_ITEM(value) ? WT_PTRDIFF(value->data, value->mem) : 0;
     WT_RET(__wt_buf_grow(session, value, item_offset + value->size));

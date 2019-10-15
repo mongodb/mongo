@@ -59,17 +59,14 @@ __wt_cond_wait_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs
     locked = true;
 
     /*
-     * It's possible to race with threads waking us up. That's not a problem
-     * if there are multiple wakeups because the next wakeup will get us, or
-     * if we're only pausing for a short period. It's a problem if there's
-     * only a single wakeup, our waker is likely waiting for us to exit.
-     * After acquiring the mutex (so we're guaranteed to be awakened by any
-     * future wakeup call), optionally check if we're OK to keep running.
-     * This won't ensure our caller won't just loop and call us again, but
-     * at least it's not our fault.
+     * It's possible to race with threads waking us up. That's not a problem if there are multiple
+     * wakeups because the next wakeup will get us, or if we're only pausing for a short period.
+     * It's a problem if there's only a single wakeup, our waker is likely waiting for us to exit.
+     * After acquiring the mutex (so we're guaranteed to be awakened by any future wakeup call),
+     * optionally check if we're OK to keep running. This won't ensure our caller won't just loop
+     * and call us again, but at least it's not our fault.
      *
-     * Assert we're not waiting longer than a second if not checking the
-     * run status.
+     * Assert we're not waiting longer than a second if not checking the run status.
      */
     WT_ASSERT(session, run_func != NULL || usecs <= WT_MILLION);
 

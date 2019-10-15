@@ -415,9 +415,8 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
         /*
          * Make sure the ID doesn't move past any named snapshots.
          *
-         * Don't include the read/assignment in the assert statement.  Coverity
-         * complains if there are assignments only done in diagnostic builds,
-         * and when the read is from a volatile.
+         * Don't include the read/assignment in the assert statement. Coverity complains if there
+         * are assignments only done in diagnostic builds, and when the read is from a volatile.
          */
         uint64_t id = txn_global->nsnap_oldest_id;
         WT_ASSERT(session, id == WT_TXN_NONE || !WT_TXNID_LT(id, oldest_id));
@@ -475,8 +474,8 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
         session->operation_timeout_us = S2C(session)->operation_timeout_us;
 
     /*
-     * The default sync setting is inherited from the connection, but can
-     * be overridden by an explicit "sync" setting for this transaction.
+     * The default sync setting is inherited from the connection, but can be overridden by an
+     * explicit "sync" setting for this transaction.
      *
      * We want to distinguish between inheriting implicitly and explicitly.
      */
@@ -615,9 +614,8 @@ __wt_txn_release(WT_SESSION_IMPL *session)
     /*
      * Ensure the transaction flags are cleared on exit
      *
-     * Purposely do NOT clear the commit and durable timestamps on release.
-     * Other readers may still find these transactions in the durable queue
-     * and will need to see those timestamps.
+     * Purposely do NOT clear the commit and durable timestamps on release. Other readers may still
+     * find these transactions in the durable queue and will need to see those timestamps.
      */
     txn->flags = 0;
     txn->prepare_timestamp = WT_TS_NONE;
@@ -1131,18 +1129,14 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
             op->u.op_upd = NULL;
             WT_STAT_CONN_INCR(session, txn_prepared_updates_count);
             /*
-             * Set the key repeated flag which tells us that we've
-             * got multiple updates to the same key by the same txn.
-             * This is later used in txn commit.
+             * Set the key repeated flag which tells us that we've got multiple updates to the same
+             * key by the same txn. This is later used in txn commit.
              *
-             * When we see a reserved update we set the
-             * WT_UPDATE_RESERVED flag instead. We do this as we
-             * cannot know if our current update should specify the
-             * key repeated flag as we don't want to traverse the
-             * entire update chain to find out. i.e. if there is
-             * an update with our txnid after the reserved update
-             * we should set key repeated, but if there isn't we
-             * shouldn't.
+             * When we see a reserved update we set the WT_UPDATE_RESERVED flag instead. We do this
+             * as we cannot know if our current update should specify the key repeated flag as we
+             * don't want to traverse the entire update chain to find out. i.e. if there is an
+             * update with our txnid after the reserved update we should set key repeated, but if
+             * there isn't we shouldn't.
              */
             if (upd->next != NULL && upd->txnid == upd->next->txnid) {
                 if (upd->next->type == WT_UPDATE_RESERVE)

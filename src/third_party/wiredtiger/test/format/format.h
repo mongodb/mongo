@@ -90,13 +90,11 @@ typedef struct {
     WT_RAND_STATE rnd; /* Global RNG state */
 
     /*
-     * Prepare will return an error if the prepare timestamp is less than
-     * any active read timestamp. Lock across allocating prepare and read
-     * timestamps.
+     * Prepare will return an error if the prepare timestamp is less than any active read timestamp.
+     * Lock across allocating prepare and read timestamps.
      *
-     * We get the last committed timestamp periodically in order to update
-     * the oldest timestamp, that requires locking out transactional ops
-     * that set a timestamp.
+     * We get the last committed timestamp periodically in order to update the oldest timestamp,
+     * that requires locking out transactional ops that set a timestamp.
      */
     pthread_rwlock_t ts_lock;
 

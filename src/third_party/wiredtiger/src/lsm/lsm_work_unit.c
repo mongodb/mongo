@@ -101,11 +101,11 @@ __wt_lsm_get_chunk_to_flush(
     }
 
     /*
-     * Don't be overly zealous about pushing old chunks from cache.
-     * Attempting too many drops can interfere with checkpoints.
+     * Don't be overly zealous about pushing old chunks from cache. Attempting too many drops can
+     * interfere with checkpoints.
      *
-     * If retrying a discard push an additional work unit so there are
-     * enough to trigger checkpoints.
+     * If retrying a discard push an additional work unit so there are enough to trigger
+     * checkpoints.
      */
     if (evict_chunk != NULL && flush_chunk != NULL) {
         chunk = (__wt_random(&session->rnd) & 1) ? evict_chunk : flush_chunk;
@@ -619,10 +619,9 @@ __lsm_drop_file(WT_SESSION_IMPL *session, const char *uri)
     const char *drop_cfg[] = {WT_CONFIG_BASE(session, WT_SESSION_drop), "remove_files=false", NULL};
 
     /*
-     * We need to grab the schema lock to drop the file, so first try to
-     * make sure there is minimal work to freeing space in the cache.  Only
-     * bother trying to discard the checkpoint handle: the in-memory handle
-     * should have been closed already.
+     * We need to grab the schema lock to drop the file, so first try to make sure there is minimal
+     * work to freeing space in the cache. Only bother trying to discard the checkpoint handle: the
+     * in-memory handle should have been closed already.
      *
      * This will fail with EBUSY if the file is still in use.
      */
@@ -663,14 +662,12 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
     flush_metadata = false;
 
     /*
-     * Take a copy of the current state of the LSM tree and look for chunks
-     * to drop.  We do it this way to avoid holding the LSM tree lock while
-     * doing I/O or waiting on the schema lock.
+     * Take a copy of the current state of the LSM tree and look for chunks to drop. We do it this
+     * way to avoid holding the LSM tree lock while doing I/O or waiting on the schema lock.
      *
-     * This is safe because only one thread will be in this function at a
-     * time.  Merges may complete concurrently, and the old_chunks array
-     * may be extended, but we shuffle down the pointers each time we free
-     * one to keep the non-NULL slots at the beginning of the array.
+     * This is safe because only one thread will be in this function at a time. Merges may complete
+     * concurrently, and the old_chunks array may be extended, but we shuffle down the pointers each
+     * time we free one to keep the non-NULL slots at the beginning of the array.
      */
     WT_CLEAR(cookie);
     WT_RET(__lsm_copy_chunks(session, lsm_tree, &cookie, true));

@@ -316,8 +316,9 @@ __random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
         if (ret == WT_NOTFOUND) {
             next = !next; /* Reverse direction. */
             ret = next ? __wt_btcur_next(cbt, false) : __wt_btcur_prev(cbt, false);
-            WT_RET(ret); /* An empty tree. */
         }
+        WT_RET(ret);
+
         if (i > 0)
             --i;
         else {
@@ -397,15 +398,13 @@ restart:
         }
 
         /*
-         * There may be empty pages in the tree, and they're useless to
-         * us. If we don't find a non-empty page in "entries" random
-         * guesses, take the first non-empty page in the tree. If the
-         * search page contains nothing other than empty pages, restart
-         * from the root some number of times before giving up.
+         * There may be empty pages in the tree, and they're useless to us. If we don't find a
+         * non-empty page in "entries" random guesses, take the first non-empty page in the tree. If
+         * the search page contains nothing other than empty pages, restart from the root some
+         * number of times before giving up.
          *
-         * Random sampling is looking for a key/value pair on a random
-         * leaf page, and so will accept any page that contains a valid
-         * key/value pair, so on-disk is fine, but deleted is not.
+         * Random sampling is looking for a key/value pair on a random leaf page, and so will accept
+         * any page that contains a valid key/value pair, so on-disk is fine, but deleted is not.
          */
         descent = NULL;
         for (i = 0; i < entries; ++i) {
@@ -430,11 +429,10 @@ restart:
         }
 
     /*
-     * Swap the current page for the child page. If the page splits
-     * while we're retrieving it, restart the search at the root.
+     * Swap the current page for the child page. If the page splits while we're retrieving it,
+     * restart the search at the root.
      *
-     * On other error, simply return, the swap call ensures we're
-     * holding nothing on failure.
+     * On other error, simply return, the swap call ensures we're holding nothing on failure.
      */
 descend:
         if ((ret = __wt_page_swap(session, current, descent, flags)) == 0) {
@@ -523,12 +521,11 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
     }
 
     /*
-     * Cursor through the tree, skipping past the sample size of the leaf
-     * pages in the tree between each random key return to compensate for
-     * unbalanced trees.
+     * Cursor through the tree, skipping past the sample size of the leaf pages in the tree between
+     * each random key return to compensate for unbalanced trees.
      *
-     * If the random descent attempt failed, we don't have a configured
-     * sample size, use 100 for no particular reason.
+     * If the random descent attempt failed, we don't have a configured sample size, use 100 for no
+     * particular reason.
      */
     if (cbt->next_random_sample_size == 0)
         cbt->next_random_sample_size = 100;
@@ -555,19 +552,17 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
     }
 
     /*
-     * Be paranoid about loop termination: first, if the last leaf page
-     * skipped was also the last leaf page in the tree, skip may be set to
-     * zero on return along with the NULL WT_REF end-of-walk condition.
-     * Second, if a tree has no valid pages at all (the condition after
-     * initial creation), we might make no progress at all, or finally, if
-     * a tree has only deleted pages, we'll make progress, but never get a
-     * useful WT_REF. And, of course, the tree can switch from one of these
-     * states to another without warning. Decrement skip regardless of what
+     * Be paranoid about loop termination: first, if the last leaf page skipped was also the last
+     * leaf page in the tree, skip may be set to zero on return along with the NULL WT_REF
+     * end-of-walk condition. Second, if a tree has no valid pages at all (the condition after
+     * initial creation), we might make no progress at all, or finally, if a tree has only deleted
+     * pages, we'll make progress, but never get a useful WT_REF. And, of course, the tree can
+     * switch from one of these states to another without warning. Decrement skip regardless of what
      * is happening in the search, guarantee we eventually quit.
      *
-     * Pages read for data sampling aren't "useful"; don't update the read
-     * generation of pages already in memory, and if a page is read, set
-     * its generation to a low value so it is evicted quickly.
+     * Pages read for data sampling aren't "useful"; don't update the read generation of pages
+     * already in memory, and if a page is read, set its generation to a low value so it is evicted
+     * quickly.
      */
     for (skip = cbt->next_random_leaf_skip; cbt->ref == NULL || skip > 0;) {
         n = skip;

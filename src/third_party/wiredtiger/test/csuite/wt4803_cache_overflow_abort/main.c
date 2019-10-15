@@ -59,11 +59,11 @@ handle_message(WT_EVENT_HANDLER *handler, WT_SESSION *session, int error, const 
           stderr, "Got cache overflow error (expect_panic=%s)\n", expect_panic ? "true" : "false");
 
         /*
-         * If we're expecting a panic, exit with zero to indicate to the
-         * parent that this test was successful.
+         * If we're expecting a panic, exit with zero to indicate to the parent that this test was
+         * successful.
          *
-         * If not, don't intercept. We'll naturally exit with non-zero
-         * if we're terminating due to panic.
+         * If not, don't intercept. We'll naturally exit with non-zero if we're terminating due to
+         * panic.
          */
         if (expect_panic)
             exit(EXIT_SUCCESS);
@@ -101,15 +101,13 @@ las_workload(TEST_OPTS *opts, const char *las_file_max)
     }
 
     /*
-     * Open a snapshot isolation transaction in another session. This forces
-     * the cache to retain all previous values. Then update all keys with a
-     * new value in the original session while keeping that snapshot
-     * transaction open. With the large value buffer, small cache and lots
-     * of keys, this will force a lot of lookaside usage.
+     * Open a snapshot isolation transaction in another session. This forces the cache to retain all
+     * previous values. Then update all keys with a new value in the original session while keeping
+     * that snapshot transaction open. With the large value buffer, small cache and lots of keys,
+     * this will force a lot of lookaside usage.
      *
-     * When the file_max setting is small, the maximum size should easily be
-     * reached and we should panic. When the maximum size is large or not
-     * set, then we should succeed.
+     * When the file_max setting is small, the maximum size should easily be reached and we should
+     * panic. When the maximum size is large or not set, then we should succeed.
      */
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &other_session));
     testutil_check(other_session->begin_transaction(other_session, "isolation=snapshot"));
@@ -147,11 +145,11 @@ test_las_workload(TEST_OPTS *opts, const char *las_file_max)
     testutil_make_work_dir(opts->home);
 
     /*
-     * Since it's possible that the workload will panic and abort, we will
-     * fork the process and execute the workload in the child process.
+     * Since it's possible that the workload will panic and abort, we will fork the process and
+     * execute the workload in the child process.
      *
-     * This way, we can safely check the exit code of the child process and
-     * confirm that it is what we expected.
+     * This way, we can safely check the exit code of the child process and confirm that it is what
+     * we expected.
      */
     pid = fork();
     if (pid < 0)

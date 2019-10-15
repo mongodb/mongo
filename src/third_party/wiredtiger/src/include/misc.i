@@ -238,12 +238,12 @@ __wt_timing_stress(WT_SESSION_IMPL *session, u_int flag)
 }
 
 /*
- * The hardware-accelerated checksum code that originally shipped on Windows
- * did not correctly handle memory that wasn't 8B aligned and a multiple of 8B.
- * It's likely that calculations were always 8B aligned, but there's some risk.
+ * The hardware-accelerated checksum code that originally shipped on Windows did not correctly
+ * handle memory that wasn't 8B aligned and a multiple of 8B. It's likely that calculations were
+ * always 8B aligned, but there's some risk.
  *
- * What we do is always write the correct checksum, and if a checksum test
- * fails, check it against the alternate version have before failing.
+ * What we do is always write the correct checksum, and if a checksum test fails, check it against
+ * the alternate version have before failing.
  */
 
 #if defined(_M_AMD64) && !defined(HAVE_NO_CRC32_HARDWARE)

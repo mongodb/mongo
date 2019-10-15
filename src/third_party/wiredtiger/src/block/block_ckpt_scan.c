@@ -239,16 +239,14 @@ __wt_block_checkpoint_last(WT_SESSION_IMPL *session, WT_BLOCK *block, char **met
     WT_RET(__wt_buf_init(session, checkpoint, WT_BLOCK_CHECKPOINT_BUFFER));
 
     /*
-     * Initialize a pair of structures that track the best and current
-     * checkpoints found so far. This is a little trickier than normal
-     * because we don't want to start saving a checkpoint only to find
-     * out it's not one we can use. I doubt that can happen and it
-     * suggests corruption, but half-a-checkpoint isn't a good place to
-     * be. Only swap to a new "best" checkpoint if we read the whole
-     * thing successfully.
+     * Initialize a pair of structures that track the best and current checkpoints found so far.
+     * This is a little trickier than normal because we don't want to start saving a checkpoint only
+     * to find out it's not one we can use. I doubt that can happen and it suggests corruption, but
+     * half-a-checkpoint isn't a good place to be. Only swap to a new "best" checkpoint if we read
+     * the whole thing successfully.
      *
-     * Don't re-order these lines: it's done this way so the WT_ITEMs
-     * are always initialized and error handling works.
+     * Don't re-order these lines: it's done this way so the WT_ITEMs are always initialized and
+     * error handling works.
      */
     memset((best = &_best), 0, sizeof(_best));
     memset((current = &_current), 0, sizeof(_current));

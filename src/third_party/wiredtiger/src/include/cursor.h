@@ -265,26 +265,22 @@ struct __wt_cursor_index {
 };
 
 /*
- * A join iterator structure is used to generate candidate primary keys. It
- * is the responsibility of the caller of the iterator to filter these
- * primary key against the other conditions of the join before returning
- * them the caller of WT_CURSOR::next.
+ * A join iterator structure is used to generate candidate primary keys. It is the responsibility of
+ * the caller of the iterator to filter these primary key against the other conditions of the join
+ * before returning them the caller of WT_CURSOR::next.
  *
- * For a conjunction join (the default), entry_count will be 1, meaning that
- * the iterator only consumes the first entry (WT_CURSOR_JOIN_ENTRY).  That
- * is, it successively returns primary keys from a cursor for the first
- * index that was joined.  When the values returned by that cursor are
- * exhausted, the iterator has completed.  For a disjunction join,
- * exhausting a cursor just means that the iterator advances to the next
- * entry. If the next entry represents an index, a new cursor is opened and
- * primary keys from that index are then successively returned.
+ * For a conjunction join (the default), entry_count will be 1, meaning that the iterator only
+ * consumes the first entry (WT_CURSOR_JOIN_ENTRY). That is, it successively returns primary keys
+ * from a cursor for the first index that was joined. When the values returned by that cursor are
+ * exhausted, the iterator has completed. For a disjunction join, exhausting a cursor just means
+ * that the iterator advances to the next entry. If the next entry represents an index, a new cursor
+ * is opened and primary keys from that index are then successively returned.
  *
- * When positioned on an entry that represents a nested join, a new child
- * iterator is created that will be bound to the nested WT_CURSOR_JOIN.
- * That iterator is then used to generate candidate primary keys.  When its
- * iteration is completed, that iterator is destroyed and the parent
- * iterator advances to the next entry.  Thus, depending on how deeply joins
- * are nested, a similarly deep stack of iterators is created.
+ * When positioned on an entry that represents a nested join, a new child iterator is created that
+ * will be bound to the nested WT_CURSOR_JOIN. That iterator is then used to generate candidate
+ * primary keys. When its iteration is completed, that iterator is destroyed and the parent iterator
+ * advances to the next entry. Thus, depending on how deeply joins are nested, a similarly deep
+ * stack of iterators is created.
  */
 struct __wt_cursor_join_iter {
     WT_SESSION_IMPL *session;

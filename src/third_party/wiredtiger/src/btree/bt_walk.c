@@ -34,15 +34,12 @@ __ref_index_slot(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_INDEX **pindexp,
         entries = pindex->entries;
 
         /*
-         * Use the page's reference hint: it should be correct unless
-         * there was a split or delete in the parent before our slot.
-         * If the hint is wrong, it can be either too big or too small,
-         * but often only by a small amount.  Search up and down the
-         * index starting from the hint.
+         * Use the page's reference hint: it should be correct unless there was a split or delete in
+         * the parent before our slot. If the hint is wrong, it can be either too big or too small,
+         * but often only by a small amount. Search up and down the index starting from the hint.
          *
-         * It's not an error for the reference hint to be wrong, it
-         * just means the first retrieval (which sets the hint for
-         * subsequent retrievals), is slower.
+         * It's not an error for the reference hint to be wrong, it just means the first retrieval
+         * (which sets the hint for subsequent retrievals), is slower.
          */
         slot = ref->pindex_hint;
         if (slot >= entries)
@@ -175,28 +172,25 @@ __split_prev_race(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_INDEX **pindexp
     WT_PAGE_INDEX *pindex;
 
     /*
-     * Handle a cursor moving backwards through the tree or setting up at
-     * the end of the tree. We're passed the child page into which we're
-     * descending, and the parent page's page-index we used to find that
-     * child page.
+     * Handle a cursor moving backwards through the tree or setting up at the end of the tree. We're
+     * passed the child page into which we're descending, and the parent page's page-index we used
+     * to find that child page.
      *
-     * When splitting an internal page into its parent, we move the split
-     * pages WT_REF structures, then update the parent's page index, then
-     * update the split page's page index, and nothing is atomic. A thread
-     * can read the parent page's replacement page index and then the split
-     * page's original index, or vice-versa, and either change can cause a
-     * cursor moving backwards through the tree to skip pages.
+     * When splitting an internal page into its parent, we move the split pages WT_REF structures,
+     * then update the parent's page index, then update the split page's page index, and nothing is
+     * atomic. A thread can read the parent page's replacement page index and then the split page's
+     * original index, or vice-versa, and either change can cause a cursor moving backwards through
+     * the tree to skip pages.
      *
-     * This isn't a problem for a cursor setting up at the start of the tree
-     * or moving forward through the tree because we do right-hand splits on
-     * internal pages and the initial part of the split page's namespace
-     * won't change as part of a split (in other words, a thread reading the
-     * parent page's and split page's indexes will move to the same slot no
-     * matter what order of indexes are read.
+     * This isn't a problem for a cursor setting up at the start of the tree or moving forward
+     * through the tree because we do right-hand splits on internal pages and the initial part of
+     * the split page's namespace won't change as part of a split (in other words, a thread reading
+     * the parent page's and split page's indexes will move to the same slot no matter what order of
+     * indexes are read.
      *
-     * Acquire the child's page index, then confirm the parent's page index
-     * hasn't changed, to check for reading an old version of the parent's
-     * page index and then reading a new version of the child's page index.
+     * Acquire the child's page index, then confirm the parent's page index hasn't changed, to check
+     * for reading an old version of the parent's page index and then reading a new version of the
+     * child's page index.
      */
     WT_INTL_INDEX_GET(session, ref->page, pindex);
     if (__wt_split_descent_race(session, ref, *pindexp))
@@ -406,16 +400,13 @@ restart:
 
             for (;;) {
                 /*
-                 * Swap our previous hazard pointer for the page
-                 * we'll return.
+                 * Swap our previous hazard pointer for the page we'll return.
                  *
-                 * Not-found is an expected return, as eviction
-                 * might have been attempted. The page can't be
-                 * evicted, we're holding a hazard pointer on a
-                 * child, spin until we're successful.
+                 * Not-found is an expected return, as eviction might have been attempted. The page
+                 * can't be evicted, we're holding a hazard pointer on a child, spin until we're
+                 * successful.
                  *
-                 * Restart is not expected, our parent WT_REF
-                 * should not have split.
+                 * Restart is not expected, our parent WT_REF should not have split.
                  */
                 ret = __wt_page_swap(session, couple, ref, WT_READ_NOTFOUND_OK | flags);
                 if (ret == 0) {
@@ -528,8 +519,8 @@ descend:
             }
 
             /*
-             * Not-found is an expected return when walking only
-             * in-cache pages, or if we see a deleted page.
+             * Not-found is an expected return when walking only in-cache pages, or if we see a
+             * deleted page.
              *
              * An expected error, so "couple" is unchanged.
              */
@@ -540,8 +531,7 @@ descend:
             }
 
             /*
-             * The page we're moving to might have split, in which
-             * case restart the movement.
+             * The page we're moving to might have split, in which case restart the movement.
              *
              * An expected error, so "couple" is unchanged.
              */

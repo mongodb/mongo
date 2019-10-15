@@ -243,12 +243,12 @@ __rebalance_row_leaf_key(WT_SESSION_IMPL *session, const uint8_t *addr, size_t a
     WT_PAGE *page;
 
     /*
-     * We need the first key from a leaf page. Leaf pages are relatively
-     * complex (Huffman encoding, prefix compression, and so on), do the
-     * work to instantiate the page and copy the first key to the buffer.
+     * We need the first key from a leaf page. Leaf pages are relatively complex (Huffman encoding,
+     * prefix compression, and so on), do the work to instantiate the page and copy the first key to
+     * the buffer.
      *
-     * Page flags are 0 because we aren't releasing the memory used to read
-     * the page into memory and we don't want page discard to free it.
+     * Page flags are 0 because we aren't releasing the memory used to read the page into memory and
+     * we don't want page discard to free it.
      */
     WT_RET(__wt_bt_read(session, rs->tmp1, addr, addr_len));
     WT_RET(__wt_page_inmem(session, NULL, rs->tmp1->data, 0, false, &page));
@@ -296,13 +296,12 @@ __rebalance_row_walk(WT_SESSION_IMPL *session, wt_timestamp_t durable_ts, const 
             break;
         case WT_CELL_KEY_OVFL:
             /*
-             * Any overflow key that references an internal page is
-             * of no further use, schedule its blocks to be freed.
+             * Any overflow key that references an internal page is of no further use, schedule its
+             * blocks to be freed.
              *
-             * We could potentially use the same overflow key being
-             * freed here for the internal page we're creating, but
-             * that's more work to get reconciliation to understand
-             * and overflow keys are (well, should be), uncommon.
+             * We could potentially use the same overflow key being freed here for the internal page
+             * we're creating, but that's more work to get reconciliation to understand and overflow
+             * keys are (well, should be), uncommon.
              */
             __wt_verbose(session, WT_VERB_REBALANCE, "free-list append overflow key: %s",
               __wt_addr_string(session, unpack.data, unpack.size, rs->tmp1));
