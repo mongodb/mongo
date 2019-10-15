@@ -53,7 +53,6 @@ public:
         return *_internal;
     }
 
-    const LogComponentSettings& settings() const;
     LogRecord openRecord(LogSeverity severity, LogComponent component, LogTag tags);
 
 private:

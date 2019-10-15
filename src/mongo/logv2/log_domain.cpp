@@ -37,9 +37,6 @@ LogDomain::LogDomain(std::unique_ptr<LogDomain::Internal> internalDomain)
     : _internal(std::move(internalDomain)) {}
 LogDomain::~LogDomain() = default;
 
-const LogComponentSettings& LogDomain::settings() const {
-    return internal().settings();
-}
 
 LogRecord LogDomain::openRecord(LogSeverity severity, LogComponent component, LogTag tags) {
     std::unique_ptr<LogRecordImpl> record_impl;

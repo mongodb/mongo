@@ -44,8 +44,10 @@ namespace logv2 {
 // Boost::log filter that enables logging if Component+Severity match current settings
 class ComponentSettingsFilter : public DomainFilter<ComponentSettingsFilter> {
 public:
-    ComponentSettingsFilter(const LogDomain& domain)
-        : DomainFilter(domain), _settings(domain.settings()) {}
+    ComponentSettingsFilter(const LogDomain& domain, const LogComponentSettings& settings)
+        : DomainFilter(domain), _settings(settings) {}
+    ComponentSettingsFilter(const LogDomain::Internal& domain, const LogComponentSettings& settings)
+        : DomainFilter(domain), _settings(settings) {}
     bool filter(boost::log::attribute_value_set const& attrs) const {
         using boost::log::extract;
 

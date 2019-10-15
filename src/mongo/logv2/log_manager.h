@@ -38,6 +38,8 @@ namespace mongo {
 namespace logv2 {
 
 class LogDomain;
+class LogDomainGlobal;
+class LogComponentSettings;
 
 /**
  * Container for managing log domains.
@@ -55,40 +57,19 @@ public:
     static LogManager& global();
 
     /**
-     * Gets the global domain for this manager.  It has no name.
-     * Will attach a default console log appender.
+     * Gets the global domain for this manager.
      */
     LogDomain& getGlobalDomain();
-
-    void setOutputFormat(LogFormat format);
+    /**
+     * Gets the internal global domain with an extended interface. Require the user to include
+     * log_domain_global.h.
+     */
+    LogDomainGlobal& getGlobalDomainInternal();
 
     /**
-     * Detaches the default log backends
-     *
-     * @note This function is not thread safe.
+     * Gets the global settings belonging to the global domain.
      */
-    void detachDefaultBackends();
-    void detachConsoleBackend();
-
-    /**
-     * Reattaches the default log backends
-     *
-     * @note This function is not thread safe.
-     */
-    void reattachDefaultBackends();
-    void reattachConsoleBackend();
-
-    void setupSyslogBackend(int syslogFacility);
-    void reattachSyslogBackend();
-
-    void setupRotatableFileBackend(std::string path, bool append);
-    void reattachRotatableFileBackend();
-    void rotate();
-
-    /**
-     * Checks if the default log backends are attached
-     */
-    bool isDefaultBackendsAttached() const;
+    LogComponentSettings& getGlobalSettings();
 
 private:
     struct Impl;

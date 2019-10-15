@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/logv2/log_domain.h"
+#include "mongo/logv2/log_domain_global.h"
 #include "mongo/logv2/log_domain_internal.h"
 #include "mongo/logv2/log_manager.h"
 #include "mongo/unittest/unittest.h"
@@ -49,17 +50,28 @@ class LogTestV2 : public unittest::Test {
 
 public:
     LogTestV2() {
-        LogManager::global().detachDefaultBackends();
+        LogDomainGlobal::ConfigurationOptions config;
+        config.makeDisabled();
+
+        ASSERT_OK(LogManager::global().getGlobalDomainInternal().configure(config));
     }
 
     ~LogTestV2() override {
-        LogManager::global().reattachDefaultBackends();
-        boost::log::core::get()->remove_all_sinks();
+        for (auto&& sink : _attachedSinks) {
+            boost::log::core::get()->remove_sink(sink);
+        }
+
+        ASSERT_OK(LogManager::global().getGlobalDomainInternal().configure({}));
     }
 
     void attach(boost::shared_ptr<boost::log::sinks::sink> sink) {
         boost::log::core::get()->add_sink(std::move(sink));
+        _attachedSinks.push_back(sink);
     }
+
+
+private:
+    std::vector<boost::shared_ptr<boost::log::sinks::sink>> _attachedSinks;
 };
 
 }  // namespace logv2

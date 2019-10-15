@@ -134,7 +134,7 @@ namespace mongo {
 #define LOGV2_DEBUG_OPTIONS_INLINE_1(DLEVEL, OPTIONS, MESSAGE, ...)                       \
     do {                                                                                  \
         auto severity = ::mongo::logv2::LogSeverity::Debug(DLEVEL);                       \
-        if (::mongo::logv2::LogManager::global().getGlobalDomain().settings().shouldLog(  \
+        if (::mongo::logv2::LogManager::global().getGlobalSettings().shouldLog(           \
                 MongoLogV2DefaultComponent_component, severity)) {                        \
             LOGV2_IMPL_1(severity, OPTIONS, ::mongo::StringData{}, MESSAGE, __VA_ARGS__); \
         }                                                                                 \
@@ -171,13 +171,13 @@ namespace mongo {
 #define LOGV2_DEBUG_0(DLEVEL, MESSAGE) \
     LOGV2_DEBUG_OPTIONS_0(DLEVEL, ::mongo::logv2::LogOptions{}, MESSAGE)
 
-#define LOGV2_DEBUG_OPTIONS_INLINE_0(DLEVEL, OPTIONS, MESSAGE)                           \
-    do {                                                                                 \
-        auto severity = ::mongo::logv2::LogSeverity::Debug(DLEVEL);                      \
-        if (::mongo::logv2::LogManager::global().getGlobalDomain().settings().shouldLog( \
-                MongoLogV2DefaultComponent_component, severity)) {                       \
-            LOGV2_IMPL_0(severity, OPTIONS, ::mongo::StringData{}, MESSAGE);             \
-        }                                                                                \
+#define LOGV2_DEBUG_OPTIONS_INLINE_0(DLEVEL, OPTIONS, MESSAGE)                  \
+    do {                                                                        \
+        auto severity = ::mongo::logv2::LogSeverity::Debug(DLEVEL);             \
+        if (::mongo::logv2::LogManager::global().getGlobalSettings().shouldLog( \
+                MongoLogV2DefaultComponent_component, severity)) {              \
+            LOGV2_IMPL_0(severity, OPTIONS, ::mongo::StringData{}, MESSAGE);    \
+        }                                                                       \
     } while (false)
 
 #define LOGV2_DEBUG_INLINE_0(DLEVEL, MESSAGE) \

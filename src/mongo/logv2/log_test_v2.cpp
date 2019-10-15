@@ -133,7 +133,8 @@ public:
     LogDuringInitTester() {
         std::vector<std::string> lines;
         auto sink = LogTestBackend::create(lines);
-        sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain()));
+        sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
+                                                 LogManager::global().getGlobalSettings()));
         sink->set_formatter(PlainFormatter());
         boost::log::core::get()->add_sink(sink);
 
@@ -149,7 +150,8 @@ LogDuringInitTester logDuringInit;
 TEST_F(LogTestV2, Basic) {
     std::vector<std::string> lines;
     auto sink = LogTestBackend::create(lines);
-    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain()));
+    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
+                                             LogManager::global().getGlobalSettings()));
     sink->set_formatter(PlainFormatter());
     attach(sink);
 
@@ -185,7 +187,8 @@ TEST_F(LogTestV2, Basic) {
 TEST_F(LogTestV2, TextFormat) {
     std::vector<std::string> lines;
     auto sink = LogTestBackend::create(lines);
-    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain()));
+    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
+                                             LogManager::global().getGlobalSettings()));
     sink->set_formatter(TextFormatter());
     attach(sink);
 
@@ -207,7 +210,8 @@ TEST_F(LogTestV2, TextFormat) {
 TEST_F(LogTestV2, JSONFormat) {
     std::vector<std::string> lines;
     auto sink = LogTestBackend::create(lines);
-    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain()));
+    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
+                                             LogManager::global().getGlobalSettings()));
     sink->set_formatter(JsonFormatter());
     attach(sink);
 
@@ -260,19 +264,22 @@ TEST_F(LogTestV2, JSONFormat) {
 TEST_F(LogTestV2, Threads) {
     std::vector<std::string> linesPlain;
     auto plainSink = LogTestBackend::create(linesPlain);
-    plainSink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain()));
+    plainSink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
+                                                  LogManager::global().getGlobalSettings()));
     plainSink->set_formatter(PlainFormatter());
     attach(plainSink);
 
     std::vector<std::string> linesText;
     auto textSink = LogTestBackend::create(linesText);
-    textSink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain()));
+    textSink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
+                                                 LogManager::global().getGlobalSettings()));
     textSink->set_formatter(TextFormatter());
     attach(textSink);
 
     std::vector<std::string> linesJson;
     auto jsonSink = LogTestBackend::create(linesJson);
-    jsonSink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain()));
+    jsonSink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
+                                                 LogManager::global().getGlobalSettings()));
     jsonSink->set_formatter(JsonFormatter());
     attach(jsonSink);
 
@@ -312,13 +319,15 @@ TEST_F(LogTestV2, Ramlog) {
     RamLog* ramlog = RamLog::get("test_ramlog");
 
     auto sink = RamLogSink::create(ramlog);
-    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain()));
+    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
+                                             LogManager::global().getGlobalSettings()));
     sink->set_formatter(PlainFormatter());
     attach(sink);
 
     std::vector<std::string> lines;
     auto testSink = LogTestBackend::create(lines);
-    testSink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain()));
+    testSink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
+                                                 LogManager::global().getGlobalSettings()));
     testSink->set_formatter(PlainFormatter());
     attach(testSink);
 
@@ -338,7 +347,8 @@ TEST_F(LogTestV2, Ramlog) {
 TEST_F(LogTestV2, MultipleDomains) {
     std::vector<std::string> global_lines;
     auto sink = LogTestBackend::create(global_lines);
-    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain()));
+    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
+                                             LogManager::global().getGlobalSettings()));
     sink->set_formatter(PlainFormatter());
     attach(sink);
 
@@ -356,7 +366,8 @@ TEST_F(LogTestV2, MultipleDomains) {
     LogDomain other_domain(std::make_unique<OtherDomainImpl>());
     std::vector<std::string> other_lines;
     auto other_sink = LogTestBackend::create(other_lines);
-    other_sink->set_filter(ComponentSettingsFilter(other_domain));
+    other_sink->set_filter(
+        ComponentSettingsFilter(other_domain, LogManager::global().getGlobalSettings()));
     other_sink->set_formatter(PlainFormatter());
     attach(other_sink);
 
@@ -386,7 +397,8 @@ TEST_F(LogTestV2, FileLogging) {
 
     auto sink = boost::make_shared<
         boost::log::sinks::synchronous_sink<boost::log::sinks::text_file_backend>>(backend);
-    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain()));
+    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
+                                             LogManager::global().getGlobalSettings()));
     sink->set_formatter(PlainFormatter());
     attach(sink);
 

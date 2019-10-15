@@ -41,13 +41,6 @@ public:
     virtual ~Internal();
 
     virtual LogSource& source() = 0;
-
-    const LogComponentSettings& settings() const {
-        return _settings;
-    }
-
-private:
-    LogComponentSettings _settings;
 };
 
 }  // namespace logv2

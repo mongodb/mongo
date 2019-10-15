@@ -43,7 +43,8 @@ namespace logv2 {
 template <class Filter>
 class DomainFilter {
 public:
-    DomainFilter(const LogDomain& domain) : _domain(&domain.internal()) {}
+    explicit DomainFilter(const LogDomain& domain) : DomainFilter(domain.internal()) {}
+    explicit DomainFilter(const LogDomain::Internal& domain) : _domain(&domain) {}
 
     bool operator()(boost::log::attribute_value_set const& attrs) {
         using boost::log::extract;

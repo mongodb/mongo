@@ -45,6 +45,8 @@ class TaggedSeverityFilter : public DomainFilter<TaggedSeverityFilter> {
 public:
     TaggedSeverityFilter(const LogDomain& domain, LogTag tag, LogSeverity severity)
         : DomainFilter(domain), _tag(tag), _severity(severity) {}
+    TaggedSeverityFilter(const LogDomain::Internal& domain, LogTag tag, LogSeverity severity)
+        : DomainFilter(domain), _tag(tag), _severity(severity) {}
     bool filter(boost::log::attribute_value_set const& attrs) const {
         using boost::log::extract;
 
