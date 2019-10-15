@@ -36,7 +36,7 @@ imports:
 
 structs:
     singleWriteResult:
-        description: "A document used for storing session transaction states."
+        description: "A document that contains basic statistics for an executed write."
         fields:
             n:
                 type: long
