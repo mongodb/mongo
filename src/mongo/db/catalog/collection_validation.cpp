@@ -244,10 +244,15 @@ void _reportValidationResults(OperationContext* opCtx,
         indexDetails = std::make_unique<BSONObjBuilder>();
     }
 
-    // Report index validation results.
-    for (const auto& it : *indexNsResultsMap) {
-        const string indexName = it.first;
-        const ValidateResults& vr = it.second;
+    // Report detailed index validation results gathered when using {full: true} for validated
+    // indexes.
+    for (const auto& index : validateState->getIndexes()) {
+        const std::string indexName = index->descriptor()->indexName();
+        if (indexNsResultsMap->find(indexName) == indexNsResultsMap->end()) {
+            continue;
+        }
+
+        const ValidateResults& vr = indexNsResultsMap->at(indexName);
 
         if (!vr.valid) {
             results->valid = false;
