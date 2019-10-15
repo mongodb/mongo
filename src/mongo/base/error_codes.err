@@ -364,3 +364,18 @@ error_class("SnapshotError", ["SnapshotTooOld", "SnapshotUnavailable", "StaleChu
 error_class("VoteAbortError", ["NoSuchTransaction", "ReadConcernMajorityNotEnabled", "TransactionTooOld"])
 
 error_class("NonResumableChangeStreamError", ["ChangeStreamFatalError", "ChangeStreamHistoryLost"])
+error_class("RetriableError", [
+    "NotMaster",
+    "NotMasterNoSlaveOk",
+    "NotMasterOrSecondary",
+    "InterruptedDueToReplStateChange",
+    "PrimarySteppedDown",
+    "WriteConcernFailed",
+    "HostUnreachable",
+    "HostNotFound",
+    "NetworkTimeout",
+    "SocketException",
+    "ShutdownInProgress",
+    "InterruptedAtShutdown",
+    "BalancerInterrupted",
+])

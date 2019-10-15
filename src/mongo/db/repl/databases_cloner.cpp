@@ -209,10 +209,9 @@ Status DatabasesCloner::startup() noexcept {
         _exec,
         listDBsReq,
         [this](const auto& x) { this->_onListDatabaseFinish(x); },
-        RemoteCommandRetryScheduler::makeRetryPolicy(
+        RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::RetriableError>(
             numInitialSyncListDatabasesAttempts.load(),
-            executor::RemoteCommandRequest::kNoTimeout,
-            RemoteCommandRetryScheduler::kAllRetriableErrors));
+            executor::RemoteCommandRequest::kNoTimeout));
     _status = _listDBsScheduler->startup();
 
     if (!_status.isOK()) {

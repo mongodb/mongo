@@ -95,13 +95,9 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
                     uassertStatusOK(cursor.getStatus());
                 }
 
-            } catch (const DBException& ex) {
+            } catch (const ExceptionForCat<ErrorCategory::RetriableError>&) {
                 // Retriable errors are swallowed if 'allowPartialResults' is true.
-                if (allowPartialResults &&
-                    std::find(RemoteCommandRetryScheduler::kAllRetriableErrors.begin(),
-                              RemoteCommandRetryScheduler::kAllRetriableErrors.end(),
-                              ex.code()) !=
-                        RemoteCommandRetryScheduler::kAllRetriableErrors.end()) {
+                if (allowPartialResults) {
                     continue;
                 }
                 throw;  // Fail this loop.
