@@ -930,6 +930,16 @@ public:
      */
     virtual void finishRecoveryIfEligible(OperationContext* opCtx) = 0;
 
+    /**
+     * Field name of the newPrimaryMsg within the 'o' field in the new term oplog entry.
+     */
+    inline static constexpr StringData newPrimaryMsgField = "msg"_sd;
+
+    /**
+     * Message string passed in the new term oplog entry after a primary has stepped up.
+     */
+    inline static constexpr StringData newPrimaryMsg = "new primary"_sd;
+
 protected:
     ReplicationCoordinator();
 };

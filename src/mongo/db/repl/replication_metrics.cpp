@@ -300,7 +300,7 @@ void ReplicationMetrics::setNumCatchUpOps(long numCatchUpOps) {
     _updateAverageCatchUpOps(lk);
 }
 
-void ReplicationMetrics::setNewTermStartDate(Date_t newTermStartDate) {
+void ReplicationMetrics::setCandidateNewTermStartDate(Date_t newTermStartDate) {
     stdx::lock_guard<Latch> lk(_mutex);
     _electionCandidateMetrics.setNewTermStartDate(newTermStartDate);
 }
@@ -326,6 +326,15 @@ BSONObj ReplicationMetrics::getElectionCandidateMetricsBSON() {
         return _electionCandidateMetrics.toBSON();
     }
     return BSONObj();
+}
+
+void ReplicationMetrics::clearElectionCandidateMetrics() {
+    stdx::lock_guard<Latch> lk(_mutex);
+    _electionCandidateMetrics.setTargetCatchupOpTime(boost::none);
+    _electionCandidateMetrics.setNumCatchUpOps(boost::none);
+    _electionCandidateMetrics.setNewTermStartDate(boost::none);
+    _electionCandidateMetrics.setWMajorityWriteAvailabilityDate(boost::none);
+    _nodeIsCandidateOrPrimary = false;
 }
 
 void ReplicationMetrics::setElectionParticipantMetrics(const bool votedForCandidate,
@@ -357,13 +366,17 @@ BSONObj ReplicationMetrics::getElectionParticipantMetricsBSON() {
     return BSONObj();
 }
 
-void ReplicationMetrics::clearElectionCandidateMetrics() {
+void ReplicationMetrics::setParticipantNewTermDates(Date_t newTermStartDate,
+                                                    Date_t newTermAppliedDate) {
     stdx::lock_guard<Latch> lk(_mutex);
-    _electionCandidateMetrics.setTargetCatchupOpTime(boost::none);
-    _electionCandidateMetrics.setNumCatchUpOps(boost::none);
-    _electionCandidateMetrics.setNewTermStartDate(boost::none);
-    _electionCandidateMetrics.setWMajorityWriteAvailabilityDate(boost::none);
-    _nodeIsCandidateOrPrimary = false;
+    _electionParticipantMetrics.setNewTermStartDate(newTermStartDate);
+    _electionParticipantMetrics.setNewTermAppliedDate(newTermAppliedDate);
+}
+
+void ReplicationMetrics::clearParticipantNewTermDates() {
+    stdx::lock_guard<Latch> lk(_mutex);
+    _electionParticipantMetrics.setNewTermStartDate(boost::none);
+    _electionParticipantMetrics.setNewTermAppliedDate(boost::none);
 }
 
 void ReplicationMetrics::_updateAverageCatchUpOps(WithLock lk) {

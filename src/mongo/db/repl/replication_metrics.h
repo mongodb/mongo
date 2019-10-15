@@ -92,7 +92,7 @@ public:
                                      const boost::optional<int> priorPrimary);
     void setTargetCatchupOpTime(OpTime opTime);
     void setNumCatchUpOps(long numCatchUpOps);
-    void setNewTermStartDate(Date_t newTermStartDate);
+    void setCandidateNewTermStartDate(Date_t newTermStartDate);
     void setWMajorityWriteAvailabilityDate(Date_t wMajorityWriteAvailabilityDate);
 
     boost::optional<OpTime> getTargetCatchupOpTime_forTesting();
@@ -116,6 +116,9 @@ public:
                                        const double priorityAtElection);
 
     BSONObj getElectionParticipantMetricsBSON();
+    void setParticipantNewTermDates(Date_t newTermStartDate, Date_t newTermAppliedDate);
+    void clearParticipantNewTermDates();
+
 
 private:
     class ElectionMetricsSSS;

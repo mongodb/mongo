@@ -868,6 +868,16 @@ Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
 
     if (opType == OpTypeEnum::kNoop) {
         incrementOpsAppliedStats();
+
+        auto opObj = op.getObject();
+        if (opObj.hasField(ReplicationCoordinator::newPrimaryMsgField) &&
+            opObj.getField(ReplicationCoordinator::newPrimaryMsgField).str() ==
+                ReplicationCoordinator::newPrimaryMsg) {
+
+            ReplicationMetrics::get(opCtx).setParticipantNewTermDates(op.getWallClockTime(),
+                                                                      applyStartTime);
+        }
+
         return Status::OK();
     } else if (OplogEntry::isCrudOpType(opType)) {
         auto status =
@@ -1017,7 +1027,6 @@ Status OplogApplierImpl::applyOplogBatchPerWorker(OperationContext* opCtx,
 
     return Status::OK();
 }
-
 
 }  // namespace repl
 }  // namespace mongo
