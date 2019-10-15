@@ -14,8 +14,11 @@ load("jstests/libs/analyze_plan.js");
 // Only allow blocking sort execution to use 100 kB of memory.
 const kMaxMemoryUsageBytes = 100 * 1024;
 
-const kNumDocsWithinMemLimit = 70;
-const kNumDocsExceedingMemLimit = 100;
+// TODO (SERVER-43993): Documents can occupy twice as much memory as needed to just store the BSON
+// contents of the documents, which is why we can exceed the 100kB memory limit with just 50
+// documents, instead of the roughly 100 documents we might expect.
+const kNumDocsWithinMemLimit = 35;
+const kNumDocsExceedingMemLimit = 50;
 
 const kMemoryLimitExceededErrCode = 16819;
 

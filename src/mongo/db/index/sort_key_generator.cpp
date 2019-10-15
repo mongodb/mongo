@@ -76,30 +76,15 @@ SortKeyGenerator::SortKeyGenerator(SortPattern sortPattern, const CollatorInterf
                                                        Ordering::make(_sortSpecWithoutMeta));
 }
 
-// TODO (SERVER-42836): Once WorkingSetMember objects store a Document (SERVER-42181), this function
-// will be able to use the Document overload of computeSortKeyFromDocument, and it will be able to
-// store the text score with the Document instead of in a separate SortKeyGenerator::Metadata
-// object.
-StatusWith<Value> SortKeyGenerator::computeSortKey(const WorkingSetMember& wsm) const {
+Value SortKeyGenerator::computeSortKey(const WorkingSetMember& wsm) const {
     if (wsm.hasObj()) {
-        SortKeyGenerator::Metadata metadata;
-        if (_sortHasMeta && wsm.metadata().hasTextScore()) {
-            metadata.textScore = wsm.metadata().getTextScore();
-        }
-        auto statusWithSortKeyObj = computeSortKeyFromDocument(wsm.doc.value().toBson(), &metadata);
-        if (!statusWithSortKeyObj.isOK()) {
-            return statusWithSortKeyObj.getStatus();
-        }
-
-        return DocumentMetadataFields::deserializeSortKey(isSingleElementKey(),
-                                                          statusWithSortKeyObj.getValue());
+        return computeSortKeyFromDocument(wsm.doc.value(), wsm.metadata());
     }
 
     return computeSortKeyFromIndexKey(wsm);
 }
 
-StatusWith<Value> SortKeyGenerator::computeSortKeyFromIndexKey(
-    const WorkingSetMember& member) const {
+Value SortKeyGenerator::computeSortKeyFromIndexKey(const WorkingSetMember& member) const {
     invariant(member.getState() == WorkingSetMember::RID_AND_IDX);
     invariant(!_sortHasMeta);
 
@@ -118,16 +103,9 @@ StatusWith<Value> SortKeyGenerator::computeSortKeyFromIndexKey(
     return DocumentMetadataFields::deserializeSortKey(isSingleElementKey(), objBuilder.obj());
 }
 
-StatusWith<BSONObj> SortKeyGenerator::computeSortKeyFromDocument(const BSONObj& obj,
-                                                                 const Metadata* metadata) const {
-    if (_sortHasMeta) {
-        invariant(metadata);
-    }
-
-    auto sortKeyNoMetadata = computeSortKeyFromDocumentWithoutMetadata(obj);
-    if (!sortKeyNoMetadata.isOK()) {
-        return sortKeyNoMetadata;
-    }
+BSONObj SortKeyGenerator::computeSortKeyFromDocument(const BSONObj& obj,
+                                                     const DocumentMetadataFields& metadata) const {
+    auto sortKeyNoMetadata = uassertStatusOK(computeSortKeyFromDocumentWithoutMetadata(obj));
 
     if (!_sortHasMeta) {
         // We don't have to worry about $meta sort, so the index key becomes the sort key.
@@ -137,24 +115,27 @@ StatusWith<BSONObj> SortKeyGenerator::computeSortKeyFromDocument(const BSONObj& 
     BSONObjBuilder mergedKeyBob;
 
     // Merge metadata into the key.
-    BSONObjIterator sortKeyIt(sortKeyNoMetadata.getValue());
+    BSONObjIterator sortKeyIt(sortKeyNoMetadata);
     for (auto& part : _sortPattern) {
         if (part.fieldPath) {
             invariant(sortKeyIt.more());
             mergedKeyBob.append(sortKeyIt.next());
             continue;
         }
+
+        // Create a Document that represents the input object and its metadata together, so we can
+        // use it to evaluate the ExpressionMeta for this part of the sort pattern. This operation
+        // copies the data in 'metadata' but not any of the data in the 'obj' BSON.
+        MutableDocument documentWithMetdata(Document{obj});
+        documentWithMetdata.setMetadata(DocumentMetadataFields(metadata));
+
         invariant(part.expression);
-        switch (part.expression->getMetaType()) {
-            case DocumentMetadataFields::MetaType::kTextScore: {
-                mergedKeyBob.append("", metadata->textScore);
-                continue;
-            }
-            case DocumentMetadataFields::MetaType::kRandVal: {
-                mergedKeyBob.append("", metadata->randVal);
-                continue;
-            }
-            default: { MONGO_UNREACHABLE; }
+        auto value =
+            part.expression->evaluate(documentWithMetdata.freeze(), nullptr /* variables */);
+        if (!value.missing()) {
+            value.addToBsonObj(&mergedKeyBob, ""_sd);
+        } else {
+            mergedKeyBob.appendNull("");
         }
     }
 
@@ -231,7 +212,9 @@ Value SortKeyGenerator::getCollationComparisonKey(const Value& val) const {
 }
 
 StatusWith<Value> SortKeyGenerator::extractKeyPart(
-    const Document& doc, const SortPattern::SortPatternPart& patternPart) const {
+    const Document& doc,
+    const DocumentMetadataFields& metadata,
+    const SortPattern::SortPatternPart& patternPart) const {
     Value plainKey;
     if (patternPart.fieldPath) {
         invariant(!patternPart.expression);
@@ -243,22 +226,28 @@ StatusWith<Value> SortKeyGenerator::extractKeyPart(
         plainKey = key.getValue();
     } else {
         invariant(patternPart.expression);
+        // ExpressionMeta expects metadata to be attached to the document.
+        MutableDocument documentWithMetadata(doc);
+        documentWithMetadata.setMetadata(DocumentMetadataFields(metadata));
+
         // ExpressionMeta does not use Variables.
-        plainKey = patternPart.expression->evaluate(doc, nullptr /* variables */);
+        plainKey = patternPart.expression->evaluate(documentWithMetadata.freeze(),
+                                                    nullptr /* variables */);
     }
 
-    return getCollationComparisonKey(plainKey);
+    return plainKey.missing() ? Value{BSONNULL} : getCollationComparisonKey(plainKey);
 }
 
-StatusWith<Value> SortKeyGenerator::extractKeyFast(const Document& doc) const {
+StatusWith<Value> SortKeyGenerator::extractKeyFast(const Document& doc,
+                                                   const DocumentMetadataFields& metadata) const {
     if (_sortPattern.isSingleElementKey()) {
-        return extractKeyPart(doc, _sortPattern[0]);
+        return extractKeyPart(doc, metadata, _sortPattern[0]);
     }
 
     std::vector<Value> keys;
     keys.reserve(_sortPattern.size());
     for (auto&& keyPart : _sortPattern) {
-        auto extractedKey = extractKeyPart(doc, keyPart);
+        auto extractedKey = extractKeyPart(doc, metadata, keyPart);
         if (!extractedKey.isOK()) {
             // We can't use the fast path, so bail out.
             return extractedKey;
@@ -269,24 +258,18 @@ StatusWith<Value> SortKeyGenerator::extractKeyFast(const Document& doc) const {
     return Value{std::move(keys)};
 }
 
-BSONObj SortKeyGenerator::extractKeyWithArray(const Document& doc) const {
-    SortKeyGenerator::Metadata metadata;
-    if (doc.metadata().hasTextScore()) {
-        metadata.textScore = doc.metadata().getTextScore();
-    }
-    if (doc.metadata().hasRandVal()) {
-        metadata.randVal = doc.metadata().getRandVal();
-    }
-
+BSONObj SortKeyGenerator::extractKeyWithArray(const Document& doc,
+                                              const DocumentMetadataFields& metadata) const {
     // Convert the Document to a BSONObj, but only do the conversion for the paths we actually need.
     // Then run the result through the SortKeyGenerator to obtain the final sort key.
     auto bsonDoc = _sortPattern.documentToBsonWithSortPaths(doc);
-    return uassertStatusOK(computeSortKeyFromDocument(bsonDoc, &metadata));
+    return computeSortKeyFromDocument(bsonDoc, metadata);
 }
 
-Value SortKeyGenerator::computeSortKeyFromDocument(const Document& doc) const {
+Value SortKeyGenerator::computeSortKeyFromDocument(const Document& doc,
+                                                   const DocumentMetadataFields& metadata) const {
     // This fast pass directly generates a Value.
-    auto fastKey = extractKeyFast(doc);
+    auto fastKey = extractKeyFast(doc, metadata);
     if (fastKey.isOK()) {
         return std::move(fastKey.getValue());
     }
@@ -295,7 +278,7 @@ Value SortKeyGenerator::computeSortKeyFromDocument(const Document& doc) const {
     // form like BSONObj {'': 1, '': [2, 3]}) and converts it to a Value (Value [1, [2, 3]] in the
     // earlier example).
     return DocumentMetadataFields::deserializeSortKey(_sortPattern.isSingleElementKey(),
-                                                      extractKeyWithArray(doc));
+                                                      extractKeyWithArray(doc, metadata));
 }
 
 }  // namespace mongo
