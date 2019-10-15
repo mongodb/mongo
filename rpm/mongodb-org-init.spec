@@ -6,7 +6,7 @@ Release: %{dynamic_release}%{?dist}
 Obsoletes: mongo-10gen
 Provides: mongo-10gen
 Summary: MongoDB open source document-oriented database system (metapackage)
-License: AGPL 3.0
+License: SSPL
 URL: http://www.mongodb.org
 Group: Applications/Databases
 Requires: mongodb-org-server = %{version}, mongodb-org-shell = %{version}, mongodb-org-mongos = %{version}, mongodb-org-tools = %{version}
