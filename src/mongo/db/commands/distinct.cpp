@@ -228,13 +228,11 @@ public:
 
         const auto key = cmdObj[ParsedDistinct::kKeyField].valuestrsafe();
 
-        int bufSize = BSONObjMaxUserSize - 4096;
-        BufBuilder bb(bufSize);
-        char* start = bb.buf();
-
-        BSONArrayBuilder arr(bb);
+        std::vector<BSONObj> distinctValueHolder;
         BSONElementSet values(executor.getValue()->getCanonicalQuery()->getCollator());
 
+        const int kMaxResponseSize = BSONObjMaxUserSize - 4096;
+        size_t listApproxBytes = 0;
         BSONObj obj;
         PlanExecutor::ExecState state;
         while (PlanExecutor::ADVANCED == (state = executor.getValue()->getNext(&obj, NULL))) {
@@ -251,15 +249,16 @@ public:
                 if (values.count(elt)) {
                     continue;
                 }
-                int currentBufPos = bb.len();
 
-                uassert(17217,
-                        "distinct too big, 16mb cap",
-                        (currentBufPos + elt.size() + 1024) < bufSize);
+                // This is an approximate size check which safeguards against use of unbounded
+                // memory by the distinct command. We perform a more precise check at the end of
+                // this method to confirm that the response size is less than 16MB.
+                listApproxBytes += elt.size();
+                uassert(17217, "distinct too big, 16mb cap", listApproxBytes < kMaxResponseSize);
 
-                arr.append(elt);
-                BSONElement x(start + currentBufPos);
-                values.insert(x);
+                auto distinctObj = elt.wrap();
+                values.insert(distinctObj.firstElement());
+                distinctValueHolder.push_back(std::move(distinctObj));
             }
         }
 
@@ -293,10 +292,13 @@ public:
             curOp->debug().execStats = execStatsBob.obj();
         }
 
-        verify(start == bb.buf());
+        BSONArrayBuilder valueListBuilder(result.subarrayStart("values"));
+        for (const auto& value : values) {
+            valueListBuilder.append(value);
+        }
+        valueListBuilder.doneFast();
 
-        result.appendArray("values", arr.done());
-
+        uassert(31299, "distinct too big, 16mb cap", result.len() < kMaxResponseSize);
         return true;
     }
 
