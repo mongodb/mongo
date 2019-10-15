@@ -71,7 +71,6 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(skipIndexCreateFieldNameValidation);
 
 static std::set<StringData> allowedFieldNames = {
-    IndexDescriptor::k2dIndexMaxFieldName,
     IndexDescriptor::k2dIndexBitsFieldName,
     IndexDescriptor::k2dIndexMaxFieldName,
     IndexDescriptor::k2dIndexMinFieldName,
