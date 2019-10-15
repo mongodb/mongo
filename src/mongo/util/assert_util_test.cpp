@@ -88,9 +88,10 @@ TEST(AssertUtils, UassertNamedCodeWithoutCategories) {
     ASSERT_NOT_CATCHES(ErrorCodes::BadValue, ExceptionForCat<ErrorCategory::Interruption>);
 }
 
-// NotMaster - just NotMasterError
+// NotMaster - NotMasterError, RetriableError
 MONGO_STATIC_ASSERT(std::is_same<error_details::ErrorCategoriesFor<ErrorCodes::NotMaster>,
-                                 error_details::CategoryList<ErrorCategory::NotMasterError>>());
+                                 error_details::CategoryList<ErrorCategory::NotMasterError,
+                                                             ErrorCategory::RetriableError>>());
 MONGO_STATIC_ASSERT(std::is_base_of<AssertionException, ExceptionFor<ErrorCodes::NotMaster>>());
 MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::NetworkError>,
                                      ExceptionFor<ErrorCodes::NotMaster>>());
@@ -109,11 +110,12 @@ TEST(AssertUtils, UassertNamedCodeWithOneCategory) {
     ASSERT_NOT_CATCHES(ErrorCodes::NotMaster, ExceptionForCat<ErrorCategory::Interruption>);
 }
 
-// InterruptedDueToReplStateChange - NotMasterError and Interruption
+// InterruptedDueToReplStateChange - NotMasterError, Interruption, RetriableError
 MONGO_STATIC_ASSERT(
-    std::is_same<
-        error_details::ErrorCategoriesFor<ErrorCodes::InterruptedDueToReplStateChange>,
-        error_details::CategoryList<ErrorCategory::Interruption, ErrorCategory::NotMasterError>>());
+    std::is_same<error_details::ErrorCategoriesFor<ErrorCodes::InterruptedDueToReplStateChange>,
+                 error_details::CategoryList<ErrorCategory::Interruption,
+                                             ErrorCategory::NotMasterError,
+                                             ErrorCategory::RetriableError>>());
 MONGO_STATIC_ASSERT(std::is_base_of<AssertionException,
                                     ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>>());
 MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::NetworkError>,

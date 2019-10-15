@@ -127,10 +127,9 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
                       [this](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
                           return _countCallback(args);
                       },
-                      RemoteCommandRetryScheduler::makeRetryPolicy(
+                      RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::RetriableError>(
                           numInitialSyncCollectionCountAttempts.load(),
-                          executor::RemoteCommandRequest::kNoTimeout,
-                          RemoteCommandRetryScheduler::kAllRetriableErrors)),
+                          executor::RemoteCommandRequest::kNoTimeout)),
       _listIndexesFetcher(
           _executor,
           _source,
@@ -144,10 +143,9 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
           ReadPreferenceSetting::secondaryPreferredMetadata(),
           RemoteCommandRequest::kNoTimeout /* find network timeout */,
           RemoteCommandRequest::kNoTimeout /* getMore network timeout */,
-          RemoteCommandRetryScheduler::makeRetryPolicy(
+          RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::RetriableError>(
               numInitialSyncListIndexesAttempts.load(),
-              executor::RemoteCommandRequest::kNoTimeout,
-              RemoteCommandRetryScheduler::kAllRetriableErrors)),
+              executor::RemoteCommandRequest::kNoTimeout)),
       _indexSpecs(),
       _documentsToInsert(),
       _dbWorkTaskRunner(_dbWorkThreadPool),
@@ -524,10 +522,8 @@ void CollectionCloner::_beginCollectionCallback(const executor::TaskExecutor::Ca
         [=](const RemoteCommandCallbackArgs& rcbd) {
             _establishCollectionCursorsCallback(rcbd, cursorCommand);
         },
-        RemoteCommandRetryScheduler::makeRetryPolicy(
-            numInitialSyncCollectionFindAttempts.load(),
-            executor::RemoteCommandRequest::kNoTimeout,
-            RemoteCommandRetryScheduler::kAllRetriableErrors));
+        RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::RetriableError>(
+            numInitialSyncListIndexesAttempts.load(), executor::RemoteCommandRequest::kNoTimeout));
     auto scheduleStatus = _establishCollectionCursorsScheduler->startup();
     LOG(1) << "Attempting to establish cursors with maxNumClonerCursors: " << _maxNumClonerCursors;
 

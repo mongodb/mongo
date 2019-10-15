@@ -329,3 +329,18 @@ error_class("ExceededTimeLimitError", ["ExceededTimeLimit", "MaxTimeMSExpired", 
 error_class("SnapshotError", ["SnapshotTooOld", "SnapshotUnavailable", "StaleChunkHistory"])
 
 error_class("NonResumableChangeStreamError", ["ChangeStreamFatalError"])
+error_class("RetriableError", [
+    "NotMaster",
+    "NotMasterNoSlaveOk",
+    "NotMasterOrSecondary",
+    "InterruptedDueToReplStateChange",
+    "PrimarySteppedDown",
+    "WriteConcernFailed",
+    "HostUnreachable",
+    "HostNotFound",
+    "NetworkTimeout",
+    "SocketException",
+    "ShutdownInProgress",
+    "InterruptedAtShutdown",
+    "BalancerInterrupted",
+])

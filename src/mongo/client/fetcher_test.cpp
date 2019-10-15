@@ -1033,10 +1033,8 @@ TEST_F(FetcherTest, ShutdownDuringSecondBatch) {
 }
 
 TEST_F(FetcherTest, FetcherAppliesRetryPolicyToFirstCommandButNotToGetMoreRequests) {
-    auto policy = RemoteCommandRetryScheduler::makeRetryPolicy(
-        3U,
-        executor::RemoteCommandRequest::kNoTimeout,
-        {ErrorCodes::BadValue, ErrorCodes::InternalError});
+    auto policy = RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::RetriableError>(
+        3U, executor::RemoteCommandRequest::kNoTimeout);
 
     fetcher = stdx::make_unique<Fetcher>(&getExecutor(),
                                          source,
@@ -1054,9 +1052,9 @@ TEST_F(FetcherTest, FetcherAppliesRetryPolicyToFirstCommandButNotToGetMoreReques
 
     // Retry policy is applied to find command.
     const BSONObj doc = BSON("_id" << 1);
-    auto rs = ResponseStatus(ErrorCodes::BadValue, "first", Milliseconds(0));
+    auto rs = ResponseStatus(ErrorCodes::HostUnreachable, "first", Milliseconds(0));
     processNetworkResponse(rs, ReadyQueueState::kHasReadyRequests, FetcherState::kActive);
-    rs = ResponseStatus(ErrorCodes::InternalError, "second", Milliseconds(0));
+    rs = ResponseStatus(ErrorCodes::SocketException, "second", Milliseconds(0));
     processNetworkResponse(rs, ReadyQueueState::kHasReadyRequests, FetcherState::kActive);
     processNetworkResponse(BSON("cursor" << BSON("id" << 1LL << "ns"
                                                       << "db.coll"
