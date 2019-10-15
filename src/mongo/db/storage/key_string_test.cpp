@@ -306,6 +306,10 @@ TEST_F(KeyStringBuilderTest, Simple1) {
         }                                                                  \
     } while (0)
 
+TEST_F(KeyStringBuilderTest, DeprecatedBinData) {
+    ROUNDTRIP(version, BSON("" << BSONBinData(nullptr, 0, ByteArrayDeprecated)));
+}
+
 TEST_F(KeyStringBuilderTest, ActualBytesDouble) {
     // just one test like this for utter sanity
 
