@@ -2381,9 +2381,8 @@ var ReplSetTest = function(opts) {
 
         if (jsTest.options().randomBinVersions) {
             const rand = Random.rand();
-            const version = rand < 0.5 ? "latest" : "last-stable";
-            print("Randomly assigned binary version: " + version + " to node: " + n);
-            options.binVersion = version;
+            options.binVersion = rand < 0.5 ? "latest" : "last-stable";
+            print("Randomly assigned binary version: " + options.binVersion + " to node: " + n);
         }
 
         options.restart = options.restart || restart;

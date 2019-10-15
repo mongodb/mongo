@@ -1,0 +1,24 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstestfuzz/out/*.js
+
+executor:
+  archive:
+    tests: true
+  config:
+    shell_options:
+      nodb: ''
+      readMode: commands
+      global_vars:
+        TestData:
+          syncdelay: 5
+          logComponentVerbosity:
+            replication:
+              heartbeats: 2
+              rollback: 2
+            storage:
+              recovery: 3
+          rollbackShutdowns: true
+          randomBinVersions: true

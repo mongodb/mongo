@@ -5365,6 +5365,21 @@ tasks:
       jepsen_test_name: read-concern-majority
       jepsen_write_concern: --write-concern w1
 
+## initial sync multiversion fuzzer ##
+- <<: *jstestfuzz_template
+  name: initial_sync_multiversion_fuzzer_gen
+  tags: ["multiversion_fuzzer"]
+  commands:
+  - func: "generate fuzzer tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      num_files: 10
+      num_tasks: 15
+      npm_command: initsync-fuzzer
+      resmoke_args: --suites=initial_sync_multiversion_fuzzer
+      name: initial_sync_multiversion_fuzzer
+      task_path_suffix: "/data/multiversion"
+
 ## initial sync generational fuzzer ##
 - <<: *jstestfuzz_template
   name: initial_sync_fuzzer_gen
@@ -5511,6 +5526,21 @@ tasks:
       npm_command: update-fuzzer
       resmoke_args: "--suites=generational_fuzzer_replication --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       name: update_fuzzer_replication
+      task_path_suffix: "/data/multiversion"
+
+## rollback multiversion fuzzer ##
+- <<: *jstestfuzz_template
+  name: rollback_multiversion_fuzzer_gen
+  tags: ["multiversion_fuzzer"]
+  commands:
+  - func: "generate fuzzer tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      num_files: 3
+      num_tasks: 5
+      npm_command: rollback-fuzzer
+      resmoke_args: --suites=rollback_multiversion_fuzzer
+      name: rollback_multiversion_fuzzer
       task_path_suffix: "/data/multiversion"
 
 ## rollback generational fuzzer ##
@@ -9017,6 +9047,7 @@ buildvariants:
   - name: jsCore_auth
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
+  - name: .multiversion_fuzzer
   - name: .multiversion_passthrough
   - name: .random_multiversion_replica_sets
   - name: replica_sets_auth_gen
@@ -11024,6 +11055,7 @@ buildvariants:
     - name: .logical_session_cache .one_sec
     - name: .multi_shard .common
     - name: multiversion
+    - name: .multiversion_fuzzer
     - name: .multiversion_passthrough
     - name: .query_fuzzer
     - name: .random_multiversion_replica_sets
@@ -12652,6 +12684,7 @@ buildvariants:
   - name: .logical_session_cache
   - name: .multi_shard .common
   - name: multiversion
+  - name: .multiversion_fuzzer
   - name: .multiversion_passthrough
   - name: .query_fuzzer
   - name: .random_multiversion_replica_sets
@@ -12741,6 +12774,7 @@ buildvariants:
   - name: .logical_session_cache .one_sec
   - name: .multi_shard .common
   - name: multiversion
+  - name: .multiversion_fuzzer
   - name: .multiversion_passthrough
   - name: .random_multiversion_replica_sets
   - name: .read_write_concern
