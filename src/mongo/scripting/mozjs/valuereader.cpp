@@ -136,7 +136,7 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
         }
         case mongo::BinData: {
             int len;
-            const char* data = elem.binDataClean(len);
+            const char* data = elem.binData(len);
             std::stringstream ss;
             base64::encode(ss, data, len);
 
