@@ -6794,12 +6794,12 @@ tasks:
       task_path_suffix: /data/multiversion
       resmoke_args: --suites=multiversion --storageEngine=wiredTiger
 
-- name: unittest_peer_pids_gen
+- name: unittest_shell_hang_analyzer_gen
   tags: ["misc_js"]
   commands:
   - func: "generate resmoke tasks"
     vars:
-      suite: unittest_peer_pids
+      suite: unittest_shell_hang_analyzer
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 1
 
@@ -9731,7 +9731,7 @@ buildvariants:
         - windows-64-vs2017-compile
     - name: burn_in_tests_gen
     - name: buildscripts_test
-    - name: unittest_peer_pids_gen
+    - name: unittest_shell_hang_analyzer_gen
     - name: dbtest_TG
       distros:
         - windows-64-vs2017-compile
@@ -10694,7 +10694,7 @@ buildvariants:
     distros:
     - centos6-perf
   - name: buildscripts_test
-  - name: unittest_peer_pids_gen
+  - name: unittest_shell_hang_analyzer_gen
   - name: .causally_consistent !.sharding
   - name: .change_streams
   - name: .misc_js

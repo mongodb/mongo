@@ -84,6 +84,54 @@ MongoRunner.VersionSub = function(pattern, version) {
     this.version = version;
 };
 
+(function() {
+// Hang Analyzer integration.
+
+function getPids() {
+    let pids = [];
+    if (typeof TestData !== 'undefined' && typeof TestData.peerPids !== 'undefined') {
+        pids = pids.concat(TestData.peerPids);
+    }
+    pids = pids.concat(MongoRunner.runningChildPids());
+    return pids;
+}
+
+// A path.join-like thing for paths that must work
+// on Windows (\-separated) and *nix (/-separated).
+function pathJoin(...parts) {
+    const separator = _isWindows() ? '\\' : '/';
+    return parts.join(separator);
+}
+
+/**
+ * Run `./buildscripts/hang_analyzer.py`.
+ *
+ * @param {Number[]} pids
+ *     optional pids of processes to pass to hang_analyzer.py.
+ *     If not specified will use `TestData.peerPids` (pids of
+ *     "fixture" processes started and passed in by resmoke)
+ *     plus `MongoRunner.runningChildPids()` which includes all
+ *     child processes started by `MongoRunner.runMongo*()` etc.
+ */
+function runHangAnalyzer(pids) {
+    if (typeof pids === 'undefined') {
+        pids = getPids();
+    }
+    if (pids.length <= 0) {
+        print("Skipping runHangAnalyzer: no running child or peer mongo processes.");
+        return;
+    }
+    // Result of runningChildPids may be NumberLong(), so
+    // add 0 to convert to Number.
+    pids = pids.map(p => p + 0).join(',');
+    print(`Running hang_analyzer.py for pids [${pids}]`);
+    const scriptPath = pathJoin('.', 'buildscripts', 'hang_analyzer.py');
+    runProgram('python', scriptPath, '-c', '-d', pids);
+}
+
+MongoRunner.runHangAnalyzer = runHangAnalyzer;
+})();
+
 /**
  * Returns an array of version elements from a version string.
  *

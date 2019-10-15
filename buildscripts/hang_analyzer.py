@@ -65,17 +65,12 @@ def callo(args, logger):
 
 def find_program(prog, paths):
     """Find the specified program in env PATH, or tries a set of paths."""
-    loc = spawn.find_executable(prog)
-
-    if loc is not None:
-        return loc
-
     for loc in paths:
         full_prog = os.path.join(loc, prog)
         if os.path.exists(full_prog):
             return full_prog
 
-    return None
+    return spawn.find_executable(prog)
 
 
 def get_process_logger(debugger_output, pid, process_name):
