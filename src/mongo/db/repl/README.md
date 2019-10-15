@@ -472,33 +472,59 @@ extended to support a sharded cluster and use a **Lamport Clock** to provide **c
 
 ## Step Up
 
-A node runs for election when it does a priority takeover or when it doesn't see a primary within
-the election timeout.
+There are a number of ways that a node will run for election:
+* If it hasn't seen a primary within the election timeout (which defaults to 10 seconds).
+* If it realizes that it has higher priority than the primary, it will wait and run for
+  election (also known as a **priority takeover**). The amount of time the node waits before calling
+  an election is directly related to its priority in comparison to the priority of rest of the set
+  (so higher priority nodes will call for a priority takeover faster than lower priority nodes).
+  Priority takeovers allow users to specify a node that they would prefer be the primary.
+* Newly elected primaries attempt to catchup to the latest applied OpTime in the replica
+  set. Until this process (called primary catchup) completes, the new primary will not accept
+  writes. If a secondary realizes that it is more up-to-date than the primary and the primary takes
+  longer than `catchUpTakeoverDelayMillis` (default 30 seconds), it will run for election. This
+  behvarior is known as a **catchup takeover**. If primary catchup is taking too long, catchup
+  takeover can help allow the replica set to accept writes sooner, since a more up-to-date node will
+  not spend as much time (or any time) in catchup. See the "Transitioning to PRIMARY" section for
+  further details on primary catchup.
+* The `replSetStepUp` command can be run on an eligible node to cause it to run for election
+  immediately. We don't expect users to call this command, but it is run internally for election
+  handoff and testing.
+* When a node is stepped down via the `replSetStepDown` command, if the `enableElectionHandoff`
+  parameter is set to true (the default), it will choose an eligible secondary to run the
+  `replSetStepUp` command on a best-effort basis. This behavior is called **election handoff**. This
+  will mean that the replica set can shorten failover time, since it skips waiting for the election
+  timeout. If `replSetStepDown` was called with `force: true` or the node was stepped down while
+  `enableElectionHandoff` is false, then nodes in the replica set will wait until the election
+  timeout triggers to run for election.
 
-#### Candidate Perspective
 
-A candidate node first runs a dry-run election. In a **dry-run election**, a node sends out
-`replSetRequestVotes` commands to every node asking if that node would vote for it, but the
-candidate node does not increase its term. If a primary ever sees a higher term than its own, it
-steps down. By first conducting a dry-run election, we prevent nodes from increasing their own term
-when they would not win and prevent needless primary stepdowns. If the node fails the dry-run
-election, it just continues replicating as normal. If the node wins the dry-run election, it begins
-a real election.
+### Candidate Perspective
 
-In the real election, the node first increments its term and votes for itself. It then starts a
-[`VoteRequester`](https://github.com/mongodb/mongo/blob/r3.4.2/src/mongo/db/repl/vote_requester.h),
+A candidate node first runs a dry-run election. In a **dry-run election**, a node starts a
+[`VoteRequester`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/vote_requester.h),
 which uses a
-[`ScatterGatherRunner`](https://github.com/mongodb/mongo/blob/r3.4.2/src/mongo/db/repl/scatter_gather_runner.h)
-to send a `replSetRequestVotes` command to every single node. Each node then decides if it should
-vote "aye" or "nay" and responds to the candidate with their vote. When nodes respond, the
-`ReplicationCoordinator` updates its `SlaveInfo` map to say that those nodes are still up for
-liveness information. The candidate node must be at least as up to date as a majority of voting
+[`ScatterGatherRunner`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/scatter_gather_runner.h)
+to send a `replSetRequestVotes` command to every node asking if that node would vote for it. The
+candidate node does not increase its term during a dry-run because if a primary ever sees a higher
+term than its own, it steps down. By first conducting a dry-run election, we make it unlikely that
+nodes will increase their own term when they would not win and prevent needless primary stepdowns.
+If the node fails the dry-run election, it just continues replicating as normal. If the node wins
+the dry-run election, it begins a real election.
+
+If the candidate was stepped up as a result of an election handoff, it will skip the dry-run and
+immediately call for a real election.
+
+In the real election, the node first increments its term and votes for itself. It then follows the
+same process as the dry-run to start a `VoteRequester` to send a `replSetRequestVotes` command to
+every single node. Each node then decides if it should vote "aye" or "nay" and responds to the
+candidate with their vote. The candidate node must be at least as up to date as a majority of voting
 members in order to get elected.
 
 If the candidate received votes from a majority of nodes, including itself, the candidate wins the
 election.
 
-#### Voter Perspective
+### Voter Perspective
 
 When a node receives a `replSetRequestVotes` command, it first checks if the term is up to date and
 updates its own term accordingly. The `ReplicationCoordinator` then asks the `TopologyCoordinator`
@@ -507,7 +533,7 @@ if it should grant a vote. The vote is rejected if:
 1. It's from an older term.
 2. The config versions do not match.
 3. The replica set name does not match.
-4. The last committed OpTime that comes in the vote request is older than the voter's last applied
+4. The last applied OpTime that comes in the vote request is older than the voter's last applied
    OpTime.
 5. If it's not a dry-run election and the voter has already voted in this term.
 6. If the voter is an arbiter and it can see a healthy primary of greater or equal priority. This is
@@ -519,32 +545,40 @@ the `local.replset.election` collection. This information is read into memory at
 future elections. This ensures that even if a node restarts, it does not vote for two nodes in the
 same term.
 
-#### Transitioning to PRIMARY
+### Transitioning to PRIMARY
 
-Now that the candidate has won, it must become PRIMARY. First it notifies all nodes that it won the
-election via a round of heartbeats. Then the node checks if it needs to catch up from the former
-primary. Since the node can be elected without the former primary's vote, the primary-elect will
-attempt to replicate any remaining oplog entries it has not yet replicated from any viable sync
-source. While these are guaranteed to not be committed, it is still good to minimize rollback when
-possible.
+Now that the candidate has won, it must become PRIMARY. First it clears its sync source and notifies
+all nodes that it won the election via a round of heartbeats. Then the node checks if it needs to
+catch up from the former primary. Since the node can be elected without the former primary's vote,
+the primary-elect will attempt to replicate any remaining oplog entries it has not yet replicated
+from any viable sync source. While these are guaranteed to not be committed, it is still good to
+minimize rollback when possible.
 
-The primary-elect uses the
-[`FreshnessScanner`](https://github.com/mongodb/mongo/blob/r3.4.2/src/mongo/db/repl/freshness_scanner.h)
-to send a `replSetGetStatus` request to every other node to see the last applied OpTime of every
-other node. If the primary-elect’s last applied OpTime is less than the newest last applied OpTime
-it sees, it will schedule a timer for the catchup-timeout. If that timeout expires or if the node
-reaches the old primary's last applied OpTime, then the node ends catch-up phase. The node then
-stops the `OplogFetcher`.
+The primary-elect uses the responses from the recent round of heartbeats to see the latest applied
+OpTime of every other node. If the primary-elect’s last applied OpTime is less than the newest last
+applied OpTime it sees, it will set that as its target OpTime to catch up to. At the beginning of
+catchup, the primary-elect will schedule a timer for the catchup-timeout. If that timeout expires or
+if the node reaches the target OpTime, then the node ends the catch-up phase. The node then clears
+its sync source and stops the `OplogFetcher`.
 
-At this point the node goes into "drain mode". This is when the node has already logged "transition
-to PRIMARY", but has not yet applied all of the oplog entries in its oplog buffer.
-`replSetGetStatus` will now say the node is in PRIMARY state. The applier keeps running, and when it
-completely drains the buffer, it signals to the `ReplicationCoordinator` to finish the step up
-process. The node marks that it can begin to accept writes. According to the Raft Protocol, no oplog
-entries from previous terms can be committed until an oplog entry in the current term is committed.
-The node now writes a "new primary" noop oplog entry so that it can commit older writes as soon as
-possible. Finally, the node drops all temporary collections and logs “transition to primary
-complete”.
+We will ignore whether or not **chaining** is enabled for primary catchup so that the primary-elect
+can find a sync source. And one thing to note is that the primary-elect will not necessarily sync
+from the most up-to-date node, but its sync source will sync from a more up-to-date node. This will
+mean that the primary-elect will still be able to catchup to its target OpTime. Since catchup is
+best-effort, it could time out before the node has applied operations through the target OpTime.
+Even if this happens, the primary-elect will not step down.
+
+At this point, whether catchup was successful or not, the node goes into "drain mode". This is when
+the node has already logged "transition to PRIMARY", but has not yet applied all of the oplog
+entries in its oplog buffer. `replSetGetStatus` will now say the node is in PRIMARY state. The
+applier keeps running, and when it completely drains the buffer, it signals to the
+`ReplicationCoordinator` to finish the step up process. The node marks that it can begin to accept
+writes. According to the Raft Protocol, we cannot update the commit point to reflect oplog entries
+from previous terms until the commit point is updated to reflect an oplog entry in the current term.
+The node writes a "new primary" noop oplog entry so that it can commit older writes as soon as
+possible. Once the commit point is updated to reflect the "new primary" oplog entry, older writes
+will automatically be part of the commit point by nature of happening before the term change.
+Finally, the node drops all temporary collections and logs “transition to primary complete”.
 
 ## Step Down
 
