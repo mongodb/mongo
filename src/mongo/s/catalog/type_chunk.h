@@ -183,7 +183,8 @@ public:
     static const std::string ShardNSPrefix;
 
     // Field names and types in the chunks collections.
-    static const BSONField<std::string> name;
+    static const BSONField<OID> name;
+    static const BSONField<std::string> legacyName;  // TODO SERVER-44034: Remove legacyName.
     static const BSONField<BSONObj> minShardID;
     static const BSONField<std::string> ns;
     static const BSONField<BSONObj> min;
@@ -214,6 +215,14 @@ public:
     BSONObj toConfigBSON() const;
 
     /**
+     * Returns the BSON representation of the entry for the config server's config.chunks
+     * collection using the _id format expected by binaries in 4.2 and earlier.
+     *
+     * TODO SERVER-44034: Remove when 4.4 becomes last-stable.
+     */
+    BSONObj toConfigBSONLegacyID() const;
+
+    /**
      * Constructs a new ChunkType object from BSON that has a shard server's config.chunks.<epoch>
      * collection format.
      *
@@ -222,19 +231,28 @@ public:
     static StatusWith<ChunkType> fromShardBSON(const BSONObj& source, const OID& epoch);
 
     /**
+     * Generates the chunk id that would be expected in binaries 4.2 and earlier based on the
+     * namespace and lower chunk bound.
+     *
+     * TODO SERVER-44034: Remove when 4.4 becomes last-stable.
+     */
+    static std::string genLegacyID(const NamespaceString& nss, const BSONObj& o);
+
+    /**
      * Returns the BSON representation of the entry for a shard server's config.chunks.<epoch>
      * collection.
      */
     BSONObj toShardBSON() const;
 
-    std::string getName() const;
-    void setName(const OID& id);
-
     /**
-     * TODO SERVER-42299: Remove this method once _id is stored as an OID on disk instead of as a
-     * string.
+     * Returns the _id that would be used for this chunk in binaries 4.2 and earlier.
+     *
+     * TODO SERVER-44034: Remove when 4.4 becomes last-stable.
      */
-    void setName(const std::string& id);
+    std::string getLegacyName() const;
+
+    const OID& getName() const;
+    void setName(const OID& id);
 
     /**
      * Getters and setters.
@@ -303,7 +321,7 @@ private:
     // Convention: (M)andatory, (O)ptional, (S)pecial; (C)onfig, (S)hard.
 
     // (M)(C)     auto-generated object id
-    boost::optional<std::string> _id;
+    boost::optional<OID> _id;
     // (O)(C)     collection this chunk is in
     boost::optional<NamespaceString> _nss;
     // (M)(C)(S)  first key of the range, inclusive

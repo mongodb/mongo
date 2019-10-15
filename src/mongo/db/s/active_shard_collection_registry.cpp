@@ -139,6 +139,23 @@ Status ActiveShardCollectionRegistry::ActiveShardCollectionState::constructError
                           << "collection with arguments: " << activeRequest.toBSON()};
 }
 
+void ActiveShardCollectionRegistry::waitForActiveShardCollectionsToComplete(
+    OperationContext* opCtx) {
+    // Take a snapshot of the currently active shard collections.
+    std::vector<SharedSemiFuture<boost::optional<UUID>>> shardCollectionFutures;
+    {
+        stdx::lock_guard<Latch> lk(_mutex);
+        for (const auto& it : _activeShardCollectionMap) {
+            shardCollectionFutures.emplace_back(it.second->_uuidPromise.getFuture());
+        }
+    }
+
+    // Synchronously wait for all futures to resolve.
+    for (const auto& fut : shardCollectionFutures) {
+        fut.wait(opCtx);
+    }
+}
+
 ScopedShardCollection::ScopedShardCollection(std::string nss,
                                              ActiveShardCollectionRegistry* registry,
                                              bool shouldExecute,

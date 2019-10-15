@@ -38,6 +38,15 @@ assert.eq(res.version.t, 1);
 assert.eq(res.version.i, 0);
 if (jsTestOptions().mongosBinVersion == "last-stable") {
     assert.eq(undefined, res.chunks);
+
+    // The _id format for config.chunks documents was changed in 4.4, so in the mixed version suite
+    // the below size arithmetic does not hold and splitting chunks will fail with BSONObjectTooBig.
+    // A mongos with the last-stable binary does not support returning chunks in getShardVersion, so
+    // we can just return early.
+    //
+    // TODO SERVER-44034: Remove this branch when 4.4 becomes last stable.
+    st.stop();
+    return;
 } else {
     assert.eq(1, res.chunks.length);
     assert.eq(min, res.chunks[0][0]);

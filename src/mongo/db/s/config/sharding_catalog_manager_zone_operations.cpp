@@ -37,6 +37,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -372,6 +373,11 @@ Status ShardingCatalogManager::assignKeyRangeToZone(OperationContext* opCtx,
     BSONObj updateQuery(BSON(TagsType::ns(nss.ns()) << TagsType::min(fullShardKeyRange.getMin())));
 
     BSONObjBuilder updateBuilder;
+    if (serverGlobalParams.featureCompatibility.getVersion() <=
+        ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo42) {
+        updateBuilder.append(
+            "_id", BSON(TagsType::ns(nss.ns()) << TagsType::min(fullShardKeyRange.getMin())));
+    }
     updateBuilder.append(TagsType::ns(), nss.ns());
     updateBuilder.append(TagsType::min(), fullShardKeyRange.getMin());
     updateBuilder.append(TagsType::max(), fullShardKeyRange.getMax());

@@ -33,8 +33,12 @@
 
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 
+#include "mongo/db/auth/authorization_session_impl.h"
+#include "mongo/db/commands/txn_cmds_gen.h"
+#include "mongo/db/logical_session_cache.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/balancer/type_migration.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -46,6 +50,9 @@
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/transport/service_entry_point.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -56,6 +63,75 @@ const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::
 // This value is initialized only if the node is running as a config server
 const auto getShardingCatalogManager =
     ServiceContext::declareDecoration<boost::optional<ShardingCatalogManager>>();
+
+OpMsg runCommandInLocalTxn(OperationContext* opCtx,
+                           StringData db,
+                           bool startTransaction,
+                           TxnNumber txnNumber,
+                           BSONObj cmdObj) {
+    BSONObjBuilder bob(std::move(cmdObj));
+    if (startTransaction) {
+        bob.append("startTransaction", true);
+    }
+    bob.append("autocommit", false);
+    bob.append(OperationSessionInfo::kTxnNumberFieldName, txnNumber);
+
+    BSONObjBuilder lsidBuilder(bob.subobjStart("lsid"));
+    opCtx->getLogicalSessionId()->serialize(&bob);
+    lsidBuilder.doneFast();
+
+    return OpMsg::parseOwned(
+        opCtx->getServiceContext()
+            ->getServiceEntryPoint()
+            ->handleRequest(opCtx,
+                            OpMsgRequest::fromDBAndBody(db.toString(), bob.obj()).serialize())
+            .response);
+}
+
+void insertDocumentsInLocalTxn(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               std::vector<BSONObj> docs,
+                               bool startTransaction,
+                               TxnNumber txnNumber) {
+    BatchedCommandRequest request([&] {
+        write_ops::Insert insertOp(nss);
+        insertOp.setDocuments(std::move(docs));
+        return insertOp;
+    }());
+
+    uassertStatusOK(getStatusFromWriteCommandReply(
+        runCommandInLocalTxn(opCtx, nss.db(), startTransaction, txnNumber, request.toBSON()).body));
+}
+
+void removeDocumentsInLocalTxn(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               const BSONObj& query,
+                               bool startTransaction,
+                               TxnNumber txnNumber) {
+    BatchedCommandRequest request([&] {
+        write_ops::Delete deleteOp(nss);
+        deleteOp.setDeletes({[&] {
+            write_ops::DeleteOpEntry entry;
+            entry.setQ(query);
+            entry.setMulti(true);
+            return entry;
+        }()});
+        return deleteOp;
+    }());
+
+    uassertStatusOK(getStatusFromWriteCommandReply(
+        runCommandInLocalTxn(opCtx, nss.db(), startTransaction, txnNumber, request.toBSON()).body));
+}
+
+void commitLocalTxn(OperationContext* opCtx, TxnNumber txnNumber) {
+    uassertStatusOK(
+        getStatusFromCommandResult(runCommandInLocalTxn(opCtx,
+                                                        NamespaceString::kAdminDb,
+                                                        false /* startTransaction */,
+                                                        txnNumber,
+                                                        BSON(CommitTransaction::kCommandName << 1))
+                                       .body));
+}
 
 }  // namespace
 
@@ -327,6 +403,175 @@ Status ShardingCatalogManager::setFeatureCompatibilityVersionOnShards(OperationC
 Lock::ExclusiveLock ShardingCatalogManager::lockZoneMutex(OperationContext* opCtx) {
     Lock::ExclusiveLock lk(opCtx->lockState(), _kZoneOpLock);
     return lk;
+}
+
+void ShardingCatalogManager::upgradeChunksAndTags(OperationContext* opCtx) {
+    // Upgrade each chunk document by deleting and re-inserting with the 4.4 _id format.
+    {
+        Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
+
+        auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+        auto findResponse = uassertStatusOK(
+            configShard->exhaustiveFindOnConfig(opCtx,
+                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                repl::ReadConcernLevel::kLocalReadConcern,
+                                                ChunkType::ConfigNS,
+                                                {},
+                                                {},
+                                                boost::none /* limit */));
+
+        AlternativeSessionRegion asr(opCtx);
+        AuthorizationSession::get(asr.opCtx()->getClient())
+            ->grantInternalAuthorization(asr.opCtx()->getClient());
+        TxnNumber txnNumber = 0;
+        for (const auto& chunkObj : findResponse.docs) {
+            auto chunk = uassertStatusOK(ChunkType::fromConfigBSON(chunkObj));
+
+            removeDocumentsInLocalTxn(
+                asr.opCtx(),
+                ChunkType::ConfigNS,
+                BSON(ChunkType::ns(chunk.getNS().ns()) << ChunkType::min(chunk.getMin())),
+                true /* startTransaction */,
+                txnNumber);
+
+            // Note that ChunkType::toConfigBSON() will not include an _id if one hasn't been set,
+            // which will be the case for chunks written in the 4.2 format because parsing ignores
+            // _ids in the 4.2 format, so the insert path will generate one for us.
+            insertDocumentsInLocalTxn(asr.opCtx(),
+                                      ChunkType::ConfigNS,
+                                      {chunk.toConfigBSON()},
+                                      false /* startTransaction */,
+                                      txnNumber);
+
+            commitLocalTxn(asr.opCtx(), txnNumber);
+
+            txnNumber += 1;
+        }
+    }
+
+    // Upgrade each tag document by deleting and re-inserting with the 4.4 _id format.
+    {
+        Lock::ExclusiveLock lk(opCtx->lockState(), _kZoneOpLock);
+
+        auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+        auto findResponse = uassertStatusOK(
+            configShard->exhaustiveFindOnConfig(opCtx,
+                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                repl::ReadConcernLevel::kLocalReadConcern,
+                                                TagsType::ConfigNS,
+                                                {},
+                                                {},
+                                                boost::none /* limit */));
+
+        AlternativeSessionRegion asr(opCtx);
+        AuthorizationSession::get(asr.opCtx()->getClient())
+            ->grantInternalAuthorization(asr.opCtx()->getClient());
+        TxnNumber txnNumber = 0;
+        for (const auto& tagObj : findResponse.docs) {
+            auto tag = uassertStatusOK(TagsType::fromBSON(tagObj));
+
+            removeDocumentsInLocalTxn(
+                asr.opCtx(),
+                TagsType::ConfigNS,
+                BSON(TagsType::ns(tag.getNS().ns()) << TagsType::min(tag.getMinKey())),
+                true /* startTransaction */,
+                txnNumber);
+
+            // Note that TagsType::toBSON() will not include an _id, so the insert path will
+            // generate one for us.
+            insertDocumentsInLocalTxn(asr.opCtx(),
+                                      TagsType::ConfigNS,
+                                      {tag.toBSON()},
+                                      false /* startTransaction */,
+                                      txnNumber);
+
+            commitLocalTxn(asr.opCtx(), txnNumber);
+
+            txnNumber += 1;
+        }
+    }
+}
+
+void ShardingCatalogManager::downgradeChunksAndTags(OperationContext* opCtx) {
+    // Downgrade each chunk document by deleting and re-inserting with the 4.2 _id format.
+    {
+        Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
+
+        auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+        auto findResponse = uassertStatusOK(
+            configShard->exhaustiveFindOnConfig(opCtx,
+                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                repl::ReadConcernLevel::kLocalReadConcern,
+                                                ChunkType::ConfigNS,
+                                                {},
+                                                {},
+                                                boost::none /* limit */));
+
+        AlternativeSessionRegion asr(opCtx);
+        AuthorizationSession::get(asr.opCtx()->getClient())
+            ->grantInternalAuthorization(asr.opCtx()->getClient());
+        TxnNumber txnNumber = 0;
+        for (const auto& chunkObj : findResponse.docs) {
+            auto chunk = uassertStatusOK(ChunkType::fromConfigBSON(chunkObj));
+
+            removeDocumentsInLocalTxn(
+                asr.opCtx(),
+                ChunkType::ConfigNS,
+                BSON(ChunkType::ns(chunk.getNS().ns()) << ChunkType::min(chunk.getMin())),
+                true /* startTransaction */,
+                txnNumber);
+
+            insertDocumentsInLocalTxn(asr.opCtx(),
+                                      ChunkType::ConfigNS,
+                                      {chunk.toConfigBSONLegacyID()},
+                                      false /* startTransaction */,
+                                      txnNumber);
+
+            commitLocalTxn(asr.opCtx(), txnNumber);
+
+            txnNumber += 1;
+        }
+    }
+
+    // Downgrade each tag document by deleting and re-inserting with the 4.2 _id format.
+    {
+        Lock::ExclusiveLock lk(opCtx->lockState(), _kZoneOpLock);
+
+        auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+        auto findResponse = uassertStatusOK(
+            configShard->exhaustiveFindOnConfig(opCtx,
+                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                repl::ReadConcernLevel::kLocalReadConcern,
+                                                TagsType::ConfigNS,
+                                                {},
+                                                {},
+                                                boost::none /* limit */));
+
+        AlternativeSessionRegion asr(opCtx);
+        AuthorizationSession::get(asr.opCtx()->getClient())
+            ->grantInternalAuthorization(asr.opCtx()->getClient());
+        TxnNumber txnNumber = 0;
+        for (const auto& tagObj : findResponse.docs) {
+            auto tag = uassertStatusOK(TagsType::fromBSON(tagObj));
+
+            removeDocumentsInLocalTxn(
+                asr.opCtx(),
+                TagsType::ConfigNS,
+                BSON(TagsType::ns(tag.getNS().ns()) << TagsType::min(tag.getMinKey())),
+                true /* startTransaction */,
+                txnNumber);
+
+            insertDocumentsInLocalTxn(asr.opCtx(),
+                                      TagsType::ConfigNS,
+                                      {tag.toBSONLegacyID()},
+                                      false /* startTransaction */,
+                                      txnNumber);
+
+            commitLocalTxn(asr.opCtx(), txnNumber);
+
+            txnNumber += 1;
+        }
+    }
 }
 
 }  // namespace mongo

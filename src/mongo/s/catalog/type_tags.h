@@ -81,6 +81,14 @@ public:
     BSONObj toBSON() const;
 
     /**
+     * Returns the BSON representation of the tag with an _id in the format expected by binaries 4.2
+     * and below.
+     *
+     * TODO SERVER-44034: Remove this method.
+     */
+    BSONObj toBSONLegacyID() const;
+
+    /**
      * Returns a std::string representation of the current internal state.
      */
     std::string toString() const;

@@ -95,11 +95,11 @@ function assertNoSuchTransactionOnConn(conn, lsid, txnNumber) {
             ", txnNumber: " + tojson(txnNumber) + ", connection: " + tojson(conn));
 }
 
-function waitForFailpoint(hitFailpointStr, numTimes) {
+function waitForFailpoint(hitFailpointStr, numTimes, timeout) {
     assert.soon(function() {
         const re = new RegExp(hitFailpointStr, 'g' /* find all occurrences */);
         return (rawMongoProgramOutput().match(re) || []).length == numTimes;
-    }, 'Failed to find "' + hitFailpointStr + '" logged ' + numTimes + ' times');
+    }, 'Failed to find "' + hitFailpointStr + '" logged ' + numTimes + ' times', timeout);
 }
 
 // Enables the transaction router to retry on stale version (db or shard version) and snapshot

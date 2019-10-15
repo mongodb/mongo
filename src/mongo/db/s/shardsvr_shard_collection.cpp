@@ -62,6 +62,7 @@
 #include "mongo/s/request_types/clone_collection_options_from_primary_shard_gen.h"
 #include "mongo/s/request_types/shard_collection_gen.h"
 #include "mongo/s/shard_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
@@ -69,6 +70,8 @@
 namespace mongo {
 
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(pauseShardCollectionBeforeReturning);
 
 struct ShardCollectionTargetState {
     UUID uuid;
@@ -607,7 +610,12 @@ void writeFirstChunksToConfig(OperationContext* opCtx,
     std::vector<BSONObj> chunkObjs;
     chunkObjs.reserve(initialChunks.chunks.size());
     for (const auto& chunk : initialChunks.chunks) {
-        chunkObjs.push_back(chunk.toConfigBSON());
+        if (serverGlobalParams.featureCompatibility.getVersion() >=
+            ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo44) {
+            chunkObjs.push_back(chunk.toConfigBSON());
+        } else {
+            chunkObjs.push_back(chunk.toConfigBSONLegacyID());
+        }
     }
 
     Grid::get(opCtx)->catalogClient()->insertConfigDocumentsAsRetryableWrite(
@@ -855,6 +863,11 @@ public:
             uassert(ErrorCodes::InvalidUUID,
                     str::stream() << "Collection " << nss << " is sharded without UUID",
                     uuid);
+
+            if (MONGO_unlikely(pauseShardCollectionBeforeReturning.shouldFail())) {
+                log() << "Hit pauseShardCollectionBeforeReturning";
+                pauseShardCollectionBeforeReturning.pauseWhileSet(opCtx);
+            }
 
             scopedShardCollection.emplaceUUID(uuid);
         }

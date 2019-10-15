@@ -43,6 +43,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/active_shard_collection_registry.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/server_options.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -60,6 +61,8 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(featureCompatibilityDowngrade);
 MONGO_FAIL_POINT_DEFINE(featureCompatibilityUpgrade);
+MONGO_FAIL_POINT_DEFINE(pauseBeforeDowngradingConfigMetadata);  // TODO SERVER-44034: Remove.
+MONGO_FAIL_POINT_DEFINE(pauseBeforeUpgradingConfigMetadata);    // TODO SERVER-44034: Remove.
 
 /**
  * Sets the minimum allowed version for the cluster. If it is 4.2, then the node should not use 4.4
@@ -173,6 +176,14 @@ public:
                 Lock::GlobalLock lk(opCtx, MODE_S);
             }
 
+            if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+                // The primary shard sharding a collection will write the initial chunks for a
+                // collection directly to the config server, so wait for all shard collections to
+                // complete to guarantee no chunks are missed by the update on the config server.
+                ActiveShardCollectionRegistry::get(opCtx).waitForActiveShardCollectionsToComplete(
+                    opCtx);
+            }
+
             // Upgrade shards before config finishes its upgrade.
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
                 uassertStatusOK(
@@ -183,6 +194,12 @@ public:
                                 cmdObj,
                                 BSON(FeatureCompatibilityVersionCommandParser::kCommandName
                                      << requestedVersion)))));
+
+                if (MONGO_unlikely(pauseBeforeUpgradingConfigMetadata.shouldFail())) {
+                    log() << "Hit pauseBeforeUpgradingConfigMetadata";
+                    pauseBeforeUpgradingConfigMetadata.pauseWhileSet(opCtx);
+                }
+                ShardingCatalogManager::get(opCtx)->upgradeChunksAndTags(opCtx);
             }
 
             FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(opCtx, requestedVersion);
@@ -215,6 +232,14 @@ public:
                 Lock::GlobalLock lk(opCtx, MODE_S);
             }
 
+            if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+                // The primary shard sharding a collection will write the initial chunks for a
+                // collection directly to the config server, so wait for all shard collections to
+                // complete to guarantee no chunks are missed by the update on the config server.
+                ActiveShardCollectionRegistry::get(opCtx).waitForActiveShardCollectionsToComplete(
+                    opCtx);
+            }
+
             // Downgrade shards before config finishes its downgrade.
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
                 uassertStatusOK(
@@ -225,6 +250,12 @@ public:
                                 cmdObj,
                                 BSON(FeatureCompatibilityVersionCommandParser::kCommandName
                                      << requestedVersion)))));
+
+                if (MONGO_unlikely(pauseBeforeDowngradingConfigMetadata.shouldFail())) {
+                    log() << "Hit pauseBeforeDowngradingConfigMetadata";
+                    pauseBeforeDowngradingConfigMetadata.pauseWhileSet(opCtx);
+                }
+                ShardingCatalogManager::get(opCtx)->downgradeChunksAndTags(opCtx);
             }
 
             FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(opCtx, requestedVersion);

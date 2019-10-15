@@ -416,6 +416,28 @@ public:
      */
     static void clearForTests(ServiceContext* serviceContext);
 
+    /**
+     * Changes the _id format of all documents in config.chunks and config.tags to use the format
+     * introduced in 4.4.
+     *
+     * TODO SERVER-44034: Remove this method.
+     *
+     * TODO SERVER-42299: Optimize this method by batching inserts and deletes into larger
+     * transactions.
+     */
+    void upgradeChunksAndTags(OperationContext* opCtx);
+
+    /**
+     * Changes the _id format of all documents in config.chunks and config.tags to use the format
+     * expected by a 4.2 binary.
+     *
+     * TODO SERVER-44034: Remove this method.
+     *
+     * TODO SERVER-42299: Optimize this method by batching inserts and deletes into larger
+     * transactions.
+     */
+    void downgradeChunksAndTags(OperationContext* opCtx);
+
     Lock::ExclusiveLock lockZoneMutex(OperationContext* opCtx);
 
 private:
