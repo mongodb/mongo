@@ -92,7 +92,7 @@ assert.commandFailed(db.runCommand({
 }));
 
 // Test that mapReduce fails when run against a view.
-assertDropCollection(db, source.getName());
+assertDropCollection(db, "sourceView");
 assert.commandWorked(db.createView("sourceView", source.getName(), [{$project: {_id: 0}}]));
 assert.commandFailedWithCode(
     db.runCommand({mapReduce: "sourceView", map: mapFunc, reduce: reduceFunc, out: "foo"}),
