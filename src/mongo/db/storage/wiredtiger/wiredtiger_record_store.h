@@ -292,9 +292,33 @@ private:
                           const Timestamp* timestamps,
                           size_t nRecords);
 
-    RecordId _nextId();
-    void _setId(RecordId id);
+    RecordId _nextId(OperationContext* opCtx);
     bool cappedAndNeedDelete() const;
+
+    /**
+     * Initialize the largest known RecordId if it is not already. This is designed to be called
+     * immediately before operations that may need this Recordid. This is to support lazily
+     * initializing the value instead of all at once during startup.
+     */
+    void _initNextIdIfNeeded(OperationContext* opCtx);
+
+    /**
+     * Adjusts the record count and data size metadata for this record store, respectively. These
+     * functions consult the SizeRecoveryState to determine whether or not to actually change the
+     * size metadata if the server is undergoing recovery.
+     *
+     * For most record stores, we will not update the size metadata during recovery, as we trust
+     * that the values in the SizeStorer are accurate with respect to the end state of recovery.
+     * However, there are two exceptions:
+     *
+     *   1. When a record store is created as part of the recovery process. The SizeStorer will have
+     *      no information about that newly-created ident.
+     *   2. When a record store is created at startup but constains no records as of the stable
+     *      checkpoint timestamp. In this scenario, we will assume that the record store has a size
+     *      of zero and will discard all cached size metadata. This assumption is incorrect if there
+     *      are pending writes to this ident as part of the recovery process, and so we must
+     *      always adjust size metadata for these idents.
+     */
     void _changeNumRecords(OperationContext* opCtx, int64_t diff);
     void _increaseDataSize(OperationContext* opCtx, int64_t amount);
     RecordData _getData(const WiredTigerCursor& cursor) const;
@@ -327,7 +351,9 @@ private:
     int _cappedDeleteCheckCount;
     mutable stdx::timed_mutex _cappedDeleterMutex;
 
-    AtomicInt64 _nextIdNum;
+    // Protects initialization of the _nextIdNum.
+    mutable stdx::mutex _initNextIdMutex;
+    AtomicInt64 _nextIdNum{0};
 
     WiredTigerSizeStorer* _sizeStorer;  // not owned, can be NULL
     std::shared_ptr<WiredTigerSizeStorer::SizeInfo> _sizeInfo;
@@ -492,4 +518,4 @@ MONGO_FP_FORWARD_DECLARE(WTWriteConflictExceptionForReads);
 // will not be considered durable until deactivated. It is unspecified whether writes that commit
 // before activation will become visible while active.
 MONGO_FP_FORWARD_DECLARE(WTPausePrimaryOplogDurabilityLoop);
-}
+}  // namespace mongo

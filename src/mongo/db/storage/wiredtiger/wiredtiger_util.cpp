@@ -96,7 +96,7 @@ void WiredTigerUtil::fetchTypeAndSourceURI(OperationContext* opCtx,
     const size_t colon = tableUri.find(':');
     invariant(colon != string::npos);
     colgroupUri += tableUri.substr(colon);
-    StatusWith<std::string> colgroupResult = getMetadata(opCtx, colgroupUri);
+    StatusWith<std::string> colgroupResult = getMetadataCreate(opCtx, colgroupUri);
     invariantOK(colgroupResult.getStatus());
     WiredTigerConfigParser parser(colgroupResult.getValue());
 
@@ -111,16 +111,8 @@ void WiredTigerUtil::fetchTypeAndSourceURI(OperationContext* opCtx,
     *source = std::string(sourceItem.str, sourceItem.len);
 }
 
-StatusWith<std::string> WiredTigerUtil::getMetadata(OperationContext* opCtx, StringData uri) {
-    invariant(opCtx);
-
-    auto session = WiredTigerRecoveryUnit::get(opCtx)->getSessionNoTxn();
-    WT_CURSOR* cursor =
-        session->getCursor("metadata:create", WiredTigerSession::kMetadataTableId, false);
-    invariant(cursor);
-    auto releaser =
-        MakeGuard([&] { session->releaseCursor(WiredTigerSession::kMetadataTableId, cursor); });
-
+namespace {
+StatusWith<std::string> _getMetadata(WT_CURSOR* cursor, StringData uri) {
     std::string strUri = uri.toString();
     cursor->set_key(cursor, strUri.c_str());
     int ret = cursor->search(cursor);
@@ -137,6 +129,49 @@ StatusWith<std::string> WiredTigerUtil::getMetadata(OperationContext* opCtx, Str
     }
     invariant(metadata);
     return StatusWith<std::string>(metadata);
+}
+}  // namespace
+
+StatusWith<std::string> WiredTigerUtil::getMetadataCreate(WT_SESSION* session, StringData uri) {
+    WT_CURSOR* cursor;
+    invariantWTOK(session->open_cursor(session, "metadata:create", nullptr, "", &cursor));
+    invariant(cursor);
+    ON_BLOCK_EXIT([cursor] { invariantWTOK(cursor->close(cursor)); });
+
+    return _getMetadata(cursor, uri);
+}
+
+StatusWith<std::string> WiredTigerUtil::getMetadataCreate(OperationContext* opCtx, StringData uri) {
+    invariant(opCtx);
+
+    auto session = WiredTigerRecoveryUnit::get(opCtx)->getSessionNoTxn();
+    WT_CURSOR* cursor =
+        session->getCursor("metadata:create", WiredTigerSession::kMetadataCreateTableId, false);
+
+    auto releaser = MakeGuard(
+        [&] { session->releaseCursor(WiredTigerSession::kMetadataCreateTableId, cursor); });
+
+    return _getMetadata(cursor, uri);
+}
+
+StatusWith<std::string> WiredTigerUtil::getMetadata(WT_SESSION* session, StringData uri) {
+    WT_CURSOR* cursor;
+    invariantWTOK(session->open_cursor(session, "metadata:", nullptr, "", &cursor));
+    invariant(cursor);
+    ON_BLOCK_EXIT([cursor] { invariantWTOK(cursor->close(cursor)); });
+
+    return _getMetadata(cursor, uri);
+}
+
+StatusWith<std::string> WiredTigerUtil::getMetadata(OperationContext* opCtx, StringData uri) {
+    invariant(opCtx);
+
+    auto session = WiredTigerRecoveryUnit::get(opCtx)->getSessionNoTxn();
+    WT_CURSOR* cursor = session->getCursor("metadata:", WiredTigerSession::kMetadataTableId, false);
+    auto releaser =
+        MakeGuard([&] { session->releaseCursor(WiredTigerSession::kMetadataTableId, cursor); });
+
+    return _getMetadata(cursor, uri);
 }
 
 Status WiredTigerUtil::getApplicationMetadata(OperationContext* opCtx,
