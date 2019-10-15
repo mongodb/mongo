@@ -73,9 +73,11 @@ TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoading) {
     auto expCtx = getExpCtx();
     expCtx->inMongos = true;  // Disallow external sort.
                               // This is the only way to do this in a debug build.
-    AccumulationStatement countStatement{"count",
-                                         ExpressionConstant::create(expCtx, Value(1)),
-                                         AccumulationStatement::getFactory("$sum")};
+    auto&& parser = AccumulationStatement::getParser("$sum");
+    auto accumulatorArg = BSON("" << 1);
+    auto [expression, factory] =
+        parser(expCtx, accumulatorArg.firstElement(), expCtx->variablesParseState);
+    AccumulationStatement countStatement{"count", expression, factory};
     auto group = DocumentSourceGroup::create(
         expCtx, ExpressionConstant::create(expCtx, Value(BSONNULL)), {countStatement});
     auto mock =
@@ -108,11 +110,14 @@ TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoadingWhileSpilled) {
     expCtx->allowDiskUse = true;
     const size_t maxMemoryUsageBytes = 1000;
 
-    VariablesParseState vps = expCtx->variablesParseState;
-    AccumulationStatement pushStatement{"spaceHog",
-                                        ExpressionFieldPath::parse(expCtx, "$largeStr", vps),
-                                        AccumulationStatement::getFactory("$push")};
-    auto groupByExpression = ExpressionFieldPath::parse(expCtx, "$_id", vps);
+    auto&& parser = AccumulationStatement::getParser("$push");
+    auto accumulatorArg = BSON(""
+                               << "$largeStr");
+    auto [expression, factory] =
+        parser(expCtx, accumulatorArg.firstElement(), expCtx->variablesParseState);
+    AccumulationStatement pushStatement{"spaceHog", expression, factory};
+    auto groupByExpression =
+        ExpressionFieldPath::parse(expCtx, "$_id", expCtx->variablesParseState);
     auto group = DocumentSourceGroup::create(
         expCtx, groupByExpression, {pushStatement}, maxMemoryUsageBytes);
 
@@ -148,11 +153,14 @@ TEST_F(DocumentSourceGroupTest, ShouldErrorIfNotAllowedToSpillToDiskAndResultSet
     expCtx->inMongos = true;  // Disallow external sort.
                               // This is the only way to do this in a debug build.
 
-    VariablesParseState vps = expCtx->variablesParseState;
-    AccumulationStatement pushStatement{"spaceHog",
-                                        ExpressionFieldPath::parse(expCtx, "$largeStr", vps),
-                                        AccumulationStatement::getFactory("$push")};
-    auto groupByExpression = ExpressionFieldPath::parse(expCtx, "$_id", vps);
+    auto&& parser = AccumulationStatement::getParser("$push");
+    auto accumulatorArg = BSON(""
+                               << "$largeStr");
+    auto [expression, factory] =
+        parser(expCtx, accumulatorArg.firstElement(), expCtx->variablesParseState);
+    AccumulationStatement pushStatement{"spaceHog", expression, factory};
+    auto groupByExpression =
+        ExpressionFieldPath::parse(expCtx, "$_id", expCtx->variablesParseState);
     auto group = DocumentSourceGroup::create(
         expCtx, groupByExpression, {pushStatement}, maxMemoryUsageBytes);
 
@@ -170,11 +178,14 @@ TEST_F(DocumentSourceGroupTest, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
     expCtx->inMongos = true;  // Disallow external sort.
                               // This is the only way to do this in a debug build.
 
-    VariablesParseState vps = expCtx->variablesParseState;
-    AccumulationStatement pushStatement{"spaceHog",
-                                        ExpressionFieldPath::parse(expCtx, "$largeStr", vps),
-                                        AccumulationStatement::getFactory("$push")};
-    auto groupByExpression = ExpressionFieldPath::parse(expCtx, "$_id", vps);
+    auto&& parser = AccumulationStatement::getParser("$push");
+    auto accumulatorArg = BSON(""
+                               << "$largeStr");
+    auto [expression, factory] =
+        parser(expCtx, accumulatorArg.firstElement(), expCtx->variablesParseState);
+    AccumulationStatement pushStatement{"spaceHog", expression, factory};
+    auto groupByExpression =
+        ExpressionFieldPath::parse(expCtx, "$_id", expCtx->variablesParseState);
     auto group = DocumentSourceGroup::create(
         expCtx, groupByExpression, {pushStatement}, maxMemoryUsageBytes);
 

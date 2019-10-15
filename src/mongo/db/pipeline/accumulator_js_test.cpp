@@ -75,25 +75,22 @@ void MapReduceFixture::tearDown() {
 
 namespace InternalJsReduce {
 
-static void assertProcessFailsWithCode(std::string accumulatorName,
-                                       const boost::intrusive_ptr<ExpressionContext>& expCtx,
+template <typename AccName>
+static void assertProcessFailsWithCode(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        Value processArgument,
                                        int code) {
-    auto factory = AccumulationStatement::getFactory(accumulatorName);
-    boost::intrusive_ptr<Accumulator> accum(factory(expCtx));
+    auto accum = AccName::create(expCtx);
     ASSERT_THROWS_CODE(accum->process(processArgument, false), AssertionException, code);
 }
 
-static void assertExpectedResults(std::string accumulatorName,
-                                  const boost::intrusive_ptr<ExpressionContext>& expCtx,
+template <typename AccName>
+static void assertExpectedResults(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                   std::string eval,
                                   std::vector<Value> data,
                                   Value expectedResult) {
-    auto factory = AccumulationStatement::getFactory(accumulatorName);
-
     // Asserts that result equals expected result when not sharded.
     {
-        boost::intrusive_ptr<Accumulator> accum(factory(expCtx));
+        auto accum = AccName::create(expCtx);
         for (auto&& val : data) {
             auto input = Value(DOC("eval" << eval << "data" << val));
             accum->process(input, false);
@@ -105,8 +102,8 @@ static void assertExpectedResults(std::string accumulatorName,
 
     // Asserts that result equals expected result when all input is on one shard.
     {
-        boost::intrusive_ptr<Accumulator> accum(factory(expCtx));
-        boost::intrusive_ptr<Accumulator> shard(factory(expCtx));
+        auto accum = AccName::create(expCtx);
+        auto shard = AccName::create(expCtx);
         for (auto&& val : data) {
             auto input = Value(DOC("eval" << eval << "data" << val));
             shard->process(input, false);
@@ -119,10 +116,10 @@ static void assertExpectedResults(std::string accumulatorName,
 
     // Asserts that result equals expected result when each input is on a separate shard.
     {
-        boost::intrusive_ptr<Accumulator> accum(factory(expCtx));
+        auto accum = AccName::create(expCtx);
         for (auto&& val : data) {
             auto input = Value(DOC("eval" << eval << "data" << val));
-            boost::intrusive_ptr<Accumulator> shard(factory(expCtx));
+            auto shard = AccName::create(expCtx);
             shard->process(input, false);
             accum->process(shard->getValue(true), true);
         }
@@ -134,23 +131,22 @@ static void assertExpectedResults(std::string accumulatorName,
 
 TEST_F(MapReduceFixture, InternalJsReduceProducesExpectedResults) {
     // Null value.
-    assertExpectedResults("$_internalJsReduce",
-                          getExpCtx(),
-                          "function(key, value) { return null; };",
-                          {Value(DOC("k" << 1 << "v" << Value(BSONNULL)))},
-                          Value(BSONNULL));
+    assertExpectedResults<AccumulatorInternalJsReduce>(
+        getExpCtx(),
+        "function(key, value) { return null; };",
+        {Value(DOC("k" << 1 << "v" << Value(BSONNULL)))},
+        Value(BSONNULL));
 
     // Multiple inputs.
-    assertExpectedResults("$_internalJsReduce",
-                          getExpCtx(),
-                          "function(key, values) { return Array.sum(values); };",
-                          {Value(DOC("k" << std::string("foo") << "v" << Value(2))),
-                           Value(DOC("k" << std::string("foo") << "v" << Value(5)))},
-                          Value(7.0));
+    assertExpectedResults<AccumulatorInternalJsReduce>(
+        getExpCtx(),
+        "function(key, values) { return Array.sum(values); };",
+        {Value(DOC("k" << std::string("foo") << "v" << Value(2))),
+         Value(DOC("k" << std::string("foo") << "v" << Value(5)))},
+        Value(7.0));
 
     // Multiple inputs, numeric key.
-    assertExpectedResults(
-        "$_internalJsReduce",
+    assertExpectedResults<AccumulatorInternalJsReduce>(
         getExpCtx(),
         "function(key, values) { return Array.sum(values); };",
         {Value(DOC("k" << 1 << "v" << Value(2))), Value(DOC("k" << 1 << "v" << Value(5)))},
@@ -158,9 +154,7 @@ TEST_F(MapReduceFixture, InternalJsReduceProducesExpectedResults) {
 }
 
 TEST_F(MapReduceFixture, InternalJsReduceIdempotentOnlyWhenJSFunctionIsIdempotent) {
-
-    auto factory = AccumulationStatement::getFactory("$_internalJsReduce");
-    boost::intrusive_ptr<Accumulator> accum(factory(getExpCtx()));
+    auto accum = AccumulatorInternalJsReduce::create(getExpCtx());
 
     // A non-idempotent Javascript function will produce non-idempotent results. In this case a
     // single document reduce causes a change in value.
@@ -177,11 +171,9 @@ TEST_F(MapReduceFixture, InternalJsReduceIdempotentOnlyWhenJSFunctionIsIdempoten
 }
 
 TEST_F(MapReduceFixture, InternalJsReduceFailsWhenEvalContainsInvalidJavascript) {
-    auto factory = AccumulationStatement::getFactory("$_internalJsReduce");
-
     // Multiple source documents.
     {
-        boost::intrusive_ptr<Accumulator> accum(factory(getExpCtx()));
+        auto accum = AccumulatorInternalJsReduce::create(getExpCtx());
 
         auto input = Value(DOC("eval" << std::string("INVALID_JAVASCRIPT") << "data"
                                       << Value(DOC("k" << Value(1) << "v" << Value(2)))));
@@ -193,7 +185,7 @@ TEST_F(MapReduceFixture, InternalJsReduceFailsWhenEvalContainsInvalidJavascript)
 
     // Single source document.
     {
-        boost::intrusive_ptr<Accumulator> accum(factory(getExpCtx()));
+        auto accum = AccumulatorInternalJsReduce::create(getExpCtx());
 
         auto input = Value(DOC("eval" << std::string("INVALID_JAVASCRIPT") << "data"
                                       << Value(DOC("k" << Value(1) << "v" << Value(2)))));
@@ -206,24 +198,24 @@ TEST_F(MapReduceFixture, InternalJsReduceFailsWhenEvalContainsInvalidJavascript)
 TEST_F(MapReduceFixture, InternalJsReduceFailsIfArgumentNotDocument) {
 
     auto argument = Value(2);
-    assertProcessFailsWithCode("$_internalJsReduce", getExpCtx(), argument, 31242);
+    assertProcessFailsWithCode<AccumulatorInternalJsReduce>(getExpCtx(), argument, 31242);
 }
 
 TEST_F(MapReduceFixture, InternalJsReduceFailsIfEvalAndDataArgumentsNotProvided) {
     // Data argument missing.
     auto argument =
         Value(DOC("eval" << std::string("function(key, values) { return Array.sum(values); };")));
-    assertProcessFailsWithCode("$_internalJsReduce", getExpCtx(), argument, 31243);
+    assertProcessFailsWithCode<AccumulatorInternalJsReduce>(getExpCtx(), argument, 31243);
 
     // Eval argument missing.
     argument = Value(DOC("data" << Value(DOC("k" << Value(1) << "v" << Value(2)))));
-    assertProcessFailsWithCode("$_internalJsReduce", getExpCtx(), argument, 31243);
+    assertProcessFailsWithCode<AccumulatorInternalJsReduce>(getExpCtx(), argument, 31243);
 }
 
 TEST_F(MapReduceFixture, InternalJsReduceFailsIfEvalArgumentNotOfTypeStringOrCode) {
     auto argument = Value(
         DOC("eval" << 1 << "data" << Value(DOC("k" << std::string("foo") << "v" << Value(2)))));
-    assertProcessFailsWithCode("$_internalJsReduce", getExpCtx(), argument, 31244);
+    assertProcessFailsWithCode<AccumulatorInternalJsReduce>(getExpCtx(), argument, 31244);
 
     // MapReduce does not accept JavaScript function of BSON type CodeWScope.
     BSONObjBuilder objBuilder;
@@ -231,14 +223,15 @@ TEST_F(MapReduceFixture, InternalJsReduceFailsIfEvalArgumentNotOfTypeStringOrCod
         "eval", "function(key, values) { return Array.sum(values); };", BSONObj());
     objBuilder.append("data", BSON("k" << std::string("foo") << "v" << Value(2)));
 
-    assertProcessFailsWithCode("$_internalJsReduce", getExpCtx(), Value(objBuilder.obj()), 31244);
+    assertProcessFailsWithCode<AccumulatorInternalJsReduce>(
+        getExpCtx(), Value(objBuilder.obj()), 31244);
 }
 
 TEST_F(MapReduceFixture, InternalJsReduceFailsIfDataArgumentNotDocument) {
     auto argument =
         Value(DOC("eval" << std::string("function(key, values) { return Array.sum(values); };")
                          << "data" << Value(2)));
-    assertProcessFailsWithCode("$_internalJsReduce", getExpCtx(), argument, 31245);
+    assertProcessFailsWithCode<AccumulatorInternalJsReduce>(getExpCtx(), argument, 31245);
 }
 
 TEST_F(MapReduceFixture, InternalJsReduceFailsIfDataArgumentDoesNotContainExpectedFields) {
@@ -246,19 +239,19 @@ TEST_F(MapReduceFixture, InternalJsReduceFailsIfDataArgumentDoesNotContainExpect
     auto argument = Value(
         DOC("eval" << std::string("function(key, values) { return Array.sum(values); };") << "data"
                    << Value(DOC("foo" << std::string("keyVal") << "v" << Value(2)))));
-    assertProcessFailsWithCode("$_internalJsReduce", getExpCtx(), argument, 31251);
+    assertProcessFailsWithCode<AccumulatorInternalJsReduce>(getExpCtx(), argument, 31251);
 
     // No "v" field.
     argument = Value(
         DOC("eval" << std::string("function(key, values) { return Array.sum(values); };") << "data"
                    << Value(DOC("k" << std::string("keyVal") << "bar" << Value(2)))));
-    assertProcessFailsWithCode("$_internalJsReduce", getExpCtx(), argument, 31251);
+    assertProcessFailsWithCode<AccumulatorInternalJsReduce>(getExpCtx(), argument, 31251);
 
     // Both "k" and "v" fields missing.
     argument =
         Value(DOC("eval" << std::string("function(key, values) { return Array.sum(values); };")
                          << "data" << Value(Document())));
-    assertProcessFailsWithCode("$_internalJsReduce", getExpCtx(), argument, 31251);
+    assertProcessFailsWithCode<AccumulatorInternalJsReduce>(getExpCtx(), argument, 31251);
 }
 
 }  // namespace InternalJsReduce
