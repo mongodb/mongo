@@ -168,6 +168,11 @@ Status buildMissingIdIndex(OperationContext* opCtx, Collection* collection) {
         return status;
     }
 
+    status = indexer.checkConstraints(opCtx);
+    if (!status.isOK()) {
+        return status;
+    }
+
     WriteUnitOfWork wuow(opCtx);
     status = indexer.commit(
         opCtx, collection, MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn);

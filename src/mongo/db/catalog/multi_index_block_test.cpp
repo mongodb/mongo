@@ -117,6 +117,7 @@ TEST_F(MultiIndexBlockTest, CommitWithoutInsertingDocuments) {
     ASSERT_EQUALS(MultiIndexBlock::State::kRunning, indexer->getState_forTest());
 
     ASSERT_OK(indexer->dumpInsertsFromBulk(getOpCtx()));
+    ASSERT_OK(indexer->checkConstraints(getOpCtx()));
 
     ASSERT_FALSE(indexer->isCommitted());
     {
@@ -142,6 +143,7 @@ TEST_F(MultiIndexBlockTest, CommitAfterInsertingSingleDocument) {
 
     ASSERT_OK(indexer->insert(getOpCtx(), {}, {}));
     ASSERT_OK(indexer->dumpInsertsFromBulk(getOpCtx()));
+    ASSERT_OK(indexer->checkConstraints(getOpCtx()));
 
     ASSERT_FALSE(indexer->isCommitted());
     {

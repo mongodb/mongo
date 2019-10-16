@@ -339,6 +339,9 @@ private:
     // incorrect state set anywhere.
     bool _buildIsCleanedUp = true;
 
+    // Duplicate key constraints should be checked at least once in the MultiIndexBlock.
+    bool _constraintsChecked = false;
+
     // Protects member variables of this class declared below.
     mutable stdx::mutex _mutex;
 

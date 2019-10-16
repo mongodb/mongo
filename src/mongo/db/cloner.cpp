@@ -403,6 +403,7 @@ void Cloner::copyIndexes(OperationContext* opCtx,
     auto indexInfoObjs = uassertStatusOK(
         indexer.init(opCtx, collection, prunedIndexesToBuild, MultiIndexBlock::kNoopOnInitFn));
     uassertStatusOK(indexer.insertAllDocumentsInCollection(opCtx, collection));
+    uassertStatusOK(indexer.checkConstraints(opCtx));
 
     WriteUnitOfWork wunit(opCtx);
     uassertStatusOK(indexer.commit(
