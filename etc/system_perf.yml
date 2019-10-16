@@ -46,6 +46,7 @@ post:
             mark_idle.sh
           fi
 
+    - func: "upload pip requirements"
     - command: shell.exec
       params:
         working_dir: src
@@ -362,6 +363,18 @@ functions:
         script: |
           set -o verbose
           exit $(cat post_run_check.status)
+
+  "upload pip requirements":
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: pip-requirements.txt
+      remote_file: ${project}/${build_variant}/${revision}/pip-requirements-${task_id}-${execution}.txt
+      bucket: mciuploads
+      permissions: public-read
+      content_type: atext-plain
+      display_name: Pip Requirements
 
 #######################################
 #               Tasks                 #

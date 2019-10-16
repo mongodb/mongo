@@ -41,6 +41,7 @@ post:
           if [ -d "${scons_cache_path}" ]; then
               /opt/mongodbtoolchain/v3/bin/python3 buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
           fi
+    - func: "upload pip requirements"
 
 
 # Be sure to add the module to git.get_project revisions parameter so the revision in the manifest
@@ -243,6 +244,18 @@ functions:
       params:
         name: "perf"
         file: "src/perf/perf.json"
+
+  "upload pip requirements":
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: pip-requirements.txt
+      remote_file: ${project}/${build_variant}/${revision}/pip-requirements-${task_id}-${execution}.txt
+      bucket: mciuploads
+      permissions: public-read
+      content_type: atext-plain
+      display_name: Pip Requirements
 
 tasks:
 
