@@ -271,6 +271,13 @@ void InitialSyncer::_cancelRemainingWork_inlock() {
     _cancelHandle_inlock(_getNextApplierBatchHandle);
 
     _shutdownComponent_inlock(_oplogFetcher);
+    if (_sharedData) {
+        stdx::lock_guard<Latch>(_sharedData->mutex);
+        if (_sharedData->initialSyncStatus.isOK()) {
+            _sharedData->initialSyncStatus =
+                Status{ErrorCodes::CallbackCanceled, "Initial sync attempt canceled"};
+        }
+    }
     if (_initialSyncState) {
         _shutdownComponent_inlock(_initialSyncState->dbsCloner);
     }
@@ -853,6 +860,7 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
     // This is where the flow of control starts to split into two parallel tracks:
     // - oplog fetcher
     // - data cloning and applier
+    _sharedData = std::make_unique<InitialSyncSharedData>(version, _rollbackChecker->getBaseRBID());
     auto listDatabasesFilter = [](BSONObj dbInfo) {
         std::string name;
         auto status = mongo::bsonExtractStringField(dbInfo, "name", &name);
