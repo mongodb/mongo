@@ -46,6 +46,15 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
 
+#define ASSERT_DOES_NOT_THROW(EXPRESSION)                                          \
+    try {                                                                          \
+        EXPRESSION;                                                                \
+    } catch (const AssertionException& e) {                                        \
+        str::stream err;                                                           \
+        err << "Threw an exception incorrectly: " << e.toString();                 \
+        ::mongo::unittest::TestAssertionFailure(__FILE__, __LINE__, err).stream(); \
+    }
+
 namespace mongo {
 namespace {
 
@@ -210,6 +219,29 @@ TEST(MapReduceAggTest, testOutSameCollection) {
     ASSERT(typeid(DocumentSourceUnwind) == typeid(**iter++));
     ASSERT(typeid(DocumentSourceGroup) == typeid(**iter++));
     ASSERT(typeid(DocumentSourceOut) == typeid(**iter));
+}
+
+TEST(MapReduceAggTest, testSourceDestinationCollectionsEqualMergeFail) {
+    auto nss = NamespaceString{"db", "coll"};
+    auto mr = MapReduce{
+        nss,
+        MapReduceJavascriptCode{mapJavascript.toString()},
+        MapReduceJavascriptCode{reduceJavascript.toString()},
+        MapReduceOutOptions{boost::make_optional("db"s), "coll", OutputType::Merge, false}};
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
+    ASSERT_THROWS_CODE(
+        map_reduce_common::translateFromMR(mr, expCtx), DBException, ErrorCodes::InvalidOptions);
+}
+
+TEST(MapReduceAggTest, testSourceDestinationCollectionsNotEqualMergeDoesNotFail) {
+    auto nss = NamespaceString{"db", "coll"};
+    auto mr = MapReduce{
+        nss,
+        MapReduceJavascriptCode{mapJavascript.toString()},
+        MapReduceJavascriptCode{reduceJavascript.toString()},
+        MapReduceOutOptions{boost::make_optional("db2"s), "coll", OutputType::Merge, false}};
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
+    ASSERT_DOES_NOT_THROW(map_reduce_common::translateFromMR(mr, expCtx));
 }
 
 }  // namespace

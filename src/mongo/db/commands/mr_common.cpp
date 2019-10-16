@@ -302,6 +302,23 @@ bool mrSupportsWriteConcern(const BSONObj& cmd) {
 
 std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
     MapReduce parsedMr, boost::intrusive_ptr<ExpressionContext> expCtx) {
+    // Verify that source and output collections are different.
+    // Note that $out allows for the source and the destination to match, so only reject
+    // in the case that the out option is being converted to a $merge.
+    auto& inNss = parsedMr.getNamespace();
+    auto outNss = NamespaceString{parsedMr.getOutOptions().getDatabaseName()
+                                      ? *parsedMr.getOutOptions().getDatabaseName()
+                                      : parsedMr.getNamespace().db(),
+                                  parsedMr.getOutOptions().getCollectionName()};
+
+    auto outType = parsedMr.getOutOptions().getOutputType();
+    if (outType == OutputType::Merge || outType == OutputType::Reduce) {
+        uassert(ErrorCodes::InvalidOptions,
+                "Source collection cannot be the same as destination collection in MapReduce when "
+                "using merge or "
+                "reduce actions",
+                inNss != outNss);
+    }
 
     // TODO: It would be good to figure out what kind of errors this would produce in the Status.
     // It would be better not to produce something incomprehensible out of an internal translation.
@@ -318,12 +335,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
                 return translateFinalize(expCtx, parsedMr.getFinalize()->getCode());
             }),
             translateOut(expCtx,
-                         parsedMr.getOutOptions().getOutputType(),
+                         outType,
                          parsedMr.getNamespace().db(),
-                         NamespaceString{parsedMr.getOutOptions().getDatabaseName()
-                                             ? *parsedMr.getOutOptions().getDatabaseName()
-                                             : parsedMr.getNamespace().db(),
-                                         parsedMr.getOutOptions().getCollectionName()},
+                         std::move(outNss),
                          parsedMr.getReduce().getCode())),
         expCtx));
 }
