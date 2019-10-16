@@ -55,22 +55,44 @@ MongoRunner.validateCollectionsCallback = function(port) {
                           // been initialized yet, then it cannot get elected.
                           const kFreezeTimeSecs = 24 * 60 * 60;  // 24 hours.
 
-                          assert.commandWorkedOrFailedWithCode(
-                              conn.adminCommand({replSetStepDown: kFreezeTimeSecs, force: true}), [
-                                  ErrorCodes.NotMaster,
-                                  ErrorCodes.NotYetInitialized,
-                                  ErrorCodes.Unauthorized
-                              ]);
+                          assert.soon(
+                              () => {
+                                  assert.commandWorkedOrFailedWithCode(
+                                      conn.adminCommand(
+                                          {replSetStepDown: kFreezeTimeSecs, force: true}),
+                                      [
+                                          ErrorCodes.NotMaster,
+                                          ErrorCodes.NotYetInitialized,
+                                          ErrorCodes.Unauthorized
+                                      ]);
+                                  const res = conn.adminCommand({replSetFreeze: kFreezeTimeSecs});
+                                  assert.commandWorkedOrFailedWithCode(res, [
+                                      ErrorCodes.NotYetInitialized,
+                                      ErrorCodes.Unauthorized,
+                                      ErrorCodes.NotSecondary
+                                  ]);
 
-                          assert.commandWorkedOrFailedWithCode(
-                              conn.adminCommand({replSetFreeze: kFreezeTimeSecs}), [
-                                  ErrorCodes.NotYetInitialized,
-                                  ErrorCodes.Unauthorized,
-                                  // We include "NotSecondary" because if replSetStepDown receives
-                                  // "NotYetInitialized", then this command will fail with
-                                  // "NotSecondary". This is why this is a "best-effort".
-                                  ErrorCodes.NotSecondary
-                              ]);
+                                  // If 'replSetFreeze' succeeds or fails with NotYetInitialized or
+                                  // Unauthorized, we do not need to retry the command because
+                                  // retrying will not work if the replica set is not yet
+                                  // initialized or if we are not authorized to run the command.
+                                  // This is why this is a "best-effort".
+                                  if (res.ok === 1 || res.code !== ErrorCodes.NotSecondary) {
+                                      return true;
+                                  }
+
+                                  // We only retry on NotSecondary error because 'replSetFreeze'
+                                  // could fail with NotSecondary if the node is currently primary
+                                  // or running for election. This could happen if there is a
+                                  // concurrent election running in parallel with the
+                                  // 'replSetStepDown' sent above.
+                                  jsTestLog(
+                                      "Retrying 'replSetStepDown' and 'replSetFreeze' in port " +
+                                      conn.port + " res: " + tojson(res));
+                                  return false;
+                              },
+                              "Timed out running 'replSetStepDown' and 'replSetFreeze' node in " +
+                                  "port " + conn.port);
                       }
                   })
             .then("getting the list of databases",
