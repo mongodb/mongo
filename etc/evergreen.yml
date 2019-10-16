@@ -6656,7 +6656,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_with_stepdowns
-  tags: ["concurrency"]
+  tags: ["concurrency", "stepdowns"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6666,12 +6666,32 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_with_stepdowns_and_balancer
-  tags: ["concurrency"]
+  tags: ["concurrency", "stepdowns"]
   commands:
   - func: "do setup"
   - func: "run tests"
     vars:
       resmoke_args: --suites=concurrency_sharded_with_stepdowns_and_balancer --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
+
+- <<: *task_template
+  name: concurrency_sharded_terminate_primary_with_balancer
+  tags: ["concurrency", "stepdowns", "kill_terminate"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=concurrency_sharded_terminate_primary_with_balancer --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
+
+- <<: *task_template
+  name: concurrency_sharded_kill_primary_with_balancer
+  tags: ["concurrency", "stepdowns", "kill_terminate"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=concurrency_sharded_kill_primary_with_balancer --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -6722,6 +6742,26 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=concurrency_sharded_multi_stmt_txn_with_stepdowns --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
+
+- <<: *task_template
+  name: concurrency_sharded_multi_stmt_txn_terminate_primary
+  tags: ["concurrency", "stepdowns", "kill_terminate"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=concurrency_sharded_multi_stmt_txn_terminate_primary --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
+
+- <<: *task_template
+  name: concurrency_sharded_multi_stmt_txn_kill_primary
+  tags: ["concurrency", "stepdowns", "kill_terminate"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=concurrency_sharded_multi_stmt_txn_kill_primary --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -8246,7 +8286,7 @@ buildvariants:
   - name: jsCore_txns
   - name: .logical_session_cache
   - name: parallel_gen
-  - name: .concurrency .common
+  - name: .concurrency .common !.kill_terminate
     distros:
       - rhel62-large
   - name: concurrency_replication_causal_consistency
@@ -9225,7 +9265,7 @@ buildvariants:
   - name: .misc_js !.non_win_dbg
     # Some concurrency workloads require a lot of memory, so we use machines
     # with more RAM for these suites.
-  - name: .concurrency !.ubsan !.no_txns
+  - name: .concurrency !.ubsan !.no_txns !.kill_terminate
     distros:
       - windows-64-vs2017-compile
   - name: disk_wiredtiger
@@ -9551,7 +9591,7 @@ buildvariants:
   - name: .causally_consistent !.sharding
   - name: .change_streams !.secondary_reads
   - name: .misc_js
-  - name: .concurrency !.ubsan !.no_txns
+  - name: .concurrency !.ubsan !.no_txns !.kill_terminate
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: initial_sync_fuzzer_gen
@@ -10542,7 +10582,7 @@ buildvariants:
     - name: causally_consistent_jscore_txns_passthrough
     - name: .change_streams
     - name: .misc_js !.tool
-    - name: .concurrency !.ubsan !.no_txns !.stepdowns
+    - name: .concurrency !.ubsan !.no_txns !.stepdowns !.kill_terminate
     - name: disk_wiredtiger
     - name: .encrypt
     - name: initial_sync_fuzzer_gen
@@ -11829,7 +11869,7 @@ buildvariants:
   - name: .causally_consistent !.wo_snapshot
   - name: .change_streams !.secondary_reads
   - name: .misc_js
-  - name: .concurrency !.ubsan !.no_txns
+  - name: .concurrency !.ubsan !.no_txns !.kill_terminate
     distros:
     - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
   - name: .integration !.audit
@@ -12252,7 +12292,7 @@ buildvariants:
   - name: .causally_consistent !.wo_snapshot
   - name: .change_streams
   - name: .misc_js
-  - name: .concurrency !.ubsan !.no_txns
+  - name: .concurrency !.ubsan !.no_txns !.kill_terminate
   - name: disk_wiredtiger
   - name: .encrypt
   - name: free_monitoring
@@ -12342,7 +12382,7 @@ buildvariants:
   - name: .causally_consistent !.wo_snapshot
   - name: .change_streams
   - name: .misc_js
-  - name: .concurrency !.no_txns !.repl
+  - name: .concurrency !.no_txns !.repl !.kill_terminate
   - name: disk_wiredtiger
   - name: .encrypt
   - name: free_monitoring
@@ -12435,7 +12475,7 @@ buildvariants:
   - name: audit
   - name: .causally_consistent !.wo_snapshot
   - name: .misc_js
-  - name: .concurrency .common
+  - name: .concurrency .common !.kill_terminate
   - name: concurrency_replication_causal_consistency
   - name: disk_wiredtiger
   - name: .encrypt
