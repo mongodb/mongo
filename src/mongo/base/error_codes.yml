@@ -26,6 +26,7 @@ error_categories:
     # get the client to through server selection again.
     - CloseConnectionError
     - VersionedAPIError
+    - ValidationError
 
 error_codes:
     - {code: 0,name: OK}
@@ -43,14 +44,14 @@ error_codes:
     - {code: 12,name: UnsupportedFormat}
     - {code: 13,name: Unauthorized}
     - {code: 14,name: TypeMismatch}
-    - {code: 15,name: Overflow}
+    - {code: 15,name: Overflow,categories: [ValidationError]}
     - {code: 16,name: InvalidLength}
     - {code: 17,name: ProtocolError}
     - {code: 18,name: AuthenticationFailed}
     - {code: 19,name: CannotReuseObject}
     - {code: 20,name: IllegalOperation}
     - {code: 21,name: EmptyArrayOperation}
-    - {code: 22,name: InvalidBSON}
+    - {code: 22,name: InvalidBSON,categories: [ValidationError]}
     - {code: 23,name: AlreadyInitialized}
     - {code: 24,name: LockTimeout,categories: [Interruption]}
     - {code: 25,name: RemoteValidationError}
