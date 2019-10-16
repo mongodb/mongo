@@ -26,399 +26,289 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include <cstring>
-#include <limits>
 #include <vector>
 
 #include "mongo/base/data_view.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bson_validate.h"
-#include "mongo/bson/oid.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/platform/decimal128.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo {
-
 namespace {
 
-/**
- * Creates a status with InvalidBSON code and adds information about _id if available.
- * WARNING: only pass in a non-EOO idElem if it has been fully validated already!
- * 'elemName' should be the known, validated field name of the element containing the error, if it
- * exists. Otherwise, it should be empty.
- */
-MONGO_COMPILER_NOINLINE Status makeError(StringData baseMsg,
-                                         BSONElement idElem,
-                                         StringData elemName) {
-    str::stream msg;
-    msg << baseMsg;
+// The values of the kSkipXX styles are used to compute the size, the remaining ones are arbitrary.
+// NOTE: The kSkipXX values directly encode the amount of 4-byte words to skip: don't change them!
+enum ValidationStyle : uint8_t {
+    kSkip0 = 0,          // The element only consists of the type byte and field name.
+    kSkip4 = 1,          // There are 4 additional bytes of data, see note above.
+    kSkip8 = 2,          // There are 8 additional bytes of data, see note above.
+    kSkip12 = 3,         // There are 12 additional bytes of data, see note above.
+    kSkip16 = 4,         // There are 16 additional bytes of data, see note above.
+    kString = 5,         // An int32 with the string length (including NUL) follows the field name.
+    kObjectOrArray = 6,  // The type starts a new nested object or array.
+    kSpecial = 7,        // Handled specially: any cases that don't fall into the above.
+};
 
-    if (!elemName.empty()) {
-        msg << " in element with field name '";
-        msg << elemName.toString();
-        msg << "'";
-    }
+// This table is padded and aligned to 32 bytes for more efficient lookup.
+static constexpr ValidationStyle kTypeInfoTable alignas(32)[32] = {
+    ValidationStyle::kSpecial,        // \x00 EOO
+    ValidationStyle::kSkip8,          // \x01 NumberDouble
+    ValidationStyle::kString,         // \x02 String
+    ValidationStyle::kObjectOrArray,  // \x03 Object
+    ValidationStyle::kObjectOrArray,  // \x04 Array
+    ValidationStyle::kSpecial,        // \x05 BinData
+    ValidationStyle::kSkip0,          // \x06 Undefined
+    ValidationStyle::kSkip12,         // \x07 OID
+    ValidationStyle::kSpecial,        // \x08 Bool (requires 0/1 false/true validation)
+    ValidationStyle::kSkip8,          // \x09 Date
+    ValidationStyle::kSkip0,          // \x0a Null
+    ValidationStyle::kSpecial,        // \x0b Regex (two nul-terminated strings)
+    ValidationStyle::kSpecial,        // \x0c DBRef
+    ValidationStyle::kString,         // \x0d Code
+    ValidationStyle::kString,         // \x0e Symbol
+    ValidationStyle::kSpecial,        // \x0f CodeWScope
+    ValidationStyle::kSkip4,          // \x10 Int
+    ValidationStyle::kSkip8,          // \x11 Timestamp
+    ValidationStyle::kSkip8,          // \x12 Long
+    ValidationStyle::kSkip16,         // \x13 Decimal
+};
+MONGO_STATIC_ASSERT(sizeof(kTypeInfoTable) == 32);
 
-    if (idElem.eoo()) {
-        msg << " in object with unknown _id";
-    } else {
-        msg << " in object with " + idElem.toString(/*field name=*/true, /*full=*/true);
-    }
-    return Status(ErrorCodes::InvalidBSON, msg);
-}
+constexpr ErrorCodes::Error InvalidBSON = ErrorCodes::InvalidBSON;
 
-class Buffer {
+template <bool precise>
+class ValidateBuffer {
 public:
-    Buffer(const char* buffer, uint64_t maxLength)
-        : _buffer(buffer), _position(0), _maxLength(maxLength) {}
+    ValidateBuffer(const char* data, uint64_t maxLength) : _data(data), _maxLength(maxLength) {
+        if constexpr (precise)
+            _frames.resize(BSONDepth::getMaxAllowableDepth() + 1);
+    }
 
-    template <typename N>
-    bool readNumber(N* out) {
-        if ((_position + sizeof(N)) > _maxLength)
-            return false;
-        if (out) {
-            *out = ConstDataView(_buffer).read<LittleEndian<N>>(_position);
+    Status validate() noexcept {
+        try {
+            _currFrame = _frames.begin();
+            _currElem = nullptr;
+            auto maxFrames = BSONDepth::getMaxAllowableDepth() + 1;  // A flat BSON has one frame.
+            uassert(InvalidBSON, "Cannot enforce max nesting depth", _frames.size() <= maxFrames);
+            uassert(InvalidBSON, "BSON data has to be at least 5 bytes", _maxLength >= 5);
+
+            // Read the length as signed integer, to ensure we limit it to < 2GB.
+            // All other lengths are read as unsigned, which makes for easier bounds checking.
+            Cursor cursor = {_data, _data + _maxLength};
+            int32_t len = cursor.template read<int32_t>();
+            uassert(InvalidBSON, "BSON data has to be at least 5 bytes", len >= 5);
+            uassert(InvalidBSON, "Incorrect BSON length", static_cast<size_t>(len) <= _maxLength);
+            const char* end = _currFrame->end = _data + len;
+            uassert(InvalidBSON, "BSON object not terminated with EOO", end[-1] == 0);
+            _validateIterative(Cursor{cursor.ptr, end});
+        } catch (const ExceptionForCat<ErrorCategory::ValidationError>& e) {
+            return Status(e.code(), str::stream() << e.what() << " " << _context());
         }
-        _position += sizeof(N);
+        return Status::OK();
+    }
+
+private:
+    struct Empty {};
+
+    /**
+     * Extra information for each nesting level in the precise validation mode.
+     */
+    struct PreciseFrameInfo {
+        BSONElement elem;  // _id for top frame, unchecked Object, Array or CodeWScope otherwise.
+    };
+
+    struct Frame : public std::conditional<precise, PreciseFrameInfo, Empty>::type {
+        const char* end;  // Used for checking encoded object/array sizes, not bounds checking.
+    };
+
+    using Frames =
+        typename std::conditional<precise, std::vector<Frame>, std::array<Frame, 16>>::type;
+
+    struct Cursor {
+        void skip(size_t len) {
+            uassert(InvalidBSON, "BSON size is larger than buffer size", (ptr += len) < end);
+        }
+
+        template <typename T>
+        const T read() {
+            auto val = ptr;
+            skip(sizeof(T));
+            return ConstDataView(val).read<LittleEndian<T>>();
+        }
+
+        void skipString() {
+            auto len = read<uint32_t>();
+            skip(len);
+            uassert(InvalidBSON, "Not null terminated string", !ptr[-1] && len > 0);
+        }
+
+        size_t strlen() const {
+            // This is actually by far the hottest code in all of BSON validation.
+            dassert(ptr < end);
+            size_t len = 0;
+            while (ptr[len])
+                ++len;
+            return len;
+        }
+
+        const char* ptr;
+        const char* const end;
+    };
+
+    const char* _pushFrame(Cursor cursor) {
+        uassert(ErrorCodes::Overflow,
+                "BSONObj exceeds maximum nested object depth",
+                ++_currFrame != _frames.end());
+
+        auto obj = cursor.ptr;
+        auto len = cursor.template read<int32_t>();
+        uassert(ErrorCodes::InvalidBSON, "Nested BSON object has to be at least 5 bytes", len >= 5);
+        _currFrame->end = obj + len;
+
+        if constexpr (precise) {
+            auto nameLen = obj - _currElem;
+            _currFrame->elem =
+                BSONElement(_currElem, nameLen, nameLen + len, BSONElement::CachedSizeTag());
+        }
+        return cursor.ptr;
+    }
+
+    bool _popFrame() {
+        if (_currFrame == _frames.begin())
+            return false;
+        --_currFrame;
         return true;
     }
 
-    /* Attempts to read a c-string starting at the next position in the buffer, and writes the
-     * string into 'out', if non-null.
-     * 'elemName' should be the known, validated field name of the BSONElement in which we are
-     * reading, if it exists. Otherwise, it should be empty.
-     */
-    Status readCString(StringData elemName, StringData* out) {
-        const void* x = memchr(_buffer + _position, 0, _maxLength - _position);
-        if (!x)
-            return makeError("no end of c-string", _idElem, elemName);
-        uint64_t len = static_cast<uint64_t>(static_cast<const char*>(x) - (_buffer + _position));
-
-        StringData data(_buffer + _position, len);
-        _position += len + 1;
-
-        if (out) {
-            *out = data;
+    static const char* _validateSpecial(Cursor cursor, uint8_t type) {
+        switch (type) {
+            case BSONType::BinData:
+                cursor.skip(cursor.template read<uint32_t>());  // Like String, but...
+                cursor.skip(1);  // ...add extra skip for the subtype byte to avoid overflow.
+                break;
+            case BSONType::Bool:
+                if (auto value = cursor.template read<uint8_t>())  // If not 0, must be 1.
+                    uassert(InvalidBSON, "BSON bool is neither false nor true", value == 1);
+                break;
+            case BSONType::RegEx:
+                cursor.skip(0);  // Force validation of the ptr after skipping past the field name.
+                cursor.skip(cursor.strlen() + 1);  // Skip regular expression cstring.
+                cursor.skip(cursor.strlen() + 1);  // Skip options cstring.
+                break;
+            case BSONType::DBRef:
+                cursor.skipString();  // Like String, but...
+                cursor.skip(12);      // ...also skip the 12-byte ObjectId.
+                break;
+            case static_cast<uint8_t>(BSONType::MinKey):  // Need to cast, as MinKey is negative.
+            case BSONType::MaxKey:
+                cursor.skip(0);  // Force validation of the ptr after skipping past the field name.
+                break;
+            default:
+                uasserted(InvalidBSON, str::stream() << "Unrecognized BSON type " << type);
         }
-        return Status::OK();
+        return cursor.ptr;
     }
 
-    /* Attempts to read a UTF8 string starting at the next position in the buffer, and writes the
-     * string into 'out', if non-null.
-     * 'elemName' should be the known, validated field name of the BSONElement in which we are
-     * reading, if it exists. Otherwise, it should be empty.
-     */
-    Status readUTF8String(StringData elemName, StringData* out) {
-        int sz;
-        if (!readNumber<int>(&sz))
-            return makeError("invalid bson", _idElem, elemName);
+    const char* _pushCodeWithScope(Cursor cursor) {
+        cursor.ptr = _pushFrame(cursor);  // Push a dummy frame to check the CodeWScope size.
+        cursor.skipString();              // Now skip the BSON UTF8 string containing the code.
+        return _pushFrame(cursor);
+    }
 
-        if (sz <= 0) {
-            // must have NULL at the very least
-            return makeError("invalid bson", _idElem, elemName);
+    void _maybePopCodeWithScope(Cursor cursor) {
+        if constexpr (precise) {
+            // When ending the scope of a CodeWScope, pop the extra dummy frame and check its size.
+            if (_currFrame != _frames.begin() && _currFrame[-1].elem.type() == CodeWScope) {
+                invariant(_popFrame());
+                uassert(InvalidBSON, "incorrect BSON length", cursor.ptr == _currFrame->end);
+            }
         }
-
-        if (out) {
-            *out = StringData(_buffer + _position, sz);
-        }
-
-        if (!skip(sz - 1))
-            return makeError("invalid bson", _idElem, elemName);
-
-        char c;
-        if (!readNumber<char>(&c))
-            return makeError("invalid bson", _idElem, elemName);
-
-        if (c != 0)
-            return makeError("not null terminated string", _idElem, elemName);
-
-        return Status::OK();
     }
 
-    bool skip(uint64_t sz) {
-        _position += sz;
-        return _position < _maxLength;
+    const char* _validateElem(Cursor cursor, uint8_t type) {
+        if (MONGO_unlikely(type > JSTypeMax))
+            return _validateSpecial(cursor, type);
+
+        auto style = kTypeInfoTable[type];
+        if (MONGO_likely(style <= kSkip16))
+            cursor.skip(style * 4);
+        else if (MONGO_likely(style == kString))
+            cursor.skipString();
+        else if (MONGO_likely(style == kObjectOrArray))
+            cursor.ptr = _pushFrame(cursor);
+        else if (MONGO_unlikely(precise && type == CodeWScope))
+            cursor.ptr = _pushCodeWithScope(cursor);
+        else
+            cursor.ptr = _validateSpecial(cursor, type);
+
+        return cursor.ptr;
     }
 
-    uint64_t position() const {
-        return _position;
-    }
+    MONGO_COMPILER_NOINLINE void _validateIterative(Cursor cursor) {
+        do {
+            // Use the fact that the EOO byte is 0, just like the end of string, so checking for EOO
+            // is same as finding len == 0. The cursor cannot point past EOO, so the strlen is safe.
+            uassert(InvalidBSON, "BSON size is larger than buffer size", cursor.ptr < cursor.end);
+            while (size_t len = cursor.strlen()) {
+                uint8_t type = *cursor.ptr;
+                _currElem = cursor.ptr;
+                cursor.ptr += len + 1;
+                cursor.ptr = _validateElem(cursor, type);
 
-    const char* getBasePtr() const {
-        return _buffer;
+                if constexpr (precise) {
+                    // See if the _id field was just validated. If so, set the global scope element.
+                    if (_currFrame == _frames.begin() && StringData(_currElem + 1) == "_id"_sd)
+                        _currFrame->elem = BSONElement(_currElem);  // This is fully validated now.
+                }
+                dassert(cursor.ptr <= cursor.end);
+            }
+
+            // Got the EOO byte: skip it and compare its location with the expected frame end.
+            uassert(InvalidBSON, "incorrect BSON length", ++cursor.ptr == _currFrame->end);
+            _maybePopCodeWithScope(cursor);
+        } while (_popFrame());  // Finished when there are no frames left.
     }
 
     /**
-     * WARNING: only pass in a non-EOO idElem if it has been fully validated already!
+     * Returns a string qualifying the context in which an exception occurred. Example return is
+     * "in element with field name 'foo.bar' in object with _id: 1".
      */
-    void setIdElem(BSONElement idElem) {
-        _idElem = idElem;
-    }
-
-private:
-    const char* _buffer;
-    uint64_t _position;
-    uint64_t _maxLength;
-    BSONElement _idElem;
-};
-
-struct ValidationState {
-    enum State { BeginObj = 1, WithinObj, EndObj, BeginCodeWScope, EndCodeWScope, Done };
-};
-
-class ValidationObjectFrame {
-public:
-    int startPosition() const {
-        return _startPosition & ~(1 << 31);
-    }
-    bool isCodeWithScope() const {
-        return _startPosition & (1 << 31);
-    }
-
-    void setStartPosition(int pos) {
-        _startPosition = (_startPosition & (1 << 31)) | (pos & ~(1 << 31));
-    }
-    void setIsCodeWithScope(bool isCodeWithScope) {
-        if (isCodeWithScope) {
-            _startPosition |= 1 << 31;
-        } else {
-            _startPosition &= ~(1 << 31);
+    std::string _context() {
+        str::stream ctx;
+        ctx << "in element with field name '";
+        if constexpr (precise) {
+            std::for_each(_frames.begin() + 1,
+                          _currFrame + (_currFrame != _frames.end()),
+                          [&](auto& frame) { ctx << frame.elem.fieldName() << "."; });
         }
+        ctx << (_currElem ? _currElem + 1 : "?") << "'";
+
+        if constexpr (precise) {
+            auto _id = _frames.begin()->elem;
+            ctx << " in object with " << (_id ? BSONElement(_id).toString() : "unknown _id");
+        }
+        return str::escape(ctx);
     }
 
-    int expectedSize;
-
-private:
-    int _startPosition;
+    const char* const _data;  // The data buffer to check.
+    const size_t _maxLength;  // The size of the data buffer. The BSON object may be smaller.
+    const char* _currElem = nullptr;  // Element to validate: only the name is known to be good.
+    typename Frames::iterator _currFrame;  // Frame currently being validated.
+    Frames _frames;  // Has end pointers to check and the containing element for precise mode.
 };
-
-/**
- * WARNING: only pass in a non-EOO idElem if it has been fully validated already!
- */
-Status validateElementInfo(Buffer* buffer,
-                           ValidationState::State* nextState,
-                           BSONElement idElem,
-                           StringData* elemName) {
-    Status status = Status::OK();
-
-    signed char type;
-    if (!buffer->readNumber<signed char>(&type))
-        return makeError("invalid bson", idElem, StringData());
-
-    if (type == EOO) {
-        *nextState = ValidationState::EndObj;
-        return Status::OK();
-    }
-
-    status = buffer->readCString(StringData(), elemName);
-    if (!status.isOK())
-        return status;
-
-    switch (type) {
-        case MinKey:
-        case MaxKey:
-        case jstNULL:
-        case Undefined:
-            return Status::OK();
-
-        case jstOID:
-            if (!buffer->skip(OID::kOIDSize))
-                return makeError("invalid bson", idElem, *elemName);
-            return Status::OK();
-
-        case NumberInt:
-            if (!buffer->skip(sizeof(int32_t)))
-                return makeError("invalid bson", idElem, *elemName);
-            return Status::OK();
-
-        case Bool:
-            uint8_t val;
-            if (!buffer->readNumber(&val))
-                return makeError("invalid bson", idElem, *elemName);
-            if ((val != 0) && (val != 1))
-                return makeError("invalid boolean value", idElem, *elemName);
-            return Status::OK();
-
-        case NumberDouble:
-        case NumberLong:
-        case bsonTimestamp:
-        case Date:
-            if (!buffer->skip(sizeof(int64_t)))
-                return makeError("invalid bson", idElem, *elemName);
-            return Status::OK();
-
-        case NumberDecimal:
-            if (!buffer->skip(sizeof(Decimal128::Value)))
-                return makeError("Invalid bson", idElem, *elemName);
-            return Status::OK();
-
-        case DBRef:
-            status = buffer->readUTF8String(*elemName, nullptr);
-            if (!status.isOK())
-                return status;
-            if (!buffer->skip(OID::kOIDSize)) {
-                return makeError("invalid bson length", idElem, *elemName);
-            }
-            return Status::OK();
-
-        case RegEx:
-            status = buffer->readCString(*elemName, nullptr);
-            if (!status.isOK())
-                return status;
-            status = buffer->readCString(*elemName, nullptr);
-            if (!status.isOK())
-                return status;
-
-            return Status::OK();
-
-        case Code:
-        case Symbol:
-        case String:
-            status = buffer->readUTF8String(*elemName, nullptr);
-            if (!status.isOK())
-                return status;
-            return Status::OK();
-
-        case BinData: {
-            int sz;
-            if (!buffer->readNumber<int>(&sz))
-                return makeError("invalid bson", idElem, *elemName);
-            if (sz < 0 || sz == std::numeric_limits<int>::max())
-                return makeError("invalid size in bson", idElem, *elemName);
-            if (!buffer->skip(1 + sz))
-                return makeError("invalid bson", idElem, *elemName);
-            return Status::OK();
-        }
-        case CodeWScope:
-            *nextState = ValidationState::BeginCodeWScope;
-            return Status::OK();
-        case Object:
-        case Array:
-            *nextState = ValidationState::BeginObj;
-            return Status::OK();
-
-        default:
-            return makeError("invalid bson type", idElem, *elemName);
-    }
-}
-
-Status validateBSONIterative(Buffer* buffer) {
-    std::vector<ValidationObjectFrame> frames;
-    frames.reserve(16);
-    ValidationObjectFrame* curr = nullptr;
-    ValidationState::State state = ValidationState::BeginObj;
-
-    uint64_t idElemStartPos = 0;  // will become idElem once validated
-    BSONElement idElem;
-
-    while (state != ValidationState::Done) {
-        switch (state) {
-            case ValidationState::BeginObj:
-                if (frames.size() > BSONDepth::getMaxAllowableDepth()) {
-                    return {ErrorCodes::Overflow,
-                            str::stream() << "BSONObj exceeded maximum nested object depth: "
-                                          << BSONDepth::getMaxAllowableDepth()};
-                }
-
-                frames.push_back(ValidationObjectFrame());
-                curr = &frames.back();
-                curr->setStartPosition(buffer->position());
-                curr->setIsCodeWithScope(false);
-                if (!buffer->readNumber<int>(&curr->expectedSize)) {
-                    return makeError("bson size is larger than buffer size", idElem, StringData());
-                }
-                state = ValidationState::WithinObj;
-            // fall through
-            case ValidationState::WithinObj: {
-                const bool atTopLevel = frames.size() == 1;
-                // check if we've finished validating idElem and are at start of next element.
-                if (atTopLevel && idElemStartPos) {
-                    idElem = BSONElement(buffer->getBasePtr() + idElemStartPos);
-                    buffer->setIdElem(idElem);
-                    idElemStartPos = 0;
-                }
-
-                const uint64_t elemStartPos = buffer->position();
-                ValidationState::State nextState = state;
-                StringData elemName;
-                Status status = validateElementInfo(buffer, &nextState, idElem, &elemName);
-                if (!status.isOK())
-                    return status;
-
-                // we've already validated that fieldname is safe to access as long as we aren't
-                // at the end of the object, since EOO doesn't have a fieldname.
-                if (nextState != ValidationState::EndObj && idElem.eoo() && atTopLevel) {
-                    if (elemName == "_id") {
-                        idElemStartPos = elemStartPos;
-                    }
-                }
-
-                state = nextState;
-                break;
-            }
-            case ValidationState::EndObj: {
-                int actualLength = buffer->position() - curr->startPosition();
-                if (actualLength != curr->expectedSize) {
-                    return makeError(
-                        "bson length doesn't match what we found", idElem, StringData());
-                }
-                frames.pop_back();
-                if (frames.empty()) {
-                    state = ValidationState::Done;
-                } else {
-                    curr = &frames.back();
-                    if (curr->isCodeWithScope())
-                        state = ValidationState::EndCodeWScope;
-                    else
-                        state = ValidationState::WithinObj;
-                }
-                break;
-            }
-            case ValidationState::BeginCodeWScope: {
-                frames.push_back(ValidationObjectFrame());
-                curr = &frames.back();
-                curr->setStartPosition(buffer->position());
-                curr->setIsCodeWithScope(true);
-                if (!buffer->readNumber<int>(&curr->expectedSize))
-                    return makeError("invalid bson CodeWScope size", idElem, StringData());
-                Status status = buffer->readUTF8String(StringData(), nullptr);
-                if (!status.isOK())
-                    return status;
-                state = ValidationState::BeginObj;
-                break;
-            }
-            case ValidationState::EndCodeWScope: {
-                int actualLength = buffer->position() - curr->startPosition();
-                if (actualLength != curr->expectedSize) {
-                    return makeError("bson length for CodeWScope doesn't match what we found",
-                                     idElem,
-                                     StringData());
-                }
-                frames.pop_back();
-                if (frames.empty())
-                    return makeError("unnested CodeWScope", idElem, StringData());
-                curr = &frames.back();
-                state = ValidationState::WithinObj;
-                break;
-            }
-            case ValidationState::Done:
-                MONGO_UNREACHABLE;
-        }
-    }
-
-    return Status::OK();
-}
-
 }  // namespace
 
-Status validateBSON(const char* originalBuffer, uint64_t maxLength) {
-    if (maxLength < 5) {
-        return Status(ErrorCodes::InvalidBSON, "bson data has to be at least 5 bytes");
-    }
+Status validateBSON(const char* originalBuffer, uint64_t maxLength) noexcept {
+    // First try validating using the fast but less precise version. That version will return
+    // a not-OK status for objects with CodeWScope or nesting exceeding 16 levels. These cases and
+    // actual failures will rerun the precise version that gives a detailed error context.
+    if (MONGO_likely(ValidateBuffer<false>(originalBuffer, maxLength).validate().isOK()))
+        return Status::OK();
 
-    Buffer buf(originalBuffer, maxLength);
-    return validateBSONIterative(&buf);
+    return ValidateBuffer<true>(originalBuffer, maxLength).validate();
 }
-
 }  // namespace mongo
