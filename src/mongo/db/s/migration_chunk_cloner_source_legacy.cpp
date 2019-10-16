@@ -778,6 +778,12 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opC
     const long long totalRecs = collection->numRecords(opCtx);
     if (totalRecs > 0) {
         avgRecSize = collection->dataSize(opCtx) / totalRecs;
+        // The calls to numRecords() and dataSize() are not atomic so it is possible that the data
+        // size becomes smaller than the number of records between the two calls, which would result
+        // in average record size of zero
+        if (avgRecSize == 0) {
+            avgRecSize = BSONObj::kMinBSONLength;
+        }
         maxRecsWhenFull = _args.getMaxChunkSizeBytes() / avgRecSize;
         maxRecsWhenFull = 130 * maxRecsWhenFull / 100;  // pad some slack
     } else {
