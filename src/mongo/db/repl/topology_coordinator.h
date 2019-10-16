@@ -306,6 +306,7 @@ public:
         const OpTimeAndWallTime readConcernMajorityOpTime;
         const BSONObj initialSyncStatus;
         const BSONObj electionCandidateMetrics;
+        const BSONObj electionParticipantMetrics;
 
         // boost::none if the storage engine does not support RTT, or if it does but does not
         // persist data to necessitate taking checkpoints. Timestamp::min() if a checkpoint is yet

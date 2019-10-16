@@ -719,6 +719,7 @@ env.Library(
         'repl_coordinator_interface',
         'repl_settings',
         'storage_interface',
+        'replication_metrics',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/mongod_fsync',

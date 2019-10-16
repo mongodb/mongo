@@ -144,8 +144,8 @@ structs:
             lastElectionDate:
                 description: "Time the node called for the election"
                 type: date
-            termAtElection:
-                description: "New term at the time of election"
+            electionTerm:
+                description: "Proposed new term for this election"
                 type: long
             lastCommittedOpTimeAtElection:
                 description: "Last OpTime the node committed before calling the election"
@@ -189,6 +189,36 @@ structs:
         description: "Stores metrics that are specific to the last election in which the node voted"
         strict: true
         fields:
+            votedForCandidate:
+                description: "States if the node has voted yes or no for the candidate in this election"
+                type: bool
+            electionTerm:
+                description: "The term of the candidate that is running for election"
+                type: long
+            lastVoteDate:
+                description: "Time the node voted"
+                type: date
+            electionCandidateMemberId:
+                description: "MemberId of the node requesting a vote"
+                type: int
+            voteReason:
+                description: "Reason why the node voted the way it did"
+                type: string
+            lastAppliedOpTimeAtElection:
+                description: "Latest applied OpTime at the time of voting"
+                type: optime
+            maxAppliedOpTimeInSet:
+                description: "Highest applied time of any node in this replica set, as currently
+                              known by this node"
+                type: optime
             priorityAtElection:
                 description: "The node's priority at the time of the election"
                 type: double
+            newTermStartDate:
+                description: "Time the new term oplog entry was written by the primary"
+                type: date
+                optional: true
+            newTermAppliedDate:
+                description: "Time this node applied the new term oplog entry"
+                type: date
+                optional: true

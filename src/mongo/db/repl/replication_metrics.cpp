@@ -264,7 +264,7 @@ long ReplicationMetrics::getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_f
 void ReplicationMetrics::setElectionCandidateMetrics(
     const StartElectionReasonEnum reason,
     const Date_t lastElectionDate,
-    const long long termAtElection,
+    const long long electionTerm,
     const OpTime lastCommittedOpTime,
     const OpTime lastSeenOpTime,
     const int numVotesNeeded,
@@ -277,7 +277,7 @@ void ReplicationMetrics::setElectionCandidateMetrics(
     _nodeIsCandidateOrPrimary = true;
     _electionCandidateMetrics.setLastElectionReason(reason);
     _electionCandidateMetrics.setLastElectionDate(lastElectionDate);
-    _electionCandidateMetrics.setTermAtElection(termAtElection);
+    _electionCandidateMetrics.setElectionTerm(electionTerm);
     _electionCandidateMetrics.setLastCommittedOpTimeAtElection(lastCommittedOpTime);
     _electionCandidateMetrics.setLastSeenOpTimeAtElection(lastSeenOpTime);
     _electionCandidateMetrics.setNumVotesNeeded(numVotesNeeded);
@@ -292,14 +292,15 @@ void ReplicationMetrics::setTargetCatchupOpTime(OpTime opTime) {
     _electionCandidateMetrics.setTargetCatchupOpTime(opTime);
 }
 
-void ReplicationMetrics::setNumCatchUpOps(int numCatchUpOps) {
+void ReplicationMetrics::setNumCatchUpOps(long numCatchUpOps) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
+    invariant(numCatchUpOps >= 0);
     _electionCandidateMetrics.setNumCatchUpOps(numCatchUpOps);
     _totalNumCatchUpOps += numCatchUpOps;
     _updateAverageCatchUpOps(lk);
 }
 
-void ReplicationMetrics::setNewTermStartDate(Date_t newTermStartDate) {
+void ReplicationMetrics::setCandidateNewTermStartDate(Date_t newTermStartDate) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _electionCandidateMetrics.setNewTermStartDate(newTermStartDate);
 }
@@ -334,6 +335,48 @@ void ReplicationMetrics::clearElectionCandidateMetrics() {
     _electionCandidateMetrics.setNewTermStartDate(boost::none);
     _electionCandidateMetrics.setWMajorityWriteAvailabilityDate(boost::none);
     _nodeIsCandidateOrPrimary = false;
+}
+
+void ReplicationMetrics::setElectionParticipantMetrics(const bool votedForCandidate,
+                                                       const long long electionTerm,
+                                                       const Date_t lastVoteDate,
+                                                       const int electionCandidateMemberId,
+                                                       const std::string voteReason,
+                                                       const OpTime lastAppliedOpTime,
+                                                       const OpTime maxAppliedOpTimeInSet,
+                                                       const double priorityAtElection) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+    _nodeHasVotedInElection = true;
+    _electionParticipantMetrics.setVotedForCandidate(votedForCandidate);
+    _electionParticipantMetrics.setElectionTerm(electionTerm);
+    _electionParticipantMetrics.setLastVoteDate(lastVoteDate);
+    _electionParticipantMetrics.setElectionCandidateMemberId(electionCandidateMemberId);
+    _electionParticipantMetrics.setVoteReason(voteReason);
+    _electionParticipantMetrics.setLastAppliedOpTimeAtElection(lastAppliedOpTime);
+    _electionParticipantMetrics.setMaxAppliedOpTimeInSet(maxAppliedOpTimeInSet);
+    _electionParticipantMetrics.setPriorityAtElection(priorityAtElection);
+}
+
+BSONObj ReplicationMetrics::getElectionParticipantMetricsBSON() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    if (_nodeHasVotedInElection) {
+        return _electionParticipantMetrics.toBSON();
+    }
+    return BSONObj();
+}
+
+void ReplicationMetrics::setParticipantNewTermDates(Date_t newTermStartDate,
+                                                    Date_t newTermAppliedDate) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _electionParticipantMetrics.setNewTermStartDate(newTermStartDate);
+    _electionParticipantMetrics.setNewTermAppliedDate(newTermAppliedDate);
+}
+
+void ReplicationMetrics::clearParticipantNewTermDates() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _electionParticipantMetrics.setNewTermStartDate(boost::none);
+    _electionParticipantMetrics.setNewTermAppliedDate(boost::none);
 }
 
 void ReplicationMetrics::_updateAverageCatchUpOps(WithLock lk) {

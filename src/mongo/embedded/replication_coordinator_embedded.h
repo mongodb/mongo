@@ -253,7 +253,7 @@ public:
 
     Status abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) override;
 
-    void incrementNumCatchUpOpsIfCatchingUp(int numOps) override;
+    void incrementNumCatchUpOpsIfCatchingUp(long numOps) override;
 
     void signalDropPendingCollectionsRemovedFromStorage() final;
 

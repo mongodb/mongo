@@ -245,7 +245,7 @@ public:
 
     Status abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) final;
 
-    void incrementNumCatchUpOpsIfCatchingUp(int numOps) final;
+    void incrementNumCatchUpOpsIfCatchingUp(long numOps) final;
 
     void signalDropPendingCollectionsRemovedFromStorage() final;
 

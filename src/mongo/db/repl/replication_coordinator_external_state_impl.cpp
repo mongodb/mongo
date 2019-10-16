@@ -481,8 +481,8 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
         WriteUnitOfWork wuow(opCtx);
         opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
             opCtx,
-            BSON("msg"
-                 << "new primary"));
+            BSON(ReplicationCoordinator::newPrimaryMsgField
+                 << ReplicationCoordinator::newPrimaryMsg));
         wuow.commit();
     });
     const auto loadLastOpTimeAndWallTimeResult = loadLastOpTimeAndWallTime(opCtx);
@@ -490,7 +490,7 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     auto opTimeToReturn = loadLastOpTimeAndWallTimeResult.getValue().opTime;
 
     auto newTermStartDate = loadLastOpTimeAndWallTimeResult.getValue().wallTime;
-    ReplicationMetrics::get(opCtx).setNewTermStartDate(newTermStartDate);
+    ReplicationMetrics::get(opCtx).setCandidateNewTermStartDate(newTermStartDate);
 
     auto replCoord = ReplicationCoordinator::get(opCtx);
     replCoord->createWMajorityWriteAvailabilityDateWaiter(opTimeToReturn);

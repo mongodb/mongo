@@ -232,32 +232,6 @@ auto parseFromOplogEntryArray(const BSONObj& obj, int elem) {
     return OpTime(tsArray.Array()[elem].timestamp(), termArray.Array()[elem].Long());
 };
 
-TEST_F(SyncTailTest, SyncApplyNoNamespaceBadOp) {
-    const BSONObj op = BSON("op"
-                            << "x");
-    ASSERT_THROWS(
-        SyncTail::syncApply(_opCtx.get(), op, OplogApplication::Mode::kInitialSync, boost::none),
-        ExceptionFor<ErrorCodes::BadValue>);
-}
-
-TEST_F(SyncTailTest, SyncApplyNoNamespaceNoOp) {
-    ASSERT_OK(SyncTail::syncApply(_opCtx.get(),
-                                  BSON("op"
-                                       << "n"),
-                                  OplogApplication::Mode::kInitialSync,
-                                  boost::none));
-}
-
-TEST_F(SyncTailTest, SyncApplyBadOp) {
-    const BSONObj op = BSON("op"
-                            << "x"
-                            << "ns"
-                            << "test.t");
-    ASSERT_THROWS(
-        SyncTail::syncApply(_opCtx.get(), op, OplogApplication::Mode::kInitialSync, boost::none),
-        ExceptionFor<ErrorCodes::BadValue>);
-}
-
 TEST_F(SyncTailTest, SyncApplyInsertDocumentDatabaseMissing) {
     NamespaceString nss("test.t");
     auto op = makeOplogEntry(OpTypeEnum::kInsert, nss, {});

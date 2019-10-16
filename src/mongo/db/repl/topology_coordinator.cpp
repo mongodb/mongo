@@ -65,6 +65,8 @@ namespace mongo {
 namespace repl {
 
 MONGO_FAIL_POINT_DEFINE(forceSyncSourceCandidate);
+MONGO_FAIL_POINT_DEFINE(voteNoInElection);
+MONGO_FAIL_POINT_DEFINE(voteYesInDryRunButNoInRealElection);
 
 // If this fail point is enabled, TopologyCoordinator::shouldChangeSyncSource() will ignore
 // the option TopologyCoordinator::Options::maxSyncSourceLagSecs. The sync source will not be
@@ -1388,7 +1390,7 @@ std::string TopologyCoordinator::_getReplSetStatusString() {
     // Construct a ReplSetStatusArgs using default parameters. Missing parameters will not be
     // included in the status string.
     ReplSetStatusArgs rsStatusArgs{
-        Date_t::now(), 0U, OpTimeAndWallTime(), BSONObj(), BSONObj(), boost::none};
+        Date_t::now(), 0U, OpTimeAndWallTime(), BSONObj(), BSONObj(), BSONObj(), boost::none};
     BSONObjBuilder builder;
     Status result(ErrorCodes::InternalError, "didn't set status in prepareStatusResponse");
     prepareStatusResponse(rsStatusArgs, &builder, &result);
@@ -1411,6 +1413,7 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
     const Date_t lastOpDurableWall = getMyLastDurableOpTimeAndWallTime().wallTime;
     const BSONObj& initialSyncStatus = rsStatusArgs.initialSyncStatus;
     const BSONObj& electionCandidateMetrics = rsStatusArgs.electionCandidateMetrics;
+    const BSONObj& electionParticipantMetrics = rsStatusArgs.electionParticipantMetrics;
     const boost::optional<Timestamp>& lastStableRecoveryTimestamp =
         rsStatusArgs.lastStableRecoveryTimestamp;
     const boost::optional<Timestamp>& lastStableCheckpointTimestampDeprecated =
@@ -1615,6 +1618,10 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
 
     if (!electionCandidateMetrics.isEmpty()) {
         response->append("electionCandidateMetrics", electionCandidateMetrics);
+    }
+
+    if (!electionParticipantMetrics.isEmpty()) {
+        response->append("electionParticipantMetrics", electionParticipantMetrics);
     }
 
     response->append("members", membersOut);
@@ -2689,6 +2696,29 @@ rpc::OplogQueryMetadata TopologyCoordinator::prepareOplogQueryMetadata(int rbid)
 void TopologyCoordinator::processReplSetRequestVotes(const ReplSetRequestVotesArgs& args,
                                                      ReplSetRequestVotesResponse* response) {
     response->setTerm(_term);
+
+    if (MONGO_unlikely(voteNoInElection.shouldFail())) {
+        log() << "failpoint voteNoInElection enabled";
+        response->setVoteGranted(false);
+        response->setReason(str::stream() << "forced to vote no during dry run election due to "
+                                             "failpoint voteNoInElection set");
+        return;
+    }
+
+    if (MONGO_unlikely(voteYesInDryRunButNoInRealElection.shouldFail())) {
+        log() << "failpoint voteYesInDryRunButNoInRealElection enabled";
+        if (args.isADryRun()) {
+            response->setVoteGranted(true);
+            response->setReason(str::stream() << "forced to vote yes in dry run due to failpoint "
+                                                 "voteYesInDryRunButNoInRealElection set");
+        } else {
+            response->setVoteGranted(false);
+            response->setReason(str::stream()
+                                << "forced to vote no in real election due to failpoint "
+                                   "voteYesInDryRunButNoInRealElection set");
+        }
+        return;
+    }
 
     if (args.getTerm() < _term) {
         response->setVoteGranted(false);

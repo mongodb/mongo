@@ -69,6 +69,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_metrics.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/session.h"
 #include "mongo/db/session_txn_record_gen.h"
@@ -327,6 +328,18 @@ Status SyncTail::syncApply(OperationContext* opCtx,
 
     if (opType == OpTypeEnum::kNoop) {
         incrementOpsAppliedStats();
+
+        auto oplogEntry = OplogEntryBase::parse(IDLParserErrorContext("syncApply"), op);
+        auto opObj = oplogEntry.getObject();
+        if (opObj.hasField(ReplicationCoordinator::newPrimaryMsgField) &&
+            opObj.getField(ReplicationCoordinator::newPrimaryMsgField).str() ==
+                ReplicationCoordinator::newPrimaryMsg) {
+
+            invariant(oplogEntry.getWallClockTime());
+            ReplicationMetrics::get(opCtx).setParticipantNewTermDates(
+                oplogEntry.getWallClockTime().get(), applyStartTime);
+        }
+
         return Status::OK();
     } else if (OplogEntry::isCrudOpType(opType)) {
         return finishApply(writeConflictRetry(opCtx, "syncApply_CRUD", nss.ns(), [&] {
