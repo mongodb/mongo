@@ -390,7 +390,8 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
     // kill all write operations which are no longer safe to run on step down. Also, operations that
     // have taken global lock in S mode and operations blocked on prepare conflict will be killed to
     // avoid 3-way deadlock between read, prepared transaction and step down thread.
-    AutoGetRstlForStepUpStepDown arsd(this, opCtx.get());
+    AutoGetRstlForStepUpStepDown arsd(
+        this, opCtx.get(), ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown);
     stdx::unique_lock<Latch> lk(_mutex);
 
     // This node has already stepped down due to reconfig. So, signal anyone who is waiting on the
@@ -407,7 +408,6 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
     yieldLocksForPreparedTransactions(opCtx.get());
 
     lk.lock();
-    _updateAndLogStatsOnStepDown(&arsd);
 
     // Clear the node's election candidate metrics since it is no longer primary.
     ReplicationMetrics::get(opCtx.get()).clearElectionCandidateMetrics();
@@ -619,7 +619,8 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
 
         // Primary node will be either unelectable or removed after the configuration change.
         // So, finish the reconfig under RSTL, so that the step down occurs safely.
-        arsd.emplace(this, opCtx.get());
+        arsd.emplace(
+            this, opCtx.get(), ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown);
 
         lk.lock();
         if (_topCoord->isSteppingDownUnconditionally()) {
@@ -633,7 +634,6 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
             yieldLocksForPreparedTransactions(opCtx.get());
 
             lk.lock();
-            _updateAndLogStatsOnStepDown(&arsd.get());
 
             // Clear the node's election candidate metrics since it is no longer primary.
             ReplicationMetrics::get(opCtx.get()).clearElectionCandidateMetrics();

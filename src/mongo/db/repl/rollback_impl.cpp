@@ -267,13 +267,13 @@ bool RollbackImpl::_isInShutdown() const {
     return _inShutdown;
 }
 
-namespace {
-void killAllUserOperations(OperationContext* opCtx) {
+void RollbackImpl::_killAllUserOperations(OperationContext* opCtx) {
     invariant(opCtx);
     ServiceContext* serviceCtx = opCtx->getServiceContext();
     invariant(serviceCtx);
 
     int numOpsKilled = 0;
+    int numOpsRunning = 0;
 
     for (ServiceContext::LockedClientsCursor cursor(serviceCtx); Client* client = cursor.next();) {
         stdx::lock_guard<Client> lk(*client);
@@ -291,12 +291,17 @@ void killAllUserOperations(OperationContext* opCtx) {
         if (toKill && !toKill->isKillPending()) {
             serviceCtx->killOperation(lk, toKill, ErrorCodes::InterruptedDueToReplStateChange);
             numOpsKilled++;
+        } else {
+            numOpsRunning++;
         }
     }
 
-    log() << "Killed {} operation(s) while transitioning to ROLLBACK"_format(numOpsKilled);
+    // Update the metrics for tracking user operations during state transitions.
+    _replicationCoordinator->updateAndLogStateTransitionMetrics(
+        ReplicationCoordinator::OpsKillingStateTransitionEnum::kRollback,
+        numOpsKilled,
+        numOpsRunning);
 }
-}  // namespace
 
 Status RollbackImpl::_transitionToRollback(OperationContext* opCtx) {
     invariant(opCtx);
@@ -312,7 +317,7 @@ Status RollbackImpl::_transitionToRollback(OperationContext* opCtx) {
         // Kill all user operations to ensure we can successfully acquire the RSTL. Since the node
         // must be a secondary, this is only killing readers, whose connections will be closed
         // shortly regardless.
-        killAllUserOperations(opCtx);
+        _killAllUserOperations(opCtx);
 
         rstlLock.waitForLockUntil(Date_t::max());
 

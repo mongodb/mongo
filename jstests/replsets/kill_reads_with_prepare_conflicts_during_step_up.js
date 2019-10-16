@@ -11,7 +11,7 @@
 load("jstests/core/txns/libs/prepare_helpers.js");
 load("jstests/libs/check_log.js");
 
-var rst = new ReplSetTest({nodes: 2});
+const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 
 const config = rst.getReplSetConfig();
@@ -107,6 +107,11 @@ rst.waitForState(secondary, ReplSetTest.State.PRIMARY);
 rst.waitForState(primary, ReplSetTest.State.SECONDARY);
 
 primary = rst.getPrimary();
+
+// Validate that the read operation got killed during step up.
+let replMetrics = assert.commandWorked(primary.adminCommand({serverStatus: 1})).metrics.repl;
+assert.eq(replMetrics.stateTransition.lastStateTransition, "stepUp");
+assert.eq(replMetrics.stateTransition.userOperationsKilled, 1);
 
 // Make sure we can successfully commit the prepared transaction.
 jsTestLog("Restoring shell session state");

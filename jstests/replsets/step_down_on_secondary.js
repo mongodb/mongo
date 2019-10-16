@@ -124,7 +124,8 @@ joinReadThread();
 
 // Validate that the read operation got killed during step down.
 const replMetrics = assert.commandWorked(primary.adminCommand({serverStatus: 1})).metrics.repl;
-assert.eq(replMetrics.stepDown.userOperationsKilled, 1, replMetrics);
+assert.eq(replMetrics.stateTransition.lastStateTransition, "stepDown");
+assert.eq(replMetrics.stateTransition.userOperationsKilled, 1, replMetrics);
 
 jsTestLog("Check nodes have correct data");
 assert.docEq(newPrimary.getDB(dbName)[collName].find({_id: 0}).toArray(), [{_id: 0, b: 1}]);

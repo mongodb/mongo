@@ -12,7 +12,7 @@ load("jstests/core/txns/libs/prepare_helpers.js");
 load("jstests/libs/check_log.js");
 
 // Start one of the nodes with priority: 0 to avoid elections.
-var rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
+const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
 rst.startSet();
 rst.initiate();
 
@@ -84,7 +84,8 @@ rst.waitForState(primary, ReplSetTest.State.SECONDARY);
 
 // Validate that the read operation got killed during step down.
 let replMetrics = assert.commandWorked(primaryAdmin.adminCommand({serverStatus: 1})).metrics.repl;
-assert.eq(replMetrics.stepDown.userOperationsKilled, 1);
+assert.eq(replMetrics.stateTransition.lastStateTransition, "stepDown");
+assert.eq(replMetrics.stateTransition.userOperationsKilled, 1);
 
 // Allow the primary to be re-elected, and wait for it.
 assert.commandWorked(primaryAdmin.adminCommand({replSetFreeze: 0}));

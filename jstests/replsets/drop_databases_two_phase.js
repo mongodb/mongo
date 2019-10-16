@@ -19,6 +19,7 @@
 
 load('jstests/replsets/libs/two_phase_drops.js');  // For TwoPhaseDropCollectionTest.
 load('jstests/libs/check_log.js');
+load("jstests/replsets/rslib.js");
 
 // Returns a list of all collections in a given database. Use 'args' as the
 // 'listCollections' command arguments.
@@ -44,11 +45,6 @@ function listCollectionNames(database, args) {
     return listCollections(database, args).map(c => c.name);
 }
 
-// Sets a fail point on a specified node.
-function setFailPoint(node, failpoint, mode) {
-    assert.commandWorked(node.adminCommand({configureFailPoint: failpoint, mode: mode}));
-}
-
 var dbNameToDrop = 'dbToDrop';
 var replTest = new ReplSetTest({nodes: [{}, {}, {arbiter: true}]});
 
@@ -72,7 +68,7 @@ assert.eq(1, collToDrop.find().itcount());
 // Pause application on secondary so that commit point doesn't advance, meaning that a dropped
 // database on the primary will remain in 'drop-pending' state.
 jsTestLog("Pausing oplog application on the secondary node.");
-setFailPoint(secondary, "rsSyncApplyStop", "alwaysOn");
+setFailPoint(secondary, "rsSyncApplyStop");
 
 // Make sure the collection was created.
 assert.contains(collNameToDrop,
@@ -139,7 +135,7 @@ assert.commandFailedWithCode(dbToDrop.adminCommand('restartCatalog'),
 // Let the secondary apply the collection drop operation, so that the replica set commit point
 // will advance, and the 'Database' phase of the database drop will complete on the primary.
 jsTestLog("Restarting oplog application on the secondary node.");
-setFailPoint(secondary, "rsSyncApplyStop", "off");
+clearFailPoint(secondary, "rsSyncApplyStop");
 
 jsTestLog("Waiting for collection drop operation to replicate to all nodes.");
 replTest.awaitReplication();

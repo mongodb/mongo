@@ -339,6 +339,11 @@ public:
 
     virtual void finishRecoveryIfEligible(OperationContext* opCtx) override;
 
+    virtual void updateAndLogStateTransitionMetrics(
+        const ReplicationCoordinator::OpsKillingStateTransitionEnum stateTransition,
+        const size_t numOpsKilled,
+        const size_t numOpsRunning) const override;
+
     // ================== Test support API ===================
 
     /**
@@ -491,9 +496,11 @@ private:
     // operations (user/system) and aborts stashed running transactions.
     class AutoGetRstlForStepUpStepDown {
     public:
-        AutoGetRstlForStepUpStepDown(ReplicationCoordinatorImpl* repl,
-                                     OperationContext* opCtx,
-                                     Date_t deadline = Date_t::max());
+        AutoGetRstlForStepUpStepDown(
+            ReplicationCoordinatorImpl* repl,
+            OperationContext* opCtx,
+            ReplicationCoordinator::OpsKillingStateTransitionEnum stateTransition,
+            Date_t deadline = Date_t::max());
 
         // Disallows copying.
         AutoGetRstlForStepUpStepDown(const AutoGetRstlForStepUpStepDown&) = delete;
@@ -510,6 +517,16 @@ private:
         void rstlReacquire();
 
         /*
+         * Returns _userOpsKilled value.
+         */
+        size_t getUserOpsKilled() const;
+
+        /*
+         * Increments _userOpsKilled by val.
+         */
+        void incrementUserOpsKilled(size_t val = 1);
+
+        /*
          * Returns _userOpsRunning value.
          */
         size_t getUserOpsRunning() const;
@@ -517,7 +534,7 @@ private:
         /*
          * Increments _userOpsRunning by val.
          */
-        void incrUserOpsRunningBy(size_t val = 1);
+        void incrementUserOpsRunning(size_t val = 1);
 
         /*
          * Returns the step up/step down opCtx.
@@ -570,7 +587,9 @@ private:
         boost::optional<ReplicationStateTransitionLockGuard> _rstlLock;
         // Thread that will run killOpThreadFn().
         std::unique_ptr<stdx::thread> _killOpThread;
-        // Tracks number of operations left running on step down.
+        // Tracks number of operations killed on step up / step down.
+        size_t _userOpsKilled = 0;
+        // Tracks number of operations left running on step up / step down.
         size_t _userOpsRunning = 0;
         // Protects killSignaled and stopKillingOps cond. variable.
         Mutex _mutex = MONGO_MAKE_LATCH("AutoGetRstlForStepUpStepDown::_mutex");
@@ -578,6 +597,9 @@ private:
         stdx::condition_variable _stopKillingOps;
         // Once this is set to true, the killOpThreadFn method will terminate.
         bool _killSignaled = false;
+        // The state transition that is in progress. Should never be set to rollback within this
+        // class.
+        ReplicationCoordinator::OpsKillingStateTransitionEnum _stateTransition;
     };
 
     struct Waiter {
@@ -1045,12 +1067,6 @@ private:
      * Schedules stepdown to run with the global exclusive lock.
      */
     executor::TaskExecutor::EventHandle _stepDownStart();
-
-    /**
-     * Update the "repl.stepDown.userOperationsRunning" counter and log number of operations
-     * killed and left running on step down.
-     */
-    void _updateAndLogStatsOnStepDown(const AutoGetRstlForStepUpStepDown* arsd) const;
 
     /**
      * kill all conflicting operations that are blocked either on prepare conflict or have taken

@@ -940,6 +940,21 @@ public:
      */
     inline static constexpr StringData newPrimaryMsg = "new primary"_sd;
 
+    /*
+     * Specifies the state transitions that kill user operations. Used for tracking state transition
+     * metrics.
+     */
+    enum class OpsKillingStateTransitionEnum { kStepUp, kStepDown, kRollback };
+
+    /**
+     * Updates metrics around user ops when a state transition that kills user ops and select
+     * internal operations occurs (i.e. step up, step down, or rollback). Also logs the metrics.
+     */
+    virtual void updateAndLogStateTransitionMetrics(
+        const ReplicationCoordinator::OpsKillingStateTransitionEnum stateTransition,
+        const size_t numOpsKilled,
+        const size_t numOpsRunning) const = 0;
+
 protected:
     ReplicationCoordinator();
 };

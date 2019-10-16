@@ -5,6 +5,7 @@
 load("jstests/libs/check_log.js");
 load('jstests/libs/parallelTester.js');
 load("jstests/libs/curop_helpers.js");  // for waitForCurOpByFailPoint().
+load("jstests/replsets/rslib.js");
 
 (function() {
 
@@ -80,17 +81,13 @@ checkLog.contains(primary, "Starting to kill user operations");
 
 // Enable "waitAfterCommandFinishesExecution" fail point to make sure the find and get more
 // commands on database 'test' does not complete before step down.
-assert.commandWorked(primaryAdmin.runCommand({
-    configureFailPoint: "waitAfterCommandFinishesExecution",
-    data: {ns: primaryColl.getFullName(), commands: ["find", "getMore"]},
-    mode: "alwaysOn"
-}));
+setFailPoint(primaryAdmin,
+             "waitAfterCommandFinishesExecution",
+             {ns: collNss, commands: ["find", "getMore"]});
 
 jsTestLog("4. Disable fail points");
-assert.commandWorked(
-    primaryAdmin.runCommand({configureFailPoint: "waitInFindBeforeMakingBatch", mode: "off"}));
-assert.commandWorked(primaryAdmin.runCommand(
-    {configureFailPoint: "waitAfterPinningCursorBeforeGetMoreBatch", mode: "off"}));
+clearFailPoint(primaryAdmin, "waitInFindBeforeMakingBatch");
+clearFailPoint(primaryAdmin, "waitAfterPinningCursorBeforeGetMoreBatch");
 
 // Wait until the primary transitioned to SECONDARY state.
 joinStepDownThread();
@@ -99,8 +96,7 @@ rst.waitForState(primary, ReplSetTest.State.SECONDARY);
 // We don't want to check if we have reached "waitAfterCommandFinishesExecution" fail point
 // because we already know that the primary has stepped down successfully. This implies that
 // the find and get more commands are still running even after the node stepped down.
-assert.commandWorked(primaryAdmin.runCommand(
-    {configureFailPoint: "waitAfterCommandFinishesExecution", mode: "off"}));
+clearFailPoint(primaryAdmin, "waitAfterCommandFinishesExecution");
 
 // Wait for find & getmore thread to join.
 joinGetMoreThread();
@@ -113,10 +109,11 @@ assert.docEq([{_id: 0}], getMoreRes.cursor.nextBatch);
 
 // Validate that no operations got killed on step down and no network disconnection happened due
 // to failed unacknowledged operations.
-let replMetrics = assert.commandWorked(primaryAdmin.adminCommand({serverStatus: 1})).metrics.repl;
-assert.eq(replMetrics.stepDown.userOperationsKilled, 0);
+const replMetrics = assert.commandWorked(primaryAdmin.adminCommand({serverStatus: 1})).metrics.repl;
+assert.eq(replMetrics.stateTransition.lastStateTransition, "stepDown");
+assert.eq(replMetrics.stateTransition.userOperationsKilled, 0);
 // Should account for find and getmore commands issued before step down.
-assert.gte(replMetrics.stepDown.userOperationsRunning, 2);
+assert.gte(replMetrics.stateTransition.userOperationsRunning, 2);
 assert.eq(replMetrics.network.notMasterUnacknowledgedWrites, 0);
 
 rst.stopSet();

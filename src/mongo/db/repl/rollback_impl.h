@@ -349,6 +349,12 @@ private:
         OperationContext* opCtx, RollBackLocalOperations::RollbackCommonPoint commonPoint) const;
 
     /**
+     * Kills all user operations currently being performed. Since this node is a secondary, these
+     * operations are all reads.
+     */
+    void _killAllUserOperations(OperationContext* opCtx);
+
+    /**
      * Uses the ReplicationCoordinator to transition the current member state to ROLLBACK.
      * If the transition to ROLLBACK fails, this could mean that we have been elected PRIMARY. In
      * this case, we return a NotSecondary error.
