@@ -41,6 +41,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/map_reduce_agg.h"
 #include "mongo/db/commands/map_reduce_javascript_code.h"
+#include "mongo/db/commands/map_reduce_stats.h"
 #include "mongo/db/commands/mr_common.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -93,6 +94,16 @@ auto makeExpressionContext(OperationContext* opCtx, const MapReduce& parsedMr) {
         uuid);
 }
 
+std::vector<CommonStats> extractStats(const Pipeline& pipeline) {
+    std::vector<CommonStats> pipelineStats;
+
+    for (const auto& stage : pipeline.getSources()) {
+        pipelineStats.push_back(stage->getCommonStats());
+    }
+
+    return pipelineStats;
+}
+
 }  // namespace
 
 bool runAggregationMapReduce(OperationContext* opCtx,
@@ -107,6 +118,8 @@ bool runAggregationMapReduce(OperationContext* opCtx,
         return bab.arr();
     };
 
+    Timer cmdTimer;
+
     auto parsedMr = MapReduce::parse(IDLParserErrorContext("MapReduce"), cmd);
     auto expCtx = makeExpressionContext(opCtx, parsedMr);
     auto runnablePipeline = [&]() {
@@ -115,23 +128,24 @@ bool runAggregationMapReduce(OperationContext* opCtx,
             expCtx, pipeline.release());
     }();
 
+    auto resultArray = exhaustPipelineIntoBSONArray(runnablePipeline);
+
+    MapReduceStats mapReduceStats(extractStats(*runnablePipeline),
+                                  MapReduceStats::ResponseType::kUnsharded,
+                                  boost::get_optional_value_or(parsedMr.getVerbose(), false),
+                                  cmdTimer.millis());
+
     if (parsedMr.getOutOptions().getOutputType() == OutputType::InMemory) {
         map_reduce_output_format::appendInlineResponse(
-            exhaustPipelineIntoBSONArray(runnablePipeline),
-            boost::get_optional_value_or(parsedMr.getVerbose(), false),
-            false,
-            &result);
+            std::move(resultArray), mapReduceStats, &result);
     } else {
-        // For non-inline output, the pipeline should not return any results however getNext() still
-        // needs to be called once to ensure documents are written to the output collection.
-        invariant(!runnablePipeline->getNext());
+        // For output to collection, pipeline execution should not return any results.
+        invariant(resultArray.isEmpty());
 
-        map_reduce_output_format::appendOutResponse(
-            parsedMr.getOutOptions().getDatabaseName(),
-            parsedMr.getOutOptions().getCollectionName(),
-            boost::get_optional_value_or(parsedMr.getVerbose(), false),
-            false,
-            &result);
+        map_reduce_output_format::appendOutResponse(parsedMr.getOutOptions().getDatabaseName(),
+                                                    parsedMr.getOutOptions().getCollectionName(),
+                                                    mapReduceStats,
+                                                    &result);
     }
 
     return true;

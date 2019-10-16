@@ -58,6 +58,8 @@ struct SpecificStats {
 
 // Every stage has CommonStats.
 struct CommonStats {
+    CommonStats() = delete;
+
     CommonStats(const char* type)
         : stageTypeStr(type),
           works(0),
@@ -103,10 +105,6 @@ struct CommonStats {
 
     bool failed;
     bool isEOF;
-
-private:
-    // Default constructor is illegal.
-    CommonStats();
 };
 
 // The universal container for a stage's stats.

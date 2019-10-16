@@ -113,12 +113,13 @@ auto translateFinalize(boost::intrusive_ptr<ExpressionContext> expCtx, std::stri
                 ExpressionFieldPath::parse(expCtx, "$value", expCtx->variablesParseState))),
         code);
     auto node = std::make_unique<parsed_aggregation_projection::InclusionNode>(
-        ProjectionPolicies{ProjectionPolicies::DefaultIdPolicy::kExcludeId});
+        ProjectionPolicies{ProjectionPolicies::DefaultIdPolicy::kIncludeId});
+    node->addProjectionForPath(FieldPath{"_id"s});
     node->addExpressionForPath(FieldPath{"value"s}, std::move(jsExpression));
     auto inclusion = std::unique_ptr<TransformerInterface>{
         std::make_unique<parsed_aggregation_projection::ParsedInclusionProjection>(
             expCtx,
-            ProjectionPolicies{ProjectionPolicies::DefaultIdPolicy::kExcludeId},
+            ProjectionPolicies{ProjectionPolicies::DefaultIdPolicy::kIncludeId},
             std::move(node))};
     return make_intrusive<DocumentSourceSingleDocumentTransformation>(
         expCtx, std::move(inclusion), DocumentSourceProject::kStageName, false);

@@ -193,6 +193,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     }
 
     auto aggResults = tempResults.done();
+    // TODO SERVER-43290: Add support for cluster MapReduce statistics.
     if (parsedMr.getOutOptions().getOutputType() == OutputType::InMemory) {
         // If the inline results could not fit into a single batch, then kill the remote
         // operation(s) and return an error since mapReduce does not support a cursor-style
@@ -209,17 +210,13 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                 bab.append(elem.embeddedObject());
             return bab.arr();
         }();
-        map_reduce_output_format::appendInlineResponse(std::move(exhaustedResults),
-                                                       parsedMr.getVerbose().get_value_or(false),
-                                                       true,  // inMongos
-                                                       &result);
+        map_reduce_output_format::appendInlineResponse(
+            std::move(exhaustedResults), MapReduceStats::createForTest(), &result);
     } else {
-        map_reduce_output_format::appendOutResponse(
-            parsedMr.getOutOptions().getDatabaseName(),
-            parsedMr.getOutOptions().getCollectionName(),
-            boost::get_optional_value_or(parsedMr.getVerbose(), false),
-            true,  // inMongos
-            &result);
+        map_reduce_output_format::appendOutResponse(parsedMr.getOutOptions().getDatabaseName(),
+                                                    parsedMr.getOutOptions().getCollectionName(),
+                                                    MapReduceStats::createForTest(),
+                                                    &result);
     }
 
     return true;

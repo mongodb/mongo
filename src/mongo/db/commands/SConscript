@@ -504,16 +504,27 @@ env.Library(
 )
 
 env.Library(
+    target='map_reduce_stats',
+    source=[
+        'map_reduce_stats.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/pipeline/pipeline',
+    ]
+)
+
+env.Library(
     target='map_reduce_agg',
     source=[
         'map_reduce_agg.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/db/commands/map_reduce_stats',
         '$BUILD_DIR/mongo/db/commands/servers',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/pipeline/mongo_process_interface',
         '$BUILD_DIR/mongo/db/query/map_reduce_output_format',
+        '$BUILD_DIR/mongo/idl/idl_parser',
         'map_reduce_parser'
     ]
 )
@@ -540,6 +551,7 @@ env.CppUnitTest(
     source=[
         "map_reduce_agg_test.cpp",
         "map_reduce_parse_test.cpp",
+        "map_reduce_stats_test.cpp",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',

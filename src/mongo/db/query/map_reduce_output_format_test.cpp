@@ -45,129 +45,58 @@ TEST(MapReduceOutputFormat, FormatInlineMapReduceResponse) {
     BSONArrayBuilder documents;
     documents.append(BSON("a" << 1));
     documents.append(BSON("b" << 1));
+
     BSONObjBuilder builder;
-    map_reduce_output_format::appendInlineResponse(documents.arr(), false, false, &builder);
+    map_reduce_output_format::appendInlineResponse(
+        documents.arr(), MapReduceStats::createForTest(), &builder);
     ASSERT_BSONOBJ_EQ(fromjson("{results: [{a: 1}, {b: 1}],"
                                "timeMillis: 0,"
-                               "counts: {input: 0, emit: 0, reduce: 0, output: 0},"
-                               "ok: 1}"),
+                               "counts: {input: 0, emit: 0, output: 0}}"),
+                      builder.obj());
+}
+
+TEST(MapReduceOutputFormat, FormatVerboseInlineMapReduceResponse) {
+    BSONArrayBuilder documents;
+    documents.append(BSON("a" << 1));
+    documents.append(BSON("b" << 1));
+
+    BSONObjBuilder builder;
+    map_reduce_output_format::appendInlineResponse(
+        documents.arr(), MapReduceStats::createForTest(), &builder);
+    ASSERT_BSONOBJ_EQ(fromjson("{results: [{a: 1}, {b: 1}],"
+                               "timeMillis: 0,"
+                               "counts: {input: 0, emit: 0, output: 0}}"),
                       builder.obj());
 }
 
 TEST(MapReduceOutputFormat, FormatEmptyInlineMapReduceResponse) {
     BSONArrayBuilder documents;
     BSONObjBuilder builder;
-    map_reduce_output_format::appendInlineResponse(documents.arr(), false, false, &builder);
+    map_reduce_output_format::appendInlineResponse(
+        documents.arr(), MapReduceStats::createForTest(), &builder);
     ASSERT_BSONOBJ_EQ(fromjson("{results: [],"
                                "timeMillis: 0,"
-                               "counts: {input: 0, emit: 0, reduce: 0, output: 0},"
-                               "ok: 1}"),
+                               "counts: {input: 0, emit: 0, output: 0}}"),
                       builder.obj());
 }
 
 TEST(MapReduceOutputFormat, FormatNonInlineMapReduceResponseWithoutDb) {
     BSONObjBuilder builder;
-    map_reduce_output_format::appendOutResponse(boost::none, "c", false, false, &builder);
+    map_reduce_output_format::appendOutResponse(
+        boost::none, "c", MapReduceStats::createForTest(), &builder);
     ASSERT_BSONOBJ_EQ(fromjson("{result: \"c\","
                                "timeMillis: 0,"
-                               "counts: {input: 0, emit: 0, reduce: 0, output: 0},"
-                               "ok: 1}"),
+                               "counts: {input: 0, emit: 0, output: 0}}"),
                       builder.obj());
 }
 
 TEST(MapReduceOutputFormat, FormatNonInlineMapReduceResponseWithDb) {
     BSONObjBuilder builder;
-    map_reduce_output_format::appendOutResponse("db"s, "c", false, false, &builder);
+    map_reduce_output_format::appendOutResponse(
+        "db"s, "c", MapReduceStats::createForTest(), &builder);
     ASSERT_BSONOBJ_EQ(fromjson("{result: {db: \"db\", collection: \"c\"},"
                                "timeMillis: 0,"
-                               "counts: {input: 0, emit: 0, reduce: 0, output: 0},"
-                               "ok: 1}"),
-                      builder.obj());
-}
-
-TEST(MapReduceOutputFormat, FormatVerboseMapReduceResponse) {
-    BSONObjBuilder builder;
-    map_reduce_output_format::appendOutResponse(boost::none, "c", true, false, &builder);
-    ASSERT_BSONOBJ_EQ(fromjson("{result: \"c\","
-                               "timeMillis: 0,"
-                               "timing: {mapTime: 0, emitLoop: 0, reduceTime: 0, total: 0},"
-                               "counts: {input: 0, emit: 0, reduce: 0, output: 0},"
-                               "ok: 1}"),
-                      builder.obj());
-}
-
-TEST(MapReduceOutputFormat, FormatInlineClusterMapReduceResponse) {
-    BSONArrayBuilder documents;
-    documents.append(BSON("a" << 1));
-    documents.append(BSON("b" << 1));
-    BSONObjBuilder builder;
-    map_reduce_output_format::appendInlineResponse(documents.arr(), false, true, &builder);
-    ASSERT_BSONOBJ_EQ(fromjson("{results: [{a: 1}, {b: 1}], "
-                               "counts: {input: 0, emit: 0, reduce: 0, output: 0}, "
-                               "timeMillis: 0, "
-                               "shardCounts: {"
-                               "\"shard-conn-string\": {input: 0, emit: 0, reduce: 0, output: 0}}, "
-                               "postProcessCounts: {"
-                               "\"merging-shard-conn-string\": {input: 0, reduce: 0, output: 0}},"
-                               "ok: 1}"),
-                      builder.obj());
-}
-
-TEST(MapReduceOutputFormat, FormatEmptyInlineClusterMapReduceResponse) {
-    BSONArrayBuilder documents;
-    BSONObjBuilder builder;
-    map_reduce_output_format::appendInlineResponse(documents.arr(), false, true, &builder);
-    ASSERT_BSONOBJ_EQ(fromjson("{results: [],"
-                               "counts: {input: 0, emit: 0, reduce: 0, output: 0},"
-                               "timeMillis: 0,"
-                               "shardCounts: {"
-                               "\"shard-conn-string\": {input: 0, emit: 0, reduce: 0, output: 0}}, "
-                               "postProcessCounts: {"
-                               "\"merging-shard-conn-string\": {input: 0, reduce: 0, output: 0}},"
-                               "ok: 1}"),
-                      builder.obj());
-}
-
-TEST(MapReduceOutputFormat, FormatNonInlineClusterMapReduceResponseWithoutDb) {
-    BSONObjBuilder builder;
-    map_reduce_output_format::appendOutResponse(boost::none, "c", false, true, &builder);
-    ASSERT_BSONOBJ_EQ(fromjson("{result: \"c\","
-                               "counts: {input: 0, emit: 0, reduce: 0, output: 0},"
-                               "timeMillis: 0,"
-                               "shardCounts: {"
-                               "\"shard-conn-string\": {input: 0, emit: 0, reduce: 0, output: 0}}, "
-                               "postProcessCounts: {"
-                               "\"merging-shard-conn-string\": {input: 0, reduce: 0, output: 0}},"
-                               "ok: 1}"),
-                      builder.obj());
-}
-
-TEST(MapReduceOutputFormat, FormatNonInlineClusterMapReduceResponseWithDb) {
-    BSONObjBuilder builder;
-    map_reduce_output_format::appendOutResponse("db"s, "c", false, true, &builder);
-    ASSERT_BSONOBJ_EQ(fromjson("{result: {db: \"db\", collection: \"c\"},"
-                               "counts: {input: 0, emit: 0, reduce: 0, output: 0},"
-                               "timeMillis: 0,"
-                               "shardCounts: {"
-                               "\"shard-conn-string\": {input: 0, emit: 0, reduce: 0, output: 0}}, "
-                               "postProcessCounts: {"
-                               "\"merging-shard-conn-string\": {input: 0, reduce: 0, output: 0}},"
-                               "ok: 1}"),
-                      builder.obj());
-}
-
-TEST(MapReduceOutputFormat, FormatVerboseClusterMapReduceResponse) {
-    BSONObjBuilder builder;
-    map_reduce_output_format::appendOutResponse(boost::none, "c", true, true, &builder);
-    ASSERT_BSONOBJ_EQ(fromjson("{result: \"c\","
-                               "counts: {input: 0, emit: 0, reduce: 0, output: 0},"
-                               "timeMillis: 0,"
-                               "timing: {shardProcessing: 0, postProcessing: 0},"
-                               "shardCounts: {"
-                               "\"shard-conn-string\": {input: 0, emit: 0, reduce: 0, output: 0}}, "
-                               "postProcessCounts: {"
-                               "\"merging-shard-conn-string\": {input: 0, reduce: 0, output: 0}},"
-                               "ok: 1}"),
+                               "counts: {input: 0, emit: 0, output: 0}}"),
                       builder.obj());
 }
 

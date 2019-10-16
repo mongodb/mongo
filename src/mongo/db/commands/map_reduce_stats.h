@@ -29,25 +29,67 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
+#include <vector>
 
-#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/commands/map_reduce_gen.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/exec/plan_stats.h"
 
-namespace mongo::map_reduce_agg {
+namespace mongo {
 
 /**
- * Executes a mapReduce command against a replica set/standalone.
+ * Responsible for building the set of statistics required for a MapReduce command response and
+ * appending to a response message.
  */
-bool runAggregationMapReduce(OperationContext* opCtx,
-                             const std::string& dbname,
-                             const BSONObj& cmd,
-                             std::string& errmsg,
-                             BSONObjBuilder& result);
+class MapReduceStats {
+public:
+    /**
+     * The mapReduce command response format differs when run against a sharded vs unsharded
+     * collection.
+     */
+    enum class ResponseType {
+        kUnsharded,
+        kSharded,
+    };
 
-}  // namespace mongo::map_reduce_agg
+    MapReduceStats(const std::vector<CommonStats>& stageStatistics,
+                   ResponseType responseType,
+                   bool verbose,
+                   int executionTime);
+
+    void appendStats(BSONObjBuilder* resultBuilder) const;
+
+    /**
+     * Creates a dummy MapReduceStats instance for use in unit testing.
+     */
+    static MapReduceStats createForTest() {
+        return MapReduceStats();
+    }
+
+private:
+    struct StageCounts {
+        size_t input = 0;
+        size_t emit = 0;
+        size_t output = 0;
+    } _counts;
+
+    struct StageTiming {
+        long long map = 0;
+        long long reduce = 0;
+    } _timing;
+
+    MapReduceStats() = default;
+
+    void appendCounts(BSONObjBuilder* resultBuilder) const;
+
+    void appendTiming(BSONObjBuilder* resultBuilder) const;
+
+    void appendShardCounts(BSONObjBuilder* resultBuilder) const;
+
+    void appendPostProcessCounts(BSONObjBuilder* resultBuilder) const;
+
+    const ResponseType _responseType = ResponseType::kUnsharded;
+    const bool _verbose = false;
+    const int _executionTime = 0;
+};
+
+}  // namespace mongo

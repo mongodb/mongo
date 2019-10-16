@@ -29,62 +29,28 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/commands/map_reduce_stats.h"
 #include "mongo/db/query/map_reduce_output_format.h"
 
 namespace mongo::map_reduce_output_format {
 
-namespace {
-
-void appendMetadataFields(bool verbose, bool inMongos, BSONObjBuilder* resultBuilder) {
-    // TODO: SERVER-42644 Build stats (encapsulate in functions!).
-    if (inMongos)
-        resultBuilder->append("counts",
-                              BSON("input" << 0 << "emit" << 0 << "reduce" << 0 << "output" << 0));
-
-    resultBuilder->append("timeMillis", 0);
-
-    if (verbose) {
-        auto&& timingField = inMongos
-            ? BSON("shardProcessing" << 0 << "postProcessing" << 0)
-            : BSON("mapTime" << 0 << "emitLoop" << 0 << "reduceTime" << 0 << "total" << 0);
-        resultBuilder->append("timing", timingField);
-    }
-
-    if (inMongos) {
-        resultBuilder->append(
-            "shardCounts",
-            BSON("shard-conn-string"
-                 << BSON("input" << 0 << "emit" << 0 << "reduce" << 0 << "output" << 0)));
-        resultBuilder->append("postProcessCounts",
-                              BSON("merging-shard-conn-string"
-                                   << BSON("input" << 0 << "reduce" << 0 << "output" << 0)));
-    } else {
-        resultBuilder->append("counts",
-                              BSON("input" << 0 << "emit" << 0 << "reduce" << 0 << "output" << 0));
-    }
-
-    resultBuilder->append("ok", 1);
-}
-
-}  // namespace
-
 void appendInlineResponse(BSONArray&& documents,
-                          bool verbose,
-                          bool inMongos,
+                          const MapReduceStats& mapReduceStats,
                           BSONObjBuilder* resultBuilder) {
     resultBuilder->appendArray("results", documents);
-    appendMetadataFields(verbose, inMongos, resultBuilder);
+    mapReduceStats.appendStats(resultBuilder);
 }
 
 void appendOutResponse(boost::optional<std::string> outDb,
                        std::string outColl,
-                       bool verbose,
-                       bool inMongos,
+                       const MapReduceStats& mapReduceStats,
                        BSONObjBuilder* resultBuilder) {
-    if (!outDb)
-        resultBuilder->append("result", outColl);
-    else
+    if (outDb) {
         resultBuilder->append("result", BSON("db" << *outDb << "collection" << outColl));
-    appendMetadataFields(verbose, inMongos, resultBuilder);
+    } else {
+        resultBuilder->append("result", outColl);
+    }
+
+    mapReduceStats.appendStats(resultBuilder);
 }
 }  // namespace mongo::map_reduce_output_format

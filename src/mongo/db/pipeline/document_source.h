@@ -272,6 +272,13 @@ public:
     }
 
     /**
+     * Get the CommonStats for this DocumentSource.
+     */
+    const CommonStats& getCommonStats() const {
+        return _commonStats;
+    }
+
+    /**
      * Get the stage's name.
      */
     virtual const char* getSourceName() const;
