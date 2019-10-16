@@ -40,7 +40,6 @@
 #include "mongo/util/log.h"
 #include "mongo/util/net/http_client.h"
 #include "mongo/util/net/socket_utils.h"
-#include "mongo/util/ramlog.h"
 #include "mongo/util/version.h"
 
 namespace mongo {
@@ -141,18 +140,6 @@ public:
         }
 
         // --- some hard coded global things hard to pull out
-
-        {
-            RamLog::LineIterator rl(RamLog::get("warnings"));
-            if (rl.lastWrite() >=
-                time(nullptr) - (10 * 60)) {  // only show warnings from last 10 minutes
-                BSONArrayBuilder arr(result.subarrayStart("warnings"));
-                while (rl.more()) {
-                    arr.append(rl.next());
-                }
-                arr.done();
-            }
-        }
 
         auto runElapsed = clock->now() - runStart;
         timeBuilder.appendNumber("at end", durationCount<Milliseconds>(runElapsed));

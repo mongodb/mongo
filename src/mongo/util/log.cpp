@@ -101,7 +101,6 @@ void setPlainConsoleLogger() {
             std::make_unique<logger::MessageEventUnadornedEncoder>()));
 }
 
-Tee* const warnings = RamLog::get("warnings");  // Things put here go in serverStatus
 Tee* const startupWarningsLog = RamLog::get("startupWarnings");  // intentionally leaked
 
 }  // namespace mongo

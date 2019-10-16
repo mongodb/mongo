@@ -37,6 +37,7 @@
 #include "mongo/db/commands/shutdown.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/log_process_details.h"
+#include "mongo/logv2/ramlog.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point.h"
@@ -51,9 +52,6 @@
 
 namespace mongo {
 namespace {
-
-using std::string;
-using std::vector;
 
 class FeaturesCmd : public BasicCommand {
 public:
@@ -71,7 +69,7 @@ public:
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) const {}  // No auth required
     virtual bool run(OperationContext* opCtx,
-                     const string& ns,
+                     const std::string& ns,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         if (getGlobalScriptEngine()) {
@@ -112,7 +110,7 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         ProcessInfo p;
@@ -165,7 +163,7 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
     virtual bool run(OperationContext* opCtx,
-                     const string&,
+                     const std::string&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         result.append("argv", serverGlobalParams.argvArray);
@@ -195,7 +193,7 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
     virtual bool run(OperationContext* opCtx,
-                     const string& ns,
+                     const std::string& ns,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         bool didRotate = rotateLogs(serverGlobalParams.logRenameOnRotate, serverGlobalParams.logV2);
@@ -230,11 +228,23 @@ public:
         return "{ getLog : '*' }  OR { getLog : 'global' }";
     }
 
-    virtual bool errmsgRun(OperationContext* opCtx,
-                           const string& dbname,
-                           const BSONObj& cmdObj,
-                           string& errmsg,
-                           BSONObjBuilder& result) {
+    bool errmsgRun(OperationContext* opCtx,
+                   const std::string& dbname,
+                   const BSONObj& cmdObj,
+                   std::string& errmsg,
+                   BSONObjBuilder& result) override {
+        if (serverGlobalParams.logV2) {
+            return errmsgRunImpl<logv2::RamLog>(opCtx, dbname, cmdObj, errmsg, result);
+        }
+        return errmsgRunImpl<RamLog>(opCtx, dbname, cmdObj, errmsg, result);
+    }
+
+    template <typename RamLogType>
+    bool errmsgRunImpl(OperationContext* opCtx,
+                       const std::string& dbname,
+                       const BSONObj& cmdObj,
+                       std::string& errmsg,
+                       BSONObjBuilder& result) {
         BSONElement val = cmdObj.firstElement();
         if (val.type() != String) {
             uasserted(ErrorCodes::TypeMismatch,
@@ -242,10 +252,10 @@ public:
                                     << val.toString(false) << " of type " << typeName(val.type()));
         }
 
-        string p = val.String();
+        std::string p = val.String();
         if (p == "*") {
-            vector<string> names;
-            RamLog::getNames(names);
+            std::vector<std::string> names;
+            RamLogType::getNames(names);
 
             BSONArrayBuilder arr;
             for (unsigned i = 0; i < names.size(); i++) {
@@ -254,12 +264,12 @@ public:
 
             result.appendArray("names", arr.arr());
         } else {
-            RamLog* ramlog = RamLog::getIfExists(p);
+            RamLogType* ramlog = RamLogType::getIfExists(p);
             if (!ramlog) {
                 errmsg = str::stream() << "no RamLog named: " << p;
                 return false;
             }
-            RamLog::LineIterator rl(ramlog);
+            typename RamLogType::LineIterator rl(ramlog);
 
             result.appendNumber("totalLinesWritten", rl.getTotalLinesWritten());
 
@@ -298,7 +308,7 @@ public:
     }
 
     virtual bool run(OperationContext* opCtx,
-                     const string& dbname,
+                     const std::string& dbname,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         std::string logName;
@@ -308,9 +318,15 @@ public:
         if (logName != "global") {
             uasserted(ErrorCodes::InvalidOptions, "Only the 'global' log can be cleared");
         }
-        RamLog* ramlog = RamLog::getIfExists(logName);
-        invariant(ramlog);
-        ramlog->clear();
+        auto clearRamlog = [&](auto* ramlog) {
+            invariant(ramlog);
+            ramlog->clear();
+        };
+        if (serverGlobalParams.logV2) {
+            clearRamlog(logv2::RamLog::getIfExists(logName));
+        } else {
+            clearRamlog(RamLog::getIfExists(logName));
+        }
         return true;
     }
 };

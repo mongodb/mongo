@@ -93,6 +93,10 @@ public:
      */
     void write(const std::string& str);
 
+    const std::string& getName() const {
+        return _name;
+    };
+
     /**
      * Empties out the RamLog.
      */

@@ -35,9 +35,28 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_detail.h"
 #include "mongo/logv2/log_domain.h"
+#include "mongo/logv2/log_tag.h"
 
 namespace mongo {
 namespace logger {
+
+
+namespace {
+
+auto findTeeTag(StringData teeName) {
+    static constexpr std::pair<StringData, logv2::LogTag::Value> kTees[] = {
+        {"rs"_sd, logv2::LogTag::kRS},
+        {"startupWarnings"_sd, logv2::LogTag::kStartupWarnings},
+    };
+    if (teeName.empty())
+        return logv2::LogTag::kNone;
+    for (auto&& e : kTees)
+        if (e.first == teeName)
+            return e.second;
+    MONGO_UNREACHABLE;
+}
+
+}  // namespace
 
 /**
  * Appender for writing to a logv2 domain
@@ -51,6 +70,9 @@ public:
     explicit LogV2Appender(logv2::LogDomain* domain) : _domain(domain) {}
 
     Status append(const Event& event) override {
+
+        auto logTagValue = findTeeTag(event.getTeeName());
+
         logv2::detail::doLog(
 
             // We need to cast from the v1 logging severity to the equivalent v2 severity
@@ -62,7 +84,7 @@ public:
                                   static_cast<std::underlying_type_t<LogComponent::Value>>(
                                       static_cast<LogComponent::Value>(event.getComponent())))),
                               _domain,
-                              logv2::LogTag{}},
+                              logv2::LogTag{logTagValue}},
 
             // stable id doesn't exist in logv1
             StringData{},

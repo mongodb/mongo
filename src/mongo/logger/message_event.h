@@ -64,11 +64,17 @@ public:
           _contextName(contextName),
           _message(message) {}
 
+    void setTeeName(StringData tee) {
+        _teeName = tee;
+    }
     MessageEventEphemeral& setIsTruncatable(bool value) {
         _isTruncatable = value;
         return *this;
     }
 
+    StringData getTeeName() const {
+        return _teeName;
+    }
     Date_t getDate() const {
         return _date;
     }
@@ -95,6 +101,7 @@ private:
     StringData _contextName;
     StringData _message;
     bool _isTruncatable = true;
+    StringData _teeName;
 };
 
 }  // namespace logger

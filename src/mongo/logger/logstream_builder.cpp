@@ -33,9 +33,11 @@
 
 #include <memory>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
+#include "mongo/logger/ramlog.h"
 #include "mongo/logger/tee.h"
 #include "mongo/util/assert_util.h"  // TODO: remove apple dep for this in threadlocal.h
 #include "mongo/util/time_support.h"
@@ -94,6 +96,9 @@ LogstreamBuilder::~LogstreamBuilder() {
         MessageEventEphemeral message(
             Date_t::now(), _severity, _component, _contextName, _baseMessage);
         message.setIsTruncatable(_isTruncatable);
+        if (_tee) {
+            message.setTeeName(checked_cast<RamLog*>(_tee)->getName());
+        }
         _domain->append(message).transitional_ignore();
         if (_tee) {
             _os->str("");

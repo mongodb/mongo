@@ -36,7 +36,18 @@ namespace mongo {
 namespace logv2 {
 class LogTag {
 public:
-    enum Value { kNone = 0, kStartupWarnings = 1 << 0, kJavascript = 1 << 1 };
+    enum Value {
+        kNone = 0,
+
+        // replica set ramlog
+        kRS = 1 << 0,
+
+        // startupWarnings ramlog
+        kStartupWarnings = 1 << 1,
+
+        // representing the logv1 javascriptOutput domain
+        kJavascript = 1 << 2,
+    };
 
     LogTag() : _value(kNone) {}
     /* implicit */ LogTag(Value value) {
