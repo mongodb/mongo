@@ -325,6 +325,9 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
     int bytesBuffered = 0;
 
+    // This loop will not result in actually calling getMore against shards, but just loading
+    // results from the initial batches (that were obtained while establishing cursors) into
+    // 'results'.
     while (!FindCommon::enoughForFirstBatch(query.getQueryRequest(), results->size())) {
         auto next = uassertStatusOK(ccc->next(RouterExecStage::ExecContext::kInitialFind));
 
