@@ -57,26 +57,36 @@ public:
      * Sets _waitOnPrepareConflict to true after a read thread hits a WT_PREPARE_CONFLICT
      * error code.
      */
-    void beginPrepareConflict();
+    void beginPrepareConflict(OperationContext* opCtx);
 
     /**
      * Sets _waitOnPrepareConflict to false after wiredTigerPrepareConflictRetry returns,
      * implying that the read thread is not blocked on a prepare conflict.
      */
-    void endPrepareConflict();
+    void endPrepareConflict(OperationContext* opCtx);
 
     /**
      * Returns the total duration of time spent blocked on prepare conflicts.
      */
-    unsigned long long getPrepareConflictDuration();
+    Microseconds getPrepareConflictDuration();
 
 private:
     /**
      * Set to true when a read operation is currently blocked on a prepare conflict.
      */
     AtomicWord<bool> _waitOnPrepareConflict{false};
-    unsigned long long _prepareConflictStartTime{0};
-    unsigned long long _prepareConflictDuration{0};
+
+    /**
+     * Multiple prepare read conflicts can be hit during the life time of the prepare conflict
+     * tracker. _prepareConflictStartTime indicates the most recent time a block started due to a
+     * prepare read conflict.
+     */
+    TickSource::Tick _prepareConflictStartTime{0};
+
+    /**
+     * Stores the total amount of time spent blocked on prepare read conflicts.
+     */
+    Microseconds _prepareConflictDuration{0};
 };
 
 }  // namespace mongo

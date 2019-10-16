@@ -456,8 +456,11 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
         }
 
         // Gets the time spent blocked on prepare conflicts.
-        _debug.prepareConflictDurationMicros =
+        auto prepareConflictDurationMicros =
             PrepareConflictTracker::get(opCtx).getPrepareConflictDuration();
+        _debug.prepareConflictDurationMillis =
+            duration_cast<Milliseconds>(prepareConflictDurationMicros);
+
         log(component) << _debug.report(opCtx, (lockerInfo ? &lockerInfo->stats : nullptr));
     }
 
@@ -689,8 +692,8 @@ string OpDebug::report(OperationContext* opCtx, const SingleThreadedLockStats* l
         s << " planSummary: " << curop.getPlanSummary().toString();
     }
 
-    if (prepareConflictDurationMicros > 0) {
-        s << " prepareConflictDuration: " << (prepareConflictDurationMicros / 1000) << "ms";
+    if (prepareConflictDurationMillis > Milliseconds::zero()) {
+        s << " prepareConflictDuration: " << prepareConflictDurationMillis;
     }
 
     OPDEBUG_TOSTRING_HELP(nShards);

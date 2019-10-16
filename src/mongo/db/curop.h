@@ -227,7 +227,7 @@ public:
     int nShards{-1};
 
     // Stores the duration of time spent blocked on prepare conflicts.
-    unsigned long long prepareConflictDurationMicros{0};
+    Milliseconds prepareConflictDurationMillis{0};
 
     // Stores additive metrics.
     AdditiveMetrics additiveMetrics;

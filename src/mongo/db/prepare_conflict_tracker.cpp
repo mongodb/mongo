@@ -39,23 +39,29 @@ bool PrepareConflictTracker::isWaitingOnPrepareConflict() const {
     return _waitOnPrepareConflict.load();
 }
 
-void PrepareConflictTracker::beginPrepareConflict() {
+void PrepareConflictTracker::beginPrepareConflict(OperationContext* opCtx) {
     invariant(_prepareConflictStartTime == 0);
-    _prepareConflictStartTime = curTimeMicros64();
+    _prepareConflictStartTime = opCtx->getServiceContext()->getTickSource()->getTicks();
 
     // Implies that the current read operation is blocked on a prepared transaction.
     _waitOnPrepareConflict.store(true);
 }
 
-void PrepareConflictTracker::endPrepareConflict() {
+void PrepareConflictTracker::endPrepareConflict(OperationContext* opCtx) {
     // This function is called regardless whether there was a prepare conflict.
-    if (_prepareConflictStartTime > 0) {
-        auto curTimeMicros = curTimeMicros64();
-        invariant(_prepareConflictStartTime <= curTimeMicros,
-                  str::stream() << "Prepare conflict start time (" << _prepareConflictStartTime
-                                << ") is somehow greater than current time (" << curTimeMicros
-                                << ")");
-        _prepareConflictDuration += curTimeMicros - _prepareConflictStartTime;
+    if (_prepareConflictStartTime) {
+        auto tickSource = opCtx->getServiceContext()->getTickSource();
+        auto curTick = tickSource->getTicks();
+
+        invariant(_prepareConflictStartTime <= curTick,
+                  str::stream() << "Prepare conflict start time ("
+                                << tickSource->ticksTo<Microseconds>(_prepareConflictStartTime)
+                                << ") is somehow greater than current time ("
+                                << tickSource->ticksTo<Microseconds>(curTick) << ")");
+
+        auto curConflictDuration =
+            tickSource->ticksTo<Microseconds>(curTick - _prepareConflictStartTime);
+        _prepareConflictDuration += curConflictDuration;
     }
     _prepareConflictStartTime = 0;
 
@@ -63,7 +69,7 @@ void PrepareConflictTracker::endPrepareConflict() {
     _waitOnPrepareConflict.store(false);
 }
 
-unsigned long long PrepareConflictTracker::getPrepareConflictDuration() {
+Microseconds PrepareConflictTracker::getPrepareConflictDuration() {
     return _prepareConflictDuration;
 }
 
