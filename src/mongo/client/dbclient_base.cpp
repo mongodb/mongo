@@ -319,7 +319,7 @@ bool DBClientBase::runPseudoCommand(StringData db,
     return success;
 }
 
-unsigned long long DBClientBase::count(
+long long DBClientBase::count(
     const NamespaceStringOrUUID nsOrUuid, const BSONObj& query, int options, int limit, int skip) {
     auto dbName = (nsOrUuid.uuid() ? nsOrUuid.dbname() : (*nsOrUuid.nss()).db().toString());
     BSONObj cmd = _countCmd(nsOrUuid, query, options, limit, skip);

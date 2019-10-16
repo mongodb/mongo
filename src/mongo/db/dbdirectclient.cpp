@@ -172,7 +172,7 @@ unique_ptr<DBClientCursor> DBDirectClient::query(const NamespaceStringOrUUID& ns
         nsOrUuid, query, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize);
 }
 
-unsigned long long DBDirectClient::count(
+long long DBDirectClient::count(
     const NamespaceStringOrUUID nsOrUuid, const BSONObj& query, int options, int limit, int skip) {
     DirectClientScope directClientScope(_opCtx);
     BSONObj cmdObj = _countCmd(nsOrUuid, query, options, limit, skip);

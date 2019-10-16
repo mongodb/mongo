@@ -351,11 +351,11 @@ public:
     /** count number of objects in collection ns that match the query criteria specified
         throws UserAssertion if database returns an error
     */
-    virtual unsigned long long count(NamespaceStringOrUUID nsOrUuid,
-                                     const BSONObj& query = BSONObj(),
-                                     int options = 0,
-                                     int limit = 0,
-                                     int skip = 0);
+    virtual long long count(NamespaceStringOrUUID nsOrUuid,
+                            const BSONObj& query = BSONObj(),
+                            int options = 0,
+                            int limit = 0,
+                            int skip = 0);
 
     static std::string createPasswordDigest(const std::string& username,
                                             const std::string& clearTextPassword);
