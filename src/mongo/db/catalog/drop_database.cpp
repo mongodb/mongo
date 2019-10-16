@@ -54,8 +54,8 @@
 
 namespace mongo {
 
-MONGO_FAIL_POINT_DEFINE(dropDatabaseHangBeforeLog);
 MONGO_FAIL_POINT_DEFINE(dropDatabaseHangAfterAllCollectionsDrop);
+MONGO_FAIL_POINT_DEFINE(dropDatabaseHangBeforeInMemoryDrop);
 
 namespace {
 
@@ -78,24 +78,23 @@ void _finishDropDatabase(OperationContext* opCtx,
     BackgroundOperation::assertNoBgOpInProgForDb(dbName);
     IndexBuildsCoordinator::get(opCtx)->assertNoBgOpInProgForDb(dbName);
 
+    writeConflictRetry(opCtx, "dropDatabase_database", dbName, [&] {
+        WriteUnitOfWork wunit(opCtx);
+        opCtx->getServiceContext()->getOpObserver()->onDropDatabase(opCtx, dbName);
+        wunit.commit();
+    });
+
+    if (MONGO_FAIL_POINT(dropDatabaseHangBeforeInMemoryDrop)) {
+        log() << "dropDatabase - fail point dropDatabaseHangBeforeInMemoryDrop enabled.";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(dropDatabaseHangBeforeInMemoryDrop);
+    }
+
     auto databaseHolder = DatabaseHolder::get(opCtx);
     databaseHolder->dropDb(opCtx, db);
     dropPendingGuard.dismiss();
 
     log() << "dropDatabase " << dbName << " - dropped " << numCollections << " collection(s)";
     log() << "dropDatabase " << dbName << " - finished";
-
-    if (MONGO_FAIL_POINT(dropDatabaseHangBeforeLog)) {
-        log() << "dropDatabase - fail point dropDatabaseHangBeforeLog enabled. "
-                 "Blocking until fail point is disabled. ";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(dropDatabaseHangBeforeLog);
-    }
-
-    writeConflictRetry(opCtx, "dropDatabase_database", dbName, [&] {
-        WriteUnitOfWork wunit(opCtx);
-        getGlobalServiceContext()->getOpObserver()->onDropDatabase(opCtx, dbName);
-        wunit.commit();
-    });
 }
 
 }  // namespace
