@@ -47,6 +47,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/logger/logger.h"
 #include "mongo/transport/transport_layer_asio.h"
 #include "mongo/util/log.h"
 
@@ -54,6 +55,9 @@ using namespace mongo::repl;
 
 namespace ReplTests {
 
+using mongo::logger::globalLogDomain;
+using mongo::logger::LogComponent;
+using mongo::logger::LogSeverity;
 using std::endl;
 using std::string;
 using std::stringstream;
@@ -256,25 +260,6 @@ protected:
                 uassertStatusOK(applyOperation_inlock(
                     &_opCtx, ctx.db(), &entry, false, OplogApplication::Mode::kSecondary));
             }
-        }
-    }
-    void printAll(const char* ns) {
-        Lock::GlobalWrite lk(&_opCtx);
-        OldClientContext ctx(&_opCtx, ns);
-        NamespaceString nss(ns);
-
-        Database* db = ctx.db();
-        Collection* coll = CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(nss);
-        if (!coll) {
-            WriteUnitOfWork wunit(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss);
-            wunit.commit();
-        }
-
-        auto cursor = coll->getCursor(&_opCtx);
-        ::mongo::log() << "all for " << ns << endl;
-        while (auto record = cursor->next()) {
-            ::mongo::log() << record->data.releaseToBson() << endl;
         }
     }
     // These deletes don't get logged.
@@ -1312,11 +1297,22 @@ public:
 
 class DeleteOpIsIdBased : public Base {
 public:
+    DeleteOpIsIdBased() : _oldSeverity(globalLogDomain()->getMinimumLogSeverity()) {
+        // TODO (SERVER-43399): This is temporary to help diagnose a rare failure.
+        globalLogDomain()->setMinimumLoggedSeverity(LogComponent::kDefault, LogSeverity::Debug(2));
+    }
+
+    ~DeleteOpIsIdBased() {
+        globalLogDomain()->setMinimumLoggedSeverity(LogComponent::kDefault, _oldSeverity);
+    }
+
     void run() {
         // Replication is not supported by mobile SE.
         if (mongo::storageGlobalParams.engine == "mobile") {
             return;
         }
+
+        // These inserts don't write oplog entries.
         insert(BSON("_id" << 0 << "a" << 10));
         insert(BSON("_id" << 1 << "a" << 11));
         insert(BSON("_id" << 3 << "a" << 10));
@@ -1325,12 +1321,16 @@ public:
         insert(BSON("_id" << 0 << "a" << 11));
         insert(BSON("_id" << 2 << "a" << 10));
         insert(BSON("_id" << 3 << "a" << 10));
-
+        // Now the collection has _ids 0, 1, 2, 3. Apply the delete oplog entries for _id 0 and 3.
         applyAllOperations();
+        // _id 1 and 2 remain.
         ASSERT_EQUALS(2U, _client.count(nss(), BSONObj()));
         ASSERT(!one(BSON("_id" << 1)).isEmpty());
         ASSERT(!one(BSON("_id" << 2)).isEmpty());
     }
+
+private:
+    LogSeverity _oldSeverity;
 };
 
 class All : public OldStyleSuiteSpecification {

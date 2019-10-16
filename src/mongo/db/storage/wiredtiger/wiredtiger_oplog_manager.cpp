@@ -140,8 +140,8 @@ void WiredTigerOplogManager::waitForAllEarlierOplogWritesToBeVisible(
         currentLatestVisibleTimestamp = newLatestVisibleTimestamp;
         RecordId latestVisible = RecordId(currentLatestVisibleTimestamp);
         if (latestVisible < waitingFor) {
-            LOG(2) << "Operation is waiting for " << waitingFor << "; latestVisible is "
-                   << Timestamp(currentLatestVisibleTimestamp);
+            LOG(2) << "Operation is waiting for " << Timestamp(waitingFor.repr())
+                   << "; latestVisible is " << Timestamp(currentLatestVisibleTimestamp);
         }
         return latestVisible >= waitingFor;
     });
