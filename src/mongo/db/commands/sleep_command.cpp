@@ -58,7 +58,8 @@ public:
                "If neither 'secs' nor 'millis' is set, command will sleep for 10 seconds. "
                "If both are set, command will sleep for the sum of 'secs' and 'millis.'\n"
                "   w:<bool> (deprecated: use 'lock' instead) if true, takes a write lock.\n"
-               "   lock: r, w, none. If r or w, db will block under a lock. Defaults to r."
+               "   lock: r, ir, w, iw, none. If r or w, db will block under a lock.\n"
+               "   If ir or iw, db will block under an intent lock. Defaults to ir."
                " 'lock' and 'w' may not both be set.\n"
                "   secs:<seconds> Amount of time to sleep, in seconds.\n"
                "   millis:<milliseconds> Amount of time to sleep, in ms.\n"
@@ -159,9 +160,14 @@ public:
                     opCtx->sleepFor(Milliseconds(msRemaining));
                 } else if (lock == "w") {
                     _sleepInLock(opCtx, msRemaining.count(), MODE_X, lockTarget);
-                } else {
-                    uassert(34347, "'lock' must be one of 'r', 'w', 'none'.", lock == "r");
+                } else if (lock == "iw") {
+                    _sleepInLock(opCtx, msRemaining.count(), MODE_IX, lockTarget);
+                } else if (lock == "r") {
                     _sleepInLock(opCtx, msRemaining.count(), MODE_S, lockTarget);
+                } else {
+                    uassert(
+                        34347, "'lock' must be one of 'r', 'ir', 'w', 'iw', 'none'.", lock == "ir");
+                    _sleepInLock(opCtx, msRemaining.count(), MODE_IS, lockTarget);
                 }
             }
         }

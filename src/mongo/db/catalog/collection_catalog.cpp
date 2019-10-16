@@ -212,7 +212,7 @@ void CollectionCatalog::setCollectionNamespace(OperationContext* opCtx,
 }
 
 void CollectionCatalog::onCloseDatabase(OperationContext* opCtx, std::string dbName) {
-    invariant(opCtx->lockState()->isW());
+    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
     auto rid = ResourceId(RESOURCE_DATABASE, dbName);
     removeResource(rid, dbName);
 }

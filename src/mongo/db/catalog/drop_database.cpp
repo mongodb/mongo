@@ -126,7 +126,6 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
     repl::OpTime latestDropPendingOpTime;
 
     {
-        Lock::GlobalWrite lk(opCtx);
         AutoGetDb autoDB(opCtx, dbName, MODE_X);
         Database* const db = autoDB.getDb();
         if (!db) {
@@ -299,7 +298,6 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(dropDatabaseHangAfterAllCollectionsDrop);
     }
 
-    Lock::GlobalWrite lk(opCtx);
     AutoGetDb autoDB(opCtx, dbName, MODE_X);
     auto db = autoDB.getDb();
     if (!db) {
