@@ -199,7 +199,8 @@ public:
                     log() << "Hit pauseBeforeUpgradingConfigMetadata";
                     pauseBeforeUpgradingConfigMetadata.pauseWhileSet(opCtx);
                 }
-                ShardingCatalogManager::get(opCtx)->upgradeChunksAndTags(opCtx);
+                ShardingCatalogManager::get(opCtx)->upgradeOrDowngradeChunksAndTags(
+                    opCtx, ShardingCatalogManager::ConfigUpgradeType::kUpgrade);
             }
 
             FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(opCtx, requestedVersion);
@@ -255,7 +256,8 @@ public:
                     log() << "Hit pauseBeforeDowngradingConfigMetadata";
                     pauseBeforeDowngradingConfigMetadata.pauseWhileSet(opCtx);
                 }
-                ShardingCatalogManager::get(opCtx)->downgradeChunksAndTags(opCtx);
+                ShardingCatalogManager::get(opCtx)->upgradeOrDowngradeChunksAndTags(
+                    opCtx, ShardingCatalogManager::ConfigUpgradeType::kDowngrade);
             }
 
             FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(opCtx, requestedVersion);

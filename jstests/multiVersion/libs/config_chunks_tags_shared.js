@@ -24,6 +24,22 @@ function setUpCollectionForZoneTesting(st, ns) {
         st.s.adminCommand({updateZoneKeyRange: ns, min: {_id: 0}, max: {_id: 50}, zone: "zone1"}));
 }
 
+// Sets up a sharded collection with the given number of chunks and zones.
+function setUpCollectionWithManyChunksAndZones(st, ns, numChunks, numZones) {
+    assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
+
+    for (let i = 0; i < numChunks - 1; i++) {
+        assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: i}}));
+    }
+
+    for (let i = 0; i < numZones; i++) {
+        assert.commandWorked(
+            st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: "many_zones-" + i}));
+        assert.commandWorked(st.s.adminCommand(
+            {updateZoneKeyRange: ns, min: {_id: i}, max: {_id: i + 1}, zone: "many_zones-" + i}));
+    }
+}
+
 function setUpExtraShardedCollections(st, dbName) {
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
     st.ensurePrimaryShard(dbName, st.shard1.shardName);

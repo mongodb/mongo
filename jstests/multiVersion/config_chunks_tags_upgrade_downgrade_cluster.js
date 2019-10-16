@@ -53,6 +53,17 @@ setUpCollectionForZoneTesting(st, zoneNs);
 // for every sharded collection.
 setUpExtraShardedCollections(st, "extra_db" /* dbName */);
 
+// Set up collections with the same number of chunks and zones as the batch limit for the
+// transactions used to modify chunks and zones documents and with more than the limit to verify the
+// batching logic in both cases.
+const txnBatchSize = 100;
+setUpCollectionWithManyChunksAndZones(
+    st, dbName + ".many_at_batch_size", txnBatchSize /* numChunks */, txnBatchSize /* numZones */);
+setUpCollectionWithManyChunksAndZones(st,
+                                      dbName + ".many_over_batch_size",
+                                      txnBatchSize + 5 /* numChunks */,
+                                      txnBatchSize + 5 /* numZones */);
+
 //
 // Upgrade back to the latest version.
 //

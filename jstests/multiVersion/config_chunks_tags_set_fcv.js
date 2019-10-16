@@ -138,5 +138,36 @@ function runInProgressSetFCVTest(st, {initialFCV, desiredFCV}) {
 runInProgressSetFCVTest(st, {initialFCV: latestFCV, desiredFCV: lastStableFCV});
 runInProgressSetFCVTest(st, {initialFCV: lastStableFCV, desiredFCV: latestFCV});
 
+//
+// Test setFCV with many chunks and tags.
+//
+
+// Set up collections with the same number of chunks and zones as the batch limit for the
+// transactions used to modify chunks and zones documents and with more than the limit to verify the
+// batching logic in both cases.
+const txnBatchSize = 100;
+setUpCollectionWithManyChunksAndZones(
+    st, dbName + ".many_at_batch_size", txnBatchSize /* numChunks */, txnBatchSize /* numZones */);
+setUpCollectionWithManyChunksAndZones(st,
+                                      dbName + ".many_over_batch_size",
+                                      txnBatchSize + 5 /* numChunks */,
+                                      txnBatchSize + 5 /* numZones */);
+
+checkFCV(configPrimary.getDB("admin"), latestFCV);
+
+verifyChunks(st, {expectNewFormat: true});
+
+jsTestLog("Downgrading FCV to last stable with many chunks and zones");
+assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+checkFCV(configPrimary.getDB("admin"), lastStableFCV);
+
+verifyChunks(st, {expectNewFormat: false});
+
+jsTestLog("Upgrading FCV to latest with many chunks and zones");
+assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+checkFCV(configPrimary.getDB("admin"), latestFCV);
+
+verifyChunks(st, {expectNewFormat: true});
+
 st.stop();
 }());
