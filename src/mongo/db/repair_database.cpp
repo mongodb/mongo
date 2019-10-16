@@ -55,6 +55,7 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/storage/mmap_v1/repair_database_interface.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -64,6 +65,8 @@ using std::endl;
 using std::string;
 
 using IndexVersion = IndexDescriptor::IndexVersion;
+
+MONGO_FAIL_POINT_DEFINE(exitBeforeIndexRepair);
 
 StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
                                            DatabaseCatalogEntry* dbce,
@@ -174,6 +177,16 @@ Status rebuildIndexesOnCollection(OperationContext* opCtx,
             // The WUOW will handle cleanup, so the indexer shouldn't do its own.
             indexer->abortWithoutCleanup();
             return status;
+        }
+
+        MONGO_FAIL_POINT_BLOCK(exitBeforeIndexRepair, data) {
+            const auto failpointNamespace = data.getData().getStringField("namespace");
+            if (failpointNamespace == ns) {
+                const std::string msg = str::stream()
+                    << "Failpoint exitBeforeIndexRepair has been enabled."
+                    << " Failure while building indexes on " << ns;
+                error_details::throwExceptionForStatus({ErrorCodes::FailPointEnabled, msg});
+            }
         }
 
         wuow.commit();
@@ -303,7 +316,8 @@ Status repairDatabase(OperationContext* opCtx,
 
     // Close the db and invalidate all current users and caches.
     DatabaseHolder::getDatabaseHolder().close(opCtx, dbName, "database closed for repair");
-    ON_BLOCK_EXIT([&dbName, &opCtx] {
+
+    ON_BLOCK_EXIT([&dbName, opCtx] {
         try {
             // Ensure that we don't trigger an exception when attempting to take locks.
             UninterruptibleLockGuard noInterrupt(opCtx->lockState());
@@ -328,12 +342,20 @@ Status repairDatabase(OperationContext* opCtx,
         }
     });
 
-    auto status = repairCollections(opCtx, engine, dbName);
-    if (!status.isOK()) {
-        severe() << "Failed to repair database " << dbName << ": " << status.reason();
-        return status;
+    try {
+        auto status = repairCollections(opCtx, engine, dbName);
+        if (!status.isOK()) {
+            severe() << "Failed to repair database '" << dbName << "': " << status.reason();
+            return status;
+        }
+
+    } catch (const DBException& ex) {
+        // Log the error now and then rethrow because the call to reopen the database may fail,
+        // supressing this error.
+        severe() << "Caught exception repairing database '" << dbName << "': " << ex;
+        return ex.toStatus();
     }
 
     return Status::OK();
 }
-}
+}  // namespace mongo
