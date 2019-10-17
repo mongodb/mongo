@@ -329,7 +329,6 @@ OldClientContext::OldClientContext(OperationContext* opCtx, const std::string& n
     : _opCtx(opCtx), _db(DatabaseHolder::get(opCtx)->getDb(opCtx, ns)) {
     if (!_db) {
         const auto dbName = nsToDatabaseSubstring(ns);
-        invariant(_opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
         _db = DatabaseHolder::get(opCtx)->openDb(_opCtx, dbName, &_justCreated);
         invariant(_db);
     }

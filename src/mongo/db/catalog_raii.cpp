@@ -135,18 +135,12 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
 AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* opCtx,
                                      StringData dbName,
                                      LockMode mode,
-                                     Date_t deadline) {
+                                     Date_t deadline)
+    : _autoDb(opCtx, dbName, mode, deadline) {
     invariant(mode == MODE_IX || mode == MODE_X);
 
-    _autoDb.emplace(opCtx, dbName, mode, deadline);
-    _db = _autoDb->getDb();
-
-    // If the database didn't exist, relock in MODE_X
+    _db = _autoDb.getDb();
     if (!_db) {
-        if (mode != MODE_X) {
-            _autoDb.emplace(opCtx, dbName, MODE_X, deadline);
-        }
-
         auto databaseHolder = DatabaseHolder::get(opCtx);
         _db = databaseHolder->openDb(opCtx, dbName, &_justCreated);
     }

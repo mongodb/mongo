@@ -65,8 +65,8 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
 /**
  * Combines AutoGetOrCreateDb and OldClientContext. If the requested 'ns' exists, the constructed
  * object will have both the database and the collection locked in MODE_IX. Otherwise, the database
- * will be locked in MODE_X and will be created (note, only the database will be created, but not
- * the collection).
+ * will be locked in MODE_IX and will be created, while the collection will be locked in MODE_X, but
+ * not created.
  */
 class WriteContextForTests {
     WriteContextForTests(const WriteContextForTests&) = delete;

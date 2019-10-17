@@ -157,22 +157,8 @@ WriteContextForTests::WriteContextForTests(OperationContext* opCtx, StringData n
     if (getCollection())
         return;
 
-    // If the database was just created, it is already locked in MODE_X so we can skip the relocking
-    // code below
-    if (_autoCreateDb->justCreated()) {
-        dassert(opCtx->lockState()->isDbLockedForMode(_nss.db(), MODE_X));
-        return;
-    }
-
-    // If the collection doesn't exists, put the context in a state where the database is locked in
-    // MODE_X so that the collection can be created
-    _clientContext.reset();
-    _collLock.reset();
-    _autoCreateDb.reset();
-    _autoCreateDb.emplace(opCtx, _nss.db(), MODE_X);
-
-    _clientContext.emplace(opCtx, _nss.ns(), _autoCreateDb->getDb());
     invariant(_autoCreateDb->getDb() == _clientContext->db());
+    _collLock.emplace(opCtx, _nss, MODE_X);
 }
 
 }  // namespace dbtests

@@ -117,7 +117,8 @@ void createCollection(OperationContext* opCtx,
                       const NamespaceString& nss,
                       const CollectionOptions& options) {
     writeConflictRetry(opCtx, "createCollection", nss.ns(), [&] {
-        Lock::DBLock dblk(opCtx, nss.db(), MODE_X);
+        Lock::DBLock dblk(opCtx, nss.db(), MODE_IX);
+        Lock::CollectionLock collLk(opCtx, nss, MODE_X);
         OldClientContext ctx(opCtx, nss.ns());
         auto db = ctx.db();
         ASSERT_TRUE(db);
@@ -210,7 +211,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentCollec
     createDatabase(_opCtx.get(), nss.db());
     // Even though the collection doesn't exist, this is handled in the actual application function,
     // which in the case of this test just ignores such errors. This tests mostly that we don't
-    // implicitly create the collection and lock the database in MODE_X.
+    // implicitly create the collection.
     auto op = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
     ASSERT_THROWS(_applyOplogEntryOrGroupedInsertsWrapper(
                       _opCtx.get(), &op, OplogApplication::Mode::kSecondary),
@@ -223,7 +224,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentCollec
     createDatabase(_opCtx.get(), nss.db());
     // Even though the collection doesn't exist, this is handled in the actual application function,
     // which in the case of this test just ignores such errors. This tests mostly that we don't
-    // implicitly create the collection and lock the database in MODE_X.
+    // implicitly create the collection.
     auto op = makeOplogEntry(OpTypeEnum::kDelete, nss, {});
     _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, false);
     ASSERT_FALSE(collectionExists(_opCtx.get(), nss));
@@ -279,7 +280,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsCommand) {
                                             const BSONObj&) {
         applyCmdCalled = true;
         ASSERT_TRUE(opCtx);
-        ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+        ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
         ASSERT_EQUALS(nss, collNss);
         return Status::OK();
     };

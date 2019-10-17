@@ -109,7 +109,7 @@ std::vector<std::string> DatabaseHolderImpl::getNames() {
 
 Database* DatabaseHolderImpl::openDb(OperationContext* opCtx, StringData ns, bool* justCreated) {
     const StringData dbname = _todb(ns);
-    invariant(opCtx->lockState()->isDbLockedForMode(dbname, MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(dbname, MODE_IX));
 
     if (justCreated)
         *justCreated = false;  // Until proven otherwise.
@@ -136,11 +136,8 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx, StringData ns, boo
                           << "]",
             duplicates.empty());
 
-
     // Do the catalog lookup and database creation outside of the scoped lock, because these may
-    // block. Only one thread can be inside this method for the same DB name, because of the
-    // requirement for X-lock on the database when we enter. So there is no way we can insert two
-    // different databases for the same name.
+    // block.
     lk.unlock();
 
     if (CollectionCatalog::get(opCtx).getAllCollectionUUIDsFromDb(dbname).empty()) {
@@ -156,7 +153,15 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx, StringData ns, boo
     removeDbGuard.dismiss();
     lk.lock();
     auto it = _dbs.find(dbname);
-    invariant(it != _dbs.end() && it->second == nullptr);
+    // Dropping a database requires a MODE_X lock, so the entry in the `_dbs` map cannot disappear.
+    invariant(it != _dbs.end());
+    if (it->second) {
+        // Creating databases only requires a DB lock in MODE_IX. Thus databases can concurrently
+        // created. If this thread "lost the race", return the database object that was persisted in
+        // the `_dbs` map.
+        return it->second;
+    }
+
     it->second = newDb.release();
     invariant(_getNamesWithConflictingCasing_inlock(dbname.toString()).empty());
 

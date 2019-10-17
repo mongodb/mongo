@@ -148,8 +148,7 @@ private:
  * RAII-style class, which acquires a lock on the specified database in the requested mode and
  * obtains a reference to the database, creating it was non-existing. Used as a shortcut for
  * calls to DatabaseHolder::get(opCtx)->openDb(), taking care of locking details. The
- * requested mode must be MODE_IX or MODE_X. If the database needs to be created, the lock will
- * automatically be reacquired as MODE_X.
+ * requested mode must be MODE_IX or MODE_X.
  *
  * Use this when you are about to perform a write, and want to create the database if it doesn't
  * already exist.
@@ -176,7 +175,7 @@ public:
     }
 
 private:
-    boost::optional<AutoGetDb> _autoDb;
+    AutoGetDb _autoDb;
 
     Database* _db;
     bool _justCreated{false};
