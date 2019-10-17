@@ -114,6 +114,7 @@ protected:
         getTopoCoord().changeMemberState_forTest(MemberState::RS_PRIMARY, electionTimestamp);
         getTopoCoord().setCurrentPrimary_forTest(_selfIndex, electionTimestamp);
         OpTime dummyOpTime(Timestamp(1, 1), getTopoCoord().getTerm());
+        setMyOpTime(dummyOpTime);
         ASSERT_OK(getTopoCoord().completeTransitionToPrimary(dummyOpTime));
     }
 

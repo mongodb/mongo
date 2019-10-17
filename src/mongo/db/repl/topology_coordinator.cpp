@@ -830,6 +830,12 @@ bool TopologyCoordinator::haveNumNodesReachedOpTime(const OpTime& targetOpTime,
         return false;
     }
 
+    // Invariants that we only wait for an OpTime in the term that this node is currently writing
+    // to. In other words, we do not support waiting for an OpTime written by a previous primary
+    // because comparing members' lastApplied/lastDurable alone is not sufficient to tell if the
+    // OpTime has been replicated.
+    invariant(targetOpTime.getTerm() == getMyLastAppliedOpTime().getTerm());
+
     for (auto&& memberData : _memberData) {
         const auto isArbiter = _rsConfig.getMemberAt(memberData.getConfigIndex()).isArbiter();
 
@@ -841,7 +847,14 @@ bool TopologyCoordinator::haveNumNodesReachedOpTime(const OpTime& targetOpTime,
         const OpTime& memberOpTime =
             durablyWritten ? memberData.getLastDurableOpTime() : memberData.getLastAppliedOpTime();
 
-        if (memberOpTime >= targetOpTime) {
+        // In addition to checking if a member has a greater/equal timestamp field we also need to
+        // make sure that the memberOpTime is in the same term as the OpTime we wait for. If a
+        // member's OpTime has a higher term, it indicates that this node will be stepping down. And
+        // thus we do not know if the target OpTime in our previous term has been replicated to the
+        // member because the memberOpTime in a higher term could correspond to an operation in a
+        // divergent branch of history regardless of its timestamp.
+        if (memberOpTime.getTerm() == targetOpTime.getTerm() &&
+            memberOpTime.getTimestamp() >= targetOpTime.getTimestamp()) {
             --numNodes;
         }
 
@@ -856,10 +869,25 @@ bool TopologyCoordinator::haveTaggedNodesReachedOpTime(const OpTime& opTime,
                                                        const ReplSetTagPattern& tagPattern,
                                                        bool durablyWritten) {
     ReplSetTagMatch matcher(tagPattern);
+
+    // Invariants that we only wait for an OpTime in the term that this node is currently writing
+    // to. In other words, we do not support waiting for an OpTime written by a previous primary
+    // because comparing members' lastApplied/lastDurable alone is not sufficient to tell if the
+    // OpTime has been replicated.
+    invariant(opTime.getTerm() == getMyLastAppliedOpTime().getTerm());
+
     for (auto&& memberData : _memberData) {
         const OpTime& memberOpTime =
             durablyWritten ? memberData.getLastDurableOpTime() : memberData.getLastAppliedOpTime();
-        if (memberOpTime >= opTime) {
+
+        // In addition to checking if a member has a greater/equal timestamp field we also need to
+        // make sure that the memberOpTime is in the same term as the OpTime we wait for. If a
+        // member's OpTime has a higher term, it indicates that this node will be stepping down. And
+        // thus we do not know if the target OpTime in our previous term has been replicated to the
+        // member because the memberOpTime in a higher term could correspond to an operation in a
+        // divergent branch of history regardless of its timestamp.
+        if (memberOpTime.getTerm() == opTime.getTerm() &&
+            memberOpTime.getTimestamp() >= opTime.getTimestamp()) {
             // This node has reached the desired optime, now we need to check if it is a part
             // of the tagPattern.
             int memberIndex = memberData.getConfigIndex();

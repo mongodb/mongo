@@ -407,14 +407,14 @@ public:
         const StatusWith<ReplSetHeartbeatResponse>& hbResponse);
 
     /**
-     *  Returns whether or not at least 'numNodes' have reached the given opTime.
+     *  Returns whether or not at least 'numNodes' have reached the given opTime with the same term.
      * "durablyWritten" indicates whether the operation has to be durably applied.
      */
     bool haveNumNodesReachedOpTime(const OpTime& opTime, int numNodes, bool durablyWritten);
 
     /**
-     * Returns whether or not at least one node matching the tagPattern has reached
-     * the given opTime.
+     * Returns whether or not at least one node matching the tagPattern has reached the given opTime
+     * with the same term.
      * "durablyWritten" indicates whether the operation has to be durably applied.
      */
     bool haveTaggedNodesReachedOpTime(const OpTime& opTime,
