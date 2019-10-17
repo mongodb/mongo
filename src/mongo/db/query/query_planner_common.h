@@ -31,6 +31,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/projection.h"
 #include "mongo/db/query/query_solution.h"
 
 namespace mongo {
@@ -89,7 +90,8 @@ public:
      * given projection 'proj'. For example, given a projection {a:1, b: {$meta: "sortKey"},
      * c: {$meta: "sortKey"}}, the returned vector will contain two elements ["b", "c"].
      */
-    static std::vector<std::string> extractSortKeyMetaFieldsFromProjection(const BSONObj& proj);
+    static std::vector<FieldPath> extractSortKeyMetaFieldsFromProjection(
+        const projection_ast::Projection& proj);
 };
 
 }  // namespace mongo

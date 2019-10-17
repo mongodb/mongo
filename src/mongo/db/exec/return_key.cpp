@@ -33,7 +33,9 @@
 
 #include "mongo/db/exec/return_key.h"
 
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -86,19 +88,20 @@ Status ReturnKeyStage::_extractIndexKey(WorkingSetMember* member) {
         ? DocumentMetadataFields::serializeSortKey(member->metadata().isSingleElementKey(),
                                                    member->metadata().getSortKey())
         : BSONObj();
-    BSONObjBuilder bob;
 
-    if (!indexKey.isEmpty()) {
-        bob.appendElements(indexKey);
+    MutableDocument md;
+
+    for (auto&& elem : indexKey) {
+        md.addField(elem.fieldNameStringData(), Value(elem));
     }
 
-    for (const auto& fieldName : _sortKeyMetaFields) {
-        bob.append(fieldName, sortKey);
+    for (const auto& fieldPath : _sortKeyMetaFields) {
+        md.setNestedField(fieldPath, Value(sortKey));
     }
 
     member->keyData.clear();
     member->recordId = {};
-    member->resetDocument({}, bob.obj());
+    member->doc = {{}, md.freeze()};
     member->transitionToOwnedObj();
 
     return Status::OK();

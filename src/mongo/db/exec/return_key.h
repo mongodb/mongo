@@ -47,7 +47,7 @@ public:
     static constexpr StringData kStageName = "RETURN_KEY"_sd;
 
     ReturnKeyStage(OperationContext* opCtx,
-                   std::vector<std::string> sortKeyMetaFields,
+                   std::vector<FieldPath> sortKeyMetaFields,
                    WorkingSet* ws,
                    std::unique_ptr<PlanStage> child)
         : PlanStage(opCtx, std::move(child), kStageName.rawData()),
@@ -78,6 +78,6 @@ private:
 
     // The field names associated with any sortKey meta-projection(s). Empty if there is no sortKey
     // meta-projection.
-    std::vector<std::string> _sortKeyMetaFields;
+    std::vector<FieldPath> _sortKeyMetaFields;
 };
 }  // namespace mongo

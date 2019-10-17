@@ -32,6 +32,7 @@
 #include "mongo/db/query/query_solution.h"
 
 #include <boost/algorithm/string/join.hpp>
+#include <boost/range/adaptor/transformed.hpp>
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/mutable/document.h"
@@ -858,7 +859,13 @@ void ReturnKeyNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "RETURN_KEY\n";
     addIndent(ss, indent + 1);
-    *ss << "sortKeyMetaFields = [" << boost::algorithm::join(sortKeyMetaFields, ", ") << "]\n";
+
+    *ss << "sortKeyMetaFields = ["
+        << boost::algorithm::join(
+               sortKeyMetaFields |
+                   boost::adaptors::transformed([](const auto& field) { return field.fullPath(); }),
+               ", ");
+    *ss << "]\n";
     addCommon(ss, indent);
     addIndent(ss, indent + 1);
     *ss << "Child:" << '\n';

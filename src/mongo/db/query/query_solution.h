@@ -542,7 +542,7 @@ struct IndexScanNode : public QuerySolutionNode {
 
 struct ReturnKeyNode : public QuerySolutionNode {
     ReturnKeyNode(std::unique_ptr<QuerySolutionNode> child,
-                  std::vector<std::string> sortKeyMetaFields)
+                  std::vector<FieldPath> sortKeyMetaFields)
         : QuerySolutionNode(std::move(child)), sortKeyMetaFields(std::move(sortKeyMetaFields)) {}
 
     StageType getType() const final {
@@ -566,7 +566,7 @@ struct ReturnKeyNode : public QuerySolutionNode {
 
     QuerySolutionNode* clone() const final;
 
-    std::vector<std::string> sortKeyMetaFields;
+    std::vector<FieldPath> sortKeyMetaFields;
 };
 
 /**

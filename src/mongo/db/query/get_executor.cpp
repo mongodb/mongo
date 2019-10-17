@@ -390,6 +390,8 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
                 std::move(root));
         }
 
+        const auto* cqProjection = canonicalQuery->getProj();
+
         // Add a SortKeyGeneratorStage if the query requested sortKey metadata.
         if (canonicalQuery->metadataDeps()[DocumentMetadataFields::kSortKey]) {
             root = std::make_unique<SortKeyGeneratorStage>(
@@ -406,16 +408,17 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
             // returnKey.
             root = std::make_unique<ReturnKeyStage>(
                 opCtx,
-                QueryPlannerCommon::extractSortKeyMetaFieldsFromProjection(
-                    canonicalQuery->getQueryRequest().getProj()),
+                cqProjection
+                    ? QueryPlannerCommon::extractSortKeyMetaFieldsFromProjection(*cqProjection)
+                    : std::vector<FieldPath>{},
                 ws,
                 std::move(root));
-        } else if (canonicalQuery->getProj()) {
+        } else if (cqProjection) {
             // There might be a projection. The idhack stage will always fetch the full
             // document, so we don't support covered projections. However, we might use the
             // simple inclusion fast path.
             // Stuff the right data into the params depending on what proj impl we use.
-            if (!canonicalQuery->getProj()->isSimple()) {
+            if (!cqProjection->isSimple()) {
                 root = std::make_unique<ProjectionStageDefault>(
                     canonicalQuery->getExpCtx(),
                     canonicalQuery->getQueryRequest().getProj(),

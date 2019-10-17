@@ -31,6 +31,9 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/exact_cast.h"
+#include "mongo/db/query/projection_ast_path_tracking_visitor.h"
+#include "mongo/db/query/projection_ast_walker.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -75,32 +78,51 @@ void QueryPlannerCommon::reverseScans(QuerySolutionNode* node) {
     }
 }
 
-// TODO SERVER-42422: reimplement by walking a projection AST rather than raw bson.
-std::vector<std::string> QueryPlannerCommon::extractSortKeyMetaFieldsFromProjection(
-    const BSONObj& proj) {
-    std::vector<std::string> sortKeyMetaFields;
+namespace {
 
-    for (auto&& elem : proj) {
-        if (elem.type() == BSONType::Object) {
-            BSONObj obj = elem.embeddedObject();
-            // The caller must have already validated the projection, so we expect
-            // to see only one element.
-            invariant(1 == obj.nFields());
+struct MetaFieldData {
+    std::vector<FieldPath> metaPaths;
+};
 
-            BSONElement firstSubElem = obj.firstElement();
-            if (firstSubElem.fieldNameStringData() == "$meta") {
-                invariant(firstSubElem.type() == BSONType::String);
-                if (firstSubElem.valueStringData() == QueryRequest::metaSortKey) {
-                    invariant(std::find(sortKeyMetaFields.begin(),
-                                        sortKeyMetaFields.end(),
-                                        elem.fieldName()) == sortKeyMetaFields.end());
-                    sortKeyMetaFields.push_back(elem.fieldName());
-                }
-            }
+using MetaFieldVisitorContext = projection_ast::PathTrackingVisitorContext<MetaFieldData>;
+
+/**
+ * Visitor which produces a list of paths where $meta expressions are.
+ */
+class MetaFieldVisitor final : public projection_ast::ProjectionASTConstVisitor {
+public:
+    MetaFieldVisitor(MetaFieldVisitorContext* context) : _context(context) {}
+
+
+    void visit(const projection_ast::ExpressionASTNode* node) final {
+        const auto* metaExpr = exact_pointer_cast<const ExpressionMeta*>(node->expressionRaw());
+        if (!metaExpr || metaExpr->getMetaType() != DocumentMetadataFields::MetaType::kSortKey) {
+            return;
         }
+
+        _context->data().metaPaths.push_back(_context->fullPath());
     }
 
-    return sortKeyMetaFields;
-}
+    void visit(const projection_ast::ProjectionPositionalASTNode* node) final {}
+    void visit(const projection_ast::ProjectionSliceASTNode* node) final {}
+    void visit(const projection_ast::ProjectionElemMatchASTNode* node) final {}
+    void visit(const projection_ast::BooleanConstantASTNode* node) final {}
+    void visit(const projection_ast::ProjectionPathASTNode* node) final {}
+    void visit(const projection_ast::MatchExpressionASTNode* node) final {}
 
+private:
+    MetaFieldVisitorContext* _context;
+};
+}  // namespace
+
+std::vector<FieldPath> QueryPlannerCommon::extractSortKeyMetaFieldsFromProjection(
+    const projection_ast::Projection& proj) {
+
+    MetaFieldVisitorContext ctx;
+    MetaFieldVisitor visitor(&ctx);
+    projection_ast::PathTrackingConstWalker<MetaFieldData> walker{&ctx, {&visitor}, {}};
+    projection_ast_walker::walk(&walker, proj.root());
+
+    return std::move(ctx.data().metaPaths);
+}
 }  // namespace mongo

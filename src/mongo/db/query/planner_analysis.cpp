@@ -795,7 +795,9 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
         // is that the projection is ignored when returnKey is specified.
         solnRoot = std::make_unique<ReturnKeyNode>(
             addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot)),
-            QueryPlannerCommon::extractSortKeyMetaFieldsFromProjection(qr.getProj()));
+            query.getProj()
+                ? QueryPlannerCommon::extractSortKeyMetaFieldsFromProjection(*query.getProj())
+                : std::vector<FieldPath>{});
     } else if (query.getProj()) {
         solnRoot = analyzeProjection(query, std::move(solnRoot), hasSortStage);
         // If we don't have a covered project, and we're not allowed to put an uncovered one in,

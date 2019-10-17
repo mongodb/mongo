@@ -231,5 +231,12 @@ private:
     std::vector<ProjectionASTVisitor<IsConst>*> _preVisitors;
     std::vector<ProjectionASTVisitor<IsConst>*> _postVisitors;
 };
+
+template <class UserData>
+using PathTrackingConstWalker = PathTrackingWalker<UserData, true>;
+
+template <class UserData>
+using PathTrackingMutableWalker = PathTrackingWalker<UserData, false>;
+
 }  // namespace projection_ast
 }  // namespace mongo

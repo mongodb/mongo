@@ -61,11 +61,11 @@ class Projection {
 public:
     Projection(ProjectionPathASTNode root, ProjectType type);
 
-    const ProjectionPathASTNode* root() const {
+    ProjectionPathASTNode* root() {
         return &_root;
     }
 
-    ProjectionPathASTNode* root() {
+    const ProjectionPathASTNode* root() const {
         return &_root;
     }
 

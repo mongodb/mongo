@@ -81,4 +81,12 @@ assert.eq(results, [
     {a: 2, c: {'': 2}, d: {'': 2}},
     {a: 1, c: {'': 3}, d: {'': 3}}
 ]);
+
+// returnKey with a sortKey $meta projection on a nested field.
+// TODO: SERVER-42435: Re-enable this test once 4.2 find() projection parser is removed.
+if (false) {
+    results =
+        coll.find({}, {"c.d": {$meta: "sortKey"}}).hint({a: 1}).sort({b: 1}).returnKey().toArray();
+    assert.eq(results, [{a: 3, c: {d: {'': 1}}}, {a: 2, c: {d: {'': 1}}}, {a: 1, c: {d: {'': 1}}}]);
+}
 })();
