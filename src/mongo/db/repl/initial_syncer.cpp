@@ -272,7 +272,7 @@ void InitialSyncer::_cancelRemainingWork_inlock() {
 
     _shutdownComponent_inlock(_oplogFetcher);
     if (_sharedData) {
-        stdx::lock_guard<Latch>(_sharedData->mutex);
+        stdx::lock_guard<Latch> lock(_sharedData->mutex);
         if (_sharedData->initialSyncStatus.isOK()) {
             _sharedData->initialSyncStatus =
                 Status{ErrorCodes::CallbackCanceled, "Initial sync attempt canceled"};
