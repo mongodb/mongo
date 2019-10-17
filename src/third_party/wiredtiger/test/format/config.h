@@ -222,6 +222,9 @@ static CONFIG c[] = {{"abort", "if timed run should drop core", /* 0% */
 
   {"quiet", "quiet run (same as -q)", C_IGNORE | C_BOOL, 0, 0, 1, &g.c_quiet, NULL},
 
+  {"random_cursor", "if random cursor reads configured", /* 10% */
+    C_BOOL, 10, 0, 0, &g.c_random_cursor, NULL},
+
   {"read_pct", "percent operations that are reads", C_IGNORE, 0, 0, 100, &g.c_read_pct, NULL},
 
   {"rebalance", "rebalance testing", /* 100% */

@@ -100,9 +100,8 @@ __wt_gen_drain(WT_SESSION_IMPL *session, int which, uint64_t generation)
             WT_ORDERED_READ(v, s->generations[which]);
 
             /*
-             * The generation argument is newer than the limit. Wait
-             * for threads in generations older than the argument
-             * generation, threads in argument generations are OK.
+             * The generation argument is newer than the limit. Wait for threads in generations
+             * older than the argument generation, threads in argument generations are OK.
              *
              * The thread's generation may be 0 (that is, not set).
              */

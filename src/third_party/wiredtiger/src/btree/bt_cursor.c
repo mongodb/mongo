@@ -54,7 +54,7 @@ __cursor_state_restore(WT_CURSOR *cursor, WT_CURFILE_STATE *state)
  *     Return if we have a page pinned.
  */
 static inline bool
-__cursor_page_pinned(WT_CURSOR_BTREE *cbt)
+__cursor_page_pinned(WT_CURSOR_BTREE *cbt, bool search_operation)
 {
     WT_CURSOR *cursor;
     WT_SESSION_IMPL *session;
@@ -72,11 +72,25 @@ __cursor_page_pinned(WT_CURSOR_BTREE *cbt)
     }
 
     /*
-     * Check if the key references the page. When returning from search, the page is active and the
-     * key is internal. After the application sets a key, the key is external, and the page is
-     * useless.
+     * Check if the key references an item on a page. When returning from search, the page is pinned
+     * and the key is internal. After the application sets a key, the key becomes external. For the
+     * search and search-near operations, we assume locality and check any pinned page first on each
+     * new search operation. For operations other than search and search-near, check if we have an
+     * internal key. If the page is pinned and we're pointing into the page, we don't need to search
+     * at all, we can proceed with the operation. However, if the key has been set, that is, it's an
+     * external key, we're going to have to do a full search.
      */
-    if (!F_ISSET(cursor, WT_CURSTD_KEY_INT))
+    if (!search_operation && !F_ISSET(cursor, WT_CURSTD_KEY_INT))
+        return (false);
+
+    /*
+     * XXX No fast-path searches at read-committed isolation. Underlying transactional functions
+     * called by the fast and slow path search code handle transaction IDs differently, resulting in
+     * different search results at read-committed isolation. This makes no difference for the update
+     * functions, but in the case of a search, we will see different results based on the cursor's
+     * initial location. See WT-5134 for the details.
+     */
+    if (search_operation && session->txn.isolation == WT_ISO_READ_COMMITTED)
         return (false);
 
     /*
@@ -181,15 +195,13 @@ static inline bool
 __cursor_fix_implicit(WT_BTREE *btree, WT_CURSOR_BTREE *cbt)
 {
     /*
-     * When there's no exact match, column-store search returns the key
-     * nearest the searched-for key (continuing past keys smaller than the
-     * searched-for key to return the next-largest key). Therefore, if the
-     * returned comparison is -1, the searched-for key was larger than any
-     * row on the page's standard information or column-store insert list.
+     * When there's no exact match, column-store search returns the key nearest the searched-for key
+     * (continuing past keys smaller than the searched-for key to return the next-largest key).
+     * Therefore, if the returned comparison is -1, the searched-for key was larger than any row on
+     * the page's standard information or column-store insert list.
      *
-     * If the returned comparison is NOT -1, there was a row equal to or
-     * larger than the searched-for key, and we implicitly create missing
-     * rows.
+     * If the returned comparison is NOT -1, there was a row equal to or larger than the
+     * searched-for key, and we implicitly create missing rows.
      */
     return (btree->type == BTREE_COL_FIX && cbt->compare != -1);
 }
@@ -541,7 +553,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
      * pinned page doesn't find an exact match, search from the root.
      */
     valid = false;
-    if (__cursor_page_pinned(cbt)) {
+    if (__cursor_page_pinned(cbt, true)) {
         __wt_txn_cursor_op(session);
 
         WT_ERR(btree->type == BTREE_ROW ? __cursor_row_search(session, cbt, cbt->ref, false) :
@@ -630,19 +642,17 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
     __cursor_state_save(cursor, &state);
 
     /*
-     * If we have a row-store page pinned, search it; if we don't have a
-     * page pinned, or the search of the pinned page doesn't find an exact
-     * match, search from the root. Unlike WT_CURSOR.search, ignore pinned
-     * pages in the case of column-store, search-near isn't an interesting
-     * enough case for column-store to add the complexity needed to avoid
-     * the tree search.
+     * If we have a row-store page pinned, search it; if we don't have a page pinned, or the search
+     * of the pinned page doesn't find an exact match, search from the root. Unlike
+     * WT_CURSOR.search, ignore pinned pages in the case of column-store, search-near isn't an
+     * interesting enough case for column-store to add the complexity needed to avoid the tree
+     * search.
      *
-     * Set the "insert" flag for the btree row-store search; we may intend
-     * to position the cursor at the end of the tree, rather than match an
-     * existing record.
+     * Set the "insert" flag for the btree row-store search; we may intend to position the cursor at
+     * the end of the tree, rather than match an existing record.
      */
     valid = false;
-    if (btree->type == BTREE_ROW && __cursor_page_pinned(cbt)) {
+    if (btree->type == BTREE_ROW && __cursor_page_pinned(cbt, true)) {
         __wt_txn_cursor_op(session);
 
         WT_ERR(__cursor_row_search(session, cbt, cbt->ref, true));
@@ -667,17 +677,15 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
     /*
      * If we find a valid key, return it.
      *
-     * Else, creating a record past the end of the tree in a fixed-length
-     * column-store implicitly fills the gap with empty records.  In this
-     * case, we instantiate the empty record, it's an exact match.
+     * Else, creating a record past the end of the tree in a fixed-length column-store implicitly
+     * fills the gap with empty records. In this case, we instantiate the empty record, it's an
+     * exact match.
      *
-     * Else, move to the next key in the tree (bias for prefix searches).
-     * Cursor next skips invalid rows, so we don't have to test for them
-     * again.
+     * Else, move to the next key in the tree (bias for prefix searches). Cursor next skips invalid
+     * rows, so we don't have to test for them again.
      *
-     * Else, redo the search and move to the previous key in the tree.
-     * Cursor previous skips invalid rows, so we don't have to test for
-     * them again.
+     * Else, redo the search and move to the previous key in the tree. Cursor previous skips invalid
+     * rows, so we don't have to test for them again.
      *
      * If that fails, quit, there's no record to return.
      */
@@ -784,16 +792,14 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
     __cursor_state_save(cursor, &state);
 
     /*
-     * If inserting with overwrite configured, and positioned to an on-page
-     * key, the update doesn't require another search. Cursors configured
-     * for append aren't included, regardless of whether or not they meet
-     * all other criteria.
+     * If inserting with overwrite configured, and positioned to an on-page key, the update doesn't
+     * require another search. Cursors configured for append aren't included, regardless of whether
+     * or not they meet all other criteria.
      *
-     * Fixed-length column store can never use a positioned cursor to update
-     * because the cursor may not be positioned to the correct record in the
-     * case of implicit records in the append list.
+     * Fixed-length column store can never use a positioned cursor to update because the cursor may
+     * not be positioned to the correct record in the case of implicit records in the append list.
      */
-    if (btree->type != BTREE_COL_FIX && __cursor_page_pinned(cbt) &&
+    if (btree->type != BTREE_COL_FIX && __cursor_page_pinned(cbt, false) &&
       F_ISSET(cursor, WT_CURSTD_OVERWRITE) && !append_key) {
         WT_ERR(__wt_txn_autocommit_check(session));
         /*
@@ -997,29 +1003,24 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt, bool positioned)
     __cursor_state_save(cursor, &state);
 
     /*
-     * If remove positioned to an on-page key, the remove doesn't require
-     * another search. We don't care about the "overwrite" configuration
-     * because regardless of the overwrite setting, any existing record is
-     * removed, and the record must exist with a positioned cursor.
+     * If remove positioned to an on-page key, the remove doesn't require another search. We don't
+     * care about the "overwrite" configuration because regardless of the overwrite setting, any
+     * existing record is removed, and the record must exist with a positioned cursor.
      *
-     * There's trickiness in the page-pinned check. By definition a remove
-     * operation leaves a cursor positioned if it's initially positioned.
-     * However, if every item on the page is deleted and we unpin the page,
-     * eviction might delete the page and our search will re-instantiate an
-     * empty page for us. Cursor remove returns not-found whether or not
-     * that eviction/deletion happens and it's OK unless cursor-overwrite
-     * is configured (which means we return success even if there's no item
-     * to delete). In that case, we'll fail when we try to point the cursor
-     * at the key on the page to satisfy the positioned requirement. It's
-     * arguably safe to simply leave the key initialized in the cursor (as
-     * that's all a positioned cursor implies), but it's probably safer to
-     * avoid page eviction entirely in the positioned case.
+     * There's trickiness in the page-pinned check. By definition a remove operation leaves a cursor
+     * positioned if it's initially positioned. However, if every item on the page is deleted and we
+     * unpin the page, eviction might delete the page and our search will re-instantiate an empty
+     * page for us. Cursor remove returns not-found whether or not that eviction/deletion happens
+     * and it's OK unless cursor-overwrite is configured (which means we return success even if
+     * there's no item to delete). In that case, we'll fail when we try to point the cursor at the
+     * key on the page to satisfy the positioned requirement. It's arguably safe to simply leave the
+     * key initialized in the cursor (as that's all a positioned cursor implies), but it's probably
+     * safer to avoid page eviction entirely in the positioned case.
      *
-     * Fixed-length column store can never use a positioned cursor to update
-     * because the cursor may not be positioned to the correct record in the
-     * case of implicit records in the append list.
+     * Fixed-length column store can never use a positioned cursor to update because the cursor may
+     * not be positioned to the correct record in the case of implicit records in the append list.
      */
-    if (btree->type != BTREE_COL_FIX && __cursor_page_pinned(cbt)) {
+    if (btree->type != BTREE_COL_FIX && __cursor_page_pinned(cbt, false)) {
         WT_ERR(__wt_txn_autocommit_check(session));
 
         /*
@@ -1036,12 +1037,11 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt, bool positioned)
 
 retry:
     /*
-     * Note these steps must be repeatable, we'll continue to take this path
-     * as long as we encounter WT_RESTART.
+     * Note these steps must be repeatable, we'll continue to take this path as long as we encounter
+     * WT_RESTART.
      *
-     * Any pinned page goes away if we do a search, including as a result of
-     * a restart. Get a local copy of any pinned key and re-save the cursor
-     * state: we may retry but eventually fail.
+     * Any pinned page goes away if we do a search, including as a result of a restart. Get a local
+     * copy of any pinned key and re-save the cursor state: we may retry but eventually fail.
      */
     WT_ERR(__cursor_localkey(cursor));
     __cursor_state_save(cursor, &state);
@@ -1085,14 +1085,12 @@ retry:
             if (!__cursor_fix_implicit(btree, cbt))
                 goto search_notfound;
             /*
-             * Creating a record past the end of the tree in a
-             * fixed-length column-store implicitly fills the
-             * gap with empty records.  Return success in that
-             * case, the record was deleted successfully.
+             * Creating a record past the end of the tree in a fixed-length column-store implicitly
+             * fills the gap with empty records. Return success in that case, the record was deleted
+             * successfully.
              *
-             * Correct the btree cursor's location: the search
-             * will have pointed us at the previous/next item,
-             * and that's not correct.
+             * Correct the btree cursor's location: the search will have pointed us at the
+             * previous/next item, and that's not correct.
              */
             cbt->recno = cursor->recno;
         } else
@@ -1107,11 +1105,10 @@ err:
 
     if (ret == 0) {
         /*
-         * If positioned originally, but we had to do a search, acquire
-         * a position so we can return success.
+         * If positioned originally, but we had to do a search, acquire a position so we can return
+         * success.
          *
-         * If not positioned originally, leave it that way, clear any
-         * key and reset the cursor.
+         * If not positioned originally, leave it that way, clear any key and reset the cursor.
          */
         if (positioned) {
             if (searched)
@@ -1192,16 +1189,14 @@ __btcur_update(WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
     __cursor_state_save(cursor, &state);
 
     /*
-     * If update positioned to an on-page key, the update doesn't require
-     * another search. We don't care about the "overwrite" configuration
-     * because regardless of the overwrite setting, any existing record is
-     * updated, and the record must exist with a positioned cursor.
+     * If update positioned to an on-page key, the update doesn't require another search. We don't
+     * care about the "overwrite" configuration because regardless of the overwrite setting, any
+     * existing record is updated, and the record must exist with a positioned cursor.
      *
-     * Fixed-length column store can never use a positioned cursor to update
-     * because the cursor may not be positioned to the correct record in the
-     * case of implicit records in the append list.
+     * Fixed-length column store can never use a positioned cursor to update because the cursor may
+     * not be positioned to the correct record in the case of implicit records in the append list.
      */
-    if (btree->type != BTREE_COL_FIX && __cursor_page_pinned(cbt)) {
+    if (btree->type != BTREE_COL_FIX && __cursor_page_pinned(cbt, false)) {
         WT_ERR(__wt_txn_autocommit_check(session));
 
         /*
@@ -1349,23 +1344,20 @@ __cursor_chain_exceeded(WT_CURSOR_BTREE *cbt)
     /*
      * Step through the modify operations at the beginning of the chain.
      *
-     * Deleted or standard updates are anticipated to be sufficient to base
-     * the modify (although that's not guaranteed: they may not be visible
-     * or might abort before we read them).  Also, this is not a hard
-     * limit, threads can race modifying updates.
+     * Deleted or standard updates are anticipated to be sufficient to base the modify (although
+     * that's not guaranteed: they may not be visible or might abort before we read them). Also,
+     * this is not a hard limit, threads can race modifying updates.
      *
-     * If the total size in bytes of the updates exceeds some factor of the
-     * underlying value size (which we know because the cursor is
-     * positioned), create a new full copy of the value.  This limits the
-     * cache pressure from creating full copies to that factor: with the
-     * default factor of 1, the total size in memory of a set of modify
-     * updates is limited to double the size of the modifies.
+     * If the total size in bytes of the updates exceeds some factor of the underlying value size
+     * (which we know because the cursor is positioned), create a new full copy of the value. This
+     * limits the cache pressure from creating full copies to that factor: with the default factor
+     * of 1, the total size in memory of a set of modify updates is limited to double the size of
+     * the modifies.
      *
-     * Otherwise, limit the length of the update chain to a fixed size to
-     * bound the cost of rebuilding the value during reads.  When history
-     * has to be maintained, creating extra copies of large documents
-     * multiplies cache pressure because the old ones cannot be freed, so
-     * allow the modify chain to grow.
+     * Otherwise, limit the length of the update chain to a fixed size to bound the cost of
+     * rebuilding the value during reads. When history has to be maintained, creating extra copies
+     * of large documents multiplies cache pressure because the old ones cannot be freed, so allow
+     * the modify chain to grow.
      */
     for (i = 0, upd_size = 0; upd != NULL && upd->type == WT_UPDATE_MODIFY; ++i, upd = upd->next) {
         upd_size += WT_UPDATE_MEMSIZE(upd);
@@ -1400,26 +1392,22 @@ __wt_btcur_modify(WT_CURSOR_BTREE *cbt, WT_MODIFY *entries, int nentries)
     __cursor_state_save(cursor, &state);
 
     /*
-     * Get the current value and apply the modification to it, for a few
-     * reasons: first, we set the updated value so the application can
-     * retrieve the cursor's value; second, we use the updated value as
-     * the update if the update chain is too long; third, there's a check
-     * if the updated value is too large to store; fourth, to simplify the
-     * count of bytes being added/removed; fifth, we can get into serious
-     * trouble if we attempt to modify a value that doesn't exist or read
-     * a value that might not exist in the future. For the fifth reason,
-     * fail if in anything other than a snapshot transaction, read-committed
-     * and read-uncommitted imply values that might disappear out from under
-     * us or an inability to repeat point-in-time reads.
+     * Get the current value and apply the modification to it, for a few reasons: first, we set the
+     * updated value so the application can retrieve the cursor's value; second, we use the updated
+     * value as the update if the update chain is too long; third, there's a check if the updated
+     * value is too large to store; fourth, to simplify the count of bytes being added/removed;
+     * fifth, we can get into serious trouble if we attempt to modify a value that doesn't exist or
+     * read a value that might not exist in the future. For the fifth reason, fail if in anything
+     * other than a snapshot transaction, read-committed and read-uncommitted imply values that
+     * might disappear out from under us or an inability to repeat point-in-time reads.
      *
-     * Also, an application might read a value outside of a transaction and
-     * then call modify. For that to work, the read must be part of the
-     * transaction that performs the update for correctness, otherwise we
-     * could race with another thread and end up modifying the wrong value.
-     * A clever application could get this right (imagine threads that only
-     * updated non-overlapping, fixed-length byte strings), but it's unsafe
-     * because it will work most of the time and the failure is unlikely to
-     * be detected. Require explicit transactions for modify operations.
+     * Also, an application might read a value outside of a transaction and then call modify. For
+     * that to work, the read must be part of the transaction that performs the update for
+     * correctness, otherwise we could race with another thread and end up modifying the wrong
+     * value. A clever application could get this right (imagine threads that only updated
+     * non-overlapping, fixed-length byte strings), but it's unsafe because it will work most of the
+     * time and the failure is unlikely to be detected. Require explicit transactions for modify
+     * operations.
      */
     if (session->txn.isolation != WT_ISO_SNAPSHOT)
         WT_ERR_MSG(session, ENOTSUP,
@@ -1444,9 +1432,8 @@ __wt_btcur_modify(WT_CURSOR_BTREE *cbt, WT_MODIFY *entries, int nentries)
     /*
      * WT_CURSOR.modify is update-without-overwrite.
      *
-     * Use the modify buffer as the update if the data package saves us some
-     * memory and the update chain is under the limit, else use the complete
-     * value.
+     * Use the modify buffer as the update if the data package saves us some memory and the update
+     * chain is under the limit, else use the complete value.
      */
     overwrite = F_ISSET(cursor, WT_CURSTD_OVERWRITE);
     F_CLR(cursor, WT_CURSTD_OVERWRITE);
@@ -1645,23 +1632,19 @@ __cursor_truncate(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *start, WT_CURSOR_BT
     yield_count = sleep_usecs = 0;
 
 /*
- * First, call the cursor search method to re-position the cursor: we
- * may not have a cursor position (if the higher-level truncate code
- * switched the cursors to have an "external" cursor key, and because
- * we don't save a copy of the page's write generation information,
- * which we need to remove records).
+ * First, call the cursor search method to re-position the cursor: we may not have a cursor position
+ * (if the higher-level truncate code switched the cursors to have an "external" cursor key, and
+ * because we don't save a copy of the page's write generation information, which we need to remove
+ * records).
  *
- * Once that's done, we can delete records without a full search, unless
- * we encounter a restart error because the page was modified by some
- * other thread of control; in that case, repeat the full search to
- * refresh the page's modification information.
+ * Once that's done, we can delete records without a full search, unless we encounter a restart
+ * error because the page was modified by some other thread of control; in that case, repeat the
+ * full search to refresh the page's modification information.
  *
- * If this is a row-store, we delete leaf pages having no overflow items
- * without reading them; for that to work, we have to ensure we read the
- * page referenced by the ending cursor, since we may be deleting only a
- * partial page at the end of the truncation.  Our caller already fully
- * instantiated the end cursor, so we know that page is pinned in memory
- * and we can proceed without concern.
+ * If this is a row-store, we delete leaf pages having no overflow items without reading them; for
+ * that to work, we have to ensure we read the page referenced by the ending cursor, since we may be
+ * deleting only a partial page at the end of the truncation. Our caller already fully instantiated
+ * the end cursor, so we know that page is pinned in memory and we can proceed without concern.
  */
 retry:
     WT_ERR(__wt_btcur_search(start));
@@ -1703,23 +1686,20 @@ __cursor_truncate_fix(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *start, WT_CURSO
     yield_count = sleep_usecs = 0;
 
 /*
- * Handle fixed-length column-store objects separately: for row-store
- * and variable-length column-store objects we have "deleted" values
- * and so returned objects actually exist: fixed-length column-store
- * objects are filled-in if they don't exist, that is, if you create
- * record 37, records 1-36 magically appear.  Those records can't be
- * deleted, which means we have to ignore already "deleted" records.
+ * Handle fixed-length column-store objects separately: for row-store and variable-length
+ * column-store objects we have "deleted" values and so returned objects actually exist:
+ * fixed-length column-store objects are filled-in if they don't exist, that is, if you create
+ * record 37, records 1-36 magically appear. Those records can't be deleted, which means we have to
+ * ignore already "deleted" records.
  *
- * First, call the cursor search method to re-position the cursor: we
- * may not have a cursor position (if the higher-level truncate code
- * switched the cursors to have an "external" cursor key, and because
- * we don't save a copy of the page's write generation information,
- * which we need to remove records).
+ * First, call the cursor search method to re-position the cursor: we may not have a cursor position
+ * (if the higher-level truncate code switched the cursors to have an "external" cursor key, and
+ * because we don't save a copy of the page's write generation information, which we need to remove
+ * records).
  *
- * Once that's done, we can delete records without a full search, unless
- * we encounter a restart error because the page was modified by some
- * other thread of control; in that case, repeat the full search to
- * refresh the page's modification information.
+ * Once that's done, we can delete records without a full search, unless we encounter a restart
+ * error because the page was modified by some other thread of control; in that case, repeat the
+ * full search to refresh the page's modification information.
  */
 retry:
     WT_ERR(__wt_btcur_search(start));
@@ -1764,13 +1744,12 @@ __wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
     WT_STAT_DATA_INCR(session, cursor_truncate);
 
     /*
-     * For recovery, log the start and stop keys for a truncate operation,
-     * not the individual records removed.  On the other hand, for rollback
-     * we need to keep track of all the in-memory operations.
+     * For recovery, log the start and stop keys for a truncate operation, not the individual
+     * records removed. On the other hand, for rollback we need to keep track of all the in-memory
+     * operations.
      *
-     * We deal with this here by logging the truncate range first, then (in
-     * the logging code) disabling writing of the in-memory remove records
-     * to disk.
+     * We deal with this here by logging the truncate range first, then (in the logging code)
+     * disabling writing of the in-memory remove records to disk.
      */
     if (FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED))
         WT_RET(__wt_txn_truncate_log(session, start, stop));

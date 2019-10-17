@@ -26,12 +26,10 @@ __wt_btree_page_version_config(WT_SESSION_IMPL *session)
     conn = S2C(session);
 
 /*
- * Write timestamp format pages if at the right version or if configured
- * at build-time.
+ * Write timestamp format pages if at the right version or if configured at build-time.
  *
- * WiredTiger version where timestamp page format is written. This is a
- * future release, and the values may require update when the release is
- * named.
+ * WiredTiger version where timestamp page format is written. This is a future release, and the
+ * values may require update when the release is named.
  */
 #define WT_VERSION_TS_MAJOR 3
 #define WT_VERSION_TS_MINOR 3
@@ -201,17 +199,15 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
     }
 
     /*
-     * Eviction ignores trees until the handle's open flag is set, configure
-     * eviction before that happens.
+     * Eviction ignores trees until the handle's open flag is set, configure eviction before that
+     * happens.
      *
-     * Files that can still be bulk-loaded cannot be evicted.
-     * Permanently cache-resident files can never be evicted.
-     * Special operations don't enable eviction. The underlying commands may
-     * turn on eviction (for example, verify turns on eviction while working
-     * a file to keep from consuming the cache), but it's their decision. If
-     * an underlying command reconfigures eviction, it must either clear the
-     * evict-disabled-open flag or restore the eviction configuration when
-     * finished so that handle close behaves correctly.
+     * Files that can still be bulk-loaded cannot be evicted. Permanently cache-resident files can
+     * never be evicted. Special operations don't enable eviction. The underlying commands may turn
+     * on eviction (for example, verify turns on eviction while working a file to keep from
+     * consuming the cache), but it's their decision. If an underlying command reconfigures
+     * eviction, it must either clear the evict-disabled-open flag or restore the eviction
+     * configuration when finished so that handle close behaves correctly.
      */
     if (btree->original || F_ISSET(btree, WT_BTREE_IN_MEMORY | WT_BTREE_REBALANCE |
                                WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
@@ -243,12 +239,10 @@ __wt_btree_close(WT_SESSION_IMPL *session)
     btree = S2BT(session);
 
     /*
-     * The close process isn't the same as discarding the handle: we might
-     * re-open the handle, which isn't a big deal, but the backing blocks
-     * for the handle may not yet have been discarded from the cache, and
-     * eviction uses WT_BTREE structure elements. Free backing resources
-     * but leave the rest alone, and we'll discard the structure when we
-     * discard the data handle.
+     * The close process isn't the same as discarding the handle: we might re-open the handle, which
+     * isn't a big deal, but the backing blocks for the handle may not yet have been discarded from
+     * the cache, and eviction uses WT_BTREE structure elements. Free backing resources but leave
+     * the rest alone, and we'll discard the structure when we discard the data handle.
      *
      * Handles can be closed multiple times, ignore all but the first.
      */
@@ -532,14 +526,12 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
     if (btree->compressor != NULL && btree->compressor->compress != NULL &&
       btree->type != BTREE_COL_FIX) {
         /*
-         * Don't do compression adjustment when on-disk page sizes are
-         * less than 16KB. There's not enough compression going on to
-         * fine-tune the size, all we end up doing is hammering shared
-         * memory.
+         * Don't do compression adjustment when on-disk page sizes are less than 16KB. There's not
+         * enough compression going on to fine-tune the size, all we end up doing is hammering
+         * shared memory.
          *
-         * Don't do compression adjustment when on-disk page sizes are
-         * equal to the maximum in-memory page image, the bytes taken
-         * for compression can't grow past the base value.
+         * Don't do compression adjustment when on-disk page sizes are equal to the maximum
+         * in-memory page image, the bytes taken for compression can't grow past the base value.
          */
         if (btree->maxintlpage >= 16 * 1024 && btree->maxmempage_image > btree->maxintlpage) {
             btree->intlpage_compadjust = true;
@@ -611,9 +603,8 @@ __wt_btree_tree_open(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_
     WT_CLEAR(dsk);
 
     /*
-     * Read and verify the page (verify to catch encrypted objects we can't
-     * decrypt, where we read the object successfully but we can't decrypt
-     * it, and we want to fail gracefully).
+     * Read and verify the page (verify to catch encrypted objects we can't decrypt, where we read
+     * the object successfully but we can't decrypt it, and we want to fail gracefully).
      *
      * Create a printable version of the address to pass to verify.
      */
@@ -939,8 +930,8 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
     /*
      * Get the maximum internal/leaf page key/value sizes.
      *
-     * In-memory configuration overrides any key/value sizes, there's no
-     * such thing as an overflow item in an in-memory configuration.
+     * In-memory configuration overrides any key/value sizes, there's no such thing as an overflow
+     * item in an in-memory configuration.
      */
     if (F_ISSET(conn, WT_CONN_IN_MEMORY)) {
         btree->maxintlkey = WT_BTREE_MAX_OBJECT_SIZE;
@@ -971,13 +962,12 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
     }
 
     /*
-     * Default/maximum for internal and leaf page keys: split-page / 10.
-     * Default for leaf page values: split-page / 2.
+     * Default/maximum for internal and leaf page keys: split-page / 10. Default for leaf page
+     * values: split-page / 2.
      *
-     * It's difficult for applications to configure this in any exact way as
-     * they have to duplicate our calculation of how many keys must fit on a
-     * page, and given a split-percentage and page header, that isn't easy
-     * to do. If the maximum internal key value is too large for the page,
+     * It's difficult for applications to configure this in any exact way as they have to duplicate
+     * our calculation of how many keys must fit on a page, and given a split-percentage and page
+     * header, that isn't easy to do. If the maximum internal key value is too large for the page,
      * reset it to the default.
      */
     if (btree->maxintlkey == 0 || btree->maxintlkey > intl_split_size / 10)

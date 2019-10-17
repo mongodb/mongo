@@ -46,17 +46,14 @@ __col_insert_search_gt(WT_INSERT_HEAD *ins_head, uint64_t recno)
     }
 
     /*
-     * If we didn't find any records greater than or equal to the target,
-     * we never set the return value, set it to the first record in the
-     * list.
+     * If we didn't find any records greater than or equal to the target, we never set the return
+     * value, set it to the first record in the list.
      *
-     * Otherwise, it references a record less-than-or-equal to the target,
-     * move to a later record, that is, a subsequent record greater than
-     * the target.  Because inserts happen concurrently, additional records
-     * might be inserted after the searched-for record that are still
-     * smaller than the target, continue to move forward until reaching a
-     * record larger than the target. There isn't any safety testing
-     * because we confirmed such a record exists before searching.
+     * Otherwise, it references a record less-than-or-equal to the target, move to a later record,
+     * that is, a subsequent record greater than the target. Because inserts happen concurrently,
+     * additional records might be inserted after the searched-for record that are still smaller
+     * than the target, continue to move forward until reaching a record larger than the target.
+     * There isn't any safety testing because we confirmed such a record exists before searching.
      */
     if ((ins = ret_ins) == NULL)
         ins = WT_SKIP_FIRST(ins_head);
@@ -282,11 +279,10 @@ __col_var_search(WT_REF *ref, uint64_t recno, uint64_t *start_recnop)
     /*
      * Find the matching slot.
      *
-     * This is done in two stages: first, we do a binary search among any
-     * repeating records to find largest repeating less than the search key.
-     * Once there, we can do a simple offset calculation to find the correct
-     * slot for this record number, because we know any intervening records
-     * have repeat counts of 1.
+     * This is done in two stages: first, we do a binary search among any repeating records to find
+     * largest repeating less than the search key. Once there, we can do a simple offset calculation
+     * to find the correct slot for this record number, because we know any intervening records have
+     * repeat counts of 1.
      */
     for (base = 0, limit = WT_COL_VAR_REPEAT_SET(page) ? page->pg_var_nrepeats : 0; limit != 0;
          limit >>= 1) {

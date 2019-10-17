@@ -325,13 +325,12 @@ __session_close(WT_SESSION *wt_session, const char *config)
     WT_STAT_CONN_DECR(session, session_open);
 
     /*
-     * Sessions are re-used, clear the structure: the clear sets the active
-     * field to 0, which will exclude the hazard array from review by the
-     * eviction thread. Because some session fields are accessed by other
-     * threads, the structure must be cleared carefully.
+     * Sessions are re-used, clear the structure: the clear sets the active field to 0, which will
+     * exclude the hazard array from review by the eviction thread. Because some session fields are
+     * accessed by other threads, the structure must be cleared carefully.
      *
-     * We don't need to publish here, because regardless of the active field
-     * being non-zero, the hazard pointer is always valid.
+     * We don't need to publish here, because regardless of the active field being non-zero, the
+     * hazard pointer is always valid.
      */
     __session_clear(session);
     session = conn->default_session;
@@ -423,12 +422,11 @@ __session_open_cursor_int(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *
     *cursorp = NULL;
 
     /*
-     * Open specific cursor types we know about, or call the generic data
-     * source open function.
+     * Open specific cursor types we know about, or call the generic data source open function.
      *
-     * Unwind a set of string comparisons into a switch statement hoping
-     * the compiler can make it fast, but list the common choices first
-     * instead of sorting so if/else patterns are still fast.
+     * Unwind a set of string comparisons into a switch statement hoping the compiler can make it
+     * fast, but list the common choices first instead of sorting so if/else patterns are still
+     * fast.
      */
     switch (uri[0]) {
     /*
@@ -596,13 +594,12 @@ err:
             WT_TRET(cursor->close(cursor));
     }
     /*
-     * Opening a cursor on a non-existent data source will set ret to
-     * either of ENOENT or WT_NOTFOUND at this point. However,
-     * applications may reasonably do this inside a transaction to check
-     * for the existence of a table or index.
+     * Opening a cursor on a non-existent data source will set ret to either of ENOENT or
+     * WT_NOTFOUND at this point. However, applications may reasonably do this inside a transaction
+     * to check for the existence of a table or index.
      *
-     * Failure in opening a cursor should not set an error on the
-     * transaction and WT_NOTFOUND will be mapped to ENOENT.
+     * Failure in opening a cursor should not set an error on the transaction and WT_NOTFOUND will
+     * be mapped to ENOENT.
      */
 
     API_END_RET_NO_TXN_ERROR(session, ret);
@@ -1350,15 +1347,14 @@ __wt_session_range_truncate(
         WT_ERR(__wt_bad_object_type(session, stop->uri));
 
     /*
-     * If both cursors set, check they're correctly ordered with respect to
-     * each other.  We have to test this before any search, the search can
-     * change the initial cursor position.
+     * If both cursors set, check they're correctly ordered with respect to each other. We have to
+     * test this before any search, the search can change the initial cursor position.
      *
-     * Rather happily, the compare routine will also confirm the cursors
-     * reference the same object and the keys are set.
+     * Rather happily, the compare routine will also confirm the cursors reference the same object
+     * and the keys are set.
      *
-     * The test for a NULL start comparison function isn't necessary (we
-     * checked it above), but it quiets clang static analysis complaints.
+     * The test for a NULL start comparison function isn't necessary (we checked it above), but it
+     * quiets clang static analysis complaints.
      */
     if (start != NULL && stop != NULL && start->compare != NULL) {
         WT_ERR(start->compare(start, stop, &cmp));
@@ -1391,13 +1387,12 @@ __wt_session_range_truncate(
         }
 
     /*
-     * We always truncate in the forward direction because the underlying
-     * data structures can move through pages faster forward than backward.
-     * If we don't have a start cursor, create one and position it at the
-     * first record.
+     * We always truncate in the forward direction because the underlying data structures can move
+     * through pages faster forward than backward. If we don't have a start cursor, create one and
+     * position it at the first record.
      *
-     * If start is NULL, stop must not be NULL, but static analyzers have
-     * a hard time with that, test explicitly.
+     * If start is NULL, stop must not be NULL, but static analyzers have a hard time with that,
+     * test explicitly.
      */
     if (start == NULL && stop != NULL) {
         WT_ERR(__session_open_cursor((WT_SESSION *)session, stop->uri, NULL, NULL, &start));
@@ -1421,9 +1416,8 @@ err:
     /*
      * Close any locally-opened start cursor.
      *
-     * Reset application cursors, they've possibly moved and the
-     * application cannot use them.  Note that we can make it here with a
-     * NULL start cursor (e.g., if the truncate range is empty).
+     * Reset application cursors, they've possibly moved and the application cannot use them. Note
+     * that we can make it here with a NULL start cursor (e.g., if the truncate range is empty).
      */
     if (local_start)
         WT_TRET(start->close(start));
@@ -1450,12 +1444,12 @@ __session_truncate(
     WT_STAT_CONN_INCR(session, cursor_truncate);
 
     /*
-     * If the URI is specified, we don't need a start/stop, if start/stop
-     * is specified, we don't need a URI.  One exception is the log URI
-     * which may truncate (archive) log files for a backup cursor.
+     * If the URI is specified, we don't need a start/stop, if start/stop is specified, we don't
+     * need a URI. One exception is the log URI which may truncate (archive) log files for a backup
+     * cursor.
      *
-     * If no URI is specified, and both cursors are specified, start/stop
-     * must reference the same object.
+     * If no URI is specified, and both cursors are specified, start/stop must reference the same
+     * object.
      *
      * Any specified cursor must have been initialized.
      */
@@ -1956,17 +1950,14 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
     WT_ERR(__wt_inmem_unsupported_op(session, NULL));
 
     /*
-     * Checkpoints require a snapshot to write a transactionally consistent
-     * snapshot of the data.
+     * Checkpoints require a snapshot to write a transactionally consistent snapshot of the data.
      *
-     * We can't use an application's transaction: if it has uncommitted
-     * changes, they will be written in the checkpoint and may appear after
-     * a crash.
+     * We can't use an application's transaction: if it has uncommitted changes, they will be
+     * written in the checkpoint and may appear after a crash.
      *
-     * Use a real snapshot transaction: we don't want any chance of the
-     * snapshot being updated during the checkpoint.  Eviction is prevented
-     * from evicting anything newer than this because we track the oldest
-     * transaction ID in the system that is not visible to all readers.
+     * Use a real snapshot transaction: we don't want any chance of the snapshot being updated
+     * during the checkpoint. Eviction is prevented from evicting anything newer than this because
+     * we track the oldest transaction ID in the system that is not visible to all readers.
      */
     WT_ERR(__wt_txn_context_check(session, false));
 

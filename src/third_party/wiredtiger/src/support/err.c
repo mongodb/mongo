@@ -228,14 +228,13 @@ __eventv(WT_SESSION_IMPL *session, bool msg_event, int error, const char *func, 
 
     if (error != 0) {
         /*
-         * When the engine calls __wt_err on error, it often outputs an
-         * error message including the string associated with the error
-         * it's returning.  We could change the calls to call __wt_errx,
-         * but it's simpler to not append an error string if all we are
-         * doing is duplicating an existing error string.
+         * When the engine calls __wt_err on error, it often outputs an error message including the
+         * string associated with the error it's returning. We could change the calls to call
+         * __wt_errx, but it's simpler to not append an error string if all we are doing is
+         * duplicating an existing error string.
          *
-         * Use strcmp to compare: both strings are nul-terminated, and
-         * we don't want to run past the end of the buffer.
+         * Use strcmp to compare: both strings are nul-terminated, and we don't want to run past the
+         * end of the buffer.
          */
         err = __wt_strerror(session, error, NULL, 0);
         len = strlen(err);
@@ -244,18 +243,15 @@ __eventv(WT_SESSION_IMPL *session, bool msg_event, int error, const char *func, 
     }
 
     /*
-     * If a handler fails, return the error status: if we're in the process
-     * of handling an error, any return value we provide will be ignored by
-     * our caller, our caller presumably already has an error value it will
-     * be returning.
+     * If a handler fails, return the error status: if we're in the process of handling an error,
+     * any return value we provide will be ignored by our caller, our caller presumably already has
+     * an error value it will be returning.
      *
-     * If an application-specified or default informational message handler
-     * fails, complain using the application-specified or default error
-     * handler.
+     * If an application-specified or default informational message handler fails, complain using
+     * the application-specified or default error handler.
      *
-     * If an application-specified error message handler fails, complain
-     * using the default error handler.  If the default error handler fails,
-     * fallback to stderr.
+     * If an application-specified error message handler fails, complain using the default error
+     * handler. If the default error handler fails, fallback to stderr.
      */
     wt_session = (WT_SESSION *)session;
     handler = session->event_handler;

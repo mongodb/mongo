@@ -310,11 +310,9 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp, const char *
                 /*
                  * Read the item we're about to overwrite.
                  *
-                 * There is subtlety here: the value format
-                 * may not exactly match the cursor's format.
-                 * In particular, we need lengths with raw
-                 * columns in the middle of a packed struct,
-                 * but not if they are at the end of a struct.
+                 * There is subtlety here: the value format may not exactly match the cursor's
+                 * format. In particular, we need lengths with raw columns in the middle of a packed
+                 * struct, but not if they are at the end of a struct.
                  */
                 WT_RET(__pack_next(&pack, &pv));
 

@@ -115,14 +115,12 @@ __wt_session_lock_dhandle(WT_SESSION_IMPL *session, uint32_t flags, bool *is_dea
     want_exclusive = LF_ISSET(WT_DHANDLE_EXCLUSIVE);
 
     /*
-     * If this session already has exclusive access to the handle, there is
-     * no point trying to lock it again.
+     * If this session already has exclusive access to the handle, there is no point trying to lock
+     * it again.
      *
-     * This should only happen if a checkpoint handle is locked multiple
-     * times during a checkpoint operation, or the handle is already open
-     * without any special flags.  In particular, it must fail if
-     * attempting to checkpoint a handle opened for a bulk load, even in
-     * the same session.
+     * This should only happen if a checkpoint handle is locked multiple times during a checkpoint
+     * operation, or the handle is already open without any special flags. In particular, it must
+     * fail if attempting to checkpoint a handle opened for a bulk load, even in the same session.
      */
     if (dhandle->excl_session == session) {
         if (!LF_ISSET(WT_DHANDLE_LOCK_ONLY) &&
@@ -134,14 +132,12 @@ __wt_session_lock_dhandle(WT_SESSION_IMPL *session, uint32_t flags, bool *is_dea
     }
 
     /*
-     * Check that the handle is open.  We've already incremented
-     * the reference count, so once the handle is open it won't be
-     * closed by another thread.
+     * Check that the handle is open. We've already incremented the reference count, so once the
+     * handle is open it won't be closed by another thread.
      *
-     * If we can see the WT_DHANDLE_OPEN flag set while holding a
-     * lock on the handle, then it's really open and we can start
-     * using it.  Alternatively, if we can get an exclusive lock
-     * and WT_DHANDLE_OPEN is still not set, we need to do the open.
+     * If we can see the WT_DHANDLE_OPEN flag set while holding a lock on the handle, then it's
+     * really open and we can start using it. Alternatively, if we can get an exclusive lock and
+     * WT_DHANDLE_OPEN is still not set, we need to do the open.
      */
     for (;;) {
         /* If the handle is dead, give up. */
@@ -159,11 +155,10 @@ __wt_session_lock_dhandle(WT_SESSION_IMPL *session, uint32_t flags, bool *is_dea
         /*
          * If the handle is open, get a read lock and recheck.
          *
-         * Wait for a read lock if we want exclusive access and failed
-         * to get it: the sweep server may be closing this handle, and
-         * we need to wait for it to release its lock.  If we want
-         * exclusive access and find the handle open once we get the
-         * read lock, give up: some other thread has it locked for real.
+         * Wait for a read lock if we want exclusive access and failed to get it: the sweep server
+         * may be closing this handle, and we need to wait for it to release its lock. If we want
+         * exclusive access and find the handle open once we get the read lock, give up: some other
+         * thread has it locked for real.
          */
         if (F_ISSET(dhandle, WT_DHANDLE_OPEN) && (!want_exclusive || lock_busy)) {
             __wt_readlock(session, &dhandle->rwlock);
@@ -324,16 +319,15 @@ retry:
     __wt_free(session, checkpoint);
 
     /*
-     * There's a potential race: we get the name of the most recent unnamed
-     * checkpoint, but if it's discarded (or locked so it can be discarded)
-     * by the time we try to open it, we'll fail the open.  Retry in those
-     * cases, a new "last" checkpoint should surface, and we can't return an
-     * error, the application will be justifiably upset if we can't open the
-     * last checkpoint instance of an object.
+     * There's a potential race: we get the name of the most recent unnamed checkpoint, but if it's
+     * discarded (or locked so it can be discarded) by the time we try to open it, we'll fail the
+     * open. Retry in those cases, a new "last" checkpoint should surface, and we can't return an
+     * error, the application will be justifiably upset if we can't open the last checkpoint
+     * instance of an object.
      *
-     * The check against WT_NOTFOUND is correct: if there was no checkpoint
-     * for the object (that is, the object has never been in a checkpoint),
-     * we returned immediately after the call to search for that name.
+     * The check against WT_NOTFOUND is correct: if there was no checkpoint for the object (that is,
+     * the object has never been in a checkpoint), we returned immediately after the call to search
+     * for that name.
      */
     if (last_ckpt && (ret == WT_NOTFOUND || ret == EBUSY))
         goto retry;
@@ -485,14 +479,12 @@ __wt_session_get_dhandle(WT_SESSION_IMPL *session, const char *uri, const char *
         WT_ASSERT(session, F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE));
 
         /*
-         * For now, we need the schema lock and handle list locks to
-         * open a file for real.
+         * For now, we need the schema lock and handle list locks to open a file for real.
          *
-         * Code needing exclusive access (such as drop or verify)
-         * assumes that it can close all open handles, then open an
-         * exclusive handle on the active tree and no other threads can
-         * reopen handles in the meantime.  A combination of the schema
-         * and handle list locks are used to enforce this.
+         * Code needing exclusive access (such as drop or verify) assumes that it can close all open
+         * handles, then open an exclusive handle on the active tree and no other threads can reopen
+         * handles in the meantime. A combination of the schema and handle list locks are used to
+         * enforce this.
          */
         if (!F_ISSET(session, WT_SESSION_LOCKED_SCHEMA)) {
             dhandle->excl_session = NULL;

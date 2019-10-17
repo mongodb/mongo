@@ -291,11 +291,10 @@ main(int argc, char *argv[])
         testutil_die(ret, "wiredtiger_open readonly nolock");
 
     /*
-     * Create a child to also open a connection handle to the databases.
-     * We cannot use fork here because using fork the child inherits the
-     * same memory image.  Therefore the WT process structure is set in
-     * the child even though it should not be.  So use 'system' to spawn
-     * an entirely new process.
+     * Create a child to also open a connection handle to the databases. We cannot use fork here
+     * because using fork the child inherits the same memory image. Therefore the WT process
+     * structure is set in the child even though it should not be. So use 'system' to spawn an
+     * entirely new process.
      *
      * The child will exit with success if its test passes.
      */

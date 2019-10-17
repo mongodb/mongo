@@ -327,17 +327,14 @@ __wt_block_verify_addr(
     WT_RET(__verify_filefrag_add(session, block, NULL, offset, size, false));
 
     /*
-     * It's tempting to try and flag a page as "verified" when we read it.
-     * That doesn't work because we may visit a page multiple times when
-     * verifying a single checkpoint (for example, when verifying the
-     * physical image of a row-store leaf page with overflow keys, the
-     * overflow keys are read when checking for key sort issues, and read
-     * again when more general overflow item checking is done).  This
-     * function is called by the btree verification code, once per logical
-     * visit in a checkpoint, so we can detect if a page is referenced
-     * multiple times within a single checkpoint.  This doesn't apply to
-     * the per-file list, because it is expected for the same btree blocks
-     * to appear in multiple checkpoints.
+     * It's tempting to try and flag a page as "verified" when we read it. That doesn't work because
+     * we may visit a page multiple times when verifying a single checkpoint (for example, when
+     * verifying the physical image of a row-store leaf page with overflow keys, the overflow keys
+     * are read when checking for key sort issues, and read again when more general overflow item
+     * checking is done). This function is called by the btree verification code, once per logical
+     * visit in a checkpoint, so we can detect if a page is referenced multiple times within a
+     * single checkpoint. This doesn't apply to the per-file list, because it is expected for the
+     * same btree blocks to appear in multiple checkpoints.
      *
      * Add the block to the per-checkpoint list.
      */
@@ -401,14 +398,12 @@ __verify_filefrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
         return (0);
 
     /*
-     * It's OK if we have not verified blocks at the end of the file: that
-     * happens if the file is truncated during a checkpoint or load or was
-     * extended after writing a checkpoint.  We should never see unverified
-     * blocks anywhere else, though.
+     * It's OK if we have not verified blocks at the end of the file: that happens if the file is
+     * truncated during a checkpoint or load or was extended after writing a checkpoint. We should
+     * never see unverified blocks anywhere else, though.
      *
-     * I'm deliberately testing for a last fragment of 0, it makes no sense
-     * there would be no fragments verified, complain if the first fragment
-     * in the file wasn't verified.
+     * I'm deliberately testing for a last fragment of 0, it makes no sense there would be no
+     * fragments verified, complain if the first fragment in the file wasn't verified.
      */
     for (last = block->frags - 1; last != 0; --last) {
         if (__bit_test(block->fragfile, last))

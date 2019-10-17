@@ -87,15 +87,13 @@ __curds_cursor_resolve(WT_CURSOR *cursor, int ret)
     source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
     /*
-     * Update the cursor's key, value and flags.  (We use the _INT flags in
-     * the same way as file objects: there's some chance the underlying data
-     * source is passing us a reference to data only pinned per operation,
-     * might as well be safe.)
+     * Update the cursor's key, value and flags. (We use the _INT flags in the same way as file
+     * objects: there's some chance the underlying data source is passing us a reference to data
+     * only pinned per operation, might as well be safe.)
      *
-     * There's also a requirement the underlying data-source never returns
-     * with the cursor/source key referencing application memory: it'd be
-     * great to do a copy as necessary here so the data-source doesn't have
-     * to worry about copying the key, but we don't have enough information
+     * There's also a requirement the underlying data-source never returns with the cursor/source
+     * key referencing application memory: it'd be great to do a copy as necessary here so the
+     * data-source doesn't have to worry about copying the key, but we don't have enough information
      * to know if a cursor is pointing at application or data-source memory.
      */
     if (ret == 0) {

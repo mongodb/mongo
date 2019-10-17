@@ -84,17 +84,15 @@
 #define WT_CELL_TXN_STOP 0x10   /* Newest-stop txn ID */
 
 /*
- * WT_CELL_ADDR_INT is an internal block location, WT_CELL_ADDR_LEAF is a leaf
- * block location, and WT_CELL_ADDR_LEAF_NO is a leaf block location where the
- * page has no overflow items.  (The goal is to speed up truncation as we don't
- * have to read pages without overflow items in order to delete them.  Note,
- * WT_CELL_ADDR_LEAF_NO is not guaranteed to be set on every page without
- * overflow items, the only guarantee is that if set, the page has no overflow
- * items.)
+ * WT_CELL_ADDR_INT is an internal block location, WT_CELL_ADDR_LEAF is a leaf block location, and
+ * WT_CELL_ADDR_LEAF_NO is a leaf block location where the page has no overflow items. (The goal is
+ * to speed up truncation as we don't have to read pages without overflow items in order to delete
+ * them. Note, WT_CELL_ADDR_LEAF_NO is not guaranteed to be set on every page without overflow
+ * items, the only guarantee is that if set, the page has no overflow items.)
  *
- * WT_CELL_VALUE_COPY is a reference to a previous cell on the page, supporting
- * value dictionaries: if the two values are the same, we only store them once
- * and have any second and subsequent uses reference the original.
+ * WT_CELL_VALUE_COPY is a reference to a previous cell on the page, supporting value dictionaries:
+ * if the two values are the same, we only store them once and have any second and subsequent uses
+ * reference the original.
  */
 #define WT_CELL_ADDR_DEL (0)            /* Address: deleted */
 #define WT_CELL_ADDR_INT (1 << 4)       /* Address: internal  */

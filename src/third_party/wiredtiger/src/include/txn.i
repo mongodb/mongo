@@ -136,13 +136,11 @@ __txn_resolve_prepared_update(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 
     txn = &session->txn;
     /*
-     * In case of a prepared transaction, the order of modification of the
-     * prepare timestamp to commit timestamp in the update chain will not
-     * affect the data visibility, a reader will encounter a prepared
-     * update resulting in prepare conflict.
+     * In case of a prepared transaction, the order of modification of the prepare timestamp to
+     * commit timestamp in the update chain will not affect the data visibility, a reader will
+     * encounter a prepared update resulting in prepare conflict.
      *
-     * As updating timestamp might not be an atomic operation, we will
-     * manage using state.
+     * As updating timestamp might not be an atomic operation, we will manage using state.
      */
     upd->prepare_state = WT_PREPARE_LOCKED;
     WT_WRITE_BARRIER();
@@ -552,14 +550,12 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
     WT_READ_BARRIER();
 
     /*
-     * Checkpoint transactions often fall behind ordinary application
-     * threads.  Take special effort to not keep changes pinned in cache
-     * if they are only required for the checkpoint and it has already
-     * seen them.
+     * Checkpoint transactions often fall behind ordinary application threads. Take special effort
+     * to not keep changes pinned in cache if they are only required for the checkpoint and it has
+     * already seen them.
      *
-     * If there is no active checkpoint or this handle is up to date with
-     * the active checkpoint then it's safe to ignore the checkpoint ID in
-     * the visibility check.
+     * If there is no active checkpoint or this handle is up to date with the active checkpoint then
+     * it's safe to ignore the checkpoint ID in the visibility check.
      */
     checkpoint_pinned = txn_global->checkpoint_state.pinned_id;
     if (checkpoint_pinned == WT_TXN_NONE || WT_TXNID_LT(oldest_id, checkpoint_pinned))
@@ -586,14 +582,12 @@ __wt_txn_pinned_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *pinned_tsp)
     *pinned_tsp = pinned_ts = txn_global->pinned_timestamp;
 
     /*
-     * Checkpoint transactions often fall behind ordinary application
-     * threads.  Take special effort to not keep changes pinned in cache if
-     * they are only required for the checkpoint and it has already seen
-     * them.
+     * Checkpoint transactions often fall behind ordinary application threads. Take special effort
+     * to not keep changes pinned in cache if they are only required for the checkpoint and it has
+     * already seen them.
      *
-     * If there is no active checkpoint or this handle is up to date with
-     * the active checkpoint then it's safe to ignore the checkpoint ID in
-     * the visibility check.
+     * If there is no active checkpoint or this handle is up to date with the active checkpoint then
+     * it's safe to ignore the checkpoint ID in the visibility check.
      */
     include_checkpoint_txn =
       btree == NULL || (!F_ISSET(btree, WT_BTREE_LOOKASIDE) &&
@@ -709,13 +703,11 @@ __txn_visible_id(WT_SESSION_IMPL *session, uint64_t id)
         return (true);
 
     /*
-     * WT_ISO_SNAPSHOT, WT_ISO_READ_COMMITTED: the ID is visible if it is
-     * not the result of a concurrent transaction, that is, if was
-     * committed before the snapshot was taken.
+     * WT_ISO_SNAPSHOT, WT_ISO_READ_COMMITTED: the ID is visible if it is not the result of a
+     * concurrent transaction, that is, if was committed before the snapshot was taken.
      *
-     * The order here is important: anything newer than the maximum ID we
-     * saw when taking the snapshot should be invisible, even if the
-     * snapshot is empty.
+     * The order here is important: anything newer than the maximum ID we saw when taking the
+     * snapshot should be invisible, even if the snapshot is empty.
      */
     if (WT_TXNID_LE(txn->snap_max, id))
         return (false);
@@ -793,19 +785,6 @@ __wt_txn_upd_visible_type(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 }
 
 /*
- * __wt_txn_upd_durable --
- *     Can the current transaction make the given update durable.
- */
-static inline bool
-__wt_txn_upd_durable(WT_SESSION_IMPL *session, WT_UPDATE *upd)
-{
-    /* If update is visible then check if it is durable. */
-    if (__wt_txn_upd_visible_type(session, upd) != WT_VISIBLE_TRUE)
-        return (false);
-    return (__wt_txn_visible(session, upd->txnid, upd->durable_ts));
-}
-
-/*
  * __wt_txn_upd_visible --
  *     Can the current transaction see the given update.
  */
@@ -871,8 +850,12 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
         if (session->ncursors > 0)
             WT_RET(__wt_session_copy_values(session));
 
-        /* Stall here if the cache is completely full. */
-        WT_RET(__wt_cache_eviction_check(session, false, true, NULL));
+        /*
+         * Stall here if the cache is completely full. We have allocated a transaction ID which
+         * makes it possible for eviction to decide we're contributing to the problem and return
+         * WT_ROLLBACK. The WT_SESSION.begin_transaction API can't return rollback, continue on.
+         */
+        WT_RET_ERROR_OK(__wt_cache_eviction_check(session, false, true, NULL), WT_ROLLBACK);
 
         __wt_txn_get_snapshot(session);
     }
@@ -945,26 +928,21 @@ __wt_txn_id_alloc(WT_SESSION_IMPL *session, bool publish)
     /*
      * Allocating transaction IDs involves several steps.
      *
-     * Firstly, publish that this transaction is allocating its ID, then
-     * publish the transaction ID as the current global ID.  Note that this
-     * transaction ID might not be unique among threads and hence not valid
-     * at this moment. The flag will notify other transactions that are
-     * attempting to get their own snapshot for this transaction ID to
-     * retry.
+     * Firstly, publish that this transaction is allocating its ID, then publish the transaction ID
+     * as the current global ID. Note that this transaction ID might not be unique among threads and
+     * hence not valid at this moment. The flag will notify other transactions that are attempting
+     * to get their own snapshot for this transaction ID to retry.
      *
-     * Then we do an atomic increment to allocate a unique ID. This will
-     * give the valid ID to this transaction that we publish to the global
-     * transaction table.
+     * Then we do an atomic increment to allocate a unique ID. This will give the valid ID to this
+     * transaction that we publish to the global transaction table.
      *
-     * We want the global value to lead the allocated values, so that any
-     * allocated transaction ID eventually becomes globally visible.  When
-     * there are no transactions running, the oldest_id will reach the
-     * global current ID, so we want post-increment semantics.  Our atomic
-     * add primitive does pre-increment, so adjust the result here.
+     * We want the global value to lead the allocated values, so that any allocated transaction ID
+     * eventually becomes globally visible. When there are no transactions running, the oldest_id
+     * will reach the global current ID, so we want post-increment semantics. Our atomic add
+     * primitive does pre-increment, so adjust the result here.
      *
-     * We rely on atomic reads of the current ID to create snapshots, so
-     * for unlocked reads to be well defined, we must use an atomic
-     * increment here.
+     * We rely on atomic reads of the current ID to create snapshots, so for unlocked reads to be
+     * well defined, we must use an atomic increment here.
      */
     if (publish) {
         WT_PUBLISH(txn_state->is_allocating, true);
@@ -1095,8 +1073,8 @@ __wt_txn_read_last(WT_SESSION_IMPL *session)
     /*
      * Release the snap_min ID we put in the global table.
      *
-     * If the isolation has been temporarily forced, don't touch the
-     * snapshot here: it will be restored by WT_WITH_TXN_ISOLATION.
+     * If the isolation has been temporarily forced, don't touch the snapshot here: it will be
+     * restored by WT_WITH_TXN_ISOLATION.
      */
     if ((!F_ISSET(txn, WT_TXN_RUNNING) || txn->isolation != WT_ISO_SNAPSHOT) &&
       txn->forced_iso == 0)
@@ -1142,40 +1120,6 @@ __wt_txn_cursor_op(WT_SESSION_IMPL *session)
             txn_state->metadata_pinned = txn_state->pinned_id;
     } else if (!F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))
         __wt_txn_get_snapshot(session);
-}
-
-/*
- * __wt_txn_am_oldest --
- *     Am I the oldest transaction in the system?
- */
-static inline bool
-__wt_txn_am_oldest(WT_SESSION_IMPL *session)
-{
-    WT_CONNECTION_IMPL *conn;
-    WT_TXN *txn;
-    WT_TXN_GLOBAL *txn_global;
-    WT_TXN_STATE *s;
-    uint64_t id;
-    uint32_t i, session_cnt;
-
-    conn = S2C(session);
-    txn = &session->txn;
-    txn_global = &conn->txn_global;
-
-    if (txn->id == WT_TXN_NONE || F_ISSET(txn, WT_TXN_PREPARE))
-        return (false);
-
-    WT_ORDERED_READ(session_cnt, conn->session_cnt);
-    for (i = 0, s = txn_global->states; i < session_cnt; i++, s++)
-        /*
-         * We are checking if the transaction is oldest one in the system. It is safe to ignore any
-         * sessions that are allocating transaction IDs, since we already have an ID, they are
-         * guaranteed to be newer.
-         */
-        if (!s->is_allocating && (id = s->id) != WT_TXN_NONE && WT_TXNID_LT(id, txn->id))
-            return (false);
-
-    return (true);
 }
 
 /*

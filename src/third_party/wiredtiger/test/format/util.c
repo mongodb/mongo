@@ -165,9 +165,8 @@ val_init(void)
     /*
      * Set initial buffer contents to recognizable text.
      *
-     * Add a few extra bytes in order to guarantee we can always offset
-     * into the buffer by a few extra bytes, used to generate different
-     * data for column-store run-length encoded files.
+     * Add a few extra bytes in order to guarantee we can always offset into the buffer by a few
+     * extra bytes, used to generate different data for column-store run-length encoded files.
      */
     val_len = MAX(KILOBYTE(100), g.c_value_max) + 20;
     val_base = dmalloc(val_len);
@@ -351,11 +350,11 @@ path_setup(const char *home)
     testutil_check(__wt_snprintf(g.home_stats, len, "%s/%s", g.home, "stats"));
 
 /*
- * Home directory initialize command: create the directory if it doesn't
- * exist, else remove everything except the RNG log file.
+ * Home directory initialize command: create the directory if it doesn't exist, else remove
+ * everything except the RNG log file.
  *
- * Redirect the "cd" command to /dev/null so chatty cd implementations
- * don't add the new working directory to our output.
+ * Redirect the "cd" command to /dev/null so chatty cd implementations don't add the new working
+ * directory to our output.
  */
 #undef CMD
 #ifdef _WIN32
@@ -398,11 +397,10 @@ path_setup(const char *home)
       "BACKUP_COPY", g.home, "BACKUP", g.home, "BACKUP_COPY"));
 
 /*
- * Salvage command, save the interesting files so we can replay the
- * salvage command as necessary.
+ * Salvage command, save the interesting files so we can replay the salvage command as necessary.
  *
- * Redirect the "cd" command to /dev/null so chatty cd implementations
- * don't add the new working directory to our output.
+ * Redirect the "cd" command to /dev/null so chatty cd implementations don't add the new working
+ * directory to our output.
  */
 #undef CMD
 #ifdef _WIN32
@@ -439,12 +437,11 @@ rng(WT_RAND_STATE *rnd)
         rnd = &g.rnd;
 
     /*
-     * We can reproduce a single-threaded run based on the random numbers
-     * used in the initial run, plus the configuration files.
+     * We can reproduce a single-threaded run based on the random numbers used in the initial run,
+     * plus the configuration files.
      *
-     * Check g.replay and g.rand_log_stop: multithreaded runs log/replay
-     * until they get to the operations phase, then turn off log/replay,
-     * threaded operation order can't be replayed.
+     * Check g.replay and g.rand_log_stop: multithreaded runs log/replay until they get to the
+     * operations phase, then turn off log/replay, threaded operation order can't be replayed.
      */
     if (g.rand_log_stop)
         return (__wt_random(rnd));

@@ -109,12 +109,11 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, uint64_t recno,
     /*
      * Delete, insert or update a column-store entry.
      *
-     * If modifying a previously modified record, cursor.ins will be set to
-     * point to the correct update list. Create a new update entry and link
-     * it into the existing list.
+     * If modifying a previously modified record, cursor.ins will be set to point to the correct
+     * update list. Create a new update entry and link it into the existing list.
      *
-     * Else, allocate an insert array as necessary, build an insert/update
-     * structure pair, and link it into place.
+     * Else, allocate an insert array as necessary, build an insert/update structure pair, and link
+     * it into place.
      */
     if (cbt->compare == 0 && cbt->ins != NULL) {
         /*
@@ -190,17 +189,15 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, uint64_t recno,
         ins_size += upd_size;
 
         /*
-         * If there was no insert list during the search, or there was
-         * no search because the record number has not been allocated
-         * yet, the cursor's information cannot be correct, search
+         * If there was no insert list during the search, or there was no search because the record
+         * number has not been allocated yet, the cursor's information cannot be correct, search
          * couldn't have initialized it.
          *
-         * Otherwise, point the new WT_INSERT item's skiplist to the
-         * next elements in the insert list (which we will check are
-         * still valid inside the serialization function).
+         * Otherwise, point the new WT_INSERT item's skiplist to the next elements in the insert
+         * list (which we will check are still valid inside the serialization function).
          *
-         * The serial mutex acts as our memory barrier to flush these
-         * writes before inserting them into the list.
+         * The serial mutex acts as our memory barrier to flush these writes before inserting them
+         * into the list.
          */
         if (cbt->ins_stack[0] == NULL || recno == WT_RECNO_OOB)
             for (i = 0; i < skipdepth; i++) {

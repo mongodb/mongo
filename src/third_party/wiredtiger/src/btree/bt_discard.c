@@ -24,8 +24,7 @@ void
 __wt_ref_out(WT_SESSION_IMPL *session, WT_REF *ref)
 {
     /*
-     * A version of the page-out function that allows us to make additional
-     * diagnostic checks.
+     * A version of the page-out function that allows us to make additional diagnostic checks.
      *
      * The WT_REF cannot be the eviction thread's location.
      */
@@ -336,9 +335,8 @@ __free_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
     /*
      * Free the in-memory index array.
      *
-     * For each entry, see if the key was an allocation (that is, if it
-     * points somewhere other than the original page), and if so, free
-     * the memory.
+     * For each entry, see if the key was an allocation (that is, if it points somewhere other than
+     * the original page), and if so, free the memory.
      */
     WT_ROW_FOREACH (page, rip, i) {
         copy = WT_ROW_KEY_COPY(rip);

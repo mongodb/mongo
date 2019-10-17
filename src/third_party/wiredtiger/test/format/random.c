@@ -29,28 +29,66 @@
 #include "format.h"
 
 /*
- * compaction --
- *     Periodically do a compaction operation.
+ * random_kv --
+ *     Do random cursor operations.
  */
 WT_THREAD_RET
-compact(void *arg)
+random_kv(void *arg)
 {
     WT_CONNECTION *conn;
+    WT_CURSOR *cursor;
     WT_DECL_RET;
+    WT_ITEM key, value;
     WT_SESSION *session;
+    uint32_t i;
     u_int period;
+    const char *config;
+    bool simple;
 
-    (void)(arg);
+    (void)(arg); /* Unused parameter */
+
+    conn = g.wts_conn;
+
+    /* Random cursor ops are only supported on row-store. */
+    if (g.type != ROW)
+        return (WT_THREAD_RET_VALUE);
 
     /* Open a session. */
-    conn = g.wts_conn;
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
-    /*
-     * Perform compaction at somewhere under 15 seconds (so we get at least one done), and then at
-     * 23 second intervals.
-     */
-    for (period = mmrand(NULL, 1, 15);; period = 23) {
+    for (simple = false;;) {
+        /* Alternate between simple random cursors and sample-size random cursors. */
+        config = simple ? "next_random=true" : "next_random=true,next_random_sample_size=37";
+        simple = !simple;
+
+        /*
+         * open_cursor can return EBUSY if concurrent with a metadata operation, retry in that case.
+         */
+        while ((ret = session->open_cursor(session, g.uri, NULL, config, &cursor)) == EBUSY)
+            __wt_yield();
+        testutil_check(ret);
+
+        /* This is just a smoke-test, get some key/value pairs. */
+        for (i = mmrand(NULL, 0, 1000); i > 0; --i) {
+            switch (ret = cursor->next(cursor)) {
+            case 0:
+                break;
+            case WT_NOTFOUND:
+            case WT_ROLLBACK:
+            case WT_PREPARE_CONFLICT:
+                continue;
+            default:
+                testutil_check(ret);
+            }
+            testutil_check(cursor->get_key(cursor, &key));
+            testutil_check(cursor->get_value(cursor, &value));
+        }
+
+        testutil_check(cursor->close(cursor));
+
+        /* Sleep for some number of seconds. */
+        period = mmrand(NULL, 1, 10);
+
         /* Sleep for short periods so we don't make the run wait. */
         while (period > 0 && !g.workers_finished) {
             --period;
@@ -58,17 +96,6 @@ compact(void *arg)
         }
         if (g.workers_finished)
             break;
-
-        /*
-         * Compact can return EBUSY if concurrent with alter or if there is eviction pressure, or we
-         * collide with checkpoints.
-         *
-         * Compact returns ETIMEDOUT if the compaction doesn't finish in in some number of seconds.
-         * We don't configure a timeout and occasionally exceed the default of 1200 seconds.
-         */
-        ret = session->compact(session, g.uri, NULL);
-        if (ret != 0 && ret != EBUSY && ret != ETIMEDOUT && ret != WT_ROLLBACK)
-            testutil_die(ret, "session.compact");
     }
 
     testutil_check(session->close(session, NULL));

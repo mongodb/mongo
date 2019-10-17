@@ -343,10 +343,9 @@ __wt_eviction_needed(WT_SESSION_IMPL *session, bool busy, bool readonly, double 
     /*
      * Only check the dirty trigger when the session is not busy.
      *
-     * In other words, once we are pinning resources, try to finish the
-     * operation as quickly as possible without exceeding the cache size.
-     * The next transaction in this session will not be able to start until
-     * the cache is under the limit.
+     * In other words, once we are pinning resources, try to finish the operation as quickly as
+     * possible without exceeding the cache size. The next transaction in this session will not be
+     * able to start until the cache is under the limit.
      */
     return (clean_needed || (!busy && dirty_needed));
 }

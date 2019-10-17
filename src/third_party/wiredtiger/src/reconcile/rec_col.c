@@ -26,14 +26,12 @@ __rec_col_fix_bulk_insert_split_check(WT_CURSOR_BULK *cbulk)
     if (cbulk->entry == cbulk->nrecs) {
         if (cbulk->entry != 0) {
             /*
-             * If everything didn't fit, update the counters and
-             * split.
+             * If everything didn't fit, update the counters and split.
              *
              * Boundary: split or write the page.
              *
-             * No need to have a minimum split size boundary, all
-             * pages are filled 100% except the last, allowing it to
-             * grow in the future.
+             * No need to have a minimum split size boundary, all pages are filled 100% except the
+             * last, allowing it to grow in the future.
              */
             __wt_rec_incr(
               session, r, cbulk->entry, __bitstr_size((size_t)cbulk->entry * btree->bitcnt));
@@ -404,14 +402,12 @@ __wt_rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
             }
 
             /*
-             * If everything didn't fit, update the counters and
-             * split.
+             * If everything didn't fit, update the counters and split.
              *
              * Boundary: split or write the page.
              *
-             * No need to have a minimum split size boundary, all
-             * pages are filled 100% except the last, allowing it to
-             * grow in the future.
+             * No need to have a minimum split size boundary, all pages are filled 100% except the
+             * last, allowing it to grow in the future.
              */
             __wt_rec_incr(session, r, entry, __bitstr_size((size_t)entry * btree->bitcnt));
             WT_RET(__wt_rec_split(session, r, 0));
@@ -708,21 +704,16 @@ __wt_rec_col_var(
             goto record_loop;
 
         /*
-         * Overflow items are tricky: we don't know until we're
-         * finished processing the set of values if we need the
-         * overflow value or not.  If we don't use the overflow
-         * item at all, we have to discard it from the backing
-         * file, otherwise we'll leak blocks on the checkpoint.
-         * That's safe because if the backing overflow value is
-         * still needed by any running transaction, we'll cache
-         * a copy in the update list.
+         * Overflow items are tricky: we don't know until we're finished processing the set of
+         * values if we need the overflow value or not. If we don't use the overflow item at all, we
+         * have to discard it from the backing file, otherwise we'll leak blocks on the checkpoint.
+         * That's safe because if the backing overflow value is still needed by any running
+         * transaction, we'll cache a copy in the update list.
          *
-         * Regardless, we avoid copying in overflow records: if
-         * there's a WT_INSERT entry that modifies a reference
-         * counted overflow record, we may have to write copies
-         * of the overflow record, and in that case we'll do the
-         * comparisons, but we don't read overflow items just to
-         * see if they match records on either side.
+         * Regardless, we avoid copying in overflow records: if there's a WT_INSERT entry that
+         * modifies a reference counted overflow record, we may have to write copies of the overflow
+         * record, and in that case we'll do the comparisons, but we don't read overflow items just
+         * to see if they match records on either side.
          */
         if (vpack->ovfl) {
             ovfl_state = OVFL_UNUSED;
@@ -799,15 +790,12 @@ __wt_rec_col_var(
                 }
             } else if (vpack->raw == WT_CELL_VALUE_OVFL_RM) {
                 /*
-                 * If doing an update save and restore, and the
-                 * underlying value is a removed overflow value,
-                 * we end up here.
+                 * If doing an update save and restore, and the underlying value is a removed
+                 * overflow value, we end up here.
                  *
-                 * If necessary, when the overflow value was
-                 * originally removed, reconciliation appended
-                 * a globally visible copy of the value to the
-                 * key's update list, meaning the on-page item
-                 * isn't accessed after page re-instantiation.
+                 * If necessary, when the overflow value was originally removed, reconciliation
+                 * appended a globally visible copy of the value to the key's update list, meaning
+                 * the on-page item isn't accessed after page re-instantiation.
                  *
                  * Assert the case.
                  */
@@ -844,8 +832,7 @@ __wt_rec_col_var(
                     /*
                      * An as-yet-unused overflow item.
                      *
-                     * We're going to copy the on-page cell,
-                     * write out any record we're tracking.
+                     * We're going to copy the on-page cell, write out any record we're tracking.
                      */
                     if (rle != 0) {
                         WT_ERR(__rec_col_var_helper(session, r, salvage, last.value, durable_ts,

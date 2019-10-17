@@ -30,16 +30,14 @@
 /*
  * JIRA ticket reference: WT-2853
  *
- * Test case description: create two threads: one is populating/updating
- * records in a table with a few indices, the other is reading from table and
- * indices.  The test is adapted from one that uses cursor joins, this test
- * does not, but simulates some of the access patterns.
+ * Test case description: create two threads: one is populating/updating records in a table with a
+ * few indices, the other is reading from table and indices. The test is adapted from one that uses
+ * cursor joins, this test does not, but simulates some of the access patterns.
  *
- * Failure mode: after a second or two of progress by both threads, they both
- * appear to slow dramatically, almost locking up.  After some time (I've
- * observed from a half minute to a few minutes), the lock up ends and both
- * threads seem to be inserting and reading at a normal fast pace.  That
- * continues until the test ends (~30 seconds).
+ * Failure mode: after a second or two of progress by both threads, they both appear to slow
+ * dramatically, almost locking up. After some time (I've observed from a half minute to a few
+ * minutes), the lock up ends and both threads seem to be inserting and reading at a normal fast
+ * pace. That continues until the test ends (~30 seconds).
  */
 
 static void *thread_insert(void *);

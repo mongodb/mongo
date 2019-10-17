@@ -116,9 +116,8 @@ zstd_compress(WT_COMPRESSOR *compressor, WT_SESSION *session, uint8_t *src, size
         *compression_failed = 0;
 
         /*
-         * On decompression, Zstd requires an exact compressed byte
-         * count (the current value of zstd_ret). WiredTiger does not
-         * preserve that value, so save zstd_ret at the beginning of
+         * On decompression, Zstd requires an exact compressed byte count (the current value of
+         * zstd_ret). WiredTiger does not preserve that value, so save zstd_ret at the beginning of
          * the destination buffer.
          *
          * Store the value in little-endian format.

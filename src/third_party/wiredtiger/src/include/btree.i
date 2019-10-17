@@ -476,34 +476,29 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
         last_running = S2C(session)->txn_global.last_running;
 
     /*
-     * We depend on the atomic operation being a write barrier, that is, a
-     * barrier to ensure all changes to the page are flushed before updating
-     * the page state and/or marking the tree dirty, otherwise checkpoints
-     * and/or page reconciliation might be looking at a clean page/tree.
+     * We depend on the atomic operation being a write barrier, that is, a barrier to ensure all
+     * changes to the page are flushed before updating the page state and/or marking the tree dirty,
+     * otherwise checkpoints and/or page reconciliation might be looking at a clean page/tree.
      *
-     * Every time the page transitions from clean to dirty, update the cache
-     * and transactional information.
+     * Every time the page transitions from clean to dirty, update the cache and transactional
+     * information.
      *
-     * The page state can only ever be incremented above dirty by the number
-     * of concurrently running threads, so the counter will never approach
-     * the point where it would wrap.
+     * The page state can only ever be incremented above dirty by the number of concurrently running
+     * threads, so the counter will never approach the point where it would wrap.
      */
     if (page->modify->page_state < WT_PAGE_DIRTY &&
       __wt_atomic_add32(&page->modify->page_state, 1) == WT_PAGE_DIRTY_FIRST) {
         __wt_cache_dirty_incr(session, page);
 
         /*
-         * We won the race to dirty the page, but another thread could
-         * have committed in the meantime, and the last_running field
-         * been updated past it.  That is all very unlikely, but not
-         * impossible, so we take care to read the global state before
-         * the atomic increment.
+         * We won the race to dirty the page, but another thread could have committed in the
+         * meantime, and the last_running field been updated past it. That is all very unlikely, but
+         * not impossible, so we take care to read the global state before the atomic increment.
          *
-         * If the page was dirty on entry, then last_running == 0. The
-         * page could have become clean since then, if reconciliation
-         * completed. In that case, we leave the previous value for
-         * first_dirty_txn rather than potentially racing to update it,
-         * at worst, we'll unnecessarily write a page in a checkpoint.
+         * If the page was dirty on entry, then last_running == 0. The page could have become clean
+         * since then, if reconciliation completed. In that case, we leave the previous value for
+         * first_dirty_txn rather than potentially racing to update it, at worst, we'll
+         * unnecessarily write a page in a checkpoint.
          */
         if (last_running != 0)
             page->modify->first_dirty_txn = last_running;
@@ -524,10 +519,9 @@ __wt_tree_modify_set(WT_SESSION_IMPL *session)
     /*
      * Test before setting the dirty flag, it's a hot cache line.
      *
-     * The tree's modified flag is cleared by the checkpoint thread: set it
-     * and insert a barrier before dirtying the page.  (I don't think it's
-     * a problem if the tree is marked dirty with all the pages clean, it
-     * might result in an extra checkpoint that doesn't do any work but it
+     * The tree's modified flag is cleared by the checkpoint thread: set it and insert a barrier
+     * before dirtying the page. (I don't think it's a problem if the tree is marked dirty with all
+     * the pages clean, it might result in an extra checkpoint that doesn't do any work but it
      * shouldn't cause problems; regardless, let's play it safe.)
      */
     if (!S2BT(session)->modified) {
@@ -554,21 +548,19 @@ static inline void
 __wt_page_modify_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     /*
-     * The page must be held exclusive when this call is made, this call
-     * can only be used when the page is owned by a single thread.
+     * The page must be held exclusive when this call is made, this call can only be used when the
+     * page is owned by a single thread.
      *
      * Allow the call to be made on clean pages.
      */
     if (__wt_page_is_modified(page)) {
         /*
-         * The only part where ordering matters is during
-         * reconciliation where updates on other threads are performing
-         * writes to the page state that need to be visible to the
+         * The only part where ordering matters is during reconciliation where updates on other
+         * threads are performing writes to the page state that need to be visible to the
          * reconciliation thread.
          *
-         * Since clearing of the page state is not going to be happening
-         * during reconciliation on a separate thread, there's no write
-         * barrier needed here.
+         * Since clearing of the page state is not going to be happening during reconciliation on a
+         * separate thread, there's no write barrier needed here.
          */
         page->modify->page_state = WT_PAGE_CLEAN;
         __wt_cache_dirty_decr(session, page);
@@ -1067,9 +1059,8 @@ __wt_ref_info(
     page = ref->home;
 
     /*
-     * If NULL, there is no location.
-     * If off-page, the pointer references a WT_ADDR structure.
-     * If on-page, the pointer references a cell.
+     * If NULL, there is no location. If off-page, the pointer references a WT_ADDR structure. If
+     * on-page, the pointer references a cell.
      *
      * The type is of a limited set: internal, leaf or no-overflow leaf.
      */
@@ -1160,12 +1151,10 @@ __wt_page_las_active(WT_SESSION_IMPL *session, WT_REF *ref)
         return (false);
     if (page_las->resolved)
         return (false);
-    if (!page_las->skew_newest || page_las->has_prepares)
+    if (page_las->min_skipped_ts != WT_TS_MAX || page_las->has_prepares)
         return (true);
-    if (__wt_txn_visible_all(session, page_las->max_txn, page_las->max_timestamp))
-        return (false);
 
-    return (true);
+    return (!__wt_txn_visible_all(session, page_las->max_txn, page_las->max_ondisk_ts));
 }
 
 /*
@@ -1216,16 +1205,14 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
         return (false);
 
     /*
-     * Check for pages with append-only workloads. A common application
-     * pattern is to have multiple threads frantically appending to the
-     * tree. We want to reconcile and evict this page, but we'd like to
-     * do it without making the appending threads wait. See if it's worth
-     * doing a split to let the threads continue before doing eviction.
+     * Check for pages with append-only workloads. A common application pattern is to have multiple
+     * threads frantically appending to the tree. We want to reconcile and evict this page, but we'd
+     * like to do it without making the appending threads wait. See if it's worth doing a split to
+     * let the threads continue before doing eviction.
      *
-     * Ignore anything other than large, dirty leaf pages. We depend on the
-     * page being dirty for correctness (the page must be reconciled again
-     * before being evicted after the split, information from a previous
-     * reconciliation will be wrong, so we can't evict immediately).
+     * Ignore anything other than large, dirty leaf pages. We depend on the page being dirty for
+     * correctness (the page must be reconciled again before being evicted after the split,
+     * information from a previous reconciliation will be wrong, so we can't evict immediately).
      */
     if (page->memory_footprint < btree->splitmempage)
         return (false);
@@ -1386,15 +1373,13 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
     }
 
     /*
-     * If a split created new internal pages, those newly created internal
-     * pages cannot be evicted until all threads are known to have exited
-     * the original parent page's index, because evicting an internal page
-     * discards its WT_REF array, and a thread traversing the original
-     * parent page index might see a freed WT_REF.
+     * If a split created new internal pages, those newly created internal pages cannot be evicted
+     * until all threads are known to have exited the original parent page's index, because evicting
+     * an internal page discards its WT_REF array, and a thread traversing the original parent page
+     * index might see a freed WT_REF.
      *
-     * One special case where we know this is safe is if the handle is
-     * locked exclusive (e.g., when the whole tree is being evicted).  In
-     * that case, no readers can be looking at an old index.
+     * One special case where we know this is safe is if the handle is locked exclusive (e.g., when
+     * the whole tree is being evicted). In that case, no readers can be looking at an old index.
      */
     if (WT_PAGE_IS_INTERNAL(page) && !F_ISSET(session->dhandle, WT_DHANDLE_EXCLUSIVE) &&
       __wt_gen_active(session, WT_GEN_SPLIT, page->pg_intl_split_gen))
@@ -1436,20 +1421,18 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
         return (0);
 
     /*
-     * Attempt to evict pages with the special "oldest" read generation.
-     * This is set for pages that grow larger than the configured
-     * memory_page_max setting, when we see many deleted items, and when we
-     * are attempting to scan without trashing the cache.
+     * Attempt to evict pages with the special "oldest" read generation. This is set for pages that
+     * grow larger than the configured memory_page_max setting, when we see many deleted items, and
+     * when we are attempting to scan without trashing the cache.
      *
-     * Checkpoint should not queue pages for urgent eviction if they require
-     * dirty eviction: there is a special exemption that allows checkpoint
-     * to evict dirty pages in a tree that is being checkpointed, and no
-     * other thread can help with that. Checkpoints don't rely on this code
-     * for dirty eviction: that is handled explicitly in __wt_sync_file.
+     * Checkpoint should not queue pages for urgent eviction if they require dirty eviction: there
+     * is a special exemption that allows checkpoint to evict dirty pages in a tree that is being
+     * checkpointed, and no other thread can help with that. Checkpoints don't rely on this code for
+     * dirty eviction: that is handled explicitly in __wt_sync_file.
      *
-     * If the operation has disabled eviction or splitting, or the session
-     * is preventing from reconciling, then just queue the page for urgent
-     * eviction.  Otherwise, attempt to release and evict it.
+     * If the operation has disabled eviction or splitting, or the session is preventing from
+     * reconciling, then just queue the page for urgent eviction. Otherwise, attempt to release and
+     * evict it.
      */
     page = ref->page;
     if (WT_READGEN_EVICT_SOON(page->read_gen) && btree->evict_disabled == 0 &&

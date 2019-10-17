@@ -1010,7 +1010,6 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
     WT_SESSION *wt_session;
     WT_SESSION_IMPL *s, *session;
     uint32_t i;
-    const char *ckpt_cfg;
 
     conn = (WT_CONNECTION_IMPL *)wt_conn;
 
@@ -1074,47 +1073,24 @@ err:
     WT_TRET(__wt_lsm_manager_destroy(session));
 
     /*
-     * After the async and LSM threads have exited, we shouldn't opening any more files.
+     * After the async and LSM threads have exited, we won't open more files for the application.
+     * However, the sweep server is still running and it can close file handles at the same time the
+     * final checkpoint is reviewing open data handles (forcing checkpoint to reopen handles). Shut
+     * down the sweep server and then flag the system should not open anything new.
      */
+    WT_TRET(__wt_sweep_destroy(session));
     F_SET(conn, WT_CONN_CLOSING_NO_MORE_OPENS);
     WT_FULL_BARRIER();
 
-    /* The default session is used to access data handles during close. */
-    F_CLR(session, WT_SESSION_NO_DATA_HANDLES);
-
     /*
-     * Perform a system-wide checkpoint so that all tables are consistent with each other. All
-     * transactions are resolved but ignore timestamps to make sure all data gets to disk. Do this
-     * before shutting down all the subsystems. We have shut down all user sessions, but send in
-     * true for waiting for internal races.
+     * Shut down the checkpoint and capacity server threads: we don't want to throttle writes and
+     * we're about to do a final checkpoint separately from the checkpoint server.
      */
-    WT_TRET(__wt_config_gets(session, cfg, "use_timestamp", &cval));
-    ckpt_cfg = "use_timestamp=false";
-    if (cval.val != 0) {
-        ckpt_cfg = "use_timestamp=true";
-        if (conn->txn_global.has_stable_timestamp)
-            F_SET(conn, WT_CONN_CLOSING_TIMESTAMP);
-    }
-    if (!F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY)) {
-        s = NULL;
-        WT_TRET(__wt_open_internal_session(conn, "close_ckpt", true, 0, &s));
-        if (s != NULL) {
-            const char *checkpoint_cfg[] = {
-              WT_CONFIG_BASE(session, WT_SESSION_checkpoint), ckpt_cfg, NULL};
-            wt_session = &s->iface;
-            WT_TRET(__wt_txn_checkpoint(s, checkpoint_cfg, true));
+    WT_TRET(__wt_capacity_server_destroy(session));
+    WT_TRET(__wt_checkpoint_server_destroy(session));
 
-            /*
-             * Mark the metadata dirty so we flush it on close, allowing recovery to be skipped.
-             */
-            WT_WITH_DHANDLE(s, WT_SESSION_META_DHANDLE(s), __wt_tree_modify_set(s));
-
-            WT_TRET(wt_session->close(wt_session, config));
-        }
-    }
-
-    /* Shut down the global transaction state. */
-    __wt_txn_global_shutdown(session);
+    /* Perform a final checkpoint and shut down the global transaction state. */
+    WT_TRET(__wt_txn_global_shutdown(session, config, cfg));
 
     if (ret != 0) {
         __wt_err(session, ret, "failure during close, disabling further writes");
@@ -1375,12 +1351,11 @@ __conn_config_file(
     len = (size_t)size;
 
     /*
-     * Copy the configuration file into memory, with a little slop, I'm not
-     * interested in debugging off-by-ones.
+     * Copy the configuration file into memory, with a little slop, I'm not interested in debugging
+     * off-by-ones.
      *
-     * The beginning of a file is the same as if we run into an unquoted
-     * newline character, simplify the parsing loop by pretending that's
-     * what we're doing.
+     * The beginning of a file is the same as if we run into an unquoted newline character, simplify
+     * the parsing loop by pretending that's what we're doing.
      */
     WT_ERR(__wt_buf_init(session, cbuf, len + 10));
     WT_ERR(__wt_read(session, fh, (wt_off_t)0, len, ((uint8_t *)cbuf->mem) + 1));
@@ -1429,11 +1404,10 @@ __conn_config_file(
         }
 
         /*
-         * Replace any newline characters with commas (and strings of
-         * commas are safe).
+         * Replace any newline characters with commas (and strings of commas are safe).
          *
-         * After any newline, skip to a non-white-space character; if
-         * the next character is a hash mark, skip to the next newline.
+         * After any newline, skip to a non-white-space character; if the next character is a hash
+         * mark, skip to the next newline.
          */
         for (;;) {
             for (*t++ = ','; --len > 0 && __wt_isspace((u_char) * ++p);)
@@ -1496,8 +1470,8 @@ __conn_env_var(WT_SESSION_IMPL *session, const char *cfg[], const char *name, co
     /*
      * Security stuff:
      *
-     * Don't use the environment variable if the process has additional
-     * privileges, unless "use_environment_priv" is configured.
+     * Don't use the environment variable if the process has additional privileges, unless
+     * "use_environment_priv" is configured.
      */
     if (!__wt_has_priv())
         return (0);
@@ -1656,14 +1630,12 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
       is_create || exist ? WT_FS_OPEN_CREATE : 0, &conn->lock_fh);
 
     /*
-     * If this is a read-only connection and we cannot grab the lock file,
-     * check if it is because there's no write permission or if the file
-     * does not exist. If so, then ignore the error.
-     * XXX Ignoring the error does allow multiple read-only connections to
-     * exist at the same time on a read-only directory.
+     * If this is a read-only connection and we cannot grab the lock file, check if it is because
+     * there's no write permission or if the file does not exist. If so, then ignore the error. XXX
+     * Ignoring the error does allow multiple read-only connections to exist at the same time on a
+     * read-only directory.
      *
-     * If we got an expected permission or non-existence error then skip
-     * the byte lock.
+     * If we got an expected permission or non-existence error then skip the byte lock.
      */
     if (F_ISSET(conn, WT_CONN_READONLY) && (ret == EACCES || ret == ENOENT)) {
         bytelock = false;
@@ -1682,15 +1654,13 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
               "another process");
 
 /*
- * If the size of the lock file is non-zero, we created it (or
- * won a locking race with the thread that created it, it
- * doesn't matter).
+ * If the size of the lock file is non-zero, we created it (or won a locking race with the thread
+ * that created it, it doesn't matter).
  *
- * Write something into the file, zero-length files make me
- * nervous.
+ * Write something into the file, zero-length files make me nervous.
  *
- * The test against the expected length is sheer paranoia (the
- * length should be 0 or correct), but it shouldn't hurt.
+ * The test against the expected length is sheer paranoia (the length should be 0 or correct), but
+ * it shouldn't hurt.
  */
 #define WT_SINGLETHREAD_STRING "WiredTiger lock file\n"
         WT_ERR(__wt_filesize(session, conn->lock_fh, &size));
@@ -2051,26 +2021,22 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
       "# or create a WiredTiger.config file to override them."));
 
     /*
-     * The base configuration file contains all changes to default settings
-     * made at create, and we include the user-configuration file in that
-     * list, even though we don't expect it to change. Of course, an
-     * application could leave that file as it is right now and not remove
-     * a configuration we need, but applications can also guarantee all
-     * database users specify consistent environment variables and
-     * wiredtiger_open configuration arguments -- if we protect against
-     * those problems, might as well include the application's configuration
-     * file in that protection.
+     * The base configuration file contains all changes to default settings made at create, and we
+     * include the user-configuration file in that list, even though we don't expect it to change.
+     * Of course, an application could leave that file as it is right now and not remove a
+     * configuration we need, but applications can also guarantee all database users specify
+     * consistent environment variables and wiredtiger_open configuration arguments -- if we protect
+     * against those problems, might as well include the application's configuration file in that
+     * protection.
      *
-     * We were passed the configuration items specified by the application.
-     * That list includes configuring the default settings, presumably if
-     * the application configured it explicitly, that setting should survive
-     * even if the default changes.
+     * We were passed the configuration items specified by the application. That list includes
+     * configuring the default settings, presumably if the application configured it explicitly,
+     * that setting should survive even if the default changes.
      *
-     * When writing the base configuration file, we write the version and
-     * any configuration information set by the application (in other words,
-     * the stack except for cfg[0]). However, some configuration values need
-     * to be stripped out from the base configuration file; do that now, and
-     * merge the rest to be written.
+     * When writing the base configuration file, we write the version and any configuration
+     * information set by the application (in other words, the stack except for cfg[0]). However,
+     * some configuration values need to be stripped out from the base configuration file; do that
+     * now, and merge the rest to be written.
      */
     WT_ERR(__wt_config_merge(session, cfg + 1,
       "compatibility=(release=),"
@@ -2337,14 +2303,13 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     WT_ERR(__conn_config_env(session, cfg, i1));
 
     /*
-     * We need to know if configured for read-only or in-memory behavior
-     * before reading/writing the filesystem. The only way the application
-     * can configure that before we touch the filesystem is the wiredtiger
-     * config string or the WIREDTIGER_CONFIG environment variable.
+     * We need to know if configured for read-only or in-memory behavior before reading/writing the
+     * filesystem. The only way the application can configure that before we touch the filesystem is
+     * the wiredtiger config string or the WIREDTIGER_CONFIG environment variable.
      *
-     * The environment isn't trusted by default, for security reasons; if
-     * the application wants us to trust the environment before reading
-     * the filesystem, the wiredtiger_open config string is the only way.
+     * The environment isn't trusted by default, for security reasons; if the application wants us
+     * to trust the environment before reading the filesystem, the wiredtiger_open config string is
+     * the only way.
      */
     WT_ERR(__wt_config_gets(session, cfg, "in_memory", &cval));
     if (cval.val != 0)
@@ -2469,14 +2434,12 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     /*
      * Configuration ...
      *
-     * We can't open sessions yet, so any configurations that cause
-     * sessions to be opened must be handled inside __wt_connection_open.
+     * We can't open sessions yet, so any configurations that cause sessions to be opened must be
+     * handled inside __wt_connection_open.
      *
-     * The error message configuration might have changed (if set in a
-     * configuration file, and not in the application's configuration
-     * string), get it again. Do it first, make error messages correct.
-     * Ditto verbose configuration so we dump everything the application
-     * wants to see.
+     * The error message configuration might have changed (if set in a configuration file, and not
+     * in the application's configuration string), get it again. Do it first, make error messages
+     * correct. Ditto verbose configuration so we dump everything the application wants to see.
      */
     WT_ERR(__wt_config_gets(session, cfg, "error_prefix", &cval));
     if (cval.len != 0) {
@@ -2573,6 +2536,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
 
     WT_ERR(__wt_config_gets(session, cfg, "mmap", &cval));
     conn->mmap = cval.val != 0;
+
+    WT_ERR(__wt_config_gets(session, cfg, "operation_timeout_ms", &cval));
+    conn->operation_timeout_us = (uint64_t)(cval.val * WT_THOUSAND);
 
     WT_ERR(__wt_config_gets(session, cfg, "salvage", &cval));
     if (cval.val) {

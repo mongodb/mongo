@@ -41,16 +41,14 @@ __sync_checkpoint_can_skip(WT_SESSION_IMPL *session, WT_PAGE *page)
         return (false);
 
     /*
-     * The problematic case is when a page was evicted but when there were
-     * unresolved updates and not every block associated with the page has
-     * a disk address. We can't skip such pages because we need a checkpoint
-     * write with valid addresses.
+     * The problematic case is when a page was evicted but when there were unresolved updates and
+     * not every block associated with the page has a disk address. We can't skip such pages because
+     * we need a checkpoint write with valid addresses.
      *
-     * The page's modification information can change underfoot if the page
-     * is being reconciled, so we'd normally serialize with reconciliation
-     * before reviewing page-modification information. However, checkpoint
-     * is the only valid writer of dirty leaf pages at this point, we skip
-     * the lock.
+     * The page's modification information can change underfoot if the page is being reconciled, so
+     * we'd normally serialize with reconciliation before reviewing page-modification information.
+     * However, checkpoint is the only valid writer of dirty leaf pages at this point, we skip the
+     * lock.
      */
     if (mod->rec_result == WT_PM_REC_MULTIBLOCK)
         for (multi = mod->mod_multi, i = 0; i < mod->mod_multi_entries; ++multi, ++i)
@@ -152,9 +150,8 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
         /*
          * Write all immediately available, dirty in-cache leaf pages.
          *
-         * Writing the leaf pages is done without acquiring a high-level
-         * lock, serialize so multiple threads don't walk the tree at
-         * the same time.
+         * Writing the leaf pages is done without acquiring a high-level lock, serialize so multiple
+         * threads don't walk the tree at the same time.
          */
         if (!btree->modified)
             return (0);
@@ -195,27 +192,23 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
         break;
     case WT_SYNC_CHECKPOINT:
         /*
-         * If we are flushing a file at read-committed isolation, which
-         * is of particular interest for flushing the metadata to make
-         * a schema-changing operation durable, get a transactional
-         * snapshot now.
+         * If we are flushing a file at read-committed isolation, which is of particular interest
+         * for flushing the metadata to make a schema-changing operation durable, get a
+         * transactional snapshot now.
          *
-         * All changes committed up to this point should be included.
-         * We don't update the snapshot in between pages because the
-         * metadata shouldn't have many pages.  Instead, read-committed
-         * isolation ensures that all metadata updates completed before
-         * the checkpoint are included.
+         * All changes committed up to this point should be included. We don't update the snapshot
+         * in between pages because the metadata shouldn't have many pages. Instead, read-committed
+         * isolation ensures that all metadata updates completed before the checkpoint are included.
          */
         if (txn->isolation == WT_ISO_READ_COMMITTED)
             __wt_txn_get_snapshot(session);
 
         /*
-         * We cannot check the tree modified flag in the case of a
-         * checkpoint, the checkpoint code has already cleared it.
+         * We cannot check the tree modified flag in the case of a checkpoint, the checkpoint code
+         * has already cleared it.
          *
-         * Writing the leaf pages is done without acquiring a high-level
-         * lock, serialize so multiple threads don't walk the tree at
-         * the same time.  We're holding the schema lock, but need the
+         * Writing the leaf pages is done without acquiring a high-level lock, serialize so multiple
+         * threads don't walk the tree at the same time. We're holding the schema lock, but need the
          * lower-level lock as well.
          */
         __wt_spin_lock(session, &btree->flush_lock);
@@ -284,36 +277,20 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
             }
 
             /*
-             * If the page was pulled into cache by our read, try
-             * to evict it now.
+             * If the page was pulled into cache by our read, try to evict it now.
              *
-             * For eviction to have a chance, we first need to move
-             * the walk point to the next page checkpoint will
-             * visit.  We want to avoid this code being too special
-             * purpose, so try to reuse the ordinary eviction path.
+             * For eviction to have a chance, we first need to move the walk point to the next page
+             * checkpoint will visit. We want to avoid this code being too special purpose, so try
+             * to reuse the ordinary eviction path.
              *
-             * Regardless of whether eviction succeeds or fails,
-             * the walk continues from the previous location.  We
-             * remember whether we tried eviction, and don't try
-             * again.  Even if eviction fails (the page may stay in
-             * cache clean but with history that cannot be
-             * discarded), that is not wasted effort because
-             * checkpoint doesn't need to write the page again.
-             *
-             * Once the transaction has given up it's snapshot it
-             * is no longer safe to reconcile pages. That happens
-             * prior to the final metadata checkpoint.
-             *
-             * XXX Only attempt this eviction when there are no
-             * readers older than the checkpoint.  Otherwise, a bug
-             * in eviction can mark the page clean and discard
-             * history, causing those reads to incorrectly see
-             * newer versions of data than they should.
+             * Regardless of whether eviction succeeds or fails, the walk continues from the
+             * previous location. We remember whether we tried eviction, and don't try again. Even
+             * if eviction fails (the page may stay in cache clean but with history that cannot be
+             * discarded), that is not wasted effort because checkpoint doesn't need to write the
+             * page again.
              */
             if (!WT_PAGE_IS_INTERNAL(page) && page->read_gen == WT_READGEN_WONT_NEED &&
-              !tried_eviction && F_ISSET(&session->txn, WT_TXN_HAS_SNAPSHOT) &&
-              (!F_ISSET(txn, WT_TXN_HAS_TS_READ) ||
-                txn->read_timestamp == conn->txn_global.pinned_timestamp)) {
+              !tried_eviction) {
                 WT_ERR_BUSY_OK(__wt_page_release_evict(session, walk, 0));
                 walk = prev;
                 prev = NULL;

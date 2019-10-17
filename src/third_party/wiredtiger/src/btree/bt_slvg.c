@@ -170,19 +170,15 @@ __slvg_checkpoint(WT_SESSION_IMPL *session, WT_REF *root)
     config = NULL;
 
     /*
-     * XXX
-     * The salvage process reads and discards previous checkpoints, so the
-     * underlying block manager has to ignore any previous checkpoint
-     * entries when creating a new checkpoint. In other words, we can't use
-     * the metadata checkpoint list, it lists the previous checkpoints and
-     * we don't care about them. Build a clean checkpoint list and use it
-     * instead.
+     * XXX The salvage process reads and discards previous checkpoints, so the underlying block
+     * manager has to ignore any previous checkpoint entries when creating a new checkpoint. In
+     * other words, we can't use the metadata checkpoint list, it lists the previous checkpoints and
+     * we don't care about them. Build a clean checkpoint list and use it instead.
      *
-     * Don't first clear the metadata checkpoint list and call the function
-     * to get a list of checkpoints: a crash between clearing the metadata
-     * checkpoint list and creating a new checkpoint list would look like a
-     * create or open of a file without a checkpoint to roll-forward from,
-     * and the contents of the file would be discarded.
+     * Don't first clear the metadata checkpoint list and call the function to get a list of
+     * checkpoints: a crash between clearing the metadata checkpoint list and creating a new
+     * checkpoint list would look like a create or open of a file without a checkpoint to
+     * roll-forward from, and the contents of the file would be discarded.
      */
     WT_RET(__wt_calloc_def(session, 2, &ckptbase));
     WT_ERR(__wt_strdup(session, WT_CHECKPOINT, &ckptbase->name));
@@ -209,11 +205,11 @@ __slvg_checkpoint(WT_SESSION_IMPL *session, WT_REF *root)
     }
 
     /*
-     * If no checkpoint was created, clear all recorded checkpoints for the
-     * file. This is expected if we didn't find any leaf pages to salvage.
+     * If no checkpoint was created, clear all recorded checkpoints for the file. This is expected
+     * if we didn't find any leaf pages to salvage.
      *
-     * If a checkpoint was created, life is good, replace any existing list
-     * of checkpoints with the single new one.
+     * If a checkpoint was created, life is good, replace any existing list of checkpoints with the
+     * single new one.
      */
     if (ckptbase->raw.data == NULL)
         WT_TRET(__wt_meta_checkpoint_clear(session, dhandle->name));
@@ -259,13 +255,11 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
     WT_ERR(bm->salvage_start(bm, session));
 
     /*
-     * Step 2:
-     * Read the file and build in-memory structures that reference any leaf
-     * or overflow page.  Any pages other than leaf or overflow pages are
-     * added to the free list.
+     * Step 2: Read the file and build in-memory structures that reference any leaf or overflow
+     * page. Any pages other than leaf or overflow pages are added to the free list.
      *
-     * Turn off read checksum and verification error messages while we're
-     * reading the file, we expect to see corrupted blocks.
+     * Turn off read checksum and verification error messages while we're reading the file, we
+     * expect to see corrupted blocks.
      */
     F_SET(session, WT_SESSION_QUIET_CORRUPT_FILE);
     ret = __slvg_read(session, ss);
@@ -348,12 +342,11 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
     }
 
     /*
-     * Step 7:
-     * Build an internal page that references all of the leaf pages,
-     * and write it, as well as any merged pages, to the file.
+     * Step 7: Build an internal page that references all of the leaf pages, and write it, as well
+     * as any merged pages, to the file.
      *
-     * Count how many leaf pages we have (we could track this during the
-     * array shuffling/splitting, but that's a lot harder).
+     * Count how many leaf pages we have (we could track this during the array shuffling/splitting,
+     * but that's a lot harder).
      */
     for (leaf_cnt = i = 0; i < ss->pages_next; ++i)
         if (ss->pages[i] != NULL)
@@ -439,10 +432,9 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
             WT_ERR(__wt_progress(session, NULL, ss->fcnt));
 
         /*
-         * Read (and potentially decompress) the block; the underlying
-         * block manager might return only good blocks if checksums are
-         * configured, or both good and bad blocks if we're relying on
-         * compression.
+         * Read (and potentially decompress) the block; the underlying block manager might return
+         * only good blocks if checksums are configured, or both good and bad blocks if we're
+         * relying on compression.
          *
          * Report the block's status to the block manager.
          */
@@ -464,11 +456,10 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
         /*
          * Make sure it's an expected page type for the file.
          *
-         * We only care about leaf and overflow pages from here on out;
-         * discard all of the others.  We put them on the free list now,
-         * because we might as well overwrite them, we want the file to
-         * grow as little as possible, or shrink, and future salvage
-         * calls don't need them either.
+         * We only care about leaf and overflow pages from here on out; discard all of the others.
+         * We put them on the free list now, because we might as well overwrite them, we want the
+         * file to grow as little as possible, or shrink, and future salvage calls don't need them
+         * either.
          */
         dsk = buf->data;
         switch (dsk->type) {
@@ -617,16 +608,13 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, uint8_t *ad
         break;
     case WT_PAGE_ROW_LEAF:
         /*
-         * Row-store format: copy the first and last keys on the page.
-         * Keys are prefix-compressed, the simplest and slowest thing
-         * to do is instantiate the in-memory page, then instantiate
-         * and copy the full keys, then free the page. We do this on
-         * every leaf page, and if you need to speed up the salvage,
-         * it's probably a great place to start.
+         * Row-store format: copy the first and last keys on the page. Keys are prefix-compressed,
+         * the simplest and slowest thing to do is instantiate the in-memory page, then instantiate
+         * and copy the full keys, then free the page. We do this on every leaf page, and if you
+         * need to speed up the salvage, it's probably a great place to start.
          *
-         * Page flags are 0 because we aren't releasing the memory used
-         * to read the page into memory and we don't want page discard
-         * to free it.
+         * Page flags are 0 because we aren't releasing the memory used to read the page into memory
+         * and we don't want page discard to free it.
          */
         WT_ERR(__wt_page_inmem(session, NULL, dsk, 0, false, &page));
         WT_ERR(__wt_row_leaf_key_copy(session, page, &page->pg_row[0], &trk->row_start));
@@ -768,16 +756,14 @@ __slvg_col_range(WT_SESSION_IMPL *session, WT_STUFF *ss)
     uint32_t i, j;
 
     /*
-     * DO NOT MODIFY THIS CODE WITHOUT REVIEWING THE CORRESPONDING ROW- OR
-     * COLUMN-STORE CODE: THEY ARE IDENTICAL OTHER THAN THE PAGES THAT ARE
-     * BEING HANDLED.
+     * DO NOT MODIFY THIS CODE WITHOUT REVIEWING THE CORRESPONDING ROW- OR COLUMN-STORE CODE: THEY
+     * ARE IDENTICAL OTHER THAN THE PAGES THAT ARE BEING HANDLED.
      *
-     * Walk the page array looking for overlapping key ranges, adjusting
-     * the ranges based on the LSN until there are no overlaps.
+     * Walk the page array looking for overlapping key ranges, adjusting the ranges based on the LSN
+     * until there are no overlaps.
      *
-     * DO NOT USE POINTERS INTO THE ARRAY: THE ARRAY IS RE-SORTED IN PLACE
-     * AS ENTRIES ARE SPLIT, SO ARRAY REFERENCES MUST ALWAYS BE ARRAY BASE
-     * PLUS OFFSET.
+     * DO NOT USE POINTERS INTO THE ARRAY: THE ARRAY IS RE-SORTED IN PLACE AS ENTRIES ARE SPLIT, SO
+     * ARRAY REFERENCES MUST ALWAYS BE ARRAY BASE PLUS OFFSET.
      */
     for (i = 0; i < ss->pages_next; ++i) {
         if (ss->pages[i] == NULL)
@@ -951,12 +937,10 @@ __slvg_col_range_overlap(WT_SESSION_IMPL *session, uint32_t a_slot, uint32_t b_s
     }
 
     /*
-     * Case #5: b_trk is more desirable and is a middle chunk of a_trk.
-     * Split a_trk into two parts, the key range before b_trk and the
-     * key range after b_trk.
+     * Case #5: b_trk is more desirable and is a middle chunk of a_trk. Split a_trk into two parts,
+     * the key range before b_trk and the key range after b_trk.
      *
-     * Allocate a new WT_TRACK object, and extend the array of pages as
-     * necessary.
+     * Allocate a new WT_TRACK object, and extend the array of pages as necessary.
      */
     WT_RET(__wt_calloc_one(session, &new));
     if ((ret = __wt_realloc_def(session, &ss->pages_allocated, ss->pages_next + 1, &ss->pages)) !=
@@ -1356,16 +1340,14 @@ __slvg_row_range(WT_SESSION_IMPL *session, WT_STUFF *ss)
     btree = S2BT(session);
 
     /*
-     * DO NOT MODIFY THIS CODE WITHOUT REVIEWING THE CORRESPONDING ROW- OR
-     * COLUMN-STORE CODE: THEY ARE IDENTICAL OTHER THAN THE PAGES THAT ARE
-     * BEING HANDLED.
+     * DO NOT MODIFY THIS CODE WITHOUT REVIEWING THE CORRESPONDING ROW- OR COLUMN-STORE CODE: THEY
+     * ARE IDENTICAL OTHER THAN THE PAGES THAT ARE BEING HANDLED.
      *
-     * Walk the page array looking for overlapping key ranges, adjusting
-     * the ranges based on the LSN until there are no overlaps.
+     * Walk the page array looking for overlapping key ranges, adjusting the ranges based on the LSN
+     * until there are no overlaps.
      *
-     * DO NOT USE POINTERS INTO THE ARRAY: THE ARRAY IS RE-SORTED IN PLACE
-     * AS ENTRIES ARE SPLIT, SO ARRAY REFERENCES MUST ALWAYS BE ARRAY BASE
-     * PLUS OFFSET.
+     * DO NOT USE POINTERS INTO THE ARRAY: THE ARRAY IS RE-SORTED IN PLACE AS ENTRIES ARE SPLIT, SO
+     * ARRAY REFERENCES MUST ALWAYS BE ARRAY BASE PLUS OFFSET.
      */
     for (i = 0; i < ss->pages_next; ++i) {
         if (ss->pages[i] == NULL)
@@ -1550,12 +1532,10 @@ __slvg_row_range_overlap(WT_SESSION_IMPL *session, uint32_t a_slot, uint32_t b_s
     }
 
     /*
-     * Case #5: b_trk is more desirable and is a middle chunk of a_trk.
-     * Split a_trk into two parts, the key range before b_trk and the
-     * key range after b_trk.
+     * Case #5: b_trk is more desirable and is a middle chunk of a_trk. Split a_trk into two parts,
+     * the key range before b_trk and the key range after b_trk.
      *
-     * Allocate a new WT_TRACK object, and extend the array of pages as
-     * necessary.
+     * Allocate a new WT_TRACK object, and extend the array of pages as necessary.
      */
     WT_RET(__wt_calloc_one(session, &new));
     if ((ret = __wt_realloc_def(session, &ss->pages_allocated, ss->pages_next + 1, &ss->pages)) !=
@@ -1819,19 +1799,16 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref, WT_S
     page = ref->page;
 
     /*
-     * Figure out how many page keys we want to take and how many we want
-     * to skip.
+     * Figure out how many page keys we want to take and how many we want to skip.
      *
-     * If checking the starting range key, the key we're searching for will
-     * be equal to the starting range key.  This is because we figured out
-     * the true merged-page start key as part of discarding initial keys
-     * from the page (see the __slvg_row_range_overlap function, and its
+     * If checking the starting range key, the key we're searching for will be equal to the starting
+     * range key. This is because we figured out the true merged-page start key as part of
+     * discarding initial keys from the page (see the __slvg_row_range_overlap function, and its
      * calls to __slvg_row_trk_update_start for more information).
      *
-     * If checking the stopping range key, we want the keys on the page that
-     * are less-than the stopping range key.  This is because we copied a
-     * key from another page to define this page's stop range: that page is
-     * the page that owns the "equal to" range space.
+     * If checking the stopping range key, we want the keys on the page that are less-than the
+     * stopping range key. This is because we copied a key from another page to define this page's
+     * stop range: that page is the page that owns the "equal to" range space.
      */
     skip_start = skip_stop = 0;
     if (F_ISSET(trk, WT_TRACK_CHECK_START))
@@ -2043,11 +2020,10 @@ __slvg_ovfl_reconcile(WT_SESSION_IMPL *session, WT_STUFF *ss)
     slot = NULL;
 
     /*
-     * If an overflow page is referenced more than once, discard leaf pages
-     * with the lowest LSNs until overflow pages are only referenced once.
+     * If an overflow page is referenced more than once, discard leaf pages with the lowest LSNs
+     * until overflow pages are only referenced once.
      *
-     * This requires sorting the page list by LSN, and the overflow array by
-     * address cookie.
+     * This requires sorting the page list by LSN, and the overflow array by address cookie.
      */
     __wt_qsort(ss->pages, (size_t)ss->pages_next, sizeof(WT_TRACK *), __slvg_trk_compare_gen);
     __wt_qsort(ss->ovfl, (size_t)ss->ovfl_next, sizeof(WT_TRACK *), __slvg_trk_compare_addr);
@@ -2261,11 +2237,11 @@ __slvg_ovfl_discard(WT_SESSION_IMPL *session, WT_STUFF *ss)
     uint32_t i;
 
     /*
-     * Walk the overflow page array: if an overflow page isn't referenced,
-     * add its file blocks to the free list.
+     * Walk the overflow page array: if an overflow page isn't referenced, add its file blocks to
+     * the free list.
      *
-     * Clear the reference flag (it's reused to figure out if the overflow
-     * record is referenced, but never used, by merged pages).
+     * Clear the reference flag (it's reused to figure out if the overflow record is referenced, but
+     * never used, by merged pages).
      */
     for (i = 0; i < ss->ovfl_next; ++i) {
         if ((trk = ss->ovfl[i]) == NULL)

@@ -68,8 +68,7 @@ text(WT_SESSION *session, const char *uri)
     /*
      * We're about to load strings, make sure the formats match.
      *
-     * Row-store tables have key/value pairs, column-store tables only have
-     * values.
+     * Row-store tables have key/value pairs, column-store tables only have values.
      */
     if (!WT_STREQ(cursor->value_format, "S") ||
       (!WT_STREQ(cursor->key_format, "S") && !WT_STREQ(cursor->key_format, "r")))

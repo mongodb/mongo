@@ -210,20 +210,18 @@ __txn_get_published_timestamp(WT_SESSION_IMPL *session, WT_TXN *txn)
     wt_timestamp_t ts;
 
     /*
-     * Any checking of bit flags in this logic is invalid. __wt_txn_release
-     * may have already been called on this transaction which will set the
-     * flags member to 0. So we need to deduce which timestamp to use purely
-     * by inspecting the timestamp members which we deliberately preserve
+     * Any checking of bit flags in this logic is invalid. __wt_txn_release may have already been
+     * called on this transaction which will set the flags member to 0. So we need to deduce which
+     * timestamp to use purely by inspecting the timestamp members which we deliberately preserve
      * for reader threads such as ourselves.
      *
-     * In the non-prepared case, the first commit will either be less than
-     * the commit (in the case of multiple commits) in which case we should
-     * return the first commit. Or it will be equal to the commit (in the
-     * case of a single commit) and we can return durable (which is mirrored
-     * from the commit timestamp).
+     * In the non-prepared case, the first commit will either be less than the commit (in the case
+     * of multiple commits) in which case we should return the first commit. Or it will be equal to
+     * the commit (in the case of a single commit) and we can return durable (which is mirrored from
+     * the commit timestamp).
      *
-     * In the prepared case, the first commit will always be equal to the
-     * commit so we'll return durable.
+     * In the prepared case, the first commit will always be equal to the commit so we'll return
+     * durable.
      */
     if (txn->commit_timestamp != txn->first_commit_timestamp)
         ts = txn->first_commit_timestamp;
@@ -546,14 +544,12 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 set:
     __wt_writelock(session, &txn_global->rwlock);
     /*
-     * This method can be called from multiple threads, check that we are
-     * moving the global timestamps forwards.
+     * This method can be called from multiple threads, check that we are moving the global
+     * timestamps forwards.
      *
-     * The exception is the durable timestamp, where the application can
-     * move it backwards (in fact, it only really makes sense to explicitly
-     * move it backwards because it otherwise tracks the largest
-     * durable_timestamp so it moves forward whenever transactions are
-     * assigned timestamps).
+     * The exception is the durable timestamp, where the application can move it backwards (in fact,
+     * it only really makes sense to explicitly move it backwards because it otherwise tracks the
+     * largest durable_timestamp so it moves forward whenever transactions are assigned timestamps).
      */
     if (has_durable) {
         txn_global->durable_timestamp = durable_ts;

@@ -1,9 +1,7 @@
 /*
- * CRC-32 algorithms implemented with the z/Architecture
- * Vector Extension Facility.
+ * CRC-32 algorithms implemented with the z/Architecture Vector Extension Facility.
  *
- * Copyright IBM Corp. 2015
- * Author(s): Hendrik Brueckner <brueckner@linux.vnet.ibm.com>
+ * Copyright IBM Corp. 2015 Author(s): Hendrik Brueckner <brueckner@linux.vnet.ibm.com>
  *
  */
 
@@ -48,10 +46,9 @@ __wt_crc32c_le(unsigned int crc, const unsigned char *buf, size_t len)
 /*
  * DEFINE_CRC32_VX() - Define a CRC-32 function using the vector extension
  *
- * Creates a function to perform a particular CRC-32 computation. Depending
- * on the message buffer, the hardware-accelerated or software implementation
- * is used. Note that the message buffer is aligned to improve fetch
- * operations of VECTOR LOAD MULTIPLE instructions.
+ * Creates a function to perform a particular CRC-32 computation. Depending on the message buffer,
+ * the hardware-accelerated or software implementation is used. Note that the message buffer is
+ * aligned to improve fetch operations of VECTOR LOAD MULTIPLE instructions.
  *
  */
 #define DEFINE_CRC32_VX(___fname, ___crc32_vx, ___crc32_sw)                            \

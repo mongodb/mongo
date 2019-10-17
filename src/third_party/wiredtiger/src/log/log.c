@@ -201,14 +201,12 @@ __log_fs_write(
     WT_DECL_RET;
 
     /*
-     * If we're writing into a new log file and we're running in
-     * compatibility mode to an older release, we have to wait for all
-     * writes to the previous log file to complete otherwise there could
-     * be a hole at the end of the previous log file that we cannot detect.
+     * If we're writing into a new log file and we're running in compatibility mode to an older
+     * release, we have to wait for all writes to the previous log file to complete otherwise there
+     * could be a hole at the end of the previous log file that we cannot detect.
      *
-     * NOTE: Check for a version less than the one writing the system
-     * record since we've had a log version change without any actual
-     * file format changes.
+     * NOTE: Check for a version less than the one writing the system record since we've had a log
+     * version change without any actual file format changes.
      */
     if (S2C(session)->log->log_version < WT_LOG_VERSION_SYSTEM &&
       slot->slot_release_lsn.l.file < slot->slot_start_lsn.l.file) {
@@ -784,9 +782,9 @@ __log_file_header(WT_SESSION_IMPL *session, WT_FH *fh, WT_LSN *end_lsn, bool pre
     /*
      * Now that the record is set up, initialize the record header.
      *
-     * Checksum a little-endian version of the header, and write everything
-     * in little-endian format. The checksum is (potentially) returned in a
-     * big-endian format, swap it into place in a separate step.
+     * Checksum a little-endian version of the header, and write everything in little-endian format.
+     * The checksum is (potentially) returned in a big-endian format, swap it into place in a
+     * separate step.
      */
     logrec->len = log->allocsize;
     logrec->checksum = 0;
@@ -1790,16 +1788,14 @@ __log_has_hole(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t log_size, wt_off_t 
                     break;
             }
             /*
-             * A presumed log record begins here where the buffer
-             * becomes non-zero.  If we have enough of a log record
-             * present in the buffer, we either have a valid header
-             * or corruption.  Verify the header of this record to
-             * determine whether it is just a hole or corruption.
+             * A presumed log record begins here where the buffer becomes non-zero. If we have
+             * enough of a log record present in the buffer, we either have a valid header or
+             * corruption. Verify the header of this record to determine whether it is just a hole
+             * or corruption.
              *
-             * We don't bother making this check for backup copies,
-             * as records may have their beginning zeroed, hence
-             * the part after a hole may in fact be the middle of
-             * the record.
+             * We don't bother making this check for backup copies, as records may have their
+             * beginning zeroed, hence the part after a hole may in fact be the middle of the
+             * record.
              */
             if (!F_ISSET(conn, WT_CONN_WAS_BACKUP)) {
                 logrec = (WT_LOG_RECORD *)p;
@@ -2348,13 +2344,12 @@ advance:
         next_lsn.l.offset += rdup_len;
         if (rd_lsn.l.offset != 0) {
             /*
-             * We need to manage the different buffers here.
-             * Buf is the buffer this function uses to read from
-             * the disk.  The callback buffer may change based
-             * on whether encryption and compression are used.
+             * We need to manage the different buffers here. Buf is the buffer this function uses to
+             * read from the disk. The callback buffer may change based on whether encryption and
+             * compression are used.
              *
-             * We want to free any buffers from compression and
-             * encryption but keep the one we use for reading.
+             * We want to free any buffers from compression and encryption but keep the one we use
+             * for reading.
              */
             cbbuf = buf;
             if (F_ISSET(logrec, WT_LOG_RECORD_ENCRYPTED)) {
@@ -2589,12 +2584,11 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp, ui
     myslot.slot = NULL;
     memset(&myslot, 0, sizeof(myslot));
     /*
-     * Assume the WT_ITEM the caller passed is a WT_LOG_RECORD, which has a
-     * header at the beginning for us to fill in.
+     * Assume the WT_ITEM the caller passed is a WT_LOG_RECORD, which has a header at the beginning
+     * for us to fill in.
      *
-     * If using direct_io, the caller should pass us an aligned record.
-     * But we need to make sure it is big enough and zero-filled so
-     * that we can write the full amount.  Do this whether or not
+     * If using direct_io, the caller should pass us an aligned record. But we need to make sure it
+     * is big enough and zero-filled so that we can write the full amount. Do this whether or not
      * direct_io is in use because it makes the reading code cleaner.
      */
     WT_STAT_CONN_INCRV(session, log_bytes_payload, record->size);
@@ -2602,8 +2596,8 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp, ui
     WT_ERR(__wt_buf_grow(session, record, rdup_len));
     WT_ASSERT(session, record->data == record->mem);
     /*
-     * If the caller's record only partially fills the necessary
-     * space, we need to zero-fill the remainder.
+     * If the caller's record only partially fills the necessary space, we need to zero-fill the
+     * remainder.
      *
      * The cast is safe, we've already checked to make sure it's in range.
      */
@@ -2611,28 +2605,23 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp, ui
     if (fill_size != 0) {
         memset((uint8_t *)record->mem + record->size, 0, fill_size);
         /*
-         * Set the last byte of the log record to a non-zero value,
-         * that allows us, on the input side, to tell that a log
-         * record was completely written; there couldn't have been
-         * a partial write. That means that any checksum mismatch
-         * in those conditions is a log corruption.
+         * Set the last byte of the log record to a non-zero value, that allows us, on the input
+         * side, to tell that a log record was completely written; there couldn't have been a
+         * partial write. That means that any checksum mismatch in those conditions is a log
+         * corruption.
          *
-         * Without this changed byte, when we see a zeroed last byte,
-         * we must always treat a checksum error as a possible partial
-         * write. Since partial writes can happen as a result of an
-         * interrupted process (for example, a shutdown), we must
-         * treat a checksum error as a normal occurrence, and merely
-         * the place where the log must be truncated. So any real
+         * Without this changed byte, when we see a zeroed last byte, we must always treat a
+         * checksum error as a possible partial write. Since partial writes can happen as a result
+         * of an interrupted process (for example, a shutdown), we must treat a checksum error as a
+         * normal occurrence, and merely the place where the log must be truncated. So any real
          * corruption within log records is hard to detect as such.
          *
-         * However, we can only make this modification if there is
-         * more than one byte being filled, as the first zero byte
-         * past the actual record is needed to terminate the loop
-         * in txn_commit_apply.
+         * However, we can only make this modification if there is more than one byte being filled,
+         * as the first zero byte past the actual record is needed to terminate the loop in
+         * txn_commit_apply.
          *
-         * This is not a log format change, as we only are changing a
-         * byte in the padding portion of a record, and no logging code
-         * has ever checked that it is any particular value up to now.
+         * This is not a log format change, as we only are changing a byte in the padding portion of
+         * a record, and no logging code has ever checked that it is any particular value up to now.
          */
         if (fill_size > 1)
             *((uint8_t *)record->mem + rdup_len - 1) = WT_DEBUG_BYTE;
@@ -2681,8 +2670,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp, ui
             __wt_log_slot_free(session, myslot.slot);
     } else if (force) {
         /*
-         * If we are going to wait for this slot to get written,
-         * signal the wrlsn thread.
+         * If we are going to wait for this slot to get written, signal the wrlsn thread.
          *
          * XXX I've seen times when conditions are NULL.
          */

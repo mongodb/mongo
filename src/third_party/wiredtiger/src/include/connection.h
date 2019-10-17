@@ -204,6 +204,8 @@ struct __wt_connection_impl {
     /* Configuration */
     const WT_CONFIG_ENTRY **config_entries;
 
+    uint64_t operation_timeout_us; /* Maximum operation period before rollback */
+
     const char *optrack_path;         /* Directory for operation logs */
     WT_FH *optrack_map_fh;            /* Name to id translation file. */
     WT_SPINLOCK optrack_map_spinlock; /* Translation file spinlock. */
@@ -248,15 +250,13 @@ struct __wt_connection_impl {
     uint32_t open_cursor_count; /* Atomic: open cursor handle count */
 
     /*
-     * WiredTiger allocates space for 50 simultaneous sessions (threads of
-     * control) by default.  Growing the number of threads dynamically is
-     * possible, but tricky since server threads are walking the array
-     * without locking it.
+     * WiredTiger allocates space for 50 simultaneous sessions (threads of control) by default.
+     * Growing the number of threads dynamically is possible, but tricky since server threads are
+     * walking the array without locking it.
      *
-     * There's an array of WT_SESSION_IMPL pointers that reference the
-     * allocated array; we do it that way because we want an easy way for
-     * the server thread code to avoid walking the entire array when only a
-     * few threads are running.
+     * There's an array of WT_SESSION_IMPL pointers that reference the allocated array; we do it
+     * that way because we want an easy way for the server thread code to avoid walking the entire
+     * array when only a few threads are running.
      */
     WT_SESSION_IMPL *sessions; /* Session reference */
     uint32_t session_size;     /* Session array size */

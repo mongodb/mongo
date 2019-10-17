@@ -217,11 +217,10 @@ __wt_realloc_aligned(
     }
 #endif
     /*
-     * If there is no posix_memalign function, or no alignment configured,
-     * fall back to realloc.
+     * If there is no posix_memalign function, or no alignment configured, fall back to realloc.
      *
-     * Windows note: Visual C CRT memalign does not match POSIX behavior
-     * and would also double each allocation so it is bad for memory use.
+     * Windows note: Visual C CRT memalign does not match POSIX behavior and would also double each
+     * allocation so it is bad for memory use.
      */
     return (__realloc_func(session, bytes_allocated_ret, bytes_to_allocate, false, retp));
 }

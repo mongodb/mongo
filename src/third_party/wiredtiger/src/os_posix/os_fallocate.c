@@ -103,17 +103,14 @@ __wt_posix_file_extend(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, wt_o
     /*
      * The first file extension call: figure out what this system has.
      *
-     * This function is configured as a locking call, so we know we're
-     * single-threaded through here. Set the nolock function first, then
-     * publish the NULL replacement to ensure the handle functions are
-     * always correct.
+     * This function is configured as a locking call, so we know we're single-threaded through here.
+     * Set the nolock function first, then publish the NULL replacement to ensure the handle
+     * functions are always correct.
      *
-     * We've seen Linux systems where posix_fallocate has corrupted existing
-     * file data (even though that is explicitly disallowed by POSIX).
-     * FreeBSD and Solaris support posix_fallocate, and so far we've seen
-     * no problems leaving it unlocked. Check for fallocate (and the system
-     * call version of fallocate) first to avoid locking on Linux if at all
-     * possible.
+     * We've seen Linux systems where posix_fallocate has corrupted existing file data (even though
+     * that is explicitly disallowed by POSIX). FreeBSD and Solaris support posix_fallocate, and so
+     * far we've seen no problems leaving it unlocked. Check for fallocate (and the system call
+     * version of fallocate) first to avoid locking on Linux if at all possible.
      */
     if (__posix_std_fallocate(file_handle, wt_session, offset) == 0) {
         file_handle->fh_extend_nolock = __posix_std_fallocate;

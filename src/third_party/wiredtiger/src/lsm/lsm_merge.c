@@ -199,18 +199,15 @@ __lsm_merge_span(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id, u_in
         return (WT_NOTFOUND);
 
 /*
- * Look for the most efficient merge we can do.  We define efficiency
- * as collapsing as many levels as possible while processing the
- * smallest number of rows.
+ * Look for the most efficient merge we can do. We define efficiency as collapsing as many levels as
+ * possible while processing the smallest number of rows.
  *
- * We make a distinction between "major" and "minor" merges.  The
- * difference is whether the oldest chunk is involved: if it is, we can
- * discard tombstones, because there can be no older record to marked
- * deleted.
+ * We make a distinction between "major" and "minor" merges. The difference is whether the oldest
+ * chunk is involved: if it is, we can discard tombstones, because there can be no older record to
+ * marked deleted.
  *
- * Respect the configured limit on the number of chunks to merge: start
- * with the most recent set of chunks and work backwards until going
- * further becomes significantly less efficient.
+ * Respect the configured limit on the number of chunks to merge: start with the most recent set of
+ * chunks and work backwards until going further becomes significantly less efficient.
  */
 retry_find:
     oldest_gen = youngest_gen = lsm_tree->chunk[end_chunk]->generation;
@@ -539,12 +536,12 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
     F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 
     /*
-     * We have no current way of continuing if the metadata update fails,
-     * so we will panic in that case.  Put some effort into cleaning up
-     * after ourselves here - so things have a chance of shutting down.
+     * We have no current way of continuing if the metadata update fails, so we will panic in that
+     * case. Put some effort into cleaning up after ourselves here - so things have a chance of
+     * shutting down.
      *
-     * Any errors that happened after the tree was locked are
-     * fatal - we can't guarantee the state of the tree.
+     * Any errors that happened after the tree was locked are fatal - we can't guarantee the state
+     * of the tree.
      */
     if ((ret = __wt_lsm_meta_write(session, lsm_tree, NULL)) != 0)
         WT_PANIC_ERR(session, ret, "Failed finalizing LSM merge");

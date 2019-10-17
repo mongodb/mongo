@@ -37,13 +37,12 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
     }
 
     /*
-     * If the page is a replacement, test the replacement addresses.
-     * Ignore empty pages, they get merged into the parent.
+     * If the page is a replacement, test the replacement addresses. Ignore empty pages, they get
+     * merged into the parent.
      *
-     * Page-modify variable initialization done here because the page could
-     * be modified while we're looking at it, so the page modified structure
-     * may appear at any time (but cannot disappear). We've confirmed there
-     * is a page modify structure, it's OK to look at it.
+     * Page-modify variable initialization done here because the page could be modified while we're
+     * looking at it, so the page modified structure may appear at any time (but cannot disappear).
+     * We've confirmed there is a page modify structure, it's OK to look at it.
      */
     mod = page->modify;
     if (mod->rec_result == WT_PM_REC_REPLACE)
@@ -77,18 +76,15 @@ __compact_rewrite_lock(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
     btree = S2BT(session);
 
     /*
-     * Reviewing in-memory pages requires looking at page reconciliation
-     * results, because we care about where the page is stored now, not
-     * where the page was stored when we first read it into the cache.
-     * We need to ensure we don't race with page reconciliation as it's
-     * writing the page modify information.
+     * Reviewing in-memory pages requires looking at page reconciliation results, because we care
+     * about where the page is stored now, not where the page was stored when we first read it into
+     * the cache. We need to ensure we don't race with page reconciliation as it's writing the page
+     * modify information.
      *
-     * There are two ways we call reconciliation: checkpoints and eviction.
-     * Get the tree's flush lock which blocks threads writing pages for
-     * checkpoints. If checkpoint is holding the lock, quit working this
-     * file, we'll visit it again in our next pass. We don't have to worry
-     * about eviction, we're holding a hazard pointer on the WT_REF, it's
-     * not going anywhere.
+     * There are two ways we call reconciliation: checkpoints and eviction. Get the tree's flush
+     * lock which blocks threads writing pages for checkpoints. If checkpoint is holding the lock,
+     * quit working this file, we'll visit it again in our next pass. We don't have to worry about
+     * eviction, we're holding a hazard pointer on the WT_REF, it's not going anywhere.
      */
     WT_RET(__wt_spin_trylock(session, &btree->flush_lock));
 
@@ -192,8 +188,8 @@ __wt_compact(WT_SESSION_IMPL *session)
         /*
          * Cheap checks that don't require locking.
          *
-         * Ignore the root: it may not have a replacement address, and
-         * besides, if anything else gets written, so will it.
+         * Ignore the root: it may not have a replacement address, and besides, if anything else
+         * gets written, so will it.
          *
          * Ignore dirty pages, checkpoint writes them regardless.
          */
@@ -247,12 +243,12 @@ __wt_compact_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, void *context, boo
     }
 
     /*
-     * If the page is in-memory, we want to look at it (it may have been
-     * modified and written, and the current location is the interesting
-     * one in terms of compaction, not the original location).
+     * If the page is in-memory, we want to look at it (it may have been modified and written, and
+     * the current location is the interesting one in terms of compaction, not the original
+     * location).
      *
-     * This test could be combined with the next one, but this is a cheap
-     * test and the next one is expensive.
+     * This test could be combined with the next one, but this is a cheap test and the next one is
+     * expensive.
      */
     if (ref->state != WT_REF_DISK)
         return (0);
@@ -266,12 +262,11 @@ __wt_compact_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, void *context, boo
         return (0);
 
     /*
-     * The page is on disk, so there had better be an address; assert that
-     * fact, test at run-time to avoid the core dump.
+     * The page is on disk, so there had better be an address; assert that fact, test at run-time to
+     * avoid the core dump.
      *
-     * Internal pages must be read to walk the tree; ask the block-manager
-     * if it's useful to rewrite leaf pages, don't do the I/O if a rewrite
-     * won't help.
+     * Internal pages must be read to walk the tree; ask the block-manager if it's useful to rewrite
+     * leaf pages, don't do the I/O if a rewrite won't help.
      */
     __wt_ref_info(session, ref, &addr, &addr_size, &type);
     WT_ASSERT(session, addr != NULL);

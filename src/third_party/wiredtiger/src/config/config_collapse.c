@@ -56,9 +56,8 @@ __wt_config_collapse(WT_SESSION_IMPL *session, const char **cfg, char **config_r
         goto err;
 
     /*
-     * If the caller passes us no valid configuration strings, we get here
-     * with no bytes to copy -- that's OK, the underlying string copy can
-     * handle empty strings.
+     * If the caller passes us no valid configuration strings, we get here with no bytes to copy --
+     * that's OK, the underlying string copy can handle empty strings.
      *
      * Strip any trailing comma.
      */
@@ -145,9 +144,8 @@ keep:
         goto err;
 
     /*
-     * If the caller passes us only default configuration strings, we get
-     * here with no bytes to copy -- that's OK, the underlying string copy
-     * can handle empty strings.
+     * If the caller passes us only default configuration strings, we get here with no bytes to copy
+     * -- that's OK, the underlying string copy can handle empty strings.
      *
      * Strip any trailing comma.
      */

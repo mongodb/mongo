@@ -473,9 +473,8 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
         cache = entry->cache;
 
         /*
-         * Figure out a delta since the last time we did an assessment
-         * for each metric we are tracking.  Watch out for wrapping
-         * of values.
+         * Figure out a delta since the last time we did an assessment for each metric we are
+         * tracking. Watch out for wrapping of values.
          *
          * Count pages read, assuming pages are 4KB.
          */
@@ -652,15 +651,12 @@ __cache_pool_adjust(WT_SESSION_IMPL *session, uint64_t highest, uint64_t bump_th
               cache->cp_quota - entry->cache_size);
         }
         /*
-         * Bounds checking: don't go over the pool size or under the
-         * reserved size for this cache.
+         * Bounds checking: don't go over the pool size or under the reserved size for this cache.
          *
-         * Shrink by a chunk size if that doesn't drop us
-         * below the reserved size.
+         * Shrink by a chunk size if that doesn't drop us below the reserved size.
          *
-         * Limit the reduction to half of the free space in the
-         * connection's cache.  This should reduce cache sizes
-         * gradually without stalling application threads.
+         * Limit the reduction to half of the free space in the connection's cache. This should
+         * reduce cache sizes gradually without stalling application threads.
          */
         if (adjustment > 0) {
             *adjustedp = true;

@@ -56,7 +56,7 @@ AS_CASE([$host_cpu],
 	[wt_cv_powerpc="no"])
 AM_CONDITIONAL([POWERPC_HOST], [test "$wt_cv_powerpc" = "yes"])
 AS_CASE([$host_cpu],
-	[amd*|i[[3456]]86*|pentium|x86*], [wt_cv_x86="yes"], [wt_cv_x86="no"])
+	[amd*|i[[3456]]86*|pentium|x86*|mips64el*], [wt_cv_x86="yes"], [wt_cv_x86="no"])
 AM_CONDITIONAL([X86_HOST], [test "$wt_cv_x86" = "yes"])
 AS_CASE([$host_cpu],
 	[s390x*], [wt_cv_zseries="yes"],
@@ -66,6 +66,10 @@ AS_CASE([$host_cpu],
 	[aarch64*], [wt_cv_arm64="yes"],
 	[wt_cv_arm64="no"])
 AM_CONDITIONAL([ARM64_HOST], [test "$wt_cv_arm64" = "yes"])
+AS_CASE([$host_cpu],
+       [mips64el*], [wt_cv_mips64el="yes"],
+       [wt_cv_mips64el="no"])
+AM_CONDITIONAL([MIPS64EL_HOST], [test "$wt_cv_mips64el" = "yes"])
 AS_CASE([$host_os], [*solaris*], [wt_cv_solaris="yes"], [wt_cv_solaris="no"])
 
 # This is a workaround as part of WT-2459. Currently, clang (v3.7) does not

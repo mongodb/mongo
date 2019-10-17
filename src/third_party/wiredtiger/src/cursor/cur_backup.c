@@ -242,20 +242,16 @@ __backup_start(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, bool is_dup, cons
 
     if (!is_dup) {
         /*
-         * The hot backup copy is done outside of WiredTiger, which
-         * means file blocks can't be freed and re-allocated until the
-         * backup completes. The checkpoint code checks the backup flag,
-         * and if a backup cursor is open checkpoints aren't discarded.
-         * We release the lock as soon as we've set the flag, we don't
-         * want to block checkpoints, we just want to make sure no
-         * checkpoints are deleted.  The checkpoint code holds the lock
-         * until it's finished the checkpoint, otherwise we could start
-         * a hot backup that would race with an already-started
+         * The hot backup copy is done outside of WiredTiger, which means file blocks can't be freed
+         * and re-allocated until the backup completes. The checkpoint code checks the backup flag,
+         * and if a backup cursor is open checkpoints aren't discarded. We release the lock as soon
+         * as we've set the flag, we don't want to block checkpoints, we just want to make sure no
+         * checkpoints are deleted. The checkpoint code holds the lock until it's finished the
+         * checkpoint, otherwise we could start a hot backup that would race with an already-started
          * checkpoint.
          *
-         * We are holding the checkpoint and schema locks so schema
-         * operations will not see the backup file list until it is
-         * complete and valid.
+         * We are holding the checkpoint and schema locks so schema operations will not see the
+         * backup file list until it is complete and valid.
          */
         WT_WITH_HOTBACKUP_WRITE_LOCK(session, WT_CONN_HOTBACKUP_START(conn));
 
@@ -313,15 +309,13 @@ __backup_start(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, bool is_dup, cons
     /* Add the hot backup and standard WiredTiger files to the list. */
     if (log_only) {
         /*
-         * If this is not a duplicate cursor, using the log target is an
-         * incremental backup. If this is a duplicate cursor then using
-         * the log target on an existing backup cursor means this cursor
-         * returns the current list of log files. That list was set up
-         * when parsing the URI so we don't have anything to do here.
+         * If this is not a duplicate cursor, using the log target is an incremental backup. If this
+         * is a duplicate cursor then using the log target on an existing backup cursor means this
+         * cursor returns the current list of log files. That list was set up when parsing the URI
+         * so we don't have anything to do here.
          *
-         * We also open an incremental backup source file so that we can
-         * detect a crash with an incremental backup existing in the
-         * source directory versus an improper destination.
+         * We also open an incremental backup source file so that we can detect a crash with an
+         * incremental backup existing in the source directory versus an improper destination.
          */
         dest = WT_INCREMENTAL_BACKUP;
         WT_ERR(__wt_fopen(session, WT_INCREMENTAL_SRC, WT_FS_OPEN_CREATE, WT_STREAM_WRITE, &srcfs));

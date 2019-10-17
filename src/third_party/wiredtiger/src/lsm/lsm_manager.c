@@ -592,13 +592,11 @@ __wt_lsm_manager_push_entry(
     }
 
     /*
-     * Don't allow any work units unless a tree is active, this avoids
-     * races on shutdown between clearing out queues and pushing new
-     * work units.
+     * Don't allow any work units unless a tree is active, this avoids races on shutdown between
+     * clearing out queues and pushing new work units.
      *
-     * Increment the queue reference before checking the flag since
-     * on close, the flag is cleared and then the queue reference count
-     * is checked.
+     * Increment the queue reference before checking the flag since on close, the flag is cleared
+     * and then the queue reference count is checked.
      */
     (void)__wt_atomic_add32(&lsm_tree->queue_ref, 1);
     if (!lsm_tree->active) {

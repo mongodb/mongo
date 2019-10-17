@@ -166,14 +166,13 @@ struct __wt_ovfl_reuse {
     uint8_t addr_size;     /* Overflow addr size */
 
 /*
- * On each page reconciliation, we clear the entry's in-use flag, and
- * reset it as the overflow record is re-used.  After reconciliation
- * completes, unused skiplist entries are discarded, along with their
- * underlying blocks.
+ * On each page reconciliation, we clear the entry's in-use flag, and reset it as the overflow
+ * record is re-used. After reconciliation completes, unused skiplist entries are discarded, along
+ * with their underlying blocks.
  *
- * On each page reconciliation, set the just-added flag for each new
- * skiplist entry; if reconciliation fails for any reason, discard the
- * newly added skiplist entries, along with their underlying blocks.
+ * On each page reconciliation, set the just-added flag for each new skiplist entry; if
+ * reconciliation fails for any reason, discard the newly added skiplist entries, along with their
+ * underlying blocks.
  */
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define WT_OVFL_REUSE_INUSE 0x1u
@@ -230,21 +229,31 @@ struct __wt_ovfl_reuse {
 
 /*
  * WT_PAGE_LOOKASIDE --
- *	Related information for on-disk pages with lookaside entries.
+ *	Information for on-disk pages with lookaside entries.
+ *
+ * This information is used to decide whether history evicted to lookaside is
+ * needed for a read, and when it is no longer needed at all. We track the
+ * newest update written to the disk image in `max_ondisk_ts`, and the oldest
+ * update skipped to choose the on-disk version in `min_skipped_ts`.  If no
+ * updates were skipped, then the disk image contains the newest versions of
+ * all updates and `min_skipped_ts == WT_TS_MAX`.
+ *
+ * For reads without a timestamp, we check that there are no skipped updates
+ * and that the reader's snapshot can see everything on disk.
+ *
+ * For readers with a timestamp, it is safe to ignore lookaside if either
+ * (a) there are no skipped updates and everything on disk is visible, or
+ * (b) everything on disk is visible, and the minimum skipped update is in
+ * the future of the reader.
  */
 struct __wt_page_lookaside {
-    uint64_t las_pageid;               /* Page ID in lookaside */
-    uint64_t max_txn;                  /* Maximum transaction ID */
-    uint64_t unstable_txn;             /* First transaction ID not on page */
-    wt_timestamp_t max_timestamp;      /* Maximum timestamp */
-    wt_timestamp_t unstable_timestamp; /* First timestamp not on page */
-    wt_timestamp_t unstable_durable_timestamp;
-    /* First durable timestamp not on
-     * page */
-    bool eviction_to_lookaside; /* Revert to lookaside on eviction */
-    bool has_prepares;          /* One or more updates are prepared */
-    bool resolved;              /* History has been read into cache */
-    bool skew_newest;           /* Page image has newest versions */
+    uint64_t las_pageid;           /* Page ID in lookaside */
+    uint64_t max_txn;              /* Maximum transaction ID */
+    wt_timestamp_t max_ondisk_ts;  /* Maximum timestamp on disk */
+    wt_timestamp_t min_skipped_ts; /* Skipped in favor of disk version */
+    bool eviction_to_lookaside;    /* Revert to lookaside on eviction */
+    bool has_prepares;             /* One or more updates are prepared */
+    bool resolved;                 /* History has been read into cache */
 };
 
 /*
@@ -283,20 +292,17 @@ struct __wt_page_modify {
     size_t bytes_dirty;
 
     /*
-     * When pages are reconciled, the result is one or more replacement
-     * blocks.  A replacement block can be in one of two states: it was
-     * written to disk, and so we have a block address, or it contained
-     * unresolved modifications and we have a disk image for it with a
-     * list of those unresolved modifications.  The former is the common
-     * case: we only build lists of unresolved modifications when we're
-     * evicting a page, and we only expect to see unresolved modifications
-     * on a page being evicted in the case of a hot page that's too large
-     * to keep in memory as it is.  In other words, checkpoints will skip
-     * unresolved modifications, and will write the blocks rather than
-     * build lists of unresolved modifications.
+     * When pages are reconciled, the result is one or more replacement blocks. A replacement block
+     * can be in one of two states: it was written to disk, and so we have a block address, or it
+     * contained unresolved modifications and we have a disk image for it with a list of those
+     * unresolved modifications. The former is the common case: we only build lists of unresolved
+     * modifications when we're evicting a page, and we only expect to see unresolved modifications
+     * on a page being evicted in the case of a hot page that's too large to keep in memory as it
+     * is. In other words, checkpoints will skip unresolved modifications, and will write the blocks
+     * rather than build lists of unresolved modifications.
      *
-     * Ugly union/struct layout to conserve memory, we never have both
-     * a replace address and multiple replacement blocks.
+     * Ugly union/struct layout to conserve memory, we never have both a replace address and
+     * multiple replacement blocks.
      */
     union {
         struct { /* Single, written replacement block */
@@ -336,13 +342,12 @@ struct __wt_page_modify {
                 void *disk_image;
 
                 /*
-                 * List of unresolved updates. Updates are either a row-store
-                 * insert or update list, or column-store insert list. When
-                 * creating lookaside records, there is an additional value,
-                 * the committed item's transaction information.
+                 * List of unresolved updates. Updates are either a row-store insert or update list,
+                 * or column-store insert list. When creating lookaside records, there is an
+                 * additional value, the committed item's transaction information.
                  *
-                 * If there are unresolved updates, the block wasn't written and
-                 * there will always be a disk image.
+                 * If there are unresolved updates, the block wasn't written and there will always
+                 * be a disk image.
                  */
                 struct __wt_save_upd {
                     WT_INSERT *ins; /* Insert list reference */
@@ -372,12 +377,11 @@ struct __wt_page_modify {
     } u1;
 
     /*
-     * Internal pages need to be able to chain root-page splits and have a
-     * special transactional eviction requirement.  Column-store leaf pages
-     * need update and append lists.
+     * Internal pages need to be able to chain root-page splits and have a special transactional
+     * eviction requirement. Column-store leaf pages need update and append lists.
      *
-     * Ugly union/struct layout to conserve memory, a page is either a leaf
-     * page or an internal page.
+     * Ugly union/struct layout to conserve memory, a page is either a leaf page or an internal
+     * page.
      */
     union {
         struct {
@@ -554,12 +558,12 @@ struct __wt_page {
 #define pg_intl_split_gen u.intl.split_gen
 
 /*
- * Macros to copy/set the index because the name is obscured to ensure
- * the field isn't read multiple times.
+ * Macros to copy/set the index because the name is obscured to ensure the field isn't read multiple
+ * times.
  *
- * There are two versions of WT_INTL_INDEX_GET because the session split
- * generation is usually set, but it's not always required: for example,
- * if a page is locked for splitting, or being created or destroyed.
+ * There are two versions of WT_INTL_INDEX_GET because the session split generation is usually set,
+ * but it's not always required: for example, if a page is locked for splitting, or being created or
+ * destroyed.
  */
 #define WT_INTL_INDEX_GET_SAFE(page) ((page)->u.intl.__index)
 #define WT_INTL_INDEX_GET(session, page, pindex)                          \
@@ -614,15 +618,12 @@ struct __wt_page {
             WT_COL *col_var; /* Values */
 
             /*
-             * Variable-length column-store pages have an array
-             * of page entries with RLE counts greater than 1 when
-             * reading the page, so it's not necessary to walk the
-             * page counting records to find a specific entry. We
-             * can do a binary search in this array, then an offset
-             * calculation to find the cell.
+             * Variable-length column-store pages have an array of page entries with RLE counts
+             * greater than 1 when reading the page, so it's not necessary to walk the page counting
+             * records to find a specific entry. We can do a binary search in this array, then an
+             * offset calculation to find the cell.
              *
-             * It's a separate structure to keep the page structure
-             * as small as possible.
+             * It's a separate structure to keep the page structure as small as possible.
              */
             struct __wt_col_var_repeat {
                 uint32_t nrepeats;     /* repeat slots */
@@ -639,11 +640,11 @@ struct __wt_page {
     } u;
 
     /*
-     * Page entries, type and flags are positioned at the end of the WT_PAGE
-     * union to reduce cache misses in the row-store search function.
+     * Page entries, type and flags are positioned at the end of the WT_PAGE union to reduce cache
+     * misses in the row-store search function.
      *
-     * The entries field only applies to leaf pages, internal pages use the
-     * page-index entries instead.
+     * The entries field only applies to leaf pages, internal pages use the page-index entries
+     * instead.
      */
     uint32_t entries; /* Leaf page entries */
 
@@ -909,7 +910,7 @@ struct __wt_ref {
         WT_SESSION_IMPL *session;
         const char *name;
         const char *func;
-        uint32_t time_sec; /* DEBUGGING field for rare hang. */
+        uint32_t time_sec;
         uint16_t line;
         uint16_t state;
     } hist[WT_REF_SAVE_STATE_MAX];
@@ -1000,14 +1001,13 @@ struct __wt_row { /* On-page key, on-page cell, or off-page WT_IKEY */
  */
 struct __wt_col {
     /*
-     * Variable-length column-store data references are page offsets, not
-     * pointers (we boldly re-invent short pointers).  The trade-off is 4B
-     * per K/V pair on a 64-bit machine vs. a single cycle for the addition
-     * of a base pointer.  The on-page data is a WT_CELL (same as row-store
+     * Variable-length column-store data references are page offsets, not pointers (we boldly
+     * re-invent short pointers). The trade-off is 4B per K/V pair on a 64-bit machine vs. a single
+     * cycle for the addition of a base pointer. The on-page data is a WT_CELL (same as row-store
      * pages).
      *
-     * Obscure the field name, code shouldn't use WT_COL->__col_value, the
-     * public interface is WT_COL_PTR and WT_COL_PTR_SET.
+     * Obscure the field name, code shouldn't use WT_COL->__col_value, the public interface is
+     * WT_COL_PTR and WT_COL_PTR_SET.
      */
     uint32_t __col_value;
 };
@@ -1133,33 +1133,28 @@ struct __wt_update {
 /*
  * WT_INSERT --
  *
- * Row-store leaf pages support inserts of new K/V pairs.  When the first K/V
- * pair is inserted, the WT_INSERT_HEAD array is allocated, with one slot for
- * every existing element in the page, plus one additional slot.  A slot points
- * to a WT_INSERT_HEAD structure for the items which sort after the WT_ROW
- * element that references it and before the subsequent WT_ROW element; the
- * skiplist structure has a randomly chosen depth of next pointers in each
- * inserted node.
+ * Row-store leaf pages support inserts of new K/V pairs. When the first K/V pair is inserted, the
+ * WT_INSERT_HEAD array is allocated, with one slot for every existing element in the page, plus one
+ * additional slot. A slot points to a WT_INSERT_HEAD structure for the items which sort after the
+ * WT_ROW element that references it and before the subsequent WT_ROW element; the skiplist
+ * structure has a randomly chosen depth of next pointers in each inserted node.
  *
- * The additional slot is because it's possible to insert items smaller than any
- * existing key on the page: for that reason, the first slot of the insert array
- * holds keys smaller than any other key on the page.
- *
- * In column-store variable-length run-length encoded pages, a single indx
- * entry may reference a large number of records, because there's a single
- * on-page entry representing many identical records. (We don't expand those
- * entries when the page comes into memory, as that would require resources as
- * pages are moved to/from the cache, including read-only files.)  Instead, a
- * single indx entry represents all of the identical records originally found
+ * The additional slot is because it's possible to insert items smaller than any existing key on the
+ * page: for that reason, the first slot of the insert array holds keys smaller than any other key
  * on the page.
  *
- * Modifying (or deleting) run-length encoded column-store records is hard
- * because the page's entry no longer references a set of identical items.  We
- * handle this by "inserting" a new entry into the insert array, with its own
- * record number.  (This is the only case where it's possible to insert into a
- * column-store: only appends are allowed, as insert requires re-numbering
- * subsequent records.  Berkeley DB did support mutable records, but it won't
- * scale and it isn't useful enough to re-implement, IMNSHO.)
+ * In column-store variable-length run-length encoded pages, a single indx entry may reference a
+ * large number of records, because there's a single on-page entry representing many identical
+ * records. (We don't expand those entries when the page comes into memory, as that would require
+ * resources as pages are moved to/from the cache, including read-only files.) Instead, a single
+ * indx entry represents all of the identical records originally found on the page.
+ *
+ * Modifying (or deleting) run-length encoded column-store records is hard because the page's entry
+ * no longer references a set of identical items. We handle this by "inserting" a new entry into the
+ * insert array, with its own record number. (This is the only case where it's possible to insert
+ * into a column-store: only appends are allowed, as insert requires re-numbering subsequent
+ * records. Berkeley DB did support mutable records, but it won't scale and it isn't useful enough
+ * to re-implement, IMNSHO.)
  */
 struct __wt_insert {
     WT_UPDATE *upd; /* value */
@@ -1272,17 +1267,15 @@ struct __wt_insert_head {
          ++(i), (v) = __bit_getv(WT_PAGE_HEADER_BYTE(btree, dsk), i, (btree)->bitcnt))
 
 /*
- * Manage split generation numbers.  Splits walk the list of sessions to check
- * when it is safe to free structures that have been replaced.  We also check
- * that list periodically (e.g., when wrapping up a transaction) to free any
- * memory we can.
+ * Manage split generation numbers. Splits walk the list of sessions to check when it is safe to
+ * free structures that have been replaced. We also check that list periodically (e.g., when
+ * wrapping up a transaction) to free any memory we can.
  *
- * Before a thread enters code that will examine page indexes (which are
- * swapped out by splits), it publishes a copy of the current split generation
- * into its session.  Don't assume that threads never re-enter this code: if we
- * already have a split generation, leave it alone.  If our caller is examining
- * an index, we don't want the oldest split generation to move forward and
- * potentially free it.
+ * Before a thread enters code that will examine page indexes (which are swapped out by splits), it
+ * publishes a copy of the current split generation into its session. Don't assume that threads
+ * never re-enter this code: if we already have a split generation, leave it alone. If our caller is
+ * examining an index, we don't want the oldest split generation to move forward and potentially
+ * free it.
  */
 #define WT_ENTER_PAGE_INDEX(session)                                         \
     do {                                                                     \

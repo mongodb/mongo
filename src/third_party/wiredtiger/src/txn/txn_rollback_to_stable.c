@@ -105,13 +105,11 @@ __txn_abort_newer_update(
                 first_upd = upd->next;
         } else if (rollback_timestamp < upd->durable_ts) {
             /*
-             * If any updates are aborted, all newer updates
-             * better be aborted as well.
+             * If any updates are aborted, all newer updates better be aborted as well.
              *
-             * Timestamp ordering relies on the validations at
-             * the time of commit. Thus if the table is not
-             * configured for key consistency check, the
-             * the timestamps could be out of order here.
+             * Timestamp ordering relies on the validations at the time of commit. Thus if the table
+             * is not configured for key consistency check, the timestamps could be out of order
+             * here.
              */
             WT_ASSERT(session, !FLD_ISSET(S2BT(session)->assert_flags, WT_ASSERT_COMMIT_TS_KEYS) ||
                 upd == first_upd);
@@ -222,34 +220,29 @@ __txn_abort_newer_updates(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t 
 {
     WT_DECL_RET;
     WT_PAGE *page;
+    WT_PAGE_LOOKASIDE *page_las;
     uint32_t read_flags;
     bool local_read;
 
     /*
-     * If we created a page image with updates the need to be rolled back,
-     * read the history into cache now and make sure the page is marked
-     * dirty.  Otherwise, the history we need could be swept from the
-     * lookaside table before the page is read because the lookaside sweep
-     * code has no way to tell that the page image is invalid.
+     * If we created a page image with updates that need to be rolled back, read the history into
+     * cache now and make sure the page is marked dirty. Otherwise, the history we need could be
+     * swept from the lookaside table before the page is read because the lookaside sweep code has
+     * no way to tell that the page image is invalid.
      *
-     * So, if there is lookaside history for a page, first check if the
-     * history needs to be rolled back make sure that history is loaded
-     * into cache.  That is, if skew_newest is true, so the disk image
-     * potentially contained unstable updates, and the history is more
-     * recent than the rollback timestamp.
+     * So, if there is lookaside history for a page, first check if the history needs to be rolled
+     * back then ensure the history is loaded into cache.
      *
-     * Also, we have separately discarded any lookaside history more recent
-     * than the rollback timestamp.  For page_las structures in cache,
-     * reset any future timestamps back to the rollback timestamp.  This
-     * allows those structures to be discarded once the rollback timestamp
-     * is stable (crucially for tests, they can be discarded if the
-     * connection is closed right after a rollback_to_stable call).
+     * Also, we have separately discarded any lookaside history more recent than the rollback
+     * timestamp. For page_las structures in cache, reset any future timestamps back to the rollback
+     * timestamp. This allows those structures to be discarded once the rollback timestamp is stable
+     * (crucially for tests, they can be discarded if the connection is closed right after a
+     * rollback_to_stable call).
      */
     local_read = false;
     read_flags = WT_READ_WONT_NEED;
-    if (ref->page_las != NULL) {
-        if (ref->page_las->skew_newest &&
-          rollback_timestamp < ref->page_las->unstable_durable_timestamp) {
+    if ((page_las = ref->page_las) != NULL) {
+        if (rollback_timestamp < page_las->max_ondisk_ts) {
             /*
              * Make sure we get back a page with history, not a limbo page.
              */
@@ -258,13 +251,10 @@ __txn_abort_newer_updates(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t 
             WT_ASSERT(session,
               ref->state != WT_REF_LIMBO && ref->page != NULL && __wt_page_is_modified(ref->page));
             local_read = true;
+            page_las->max_ondisk_ts = rollback_timestamp;
         }
-        if (ref->page_las->max_timestamp > rollback_timestamp)
-            ref->page_las->max_timestamp = rollback_timestamp;
-        if (ref->page_las->unstable_durable_timestamp > rollback_timestamp)
-            ref->page_las->unstable_durable_timestamp = rollback_timestamp;
-        if (ref->page_las->unstable_timestamp > rollback_timestamp)
-            ref->page_las->unstable_timestamp = rollback_timestamp;
+        if (rollback_timestamp < page_las->min_skipped_ts)
+            page_las->min_skipped_ts = rollback_timestamp;
     }
 
     /* Review deleted page saved to the ref */
@@ -272,18 +262,14 @@ __txn_abort_newer_updates(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t 
         WT_ERR(__wt_delete_page_rollback(session, ref));
 
     /*
-     * If we have a ref with no page, or the page is clean, there is
-     * nothing to roll back.
+     * If we have a ref with no page, or the page is clean, there is nothing to roll back.
      *
-     * This check for a clean page is partly an optimization (checkpoint
-     * only marks pages clean when they have no unwritten updates so
-     * there's no point visiting them again), but also covers a corner case
-     * of a checkpoint with use_timestamp=false.  Such a checkpoint
-     * effectively moves the stable timestamp forward, because changes that
-     * are written in the checkpoint cannot be reliably rolled back.  The
-     * actual stable timestamp doesn't change, though, so if we try to roll
-     * back clean pages the in-memory tree can get out of sync with the
-     * on-disk tree.
+     * This check for a clean page is partly an optimization (checkpoint only marks pages clean when
+     * they have no unwritten updates so there's no point visiting them again), but also covers a
+     * corner case of a checkpoint with use_timestamp=false. Such a checkpoint effectively moves the
+     * stable timestamp forward, because changes that are written in the checkpoint cannot be
+     * reliably rolled back. The actual stable timestamp doesn't change, though, so if we try to
+     * roll back clean pages the in-memory tree can get out of sync with the on-disk tree.
      */
     if ((page = ref->page) == NULL || !__wt_page_is_modified(page))
         goto err;
@@ -436,6 +422,7 @@ __txn_rollback_to_stable_check(WT_SESSION_IMPL *session)
 
     conn = S2C(session);
     txn_global = &conn->txn_global;
+
     if (!txn_global->has_stable_timestamp)
         WT_RET_MSG(session, EINVAL, "rollback_to_stable requires a stable timestamp");
 
@@ -472,13 +459,12 @@ __txn_rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[])
 
     WT_STAT_CONN_INCR(session, txn_rollback_to_stable);
     /*
-     * Mark that a rollback operation is in progress and wait for eviction
-     * to drain.  This is necessary because lookaside eviction uses
-     * transactions and causes the check for a quiescent system to fail.
+     * Mark that a rollback operation is in progress and wait for eviction to drain. This is
+     * necessary because lookaside eviction uses transactions and causes the check for a quiescent
+     * system to fail.
      *
-     * Configuring lookaside eviction off isn't atomic, safe because the
-     * flag is only otherwise set when closing down the database. Assert
-     * to avoid confusion in the future.
+     * Configuring lookaside eviction off isn't atomic, safe because the flag is only otherwise set
+     * when closing down the database. Assert to avoid confusion in the future.
      */
     WT_ASSERT(session, !F_ISSET(conn, WT_CONN_EVICTION_NO_LOOKASIDE));
     F_SET(conn, WT_CONN_EVICTION_NO_LOOKASIDE);

@@ -39,9 +39,8 @@ typedef enum {
 /*
  * Transaction ID comparison dealing with edge cases.
  *
- * WT_TXN_ABORTED is the largest possible ID (never visible to a running
- * transaction), WT_TXN_NONE is smaller than any possible ID (visible to all
- * running transactions).
+ * WT_TXN_ABORTED is the largest possible ID (never visible to a running transaction), WT_TXN_NONE
+ * is smaller than any possible ID (visible to all running transactions).
  */
 #define WT_TXNID_LE(t1, t2) ((t1) <= (t2))
 
@@ -158,15 +157,13 @@ struct __wt_txn_global {
     uint32_t read_timestampq_len;
 
     /*
-     * Track information about the running checkpoint. The transaction
-     * snapshot used when checkpointing are special. Checkpoints can run
-     * for a long time so we keep them out of regular visibility checks.
-     * Eviction and checkpoint operations know when they need to be aware
-     * of checkpoint transactions.
+     * Track information about the running checkpoint. The transaction snapshot used when
+     * checkpointing are special. Checkpoints can run for a long time so we keep them out of regular
+     * visibility checks. Eviction and checkpoint operations know when they need to be aware of
+     * checkpoint transactions.
      *
-     * We rely on the fact that (a) the only table a checkpoint updates is
-     * the metadata; and (b) once checkpoint has finished reading a table,
-     * it won't revisit it.
+     * We rely on the fact that (a) the only table a checkpoint updates is the metadata; and (b)
+     * once checkpoint has finished reading a table, it won't revisit it.
      */
     volatile bool checkpoint_running;    /* Checkpoint running */
     volatile uint32_t checkpoint_id;     /* Checkpoint's session ID */
@@ -277,8 +274,7 @@ struct __wt_txn {
     /*
      * Timestamp copied into updates created by this transaction.
      *
-     * In some use cases, this can be updated while the transaction is
-     * running.
+     * In some use cases, this can be updated while the transaction is running.
      */
     wt_timestamp_t commit_timestamp;
 

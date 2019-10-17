@@ -180,6 +180,21 @@ WT_ATOMIC_FUNC(size, size_t, size_t *vp, size_t v)
 #define WT_READ_BARRIER() WT_FULL_BARRIER()
 #define WT_WRITE_BARRIER() WT_FULL_BARRIER()
 
+#elif defined(__mips64el__) || defined(__mips__) || defined(__mips64__) || defined(__mips64)
+#define WT_PAUSE() __asm__ volatile("pause\n" ::: "memory")
+#define WT_FULL_BARRIER()                                                                  \
+    do {                                                                                   \
+        __asm__ volatile("sync; ld $0, %0" ::"m"(*(long *)0xffffffff80000000) : "memory"); \
+    } while (0)
+#define WT_READ_BARRIER()                                                                  \
+    do {                                                                                   \
+        __asm__ volatile("sync; ld $0, %0" ::"m"(*(long *)0xffffffff80000000) : "memory"); \
+    } while (0)
+#define WT_WRITE_BARRIER()                                                                 \
+    do {                                                                                   \
+        __asm__ volatile("sync; ld $0, %0" ::"m"(*(long *)0xffffffff80000000) : "memory"); \
+    } while (0)
+
 #elif defined(__PPC64__) || defined(PPC64)
 /* ori 0,0,0 is the PPC64 noop instruction */
 #define WT_PAUSE() __asm__ volatile("ori 0,0,0" ::: "memory")

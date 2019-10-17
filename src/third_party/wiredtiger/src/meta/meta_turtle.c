@@ -197,19 +197,16 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
     WT_RET(__wt_remove_if_exists(session, WT_METADATA_TURTLE_SET, false));
 
     /*
-     * If we found a corrupted turtle file, then delete it and create a new.
-     * We could die after creating the turtle file and before creating the
-     * metadata file, or worse, the metadata file might be in some random
-     * state.  Make sure that doesn't happen: if we don't find the turtle
-     * file, first create the metadata file, load any hot backup, and then
-     * create the turtle file.  No matter what happens, if metadata file
-     * creation doesn't fully complete, we won't have a turtle file and we
-     * will repeat the process until we succeed.
+     * If we found a corrupted turtle file, then delete it and create a new. We could die after
+     * creating the turtle file and before creating the metadata file, or worse, the metadata file
+     * might be in some random state. Make sure that doesn't happen: if we don't find the turtle
+     * file, first create the metadata file, load any hot backup, and then create the turtle file.
+     * No matter what happens, if metadata file creation doesn't fully complete, we won't have a
+     * turtle file and we will repeat the process until we succeed.
      *
-     * Incremental backups can occur only if recovery is run and it becomes
-     * live. So, if there is a turtle file and an incremental backup file,
-     * that is an error.  Otherwise, if there's already a turtle file, we're
-     * done.
+     * Incremental backups can occur only if recovery is run and it becomes live. So, if there is a
+     * turtle file and an incremental backup file, that is an error. Otherwise, if there's already a
+     * turtle file, we're done.
      */
     WT_RET(__wt_fs_exist(session, WT_INCREMENTAL_BACKUP, &exist_incr));
     WT_RET(__wt_fs_exist(session, WT_INCREMENTAL_SRC, &exist_isrc));

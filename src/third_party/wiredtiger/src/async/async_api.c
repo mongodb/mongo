@@ -176,8 +176,8 @@ __async_config(WT_SESSION_IMPL *session, WT_CONNECTION_IMPL *conn, const char **
     *runp = cval.val != 0;
 
     /*
-     * Even if async is turned off, we want to parse and store the default
-     * values so that reconfigure can just enable them.
+     * Even if async is turned off, we want to parse and store the default values so that
+     * reconfigure can just enable them.
      *
      * Bound the minimum maximum operations at 10.
      */
@@ -308,18 +308,15 @@ __wt_async_reconfig(WT_SESSION_IMPL *session, const char *cfg[])
     WT_RET(__async_config(session, &tmp_conn, cfg, &run));
 
     /*
-     * There are some restrictions on the live reconfiguration of async.
-     * Unlike other subsystems where we simply destroy anything existing
-     * and restart with the new configuration, async is not so easy.
-     * If the user is just changing the number of workers, we want to
-     * allow the existing op handles and other information to remain in
-     * existence.  So we must handle various combinations of changes
-     * individually.
+     * There are some restrictions on the live reconfiguration of async. Unlike other subsystems
+     * where we simply destroy anything existing and restart with the new configuration, async is
+     * not so easy. If the user is just changing the number of workers, we want to allow the
+     * existing op handles and other information to remain in existence. So we must handle various
+     * combinations of changes individually.
      *
-     * One restriction is that if async is currently on, the user cannot
-     * change the number of async op handles available.  The user can try
-     * but we do nothing with it.  However we must allow the ops_max config
-     * string so that a user can completely start async via reconfigure.
+     * One restriction is that if async is currently on, the user cannot change the number of async
+     * op handles available. The user can try but we do nothing with it. However we must allow the
+     * ops_max config string so that a user can completely start async via reconfigure.
      */
 
     /*

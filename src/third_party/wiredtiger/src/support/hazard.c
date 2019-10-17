@@ -124,16 +124,13 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
     /*
      * Do the dance:
      *
-     * The memory location which makes a page "real" is the WT_REF's state
-     * of WT_REF_LIMBO or WT_REF_MEM, which can be set to WT_REF_LOCKED
-     * at any time by the page eviction server.
+     * The memory location which makes a page "real" is the WT_REF's state of WT_REF_LIMBO or
+     * WT_REF_MEM, which can be set to WT_REF_LOCKED at any time by the page eviction server.
      *
-     * Add the WT_REF reference to the session's hazard list and flush the
-     * write, then see if the page's state is still valid.  If so, we can
-     * use the page because the page eviction server will see our hazard
-     * pointer before it discards the page (the eviction server sets the
-     * state to WT_REF_LOCKED, then flushes memory and checks the hazard
-     * pointers).
+     * Add the WT_REF reference to the session's hazard list and flush the write, then see if the
+     * page's state is still valid. If so, we can use the page because the page eviction server will
+     * see our hazard pointer before it discards the page (the eviction server sets the state to
+     * WT_REF_LOCKED, then flushes memory and checks the hazard pointers).
      */
     hp->ref = ref;
 #ifdef HAVE_DIAGNOSTIC
@@ -200,12 +197,11 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_REF *ref)
             hp->ref = NULL;
 
             /*
-             * If this was the last hazard pointer in the session,
-             * reset the size so that checks can skip this session.
+             * If this was the last hazard pointer in the session, reset the size so that checks can
+             * skip this session.
              *
-             * A write-barrier() is necessary before the change to
-             * the in-use value, the number of active references
-             * can never be less than the number of in-use slots.
+             * A write-barrier() is necessary before the change to the in-use value, the number of
+             * active references can never be less than the number of in-use slots.
              */
             if (--session->nhazard == 0)
                 WT_PUBLISH(session->hazard_inuse, 0);
@@ -280,16 +276,13 @@ static inline void
 hazard_get_reference(WT_SESSION_IMPL *session, WT_HAZARD **hazardp, uint32_t *hazard_inusep)
 {
     /*
-     * Hazard pointer arrays can be swapped out from under us if they grow.
-     * First, read the current in-use value. The read must precede the read
-     * of the hazard pointer itself (so the in-use value is pessimistic
-     * should the hazard array grow), and additionally ensure we only read
-     * the in-use value once. Then, read the hazard pointer, also ensuring
-     * we only read it once.
+     * Hazard pointer arrays can be swapped out from under us if they grow. First, read the current
+     * in-use value. The read must precede the read of the hazard pointer itself (so the in-use
+     * value is pessimistic should the hazard array grow), and additionally ensure we only read the
+     * in-use value once. Then, read the hazard pointer, also ensuring we only read it once.
      *
-     * Use a barrier instead of marking the fields volatile because we don't
-     * want to slow down the rest of the hazard pointer functions that don't
-     * need special treatment.
+     * Use a barrier instead of marking the fields volatile because we don't want to slow down the
+     * rest of the hazard pointer functions that don't need special treatment.
      */
     WT_ORDERED_READ(*hazard_inusep, session->hazard_inuse);
     WT_ORDERED_READ(*hazardp, session->hazard);

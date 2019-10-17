@@ -141,17 +141,16 @@ main(int argc, char *argv[])
     error_check(cursor->close(cursor));
 
     /*
-     * First query: a call arrives.  In SQL:
+     * First query: a call arrives. In SQL:
      *
      * SELECT id, name FROM Customers WHERE phone=?
      *
-     * Use the cust_phone index, lookup by phone number to fill the
-     * customer record.  The cursor will have a key format of "S" for a
-     * string because the cust_phone index has a single column ("phone"),
-     * which is of type "S".
+     * Use the cust_phone index, lookup by phone number to fill the customer record. The cursor will
+     * have a key format of "S" for a string because the cust_phone index has a single column
+     * ("phone"), which is of type "S".
      *
-     * Specify the columns we want: the customer ID and the name.  This
-     * means the cursor's value format will be "rS".
+     * Specify the columns we want: the customer ID and the name. This means the cursor's value
+     * format will be "rS".
      */
     error_check(
       session->open_cursor(session, "index:customers:phone(id,name)", NULL, NULL, &cursor));
@@ -162,17 +161,16 @@ main(int argc, char *argv[])
     error_check(cursor->close(cursor));
 
     /*
-     * Next query: get the recent order history.  In SQL:
+     * Next query: get the recent order history. In SQL:
      *
      * SELECT * FROM Calls WHERE cust_id=? ORDER BY call_date DESC LIMIT 3
      *
-     * Use the call_cust_date index to find the matching calls.  Since it is
-     * is in increasing order by date for a given customer, we want to start
-     * with the last record for the customer and work backwards.
+     * Use the call_cust_date index to find the matching calls. Since it is in increasing order by
+     * date for a given customer, we want to start with the last record for the customer and work
+     * backwards.
      *
-     * Specify a subset of columns to be returned.  (Note that if these were
-     * all covered by the index, the primary would not have to be accessed.)
-     * Stop after getting 3 records.
+     * Specify a subset of columns to be returned. (Note that if these were all covered by the
+     * index, the primary would not have to be accessed.) Stop after getting 3 records.
      */
     error_check(session->open_cursor(
       session, "index:calls:cust_date(cust_id,call_type,notes)", NULL, NULL, &cursor));

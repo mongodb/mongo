@@ -301,11 +301,9 @@ __ovfl_reuse_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
     head = page->modify->ovfl_track->ovfl_reuse;
 
     /*
-     * Discard any overflow records that aren't in-use, freeing underlying
-     * blocks.
+     * Discard any overflow records that aren't in-use, freeing underlying blocks.
      *
-     * First, walk the overflow reuse lists (except for the lowest one),
-     * fixing up skiplist links.
+     * First, walk the overflow reuse lists (except for the lowest one), fixing up skiplist links.
      */
     for (i = WT_SKIP_MAXDEPTH - 1; i > 0; --i)
         for (e = &head[i]; (reuse = *e) != NULL;) {
@@ -317,15 +315,13 @@ __ovfl_reuse_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
         }
 
     /*
-     * Second, discard any overflow record without an in-use flag, clear
-     * the flags for the next run.
+     * Second, discard any overflow record without an in-use flag, clear the flags for the next run.
      *
-     * As part of the pass through the lowest level, figure out how much
-     * space we added/subtracted from the page, and update its footprint.
-     * We don't get it exactly correct because we don't know the depth of
-     * the skiplist here, but it's close enough, and figuring out the
-     * memory footprint change in the reconciliation wrapup code means
-     * fewer atomic updates and less code overall.
+     * As part of the pass through the lowest level, figure out how much space we added/subtracted
+     * from the page, and update its footprint. We don't get it exactly correct because we don't
+     * know the depth of the skiplist here, but it's close enough, and figuring out the memory
+     * footprint change in the reconciliation wrapup code means fewer atomic updates and less code
+     * overall.
      */
     decr = 0;
     for (e = &head[0]; (reuse = *e) != NULL;) {
@@ -368,11 +364,9 @@ __ovfl_reuse_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
     head = page->modify->ovfl_track->ovfl_reuse;
 
     /*
-     * Discard any overflow records that were just added, freeing underlying
-     * blocks.
+     * Discard any overflow records that were just added, freeing underlying blocks.
      *
-     * First, walk the overflow reuse lists (except for the lowest one),
-     * fixing up skiplist links.
+     * First, walk the overflow reuse lists (except for the lowest one), fixing up skiplist links.
      */
     for (i = WT_SKIP_MAXDEPTH - 1; i > 0; --i)
         for (e = &head[i]; (reuse = *e) != NULL;) {
@@ -464,14 +458,12 @@ __wt_ovfl_reuse_add(WT_SESSION_IMPL *session, WT_PAGE *page, const uint8_t *addr
     skipdepth = __wt_skip_choose_depth(session);
 
     /*
-     * Allocate the WT_OVFL_REUSE structure, next pointers for the skip
-     * list, room for the address and value, then copy everything into
-     * place.
+     * Allocate the WT_OVFL_REUSE structure, next pointers for the skip list, room for the address
+     * and value, then copy everything into place.
      *
-     * To minimize the WT_OVFL_REUSE structure size, the address offset
-     * and size are single bytes: that's safe because the address follows
-     * the structure (which can't be more than about 100B), and address
-     * cookies are limited to 255B.
+     * To minimize the WT_OVFL_REUSE structure size, the address offset and size are single bytes:
+     * that's safe because the address follows the structure (which can't be more than about 100B),
+     * and address cookies are limited to 255B.
      */
     size = sizeof(WT_OVFL_REUSE) + skipdepth * sizeof(WT_OVFL_REUSE *) + addr_size + value_size;
     WT_RET(__wt_calloc(session, 1, size, &reuse));

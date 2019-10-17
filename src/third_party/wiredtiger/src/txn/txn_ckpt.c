@@ -160,15 +160,12 @@ __checkpoint_apply_all(
 
     if (!target_list && op != NULL) {
         /*
-         * If the checkpoint is named or we're dropping checkpoints, we
-         * checkpoint both open and closed files; else, only checkpoint
-         * open files.
+         * If the checkpoint is named or we're dropping checkpoints, we checkpoint both open and
+         * closed files; else, only checkpoint open files.
          *
-         * XXX
-         * We don't optimize unnamed checkpoints of a list of targets,
-         * we open the targets and checkpoint them even if they are
-         * quiescent and don't need a checkpoint, believing applications
-         * unlikely to checkpoint a list of closed targets.
+         * XXX We don't optimize unnamed checkpoints of a list of targets, we open the targets and
+         * checkpoint them even if they are quiescent and don't need a checkpoint, believing
+         * applications unlikely to checkpoint a list of closed targets.
          */
         ckpt_closed = named;
         if (!ckpt_closed) {
@@ -217,21 +214,17 @@ __checkpoint_data_source(WT_SESSION_IMPL *session, const char *cfg[])
     WT_NAMED_DATA_SOURCE *ndsrc;
 
     /*
-     * A place-holder, to support data sources: we assume calling the
-     * underlying data-source session checkpoint function is sufficient to
-     * checkpoint all objects in the data source, open or closed, and we
-     * don't attempt to optimize the checkpoint of individual targets.
-     * Those assumptions are not necessarily going to be true for all
-     * data sources.
+     * A place-holder, to support data sources: we assume calling the underlying data-source session
+     * checkpoint function is sufficient to checkpoint all objects in the data source, open or
+     * closed, and we don't attempt to optimize the checkpoint of individual targets. Those
+     * assumptions are not necessarily going to be true for all data sources.
      *
-     * It's not difficult to support data-source checkpoints of individual
-     * targets (__wt_schema_worker is the underlying function that will do
-     * the work, and it's already written to support data-sources, although
-     * we'd probably need to pass the URI of the object to the data source
-     * checkpoint function which we don't currently do).  However, doing a
-     * full data checkpoint is trickier: currently, the connection code is
-     * written to ignore all objects other than "file:", and that code will
-     * require significant changes to work with data sources.
+     * It's not difficult to support data-source checkpoints of individual targets
+     * (__wt_schema_worker is the underlying function that will do the work, and it's already
+     * written to support data-sources, although we'd probably need to pass the URI of the object to
+     * the data source checkpoint function which we don't currently do). However, doing a full data
+     * checkpoint is trickier: currently, the connection code is written to ignore all objects other
+     * than "file:", and that code will require significant changes to work with data sources.
      */
     TAILQ_FOREACH (ndsrc, &S2C(session)->dsrcqh, q) {
         dsrc = ndsrc->dsrc;
@@ -407,9 +400,8 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
         /*
          * We haven't reached the current target.
          *
-         * Don't wait indefinitely: there might be dirty pages
-         * that can't be evicted.  If we can't meet the target,
-         * give up and start the checkpoint for real.
+         * Don't wait indefinitely: there might be dirty pages that can't be evicted. If we can't
+         * meet the target, give up and start the checkpoint for real.
          */
         bytes_written_total = cache->bytes_written - bytes_written_start;
         if (bytes_written_total > max_write)
@@ -541,9 +533,8 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
     /*
      * Start a snapshot transaction for the checkpoint.
      *
-     * Note: we don't go through the public API calls because they have
-     * side effects on cursors, which applications can hold open across
-     * calls to checkpoint.
+     * Note: we don't go through the public API calls because they have side effects on cursors,
+     * which applications can hold open across calls to checkpoint.
      */
     WT_RET(__wt_txn_begin(session, txn_cfg));
 
@@ -574,8 +565,8 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
     /*
      * Remove the checkpoint transaction from the global table.
      *
-     * This allows ordinary visibility checks to move forward because
-     * checkpoints often take a long time and only write to the metadata.
+     * This allows ordinary visibility checks to move forward because checkpoints often take a long
+     * time and only write to the metadata.
      */
     __wt_writelock(session, &txn_global->rwlock);
     txn_global->checkpoint_state = *txn_state;
@@ -597,8 +588,8 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
     /*
      * Set the checkpoint transaction's timestamp, if requested.
      *
-     * We rely on having the global transaction data locked so the oldest
-     * timestamp can't move past the stable timestamp.
+     * We rely on having the global transaction data locked so the oldest timestamp can't move past
+     * the stable timestamp.
      */
     WT_ASSERT(session, !F_ISSET(txn, WT_TXN_HAS_TS_COMMIT | WT_TXN_HAS_TS_READ |
                            WT_TXN_TS_PUBLISHED | WT_TXN_PUBLIC_TS_READ));
@@ -618,7 +609,7 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
         } else if (!F_ISSET(conn, WT_CONN_RECOVERING))
             txn_global->meta_ckpt_timestamp = txn_global->recovery_timestamp;
     } else if (!F_ISSET(conn, WT_CONN_RECOVERING))
-        txn_global->meta_ckpt_timestamp = 0;
+        txn_global->meta_ckpt_timestamp = WT_TS_NONE;
 
     __wt_writeunlock(session, &txn_global->rwlock);
 
@@ -627,8 +618,8 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
           session, txn->read_timestamp, "Checkpoint requested at stable timestamp");
 
         /*
-         * The snapshot we established when the transaction started may
-         * be too early to match the timestamp we just read.
+         * The snapshot we established when the transaction started may be too early to match the
+         * timestamp we just read.
          *
          * Get a new one.
          */
@@ -636,11 +627,11 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
     }
 
     /*
-     * Get a list of handles we want to flush; for named checkpoints this
-     * may pull closed objects into the session cache.
+     * Get a list of handles we want to flush; for named checkpoints this may pull closed objects
+     * into the session cache.
      *
-     * First, gather all handles, then start the checkpoint transaction,
-     * then release any clean handles.
+     * First, gather all handles, then start the checkpoint transaction, then release any clean
+     * handles.
      */
     WT_ASSERT(session, session->ckpt_handle_next == 0);
     WT_WITH_TABLE_READ_LOCK(
@@ -673,12 +664,11 @@ __txn_checkpoint_can_skip(
     txn_global = &conn->txn_global;
 
     /*
-     * This function also parses out some configuration options and hands
-     * them back to the caller - make sure it does that parsing regardless
-     * of the result.
+     * This function also parses out some configuration options and hands them back to the caller -
+     * make sure it does that parsing regardless of the result.
      *
-     * Determine if this is going to be a full checkpoint, that is a
-     * checkpoint that applies to all data tables in a database.
+     * Determine if this is going to be a full checkpoint, that is a checkpoint that applies to all
+     * data tables in a database.
      */
     WT_RET(__wt_config_gets(session, cfg, "target", &cval));
     __wt_config_subinit(session, &targetconf, &cval);
@@ -788,8 +778,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
     /*
      * Update the global oldest ID so we do all possible cleanup.
      *
-     * This is particularly important for compact, so that all dirty pages
-     * can be fully written.
+     * This is particularly important for compact, so that all dirty pages can be fully written.
      */
     WT_ERR(__wt_txn_update_oldest(session, WT_TXN_OLDEST_STRICT | WT_TXN_OLDEST_WAIT));
 
@@ -814,32 +803,29 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
     /*
      * Start the checkpoint for real.
      *
-     * Bump the global checkpoint generation, used to figure out whether
-     * checkpoint has visited a tree.  Use an atomic increment even though
-     * we are single-threaded because readers of the checkpoint generation
-     * don't hold the checkpoint lock.
+     * Bump the global checkpoint generation, used to figure out whether checkpoint has visited a
+     * tree. Use an atomic increment even though we are single-threaded because readers of the
+     * checkpoint generation don't hold the checkpoint lock.
      *
-     * We do need to update it before clearing the checkpoint's entry out
-     * of the transaction table, or a thread evicting in a tree could
-     * ignore the checkpoint's transaction.
+     * We do need to update it before clearing the checkpoint's entry out of the transaction table,
+     * or a thread evicting in a tree could ignore the checkpoint's transaction.
      */
     generation = __wt_gen_next(session, WT_GEN_CHECKPOINT);
     WT_STAT_CONN_SET(session, txn_checkpoint_generation, generation);
 
     /*
-     * We want to skip checkpointing clean handles whenever possible.  That
-     * is, when the checkpoint is not named or forced.  However, we need to
-     * take care about ordering with respect to the checkpoint transaction.
+     * We want to skip checkpointing clean handles whenever possible. That is, when the checkpoint
+     * is not named or forced. However, we need to take care about ordering with respect to the
+     * checkpoint transaction.
      *
-     * We can't skip clean handles before starting the transaction or the
-     * checkpoint can miss updates in trees that become dirty as the
-     * checkpoint is starting.  If we wait until the transaction has
-     * started before locking a handle, there could be a metadata-changing
-     * operation in between (e.g., salvage) that will cause a write
-     * conflict when the checkpoint goes to write the metadata.
+     * We can't skip clean handles before starting the transaction or the checkpoint can miss
+     * updates in trees that become dirty as the checkpoint is starting. If we wait until the
+     * transaction has started before locking a handle, there could be a metadata-changing operation
+     * in between (e.g., salvage) that will cause a write conflict when the checkpoint goes to write
+     * the metadata.
      *
-     * Hold the schema lock while starting the transaction and gathering
-     * handles so the set we get is complete and correct.
+     * Hold the schema lock while starting the transaction and gathering handles so the set we get
+     * is complete and correct.
      */
     WT_WITH_SCHEMA_LOCK(session, ret = __checkpoint_prepare(session, &tracking, cfg));
     WT_ERR(ret);
@@ -910,15 +896,12 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
     WT_ERR(__wt_txn_commit(session, NULL));
 
     /*
-     * Ensure that the metadata changes are durable before the checkpoint
-     * is resolved. Do this by either checkpointing the metadata or syncing
-     * the log file.
-     * Recovery relies on the checkpoint LSN in the metadata only being
-     * updated by full checkpoints so only checkpoint the metadata for
-     * full or non-logged checkpoints.
+     * Ensure that the metadata changes are durable before the checkpoint is resolved. Do this by
+     * either checkpointing the metadata or syncing the log file. Recovery relies on the checkpoint
+     * LSN in the metadata only being updated by full checkpoints so only checkpoint the metadata
+     * for full or non-logged checkpoints.
      *
-     * This is very similar to __wt_meta_track_off, ideally they would be
-     * merged.
+     * This is very similar to __wt_meta_track_off, ideally they would be merged.
      */
     if (full || !logging) {
         session->isolation = txn->isolation = WT_ISO_READ_UNCOMMITTED;
@@ -949,13 +932,26 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
         __checkpoint_stats(session);
 
         /*
-         * If timestamps were used to define the content of the checkpoint update the saved last
-         * checkpoint timestamp, otherwise leave it alone. If a checkpoint is taken without
-         * timestamps, it's likely a bug, but we don't want to clear the saved last checkpoint
-         * timestamp regardless.
+         * If timestamps defined the checkpoint's content, set the saved last checkpoint timestamp,
+         * otherwise clear it. We clear it for a couple of reasons: applications can query it and we
+         * don't want to lie, and we use it to decide if WT_CONNECTION.rollback_to_stable is an
+         * allowed operation. For the same reason, don't set it to WT_TS_NONE when the checkpoint
+         * timestamp is WT_TS_NONE, set it to 1 so we can tell the difference.
          */
-        if (use_timestamp)
-            conn->txn_global.last_ckpt_timestamp = ckpt_tmp_ts;
+        if (use_timestamp) {
+            conn->txn_global.last_ckpt_timestamp = use_timestamp ? ckpt_tmp_ts : WT_TS_NONE;
+            /*
+             * MongoDB assumes the checkpoint timestamp will be initialized with WT_TS_NONE. In such
+             * cases it queries the recovery timestamp to determine the last stable recovery
+             * timestamp. So, if the recovery timestamp is valid, set the last checkpoint timestamp
+             * to recovery timestamp. This should never be a problem, as checkpoint timestamp should
+             * never be less than recovery timestamp. This could potentially avoid MongoDB making
+             * two calls to determine last stable recovery timestamp.
+             */
+            if (conn->txn_global.last_ckpt_timestamp == WT_TS_NONE)
+                conn->txn_global.last_ckpt_timestamp = conn->txn_global.recovery_timestamp;
+        } else
+            conn->txn_global.last_ckpt_timestamp = WT_TS_NONE;
     }
 
 err:
@@ -965,17 +961,14 @@ err:
     conn->ckpt_timer_start.tv_sec = 0;
 
     /*
-     * XXX
-     * Rolling back the changes here is problematic.
+     * XXX Rolling back the changes here is problematic.
      *
-     * If we unroll here, we need a way to roll back changes to the avail
-     * list for each tree that was successfully synced before the error
-     * occurred.  Otherwise, the next time we try this operation, we will
-     * try to free an old checkpoint again.
+     * If we unroll here, we need a way to roll back changes to the avail list for each tree that
+     * was successfully synced before the error occurred. Otherwise, the next time we try this
+     * operation, we will try to free an old checkpoint again.
      *
-     * OTOH, if we commit the changes after a failure, we have partially
-     * overwritten the checkpoint, so what ends up on disk is not
-     * consistent.
+     * OTOH, if we commit the changes after a failure, we have partially overwritten the checkpoint,
+     * so what ends up on disk is not consistent.
      */
     failed = ret != 0;
     if (failed)
@@ -1076,18 +1069,15 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[], bool waiting)
 /*
  * Don't highjack the session checkpoint thread for eviction.
  *
- * Application threads are not generally available for potentially slow
- * operations, but checkpoint does enough I/O it may be called upon to
- * perform slow operations for the block manager.
+ * Application threads are not generally available for potentially slow operations, but checkpoint
+ * does enough I/O it may be called upon to perform slow operations for the block manager.
  *
- * Application checkpoints wait until the checkpoint lock is available,
- * compaction checkpoints don't.
+ * Application checkpoints wait until the checkpoint lock is available, compaction checkpoints
+ * don't.
  *
- * Checkpoints should always use a separate session for lookaside
- * updates, otherwise those updates are pinned until the checkpoint
- * commits.  Also, there are unfortunate interactions between the
- * special rules for lookaside eviction and the special handling of the
- * checkpoint transaction.
+ * Checkpoints should always use a separate session for lookaside updates, otherwise those updates
+ * are pinned until the checkpoint commits. Also, there are unfortunate interactions between the
+ * special rules for lookaside eviction and the special handling of the checkpoint transaction.
  */
 #undef WT_CHECKPOINT_SESSION_FLAGS
 #define WT_CHECKPOINT_SESSION_FLAGS (WT_SESSION_CAN_WAIT | WT_SESSION_IGNORE_CACHE_SIZE)
@@ -1246,11 +1236,9 @@ __checkpoint_lock_dirty_tree_int(WT_SESSION_IMPL *session, bool is_checkpoint, b
     /*
      * Lock the checkpoints that will be deleted.
      *
-     * Checkpoints are only locked when tracking is enabled, which covers
-     * checkpoint and drop operations, but not close.  The reasoning is
-     * there should be no access to a checkpoint during close, because any
-     * thread accessing a checkpoint will also have the current file handle
-     * open.
+     * Checkpoints are only locked when tracking is enabled, which covers checkpoint and drop
+     * operations, but not close. The reasoning is there should be no access to a checkpoint during
+     * close, because any thread accessing a checkpoint will also have the current file handle open.
      */
     if (WT_META_TRACKING(session))
         WT_CKPT_FOREACH (ckptbase, ckpt) {
@@ -1413,26 +1401,22 @@ __checkpoint_mark_skip(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, bool force)
     /*
      * Check for clean objects not requiring a checkpoint.
      *
-     * If we're closing a handle, and the object is clean, we can skip the
-     * checkpoint, whatever checkpoints we have are sufficient.  (We might
-     * not have any checkpoints if the object was never modified, and that's
-     * OK: the object creation code doesn't mark the tree modified so we can
-     * skip newly created trees here.)
+     * If we're closing a handle, and the object is clean, we can skip the checkpoint, whatever
+     * checkpoints we have are sufficient. (We might not have any checkpoints if the object was
+     * never modified, and that's OK: the object creation code doesn't mark the tree modified so we
+     * can skip newly created trees here.)
      *
-     * If the application repeatedly checkpoints an object (imagine hourly
-     * checkpoints using the same explicit or internal name), there's no
-     * reason to repeat the checkpoint for clean objects.  The test is if
-     * the only checkpoint we're deleting is the last one in the list and
-     * it has the same name as the checkpoint we're about to take, skip the
-     * work.  (We can't skip checkpoints that delete more than the last
-     * checkpoint because deleting those checkpoints might free up space in
-     * the file.)  This means an application toggling between two (or more)
-     * checkpoint names will repeatedly take empty checkpoints, but that's
-     * not likely enough to make detection worthwhile.
+     * If the application repeatedly checkpoints an object (imagine hourly checkpoints using the
+     * same explicit or internal name), there's no reason to repeat the checkpoint for clean
+     * objects. The test is if the only checkpoint we're deleting is the last one in the list and it
+     * has the same name as the checkpoint we're about to take, skip the work. (We can't skip
+     * checkpoints that delete more than the last checkpoint because deleting those checkpoints
+     * might free up space in the file.) This means an application toggling between two (or more)
+     * checkpoint names will repeatedly take empty checkpoints, but that's not likely enough to make
+     * detection worthwhile.
      *
-     * Checkpoint read-only objects otherwise: the application must be able
-     * to open the checkpoint in a cursor after taking any checkpoint, which
-     * means it must exist.
+     * Checkpoint read-only objects otherwise: the application must be able to open the checkpoint
+     * in a cursor after taking any checkpoint, which means it must exist.
      */
     F_CLR(btree, WT_BTREE_SKIP_CKPT);
     if (!btree->modified && !force) {
@@ -1589,16 +1573,14 @@ fake:
     /*
      * Update the object's metadata.
      *
-     * If the object is the metadata, the call to __wt_meta_ckptlist_set
-     * will update the turtle file and swap the new one into place.  We
-     * need to make sure the metadata is on disk before the turtle file is
-     * updated.
+     * If the object is the metadata, the call to __wt_meta_ckptlist_set will update the turtle file
+     * and swap the new one into place. We need to make sure the metadata is on disk before the
+     * turtle file is updated.
      *
-     * If we are doing a checkpoint in a file without a transaction (e.g.,
-     * closing a dirty tree before an exclusive operation like verify),
-     * the metadata update will be auto-committed.  In that case, we need to
-     * sync the file here or we could roll forward the metadata in
-     * recovery and open a checkpoint that isn't yet durable.
+     * If we are doing a checkpoint in a file without a transaction (e.g., closing a dirty tree
+     * before an exclusive operation like verify), the metadata update will be auto-committed. In
+     * that case, we need to sync the file here or we could roll forward the metadata in recovery
+     * and open a checkpoint that isn't yet durable.
      */
     if (WT_IS_METADATA(dhandle) || !F_ISSET(&session->txn, WT_TXN_RUNNING))
         WT_ERR(__wt_checkpoint_sync(session, NULL));

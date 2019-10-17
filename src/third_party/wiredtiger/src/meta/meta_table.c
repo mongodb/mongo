@@ -74,12 +74,11 @@ __wt_metadata_cursor_open(WT_SESSION_IMPL *session, const char *config, WT_CURSO
     btree = ((WT_CURSOR_BTREE *)(*cursorp))->btree;
 
 /*
- * Special settings for metadata: skew eviction so metadata almost
- * always stays in cache and make sure metadata is logged if possible.
+ * Special settings for metadata: skew eviction so metadata almost always stays in cache and make
+ * sure metadata is logged if possible.
  *
- * Test before setting so updates can't race in subsequent opens (the
- * first update is safe because it's single-threaded from
- * wiredtiger_open).
+ * Test before setting so updates can't race in subsequent opens (the first update is safe because
+ * it's single-threaded from wiredtiger_open).
  */
 #define WT_EVICT_META_SKEW 10000
     if (btree->evict_priority == 0)

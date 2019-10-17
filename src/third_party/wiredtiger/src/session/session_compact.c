@@ -287,11 +287,9 @@ __compact_worker(WT_SESSION_IMPL *session)
             }
 
             /*
-             * If compaction failed because checkpoint was running,
-             * continue with the next handle. We might continue to
-             * race with checkpoint on each handle, but that's OK,
-             * we'll step through all the handles, and then we'll
-             * block until a checkpoint completes.
+             * If compaction failed because checkpoint was running, continue with the next handle.
+             * We might continue to race with checkpoint on each handle, but that's OK, we'll step
+             * through all the handles, and then we'll block until a checkpoint completes.
              *
              * Just quit if eviction is the problem.
              */

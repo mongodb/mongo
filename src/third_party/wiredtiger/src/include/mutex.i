@@ -9,9 +9,8 @@
 /*
  * Spin locks:
  *
- * These used for cases where fast mutual exclusion is needed (where operations
- * done while holding the spin lock are expected to complete in a small number
- * of instructions.
+ * These used for cases where fast mutual exclusion is needed (where operations done while holding
+ * the spin lock are expected to complete in a small number of instructions.
  */
 
 /*

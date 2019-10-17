@@ -61,22 +61,18 @@ revint_compare(
     wt_api = revint_collator->wt_api;
 
     /*
-     * All indices using this collator have an integer key, and the
-     * primary key is also an integer. A collator is usually passed the
-     * concatenation of index key and primary key (when available),
+     * All indices using this collator have an integer key, and the primary key is also an integer.
+     * A collator is usually passed the concatenation of index key and primary key (when available),
      * hence we initially unpack using "ii".
      *
-     * A collator may also be called with an item that includes a index
-     * key and no primary key.  Among items having the same index key,
-     * an item with no primary key should sort before an item with a
-     * primary key. The reason is that if the application calls
-     * WT_CURSOR::search on a index key for which there are more than
-     * one value, the search key will not yet have a primary key.  We
-     * want to position the cursor at the 'first' matching index key so
-     * that repeated calls to WT_CURSOR::next will see them all.
+     * A collator may also be called with an item that includes a index key and no primary key.
+     * Among items having the same index key, an item with no primary key should sort before an item
+     * with a primary key. The reason is that if the application calls WT_CURSOR::search on a index
+     * key for which there are more than one value, the search key will not yet have a primary key.
+     * We want to position the cursor at the 'first' matching index key so that repeated calls to
+     * WT_CURSOR::next will see them all.
      *
-     * To keep this code simple, we do not reverse the ordering
-     * when comparing primary keys.
+     * To keep this code simple, we do not reverse the ordering when comparing primary keys.
      */
     if ((ret = wt_api->unpack_start(wt_api, session, "ii", k1->data, k1->size, &pstream)) != 0)
         return (ret);

@@ -226,9 +226,9 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
     /*
      * Either we have success and we track it, or failure and panic.
      *
-     * Reads and updates can fail with WT_NOTFOUND: we may be searching
-     * in a random range, or an insert op might have updated the
-     * last record in the table but not yet finished the actual insert.
+     * Reads and updates can fail with WT_NOTFOUND: we may be searching in a random range, or an
+     * insert op might have updated the last record in the table but not yet finished the actual
+     * insert.
      */
     if (type == WT_AOP_COMPACT)
         return (0);
@@ -654,8 +654,7 @@ worker(void *arg)
          */
         measure_latency = opts->sample_interval != 0 && trk != NULL && trk->ops != 0 &&
           (trk->ops % opts->sample_rate == 0);
-        if (measure_latency)
-            __wt_epoch(NULL, &start);
+        __wt_epoch(NULL, &start); /* [-Werror=maybe-uninitialized] */
 
         cursor->set_key(cursor, key_buf);
         switch (*op) {

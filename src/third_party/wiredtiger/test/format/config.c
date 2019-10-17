@@ -109,11 +109,10 @@ config_setup(void)
                 /*
                  * LSM requires a row-store and backing disk.
                  *
-                 * Configuring truncation or timestamps results in LSM
-                 * cache problems, don't configure LSM if those set.
+                 * Configuring truncation or timestamps results in LSM cache problems, don't
+                 * configure LSM if those set.
                  *
-                 * XXX
-                 * Remove the timestamp test when WT-4162 resolved.
+                 * XXX Remove the timestamp test when WT-4162 resolved.
                  */
             if (g.type != ROW || g.c_in_memory)
                 break;
@@ -209,16 +208,14 @@ config_setup(void)
     /*
      * Run-length is configured by a number of operations and a timer.
      *
-     * If the operation count and the timer are both configured, do nothing.
-     * If only the timer is configured, clear the operations count.
-     * If only the operation count is configured, limit the run to 6 hours.
-     * If neither is configured, leave the operations count alone and limit
-     * the run to 30 minutes.
+     * If the operation count and the timer are both configured, do nothing. If only the timer is
+     * configured, clear the operations count. If only the operation count is configured, limit the
+     * run to 6 hours. If neither is configured, leave the operations count alone and limit the run
+     * to 30 minutes.
      *
-     * In other words, if we rolled the dice on everything, do a short run.
-     * If we chose a number of operations but the rest of the configuration
-     * means operations take a long time to complete (for example, a small
-     * cache and many worker threads), don't let it run forever.
+     * In other words, if we rolled the dice on everything, do a short run. If we chose a number of
+     * operations but the rest of the configuration means operations take a long time to complete
+     * (for example, a small cache and many worker threads), don't let it run forever.
      */
     if (config_is_perm("timer")) {
         if (!config_is_perm("ops"))
@@ -263,16 +260,14 @@ config_cache(void)
     /*
      * Maximum internal/leaf page size sanity.
      *
-     * Ensure we can service at least one operation per-thread concurrently
-     * without filling the cache with pinned pages, that is, every thread
-     * consuming an internal page and a leaf page (or a pair of leaf pages
-     * for cursor movements).
+     * Ensure we can service at least one operation per-thread concurrently without filling the
+     * cache with pinned pages, that is, every thread consuming an internal page and a leaf page (or
+     * a pair of leaf pages for cursor movements).
      *
      * Maximum memory pages are in units of MB.
      *
-     * This code is what dramatically increases the cache size when there
-     * are lots of threads, it grows the cache to several megabytes per
-     * thread.
+     * This code is what dramatically increases the cache size when there are lots of threads, it
+     * grows the cache to several megabytes per thread.
      */
     g.c_cache = WT_MAX(g.c_cache, 2 * g.c_threads * g.c_memory_page_max);
 
@@ -368,8 +363,7 @@ config_compression(const char *conf_name)
     /*
      * Select a compression type from the list of built-in engines.
      *
-     * Listed percentages are only correct if all of the possible engines
-     * are compiled in.
+     * Listed percentages are only correct if all of the possible engines are compiled in.
      */
     switch (mmrand(NULL, 1, 20)) {
 #ifdef HAVE_BUILTIN_EXTENSION_LZ4
@@ -657,13 +651,11 @@ config_pct(void)
     }
 
     /*
-     * Walk the list, allocating random numbers of operations in a random
-     * order.
+     * Walk the list, allocating random numbers of operations in a random order.
      *
-     * If the "order" field is non-zero, we need to create a value for this
-     * operation. Find the largest order field in the array; if one non-zero
-     * order field is found, it's the last entry and gets the remainder of
-     * the operations.
+     * If the "order" field is non-zero, we need to create a value for this operation. Find the
+     * largest order field in the array; if one non-zero order field is found, it's the last entry
+     * and gets the remainder of the operations.
      */
     for (pct = 100 - pct;;) {
         for (i = n = max_order = max_slot = 0; i < WT_ELEMENTS(list); ++i) {

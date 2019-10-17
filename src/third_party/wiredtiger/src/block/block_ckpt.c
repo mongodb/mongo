@@ -272,16 +272,13 @@ __ckpt_extlist_read(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckpt)
     WT_BLOCK_CKPT *ci;
 
     /*
-     * Allocate a checkpoint structure, crack the cookie and read the
-     * checkpoint's extent lists.
+     * Allocate a checkpoint structure, crack the cookie and read the checkpoint's extent lists.
      *
-     * Ignore the avail list: checkpoint avail lists are only useful if we
-     * are rolling forward from the particular checkpoint and they represent
-     * our best understanding of what blocks can be allocated.  If we are
-     * not operating on the live checkpoint, subsequent checkpoints might
-     * have allocated those blocks, and the avail list is useless.  We don't
-     * discard it, because it is useful as part of verification, but we
-     * don't re-write it either.
+     * Ignore the avail list: checkpoint avail lists are only useful if we are rolling forward from
+     * the particular checkpoint and they represent our best understanding of what blocks can be
+     * allocated. If we are not operating on the live checkpoint, subsequent checkpoints might have
+     * allocated those blocks, and the avail list is useless. We don't discard it, because it is
+     * useful as part of verification, but we don't re-write it either.
      */
     WT_RET(__wt_calloc(session, 1, sizeof(WT_BLOCK_CKPT), &ckpt->bpriv));
 
@@ -366,30 +363,24 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 #endif
 
     /*
-     * Checkpoints are a two-step process: first, write a new checkpoint to
-     * disk (including all the new extent lists for modified checkpoints
-     * and the live system).  As part of this, create a list of file blocks
-     * newly available for reallocation, based on checkpoints being deleted.
-     * We then return the locations of the new checkpoint information to our
-     * caller.  Our caller has to write that information into some kind of
-     * stable storage, and once that's done, we can actually allocate from
-     * that list of newly available file blocks.  (We can't allocate from
-     * that list immediately because the allocation might happen before our
-     * caller saves the new checkpoint information, and if we crashed before
-     * the new checkpoint location was saved, we'd have overwritten blocks
-     * still referenced by checkpoints in the system.)  In summary, there is
-     * a second step: after our caller saves the checkpoint information, we
-     * are called to add the newly available blocks into the live system's
-     * available list.
+     * Checkpoints are a two-step process: first, write a new checkpoint to disk (including all the
+     * new extent lists for modified checkpoints and the live system). As part of this, create a
+     * list of file blocks newly available for reallocation, based on checkpoints being deleted. We
+     * then return the locations of the new checkpoint information to our caller. Our caller has to
+     * write that information into some kind of stable storage, and once that's done, we can
+     * actually allocate from that list of newly available file blocks. (We can't allocate from that
+     * list immediately because the allocation might happen before our caller saves the new
+     * checkpoint information, and if we crashed before the new checkpoint location was saved, we'd
+     * have overwritten blocks still referenced by checkpoints in the system.) In summary, there is
+     * a second step: after our caller saves the checkpoint information, we are called to add the
+     * newly available blocks into the live system's available list.
      *
-     * This function is the first step, the second step is in the resolve
-     * function.
+     * This function is the first step, the second step is in the resolve function.
      *
-     * If we're called to checkpoint the same file twice (without the second
-     * resolution step), or re-entered for any reason, it's an error in our
-     * caller, and our choices are all bad: leak blocks or potentially crash
-     * with our caller not yet having saved previous checkpoint information
-     * to stable storage.
+     * If we're called to checkpoint the same file twice (without the second resolution step), or
+     * re-entered for any reason, it's an error in our caller, and our choices are all bad: leak
+     * blocks or potentially crash with our caller not yet having saved previous checkpoint
+     * information to stable storage.
      */
     __wt_spin_lock(session, &block->live_lock);
     switch (block->ckpt_state) {
@@ -412,18 +403,16 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
     WT_RET(ret);
 
     /*
-     * Extents newly available as a result of deleting previous checkpoints
-     * are added to a list of extents.  The list should be empty, but as
-     * described above, there is no "free the checkpoint information" call
-     * into the block manager; if there was an error in an upper level that
-     * resulted in some previous checkpoint never being resolved, the list
-     * may not be empty.  We should have caught that with the "checkpoint
-     * in progress" test, but it doesn't cost us anything to be cautious.
+     * Extents newly available as a result of deleting previous checkpoints are added to a list of
+     * extents. The list should be empty, but as described above, there is no "free the checkpoint
+     * information" call into the block manager; if there was an error in an upper level that
+     * resulted in some previous checkpoint never being resolved, the list may not be empty. We
+     * should have caught that with the "checkpoint in progress" test, but it doesn't cost us
+     * anything to be cautious.
      *
-     * We free the checkpoint's allocation and discard extent lists as part
-     * of the resolution step, not because they're needed at that time, but
-     * because it's potentially a lot of work, and waiting allows the btree
-     * layer to continue eviction sooner.  As for the checkpoint-available
+     * We free the checkpoint's allocation and discard extent lists as part of the resolution step,
+     * not because they're needed at that time, but because it's potentially a lot of work, and
+     * waiting allows the btree layer to continue eviction sooner. As for the checkpoint-available
      * list, make sure they get cleaned out.
      */
     __wt_block_extlist_free(session, &ci->ckpt_avail);
@@ -566,11 +555,11 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
             continue;
 
         /*
-         * We have to write the "to" checkpoint's extent lists out in
-         * new blocks, and update its cookie.
+         * We have to write the "to" checkpoint's extent lists out in new blocks, and update its
+         * cookie.
          *
-         * Free the blocks used to hold the "to" checkpoint's extent
-         * lists; don't include the avail list, it's not changing.
+         * Free the blocks used to hold the "to" checkpoint's extent lists; don't include the avail
+         * list, it's not changing.
          */
         WT_ERR(__ckpt_extlist_fblocks(session, block, &b->alloc));
         WT_ERR(__ckpt_extlist_fblocks(session, block, &b->discard));
@@ -717,16 +706,14 @@ __ckpt_update(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase, WT_C
     }
 
     /*
-     * We only write an avail list for the live system, other checkpoint's
-     * avail lists are static and never change.
+     * We only write an avail list for the live system, other checkpoint's avail lists are static
+     * and never change.
      *
-     * Write the avail list last so it reflects changes due to allocating
-     * blocks for the alloc and discard lists.  Second, when we write the
-     * live system's avail list, it's two lists: the current avail list
-     * plus the list of blocks to be made available when the new checkpoint
-     * completes.  We can't merge that second list into the real list yet,
-     * it's not truly available until the new checkpoint locations have been
-     * saved to the metadata.
+     * Write the avail list last so it reflects changes due to allocating blocks for the alloc and
+     * discard lists. Second, when we write the live system's avail list, it's two lists: the
+     * current avail list plus the list of blocks to be made available when the new checkpoint
+     * completes. We can't merge that second list into the real list yet, it's not truly available
+     * until the new checkpoint locations have been saved to the metadata.
      */
     if (is_live) {
         block->final_ckpt = ckpt;

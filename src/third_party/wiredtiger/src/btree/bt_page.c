@@ -148,14 +148,12 @@ __wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, uint32
     case WT_PAGE_COL_INT:
     case WT_PAGE_COL_VAR:
         /*
-         * Column-store leaf page entries map one-to-one to the number
-         * of physical entries on the page (each physical entry is a
-         * value item). Note this value isn't necessarily correct, we
+         * Column-store leaf page entries map one-to-one to the number of physical entries on the
+         * page (each physical entry is a value item). Note this value isn't necessarily correct, we
          * may skip values when reading the disk image.
          *
-         * Column-store internal page entries map one-to-one to the
-         * number of physical entries on the page (each entry is a
-         * location cookie).
+         * Column-store internal page entries map one-to-one to the number of physical entries on
+         * the page (each entry is a location cookie).
          */
         alloc_entries = dsk->u.entries;
         break;
@@ -191,14 +189,12 @@ __wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, uint32
     F_SET_ATOMIC(page, flags);
 
     /*
-     * Track the memory allocated to build this page so we can update the
-     * cache statistics in a single call. If the disk image is in allocated
-     * memory, start with that.
+     * Track the memory allocated to build this page so we can update the cache statistics in a
+     * single call. If the disk image is in allocated memory, start with that.
      *
-     * Accounting is based on the page-header's in-memory disk size instead
-     * of the buffer memory used to instantiate the page image even though
-     * the values might not match exactly, because that's the only value we
-     * have when discarding the page image and accounting needs to match.
+     * Accounting is based on the page-header's in-memory disk size instead of the buffer memory
+     * used to instantiate the page image even though the values might not match exactly, because
+     * that's the only value we have when discarding the page image and accounting needs to match.
      */
     size = LF_ISSET(WT_PAGE_DISK_ALLOC) ? dsk->mem_size : 0;
 
@@ -454,21 +450,16 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
             break;
         case WT_CELL_ADDR_DEL:
             /*
-             * A cell may reference a deleted leaf page: if a leaf
-             * page was deleted without being read (fast truncate),
-             * and the deletion committed, but older transactions
-             * in the system required the previous version of the
-             * page to remain available, a special deleted-address
-             * type cell is written. We'll see that cell on a page
-             * if we read from a checkpoint including a deleted
-             * cell or if we crash/recover and start off from such
-             * a checkpoint (absent running recovery, a version of
-             * the page without the deleted cell would eventually
-             * have been written). If we crash and recover to a
-             * page with a deleted-address cell, we want to discard
-             * the page from the backing store (it was never
-             * discarded), and, of course, by definition no earlier
-             * transaction will ever need it.
+             * A cell may reference a deleted leaf page: if a leaf page was deleted without being
+             * read (fast truncate), and the deletion committed, but older transactions in the
+             * system required the previous version of the page to remain available, a special
+             * deleted-address type cell is written. We'll see that cell on a page if we read from a
+             * checkpoint including a deleted cell or if we crash/recover and start off from such a
+             * checkpoint (absent running recovery, a version of the page without the deleted cell
+             * would eventually have been written). If we crash and recover to a page with a
+             * deleted-address cell, we want to discard the page from the backing store (it was
+             * never discarded), and, of course, by definition no earlier transaction will ever need
+             * it.
              *
              * Re-create the state of a deleted page.
              */
@@ -524,15 +515,14 @@ __inmem_row_leaf_entries(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, ui
     btree = S2BT(session);
 
     /*
-     * Leaf row-store page entries map to a maximum of one-to-one to the
-     * number of physical entries on the page (each physical entry might be
-     * a key without a subsequent data item).  To avoid over-allocation in
-     * workloads without empty data items, first walk the page counting the
+     * Leaf row-store page entries map to a maximum of one-to-one to the number of physical entries
+     * on the page (each physical entry might be a key without a subsequent data item). To avoid
+     * over-allocation in workloads without empty data items, first walk the page counting the
      * number of keys, then allocate the indices.
      *
-     * The page contains key/data pairs.  Keys are on-page (WT_CELL_KEY) or
-     * overflow (WT_CELL_KEY_OVFL) items, data are either non-existent or a
-     * single on-page (WT_CELL_VALUE) or overflow (WT_CELL_VALUE_OVFL) item.
+     * The page contains key/data pairs. Keys are on-page (WT_CELL_KEY) or overflow
+     * (WT_CELL_KEY_OVFL) items, data are either non-existent or a single on-page (WT_CELL_VALUE) or
+     * overflow (WT_CELL_VALUE_OVFL) item.
      */
     nindx = 0;
     WT_CELL_FOREACH_BEGIN (session, btree, dsk, unpack) {

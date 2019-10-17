@@ -110,16 +110,17 @@ union __wt_lsn {
  * Possible values for the consolidation array slot states:
  *
  * WT_LOG_SLOT_CLOSE - slot is in use but closed to new joins.
+ *
  * WT_LOG_SLOT_FREE - slot is available for allocation.
+ *
  * WT_LOG_SLOT_WRITTEN - slot is written and should be processed by worker.
  *
- * The slot state must be volatile: threads loop checking the state and can't
- * cache the first value they see.
+ * The slot state must be volatile: threads loop checking the state and can't cache the first value
+ * they see.
  *
- * The slot state is divided into two 32 bit sizes.  One half is the
- * amount joined and the other is the amount released.  Since we use
- * a few special states, reserve the top few bits for state.  That makes
- * the maximum size less than 32 bits for both joined and released.
+ * The slot state is divided into two 32 bit sizes. One half is the amount joined and the other is
+ * the amount released. Since we use a few special states, reserve the top few bits for state. That
+ * makes the maximum size less than 32 bits for both joined and released.
  */
 /*
  * XXX The log slot bits are signed and should be rewritten as unsigned. For now, give the logging
@@ -279,13 +280,11 @@ struct __wt_log {
     WT_CONDVAR *log_write_cond;
 
 /*
- * Consolidation array information
- * Our testing shows that the more consolidation we generate the
- * better the performance we see which equates to an active slot
- * slot count of one.
+ * Consolidation array information Our testing shows that the more consolidation we generate the
+ * better the performance we see which equates to an active slot slot count of one.
  *
- * Note: this can't be an array, we impose cache-line alignment and
- * gcc doesn't support that for arrays.
+ * Note: this can't be an array, we impose cache-line alignment and gcc doesn't support that for
+ * arrays.
  */
 #define WT_SLOT_POOL 128
     WT_LOGSLOT *active_slot;            /* Active slot */
@@ -309,12 +308,10 @@ struct __wt_log_record {
     uint32_t checksum; /* 04-07: Checksum of the record */
 
 /*
- * No automatic generation: flag values cannot change, they're written
- * to disk.
+ * No automatic generation: flag values cannot change, they're written to disk.
  *
- * Unused bits in the flags, as well as the 'unused' padding,
- * are expected to be zeroed; we check that to help detect file
- * corruption.
+ * Unused bits in the flags, as well as the 'unused' padding, are expected to be zeroed; we check
+ * that to help detect file corruption.
  */
 #define WT_LOG_RECORD_COMPRESSED 0x01u /* Compressed except hdr */
 #define WT_LOG_RECORD_ENCRYPTED 0x02u  /* Encrypted except hdr */

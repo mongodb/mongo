@@ -40,9 +40,8 @@ __wt_meta_checkpoint(
     /*
      * Retrieve the named checkpoint or the last checkpoint.
      *
-     * If we don't find a named checkpoint, we're done, they're read-only.
-     * If we don't find a default checkpoint, it's creation, return "no
-     * data" and let our caller handle it.
+     * If we don't find a named checkpoint, we're done, they're read-only. If we don't find a
+     * default checkpoint, it's creation, return "no data" and let our caller handle it.
      */
     if (checkpoint == NULL) {
         if ((ret = __ckpt_last(session, config, ckpt)) == WT_NOTFOUND) {
@@ -358,13 +357,11 @@ __wt_meta_ckptlist_get(
 
     if (update) {
         /*
-         * This isn't clean, but there's necessary cooperation between
-         * the schema layer (that maintains the list of checkpoints),
-         * the btree layer (that knows when the root page is written,
-         * creating a new checkpoint), and the block manager (which
-         * actually creates the checkpoint). All of that cooperation is
-         * handled in the array of checkpoint structures referenced from
-         * the WT_BTREE structure.
+         * This isn't clean, but there's necessary cooperation between the schema layer (that
+         * maintains the list of checkpoints), the btree layer (that knows when the root page is
+         * written, creating a new checkpoint), and the block manager (which actually creates the
+         * checkpoint). All of that cooperation is handled in the array of checkpoint structures
+         * referenced from the WT_BTREE structure.
          *
          * Allocate a slot for a new value, plus a slot to mark the end.
          */
@@ -498,21 +495,17 @@ __ckptlist_review_write_gen(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
     uint64_t v;
 
     /*
-     * Every page written in a given wiredtiger_open() session needs to be
-     * in a single "generation", it's how we know to ignore transactional
-     * information found on pages written in previous generations. We make
-     * this work by writing the maximum write generation we've ever seen
-     * as the write-generation of the metadata file's checkpoint. When
-     * wiredtiger_open() is called, we copy that write generation into the
-     * connection's name space as the base write generation value. Then,
-     * whenever we open a file, if the file's write generation is less than
-     * the base value, we update the file's write generation so all writes
-     * will appear after the base value, and we ignore transactions on pages
-     * where the write generation is less than the base value.
+     * Every page written in a given wiredtiger_open() session needs to be in a single "generation",
+     * it's how we know to ignore transactional information found on pages written in previous
+     * generations. We make this work by writing the maximum write generation we've ever seen as the
+     * write-generation of the metadata file's checkpoint. When wiredtiger_open() is called, we copy
+     * that write generation into the connection's name space as the base write generation value.
+     * Then, whenever we open a file, if the file's write generation is less than the base value, we
+     * update the file's write generation so all writes will appear after the base value, and we
+     * ignore transactions on pages where the write generation is less than the base value.
      *
-     * At every checkpoint, if the file's checkpoint write generation is
-     * larger than the connection's maximum write generation, update the
-     * connection.
+     * At every checkpoint, if the file's checkpoint write generation is larger than the
+     * connection's maximum write generation, update the connection.
      */
     do {
         WT_ORDERED_READ(v, S2C(session)->max_write_gen);

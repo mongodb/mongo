@@ -31,41 +31,34 @@
 #include <sys/wait.h>
 
 /*
- * JIRA ticket reference: WT-2909
- * Test case description:
+ * JIRA ticket reference: WT-2909 Test case description:
  *
- * This test attempts to check the integrity of checkpoints by injecting
- * failures (by means of a custom file system) and then trying to recover. To
- * insulate the top level program from various crashes that may occur when
- * injecting failures, the "populate" code runs in another process, and is
- * expected to sometimes fail. Then the top level program runs recovery (with
- * the normal file system) and checks the results. Any failure at the top level
- * indicates a checkpoint integrity problem.
+ * This test attempts to check the integrity of checkpoints by injecting failures (by means of a
+ * custom file system) and then trying to recover. To insulate the top level program from various
+ * crashes that may occur when injecting failures, the "populate" code runs in another process, and
+ * is expected to sometimes fail. Then the top level program runs recovery (with the normal file
+ * system) and checks the results. Any failure at the top level indicates a checkpoint integrity
+ * problem.
  *
- * Each subtest uses the same kind of schema and data, the only variance is
- * when the faults are injected. At the moment, this test only injects during
- * checkpoints, and only injects write failures. It varies in the number of
- * successful writes that occur before an injected failure (during a checkpoint
- * operation), this can be indicated with "-o N".  When N is not specified, the
- * test attempts to find the optimal range of N for testing. Clearly when N is
- * large, then the checkpoint may be successfully written, and the data
- * represented by the checkpoint will be fully present. When N is small,
- * nothing of interest is written and no data is present. To find the sweet
- * spot where interesting failures occur, the test does a binary search to find
- * the approximate N that divides the "small" and "large" cases. This is not
- * strictly deterministic, a given N may give different results on different
- * runs. But approximate optimal N can be determined, allowing a series of
- * additional tests clustered around this N.
+ * Each subtest uses the same kind of schema and data, the only variance is when the faults are
+ * injected. At the moment, this test only injects during checkpoints, and only injects write
+ * failures. It varies in the number of successful writes that occur before an injected failure
+ * (during a checkpoint operation), this can be indicated with "-o N". When N is not specified, the
+ * test attempts to find the optimal range of N for testing. Clearly when N is large, then the
+ * checkpoint may be successfully written, and the data represented by the checkpoint will be fully
+ * present. When N is small, nothing of interest is written and no data is present. To find the
+ * sweet spot where interesting failures occur, the test does a binary search to find the
+ * approximate N that divides the "small" and "large" cases. This is not strictly deterministic, a
+ * given N may give different results on different runs. But approximate optimal N can be
+ * determined, allowing a series of additional tests clustered around this N.
  *
- * The data is stored in two tables, one having indices. Both tables have
- * the same keys and are updated with the same key in a single transaction.
+ * The data is stored in two tables, one having indices. Both tables have the same keys and are
+ * updated with the same key in a single transaction.
  *
- * Failure mode:
- * If one table is out of step with the other, that is detected as a failure at
- * the top level.  If an index is missing values (or has extra values), that is
- * likewise a failure at the top level. If the tables or the home directory
- * cannot be opened, that is a top level error. The tables must be present
- * as an initial checkpoint is done without any injected fault.
+ * Failure mode: If one table is out of step with the other, that is detected as a failure at the
+ * top level. If an index is missing values (or has extra values), that is likewise a failure at the
+ * top level. If the tables or the home directory cannot be opened, that is a top level error. The
+ * tables must be present as an initial checkpoint is done without any injected fault.
  */
 
 /*

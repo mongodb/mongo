@@ -27,11 +27,9 @@
 #define WT_SINGLE_THREAD_CHECK_STOP(s) \
     if (--(s)->api_enter_refcnt == 0)  \
         WT_PUBLISH((s)->api_tid, 0);
-#define WT_TRACK_TIME(s) __wt_seconds32((s), &(s)->op_start)
 #else
 #define WT_SINGLE_THREAD_CHECK_START(s)
 #define WT_SINGLE_THREAD_CHECK_STOP(s)
-#define WT_TRACK_TIME(s) (s)->op_start = 0
 #endif
 
 /* Standard entry points to the API: declares/initializes local variables. */
@@ -46,8 +44,8 @@
      * correct.                                                     \
      */                                                             \
     WT_TRACK_OP_INIT(s);                                            \
-    (s)->op_start = 0;                                              \
     WT_SINGLE_THREAD_CHECK_START(s);                                \
+    __wt_op_timer_start(s);                                         \
     WT_ERR(WT_SESSION_CHECK_PANIC(s));                              \
     /* Reset wait time if this isn't an API reentry. */             \
     if (__oldname == NULL)                                          \

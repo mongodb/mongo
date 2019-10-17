@@ -315,13 +315,12 @@ __rec_write_check_complete(
     WT_RET(tret);
 
     /*
-     * Check if this reconciliation attempt is making progress.  If there's
-     * any sign of progress, don't fall back to the lookaside table.
+     * Check if this reconciliation attempt is making progress. If there's any sign of progress,
+     * don't fall back to the lookaside table.
      *
-     * Check if the current reconciliation split, in which case we'll
-     * likely get to write at least one of the blocks.  If we've created a
-     * page image for a page that previously didn't have one, or we had a
-     * page image and it is now empty, that's also progress.
+     * Check if the current reconciliation split, in which case we'll likely get to write at least
+     * one of the blocks. If we've created a page image for a page that previously didn't have one,
+     * or we had a page image and it is now empty, that's also progress.
      */
     if (r->multi_next > 1)
         return (0);
@@ -337,11 +336,11 @@ __rec_write_check_complete(
         return (0);
 
     /*
-     * Check if the current reconciliation applied some updates, in which
-     * case evict/restore should gain us some space.
+     * Check if the current reconciliation applied some updates, in which case evict/restore should
+     * gain us some space.
      *
-     * Check if lookaside eviction is possible.  If any of the updates we
-     * saw were uncommitted, the lookaside table cannot be used.
+     * Check if lookaside eviction is possible. If any of the updates we saw were uncommitted, the
+     * lookaside table cannot be used.
      */
     if (r->update_uncommitted || r->update_used)
         return (0);
@@ -372,12 +371,10 @@ __rec_write_page_status(WT_SESSION_IMPL *session, WT_RECONCILE *r)
         /*
          * The page remains dirty.
          *
-         * Any checkpoint call cleared the tree's modified flag before
-         * writing pages, so we must explicitly reset it.  We insert a
-         * barrier after the change for clarity (the requirement is the
-         * flag be set before a subsequent checkpoint reads it, and
-         * as the current checkpoint is waiting on this reconciliation
-         * to complete, there's no risk of that happening).
+         * Any checkpoint call cleared the tree's modified flag before writing pages, so we must
+         * explicitly reset it. We insert a barrier after the change for clarity (the requirement is
+         * the flag be set before a subsequent checkpoint reads it, and as the current checkpoint is
+         * waiting on this reconciliation to complete, there's no risk of that happening).
          */
         btree->modified = true;
         WT_FULL_BARRIER();
@@ -404,7 +401,7 @@ __rec_write_page_status(WT_SESSION_IMPL *session, WT_RECONCILE *r)
          * discard its history).
          */
         mod->rec_max_txn = r->max_txn;
-        mod->rec_max_timestamp = r->max_timestamp;
+        mod->rec_max_timestamp = r->max_ts;
 
         /*
          * Track the tree's maximum transaction ID (used to decide if it's safe to discard the
@@ -416,22 +413,20 @@ __rec_write_page_status(WT_SESSION_IMPL *session, WT_RECONCILE *r)
         if (!F_ISSET(r, WT_REC_EVICT)) {
             if (WT_TXNID_LT(btree->rec_max_txn, r->max_txn))
                 btree->rec_max_txn = r->max_txn;
-            if (btree->rec_max_timestamp < r->max_timestamp)
-                btree->rec_max_timestamp = r->max_timestamp;
+            if (btree->rec_max_timestamp < r->max_ts)
+                btree->rec_max_timestamp = r->max_ts;
         }
 
         /*
-         * We set the page state to mark it as having been dirtied for
-         * the first time prior to reconciliation. A failed atomic cas
-         * indicates that an update has taken place during
+         * We set the page state to mark it as having been dirtied for the first time prior to
+         * reconciliation. A failed atomic cas indicates that an update has taken place during
          * reconciliation.
          *
-         * The page only might be clean; if the page state is unchanged
-         * since reconciliation started, it's clean.
+         * The page only might be clean; if the page state is unchanged since reconciliation
+         * started, it's clean.
          *
-         * If the page state changed, the page has been written since
-         * reconciliation started and remains dirty (that can't happen
-         * when evicting, the page is exclusively locked).
+         * If the page state changed, the page has been written since reconciliation started and
+         * remains dirty (that can't happen when evicting, the page is exclusively locked).
          */
         if (__wt_atomic_cas32(&mod->page_state, WT_PAGE_DIRTY_FIRST, WT_PAGE_CLEAN))
             __wt_cache_dirty_decr(session, page);
@@ -477,11 +472,11 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
       session, WT_VERB_SPLIT, "root page split -> %" PRIu32 " pages", mod->mod_multi_entries);
 
     /*
-     * Create a new root page, initialize the array of child references,
-     * mark it dirty, then write it.
+     * Create a new root page, initialize the array of child references, mark it dirty, then write
+     * it.
      *
-     * Don't count the eviction of this page as progress, checkpoint can
-     * repeatedly create and discard these pages.
+     * Don't count the eviction of this page as progress, checkpoint can repeatedly create and
+     * discard these pages.
      */
     WT_RET(__wt_page_alloc(session, page->type, mod->mod_multi_entries, false, &next));
     F_SET_ATOMIC(next, WT_PAGE_EVICT_NO_PROGRESS);
@@ -576,12 +571,11 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
     r->orig_txn_checkpoint_gen = __wt_gen(session, WT_GEN_CHECKPOINT);
 
     /*
-     * Update the page state to indicate that all currently installed
-     * updates will be included in this reconciliation if it would mark the
-     * page clean.
+     * Update the page state to indicate that all currently installed updates will be included in
+     * this reconciliation if it would mark the page clean.
      *
-     * Add a write barrier to make it more likely that a thread adding an
-     * update will see this state change.
+     * Add a write barrier to make it more likely that a thread adding an update will see this state
+     * change.
      */
     page->modify->page_state = WT_PAGE_DIRTY_FIRST;
     WT_FULL_BARRIER();
@@ -596,17 +590,14 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
     WT_ORDERED_READ(r->last_running, txn_global->last_running);
 
     /*
-     * Decide whether to skew on-page values towards newer or older
-     * versions.  This is a heuristic attempting to minimize the number of
-     * pages that need to be rewritten by future checkpoints.
+     * Decide whether to skew on-page values towards newer or older versions. This is a heuristic
+     * attempting to minimize the number of pages that need to be rewritten by future checkpoints.
      *
-     * We usually prefer to skew to newer versions, the logic being that by
-     * the time the next checkpoint runs, it is likely that all the updates
-     * we choose will be stable.  However, if checkpointing with a
-     * timestamp (indicated by a stable_timestamp being set), and there is
-     * a checkpoint already running, or this page was read with lookaside
-     * history, or the stable timestamp hasn't changed since last time this
-     * page was successfully, skew oldest instead.
+     * We usually prefer to skew to newer versions, the logic being that by the time the next
+     * checkpoint runs, it is likely that all the updates we choose will be stable. However, if
+     * checkpointing with a timestamp (indicated by a stable_timestamp being set), and there is a
+     * checkpoint already running, or this page was read with lookaside history, or the stable
+     * timestamp hasn't changed since last time this page was successfully, skew oldest instead.
      */
     if (F_ISSET(S2C(session)->cache, WT_CACHE_EVICT_DEBUG_MODE) &&
       __wt_random(&session->rnd) % 3 == 0)
@@ -651,22 +642,8 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
 
     /* Track the page's min/maximum transaction */
     r->max_txn = WT_TXN_NONE;
-    r->max_timestamp = 0;
-
-    /*
-     * Track the first unstable transaction (when skewing newest this is the newest update,
-     * otherwise the newest update not on the page). This is the boundary between the on-page
-     * information and the history stored in the lookaside table.
-     */
-    if (r->las_skew_newest) {
-        r->unstable_txn = WT_TXN_NONE;
-        r->unstable_timestamp = WT_TS_NONE;
-        r->unstable_durable_timestamp = WT_TS_NONE;
-    } else {
-        r->unstable_txn = WT_TXN_ABORTED;
-        r->unstable_timestamp = WT_TS_MAX;
-        r->unstable_durable_timestamp = WT_TS_MAX;
-    }
+    r->max_ondisk_ts = r->max_ts = WT_TS_NONE;
+    r->min_skipped_ts = WT_TS_MAX;
 
     /* Track if updates were used and/or uncommitted. */
     r->updates_seen = r->updates_unstable = 0;
@@ -700,9 +677,8 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
     r->evict_matching_checksum_failed = false;
 
     /*
-     * Dictionary compression only writes repeated values once.  We grow
-     * the dictionary as necessary, always using the largest size we've
-     * seen.
+     * Dictionary compression only writes repeated values once. We grow the dictionary as necessary,
+     * always using the largest size we've seen.
      *
      * Reset the dictionary.
      *
@@ -959,12 +935,10 @@ __rec_split_chunk_init(
      *
      * Don't touch the disk image item memory, that memory is reused.
      *
-     * Clear the disk page header to ensure all of it is initialized, even
-     * the unused fields.
+     * Clear the disk page header to ensure all of it is initialized, even the unused fields.
      *
-     * In the case of fixed-length column-store, clear the entire buffer:
-     * fixed-length column-store sets bits in bytes, where the bytes are
-     * assumed to initially be 0.
+     * In the case of fixed-length column-store, clear the entire buffer: fixed-length column-store
+     * sets bits in bytes, where the bytes are assumed to initially be 0.
      */
     WT_RET(__wt_buf_init(session, &chunk->image, memsize));
     memset(chunk->image.mem, 0, r->page->type == WT_PAGE_COL_FIX ? memsize : WT_PAGE_HEADER_SIZE);
@@ -1002,39 +976,32 @@ __wt_rec_split_init(
     r->page_size = (uint32_t)max;
 
     /*
-     * If we have to split, we want to choose a smaller page size for the
-     * split pages, because otherwise we could end up splitting one large
-     * packed page over and over. We don't want to pick the minimum size
-     * either, because that penalizes an application that did a bulk load
-     * and subsequently inserted a few items into packed pages.  Currently
-     * defaulted to 75%, but I have no empirical evidence that's "correct".
+     * If we have to split, we want to choose a smaller page size for the split pages, because
+     * otherwise we could end up splitting one large packed page over and over. We don't want to
+     * pick the minimum size either, because that penalizes an application that did a bulk load and
+     * subsequently inserted a few items into packed pages. Currently defaulted to 75%, but I have
+     * no empirical evidence that's "correct".
      *
-     * The maximum page size may be a multiple of the split page size (for
-     * example, there's a maximum page size of 128KB, but because the table
-     * is active and we don't want to split a lot, the split size is 20KB).
-     * The maximum page size may NOT be an exact multiple of the split page
+     * The maximum page size may be a multiple of the split page size (for example, there's a
+     * maximum page size of 128KB, but because the table is active and we don't want to split a lot,
+     * the split size is 20KB). The maximum page size may NOT be an exact multiple of the split page
      * size.
      *
-     * It's lots of work to build these pages and don't want to start over
-     * when we reach the maximum page size (it's painful to restart after
-     * creating overflow items and compacted data, for example, as those
-     * items have already been written to disk).  So, the loop calls the
-     * helper functions when approaching a split boundary, and we save the
-     * information at that point. We also save the boundary information at
-     * the minimum split size. We maintain two chunks (each boundary
-     * represents a chunk that gets written as a page) in the memory,
-     * writing out the older one to the disk as a page when we need to make
-     * space for a new chunk. On reaching the last chunk, if it turns out to
-     * be smaller than the minimum split size, we go back into the
-     * penultimate chunk and split at this minimum split size boundary. This
-     * moves some data from the penultimate chunk to the last chunk, hence
-     * increasing the size of the last page written without decreasing the
-     * penultimate page size beyond the minimum split size.
+     * It's lots of work to build these pages and don't want to start over when we reach the maximum
+     * page size (it's painful to restart after creating overflow items and compacted data, for
+     * example, as those items have already been written to disk). So, the loop calls the helper
+     * functions when approaching a split boundary, and we save the information at that point. We
+     * also save the boundary information at the minimum split size. We maintain two chunks (each
+     * boundary represents a chunk that gets written as a page) in the memory, writing out the older
+     * one to the disk as a page when we need to make space for a new chunk. On reaching the last
+     * chunk, if it turns out to be smaller than the minimum split size, we go back into the
+     * penultimate chunk and split at this minimum split size boundary. This moves some data from
+     * the penultimate chunk to the last chunk, hence increasing the size of the last page written
+     * without decreasing the penultimate page size beyond the minimum split size.
      *
-     * Finally, all this doesn't matter for fixed-size column-store pages
-     * and salvage.  Fixed-size column store pages can split under (very)
-     * rare circumstances, but they're allocated at a fixed page size, never
-     * anything smaller. In salvage, as noted above, we can't split at all.
+     * Finally, all this doesn't matter for fixed-size column-store pages and salvage. Fixed-size
+     * column store pages can split under (very) rare circumstances, but they're allocated at a
+     * fixed page size, never anything smaller. In salvage, as noted above, we can't split at all.
      */
     if (r->salvage != NULL) {
         r->split_size = 0;
@@ -1108,14 +1075,12 @@ __rec_is_checkpoint(WT_SESSION_IMPL *session, WT_RECONCILE *r)
      *
      * This function exists as a place to hang this comment.
      *
-     * Any time we write the root page of the tree without splitting we are
-     * creating a checkpoint (and have to tell the underlying block manager
-     * so it creates and writes the additional information checkpoints
-     * require).  However, checkpoints are completely consistent, and so we
-     * have to resolve information about the blocks we're expecting to free
-     * as part of the checkpoint, before writing the checkpoint.  In short,
-     * we don't do checkpoint writes here; clear the boundary information as
-     * a reminder and create the checkpoint during wrapup.
+     * Any time we write the root page of the tree without splitting we are creating a checkpoint
+     * (and have to tell the underlying block manager so it creates and writes the additional
+     * information checkpoints require). However, checkpoints are completely consistent, and so we
+     * have to resolve information about the blocks we're expecting to free as part of the
+     * checkpoint, before writing the checkpoint. In short, we don't do checkpoint writes here;
+     * clear the boundary information as a reminder and create the checkpoint during wrapup.
      */
     return (!F_ISSET(btree, WT_BTREE_NO_CHECKPOINT) && __wt_ref_is_root(r->ref));
 }
@@ -1138,36 +1103,30 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_ITEM *key,
     int cmp;
 
     /*
-     * For a column-store, the promoted key is the recno and we already have
-     * a copy.  For a row-store, it's the first key on the page, a variable-
-     * length byte string, get a copy.
+     * For a column-store, the promoted key is the recno and we already have a copy. For a
+     * row-store, it's the first key on the page, a variable- length byte string, get a copy.
      *
-     * This function is called from the split code at each split boundary,
-     * but that means we're not called before the first boundary, and we
-     * will eventually have to get the first key explicitly when splitting
-     * a page.
+     * This function is called from the split code at each split boundary, but that means we're not
+     * called before the first boundary, and we will eventually have to get the first key explicitly
+     * when splitting a page.
      *
-     * For the current slot, take the last key we built, after doing suffix
-     * compression.  The "last key we built" describes some process: before
-     * calling the split code, we must place the last key on the page before
-     * the boundary into the "last" key structure, and the first key on the
-     * page after the boundary into the "current" key structure, we're going
-     * to compare them for suffix compression.
+     * For the current slot, take the last key we built, after doing suffix compression. The "last
+     * key we built" describes some process: before calling the split code, we must place the last
+     * key on the page before the boundary into the "last" key structure, and the first key on the
+     * page after the boundary into the "current" key structure, we're going to compare them for
+     * suffix compression.
      *
-     * Suffix compression is a hack to shorten keys on internal pages.  We
-     * only need enough bytes in the promoted key to ensure searches go to
-     * the correct page: the promoted key has to be larger than the last key
-     * on the leaf page preceding it, but we don't need any more bytes than
-     * that. In other words, we can discard any suffix bytes not required
-     * to distinguish between the key being promoted and the last key on the
-     * leaf page preceding it.  This can only be done for the first level of
-     * internal pages, you cannot repeat suffix truncation as you split up
-     * the tree, it loses too much information.
+     * Suffix compression is a hack to shorten keys on internal pages. We only need enough bytes in
+     * the promoted key to ensure searches go to the correct page: the promoted key has to be larger
+     * than the last key on the leaf page preceding it, but we don't need any more bytes than that.
+     * In other words, we can discard any suffix bytes not required to distinguish between the key
+     * being promoted and the last key on the leaf page preceding it. This can only be done for the
+     * first level of internal pages, you cannot repeat suffix truncation as you split up the tree,
+     * it loses too much information.
      *
-     * Note #1: if the last key on the previous page was an overflow key,
-     * we don't have the in-memory key against which to compare, and don't
-     * try to do suffix compression.  The code for that case turns suffix
-     * compression off for the next key, we don't have to deal with it here.
+     * Note #1: if the last key on the previous page was an overflow key, we don't have the
+     * in-memory key against which to compare, and don't try to do suffix compression. The code for
+     * that case turns suffix compression off for the next key, we don't have to deal with it here.
      */
     if (type != WT_PAGE_ROW_LEAF || !r->key_sfx_compress)
         return (__wt_buf_set(session, key, r->cur->data, r->cur->size));
@@ -1463,9 +1422,8 @@ __rec_split_finish_process_prev(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 
     if (prev_ptr->min_offset != 0 && cur_ptr->image.size < r->min_split_size) {
         /*
-         * The last chunk, pointed to by the current image pointer, has
-         * less than the minimum data. Let's move any data more than the
-         * minimum from the previous image into the current.
+         * The last chunk, pointed to by the current image pointer, has less than the minimum data.
+         * Let's move any data more than the minimum from the previous image into the current.
          *
          * Grow the current buffer if it is not large enough.
          */
@@ -1518,13 +1476,11 @@ int
 __wt_rec_split_finish(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
     /*
-     * We're done reconciling, write the final page. We may arrive here with
-     * no entries to write if the page was entirely empty or if nothing on
-     * the page was visible to us.
+     * We're done reconciling, write the final page. We may arrive here with no entries to write if
+     * the page was entirely empty or if nothing on the page was visible to us.
      *
-     * Pages with skipped or not-yet-globally visible updates aren't really
-     * empty; otherwise, the page is truly empty and we will merge it into
-     * its parent during the parent's reconciliation.
+     * Pages with skipped or not-yet-globally visible updates aren't really empty; otherwise, the
+     * page is truly empty and we will merge it into its parent during the parent's reconciliation.
      */
     if (r->entries == 0 && r->supd_next == 0)
         return (0);
@@ -1578,11 +1534,11 @@ __rec_split_write_supd(
     int cmp;
 
     /*
-     * Check if we've saved updates that belong to this block, and move
-     * any to the per-block structure.
+     * Check if we've saved updates that belong to this block, and move any to the per-block
+     * structure.
      *
-     * This code requires a key be filled in for the next block (or the
-     * last block flag be set, if there's no next block).
+     * This code requires a key be filled in for the next block (or the last block flag be set, if
+     * there's no next block).
      *
      * The last block gets all remaining saved updates.
      */
@@ -1594,13 +1550,11 @@ __rec_split_write_supd(
     }
 
     /*
-     * Get the saved update's key and compare it with the block's key range.
-     * If the saved update list belongs with the block we're about to write,
-     * move it to the per-block memory. Check only to the first update that
-     * doesn't go with the block, they must be in sorted order.
+     * Get the saved update's key and compare it with the block's key range. If the saved update
+     * list belongs with the block we're about to write, move it to the per-block memory. Check only
+     * to the first update that doesn't go with the block, they must be in sorted order.
      *
-     * The other chunk will have the key for the next page, that's what we
-     * compare against.
+     * The other chunk will have the key for the next page, that's what we compare against.
      */
     next = chunk == r->cur_ptr ? r->prev_ptr : r->cur_ptr;
     page = r->page;
@@ -1649,17 +1603,9 @@ __rec_split_write_supd(
 done:
     if (F_ISSET(r, WT_REC_LOOKASIDE)) {
         /* Track the oldest lookaside timestamp seen so far. */
-        multi->page_las.skew_newest = r->las_skew_newest;
         multi->page_las.max_txn = r->max_txn;
-        multi->page_las.unstable_txn = r->unstable_txn;
-        WT_ASSERT(session, r->unstable_txn != WT_TXN_NONE);
-        multi->page_las.max_timestamp = r->max_timestamp;
-
-        WT_ASSERT(session, r->all_upd_prepare_in_prog == true ||
-            r->unstable_durable_timestamp >= r->unstable_timestamp);
-
-        multi->page_las.unstable_timestamp = r->unstable_timestamp;
-        multi->page_las.unstable_durable_timestamp = r->unstable_durable_timestamp;
+        multi->page_las.max_ondisk_ts = r->max_ondisk_ts;
+        multi->page_las.min_skipped_ts = r->min_skipped_ts;
     }
 
 err:
@@ -1738,10 +1684,9 @@ __rec_split_write_reuse(
     /*
      * Calculating the checksum is the expensive part, try to avoid it.
      *
-     * Ignore the last block of any reconciliation. Pages are written in the
-     * same block order every time, so the last block written for a page is
-     * unlikely to match any previously written block or block written in
-     * the future, (absent a point-update earlier in the page which didn't
+     * Ignore the last block of any reconciliation. Pages are written in the same block order every
+     * time, so the last block written for a page is unlikely to match any previously written block
+     * or block written in the future, (absent a point-update earlier in the page which didn't
      * change the size of the on-page object in any way).
      */
     if (last_block)
@@ -1825,18 +1770,15 @@ __rec_compression_adjust(WT_SESSION_IMPL *session, uint32_t max, size_t compress
 
     if (compressed_size > max) {
         /*
-         * The compressed size is GT the page maximum.
-         * Check if the pre-compression size is larger than the maximum.
-         * If 10% of the page size larger than the maximum, decrease it
-         * by that amount. Else if it's not already at the page maximum,
-         * set it there.
+         * The compressed size is GT the page maximum. Check if the pre-compression size is larger
+         * than the maximum. If 10% of the page size larger than the maximum, decrease it by that
+         * amount. Else if it's not already at the page maximum, set it there.
          *
-         * Note we're using 10% of the maximum page size as our test for
-         * when to adjust the pre-compression size as well as the amount
-         * by which we adjust it. Not updating the value when it's close
-         * to the page size keeps us from constantly updating a shared
-         * memory location, and 10% of the page size is an OK step value
-         * as well, so we use it in both cases.
+         * Note we're using 10% of the maximum page size as our test for when to adjust the
+         * pre-compression size as well as the amount by which we adjust it. Not updating the value
+         * when it's close to the page size keeps us from constantly updating a shared memory
+         * location, and 10% of the page size is an OK step value as well, so we use it in both
+         * cases.
          */
         adjust = current - max;
         if (adjust > ten_percent)
@@ -1849,12 +1791,10 @@ __rec_compression_adjust(WT_SESSION_IMPL *session, uint32_t max, size_t compress
         /*
          * The compressed size is LTE the page maximum.
          *
-         * Don't increase the pre-compressed size on the last block, the
-         * last block might be tiny.
+         * Don't increase the pre-compressed size on the last block, the last block might be tiny.
          *
-         * If the compressed size is less than the page maximum by 10%,
-         * increase the pre-compression size by 10% of the page, or up
-         * to the maximum in-memory image size.
+         * If the compressed size is less than the page maximum by 10%, increase the pre-compression
+         * size by 10% of the page, or up to the maximum in-memory image size.
          *
          * Note we're using 10% of the maximum page size... see above.
          */
@@ -1940,13 +1880,12 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_CHUNK *chunk
         __rec_split_write_header(session, r, chunk, multi, compressed_image->mem);
 
     /*
-     * If we are writing the whole page in our first/only attempt, it might
-     * be a checkpoint (checkpoints are only a single page, by definition).
-     * Checkpoints aren't written here, the wrapup functions do the write.
+     * If we are writing the whole page in our first/only attempt, it might be a checkpoint
+     * (checkpoints are only a single page, by definition). Checkpoints aren't written here, the
+     * wrapup functions do the write.
      *
-     * Track the buffer with the image. (This is bad layering, but we can't
-     * write the image until the wrapup code, and we don't have a code path
-     * from here to there.)
+     * Track the buffer with the image. (This is bad layering, but we can't write the image until
+     * the wrapup code, and we don't have a code path from here to there.)
      */
     if (last_block && r->multi_next == 1 && __rec_is_checkpoint(session, r)) {
         WT_ASSERT(session, r->supd_next == 0);
@@ -2266,8 +2205,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
                             /*
                              * Discard the replacement leaf page's blocks.
                              *
-                             * The exception is root pages are never tracked or free'd, they
-                             * are checkpoints, and must be explicitly dropped.
+                             * The exception is root pages are never tracked or free'd, they are
+                             * checkpoints, and must be explicitly dropped.
                              */
         if (!__wt_ref_is_root(ref))
             WT_RET(__wt_btree_block_free(session, mod->mod_replace.addr, mod->mod_replace.size));
@@ -2328,17 +2267,14 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
         break;
     case 1: /* 1-for-1 page swap */
             /*
-             * Because WiredTiger's pages grow without splitting, we're
-             * replacing a single page with another single page most of
-             * the time.
+             * Because WiredTiger's pages grow without splitting, we're replacing a single page with
+             * another single page most of the time.
              *
-             * If in-memory, or saving/restoring changes for this page and
-             * there's only one block, there's nothing to write. Set up
-             * a single block as if to split, then use that disk image to
-             * rewrite the page in memory. This is separate from simple
-             * replacements where eviction has decided to retain the page
-             * in memory because the latter can't handle update lists and
-             * splits can.
+             * If in-memory, or saving/restoring changes for this page and there's only one block,
+             * there's nothing to write. Set up a single block as if to split, then use that disk
+             * image to rewrite the page in memory. This is separate from simple replacements where
+             * eviction has decided to retain the page in memory because the latter can't handle
+             * update lists and splits can.
              */
         if (F_ISSET(r, WT_REC_IN_MEMORY) ||
           (F_ISSET(r, WT_REC_UPDATE_RESTORE) && r->multi->supd_entries != 0))
@@ -2417,12 +2353,10 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
             multi->addr.reuse = 0;
 
     /*
-     * On error, discard blocks we've written, they're unreferenced by the
-     * tree.  This is not a question of correctness, we're avoiding block
-     * leaks.
+     * On error, discard blocks we've written, they're unreferenced by the tree. This is not a
+     * question of correctness, we're avoiding block leaks.
      *
-     * Don't discard backing blocks marked for reuse, they remain part of
-     * a previous reconciliation.
+     * Don't discard backing blocks marked for reuse, they remain part of a previous reconciliation.
      */
     for (multi = r->multi, i = 0; i < r->multi_next; ++multi, ++i)
         if (multi->addr.addr != NULL) {

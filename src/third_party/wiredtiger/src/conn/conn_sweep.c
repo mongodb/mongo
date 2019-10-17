@@ -89,8 +89,8 @@ __sweep_expire_one(WT_SESSION_IMPL *session)
     /*
      * Mark the handle dead and close the underlying handle.
      *
-     * For btree handles, closing the handle decrements the open file
-     * count, meaning the close loop won't overrun the configured minimum.
+     * For btree handles, closing the handle decrements the open file count, meaning the close loop
+     * won't overrun the configured minimum.
      */
     ret = __wt_conn_dhandle_close(session, false, true);
 
@@ -299,15 +299,13 @@ __sweep_server(void *arg)
         __wt_seconds(session, &now);
 
         /*
-         * Sweep the lookaside table. If the lookaside table hasn't yet
-         * been written, there's no work to do.
+         * Sweep the lookaside table. If the lookaside table hasn't yet been written, there's no
+         * work to do.
          *
-         * Don't sweep the lookaside table if the cache is stuck full.
-         * The sweep uses the cache and can exacerbate the problem.
-         * If we try to sweep when the cache is full or we aren't
-         * making progress in eviction, sweeping can wind up constantly
-         * bringing in and evicting pages from the lookaside table,
-         * which will stop the cache from moving into the stuck state.
+         * Don't sweep the lookaside table if the cache is stuck full. The sweep uses the cache and
+         * can exacerbate the problem. If we try to sweep when the cache is full or we aren't making
+         * progress in eviction, sweeping can wind up constantly bringing in and evicting pages from
+         * the lookaside table, which will stop the cache from moving into the stuck state.
          */
         if ((FLD_ISSET(conn->timing_stress_flags, WT_TIMING_STRESS_AGGRESSIVE_SWEEP) ||
               now - last >= WT_LAS_SWEEP_SEC) &&

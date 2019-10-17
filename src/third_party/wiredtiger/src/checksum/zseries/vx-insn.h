@@ -1,11 +1,10 @@
 /*
  * Support for Vector Instructions
  *
- * Assembler macros to generate .byte/.word code for particular
- * vector instructions that are supported by recent binutils (>= 2.26) only.
+ * Assembler macros to generate .byte/.word code for particular vector instructions that are
+ * supported by recent binutils (>= 2.26) only.
  *
- * Copyright IBM Corp. 2015
- * Author(s): Hendrik Brueckner <brueckner@linux.vnet.ibm.com>
+ * Copyright IBM Corp. 2015 Author(s): Hendrik Brueckner <brueckner@linux.vnet.ibm.com>
  */
 
 #ifndef __ASM_S390_VX_INSN_H

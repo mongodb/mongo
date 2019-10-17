@@ -68,13 +68,11 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, const WT_ITEM *k
     mod = page->modify;
 
     /*
-     * Modify: allocate an update array as necessary, build a WT_UPDATE
-     * structure, and call a serialized function to insert the WT_UPDATE
-     * structure.
+     * Modify: allocate an update array as necessary, build a WT_UPDATE structure, and call a
+     * serialized function to insert the WT_UPDATE structure.
      *
-     * Insert: allocate an insert array as necessary, build a WT_INSERT
-     * and WT_UPDATE structure pair, and call a serialized function to
-     * insert the WT_INSERT structure.
+     * Insert: allocate an insert array as necessary, build a WT_INSERT and WT_UPDATE structure
+     * pair, and call a serialized function to insert the WT_INSERT structure.
      */
     if (cbt->compare == 0) {
         if (cbt->ins == NULL) {
@@ -125,13 +123,11 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, const WT_ITEM *k
         /*
          * Allocate the insert array as necessary.
          *
-         * We allocate an additional insert array slot for insert keys
-         * sorting less than any key on the page.  The test to select
-         * that slot is baroque: if the search returned the first page
-         * slot, we didn't end up processing an insert list, and the
-         * comparison value indicates the search key was smaller than
-         * the returned slot, then we're using the smallest-key insert
-         * slot.  That's hard, so we set a flag.
+         * We allocate an additional insert array slot for insert keys sorting less than any key on
+         * the page. The test to select that slot is baroque: if the search returned the first page
+         * slot, we didn't end up processing an insert list, and the comparison value indicates the
+         * search key was smaller than the returned slot, then we're using the smallest-key insert
+         * slot. That's hard, so we set a flag.
          */
         WT_PAGE_ALLOC_AND_SWAP(session, page, mod->mod_row_insert, ins_headp, page->entries + 1);
 
@@ -167,16 +163,14 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, const WT_ITEM *k
         ins_size += upd_size;
 
         /*
-         * If there was no insert list during the search, the cursor's
-         * information cannot be correct, search couldn't have
-         * initialized it.
+         * If there was no insert list during the search, the cursor's information cannot be
+         * correct, search couldn't have initialized it.
          *
-         * Otherwise, point the new WT_INSERT item's skiplist to the
-         * next elements in the insert list (which we will check are
-         * still valid inside the serialization function).
+         * Otherwise, point the new WT_INSERT item's skiplist to the next elements in the insert
+         * list (which we will check are still valid inside the serialization function).
          *
-         * The serial mutex acts as our memory barrier to flush these
-         * writes before inserting them into the list.
+         * The serial mutex acts as our memory barrier to flush these writes before inserting them
+         * into the list.
          */
         if (cbt->ins_stack[0] == NULL)
             for (i = 0; i < skipdepth; i++) {
@@ -303,20 +297,17 @@ __wt_update_obsolete_check(
     oldest = txn_global->has_oldest_timestamp ? txn_global->oldest_timestamp : WT_TS_NONE;
     stable = txn_global->has_stable_timestamp ? txn_global->stable_timestamp : WT_TS_NONE;
     /*
-     * This function identifies obsolete updates, and truncates them from
-     * the rest of the chain; because this routine is called from inside
-     * a serialization function, the caller has responsibility for actually
-     * freeing the memory.
+     * This function identifies obsolete updates, and truncates them from the rest of the chain;
+     * because this routine is called from inside a serialization function, the caller has
+     * responsibility for actually freeing the memory.
      *
      * Walk the list of updates, looking for obsolete updates at the end.
      *
-     * Only updates with globally visible, self-contained data can terminate
-     * update chains.
+     * Only updates with globally visible, self-contained data can terminate update chains.
      *
-     * Birthmarks are a special case: once a birthmark becomes obsolete, it
-     * can be discarded and subsequent reads will see the on-page value (as
-     * expected).  Inserting updates into the lookaside table relies on
-     * this behavior to avoid creating update chains with multiple
+     * Birthmarks are a special case: once a birthmark becomes obsolete, it can be discarded and
+     * subsequent reads will see the on-page value (as expected). Inserting updates into the
+     * lookaside table relies on this behavior to avoid creating update chains with multiple
      * birthmarks.
      */
     for (first = prev = NULL, count = 0; upd != NULL; prev = upd, upd = upd->next, count++) {

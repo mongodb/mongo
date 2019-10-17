@@ -138,9 +138,8 @@ cursor_scope_ops(WT_SESSION *session, const char *uri)
         }
 
         /*
-         * The application must keep key and value memory valid until
-         * the next operation that positions the cursor, modifies the
-         * data, or resets or closes the cursor.
+         * The application must keep key and value memory valid until the next operation that
+         * positions the cursor, modifies the data, or resets or closes the cursor.
          *
          * Modifying either the key or value buffers is not permitted.
          */
@@ -199,8 +198,8 @@ cursor_scope_ops(WT_SESSION *session, const char *uri)
         case INSERT:
         case REMOVE:
             /*
-             * Insert and remove configured with a search key do
-             * not position the cursor and have no key or value.
+             * Insert and remove configured with a search key do not position the cursor and have no
+             * key or value.
              *
              * There should be two error messages, ignore them.
              */
@@ -217,8 +216,7 @@ cursor_scope_ops(WT_SESSION *session, const char *uri)
             break;
         case REMOVE_POS:
             /*
-             * Remove configured with a cursor position has a key,
-             * but no value.
+             * Remove configured with a cursor position has a key, but no value.
              *
              * There should be one error message, ignore it.
              */
@@ -243,11 +241,10 @@ cursor_scope_ops(WT_SESSION *session, const char *uri)
         case SEARCH_NEAR:
         case UPDATE:
             /*
-             * Modify, reserve, search, search-near and update all
-             * position the cursor and have both a key and value.
+             * Modify, reserve, search, search-near and update all position the cursor and have both
+             * a key and value.
              *
-             * Any key/value should not reference application
-             * memory.
+             * Any key/value should not reference application memory.
              */
             if (recno) {
                 testutil_assert(cursor->get_key(cursor, &keyr) == 0);

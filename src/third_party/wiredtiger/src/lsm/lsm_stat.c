@@ -63,9 +63,8 @@ __curstat_lsm_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cs
         /*
          * Get the statistics for the chunk's underlying object.
          *
-         * XXX kludge: we may have an empty chunk where no checkpoint
-         * was written.  If so, try to open the ordinary handle on that
-         * chunk instead.
+         * XXX kludge: we may have an empty chunk where no checkpoint was written. If so, try to
+         * open the ordinary handle on that chunk instead.
          */
         WT_ERR(__wt_buf_fmt(session, uribuf, "statistics:%s", chunk->uri));
         ret = __wt_curstat_open(session, uribuf->data, NULL,

@@ -157,7 +157,7 @@ class test_timestamp06(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Scenario: 1
         # Check that we see all the latest values (i.e. 3) as per transaction
-        # visibility when reading with out the read timestamp.
+        # visibility when reading without the read timestamp.
         # All tables should see all the values.
         self.check(self.session, "", self.table_ts_log,
             dict((k, 3) for k in orig_keys))
@@ -204,8 +204,12 @@ class test_timestamp06(wttest.WiredTigerTestCase, suite_subprocess):
         self.ckpt_backup(2, (nkeys - valcnt_ts_log), (nkeys - valcnt_ts_nolog))
 
         # Scenario: 3
-        # Check that we see all the data values correctly after rollback
+        # Check we see all the data values correctly after rollback. Skip the case where the most
+        # recent checkpoint wasn't based on the last stable timestamp, those can't be rolled back.
+        if self.ckpt_ts == False:
+                return
         self.conn.rollback_to_stable()
+
         # All tables should see the values correctly when read with
         # read timestamp as stable timestamp.
         self.check(self.session, 'read_timestamp=' + stable_ts,
@@ -214,7 +218,7 @@ class test_timestamp06(wttest.WiredTigerTestCase, suite_subprocess):
             self.table_ts_log, dict((k, 2) for k in orig_keys))
 
         # Scenario: 4
-        # Check that we see the values correctly when read with out any
+        # Check that we see the values correctly when read without any
         # timestamp.
         if self.using_log == True:
             # For logged table we should see latest values (i.e. 3) when logging
@@ -224,21 +228,13 @@ class test_timestamp06(wttest.WiredTigerTestCase, suite_subprocess):
         else:
             # When logging is disabled, we should not see the values beyond the
             # stable timestamp with timestamped checkpoints.
-            if self.ckpt_ts == True:
-                self.check(self.session, "",
-                    self.table_ts_log, dict((k, 2) for k in orig_keys))
-            else:
-                self.check(self.session, "",
-                    self.table_ts_log, dict((k, 3) for k in orig_keys))
+            self.check(self.session, "",
+                self.table_ts_log, dict((k, 2) for k in orig_keys))
 
         # For non-logged table we should not see the values beyond the
         # stable timestamp with timestamped checkpoints.
-        if self.ckpt_ts == True:
-            self.check(self.session, "",
-                self.table_ts_nolog, dict((k, 2) for k in orig_keys))
-        else:
-            self.check(self.session, "",
-                self.table_ts_nolog, dict((k, 3) for k in orig_keys))
+        self.check(self.session, "",
+            self.table_ts_nolog, dict((k, 2) for k in orig_keys))
 
 if __name__ == '__main__':
     wttest.run()

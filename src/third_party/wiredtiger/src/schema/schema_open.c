@@ -148,14 +148,12 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
     WT_ERR(__wt_strndup(session, cval.str, cval.len, &idx->key_format));
 
     /*
-     * The key format for an index is somewhat subtle: the application
-     * specifies a set of columns that it will use for the key, but the
-     * engine usually adds some hidden columns in order to derive the
-     * primary key.  These hidden columns are part of the file's key.
+     * The key format for an index is somewhat subtle: the application specifies a set of columns
+     * that it will use for the key, but the engine usually adds some hidden columns in order to
+     * derive the primary key. These hidden columns are part of the file's key.
      *
-     * The file's key_format is stored persistently, we need to calculate
-     * the index cursor key format (which will usually omit some of those
-     * keys).
+     * The file's key_format is stored persistently, we need to calculate the index cursor key
+     * format (which will usually omit some of those keys).
      */
     WT_ERR(__wt_buf_init(session, buf, 0));
     WT_ERR(__wt_config_getones(session, idx->config, "columns", &idx->colconf));

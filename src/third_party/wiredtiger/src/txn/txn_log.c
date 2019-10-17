@@ -28,12 +28,11 @@ __txn_op_log_row_key_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
     memset(&key, 0, sizeof(key));
 
     /*
-     * We used to take the row-store logging key from the page referenced by
-     * the cursor, then switched to taking it from the cursor itself. Check
-     * they are the same.
+     * We used to take the row-store logging key from the page referenced by the cursor, then
+     * switched to taking it from the cursor itself. Check they are the same.
      *
-     * If the cursor references a WT_INSERT item, take the key from there,
-     * else take the key from the original page.
+     * If the cursor references a WT_INSERT item, take the key from there, else take the key from
+     * the original page.
      */
     if (cbt->ins == NULL) {
         session = (WT_SESSION_IMPL *)cbt->iface.session;

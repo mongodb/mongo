@@ -402,10 +402,9 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
     /*
      * Wait for our group to start and any readers to drain.
      *
-     * We take care here to do an atomic read of the full 64-bit lock
-     * value.  Otherwise, reads are not guaranteed to be ordered and we
-     * could see no readers active from a different batch and decide that
-     * we have the lock.
+     * We take care here to do an atomic read of the full 64-bit lock value. Otherwise, reads are
+     * not guaranteed to be ordered and we could see no readers active from a different batch and
+     * decide that we have the lock.
      */
     for (pause_cnt = 0, old.u.v = l->u.v; ticket != old.u.s.current || old.u.s.readers_active != 0;
          pause_cnt++, old.u.v = l->u.v) {
@@ -460,9 +459,8 @@ __wt_writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
         /*
          * Allow the next batch to start.
          *
-         * If there are readers in the next group, swap queued readers
-         * to active: this could race with new readlock requests, so we
-         * have to spin.
+         * If there are readers in the next group, swap queued readers to active: this could race
+         * with new readlock requests, so we have to spin.
          */
         new.u.v = old.u.v;
         if (++new.u.s.current == new.u.s.reader) {

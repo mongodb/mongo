@@ -145,8 +145,8 @@ do_rotate(char *buf, size_t len, int rotn)
     /*
      * Now rotate.
      *
-     * Avoid ctype functions because they behave in unexpected ways,
-     * particularly when the locale is not "C".
+     * Avoid ctype functions because they behave in unexpected ways, particularly when the locale is
+     * not "C".
      */
     for (i = 0; i < len; i++) {
         if ('a' <= buf[i] && buf[i] <= 'z')
@@ -439,9 +439,8 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
         return (errno);
 
     /*
-     * Allocate a local encryptor structure, with a WT_ENCRYPTOR structure
-     * as the first field, allowing us to treat references to either type of
-     * structure as a reference to the other type.
+     * Allocate a local encryptor structure, with a WT_ENCRYPTOR structure as the first field,
+     * allowing us to treat references to either type of structure as a reference to the other type.
      *
      * Heap memory (not static), because it can support multiple databases.
      */
