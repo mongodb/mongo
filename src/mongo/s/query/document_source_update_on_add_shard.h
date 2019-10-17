@@ -102,7 +102,7 @@ private:
 
     std::shared_ptr<executor::TaskExecutor> _executor;
     boost::intrusive_ptr<DocumentSourceMergeCursors> _mergeCursors;
-    std::vector<ShardId> _shardsWithCursors;
+    std::set<ShardId> _shardsWithCursors;
     BSONObj _cmdToRunOnNewShards;
 };
 }  // namespace mongo

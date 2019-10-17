@@ -362,14 +362,11 @@ Value DocumentSourceChangeStreamTransform::serialize(
         changeStreamOptions[DocumentSourceChangeStreamSpec::kStartAfterFieldName].missing()) {
         MutableDocument newChangeStreamOptions(changeStreamOptions);
 
-        // Use the current cluster time plus 1 tick since the oplog query will include all
-        // operations/commands equal to or greater than the 'startAtOperationTime' timestamp. In
-        // particular, avoid including the last operation that went through mongos in an attempt to
-        // match the behavior of a replica set more closely.
-        auto clusterTime = LogicalClock::get(pExpCtx->opCtx)->getClusterTime();
-        clusterTime.addTicks(1);
-        newChangeStreamOptions[DocumentSourceChangeStreamSpec::kStartAtOperationTimeFieldName] =
-            Value(clusterTime.asTimestamp());
+        // Configure the serialized $changeStream to start from the initial high-watermark
+        // postBatchResumeToken which we generated while parsing the $changeStream pipeline.
+        invariant(!pExpCtx->initialPostBatchResumeToken.isEmpty());
+        newChangeStreamOptions[DocumentSourceChangeStreamSpec::kResumeAfterFieldName] =
+            Value(pExpCtx->initialPostBatchResumeToken);
         changeStreamOptions = newChangeStreamOptions.freeze();
     }
     return Value(Document{{getSourceName(), changeStreamOptions}});

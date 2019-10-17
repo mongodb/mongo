@@ -396,7 +396,7 @@ Status AsyncResultsMerger::_askForNextBatch(WithLock, size_t remoteIndex) {
     }
 
     executor::RemoteCommandRequest request(
-        remote.getTargetHost(), _params.getNss().db().toString(), cmdObj, _opCtx);
+        remote.getTargetHost(), remote.cursorNss.db().toString(), cmdObj, _opCtx);
 
     auto callbackStatus =
         _executor->scheduleRemoteCommand(request, [this, remoteIndex](auto const& cbData) {

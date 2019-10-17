@@ -36,13 +36,17 @@
 #include "mongo/client/connpool.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
+#include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/query/cluster_aggregation_planner.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
@@ -107,6 +111,33 @@ Document wrapAggAsExplain(Document aggregateCommand, ExplainOptions::Verbosity v
     }
 
     return explainCommandBuilder.freeze();
+}
+
+/**
+ * Open a $changeStream cursor on the 'config.shards' collection to watch for new shards.
+ */
+RemoteCursor openChangeStreamNewShardMonitor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                             Timestamp startMonitoringAtTime) {
+    const auto& configShard = Grid::get(expCtx->opCtx)->shardRegistry()->getConfigShard();
+    // Pipeline: {$changeStream: {startAtOperationTime: [now], allowToRunOnConfigDB: true}}
+    AggregationRequest aggReq(
+        ShardType::ConfigNS,
+        {BSON(DocumentSourceChangeStream::kStageName
+              << BSON(DocumentSourceChangeStreamSpec::kStartAtOperationTimeFieldName
+                      << startMonitoringAtTime
+                      << DocumentSourceChangeStreamSpec::kAllowToRunOnConfigDBFieldName << true))});
+    aggReq.setFromMongos(true);
+    aggReq.setNeedsMerge(true);
+    aggReq.setBatchSize(0);
+    auto configCursor =
+        establishCursors(expCtx->opCtx,
+                         Grid::get(expCtx->opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                         aggReq.getNamespaceString(),
+                         ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+                         {{configShard->getId(), aggReq.serializeToCommandObj().toBson()}},
+                         false);
+    invariant(configCursor.size() == 1);
+    return std::move(*configCursor.begin());
 }
 
 Shard::RetryPolicy getDesiredRetryPolicy(OperationContext* opCtx) {
@@ -575,13 +606,17 @@ DispatchShardPipelineResults dispatchShardPipeline(
                                            pipeline.get(),
                                            expCtx->collation);
 
-    // In order for a $changeStream to work reliably, we need the shard registry to be at least as
-    // current as the logical time at which the pipeline was serialized to 'targetedCommand' above.
-    // We therefore hard-reload and retarget the shards here. We don't refresh for other pipelines
-    // that must run on all shards (e.g. $currentOp) because, unlike $changeStream, those pipelines
-    // may not have been forced to split if there was only one shard in the cluster when the command
-    // began execution. If a shard was added since the earlier targeting logic ran, then refreshing
-    // here may cause us to illegally target an unsplit pipeline to more than one shard.
+    // A $changeStream pipeline must run on all shards, and will also open an extra cursor on the
+    // config server in order to monitor for new shards. To guarantee that we do not miss any
+    // shards, we must ensure that the list of shards to which we initially dispatch the pipeline is
+    // at least as current as the logical time at which the stream begins scanning for new shards.
+    // We therefore set 'shardRegistryReloadTime' to the current clusterTime and then hard-reload
+    // the shard registry. We don't refresh for other pipelines that must run on all shards (e.g.
+    // $currentOp) because, unlike $changeStream, those pipelines may not have been forced to split
+    // if there was only one shard in the cluster when the command began execution. If a shard was
+    // added since the earlier targeting logic ran, then refreshing here may cause us to illegally
+    // target an unsplit pipeline to more than one shard.
+    auto shardRegistryReloadTime = LogicalClock::get(opCtx)->getClusterTime().asTimestamp();
     if (hasChangeStream) {
         auto* shardRegistry = Grid::get(opCtx)->shardRegistry();
         if (!shardRegistry->reload(opCtx)) {
@@ -636,12 +671,19 @@ DispatchShardPipelineResults dispatchShardPipeline(
         invariant(cursors.size() % shardIds.size() == 0,
                   str::stream() << "Number of cursors (" << cursors.size()
                                 << ") is not a multiple of producers (" << shardIds.size() << ")");
+
+        // For $changeStream, we must open an extra cursor on the 'config.shards' collection, so
+        // that we can monitor for the addition of new shards inline with real events.
+        if (hasChangeStream && expCtx->ns.db() != ShardType::ConfigNS.db()) {
+            cursors.emplace_back(openChangeStreamNewShardMonitor(expCtx, shardRegistryReloadTime));
+        }
     }
 
     // Convert remote cursors into a vector of "owned" cursors.
     std::vector<OwnedRemoteCursor> ownedCursors;
     for (auto&& cursor : cursors) {
-        ownedCursors.emplace_back(OwnedRemoteCursor(opCtx, std::move(cursor), expCtx->ns));
+        auto cursorNss = cursor.getCursorResponse().getNSS();
+        ownedCursors.emplace_back(opCtx, std::move(cursor), std::move(cursorNss));
     }
 
     // Record the number of shards involved in the aggregation. If we are required to merge on

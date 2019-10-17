@@ -20,14 +20,14 @@ assertErrorCode(
     40602);
 
 let error = assert.throws(() => coll.aggregate([{$sort: {x: 1}}, {$changeStream: {}}]));
-assert.contains(error.code, [40602, 50988], "Unexpected error: " + tojson(error));
+assert.contains(error.code, [40602], "Unexpected error: " + tojson(error));
 
 error = assert.throws(
     () => coll.aggregate([{$sort: {x: 1}}, {$changeStream: {}}], {allowDiskUse: true}));
-assert.contains(error.code, [40602, 50988], "Unexpected error: " + tojson(error));
+assert.contains(error.code, [40602], "Unexpected error: " + tojson(error));
 
 error = assert.throws(() => coll.aggregate([{$group: {_id: "$x"}}, {$changeStream: {}}]));
-assert.contains(error.code, [40602, 50988], "Unexpected error: " + tojson(error));
+assert.contains(error.code, [40602], "Unexpected error: " + tojson(error));
 
 // This one has a different error code because of conflicting host type requirements: the $group
 // needs to merge on a shard, but the $changeStream needs to merge on mongos. This doesn't

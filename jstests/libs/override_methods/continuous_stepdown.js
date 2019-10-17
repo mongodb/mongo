@@ -176,6 +176,9 @@ ContinuousStepdown.configure = function(stepdownOptions,
      * Overrides the ReplSetTest constructor to start the continuous primary stepdown thread.
      */
     ReplSetTest = function ReplSetTestWithContinuousPrimaryStepdown() {
+        // Preserve the original set of nodeOptions passed to the constructor.
+        const origNodeOpts = Object.assign({}, (arguments[0] && arguments[0].nodeOptions) || {});
+
         // Construct the original object
         originalReplSetTest.apply(this, arguments);
 
@@ -185,24 +188,31 @@ ContinuousStepdown.configure = function(stepdownOptions,
         const _originalAwaitLastOpCommitted = this.awaitLastOpCommitted;
 
         /**
-         * Overrides startSet call to increase logging verbosity.
+         * Overrides startSet call to increase logging verbosity. Ensure that we only override the
+         * 'logComponentVerbosity' server parameter, but retain any other parameters that were
+         * supplied during ReplSetTest construction.
          */
         this.startSet = function() {
-            let options = arguments[0] || {};
-
-            if (typeof (options.setParameter) === "string") {
-                var eqIdx = options.setParameter.indexOf("=");
-                if (eqIdx != -1) {
-                    var param = options.setParameter.substring(0, eqIdx);
-                    var value = options.setParameter.substring(eqIdx + 1);
-                    options.setParameter = {};
-                    options.setParameter[param] = value;
+            // Helper function to convert a string representation of setParameter to object form.
+            function setParamToObj(setParam) {
+                if (typeof (setParam) === "string") {
+                    var eqIdx = setParam.indexOf("=");
+                    if (eqIdx != -1) {
+                        var param = setParam.substring(0, eqIdx);
+                        var value = setParam.substring(eqIdx + 1);
+                        return {[param]: value};
+                    }
                 }
+                return Object.assign({}, setParam || {});
             }
+
+            const options = arguments[0] || {};
+
+            options.setParameter = Object.assign(setParamToObj(origNodeOpts.setParameter),
+                                                 setParamToObj(options.setParameter),
+                                                 {logComponentVerbosity: verbositySetting});
             arguments[0] = options;
 
-            options.setParameter = options.setParameter || {};
-            options.setParameter.logComponentVerbosity = verbositySetting;
             return _originalStartSetFn.apply(this, arguments);
         };
 

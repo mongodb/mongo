@@ -24,6 +24,7 @@ selector:
   - jstests/sharding/prepared_txn_metadata_refresh.js
   # Enable when 4.4 becomes last stable
   - jstests/sharding/bulk_insert.js
+  - jstests/sharding/change_streams_new_shard_new_database.js
   - jstests/sharding/clear_jumbo.js
   - jstests/sharding/comment_field.js
   - jstests/sharding/covered_shard_key_indexes.js

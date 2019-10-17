@@ -166,7 +166,6 @@ public:
      */
     static BSONObj buildMatchFilter(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                     Timestamp startFrom,
-                                    bool startFromInclusive,
                                     bool showMigrationEvents);
 
     /**

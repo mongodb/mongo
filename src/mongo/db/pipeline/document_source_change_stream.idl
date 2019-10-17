@@ -109,3 +109,11 @@ structs:
                              deletes may appear that do not reflect actual deletions or insertions
                              of data. Instead they reflect this data moving from one shard to
                              another.
+            allowToRunOnConfigDB:
+                cpp_name: allowToRunOnConfigDB
+                type: bool
+                default: false
+                description: A flag indicating whether the change stream may be opened on the
+                             'config' database, which is usually banned. This flag is used
+                             internally to allow mongoS to open a stream on 'config.shards', in
+                             order to monitor for the addition of new shards to the cluster.
