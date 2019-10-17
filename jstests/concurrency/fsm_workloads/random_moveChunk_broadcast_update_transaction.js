@@ -9,7 +9,7 @@
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');
 load('jstests/concurrency/fsm_workloads/random_moveChunk_base.js');
-load('jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js');
+load('jstests/concurrency/fsm_workload_helpers/update_in_transaction_states.js');
 
 var $config = extendWorkload($config, function($config, $super) {
     $config.threadCount = 5;
@@ -18,10 +18,6 @@ var $config = extendWorkload($config, function($config, $super) {
     // Number of documents per partition. Note that there is one chunk per partition and one
     // partition per thread.
     $config.data.partitionSize = 100;
-
-    // The counter values associated with each owned id. Used to verify updates aren't double
-    // applied.
-    $config.data.expectedCounters = {};
 
     // A moveChunk may fail with a WriteConflict when clearing orphans on the destination shard if
     // any of them are concurrently written to by a broadcast transaction operation. The error
@@ -41,67 +37,24 @@ var $config = extendWorkload($config, function($config, $super) {
              err.message.indexOf("Documents in target range may still be in use") > -1);
     };
 
-    /**
-     * Sends a multi=false update with an exact match on _id for a random document assigned to this
-     * thread, which should be sent to all shards.
-     */
-    $config.states.exactIdUpdate = function exactIdUpdate(db, collName, connCache) {
-        const idToUpdate = this.getIdForThread();
-
-        const collection = this.session.getDatabase(db.getName()).getCollection(collName);
-        withTxnAndAutoRetry(this.session, () => {
-            assertWhenOwnColl.commandWorked(
-                collection.update({_id: idToUpdate}, {$inc: {counter: 1}}, {multi: false}));
-        });
-
-        // Update the expected counter for the targeted id.
-        this.expectedCounters[idToUpdate] += 1;
+    $config.states.exactIdUpdate = function(db, collName, connCache) {
+        exactIdUpdate(db, collName, this.session, this.getIdForThread(collName));
+    };
+    $config.states.multiUpdate = function(db, collName, connCache) {
+        multiUpdate(db, collName, this.session, this.tid);
+    };
+    $config.states.verifyDocuments = function(db, collName, connCache) {
+        verifyDocuments(db, collName, this.tid);
     };
 
     /**
-     * Sends a multi=true update without the shard key that targets all documents assigned to this
-     * thread, which should be sent to all shards.
-     */
-    $config.states.multiUpdate = function multiUpdate(db, collName, connCache) {
-        const collection = this.session.getDatabase(db.getName()).getCollection(collName);
-        withTxnAndAutoRetry(this.session, () => {
-            assertWhenOwnColl.commandWorked(
-                collection.update({tid: this.tid}, {$inc: {counter: 1}}, {multi: true}));
-        });
-
-        // The expected counter for every document owned by this thread should be incremented.
-        Object.keys(this.expectedCounters).forEach(id => {
-            this.expectedCounters[id] += 1;
-        });
-    };
-
-    /**
-     * Asserts all documents assigned to this thread match their expected values.
-     */
-    $config.states.verifyDocuments = function verifyDocuments(db, collName, connCache) {
-        const docs = db[collName].find({tid: this.tid}).toArray();
-        docs.forEach(doc => {
-            const expectedCounter = this.expectedCounters[doc._id];
-            assertWhenOwnColl.eq(expectedCounter, doc.counter, () => {
-                return 'unexpected counter value, doc: ' + tojson(doc);
-            });
-        });
-    };
-
-    /**
-     * Sets up the base workload, starts a session, and gives each document assigned to this thread
-     * a counter value that is tracked in-memory.
+     * Sets up the base workload, starts a session, and initializes the state necessary to update
+     * documents inside transactions.
      */
     $config.states.init = function init(db, collName, connCache) {
         $super.states.init.apply(this, arguments);
-
         this.session = db.getMongo().startSession({causalConsistency: false});
-
-        // Assign a default counter value to each document owned by this thread.
-        db[collName].find({tid: this.tid}).forEach(doc => {
-            this.expectedCounters[doc._id] = 0;
-            assert.commandWorked(db[collName].update({_id: doc._id}, {$set: {counter: 0}}));
-        });
+        initUpdateInTransactionStates(db, collName, this.tid);
     };
 
     $config.transitions = {

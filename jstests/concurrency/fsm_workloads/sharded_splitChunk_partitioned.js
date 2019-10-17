@@ -27,7 +27,7 @@ var $config = extendWorkload($config, function($config, $super) {
         var config = ChunkHelper.getPrimary(connCache.config);
 
         // Choose a random chunk in our partition to split.
-        var chunk = this.getRandomChunkInPartition(config);
+        var chunk = this.getRandomChunkInPartition(collName, config);
 
         // Save the number of documents found in this chunk's range before the splitChunk
         // operation. This will be used to verify that the same number of documents in that

@@ -15,22 +15,54 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.iterations = 1;
 
     $config.data.shardKey = {skey: 1};
-    $config.data.shardKeyField = 'skey';
+    $config.data.shardKeyField = {};
 
-    // Which skey and _id values are owned by this thread (they are equal by default), populated in
-    // init().
-    $config.data.ownedIds = [];
+    // A 'default' field needs to be specified because the 'setup' phase of the workload
+    // won't have access to each collection's current specified shard key.
+    $config.data.defaultShardKeyField = 'skey';
+
+    // Which skey and _id values are owned by this thread (they are equal by default) for each
+    // collection, populated in init().
+    $config.data.ownedIds = {};
 
     // Depending on the operations performed by each workload, it might be expected that a random
     // moveChunk may fail with an error code other than those expected by the helper.
     $config.data.isMoveChunkErrorAcceptable = (err) => false;
 
     /**
-     * Returns the _id of a random document owned by this thread.
+     * Returns the _id of a random document owned by this thread for a given collection.
      */
-    $config.data.getIdForThread = function getIdForThread() {
-        assertAlways.neq(0, this.ownedIds.size);
-        return this.ownedIds[Random.randInt(this.ownedIds.length)];
+    $config.data.getIdForThread = function getIdForThread(collName) {
+        assertAlways.neq(0, this.ownedIds[collName].size);
+
+        const randomIndex = Random.randInt(this.ownedIds[collName].length);
+        return this.ownedIds[collName][randomIndex];
+    };
+
+    /**
+     * Calculates the bounds object for a shard key given a chunk object. Assumes that any
+     * secondary shard key fields exist as a result of the refineCollectionShardKey command, and
+     * thus fills in those fields with the corresponding MinKey/MaxKey values.
+     */
+    $config.data.calculateChunkBoundsForShardKey = function calculateChunkBoundsForShardKey(
+        collName, chunk) {
+        const shardKeyField = this.shardKeyField[collName];
+        let minBound = {};
+        let maxBound = {};
+        if (Array.isArray(shardKeyField)) {
+            minBound[shardKeyField[0]] = chunk.min[shardKeyField[0]];
+            maxBound[shardKeyField[0]] = chunk.max[shardKeyField[0]];
+
+            for (let i = 1; i < shardKeyField.length; i++) {
+                minBound[shardKeyField[i]] = MinKey;
+                maxBound[shardKeyField[i]] = this.partition.isHighChunk ? MaxKey : MinKey;
+            }
+        } else {
+            minBound[shardKeyField] = chunk.min[shardKeyField];
+            maxBound[shardKeyField] = chunk.max[shardKeyField];
+        }
+
+        return [minBound, maxBound];
     };
 
     /**
@@ -39,7 +71,8 @@ var $config = extendWorkload($config, function($config, $super) {
      */
     $config.states.moveChunk = function moveChunk(db, collName, connCache) {
         // Choose a random chunk in our partition to move.
-        const chunk = this.getRandomChunkInPartition(ChunkHelper.getPrimary(connCache.config));
+        const chunk =
+            this.getRandomChunkInPartition(collName, ChunkHelper.getPrimary(connCache.config));
         const fromShard = chunk.shard;
 
         // Choose a random shard to move the chunk to.
@@ -53,10 +86,7 @@ var $config = extendWorkload($config, function($config, $super) {
 
         // Use chunk_helper.js's moveChunk wrapper to tolerate acceptable failures and to use a
         // limited number of retries with exponential backoff.
-        const bounds = [
-            {[this.shardKeyField]: chunk.min[this.shardKeyField]},
-            {[this.shardKeyField]: chunk.max[this.shardKeyField]}
-        ];
+        const bounds = this.calculateChunkBoundsForShardKey(collName, chunk);
         const waitForDelete = Random.rand() < 0.5;
         try {
             ChunkHelper.moveChunk(db, collName, bounds, toShard, waitForDelete);
@@ -73,19 +103,26 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     /**
-     * Loads this threads partition and the _ids of owned documents into memory.
+     * 1. Loads this thread's partition into memory.
+     * 2. Loads the _ids of owned documents into memory.
+     * 3. Populates the shard key for this collection into memory.
      */
     $config.states.init = function init(db, collName, connCache) {
         // Load this thread's partition.
         const ns = db[collName].getFullName();
         this.partition = this.makePartition(ns, this.tid, this.partitionSize);
 
+        // Create entry for this collection in ownedIds
+        this.ownedIds[collName] = [];
+
         // Search the collection to find the _ids of docs assigned to this thread.
         const docsOwnedByThread = db[collName].find({tid: this.tid}).toArray();
         assert.neq(0, docsOwnedByThread.size);
         docsOwnedByThread.forEach(doc => {
-            this.ownedIds.push(doc._id);
+            this.ownedIds[collName].push(doc._id);
         });
+
+        this.shardKeyField[collName] = this.defaultShardKeyField;
     };
 
     /**
@@ -115,15 +152,15 @@ var $config = extendWorkload($config, function($config, $super) {
                 }
 
                 // Give each document the same shard key and _id value, but a different tid.
-                bulk.insert({_id: i, skey: i, tid: chosenThread});
+                bulk.insert({_id: i, [this.defaultShardKeyField]: i, tid: chosenThread});
             }
             assertAlways.commandWorked(bulk.execute());
 
             // Create a chunk with boundaries matching the partition's. The low chunk's lower bound
             // is minKey, so a split is not necessary.
             if (!partition.isLowChunk) {
-                assertAlways.commandWorked(
-                    db.adminCommand({split: ns, middle: {skey: partition.lower}}));
+                assertAlways.commandWorked(db.adminCommand(
+                    {split: ns, middle: {[this.defaultShardKeyField]: partition.lower}}));
             }
         }
     };

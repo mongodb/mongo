@@ -87,8 +87,8 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.data.calculateShardKeyUpdateValues = function calculateShardKeyUpdateValues(
-        collection, shardKeyField, moveAcrossChunks) {
-        const idToUpdate = this.getIdForThread();
+        collection, collName, shardKeyField, moveAcrossChunks) {
+        const idToUpdate = this.getIdForThread(collName);
         const randomDocToUpdate = collection.findOne({_id: idToUpdate});
         assertWhenOwnColl.neq(randomDocToUpdate, null);
 
@@ -172,10 +172,11 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.data.findAndModifyShardKey = function findAndModifyShardKey(
         db, collName, {wrapInTransaction, moveAcrossChunks} = {}) {
         const collection = this.session.getDatabase(db.getName()).getCollection(collName);
-        const shardKeyField = $config.data.shardKeyField;
+        const shardKeyField = this.shardKeyField[collName];
 
         const {idToUpdate, currentShardKey, newShardKey, counterForId} =
-            this.calculateShardKeyUpdateValues(collection, shardKeyField, moveAcrossChunks);
+            this.calculateShardKeyUpdateValues(
+                collection, collName, shardKeyField, moveAcrossChunks);
 
         this.logTestIterationStart("findAndModify",
                                    wrapInTransaction,
@@ -224,10 +225,11 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.data.updateShardKey = function updateShardKey(
         db, collName, {moveAcrossChunks, wrapInTransaction} = {}) {
         const collection = this.session.getDatabase(db.getName()).getCollection(collName);
-        const shardKeyField = $config.data.shardKeyField;
+        const shardKeyField = this.shardKeyField[collName];
 
         const {idToUpdate, currentShardKey, newShardKey, counterForId} =
-            this.calculateShardKeyUpdateValues(collection, shardKeyField, moveAcrossChunks);
+            this.calculateShardKeyUpdateValues(
+                collection, collName, shardKeyField, moveAcrossChunks);
 
         this.logTestIterationStart("update",
                                    wrapInTransaction,

@@ -34,7 +34,7 @@ var $config = extendWorkload($config, function($config, $super) {
         assertAlways.gt(numShards, 1, msg);
 
         // Choose a random chunk in our partition to move.
-        var chunk = this.getRandomChunkInPartition(config);
+        var chunk = this.getRandomChunkInPartition(collName, config);
         var fromShard = chunk.shard;
 
         // Choose a random shard to move the chunk to.

@@ -192,6 +192,9 @@ selector:
   - jstests/concurrency/fsm_workloads/agg_with_chunk_migrations.js
   - jstests/concurrency/fsm_workloads/random_moveChunk_broadcast_delete_transaction.js
   - jstests/concurrency/fsm_workloads/random_moveChunk_broadcast_update_transaction.js
+  - jstests/concurrency/fsm_workloads/random_moveChunk_refine_collection_shard_key.js
+  - jstests/concurrency/fsm_workloads/random_moveChunk_refine_collection_shard_key_broadcast_delete_transaction.js
+  - jstests/concurrency/fsm_workloads/random_moveChunk_refine_collection_shard_key_broadcast_update_transaction.js
 
   # TODO SERVER-40493: JS engine interruptions on mongos return ErrorCodes::Interrupted, which isn't
   # considered a retryable or transient transaction error.

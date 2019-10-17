@@ -60,7 +60,7 @@ var $config = (function() {
 
     // Intended for use on config servers only.
     // Get a random chunk within this thread's partition.
-    data.getRandomChunkInPartition = function getRandomChunkInPartition(conn) {
+    data.getRandomChunkInPartition = function getRandomChunkInPartition(collName, conn) {
         assert(isMongodConfigsvr(conn.getDB('admin')), 'Not connected to a mongod configsvr');
         assert(this.partition,
                'This function must be called from workloads that partition data across threads.');
@@ -68,8 +68,18 @@ var $config = (function() {
         // We must split up these cases because MinKey and MaxKey are not fully comparable.
         // This may be due to SERVER-18341, where the Matcher returns false positives in
         // comparison predicates with MinKey/MaxKey.
-        const maxField = 'max.' + this.shardKeyField;
-        const minField = 'min.' + this.shardKeyField;
+        const shardKeyField = this.shardKeyField[collName] || this.shardKeyField;
+        let maxField = 'max.';
+        let minField = 'min.';
+
+        if (Array.isArray(shardKeyField)) {
+            maxField += shardKeyField[0];
+            minField += shardKeyField[0];
+        } else {
+            maxField += shardKeyField;
+            minField += shardKeyField;
+        }
+
         if (this.partition.isLowChunk && this.partition.isHighChunk) {
             return coll
                 .aggregate([
