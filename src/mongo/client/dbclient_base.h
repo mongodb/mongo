@@ -462,6 +462,16 @@ public:
      */
     std::list<BSONObj> getCollectionInfos(const std::string& db, const BSONObj& filter = BSONObj());
 
+    /**
+     * Lists databases available on the server.
+     * @param filter A filter for the results
+     * @param nameOnly Only return the names of the databases
+     * @param authorizedDatabases Only return the databases the user is authorized on
+     */
+    std::vector<BSONObj> getDatabaseInfos(const BSONObj& filter = BSONObj(),
+                                          const bool nameOnly = false,
+                                          const bool authorizedDatabases = false);
+
     bool exists(const std::string& ns);
 
     /** Create an index on the collection 'ns' as described by the given keys. If you wish

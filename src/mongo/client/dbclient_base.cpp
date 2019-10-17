@@ -588,6 +588,42 @@ list<BSONObj> DBClientBase::getCollectionInfos(const string& db, const BSONObj& 
     uasserted(18630, str::stream() << "listCollections failed: " << res);
 }
 
+vector<BSONObj> DBClientBase::getDatabaseInfos(const BSONObj& filter,
+                                               const bool nameOnly,
+                                               const bool authorizedDatabases) {
+    vector<BSONObj> infos;
+
+    BSONObjBuilder bob;
+    bob.append("listDatabases", 1);
+    bob.append("filter", filter);
+
+    if (nameOnly) {
+        bob.append("nameOnly", 1);
+    }
+    if (authorizedDatabases) {
+        bob.append("authorizedDatabases", 1);
+    }
+
+    BSONObj cmd = bob.done();
+
+    BSONObj res;
+    if (runCommand("admin", cmd, res, QueryOption_SlaveOk)) {
+        BSONObj dbs = res["databases"].Obj();
+        BSONObjIterator it(dbs);
+        while (it.more()) {
+            BSONElement e = it.next();
+            infos.push_back(e.Obj().getOwned());
+        }
+
+        return infos;
+    }
+
+    uassertStatusOKWithContext(getStatusFromCommandResult(res),
+                               str::stream()
+                                   << "Command 'listDatabases' failed. Full command: " << cmd);
+    MONGO_UNREACHABLE;
+}
+
 bool DBClientBase::exists(const string& ns) {
     BSONObj filter = BSON("name" << nsToCollectionSubstring(ns));
     list<BSONObj> results = getCollectionInfos(nsToDatabase(ns), filter);
