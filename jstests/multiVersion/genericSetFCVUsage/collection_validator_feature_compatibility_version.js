@@ -21,7 +21,13 @@ const dbpath = MongoRunner.dataPath + testName;
 // test ensures that a collection validator accepts the new query feature when the feature
 // compatibility version is the latest version, and rejects it when the feature compatibility
 // version is the last-stable version.
-const testCases = [];
+const testCases = [
+    {validator: {$expr: {$eq: [{$meta: "indexKey"}, 'foobar']}}, nonMatchingDocument: {a: 1}},
+    {validator: {$expr: {$eq: [{$meta: "sortKey"}, 'foobar']}}, nonMatchingDocument: {a: 1}},
+    {validator: {$expr: {$eq: [{$meta: "recordId"}, 'foobar']}}, nonMatchingDocument: {a: 1}},
+    {validator: {$expr: {$eq: [{$meta: "geoNearPoint"}, 'foobar']}}, nonMatchingDocument: {a: 1}},
+    {validator: {$expr: {$eq: [{$meta: "geoNearDistance"}, 'foobar']}}, nonMatchingDocument: {a: 1}}
+];
 
 let conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: "latest"});
 assert.neq(null, conn, "mongod was unable to start up");

@@ -332,6 +332,11 @@ StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::_validatePipeline(
         currentFCV != ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
         expCtx->maxFeatureCompatibilityVersion = currentFCV;
     }
+
+    // The pipeline parser needs to know that we're parsing a pipeline for a view definition
+    // to apply some additional checks.
+    expCtx->isParsingViewDefinition = true;
+
     auto pipelineStatus = Pipeline::parse(viewDef.pipeline(), std::move(expCtx));
     if (!pipelineStatus.isOK()) {
         return pipelineStatus.getStatus();

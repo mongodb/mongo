@@ -17,11 +17,27 @@ const dbpath = MongoRunner.dataPath + testName;
 // definition accepts the new aggregation feature when the feature compatibility version is the
 // latest version, and rejects it when the feature compatibility version is the last-stable
 // version.
-const pipelinesWithNewFeatures = [];
+const pipelinesWithNewFeatures = [
+    // TODO SERVER-43168: enable once indexKey and recordId $meta works correctly with pipelines.
+    // [{$project: {x: {$meta: "indexKey"}}}],
+    // [{$project: {x: {$meta: "recordId"}}}],
+    [{$project: {x: {$meta: "sortKey"}}}],
+    [
+        {$geoNear: {near: {type: "Point", coordinates: [0, 0]}, distanceField: "loc"}},
+        {$project: {m: {$meta: "geoNearPoint"}}}
+    ],
+    [
+        {$geoNear: {near: {type: "Point", coordinates: [0, 0]}, distanceField: "loc"}},
+        {$project: {m: {$meta: "geoNearDistance"}}}
+    ]
+];
 
 let conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: "latest"});
 assert.neq(null, conn, "mongod was unable to start up");
 let testDB = conn.getDB(testName);
+
+// We need a GeoSpatial index to test $geoNear queries.
+assert.commandWorked(testDB.coll.createIndex({loc: "2dsphere"}));
 
 // Explicitly set feature compatibility version to the latest version.
 assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV}));

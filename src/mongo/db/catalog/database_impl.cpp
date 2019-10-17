@@ -830,6 +830,11 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
             currentFCV != ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
             expCtx->maxFeatureCompatibilityVersion = currentFCV;
         }
+
+        // The match expression parser needs to know that we're parsing an expression for a
+        // validator to apply some additional checks.
+        expCtx->isParsingCollectionValidator = true;
+
         auto statusWithMatcher =
             MatchExpressionParser::parse(collectionOptions.validator, std::move(expCtx));
 

@@ -281,6 +281,12 @@ public:
     // "$sortKey" using the 4.2 format.
     bool use42ChangeStreamSortKeys = false;
 
+    // True if this ExpressionContext is used to parse a view definition pipeline.
+    bool isParsingViewDefinition = false;
+
+    // True if this ExpressionContext is used to parse a collection validator expression.
+    bool isParsingCollectionValidator = false;
+
 protected:
     static const int kInterruptCheckPeriod = 128;
 

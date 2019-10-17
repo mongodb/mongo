@@ -2582,6 +2582,22 @@ intrusive_ptr<Expression> ExpressionMeta::parse(
 
     const auto iter = kMetaNameToMetaType.find(expr.valueStringData());
     if (iter != kMetaNameToMetaType.end()) {
+        if ((expCtx->isParsingCollectionValidator || expCtx->isParsingViewDefinition) &&
+            expCtx->maxFeatureCompatibilityVersion &&
+            expCtx->maxFeatureCompatibilityVersion !=
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+            uassert(ErrorCodes::QueryFeatureNotAllowed,
+                    str::stream() << "$meta type " << iter->second << " can only be used in "
+                                  << (expCtx->isParsingViewDefinition ? "view definition"
+                                                                      : "collection validator")
+                                  << " when feature compatibility version is 4.4",
+                    iter->second != DocumentMetadataFields::kIndexKey &&
+                        iter->second != DocumentMetadataFields::kSortKey &&
+                        iter->second != DocumentMetadataFields::kRecordId &&
+                        iter->second != DocumentMetadataFields::kGeoNearPoint &&
+                        iter->second != DocumentMetadataFields::kGeoNearDist);
+        }
+
         return new ExpressionMeta(expCtx, iter->second);
     } else {
         uasserted(17308, "Unsupported argument to $meta: " + expr.String());

@@ -330,6 +330,10 @@ StatusWithMatchExpression CollectionImpl::parseValidator(
     // Enforce a maximum feature version if requested.
     expCtx->maxFeatureCompatibilityVersion = maxFeatureCompatibilityVersion;
 
+    // The match expression parser needs to know that we're parsing an expression for a
+    // validator to apply some additional checks.
+    expCtx->isParsingCollectionValidator = true;
+
     auto statusWithMatcher =
         MatchExpressionParser::parse(validator, expCtx, ExtensionsCallbackNoop(), allowedFeatures);
     if (!statusWithMatcher.isOK())
