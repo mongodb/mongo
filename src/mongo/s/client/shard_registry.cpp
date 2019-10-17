@@ -294,13 +294,13 @@ bool ShardRegistry::reload(OperationContext* opCtx) {
         // There is also an issue if multiple threads are allowed to call getAllShards()
         // simultaneously because there is no good way to determine which of the threads has the
         // more recent version of the data.
-        do {
-            auto waitStatus = opCtx->waitForConditionOrInterruptNoAssert(_inReloadCV, reloadLock);
-            if (!waitStatus.isOK()) {
-                LOG(1) << "ShardRegistry reload is interrupted due to: " << redact(waitStatus);
-                return false;
-            }
-        } while (_reloadState == ReloadState::Reloading);
+        try {
+            opCtx->waitForConditionOrInterrupt(
+                _inReloadCV, reloadLock, [&] { return _reloadState != ReloadState::Reloading; });
+        } catch (const DBException& e) {
+            LOG(1) << "ShardRegistry reload is interrupted due to: " << redact(e.toStatus());
+            return false;
+        }
 
         if (_reloadState == ReloadState::Idle) {
             return false;

@@ -151,21 +151,22 @@ void WatchdogPeriodicThread::doLoop() {
             // Check if the period is different?
             // We are signalled on period changes at which point we may be done waiting or need to
             // wait longer.
-            while (startTime + _period > preciseClockSource->now() &&
-                   _state != State::kShutdownRequested) {
-                auto s = opCtx->waitForConditionOrInterruptNoAssertUntil(
-                    _condvar, lock, startTime + _period);
-
-                if (!s.isOK()) {
-                    // The only bad status is when we are in shutdown
-                    if (!opCtx->getServiceContext()->getKillAllOperations()) {
-                        severe() << "Watchdog was interrupted, shutting down, reason: "
-                                 << s.getStatus();
-                        exitCleanly(ExitCode::EXIT_ABRUPT);
-                    }
-
-                    return;
+            try {
+                opCtx->waitForConditionOrInterruptUntil(_condvar, lock, startTime + _period, [&] {
+                    return (startTime + _period) <= preciseClockSource->now() ||
+                        _state == State::kShutdownRequested;
+                });
+            } catch (const DBException& e) {
+                // The only bad status is when we are in shutdown
+                if (!opCtx->getServiceContext()->getKillAllOperations()) {
+                    severe() << "Watchdog was interrupted, shutting down, reason: " << e.toStatus();
+                    exitCleanly(ExitCode::EXIT_ABRUPT);
                 }
+
+                // This interruption ends the WatchdogPeriodicThread. This means it is possible to
+                // killOp this operation and stop it for the lifetime of the process.
+                LOG(1) << "WatchdogPeriodicThread interrupted by: " << e;
+                return;
             }
 
             // Are we done running?

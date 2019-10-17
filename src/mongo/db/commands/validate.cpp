@@ -150,9 +150,9 @@ public:
         {
             stdx::unique_lock<Latch> lock(_validationMutex);
             try {
-                while (_validationsInProgress.find(nss.ns()) != _validationsInProgress.end()) {
-                    opCtx->waitForConditionOrInterrupt(_validationNotifier, lock);
-                }
+                opCtx->waitForConditionOrInterrupt(_validationNotifier, lock, [&] {
+                    return _validationsInProgress.find(nss.ns()) == _validationsInProgress.end();
+                });
             } catch (AssertionException& e) {
                 CommandHelpers::appendCommandStatusNoThrow(
                     result,

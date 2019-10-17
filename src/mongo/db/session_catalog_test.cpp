@@ -603,8 +603,10 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ConcurrentCheckOutAndKill) {
             auto m = MONGO_MAKE_LATCH();
             stdx::condition_variable cond;
             stdx::unique_lock<Latch> lock(m);
-            ASSERT_EQ(ErrorCodes::InternalError,
-                      _opCtx->waitForConditionOrInterruptNoAssert(cond, lock));
+            ASSERT_THROWS_CODE(
+                _opCtx->waitForConditionOrInterrupt(cond, lock, [] { return false; }),
+                DBException,
+                ErrorCodes::InternalError);
         }
     }
     normalCheckOutFinish.get();

@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/wait_for_majority_service.h"
@@ -38,6 +40,7 @@
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -177,8 +180,11 @@ void WaitForMajorityService::_periodicallyWaitForMajority(ServiceContext* servic
             _queuedOpTimes.erase(lowestOpTimeIter);
         }
 
-        if (_queuedOpTimes.empty() && !_inShutDown) {
-            _opCtx->waitForConditionOrInterruptNoAssert(_hasNewOpTimeCV, lk).ignore();
+        try {
+            _opCtx->waitForConditionOrInterrupt(
+                _hasNewOpTimeCV, lk, [&] { return !_queuedOpTimes.empty() || _inShutDown; });
+        } catch (const DBException& e) {
+            LOG(1) << "Unable to wait for new op time due to: " << e;
         }
 
         _opCtx = nullptr;

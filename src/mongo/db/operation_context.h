@@ -352,9 +352,6 @@ public:
      */
     Microseconds getRemainingMaxTimeMicros() const;
 
-    StatusWith<stdx::cv_status> waitForConditionOrInterruptNoAssertUntil(
-        stdx::condition_variable& cv, BasicLockableAdapter m, Date_t deadline) noexcept override;
-
     bool isIgnoringInterrupts() const;
 
     /**
@@ -383,6 +380,9 @@ public:
     }
 
 private:
+    StatusWith<stdx::cv_status> waitForConditionOrInterruptNoAssertUntil(
+        stdx::condition_variable& cv, BasicLockableAdapter m, Date_t deadline) noexcept override;
+
     IgnoreInterruptsState pushIgnoreInterrupts() override {
         IgnoreInterruptsState iis{_ignoreInterrupts,
                                   {_deadline, _timeoutError, _hasArtificialDeadline}};

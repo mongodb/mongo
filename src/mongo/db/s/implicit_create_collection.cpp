@@ -72,16 +72,14 @@ public:
     Status onCannotImplicitlyCreateCollection(OperationContext* opCtx) noexcept {
         invariant(!opCtx->lockState()->isLocked());
 
-        {
+        try {
             stdx::unique_lock<Latch> lg(_mutex);
-            while (_isInProgress) {
-                auto status = opCtx->waitForConditionOrInterruptNoAssert(_cvIsInProgress, lg);
-                if (!status.isOK()) {
-                    return status;
-                }
-            }
+
+            opCtx->waitForConditionOrInterrupt(_cvIsInProgress, lg, [&] { return !_isInProgress; });
 
             _isInProgress = true;
+        } catch (const DBException& e) {
+            return e.toStatus();
         }
 
         ON_BLOCK_EXIT([&] {
