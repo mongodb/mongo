@@ -383,11 +383,19 @@ if (typeof _threadInject != "undefined") {
         for (var i in params) {
             var param = params[i];
             var test = param.shift();
+
+            // Make a shallow copy of TestData so we can override the test name to
+            // prevent tests on different threads that to use jsTestName() as the
+            // collection name from colliding.
+            const clonedTestData = Object.assign({}, TestData);
+            clonedTestData.testName = `ParallelTesterThread${i}`;
+
             var t;
             if (newScopes)
-                t = new ScopedThread(wrapper, test, param, {TestData: TestData});
+                t = new ScopedThread(wrapper, test, param, {TestData: clonedTestData});
             else
-                t = new Thread(wrapper, test, param, {TestData: TestData});
+                t = new Thread(wrapper, test, param, {TestData: clonedTestData});
+
             runners.push(t);
         }
 
