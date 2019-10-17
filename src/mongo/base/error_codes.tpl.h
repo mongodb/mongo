@@ -151,7 +151,7 @@ template <int32_t code>
 constexpr bool isNamedCode = false;
 //#for $ec in $codes
 template <>
-constexpr bool isNamedCode<ErrorCodes::$ec.name> = true;
+constexpr inline bool isNamedCode<ErrorCodes::$ec.name> = true;
 //#end for
 
 MONGO_COMPILER_NORETURN void throwExceptionForStatus(const Status& status);
