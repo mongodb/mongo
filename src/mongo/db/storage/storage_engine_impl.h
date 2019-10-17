@@ -97,9 +97,10 @@ public:
 
     virtual void endBackup(OperationContext* opCtx);
 
-    virtual StatusWith<std::vector<std::string>> beginNonBlockingBackup(OperationContext* opCtx);
+    virtual StatusWith<std::vector<BackupBlock>> beginNonBlockingBackup(
+        OperationContext* opCtx) override;
 
-    virtual void endNonBlockingBackup(OperationContext* opCtx);
+    virtual void endNonBlockingBackup(OperationContext* opCtx) override;
 
     virtual StatusWith<std::vector<std::string>> extendBackupCursor(OperationContext* opCtx);
 

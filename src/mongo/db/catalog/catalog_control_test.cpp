@@ -69,6 +69,21 @@ public:
     int flushAllFiles(OperationContext* opCtx, bool sync) final {
         return 0;
     }
+    Status beginBackup(OperationContext* opCtx) final {
+        return Status(ErrorCodes::CommandNotSupported,
+                      "The current storage engine doesn't support backup mode");
+    }
+    void endBackup(OperationContext* opCtx) final {}
+    StatusWith<std::vector<StorageEngine::BackupBlock>> beginNonBlockingBackup(
+        OperationContext* opCtx) final {
+        return Status(ErrorCodes::CommandNotSupported,
+                      "The current storage engine does not support a concurrent mode.");
+    }
+    void endNonBlockingBackup(OperationContext* opCtx) final {}
+    StatusWith<std::vector<std::string>> extendBackupCursor(OperationContext* opCtx) final {
+        return Status(ErrorCodes::CommandNotSupported,
+                      "The current storage engine does not support a concurrent mode.");
+    }
     Status repairRecordStore(OperationContext* opCtx, const NamespaceString& ns) final {
         return Status::OK();
     }
