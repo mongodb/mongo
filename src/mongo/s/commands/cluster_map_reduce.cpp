@@ -671,10 +671,7 @@ bool runMapReduce(OperationContext* opCtx,
                 outputRoutingInfo.cm());
     }
 
-    if (!ok) {
-        errmsg = str::stream() << "MR post processing failed: " << singleResult.toString();
-        return false;
-    }
+    uassert(31311, str::stream() << "MR post processing failed: " << singleResult.toString(), ok);
 
     // copy some elements from a single result
     // annoying that we have to copy all results for inline, but no way around it

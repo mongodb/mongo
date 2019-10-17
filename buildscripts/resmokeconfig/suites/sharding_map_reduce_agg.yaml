@@ -9,6 +9,7 @@ selector:
   - jstests/sharding/authmr.js
   - jstests/sharding/causal_consistency_shell_support.js
   - jstests/sharding/localhostAuthBypass.js
+  - jstests/sharding/map_reduce_invalid_output_collection.js
   - jstests/sharding/map_reduce_invalid_result_set.js
   - jstests/sharding/max_time_ms_sharded.js
   - jstests/sharding/mr_and_agg_versioning.js

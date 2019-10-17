@@ -316,9 +316,20 @@ std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
     if (outType == OutputType::Merge || outType == OutputType::Reduce) {
         uassert(ErrorCodes::InvalidOptions,
                 "Source collection cannot be the same as destination collection in MapReduce when "
-                "using merge or "
-                "reduce actions",
+                "using merge or reduce actions",
                 inNss != outNss);
+    }
+
+    // If non-inline output, verify that the target collection is *not* sharded by anything other
+    // than _id.
+    if (outType != OutputType::InMemory) {
+        auto [shardKey, targetCollectionVersion] =
+            expCtx->mongoProcessInterface->ensureFieldsUniqueOrResolveDocumentKey(
+                expCtx, boost::none, boost::none, outNss);
+        uassert(31313,
+                "The mapReduce target collection must either be unsharded or sharded by {_id: 1} "
+                "or {_id: 'hashed'}",
+                shardKey == std::set<FieldPath>{FieldPath("_id"s)});
     }
 
     // TODO: It would be good to figure out what kind of errors this would produce in the Status.

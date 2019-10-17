@@ -31,6 +31,7 @@ selector:
   - jstests/sharding/explain_exec_stats_on_shards.js
   - jstests/sharding/extract_shard_key_values.js
   - jstests/sharding/features1.js
+  - jstests/sharding/map_reduce_invalid_output_collection.js
   - jstests/sharding/mongos_query_comment.js
   - jstests/sharding/prefix_shard_key.js
   - jstests/sharding/refine_collection_shard_key_basic.js
