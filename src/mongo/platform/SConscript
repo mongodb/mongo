@@ -13,6 +13,7 @@ env.CppUnitTest(
         'mutex_test.cpp',
         'process_id_test.cpp',
         'random_test.cpp',
+        'source_location_test.cpp',
         'stack_locator_test.cpp',
         'decimal128_test.cpp',
         'decimal128_bson_test.cpp',
