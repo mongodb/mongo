@@ -159,6 +159,103 @@ TEST_F(CreateDatabaseTest, createDatabaseSuccess) {
     future.default_timed_get();
 }
 
+TEST_F(CreateDatabaseTest,
+       createDatabaseShardReturnsNamespaceNotFoundForFlushDatabaseCacheUpdates) {
+    const std::string dbname = "db1";
+
+    ShardType s0;
+    s0.setName("shard0000");
+    s0.setHost("ShardHost0:27017");
+    setupShards(vector<ShardType>{s0});
+
+    ShardType s1;
+    s1.setName("shard0001");
+    s1.setHost("ShardHost1:27017");
+    setupShards(vector<ShardType>{s1});
+
+    ShardType s2;
+    s2.setName("shard0002");
+    s2.setHost("ShardHost2:27017");
+    setupShards(vector<ShardType>{s2});
+
+    // Prime the shard registry with information about the existing shards
+    shardRegistry()->reload(operationContext());
+
+    // Set up all the target mocks return values.
+    RemoteCommandTargeterMock::get(
+        uassertStatusOK(shardRegistry()->getShard(operationContext(), s0.getName()))->getTargeter())
+        ->setFindHostReturnValue(HostAndPort(s0.getHost()));
+    RemoteCommandTargeterMock::get(
+        uassertStatusOK(shardRegistry()->getShard(operationContext(), s1.getName()))->getTargeter())
+        ->setFindHostReturnValue(HostAndPort(s1.getHost()));
+    RemoteCommandTargeterMock::get(
+        uassertStatusOK(shardRegistry()->getShard(operationContext(), s2.getName()))->getTargeter())
+        ->setFindHostReturnValue(HostAndPort(s2.getHost()));
+
+    // Now actually start the createDatabase work.
+
+    auto future = launchAsync([this, dbname] {
+        ThreadClient tc("Test", getGlobalServiceContext());
+        auto opCtx = cc().makeOperationContext();
+        ShardingCatalogManager::get(opCtx.get())->createDatabase(opCtx.get(), dbname);
+    });
+
+    // Return size information about first shard
+    onCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS(s0.getHost(), request.target.toString());
+        ASSERT_EQUALS("admin", request.dbname);
+        std::string cmdName = request.cmdObj.firstElement().fieldName();
+        ASSERT_EQUALS("listDatabases", cmdName);
+        ASSERT_FALSE(request.cmdObj.hasField(repl::ReadConcernArgs::kReadConcernFieldName));
+
+        ASSERT_BSONOBJ_EQ(
+            ReadPreferenceSetting(ReadPreference::PrimaryPreferred).toContainingBSON(),
+            rpc::TrackingMetadata::removeTrackingData(request.metadata));
+
+        return BSON("ok" << 1 << "totalSize" << 10);
+    });
+
+    // Return size information about second shard
+    onCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS(s1.getHost(), request.target.toString());
+        ASSERT_EQUALS("admin", request.dbname);
+        std::string cmdName = request.cmdObj.firstElement().fieldName();
+        ASSERT_EQUALS("listDatabases", cmdName);
+        ASSERT_FALSE(request.cmdObj.hasField(repl::ReadConcernArgs::kReadConcernFieldName));
+
+        ASSERT_BSONOBJ_EQ(
+            ReadPreferenceSetting(ReadPreference::PrimaryPreferred).toContainingBSON(),
+            rpc::TrackingMetadata::removeTrackingData(request.metadata));
+
+        return BSON("ok" << 1 << "totalSize" << 1);
+    });
+
+    // Return size information about third shard
+    onCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS(s2.getHost(), request.target.toString());
+        ASSERT_EQUALS("admin", request.dbname);
+        std::string cmdName = request.cmdObj.firstElement().fieldName();
+        ASSERT_EQUALS("listDatabases", cmdName);
+
+        ASSERT_BSONOBJ_EQ(
+            ReadPreferenceSetting(ReadPreference::PrimaryPreferred).toContainingBSON(),
+            rpc::TrackingMetadata::removeTrackingData(request.metadata));
+
+        return BSON("ok" << 1 << "totalSize" << 100);
+    });
+
+    // Return NamespaceNotFound for _flushDatabaseCacheUpdates
+    onCommand([&](const RemoteCommandRequest& request) {
+        std::string cmdName = request.cmdObj.firstElement().fieldName();
+        ASSERT_EQUALS("_flushDatabaseCacheUpdates", cmdName);
+
+        return BSON("ok" << 0 << "code" << ErrorCodes::NamespaceNotFound << "errmsg"
+                         << "dummy");
+    });
+
+    future.default_timed_get();
+}
+
 TEST_F(CreateDatabaseTest, createDatabaseDBExists) {
     const std::string dbname = "db3";
 
