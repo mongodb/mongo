@@ -252,6 +252,9 @@ functions:
           dsi_analysis_atlas_pw: "${dsi_analysis_atlas_pw}"
           EOF
           chmod 400 runtime_secret.yml
+    - command: expansions.write
+      params:
+        file: work/expansions.yml
     - command: shell.exec
       params:
         working_dir: work
