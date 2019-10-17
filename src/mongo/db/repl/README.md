@@ -599,45 +599,83 @@ Once the node begins to step down, it first sets its state to `follower` in the
 
 # Rollback
 
-Rollback is the process whereby a node that diverges from its sync source undoes the divergent
-operations and gets back to a consistent point.
+Rollback is the process whereby a node that diverges from its sync source gets back to a consistent
+point in time on the sync source's branch of history. We currently support two rollback algorithms,
+Recover To A Timestamp (RTT) and Rollback via Refetch. This section will cover the RTT method.
 
-This can occur if there is a partition in the network for some time and a node runs for election
-because it doesn't hear from the primary. There will be some time with 2 primaries and in this time
-both can take writes. When the partition is healed, the smaller half of the partition may have to
-roll back its changes and roll forward to match the other one.
+Situations that require rollback can occur due to network partitions. Consider a scenario where a
+secondary can no longer hear from the primary and subsequently runs for an election. We now have
+two primaries that can both accept writes, creating two different branches of history (one of the
+primaries will detect this situation soon and step down). If the smaller half, meaning less than a
+majority of the set, accepts writes during this time, those writes will be uncommitted. A node with
+uncommitted writes will roll back its changes and roll forward to match its sync source. Note that a
+rollback is not necessary if there are no uncommitted writes.
 
-Nodes go into rollback if after they receive the first batch of writes from their sync source, they
-realize that the greater than or equal to predicate did not return the last op in their oplog. When
-rolling back, nodes are in the `ROLLBACK` state and reads are prohibited. When a node goes into
-rollback it drops all snapshots.
+As of 4.0, Replication supports the [`Recover To A Timestamp`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/rollback_impl.h#L158)
+algorithm (RTT), in which a node recovers to a consistent point in time and applies operations until
+it catches up to the sync source's branch of history. RTT uses the WiredTiger storage engine to
+recover to a stable timestamp, which is the highest timestamp at which the storage engine can take
+a checkpoint. This can be considered a consistent, majority committed point in time for replication
+and storage.
 
-The rolling-back node first finds the common point between its oplog and its sync source's oplog. It
-then goes through all of the operations in its oplog back to the common point and figures out how to
-undo them.
+A node goes into rollback when its last fetched OpTime is greater than its sync source's last
+applied OpTime, but it is in a lower term. In this case, the `OplogFetcher` will return an empty
+batch and fail with an `OplogStartMissing` error.
 
-Simply doing the "inverse" operation is sometimes impossible, such as a document remove where we do
-not log the entire document that is removed. Instead, the node simply refetches the problematic
-documents, or entire collections in the case of undoing a `drop`, from the sync source and replaces
-the local version with that version. Some operations also have special handling, and some just fail,
-such as `dropDatabase`, causing the entire node to shut down.
+During [rollback](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/rollback_impl.cpp#L176),
+nodes first transition to the `ROLLBACK` state and kill all user operations to ensure that we can
+successfully acquire the RSTL. (TODO SERVER-43789: link to RSTL section) Reads are prohibited while
+we are in the `ROLLBACK` state.
 
-The node first compiles a list of documents, collections, and indexes to fetch and drop. Before
-actually doing the undo steps, the node "fixes up" the operations by "cancelling out" operations
-that negate each other to reduce work. The node then drops and fetches all data it needs and
-replaces the local version with the remote versions.
+We then wait for background index builds to complete before finding the `common point` between the
+rolling back node and the sync source node. The `common point` is the OpTime after which the nodes'
+oplogs start to differ. During this step, we keep track of the operations that are rolled back up
+until the `common point` and update necessary data structures. This includes metadata that we may
+write out to rollback files and and use to roll back collection fast-counts. Then, we increment
+the Rollback ID (RBID), a monotonically increasing number that is incremented every time a rollback
+occurs. We can use the RBID to check if a rollback has occurred on our sync source since the
+baseline RBID was set.
 
-The node gets the last applied OpTime from the sync source and the Rollback ID to check if a
-rollback has happened during this rollback, in which case it fails rollback and shuts down. The last
-applied OpTime is set as the `minValid` for the node and the node goes into RECOVERING state. The
-node resumes fetching and applying operations like a normal secondary until it hits that `minValid`.
-Only at that point does the node go into SECONDARY state.
+Now, we enter the data modification section of the rollback algorithm, which begins with
+aborting prepared transactions and ends with reconstructing them at the end. If we fail at any point
+during this phase, we must terminate the rollback attempt because we cannot safely recover.
 
-This process is very similar to initial sync and startup after an unclean shutdown in that
-operations are applied on data that may already reflect those operations and operations in the
-future. This leads to all of the same idempotency concerns and index constraint relaxation.
+Before we actually recover to the `stableTimestamp`, we must abort the storage transaction of any
+prepared transaction. In doing so, we release any resources held by those transactions and
+invalidate any in-memory state we recorded.
 
-This code is about to change radically in version 3.6.
+If `createRollbackDataFiles` was set to `true` (the default), we begin writing rollback files for
+our rolled back documents. It is important that we do this after we abort any prepared transactions
+in order to avoid unnecessary prepare conflicts when trying to read documents that were modified by
+those transactions, which must be aborted for rollback anyway. Finally, if we have rolled back any
+operations, we invalidate all sessions on this server.
+
+Now, we are ready to tell the storage engine to recover to the last stable timestamp. Upon success,
+the storage engine restores the data reflected in the database to the data reflected at the last
+stable timestamp. This does not, however, revert the oplog. In order to revert the oplog, rollback
+must remove all oplog entries after the `common point`. This is called the truncate point and is
+written into the `oplogTruncateAfterPoint` document. Now, the recovery process knows where to
+truncate the oplog on the rollback node.
+
+During the last few steps of the data modification section, we clear the state of the
+`DropPendingCollectionReaper`, which manages collections that are marked as drop-pending by the Two
+Phase Drop algorithm, and make sure it aligns with what is currently on disk. After doing so, we can
+run through the oplog recovery process, which truncates the oplog after the `common point` (at the
+truncate point) and applies all oplog entries through the end of the sync source's oplog.
+
+The last thing we do before exiting the data modification section is reconstruct prepared
+transactions. (TODO SERVER-43783: add link to prepared transactions recovery process). We must also
+restore their in-memory state to what it was prior to the rollback in order to fulfill the
+durability guarantees of prepared transactions.
+
+At this point, the last applied and durable OpTimes still point to the divergent branch of history,
+so we must update them to be at the top of the oplog, which should be the `common point`.
+
+Now, we can trigger the rollback `OpObserver` and notify any external subsystems that a rollback has
+occurred. For example, the config server must update its shard registry in order to make sure it
+does not have data that has just been rolled back. Finally, we log a summary of the rollback process
+and transition to the `SECONDARY` state. This transition must succeed if we ever entered the
+`ROLLBACK` state in the first place. Otherwise, we shut down.
 
 # Initial Sync
 
