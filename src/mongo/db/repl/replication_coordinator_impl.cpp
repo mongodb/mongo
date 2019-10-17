@@ -3690,8 +3690,9 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
                     _updateCommittedSnapshot(lk, newCommittedSnapshot);
                 }
                 // Set the stable timestamp regardless of whether the majority commit point moved
-                // forward.
-                if (!MONGO_FAIL_POINT(disableSnapshotting)) {
+                // forward. If we are in rollback state, however, do not alter the stable timestamp,
+                // since it may be moved backwards explicitly by the rollback-via-refetch process.
+                if (!MONGO_FAIL_POINT(disableSnapshotting) && !_memberState.rollback()) {
                     _storage->setStableTimestamp(getServiceContext(),
                                                  stableOpTime->opTime.getTimestamp());
                 }

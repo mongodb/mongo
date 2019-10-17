@@ -4116,6 +4116,64 @@ TEST_F(StableOpTimeTest, AdvanceCommitPointSetsStableOpTimeForStorage) {
     ASSERT_OPTIME_SET_EQ(expectedOpTimeCandidates, opTimeCandidates);
 }
 
+TEST_F(StableOpTimeTest,
+       AdvanceCommitPointDoesNotSetStableOpTimeForStorageInRollbackMajorityReadConcernOff) {
+
+    const auto originalEnableMajorityReadConcern = serverGlobalParams.enableMajorityReadConcern;
+    serverGlobalParams.enableMajorityReadConcern = false;
+    ON_BLOCK_EXIT(
+        [&] { serverGlobalParams.enableMajorityReadConcern = originalEnableMajorityReadConcern; });
+
+    init("mySet/test1:1234,test2:1234,test3:1234");
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "protocolVersion" << 1 << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "test1:1234")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "test2:1234")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "test3:1234"))),
+                       HostAndPort("test2", 1234));
+
+    getStorageInterface()->supportsDocLockingBool = true;
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    // Initially the stable timestamp and commit point are unset.
+    ASSERT_EQUALS(Timestamp::min(), getStorageInterface()->getStableTimestamp());
+    ASSERT_EQUALS(OpTime(), getReplCoord()->getLastCommittedOpTime());
+
+    // Advance the stable timestamp a bit. In this test we simulate a case where timestamp (1,3) is
+    // getting rolled back and timestamp (1,2) is the rollback common point. Note that when
+    // EMRC=false, the stable timestamp is always advanced to the newest all-committed/all-durable
+    // timestamp i.e. it is not required to be behind the majority commit point.
+    getStorageInterface()->allDurableTimestamp = Timestamp(1, 3);
+    replCoordSetMyLastAppliedOpTime(OpTime({1, 1}, 1), Date_t() + Seconds(1));
+    replCoordSetMyLastAppliedOpTime(OpTime({1, 2}, 1), Date_t() + Seconds(2));
+    replCoordSetMyLastAppliedOpTime(OpTime({1, 3}, 1), Date_t() + Seconds(3));
+    ASSERT_EQUALS(Timestamp(1, 3), getStorageInterface()->getStableTimestamp());
+
+    // We must take the RSTL in mode X before transitioning to RS_ROLLBACK.
+    const auto opCtx = makeOperationContext();
+    ReplicationStateTransitionLockGuard transitionGuard(opCtx.get(), MODE_X);
+    ASSERT_OK(getReplCoord()->setFollowerModeStrict(opCtx.get(), MemberState::RS_ROLLBACK));
+
+    // It is possible that rollback-via-refetch forces the stable timestamp backwards to the common
+    // point at the end of rollback.
+    getStorageInterface()->setStableTimestamp(getServiceContext(), Timestamp(1, 2));
+
+    // Normally, when not in ROLLBACK state, we will update the stable timestamp whenever we hear
+    // about a new commit point. We want to verify that in ROLLBACK state, however, the stable
+    // timestamp is not altered when learning of a new commit point. The particular value of the
+    // commit point isn't important, since it doesn't affect the calculation of the stable timestamp
+    // when EMRC=false. We just want it to be newer than our currently known commit point.
+    OpTimeAndWallTime commitPoint = makeOpTimeAndWallTime(OpTime({1, 1}, 1), Date_t() + Seconds(1));
+    replCoordAdvanceCommitPoint(commitPoint, false);
+
+    // Make sure the stable timestamp did not move.
+    ASSERT_EQUALS(Timestamp(1, 2), getStorageInterface()->getStableTimestamp());
+}
+
 TEST_F(StableOpTimeTest, ClearOpTimeCandidatesPastCommonPointAfterRollback) {
 
     assertStartSuccess(BSON("_id"
