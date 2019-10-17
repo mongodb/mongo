@@ -15,3 +15,9 @@ executor:
       sslCAFile: jstests/libs/ca.pem
       sslPEMKeyFile: jstests/libs/client.pem
       readMode: commands
+      global_vars:
+        TestData:
+          setParameters:
+            logComponentVerbosity: "{network:2}"
+          setParametersMongos:
+            logComponentVerbosity: "{network:2}"
