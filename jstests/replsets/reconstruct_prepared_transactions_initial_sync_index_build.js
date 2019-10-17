@@ -3,7 +3,12 @@
  * of initial sync.  Additionally, we will test that a background index build blocks this particular
  * situation until the index build is finished.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * TODO(SERVER-44042): Remove two_phase_index_builds_unsupported tag.
+ * @tags: [
+ *     uses_transactions,
+ *     uses_prepare_transaction,
+ *     two_phase_index_builds_unsupported,
+ * ]
  */
 
 (function() {

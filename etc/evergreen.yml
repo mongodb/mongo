@@ -11010,6 +11010,9 @@ buildvariants:
   - name: .jscore .common
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
+  - name: replica_sets
+    distros:
+    - rhel62-large
   - name: sharding_gen
 
 - name: enterprise-rhel-62-64-bit-coverage

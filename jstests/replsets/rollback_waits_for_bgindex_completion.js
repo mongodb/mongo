@@ -2,7 +2,13 @@
  * Test to ensure that rollback waits for in-progress background index builds to finish before
  * starting the rollback process. Only applies to Recoverable Rollback via WiredTiger checkpoints.
  *
- * @tags: [requires_wiredtiger, requires_journaling, requires_majority_read_concern]
+ * TODO(SERVER-39451): Remove two_phase_index_builds_unsupported tag.
+ * @tags: [
+ *     requires_wiredtiger,
+ *     requires_journaling,
+ *     requires_majority_read_concern,
+ *     two_phase_index_builds_unsupported,
+ * ]
  */
 (function() {
 'use strict';

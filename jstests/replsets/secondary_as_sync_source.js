@@ -2,7 +2,12 @@
  * Tests that a new replica set member performing an initial sync from a secondary node as the sync
  * source, which has an in-progress index build will also build the index as part of the initial
  * sync operation.
- * @tags: [requires_replication]
+ *
+ * TODO(SERVER-44043): Remove two_phase_index_builds_unsupported tag.
+ * @tags: [
+ *     requires_replication,
+ *     two_phase_index_builds_unsupported,
+ * ]
  */
 (function() {
 'use strict';

@@ -5,7 +5,12 @@
  * writes if the prepared transaction commits after a hybrid index build commits.  The long term
  * solution to this problem is to synchronize index build commits.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * TODO(SERVER-44041): Remove two_phase_index_builds_unsupported tag.
+ * @tags: [
+ *     uses_transactions,
+ *     uses_prepare_transaction,
+ *     two_phase_index_builds_unsupported,
+ * ]
  */
 (function() {
 "use strict";
