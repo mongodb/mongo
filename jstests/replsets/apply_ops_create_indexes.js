@@ -32,6 +32,28 @@ let ensureOplogEntryExists = function(localDB, indexName) {
     let errMsg = "expected more data from command " + tojson(cmd) + ", with result " + tojson(res);
     assert(cursor.hasNext(), errMsg);
     let oplog = localDB.getCollection("oplog.rs");
+
+    // If two phase index builds are enabled, index creation will show up in the oplog as a pair of
+    // startIndexBuild and commitIndexBuild oplog entries rather than a single createIndexes entry.
+    const enableTwoPhaseIndexBuild =
+        assert.commandWorked(localDB.adminCommand({getParameter: 1, enableTwoPhaseIndexBuild: 1}))
+            .enableTwoPhaseIndexBuild;
+    if (enableTwoPhaseIndexBuild) {
+        let query = {
+            $and: [{"o.startIndexBuild": {$exists: true}}, {"o.indexes.0.name": indexName}]
+        };
+        let resCursor = oplog.find(query);
+        assert.eq(resCursor.count(),
+                  1,
+                  "Expected the query " + tojson(query) + " to return exactly 1 document");
+        query = {$and: [{"o.commitIndexBuild": {$exists: true}}, {"o.indexes.0.name": indexName}]};
+        resCursor = oplog.find(query);
+        assert.eq(resCursor.count(),
+                  1,
+                  "Expected the query " + tojson(query) + " to return exactly 1 document");
+        return;
+    }
+
     let query = {$and: [{"o.createIndexes": {$exists: true}}, {"o.name": indexName}]};
     let resCursor = oplog.find(query);
     assert.eq(resCursor.count(),
