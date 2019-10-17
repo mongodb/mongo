@@ -477,6 +477,10 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
         }
     }
 
+    if (!client->session()) {
+        return false;
+    }
+
     for (auto&& failCommand : data.getObjectField("failCommands")) {
         if (failCommand.type() == String && failCommand.valueStringData() == cmdName) {
             return true;
