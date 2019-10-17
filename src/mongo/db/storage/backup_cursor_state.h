@@ -34,13 +34,14 @@
 #include <vector>
 
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/storage/storage_engine.h"
 
 namespace mongo {
 
 struct BackupCursorState {
     UUID backupId;
     boost::optional<Document> preamble;
-    std::vector<std::string> filenames;
+    std::vector<StorageEngine::BackupBlock> blocksToCopy;
 };
 
 struct BackupCursorExtendState {

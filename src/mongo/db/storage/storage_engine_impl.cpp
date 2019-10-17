@@ -667,7 +667,7 @@ void StorageEngineImpl::endBackup(OperationContext* opCtx) {
     _inBackupMode = false;
 }
 
-StatusWith<std::vector<std::string>> StorageEngineImpl::beginNonBlockingBackup(
+StatusWith<std::vector<StorageEngine::BackupBlock>> StorageEngineImpl::beginNonBlockingBackup(
     OperationContext* opCtx) {
     return _engine->beginNonBlockingBackup(opCtx);
 }

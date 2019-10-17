@@ -86,7 +86,8 @@ public:
                       "The current storage engine doesn't support backup mode");
     }
     void endBackup(OperationContext* opCtx) final {}
-    StatusWith<std::vector<std::string>> beginNonBlockingBackup(OperationContext* opCtx) final {
+    StatusWith<std::vector<StorageEngine::BackupBlock>> beginNonBlockingBackup(
+        OperationContext* opCtx) final {
         return Status(ErrorCodes::CommandNotSupported,
                       "The current storage engine does not support a concurrent mode.");
     }

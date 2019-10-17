@@ -39,6 +39,7 @@
 #define NVALGRIND
 #endif
 
+#include <fmt/format.h>
 #include <memory>
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
@@ -538,11 +539,10 @@ Status OpenReadTransactionParam::setFromString(const std::string& str) {
 
 namespace {
 
-StatusWith<std::vector<std::string>> getDataFilesFromBackupCursor(WT_CURSOR* cursor,
-                                                                  std::string dbPath,
-                                                                  const char* statusPrefix) {
+StatusWith<std::vector<StorageEngine::BackupBlock>> getDataBlocksFromBackupCursor(
+    WT_CURSOR* cursor, std::string dbPath, const char* statusPrefix) {
     int wtRet;
-    std::vector<std::string> files;
+    std::vector<StorageEngine::BackupBlock> blocks;
     const char* filename;
     const auto directoryPath = boost::filesystem::path(dbPath);
     const auto wiredTigerLogFilePrefix = "WiredTigerLog";
@@ -558,12 +558,19 @@ StatusWith<std::vector<std::string>> getDataFilesFromBackupCursor(WT_CURSOR* cur
         }
         filePath /= name;
 
-        files.push_back(filePath.string());
+        boost::system::error_code errorCode;
+        const std::uint64_t filesize = boost::filesystem::file_size(filePath, errorCode);
+        uassert(31317,
+                "Failed to get a file's size. Filename: {} Error: {}"_format(filePath.string(),
+                                                                             errorCode.message()),
+                !errorCode);
+        blocks.push_back({filePath.string(), 0, filesize});
     }
+
     if (wtRet != WT_NOTFOUND) {
         return wtRCToStatus(wtRet, statusPrefix);
     }
-    return files;
+    return blocks;
 }
 
 }  // namespace
@@ -1066,7 +1073,7 @@ void WiredTigerKVEngine::endBackup(OperationContext* opCtx) {
     _backupSession.reset();
 }
 
-StatusWith<std::vector<std::string>> WiredTigerKVEngine::beginNonBlockingBackup(
+StatusWith<std::vector<StorageEngine::BackupBlock>> WiredTigerKVEngine::beginNonBlockingBackup(
     OperationContext* opCtx) {
     uassert(51034, "Cannot open backup cursor with in-memory mode.", !isEphemeral());
 
@@ -1089,18 +1096,18 @@ StatusWith<std::vector<std::string>> WiredTigerKVEngine::beginNonBlockingBackup(
         return wtRCToStatus(wtRet);
     }
 
-    auto swFilesToCopy =
-        getDataFilesFromBackupCursor(cursor, _path, "Error opening backup cursor.");
+    auto swBlocksToCopy =
+        getDataBlocksFromBackupCursor(cursor, _path, "Error opening backup cursor.");
 
-    if (!swFilesToCopy.isOK()) {
-        return swFilesToCopy;
+    if (!swBlocksToCopy.isOK()) {
+        return swBlocksToCopy;
     }
 
     pinOplogGuard.dismiss();
     _backupSession = std::move(sessionRaii);
     _backupCursor = cursor;
 
-    return swFilesToCopy;
+    return swBlocksToCopy;
 }
 
 void WiredTigerKVEngine::endNonBlockingBackup(OperationContext* opCtx) {
@@ -1123,15 +1130,28 @@ StatusWith<std::vector<std::string>> WiredTigerKVEngine::extendBackupCursor(
         return wtRCToStatus(wtRet);
     }
 
-    auto swFilesToCopy =
-        getDataFilesFromBackupCursor(cursor, _path, "Error extending backup cursor.");
+    StatusWith<std::vector<StorageEngine::BackupBlock>> swBlocksToCopy =
+        getDataBlocksFromBackupCursor(cursor, _path, "Error extending backup cursor.");
 
     wtRet = cursor->close(cursor);
     if (wtRet != 0) {
         return wtRCToStatus(wtRet);
     }
 
-    return swFilesToCopy;
+    if (!swBlocksToCopy.isOK()) {
+        return swBlocksToCopy.getStatus();
+    }
+
+    // Journal files returned from the future backup cursor are not intended to have block level
+    // information. For now, this is being explicitly codified by transforming the result into a
+    // vector of filename strings. The lack of block/filesize information instructs the client to
+    // copy the whole file.
+    std::vector<std::string> filenames;
+    for (const auto& block : swBlocksToCopy.getValue()) {
+        filenames.push_back(std::move(block.filename));
+    }
+
+    return {filenames};
 }
 
 void WiredTigerKVEngine::syncSizeInfo(bool sync) const {

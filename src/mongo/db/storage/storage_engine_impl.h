@@ -97,7 +97,7 @@ public:
 
     virtual void endBackup(OperationContext* opCtx) override;
 
-    virtual StatusWith<std::vector<std::string>> beginNonBlockingBackup(
+    virtual StatusWith<std::vector<BackupBlock>> beginNonBlockingBackup(
         OperationContext* opCtx) override;
 
     virtual void endNonBlockingBackup(OperationContext* opCtx) override;

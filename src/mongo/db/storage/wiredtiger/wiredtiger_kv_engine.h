@@ -177,7 +177,8 @@ public:
 
     void endBackup(OperationContext* opCtx) override;
 
-    StatusWith<std::vector<std::string>> beginNonBlockingBackup(OperationContext* opCtx) override;
+    StatusWith<std::vector<StorageEngine::BackupBlock>> beginNonBlockingBackup(
+        OperationContext* opCtx) override;
 
     void endNonBlockingBackup(OperationContext* opCtx) override;
 

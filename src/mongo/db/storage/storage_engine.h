@@ -68,6 +68,12 @@ public:
     using OldestActiveTransactionTimestampCallback =
         std::function<OldestActiveTransactionTimestampResult(Timestamp stableTimestamp)>;
 
+    struct BackupBlock {
+        std::string filename;
+        std::uint64_t offset;
+        std::uint64_t length;
+    };
+
     /**
      * The interface for creating new instances of storage engines.
      *
@@ -293,7 +299,7 @@ public:
      */
     virtual void endBackup(OperationContext* opCtx) = 0;
 
-    virtual StatusWith<std::vector<std::string>> beginNonBlockingBackup(
+    virtual StatusWith<std::vector<BackupBlock>> beginNonBlockingBackup(
         OperationContext* opCtx) = 0;
 
     virtual void endNonBlockingBackup(OperationContext* opCtx) = 0;
