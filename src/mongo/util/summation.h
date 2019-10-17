@@ -92,9 +92,9 @@ public:
      * Summations of even extremely long series of 32-bit and 64-bit integers should be exact.
      */
     Decimal128 getDecimal() const {
-        return std::isnan(_sum) ? Decimal128(_special, Decimal128::kRoundTo34Digits)
-                                : Decimal128(_sum, Decimal128::kRoundTo34Digits)
-                                      .add(Decimal128(_addend, Decimal128::kRoundTo34Digits));
+        return !std::isfinite(_sum) ? Decimal128(_special, Decimal128::kRoundTo34Digits)
+                                    : Decimal128(_sum, Decimal128::kRoundTo34Digits)
+                                          .add(Decimal128(_addend, Decimal128::kRoundTo34Digits));
     }
 
     /**
