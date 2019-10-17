@@ -141,6 +141,10 @@ bool shouldActivateFailCommandFailPoint(const BSONObj& data, StringData cmdName,
         }
     }
 
+    if (!client->session()) {
+        return false;
+    }
+
     for (auto&& failCommand : data.getObjectField("failCommands")) {
         if (failCommand.type() == String && failCommand.valueStringData() == cmdName) {
             return true;
