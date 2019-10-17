@@ -241,10 +241,5 @@ public:
         }
         return {fieldPaths, targetCollectionVersion};
     }
-
-    std::pair<JsExecution*, bool> getJsExec(const BSONObj&) {
-        MONGO_UNREACHABLE;
-    }
-    void releaseJsExec() {}
 };
 }  // namespace mongo

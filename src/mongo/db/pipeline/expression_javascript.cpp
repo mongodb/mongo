@@ -117,10 +117,7 @@ Value ExpressionInternalJsEmit::evaluate(const Document& root, Variables* variab
     // If the scope does not exist and is created by the following call, then make sure to
     // re-bind emit() and the given function to the new scope.
     auto expCtx = getExpressionContext();
-    auto [jsExec, newlyCreated] = expCtx->getJsExecWithScope();
-    if (newlyCreated) {
-        jsExec->getScope()->loadStored(expCtx->opCtx, true);
-    }
+    auto jsExec = expCtx->getJsExecWithScope();
 
     // Although inefficient to "create" a new function every time we evaluate, this will usually end
     // up being a simple cache lookup. This is needed because the JS Scope may have been recreated
@@ -204,10 +201,7 @@ Value ExpressionInternalJs::evaluate(const Document& root, Variables* variables)
                           << " can't be run on this process. Javascript is disabled.",
             getGlobalScriptEngine());
 
-    auto [jsExec, newlyCreated] = expCtx->getJsExecWithScope();
-    if (newlyCreated) {
-        jsExec->getScope()->loadStored(expCtx->opCtx, true);
-    }
+    auto jsExec = expCtx->getJsExecWithScope();
 
     ScriptingFunction func = jsExec->getScope()->createFunction(_funcSource.c_str());
     uassert(31265, "The eval function did not evaluate", func);

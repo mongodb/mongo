@@ -49,12 +49,14 @@ env.Library(
     target='expression_context',
     source=[
         'expression_context.cpp',
+        'javascript_execution.cpp',
         'variables.cpp',
     ],
     LIBDEPS=[
         'aggregation_request',
         '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/scripting/scripting',
         '$BUILD_DIR/mongo/util/intrusive_counter',
     ]
 )

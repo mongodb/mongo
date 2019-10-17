@@ -42,6 +42,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/pipeline/javascript_execution.h"
 #include "mongo/db/pipeline/mongo_process_interface.h"
 #include "mongo/db/pipeline/runtime_constants_gen.h"
 #include "mongo/db/pipeline/variables.h"
@@ -228,7 +229,7 @@ public:
     auto getJsExecWithScope() const {
         RuntimeConstants runtimeConstants = getRuntimeConstants();
         const boost::optional<mongo::BSONObj>& scope = runtimeConstants.getJsScope();
-        return mongoProcessInterface->getJsExec(scope.get_value_or(BSONObj()));
+        return JsExecution::get(opCtx, scope.get_value_or(BSONObj()));
     }
 
     // The explain verbosity requested by the user, or boost::none if no explain was requested.

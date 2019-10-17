@@ -33,7 +33,7 @@ assert.eq(2, db[out].findOne({_id: 1}).value, "A1");
 assert.eq(1, db[out].findOne({_id: 2}).value, "A2");
 
 t.insert({_id: 4, x: 2});
-res = t.mapReduce(m, r, {out: {reduce: out}, query: {_id: {$gt: 3}}, finalize: null});
+res = t.mapReduce(m, r, {out: {reduce: out}, query: {_id: {$gt: 3}}});
 
 assert.eq(2, db[out].findOne({_id: 1}).value, "B1");
 assert.eq(2, db[out].findOne({_id: 2}).value, "B2");

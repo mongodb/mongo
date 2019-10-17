@@ -320,7 +320,6 @@ bool Pipeline::aggHasWriteStage(const BSONObj& cmd) {
 void Pipeline::detachFromOperationContext() {
     pCtx->opCtx = nullptr;
     pCtx->mongoProcessInterface->setOperationContext(nullptr);
-    pCtx->mongoProcessInterface->releaseJsExec();
 
     for (auto&& source : _sources) {
         source->detachFromOperationContext();

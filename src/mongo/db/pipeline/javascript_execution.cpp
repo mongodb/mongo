@@ -27,42 +27,23 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include <string>
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
+#include "mongo/db/pipeline/javascript_execution.h"
 
 namespace mongo {
 
-/**
- * Code to run as a component of MapReduce.
- */
-class MapReduceJavascriptCode {
-public:
-    static MapReduceJavascriptCode parseFromBSON(const BSONElement& element) {
-        uassert(ErrorCodes::BadValue,
-                str::stream() << "'" << element.fieldNameStringData()
-                              << "' must be of string or code type",
-                element.type() == String || element.type() == Code);
-        return MapReduceJavascriptCode(element._asCode());
+namespace {
+const auto getExec = OperationContext::declareDecoration<std::unique_ptr<JsExecution>>();
+}  // namespace
+
+JsExecution* JsExecution::get(OperationContext* opCtx, const BSONObj& scope) {
+    auto& exec = getExec(opCtx);
+    if (!exec) {
+        exec = std::make_unique<JsExecution>(scope);
+        exec->getScope()->loadStored(opCtx, true);
     }
-
-    MapReduceJavascriptCode() = default;
-    MapReduceJavascriptCode(std::string&& code) : code(code) {}
-
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
-        (*builder) << fieldName << code;
-    }
-
-    auto getCode() const {
-        return code;
-    }
-
-private:
-    std::string code;
-};
+    return exec.get();
+}
 
 }  // namespace mongo

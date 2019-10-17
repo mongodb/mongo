@@ -150,9 +150,10 @@ auto translateOutReduce(boost::intrusive_ptr<ExpressionContext> expCtx,
                         NamespaceString targetNss,
                         std::string code) {
     // Because of communication for sharding, $merge must hold on to a serializable BSON object
-    // at the moment so we reparse here.
-    auto reduceObj = BSON("args" << BSON_ARRAY("$value"
-                                               << "$$new.value")
+    // at the moment so we reparse here. Note that the reduce function signature expects 2
+    // arguments, the first being the key and the second being the array of values to reduce.
+    auto reduceObj = BSON("args" << BSON_ARRAY("$_id" << BSON_ARRAY("$value"
+                                                                    << "$$new.value"))
                                  << "eval" << code);
 
     auto finalProjectSpec =

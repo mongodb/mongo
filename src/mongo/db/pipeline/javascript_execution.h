@@ -31,9 +31,13 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/scripting/engine.h"
 
 namespace mongo {
+
+class OperationContext;
+
 /*
  * This class provides a more sensible interface with JavaScript Scope objects. It helps with
  * boilerplate related to calling JS functions from C++ code, and extracting BSON objects from the
@@ -42,9 +46,15 @@ namespace mongo {
 class JsExecution {
 public:
     /**
+     * Create or get a pointer to a JsExecution instance, capable of invoking Javascript functions
+     * and reading the return value.
+     */
+    static JsExecution* get(OperationContext* opCtx, const BSONObj& scope);
+
+    /**
      * Construct with a thread-local scope and initialize with the given scope variables.
      */
-    JsExecution(const BSONObj& scopeVars)
+    explicit JsExecution(const BSONObj& scopeVars)
         : _scope(getGlobalScriptEngine()->newScopeForCurrentThread()) {
         _scopeVars = scopeVars.getOwned();
         _scope->init(&_scopeVars);

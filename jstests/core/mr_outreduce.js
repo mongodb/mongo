@@ -57,8 +57,7 @@ assert.eq(tos(expected), tos(out.convertToSingleObject("value")), "B");
 
 t.insert({_id: 5, a: [5, 6]});
 out.insert({_id: 20, value: "10"});  // this is a sentinal to make sure it wasn't killed
-assert.commandWorked(
-    t.mapReduce(m, r, {out: {reduce: outName, nonAtomic: true}, query: {_id: {$gt: 4}}}));
+assert.commandWorked(t.mapReduce(m, r, {out: {reduce: outName}, query: {_id: {$gt: 4}}}));
 
 expected["5"]++;
 expected["6"] = 1;

@@ -154,22 +154,6 @@ public:
                                            boost::optional<ChunkVersion> targetCollectionVersion,
                                            const NamespaceString& outputNs) const override;
 
-    /**
-     * If we are creating a new JsExecution (and therefore a new thread-local scope), make sure
-     * we pass that information back to the caller.
-     */
-    std::pair<JsExecution*, bool> getJsExec(const BSONObj& scope) override {
-        if (!_jsExec) {
-            _jsExec = std::make_unique<JsExecution>(scope);
-            return {_jsExec.get(), true};
-        }
-        return {_jsExec.get(), false};
-    }
-
-    void releaseJsExec() override {
-        _jsExec.reset();
-    }
-
 protected:
     BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
                                       Client* client,

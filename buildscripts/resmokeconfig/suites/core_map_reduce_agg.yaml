@@ -10,6 +10,8 @@ selector:
   - jstests/core/mr_index2.js
   - jstests/core/mr_merge2.js
   - jstests/core/mr_mutable_properties.js
+  - jstests/core/mr_outreduce.js
+  - jstests/core/mr_outreduce2.js
   - jstests/core/mr_sort.js
   - jstests/core/mr_tolerates_js_exception.js
   - jstests/core/mr_undef.js
