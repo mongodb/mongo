@@ -621,8 +621,7 @@ Status QueryRequest::validate() const {
         BSONElement sortElt = sortIt.next();
         if (isTextScoreMeta(sortElt) || isShardNameMeta(sortElt)) {
             BSONElement projElt = _proj[sortElt.fieldName()];
-            if (projElt.eoo() || (isTextScoreMeta(sortElt) && !isTextScoreMeta(projElt)) ||
-             (isShardNameMeta(sortElt) && !isShardNameMeta(projElt))) {
+            if (projElt.eoo() || (isTextScoreMeta(sortElt) && !isTextScoreMeta(projElt))) {
                 return Status(ErrorCodes::BadValue,
                               "must have $meta projection for all $meta sort keys");
             }
