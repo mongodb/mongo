@@ -47,20 +47,19 @@ using std::vector;
 
 namespace mongo {
 
-MockRemoteDBServer::CircularBSONIterator::CircularBSONIterator(const vector<BSONObj>& replyVector) {
-    for (std::vector<mongo::BSONObj>::const_iterator iter = replyVector.begin();
-         iter != replyVector.end();
-         ++iter) {
-        _replyObjs.push_back(iter->copy());
+MockRemoteDBServer::CircularBSONIterator::CircularBSONIterator(
+    const vector<StatusWith<BSONObj>>& replyVector) {
+    for (auto iter = replyVector.begin(); iter != replyVector.end(); ++iter) {
+        _replyObjs.push_back(iter->isOK() ? StatusWith(iter->getValue().copy()) : *iter);
     }
 
     _iter = _replyObjs.begin();
 }
 
-BSONObj MockRemoteDBServer::CircularBSONIterator::next() {
+StatusWith<BSONObj> MockRemoteDBServer::CircularBSONIterator::next() {
     verify(_iter != _replyObjs.end());
 
-    BSONObj reply = _iter->copy();
+    StatusWith<BSONObj> reply = _iter->isOK() ? StatusWith(_iter->getValue().copy()) : *_iter;
     ++_iter;
 
     if (_iter == _replyObjs.end()) {
@@ -109,14 +108,15 @@ bool MockRemoteDBServer::isRunning() const {
     return _isRunning;
 }
 
-void MockRemoteDBServer::setCommandReply(const string& cmdName, const mongo::BSONObj& replyObj) {
-    vector<BSONObj> replySequence;
+void MockRemoteDBServer::setCommandReply(const string& cmdName,
+                                         const StatusWith<mongo::BSONObj>& replyObj) {
+    vector<StatusWith<BSONObj>> replySequence;
     replySequence.push_back(replyObj);
     setCommandReply(cmdName, replySequence);
 }
 
 void MockRemoteDBServer::setCommandReply(const string& cmdName,
-                                         const vector<BSONObj>& replySequence) {
+                                         const vector<StatusWith<BSONObj>>& replySequence) {
     scoped_spinlock sLock(_lock);
     _cmdMap[cmdName].reset(new CircularBSONIterator(replySequence));
 }
@@ -146,16 +146,15 @@ rpc::UniqueReply MockRemoteDBServer::runCommand(InstanceID id, const OpMsgReques
     checkIfUp(id);
     std::string cmdName = request.getCommandName().toString();
 
-    BSONObj reply;
-    {
+    StatusWith<BSONObj> reply([this, &cmdName] {
         scoped_spinlock lk(_lock);
 
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "no reply for command: " << cmdName,
                 _cmdMap.count(cmdName));
 
-        reply = _cmdMap[cmdName]->next();
-    }
+        return _cmdMap[cmdName]->next();
+    }());
 
     if (_delayMilliSec > 0) {
         mongo::sleepmillis(_delayMilliSec);

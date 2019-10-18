@@ -32,6 +32,7 @@
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 
 #include "mongo/client/dbclient_mockcursor.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/time_support.h"
 
@@ -68,12 +69,20 @@ std::pair<rpc::UniqueReply, DBClientBase*> MockDBClientConnection::runCommandWit
     checkConnection();
 
     try {
-        return {_remoteServer->runCommand(_remoteServerInstanceID, request), this};
+        auto reply = _remoteServer->runCommand(_remoteServerInstanceID, request);
+        auto status = getStatusFromCommandResult(reply->getCommandReply());
+        // The real DBClientBase always throws HostUnreachable on network error, so we do the
+        // same here.
+        uassert(ErrorCodes::HostUnreachable,
+                str::stream() << "network error while attempting to run "
+                              << "command '" << request.getCommandName() << "' " << status,
+                !ErrorCodes::isNetworkError(status));
+        return {std::move(reply), this};
     } catch (const mongo::DBException&) {
         _isFailed = true;
         throw;
     }
-}
+}  // namespace mongo
 
 
 std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query(

@@ -411,7 +411,7 @@ TEST(MockDBClientConnTest, CyclingCmd) {
     MockRemoteDBServer server("test");
 
     {
-        vector<BSONObj> isMasterSequence;
+        vector<mongo::StatusWith<BSONObj>> isMasterSequence;
         isMasterSequence.push_back(BSON("set"
                                         << "a"
                                         << "isMaster" << true << "ok" << 1));

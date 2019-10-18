@@ -116,7 +116,7 @@ public:
      * @param cmdName the name of the command
      * @param replyObj the exact reply for the command
      */
-    void setCommandReply(const std::string& cmdName, const mongo::BSONObj& replyObj);
+    void setCommandReply(const std::string& cmdName, const StatusWith<mongo::BSONObj>& replyObj);
 
     /**
      * Sets the reply for a command.
@@ -128,7 +128,7 @@ public:
      *     that requires different results when calling a method.
      */
     void setCommandReply(const std::string& cmdName,
-                         const std::vector<mongo::BSONObj>& replySequence);
+                         const std::vector<StatusWith<mongo::BSONObj>>& replySequence);
 
     /**
      * Inserts a single document to this server.
@@ -203,12 +203,12 @@ private:
         /**
          * Creates a new iterator with a deep copy of the vector.
          */
-        CircularBSONIterator(const std::vector<mongo::BSONObj>& replyVector);
-        mongo::BSONObj next();
+        CircularBSONIterator(const std::vector<StatusWith<mongo::BSONObj>>& replyVector);
+        StatusWith<mongo::BSONObj> next();
 
     private:
-        std::vector<mongo::BSONObj>::iterator _iter;
-        std::vector<mongo::BSONObj> _replyObjs;
+        std::vector<StatusWith<mongo::BSONObj>>::iterator _iter;
+        std::vector<StatusWith<mongo::BSONObj>> _replyObjs;
     };
 
     /**
