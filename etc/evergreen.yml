@@ -8077,7 +8077,6 @@ buildvariants:
     packager_arch: s390x
     packager_distro: ubuntu1804
     repo_edition: org
-    scons_cache_scope: local
     tooltags: "ssl"
     build_mongoreplay: true
   display_tasks:
@@ -8120,7 +8119,6 @@ buildvariants:
     multiversion_platform: ubuntu1804
     multiversion_architecture: s390x
     multiversion_edition: enterprise
-    scons_cache_scope: local
   display_tasks:
   - *dbtest
   - *unittests
