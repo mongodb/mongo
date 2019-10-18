@@ -2307,6 +2307,68 @@ TEST_F(QueryPlannerTest, ContainedOrPushdownIndexedExpr) {
     assertSolutionExists("{cscan: {dir: 1}}}}");
 }
 
+// SERVER-41872 fixed a case where variable "choice" ordering in the PlanEnumerator memo could lead
+// to different sets of solutions generated for the same input. This would occur in the case where
+// we only enumerate a subset of possible plans due to reaching internal limits and enumerate plans
+// in a non-stable order. With the fix for SERVER-41872, PlanEnumerator ordering is stable and
+// expected to always return the same set of solutions for a given input.
+TEST_F(QueryPlannerTest, SolutionSetStableWhenOrEnumerationLimitIsReached) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    addIndex(BSON("d" << 1));
+    addIndex(BSON("e" << 1));
+    addIndex(BSON("f" << 1));
+    addIndex(BSON("f" << 1 << "y" << 1));
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("b" << 1));
+    addIndex(BSON("c" << 1));
+    addIndex(BSON("c" << 1 << "x" << 1));
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {$or: [{a: 1, b: 1, c: 1}, {d: 1, e: 1, f: 1}]}}"));
+
+    assertNumSolutions(10U);
+
+    assertSolutionExists(
+        "{or: {nodes: [{fetch: {filter: {b: {$eq: 1}, c: {$eq: 1} }, node: {ixscan: {pattern: {a: "
+        "1}}}}}, {fetch: {filter: {e: {$eq: 1}, f: {$eq: 1} }, node: {ixscan: {pattern: {d: "
+        "1}}}}}]}}");
+    assertSolutionExists(
+        "{or: {nodes: [{fetch: {filter: {a: {$eq: 1}, c: {$eq: 1} }, node: {ixscan: {pattern: {b: "
+        "1}}}}}, {fetch: {filter: {e: {$eq: 1}, f: {$eq: 1} }, node: {ixscan: {pattern: {d: "
+        "1}}}}}]}}");
+    assertSolutionExists(
+        "{or: {nodes: [{fetch: {filter: {a: {$eq: 1}, b: {$eq: 1} }, node: {ixscan: {pattern: {c: "
+        "1}}}}}, {fetch: {filter: {e: {$eq: 1}, f: {$eq: 1} }, node: {ixscan: {pattern: {d: "
+        "1}}}}}]}}");
+    assertSolutionExists(
+        "{or: {nodes: [{fetch: {filter: {a: {$eq: 1}, b: {$eq: 1} }, node: {ixscan: {pattern: {c: "
+        "1, x: 1}}}}}, {fetch: {filter: {e: {$eq: 1}, f: {$eq: 1} }, node: {ixscan: {pattern: {d: "
+        "1}}}}}]}}");
+    assertSolutionExists(
+        "{or: {nodes: [{fetch: {filter: {b: {$eq: 1}, c: {$eq: 1} }, node: {ixscan: {pattern: {a: "
+        "1}}}}}, {fetch: {filter: {d: {$eq: 1}, f: {$eq: 1} }, node: {ixscan: {pattern: {e: "
+        "1}}}}}]}}");
+    assertSolutionExists(
+        "{or: {nodes: [{fetch: {filter: {a: {$eq: 1}, c: {$eq: 1} }, node: {ixscan: {pattern: {b: "
+        "1}}}}}, {fetch: {filter: {d: {$eq: 1}, f: {$eq: 1} }, node: {ixscan: {pattern: {e: "
+        "1}}}}}]}}");
+    assertSolutionExists(
+        "{or: {nodes: [{fetch: {filter: {a: {$eq: 1}, b: {$eq: 1} }, node: {ixscan: {pattern: {c: "
+        "1}}}}}, {fetch: {filter: {d: {$eq: 1}, f: {$eq: 1} }, node: {ixscan: {pattern: {e: "
+        "1}}}}}]}}");
+    assertSolutionExists(
+        "{or: {nodes: [{fetch: {filter: {a: {$eq: 1}, b: {$eq: 1} }, node: {ixscan: {pattern: {c: "
+        "1, x: 1}}}}}, {fetch: {filter: {d: {$eq: 1}, f: {$eq: 1} }, node: {ixscan: {pattern: {e: "
+        "1}}}}}]}}");
+    assertSolutionExists(
+        "{or: {nodes: [{fetch: {filter: {b: {$eq: 1}, c: {$eq: 1} }, node: {ixscan: {pattern: {a: "
+        "1}}}}}, {fetch: {filter: {d: {$eq: 1}, e: {$eq: 1} }, node: {ixscan: {pattern: {f: "
+        "1}}}}}]}}");
+    assertSolutionExists(
+        "{or: {nodes: [{fetch: {filter: {a: {$eq: 1}, c: {$eq: 1} }, node: {ixscan: {pattern: {b: "
+        "1}}}}}, {fetch: {filter: {d: {$eq: 1}, e: {$eq: 1} }, node: {ixscan: {pattern: {f: "
+        "1}}}}}]}}");
+}
 
 }  // namespace
 }  // namespace mongo
