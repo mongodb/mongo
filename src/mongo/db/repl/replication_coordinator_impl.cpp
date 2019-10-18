@@ -2939,8 +2939,6 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
         // When we try to make (1,2) the commit point, we'd find (0,2) as the newest snapshot
         // before the commit point, but it would be invalid to mark it as the committed snapshot
         // since it was never committed.
-        //
-        // TODO SERVER-19209 We also need to clear snapshots before a resync.
         _dropAllSnapshots_inlock();
     }
 
