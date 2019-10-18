@@ -49,7 +49,6 @@
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 
@@ -71,12 +70,28 @@ public:
     }
 
     void start() {
+        stdx::unique_lock<Latch> lock(_mutex);
         _last = Date_t::now();
     }
 
-    void wait() {
+    void abort() {
+        stdx::unique_lock<Latch> lock(_mutex);
+        _inShutdown = true;
+        _condition.notify_all();
+    }
+
+    /**
+     * Sleeps until either an interval has elapsed since the last call to wait(), or a shutdown
+     * event is triggered via abort(). Returns false if interrupted due to shutdown, or true if an
+     * interval has elapsed.
+     */
+    bool wait() {
         stdx::unique_lock<Latch> lock(_mutex);
         while (true) {
+            if (_inShutdown) {
+                return false;
+            }
+
             Date_t now = Date_t::now();
             Date_t expiry = _last + _interval;
             MONGO_LOG(5) << "wait: now=" << now << ", expiry=" << expiry;
@@ -84,7 +99,7 @@ public:
             if (now >= expiry) {
                 _last = now;
                 MONGO_LOG(5) << "wait: done";
-                return;
+                return true;
             }
 
             MONGO_LOG(5) << "wait: blocking";
@@ -97,6 +112,7 @@ private:
     Seconds _interval;
     Mutex _mutex = MONGO_MAKE_LATCH("ThreadSleepInterval::_mutex");
     stdx::condition_variable _condition;
+    bool _inShutdown = false;
     Date_t _last;
 };
 
@@ -136,7 +152,7 @@ UserCacheInvalidator::UserCacheInvalidator(AuthorizationManager* authzManager)
     : _authzManager(authzManager) {}
 
 UserCacheInvalidator::~UserCacheInvalidator() {
-    invariant(globalInShutdownDeprecated());
+    globalInvalidationInterval()->abort();
     // Wait to stop running.
     wait();
 }
@@ -164,25 +180,14 @@ void UserCacheInvalidator::run() {
     Client::initThread("UserCacheInvalidator");
     auto interval = globalInvalidationInterval();
     interval->start();
-    while (true) {
-        interval->wait();
-
-        if (globalInShutdownDeprecated()) {
-            break;
-        }
-
+    while (interval->wait()) {
         auto opCtx = cc().makeOperationContext();
         StatusWith<OID> currentGeneration = getCurrentCacheGeneration(opCtx.get());
         if (!currentGeneration.isOK()) {
-            if (currentGeneration.getStatus().code() == ErrorCodes::CommandNotFound) {
-                warning() << "_getUserCacheGeneration command not found on config server(s), "
-                             "this most likely means you are running an outdated version of mongod "
-                             "on the config servers";
-            } else {
-                warning() << "An error occurred while fetching current user cache generation "
-                             "to check if user cache needs invalidation: "
-                          << currentGeneration.getStatus();
-            }
+            warning() << "An error occurred while fetching current user cache generation "
+                         "to check if user cache needs invalidation: "
+                      << currentGeneration.getStatus();
+
             // When in doubt, invalidate the cache
             try {
                 _authzManager->invalidateUserCache(opCtx.get());
