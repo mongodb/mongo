@@ -30,14 +30,12 @@
 #pragma once
 
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/shard_namer_impl.h"
 
 namespace mongo {
 
 class ShardNameStage final : public PlanStage {
 public:
     ShardNameStage(OperationContext* opCtx,
-                   ScopedCollectionMetadata metadata,
                    WorkingSet* ws,
                    std::unique_ptr<PlanStage> child);
     ~ShardNameStage();
@@ -57,14 +55,6 @@ public:
 
 private:
     WorkingSet* _ws;
-
-    // Note: it is important that this owns the ScopedCollectionMetadata from the time this stage
-    // is constructed. See ScopedCollectionMetadata class comment and MetadataManager comment for
-    // details. The existence of the ScopedCollectionMetadata prevents data which may have been
-    // migrated from being deleted while the query is still active. If we didn't hold one
-    // ScopedCollectionMetadata for the entire query, it'd be possible for data which the query
-    // needs to read to be deleted while it's still running.
-    ShardNamerImpl _shardNamer;
 };
 
 }  // namespace mongo

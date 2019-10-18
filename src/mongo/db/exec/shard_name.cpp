@@ -36,6 +36,7 @@
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/s/shard_key_pattern.h"
 
 namespace mongo {
@@ -49,12 +50,11 @@ using std::string;
 const char* ShardNameStage::kStageType = "SHARD_NAME";
 
 ShardNameStage::ShardNameStage(OperationContext* opCtx,
-                               ScopedCollectionMetadata metadata,
                                WorkingSet* ws,
                                std::unique_ptr<PlanStage> child)
-    : PlanStage(kStageType, opCtx), _ws(ws), _shardNamer(std::move(metadata)) {
+    : PlanStage(kStageType, opCtx), _ws(ws) {
     _children.emplace_back(std::move(child));
-}
+ }
 
 ShardNameStage::~ShardNameStage() {}
 
@@ -72,12 +72,12 @@ PlanStage::StageState ShardNameStage::doWork(WorkingSetID* out) {
 
     if (PlanStage::ADVANCED == status) {
         // If we're sharded make sure to add shardName to the output.
-        if (_shardNamer.isCollectionSharded()) {
+        auto sharding = ShardingState::get(this->getOpCtx());
+        if (sharding->enabled()) {
             WorkingSetMember* member = _ws->get(*out);
-            const StringData shardName = _shardNamer.shardName();
 
             // Populate the working set member with the shard name and return it.
-            member->metadata().setShardName(shardName);
+            member->metadata().setShardName(sharding->shardId());
         }
 
         // If we're here either we have shard state and added the shardName, or we have no shard

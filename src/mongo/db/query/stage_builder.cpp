@@ -283,12 +283,9 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
             warning() << "building stage: STAGE_SHARD_NAME";
             const ShardNameNode* fn = static_cast<const ShardNameNode*>(root);
             auto childStage = buildStages(opCtx, collection, cq, qsol, fn->children[0], ws);
-            if (nullptr == childStage) {
-                return nullptr;
-            }
-
-            auto css = CollectionShardingState::get(opCtx, collection->ns());
-            return std::make_unique<ShardNameStage>(opCtx, css->getCurrentMetadata(), ws, std::move(childStage));
+            return childStage == nullptr
+                ? nullptr
+                : std::make_unique<ShardNameStage>(opCtx, ws, std::move(childStage));
         }
         case STAGE_DISTINCT_SCAN: {
             const DistinctNode* dn = static_cast<const DistinctNode*>(root);

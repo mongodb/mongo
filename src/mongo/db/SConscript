@@ -1028,7 +1028,6 @@ env.Library(
         'exec/shard_filter.cpp',
         'exec/shard_filterer_impl.cpp',
         'exec/shard_name.cpp',
-        'exec/shard_namer_impl.cpp',
         'exec/skip.cpp',
         'exec/sort.cpp',
         'exec/sort_key_generator.cpp',
