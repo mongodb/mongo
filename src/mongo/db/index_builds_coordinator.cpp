@@ -160,6 +160,29 @@ void logFailure(Status status,
           << replState->collectionUUID << " ): " << status;
 }
 
+/**
+ * Iterates over index builds with the provided function.
+ */
+void forEachIndexBuild(
+    const std::vector<std::shared_ptr<ReplIndexBuildState>>& indexBuilds,
+    StringData logPrefix,
+    std::function<void(std::shared_ptr<ReplIndexBuildState> replState)> onIndexBuild) {
+    if (indexBuilds.empty()) {
+        return;
+    }
+
+    log() << logPrefix << "active index builds: " << indexBuilds.size();
+
+    for (auto replState : indexBuilds) {
+        std::string indexNamesStr;
+        str::joinStringDelim(replState->indexNames, &indexNamesStr, ',');
+        log() << logPrefix << replState->buildUUID << ": collection: " << replState->collectionUUID
+              << "; indexes: " << replState->indexNames.size() << " [" << indexNamesStr << "]";
+
+        onIndexBuild(replState);
+    }
+}
+
 }  // namespace
 
 const auto getIndexBuildsCoord =
@@ -396,6 +419,21 @@ void IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
         replState->abortReason = reason;
         replState->condVar.notify_all();
     }
+}
+
+void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
+    log() << "IndexBuildsCoordinator::onStepUp - this node is stepping up to primary";
+
+    auto indexBuilds = _getIndexBuilds();
+    auto onIndexBuild = [](std::shared_ptr<ReplIndexBuildState> replState) {};
+    forEachIndexBuild(indexBuilds, "IndexBuildsCoordinator::onStepUp - "_sd, onIndexBuild);
+}
+
+void IndexBuildsCoordinator::onRollback(OperationContext* opCtx) {
+    log() << "IndexBuildsCoordinator::onRollback - this node is entering the rollback state";
+    auto indexBuilds = _getIndexBuilds();
+    auto onIndexBuild = [](std::shared_ptr<ReplIndexBuildState> replState) {};
+    forEachIndexBuild(indexBuilds, "IndexBuildsCoordinator::onRollback - "_sd, onIndexBuild);
 }
 
 void IndexBuildsCoordinator::recoverIndexBuilds() {
@@ -1303,6 +1341,17 @@ StatusWith<std::shared_ptr<ReplIndexBuildState>> IndexBuildsCoordinator::_getInd
         return {ErrorCodes::NoSuchKey, str::stream() << "No index build with UUID: " << buildUUID};
     }
     return it->second;
+}
+
+std::vector<std::shared_ptr<ReplIndexBuildState>> IndexBuildsCoordinator::_getIndexBuilds() const {
+    std::vector<std::shared_ptr<ReplIndexBuildState>> indexBuilds;
+    {
+        stdx::unique_lock<Latch> lk(_mutex);
+        for (auto pair : _allIndexBuilds) {
+            indexBuilds.push_back(pair.second);
+        }
+    }
+    return indexBuilds;
 }
 
 ScopedStopNewDatabaseIndexBuilds::ScopedStopNewDatabaseIndexBuilds(

@@ -211,6 +211,18 @@ public:
                                     const std::string& reason);
 
     /**
+     * Invoked when the node enters the primary state.
+     * Unblocks index builds that have been waiting to commit/abort during the secondary state.
+     */
+    void onStepUp(OperationContext* opCtx);
+
+    /**
+     * Invoked when the node enters the rollback state.
+     * Unblocks index builds that have been waiting to commit/abort during the secondary state.
+     */
+    void onRollback(OperationContext* opCtx);
+
+    /**
      * TODO: This is not yet implemented.
      */
     virtual Status voteCommitIndexBuild(const UUID& buildUUID, const HostAndPort& hostAndPort) = 0;
@@ -417,6 +429,12 @@ protected:
      * Looks up active index build by UUID.
      */
     StatusWith<std::shared_ptr<ReplIndexBuildState>> _getIndexBuild(const UUID& buildUUID) const;
+
+    /**
+     * Returns a snapshot of active index builds. Since each index build state is reference counted,
+     * it is fine to examine the returned index builds without re-locking 'mutex'.
+     */
+    std::vector<std::shared_ptr<ReplIndexBuildState>> _getIndexBuilds() const;
 
     // Protects the below state.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("IndexBuildsCoordinator::_mutex");

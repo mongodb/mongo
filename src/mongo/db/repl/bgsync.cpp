@@ -45,6 +45,7 @@
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/repl/data_replicator_external_state_impl.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_interface_local.h"
@@ -632,6 +633,8 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
     // Because oplog visibility is updated asynchronously, wait until all uncommitted oplog entries
     // are visible before potentially truncating the oplog.
     storageInterface->waitForAllEarlierOplogWritesToBeVisible(opCtx);
+
+    IndexBuildsCoordinator::get(opCtx)->onRollback(opCtx);
 
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     if (!forceRollbackViaRefetch.load() && storageEngine->supportsRecoverToStableTimestamp()) {

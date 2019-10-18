@@ -128,6 +128,7 @@ env.Library(
         '$BUILD_DIR/mongo/client/connection_pool',
         '$BUILD_DIR/mongo/client/fetcher',
         '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
+        '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
     ],
@@ -1197,6 +1198,7 @@ env.Library(
         'repl_server_parameters',
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
     ],
 )
 
