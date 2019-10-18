@@ -193,7 +193,7 @@ assert.doesNotThrow(function() {
 //
 
 t.drop();
-res = t.getDB().adminCommand({sleep: 1, millis: 300, maxTimeMS: 100});
+res = t.getDB().adminCommand({sleep: 1, millis: 300, maxTimeMS: 100, lock: "none"});
 assert(res.ok == 0 && res.code == ErrorCodes.MaxTimeMSExpired,
        "expected sleep command to abort due to time limit, ok=" + res.ok + ", code=" + res.code);
 
@@ -203,7 +203,7 @@ assert(res.ok == 0 && res.code == ErrorCodes.MaxTimeMSExpired,
 //
 
 t.drop();
-res = t.getDB().adminCommand({sleep: 1, millis: 300, maxTimeMS: 10 * 1000});
+res = t.getDB().adminCommand({sleep: 1, millis: 300, maxTimeMS: 10 * 1000, lock: "none"});
 assert(res.ok == 1,
        "expected sleep command to not hit the time limit, ok=" + res.ok + ", code=" + res.code);
 
@@ -336,7 +336,7 @@ t.drop();
 try {
     assert.commandWorked(
         t.getDB().adminCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "alwaysOn"}));
-    res = t.getDB().adminCommand({sleep: 1, millis: 300, maxTimeMS: 100});
+    res = t.getDB().adminCommand({sleep: 1, millis: 300, maxTimeMS: 100, lock: "none"});
     assert(res.ok == 1,
            "expected command to trigger maxTimeNeverTimeOut fail point, ok=" + res.ok +
                ", code=" + res.code);
