@@ -56,6 +56,16 @@ session.startTransaction({readConcern: {level: "snapshot", atClusterTime: "bad"}
 assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.TypeMismatch);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
+// 'atClusterTime' cannot specify a null Timestamp.
+session.startTransaction({readConcern: {level: "snapshot", atClusterTime: Timestamp(0, 0)}});
+assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+
+// 'atClusterTime' cannot specify a Timestamp with zero seconds.
+session.startTransaction({readConcern: {level: "snapshot", atClusterTime: Timestamp(0, 1)}});
+assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+
 // 'atClusterTime' cannot be used with readConcern level 'majority'.
 session.startTransaction({readConcern: {level: "majority", atClusterTime: clusterTime}});
 assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.InvalidOptions);

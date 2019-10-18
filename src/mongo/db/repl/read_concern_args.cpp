@@ -220,14 +220,17 @@ Status ReadConcernArgs::parse(const BSONObj& readConcernObj) {
                           << kLevelFieldName << " is equal to " << kSnapshotReadConcernStr);
     }
 
+    // Make sure that atClusterTime wasn't specified with zero seconds.
+    if (_atClusterTime && _atClusterTime->asTimestamp().isNull()) {
+        return Status(ErrorCodes::InvalidOptions,
+                      str::stream() << kAtClusterTimeFieldName << " cannot be a null timestamp");
+    }
+
+    // It's okay for afterClusterTime to be specified with zero seconds, but not an uninitialized
+    // timestamp.
     if (_afterClusterTime && _afterClusterTime == LogicalTime::kUninitialized) {
         return Status(ErrorCodes::InvalidOptions,
                       str::stream() << kAfterClusterTimeFieldName << " cannot be a null timestamp");
-    }
-
-    if (_atClusterTime && _atClusterTime == LogicalTime::kUninitialized) {
-        return Status(ErrorCodes::InvalidOptions,
-                      str::stream() << kAtClusterTimeFieldName << " cannot be a null timestamp");
     }
 
     return Status::OK();
