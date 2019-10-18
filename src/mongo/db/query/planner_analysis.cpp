@@ -384,12 +384,6 @@ std::unique_ptr<ProjectionNode> analyzeProjection(const CanonicalQuery& query,
             }
         }
     }
-    auto wantShardName = query.metadataDeps()[DocumentMetadataFields::kShardName];
-    if (wantShardName) {
-        auto shardNameNode = std::make_unique<ShardNameNode>();
-        shardNameNode->children.push_back(solnRoot.release());
-        solnRoot = std::move(shardNameNode);
-    }
     return std::make_unique<ProjectionNodeDefault>(
         addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot)),
         *query.root(),
@@ -767,7 +761,8 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
             }
         }
 
-        ShardingFilterNode* sfn = new ShardingFilterNode();
+        auto wantShardName = query.metadataDeps()[DocumentMetadataFields::kShardName];
+        ShardingFilterNode* sfn = new ShardingFilterNode(wantShardName);
         sfn->children.push_back(solnRoot.release());
         solnRoot.reset(sfn);
     }

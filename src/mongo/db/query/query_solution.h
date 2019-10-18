@@ -915,7 +915,7 @@ struct GeoNear2DSphereNode : public QuerySolutionNode {
  * through the pipeline.
  */
 struct ShardingFilterNode : public QuerySolutionNode {
-    ShardingFilterNode() {}
+    ShardingFilterNode(bool wantShardName): _wantShardName(wantShardName) {}
     virtual ~ShardingFilterNode() {}
 
     virtual StageType getType() const {
@@ -935,37 +935,14 @@ struct ShardingFilterNode : public QuerySolutionNode {
     const BSONObjSet& getSort() const {
         return children[0]->getSort();
     }
-
-    QuerySolutionNode* clone() const;
-};
-
-/**
- * If we're answering a query on a that has shardName metadata, docs must be appended with
- * the shard name.
- */
-struct ShardNameNode : public QuerySolutionNode {
-    ShardNameNode() {}
-    virtual ~ShardNameNode() {}
-
-    virtual StageType getType() const {
-        return STAGE_SHARD_NAME;
-    }
-    virtual void appendToString(str::stream* ss, int indent) const;
-
-    bool fetched() const {
-        return children[0]->fetched();
-    }
-    bool hasField(const std::string& field) const {
-        return children[0]->hasField(field);
-    }
-    bool sortedByDiskLoc() const {
-        return children[0]->sortedByDiskLoc();
-    }
-    const BSONObjSet& getSort() const {
-        return children[0]->getSort();
+    bool wantShardName() const {
+        return _wantShardName;
     }
 
     QuerySolutionNode* clone() const;
+
+private:
+    bool _wantShardName;
 };
 
 /**

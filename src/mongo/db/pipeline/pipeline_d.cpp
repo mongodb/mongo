@@ -167,12 +167,12 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorEx
             sampleSize / (numRecords * kMaxSampleRatioForRandCursor), kMaxSampleRatioForRandCursor);
         // The trial plan is SHARDING_FILTER-MULTI_ITERATOR.
         auto randomCursorPlan =
-            std::make_unique<ShardFilterStage>(opCtx, shardMetadata, ws.get(), std::move(root));
+            std::make_unique<ShardFilterStage>(opCtx, shardMetadata, ws.get(), std::move(root), false);
         // The backup plan is SHARDING_FILTER-COLLSCAN.
         std::unique_ptr<PlanStage> collScanPlan = std::make_unique<CollectionScan>(
             opCtx, coll, CollectionScanParams{}, ws.get(), nullptr);
         collScanPlan = std::make_unique<ShardFilterStage>(
-            opCtx, shardMetadata, ws.get(), std::move(collScanPlan));
+            opCtx, shardMetadata, ws.get(), std::move(collScanPlan), false);
         // Place a TRIAL stage at the root of the plan tree, and pass it the trial and backup plans.
         root = std::make_unique<TrialStage>(opCtx,
                                             ws.get(),

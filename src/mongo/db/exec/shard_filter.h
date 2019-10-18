@@ -74,7 +74,8 @@ public:
     ShardFilterStage(OperationContext* opCtx,
                      ScopedCollectionMetadata metadata,
                      WorkingSet* ws,
-                     std::unique_ptr<PlanStage> child);
+                     std::unique_ptr<PlanStage> child,
+                     bool wantShardName);
     ~ShardFilterStage();
 
     bool isEOF() final;
@@ -91,6 +92,10 @@ public:
     static const char* kStageType;
 
 private:
+    bool wantShardName() const {
+        return _wantShardName;
+    }
+
     WorkingSet* _ws;
 
     // Stats
@@ -103,6 +108,8 @@ private:
     // ScopedCollectionMetadata for the entire query, it'd be possible for data which the query
     // needs to read to be deleted while it's still running.
     ShardFiltererImpl _shardFilterer;
+
+    bool _wantShardName;
 };
 
 }  // namespace mongo

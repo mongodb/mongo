@@ -382,12 +382,14 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
 
         // Might have to filter out orphaned docs.
         if (plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
+            auto wantShardName = canonicalQuery->metadataDeps()[DocumentMetadataFields::kShardName];
             root = std::make_unique<ShardFilterStage>(
                 opCtx,
                 CollectionShardingState::get(opCtx, canonicalQuery->nss())
                     ->getOrphansFilter(opCtx, collection),
                 ws,
-                std::move(root));
+                std::move(root),
+                wantShardName);
         }
 
         const auto* cqProjection = canonicalQuery->getProj();

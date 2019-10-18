@@ -1125,6 +1125,9 @@ QuerySolutionNode* GeoNear2DSphereNode::clone() const {
 void ShardingFilterNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "SHARDING_FILTER\n";
+    if (wantShardName()) {
+        *ss << "with shard name\n";
+    }
     if (nullptr != filter) {
         addIndent(ss, indent + 1);
         StringBuilder sb;
@@ -1139,33 +1142,7 @@ void ShardingFilterNode::appendToString(str::stream* ss, int indent) const {
 }
 
 QuerySolutionNode* ShardingFilterNode::clone() const {
-    ShardingFilterNode* copy = new ShardingFilterNode();
-    cloneBaseData(copy);
-    return copy;
-}
-
-//
-// ShardNameNode
-//
-
-void ShardNameNode::appendToString(str::stream* ss, int indent) const {
-    addIndent(ss, indent);
-    *ss << "SHARD_NAME\n";
-    if (nullptr != filter) {
-        addIndent(ss, indent + 1);
-        StringBuilder sb;
-        *ss << "filter:\n";
-        filter->debugString(sb, indent + 2);
-        *ss << sb.str();
-    }
-    addCommon(ss, indent);
-    addIndent(ss, indent + 1);
-    *ss << "Child:" << '\n';
-    children[0]->appendToString(ss, indent + 2);
-}
-
-QuerySolutionNode* ShardNameNode::clone() const {
-    ShardNameNode* copy = new ShardNameNode();
+    ShardingFilterNode* copy = new ShardingFilterNode(this->wantShardName());
     cloneBaseData(copy);
     return copy;
 }

@@ -54,7 +54,6 @@
 #include "mongo/db/exec/projection.h"
 #include "mongo/db/exec/return_key.h"
 #include "mongo/db/exec/shard_filter.h"
-#include "mongo/db/exec/shard_name.h"
 #include "mongo/db/exec/skip.h"
 #include "mongo/db/exec/sort.h"
 #include "mongo/db/exec/sort_key_generator.h"
@@ -277,15 +276,8 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
 
             auto css = CollectionShardingState::get(opCtx, collection->ns());
             return std::make_unique<ShardFilterStage>(
-                opCtx, css->getOrphansFilter(opCtx, collection), ws, std::move(childStage));
-        }
-        case STAGE_SHARD_NAME: {
-            warning() << "building stage: STAGE_SHARD_NAME";
-            const ShardNameNode* fn = static_cast<const ShardNameNode*>(root);
-            auto childStage = buildStages(opCtx, collection, cq, qsol, fn->children[0], ws);
-            return childStage == nullptr
-                ? nullptr
-                : std::make_unique<ShardNameStage>(opCtx, ws, std::move(childStage));
+                opCtx, css->getOrphansFilter(opCtx, collection), ws, std::move(childStage),
+                fn->wantShardName());
         }
         case STAGE_DISTINCT_SCAN: {
             const DistinctNode* dn = static_cast<const DistinctNode*>(root);
