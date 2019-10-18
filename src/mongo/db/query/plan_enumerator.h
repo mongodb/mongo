@@ -429,10 +429,16 @@ private:
      */
     bool alreadyCompounded(const std::set<MatchExpression*>& ixisectAssigned,
                            const AndAssignment* andAssignment);
+
+    struct CmpByIndexID {
+        bool operator()(IndexID a, IndexID b) const {
+            return a < b;
+        }
+    };
     /**
-     * Output index intersection assignments inside of an AND node.
+     * Maps from index id to the list of predicates assigned to that index.
      */
-    typedef stdx::unordered_map<IndexID, std::vector<MatchExpression*>> IndexToPredMap;
+    typedef std::map<IndexID, std::vector<MatchExpression*>, CmpByIndexID> IndexToPredMap;
 
     /**
      * Generate index intersection assignments given the predicate/index structure in idxToFirst
