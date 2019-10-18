@@ -93,6 +93,7 @@ public:
     virtual Timestamp getGlobalTimestamp(ServiceContext* service);
     bool oplogExists(OperationContext* opCtx) final;
     virtual StatusWith<OpTime> loadLastOpTime(OperationContext* opCtx);
+    virtual StatusWith<Date_t> loadLastWallTime(OperationContext* opCtx);
     virtual HostAndPort getClientHostAndPort(const OperationContext* opCtx);
     virtual void closeConnections();
     virtual void killAllUserOperations(OperationContext* opCtx);
@@ -141,6 +142,11 @@ private:
     * for "opCtx".
     */
     void _dropAllTempCollections(OperationContext* opCtx);
+
+    /**
+     * Gets the last oplog entry from the oplog and populates 'result'.
+     */
+    Status _loadLastOplogEntry(OperationContext* opCtx, BSONObj* result);
 
     ServiceContext* _service;
 

@@ -43,6 +43,7 @@ namespace repl {
 
 const char OpTime::kTimestampFieldName[] = "ts";
 const char OpTime::kTermFieldName[] = "t";
+const char OpTime::kWallFieldName[] = "wall";
 const long long OpTime::kInitialTerm = 0;
 
 // static
@@ -71,6 +72,15 @@ StatusWith<OpTime> OpTime::parseFromOplogEntry(const BSONObj& obj) {
         return status;
 
     return OpTime(ts, term);
+}
+
+StatusWith<Date_t> OpTime::parseWallTimeFromOplogEntry(const BSONObj& obj) {
+    BSONElement wallClockTime;
+    Status status = bsonExtractTypedField(obj, kWallFieldName, BSONType::Date, &wallClockTime);
+    if (!status.isOK()) {
+        return status;
+    }
+    return wallClockTime.Date();
 }
 
 BSONObj OpTime::toBSON() const {

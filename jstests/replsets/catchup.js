@@ -136,10 +136,34 @@
 
     var stepUpResults = stopReplicationAndEnforceNewPrimaryToCatchUp();
 
+    // Check that the 'electionCandidateMetrics' section of the replSetGetStatus response does not
+    // have
+    // a 'newTermStartDate' field before the transition to primary is complete.
+    res = assert.commandWorked(stepUpResults.newPrimary.adminCommand({replSetGetStatus: 1}));
+    assert(res.electionCandidateMetrics,
+           () => "Response should have an 'electionCandidateMetrics' field: " + tojson(res));
+    assert(!res.electionCandidateMetrics.newTermStartDate,
+           () => "Response should not have an 'electionCandidateMetrics.newTermStartDate' field: " +
+               tojson(res.electionCandidateMetrics));
+
     // Disable fail point to allow replication.
     restartServerReplication(stepUpResults.oldSecondaries);
     // getPrimary() blocks until the primary finishes drain mode.
     assert.eq(stepUpResults.newPrimary, rst.getPrimary());
+
+    // Wait until the new primary completes the transition to primary and writes a no-op.
+    checkLog.contains(stepUpResults.newPrimary, "transition to primary complete");
+    // Check that the new primary's term has been updated because of the no-op.
+    assert.eq(getLatestOp(stepUpResults.newPrimary).t, stepUpResults.latestOpOnNewPrimary.t + 1);
+
+    // Check that the 'electionCandidateMetrics' section of the replSetGetStatus response has a
+    // 'newTermStartDate' field once the transition to primary is complete.
+    res = assert.commandWorked(stepUpResults.newPrimary.adminCommand({replSetGetStatus: 1}));
+    assert(res.electionCandidateMetrics,
+           () => "Response should have an 'electionCandidateMetrics' field: " + tojson(res));
+    assert(res.electionCandidateMetrics.newTermStartDate,
+           () => "Response should have an 'electionCandidateMetrics.newTermStartDate' field: " +
+               tojson(res.electionCandidateMetrics));
 
     // Check that the 'numCatchUps' field has been incremented in serverStatus.
     newNewPrimaryStatus =

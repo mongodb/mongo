@@ -186,6 +186,11 @@ StatusWith<OpTime> ReplicationCoordinatorExternalStateMock::loadLastOpTime(
     return _lastOpTime;
 }
 
+StatusWith<Date_t> ReplicationCoordinatorExternalStateMock::loadLastWallTime(
+    OperationContext* opCtx) {
+    return Date_t();
+}
+
 void ReplicationCoordinatorExternalStateMock::setLastOpTime(const StatusWith<OpTime>& lastApplied) {
     _lastOpTime = lastApplied;
 }

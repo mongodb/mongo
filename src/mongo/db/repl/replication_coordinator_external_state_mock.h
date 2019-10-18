@@ -82,6 +82,7 @@ public:
     virtual Timestamp getGlobalTimestamp(ServiceContext* service);
     bool oplogExists(OperationContext* opCtx) override;
     virtual StatusWith<OpTime> loadLastOpTime(OperationContext* opCtx);
+    virtual StatusWith<Date_t> loadLastWallTime(OperationContext* opCtx);
     virtual void closeConnections();
     virtual void killAllUserOperations(OperationContext* opCtx);
     virtual void shardingOnStepDownHook();
