@@ -1,0 +1,459 @@
+# Definition for testing certificates used by MongoDB unit tests.
+
+# Note: CRLs are constructed in mkcrl.sh
+
+global:
+  # All subject names will have these elements automatically,
+  # unless `explicit_subject: true` is specified.
+  output_path: 'jstests/libs/'
+  Subject:
+    C: 'US'
+    ST: 'New York'
+    L: 'New York City'
+    O: 'MongoDB'
+    OU: 'Kernel'
+
+###
+# Root ca.pem based tree.
+###
+
+certs:
+- name: 'ca.pem'
+  description: >-
+    Primary Root Certificate Authority
+    Most Certificates are issued by this CA.
+  Subject: {CN: 'Kernel Test CA'}
+  # ca-2019.pem is our "legacy" SHA-1 self-signed CA root.
+  append_cert: ['ca-2019.pem']
+  Issuer: self
+  extensions:
+    basicConstraints:
+      critical: true
+      CA: true
+
+- name: 'badSAN.pem'
+  description: >-
+    Certificate with an otherwise permissible CommonName,
+    but with an unmatchable SubjectAlternateName.
+  Subject: {CN: '127.0.0.1'}
+  extensions:
+    basicConstraints: {CA: false}
+    keyUsage: [digitalSignature, keyEncipherment]
+    extendedKeyUsage: [serverAuth]
+    subjectAltName: {DNS: badSAN}
+    subjectKeyIdentifier: hash
+
+- name: 'client-all-the-oids.pem'
+  description: >-
+    Client certificate with a long list of OIDs.
+    Ensures the server functions well in unexpected circumstances.
+  explicit_subject: true
+  Subject:
+    CN: Datum-3
+    SN: Datum-4
+    serialNumber: Datum-5
+    C: US
+    L: Datum-7
+    ST: NY
+    street: Datum-9
+    O: Datum-10
+    OU: Datum-11
+    title: Datum-12
+    description: Datum-13
+    searchGuide: Datum-14
+    businessCategory: Datum-15
+    postalAddress: Datum-16
+    postalCode: Datum-17
+    postOfficeBox: Datum-18
+    physicalDeliveryOfficeName: Datum-19
+    telephoneNumber: Datum-20
+    telexNumber: Datum-21
+    teletexTerminalIdentifier: Datum-22
+    facsimileTelephoneNumber: Datum-23
+    x121Address: Datum-24
+    internationaliSDNNumber: Datum-25
+    registeredAddress: Datum-26
+    destinationIndicator: Datum-27
+    preferredDeliveryMethod: Datum-28
+    presentationAddress: Datum-29
+    supportedApplicationContext: Datum-30
+    member: Datum-31
+    owner: Datum-32
+    roleOccupant: Datum-33
+    seeAlso: Datum-34
+    userPassword: Datum-35
+    userCertificate: Datum-36
+    cACertificate: Datum-37
+    authorityRevocationList: Datum-38
+    certificateRevocationList: Datum-39
+    crossCertificatePair: Datum-40
+    name: Datum-41
+    GN: Datum-42
+    initials: Datum-43
+    generationQualifier: Datum-44
+    x500UniqueIdentifier: Datum-45
+    dnQualifier: Datum-46
+    enhancedSearchGuide: Datum-47
+    protocolInformation: Datum-48
+    distinguishedName: Datum-49
+    uniqueMember: Datum-50
+    houseIdentifier: Datum-51
+    supportedAlgorithms: Datum-52
+    deltaRevocationList: Datum-53
+    dmdName: Datum-54
+    pseudonym: Datum-65
+    role: Datum-72
+
+- name: 'client-custom-oids.pem'
+  description: Client certificate using non-standard OIDs.
+  Subject:
+    OU: 'KernelUser'
+    CN: 'client'
+    '1.2.3.56': 'RandoValue'
+    '1.2.3.45': 'Value,Rando'
+
+- name: 'client_email.pem'
+  description: >-
+    Client certificate containing an email address.
+    Includes authorizations for queryable backup.
+  Subject:
+    OU: 'KernelUser'
+    CN: 'client'
+    emailAddress: 'example@mongodb.com'
+  extensions:
+    mongoRoles:
+    - {role: backup, db: admin}
+    - {role: readAnyDatabase, db: admin}
+
+- name: 'client_escape.pem'
+  description: >-
+    Client certificate with reserved characters in subject name.
+    Includes authorizations for queryable backup.
+  explicit_subject: true
+  Subject:
+    C: ',+'
+    ST: '"\<'
+    L: ' >'
+    O: '; '
+    OU: 'Escape'
+    CN: 'Test'
+  Issuer: 'ca.pem'
+  extensions:
+    mongoRoles:
+    - {role: backup, db: admin}
+    - {role: readAnyDatabase, db: admin}
+
+- name: 'client.pem'
+  description: General purpose client certificate.
+  Subject: {OU: 'KernelUser', CN: 'client'}
+  extensions:
+    basicConstraints: {CA: false}
+    subjectKeyIdentifier: hash
+    keyUsage: [digitalSignature, keyEncipherment]
+    extendedKeyUsage: [clientAuth]
+
+# Special case certificate, see mkcert.py
+- name: 'client-multivalue-rdn.pem'
+  description: Client certificate containing multivalue RDNs
+  Issuer: 'ca.pem'
+
+- name: 'client_privatekey.pem'
+  description: General purpose client certificate with roles.
+  Subject: {CN: 'client', emailAddress: 'example@mongodb.com', title: 'A Test Certificate'}
+  extensions:
+    mongoRoles:
+    - {role: backup, db: admin}
+    - {role: readAnyDatabase, db: admin}
+
+- name: 'client_revoked.pem'
+  description: Client certificate which has been explicitly revoked.
+  Subject: {CN: 'client_revoked'}
+  serial: 4 # See crl_client_revoked.pem revocation list
+  extensions:
+    basicConstraints: {CA: false}
+    subjectKeyIdentifier: hash
+    keyUsage: [digitalSignature, keyEncipherment]
+    extendedKeyUsage: [clientAuth]
+
+- name: 'client_roles.pem'
+  description: General purpose client certificate with roles.
+  Subject: {OU: 'Kernel Users', CN: 'Kernel Client Peer Role'}
+  extensions:
+    mongoRoles:
+    - {role: backup, db: admin}
+    - {role: readAnyDatabase, db: admin}
+
+- name: 'client_title.pem'
+  description: General purpose client certificate with roles.
+  Subject:
+    OU: 'KernelUser'
+    CN: 'client'
+    emailAddress: 'example@mongodb.com'
+    title: 'A Test Certificate'
+  extensions:
+    mongoRoles:
+    - {role: backup, db: admin}
+    - {role: readAnyDatabase, db: admin}
+
+- name: 'client_utf8.pem'
+  description: Client certificate with non latin-1 unicode characters.
+  Subject: {OU: 'Kernel Users', CN: "\u041A\u0430\u043B\u043E\u044F\u043D"}
+  extensions:
+    mongoRoles:
+    - {role: backup, db: admin}
+    - {role: readAnyDatabase, db: admin}
+
+- name: 'cluster_cert.pem'
+  description: Alternate cert for use in intra-cluster communication.
+  Subject: {CN: 'clustertest'}
+
+- name: 'expired.pem'
+  description: A certificate which has passed its expiration date.
+  Subject: {CN: 'expired'}
+  not_before: -10000000
+  not_after: -1000000
+  extensions:
+    subjectAltName:
+      DNS: localhost
+      IP: 127.0.0.1
+
+- name: 'localhostnameCN.pem'
+  description: Server certificate with IP localhost in CN, includes a SAN.
+  Subject: {CN: '127.0.0.1'}
+  extensions:
+    basicConstraints: {CA: false}
+    subjectKeyIdentifier: hash
+    keyUsage: [digitalSignature, keyEncipherment]
+    extendedKeyUsage: [serverAuth]
+    subjectAltName:
+      DNS: ['localhost', '127.0.0.1']
+
+- name: 'localhost-cn-with-san.pem'
+  description: Localhost based certificate using non-matching subject alternate name.
+  output_path: 'jstests/ssl/libs/'
+  Subject: {CN: 'localhost'}
+  Issuer: 'ca.pem'
+  extensions:
+    subjectAltName:
+      DNS: 'example.com'
+
+- name: 'localhostnameSAN.pem'
+  description: Server certificate with a selection of SANs
+  Subject: {CN: 'santesthostname.com'}
+  extensions:
+    basicConstraints: {CA: false}
+    subjectKeyIdentifier: hash
+    keyUsage: [digitalSignature, keyEncipherment]
+    extendedKeyUsage: [serverAuth]
+    subjectAltName:
+      DNS: ['*.example.com', 'localhost', '127.0.0.1', 'morefun!']
+
+- name: 'not_yet_valid.pem'
+  description: A certificate which has yet to reach its validity date.
+  Subject: {CN: 'not_yet_valid'}
+  not_before: 630720000 # 20 years hence
+  not_after: 1261440000 # a further 20
+  extensions:
+    mongoRoles:
+    - {role: backup, db: admin}
+    - {role: readAnyDatabase, db: admin}
+
+- name: 'password_protected.pem'
+  description: Server cerificate using an encrypted private key.
+  Subject: {CN: server}
+  passphrase: 'qwerty'
+  pkcs1: true
+  extensions:
+    basicConstraints: {CA: false}
+    subjectKeyIdentifier: hash
+    keyUsage: [digitalSignature, keyEncipherment]
+    extendedKeyUsage: [serverAuth]
+    authorityKeyIdentifier: issuer
+    subjectAltName:
+      DNS: ['localhost', '127.0.0.1']
+
+- name: 'server.pem'
+  description: General purpose server certificate file.
+  Subject: {CN: 'server'}
+  extensions:
+    basicConstraints: {CA: false}
+    subjectKeyIdentifier: hash
+    keyUsage: [digitalSignature, keyEncipherment]
+    extendedKeyUsage: [serverAuth, clientAuth]
+    authorityKeyIdentifier: issuer
+    subjectAltName:
+      DNS: ['localhost', '127.0.0.1']
+
+- name: 'server_SAN.pem'
+  description: General purpose server certificate with good SANs.
+  Subject: {CN: 'Kernel Client Peer Role'}
+  extensions:
+    subjectAltName:
+      DNS: 'localhost'
+      IP: ['127.0.0.1', '::1']
+
+- name: 'server_SAN2.pem'
+  description: General purpose server certificate with bad SANs.
+  Subject: {CN: 'Kernel Client Peer Role'}
+  extensions:
+    subjectAltName:
+      DNS: ['localhost', '127.0.0.1', '::1']
+
+###
+# Certificates not based on the primary root ca.pem
+###
+
+# Standalone self-signed cert.
+- name: 'client-self-signed.pem'
+  description: A basic self-signed certificate.
+  Subject: {OU: 'KernelUser', CN: 'client'}
+  Issuer: self
+  extensions:
+    basicConstraints: {CA: false}
+    authorityKeyIdentifier: issuer
+    subjectKeyIdentifier: hash
+    keyUsage: [digitalSignature, keyEncipherment, nonRepudiation]
+    extendedKeyUsage: [clientAuth]
+    nsComment: 'OpenSSL Generated Certificate'
+
+# Standalone smoke test cert.
+- name: 'smoke.pem'
+  description: A self-signed certificate used for smoke testing.
+  Subject: {CN: smoke}
+  Issuer: self
+  extensions: {basicConstraints: {CA: true}}
+
+###
+# Rollover tree
+###
+
+- name: 'rollover_ca.pem'
+  description: Separate CA used during rollover tests.
+  explicit_subject: true
+  Subject:
+    C: 'US'
+    ST: 'New York'
+    L: 'New York'
+    O: 'MongoDB, Inc.'
+    OU: 'Kernel'
+    CN: 'Kernel Rollover Test CA'
+  Issuer: self
+  extensions:
+    basicConstraints: {critical: true, CA: true}
+    subjectKeyIdentifier: hash
+    authorityKeyIdentifier: keyid
+    keyUsage: [critical, digitalSignature, keyCertSign, cRLSign]
+
+- name: 'rollover_ca_merged.pem'
+  description: Combination of rollover_ca.pem and ca.pem
+  append_cert: ['rollover_ca.pem', 'ca.pem']
+
+- name: 'rollover_server.pem'
+  description: Server rollover certificate.
+  explicit_subject: true
+  Subject:
+    C: 'US'
+    ST: 'New York'
+    L: 'New York'
+    O: 'MongoDB, Inc. (Rollover)'
+    OU: 'Kernel'
+    CN: 'server'
+  Issuer: 'rollover_ca.pem'
+  extensions:
+    subjectAltName:
+      DNS: ['localhost', '127.0.0.1']
+
+###
+# Intermediate
+###
+
+- name: 'intermediate-ca.pem'
+  description: CA issues by the primary root CA, which then issues its own server cert.
+  Subject: {CN: 'Intermediate CA'}
+  Issuer: 'ca.pem'
+
+- name: 'server-intermediate-ca.pem'
+  description: Server certificate signed by intermediate CA, including root CA in bundle.
+  Subject: {CN: 'Server Via Intermediate'}
+  Issuer: 'intermediate-ca.pem'
+  append_cert: 'ca.pem'
+
+###
+# Split Horizon
+###
+
+- name: 'splithorizon-ca.pem'
+  description: CA for split horizon testing.
+  Subject: {O: 'MongoDB, Inc.', CN: 'Kernel Split Horizon Test CA'}
+  Issuer: self
+  extensions:
+    subjectKeyIdentifier: hash
+    authorityKeyIdentifier: keyid
+    basicConstraints: {CA: true}
+
+- name: 'splithorizon-server.pem'
+  description: Server certificate for split horizon testing.
+  Subject: {O: 'MongoDB, Inc. (Splithorizon)', CN: 'server'}
+  Issuer: 'splithorizon-ca.pem'
+  extensions:
+    subjectAltName:
+      DNS:
+        - 'localhost'
+        - '127.0.0.1'
+        - 'splithorizon1'
+        - 'splithorizon2'
+
+###
+# Trusted CA
+###
+
+- name: 'trusted-ca.pem'
+  description: CA for alternate client/server certificate chain.
+  Subject: {CN: 'Trusted Kernel Test CA'}
+  Issuer: self
+  extensions:
+    basicConstraints: {CA: true}
+    subjectAltName:
+      DNS: ['localhost', '127.0.0.1']
+
+# trusted-client.pfx created by mkspecial.sh
+- name: 'trusted-client.pem'
+  description: Client certificate for trusted chain.
+  Subject: {CN: 'Trusted Kernel Test Client'}
+  Issuer: 'trusted-ca.pem'
+  pkcs12:
+    passphrase: 'qwerty'
+    name: 'trusted-client.pfx'
+  extensions:
+    subjectAltName:
+      DNS: ['localhost', '127.0.0.1']
+
+# trusted-server.pfx created by mkspecial.sh
+- name: 'trusted-server.pem'
+  description: Server certificate for trusted chain.
+  Subject: {CN: 'Trusted Kernel Test Server'}
+  Issuer: 'trusted-ca.pem'
+  pkcs12:
+    passphrase: 'qwerty'
+    name: 'trusted-server.pfx'
+  extensions:
+    subjectAltName:
+      DNS: ['localhost', '127.0.0.1']
+
+###
+# ECDSA tree
+###
+
+# These three are all special cases handled internally by mkcert.py
+
+- name: 'ecdsa-ca.pem'
+  description: Root of ECDSA tree.
+  Issuer: self
+
+- name: 'ecdsa-client.pem'
+  description: Client certificate for ECDSA tree.
+  Issuer: 'ecdsa-ca.pem'
+
+- name: 'ecdsa-server.pem'
+  description: Server certificate for ECDSA tree.
+  Issuer: 'ecdsa-ca.pem'

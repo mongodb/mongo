@@ -1,0 +1,62 @@
+This directory contains two scripts.
+
+mkcert.py    - A python3 script using PyOpenSSL to generate the majority of
+               X509 certificates based on the contents of certs.yml
+mkcrl.sh     - Certificate Revocation List generators.
+
+mkcert.py may be invoked without any arguments, in which case it will regenerate ALL certificates.
+Alternatively, pass one or more certificate symbolic names.
+If any of these certificates represent CAs, then all dependent certificates will also be regenerted.
+
+cert.yml format:
+
+global:
+  output_path: '.../'   # Required, default output path for all certs in this file.
+  Subject: {...}        # Optional, name entities to use for all cert, overridden by values in cert entries.
+
+certs:
+    # Required, this will be used as the name of the file, and for referencing issuers.
+  - name: 'name-of-cert.pem'
+    # Required, this will be included in the generated certificates.
+    description: Tell us about yourself.
+    # Required, The X509 subject name.
+    Subject: { C: US, ST: New York, etc... }
+    # Required, Who is the (intermediate) CA for this certificate.  May be 'self'.
+    Issuer: 'ca.pem'
+    # Optional, set to true to ignore global.Subject values.
+    explicit_subject: false
+    # Optional, hash algorithm to use
+    hash: sha256
+    # Optional, key algorithm to use
+    key_type: RSA
+    # Optional, serial number to assign this certificate (default: random number >= 1000)
+    serial: 42
+    # Optional, validity start date, currently expressed in seconds relative to now.
+    not_before: -86400 # 1 day ago
+    # Optional, validity end date, currently expressed in seconds relative to now.
+    not_after: 631152000 # 20 years from now
+    # Optional, where to store this certificate (overrides global)
+    output_path: 'jstests/ssl/libs/'
+    # Optional, IDs of other public keys to append to the file
+    append_certs: ['ca.pem', 'intermediate-ca.pem', ...]
+    # Optional, passphrase to encript private key with
+    passphrase: 'secret'
+    # Optional, x509v3 extensions, refer to: https://www.openssl.org/docs/man1.1.0/man5/x509v3_config.html
+    pkcs1: true
+    # Optional, by default encrypted passwords use PKCS#8 format. Set this to use PKCS#1
+    pkcs12: true | map with keys below
+    # Optional, make a pkcs12 copy of the certificate
+        passphrase: 'secret'
+        # Optional, all PKCS#12 keys must be encrypted. Will use cert.passphase if not provided.
+        name: 'name-of-cert.pfx'
+        # Optional, name of PKCS#12 version of certificate. If not provided, the original cert will be overwritten with the PKCS#12 version
+    extensions: # All extensions are optional.
+    - basicConstraints: {}
+    - keyUsage: {}
+    - extendedKeyUsage: {}
+    - subjectKeyIdentifier: hash
+    - authorityKeyIdentifier: keyid | issuer
+    - subjectAltName: {DNS: [...], IP: [...]}
+    - mongoRoles:
+      - {role: readWrite, db: test1}
+      - {role: read, db: test2}
