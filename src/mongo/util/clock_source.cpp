@@ -38,6 +38,11 @@ stdx::cv_status ClockSource::waitForConditionUntil(stdx::condition_variable& cv,
                                                    stdx::unique_lock<stdx::mutex>& m,
                                                    Date_t deadline) {
     if (_tracksSystemClock) {
+        if (deadline == Date_t::max()) {
+            cv.wait(m);
+            return stdx::cv_status::no_timeout;
+        }
+
         return cv.wait_until(m, deadline.toSystemTimePoint());
     }
 
