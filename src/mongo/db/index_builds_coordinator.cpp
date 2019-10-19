@@ -425,7 +425,18 @@ void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
     log() << "IndexBuildsCoordinator::onStepUp - this node is stepping up to primary";
 
     auto indexBuilds = _getIndexBuilds();
-    auto onIndexBuild = [](std::shared_ptr<ReplIndexBuildState> replState) {};
+    auto onIndexBuild = [](std::shared_ptr<ReplIndexBuildState> replState) {
+        stdx::unique_lock<Latch> lk(replState->mutex);
+        if (!replState->aborted) {
+            // Leave commit timestamp as null. We will be writing a commitIndexBuild oplog entry now
+            // that we are primary and using the timestamp from the oplog entry to update the mdb
+            // catalog.
+            invariant(replState->commitTimestamp.isNull(), replState->buildUUID.toString());
+            invariant(!replState->isCommitReady, replState->buildUUID.toString());
+            replState->isCommitReady = true;
+            replState->condVar.notify_all();
+        }
+    };
     forEachIndexBuild(indexBuilds, "IndexBuildsCoordinator::onStepUp - "_sd, onIndexBuild);
 }
 
