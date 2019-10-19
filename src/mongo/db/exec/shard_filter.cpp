@@ -112,7 +112,7 @@ PlanStage::StageState ShardFilterStage::doWork(WorkingSetID* out) {
                 auto sharding = ShardingState::get(this->getOpCtx());
 
                 // Populate the working set member with the shard name and return it.
-                member->metadata().setShardName(sharding->shardId());
+                member->metadata().setShardName(sharding->shardId().toString());
             }
         }
 

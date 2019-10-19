@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/record_id.h"
+#include "mongo/s/shard_id.h"
 
 namespace mongo {
 /**
@@ -307,12 +308,12 @@ public:
         return _holder && _holder->metaFields.test(MetaType::kShardName);
     }
 
-    StringData getShardName() const {
+    ShardId getShardName() const {
         invariant(hasShardName());
         return _holder->shardName;
     }
 
-    void setShardName(StringData shardName) {
+    void setShardName(ShardId shardName) {
         if (!_holder) {
             _holder = std::make_unique<MetadataHolder>();
         }
@@ -342,7 +343,7 @@ private:
         Value searchHighlights;
         BSONObj indexKey;
         RecordId recordId;
-        StringData shardName;
+        ShardId shardName;
     };
 
     // Null until the first setter is called, at which point a MetadataHolder struct is allocated.
