@@ -443,7 +443,19 @@ void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
 void IndexBuildsCoordinator::onRollback(OperationContext* opCtx) {
     log() << "IndexBuildsCoordinator::onRollback - this node is entering the rollback state";
     auto indexBuilds = _getIndexBuilds();
-    auto onIndexBuild = [](std::shared_ptr<ReplIndexBuildState> replState) {};
+    auto onIndexBuild = [](std::shared_ptr<ReplIndexBuildState> replState) {
+        stdx::unique_lock<Latch> lk(replState->mutex);
+        if (!replState->aborted) {
+            // Leave abort timestamp as null. This will unblock the index build and allow it to
+            // complete using a ghost timestamp. Subsequently, the rollback algorithm can decide how
+            // undo the index build depending on the state of the oplog.
+            invariant(replState->abortTimestamp.isNull(), replState->buildUUID.toString());
+            invariant(!replState->aborted, replState->buildUUID.toString());
+            replState->aborted = true;
+            replState->abortReason = "rollback";
+            replState->condVar.notify_all();
+        }
+    };
     forEachIndexBuild(indexBuilds, "IndexBuildsCoordinator::onRollback - "_sd, onIndexBuild);
 }
 
