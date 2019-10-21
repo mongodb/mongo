@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/cursor_manager.h"
@@ -53,6 +55,7 @@
 #include "mongo/platform/random.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/log.h"
 #include "mongo/util/startup_test.h"
 
 namespace mongo {
@@ -515,6 +518,8 @@ std::size_t CursorManager::timeoutCursors(OperationContext* opCtx, Date_t now) {
 
     // Be careful not to dispose of cursors while holding the partition lock.
     for (auto&& cursor : toDisposeWithoutMutex) {
+        log() << "Cursor id " << cursor->cursorid() << " timed out, idle since "
+              << cursor->getLastUseDate();
         cursor->dispose(opCtx);
     }
     return toDisposeWithoutMutex.size();

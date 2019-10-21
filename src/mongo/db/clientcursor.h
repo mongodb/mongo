@@ -236,6 +236,10 @@ public:
         return cursor->cursorid();
     }
 
+    Date_t getLastUseDate() const {
+        return _lastUseDate;
+    }
+
 private:
     friend class CursorManager;
     friend class ClientCursorPin;

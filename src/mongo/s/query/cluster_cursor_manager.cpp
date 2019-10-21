@@ -403,6 +403,8 @@ void ClusterCursorManager::killAllCursors() {
     for (auto& nsContainerPair : _namespaceToContainerMap) {
         for (auto& cursorIdEntryPair : nsContainerPair.second.entryMap) {
             cursorIdEntryPair.second.setKillPending();
+            log() << "Cursor id " << cursorIdEntryPair.first << " timed out, idle since "
+                  << cursorIdEntryPair.second.getLastActive().toString();
         }
     }
 }
