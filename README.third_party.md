@@ -23,9 +23,9 @@ a notice will be included in
 | ---------------------------| ----------------- | ---------------- | ------------------| :------------------: | :-----------------------------: |
 | [abseil-cpp]               | Apache-2.0        |                  | 070f6e47b3        |                      |                ✗                |
 | Aladdin MD5                | Zlib              |                  | Unknown           |          ✗           |                ✗                |
-| [ASIO]                     | BSL-1.0           | 1.13.0           | b0926b61b0        |                      |                ✗                |
+| [ASIO]                     | BSL-1.0           | 1.14.0           | b0926b61b0        |                      |                ✗                |
 | [benchmark]                | Apache-2.0        | 1.5.0            | 1.4.1             |                      |                                 |
-| [Boost]                    | BSL-1.0           | 1.70.0           | 1.70.0            |                      |                ✗                |
+| [Boost]                    | BSL-1.0           | 1.71.0           | 1.70.0            |                      |                ✗                |
 | [fmt]                      | BSD-2-Clause      |                  | 018d8b57f6        |                      |                ✗                |
 | [GPerfTools]               | BSD-3-Clause      | 2.7              | 2.7               |                      |                ✗                |
 | [ICU4]                     | ICU               | 64.2             | 57.1              |          ✗           |                ✗                |
@@ -34,21 +34,21 @@ a notice will be included in
 | [kms-message]              |                   |                  | 75e391a037        |                      |                ✗                |
 | [libstemmer]               | BSD-3-Clause      |                  | Unknown           |          ✗           |                ✗                |
 | [linenoise]                | BSD-3-Clause      |                  | Unknown + changes |                      |                ✗                |
-| [MozJS]                    | MPL-2.0           | ESR 60.8         | ESR 60.3.0        |                      |                ✗                |
+| [MozJS]                    | MPL-2.0           | ESR 60.9         | ESR 60.3.0        |                      |                ✗                |
 | [MurmurHash3]              | Public Domain     |                  | Unknown + changes |          ✗           |                ✗                |
 | [Pcre]                     | BSD-3-Clause      | 8.43             | 8.42              |                      |                ✗                |
 | [S2]                       | Apache-2.0        |                  | Unknown           |          ✗           |                ✗                |
-| [SafeInt]                  | MIT               | 3.0.20p          | 3.0.20p           |                      |                                 |
+| [SafeInt]                  | MIT               | 3.21             | 3.0.20p           |                      |                                 |
 | [scons]                    | MIT               | 3.0.4            | 3.0.4             |                      |                                 |
 | [Snappy]                   | BSD-3-Clause      | 1.1.7            | 1.1.7             |          ✗           |                ✗                |
-| [sqlite]                   | Public Domain     | 3290000          | 3260000           |          ✗           |                ✗                |
+| [sqlite]                   | Public Domain     | 3300100          | 3260000           |          ✗           |                ✗                |
 | [timelib]                  | MIT               | 2018.01          | 2018.01           |                      |                ✗                |
 | [TomCrypt]                 | Public Domain     | 1.18.2           | 1.18.2            |          ✗           |                ✗                |
 | [Unicode]                  | Unicode-DFS-2015  | 12.1.0           | 8.0.0             |          ✗           |                ✗                |
 | [Valgrind]                 | BSD-3-Clause<sup>\[<a href="#note_vg" id="ref_vg">1</a>]</sup> | 3.15.0 | 3.11.0 | |             ✗                |
 | [variant]                  | BSL-1.0           | 1.4.0            | 1.3.0             |                      |                ✗                |
 | [wiredtiger]               |                   |                  | <sup>\[<a href="#note_wt" id="ref_wt">2</a>]</sup> | ✗ |  ✗                |
-| [yaml-cpp]                 | MIT               | 0.6.2            | 0.6.2             |                      |                ✗                |
+| [yaml-cpp]                 | MIT               | 0.6.3            | 0.6.2             |                      |                ✗                |
 | [Zlib]                     | Zlib              | 1.2.11           | 1.2.11            |          ✗           |                ✗                |
 | [Zstandard]                | BSD-3-Clause      | 1.4.3            | 1.4.3             |          ✗           |                ✗                |
 
