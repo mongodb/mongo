@@ -60,8 +60,8 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
                 ]
             else:
                 # Our documented recommended path for upgrading shards lets us assume that config
-                # server secondaries will always be upgraded before the primary.
-                self.mixed_bin_versions = [last_stable_mongod, latest_mongod]
+                # server nodes will always be fully upgraded before shard nodes.
+                self.mixed_bin_versions = [latest_mongod, latest_mongod]
             num_versions = len(self.mixed_bin_versions)
             if num_versions != num_nodes and not is_config_svr:
                 msg = (("The number of binary versions specified: {} do not match the number of"\
