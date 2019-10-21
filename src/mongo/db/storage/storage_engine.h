@@ -562,6 +562,12 @@ public:
      * opening several checkpoint cursors to ensure the same checkpoint is targeted.
      */
     virtual std::unique_ptr<CheckpointLock> getCheckpointLock(OperationContext* opCtx) = 0;
+
+    virtual void addIndividuallyCheckpointedIndexToList(const std::string& ident) = 0;
+
+    virtual void clearIndividuallyCheckpointedIndexesList() = 0;
+
+    virtual bool isInIndividuallyCheckpointedIndexesList(const std::string& ident) const = 0;
 };
 
 }  // namespace mongo

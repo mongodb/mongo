@@ -330,6 +330,18 @@ public:
         return _engine->getCheckpointLock(opCtx);
     }
 
+    void addIndividuallyCheckpointedIndexToList(const std::string& ident) override {
+        return _engine->addIndividuallyCheckpointedIndexToList(ident);
+    }
+
+    void clearIndividuallyCheckpointedIndexesList() override {
+        return _engine->clearIndividuallyCheckpointedIndexesList();
+    }
+
+    bool isInIndividuallyCheckpointedIndexesList(const std::string& ident) const override {
+        return _engine->isInIndividuallyCheckpointedIndexesList(ident);
+    }
+
     /**
      * Drop abandoned idents. Returns a parallel list of index name, index spec pairs to rebuild.
      */

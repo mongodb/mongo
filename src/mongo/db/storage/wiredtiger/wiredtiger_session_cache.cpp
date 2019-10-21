@@ -273,8 +273,11 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
             stdx::unique_lock<Latch> lk(_journalListenerMutex);
             JournalListener::Token token = _journalListener->getToken();
             auto config = stableCheckpoint ? "use_timestamp=true" : "use_timestamp=false";
-            auto checkpointLock = _engine->getCheckpointLock(opCtx);
-            invariantWTOK(s->checkpoint(s, config));
+            {
+                auto checkpointLock = _engine->getCheckpointLock(opCtx);
+                _engine->clearIndividuallyCheckpointedIndexesList();
+                invariantWTOK(s->checkpoint(s, config));
+            }
             _journalListener->onDurable(token);
         }
         LOG(4) << "created checkpoint (forced)";
@@ -311,6 +314,7 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
         LOG(4) << "flushed journal";
     } else {
         auto checkpointLock = _engine->getCheckpointLock(opCtx);
+        _engine->clearIndividuallyCheckpointedIndexesList();
         invariantWTOK(_waitUntilDurableSession->checkpoint(_waitUntilDurableSession, nullptr));
         LOG(4) << "created checkpoint";
     }

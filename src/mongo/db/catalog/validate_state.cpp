@@ -234,6 +234,17 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
             continue;
         }
 
+        // Skip any newly created indexes that, because they were built with a WT bulk loader, are
+        // checkpoint'ed but not yet consistent with the rest of checkpoint's PIT view of the data.
+        if (_background &&
+            opCtx->getServiceContext()->getStorageEngine()->isInIndividuallyCheckpointedIndexesList(
+                diskIndexIdent)) {
+            _indexCursors.erase(desc->indexName());
+            log() << "Skipping validation on index '" << desc->indexName() << "' in collection '"
+                  << _nss << "' because the index data is not yet consistent in the checkpoint.";
+            continue;
+        }
+
         _indexes.push_back(indexCatalog->getEntryShared(desc));
     }
 
