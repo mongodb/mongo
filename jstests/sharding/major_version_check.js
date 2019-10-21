@@ -27,7 +27,7 @@ printjson(admin.runCommand({getShardVersion: coll + ""}));
 printjson(staleMongos.getDB("admin").runCommand({getShardVersion: coll + ""}));
 
 // Compare strings b/c timestamp comparison is a bit weird
-assert.eq(Timestamp(1, 2), admin.runCommand({getShardVersion: coll + ""}).version);
+assert.eq(Timestamp(2, 2), admin.runCommand({getShardVersion: coll + ""}).version);
 assert.eq(Timestamp(1, 0),
           staleMongos.getDB("admin").runCommand({getShardVersion: coll + ""}).version);
 
@@ -46,6 +46,22 @@ staleMongos.getCollection(coll + "").findOne();
 printjson(staleMongos.getDB("admin").runCommand({getShardVersion: coll + ""}));
 
 assert.eq(Timestamp(1, 0),
+          staleMongos.getDB("admin").runCommand({getShardVersion: coll + ""}).version);
+
+// Run another split on the original chunk, which does not exist anymore (but the stale mongos
+// thinks it exists). This should fail and cause a refresh on the shard, updating its shard
+// version.
+assert.commandFailed(staleMongos.getDB("admin").runCommand(
+    {split: coll + "", bounds: [{_id: MinKey}, {_id: MaxKey}]}));
+
+// This findOne will cause a refresh on the router since the shard version has now been
+// increased.
+staleMongos.getCollection(coll + "").findOne();
+
+printjson(staleMongos.getDB("admin").runCommand({getShardVersion: coll + ""}));
+
+// The previously stale mongos should now be up-to-date.
+assert.eq(Timestamp(2, 2),
           staleMongos.getDB("admin").runCommand({getShardVersion: coll + ""}).version);
 
 st.stop();

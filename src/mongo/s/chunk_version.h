@@ -31,6 +31,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -124,10 +125,21 @@ public:
     }
 
     void incMajor() {
+        uassert(
+            31180,
+            "The chunk major version has reached its maximum value. Manual intervention will be "
+            "required before more chunk move, split, or merge operations are allowed.",
+            majorVersion() != std::numeric_limits<uint32_t>::max());
         _combined = static_cast<uint64_t>(majorVersion() + 1) << 32;
     }
 
     void incMinor() {
+        uassert(
+            31181,
+            "The chunk minor version has reached its maximum value. Manual intervention will be "
+            "required before more chunk split or merge operations are allowed.",
+            minorVersion() != std::numeric_limits<uint32_t>::max());
+
         _combined++;
     }
 

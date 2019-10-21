@@ -87,7 +87,7 @@ testDB_s1.adminCommand({shardCollection: 'test.user', key: {x: 1}});
 testDB_s1.adminCommand({split: 'test.user', middle: {x: 0}});
 
 // shard0: 0|0|b,
-// shard1: 1|1|b, [-inf, 0), [0, inf)
+// shard1: 2|1|b, [-inf, 0), [0, inf)
 
 testDB_s1.user.insert({x: 1});
 testDB_s1.user.insert({x: -11});
@@ -97,44 +97,40 @@ assert.commandWorked(
 st.configRS.awaitLastOpCommitted();
 
 // Official config:
-// shard0: 2|0|b, [-inf, 0)
-// shard1: 2|1|b, [0, inf)
+// shard0: 3|0|b, [-inf, 0)
+// shard1: 3|1|b, [0, inf)
 //
 // Shard metadata:
 // shard0: 0|0|b
-// shard1: 2|1|b
+// shard1: 3|1|b
 //
 // mongos2: 2|0|a
 
 checkShardMajorVersion(st.rs0.getPrimary(), 0);
-checkShardMajorVersion(st.rs1.getPrimary(), 2);
+checkShardMajorVersion(st.rs1.getPrimary(), 3);
 
 // mongos2 still thinks that { x: 1 } belong to st.shard0.shardName, but should be able to
 // refresh it's metadata correctly.
 assert.neq(null, testDB_s2.user.findOne({x: 1}));
 
-checkShardMajorVersion(st.rs0.getPrimary(), 2);
-checkShardMajorVersion(st.rs1.getPrimary(), 2);
+checkShardMajorVersion(st.rs0.getPrimary(), 3);
+checkShardMajorVersion(st.rs1.getPrimary(), 3);
 
 // Set shard metadata to 2|0|b
 assert.neq(null, testDB_s2.user.findOne({x: -11}));
 
-checkShardMajorVersion(st.rs0.getPrimary(), 2);
-checkShardMajorVersion(st.rs1.getPrimary(), 2);
+checkShardMajorVersion(st.rs0.getPrimary(), 3);
+checkShardMajorVersion(st.rs1.getPrimary(), 3);
 
 // Official config:
-// shard0: 2|0|b, [-inf, 0)
-// shard1: 2|1|b, [0, inf)
+// shard0: 3|0|b, [-inf, 0)
+// shard1: 3|1|b, [0, inf)
 //
 // Shard metadata:
-// shard0: 2|0|b
-// shard1: 2|1|b
+// shard0: 3|0|b
+// shard1: 3|1|b
 //
 // mongos3: 2|0|a
-
-// 4th mongos still thinks that { x: 1 } belong to st.shard0.shardName, but should be able to
-// refresh it's metadata correctly.
-assert.neq(null, testDB_s3.user.findOne({x: 1}));
 
 ///////////////////////////////////////////////////////
 // Test mongos thinks unsharded when it's actually sharded

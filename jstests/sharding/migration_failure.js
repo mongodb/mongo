@@ -30,6 +30,12 @@ var newVersion = null;
 assert.commandWorked(st.shard0.getDB("admin").runCommand(
     {configureFailPoint: 'failMigrationCommit', mode: 'alwaysOn'}));
 
+// The split command above bumps the shard version, and this is obtained by the router via a
+// refresh at the end of the command, but the shard does not know about it yet. This find will
+// cause the shard to refresh so that this next check for 'oldVersion' sees the most recent
+// version prior to the migration.
+coll.findOne();
+
 oldVersion = st.shard0.getDB("admin").runCommand({getShardVersion: coll.toString()}).global;
 
 assert.commandFailed(
