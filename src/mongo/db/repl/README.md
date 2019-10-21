@@ -681,47 +681,79 @@ and transition to the `SECONDARY` state. This transition must succeed if we ever
 
 Initial sync is the process that we use to add a new node to a replica set. Initial sync is
 initiated by the `ReplicationCoordinator` and done in the
-[**`DataReplicator`**](https://github.com/mongodb/mongo/blob/r3.4.2/src/mongo/db/repl/data_replicator.h).
-When a node begins initial sync or `resync` is called, it goes into `STARTUP2` state. `STARTUP` is
-reserved for the time before initial sync when a node may need to recover from unclean shutdown.
+[**`InitialSyncer`**](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/initial_syncer.h).
+When a node begins initial sync, it goes into the `STARTUP2` state. `STARTUP` is reserved for the
+time before the node has loaded its local configuration of the replica set.
 
-The `DataReplicator` first gets a sync source. Second, the node drops all of its data except for the
-local database and recreates the oplog. It then gets the Rollback ID from the sync source to ensure
-at the end that no rollbacks occurred during initial sync. Finally, it creates an `OplogFetcher` and
-starts fetching and buffering oplog entries from the sync source to be applied later. Operations are
-buffered to a collection so that they are not limited by the amount of memory available.
+At a high level, there are two phases to initial sync: the data clone phase and the oplog
+application phase. During the data clone phase, the node will copy all of another node's data. After
+that phase is completed, it will start the oplog application phase where it will apply all the oplog
+entries that were written since it started copying data. Finally, it will reconstruct any
+transactions in the prepared state.
+
+Before the data clone phase begins, the node will do the following:
+
+1. Set the initial sync flag to record that initial sync is in progress and make it durable. If a
+   node restarts while this flag is set, it will restart initial sync even though it may already
+   have data because it means that initial sync didn't complete. We also check this flag to prevent
+   reading from the oplog while initial sync is in progress.
+2. Find a sync source.
+3. Drop all of its data except for the local database and recreate the oplog.
+4. Get the Rollback ID (RBID) from the sync source to ensure at the end that no rollbacks occurred
+   during initial sync.
+5. Query its sync source's transactions table for the oldest starting OpTime of all active
+   transactions. This will be the `beginFetchingTimestamp` or the timestamp that it begins fetching
+   oplog entries from, so that the node will have the oplog entries for all active transactions in
+   its oplog.
+6. Query its sync source's oplog for its lastest OpTime. This will be the `beginApplyingTimestamp`,
+   or the timestamp that it begins applying oplog entries at once it has completed the data clone
+   phase. If there was no active transaction on the sync source, the `beginFetchingTimestamp` will
+   be the same as the `beginApplyingTimestamp`.
+7. Create an `OplogFetcher` and start fetching and buffering oplog entries from the sync source
+   to be applied later. Operations are buffered to a collection so that they are not limited by the
+   amount of memory available.
 
 #### Data clone phase
 
-The new node then begins to clone data from its sync source. The `DataReplicator` constructs a
-[`DatabasesCloner`](https://github.com/mongodb/mongo/blob/r3.4.2/src/mongo/db/repl/databases_cloner.h)
+The new node then begins to clone data from its sync source. The `InitialSyncer` constructs a
+[`DatabasesCloner`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/databases_cloner.h)
 that's used to clone all of the databases on the upstream node. The `DatabasesCloner` asks the sync
 source for a list of its databases and then for each one it creates a
-[`DatabaseCloner`](https://github.com/mongodb/mongo/blob/r3.4.2/src/mongo/db/repl/database_cloner.h)
+[`DatabaseCloner`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/database_cloner.h)
 to clone that database. Each `DatabaseCloner` asks the sync source for a list of its collections and
-then creates a
-[`CollectionCloner`](https://github.com/mongodb/mongo/blob/r3.4.2/src/mongo/db/repl/collection_cloner.h)
+for each one creates a
+[`CollectionCloner`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/collection_cloner.h)
 to clone that collection. The `CollectionCloner` calls `listIndexes` on the sync source and creates
 a
-[`CollectionBulkLoader`](https://github.com/mongodb/mongo/blob/r3.4.2/src/mongo/db/repl/collection_bulk_loader.h)
-to create all of the indexes in parallel with the data cloning. The `CollectionCloner` then just
-runs `find` and `getMore` requests on the sync source repeatedly, inserting the fetched documents
-each time, until it fetches all of the documents.
+[`CollectionBulkLoader`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/collection_bulk_loader.h)
+to create all of the indexes in parallel with the data cloning. The `CollectionCloner` then uses an
+**exhaust cursor** to run a `find` request on the sync source for each collection, inserting the
+fetched documents each time, until it fetches all of the documents. Instead of explicitly needing to
+run a `getMore` on an open cursor to get the next batch, exhaust cursors make it so that if the
+`find` does not exhaust the cursor, the sync source will keep sending batches until there are none
+left.
 
 #### Oplog application phase
 
 After the cloning phase of initial sync has finished, the oplog application phase begins. The new
-node first asks its sync source for its last applied OpTime and this is saved as `minValid`, the
-oplog entry it must apply before it's consistent and can become a secondary.
+node first asks its sync source for its last applied OpTime and this is saved as the
+`stopTimestamp`, the oplog entry it must apply before it's consistent and can become a secondary. If
+the `beginFetchingTimestamp` is the same as the `stopTimestamp`, then it indicates that there are no
+oplog entries that need to be written to the oplog and no operations that need to be applied. In
+this case, the node will seed its oplog with the last oplog entry applied on its sync source and
+finish initial sync.
 
-The new node iterates through all of the buffered operations and applies them to the data on disk.
+Otherwise, the new node iterates through all of the buffered operations, writes them to the oplog,
+and if their timestamp is after the `beginApplyingTimestamp`, applies them to the data on disk.
 Oplog entries continue to be fetched and added to the buffer while this is occurring.
 
-If an error occurs on application of an entry, it retries the operation by fetching the entire
-document from the source and just replacing the local document with that one. The last applied
-OpTime is again fetched from the sync source and `minValid` is pushed back to this new OpTime. This
-can occur if a document that needs to be updated was deleted before it was cloned, so the `update`
-op refers to a document that does not exist on the initial syncing node.
+One notable exception is that the node will not apply "prepareTransaction" oplog entries. Similar
+to how we reconstruct prepared transactions in startup and rollback recovery, we will update the
+transactions table every time we see a "prepareTransaction" oplog entry. Because the nodes wrote
+all oplog entries starting at the `beginFetchingTimestamp` into the oplog, the node will have all
+the oplog entries it needs to reconstruct the state for all prepared transactions after the oplog
+application phase is done.
+<!-- TODO SERVER-43783: Link to process for reconstructing prepared transactions -->
 
 #### Idempotency concerns
 
@@ -740,14 +772,21 @@ following:
 
 As seen here, there can be operations on collections that have since been dropped or indexes could
 conflict with the data being added. As a result, many errors that occur here are ignored and assumed
-to resolve themselves. If known problematic operations such as `renameCollection` are received,
-where we cannot assume a drop will come and fix them, we abort and retry initial sync.
+to resolve themselves, such as `DuplicateKey` errors (like in the example above). If known
+problematic operations such as `renameCollection` are received, where we cannot assume a drop will
+come and fix them, we abort and retry initial sync.
 
 #### Finishing initial sync
 
-The oplog application phase concludes when the node applies `minValid`. The node checks its sync
-source's Rollback ID to see if a rollback occurred and if so, restarts initial sync. Otherwise, the
-`DataReplicator` shuts down and the `ReplicationCoordinator` starts steady state replication.
+The oplog application phase concludes when the node applies an oplog entry at `stopTimestamp`. The
+node checks its sync source's Rollback ID to see if a rollback occurred and if so, restarts initial
+sync. Otherwise, the `InitialSyncer` will begin tear down.
+
+It will register the node's `lastApplied` OpTime with the storage engine to make sure that all oplog
+entries prior to that will be visible when querying the oplog. After that it will reconstruct all
+prepared transactions. The node will then clear the initial sync flag and tell the storage engine
+that the `initialDataTimestamp` is the node's last applied OpTime. Finally, the `InitialSyncer`
+shuts down and the `ReplicationCoordinator` starts steady state replication.
 
 # Dropping Collections and Databases
 
