@@ -954,7 +954,7 @@ int _main(int argc, char* argv[], char** envp) {
 
             if (!linePtr || (strlen(linePtr) == 4 && strstr(linePtr, "exit"))) {
                 if (!mongo::serverGlobalParams.quiet.load())
-                    std::cout << "bye" << std::endl;
+                    std::cout << "bye (:" << std::endl;
                 if (line)
                     free(line);
                 break;
