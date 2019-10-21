@@ -421,7 +421,7 @@ public:
     void init(const BSONObj* data) {
         _real->init(data);
     }
-    void setLocalDB(StringData dbName) {
+    void setLocalDB(const string& dbName) {
         _real->setLocalDB(dbName);
     }
     void loadStored(OperationContext* opCtx, bool ignoreNotConnected = false) {

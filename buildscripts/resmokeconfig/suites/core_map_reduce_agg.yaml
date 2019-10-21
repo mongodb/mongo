@@ -13,7 +13,6 @@ selector:
   - jstests/core/mr_outreduce.js
   - jstests/core/mr_outreduce2.js
   - jstests/core/mr_sort.js
-  - jstests/core/mr_stored.js
   - jstests/core/mr_tolerates_js_exception.js
   - jstests/core/mr_undef.js
   - jstests/core/mr4.js

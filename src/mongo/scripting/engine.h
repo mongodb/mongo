@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
@@ -66,8 +65,8 @@ public:
     }
 
     virtual void externalSetup() = 0;
-    virtual void setLocalDB(StringData localDBName) {
-        _localDBName = localDBName.toString();
+    virtual void setLocalDB(const std::string& localDBName) {
+        _localDBName = localDBName;
     }
 
     virtual BSONObj getObject(const char* field) = 0;

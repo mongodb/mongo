@@ -242,7 +242,7 @@ public:
     auto getJsExecWithScope() const {
         RuntimeConstants runtimeConstants = getRuntimeConstants();
         const boost::optional<mongo::BSONObj>& scope = runtimeConstants.getJsScope();
-        return JsExecution::get(opCtx, scope.get_value_or(BSONObj()), ns.db());
+        return JsExecution::get(opCtx, scope.get_value_or(BSONObj()));
     }
 
     // The explain verbosity requested by the user, or boost::none if no explain was requested.

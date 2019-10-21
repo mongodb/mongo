@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/operation_context.h"
@@ -50,7 +49,7 @@ public:
      * Create or get a pointer to a JsExecution instance, capable of invoking Javascript functions
      * and reading the return value.
      */
-    static JsExecution* get(OperationContext* opCtx, const BSONObj& scope, StringData database);
+    static JsExecution* get(OperationContext* opCtx, const BSONObj& scope);
 
     /**
      * Construct with a thread-local scope and initialize with the given scope variables.
