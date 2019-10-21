@@ -19,31 +19,38 @@ function expectChunks(st, ns, chunks) {
 }
 
 const dbName = "test";
-const collName = "not_hashed";
-const ns = dbName + '.' + collName;
 
 const st = new ShardingTest({shards: 3, mongos: 1, config: 1});
 
-// Set up one sharded collection with 2 chunks, both on the primary shard.
+//////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Ranged Sharding Test
 
-assert.writeOK(st.s.getDB(dbName)[collName].insert({_id: -3}, {writeConcern: {w: "majority"}}));
-assert.writeOK(st.s.getDB(dbName)[collName].insert({_id: 11}, {writeConcern: {w: "majority"}}));
+// Set up one sharded collection with 2 chunks, both on the primary shard.
+const rangedCollName = "not_hashed";
+const rangedNs = dbName + '.' + rangedCollName;
+
+assert.commandWorked(
+    st.s.getDB(dbName)[rangedCollName].insert({_id: -3}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.getDB(dbName)[rangedCollName].insert({_id: 11}, {writeConcern: {w: "majority"}}));
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
-assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
-assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
+assert.commandWorked(st.s.adminCommand({shardCollection: rangedNs, key: {_id: 1}}));
+assert.commandWorked(st.s.adminCommand({split: rangedNs, middle: {_id: 0}}));
 
-expectChunks(st, ns, [2, 0, 0]);
+expectChunks(st, rangedNs, [2, 0, 0]);
 
 // Force a routing table refresh on Shard2, to avoid picking a global read timestamp before the
 // sharding metadata cache collections are created.
-assert.commandWorked(st.rs2.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns}));
+assert.commandWorked(st.rs2.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: rangedNs}));
 
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 11}, to: st.shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: rangedNs, find: {_id: 11}, to: st.shard1.shardName}));
 
-expectChunks(st, ns, [1, 1, 0]);
+expectChunks(st, rangedNs, [1, 1, 0]);
 
 // The command should target only the second chunk.
 let commandTestCases = function(collName) {
@@ -75,13 +82,17 @@ let commandTestCases = function(collName) {
     ];
 };
 
-function runTest(testCase, collName, moveChunkToFunc, moveChunkBack) {
+function runTest(testCase, ns, collName, moveChunkToFunc, moveChunkBack) {
     const testCaseName = testCase.name;
     const cmdTargetChunk2 = testCase.command;
 
     jsTestLog("Testing " + testCaseName + ", moveChunkBack: " + moveChunkBack);
 
-    expectChunks(st, ns, [1, 1, 0]);
+    if (ns === rangedNs) {
+        expectChunks(st, ns, [1, 1, 0]);
+    } else {  // hashed ns
+        expectChunks(st, ns, [2, 2, 2]);
+    }
 
     const session = st.s.startSession();
     const sessionDB = session.getDatabase(dbName);
@@ -160,13 +171,15 @@ function runTest(testCase, collName, moveChunkToFunc, moveChunkBack) {
 }
 
 let moveNotHashed = function(toShard) {
-    return st.s.adminCommand({moveChunk: ns, find: {_id: 11}, to: toShard});
+    return st.s.adminCommand({moveChunk: rangedNs, find: {_id: 11}, to: toShard});
 };
 
-commandTestCases(collName).forEach(
-    testCase => runTest(testCase, collName, moveNotHashed, false /*moveChunkBack*/));
-commandTestCases(collName).forEach(
-    testCase => runTest(testCase, collName, moveNotHashed, true /*moveChunkBack*/));
+commandTestCases(rangedCollName)
+    .forEach(testCase => runTest(
+                 testCase, rangedNs, rangedCollName, moveNotHashed, false /*moveChunkBack*/));
+commandTestCases(rangedCollName)
+    .forEach(testCase => runTest(
+                 testCase, rangedNs, rangedCollName, moveNotHashed, true /*moveChunkBack*/));
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -198,9 +211,11 @@ let moveHashed = function(toShard) {
 };
 
 commandTestCases(hashedCollName)
-    .forEach(testCase => runTest(testCase, hashedCollName, moveHashed, false /*moveChunkBack*/));
+    .forEach(testCase =>
+                 runTest(testCase, hashedNs, hashedCollName, moveHashed, false /*moveChunkBack*/));
 commandTestCases(hashedCollName)
-    .forEach(testCase => runTest(testCase, hashedCollName, moveHashed, true /*moveChunkBack*/));
+    .forEach(testCase =>
+                 runTest(testCase, hashedNs, hashedCollName, moveHashed, true /*moveChunkBack*/));
 
 st.stop();
 })();
