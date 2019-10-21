@@ -1571,6 +1571,11 @@ var ShardingTest = function(params) {
         authutil.asCluster(this._mongos, mongosOptions[0].keyFile, _configureCluster);
     } else {
         _configureCluster();
+        // Ensure that all config server nodes are up to date with any changes made to balancer
+        // settings before adding shards to the cluster. This prevents shards, which read
+        // config.settings with readPreference 'nearest', from accidentally fetching stale values
+        // from secondaries that aren't up-to-date.
+        this.configRS.awaitLastOpCommitted();
     }
 
     try {
