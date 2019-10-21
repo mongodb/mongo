@@ -88,6 +88,31 @@ void ServerParameterSet::add(ServerParameter* sp) {
     x = sp;
 }
 
+StatusWith<std::string> ServerParameter::coerceToString(const BSONElement& element, bool redact) {
+    switch (element.type()) {
+        case NumberDouble:
+            return std::to_string(element.Double());
+        case String:
+            return element.String();
+        case NumberInt:
+            return std::to_string(element.Int());
+        case NumberLong:
+            return std::to_string(element.Long());
+        case Date:
+            return dateToISOStringLocal(element.Date());
+        default:
+            std::string diag;
+            if (redact) {
+                diag = "###";
+            } else {
+                diag = element.toString();
+            }
+            return {ErrorCodes::BadValue,
+                    str::stream() << "Unsupported type " << typeName(element.type()) << " (value: '"
+                                  << diag << "') for setParameter: " << name()};
+    }
+}
+
 IDLServerParameterDeprecatedAlias::IDLServerParameterDeprecatedAlias(StringData name,
                                                                      ServerParameter* sp)
     : ServerParameter(ServerParameterSet::getGlobal(),
