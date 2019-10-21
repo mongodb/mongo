@@ -64,6 +64,21 @@ struct TestTask {
     }
 };
 
+void killOps(ServiceContext* serviceCtx) {
+    ServiceContext::LockedClientsCursor cursor(serviceCtx);
+
+    for (Client* client = cursor.next(); client != nullptr; client = cursor.next()) {
+        stdx::lock_guard<Client> lk(*client);
+        if (client->isFromSystemConnection() && !client->shouldKillSystemOperation(lk))
+            continue;
+
+        OperationContext* toKill = client->getOperationContext();
+
+        if (toKill && !toKill->isKillPending())
+            serviceCtx->killOperation(lk, toKill, ErrorCodes::Interrupted);
+    }
+}
+
 // Test that writes to the queue persist across instantiations.
 TEST_F(PersistentTaskQueueTest, TestWritesPersistInstances) {
     NamespaceString nss("test.foo");
@@ -224,11 +239,6 @@ TEST_F(PersistentTaskQueueTest, TestWakeupOnEmptyQueue) {
 
     auto result = stdx::async(stdx::launch::async, [&q] {
         ThreadClient tc("RangeDeletionService", getGlobalServiceContext());
-        {
-            stdx::lock_guard<Client> lk(*tc.get());
-            tc->setSystemOperationKillable(lk);
-        }
-
         auto opCtx = tc->makeOperationContext();
 
         stdx::this_thread::sleep_for(stdx::chrono::milliseconds(500));
@@ -249,8 +259,11 @@ TEST_F(PersistentTaskQueueTest, TestInterruptedWhileWaitingOnCV) {
     unittest::Barrier barrier(2);
 
     auto result = stdx::async(stdx::launch::async, [opCtx, &q, &barrier] {
+        ThreadClient tc("RangeDeletionService", getGlobalServiceContext());
+        auto opCtx = tc->makeOperationContext();
+
         barrier.countDownAndWait();
-        q.peek(opCtx);
+        q.peek(opCtx.get());
     });
 
     // Sleeps a little to make sure the thread calling peek has a chance to reach the condition
@@ -271,15 +284,23 @@ TEST_F(PersistentTaskQueueTest, TestKilledOperationContextWhileWaitingOnCV) {
     unittest::Barrier barrier(2);
 
     auto result = stdx::async(stdx::launch::async, [opCtx, &q, &barrier] {
+        ThreadClient tc("RangeDeletionService", getGlobalServiceContext());
+        {
+            stdx::lock_guard<Client> lk(*tc.get());
+            tc->setSystemOperationKillable(lk);
+        }
+
+        auto opCtx = tc->makeOperationContext();
+
         barrier.countDownAndWait();
-        q.peek(opCtx);
+        q.peek(opCtx.get());
     });
 
     // Sleeps a little to make sure the thread calling peek has a chance to reach the condition
     // variable.
     barrier.countDownAndWait();
     stdx::this_thread::sleep_for(stdx::chrono::milliseconds(100));
-    opCtx->markKilled();
+    killOps(getServiceContext());
 
     ASSERT_THROWS(result.get(), ExceptionFor<ErrorCodes::Interrupted>);
 }
