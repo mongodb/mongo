@@ -94,7 +94,6 @@ public:
 
         boost::intrusive_ptr<ExpressionContext> _expCtx;
 
-        BSONObj _originalCollation;
         std::unique_ptr<CollatorInterface> _originalCollatorOwned;
         const CollatorInterface* _originalCollatorUnowned{nullptr};
     };
@@ -122,7 +121,6 @@ public:
                       bool allowDiskUse,
                       bool bypassDocumentValidation,
                       const NamespaceString& ns,
-                      const BSONObj& collation,
                       const boost::optional<RuntimeConstants>& runtimeConstants,
                       std::unique_ptr<CollatorInterface> collator,
                       const std::shared_ptr<MongoProcessInterface>& mongoProcessInterface,
@@ -132,6 +130,8 @@ public:
     /**
      * Constructs an ExpressionContext suitable for use outside of the aggregation system, including
      * for MatchExpression parsing and executing pipeline-style operations in the Update system.
+     *
+     * If 'collator' is null, the simple collator will be used.
      */
     ExpressionContext(OperationContext* opCtx,
                       const CollatorInterface* collator,
@@ -166,6 +166,19 @@ public:
 
     const CollatorInterface* getCollator() const {
         return _unownedCollator;
+    }
+
+    /**
+     * Returns the BSON spec for the ExpressionContext's collator, or the simple collator spec if
+     * the collator is null.
+     *
+     * The ExpressionContext is always set up with the fully-resolved collation. So even though
+     * SERVER-24433 describes an ambiguity between a null collator, here we can say confidently that
+     * null must mean simple since we have already handled "absence of a collator" before creating
+     * the ExpressionContext.
+     */
+    BSONObj getCollatorBSON() const {
+        return _unownedCollator ? _unownedCollator->getSpec().toBSON() : CollationSpec::kSimpleSpec;
     }
 
     void setCollator(const CollatorInterface* collator);
@@ -258,10 +271,6 @@ public:
     std::shared_ptr<MongoProcessInterface> mongoProcessInterface;
 
     const TimeZoneDatabase* timeZoneDatabase;
-
-    // Collation requested by the user for this pipeline. Empty if the user did not request a
-    // collation.
-    BSONObj collation;
 
     Variables variables;
     VariablesParseState variablesParseState;

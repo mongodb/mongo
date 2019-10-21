@@ -86,7 +86,6 @@ auto makeExpressionContext(OperationContext* opCtx, const MapReduce& parsedMr) {
         true,         // allowDiskUse
         parsedMr.getBypassDocumentValidation().get_value_or(false),
         parsedMr.getNamespace(),
-        parsedMr.getCollation().get_value_or(BSONObj()),
         runtimeConstants,
         std::move(resolvedCollator),
         MongoProcessInterface::create(opCtx),

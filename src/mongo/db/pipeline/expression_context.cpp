@@ -58,7 +58,6 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                         request.shouldAllowDiskUse(),
                         request.shouldBypassDocumentValidation(),
                         request.getNamespaceString(),
-                        request.getCollation(),
                         request.getRuntimeConstants(),
                         std::move(collator),
                         std::move(processInterface),
@@ -73,7 +72,6 @@ ExpressionContext::ExpressionContext(
     bool allowDiskUse,
     bool bypassDocumentValidation,
     const NamespaceString& ns,
-    const BSONObj& collation,
     const boost::optional<RuntimeConstants>& runtimeConstants,
     std::unique_ptr<CollatorInterface> collator,
     const std::shared_ptr<MongoProcessInterface>& mongoProcessInterface,
@@ -91,13 +89,13 @@ ExpressionContext::ExpressionContext(
       timeZoneDatabase(opCtx && opCtx->getServiceContext()
                            ? TimeZoneDatabase::get(opCtx->getServiceContext())
                            : nullptr),
-      collation(collation),
       variablesParseState(variables.useIdGenerator()),
       _ownedCollator(std::move(collator)),
       _unownedCollator(_ownedCollator.get()),
       _documentComparator(_unownedCollator),
       _valueComparator(_unownedCollator),
       _resolvedNamespaces(std::move(resolvedNamespaces)) {
+
     if (runtimeConstants)
         variables.setRuntimeConstants(*runtimeConstants);
     else
@@ -134,12 +132,9 @@ ExpressionContext::CollatorStash::CollatorStash(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::unique_ptr<CollatorInterface> newCollator)
     : _expCtx(expCtx),
-      _originalCollation(_expCtx->collation),
       _originalCollatorOwned(std::move(_expCtx->_ownedCollator)),
       _originalCollatorUnowned(_expCtx->_unownedCollator) {
     _expCtx->setCollator(std::move(newCollator));
-    _expCtx->collation =
-        _expCtx->getCollator() ? _expCtx->getCollator()->getSpec().toBSON().getOwned() : BSONObj();
 }
 
 ExpressionContext::CollatorStash::~CollatorStash() {
@@ -154,7 +149,6 @@ ExpressionContext::CollatorStash::~CollatorStash() {
             _expCtx->_ownedCollator = nullptr;
         }
     }
-    _expCtx->collation = _originalCollation;
 }
 
 std::unique_ptr<ExpressionContext::CollatorStash> ExpressionContext::temporarilyChangeCollator(
@@ -176,16 +170,9 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     boost::optional<UUID> uuid,
     boost::optional<std::unique_ptr<CollatorInterface>> updatedCollator) const {
 
-    auto [collationParam, collatorParam] = [&]() {
-        if (updatedCollator)
-            return std::pair(*updatedCollator ? (*updatedCollator)->getSpec().toBSON()
-                                              : CollationSpec::kSimpleSpec,
-                             std::move(*updatedCollator));
-        else
-            return std::pair(collation,
-                             _ownedCollator ? _ownedCollator->clone()
-                                            : std::unique_ptr<CollatorInterface>{});
-    }();
+    auto collator = updatedCollator
+        ? std::move(*updatedCollator)
+        : (_ownedCollator ? _ownedCollator->clone() : std::unique_ptr<CollatorInterface>{});
 
     auto expCtx = make_intrusive<ExpressionContext>(opCtx,
                                                     explain,
@@ -194,9 +181,8 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
                                                     allowDiskUse,
                                                     bypassDocumentValidation,
                                                     ns,
-                                                    std::move(collationParam),
                                                     boost::none,  // runtimeConstants
-                                                    std::move(collatorParam),
+                                                    std::move(collator),
                                                     mongoProcessInterface,
                                                     _resolvedNamespaces,
                                                     uuid);
@@ -213,7 +199,7 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     // effort to divorce the ExpressionContext from general Agg resources by creating an
     // AggregationContext. If that effort comes to fruition, this special-case collator handling
     // will be made unnecessary.
-    if (!updatedCollator && !collatorParam && _unownedCollator)
+    if (!updatedCollator && !collator && _unownedCollator)
         expCtx->setCollator(_unownedCollator);
 
     expCtx->variables = variables;

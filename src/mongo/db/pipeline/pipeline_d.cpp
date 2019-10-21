@@ -211,15 +211,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
         qr->setHint(aggRequest->getHint());
     }
 
-    // If the pipeline has a non-null collator, set the collation option to the result of
-    // serializing the collator's spec back into BSON. We do this in order to fill in all options
-    // that the user omitted.
-    //
-    // If pipeline has a null collator (representing the "simple" collation), we simply set the
-    // collation option to the original user BSON, which is either the empty object (unspecified),
-    // or the specification for the "simple" collation.
-    qr->setCollation(pExpCtx->getCollator() ? pExpCtx->getCollator()->getSpec().toBSON()
-                                            : pExpCtx->collation);
+    // The collation on the ExpressionContext has been resolved to either the user-specified
+    // collation or the collection default. This BSON should never be empty even if the resolved
+    // collator is simple.
+    qr->setCollation(pExpCtx->getCollatorBSON());
 
     const ExtensionsCallbackReal extensionsCallback(pExpCtx->opCtx, &nss);
 

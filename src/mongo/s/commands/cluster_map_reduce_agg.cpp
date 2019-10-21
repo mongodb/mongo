@@ -89,7 +89,6 @@ auto makeExpressionContext(OperationContext* opCtx,
         true,         // allowDiskUse
         parsedMr.getBypassDocumentValidation().get_value_or(false),
         nss,
-        collationObj,
         runtimeConstants,
         std::move(resolvedCollator),
         std::make_shared<MongoSInterface>(),

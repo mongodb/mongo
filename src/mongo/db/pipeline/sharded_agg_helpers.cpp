@@ -393,7 +393,7 @@ BSONObj createCommandForTargetedShards(
                                      expCtx->opCtx,
                                      expCtx->explain,
                                      expCtx->getRuntimeConstants(),
-                                     expCtx->collation);
+                                     expCtx->getCollatorBSON());
 }
 
 sharded_agg_helpers::DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
@@ -569,9 +569,10 @@ DispatchShardPipelineResults dispatchShardPipeline(
         : boost::optional<CachedCollectionRoutingInfo>{};
 
     // Determine whether we can run the entire aggregation on a single shard.
+    const auto collationObj = expCtx->getCollatorBSON();
     const bool mustRunOnAll = mustRunOnAllShards(expCtx->ns, hasChangeStream);
-    std::set<ShardId> shardIds = getTargetedShards(
-        opCtx, mustRunOnAll, executionNsRoutingInfo, shardQuery, expCtx->collation);
+    std::set<ShardId> shardIds =
+        getTargetedShards(opCtx, mustRunOnAll, executionNsRoutingInfo, shardQuery, collationObj);
 
     // Don't need to split the pipeline if we are only targeting a single shard, unless:
     // - There is a stage that needs to be run on the primary shard and the single target shard
@@ -604,7 +605,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
                                            expCtx->explain,
                                            expCtx->getRuntimeConstants(),
                                            pipeline.get(),
-                                           expCtx->collation);
+                                           collationObj);
 
     // A $changeStream pipeline must run on all shards, and will also open an extra cursor on the
     // config server in order to monitor for new shards. To guarantee that we do not miss any
@@ -624,7 +625,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
         }
         // Rebuild the set of shards as the shard registry might have changed.
         shardIds = getTargetedShards(
-            opCtx, mustRunOnAll, executionNsRoutingInfo, shardQuery, expCtx->collation);
+            opCtx, mustRunOnAll, executionNsRoutingInfo, shardQuery, collationObj);
     }
 
     // If there were no shards when we began execution, we wouldn't have run this aggregation in the
@@ -658,7 +659,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
                                                            ReadPreferenceSetting::get(opCtx),
                                                            Shard::RetryPolicy::kIdempotent,
                                                            shardQuery,
-                                                           expCtx->collation);
+                                                           collationObj);
         }
     } else {
         cursors = establishShardCursors(opCtx,

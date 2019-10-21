@@ -59,7 +59,6 @@ public:
                             false,        // allowDiskUse,
                             false,        // bypassDocumentValidation,
                             nss,
-                            {},  // collation,
                             RuntimeConstants(Date_t::now(), Timestamp(1, 0)),
                             {},  // collator
                             std::make_shared<StubMongoProcessInterface>(),

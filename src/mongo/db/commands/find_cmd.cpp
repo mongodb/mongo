@@ -106,7 +106,6 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* 
                                           queryRequest.allowDiskUse(),
                                           false,  // bypassDocumentValidation
                                           queryRequest.nss(),
-                                          queryRequest.getCollation(),
                                           queryRequest.getRuntimeConstants(),
                                           std::move(collator),
                                           nullptr,  // mongoProcessInterface

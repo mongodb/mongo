@@ -122,9 +122,6 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
                                           std::move(resolvedNamespaces),
                                           uuid);
 
-    // Keep the backing collation object on the context up to date with the resolved collator.
-    mergeCtx->collation = collationObj;
-
     mergeCtx->inMongos = true;
     return mergeCtx;
 }

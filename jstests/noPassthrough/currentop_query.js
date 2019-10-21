@@ -206,7 +206,7 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
                     "aggregate": {$exists: true},
                     "pipeline.0.$match.$comment": "currentop_query",
                     "comment": "currentop_query_2",
-                    "collation": {locale: "fr"},
+                    "collation.locale": "fr",
                     "hint": {_id: 1}
                 },
                                                              isRemoteShardCurOp)
@@ -220,10 +220,8 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
                 },
                 command: "count",
                 planSummary: "COLLSCAN",
-                currentOpFilter: {
-                    "command.query.$comment": "currentop_query",
-                    "command.collation": {locale: "fr"}
-                }
+                currentOpFilter:
+                    {"command.query.$comment": "currentop_query", "command.collation.locale": "fr"}
             },
             {
                 test: function(db) {
@@ -234,10 +232,8 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
                 },
                 command: "distinct",
                 planSummary: "COLLSCAN",
-                currentOpFilter: {
-                    "command.query.$comment": "currentop_query",
-                    "command.collation": {locale: "fr"}
-                }
+                currentOpFilter:
+                    {"command.query.$comment": "currentop_query", "command.collation.locale": "fr"}
             },
             {
                 test: function(db) {
@@ -259,10 +255,8 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
                 },
                 command: "findandmodify",
                 planSummary: "IXSCAN { _id: 1 }",
-                currentOpFilter: {
-                    "command.query.$comment": "currentop_query",
-                    "command.collation": {locale: "fr"}
-                }
+                currentOpFilter:
+                    {"command.query.$comment": "currentop_query", "command.collation.locale": "fr"}
             },
             {
                 test: function(db) {
@@ -289,7 +283,7 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
                                       ? {"command.delete": coll.getName(), "command.ordered": true}
                                       : {
                                             "command.q.$comment": "currentop_query",
-                                            "command.collation": {locale: "fr"}
+                                            "command.collation.locale": "fr"
                                         })
             },
             {
@@ -305,7 +299,7 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
                                       ? {"command.update": coll.getName(), "command.ordered": true}
                                       : {
                                             "command.q.$comment": "currentop_query",
-                                            "command.collation": {locale: "fr"}
+                                            "command.collation.locale": "fr"
                                         })
             }
         ];
@@ -327,7 +321,7 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
                 command: "find",
                 planSummary: "COLLSCAN",
                 currentOpFilter:
-                    {"command.comment": "currentop_query", "command.collation": {locale: "fr"}}
+                    {"command.comment": "currentop_query", "command.collation.locale": "fr"}
             });
         }
 
@@ -360,7 +354,7 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
             currentOpFilter: commandOrOriginatingCommand({
                 "aggregate": {$exists: true},
                 "pipeline.0.$geoNear.query.$comment": "currentop_query",
-                "collation": {locale: "fr"},
+                "collation.locale": "fr",
                 "comment": "currentop_query",
             },
                                                          isRemoteShardCurOp)
