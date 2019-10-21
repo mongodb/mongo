@@ -827,7 +827,7 @@ TEST_F(RollbackImplTest,
     // Run rollback.
     auto status = _rollback->runRollback(_opCtx.get());
 
-    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, _rollback->runRollback(_opCtx.get()));
+    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status.code());
     ASSERT(_recoveredToStableTimestamp);
     ASSERT(_recoveredFromOplog);
     ASSERT_FALSE(_triggeredOpObserver);
