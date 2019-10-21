@@ -114,7 +114,7 @@ SolutionCacheData* createSolutionCacheData() {
 /**
  * Utility function to create a PlanRankingDecision
  */
-PlanRankingDecision* createDecision(size_t numPlans) {
+std::unique_ptr<PlanRankingDecision> createDecision(size_t numPlans) {
     unique_ptr<PlanRankingDecision> why(new PlanRankingDecision());
     for (size_t i = 0; i < numPlans; ++i) {
         CommonStats common("COLLSCAN");
@@ -124,7 +124,7 @@ PlanRankingDecision* createDecision(size_t numPlans) {
         why->scores.push_back(0U);
         why->candidateOrder.push_back(i);
     }
-    return why.release();
+    return why;
 }
 
 TEST(PlanCacheCommandsTest, planCacheListQueryShapesEmpty) {

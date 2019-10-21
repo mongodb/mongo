@@ -600,6 +600,26 @@ env.CppUnitTest(
     ]
 )
 
+env.Library(
+    target='container_size_helper',
+    source=[
+        'container_size_helper.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.CppUnitTest(
+    target='container_size_helper_test',
+    source=[
+        'container_size_helper_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ]
+)
+
 env.CppUnitTest(
     target='producer_consumer_queue_test',
     source=[

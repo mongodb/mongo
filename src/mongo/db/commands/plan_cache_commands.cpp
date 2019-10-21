@@ -410,9 +410,8 @@ Status PlanCacheListPlans::list(OperationContext* opCtx,
 
         // Create the plan details field. Currently, this is a simple string representation of
         // SolutionCacheData.
-        SolutionCacheData* scd = entry->plannerData[i];
         BSONObjBuilder detailsBob(planBob.subobjStart("details"));
-        detailsBob.append("solution", scd->toString());
+        detailsBob.append("solution", entry->plannerData[i]->toString());
         detailsBob.doneFast();
 
         // reason is comprised of score and initial stats provided by
@@ -440,7 +439,7 @@ Status PlanCacheListPlans::list(OperationContext* opCtx,
         }
         feedbackBob.doneFast();
 
-        planBob.append("filterSet", scd->indexFilterApplied);
+        planBob.append("filterSet", entry->plannerData[i]->indexFilterApplied);
     }
 
     plansBuilder.doneFast();

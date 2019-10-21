@@ -328,7 +328,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
                 ->getPlanCache()
                 ->add(*_query,
                       solutions,
-                      ranking.release(),
+                      std::move(ranking),
                       getOpCtx()->getServiceContext()->getPreciseClockSource()->now())
                 .transitional_ignore();
         }
