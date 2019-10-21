@@ -38,6 +38,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
@@ -79,11 +80,24 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
 
     WriteConcernOptions writeConcern = wcResult.getValue();
 
-    // Get the default write concern specified in ReplSetConfig only if no write concern is
-    // specified in the command (when usedDefault is true) to avoid locking the
-    // ReplicationCoordinator mutex unconditionally.
+    // If no write concern is specified in the command (so usedDefault is true), then use the
+    // cluster-wide default WC (if there is one), or else the default WC from the ReplSetConfig
+    // (which takes the ReplicationCoordinator mutex).
     if (writeConcern.usedDefault) {
-        writeConcern = repl::ReplicationCoordinator::get(opCtx)->getGetLastErrorDefault();
+        writeConcern = ([&]() {
+            // WriteConcern defaults can only be applied on regular replica set members.  Operations
+            // received by shard and config servers should always have WC explicitly specified.
+            if (serverGlobalParams.clusterRole != ClusterRole::ShardServer &&
+                serverGlobalParams.clusterRole != ClusterRole::ConfigServer &&
+                !opCtx->getClient()->isInDirectClient()) {
+                auto wcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
+                                     .getDefaultWriteConcern();
+                if (wcDefault) {
+                    return *wcDefault;
+                }
+            }
+            return repl::ReplicationCoordinator::get(opCtx)->getGetLastErrorDefault();
+        })();
         if (writeConcern.wNumNodes == 0 && writeConcern.wMode.empty()) {
             writeConcern.wNumNodes = 1;
         }

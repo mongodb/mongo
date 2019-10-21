@@ -62,6 +62,7 @@
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/read_concern.h"
+#include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -226,7 +227,8 @@ private:
  * Given the specified command, returns an effective read concern which should be used or an error
  * if the read concern is not valid for the command.
  */
-StatusWith<repl::ReadConcernArgs> _extractReadConcern(const CommandInvocation* invocation,
+StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
+                                                      const CommandInvocation* invocation,
                                                       const BSONObj& cmdObj,
                                                       bool startTransaction) {
     repl::ReadConcernArgs readConcernArgs;
@@ -236,7 +238,41 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(const CommandInvocation* i
         return readConcernParseStatus;
     }
 
+    auto readConcernSupport = invocation->supportsReadConcern(readConcernArgs.getLevel());
+    if (readConcernSupport.defaultReadConcern ==
+            ReadConcernSupportResult::DefaultReadConcern::kPermitted &&
+        !opCtx->getClient()->isInDirectClient()) {
+        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
+            serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            // ReadConcern should always be explicitly specified by operations received on shard and
+            // config servers, even if it is empty (ie. readConcern: {}).  In this context
+            // (shard/config servers) an empty RC indicates the operation should use the implicit
+            // server defaults.  So, warn if the operation has not specified readConcern and is on a
+            // shard/config server.
+            if (!readConcernArgs.isSpecified()) {
+                // TODO: Disabled until after SERVER-43712, to avoid log spam.
+                // log() << "Missing readConcern on " << invocation->definition()->getName();
+            }
+        } else {
+            // A member in a regular replica set.  Since these servers receive client queries, in
+            // this context empty RC (ie. readConcern: {}) means the same as if absent/unspecified,
+            // which is to apply the CWRWC defaults if present.  This means we just test isEmpty(),
+            // since this covers both isSpecified() && !isSpecified()
+            if (readConcernArgs.isEmpty()) {
+                const auto rcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
+                                           .getDefaultReadConcern();
+                if (rcDefault) {
+                    readConcernArgs = *rcDefault;
+                    LOG(2) << "Applying default readConcern on "
+                           << invocation->definition()->getName() << " of " << *rcDefault;
+                }
+            }
+        }
+    }
+
     auto readConcernLevel = readConcernArgs.getLevel();
+    // Update the readConcernSupport, in case the default RC was applied.
+    readConcernSupport = invocation->supportsReadConcern(readConcernLevel);
     if (startTransaction && readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern &&
         readConcernLevel != repl::ReadConcernLevel::kMajorityReadConcern &&
         readConcernLevel != repl::ReadConcernLevel::kLocalReadConcern) {
@@ -256,7 +292,8 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(const CommandInvocation* i
     // There is no need to check if the command supports the read concern while in a transaction
     // because all commands that are allowed to run in a transaction must support all the read
     // concerns that can be used with a transaction.
-    if (!startTransaction && !invocation->supportsReadConcern(readConcernLevel)) {
+    if (!startTransaction &&
+        readConcernSupport.readConcern == ReadConcernSupportResult::ReadConcern::kNotSupported) {
         return {ErrorCodes::InvalidOptions,
                 str::stream() << "Command does not support read concern "
                               << readConcernArgs.toString()};
@@ -564,6 +601,18 @@ bool runCommandImpl(OperationContext* opCtx,
             // the command body.
             behaviors.uassertCommandDoesNotSpecifyWriteConcern(request.body);
         } else {
+            // WriteConcern should always be explicitly specified by operations received on shard
+            // and config servers, even if it is empty (ie. writeConcern: {}).  In this context
+            // (shard/config servers) an empty WC indicates the operation should use the implicit
+            // server defaults.  So, warn if the operation has not specified writeConcern and is on
+            // a shard/config server.
+            if (!opCtx->getClient()->isInDirectClient() &&
+                (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
+                 serverGlobalParams.clusterRole == ClusterRole::ConfigServer) &&
+                !request.body.hasField(WriteConcernOptions::kWriteConcernField)) {
+                // TODO: Disabled until after SERVER-43712, to avoid log spam.
+                // log() << "Missing writeConcern on " << command->getName();
+            }
             extractedWriteConcern.emplace(
                 uassertStatusOK(extractWriteConcern(opCtx, request.body)));
             if (sessionOptions.getAutocommit()) {
@@ -862,7 +911,7 @@ void execCommandDatabase(OperationContext* opCtx,
         bool startTransaction = static_cast<bool>(sessionOptions.getStartTransaction());
         if (!skipReadConcern) {
             auto newReadConcernArgs = uassertStatusOK(
-                _extractReadConcern(invocation.get(), request.body, startTransaction));
+                _extractReadConcern(opCtx, invocation.get(), request.body, startTransaction));
             {
                 // We must obtain the client lock to set the ReadConcernArgs on the operation
                 // context as it may be concurrently read by CurrentOp.
@@ -976,7 +1025,8 @@ void execCommandDatabase(OperationContext* opCtx,
         // parse it here, so if it is valid it can be used to compute the proper operationTime.
         auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
         if (readConcernArgs.isEmpty()) {
-            auto readConcernArgsStatus = _extractReadConcern(invocation.get(), request.body, false);
+            auto readConcernArgsStatus =
+                _extractReadConcern(opCtx, invocation.get(), request.body, false);
             if (readConcernArgsStatus.isOK()) {
                 // We must obtain the client lock to set the ReadConcernArgs on the operation
                 // context as it may be concurrently read by CurrentOp.

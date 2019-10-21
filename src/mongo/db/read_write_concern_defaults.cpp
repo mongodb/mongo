@@ -35,15 +35,27 @@
 
 namespace mongo {
 
+namespace {
+
+static constexpr auto kReadConcernLevelsDisallowedAsDefault = {
+    repl::ReadConcernLevel::kSnapshotReadConcern, repl::ReadConcernLevel::kLinearizableReadConcern};
+
+}
+
+bool ReadWriteConcernDefaults::isSuitableReadConcernLevel(repl::ReadConcernLevel level) {
+    for (auto bannedLevel : kReadConcernLevelsDisallowedAsDefault) {
+        if (level == bannedLevel) {
+            return false;
+        }
+    }
+    return true;
+}
+
 void ReadWriteConcernDefaults::checkSuitabilityAsDefault(const ReadConcern& rc) {
     uassert(ErrorCodes::BadValue,
-            str::stream() << "level: '" << ReadConcern::kSnapshotReadConcernStr
+            str::stream() << "level: '" << repl::readConcernLevels::toString(rc.getLevel())
                           << "' is not suitable for the default read concern",
-            rc.getLevel() != repl::ReadConcernLevel::kSnapshotReadConcern);
-    uassert(ErrorCodes::BadValue,
-            str::stream() << "level: '" << ReadConcern::kLinearizableReadConcernStr
-                          << "' is not suitable for the default read concern",
-            rc.getLevel() != repl::ReadConcernLevel::kLinearizableReadConcern);
+            isSuitableReadConcernLevel(rc.getLevel()));
     uassert(ErrorCodes::BadValue,
             str::stream() << "'" << ReadConcern::kAfterOpTimeFieldName
                           << "' is not suitable for the default read concern",

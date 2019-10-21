@@ -176,8 +176,9 @@ public:
             return false;
         }
 
-        bool supportsReadConcern(repl::ReadConcernLevel level) const final {
-            return true;
+        ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level) const final {
+            return {ReadConcernSupportResult::ReadConcern::kSupported,
+                    ReadConcernSupportResult::DefaultReadConcern::kPermitted};
         }
 
         bool canIgnorePrepareConflicts() const override {

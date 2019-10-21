@@ -70,8 +70,9 @@ public:
             return true;
         }
 
-        bool supportsReadConcern(repl::ReadConcernLevel level) const override {
-            return true;
+        ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level) const override {
+            return {ReadConcernSupportResult::ReadConcern::kSupported,
+                    ReadConcernSupportResult::DefaultReadConcern::kPermitted};
         }
 
         void _runAggCommand(OperationContext* opCtx,

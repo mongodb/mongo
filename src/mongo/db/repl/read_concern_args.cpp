@@ -57,18 +57,20 @@ const ReadConcernArgs& ReadConcernArgs::get(const OperationContext* opCtx) {
 }
 
 
-ReadConcernArgs::ReadConcernArgs() = default;
+ReadConcernArgs::ReadConcernArgs() : _specified(false) {}
 
 ReadConcernArgs::ReadConcernArgs(boost::optional<ReadConcernLevel> level)
-    : _level(std::move(level)) {}
+    : _level(std::move(level)), _specified(_level) {}
 
 ReadConcernArgs::ReadConcernArgs(boost::optional<OpTime> opTime,
                                  boost::optional<ReadConcernLevel> level)
-    : _opTime(std::move(opTime)), _level(std::move(level)) {}
+    : _opTime(std::move(opTime)), _level(std::move(level)), _specified(_opTime || _level) {}
 
 ReadConcernArgs::ReadConcernArgs(boost::optional<LogicalTime> clusterTime,
                                  boost::optional<ReadConcernLevel> level)
-    : _afterClusterTime(std::move(clusterTime)), _level(std::move(level)) {}
+    : _afterClusterTime(std::move(clusterTime)),
+      _level(std::move(level)),
+      _specified(_afterClusterTime || _level) {}
 
 std::string ReadConcernArgs::toString() const {
     return toBSON().toString();
@@ -82,6 +84,10 @@ BSONObj ReadConcernArgs::toBSON() const {
 
 bool ReadConcernArgs::isEmpty() const {
     return !_afterClusterTime && !_opTime && !_atClusterTime && !_level;
+}
+
+bool ReadConcernArgs::isSpecified() const {
+    return _specified;
 }
 
 ReadConcernLevel ReadConcernArgs::getLevel() const {
@@ -105,6 +111,8 @@ boost::optional<LogicalTime> ReadConcernArgs::getArgsAtClusterTime() const {
 }
 
 Status ReadConcernArgs::initialize(const BSONElement& readConcernElem) {
+    invariant(isEmpty());  // only legal to call on uninitialized object.
+    _specified = false;
     if (readConcernElem.eoo()) {
         return Status::OK();
     }
@@ -158,21 +166,15 @@ Status ReadConcernArgs::parse(const BSONObj& readConcernObj) {
                 return readCommittedStatus;
             }
 
-            if (levelString == kLocalReadConcernStr) {
-                _level = ReadConcernLevel::kLocalReadConcern;
-            } else if (levelString == kMajorityReadConcernStr) {
-                _level = ReadConcernLevel::kMajorityReadConcern;
-            } else if (levelString == kLinearizableReadConcernStr) {
-                _level = ReadConcernLevel::kLinearizableReadConcern;
-            } else if (levelString == kAvailableReadConcernStr) {
-                _level = ReadConcernLevel::kAvailableReadConcern;
-            } else if (levelString == kSnapshotReadConcernStr) {
-                _level = ReadConcernLevel::kSnapshotReadConcern;
-            } else {
+            _level = readConcernLevels::fromString(levelString);
+            if (!_level) {
                 return Status(ErrorCodes::FailedToParse,
                               str::stream() << kReadConcernFieldName << '.' << kLevelFieldName
-                                            << " must be either 'local', 'majority', "
-                                               "'linearizable', 'available', or 'snapshot'");
+                                            << " must be either '" << readConcernLevels::kLocalName
+                                            << "', '" << readConcernLevels::kMajorityName << "', '"
+                                            << readConcernLevels::kLinearizableName << "', '"
+                                            << readConcernLevels::kAvailableName << "', or '"
+                                            << readConcernLevels::kSnapshotName << "'");
             }
         } else {
             return Status(ErrorCodes::InvalidOptions,
@@ -202,22 +204,23 @@ Status ReadConcernArgs::parse(const BSONObj& readConcernObj) {
         return Status(ErrorCodes::InvalidOptions,
                       str::stream()
                           << kAfterClusterTimeFieldName << " field can be set only if "
-                          << kLevelFieldName << " is equal to " << kMajorityReadConcernStr << ", "
-                          << kLocalReadConcernStr << ", or " << kSnapshotReadConcernStr);
+                          << kLevelFieldName << " is equal to " << readConcernLevels::kMajorityName
+                          << ", " << readConcernLevels::kLocalName << ", or "
+                          << readConcernLevels::kSnapshotName);
     }
 
     if (_opTime && getLevel() == ReadConcernLevel::kSnapshotReadConcern) {
         return Status(ErrorCodes::InvalidOptions,
                       str::stream()
                           << kAfterOpTimeFieldName << " field cannot be set if " << kLevelFieldName
-                          << " is equal to " << kSnapshotReadConcernStr);
+                          << " is equal to " << readConcernLevels::kSnapshotName);
     }
 
     if (_atClusterTime && getLevel() != ReadConcernLevel::kSnapshotReadConcern) {
         return Status(ErrorCodes::InvalidOptions,
-                      str::stream()
-                          << kAtClusterTimeFieldName << " field can be set only if "
-                          << kLevelFieldName << " is equal to " << kSnapshotReadConcernStr);
+                      str::stream() << kAtClusterTimeFieldName << " field can be set only if "
+                                    << kLevelFieldName << " is equal to "
+                                    << readConcernLevels::kSnapshotName);
     }
 
     // Make sure that atClusterTime wasn't specified with zero seconds.
@@ -233,6 +236,7 @@ Status ReadConcernArgs::parse(const BSONObj& readConcernObj) {
                       str::stream() << kAfterClusterTimeFieldName << " cannot be a null timestamp");
     }
 
+    _specified = true;
     return Status::OK();
 }
 
@@ -261,33 +265,7 @@ void ReadConcernArgs::appendInfo(BSONObjBuilder* builder) const {
     BSONObjBuilder rcBuilder(builder->subobjStart(kReadConcernFieldName));
 
     if (_level) {
-        StringData levelName;
-        switch (_level.get()) {
-            case ReadConcernLevel::kLocalReadConcern:
-                levelName = kLocalReadConcernStr;
-                break;
-
-            case ReadConcernLevel::kMajorityReadConcern:
-                levelName = kMajorityReadConcernStr;
-                break;
-
-            case ReadConcernLevel::kLinearizableReadConcern:
-                levelName = kLinearizableReadConcernStr;
-                break;
-
-            case ReadConcernLevel::kAvailableReadConcern:
-                levelName = kAvailableReadConcernStr;
-                break;
-
-            case ReadConcernLevel::kSnapshotReadConcern:
-                levelName = kSnapshotReadConcernStr;
-                break;
-
-            default:
-                MONGO_UNREACHABLE;
-        }
-
-        rcBuilder.append(kLevelFieldName, levelName);
+        rcBuilder.append(kLevelFieldName, readConcernLevels::toString(_level.get()));
     }
 
     if (_opTime) {
@@ -303,6 +281,44 @@ void ReadConcernArgs::appendInfo(BSONObjBuilder* builder) const {
     }
 
     rcBuilder.done();
+}
+
+boost::optional<ReadConcernLevel> readConcernLevels::fromString(StringData levelString) {
+    if (levelString == readConcernLevels::kLocalName) {
+        return ReadConcernLevel::kLocalReadConcern;
+    } else if (levelString == readConcernLevels::kMajorityName) {
+        return ReadConcernLevel::kMajorityReadConcern;
+    } else if (levelString == readConcernLevels::kLinearizableName) {
+        return ReadConcernLevel::kLinearizableReadConcern;
+    } else if (levelString == readConcernLevels::kAvailableName) {
+        return ReadConcernLevel::kAvailableReadConcern;
+    } else if (levelString == readConcernLevels::kSnapshotName) {
+        return ReadConcernLevel::kSnapshotReadConcern;
+    } else {
+        return boost::none;
+    }
+}
+
+StringData readConcernLevels::toString(ReadConcernLevel level) {
+    switch (level) {
+        case ReadConcernLevel::kLocalReadConcern:
+            return kLocalName;
+
+        case ReadConcernLevel::kMajorityReadConcern:
+            return kMajorityName;
+
+        case ReadConcernLevel::kLinearizableReadConcern:
+            return kLinearizableName;
+
+        case ReadConcernLevel::kAvailableReadConcern:
+            return kAvailableName;
+
+        case ReadConcernLevel::kSnapshotReadConcern:
+            return kSnapshotName;
+
+        default:
+            MONGO_UNREACHABLE;
+    }
 }
 
 }  // namespace repl

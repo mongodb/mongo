@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
 namespace mongo {
 namespace repl {
 
@@ -39,6 +41,25 @@ enum class ReadConcernLevel {
     kAvailableReadConcern,
     kSnapshotReadConcern
 };
+
+namespace readConcernLevels {
+
+constexpr std::initializer_list<ReadConcernLevel> all = {ReadConcernLevel::kLocalReadConcern,
+                                                         ReadConcernLevel::kMajorityReadConcern,
+                                                         ReadConcernLevel::kLinearizableReadConcern,
+                                                         ReadConcernLevel::kAvailableReadConcern,
+                                                         ReadConcernLevel::kSnapshotReadConcern};
+
+constexpr StringData kLocalName = "local"_sd;
+constexpr StringData kMajorityName = "majority"_sd;
+constexpr StringData kLinearizableName = "linearizable"_sd;
+constexpr StringData kAvailableName = "available"_sd;
+constexpr StringData kSnapshotName = "snapshot"_sd;
+
+boost::optional<ReadConcernLevel> fromString(StringData levelString);
+StringData toString(ReadConcernLevel level);
+
+}  // namespace readConcernLevels
 
 }  // namespace repl
 }  // namespace mongo

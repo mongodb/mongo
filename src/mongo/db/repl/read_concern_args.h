@@ -54,12 +54,6 @@ public:
     static constexpr StringData kAtClusterTimeFieldName = "atClusterTime"_sd;
     static constexpr StringData kLevelFieldName = "level"_sd;
 
-    static constexpr StringData kLocalReadConcernStr = "local"_sd;
-    static constexpr StringData kMajorityReadConcernStr = "majority"_sd;
-    static constexpr StringData kLinearizableReadConcernStr = "linearizable"_sd;
-    static constexpr StringData kAvailableReadConcernStr = "available"_sd;
-    static constexpr StringData kSnapshotReadConcernStr = "snapshot"_sd;
-
     /**
      * Represents the internal mechanism an operation uses to satisfy 'majority' read concern.
      */
@@ -147,6 +141,13 @@ public:
     bool isEmpty() const;
 
     /**
+     * Returns true if this ReadConcernArgs represents a read concern that was actually specified.
+     * If the RC was specified as an empty BSON object this will still be true (unlike isEmpty()).
+     * False represents an absent or missing read concern, ie. one which wasn't present at all.
+     */
+    bool isSpecified() const;
+
+    /**
      *  Returns default kLocalReadConcern if _level is not set.
      */
     ReadConcernLevel getLevel() const;
@@ -187,6 +188,12 @@ private:
      * level is 'majority'.
      */
     MajorityReadMechanism _majorityReadMechanism{MajorityReadMechanism::kMajoritySnapshot};
+
+    /**
+     * True indicates that a read concern has been specified (even if it might be empty), as
+     * opposed to being absent or missing.
+     */
+    bool _specified;
 };
 
 }  // namespace repl

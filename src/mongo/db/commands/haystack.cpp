@@ -73,10 +73,11 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 
-    bool supportsReadConcern(const std::string& dbName,
-                             const BSONObj& cmdObj,
-                             repl::ReadConcernLevel level) const final {
-        return true;
+    ReadConcernSupportResult supportsReadConcern(const std::string& dbName,
+                                                 const BSONObj& cmdObj,
+                                                 repl::ReadConcernLevel level) const final {
+        return {ReadConcernSupportResult::ReadConcern::kSupported,
+                ReadConcernSupportResult::DefaultReadConcern::kPermitted};
     }
 
     ReadWriteType getReadWriteType() const {

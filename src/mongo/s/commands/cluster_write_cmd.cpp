@@ -543,8 +543,9 @@ private:
         return true;
     }
 
-    bool supportsReadConcern(repl::ReadConcernLevel level) const final {
-        return true;
+    ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level) const final {
+        return {ReadConcernSupportResult::ReadConcern::kSupported,
+                ReadConcernSupportResult::DefaultReadConcern::kPermitted};
     }
 
     void doCheckAuthorization(OperationContext* opCtx) const final {

@@ -61,6 +61,15 @@ public:
     ReadWriteConcernDefaults() = default;
     ~ReadWriteConcernDefaults() = default;
 
+    /**
+     * Returns true if the RC level is permissible to use as a default, and false if it cannot be a
+     * RC default.
+     */
+    static bool isSuitableReadConcernLevel(repl::ReadConcernLevel level);
+
+    /**
+     * Checks if the given RWC is suitable to use as a default, and uasserts if not.
+     */
     static void checkSuitabilityAsDefault(const ReadConcern& rc);
     static void checkSuitabilityAsDefault(const WriteConcern& wc);
 
