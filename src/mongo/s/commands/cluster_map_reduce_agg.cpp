@@ -77,7 +77,10 @@ auto makeExpressionContext(OperationContext* opCtx,
                                       parsedMr.getOutOptions().getCollectionName()};
         resolvedNamespaces.try_emplace(outNss.coll(), outNss, std::vector<BSONObj>{});
     }
-
+    auto runtimeConstants = Variables::generateRuntimeConstants(opCtx);
+    if (parsedMr.getScope()) {
+        runtimeConstants.setJsScope(parsedMr.getScope()->getObj());
+    }
     auto expCtx = make_intrusive<ExpressionContext>(
         opCtx,
         boost::none,  // explain
@@ -87,7 +90,7 @@ auto makeExpressionContext(OperationContext* opCtx,
         parsedMr.getBypassDocumentValidation().get_value_or(false),
         nss,
         collationObj,
-        boost::none,  // runtimeConstants
+        runtimeConstants,
         std::move(resolvedCollator),
         std::make_shared<MongoSInterface>(),
         std::move(resolvedNamespaces),
@@ -100,10 +103,13 @@ Document serializeToCommand(BSONObj originalCmd, const MapReduce& parsedMr, Pipe
     MutableDocument translatedCmd;
 
     translatedCmd["aggregate"] = Value(parsedMr.getNamespace().coll());
-    translatedCmd["pipeline"] = Value(pipeline->serialize());
-    translatedCmd["cursor"] = Value(Document{{"batchSize", std::numeric_limits<long long>::max()}});
-    translatedCmd["allowDiskUse"] = Value(true);
-    translatedCmd["fromMongos"] = Value(true);
+    translatedCmd[AggregationRequest::kPipelineName] = Value(pipeline->serialize());
+    translatedCmd[AggregationRequest::kCursorName] =
+        Value(Document{{"batchSize", std::numeric_limits<long long>::max()}});
+    translatedCmd[AggregationRequest::kAllowDiskUseName] = Value(true);
+    translatedCmd[AggregationRequest::kFromMongosName] = Value(true);
+    translatedCmd[AggregationRequest::kRuntimeConstants] =
+        Value(pipeline->getContext()->getRuntimeConstants().toBSON());
 
     // Append generic command options.
     for (const auto& elem : CommandHelpers::appendPassthroughFields(originalCmd, BSONObj())) {
