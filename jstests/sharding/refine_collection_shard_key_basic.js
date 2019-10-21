@@ -61,10 +61,10 @@ function validateConfigChangelog(count) {
                mongos.getCollection(kConfigChangelog)
                    .find({what: 'refineCollectionShardKey.start', ns: kNsName})
                    .itcount());
-    assert.eq(count,
-              mongos.getCollection(kConfigChangelog)
-                  .find({what: 'refineCollectionShardKey.end', ns: kNsName})
-                  .itcount());
+    assert.lte(count,
+               mongos.getCollection(kConfigChangelog)
+                   .find({what: 'refineCollectionShardKey.end', ns: kNsName})
+                   .itcount());
 }
 
 function validateConfigCollectionsUnique(unique) {
