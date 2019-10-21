@@ -1503,11 +1503,18 @@ if get_option('git-decider') == 'on':
 # executable (like -fPIE), vs those being used to target a (shared) library (like -fPIC). To do so,
 # we inject a new family of SCons variables PROG*FLAGS, by reaching into the various COMs.
 if not env.TargetOSIs('windows'):
-    env["CCCOM"] = env["CCCOM"].replace("$CFLAGS", "$CFLAGS $PROGCFLAGS")
-    env["CXXCOM"] = env["CXXCOM"].replace("$CXXFLAGS", "$CXXFLAGS $PROGCXXFLAGS")
-    env["CCCOM"] = env["CCCOM"].replace("$CCFLAGS", "$CCFLAGS $PROGCCFLAGS")
-    env["CXXCOM"] = env["CXXCOM"].replace("$CCFLAGS", "$CCFLAGS $PROGCCFLAGS")
-    env["LINKCOM"] = env["LINKCOM"].replace("$LINKFLAGS", "$LINKFLAGS $PROGLINKFLAGS")
+    env["CCCOM"] = env["CCCOM"].replace("$CCFLAGS", "$PROGCCFLAGS")
+    env["CXXCOM"] = env["CXXCOM"].replace("$CCFLAGS", "$PROGCCFLAGS")
+    env["PROGCCFLAGS"] = ['$CCFLAGS']
+
+    env["CCCOM"] = env["CCCOM"].replace("$CFLAGS", "$PROGCFLAGS")
+    env["PROGCFLAGS"] = ['$CFLAGS']
+
+    env["CXXCOM"] = env["CXXCOM"].replace("$CXXFLAGS", "$PROGCXXFLAGS")
+    env['PROGCXXFLAGS'] = ['$CXXFLAGS']
+
+    env["LINKCOM"] = env["LINKCOM"].replace("$LINKFLAGS", "$PROGLINKFLAGS")
+    env["PROGLINKFLAGS"] = ['$LINKFLAGS']
 
 if not env.Verbose():
     env.Append( CCCOMSTR = "Compiling $TARGET" )
@@ -1860,8 +1867,19 @@ if env.TargetOSIs('posix'):
             ],
         )
 
-    # Everything on OS X is position independent by default. Solaris doesn't support PIE.
-    if not env.TargetOSIs('darwin', 'solaris'):
+    # If shared and static object files stripped of their rightmost
+    # dot-delimited suffix would collide, modify the shared library
+    # ones so that they won't. We do this because if split dwarf is in
+    # play, static and dynamic builds would otherwise overwrite each
+    # other's .dwo files, because GCC strips the last suffix and adds
+    # .dwo, rather than simply appending .dwo to the full filename.
+    objsuffelts = env.subst('$OBJSUFFIX').split('.')
+    shobjsuffelts = env.subst('$SHOBJSUFFIX').split('.')
+    if objsuffelts[0:-1] == shobjsuffelts[0:-1]:
+        env['SHOBJSUFFIX'] = '.dyn${OBJSUFFIX}'
+
+    # Everything on OS X is position independent by default.
+    if not env.TargetOSIs('darwin'):
         if get_option('runtime-hardening') == "on":
             # If runtime hardening is requested, then build anything
             # destined for an executable with the necessary flags for PIE.
