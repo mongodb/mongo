@@ -291,7 +291,10 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
              */
             if (!WT_PAGE_IS_INTERNAL(page) && page->read_gen == WT_READGEN_WONT_NEED &&
               !tried_eviction) {
-                WT_ERR_BUSY_OK(__wt_page_release_evict(session, walk, 0));
+                ret = __wt_page_release_evict(session, walk, 0);
+                walk = NULL;
+                WT_ERR_BUSY_OK(ret);
+
                 walk = prev;
                 prev = NULL;
                 tried_eviction = true;

@@ -633,6 +633,13 @@ __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t times
 {
     wt_timestamp_t pinned_ts;
 
+    /*
+     * When shutting down, the transactional system has finished running and all we care about is
+     * eviction, make everything visible.
+     */
+    if (F_ISSET(S2C(session), WT_CONN_CLOSING))
+        return (true);
+
     if (!__txn_visible_all_id(session, id))
         return (false);
 
@@ -640,15 +647,13 @@ __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t times
     if (timestamp == WT_TS_NONE)
         return (true);
 
-    /*
-     * If no oldest timestamp has been supplied, updates have to stay in cache until we are shutting
-     * down.
-     */
-    if (!S2C(session)->txn_global.has_pinned_timestamp)
-        return (F_ISSET(S2C(session), WT_CONN_CLOSING));
+    /* If no oldest timestamp has been supplied, updates have to stay in cache. */
+    if (S2C(session)->txn_global.has_pinned_timestamp) {
+        __wt_txn_pinned_timestamp(session, &pinned_ts);
+        return (timestamp <= pinned_ts);
+    }
 
-    __wt_txn_pinned_timestamp(session, &pinned_ts);
-    return (timestamp <= pinned_ts);
+    return (false);
 }
 
 /*

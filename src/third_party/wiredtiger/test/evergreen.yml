@@ -59,8 +59,9 @@ functions:
         else
           cd build_posix
           sh ./reconf
-          ${configure_env_vars|} ../configure ${configure_python_setting|} \
-            ${posix_configure_flags|--enable-diagnostic --enable-python --enable-zlib --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL}
+          ${configure_env_vars|CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-ggdb"} \
+            ../configure ${configure_python_setting|} \
+            ${posix_configure_flags|--enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL}
           ${make_command|make} ${smp_command|} 2>&1
 
           # On macOS, change the binary location with install_name_tool since DYLD_LIBRARY_PATH
@@ -114,16 +115,18 @@ post:
 tasks:
 ## Base compile task on posix flavours
   - name: compile
+    tags: ["pull_request"]
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
 
   - name: compile-asan
+    tags: ["pull_request"]
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
-          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:disable_coredump=0 ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer CFLAGS=-fsanitize=address
+          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:disable_coredump=0 ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer CFLAGS="-fsanitize=address -ggdb"
           posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic --disable-static
 
   - name: make-check-test
@@ -144,6 +147,7 @@ tasks:
   # Start of normal make check test tasks
 
   - name: lang-python-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -154,6 +158,7 @@ tasks:
           directory: lang/python
 
   - name: examples-c-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -163,7 +168,8 @@ tasks:
         vars:
           directory: examples/c
 
-  - name: examples-c-test-asan
+  - name: examples-c-asan-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile-asan
     commands:
@@ -172,13 +178,14 @@ tasks:
           dependent_task: compile-asan
       - func: "compile wiredtiger"
         vars:
-          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:disable_coredump=0 ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer CFLAGS=-fsanitize=address
+          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:disable_coredump=0 ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer CFLAGS="-fsanitize=address -ggdb"
           posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic --disable-static
       - func: "make check directory"
         vars:
           directory: examples/c
 
   - name: bloom-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -189,6 +196,7 @@ tasks:
           directory: test/bloom
 
   - name: checkpoint-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -199,6 +207,7 @@ tasks:
           directory: test/checkpoint
 
   - name: cursor-order-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -209,6 +218,7 @@ tasks:
           directory: test/cursor_order
 
   - name: fops-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -219,6 +229,7 @@ tasks:
           directory: test/fops
 
   - name: format-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -229,6 +240,7 @@ tasks:
           directory: test/format
 
   - name: huge-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -239,6 +251,7 @@ tasks:
           directory: test/huge
 
   - name: manydbs-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -249,6 +262,7 @@ tasks:
           directory: test/manydbs
 
   - name: packing-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -259,6 +273,7 @@ tasks:
           directory: test/packing
 
   - name: readonly-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -269,6 +284,7 @@ tasks:
           directory: test/readonly
 
   - name: salvage-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -279,6 +295,7 @@ tasks:
           directory: test/salvage
 
   - name: thread-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -289,6 +306,7 @@ tasks:
           directory: test/thread
 
   - name: bench-wtperf-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -303,11 +321,11 @@ tasks:
   # Start of csuite test tasks
 
   - name: csuite-import-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "compile wiredtiger"
       - command: shell.exec
         params:
           working_dir: "wiredtiger/build_posix"
@@ -318,6 +336,7 @@ tasks:
             ${test_env_vars|} $(pwd)/../test/csuite/import/smoke.sh 2>&1
 
   - name: csuite-random-abort-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -332,6 +351,7 @@ tasks:
             ${test_env_vars|} $(pwd)/../test/csuite/random_abort/smoke.sh 2>&1
 
   - name: csuite-random-directio-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -346,6 +366,7 @@ tasks:
             ${test_env_vars|} $(pwd)/../test/csuite/random_directio/smoke.sh 2>&1
 
   - name: csuite-schema-abort-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -360,6 +381,7 @@ tasks:
             ${test_env_vars|} $(pwd)/../test/csuite/schema_abort/smoke.sh 2>&1
 
   - name: csuite-timestamp-abort-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -374,6 +396,7 @@ tasks:
             ${test_env_vars|} $(pwd)/../test/csuite/timestamp_abort/smoke.sh 2>&1
 
   - name: csuite-scope-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -388,6 +411,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_scope 2>&1
 
   - name: csuite-truncated-log-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -402,6 +426,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_truncated_log 2>&1
 
   - name: csuite-wt1965-col-efficiency-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -416,6 +441,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_wt1965_col_efficiency 2>&1
 
   - name: csuite-wt2403-lsm-workload-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -430,6 +456,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_wt2403_lsm_workload 2>&1
 
   - name: csuite-wt2447-join-main-table-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -444,6 +471,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_wt2447_join_main_table 2>&1
 
   - name: csuite-wt2695-checksum-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -458,6 +486,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_wt2695_checksum 2>&1
 
   - name: csuite-wt2592-join-schema-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -472,6 +501,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_wt2592_join_schema 2>&1
 
   - name: csuite-wt2719-reconfig-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -486,6 +516,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_wt2719_reconfig 2>&1
 
   - name: csuite-wt2999-join-extractor-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -500,6 +531,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_wt2999_join_extractor 2>&1
 
   - name: csuite-wt3120-filesys-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -514,6 +546,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_wt3120_filesys 2>&1
 
   - name: csuite-wt3135-search-near-collator-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -528,6 +561,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_wt3135_search_near_collator 2>&1
 
   - name: csuite-wt3184-dup-index-collator-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -542,6 +576,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_wt3184_dup_index_collator 2>&1
 
   - name: csuite-wt3363-checkpoint-op-races-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -556,6 +591,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_wt3363_checkpoint_op_races 2>&1
 
   - name: csuite-wt3874-pad-byte-collator-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -570,6 +606,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_wt3874_pad_byte_collator 2>&1
 
   - name: csuite-wt4105-large-doc-small-upd-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -584,6 +621,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_wt4105_large_doc_small_upd 2>&1
 
   - name: csuite-wt4117-checksum-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -598,6 +636,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_wt4117_checksum 2>&1
 
   - name: csuite-wt4156-metadata-salvage-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -612,6 +651,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_wt4156_metadata_salvage 2>&1
 
   - name: csuite-wt4699-json-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -626,6 +666,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_wt4699_json 2>&1
 
   - name: csuite-wt4803-cache-overflow-abort-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -640,6 +681,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_wt4803_cache_overflow_abort 2>&1
 
   - name: csuite-wt4891-meta-ckptlist-get-alloc-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -654,6 +696,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_wt4891_meta_ckptlist_get_alloc 2>&1
 
   - name: csuite-rwlock-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -668,6 +711,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_rwlock 2>&1
 
   - name: csuite-wt2246-col-append-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -682,6 +726,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_wt2246_col_append 2>&1
 
   - name: csuite-wt2323-join-visibility-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -696,6 +741,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_wt2323_join_visibility 2>&1
 
   - name: csuite-wt2535-insert-race-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -710,6 +756,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_wt2535_insert_race 2>&1
 
   - name: csuite-wt2834-join-bloom-fix-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -724,6 +771,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_wt2834_join_bloom_fix 2>&1
 
   - name: csuite-wt2853-perf-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -738,6 +786,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_wt2853_perf 2>&1
 
   - name: csuite-wt2909-checkpoint-integrity-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -752,6 +801,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_wt2909_checkpoint_integrity 2>&1
 
   - name: csuite-wt3338-partial-update-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -766,6 +816,7 @@ tasks:
             ${test_env_vars|} $(pwd)/test/csuite/test_wt3338_partial_update 2>&1
 
   - name: csuite-wt4333-handle-locks-test
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
@@ -810,6 +861,7 @@ tasks:
   # "test/suite/run.py [ab]" will be translated to testing "test_a*.py" and "test_b*.py"
 
   - name: unit-test-bucket00
+    tags: ["pull_request", "unit_test"]
     depends_on:
     - name: compile
     commands:
@@ -824,6 +876,7 @@ tasks:
             ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [ab] -v 2 ${smp_command|} 2>&1
 
   - name: unit-test-bucket01
+    tags: ["pull_request", "unit_test"]
     depends_on:
     - name: compile
     commands:
@@ -838,6 +891,7 @@ tasks:
             ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [c] -v 2 ${smp_command|} 2>&1
 
   - name: unit-test-bucket02
+    tags: ["pull_request", "unit_test"]
     depends_on:
     - name: compile
     commands:
@@ -852,6 +906,7 @@ tasks:
             ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [defg] -v 2 ${smp_command|} 2>&1
 
   - name: unit-test-bucket03
+    tags: ["pull_request", "unit_test"]
     depends_on:
     - name: compile
     commands:
@@ -866,6 +921,7 @@ tasks:
             ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [hijk] -v 2 ${smp_command|} 2>&1
 
   - name: unit-test-bucket04
+    tags: ["pull_request", "unit_test"]
     depends_on:
     - name: compile
     commands:
@@ -880,6 +936,7 @@ tasks:
             ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [lmnopq] -v 2 ${smp_command|} 2>&1
 
   - name: unit-test-bucket05
+    tags: ["pull_request", "unit_test"]
     depends_on:
     - name: compile
     commands:
@@ -894,6 +951,7 @@ tasks:
             ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [rs] -v 2 ${smp_command|} 2>&1
 
   - name: unit-test-bucket06
+    tags: ["pull_request", "unit_test"]
     depends_on:
     - name: compile
     commands:
@@ -908,6 +966,7 @@ tasks:
             ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [t] -v 2 ${smp_command|} 2>&1
 
   - name: unit-test-bucket07
+    tags: ["pull_request", "unit_test"]
     depends_on:
     - name: compile
     commands:
@@ -923,7 +982,37 @@ tasks:
 
   # End of Python unit test tasks
 
+  - name: s-all
+    tags: ["pull_request"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/dist"
+          script: |
+            set -o errexit
+            set -o verbose
+            sh s_all -A -E 2>&1
+
+  - name: conf-dump-test
+    tags: ["pull_request"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix/test"
+          script: |
+            set -o errexit
+            set -o verbose
+            
+            ${test_env_vars|} ${python_binary|python} ../../test/wtperf/test_conf_dump.py 2>&1
+
   - name: compile-windows-alt
+    tags: ["pull_request", "windows_only"]
     depends_on:
     - name: compile
     commands:
@@ -938,7 +1027,24 @@ tasks:
             pip install scons==3.1.1
             scons-3.1.1.bat ${smp_command|} "CFLAGS=/Gv /wd4090 /wd4996 /we4047 /we4024 /TC /we4100 /we4133" wiredtiger.dll libwiredtiger.lib
 
+  - name: scons-check
+    tags: ["pull_request", "windows_only"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            pip install scons==3.1.1
+            scons-3.1.1.bat ${smp_command|} check
+
   - name: fops
+    tags: ["pull_request"]
     depends_on:
     - name: compile
     commands:
@@ -956,6 +1062,7 @@ tasks:
             fi
 
   - name: format
+    tags: ["windows_only"]
     depends_on:
     - name: compile
     commands:
@@ -1117,6 +1224,17 @@ tasks:
             set -o verbose
             ./test/evergreen/verify_wt_datafiles.sh 2>&1
 
+  - name: clang-analyzer
+    tags: ["pull_request"]
+    commands:
+      - func: "get project"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+            sh dist/s_clang-scan 2>&1
 
 buildvariants:
 - name: ubuntu1804
@@ -1124,70 +1242,12 @@ buildvariants:
   run_on:
   - ubuntu1804-test
   expansions:
-    # It's ugly, but we need the absolute path here, not the relative
     test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
-    configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+    posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-snappy --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
   tasks:
-    - name: compile
-    - name: lang-python-test
-    - name: examples-c-test
-    - name: bloom-test
-    - name: checkpoint-test
-    - name: cursor-order-test
-    - name: fops-test
-    - name: format-test
-    - name: huge-test
-    - name: manydbs-test
-    - name: packing-test
-    - name: readonly-test
-    - name: salvage-test
-    - name: thread-test
-    - name: bench-wtperf-test
-    - name: csuite-import-test
-    - name: csuite-random-abort-test
-    - name: csuite-random-directio-test
-    - name: csuite-schema-abort-test
-    - name: csuite-timestamp-abort-test
-    - name: csuite-scope-test
-    - name: csuite-truncated-log-test
-    - name: csuite-wt1965-col-efficiency-test
-    - name: csuite-wt2403-lsm-workload-test
-    - name: csuite-wt2447-join-main-table-test
-    - name: csuite-wt2695-checksum-test
-    - name: csuite-wt2592-join-schema-test
-    - name: csuite-wt2719-reconfig-test
-    - name: csuite-wt2999-join-extractor-test
-    - name: csuite-wt3120-filesys-test
-    - name: csuite-wt3135-search-near-collator-test
-    - name: csuite-wt3184-dup-index-collator-test
-    - name: csuite-wt3363-checkpoint-op-races-test
-    - name: csuite-wt3874-pad-byte-collator-test
-    - name: csuite-wt4105-large-doc-small-upd-test
-    - name: csuite-wt4117-checksum-test
-    - name: csuite-wt4156-metadata-salvage-test
-    - name: csuite-wt4699-json-test
-    - name: csuite-rwlock-test
-    - name: csuite-wt2246-col-append-test
-    - name: csuite-wt2323-join-visibility-test
-    - name: csuite-wt2535-insert-race-test
-    - name: csuite-wt2834-join-bloom-fix-test
-    - name: csuite-wt2853-perf-test
-    - name: csuite-wt2909-checkpoint-integrity-test
-    - name: csuite-wt3338-partial-update-test
-    - name: csuite-wt4333-handle-locks-test
-    - name: unit-test-bucket00
-    - name: unit-test-bucket01
-    - name: unit-test-bucket02
-    - name: unit-test-bucket03
-    - name: unit-test-bucket04
-    - name: unit-test-bucket05
-    - name: unit-test-bucket06
-    - name: unit-test-bucket07
-    - name: fops
-    - name: compile-asan
-    - name: examples-c-test-asan
+    - name: ".pull_request !.windows_only"
 
 - name: ubuntu1804-python3
   display_name: Ubuntu 18.04 (Python3)
@@ -1196,20 +1256,14 @@ buildvariants:
   expansions:
     test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
-    configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH
     configure_python_setting: PYTHON=python3
+    posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-snappy --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
     python_binary: python3
   tasks:
     - name: compile
-    - name: unit-test-bucket00
-    - name: unit-test-bucket01
-    - name: unit-test-bucket02
-    - name: unit-test-bucket03
-    - name: unit-test-bucket04
-    - name: unit-test-bucket05
-    - name: unit-test-bucket06
-    - name: unit-test-bucket07
+    - name: ".unit_test"
+    - name: conf-dump-test
 
 - name: rhel80
   display_name: RHEL 8.0
@@ -1218,7 +1272,6 @@ buildvariants:
   expansions:
     test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
-    configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
   tasks:
     - name: compile
@@ -1231,8 +1284,6 @@ buildvariants:
   batchtime: 1440 # 1 day
   run_on:
   - rhel80-build
-  expansions:
-    configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++
   tasks:
     - name: million-collection-test
 
@@ -1250,16 +1301,8 @@ buildvariants:
   - windows-64-vs2017-test
   tasks:
     - name: compile
-    - name: compile-windows-alt
-    - name: unit-test-bucket00
-    - name: unit-test-bucket01
-    - name: unit-test-bucket02
-    - name: unit-test-bucket03
-    - name: unit-test-bucket04
-    - name: unit-test-bucket05
-    - name: unit-test-bucket06
-    - name: unit-test-bucket07
-    #- name: format  - Enable when we have a solution for hangs and crashses
+    - name: ".windows_only"
+    - name: ".unit_test"
     - name: fops
 
 - name: macos-1012
@@ -1268,7 +1311,7 @@ buildvariants:
   - macos-1012
   expansions:
     smp_command: -j $(sysctl -n hw.logicalcpu)
-    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-ggdb"
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future make
     test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH DYLD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
   tasks:
@@ -1284,7 +1327,6 @@ buildvariants:
   batchtime: 10080 # 7 days
   expansions:
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
-    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
     test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
   tasks:
   - name: compile
@@ -1301,7 +1343,6 @@ buildvariants:
   batchtime: 10080 # 7 days
   expansions:
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
-    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
     test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.lib top_srcdir=$(pwd)/.. top_builddir=$(pwd)
   tasks:
   - name: compile

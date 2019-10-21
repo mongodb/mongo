@@ -1,15 +1,10 @@
  - name: {{task_name}}
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
       - func: "fetch artifacts"
       - func: "compile wiredtiger"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C {{test_dir}} ${smp_command|} 2>&1
-
+      - func: "make check directory"
+        vars:
+          directory: {{test_dir}}
