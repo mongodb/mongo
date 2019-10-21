@@ -449,7 +449,7 @@ std::size_t ClusterCursorManager::killMortalCursorsInactiveSince(OperationContex
             !entry.getOperationUsingCursor() && entry.getLastActive() <= cutoff;
 
         if (res) {
-            log() << "Marking cursor id " << cursorId << " for deletion, idle since "
+            log() << "Cursor id " << cursorId << " timed out, idle since "
                   << entry.getLastActive().toString();
         }
 

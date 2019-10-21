@@ -213,6 +213,10 @@ public:
         _leftoverMaxTimeMicros = leftoverMaxTimeMicros;
     }
 
+    Date_t getLastUseDate() const {
+        return _lastUseDate;
+    }
+
     /**
      * Returns the server-wide the count of living cursors. Such a cursor is called an "open
      * cursor".

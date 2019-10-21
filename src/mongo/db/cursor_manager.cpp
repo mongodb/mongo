@@ -543,6 +543,8 @@ std::size_t CursorManager::timeoutCursors(OperationContext* opCtx, Date_t now) {
 
     // Be careful not to dispose of cursors while holding the partition lock.
     for (auto&& cursor : toDisposeWithoutMutex) {
+        log() << "Cursor id " << cursor->cursorid() << " timed out, idle since "
+              << cursor->getLastUseDate();
         cursor->dispose(opCtx);
     }
     return toDisposeWithoutMutex.size();
