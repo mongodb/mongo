@@ -160,6 +160,7 @@ void ReplicaSetMonitorManager::shutdown() {
     // done.
 
     decltype(_monitors) monitors;
+    decltype(_taskExecutor) taskExecutor;
     {
         stdx::lock_guard<Latch> lk(_mutex);
         if (std::exchange(_isShutdown, true)) {
@@ -167,6 +168,12 @@ void ReplicaSetMonitorManager::shutdown() {
         }
 
         monitors = std::exchange(_monitors, {});
+        taskExecutor = std::exchange(_taskExecutor, {});
+    }
+
+    if (taskExecutor) {
+        LOG(1) << "Shutting down task executor used for monitoring replica sets";
+        taskExecutor->shutdown();
     }
 
     if (monitors.size()) {
@@ -181,9 +188,7 @@ void ReplicaSetMonitorManager::shutdown() {
         anchor->drop();
     }
 
-    if (auto taskExecutor = std::exchange(_taskExecutor, {})) {
-        LOG(1) << "Shutting down task executor used for monitoring replica sets";
-        taskExecutor->shutdown();
+    if (taskExecutor) {
         taskExecutor->join();
     }
 }

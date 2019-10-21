@@ -1352,10 +1352,26 @@ void SetState::init() {
 }
 
 void SetState::drop() {
-    isDropped = true;
+    if (std::exchange(isDropped, true)) {
+        // If a SetState calls drop() from destruction after the RSMM calls shutdown(), then the
+        // RSMM's executor may no longer exist. Thus, only drop once.
+        return;
+    }
 
     currentScan.reset();
     notify();
+
+    if (auto handle = std::exchange(refresherHandle, {})) {
+        // Cancel our refresh on the way out
+        executor->cancel(handle);
+    }
+
+    for (auto& node : nodes) {
+        if (auto handle = std::exchange(node.scheduledIsMasterHandle, {})) {
+            // Cancel any isMasters we had scheduled
+            executor->cancel(handle);
+        }
+    }
 
     // No point in notifying if we never started
     if (workingConnStr.isValid()) {
