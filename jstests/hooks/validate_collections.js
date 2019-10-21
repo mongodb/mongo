@@ -43,9 +43,11 @@ function CollectionValidator() {
             jsTest.options().skipValidationNamespaces.length > 0) {
             let skippedCollections = [];
             for (let ns of jsTest.options().skipValidationNamespaces) {
-                // Strip off the database name from 'ns' to extract the collName.
+                // Attempt to strip the name of the database we are about to validate off of the
+                // namespace we wish to skip. If the replace() function does find a match with the
+                // database, then we know that the collection we want to skip is in the database we
+                // are about to validate. We will then put it in the 'filter' for later use.
                 const collName = ns.replace(new RegExp('^' + db.getName() + '\.'), '');
-                // Skip the collection 'collName' if the db name was removed from 'ns'.
                 if (collName !== ns) {
                     skippedCollections.push({name: {$ne: collName}});
                 }

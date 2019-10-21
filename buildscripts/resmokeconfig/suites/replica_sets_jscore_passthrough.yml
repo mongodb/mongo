@@ -23,6 +23,7 @@ executor:
   archive:
     hooks:
       - CheckReplDBHashInBackground
+      - ValidateCollectionsInBackground
       - CheckReplDBHash
       - CheckReplOplogs
       - ValidateCollections
@@ -35,6 +36,7 @@ executor:
   # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
   # validating the entire contents of the collection.
   - class: CheckReplDBHashInBackground
+  - class: ValidateCollectionsInBackground
   - class: CheckReplOplogs
   - class: CheckReplDBHash
   - class: ValidateCollections

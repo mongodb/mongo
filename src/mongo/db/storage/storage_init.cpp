@@ -67,6 +67,7 @@ public:
                            << "dropPendingIdents"
                            << static_cast<long long>(engine->getDropPendingIdents().size())
                            << "supportsSnapshotReadConcern" << engine->supportsReadConcernSnapshot()
+                           << "supportsCheckpointCursors" << engine->supportsCheckpoints()
                            << "readOnly" << storageGlobalParams.readOnly << "persistent"
                            << !engine->isEphemeral() << "backupCursorOpen"
                            << backupCursorHooks->isBackupCursorOpen());
