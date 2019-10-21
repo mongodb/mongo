@@ -36,9 +36,9 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/with_lock.h"
 

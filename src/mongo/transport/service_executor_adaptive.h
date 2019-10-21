@@ -35,7 +35,7 @@
 
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/condition_variable.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_task_names.h"

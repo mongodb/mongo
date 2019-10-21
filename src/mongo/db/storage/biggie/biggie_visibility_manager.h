@@ -31,7 +31,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
-#include "mongo/platform/condition_variable.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {

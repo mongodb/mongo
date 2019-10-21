@@ -38,8 +38,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 

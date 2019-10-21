@@ -37,8 +37,8 @@
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/file_manager.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 
 namespace mongo {

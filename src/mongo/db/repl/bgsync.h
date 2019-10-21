@@ -43,8 +43,8 @@
 #include "mongo/db/repl/rollback_impl.h"
 #include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/net/hostandport.h"
 

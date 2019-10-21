@@ -26,7 +26,10 @@ const getCurrentOp = function() {
     return result;
 };
 
-const blockedOpClientName = "DiagnosticCaptureTest";
+const blockedOpClients = {
+    "DiagnosticCaptureTestLatch": {"seen": false},
+    "DiagnosticCaptureTestInterruptible": {"seen": false},
+};
 
 const getClientName = function() {
     let myUri = adminDB.runCommand({whatsmyuri: 1}).you;
@@ -46,34 +49,43 @@ try {
         },
     }));
 
-    let result = null;
+    const verifyResult = function(result) {
+        jsTestLog("Verifying " + tojson(result));
+        assert(result);
+        assert(result.hasOwnProperty("waitingForLatch"));
+        assert(result["waitingForLatch"].hasOwnProperty("timestamp"));
+        assert(result["waitingForLatch"].hasOwnProperty("captureName"));
+
+        /* Absent until we have efficient enough backtracing
+        assert(result["waitingForLatch"].hasOwnProperty("backtrace"));
+        result["waitingForLatch"]["backtrace"].forEach(function(frame) {
+            assert(frame.hasOwnProperty("addr"));
+            assert(typeof frame["addr"] === "string");
+            assert(frame.hasOwnProperty("path"));
+            assert(typeof frame["path"] === "string");
+        });
+        */
+    };
     getCurrentOp().forEach(function(op) {
-        jsTestLog(tojson(op));
-        if (op["desc"] == blockedOpClientName) {
-            result = op;
+        const name = op["desc"];
+        if (name in blockedOpClients) {
+            jsTestLog("Verifying " + op["desc"]);
+            verifyResult(op);
+            blockedOpClients[name].seen = true;
         }
     });
-    assert(result);
-    assert(result.hasOwnProperty("waitingForLatch"));
-    assert(result["waitingForLatch"].hasOwnProperty("timestamp"));
-    assert(result["waitingForLatch"].hasOwnProperty("captureName"));
 
-    /* Absent until we have efficient enough backtracing
-    assert(result["waitingForLatch"].hasOwnProperty("backtrace"));
-    result["waitingForLatch"]["backtrace"].forEach(function(frame) {
-        assert(frame.hasOwnProperty("addr"));
-        assert(typeof frame["addr"] === "string");
-        assert(frame.hasOwnProperty("path"));
-        assert(typeof frame["path"] === "string");
-    });
-    */
+    // Make sure we saw the ops we expected
+    for (const name in blockedOpClients) {
+        assert(blockedOpClients[name].seen);
+    }
 } finally {
     assert.commandWorked(db.adminCommand(
         {"configureFailPoint": 'currentOpSpawnsThreadWaitingForLatch', "mode": 'off'}));
 
     getCurrentOp().forEach(function(op) {
-        jsTestLog(tojson(op));
-        if (op["desc"] == blockedOpClientName) {
+        const name = op["desc"];
+        if (name in blockedOpClients) {
             assert(!op.hasOwnProperty("waitingForLatch"));
         }
     });

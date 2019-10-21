@@ -46,8 +46,8 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/create_collection_gen.h"
 
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {

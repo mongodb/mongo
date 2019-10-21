@@ -37,8 +37,8 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/kill_sessions.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/net/hostandport.h"

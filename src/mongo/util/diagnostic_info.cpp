@@ -33,25 +33,16 @@
 
 #include "mongo/util/diagnostic_info.h"
 
-#include "mongo/config.h"
-
-#if defined(__linux__)
-#include <elf.h>
-#include <link.h>
-#endif
-
-#if defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
-#include <execinfo.h>
-#endif
+#include <forward_list>
 
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 
 #include "mongo/base/init.h"
 #include "mongo/db/client.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/interruptible.h"
 #include "mongo/util/log.h"
 
 using namespace fmt::literals;
@@ -61,25 +52,37 @@ namespace mongo {
 namespace {
 MONGO_FAIL_POINT_DEFINE(currentOpSpawnsThreadWaitingForLatch);
 
-constexpr auto kBlockedOpMutexName = "BlockedOpForTest"_sd;
+constexpr auto kBlockedOpMutexName = "BlockedOpForTestLatch"_sd;
+constexpr auto kBlockedOpInterruptibleName = "BlockedOpForTestInterruptible"_sd;
 
 class BlockedOp {
 public:
     void start(ServiceContext* serviceContext);
     void join();
     void setIsContended(bool value);
+    void setIsWaiting(bool value);
 
 private:
-    Mutex _testMutex = MONGO_MAKE_LATCH(kBlockedOpMutexName);
-
     stdx::condition_variable _cv;
     stdx::mutex _m;  // NOLINT
 
-    struct State {
+    struct LatchState {
         bool isContended = false;
         boost::optional<stdx::thread> thread{boost::none};
+
+        Mutex mutex = MONGO_MAKE_LATCH(kBlockedOpMutexName);
     };
-    State _state;
+    LatchState _latchState;
+
+    struct InterruptibleState {
+        bool isWaiting = false;
+        boost::optional<stdx::thread> thread{boost::none};
+
+        stdx::condition_variable cv;
+        Mutex mutex = MONGO_MAKE_LATCH(kBlockedOpInterruptibleName);
+        bool isDone = false;
+    };
+    InterruptibleState _interruptibleState;
 } gBlockedOp;
 
 // This function causes us to make an additional thread with a self-contended lock so that
@@ -88,62 +91,94 @@ private:
 void BlockedOp::start(ServiceContext* serviceContext) {
     stdx::unique_lock<stdx::mutex> lk(_m);
 
-    invariant(!_state.thread);
+    invariant(!_latchState.thread);
+    invariant(!_interruptibleState.thread);
 
-    _testMutex.lock();
-    _state.thread = stdx::thread([this, serviceContext]() mutable {
-        ThreadClient tc("DiagnosticCaptureTest", serviceContext);
+    _latchState.mutex.lock();
+    _latchState.thread = stdx::thread([this, serviceContext]() mutable {
+        ThreadClient tc("DiagnosticCaptureTestLatch", serviceContext);
 
         log() << "Entered currentOpSpawnsThreadWaitingForLatch thread";
 
-        stdx::lock_guard testLock(_testMutex);
+        stdx::lock_guard testLock(_latchState.mutex);
 
         log() << "Joining currentOpSpawnsThreadWaitingForLatch thread";
     });
 
-    _cv.wait(lk, [this] { return _state.isContended; });
-    log() << "Started thread for currentOpSpawnsThreadWaitingForLatch";
+    _interruptibleState.thread = stdx::thread([this, serviceContext]() mutable {
+        ThreadClient tc("DiagnosticCaptureTestInterruptible", serviceContext);
+        auto opCtx = tc->makeOperationContext();
+
+        log() << "Entered currentOpSpawnsThreadWaitingForLatch thread for interruptibles";
+        stdx::unique_lock lk(_interruptibleState.mutex);
+        opCtx->waitForConditionOrInterrupt(
+            _interruptibleState.cv, lk, [&] { return _interruptibleState.isDone; });
+        _interruptibleState.isDone = false;
+
+        log() << "Joining currentOpSpawnsThreadWaitingForLatch thread for interruptibles";
+    });
+
+
+    _cv.wait(lk, [this] { return _latchState.isContended && _interruptibleState.isWaiting; });
+    log() << "Started threads for currentOpSpawnsThreadWaitingForLatch";
 }
 
 // This function unlocks testMutex and joins if there are no more callers of BlockedOp::start()
 // remaining
 void BlockedOp::join() {
-    auto thread = [&] {
+    decltype(_latchState.thread) latchThread;
+    decltype(_interruptibleState.thread) interruptibleThread;
+    {
         stdx::lock_guard<stdx::mutex> lk(_m);
 
-        invariant(_state.thread);
+        invariant(_latchState.thread);
+        invariant(_interruptibleState.thread);
 
-        _testMutex.unlock();
+        _latchState.mutex.unlock();
+        _latchState.isContended = false;
 
-        _state.isContended = false;
-        _cv.notify_one();
+        {
+            stdx::lock_guard lk(_interruptibleState.mutex);
+            _interruptibleState.isDone = true;
+            _interruptibleState.cv.notify_one();
+        }
+        _interruptibleState.isWaiting = false;
 
-        return std::exchange(_state.thread, boost::none);
-    }();
-    thread->join();
+        std::swap(_latchState.thread, latchThread);
+        std::swap(_interruptibleState.thread, interruptibleThread);
+    }
+
+    latchThread->join();
+    interruptibleThread->join();
 }
 
 void BlockedOp::setIsContended(bool value) {
     log() << "Setting isContended to " << (value ? "true" : "false");
     stdx::lock_guard lk(_m);
-    _state.isContended = value;
+    _latchState.isContended = value;
+    _cv.notify_one();
+}
+
+void BlockedOp::setIsWaiting(bool value) {
+    log() << "Setting isWaiting to " << (value ? "true" : "false");
+    stdx::lock_guard lk(_m);
+    _interruptibleState.isWaiting = value;
     _cv.notify_one();
 }
 
 struct DiagnosticInfoHandle {
     stdx::mutex mutex;  // NOLINT
-    boost::optional<DiagnosticInfo> maybeInfo = boost::none;
+    std::forward_list<DiagnosticInfo> list;
 };
 const auto getDiagnosticInfoHandle = Client::declareDecoration<DiagnosticInfoHandle>();
 
-MONGO_INITIALIZER(LockActions)(InitializerContext* context) {
-    class LockActionsSubclass : public Mutex::LockActions {
+MONGO_INITIALIZER(LockListener)(InitializerContext* context) {
+    class LockListener : public Mutex::LockListener {
         void onContendedLock(const StringData& name) override {
-            auto client = Client::getCurrent();
-            if (client) {
+            if (auto client = Client::getCurrent()) {
                 auto& handle = getDiagnosticInfoHandle(client);
                 stdx::lock_guard<stdx::mutex> lk(handle.mutex);
-                handle.maybeInfo.emplace(DiagnosticInfo::capture(name));
+                handle.list.emplace_front(DiagnosticInfo::capture(name));
 
                 if (currentOpSpawnsThreadWaitingForLatch.shouldFail() &&
                     (name == kBlockedOpMutexName)) {
@@ -151,183 +186,84 @@ MONGO_INITIALIZER(LockActions)(InitializerContext* context) {
                 }
             }
         }
-        void onUnlock(const StringData& name) override {
-            auto client = Client::getCurrent();
-            if (client) {
+
+        void onQuickLock(const StringData&) override {
+            // Do nothing
+        }
+
+        void onSlowLock(const StringData& name) override {
+            if (auto client = Client::getCurrent()) {
                 auto& handle = getDiagnosticInfoHandle(client);
                 stdx::lock_guard<stdx::mutex> lk(handle.mutex);
-                handle.maybeInfo.reset();
+
+                invariant(!handle.list.empty());
+                handle.list.pop_front();
             }
+        }
+
+        void onUnlock(const StringData&) override {
+            // Do nothing
         }
     };
 
     // Intentionally leaked, people use Latches in detached threads
-    static auto& actions = *new LockActionsSubclass;
-    Mutex::LockActions::add(&actions);
+    static auto& listener = *new LockListener;
+    Mutex::addLockListener(&listener);
 
     return Status::OK();
 }
 
-/*
-MONGO_INITIALIZER(ConditionVariableActions)(InitializerContext* context) {
+MONGO_INITIALIZER(InterruptibleWaitListener)(InitializerContext* context) {
+    class WaitListener : public Interruptible::WaitListener {
+        using WakeReason = Interruptible::WakeReason;
+        using WakeSpeed = Interruptible::WakeSpeed;
 
-    class ConditionVariableActionsSubclass : public ConditionVariableActions {
-        void onUnfulfilledConditionVariable(const StringData& name) override {
-            if (haveClient()) {
-                DiagnosticInfo::Diagnostic::set(
-                    Client::getCurrent(),
-                    std::make_shared<DiagnosticInfo>(capture(name)));
+        void addInfo(const StringData& name) {
+            if (auto client = Client::getCurrent()) {
+                auto& handle = getDiagnosticInfoHandle(client);
+                stdx::lock_guard<stdx::mutex> lk(handle.mutex);
+                handle.list.emplace_front(DiagnosticInfo::capture(name));
+
+                if (currentOpSpawnsThreadWaitingForLatch.shouldFail() &&
+                    (name == kBlockedOpInterruptibleName)) {
+                    gBlockedOp.setIsWaiting(true);
+                }
             }
         }
-        void onFulfilledConditionVariable() override {
-            DiagnosticInfo::Diagnostic::clearDiagnostic();
+
+        void removeInfo(const StringData& name) {
+            if (auto client = Client::getCurrent()) {
+                auto& handle = getDiagnosticInfoHandle(client);
+                stdx::lock_guard<stdx::mutex> lk(handle.mutex);
+
+                invariant(!handle.list.empty());
+                handle.list.pop_front();
+            }
+        }
+
+        void onLongSleep(const StringData& name) override {
+            addInfo(name);
+        }
+
+        void onWake(const StringData& name, WakeReason, WakeSpeed speed) override {
+            if (speed == WakeSpeed::kSlow) {
+                removeInfo(name);
+            }
         }
     };
 
-    std::unique_ptr<ConditionVariableActions> conditionVariablePointer =
-        std::make_unique<ConditionVariableActionsSubclass>();
-    ConditionVariable::setConditionVariableActions(std::move(conditionVariablePointer));
+    // Intentionally leaked, people can use in detached threads
+    static auto& listener = *new WaitListener();
+    Interruptible::addWaitListener(&listener);
 
     return Status::OK();
 }
-*/
 
 }  // namespace
-
-#if defined(__linux__)
-namespace {
-
-class DynamicObjectMap {
-public:
-    struct Section {
-        StringData objectPath;
-        uintptr_t sectionOffset = 0;
-        size_t sectionSize = 0;
-    };
-
-    // uses dl_iterate_phdr to retrieve information on the shared objects that have been loaded in
-    // the form of a map from segment address to object
-    void init() {
-        ::dl_iterate_phdr(addToMap, &_map);
-    }
-
-    // return a StackFrame object located at the header address in the map that is immediately
-    // preceding or equal to the instruction pointer address
-    DiagnosticInfo::StackFrame getFrame(void* instructionPtr) const;
-
-    // callback function in dl_iterate_phdr that iterates through the shared objects and creates a
-    // map from the section address to object
-    static int addToMap(dl_phdr_info* info, size_t size, void* data);
-
-private:
-    std::map<uintptr_t, Section> _map;
-} gDynamicObjectMap;
-
-MONGO_INITIALIZER(InitializeDynamicObjectMap)(InitializerContext* context) {
-    gDynamicObjectMap.init();
-    return Status::OK();
-};
-
-int DynamicObjectMap::addToMap(dl_phdr_info* info, size_t size, void* data) {
-    auto& addr_map = *reinterpret_cast<decltype(DynamicObjectMap::_map)*>(data);
-    for (int j = 0; j < info->dlpi_phnum; j++) {
-        auto& header = info->dlpi_phdr[j];
-        auto addr = info->dlpi_addr + header.p_vaddr;
-        switch (header.p_type) {
-            case PT_LOAD:
-            case PT_DYNAMIC:
-                break;
-            default:
-                continue;
-        }
-        auto frame = Section{
-            info->dlpi_name,                          // object name
-            static_cast<uintptr_t>(header.p_offset),  // section offset in file
-            header.p_memsz,                           // section size in memory
-        };
-        addr_map.emplace(addr, frame);
-    }
-    return 0;
-}
-
-DiagnosticInfo::StackFrame DynamicObjectMap::getFrame(void* instructionPtr) const {
-    auto address = reinterpret_cast<uintptr_t>(instructionPtr);
-
-    // instructionPtr < it->first
-    auto it = _map.upper_bound(address);
-    // instuctionPtr >= it->first
-    --it;
-
-    auto& [headerAddress, frame] = *it;
-    dassert(address < (headerAddress + frame.sectionSize));
-
-    auto fileOffset = address - headerAddress + frame.sectionOffset;
-    return DiagnosticInfo::StackFrame{frame.objectPath, fileOffset};
-}
-
-}  // namespace
-#endif  // linux
-
-#if defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE) && defined(__linux__)
-// iterates through the backtrace instruction pointers to
-// find the instruction pointer that refers to a segment in the addr_map
-DiagnosticInfo::StackTrace DiagnosticInfo::makeStackTrace() const {
-    DiagnosticInfo::StackTrace trace;
-    for (auto address : _backtrace.data) {
-        trace.frames.emplace_back(gDynamicObjectMap.getFrame(address));
-    }
-    return trace;
-}
-
-auto DiagnosticInfo::getBacktrace() -> Backtrace {
-    Backtrace list;
-    auto len = ::backtrace(list.data.data(), list.data.size());
-    list.data.resize(len);
-    return list;
-}
-#else
-DiagnosticInfo::StackTrace DiagnosticInfo::makeStackTrace() const {
-    return DiagnosticInfo::StackTrace();
-}
-
-auto DiagnosticInfo::getBacktrace() -> Backtrace {
-    return {};
-}
-#endif
-
-bool operator==(const DiagnosticInfo::StackFrame& frame1,
-                const DiagnosticInfo::StackFrame& frame2) {
-    return frame1.objectPath == frame2.objectPath &&
-        frame1.instructionOffset == frame2.instructionOffset;
-}
-
-bool operator==(const DiagnosticInfo::StackTrace& trace1,
-                const DiagnosticInfo::StackTrace& trace2) {
-    return trace1.frames == trace2.frames;
-}
 
 bool operator==(const DiagnosticInfo& info1, const DiagnosticInfo& info2) {
     return info1._captureName == info2._captureName && info1._timestamp == info2._timestamp &&
         info1._backtrace.data == info2._backtrace.data;
-}
-
-std::string DiagnosticInfo::StackFrame::toString() const {
-    return "{{ \"path\": \"{}\", \"addr\": \"0x{:x}\" }}"_format(objectPath, instructionOffset);
-}
-
-std::string DiagnosticInfo::StackTrace::toString() const {
-    str::stream stream;
-    stream << "{ \"backtrace\": [ ";
-    bool isFirst = true;
-    for (auto& frame : frames) {
-        if (!std::exchange(isFirst, false)) {
-            // Sadly, JSON doesn't allow trailing commas
-            stream << ", ";
-        }
-        stream << frame.toString();
-    }
-    stream << "] }";
-    return stream;
 }
 
 std::string DiagnosticInfo::toString() const {
@@ -336,12 +272,12 @@ std::string DiagnosticInfo::toString() const {
 }
 
 DiagnosticInfo DiagnosticInfo::capture(const StringData& captureName, Options options) {
-    // uses backtrace to retrieve an array of instruction pointers for currently active
-    // function calls of the program
-    return DiagnosticInfo(getGlobalServiceContext()->getFastClockSource()->now(),
-                          captureName,
-                          options.shouldTakeBacktrace ? DiagnosticInfo::getBacktrace()
-                                                      : Backtrace{{}});
+    // Since we don't have a fast enough backtrace implementation at the moment, the Backtrace is
+    // always empty. If SERVER-44091 happens, this should branch on options.shouldTakeBacktrace
+    auto backtrace = Backtrace{};
+    auto currentTime = getGlobalServiceContext()->getFastClockSource()->now();
+
+    return DiagnosticInfo(currentTime, captureName, std::move(backtrace));
 }
 
 DiagnosticInfo::BlockedOpGuard::~BlockedOpGuard() {
@@ -366,7 +302,12 @@ auto DiagnosticInfo::maybeMakeBlockedOpForTest(Client* client) -> std::unique_pt
 boost::optional<DiagnosticInfo> DiagnosticInfo::get(Client& client) {
     auto& handle = getDiagnosticInfoHandle(client);
     stdx::lock_guard<stdx::mutex> lk(handle.mutex);
-    return handle.maybeInfo;
+
+    if (handle.list.empty()) {
+        return boost::none;
+    }
+
+    return handle.list.front();
 }
 
 }  // namespace mongo

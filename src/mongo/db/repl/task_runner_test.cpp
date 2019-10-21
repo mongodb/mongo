@@ -34,8 +34,8 @@
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/task_runner.h"
 #include "mongo/db/repl/task_runner_test_fixture.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/util/concurrency/thread_pool.h"
 

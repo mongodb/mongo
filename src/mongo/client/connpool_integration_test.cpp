@@ -31,8 +31,8 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/global_conn_pool.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
 

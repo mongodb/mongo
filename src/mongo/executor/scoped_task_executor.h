@@ -34,8 +34,8 @@
 
 #include "mongo/base/status.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/fail_point.h"
 

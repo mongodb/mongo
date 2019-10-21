@@ -46,11 +46,18 @@ public:
     virtual void lock() = 0;
     virtual void unlock() = 0;
     virtual bool try_lock() = 0;
+
+    virtual StringData getName() const {
+        return "AnonymousLatch"_sd;
+    }
 };
 
 class Mutex : public Latch {
+    class LockNotifier;
+
 public:
-    class LockActions;
+    class LockListener;
+
     static constexpr auto kAnonymousMutexStr = "AnonymousMutex"_sd;
 
     Mutex() : Mutex(kAnonymousMutexStr) {}
@@ -61,11 +68,36 @@ public:
     void lock() override;
     void unlock() override;
     bool try_lock() override;
-    const StringData& getName() const {
+    StringData getName() const override {
         return _name;
     }
 
+    /**
+     * This function adds a LockListener subclass to the triggers for certain actions.
+     *
+     * LockListeners can only be added and not removed. If you wish to deactivate a LockListeners
+     * subclass, please provide the switch on that subclass to noop its functions. It is only safe
+     * to add a LockListener during a MONGO_INITIALIZER.
+     */
+    static void addLockListener(LockListener* listener);
+
 private:
+    static auto& _getListenerState() noexcept {
+        struct State {
+            std::vector<LockListener*> list;
+        };
+
+        // Note that state should no longer be mutated after init-time (ala MONGO_INITIALIZERS). If
+        // this changes, than this state needs to be synchronized.
+        static State state;
+        return state;
+    }
+
+    static void _onContendedLock(const StringData& name) noexcept;
+    static void _onQuickLock(const StringData& name) noexcept;
+    static void _onSlowLock(const StringData& name) noexcept;
+    static void _onUnlock(const StringData& name) noexcept;
+
     const StringData _name;
     stdx::mutex _mutex;  // NOLINT
 };
@@ -73,40 +105,31 @@ private:
 /**
  * A set of actions to happen upon notable events on a Lockable-conceptualized type
  */
-class Mutex::LockActions {
+class Mutex::LockListener {
     friend class Mutex;
 
 public:
-    virtual ~LockActions() = default;
+    virtual ~LockListener() = default;
+
     /**
      * Action to do when a lock cannot be immediately acquired
      */
     virtual void onContendedLock(const StringData& name) = 0;
 
     /**
+     * Action to do when a lock was acquired without blocking
+     */
+    virtual void onQuickLock(const StringData& name) = 0;
+
+    /**
+     * Action to do when a lock was acquired after blocking
+     */
+    virtual void onSlowLock(const StringData& name) = 0;
+
+    /**
      * Action to do when a lock is unlocked
      */
     virtual void onUnlock(const StringData& name) = 0;
-
-    /**
-     * This function adds a LockActions subclass to the triggers for certain actions.
-     *
-     * Note that currently there is only one LockActions in use at a time. As part of SERVER-42895,
-     * this will change so that there is a list of LockActions maintained.
-     *
-     * LockActions can only be added and not removed. If you wish to deactivate a LockActions
-     * subclass, please provide the switch on that subclass to noop its functions.
-     */
-    static void add(LockActions* actions);
-
-private:
-    static auto& getState() {
-        struct State {
-            AtomicWord<LockActions*> actions{nullptr};
-        };
-        static State state;
-        return state;
-    }
 };
 
 }  // namespace mongo

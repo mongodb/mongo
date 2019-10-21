@@ -29,8 +29,8 @@
 
 #pragma once
 
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 
 namespace mongo {
 namespace unittest {

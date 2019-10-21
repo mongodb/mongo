@@ -29,9 +29,13 @@
 
 #pragma once
 
+#include <vector>
+
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/util/concepts.h"
 #include "mongo/util/lockable_adapter.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/waitable.h"
 
@@ -201,6 +205,36 @@ private:
     }
 
 public:
+    class WaitListener;
+
+    /**
+     * Enum to convey why an Interruptible woke up
+     */
+    enum class WakeReason {
+        kPredicate,
+        kTimeout,
+        kInterrupt,
+    };
+
+    static constexpr auto kFastWakeTimeout = Milliseconds(100);
+
+    /**
+     * Enum to convey if an Interruptible woke up before or after kFastWakeTimeout
+     */
+    enum class WakeSpeed {
+        kFast,
+        kSlow,
+    };
+
+    /**
+     * This function adds a WaitListener subclass to the triggers for certain actions.
+     *
+     * WaitListeners can only be added and not removed. If you wish to deactivate a WaitListeners
+     * subclass, please provide the switch on that subclass to noop its functions. It is only safe
+     * to add a WaitListener during a MONGO_INITIALIZER.
+     */
+    static void addWaitListener(WaitListener* listnener);
+
     /**
      * Returns a statically allocated instance that cannot be interrupted.  Useful as a default
      * argument to Interruptible-taking methods.
@@ -257,6 +291,23 @@ public:
     }
 
     /**
+     * Get the name for a Latch
+     */
+    TEMPLATE(typename LatchT)
+    REQUIRES(std::is_base_of_v<Latch, LatchT>)  //
+    static StringData getLatchName(const stdx::unique_lock<LatchT>& lk) {
+        return lk.mutex()->getName();
+    }
+
+    /**
+     * Get a placeholder name for an arbitrary type
+     */
+    template <typename LockT>
+    static constexpr StringData getLatchName(const LockT&) {
+        return "AnonymousLockable"_sd;
+    }
+
+    /**
      * Waits on condition "cv" for "pred" until "pred" returns true, or the given "deadline"
      * expires, or this operation is interrupted, or this operation's own deadline expires.
      *
@@ -267,20 +318,73 @@ public:
     template <typename LockT, typename PredicateT>
     bool waitForConditionOrInterruptUntil(stdx::condition_variable& cv,
                                           LockT& m,
-                                          Date_t deadline,
+                                          Date_t finalDeadline,
                                           PredicateT pred) {
-        auto waitUntil = [&](Date_t deadline) {
-            // Wrapping this in a lambda because it's a mouthful
-            return uassertStatusOK(waitForConditionOrInterruptNoAssertUntil(cv, m, deadline));
-        };
+        auto latchName = getLatchName(m);
 
-        while (!pred()) {
-            if (waitUntil(deadline) == stdx::cv_status::timeout) {
-                return pred();
+        auto waitUntil = [&](Date_t deadline, WakeSpeed speed) -> boost::optional<WakeReason> {
+            // If the result of waitForConditionOrInterruptNoAssertUntil() is non-spurious, return
+            // a WakeReason. Otherwise, return boost::none
+
+            auto swResult = waitForConditionOrInterruptNoAssertUntil(cv, m, deadline);
+            if (!swResult.isOK()) {
+                _onWake(latchName, WakeReason::kInterrupt, speed);
+                uassertStatusOK(std::move(swResult));
             }
+
+            if (pred()) {
+                _onWake(latchName, WakeReason::kPredicate, speed);
+                return WakeReason::kPredicate;
+            }
+
+            if (swResult.getValue() == stdx::cv_status::timeout) {
+                _onWake(latchName, WakeReason::kTimeout, speed);
+                return WakeReason::kTimeout;
+            }
+
+            return boost::none;
         };
 
-        return true;
+        auto waitUntilNonSpurious = [&](Date_t deadline, WakeSpeed speed) -> WakeReason {
+            // Check waitUntil() in a loop until it says it has a genuine WakeReason
+
+            if (pred()) {
+                // Check for the predicate first, just in case
+                _onWake(latchName, WakeReason::kPredicate, speed);
+                return WakeReason::kPredicate;
+            }
+
+            auto maybeWakeReason = waitUntil(deadline, speed);
+            while (!maybeWakeReason) {
+                maybeWakeReason = waitUntil(deadline, speed);
+            };
+
+            return *maybeWakeReason;
+        };
+
+        const auto traceDeadline = getExpirationDateForWaitForValue(kFastWakeTimeout);
+        const auto firstDeadline = std::min(traceDeadline, finalDeadline);
+
+        // Wait for the first deadline
+        if (auto wakeReason = waitUntilNonSpurious(firstDeadline, WakeSpeed::kFast);
+            wakeReason == WakeReason::kPredicate) {
+            // If our first wait fulfilled our predicate then return true
+            return true;
+        } else if (firstDeadline == finalDeadline) {
+            // If we didn't fulfill our predicate but finalDeadline was less than traceDeadline,
+            // then the wait should return false
+            return false;
+        }
+
+        _onLongSleep(latchName);
+
+        // Wait for the final deadline
+        if (auto wakeReason = waitUntilNonSpurious(finalDeadline, WakeSpeed::kSlow);
+            wakeReason == WakeReason::kPredicate) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     /**
@@ -329,7 +433,65 @@ public:
 
 protected:
     class NotInterruptible;
+
+    void _onLongSleep(const StringData& name);
+    void _onWake(const StringData& name, WakeReason reason, WakeSpeed speed);
+
+    static auto& _getListenerState() {
+        struct State {
+            std::vector<WaitListener*> list;
+        };
+
+        // Note that state should no longer be mutated after init-time (ala MONGO_INITIALIZERS). If
+        // this changes, than this state needs to be synchronized.
+        static State state;
+        return state;
+    }
 };
+
+/**
+ * A set of event handles for an Interruptible type
+ */
+class Interruptible::WaitListener {
+public:
+    /**
+     * Action to do when a wait does not resolve quickly
+     *
+     * Any implementation of this function must be safe to invoke when an Interruptible-associated
+     * latch is held. As this is hard to reason about, avoid external latches whenever possible.
+     */
+    virtual void onLongSleep(const StringData& name) = 0;
+
+    /**
+     * Action to do when a wait resolves after a sleep
+     *
+     * Any implementation of this function must be safe to invoke when an Interruptible-associated
+     * latch is held. As this is hard to reason about, avoid external latches whenever possible.
+     */
+    virtual void onWake(const StringData& name, WakeReason reason, WakeSpeed speed) = 0;
+};
+
+inline void Interruptible::addWaitListener(WaitListener* listener) {
+    auto& state = _getListenerState();
+
+    state.list.push_back(listener);
+}
+
+inline void Interruptible::_onLongSleep(const StringData& name) {
+    auto& state = _getListenerState();
+
+    for (auto listener : state.list) {
+        listener->onLongSleep(name);
+    }
+}
+
+inline void Interruptible::_onWake(const StringData& name, WakeReason reason, WakeSpeed speed) {
+    auto& state = _getListenerState();
+
+    for (auto listener : state.list) {
+        listener->onWake(name, reason, speed);
+    }
+}
 
 /**
  * A non-interruptible type which can be used as a lightweight default arg for Interruptible-taking

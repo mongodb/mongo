@@ -31,10 +31,10 @@
 
 #include "mongo/scripting/mozjs/countdownlatch.h"
 
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_map.h"
 
 namespace mongo {

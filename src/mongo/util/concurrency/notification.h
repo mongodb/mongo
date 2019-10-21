@@ -32,8 +32,8 @@
 #include <boost/optional.hpp>
 
 #include "mongo/db/operation_context.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"

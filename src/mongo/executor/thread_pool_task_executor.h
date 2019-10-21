@@ -33,8 +33,8 @@
 #include <memory>
 
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/baton.h"
 #include "mongo/util/fail_point.h"

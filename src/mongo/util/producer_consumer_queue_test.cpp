@@ -34,8 +34,8 @@
 #include "mongo/util/producer_consumer_queue.h"
 
 #include "mongo/db/service_context.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 

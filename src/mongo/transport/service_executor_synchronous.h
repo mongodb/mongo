@@ -33,8 +33,8 @@
 
 #include "mongo/base/status.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_task_names.h"
 

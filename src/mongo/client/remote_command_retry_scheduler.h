@@ -37,8 +37,8 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

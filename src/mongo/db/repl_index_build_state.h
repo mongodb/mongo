@@ -39,7 +39,7 @@
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/platform/condition_variable.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/uuid.h"

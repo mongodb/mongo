@@ -38,8 +38,8 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/timer.h"
 

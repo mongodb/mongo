@@ -33,7 +33,7 @@
 #include <string>
 
 #include "mongo/db/repl_index_build_state.h"
-#include "mongo/platform/condition_variable.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/uuid.h"
 

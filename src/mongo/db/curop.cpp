@@ -311,11 +311,13 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
         waitingForLatchBuilder.append("captureName", diagnostic->getCaptureName());
         if (backtraceMode) {
             BSONArrayBuilder backtraceBuilder(waitingForLatchBuilder.subarrayStart("backtrace"));
+            /** This branch becomes useful again with SERVER-44091
             for (const auto& frame : diagnostic->makeStackTrace().frames) {
                 BSONObjBuilder backtraceObj(backtraceBuilder.subobjStart());
                 backtraceObj.append("addr", integerToHex(frame.instructionOffset));
                 backtraceObj.append("path", frame.objectPath);
             }
+            */
         }
     }
 }

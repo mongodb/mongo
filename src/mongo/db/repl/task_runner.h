@@ -33,8 +33,8 @@
 #include <list>
 
 #include "mongo/db/service_context.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/functional.h"
 

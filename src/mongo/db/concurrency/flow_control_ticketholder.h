@@ -31,8 +31,8 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 
 namespace mongo {
 

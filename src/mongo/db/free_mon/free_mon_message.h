@@ -33,8 +33,8 @@
 #include <vector>
 
 #include "mongo/db/free_mon/free_mon_protocol_gen.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 

@@ -35,8 +35,8 @@
 
 #include <memory>
 
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"

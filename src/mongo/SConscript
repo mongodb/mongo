@@ -123,7 +123,6 @@ baseEnv.Library(
         'logv2/log_severity.cpp',
         'logv2/log_tag.cpp',
         'logv2/ramlog.cpp',
-        'platform/condition_variable.cpp',
         'platform/decimal128.cpp',
         'platform/mutex.cpp',
         'platform/posix_fadvise.cpp',

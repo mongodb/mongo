@@ -33,7 +33,7 @@
 #include <map>
 
 #include "mongo/db/s/transaction_coordinator.h"
-#include "mongo/platform/condition_variable.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/with_lock.h"
 
 namespace mongo {

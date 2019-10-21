@@ -31,8 +31,8 @@
 
 #include "mongo/db/operation_context_group.h"
 #include "mongo/db/s/namespace_metadata_change_notifications.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/s/catalog_cache_loader.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {

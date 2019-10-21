@@ -49,7 +49,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/platform/condition_variable.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
 #include "mongo/util/exit.h"

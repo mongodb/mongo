@@ -50,8 +50,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_options.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/invalidating_lru_cache.h"
 

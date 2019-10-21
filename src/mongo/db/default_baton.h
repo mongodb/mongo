@@ -32,8 +32,8 @@
 #include <vector>
 
 #include "mongo/db/baton.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/functional.h"
 
 namespace mongo {

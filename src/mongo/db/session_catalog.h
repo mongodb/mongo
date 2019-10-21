@@ -37,8 +37,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/session.h"
 #include "mongo/db/session_killer.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/with_lock.h"
 

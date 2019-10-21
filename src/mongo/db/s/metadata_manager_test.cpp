@@ -42,10 +42,10 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/shard_server_test_fixture.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 

@@ -34,8 +34,8 @@
 #include <string>
 #include <vector>
 
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
 #include "mongo/util/time_support.h"

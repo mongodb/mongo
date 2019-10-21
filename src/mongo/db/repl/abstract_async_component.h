@@ -37,8 +37,8 @@
 #include "mongo/base/static_assert.h"
 #include "mongo/base/status.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 
 namespace mongo {
 namespace repl {

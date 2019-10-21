@@ -51,8 +51,8 @@
 #include "mongo/db/storage/capped_callback.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/snapshot.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {

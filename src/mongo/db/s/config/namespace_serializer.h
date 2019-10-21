@@ -36,8 +36,8 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {

@@ -35,8 +35,8 @@
 #include <numeric>
 
 #include "mongo/db/operation_context.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/scopeguard.h"

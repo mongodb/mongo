@@ -34,8 +34,8 @@
 #include "mongo/util/periodic_runner_impl.h"
 
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/clock_source_mock.h"
 
 namespace mongo {

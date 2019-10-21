@@ -36,8 +36,8 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/exchange_spec_gen.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 
 namespace mongo {
 

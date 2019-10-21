@@ -40,10 +40,10 @@
 #include "mongo/db/s/migration_chunk_cloner_source.h"
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/db/s/session_catalog_migration_source.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/request_types/move_chunk_request.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {

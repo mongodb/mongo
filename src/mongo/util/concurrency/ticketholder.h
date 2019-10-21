@@ -33,8 +33,8 @@
 #endif
 
 #include "mongo/db/operation_context.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/time_support.h"
 

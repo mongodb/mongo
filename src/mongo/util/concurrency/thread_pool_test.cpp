@@ -34,8 +34,8 @@
 #include <boost/optional.hpp>
 
 #include "mongo/base/init.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"

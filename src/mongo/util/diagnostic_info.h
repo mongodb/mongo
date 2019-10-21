@@ -31,8 +31,8 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
 
@@ -43,6 +43,12 @@ namespace mongo {
  */
 class DiagnosticInfo {
 public:
+    // Maximum number of stack frames to appear in a DiagnosticInfo::Backtrace.
+    static constexpr size_t kMaxBackTraceFrames = 100ull;
+    struct Backtrace {
+        std::vector<void*> data = std::vector<void*>(kMaxBackTraceFrames, nullptr);
+    };
+
     /**
      * A simple RAII guard to attempt to join a blocked op once it is no longer needed
      *
@@ -57,32 +63,6 @@ public:
 
     virtual ~DiagnosticInfo() = default;
 
-    // Maximum number of stack frames to appear in a backtrace.
-    static constexpr size_t kMaxBackTraceFrames = 100ull;
-    struct Backtrace {
-        std::vector<void*> data = std::vector<void*>(kMaxBackTraceFrames, nullptr);
-    };
-
-    struct StackFrame {
-        std::string toString() const;
-        friend bool operator==(const StackFrame& frame1, const StackFrame& frame2);
-        friend bool operator!=(const StackFrame& frame1, const StackFrame& frame2) {
-            return !(frame1 == frame2);
-        }
-
-        StringData objectPath;
-        uintptr_t instructionOffset = 0;
-    };
-    struct StackTrace {
-        std::string toString() const;
-        friend bool operator==(const StackTrace& trace1, const StackTrace& trace2);
-        friend bool operator!=(const StackTrace& trace1, const StackTrace& trace2) {
-            return !(trace1 == trace2);
-        }
-
-        std::vector<StackFrame> frames;
-    };
-
     Date_t getTimestamp() const {
         return _timestamp;
     }
@@ -90,10 +70,6 @@ public:
     StringData getCaptureName() const {
         return _captureName;
     }
-
-    StackTrace makeStackTrace() const;
-
-    static Backtrace getBacktrace();
 
     std::string toString() const;
 
@@ -117,6 +93,10 @@ public:
      */
     static std::unique_ptr<BlockedOpGuard> maybeMakeBlockedOpForTest(Client* client);
 
+    friend std::ostream& operator<<(std::ostream& s, const DiagnosticInfo& info) {
+        return s << info.toString();
+    }
+
 private:
     friend bool operator==(const DiagnosticInfo& info1, const DiagnosticInfo& info2);
     friend bool operator!=(const DiagnosticInfo& info1, const DiagnosticInfo& info2) {
@@ -132,13 +112,5 @@ private:
         : _timestamp(timestamp), _captureName(captureName), _backtrace(std::move(backtrace)) {}
 };
 
-
-inline std::ostream& operator<<(std::ostream& s, const DiagnosticInfo::StackFrame& frame) {
-    return s << frame.toString();
-}
-
-inline std::ostream& operator<<(std::ostream& s, const DiagnosticInfo& info) {
-    return s << info.toString();
-}
 
 }  // namespace mongo

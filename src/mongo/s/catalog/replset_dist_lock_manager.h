@@ -34,12 +34,12 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/dist_lock_catalog.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/dist_lock_ping_info.h"
 #include "mongo/stdx/chrono.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 

@@ -32,9 +32,9 @@
 #include "vm/PosixNSPR.h"
 
 #include "mongo/client/dbclient_cursor.h"
-#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/scripting/mozjs/engine.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/functional.h"
 
