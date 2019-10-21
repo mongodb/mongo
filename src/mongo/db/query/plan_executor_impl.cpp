@@ -381,20 +381,22 @@ void PlanExecutorImpl::reattachToOperationContext(OperationContext* opCtx) {
 }
 
 PlanExecutor::ExecState PlanExecutorImpl::getNext(BSONObj* objOut, RecordId* dlOut) {
-    Document doc;
-    const auto state = getNext(&doc, dlOut);
+    const auto state = getNext(&_docOutput, dlOut);
     if (objOut) {
-        *objOut = doc.toBson();
+        *objOut = _docOutput.toBson();
     }
     return state;
 }
 
 PlanExecutor::ExecState PlanExecutorImpl::getNext(Document* objOut, RecordId* dlOut) {
     Snapshotted<Document> snapshotted;
+    if (objOut) {
+        snapshotted.value() = std::move(*objOut);
+    }
     ExecState state = _getNextImpl(objOut ? &snapshotted : nullptr, dlOut);
 
     if (objOut) {
-        *objOut = snapshotted.value();
+        *objOut = std::move(snapshotted.value());
     }
 
     return state;
@@ -412,10 +414,12 @@ PlanExecutor::ExecState PlanExecutorImpl::getNextSnapshotted(Snapshotted<BSONObj
     // Detaching from the OperationContext means that the returned snapshot ids could be invalid.
     invariant(!_everDetachedFromOperationContext);
     Snapshotted<Document> docOut;
+    docOut.value() = std::move(_docOutput);
     const auto status = _getNextImpl(&docOut, dlOut);
     if (objOut) {
         *objOut = {docOut.snapshotId(), docOut.value().toBson()};
     }
+    _docOutput = std::move(docOut.value());
     return status;
 }
 
@@ -571,7 +575,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
                                                         Document{member->keyData[0].keyData});
                     }
                 } else if (member->hasObj()) {
-                    *objOut = member->doc;
+                    std::swap(*objOut, member->doc);
                 } else {
                     _workingSet->free(id);
                     hasRequestedData = false;
@@ -589,11 +593,11 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
 
             if (hasRequestedData) {
                 // transfer the metadata from the WSM to Document.
-                invariant(objOut);
-                MutableDocument md(std::move(objOut->value()));
-                md.setMetadata(member->releaseMetadata());
-                objOut->setValue(md.freeze());
-
+                if (objOut && member->metadata()) {
+                    MutableDocument md(std::move(objOut->value()));
+                    md.setMetadata(member->releaseMetadata());
+                    objOut->setValue(md.freeze());
+                }
                 _workingSet->free(id);
                 return PlanExecutor::ADVANCED;
             }

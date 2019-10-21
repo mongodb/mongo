@@ -106,6 +106,10 @@ public:
     /// Empty Document (does no allocation)
     Document() {}
 
+    /// Defaulted copy and move constructors.
+    Document(const Document&) = default;
+    Document(Document&&) = default;
+
     /// Create a new Document deep-converted from the given BSONObj.
     explicit Document(const BSONObj& bson);
 
@@ -119,6 +123,10 @@ public:
     void swap(Document& rhs) {
         _storage.swap(rhs._storage);
     }
+
+    /// Defaulted copy and move assignment operators.
+    Document& operator=(const Document&) = default;
+    Document& operator=(Document&&) = default;
 
     /// Look up a field by key name. Returns Value() if no such field. O(1)
     const Value operator[](StringData key) const {

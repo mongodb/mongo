@@ -189,6 +189,10 @@ private:
     // stages.
     std::queue<Document> _stash;
 
+    // The output document that is used by getNext BSON API. This allows us to avoid constantly
+    // allocating and freeing DocumentStorage.
+    Document _docOutput;
+
     enum { kUsable, kSaved, kDetached, kDisposed } _currentState = kUsable;
 
     bool _everDetachedFromOperationContext = false;
