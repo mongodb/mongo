@@ -74,11 +74,16 @@ public:
         return _children;
     }
 
+    ASTNode* child(size_t index) const {
+        invariant(index < _children.size());
+        return _children[index].get();
+    }
+
     const ASTNode* parent() const {
         return _parent;
     }
 
-    const bool isRoot() const {
+    bool isRoot() const {
         return !_parent;
     }
 
@@ -154,6 +159,21 @@ public:
     void addChild(StringData fieldName, std::unique_ptr<ASTNode> node) {
         addChildToInternalVector(std::move(node));
         _fieldNames.push_back(fieldName.toString());
+    }
+
+    /**
+     * Remove a node which is a direct child of this tree. Returns true if anything was removed,
+     * false otherwise.
+     */
+    bool removeChild(StringData fieldName) {
+        if (auto it = std::find(_fieldNames.begin(), _fieldNames.end(), fieldName);
+            it != _fieldNames.end()) {
+            _children.erase(_children.begin() + std::distance(_fieldNames.begin(), it));
+            _fieldNames.erase(it);
+            return true;
+        }
+
+        return false;
     }
 
     const std::vector<std::string>& fieldNames() const {

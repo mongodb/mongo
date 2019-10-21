@@ -28,9 +28,6 @@ env.Library(
         "planner_wildcard_helpers.cpp",
         "planner_analysis.cpp",
         "planner_ixselect.cpp",
-        "projection.cpp",
-        "projection_ast_util.cpp",
-        "projection_parser.cpp",
         "query_planner.cpp",
         "expression_index.cpp",
         "index_bounds.cpp",
@@ -54,10 +51,24 @@ env.Library(
         "collation/collator_factory_interface",
         "collation/collator_interface",
         "command_request_response",
+        "projection_ast",
         "query_knobs",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/idl/server_parameter",
+    ],
+)
+
+env.Library(
+    target='projection_ast',
+    source=[
+        "projection.cpp",
+        "projection_ast_util.cpp",
+        "projection_parser.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/matcher/expressions",
     ],
 )
 

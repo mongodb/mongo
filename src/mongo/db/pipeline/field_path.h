@@ -138,7 +138,12 @@ public:
         return FieldPath(getSubpath(getPathLength() - 2));
     }
 
+    FieldPath concat(const FieldPath& tail) const;
+
 private:
+    FieldPath(std::string string, std::vector<size_t> dots)
+        : _fieldPath(std::move(string)), _fieldPathDotPosition(std::move(dots)) {}
+
     static const char prefix = '$';
 
     // Contains the full field path, with each field delimited by a '.' character.

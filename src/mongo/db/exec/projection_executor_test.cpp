@@ -40,15 +40,30 @@ namespace mongo::projection_executor {
 class ProjectionExecutorTest : public AggregationContextFixture {
 public:
     projection_ast::Projection parseWithDefaultPolicies(
-        const BSONObj& proj, boost::optional<BSONObj> match = boost::none) {
-        StatusWith<std::unique_ptr<MatchExpression>> expr{nullptr};
-        if (match) {
-            expr = MatchExpressionParser::parse(*match, getExpCtx());
-            uassertStatusOK(expr.getStatus());
+        const BSONObj& projectionBson, boost::optional<BSONObj> matchExprBson = boost::none) {
+        return parseWithPolicies(projectionBson, matchExprBson, ProjectionPolicies{});
+    }
+
+    projection_ast::Projection parseWithFindFeaturesEnabled(
+        const BSONObj& projectionBson, boost::optional<BSONObj> matchExprBson = boost::none) {
+        auto policy = ProjectionPolicies::findProjectionPolicies();
+        return parseWithPolicies(projectionBson, matchExprBson, policy);
+    }
+
+    projection_ast::Projection parseWithPolicies(const BSONObj& projectionBson,
+                                                 boost::optional<BSONObj> matchExprBson,
+                                                 ProjectionPolicies policies) {
+        StatusWith<std::unique_ptr<MatchExpression>> swMatchExpression(nullptr);
+        if (matchExprBson) {
+            swMatchExpression = MatchExpressionParser::parse(*matchExprBson, getExpCtx());
+            uassertStatusOK(swMatchExpression.getStatus());
         }
 
-        return projection_ast::parse(
-            getExpCtx(), proj, expr.getValue().get(), match.get_value_or({}), {});
+        return projection_ast::parse(getExpCtx(),
+                                     projectionBson,
+                                     swMatchExpression.getValue().get(),
+                                     matchExprBson.get_value_or(BSONObj()),
+                                     policies);
     }
 };
 
@@ -114,14 +129,15 @@ TEST_F(ProjectionExecutorTest, CanProjectExclusionDottedPath) {
 }
 
 TEST_F(ProjectionExecutorTest, CanProjectFindPositional) {
-    auto proj = parseWithDefaultPolicies(fromjson("{'a.b.$': 1}"), fromjson("{'a.b': {$gte: 3}}"));
+    auto proj =
+        parseWithFindFeaturesEnabled(fromjson("{'a.b.$': 1}"), fromjson("{'a.b': {$gte: 3}}"));
     auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
     ASSERT_DOCUMENT_EQ(Document{fromjson("{a: {b: [3]}}")},
                        executor->applyTransformation(Document{fromjson("{a: {b: [1,2,3,4]}}")}));
 }
 
 TEST_F(ProjectionExecutorTest, CanProjectFindElemMatchWithInclusion) {
-    auto proj = parseWithDefaultPolicies(fromjson("{a: {$elemMatch: {b: {$gte: 3}}}, c: 1}"));
+    auto proj = parseWithFindFeaturesEnabled(fromjson("{a: {$elemMatch: {b: {$gte: 3}}}, c: 1}"));
     auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
     ASSERT_DOCUMENT_EQ(
         Document{fromjson("{a: [{b: 3}]}")},
@@ -129,7 +145,7 @@ TEST_F(ProjectionExecutorTest, CanProjectFindElemMatchWithInclusion) {
 }
 
 TEST_F(ProjectionExecutorTest, CanProjectFindElemMatchWithExclusion) {
-    auto proj = parseWithDefaultPolicies(fromjson("{a: {$elemMatch: {b: {$gte: 3}}}, c: 0}"));
+    auto proj = parseWithFindFeaturesEnabled(fromjson("{a: {$elemMatch: {b: {$gte: 3}}}, c: 0}"));
     auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
     ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [{b: 3}], d: 'def'}")},
                        executor->applyTransformation(Document{
@@ -137,7 +153,7 @@ TEST_F(ProjectionExecutorTest, CanProjectFindElemMatchWithExclusion) {
 }
 
 TEST_F(ProjectionExecutorTest, CanProjectFindSliceWithInclusion) {
-    auto proj = parseWithDefaultPolicies(fromjson("{'a.b': {$slice: [1,2]}, c: 1}"));
+    auto proj = parseWithFindFeaturesEnabled(fromjson("{'a.b': {$slice: [1,2]}, c: 1}"));
     auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
     ASSERT_DOCUMENT_EQ(
         Document{fromjson("{a: {b: [2,3]}, c: 'abc'}")},
@@ -145,7 +161,7 @@ TEST_F(ProjectionExecutorTest, CanProjectFindSliceWithInclusion) {
 }
 
 TEST_F(ProjectionExecutorTest, CanProjectFindSliceWithExclusion) {
-    auto proj = parseWithDefaultPolicies(fromjson("{'a.b': {$slice: [1,2]}, c: 0}"));
+    auto proj = parseWithFindFeaturesEnabled(fromjson("{'a.b': {$slice: [1,2]}, c: 0}"));
     auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
     ASSERT_DOCUMENT_EQ(
         Document{fromjson("{a: {b: [2,3]}}")},
@@ -153,8 +169,8 @@ TEST_F(ProjectionExecutorTest, CanProjectFindSliceWithExclusion) {
 }
 
 TEST_F(ProjectionExecutorTest, CanProjectFindSliceAndPositional) {
-    auto proj = parseWithDefaultPolicies(fromjson("{'a.b': {$slice: [1,2]}, 'c.$': 1}"),
-                                         fromjson("{c: {$gte: 6}}"));
+    auto proj = parseWithFindFeaturesEnabled(fromjson("{'a.b': {$slice: [1,2]}, 'c.$': 1}"),
+                                             fromjson("{c: {$gte: 6}}"));
     auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
     ASSERT_DOCUMENT_EQ(
         Document{fromjson("{a: {b: [2,3]}, c: [6]}")},

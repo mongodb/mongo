@@ -134,7 +134,10 @@ TEST(CanonicalQueryEncoderTest, ComputeKey) {
     testComputeKey("{}", "{}", "{a: 0}", "an");
     testComputeKey("{}", "{}", "{a: false}", "an");
     testComputeKey("{}", "{}", "{a: 99}", "an|_id-a");
-    testComputeKey("{}", "{}", "{a: 'foo'}", "an|_id-a");
+    // TODO SERVER-44118: Since "foo" is a computed field it's treated as an expression and means
+    // the entire document is required. This should not be the case.
+    testComputeKey("{}", "{}", "{a: 'foo'}", "an");
+
     // $slice defaults to exclusion.
     testComputeKey("{}", "{}", "{a: {$slice: [3, 5]}}", "an");
     testComputeKey("{}", "{}", "{a: {$slice: [3, 5]}, b: 0}", "an");
@@ -148,7 +151,9 @@ TEST(CanonicalQueryEncoderTest, ComputeKey) {
 
     testComputeKey("{}", "{}", "{a: {$slice: [3, 5]}, b: {$elemMatch: {x: 2}}}", "an");
 
-    testComputeKey("{}", "{}", "{a: ObjectId('507f191e810c19729de860ea')}", "an|_id-a");
+    // Since ObjectId is a literal value and is treated as an Expression, the entire document is
+    // required. TODO SERVER-44118: The entire document shouldn't be necessary.
+    testComputeKey("{}", "{}", "{a: ObjectId('507f191e810c19729de860ea')}", "an");
     testComputeKey("{a: 1}", "{}", "{'a.$': 1}", "eqa");
     testComputeKey("{a: 1}", "{}", "{a: 1}", "eqa|_id-a");
 
@@ -183,8 +188,9 @@ TEST(CanonicalQueryEncoderTest, ComputeKeyEscaped) {
     // Field name in projection.
     testComputeKey("{}", "{}", "{'a,[]~|-<>': 1}", "an|_id-a\\,\\[\\]\\~\\|\\-<>");
 
-    // Value in projection.
-    testComputeKey("{}", "{}", "{a: 'foo,[]~|-<>'}", "an|_id-a");
+    // String literal provided as value. TODO SERVER-44118: Since this is treated as an Expression,
+    // the entire document is required.
+    testComputeKey("{}", "{}", "{a: 'foo,[]~|-<>'}", "an");
 }
 
 // Cache keys for $geoWithin queries with legacy and GeoJSON coordinates should

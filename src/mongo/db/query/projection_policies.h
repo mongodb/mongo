@@ -52,22 +52,43 @@ struct ProjectionPolicies {
     // projections. Computed fields are implicitly prohibited by exclusion projections.
     enum class ComputedFieldsPolicy { kBanComputedFields, kAllowComputedFields };
 
+    // Whether $elemMatch, find() $slice and positional projection are allowed.
+    enum class FindOnlyFeaturesPolicy { kBanFindOnlyFeatures, kAllowFindOnlyFeatures };
+
     static const DefaultIdPolicy kDefaultIdPolicyDefault = DefaultIdPolicy::kIncludeId;
     static const ArrayRecursionPolicy kArrayRecursionPolicyDefault =
         ArrayRecursionPolicy::kRecurseNestedArrays;
     static const ComputedFieldsPolicy kComputedFieldsPolicyDefault =
         ComputedFieldsPolicy::kAllowComputedFields;
+    static const FindOnlyFeaturesPolicy kFindOnlyFeaturesPolicyDefault =
+        FindOnlyFeaturesPolicy::kBanFindOnlyFeatures;
 
-    ProjectionPolicies(DefaultIdPolicy idPolicy = kDefaultIdPolicyDefault,
-                       ArrayRecursionPolicy arrayRecursionPolicy = kArrayRecursionPolicyDefault,
-                       ComputedFieldsPolicy computedFieldsPolicy = kComputedFieldsPolicyDefault)
+    static ProjectionPolicies findProjectionPolicies() {
+        return ProjectionPolicies{
+            ProjectionPolicies::kDefaultIdPolicyDefault,
+            ProjectionPolicies::kArrayRecursionPolicyDefault,
+            ProjectionPolicies::kComputedFieldsPolicyDefault,
+            ProjectionPolicies::FindOnlyFeaturesPolicy::kAllowFindOnlyFeatures};
+    }
+
+    ProjectionPolicies(
+        DefaultIdPolicy idPolicy = kDefaultIdPolicyDefault,
+        ArrayRecursionPolicy arrayRecursionPolicy = kArrayRecursionPolicyDefault,
+        ComputedFieldsPolicy computedFieldsPolicy = kComputedFieldsPolicyDefault,
+        FindOnlyFeaturesPolicy findOnlyFeaturesPolicy = kFindOnlyFeaturesPolicyDefault)
         : idPolicy(idPolicy),
           arrayRecursionPolicy(arrayRecursionPolicy),
-          computedFieldsPolicy(computedFieldsPolicy) {}
+          computedFieldsPolicy(computedFieldsPolicy),
+          findOnlyFeaturesPolicy(findOnlyFeaturesPolicy) {}
 
     const DefaultIdPolicy idPolicy;
     const ArrayRecursionPolicy arrayRecursionPolicy;
     const ComputedFieldsPolicy computedFieldsPolicy;
+    const FindOnlyFeaturesPolicy findOnlyFeaturesPolicy;
+
+    bool findOnlyFeaturesAllowed() const {
+        return findOnlyFeaturesPolicy == FindOnlyFeaturesPolicy::kAllowFindOnlyFeatures;
+    }
 };
 
 }  // namespace mongo

@@ -242,8 +242,11 @@ Status CanonicalQuery::init(OperationContext* opCtx,
     if (!_qr->getProj().isEmpty()) {
         Status newParserStatus = Status::OK();
         try {
-            _proj.emplace(projection_ast::parse(
-                expCtx, _qr->getProj(), _root.get(), _qr->getFilter(), ProjectionPolicies{}));
+            _proj.emplace(projection_ast::parse(expCtx,
+                                                _qr->getProj(),
+                                                _root.get(),
+                                                _qr->getFilter(),
+                                                ProjectionPolicies::findProjectionPolicies()));
         } catch (const DBException& e) {
             newParserStatus = e.toStatus();
         }

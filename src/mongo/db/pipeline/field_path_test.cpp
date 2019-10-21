@@ -197,5 +197,34 @@ TEST(FieldPathTest, GetSubpath) {
     ASSERT_EQUALS("foo.bar.baz", path.getSubpath(2));
 }
 
+void checkConcatWorks(const FieldPath& head, const FieldPath& tail) {
+    FieldPath concat = head.concat(tail);
+    ASSERT(concat == FieldPath::getFullyQualifiedPath(head.fullPath(), tail.fullPath()));
+    ASSERT_EQ(concat.getPathLength(), head.getPathLength() + tail.getPathLength());
+
+    const auto expectedTail = head.getPathLength() == 1
+        ? tail
+        : FieldPath::getFullyQualifiedPath(head.tail().fullPath(), tail.fullPath());
+    ASSERT(FieldPath(concat.tail()) == expectedTail);
+
+    ASSERT_EQ(concat.front(), head.front());
+    ASSERT_EQ(concat.back(), tail.back());
+    for (size_t i = 0; i < concat.getPathLength(); i++) {
+        const auto expected = (i < head.getPathLength())
+            ? head.getFieldName(i)
+            : tail.getFieldName(i - head.getPathLength());
+        ASSERT_EQ(concat.getFieldName(i), expected);
+    }
+}
+
+TEST(FieldPathTest, Concat) {
+    checkConcatWorks("abc", "cde");
+    checkConcatWorks("abc.ef", "cde.ab");
+    checkConcatWorks("abc.$id", "cde");
+    checkConcatWorks("abc", "$id.x");
+    checkConcatWorks("some.long.path.with.many.parts", "another.long.ish.path");
+    checkConcatWorks("$db", "$id");
+    checkConcatWorks("$db.$id", "$id.$db");
+}
 }  // namespace
 }  // namespace mongo

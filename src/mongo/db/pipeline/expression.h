@@ -223,6 +223,11 @@ public:
         BSONElement exprElement,
         const VariablesParseState& vps);
 
+    /**
+     * Return whether 'name' refers to an expression in the language.
+     */
+    static bool isExpressionName(StringData name);
+
     /*
       Produce a field path std::string with the field prefix removed.
 

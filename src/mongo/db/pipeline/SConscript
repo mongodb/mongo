@@ -383,6 +383,7 @@ env.Library(
         'expression',
         'field_path',
         '$BUILD_DIR/mongo/db/matcher/expressions',
+        '$BUILD_DIR/mongo/db/query/projection_ast',
     ]
 )
 

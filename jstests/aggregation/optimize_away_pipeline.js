@@ -478,12 +478,11 @@ if (!FixtureHelpers.isMongos(db) && isWiredTiger(db)) {
         expectedResult: [{_id: 1, x: 10}]
     });
     db.setProfilingLevel(0);
-    let profile = db.system.profile.find({}, {op: 1, ns: 1, comment: 'optimize_away_pipeline'})
-                      .sort({ts: 1})
-                      .toArray();
-    assert(arrayEq(
-        profile,
-        [{op: "command", ns: coll.getFullName()}, {op: "getmore", ns: coll.getFullName()}]));
+    let profile = db.system.profile.find({}, {op: 1, ns: 1}).sort({ts: 1}).toArray();
+    assert(
+        arrayEq(profile,
+                [{op: "command", ns: coll.getFullName()}, {op: "getmore", ns: coll.getFullName()}]),
+        profile);
     // Test getMore puts a correct namespace into profile data for a view with an optimized away
     // pipeline.
     if (!FixtureHelpers.isSharded(coll)) {
@@ -499,9 +498,7 @@ if (!FixtureHelpers.isMongos(db) && isWiredTiger(db)) {
             expectedResult: [{_id: 1, x: 10}]
         });
         db.setProfilingLevel(0);
-        profile = db.system.profile.find({}, {op: 1, ns: 1, comment: 'optimize_away_pipeline'})
-                      .sort({ts: 1})
-                      .toArray();
+        profile = db.system.profile.find({}, {op: 1, ns: 1}).sort({ts: 1}).toArray();
         assert(arrayEq(
             profile,
             [{op: "query", ns: view.getFullName()}, {op: "getmore", ns: view.getFullName()}]));

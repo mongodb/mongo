@@ -50,7 +50,9 @@ using projection_ast::Projection;
 /**
  * Helper for creating projections.
  */
-projection_ast::Projection createProjection(const BSONObj& query, const BSONObj& projObj) {
+projection_ast::Projection createProjection(const BSONObj& query,
+                                            const BSONObj& projObj,
+                                            ProjectionPolicies policies = {}) {
     QueryTestServiceContext serviceCtx;
     auto opCtx = serviceCtx.makeOperationContext();
     const CollatorInterface* collator = nullptr;
@@ -61,7 +63,7 @@ projection_ast::Projection createProjection(const BSONObj& query, const BSONObj&
     ASSERT_OK(statusWithMatcher.getStatus());
     std::unique_ptr<MatchExpression> queryMatchExpr = std::move(statusWithMatcher.getValue());
     projection_ast::Projection res =
-        projection_ast::parse(expCtx, projObj, queryMatchExpr.get(), query, ProjectionPolicies{});
+        projection_ast::parse(expCtx, projObj, queryMatchExpr.get(), query, policies);
 
     return res;
 }
@@ -70,6 +72,12 @@ projection_ast::Projection createProjection(const char* queryStr, const char* pr
     BSONObj query = fromjson(queryStr);
     BSONObj projObj = fromjson(projStr);
     return createProjection(query, projObj);
+}
+
+projection_ast::Projection createFindProjection(const char* queryStr, const char* projStr) {
+    BSONObj query = fromjson(queryStr);
+    BSONObj projObj = fromjson(projStr);
+    return createProjection(query, projObj, ProjectionPolicies::findProjectionPolicies());
 }
 
 void assertInvalidProjection(const char* queryStr, const char* projStr) {
@@ -174,18 +182,18 @@ TEST(QueryProjectionTest, InvalidElemMatchExprProjection) {
 }
 
 TEST(QueryProjectionTest, ValidPositionalOperatorProjections) {
-    createProjection("{a: 1}", "{'a.$': 1}");
-    createProjection("{a: 1}", "{'a.foo.bar.$': 1}");
-    createProjection("{'a.b.c': 1}", "{'a.b.c.$': 1}");
-    createProjection("{'a.b.c': 1}", "{'a.e.f.$': 1}");
-    createProjection("{a: {b: 1}}", "{'a.$': 1}");
-    createProjection("{a: 1, b: 1}}", "{'a.$': 1}");
-    createProjection("{a: 1, b: 1}}", "{'b.$': 1}");
-    createProjection("{$and: [{a: 1}, {b: 1}]}", "{'a.$': 1}");
-    createProjection("{$and: [{a: 1}, {b: 1}]}", "{'b.$': 1}");
-    createProjection("{$or: [{a: 1}, {b: 1}]}", "{'a.$': 1}");
-    createProjection("{$or: [{a: 1}, {b: 1}]}", "{'b.$': 1}");
-    createProjection("{$and: [{$or: [{a: 1}, {$and: [{b: 1}, {c: 1}]}]}]}", "{'c.d.f.$': 1}");
+    createFindProjection("{a: 1}", "{'a.$': 1}");
+    createFindProjection("{a: 1}", "{'a.foo.bar.$': 1}");
+    createFindProjection("{'a.b.c': 1}", "{'a.b.c.$': 1}");
+    createFindProjection("{'a.b.c': 1}", "{'a.e.f.$': 1}");
+    createFindProjection("{a: {b: 1}}", "{'a.$': 1}");
+    createFindProjection("{a: 1, b: 1}}", "{'a.$': 1}");
+    createFindProjection("{a: 1, b: 1}}", "{'b.$': 1}");
+    createFindProjection("{$and: [{a: 1}, {b: 1}]}", "{'a.$': 1}");
+    createFindProjection("{$and: [{a: 1}, {b: 1}]}", "{'b.$': 1}");
+    createFindProjection("{$or: [{a: 1}, {b: 1}]}", "{'a.$': 1}");
+    createFindProjection("{$or: [{a: 1}, {b: 1}]}", "{'b.$': 1}");
+    createFindProjection("{$and: [{$or: [{a: 1}, {$and: [{b: 1}, {c: 1}]}]}]}", "{'c.d.f.$': 1}");
 }
 
 // Some match expressions (eg. $where) do not override MatchExpression::path()
@@ -266,7 +274,8 @@ TEST(QueryProjectionTest, SortKeyMetaProjectionDoesNotRequireDocument) {
 }
 
 TEST(QueryProjectionTest, SortKeyMetaAndSlice) {
-    auto proj = createProjection("{}", "{a: 1, foo: {$meta: 'sortKey'}, _id: 0, b: {$slice: 1}}");
+    auto proj =
+        createFindProjection("{}", "{a: 1, foo: {$meta: 'sortKey'}, _id: 0, b: {$slice: 1}}");
 
     ASSERT_TRUE(proj.metadataDeps()[DocumentMetadataFields::kSortKey]);
     ASSERT_TRUE(proj.requiresDocument());
@@ -276,8 +285,8 @@ TEST(QueryProjectionTest, SortKeyMetaAndSlice) {
 }
 
 TEST(QueryProjectionTest, SortKeyMetaAndElemMatch) {
-    auto proj =
-        createProjection("{}", "{a: 1, foo: {$meta: 'sortKey'}, _id: 0, b: {$elemMatch: {a: 1}}}");
+    auto proj = createFindProjection(
+        "{}", "{a: 1, foo: {$meta: 'sortKey'}, _id: 0, b: {$elemMatch: {a: 1}}}");
 
     ASSERT_TRUE(proj.metadataDeps()[DocumentMetadataFields::kSortKey]);
     ASSERT_TRUE(proj.requiresDocument());
@@ -331,17 +340,17 @@ TEST(QueryProjectionTest, ExclusionProjectionPreservesNonExcludedFields) {
 }
 
 TEST(QueryProjectionTest, PositionalProjectionDoesNotPreserveField) {
-    auto proj = createProjection("{a: {$elemMatch: {$eq: 0}}}", "{'a.$': 1}");
+    auto proj = createFindProjection("{a: {$elemMatch: {$eq: 0}}}", "{'a.$': 1}");
     ASSERT_FALSE(proj.isFieldRetainedExactly("a"));
 }
 
 TEST(QueryProjectionTest, PositionalProjectionDoesNotPreserveChild) {
-    auto proj = createProjection("{a: {$elemMatch: {$eq: 0}}}", "{'a.$': 1}");
+    auto proj = createFindProjection("{a: {$elemMatch: {$eq: 0}}}", "{'a.$': 1}");
     ASSERT_FALSE(proj.isFieldRetainedExactly("a.b"));
 }
 
 TEST(QueryProjectionTest, PositionalProjectionDoesNotPreserveParent) {
-    auto proj = createProjection("{'a.b': {$elemMatch: {$eq: 0}}}", "{'a.b.$': 1}");
+    auto proj = createFindProjection("{'a.b': {$elemMatch: {$eq: 0}}}", "{'a.b.$': 1}");
     ASSERT_FALSE(proj.isFieldRetainedExactly("a"));
 }
 
@@ -402,7 +411,7 @@ TEST(QueryProjectionTest, IdExclusionWithInclusionProjectionDoesNotPreserveId) {
 }
 
 TEST(QueryProjectionTest, PositionalProjectionDoesNotPreserveFields) {
-    auto proj = createProjection("{a: 1}", "{'a.$': 1}");
+    auto proj = createFindProjection("{a: 1}", "{'a.$': 1}");
     ASSERT_FALSE(proj.isFieldRetainedExactly("b"));
     ASSERT_FALSE(proj.isFieldRetainedExactly("a"));
     ASSERT_FALSE(proj.isFieldRetainedExactly("a.b"));
@@ -410,7 +419,7 @@ TEST(QueryProjectionTest, PositionalProjectionDoesNotPreserveFields) {
 }
 
 TEST(QueryProjectionTest, PositionalProjectionWithIdExclusionDoesNotPreserveFields) {
-    auto proj = createProjection("{a: 1}", "{_id: 0, 'a.$': 1}");
+    auto proj = createFindProjection("{a: 1}", "{_id: 0, 'a.$': 1}");
     ASSERT_FALSE(proj.isFieldRetainedExactly("b"));
     ASSERT_FALSE(proj.isFieldRetainedExactly("a"));
     ASSERT_FALSE(proj.isFieldRetainedExactly("a.b"));
@@ -418,7 +427,7 @@ TEST(QueryProjectionTest, PositionalProjectionWithIdExclusionDoesNotPreserveFiel
 }
 
 TEST(QueryProjectionTest, PositionalProjectionWithIdInclusionPreservesId) {
-    auto proj = createProjection("{a: 1}", "{_id: 1, 'a.$': 1}");
+    auto proj = createFindProjection("{a: 1}", "{_id: 1, 'a.$': 1}");
     ASSERT_FALSE(proj.isFieldRetainedExactly("b"));
     ASSERT_FALSE(proj.isFieldRetainedExactly("a"));
     ASSERT_FALSE(proj.isFieldRetainedExactly("a.b"));
@@ -441,14 +450,14 @@ TEST(QueryProjectionTest, DBRefProjections) {
     createProjection(BSONObj(), BSON("$id" << 1));
     createProjection(BSONObj(), BSON("$ref" << 1));
     // dotted before
-    createProjection("{}", "{'a.$ref': 1}");
-    createProjection("{}", "{'a.$id': 1}");
-    createProjection("{}", "{'a.$db': 1}");
+    createFindProjection("{}", "{'a.$ref': 1}");
+    createFindProjection("{}", "{'a.$id': 1}");
+    createFindProjection("{}", "{'a.$db': 1}");
     // dotted after
     createProjection("{}", "{'$id.a': 1}");
     // position operator on $id
     // $ref and $db hold the collection and database names respectively,
     // so these fields cannot be arrays.
-    createProjection("{'a.$id': {$elemMatch: {x: 1}}}", "{'a.$id.$': 1}");
+    createFindProjection("{'a.$id': {$elemMatch: {x: 1}}}", "{'a.$id.$': 1}");
 }
 }  // namespace

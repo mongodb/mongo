@@ -191,6 +191,10 @@ intrusive_ptr<Expression> Expression::parseOperand(
     }
 }
 
+bool Expression::isExpressionName(StringData name) {
+    return parserMap.find(name) != parserMap.end();
+}
+
 namespace {
 /**
  * UTF-8 multi-byte code points consist of one leading byte of the form 11xxxxxx, and potentially

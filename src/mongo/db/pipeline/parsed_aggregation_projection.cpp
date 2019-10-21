@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/parsed_aggregation_projection.h"
@@ -40,8 +42,10 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/parsed_exclusion_projection.h"
 #include "mongo/db/pipeline/parsed_inclusion_projection.h"
+#include "mongo/db/query/projection_parser.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -321,6 +325,19 @@ std::unique_ptr<ParsedAggregationProjection> ParsedAggregationProjection::create
 
     // Actually parse the specification.
     parsedProject->parse(spec);
+
+    // If we got here, it means that parsing using ParsedAggProjection::parse() succeeded.
+    // Since the query system is currently between two implementations of projection, we want to
+    // make sure that the old version and new version agree on which projections are valid. Check
+    // that the new parser also finds this projection valid.
+    try {
+        projection_ast::parse(expCtx, spec, policies);
+    } catch (const DBException& e) {
+        error() << "old parser found projection " << spec << " valid but new parser returned "
+                << e.toStatus();
+        MONGO_UNREACHABLE;
+    }
+
     return parsedProject;
 }
 }  // namespace parsed_aggregation_projection

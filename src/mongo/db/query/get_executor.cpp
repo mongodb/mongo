@@ -652,8 +652,12 @@ StatusWith<unique_ptr<PlanStage>> applyProjection(OperationContext* opCtx,
                                                   unique_ptr<PlanStage> root) {
     invariant(!projObj.isEmpty());
 
-    projection_ast::Projection proj = projection_ast::parse(
-        cq->getExpCtx(), projObj.getOwned(), cq->root(), cq->getQueryObj(), ProjectionPolicies{});
+    projection_ast::Projection proj =
+        projection_ast::parse(cq->getExpCtx(),
+                              projObj.getOwned(),
+                              cq->root(),
+                              cq->getQueryObj(),
+                              ProjectionPolicies::findProjectionPolicies());
 
     {
         // The query system is in the process of migrating from one projection
