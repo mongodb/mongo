@@ -357,3 +357,10 @@ function generateCollection({
     assert.eq(numDocs, res.nInserted);
     assert.eq(numDocs, coll.find().itcount());
 }
+
+/**
+ * Returns true if 'coll' exists or false otherwise.
+ */
+function collectionExists(coll) {
+    return Array.contains(coll.getDB().getCollectionNames(), coll.getName());
+}

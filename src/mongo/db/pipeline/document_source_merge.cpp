@@ -377,6 +377,14 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::create(
             "{} cannot be used with a 'linearizable' read concern level"_format(kStageName),
             readConcernLevel != repl::ReadConcernLevel::kLinearizableReadConcern);
 
+    uassert(31319,
+            "Cannot {} to special collection: {}"_format(kStageName, outputNs.coll()),
+            !outputNs.isSystem());
+
+    uassert(31320,
+            "Cannot {} to internal database: {}"_format(kStageName, outputNs.db()),
+            !outputNs.isOnInternalDb());
+
     if (whenMatched == WhenMatched::kPipeline) {
         if (!letVariables) {
             // For custom pipeline-style updates, default the 'let' variables to {new: "$$ROOT"},

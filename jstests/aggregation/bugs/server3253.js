@@ -17,10 +17,6 @@ input.drop();
 inputDoesntExist.drop();  // never created
 output.drop();
 
-function collectionExists(coll) {
-    return Array.contains(coll.getDB().getCollectionNames(), coll.getName());
-}
-
 function getOutputIndexes() {
     return output.getIndexes().sort(function(a, b) {
         if (a.name < b.name) {
@@ -103,11 +99,6 @@ if (jsTest.options().storageEngine !== "mobile") {
 
 // ensure everything works even if input doesn't exist.
 test(inputDoesntExist, [], []);
-
-// ensure we cant do dangerous things to system collections
-var outputInSystem = db.system.server3253_out;
-assertErrorCode(input, {$out: outputInSystem.getName()}, 17385);
-assert(!collectionExists(outputInSystem));
 
 // shoudn't leave temp collections laying around
 assert.eq([], listCollections(/tmp\.agg_out/));

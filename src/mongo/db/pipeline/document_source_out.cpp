@@ -199,6 +199,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceOut::create(
             "Can't {} to special collection: {}"_format(kStageName, outputNs.coll()),
             !outputNs.isSystem());
 
+    uassert(31321,
+            "Can't {} to internal database: {}"_format(kStageName, outputNs.db()),
+            !outputNs.isOnInternalDb());
+
     return new DocumentSourceOut(std::move(outputNs), expCtx);
 }
 
