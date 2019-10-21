@@ -99,8 +99,34 @@ void BSONObj::_assertInvalid(int maxSize) const {
 }
 
 BSONObj BSONObj::copy() const {
-    auto storage = SharedBuffer::allocate(objsize());
-    memcpy(storage.get(), objdata(), objsize());
+    // The undefined behavior checks in this function are best-effort and attempt to detect
+    // undefined behavior as early as possible. We cannot make any guarantees about detection
+    // because we are observing undefined state, and we assume the compiler does not make either
+    // of the following optimizations: a) optimizing away the call to objsize() on freed memory, and
+    // b) optimizing away the two sequential calls to objsize() as one.
+    // The behavior of this function must degrade as gracefully as possible under violation of
+    // those assumptions, and preserving any currently observed behavior does not form an argument
+    // against the later application of such optimizations.
+    int size = objsize();
+    if (!isOwned() && (size < kMinBSONLength || size > BufferMaxSize)) {
+        // Only for unowned objects, the size is validated in the constructor, so it is an error for
+        // the size to ever be invalid. This means that the unowned memory we are reading has
+        // changed, and we must exit immediately to avoid further undefined behavior.
+        severe() << "BSONObj::copy() - size " << size
+                 << " of unowned BSONObj is invalid and differs from previously validated size.";
+        fassertFailed(31322);
+    }
+    auto storage = SharedBuffer::allocate(size);
+
+    // If the call to objsize() changes between this call and the previous one, this indicates that
+    // that the memory we are reading has changed, and we must exit immediately to avoid further
+    // undefined behavior.
+    if (int sizeAfter = objsize(); sizeAfter != size) {
+        severe() << "BSONObj::copy() - size " << sizeAfter
+                 << " differs from previously observed size " << size;
+        fassertFailed(31323);
+    }
+    memcpy(storage.get(), objdata(), size);
     return BSONObj(std::move(storage));
 }
 
