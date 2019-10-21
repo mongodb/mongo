@@ -76,9 +76,9 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
     auto chunkDoc = chunkDocStatus.getValue();
     ASSERT_BSONOBJ_EQ(chunkSplitPoint, chunkDoc.getMax());
 
-    // Check for increment on first chunkDoc's minor version
-    ASSERT_EQ(origVersion.majorVersion(), chunkDoc.getVersion().majorVersion());
-    ASSERT_EQ(origVersion.minorVersion() + 1, chunkDoc.getVersion().minorVersion());
+    // Check for increment on first chunkDoc's major version.
+    ASSERT_EQ(origVersion.majorVersion() + 1, chunkDoc.getVersion().majorVersion());
+    ASSERT_EQ(1u, chunkDoc.getVersion().minorVersion());
 
     // Second chunkDoc should have range [chunkSplitPoint, chunkMax]
     auto otherChunkDocStatus = getChunkDoc(operationContext(), chunkSplitPoint);
@@ -87,9 +87,9 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
     auto otherChunkDoc = otherChunkDocStatus.getValue();
     ASSERT_BSONOBJ_EQ(chunkMax, otherChunkDoc.getMax());
 
-    // Check for increment on second chunkDoc's minor version
-    ASSERT_EQ(origVersion.majorVersion(), otherChunkDoc.getVersion().majorVersion());
-    ASSERT_EQ(origVersion.minorVersion() + 2, otherChunkDoc.getVersion().minorVersion());
+    // Check for increment on second chunkDoc's minor version.
+    ASSERT_EQ(origVersion.majorVersion() + 1, otherChunkDoc.getVersion().majorVersion());
+    ASSERT_EQ(2u, otherChunkDoc.getVersion().minorVersion());
 }
 
 TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
@@ -126,9 +126,9 @@ TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
     auto chunkDoc = chunkDocStatus.getValue();
     ASSERT_BSONOBJ_EQ(chunkSplitPoint, chunkDoc.getMax());
 
-    // Check for increment on first chunkDoc's minor version
-    ASSERT_EQ(origVersion.majorVersion(), chunkDoc.getVersion().majorVersion());
-    ASSERT_EQ(origVersion.minorVersion() + 1, chunkDoc.getVersion().minorVersion());
+    // Check for increment on first chunkDoc's major version.
+    ASSERT_EQ(origVersion.majorVersion() + 1, chunkDoc.getVersion().majorVersion());
+    ASSERT_EQ(1u, chunkDoc.getVersion().minorVersion());
 
     // Second chunkDoc should have range [chunkSplitPoint, chunkSplitPoint2]
     auto midChunkDocStatus = getChunkDoc(operationContext(), chunkSplitPoint);
@@ -137,9 +137,9 @@ TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
     auto midChunkDoc = midChunkDocStatus.getValue();
     ASSERT_BSONOBJ_EQ(chunkSplitPoint2, midChunkDoc.getMax());
 
-    // Check for increment on second chunkDoc's minor version
-    ASSERT_EQ(origVersion.majorVersion(), midChunkDoc.getVersion().majorVersion());
-    ASSERT_EQ(origVersion.minorVersion() + 2, midChunkDoc.getVersion().minorVersion());
+    // Check for increment on second chunkDoc's minor version.
+    ASSERT_EQ(origVersion.majorVersion() + 1, midChunkDoc.getVersion().majorVersion());
+    ASSERT_EQ(2u, midChunkDoc.getVersion().minorVersion());
 
     // Third chunkDoc should have range [chunkSplitPoint2, chunkMax]
     auto lastChunkDocStatus = getChunkDoc(operationContext(), chunkSplitPoint2);
@@ -148,9 +148,9 @@ TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
     auto lastChunkDoc = lastChunkDocStatus.getValue();
     ASSERT_BSONOBJ_EQ(chunkMax, lastChunkDoc.getMax());
 
-    // Check for increment on third chunkDoc's minor version
-    ASSERT_EQ(origVersion.majorVersion(), lastChunkDoc.getVersion().majorVersion());
-    ASSERT_EQ(origVersion.minorVersion() + 3, lastChunkDoc.getVersion().minorVersion());
+    // Check for increment on third chunkDoc's minor version.
+    ASSERT_EQ(origVersion.majorVersion() + 1, lastChunkDoc.getVersion().majorVersion());
+    ASSERT_EQ(3u, lastChunkDoc.getVersion().minorVersion());
 }
 
 TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
@@ -197,9 +197,12 @@ TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
     auto chunkDoc = chunkDocStatus.getValue();
     ASSERT_BSONOBJ_EQ(chunkSplitPoint, chunkDoc.getMax());
 
-    // Check for increment based on the competing chunk version
-    ASSERT_EQ(competingVersion.majorVersion(), chunkDoc.getVersion().majorVersion());
-    ASSERT_EQ(competingVersion.minorVersion() + 1, chunkDoc.getVersion().minorVersion());
+    // Check for major version increment based on the competing chunk version.
+    ASSERT_EQ(competingVersion.majorVersion() + 1, chunkDoc.getVersion().majorVersion());
+    // The minor version gets reset to 0 when the major version is incremented, and chunk splits
+    // increment the minor version after incrementing the major version, so we expect the minor
+    // version here to be 0 + 1 = 1.
+    ASSERT_EQ(1u, chunkDoc.getVersion().minorVersion());
 
     // Second chunkDoc should have range [chunkSplitPoint, chunkMax]
     auto otherChunkDocStatus = getChunkDoc(operationContext(), chunkSplitPoint);
@@ -208,9 +211,117 @@ TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
     auto otherChunkDoc = otherChunkDocStatus.getValue();
     ASSERT_BSONOBJ_EQ(chunkMax, otherChunkDoc.getMax());
 
-    // Check for increment based on the competing chunk version
+    // Check for increment based on the competing chunk version.
+    ASSERT_EQ(competingVersion.majorVersion() + 1, otherChunkDoc.getVersion().majorVersion());
+    // The minor version gets reset to 0 when the major version is incremented, and chunk splits
+    // increment the minor version after incrementing the major version for the first chunk in the
+    // split vector, so we expect the minor version here to be 0 + 1 + 1 = 2.
+    ASSERT_EQ(2u, otherChunkDoc.getVersion().minorVersion());
+}
+
+TEST_F(SplitChunkTest, SplitsOnShardWithLowerShardVersionDoesNotIncreaseCollectionVersion) {
+    ChunkType chunk, chunk2;
+    chunk.setNS(kNamespace.toString());
+    chunk2.setNS(kNamespace.toString());
+    auto collEpoch = OID::gen();
+
+    // Set up first chunk with lower version on shard0001. Its shard will not have shard version ==
+    // collection version, so splits to it should give it the collection version plus a minor
+    // version bump.
+    auto origVersion = ChunkVersion(1, 2, collEpoch);
+    chunk.setVersion(origVersion);
+    chunk.setShard(ShardId("shard0000"));
+    chunk.setMin(BSON("a" << 1));
+    chunk.setMax(BSON("a" << 10));
+
+    // Set up second chunk (chunk2) on shard0001. This has the higher version.
+    auto competingVersion = ChunkVersion(2, 1, collEpoch);
+    chunk2.setVersion(competingVersion);
+    chunk2.setShard(ShardId("shard0001"));
+    chunk2.setMin(BSON("a" << 10));
+    chunk2.setMax(BSON("a" << 20));
+
+    setupChunks({chunk, chunk2});
+
+    std::vector<BSONObj> splitPoints;
+    auto chunkSplitPoint = BSON("a" << 5);
+    splitPoints.push_back(chunkSplitPoint);
+
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                  ->commitChunkSplit(operationContext(),
+                                     kNamespace,
+                                     collEpoch,
+                                     ChunkRange(chunk.getMin(), chunk.getMax()),
+                                     splitPoints,
+                                     chunk.getShard().toString()));
+
+    // First chunkDoc should have range [chunk.getMin(), chunkSplitPoint]
+    auto chunkDocStatus = getChunkDoc(operationContext(), chunk.getMin());
+    auto chunkDoc = chunkDocStatus.getValue();
+
+    // Check for major version increment based on the competing chunk version.
+    ASSERT_EQ(competingVersion.majorVersion(), chunkDoc.getVersion().majorVersion());
+    ASSERT_EQ(competingVersion.minorVersion() + 1u, chunkDoc.getVersion().minorVersion());
+
+    // Second chunkDoc should have range [chunkSplitPoint, chunkMax]
+    auto otherChunkDocStatus = getChunkDoc(operationContext(), chunkSplitPoint);
+    auto otherChunkDoc = otherChunkDocStatus.getValue();
+    // Check for increment based on the competing chunk version.
     ASSERT_EQ(competingVersion.majorVersion(), otherChunkDoc.getVersion().majorVersion());
-    ASSERT_EQ(competingVersion.minorVersion() + 2, otherChunkDoc.getVersion().minorVersion());
+    ASSERT_EQ(competingVersion.minorVersion() + 2u, otherChunkDoc.getVersion().minorVersion());
+}
+
+TEST_F(SplitChunkTest, SplitsOnShardWithHighestShardVersionIncreasesCollectionVersion) {
+    ChunkType chunk, chunk2;
+    chunk.setNS(kNamespace.toString());
+    chunk2.setNS(kNamespace.toString());
+    auto collEpoch = OID::gen();
+
+    // Set up first chunk with lower version on shard0001. Its shard will not have shard version ==
+    // collection version.
+    auto origVersion = ChunkVersion(1, 2, collEpoch);
+    chunk.setVersion(origVersion);
+    chunk.setShard(ShardId("shard0000"));
+    chunk.setMin(BSON("a" << 1));
+    chunk.setMax(BSON("a" << 10));
+
+    // Set up second chunk (chunk2) on shard0001. This has the higher version, so its shard version
+    // == collection version. When we split it, its major version should increase.
+    auto competingVersion = ChunkVersion(2, 1, collEpoch);
+    chunk2.setVersion(competingVersion);
+    chunk2.setShard(ShardId("shard0001"));
+    chunk2.setMin(BSON("a" << 10));
+    chunk2.setMax(BSON("a" << 20));
+
+    setupChunks({chunk, chunk2});
+
+    std::vector<BSONObj> splitPoints;
+    // This will split the second chunk.
+    auto chunkSplitPoint = BSON("a" << 15);
+    splitPoints.push_back(chunkSplitPoint);
+
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                  ->commitChunkSplit(operationContext(),
+                                     kNamespace,
+                                     collEpoch,
+                                     ChunkRange(chunk2.getMin(), chunk2.getMax()),
+                                     splitPoints,
+                                     chunk2.getShard().toString()));
+
+    // First chunkDoc should have range [chunk2.getMin(), chunkSplitPoint]
+    auto chunkDocStatus = getChunkDoc(operationContext(), chunk2.getMin());
+    auto chunkDoc = chunkDocStatus.getValue();
+
+    // Check for major version increment based on the competing chunk version.
+    ASSERT_EQ(competingVersion.majorVersion() + 1u, chunkDoc.getVersion().majorVersion());
+    ASSERT_EQ(1u, chunkDoc.getVersion().minorVersion());
+
+    // Second chunkDoc should have range [chunkSplitPoint, chunk2.getMax()]
+    auto otherChunkDocStatus = getChunkDoc(operationContext(), chunkSplitPoint);
+    auto otherChunkDoc = otherChunkDocStatus.getValue();
+    // Check for increment based on the competing chunk version.
+    ASSERT_EQ(competingVersion.majorVersion() + 1u, otherChunkDoc.getVersion().majorVersion());
+    ASSERT_EQ(2u, otherChunkDoc.getVersion().minorVersion());
 }
 
 TEST_F(SplitChunkTest, PreConditionFailErrors) {

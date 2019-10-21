@@ -87,7 +87,7 @@
     testDB_s1.adminCommand({split: 'test.user', middle: {x: 0}});
 
     // shard0: 0|0|b,
-    // shard1: 1|1|b, [-inf, 0), [0, inf)
+    // shard1: 2|1|b, [-inf, 0), [0, inf)
 
     testDB_s1.user.insert({x: 1});
     testDB_s1.user.insert({x: -11});
@@ -97,38 +97,38 @@
     st.configRS.awaitLastOpCommitted();
 
     // Official config:
-    // shard0: 2|0|b, [-inf, 0)
-    // shard1: 2|1|b, [0, inf)
+    // shard0: 3|0|b, [-inf, 0)
+    // shard1: 3|1|b, [0, inf)
     //
     // Shard metadata:
     // shard0: 0|0|b
-    // shard1: 2|1|b
+    // shard1: 3|1|b
     //
     // mongos2: 2|0|a
 
     checkShardMajorVersion(st.d0, 0);
-    checkShardMajorVersion(st.d1, 2);
+    checkShardMajorVersion(st.d1, 3);
 
     // mongos2 still thinks that { x: 1 } belong to shard0000, but should be able to
     // refresh it's metadata correctly.
     assert.neq(null, testDB_s2.user.findOne({x: 1}));
 
-    checkShardMajorVersion(st.d0, 2);
-    checkShardMajorVersion(st.d1, 2);
+    checkShardMajorVersion(st.d0, 3);
+    checkShardMajorVersion(st.d1, 3);
 
     // Set shard metadata to 2|0|b
     assert.neq(null, testDB_s2.user.findOne({x: -11}));
 
-    checkShardMajorVersion(st.d0, 2);
-    checkShardMajorVersion(st.d1, 2);
+    checkShardMajorVersion(st.d0, 3);
+    checkShardMajorVersion(st.d1, 3);
 
     // Official config:
-    // shard0: 2|0|b, [-inf, 0)
-    // shard1: 2|1|b, [0, inf)
+    // shard0: 3|0|b, [-inf, 0)
+    // shard1: 3|1|b, [0, inf)
     //
     // Shard metadata:
-    // shard0: 2|0|b
-    // shard1: 2|1|b
+    // shard0: 3|0|b
+    // shard1: 3|1|b
     //
     // mongos3: 2|0|a
 
@@ -179,5 +179,4 @@
     checkShardMajorVersion(st.d1, 0);
 
     st.stop();
-
 })();

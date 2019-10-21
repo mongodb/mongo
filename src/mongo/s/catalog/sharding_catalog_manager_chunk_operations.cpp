@@ -229,6 +229,24 @@ BSONObj makeCommitChunkApplyOpsCommand(const NamespaceString& nss,
     return BSON("applyOps" << updates.arr());
 }
 
+// Helper function to find collection version and shard version.
+StatusWith<ChunkVersion> getMaxChunkVersionFromQueryResponse(
+    const NamespaceString& nss, const StatusWith<Shard::QueryResponse>& queryResponse) {
+
+    if (!queryResponse.isOK()) {
+        return queryResponse.getStatus();
+    }
+
+    const auto& chunksVector = queryResponse.getValue().docs;
+    if (chunksVector.empty()) {
+        return {ErrorCodes::IllegalOperation,
+                str::stream() << "Collection '" << nss.ns()
+                              << "' no longer either exists, is sharded, or has chunks"};
+    }
+
+    return ChunkVersion::fromBSON(chunksVector.front(), ChunkType::lastmod());
+}
+
 }  // namespace
 
 Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
@@ -243,44 +261,66 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
     // move chunks on different collections to proceed in parallel
     Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
 
-    std::string errmsg;
-
     // Get the max chunk version for this namespace.
-    auto findStatus = Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        repl::ReadConcernLevel::kLocalReadConcern,
-        NamespaceString(ChunkType::ConfigNS),
-        BSON("ns" << nss.ns()),
-        BSON(ChunkType::lastmod << -1),
-        1);
+    auto swCollVersion = getMaxChunkVersionFromQueryResponse(
+        nss,
+        Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            repl::ReadConcernLevel::kLocalReadConcern,
+            NamespaceString(ChunkType::ConfigNS),
+            BSON("ns" << nss.ns()),          // Query all chunks for this namespace.
+            BSON(ChunkType::lastmod << -1),  // Sort by version.
+            1));                             // Limit 1.
 
-    if (!findStatus.isOK()) {
-        return findStatus.getStatus();
+    if (!swCollVersion.isOK()) {
+        return swCollVersion.getStatus().withContext(
+            str::stream() << "splitChunk cannot split chunk " << range.toString() << ".");
     }
 
-    const auto& chunksVector = findStatus.getValue().docs;
-    if (chunksVector.empty()) {
-        errmsg = str::stream() << "splitChunk cannot split chunk " << range.toString()
-                               << ". Collection '" << nss.ns()
-                               << "' no longer either exists, is sharded, or has chunks";
-        return {ErrorCodes::IllegalOperation, errmsg};
-    }
-
-    ChunkVersion collVersion = ChunkVersion::fromBSON(chunksVector.front(), ChunkType::lastmod());
+    auto collVersion = swCollVersion.getValue();
 
     // Return an error if collection epoch does not match epoch of request.
     if (collVersion.epoch() != requestEpoch) {
-        errmsg = str::stream() << "splitChunk cannot split chunk " << range.toString()
-                               << ". Collection '" << nss.ns() << "' was dropped and re-created."
-                               << " Current epoch: " << collVersion.epoch()
-                               << ", cmd epoch: " << requestEpoch;
-        return {ErrorCodes::StaleEpoch, errmsg};
+        return {ErrorCodes::StaleEpoch,
+                str::stream() << "splitChunk cannot split chunk " << range.toString()
+                              << ". Collection '"
+                              << nss.ns()
+                              << "' was dropped and re-created."
+                              << " Current epoch: "
+                              << collVersion.epoch()
+                              << ", cmd epoch: "
+                              << requestEpoch};
     }
+
+    // Get the shard version (max chunk version) for the shard requesting the split.
+    auto swShardVersion = getMaxChunkVersionFromQueryResponse(
+        nss,
+        Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            repl::ReadConcernLevel::kLocalReadConcern,
+            NamespaceString(ChunkType::ConfigNS),
+            BSON("ns" << nss.ns() << "shard"
+                      << shardName),         // Query all chunks for this namespace and shard.
+            BSON(ChunkType::lastmod << -1),  // Sort by version.
+            1));                             // Limit 1.
+
+    if (!swShardVersion.isOK()) {
+        return swShardVersion.getStatus().withContext(
+            str::stream() << "splitChunk cannot split chunk " << range.toString() << ".");
+    }
+
+    auto shardVersion = swShardVersion.getValue();
 
     std::vector<ChunkType> newChunks;
 
     ChunkVersion currentMaxVersion = collVersion;
+    // Increment the major version only if the shard that owns the chunk being split has version ==
+    // collection version. See SERVER-41480 for details.
+    if (shardVersion == collVersion) {
+        currentMaxVersion.incMajor();
+    }
 
     auto startKey = range.getMin();
     auto newChunkBounds(splitPoints);
@@ -451,26 +491,24 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
     // move chunks on different collections to proceed in parallel
     Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
 
-    // Get the chunk with the highest version for this namespace
-    auto findStatus = Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        repl::ReadConcernLevel::kLocalReadConcern,
-        NamespaceString(ChunkType::ConfigNS),
-        BSON("ns" << ns.ns()),
-        BSON(ChunkType::lastmod << -1),
-        1);
+    // Get the max chunk version for this namespace.
+    auto swCollVersion = getMaxChunkVersionFromQueryResponse(
+        ns,
+        Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            repl::ReadConcernLevel::kLocalReadConcern,
+            NamespaceString(ChunkType::ConfigNS),
+            BSON("ns" << ns.ns()),           // Query all chunks for this namespace.
+            BSON(ChunkType::lastmod << -1),  // Sort by version.
+            1));                             // Limit 1.
 
-    if (!findStatus.isOK()) {
-        return findStatus.getStatus();
+    if (!swCollVersion.isOK()) {
+        return swCollVersion.getStatus().withContext(str::stream()
+                                                     << "mergeChunk cannot merge chunks.");
     }
 
-    const auto& chunksVector = findStatus.getValue().docs;
-    if (chunksVector.empty())
-        return {ErrorCodes::IllegalOperation,
-                "collection does not exist, isn't sharded, or has no chunks"};
-
-    ChunkVersion collVersion = ChunkVersion::fromBSON(chunksVector.front(), ChunkType::lastmod());
+    auto collVersion = swCollVersion.getValue();
 
     // Return an error if epoch of chunk does not match epoch of request
     if (collVersion.epoch() != requestEpoch) {
