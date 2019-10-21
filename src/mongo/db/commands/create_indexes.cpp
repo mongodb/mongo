@@ -405,8 +405,7 @@ bool runCreateIndexesForMobile(OperationContext* opCtx,
                                const std::string& dbname,
                                const BSONObj& cmdObj,
                                std::string& errmsg,
-                               BSONObjBuilder& result,
-                               bool runTwoPhaseBuild) {
+                               BSONObjBuilder& result) {
     NamespaceString ns(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
     uassertStatusOK(userAllowedWriteNS(ns));
 
@@ -642,8 +641,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
                                      const std::string& dbname,
                                      const BSONObj& cmdObj,
                                      std::string& errmsg,
-                                     BSONObjBuilder& result,
-                                     bool runTwoPhaseBuild) {
+                                     BSONObjBuilder& result) {
     const NamespaceString ns(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
     uassertStatusOK(userAllowedWriteNS(ns));
 
@@ -698,8 +696,9 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
 
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     auto buildUUID = UUID::gen();
-    auto protocol =
-        (runTwoPhaseBuild) ? IndexBuildProtocol::kTwoPhase : IndexBuildProtocol::kSinglePhase;
+    auto protocol = indexBuildsCoord->supportsTwoPhaseIndexBuild()
+        ? IndexBuildProtocol::kTwoPhase
+        : IndexBuildProtocol::kSinglePhase;
     log() << "Registering index build: " << buildUUID;
     ReplIndexBuildState::IndexCatalogStats stats;
     IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {commitQuorum};
@@ -829,11 +828,9 @@ public:
                 // TODO(SERVER-42513): Remove runCreateIndexesForMobile() when the mobile storage
                 // engine is supported by runCreateIndexesWithCoordinator().
                 if (storageGlobalParams.engine == "mobile") {
-                    return runCreateIndexesForMobile(
-                        opCtx, dbname, cmdObj, errmsg, result, false /*two phase build*/);
+                    return runCreateIndexesForMobile(opCtx, dbname, cmdObj, errmsg, result);
                 }
-                return runCreateIndexesWithCoordinator(
-                    opCtx, dbname, cmdObj, errmsg, result, false /*two phase build*/);
+                return runCreateIndexesWithCoordinator(opCtx, dbname, cmdObj, errmsg, result);
             } catch (const DBException& ex) {
                 if (ex.toStatus() != ErrorCodes::IndexBuildAlreadyInProgress) {
                     throw;
