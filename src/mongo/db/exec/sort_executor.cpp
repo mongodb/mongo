@@ -109,12 +109,12 @@ void SortExecutor::add(Value sortKey, WorkingSetMember data) {
     // Metadata should be attached directly to the WSM rather than inside the Document.
     invariant(!data.doc.value().metadata());
 
-    _totalDataSizeBytes += data.getMemUsage();
-
     if (!_sorter) {
         _sorter.reset(DocumentSorter::make(makeSortOptions(), Comparator(_sortPattern)));
     }
     _sorter->add(std::move(sortKey), std::move(data));
+
+    _totalDataSizeBytes += data.getMemUsage();
 }
 
 void SortExecutor::loadingDone() {
