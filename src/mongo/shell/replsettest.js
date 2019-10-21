@@ -579,7 +579,7 @@ var ReplSetTest = function(opts) {
 
         var nodes = [];
 
-        if (jsTest.options().randomBinVersions) {
+        if (jsTest.options().useRandomBinVersionsWithinReplicaSet) {
             // Set the random seed to the value passed in by TestData. The seed is undefined
             // by default.
             Random.setRandomSeed(jsTest.options().seed);
@@ -1043,7 +1043,7 @@ var ReplSetTest = function(opts) {
                 isMultiversion = true;
             }
         });
-        if (isMultiversion || jsTest.options().randomBinVersions) {
+        if (isMultiversion || jsTest.options().useRandomBinVersionsWithinReplicaSet) {
             assert.commandWorked(
                 self.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
             checkFCV(self.getPrimary().getDB("admin"), lastStableFCV);
@@ -2351,8 +2351,10 @@ var ReplSetTest = function(opts) {
             dbpath: "$set-$node"
         };
 
-        if (options && options.binVersion && jsTest.options().randomBinVersions) {
-            throw new Error("Can only specify one of binVersion and randomBinVersion, not both.");
+        if (options && options.binVersion &&
+            jsTest.options().useRandomBinVersionsWithinReplicaSet) {
+            throw new Error(
+                "Can only specify one of binVersion and useRandomBinVersionsWithinReplicaSet, not both.");
         }
 
         //
@@ -2379,7 +2381,7 @@ var ReplSetTest = function(opts) {
         }
         delete options.rsConfig;
 
-        if (jsTest.options().randomBinVersions) {
+        if (jsTest.options().useRandomBinVersionsWithinReplicaSet) {
             const rand = Random.rand();
             options.binVersion = rand < 0.5 ? "latest" : "last-stable";
             print("Randomly assigned binary version: " + options.binVersion + " to node: " + n);

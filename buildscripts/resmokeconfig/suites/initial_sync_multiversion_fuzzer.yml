@@ -22,4 +22,4 @@ executor:
               rollback: 0
           setParameters:
             numInitialSyncAttempts: 10000000
-          randomBinVersions: true
+          useRandomBinVersionsWithinReplicaSet: true

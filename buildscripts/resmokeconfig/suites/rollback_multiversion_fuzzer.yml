@@ -21,4 +21,4 @@ executor:
             storage:
               recovery: 3
           rollbackShutdowns: true
-          randomBinVersions: true
+          useRandomBinVersionsWithinReplicaSet: true

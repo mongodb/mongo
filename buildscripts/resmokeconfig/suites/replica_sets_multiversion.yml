@@ -11,4 +11,4 @@ executor:
       readMode: commands
       global_vars:
         TestData:
-          randomBinVersions: true
+          useRandomBinVersionsWithinReplicaSet: true

@@ -337,12 +337,14 @@ jsTestOptions = function() {
                 TestData.setSkipShardingPartsOfPrepareTransactionFailpoint || false,
             roleGraphInvalidationIsFatal: TestData.roleGraphInvalidationIsFatal || false,
             networkErrorAndTxnOverrideConfig: TestData.networkErrorAndTxnOverrideConfig || {},
-            // When randomBinVersions is true, randomly assign the binary versions of each node
-            // in the replica set to 'latest' or 'last-stable'.
+            // When useRandomBinVersionsWithinReplicaSet is true, randomly assign the binary
+            // versions of each node in the replica set to 'latest' or 'last-stable'.
             // This flag is currently a placeholder and only sets the replica set to last-stable
-            // FCV. Randomized behavior will be implemented as part of SERVER-42774.
-            randomBinVersions: TestData.randomBinVersions || false,
-            // Set a specific random seed to be used when randomBinVersions is true.
+            // FCV.
+            useRandomBinVersionsWithinReplicaSet:
+                TestData.useRandomBinVersionsWithinReplicaSet || false,
+            // Set a specific random seed to be used when useRandomBinVersionsWithinReplicaSet is
+            // true.
             seed: TestData.seed || undefined,
         });
     }
