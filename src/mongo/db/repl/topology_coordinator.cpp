@@ -2957,23 +2957,5 @@ bool TopologyCoordinator::checkIfCommitQuorumCanBeSatisfied(
     }
 }
 
-bool TopologyCoordinator::checkIfCommitQuorumIsSatisfied(
-    const CommitQuorumOptions& commitQuorum,
-    const std::vector<HostAndPort>& commitReadyMembers) const {
-    std::vector<MemberConfig> commitReadyMemberConfigs;
-    for (auto& commitReadyMember : commitReadyMembers) {
-        const MemberConfig* memberConfig = _rsConfig.findMemberByHostAndPort(commitReadyMember);
-
-        invariant(memberConfig);
-        commitReadyMemberConfigs.push_back(*memberConfig);
-    }
-
-    // Calling this with commit ready members only is the same as checking if the commit quorum is
-    // satisfied. Because the 'commitQuorum' is based on the participation of all the replica set
-    // members, and if the 'commitQuorum' can be satisfied with all the commit ready members, then
-    // the commit quorum is satisfied in this replica set configuration.
-    return checkIfCommitQuorumCanBeSatisfied(commitQuorum, commitReadyMemberConfigs);
-}
-
 }  // namespace repl
 }  // namespace mongo

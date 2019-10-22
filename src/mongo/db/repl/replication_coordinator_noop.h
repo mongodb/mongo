@@ -110,10 +110,6 @@ public:
 
     Status checkIfCommitQuorumCanBeSatisfied(const CommitQuorumOptions& commitQuorum) const final;
 
-    StatusWith<bool> checkIfCommitQuorumIsSatisfied(
-        const CommitQuorumOptions& commitQuorum,
-        const std::vector<HostAndPort>& commitReadyMembers) const final;
-
     void setMyLastAppliedOpTimeAndWallTime(const OpTimeAndWallTime& opTimeAndWallTime) final;
     void setMyLastDurableOpTimeAndWallTime(const OpTimeAndWallTime& opTimeAndWallTime) final;
     void setMyLastAppliedOpTimeAndWallTimeForward(const OpTimeAndWallTime& opTimeAndWallTime,
@@ -236,8 +232,6 @@ public:
     void appendDiagnosticBSON(BSONObjBuilder*) final;
 
     void appendConnectionStats(executor::ConnectionPoolStats* stats) const final;
-
-    size_t getNumUncommittedSnapshots() final;
 
     virtual void createWMajorityWriteAvailabilityDateWaiter(OpTime opTime) final;
 

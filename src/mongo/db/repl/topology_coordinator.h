@@ -697,14 +697,6 @@ public:
     bool checkIfCommitQuorumCanBeSatisfied(const CommitQuorumOptions& commitQuorum,
                                            const std::vector<MemberConfig>& members) const;
 
-    /**
-     * Returns 'true' if the 'commitQuorum' is satisifed by the 'commitReadyMembers'.
-     *
-     * 'commitReadyMembers' must be part of the replica set configuration.
-     */
-    bool checkIfCommitQuorumIsSatisfied(const CommitQuorumOptions& commitQuorum,
-                                        const std::vector<HostAndPort>& commitReadyMembers) const;
-
     ////////////////////////////////////////////////////////////
     //
     // Test support methods

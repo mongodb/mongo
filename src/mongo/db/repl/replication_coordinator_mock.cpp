@@ -419,12 +419,6 @@ Status ReplicationCoordinatorMock::checkIfCommitQuorumCanBeSatisfied(
     return Status::OK();
 }
 
-StatusWith<bool> ReplicationCoordinatorMock::checkIfCommitQuorumIsSatisfied(
-    const CommitQuorumOptions& commitQuorum,
-    const std::vector<HostAndPort>& commitReadyMembers) const {
-    return true;
-}
-
 WriteConcernOptions ReplicationCoordinatorMock::getGetLastErrorDefault() {
     return WriteConcernOptions();
 }
@@ -504,10 +498,6 @@ OpTimeAndWallTime ReplicationCoordinatorMock::getCurrentCommittedSnapshotOpTimeA
 }
 void ReplicationCoordinatorMock::waitUntilSnapshotCommitted(OperationContext* opCtx,
                                                             const Timestamp& untilSnapshot) {}
-
-size_t ReplicationCoordinatorMock::getNumUncommittedSnapshots() {
-    return 0;
-}
 
 void ReplicationCoordinatorMock::createWMajorityWriteAvailabilityDateWaiter(OpTime opTime) {
     return;

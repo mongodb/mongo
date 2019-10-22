@@ -149,10 +149,6 @@ public:
     virtual Status checkIfCommitQuorumCanBeSatisfied(
         const CommitQuorumOptions& commitQuorum) const override;
 
-    virtual StatusWith<bool> checkIfCommitQuorumIsSatisfied(
-        const CommitQuorumOptions& commitQuorum,
-        const std::vector<HostAndPort>& commitReadyMembers) const override;
-
     virtual Status checkCanServeReadsFor(OperationContext* opCtx,
                                          const NamespaceString& ns,
                                          bool slaveOk);
@@ -315,8 +311,6 @@ public:
     virtual void appendDiagnosticBSON(BSONObjBuilder*) override;
 
     virtual void appendConnectionStats(executor::ConnectionPoolStats* stats) const override;
-
-    virtual size_t getNumUncommittedSnapshots() override;
 
     virtual void createWMajorityWriteAvailabilityDateWaiter(OpTime opTime) override;
 
@@ -746,11 +740,6 @@ private:
     OpTimeAndWallTime _getCurrentCommittedSnapshotOpTimeAndWallTime_inlock() const;
 
     /**
-     * Returns the OpTime of the current committed snapshot converted to LogicalTime.
-     */
-    LogicalTime _getCurrentCommittedLogicalTime_inlock() const;
-
-    /**
      *  Verifies that ReadConcernArgs match node's readConcern.
      */
     Status _validateReadConcern(OperationContext* opCtx, const ReadConcernArgs& readConcern);
@@ -812,8 +801,6 @@ private:
 
     Status _checkIfCommitQuorumCanBeSatisfied(WithLock,
                                               const CommitQuorumOptions& commitQuorum) const;
-
-    bool _canAcceptWritesFor_inlock(const NamespaceString& ns);
 
     int _getMyId_inlock() const;
 
@@ -1437,20 +1424,9 @@ private:
     std::shared_ptr<InitialSyncer>
         _initialSyncer;  // (I) pointer set under mutex, copied by callers.
 
-    // Hands out the next snapshot name.
-    AtomicWord<unsigned long long> _snapshotNameGenerator;  // (S)
-
-    // The OpTimes and SnapshotNames for all snapshots newer than the current commit point, kept in
-    // sorted order. Any time this is changed, you must also update _uncommitedSnapshotsSize.
-    std::deque<OpTime> _uncommittedSnapshots;  // (M)
-
-    // A cache of the size of _uncommittedSnaphots that can be read without any locking.
-    // May only be written to while holding _mutex.
-    AtomicWord<unsigned long long> _uncommittedSnapshotsSize;  // (I)
-
     // The non-null OpTimeAndWallTime and SnapshotName of the current snapshot used for committed
     // reads, if there is one.
-    // When engaged, this must be <= _lastCommittedOpTime and < _uncommittedSnapshots.front().
+    // When engaged, this must be <= _lastCommittedOpTime.
     boost::optional<OpTimeAndWallTime> _currentCommittedSnapshot;  // (M)
 
     // A set of optimes that are used for computing the replication system's current 'stable'

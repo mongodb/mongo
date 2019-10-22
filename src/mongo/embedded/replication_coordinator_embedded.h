@@ -112,10 +112,6 @@ public:
     Status checkIfCommitQuorumCanBeSatisfied(
         const CommitQuorumOptions& commitQuorum) const override;
 
-    StatusWith<bool> checkIfCommitQuorumIsSatisfied(
-        const CommitQuorumOptions& commitQuorum,
-        const std::vector<HostAndPort>& commitReadyMembers) const override;
-
     void setMyLastAppliedOpTimeAndWallTime(
         const repl::OpTimeAndWallTime& opTimeAndWallTime) override;
     void setMyLastDurableOpTimeAndWallTime(
@@ -244,8 +240,6 @@ public:
     void appendDiagnosticBSON(BSONObjBuilder*) override;
 
     void appendConnectionStats(executor::ConnectionPoolStats* stats) const override;
-
-    size_t getNumUncommittedSnapshots() override;
 
     virtual void createWMajorityWriteAvailabilityDateWaiter(repl::OpTime opTime) override;
 

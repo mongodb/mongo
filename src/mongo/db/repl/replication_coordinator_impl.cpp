@@ -401,10 +401,6 @@ OpTimeAndWallTime ReplicationCoordinatorImpl::_getCurrentCommittedSnapshotOpTime
     return OpTimeAndWallTime();
 }
 
-LogicalTime ReplicationCoordinatorImpl::_getCurrentCommittedLogicalTime_inlock() const {
-    return LogicalTime(_getCurrentCommittedSnapshotOpTime_inlock().getTimestamp());
-}
-
 void ReplicationCoordinatorImpl::appendDiagnosticBSON(mongo::BSONObjBuilder* bob) {
     BSONObjBuilder eBuilder(bob->subobjStart("executor"));
     _replExecutor->appendDiagnosticBSON(&eBuilder);
@@ -3405,22 +3401,6 @@ Status ReplicationCoordinatorImpl::_checkIfCommitQuorumCanBeSatisfied(
     return Status::OK();
 }
 
-StatusWith<bool> ReplicationCoordinatorImpl::checkIfCommitQuorumIsSatisfied(
-    const CommitQuorumOptions& commitQuorum,
-    const std::vector<HostAndPort>& commitReadyMembers) const {
-    // If the 'commitQuorum' cannot be satisfied with all the members of this replica set, we
-    // need to inform the caller to avoid hanging while waiting for satisfiability of the
-    // 'commitQuorum' with 'commitReadyMembers' due to replica set reconfigurations.
-    stdx::lock_guard<Latch> lock(_mutex);
-    Status status = _checkIfCommitQuorumCanBeSatisfied(lock, commitQuorum);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    // Return whether or not the 'commitQuorum' is satisfied by the 'commitReadyMembers'.
-    return _topCoord->checkIfCommitQuorumIsSatisfied(commitQuorum, commitReadyMembers);
-}
-
 WriteConcernOptions ReplicationCoordinatorImpl::getGetLastErrorDefault() {
     stdx::lock_guard<Latch> lock(_mutex);
     if (_rsConfig.isInitialized()) {
@@ -4015,10 +3995,6 @@ void ReplicationCoordinatorImpl::waitUntilSnapshotCommitted(OperationContext* op
         return _currentCommittedSnapshot &&
             _currentCommittedSnapshot->opTime.getTimestamp() >= untilSnapshot;
     });
-}
-
-size_t ReplicationCoordinatorImpl::getNumUncommittedSnapshots() {
-    return _uncommittedSnapshotsSize.load();
 }
 
 void ReplicationCoordinatorImpl::createWMajorityWriteAvailabilityDateWaiter(OpTime opTime) {
