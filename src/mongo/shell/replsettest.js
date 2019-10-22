@@ -62,6 +62,10 @@
  *     settings {object}: Setting used in the replica set config document.
  *        Example:
  *              settings: { chainingAllowed: false, ... }
+ *
+ *     seedRandomNumberGenerator {boolean}: Indicates whether the random number generator should
+ *        be seeded when randomBinVersions is true. For ReplSetTests started by ShardingTest, the
+ *        seed is generated as part of ShardingTest.
  *   }
  *
  * Member variables:
@@ -579,9 +583,11 @@ var ReplSetTest = function(opts) {
 
         var nodes = [];
 
-        if (jsTest.options().useRandomBinVersionsWithinReplicaSet) {
+        if (jsTest.options().useRandomBinVersionsWithinReplicaSet &&
+            self.seedRandomNumberGenerator) {
             // Set the random seed to the value passed in by TestData. The seed is undefined
-            // by default.
+            // by default. For sharded clusters, the seed is already initialized as part of
+            // ShardingTest.
             Random.setRandomSeed(jsTest.options().seed);
         }
 
@@ -1035,18 +1041,36 @@ var ReplSetTest = function(opts) {
         // nodes are subsequently added to the set, since such nodes cannot set their FCV to
         // "latest". Therefore, we make sure the primary is "last-stable" FCV before adding in
         // nodes of different binary versions to the replica set.
-        let isMultiversion = false;
+        let lastStableBinVersionWasSpecifiedForSomeNode = false;
         Object.keys(this.nodeOptions).forEach(function(key, index) {
             let val = self.nodeOptions[key];
             if (typeof (val) === "object" && val.hasOwnProperty("binVersion") &&
                 MongoRunner.areBinVersionsTheSame(val.binVersion, lastStableFCV)) {
-                isMultiversion = true;
+                lastStableBinVersionWasSpecifiedForSomeNode = true;
             }
         });
-        if (isMultiversion || jsTest.options().useRandomBinVersionsWithinReplicaSet) {
-            assert.commandWorked(
-                self.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
-            checkFCV(self.getPrimary().getDB("admin"), lastStableFCV);
+
+        // Set the FCV to 'last-stable' if we are running a mixed version replica set. If this is a
+        // config server, the FCV will be set as part of ShardingTest.
+        let setLastStableFCV = (lastStableBinVersionWasSpecifiedForSomeNode ||
+                                jsTest.options().useRandomBinVersionsWithinReplicaSet) &&
+            !self.isConfigServer;
+        if (setLastStableFCV && jsTest.options().replSetFeatureCompatibilityVersion) {
+            throw new Error(
+                "The FCV will be set to 'last-stable' automatically when starting up a replica " +
+                "set with mixed binary versions. Therefore, we expect an empty value for " +
+                "'replSetFeatureCompatibilityVersion'.");
+        }
+
+        if (setLastStableFCV) {
+            // Authenticate before running the command.
+            asCluster(self.nodes, function setFCV() {
+                let fcv = lastStableFCV;
+                print("Setting feature compatibility version for replica set to '" + fcv + "'");
+                assert.commandWorked(
+                    self.getPrimary().adminCommand({setFeatureCompatibilityVersion: fcv}));
+                checkFCV(self.getPrimary().getDB("admin"), lastStableFCV);
+            });
         }
 
         // Reconfigure the set to contain the correct number of nodes (if necessary).
@@ -2382,8 +2406,14 @@ var ReplSetTest = function(opts) {
         delete options.rsConfig;
 
         if (jsTest.options().useRandomBinVersionsWithinReplicaSet) {
-            const rand = Random.rand();
-            options.binVersion = rand < 0.5 ? "latest" : "last-stable";
+            if (self.isConfigServer) {
+                // Our documented upgrade/downgrade paths for a sharded cluster lets us assume that
+                // config server nodes will always be fully upgraded before the shard nodes.
+                options.binVersion = "latest";
+            } else {
+                const rand = Random.rand();
+                options.binVersion = rand < 0.5 ? "latest" : "last-stable";
+            }
             print("Randomly assigned binary version: " + options.binVersion + " to node: " + n);
         }
 
@@ -2729,6 +2759,9 @@ var ReplSetTest = function(opts) {
         self.keyFile = opts.keyFile;
         self.protocolVersion = opts.protocolVersion;
         self.waitForKeys = opts.waitForKeys;
+
+        self.seedRandomNumberGenerator = opts.seedRandomNumberGenerator || true;
+        self.isConfigServer = opts.isConfigServer;
 
         _useBridge = opts.useBridge || false;
         _bridgeOptions = opts.bridgeOptions || {};

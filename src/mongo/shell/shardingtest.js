@@ -1198,6 +1198,16 @@ var ShardingTest = function(params) {
     otherParams.migrationLockAcquisitionMaxWaitMS =
         otherParams.migrationLockAcquisitionMaxWaitMS || 30000;
 
+    let randomSeedAlreadySet = false;
+
+    if (jsTest.options().randomBinVersions) {
+        // We avoid setting the random seed unequivocally to avoid unexpected behavior in tests
+        // that already make use of Random.setRandomSeed(). This conditional can be removed if
+        // it becomes the standard to always be generating the seed through ShardingTest.
+        Random.setRandomSeed(jsTest.options().seed);
+        randomSeedAlreadySet = true;
+    }
+
     // Start the MongoD servers (shards)
     let startTime = new Date();  // Measure the execution time of startup and initiate.
     for (var i = 0; i < numShards; i++) {
@@ -1276,7 +1286,8 @@ var ShardingTest = function(params) {
                 keyFile: keyFile,
                 protocolVersion: protocolVersion,
                 waitForKeys: false,
-                settings: rsSettings
+                settings: rsSettings,
+                seedRandomNumberGenerator: !randomSeedAlreadySet,
             });
 
             print("ShardingTest starting replica set for shard: " + setName);
@@ -1410,6 +1421,8 @@ var ShardingTest = function(params) {
         keyFile: keyFile,
         waitForKeys: false,
         name: testName + "-configRS",
+        seedRandomNumberGenerator: !randomSeedAlreadySet,
+        isConfigServer: true,
     };
 
     // when using CSRS, always use wiredTiger as the storage engine
@@ -1483,7 +1496,8 @@ var ShardingTest = function(params) {
     const configRS = this.configRS;
     if (_hasNewFeatureCompatibilityVersion() && _isMixedVersionCluster()) {
         function setFeatureCompatibilityVersion() {
-            assert.commandWorked(csrsPrimary.adminCommand({setFeatureCompatibilityVersion: '4.2'}));
+            assert.commandWorked(
+                csrsPrimary.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
 
             // Wait for the new featureCompatibilityVersion to propagate to all nodes in the CSRS
             // to ensure that older versions of mongos can successfully connect.

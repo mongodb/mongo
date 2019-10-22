@@ -7417,6 +7417,16 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 32
 
+- name: sharding_multiversion_gen
+  tags: ["random_multiversion_replica_sets"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+      resmoke_args: --storageEngine=wiredTiger --dryRun=tests
+      fallback_num_sub_suites: 32
+      use_multiversion: /data/multiversion
+
 - name: sharding_rs_matching_disabled_gen
   tags: ["sharding", "common"]
   commands:
