@@ -179,7 +179,7 @@ Status AbstractIndexAccessMethod::insertKeys(OperationContext* opCtx,
         result->numInserted += keys.size() + multikeyMetadataKeys.size();
     }
 
-    if (shouldMarkIndexAsMultikey(keys, multikeyMetadataKeys, multikeyPaths)) {
+    if (shouldMarkIndexAsMultikey(keys.size(), multikeyMetadataKeys, multikeyPaths)) {
         _btreeState->setMultikey(opCtx, multikeyPaths);
     }
     return Status::OK();
@@ -407,7 +407,7 @@ Status AbstractIndexAccessMethod::update(OperationContext* opCtx,
     }
 
     if (shouldMarkIndexAsMultikey(
-            {ticket.newKeys.begin(), ticket.newKeys.end()},
+            ticket.newKeys.size(),
             {ticket.newMultikeyMetadataKeys.begin(), ticket.newMultikeyMetadataKeys.end()},
             ticket.newMultikeyPaths)) {
         _btreeState->setMultikey(opCtx, ticket.newMultikeyPaths);
@@ -514,7 +514,7 @@ Status AbstractIndexAccessMethod::BulkBuilderImpl::insert(OperationContext* opCt
 
     _isMultiKey = _isMultiKey ||
         _real->shouldMarkIndexAsMultikey(
-            {keys.begin(), keys.end()},
+            keys.size(),
             {_multikeyMetadataKeys.begin(), _multikeyMetadataKeys.end()},
             multikeyPaths);
 
@@ -704,10 +704,10 @@ void AbstractIndexAccessMethod::getKeys(const BSONObj& obj,
 }
 
 bool AbstractIndexAccessMethod::shouldMarkIndexAsMultikey(
-    const vector<KeyString::Value>& keys,
+    size_t numberOfKeys,
     const vector<KeyString::Value>& multikeyMetadataKeys,
     const MultikeyPaths& multikeyPaths) const {
-    return (keys.size() > 1 || isMultikeyFromPaths(multikeyPaths));
+    return numberOfKeys > 1 || isMultikeyFromPaths(multikeyPaths);
 }
 
 SortedDataInterface* AbstractIndexAccessMethod::getSortedDataInterface() const {

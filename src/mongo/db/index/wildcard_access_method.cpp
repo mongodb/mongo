@@ -47,7 +47,7 @@ WildcardAccessMethod::WildcardAccessMethod(IndexCatalogEntry* wildcardState,
               getSortedDataInterface()->getOrdering()) {}
 
 bool WildcardAccessMethod::shouldMarkIndexAsMultikey(
-    const std::vector<KeyString::Value>& keys,
+    size_t numberOfKeys,
     const std::vector<KeyString::Value>& multikeyMetadataKeys,
     const MultikeyPaths& multikeyPaths) const {
     return !multikeyMetadataKeys.empty();

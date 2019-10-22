@@ -105,7 +105,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
 
         if (!descriptor->isMultikey() &&
             iam->shouldMarkIndexAsMultikey(
-                {documentKeySet.begin(), documentKeySet.end()},
+                documentKeySet.size(),
                 {multikeyMetadataKeys.begin(), multikeyMetadataKeys.end()},
                 multikeyPaths)) {
             std::string msg = str::stream()

@@ -304,7 +304,7 @@ public:
      * document, return 'true' if the index should be marked as multikey and 'false' otherwise.
      */
     virtual bool shouldMarkIndexAsMultikey(
-        const std::vector<KeyString::Value>& keys,
+        size_t numberOfKeys,
         const std::vector<KeyString::Value>& multikeyMetadataKeys,
         const MultikeyPaths& multikeyPaths) const = 0;
 
@@ -504,7 +504,7 @@ public:
                  MultikeyPaths* multikeyPaths,
                  boost::optional<RecordId> id = boost::none) const final;
 
-    bool shouldMarkIndexAsMultikey(const std::vector<KeyString::Value>& keys,
+    bool shouldMarkIndexAsMultikey(size_t numberOfKeys,
                                    const std::vector<KeyString::Value>& multikeyMetadataKeys,
                                    const MultikeyPaths& multikeyPaths) const override;
 

@@ -66,7 +66,7 @@ public:
      * more multikey metadata keys have been generated; that is, if the 'multikeyMetadataKeys'
      * vector is non-empty.
      */
-    bool shouldMarkIndexAsMultikey(const std::vector<KeyString::Value>& keys,
+    bool shouldMarkIndexAsMultikey(size_t numberOfKeys,
                                    const std::vector<KeyString::Value>& multikeyMetadataKeys,
                                    const MultikeyPaths& multikeyPaths) const final;
 
