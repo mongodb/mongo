@@ -307,10 +307,6 @@ BSONObj IndexConsistency::_generateInfo(const IndexInfo& indexInfo,
 
 uint32_t IndexConsistency::_hashKeyString(const KeyString::Value& ks,
                                           uint32_t indexNameHash) const {
-    using namespace absl::hash_internal;
-    uint64_t hash = indexNameHash;
-    hash = CityHash64WithSeed(ks.getTypeBits().getBuffer(), ks.getTypeBits().getSize(), hash);
-    hash = CityHash64WithSeed(ks.getBuffer(), ks.getSize(), hash);
-    return hash % kNumHashBuckets;
+    return ks.hash(indexNameHash) % kNumHashBuckets;
 }
 }  // namespace mongo

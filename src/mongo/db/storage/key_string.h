@@ -31,6 +31,8 @@
 
 #include <limits>
 
+#include <absl/hash/hash.h>
+
 #include "mongo/base/static_assert.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsonmisc.h"
@@ -340,6 +342,11 @@ public:
         const char* buf = _buffer.get() + _ksSize;
         BufReader reader(buf, _bufSize - _ksSize);
         return TypeBits::fromBuffer(_version, &reader);
+    }
+
+    // Compute hash over key
+    uint64_t hash(uint64_t seed = 0) const {
+        return absl::hash_internal::CityHash64WithSeed(_buffer.get(), _bufSize, seed);
     }
 
     /**
