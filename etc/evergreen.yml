@@ -48,6 +48,8 @@ variables:
   - name: compile
   commands:
   - func: "do setup"
+  - func: "set task expansion macros"
+  - func: "fetch debugsymbols archive"
   - func: "run tests"
     vars:
       resmoke_args: --help
@@ -815,30 +817,6 @@ functions:
       bucket: mciuploads
       local_file: src/mongo-debugsymbols.tgz
 
-  "extract debugsymbols": &extract_debugsymbols
-    command: shell.exec
-    params:
-      working_dir: src
-      script: |
-        set -o errexit
-        set -o verbose
-        # Debug symbols are not created for every variant
-        if [ ! -f mongo-debugsymbols.tgz ]; then
-          exit
-        fi
-        ${decompress} mongo-debugsymbols.tgz
-        files="mongo mongod mongos"
-        file_exts="debug dSYM pdb"
-        for file_ext in $file_exts
-        do
-            for file in $files
-            do
-                mv mongodb*/bin/$file.$file_ext . 2>/dev/null || true
-            done
-            rm -r mongodb*/bin/*.$file_ext 2>/dev/null || true
-        done
-        rm mongo-debugsymbols.tgz 2>/dev/null || true
-
   "fetch and build OpenSSL":
     command: shell.exec
     params:
@@ -1488,7 +1466,6 @@ functions:
           path_value="$path_value:${task_path_suffix}"
         fi
 
-
         # The "resmoke_wrapper" expansion is used by the 'burn_in_tests' task to wrap the resmoke.py
         # invocation. It doesn't set any environment variables and should therefore come last in
         # this list of expansions.
@@ -1657,6 +1634,8 @@ functions:
         value: mongodata_aws
       - key: aws_secret_remote
         value: ${mongodatafiles_aws_secret}
+  - *set_task_expansion_macros
+  - *fetch_debugsymbols_archive
   - *set_up_remote_credentials
   - *determine_resmoke_jobs
   - *update_resmoke_jobs_expansions
@@ -3647,7 +3626,6 @@ post:
 # Timeout steps
 timeout:
   - func: "fetch debugsymbols archive"
-  - func: "extract debugsymbols"
   - func: "get EC2 address"
   - func: "update EC2 address"
   - func: "run hang analyzer"
