@@ -6,7 +6,6 @@
 // @tags: [
 //     blacklist_from_rhel_67_s390x,
 //     requires_persistence,
-//     two_phase_index_builds_unsupported,
 //     uses_change_streams,
 // ]
 (function() {
