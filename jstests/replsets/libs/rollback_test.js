@@ -409,8 +409,7 @@ function RollbackTest(name = "RollbackTest", replSet) {
         return curSecondary;
     };
 
-    this.restartNode = function(
-        nodeId, signal, startOptions, allowedExitCode, {skipValidation = false} = {}) {
+    this.restartNode = function(nodeId, signal, startOptions, allowedExitCode) {
         assert(signal === SIGKILL || signal === SIGTERM, `Received unknown signal: ${signal}`);
         assert.gte(nodeId, 0, "Invalid argument to RollbackTest.restartNode()");
 
@@ -433,7 +432,10 @@ function RollbackTest(name = "RollbackTest", replSet) {
             signal = SIGTERM;
         }
 
-        let opts = {skipValidation};
+        // We may attempt to restart a node while it is in rollback or recovery, in which case
+        // the validation checks will fail. We will still validate collections during the
+        // RollbackTest's full consistency checks, so we do not lose much validation coverage.
+        let opts = {skipValidation: true};
 
         if (allowedExitCode !== undefined) {
             Object.assign(opts, {allowedExitCode: allowedExitCode});
