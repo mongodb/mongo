@@ -30,7 +30,6 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
 #include <algorithm>
-#include <third_party/murmurhash3/MurmurHash3.h>
 
 #include "mongo/platform/basic.h"
 
@@ -308,9 +307,10 @@ BSONObj IndexConsistency::_generateInfo(const IndexInfo& indexInfo,
 
 uint32_t IndexConsistency::_hashKeyString(const KeyString::Value& ks,
                                           uint32_t indexNameHash) const {
-    MurmurHash3_x86_32(
-        ks.getTypeBits().getBuffer(), ks.getTypeBits().getSize(), indexNameHash, &indexNameHash);
-    MurmurHash3_x86_32(ks.getBuffer(), ks.getSize(), indexNameHash, &indexNameHash);
-    return indexNameHash % kNumHashBuckets;
+    using namespace absl::hash_internal;
+    uint64_t hash = indexNameHash;
+    hash = CityHash64WithSeed(ks.getTypeBits().getBuffer(), ks.getTypeBits().getSize(), hash);
+    hash = CityHash64WithSeed(ks.getBuffer(), ks.getSize(), hash);
+    return hash % kNumHashBuckets;
 }
 }  // namespace mongo
