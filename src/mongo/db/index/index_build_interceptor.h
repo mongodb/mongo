@@ -46,6 +46,11 @@ class OperationContext;
 
 class IndexBuildInterceptor {
 public:
+    /**
+     * Determines if we will yield locks while draining the side tables.
+     */
+    enum class DrainYieldPolicy { kNoYield, kYield };
+
     enum class Op { kInsert, kDelete };
 
     static bool typeCanFastpathMultikeyUpdates(IndexType type);
