@@ -418,9 +418,8 @@ if [ -n "$out_file" ]; then
 fi
 
 echo "creating $md5.tar.gz"
-mydir=`pwd`
 pushd $tempdir > /dev/null
-tar -czh --numeric-owner -f "$mydir/$md5".tar.gz $target_files || {
+tar -czh --numeric-owner -f "$md5".tar.gz $target_files || {
   echo "Couldn't create archive"
   exit 3
 }
