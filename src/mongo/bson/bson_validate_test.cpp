@@ -347,4 +347,17 @@ TEST(BSONValidateBool, BoolValuesAreValidated) {
     }
 }
 
+TEST(BSONValidateFast, InvalidType) {
+    // Encode an invalid BSON Object with an invalid type, x90.
+    const char* buffer = "\x0c\x00\x00\x00\x90\x41\x00\x10\x00\x00\x00\x00";
+
+    // Constructing the object is fine, but validating should fail.
+    BSONObj obj(buffer);
+
+    // Validate fails.
+    ASSERT_NOT_OK(validateBSON(obj.objdata(), obj.objsize(), BSONVersion::kLatest));
+    ASSERT_THROWS_CODE(obj.woCompare(BSON("A" << 1)), DBException, 10320);
+}
+
+
 }  // namespace

@@ -33,6 +33,7 @@
 
 #include <boost/functional/hash.hpp>
 #include <cmath>
+#include <fmt/format.h>
 
 #include "mongo/base/compare_numbers.h"
 #include "mongo/base/data_cursor.h"
@@ -48,6 +49,10 @@
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
+
+#if !defined(__has_feature)
+#define __has_feature(x) 0
+#endif
 
 namespace mongo {
 
@@ -697,8 +702,40 @@ BSONElement BSONElement::operator[](StringData field) const {
 }
 
 namespace {
-MONGO_COMPILER_NOINLINE void msgAssertedBadType [[noreturn]] (int8_t type) {
-    msgasserted(10320, str::stream() << "BSONElement: bad type " << (int)type);
+MONGO_COMPILER_NOINLINE void msgAssertedBadType [[noreturn]] (const char* data) {
+    // We intentionally read memory that may be out of the allocated memory's boundary, so do not
+    // do this when the adress sanitizer is enabled. We do this in an attempt to log as much context
+    // about the failure, even if that risks undefined behavior or a segmentation fault.
+#if !__has_feature(address_sanitizer)
+    bool logMemory = true;
+#else
+    bool logMemory = false;
+#endif
+
+    str::stream output;
+    if (!logMemory) {
+        output << fmt::format("BSONElement: bad type {0:d} @ {1:p}", *data, data);
+    } else {
+        // To reduce the risk of a segmentation fault, only print the bytes in the 32-bit aligned
+        // block in which the address is located (i.e. round down to the lowest multiple of 32). The
+        // hope is that it's safe to read memory that may fall within the same cache line. Generate
+        // a mask to zero-out the last bits for a block-aligned address.
+        // Ex: Inverse of 0x1F (32 - 1) looks like 0xFFFFFFE0, and ANDed with the pointer, zeroes
+        // the lowest 5 bits, giving the starting address of a 32-bit block.
+        const size_t blockSize = 32;
+        const size_t mask = ~(blockSize - 1);
+        const char* startAddr =
+            reinterpret_cast<const char*>(reinterpret_cast<uintptr_t>(data) & mask);
+        const size_t offset = data - startAddr;
+
+        output << fmt::format(
+            "BSONElement: bad type {0:d} @ {1:p} at offset {2:d} in block: ", *data, data, offset);
+
+        for (size_t i = 0; i < blockSize; i++) {
+            output << fmt::format("{0:#x} ", static_cast<uint8_t>(startAddr[i]));
+        }
+    }
+    msgasserted(10320, output);
 }
 }  // namespace
 
@@ -747,7 +784,7 @@ int BSONElement::computeSize() const {
     int8_t type = *data;
     if (MONGO_unlikely(type < 0 || type > JSTypeMax)) {
         if (MONGO_unlikely(type != MinKey && type != MaxKey)) {
-            msgAssertedBadType(type);
+            msgAssertedBadType(data);
         }
 
         // MinKey and MaxKey should be treated the same as Null
