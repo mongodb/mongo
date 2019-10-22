@@ -1670,7 +1670,6 @@ var ReplSetTest = function(opts) {
 
     this.getHashesUsingSessions = function(sessions, dbName, {
         filterCapped: filterCapped = true,
-        filterMapReduce: filterMapReduce = true,
         readAtClusterTime,
     } = {}) {
         return sessions.map(session => {
@@ -1690,13 +1689,7 @@ var ReplSetTest = function(opts) {
                 // replica set members and may therefore not have the same md5sum. We remove them
                 // from the dbHash command response to avoid an already known case of a mismatch.
                 // See SERVER-16049 for more details.
-                //
-                // If a map-reduce operation is interrupted by the server stepping down, then an
-                // unreplicated "tmp.mr." collection may be left behind. We remove it from the
-                // dbHash command response to avoid an already known case of a mismatch.
-                // TODO SERVER-27147: Stop filtering out "tmp.mr." collections.
-                if (cappedCollections.has(collName) ||
-                    (filterMapReduce && collName.startsWith("tmp.mr."))) {
+                if (cappedCollections.has(collName)) {
                     delete res.collections[collName];
                     // The "uuids" field in the dbHash command response is new as of MongoDB 4.0.
                     if (res.hasOwnProperty("uuids")) {
