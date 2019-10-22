@@ -619,12 +619,6 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
 
     // If we're here, we need to add a sort stage.
 
-    // If we're not allowed to put a blocking sort in, bail out.
-    if (params.options & QueryPlannerParams::NO_BLOCKING_SORT) {
-        delete solnRoot;
-        return nullptr;
-    }
-
     if (!solnRoot->fetched()) {
         const bool sortIsCovered =
             std::all_of(sortObj.begin(), sortObj.end(), [solnRoot](BSONElement e) {

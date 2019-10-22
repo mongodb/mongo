@@ -216,19 +216,29 @@ void ParsedInclusionProjection::parseSubObject(const BSONObj& subObj,
     }
 }
 
-bool ParsedInclusionProjection::isSubsetOfProjection(const BSONObj& proj) const {
+bool ParsedInclusionProjection::isEquivalentToDependencySet(const BSONObj& deps) const {
     std::set<std::string> preservedPaths;
     _root->reportProjectedPaths(&preservedPaths);
-    for (auto&& includedField : preservedPaths) {
-        if (!proj.hasField(includedField))
+    size_t numDependencies = 0;
+    for (auto&& dependency : deps) {
+        if (!dependency.trueValue()) {
+            // This is not an included field, so move on.
+            continue;
+        }
+
+        if (preservedPaths.find(dependency.fieldNameStringData().toString()) ==
+            preservedPaths.end()) {
             return false;
+        }
+        ++numDependencies;
+    }
+
+    if (numDependencies != preservedPaths.size()) {
+        return false;
     }
 
     // If the inclusion has any computed fields or renamed fields, then it's not a subset.
-    std::set<std::string> computedPaths;
-    StringMap<std::string> renamedPaths;
-    _root->reportComputedPaths(&computedPaths, &renamedPaths);
-    return computedPaths.empty() && renamedPaths.empty();
+    return !_root->subtreeContainsComputedFields();
 }
 
 }  // namespace parsed_aggregation_projection

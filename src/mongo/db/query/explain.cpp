@@ -31,7 +31,6 @@
 
 #include "mongo/db/query/explain.h"
 
-#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/cached_plan.h"
 #include "mongo/db/exec/collection_scan.h"
@@ -42,6 +41,7 @@
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/near.h"
 #include "mongo/db/exec/pipeline_proxy.h"
+#include "mongo/db/exec/sort.h"
 #include "mongo/db/exec/text.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/keypattern.h"
@@ -983,6 +983,10 @@ void Explain::getSummaryStats(const PlanExecutor& exec, PlanSummaryStats* statsO
 
         if (STAGE_SORT == stages[i]->stageType()) {
             statsOut->hasSortStage = true;
+
+            auto sortStage = static_cast<const SortStage*>(stages[i]);
+            auto sortStats = static_cast<const SortStats*>(sortStage->getSpecificStats());
+            statsOut->usedDisk = sortStats->wasDiskUsed;
         }
 
         if (STAGE_IXSCAN == stages[i]->stageType()) {

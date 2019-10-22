@@ -126,6 +126,11 @@ public:
     void serialize(boost::optional<ExplainOptions::Verbosity> explain,
                    MutableDocument* output) const;
 
+    /**
+     * Returns true if this node or any child of this node contains a computed field.
+     */
+    bool subtreeContainsComputedFields() const;
+
 protected:
     // Returns a unique_ptr to a new instance of the implementing class for the given 'fieldName'.
     virtual std::unique_ptr<ProjectionNode> makeChild(std::string fieldName) const = 0;
@@ -181,9 +186,6 @@ private:
 
     // Returns nullptr if no such child exists.
     ProjectionNode* getChild(const std::string& field) const;
-
-    // Returns true if this node or any child of this node contains a computed field.
-    bool subtreeContainsComputedFields() const;
 
     // Our projection semantics are such that all field additions need to be processed in the order
     // specified. '_orderToProcessAdditionsAndChildren' tracks that order.

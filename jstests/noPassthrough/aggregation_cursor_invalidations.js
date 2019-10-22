@@ -99,10 +99,13 @@ assertNoOpenCursorsOnSourceCollection();
 // Test that dropping the source collection between an aggregate and a getMore will *not* cause
 // an aggregation pipeline to fail during the getMore if it *does not need* to fetch more
 // results from the collection.
+//
+// The test expects that the $sort will execute in the agg layer, and will not be pushed down into
+// the PlanStage layer. We add an $_internalInhibitOptimization stage to enforce this.
 setup();
 res = assert.commandWorked(testDB.runCommand({
     aggregate: sourceCollection.getName(),
-    pipeline: [{$sort: {x: 1}}],
+    pipeline: [{$_internalInhibitOptimization: {}}, {$sort: {x: 1}}],
     cursor: {
         batchSize: batchSize,
     },

@@ -65,39 +65,36 @@ struct QueryPlannerParams {
         // See the comment on ShardFilterStage for details.
         INCLUDE_SHARD_FILTER = 1 << 2,
 
-        // Set this if you don't want any plans with a blocking sort stage.  All sorts must be
-        // provided by an index.
-        NO_BLOCKING_SORT = 1 << 3,
-
         // Set this if you want to turn on index intersection.
-        INDEX_INTERSECTION = 1 << 4,
+        INDEX_INTERSECTION = 1 << 3,
 
-        // Indicate to the planner that the caller is requesting a count operation, possibly through
-        // a count command, or as part of an aggregation pipeline.
-        IS_COUNT = 1 << 5,
+        // Indicate to the planner that this query could be eligible for count optimization. For
+        // example, the query {$group: {_id: null, sum: {$sum: 1}}} is a count-like operation and
+        // could be eligible for the COUNT_SCAN.
+        IS_COUNT = 1 << 4,
 
         // Set this if you want to handle batchSize properly with sort(). If limits on SORT
         // stages are always actually limits, then this should be left off. If they are
         // sometimes to be interpreted as batchSize, then this should be turned on.
-        SPLIT_LIMITED_SORT = 1 << 6,
+        SPLIT_LIMITED_SORT = 1 << 5,
 
         // Set this if you don't want any plans with a non-covered projection stage. All projections
         // must be provided/covered by an index.
-        NO_UNCOVERED_PROJECTIONS = 1 << 7,
+        NO_UNCOVERED_PROJECTIONS = 1 << 6,
 
         // Set this to generate covered whole IXSCAN plans.
-        GENERATE_COVERED_IXSCANS = 1 << 8,
+        GENERATE_COVERED_IXSCANS = 1 << 7,
 
         // Set this to track the most recent timestamp seen by this cursor while scanning the oplog.
-        TRACK_LATEST_OPLOG_TS = 1 << 9,
+        TRACK_LATEST_OPLOG_TS = 1 << 8,
 
         // Set this so that collection scans on the oplog wait for visibility before reading.
-        OPLOG_SCAN_WAIT_FOR_VISIBLE = 1 << 10,
+        OPLOG_SCAN_WAIT_FOR_VISIBLE = 1 << 9,
 
         // Set this so that getExecutorDistinct() will only use a plan that _guarantees_ it will
         // return exactly one document per value of the distinct field. See the comments above the
         // declaration of getExecutorDistinct() for more detail.
-        STRICT_DISTINCT_ONLY = 1 << 11,
+        STRICT_DISTINCT_ONLY = 1 << 10,
     };
 
     // See Options enum above.

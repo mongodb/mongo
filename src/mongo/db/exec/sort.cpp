@@ -111,7 +111,7 @@ std::unique_ptr<PlanStageStats> SortStage::getStats() {
     _commonStats.isEOF = isEOF();
     std::unique_ptr<PlanStageStats> ret =
         std::make_unique<PlanStageStats>(_commonStats, STAGE_SORT);
-    ret->specific = _sortExecutor.stats();
+    ret->specific = _sortExecutor.cloneStats();
     ret->children.emplace_back(child()->getStats());
     return ret;
 }

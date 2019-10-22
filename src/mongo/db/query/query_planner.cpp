@@ -108,9 +108,6 @@ string optionString(size_t options) {
             case QueryPlannerParams::INCLUDE_SHARD_FILTER:
                 ss << "INCLUDE_SHARD_FILTER ";
                 break;
-            case QueryPlannerParams::NO_BLOCKING_SORT:
-                ss << "NO_BLOCKING_SORT ";
-                break;
             case QueryPlannerParams::INDEX_INTERSECTION:
                 ss << "INDEX_INTERSECTION ";
                 break;
@@ -854,7 +851,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         if (0 == out.size() && relevantIndices.front().type != IndexType::INDEX_WILDCARD) {
             // Push hinted index solution to output list if found. It is possible to end up without
             // a solution in the case where a filtering QueryPlannerParams argument, such as
-            // NO_BLOCKING_SORT, leads to its exclusion.
+            // NO_UNCOVERED_PROJECTIONS, leads to its exclusion.
             auto soln = buildWholeIXSoln(relevantIndices.front(), query, params);
             if (soln) {
                 LOG(5) << "Planner: outputting soln that uses hinted index as scan.";

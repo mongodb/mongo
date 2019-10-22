@@ -83,36 +83,6 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         bool trackOplogTimestamp = false);
 
-    /*
-      Record the query that was specified for the cursor this wraps, if
-      any.
-
-      This should be captured after any optimizations are applied to
-      the pipeline so that it reflects what is really used.
-
-      This gets used for explain output.
-
-      @param pBsonObj the query to record
-     */
-    void setQuery(const BSONObj& query) {
-        _query = query;
-    }
-
-    /*
-      Record the sort that was specified for the cursor this wraps, if
-      any.
-
-      This should be captured after any optimizations are applied to
-      the pipeline so that it reflects what is really used.
-
-      This gets used for explain output.
-
-      @param pBsonObj the sort to record
-     */
-    void setSort(const BSONObj& sort) {
-        _sort = sort;
-    }
-
     /**
      * If subsequent sources need no information from the cursor, the cursor can simply output empty
      * documents, avoiding the overhead of converting BSONObjs to Documents.
@@ -131,6 +101,10 @@ public:
 
     const PlanSummaryStats& getPlanSummaryStats() const {
         return _planSummaryStats;
+    }
+
+    bool usedDisk() final {
+        return _planSummaryStats.usedDisk;
     }
 
 protected:
@@ -183,9 +157,6 @@ private:
     // Batches results returned from the underlying PlanExecutor.
     std::deque<Document> _currentBatch;
 
-    // BSONObj members must outlive _projection and cursor.
-    BSONObj _query;
-    BSONObj _sort;
     bool _shouldProduceEmptyDocs = false;
 
     // The underlying query plan which feeds this pipeline. Must be destroyed while holding the

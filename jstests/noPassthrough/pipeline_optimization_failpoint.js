@@ -22,13 +22,25 @@ for (let i = 0; i < 25; ++i) {
     assert.commandWorked(coll.insert({_id: i, city: "Cleveland", pop: pop, state: "OH"}));
 }
 
-const pipeline = [{$match: {state: "OH"}}, {$sort: {pop: -1}}, {$limit: 10}];
+const pipeline = [
+    {$match: {state: "OH"}},
+    // The test-only '$_internalInhibitOptimization' operator prevents the $sort and $limit from
+    // being pushed down into the PlanStage layer, thereby ensuring that these two stages remain
+    // inside the pipeline layer. We need to make sure that the pipeline does get optimized away,
+    // since the "disablePipelineOptimization" failpoint does nothing in the
+    // "optimizedPipeline:true" case.
+    {$_internalInhibitOptimization: {}},
+    {$sort: {pop: -1}},
+    {$limit: 10}
+];
 
 const enabledPlan = coll.explain().aggregate(pipeline);
 // Test that sort and the limit were combined.
 assert.eq(aggPlanHasStage(enabledPlan, "$limit"), false);
+assert.eq(aggPlanHasStage(enabledPlan, "$cursor"), true);
+assert.eq(aggPlanHasStage(enabledPlan, "$_internalInhibitOptimization"), true);
 assert.eq(aggPlanHasStage(enabledPlan, "$sort"), true);
-assert.eq(enabledPlan.stages.length, 2);
+assert.eq(enabledPlan.stages.length, 3);
 
 const enabledResult = coll.aggregate(pipeline).toArray();
 
@@ -38,9 +50,11 @@ assert.commandWorked(
 
 const disabledPlan = coll.explain().aggregate(pipeline);
 // Test that the $limit still exists and hasn't been optimized away.
-assert.eq(aggPlanHasStage(disabledPlan, "$limit"), true);
+assert.eq(aggPlanHasStage(enabledPlan, "$cursor"), true);
+assert.eq(aggPlanHasStage(enabledPlan, "$_internalInhibitOptimization"), true);
 assert.eq(aggPlanHasStage(disabledPlan, "$sort"), true);
-assert.eq(disabledPlan.stages.length, 3);
+assert.eq(aggPlanHasStage(disabledPlan, "$limit"), true);
+assert.eq(disabledPlan.stages.length, 4);
 
 const disabledResult = coll.aggregate(pipeline).toArray();
 

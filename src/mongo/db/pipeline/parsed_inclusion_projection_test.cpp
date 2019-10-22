@@ -832,92 +832,114 @@ TEST(InclusionProjectionExecutionTest, ComputedFieldShouldReplaceNestedArrayForN
 }
 
 //
-// Detection of subset projection.
+// Detection of equivalency to the dependency set.
 //
 
-TEST(InclusionProjectionExecutionTest, ShouldDetectSubsetForIdenticalProjection) {
+TEST(InclusionProjectionExecutionTest, ShouldDetectEquivalenceForIdenticalProjection) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a" << true << "b" << true));
 
-    auto proj = BSON("_id" << false << "a" << true << "b" << true);
+    auto proj = BSON("_id" << true << "a" << true << "b" << true);
 
-    ASSERT_TRUE(inclusion.isSubsetOfProjection(proj));
+    ASSERT_TRUE(inclusion.isEquivalentToDependencySet(proj));
 }
 
-TEST(InclusionProjectionExecutionTest, ShouldDetectSubsetForSupersetProjection) {
+TEST(InclusionProjectionExecutionTest, ShouldNotDetectEquivalenceForSupersetProjection) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a" << true << "b" << true));
 
-    auto proj = BSON("_id" << false << "a" << true << "b" << true << "c" << true);
+    auto proj = BSON("_id" << true << "a" << true << "b" << true << "c" << true);
 
-    ASSERT_TRUE(inclusion.isSubsetOfProjection(proj));
+    ASSERT_FALSE(inclusion.isEquivalentToDependencySet(proj));
 }
 
-TEST(InclusionProjectionExecutionTest, ShouldDetectSubsetForIdenticalNestedProjection) {
+TEST(InclusionProjectionExecutionTest, ShouldDetectEquivalenceForIdenticalNestedProjection) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a.b" << true));
 
-    auto proj = BSON("_id" << false << "a.b" << true);
+    auto proj = BSON("_id" << true << "a.b" << true);
 
-    ASSERT_TRUE(inclusion.isSubsetOfProjection(proj));
-}
-
-TEST(InclusionProjectionExecutionTest, ShouldDetectSubsetForSupersetProjectionWithNestedFields) {
-    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
-    inclusion.parse(BSON("a" << true << "c" << BSON("d" << true)));
-
-    auto proj = BSON("_id" << false << "a" << true << "b" << true << "c.d" << true);
-
-    ASSERT_TRUE(inclusion.isSubsetOfProjection(proj));
-}
-
-TEST(InclusionProjectionExecutionTest, ShouldDetectNonSubsetForProjectionWithMissingFields) {
-    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
-    inclusion.parse(BSON("a" << true << "b" << true));
-
-    auto proj = BSON("_id" << false << "a" << true);
-    ASSERT_FALSE(inclusion.isSubsetOfProjection(proj));
-
-    proj = BSON("_id" << false << "a" << true << "c" << true);
-    ASSERT_FALSE(inclusion.isSubsetOfProjection(proj));
+    ASSERT_TRUE(inclusion.isEquivalentToDependencySet(proj));
 }
 
 TEST(InclusionProjectionExecutionTest,
-     ShouldDetectNonSubsetForSupersetProjectionWithoutComputedFields) {
+     ShouldNotDetectEquivalenceForSupersetProjectionWithNestedFields) {
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
+    inclusion.parse(BSON("a" << true << "c" << BSON("d" << true)));
+
+    auto proj = BSON("_id" << true << "a" << true << "b" << true << "c.d" << true);
+
+    ASSERT_FALSE(inclusion.isEquivalentToDependencySet(proj));
+}
+
+TEST(InclusionProjectionExecutionTest, ShouldNotDetectEquivalenceForProjectionWithMissingFields) {
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
+    inclusion.parse(BSON("a" << true << "b" << true));
+
+    auto proj = BSON("_id" << true << "a" << true);
+    ASSERT_FALSE(inclusion.isEquivalentToDependencySet(proj));
+
+    proj = BSON("_id" << true << "a" << true << "c" << true);
+    ASSERT_FALSE(inclusion.isEquivalentToDependencySet(proj));
+}
+
+TEST(InclusionProjectionExecutionTest,
+     ShouldNotDetectEquivalenceForSupersetProjectionWithoutComputedFields) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a" << true << "b" << true << "c" << BSON("$literal" << 1)));
 
     auto proj = BSON("_id" << false << "a" << true << "b" << true);
 
-    ASSERT_FALSE(inclusion.isSubsetOfProjection(proj));
+    ASSERT_FALSE(inclusion.isEquivalentToDependencySet(proj));
 }
 
-TEST(InclusionProjectionExecutionTest, ShouldDetectNonSubsetForProjectionWithMissingNestedFields) {
+TEST(InclusionProjectionExecutionTest,
+     ShouldNotDetectEquivalenceForProjectionWithMissingNestedFields) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a.b" << true << "a.c" << true));
 
     auto proj = BSON("_id" << false << "a.b" << true);
 
-    ASSERT_FALSE(inclusion.isSubsetOfProjection(proj));
+    ASSERT_FALSE(inclusion.isEquivalentToDependencySet(proj));
 }
 
-TEST(InclusionProjectionExecutionTest, ShouldDetectNonSubsetForProjectionWithRenamedFields) {
+TEST(InclusionProjectionExecutionTest, ShouldNotDetectEquivalenceForProjectionWithRenamedFields) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a"
                          << "$b"));
 
     auto proj = BSON("_id" << false << "b" << true);
 
-    ASSERT_FALSE(inclusion.isSubsetOfProjection(proj));
+    ASSERT_FALSE(inclusion.isEquivalentToDependencySet(proj));
 }
 
-TEST(InclusionProjectionExecutionTest, ShouldDetectNonSubsetForProjectionWithMissingIdField) {
+TEST(InclusionProjectionExecutionTest, ShouldNotDetectEquivalenceForProjectionWithMissingIdField) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a" << true));
 
     auto proj = BSON("a" << true);
 
-    ASSERT_FALSE(inclusion.isSubsetOfProjection(proj));
+    ASSERT_FALSE(inclusion.isEquivalentToDependencySet(proj));
+}
+
+TEST(InclusionProjectionExecutionTest,
+     ShouldNotDetectEquivalenceIfDependenciesExplicitlyExcludeId) {
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
+    inclusion.parse(BSON("a" << true));
+
+    auto proj = BSON("_id" << false << "a" << true);
+
+    ASSERT_FALSE(inclusion.isEquivalentToDependencySet(proj));
+}
+
+TEST(InclusionProjectionExecutionTest,
+     ShouldDetectEquivalenceIfBothDepsAndProjExplicitlyExcludeId) {
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
+    inclusion.parse(BSON("_id" << false << "a" << true));
+
+    auto proj = BSON("_id" << false << "a" << true);
+
+    ASSERT_TRUE(inclusion.isEquivalentToDependencySet(proj));
 }
 
 }  // namespace

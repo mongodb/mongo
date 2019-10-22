@@ -175,11 +175,11 @@ public:
     Document applyProjection(const Document& inputDoc) const final;
 
     /*
-     * Checks whether the inclusion projection represented by the InclusionNode
-     * tree is a subset of the object passed in. Projections that have any
-     * computed or renamed fields are not considered a subset.
+     * Given 'deps', a BSONObj describing a the dependency set for a pipeline, returns true if this
+     * is an inclusion projection with no computed paths which includes the exact same set of fields
+     * as 'deps'.
      */
-    bool isSubsetOfProjection(const BSONObj& proj) const final;
+    bool isEquivalentToDependencySet(const BSONObj& deps) const;
 
 private:
     /**

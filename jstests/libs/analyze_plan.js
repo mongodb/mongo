@@ -98,10 +98,13 @@ function hasRejectedPlans(root) {
     }
 
     if (root.hasOwnProperty("shards")) {
-        // This is a sharded agg explain.
-        const cursorStages = getAggPlanStages(root, "$cursor");
-        return cursorStages.find((cursorStage) => cursorStageHasRejectedPlans(cursorStage)) !==
-            undefined;
+        // This is a sharded agg explain. Recursively check whether any of the shards has rejected
+        // plans.
+        const shardExplains = [];
+        for (const shard in root.shards) {
+            shardExplains.push(root.shards[shard]);
+        }
+        return shardExplains.some(hasRejectedPlans);
     } else if (root.hasOwnProperty("stages")) {
         // This is an agg explain.
         const cursorStages = getAggPlanStages(root, "$cursor");

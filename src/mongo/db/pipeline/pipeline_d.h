@@ -170,40 +170,42 @@ private:
      * an index to provide a more efficient sort or projection, the sort and/or projection will be
      * incorporated into the PlanExecutor.
      *
-     * 'sortObj' will be set to an empty object if the query system cannot provide a non-blocking
-     * sort, and 'projectionObj' will be set to an empty object if the query system cannot provide a
-     * covered projection.
-     *
      * Set 'rewrittenGroupStage' when the pipeline uses $match+$sort+$group stages that are
      * compatible with a DISTINCT_SCAN plan that visits the first document in each group
      * (SERVER-9507).
+     *
+     * This function computes the dependencies of 'pipeline' and attempts to push the dependency set
+     * down to the query layer as a projection. If the dependency set indeed results in a projection
+     * being pushed down to the query layer, this projection is returned in 'projectionObj'. If no
+     * such projection can be pushed down, then 'projectionObj' is set to the empty BSONObj. This
+     * can happen if the query system cannot provide a covered projection.
+     *
+     * Sets the 'hasNoRequirements' out-parameter based on whether the dependency set is both finite
+     * and empty. In this case, the query has count semantics.
      */
     static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor(
-        OperationContext* opCtx,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
         Collection* collection,
         const NamespaceString& nss,
         Pipeline* pipeline,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const boost::intrusive_ptr<DocumentSourceSort>& sortStage,
         std::unique_ptr<GroupFromFirstDocumentTransformation> rewrittenGroupStage,
-        const DepsTracker& deps,
+        QueryMetadataBitSet metadataAvailable,
         const BSONObj& queryObj,
         boost::optional<long long> limit,
         const AggregationRequest* aggRequest,
         const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
-        BSONObj* sortObj,
-        BSONObj* projectionObj);
+        BSONObj* projectionObj,
+        bool* hasNoRequirements);
 
     /**
-     * Adds 'cursor' to the front of 'pipeline', using 'deps' to inform the cursor of its
-     * dependencies. If specified, 'queryObj', 'sortObj' and 'projectionObj' are passed to the
-     * cursor for explain reporting.
+     * Adds 'cursor' to the front of 'pipeline'. If 'shouldProduceEmptyDocs' is true, then we inform
+     * 'cursor' that this is a count scenario -- the dependency set is fully known and is empty. In
+     * this case, 'cursor' can return a sequence of empty documents for the caller to count.
      */
     static void addCursorSource(Pipeline* pipeline,
                                 boost::intrusive_ptr<DocumentSourceCursor> cursor,
-                                DepsTracker deps,
-                                const BSONObj& queryObj = BSONObj(),
-                                const BSONObj& sortObj = BSONObj());
+                                bool shouldProduceEmptyDocs);
 };
 
 }  // namespace mongo

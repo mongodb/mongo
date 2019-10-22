@@ -585,20 +585,6 @@ TEST_F(QueryPlannerTest, CompoundMultikeyBoundsNoIntersect) {
 // QueryPlannerParams option tests
 //
 
-TEST_F(QueryPlannerTest, NoBlockingSortsAllowedTest) {
-    params.options = QueryPlannerParams::NO_BLOCKING_SORT;
-    runQuerySortProj(BSONObj(), BSON("x" << 1), BSONObj());
-    assertNumSolutions(0U);
-
-    addIndex(BSON("x" << 1));
-
-    runQuerySortProj(BSONObj(), BSON("x" << 1), BSONObj());
-    assertNumSolutions(1U);
-    assertSolutionExists(
-        "{fetch: {filter: null, node: {ixscan: "
-        "{filter: null, pattern: {x: 1}}}}}");
-}
-
 TEST_F(QueryPlannerTest, NoTableScanBasic) {
     params.options = QueryPlannerParams::NO_TABLE_SCAN;
     runQuery(BSONObj());

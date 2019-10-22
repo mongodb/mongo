@@ -72,12 +72,8 @@ public:
 
     std::unique_ptr<PlanStageStats> getStats();
 
-    /**
-     * Returns nullptr. Stats related to sort execution must be extracted with 'getStats()', since
-     * they are retrieved on demand from the underlying sort execution machinery.
-     */
     const SpecificStats* getSpecificStats() const final {
-        return nullptr;
+        return &_sortExecutor.stats();
     }
 
 private:
@@ -85,8 +81,6 @@ private:
     WorkingSet* _ws;
 
     SortExecutor _sortExecutor;
-
-    SortStats _specificStats;
 
     // Whether or not we have finished loading data into '_sortExecutor'.
     bool _populated = false;

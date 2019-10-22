@@ -23,7 +23,7 @@ function assertQueryCoversProjection({pipeline = [], pipelineOptimizedAway = tru
     const explainOutput = coll.explain().aggregate(pipeline);
 
     if (pipelineOptimizedAway) {
-        assert(isQueryPlan(explainOutput));
+        assert(isQueryPlan(explainOutput), explainOutput);
         assert(
             !planHasStage(db, explainOutput, "FETCH"),
             "Expected pipeline " + tojsononeline(pipeline) +
@@ -32,7 +32,7 @@ function assertQueryCoversProjection({pipeline = [], pipelineOptimizedAway = tru
                "Expected pipeline " + tojsononeline(pipeline) +
                    " to include an index scan in the explain output: " + tojson(explainOutput));
     } else {
-        assert(isAggregationPlan(explainOutput));
+        assert(isAggregationPlan(explainOutput), explainOutput);
         assert(
             !aggPlanHasStage(explainOutput, "FETCH"),
             "Expected pipeline " + tojsononeline(pipeline) +
@@ -102,7 +102,6 @@ assertQueryCoversProjection({
         {$sort: {x: 1, a: 1}},  // Note: not indexable, but doesn't add any additional dependencies.
         {$project: {_id: 1, x: 1, a: 1}},
     ],
-    pipelineOptimizedAway: false
 });
 
 // Test that a multikey index will prevent a covered plan.

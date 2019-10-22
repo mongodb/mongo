@@ -85,10 +85,6 @@ public:
         return *_parsedTransform;
     }
 
-    bool isSubsetOfProjection(const BSONObj& proj) const {
-        return _parsedTransform->isSubsetOfProjection(proj);
-    }
-
 protected:
     GetNextResult doGetNext() final;
     void doDispose() final;

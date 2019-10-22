@@ -67,19 +67,5 @@ public:
      */
     virtual Document serializeTransformation(
         boost::optional<ExplainOptions::Verbosity> explain) const = 0;
-
-    /**
-     * Returns true if this transformer is an inclusion projection and is a subset of
-     * 'proj', which must be a valid projection specification. For example, if this
-     * TransformerInterface represents the inclusion projection
-     *
-     *      {a: 1, b: 1, c: 1}
-     *
-     * then it is a subset of the projection {a: 1, c: 1}, and this function returns
-     * true.
-     */
-    virtual bool isSubsetOfProjection(const BSONObj& proj) const {
-        return false;
-    }
 };
 }  // namespace mongo

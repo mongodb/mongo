@@ -251,11 +251,20 @@ assertPipelineUsesAggregation({
     expectedStages: ["COLLSCAN"],
     expectedResult: [{_id: "null", s: 50}]
 });
+
 // TODO SERVER-40253: We cannot optimize away text search queries.
 assert.commandWorked(coll.createIndex({y: "text"}));
 assertPipelineUsesAggregation(
     {pipeline: [{$match: {$text: {$search: "abc"}}}], expectedStages: ["IXSCAN"]});
+// Test that $match, $sort, and $project all get answered by the PlanStage layer for a $text query.
+assertPipelineUsesAggregation({
+    pipeline:
+        [{$match: {$text: {$search: "abc"}}}, {$sort: {sortField: 1}}, {$project: {a: 1, b: 1}}],
+    expectedStages: ["TEXT", "SORT", "PROJECTION_SIMPLE"],
+    optimizedAwayStages: ["$match", "$sort", "$project"]
+});
 assert.commandWorked(coll.dropIndexes());
+
 // We cannot optimize away geo near queries.
 assert.commandWorked(coll.createIndex({"y": "2d"}));
 assertPipelineUsesAggregation({
@@ -427,6 +436,47 @@ let skipStage = getAggPlanStage(explain, "$skip");
 assert.neq(null, skipStage, explain);
 assert.eq(30, skipStage.$skip, explain);
 
+assert.commandWorked(coll.dropIndexes());
+
+// $sort can be optimized away even if there is no index to provide the sort.
+assertPipelineDoesNotUseAggregation({
+    pipeline: [
+        {$sort: {x: -1}},
+    ],
+    expectedStages: ["COLLSCAN", "SORT"],
+    expectedResult: [{_id: 3, x: 30}, {_id: 2, x: 20}, {_id: 1, x: 10}],
+});
+
+// $match, $sort, $limit can be optimized away even if there is no index to provide the sort.
+assertPipelineDoesNotUseAggregation({
+    pipeline: [{$match: {x: {$gte: 0}}}, {$sort: {x: -1}}, {$limit: 1}],
+    expectedStages: ["COLLSCAN", "SORT"],
+    expectedResult: [{_id: 3, x: 30}],
+});
+
+// If there is a $project that can't result in a covered plan, however, then the pipeline cannot be
+// optimized away. But the $sort should still get pushed down into the PlanStage layer.
+assertPipelineUsesAggregation({
+    pipeline:
+        [{$match: {x: {$gte: 20}}}, {$sort: {x: -1}}, {$project: {_id: 0, x: 1}}, {$limit: 2}],
+    expectedStages: ["COLLSCAN", "SORT"],
+    optimizedAwayStages: ["$match", "$sort", "$limit"],
+    expectedResult: [{x: 30}, {x: 20}],
+});
+
+// Test a case where there is a projection that can be covered by an index, but a blocking sort is
+// still required. In this case, the entire pipeline can be optimized away.
+assert.commandWorked(coll.createIndex({y: 1, x: 1}));
+assertPipelineDoesNotUseAggregation({
+    pipeline: [
+        {$match: {y: {$gt: 0}, x: {$gte: 20}}},
+        {$sort: {x: -1}},
+        {$project: {_id: 0, y: 1, x: 1}},
+        {$limit: 2}
+    ],
+    expectedStages: ["IXSCAN", "SORT", "PROJECTION_COVERED"],
+    expectedResult: [],
+});
 assert.commandWorked(coll.dropIndexes());
 
 // getMore cases.

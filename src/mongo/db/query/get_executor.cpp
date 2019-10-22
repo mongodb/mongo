@@ -1021,6 +1021,14 @@ bool turnIxscanIntoCount(QuerySolution* soln) {
         return false;
     }
 
+    // Since count scans return no data, they are always forward scans. Index scans, on the other
+    // hand, may need to scan the index in reverse order in order to obtain a sort. If the index
+    // scan direction is backwards, then we need to swap the start and end of the count scan bounds.
+    if (isn->direction < 0) {
+        startKey.swap(endKey);
+        std::swap(startKeyInclusive, endKeyInclusive);
+    }
+
     // Make the count node that we replace the fetch + ixscan with.
     CountScanNode* csn = new CountScanNode(isn->index);
     csn->startKey = startKey;

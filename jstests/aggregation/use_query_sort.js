@@ -18,63 +18,69 @@ for (let i = 0; i < 100; ++i) {
 }
 assert.commandWorked(bulk.execute());
 
-function assertHasNonBlockingQuerySort(pipeline) {
+function assertHasNonBlockingQuerySort(pipeline, expectRejectedPlans) {
     const explainOutput = coll.explain().aggregate(pipeline);
-    assert(isQueryPlan(explainOutput));
-    assert(!planHasStage(db, explainOutput, "SORT"),
-           "Expected pipeline " + tojsononeline(pipeline) +
-               " *not* to include a SORT stage in the explain output: " + tojson(explainOutput));
-    assert(planHasStage(db, explainOutput, "IXSCAN"),
-           "Expected pipeline " + tojsononeline(pipeline) +
-               " to include an index scan in the explain output: " + tojson(explainOutput));
-    assert(!hasRejectedPlans(explainOutput),
-           "Expected pipeline " + tojsononeline(pipeline) +
-               " not to have any rejected plans in the explain output: " + tojson(explainOutput));
+    assert(isQueryPlan(explainOutput), explainOutput);
+    assert(!planHasStage(db, explainOutput, "SORT"), explainOutput);
+    assert(planHasStage(db, explainOutput, "IXSCAN"), explainOutput);
+    assert.eq(expectRejectedPlans, hasRejectedPlans(explainOutput), explainOutput);
     return explainOutput;
 }
 
-function assertDoesNotHaveQuerySort(pipeline) {
+function assertHasBlockingQuerySort(pipeline, expectRejectedPlans) {
     const explainOutput = coll.explain().aggregate(pipeline);
-    assert(isAggregationPlan(explainOutput));
-    assert(aggPlanHasStage(explainOutput, "$sort"),
-           "Expected pipeline " + tojsononeline(pipeline) +
-               " to include a $sort stage in the explain output: " + tojson(explainOutput));
-    assert(!aggPlanHasStage(explainOutput, "SORT"),
-           "Expected pipeline " + tojsononeline(pipeline) +
-               " *not* to include a SORT stage in the explain output: " + tojson(explainOutput));
-    assert(!hasRejectedPlans(explainOutput),
-           "Expected pipeline " + tojsononeline(pipeline) +
-               " not to have any rejected plans in the explain output: " + tojson(explainOutput));
+    assert(isQueryPlan(explainOutput), explainOutput);
+    assert(planHasStage(db, explainOutput, "SORT"), explainOutput);
+    assert.eq(expectRejectedPlans, hasRejectedPlans(explainOutput), explainOutput);
+}
+
+function assertDoesNotHaveQuerySort(pipeline, expectRejectedPlans) {
+    const explainOutput = coll.explain().aggregate(pipeline);
+    assert(isAggregationPlan(explainOutput), explainOutput);
+    assert(aggPlanHasStage(explainOutput, "$sort"), explainOutput);
+    assert(!aggPlanHasStage(explainOutput, "SORT"), explainOutput);
+    assert.eq(expectRejectedPlans, hasRejectedPlans(explainOutput), explainOutput);
     return explainOutput;
 }
 
-// Test that a sort on the _id can use the query system to provide the sort.
-assertHasNonBlockingQuerySort([{$sort: {_id: -1}}]);
-assertHasNonBlockingQuerySort([{$sort: {_id: 1}}]);
-assertHasNonBlockingQuerySort([{$match: {_id: {$gte: 50}}}, {$sort: {_id: 1}}]);
-assertHasNonBlockingQuerySort([{$match: {_id: {$gte: 50}}}, {$sort: {_id: -1}}]);
+// Test that a sort on _id can use the query system to provide the sort. Since the sort and match
+// are both on the _id field, we don't expect there to be any rejected plans.
+assertHasNonBlockingQuerySort([{$sort: {_id: -1}}], false);
+assertHasNonBlockingQuerySort([{$sort: {_id: 1}}], false);
+assertHasNonBlockingQuerySort([{$match: {_id: {$gte: 50}}}, {$sort: {_id: 1}}], false);
+assertHasNonBlockingQuerySort([{$match: {_id: {$gte: 50}}}, {$sort: {_id: -1}}], false);
 
-// Test that a sort on a field not in any index cannot use a query system sort, and thus still
-// has a $sort stage.
-assertDoesNotHaveQuerySort([{$sort: {x: -1}}]);
-assertDoesNotHaveQuerySort([{$sort: {x: 1}}]);
-assertDoesNotHaveQuerySort([{$match: {_id: {$gte: 50}}}, {$sort: {x: 1}}]);
+// Test that a sort on a field not in any index will use a SORT stage in the query layer. Since
+// there is no index to support the sort, we don't expect any rejected plans.
+assertHasBlockingQuerySort([{$sort: {x: -1}}], false);
+assertHasBlockingQuerySort([{$sort: {x: 1}}], false);
+assertHasBlockingQuerySort([{$match: {_id: {$gte: 50}}}, {$sort: {x: 1}}], false);
 
 assert.commandWorked(coll.createIndex({x: 1, y: -1}));
 
-assertHasNonBlockingQuerySort([{$sort: {x: 1, y: -1}}]);
-assertHasNonBlockingQuerySort([{$sort: {x: 1}}]);
-assertDoesNotHaveQuerySort([{$sort: {y: 1}}]);
-assertDoesNotHaveQuerySort([{$sort: {x: 1, y: 1}}]);
+// Since there is an index to support these sorts, we expect the system to choose a non-blocking
+// sort. The only indexed plan is an index-provided sort, so we don't expect any rejected plans.
+assertHasNonBlockingQuerySort([{$sort: {x: 1, y: -1}}], false);
+assertHasNonBlockingQuerySort([{$sort: {x: 1}}], false);
 
-// Test that a $match on a field not present in the same index eligible to provide a sort can
-// still result in a index scan on the sort field (SERVER-7568).
-assertHasNonBlockingQuerySort([{$match: {_id: {$gte: 50}}}, {$sort: {x: 1}}]);
+// These sorts cannot be provided by an index, but it still should get pushed down to the query
+// layer. The only plan is a COLLSCAN followed by a blocking sort, so we don't expect any rejected
+// plans.
+assertHasBlockingQuerySort([{$sort: {y: 1}}], false);
+assertHasBlockingQuerySort([{$sort: {x: 1, y: 1}}], false);
 
-// Test that a sort on the text score does not use the query system to provide the sort, since
-// it would need to be a blocking sort, and we prefer the $sort stage to the query system's sort
-// implementation.
+// In this case, there are two possible plans: an _id index scan with a blocking SORT, or an
+// index-provided sort by scanning the {x: 1, y: -1} index. Since the _id predicate is more
+// selective, we expect the blocking SORT plan to win and there to be a rejected plan.
+assertHasBlockingQuerySort([{$match: {_id: {$gte: 90}}}, {$sort: {x: 1}}], true);
+// A query of the same shape will use a non-blocking plan if the predicate is not selective.
+assertHasNonBlockingQuerySort([{$match: {_id: {$gte: 0}}}, {$sort: {x: 1}}], true);
+
+// Meta-sort on "textScore" currently cannot be pushed down into the query layer. See SERVER-43816.
 assert.commandWorked(coll.createIndex({x: "text"}));
 assertDoesNotHaveQuerySort(
-    [{$match: {$text: {$search: "test"}}}, {$sort: {key: {$meta: "textScore"}}}]);
+    [{$match: {$text: {$search: "test"}}}, {$sort: {key: {$meta: "textScore"}}}], false);
+
+// Meta-sort on "randVal" cannot be pushed into the query layer. See SERVER-43816.
+assertDoesNotHaveQuerySort([{$sort: {key: {$meta: "randVal"}}}], false);
 }());

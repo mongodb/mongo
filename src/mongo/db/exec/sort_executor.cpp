@@ -55,10 +55,13 @@ SortExecutor::SortExecutor(SortPattern sortPattern,
                            std::string tempDir,
                            bool allowDiskUse)
     : _sortPattern(std::move(sortPattern)),
-      _limit(limit),
-      _maxMemoryUsageBytes(maxMemoryUsageBytes),
       _tempDir(std::move(tempDir)),
-      _diskUseAllowed(allowDiskUse) {}
+      _diskUseAllowed(allowDiskUse) {
+    _stats.sortPattern =
+        _sortPattern.serialize(SortPattern::SortKeySerialization::kForExplain).toBson();
+    _stats.limit = limit;
+    _stats.maxMemoryUsageBytes = maxMemoryUsageBytes;
+}
 
 boost::optional<Document> SortExecutor::getNextDoc() {
     auto wsm = getNextWsm();
@@ -114,7 +117,7 @@ void SortExecutor::add(Value sortKey, WorkingSetMember data) {
     }
     _sorter->add(std::move(sortKey), std::move(data));
 
-    _totalDataSizeBytes += data.getMemUsage();
+    _stats.totalDataSizeBytes += data.getMemUsage();
 }
 
 void SortExecutor::loadingDone() {
@@ -123,17 +126,17 @@ void SortExecutor::loadingDone() {
         _sorter.reset(DocumentSorter::make(makeSortOptions(), Comparator(_sortPattern)));
     }
     _output.reset(_sorter->done());
-    _wasDiskUsed = _wasDiskUsed || _sorter->usedDisk();
+    _stats.wasDiskUsed = _stats.wasDiskUsed || _sorter->usedDisk();
     _sorter.reset();
 }
 
 SortOptions SortExecutor::makeSortOptions() const {
     SortOptions opts;
-    if (_limit) {
-        opts.limit = _limit;
+    if (_stats.limit) {
+        opts.limit = _stats.limit;
     }
 
-    opts.maxMemoryUsageBytes = _maxMemoryUsageBytes;
+    opts.maxMemoryUsageBytes = _stats.maxMemoryUsageBytes;
     if (_diskUseAllowed) {
         opts.extSortAllowed = true;
         opts.tempDir = _tempDir;
@@ -142,15 +145,8 @@ SortOptions SortExecutor::makeSortOptions() const {
     return opts;
 }
 
-std::unique_ptr<SortStats> SortExecutor::stats() const {
-    auto stats = std::make_unique<SortStats>();
-    stats->sortPattern =
-        _sortPattern.serialize(SortPattern::SortKeySerialization::kForExplain).toBson();
-    stats->limit = _limit;
-    stats->maxMemoryUsageBytes = _maxMemoryUsageBytes;
-    stats->totalDataSizeBytes = _totalDataSizeBytes;
-    stats->wasDiskUsed = _wasDiskUsed;
-    return stats;
+std::unique_ptr<SortStats> SortExecutor::cloneStats() const {
+    return std::unique_ptr<SortStats>{static_cast<SortStats*>(_stats.clone())};
 }
 }  // namespace mongo
 

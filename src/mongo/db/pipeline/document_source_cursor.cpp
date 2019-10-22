@@ -183,10 +183,6 @@ Value DocumentSourceCursor::serialize(boost::optional<ExplainOptions::Verbosity>
             verbosity == pExpCtx->explain);
 
     MutableDocument out;
-    out["query"] = Value(_query);
-
-    if (!_sort.isEmpty())
-        out["sort"] = Value(_sort);
 
     BSONObjBuilder explainStatsBuilder;
 

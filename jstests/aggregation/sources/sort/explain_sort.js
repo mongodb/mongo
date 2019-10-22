@@ -17,19 +17,23 @@ function checkResults(results, verbosity, expectedNumResults = kNumDocs) {
     let cursorSubdocs = getAggPlanStages(results, "$cursor");
     let nReturned = 0;
     let nExamined = 0;
-    assert.gt(cursorSubdocs.length, 0);
     for (let stageResult of cursorSubdocs) {
         const result = stageResult.$cursor;
         if (verbosity === "queryPlanner") {
-            assert(!result.hasOwnProperty("executionStats"), tojson(results));
+            assert(!result.hasOwnProperty("executionStats"), results);
         } else if (cursorSubdocs.length === 1) {
             // If there was a single shard, then we can assert that 'nReturned' and
             // 'totalDocsExamined' are as expected. If there are multiple shards, these assertions
             // might not hold, since each shard enforces the limit on its own and then the merging
             // node enforces the limit again to obtain the final result set.
-            assert.eq(result.executionStats.nReturned, expectedNumResults, tojson(results));
-            assert.eq(result.executionStats.totalDocsExamined, expectedNumResults, tojson(results));
+            assert.eq(result.executionStats.nReturned, expectedNumResults, results);
+            assert.eq(result.executionStats.totalDocsExamined, expectedNumResults, results);
         }
+    }
+
+    // If there was no $cursor stage, then assert that the pipeline was optimized away.
+    if (cursorSubdocs.length === 0) {
+        assert(isQueryPlan(results), results);
     }
 }
 

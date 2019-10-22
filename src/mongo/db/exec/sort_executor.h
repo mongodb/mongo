@@ -68,20 +68,20 @@ public:
      * the smallest limit.
      */
     void setLimit(uint64_t limit) {
-        if (!_limit || limit < _limit)
-            _limit = limit;
+        if (!_stats.limit || limit < _stats.limit)
+            _stats.limit = limit;
     }
 
     uint64_t getLimit() const {
-        return _limit;
+        return _stats.limit;
     }
 
     bool hasLimit() const {
-        return _limit > 0;
+        return _stats.limit > 0;
     }
 
     bool wasDiskUsed() const {
-        return _wasDiskUsed;
+        return _stats.wasDiskUsed;
     }
 
     /**
@@ -107,7 +107,11 @@ public:
         return _isEOF;
     }
 
-    std::unique_ptr<SortStats> stats() const;
+    const SortStats& stats() const {
+        return _stats;
+    }
+
+    std::unique_ptr<SortStats> cloneStats() const;
 
 private:
     using DocumentSorter = Sorter<Value, WorkingSetMember>;
@@ -124,18 +128,15 @@ private:
 
     SortOptions makeSortOptions() const;
 
-    SortPattern _sortPattern;
-    //  A limit of zero is defined as no limit.
-    uint64_t _limit;
-    uint64_t _maxMemoryUsageBytes;
-    std::string _tempDir;
-    bool _diskUseAllowed = false;
+    const SortPattern _sortPattern;
+    const std::string _tempDir;
+    const bool _diskUseAllowed;
 
     std::unique_ptr<DocumentSorter> _sorter;
     std::unique_ptr<DocumentSorter::Iterator> _output;
 
+    SortStats _stats;
+
     bool _isEOF = false;
-    bool _wasDiskUsed = false;
-    uint64_t _totalDataSizeBytes = 0u;
 };
 }  // namespace mongo

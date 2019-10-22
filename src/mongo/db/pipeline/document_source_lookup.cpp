@@ -265,10 +265,7 @@ DocumentSource::GetNextResult DocumentSourceLookUp::doGetNext() {
                 objsize <= maxBytes);
         results.emplace_back(std::move(*result));
     }
-    for (auto&& source : pipeline->getSources()) {
-        if (source->usedDisk())
-            _usedDisk = true;
-    }
+    _usedDisk = _usedDisk || pipeline->usedDisk();
 
     MutableDocument output(std::move(inputDoc));
     output.setNestedField(_as, Value(std::move(results)));
