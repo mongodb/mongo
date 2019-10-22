@@ -120,7 +120,8 @@ public:
      */
     Status drainBackgroundWrites(OperationContext* opCtx,
                                  const UUID& buildUUID,
-                                 RecoveryUnit::ReadSource readSource);
+                                 RecoveryUnit::ReadSource readSource,
+                                 IndexBuildInterceptor::DrainYieldPolicy drainYieldPolicy);
 
     /**
      * Persists information in the index catalog entry to reflect the successful completion of the

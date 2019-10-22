@@ -1114,7 +1114,10 @@ void IndexBuildsCoordinator::_buildIndex(
         Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_IS);
 
         uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
-            opCtx, replState->buildUUID, RecoveryUnit::ReadSource::kUnset));
+            opCtx,
+            replState->buildUUID,
+            RecoveryUnit::ReadSource::kUnset,
+            IndexBuildInterceptor::DrainYieldPolicy::kYield));
     }
 
     if (MONGO_unlikely(hangAfterIndexBuildFirstDrain.shouldFail())) {
@@ -1128,7 +1131,10 @@ void IndexBuildsCoordinator::_buildIndex(
         Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_S);
 
         uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
-            opCtx, replState->buildUUID, RecoveryUnit::ReadSource::kUnset));
+            opCtx,
+            replState->buildUUID,
+            RecoveryUnit::ReadSource::kUnset,
+            IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
     }
 
     if (MONGO_unlikely(hangAfterIndexBuildSecondDrain.shouldFail())) {
@@ -1191,7 +1197,10 @@ void IndexBuildsCoordinator::_buildIndex(
     // Perform the third and final drain after releasing a shared lock and reacquiring an
     // exclusive lock on the database.
     uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
-        opCtx, replState->buildUUID, RecoveryUnit::ReadSource::kUnset));
+        opCtx,
+        replState->buildUUID,
+        RecoveryUnit::ReadSource::kUnset,
+        IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
     // Index constraint checking phase.
     uassertStatusOK(
