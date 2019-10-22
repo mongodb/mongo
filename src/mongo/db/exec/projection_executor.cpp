@@ -252,6 +252,7 @@ auto buildProjectionExecutor(boost::intrusive_ptr<ExpressionContext> expCtx,
     ProjectionExecutorVisitor<Executor> executorVisitor{&context};
     projection_ast::PathTrackingWalker walker{&context, {&executorVisitor}, {}};
     projection_ast_walker::walk(&walker, root);
+    context.data().executor->optimize();
     return std::move(context.data().executor);
 }
 }  // namespace

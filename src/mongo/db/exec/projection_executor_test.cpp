@@ -176,4 +176,11 @@ TEST_F(ProjectionExecutorTest, CanProjectFindSliceAndPositional) {
         Document{fromjson("{a: {b: [2,3]}, c: [6]}")},
         executor->applyTransformation(Document{fromjson("{a: {b: [1,2,3,4]}, c: [5,6,7]}")}));
 }
+
+TEST_F(ProjectionExecutorTest, ExecutorOptimizesExpression) {
+    auto proj = parseWithDefaultPolicies(fromjson("{a: 1, b: {$add: [1, 2]}}"));
+    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{_id: true, a: true, b: {$const: 3}}")},
+                       executor->serializeTransformation(boost::none));
+}
 }  // namespace mongo::projection_executor
