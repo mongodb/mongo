@@ -36,51 +36,11 @@
         node.adminCommand(verbosity);
     });
 
-    function stepUpNode(node) {
-        assert.soonNoExcept(function() {
-            assert.commandWorked(node.adminCommand({replSetStepUp: 1}));
-            rst.awaitNodesAgreeOnPrimary(rst.kDefaultTimeoutMS, rst.nodes, rst.getNodeId(node));
-            return node.adminCommand('replSetGetStatus').myState == ReplSetTest.State.PRIMARY;
-        }, 'failed to step up node ' + node.host, rst.kDefaultTimeoutMS);
-
-        return node;
-    }
-
     function checkOpInOplog(node, op, count) {
         node.getDB("admin").getMongo().setSlaveOk();
         var oplog = node.getDB("local")['oplog.rs'];
         var oplogArray = oplog.find().toArray();
         assert.eq(oplog.count(op), count, "op: " + tojson(op) + ", oplog: " + tojson(oplogArray));
-    }
-
-    // Stop replication on secondaries, do writes and step up one of the secondaries.
-    //
-    // The old primary has extra writes that are not replicated to the other nodes yet,
-    // but the new primary steps up, getting the vote from the the third node "voter".
-    function stopReplicationAndEnforceNewPrimaryToCatchUp() {
-        // Write documents that cannot be replicated to secondaries in time.
-        var oldSecondaries = rst.getSecondaries();
-        var oldPrimary = rst.getPrimary();
-        stopServerReplication(oldSecondaries);
-        for (var i = 0; i < 3; i++) {
-            assert.writeOK(oldPrimary.getDB("test").foo.insert({x: i}));
-        }
-        var latestOpOnOldPrimary = getLatestOp(oldPrimary);
-
-        // New primary wins immediately, but needs to catch up.
-        var newPrimary = stepUpNode(oldSecondaries[0]);
-        var latestOpOnNewPrimary = getLatestOp(newPrimary);
-        // Check this node is not writable.
-        assert.eq(newPrimary.getDB("test").isMaster().ismaster, false);
-
-        return {
-            oldSecondaries: oldSecondaries,
-            oldPrimary: oldPrimary,
-            newPrimary: newPrimary,
-            voter: oldSecondaries[1],
-            latestOpOnOldPrimary: latestOpOnOldPrimary,
-            latestOpOnNewPrimary: latestOpOnNewPrimary
-        };
     }
 
     function reconfigElectionAndCatchUpTimeout(electionTimeout, catchupTimeout) {
@@ -103,7 +63,7 @@
         assert.commandWorked(rst.getSecondary().adminCommand({serverStatus: 1}));
 
     // Should complete transition to primary immediately.
-    var newPrimary = stepUpNode(rst.getSecondary());
+    var newPrimary = rst.stepUpNoAwaitReplication(rst.getSecondary());
     // Should win an election and finish the transition very quickly.
     assert.eq(newPrimary, rst.getPrimary());
     rst.awaitReplication();
@@ -130,11 +90,18 @@
         () => "Response should not have an 'electionCandidateMetrics.targetCatchupOpTime' field: " +
             tojson(res.electionCandidateMetrics));
 
+    // Check that the 'electionCandidateMetrics' section of the replSetGetStatus response has a
+    // 'numCatchUpOps' field once the primary is caught up, and that it has the correct value.
+    assert(res.electionCandidateMetrics.numCatchUpOps,
+           () => "Response should have an 'electionCandidateMetrics.numCatchUpOps' field: " +
+               tojson(res.electionCandidateMetrics));
+    assert.eq(res.electionCandidateMetrics.numCatchUpOps, 0);
+
     jsTest.log("Case 2: The primary needs to catch up, succeeds in time.");
     initialNewPrimaryStatus =
         assert.commandWorked(rst.getSecondaries()[0].adminCommand({serverStatus: 1}));
 
-    var stepUpResults = stopReplicationAndEnforceNewPrimaryToCatchUp();
+    var stepUpResults = stopReplicationAndEnforceNewPrimaryToCatchUp(rst, rst.getSecondaries()[0]);
 
     // Check that the 'electionCandidateMetrics' section of the replSetGetStatus response does not
     // have
@@ -178,9 +145,9 @@
                                   newNewPrimaryStatus.electionMetrics,
                                   'numCatchUpsSucceeded');
 
-    // Check that the 'electionCandidateMetrics' section of the replSetGetStatus response has a
-    // 'targetCatchupOpTime' field once heartbeats have updated the target opTime for catchup, and
-    // that it has the correct value.
+    // Check that the 'electionCandidateMetrics' section of the replSetGetStatus response has
+    // 'targetCatchupOpTime' field once the primary is caught up, and that it has the correct
+    // values.
     res = assert.commandWorked(stepUpResults.newPrimary.adminCommand({replSetGetStatus: 1}));
     assert(res.electionCandidateMetrics,
            () => "Response should have an 'electionCandidateMetrics' field: " + tojson(res));
@@ -203,7 +170,7 @@
     // longer be blacklisted by the new primary if it happened to be at the beginning of the test.
     reconfigElectionAndCatchUpTimeout(3 * 60 * 1000, conf.settings.catchUpTimeoutMillis);
 
-    stepUpResults = stopReplicationAndEnforceNewPrimaryToCatchUp();
+    stepUpResults = stopReplicationAndEnforceNewPrimaryToCatchUp(rst, rst.getSecondaries()[0]);
 
     // Disable fail point on the voter. Wait until it catches up with the old primary.
     restartServerReplication(stepUpResults.voter);
@@ -234,7 +201,7 @@
     // Reconfig to make the catchup timeout shorter.
     reconfigElectionAndCatchUpTimeout(conf.settings.electionTimeoutMillis, 10 * 1000);
 
-    stepUpResults = stopReplicationAndEnforceNewPrimaryToCatchUp();
+    stepUpResults = stopReplicationAndEnforceNewPrimaryToCatchUp(rst, rst.getSecondaries()[0]);
     // Wait until the new primary completes the transition to primary and writes a no-op.
     checkLog.contains(stepUpResults.newPrimary, "Catchup timed out after becoming primary");
     restartServerReplication(stepUpResults.newPrimary);
@@ -262,7 +229,7 @@
     jsTest.log("Case 5: The primary needs to catch up with no timeout, then gets aborted.");
     // Reconfig to make the catchup timeout infinite.
     reconfigElectionAndCatchUpTimeout(conf.settings.electionTimeoutMillis, -1);
-    stepUpResults = stopReplicationAndEnforceNewPrimaryToCatchUp();
+    stepUpResults = stopReplicationAndEnforceNewPrimaryToCatchUp(rst, rst.getSecondaries()[0]);
 
     initialNewPrimaryStatus =
         assert.commandWorked(stepUpResults.newPrimary.adminCommand({serverStatus: 1}));
@@ -295,7 +262,7 @@
     initialNewPrimaryStatus =
         assert.commandWorked(rst.getSecondaries()[0].adminCommand({serverStatus: 1}));
 
-    var stepUpResults = stopReplicationAndEnforceNewPrimaryToCatchUp();
+    var stepUpResults = stopReplicationAndEnforceNewPrimaryToCatchUp(rst, rst.getSecondaries()[0]);
 
     // Step-down command should abort catchup.
     try {

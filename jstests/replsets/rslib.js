@@ -14,6 +14,7 @@ var reInitiateWithoutThrowingOnAbortedMember;
 var awaitRSClientHosts;
 var getLastOpTime;
 var setLogVerbosity;
+var stopReplicationAndEnforceNewPrimaryToCatchUp;
 
 (function() {
     "use strict";
@@ -461,4 +462,37 @@ var setLogVerbosity;
         });
     };
 
+    /**
+     * Stop replication on secondaries, do writes and step up the node that was passed in.
+     *
+     * The old primary has extra writes that are not replicated to the other nodes yet,
+     * but the new primary steps up, getting the vote from the the third node "voter".
+     */
+    stopReplicationAndEnforceNewPrimaryToCatchUp = function(rst, node) {
+        // Write documents that cannot be replicated to secondaries in time.
+        const oldSecondaries = rst.getSecondaries();
+        const oldPrimary = rst.getPrimary();
+
+        stopServerReplication(oldSecondaries);
+        for (let i = 0; i < 3; i++) {
+            assert.commandWorked(oldPrimary.getDB("test").foo.insert({x: i}));
+        }
+
+        const latestOpOnOldPrimary = getLatestOp(oldPrimary);
+
+        // New primary wins immediately, but needs to catch up.
+        const newPrimary = rst.stepUpNoAwaitReplication(node);
+        const latestOpOnNewPrimary = getLatestOp(newPrimary);
+        // Check this node is not writable.
+        assert.eq(newPrimary.getDB("test").isMaster().ismaster, false);
+
+        return {
+            oldSecondaries: oldSecondaries,
+            oldPrimary: oldPrimary,
+            newPrimary: newPrimary,
+            voter: oldSecondaries[1],
+            latestOpOnOldPrimary: latestOpOnOldPrimary,
+            latestOpOnNewPrimary: latestOpOnNewPrimary
+        };
+    };
 }());

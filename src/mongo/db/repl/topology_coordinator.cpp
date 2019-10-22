@@ -602,7 +602,7 @@ void TopologyCoordinator::prepareFreshResponse(const ReplicationCoordinator::Rep
         weAreFresher = true;
     }
     // check not only our own optime, but any other member we can reach
-    else if (OpTime(args.opTime, _term) < _latestKnownOpTime()) {
+    else if (OpTime(args.opTime, _term) < latestKnownOpTime()) {
         weAreFresher = true;
     }
     response->appendDate("opTime",
@@ -812,7 +812,8 @@ Status TopologyCoordinator::prepareHeartbeatResponse(Date_t now,
     const OpTime lastOpDurable = getMyLastDurableOpTime();
 
     // Are we electable
-    response->setElectable(!_getMyUnelectableReason(now, StartElectionReason::kElectionTimeout));
+    response->setElectable(
+        !_getMyUnelectableReason(now, StartElectionReasonEnum::kElectionTimeout));
 
     // Heartbeat status message
     response->setHbMsg(_getHbmsg(now));
@@ -1263,7 +1264,8 @@ bool TopologyCoordinator::setMemberAsDown(Date_t now, const int memberIndex) {
     MemberData& hbData = _memberData.at(memberIndex);
     hbData.setDownValues(now, "no response within election timeout period");
 
-    if (CannotSeeMajority & _getMyUnelectableReason(now, StartElectionReason::kElectionTimeout)) {
+    if (CannotSeeMajority &
+        _getMyUnelectableReason(now, StartElectionReasonEnum::kElectionTimeout)) {
         return true;
     }
 
@@ -1553,7 +1555,7 @@ HeartbeatResponseAction TopologyCoordinator::_updatePrimaryFromHBData(
 
             if ((highestPriorityMember.getPriority() > currentPrimaryMember.getPriority()) &&
                 _isOpTimeCloseEnoughToLatestToElect(highestPriorityMemberOptime)) {
-                const OpTime latestOpTime = _latestKnownOpTime();
+                const OpTime latestOpTime = latestKnownOpTime();
 
                 if (_iAmPrimary()) {
                     if (_leaderMode == LeaderMode::kSteppingDown) {
@@ -1656,7 +1658,7 @@ HeartbeatResponseAction TopologyCoordinator::_updatePrimaryFromHBData(
     // stepdown if we can't.
     if (_iAmPrimary()) {
         if (CannotSeeMajority &
-            _getMyUnelectableReason(now, StartElectionReason::kElectionTimeout)) {
+            _getMyUnelectableReason(now, StartElectionReasonEnum::kElectionTimeout)) {
             if (_leaderMode == LeaderMode::kSteppingDown) {
                 return HeartbeatResponseAction::makeNoAction();
             }
@@ -1690,7 +1692,7 @@ HeartbeatResponseAction TopologyCoordinator::_updatePrimaryFromHBData(
         LOG(2) << "TopologyCoordinator::_updatePrimaryFromHBData - " << status.reason();
         return HeartbeatResponseAction::makeNoAction();
     }
-    fassert(28816, becomeCandidateIfElectable(now, StartElectionReason::kElectionTimeout));
+    fassert(28816, becomeCandidateIfElectable(now, StartElectionReasonEnum::kElectionTimeout));
     return HeartbeatResponseAction::makeElectAction();
 }
 
@@ -1705,7 +1707,7 @@ Status TopologyCoordinator::checkShouldStandForElection(Date_t now) const {
     }
 
     const UnelectableReasonMask unelectableReason =
-        _getMyUnelectableReason(now, StartElectionReason::kElectionTimeout);
+        _getMyUnelectableReason(now, StartElectionReasonEnum::kElectionTimeout);
     if (NotCloseEnoughToLatestOptime & unelectableReason) {
         return {ErrorCodes::NodeNotElectable,
                 str::stream() << "Not standing for election because "
@@ -1713,7 +1715,7 @@ Status TopologyCoordinator::checkShouldStandForElection(Date_t now) const {
                               << "; my last optime is "
                               << getMyLastAppliedOpTime().toString()
                               << " and the newest is "
-                              << _latestKnownOpTime().toString()};
+                              << latestKnownOpTime().toString()};
     }
     if (unelectableReason) {
         return {ErrorCodes::NodeNotElectable,
@@ -1769,13 +1771,13 @@ int TopologyCoordinator::_findHealthyPrimaryOfEqualOrGreaterPriority(
 }
 
 bool TopologyCoordinator::_isOpTimeCloseEnoughToLatestToElect(const OpTime& otherOpTime) const {
-    const OpTime latestKnownOpTime = _latestKnownOpTime();
+    const OpTime ourLatestKnownOpTime = latestKnownOpTime();
     // Use addition instead of subtraction to avoid overflow.
-    return otherOpTime.getSecs() + 10 >= (latestKnownOpTime.getSecs());
+    return otherOpTime.getSecs() + 10 >= (ourLatestKnownOpTime.getSecs());
 }
 
 bool TopologyCoordinator::_amIFreshEnoughForPriorityTakeover() const {
-    const OpTime latestKnownOpTime = _latestKnownOpTime();
+    const OpTime ourLatestKnownOpTime = latestKnownOpTime();
 
     // Rules are:
     // - If the terms don't match, we don't call for priority takeover.
@@ -1789,22 +1791,23 @@ bool TopologyCoordinator::_amIFreshEnoughForPriorityTakeover() const {
     // passes the timestamp component of the last oplog entry.
 
     const OpTime ourLastOpApplied = getMyLastAppliedOpTime();
-    if (ourLastOpApplied.getTerm() != latestKnownOpTime.getTerm()) {
+    if (ourLastOpApplied.getTerm() != ourLatestKnownOpTime.getTerm()) {
         return false;
     }
 
-    if (ourLastOpApplied.getTimestamp().getSecs() != latestKnownOpTime.getTimestamp().getSecs()) {
+    if (ourLastOpApplied.getTimestamp().getSecs() !=
+        ourLatestKnownOpTime.getTimestamp().getSecs()) {
         return ourLastOpApplied.getTimestamp().getSecs() + priorityTakeoverFreshnessWindowSeconds >=
-            latestKnownOpTime.getTimestamp().getSecs();
+            ourLatestKnownOpTime.getTimestamp().getSecs();
     } else {
         return ourLastOpApplied.getTimestamp().getInc() + 1000 >=
-            latestKnownOpTime.getTimestamp().getInc();
+            ourLatestKnownOpTime.getTimestamp().getInc();
     }
 }
 
 bool TopologyCoordinator::_amIFreshEnoughForCatchupTakeover() const {
 
-    const OpTime latestKnownOpTime = _latestKnownOpTime();
+    const OpTime ourLatestKnownOpTime = latestKnownOpTime();
 
     // Rules are:
     // - We must have the freshest optime of all the up nodes.
@@ -1816,7 +1819,7 @@ bool TopologyCoordinator::_amIFreshEnoughForCatchupTakeover() const {
     // There is no point to a catchup takeover if we aren't the freshest node because
     // another node would immediately perform another catchup takeover when we become primary.
     const OpTime ourLastOpApplied = getMyLastAppliedOpTime();
-    if (ourLastOpApplied < latestKnownOpTime) {
+    if (ourLastOpApplied < ourLatestKnownOpTime) {
         return false;
     }
 
@@ -1845,34 +1848,6 @@ bool TopologyCoordinator::_iAmPrimary() const {
     return false;
 }
 
-OpTime TopologyCoordinator::_latestKnownOpTime() const {
-    OpTime latest = getMyLastAppliedOpTime();
-    for (std::vector<MemberData>::const_iterator it = _memberData.begin(); it != _memberData.end();
-         ++it) {
-        // Ignore self
-        // TODO(russotto): Simplify when heartbeat and spanning tree times are combined.
-        if (it->isSelf()) {
-            continue;
-        }
-        // Ignore down members
-        if (!it->up()) {
-            continue;
-        }
-        // Ignore removed nodes (not in config, so not valid).
-        if (it->getState().removed()) {
-            continue;
-        }
-
-        OpTime optime = it->getHeartbeatAppliedOpTime();
-
-        if (optime > latest) {
-            latest = optime;
-        }
-    }
-
-    return latest;
-}
-
 bool TopologyCoordinator::_isMemberHigherPriority(int memberOneIndex, int memberTwoIndex) const {
     if (memberOneIndex == -1)
         return false;
@@ -1888,7 +1863,7 @@ int TopologyCoordinator::_getHighestPriorityElectableIndex(Date_t now) const {
     int maxIndex = -1;
     for (int currentIndex = 0; currentIndex < _rsConfig.getNumMembers(); currentIndex++) {
         UnelectableReasonMask reason = currentIndex == _selfIndex
-            ? _getMyUnelectableReason(now, StartElectionReason::kElectionTimeout)
+            ? _getMyUnelectableReason(now, StartElectionReasonEnum::kElectionTimeout)
             : _getUnelectableReason(currentIndex);
         if (None == reason && _isMemberHigherPriority(currentIndex, maxIndex)) {
             maxIndex = currentIndex;
@@ -2564,7 +2539,7 @@ TopologyCoordinator::UnelectableReasonMask TopologyCoordinator::_getUnelectableR
 }
 
 TopologyCoordinator::UnelectableReasonMask TopologyCoordinator::_getMyUnelectableReason(
-    const Date_t now, StartElectionReason reason) const {
+    const Date_t now, StartElectionReasonEnum reason) const {
     UnelectableReasonMask result = None;
     const OpTime lastApplied = getMyLastAppliedOpTime();
     if (lastApplied.isNull()) {
@@ -2605,12 +2580,12 @@ TopologyCoordinator::UnelectableReasonMask TopologyCoordinator::_getMyUnelectabl
     } else {
         // Election rules only for protocol version 1.
         invariant(_rsConfig.getProtocolVersion() == 1);
-        if (reason == StartElectionReason::kPriorityTakeover &&
+        if (reason == StartElectionReasonEnum::kPriorityTakeover &&
             !_amIFreshEnoughForPriorityTakeover()) {
             result |= NotCloseEnoughToLatestForPriorityTakeover;
         }
 
-        if (reason == StartElectionReason::kCatchupTakeover &&
+        if (reason == StartElectionReasonEnum::kCatchupTakeover &&
             !_amIFreshEnoughForCatchupTakeover()) {
             result |= NotFreshEnoughForCatchupTakeover;
         }
@@ -3425,7 +3400,7 @@ void TopologyCoordinator::setPrimaryIndex(long long primaryIndex) {
 }
 
 Status TopologyCoordinator::becomeCandidateIfElectable(const Date_t now,
-                                                       StartElectionReason reason) {
+                                                       StartElectionReasonEnum reason) {
     if (_role == Role::kLeader) {
         return {ErrorCodes::NodeNotElectable, "Not standing for election again; already primary"};
     }
@@ -3456,6 +3431,33 @@ void TopologyCoordinator::restartHeartbeats() {
     for (auto& hb : _memberData) {
         hb.restart();
     }
+}
+
+OpTime TopologyCoordinator::latestKnownOpTime() const {
+    OpTime latest = getMyLastAppliedOpTime();
+    for (std::vector<MemberData>::const_iterator it = _memberData.begin(); it != _memberData.end();
+         ++it) {
+        // Ignore self
+        if (it->isSelf()) {
+            continue;
+        }
+        // Ignore down members
+        if (!it->up()) {
+            continue;
+        }
+        // Ignore removed nodes (not in config, so not valid).
+        if (it->getState().removed()) {
+            continue;
+        }
+
+        OpTime optime = it->getHeartbeatAppliedOpTime();
+
+        if (optime > latest) {
+            latest = optime;
+        }
+    }
+
+    return latest;
 }
 
 boost::optional<OpTime> TopologyCoordinator::latestKnownOpTimeSinceHeartbeatRestart() const {

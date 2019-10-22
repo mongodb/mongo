@@ -40,6 +40,18 @@ imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/db/repl/replication_types.idl"
 
+enums:
+    StartElectionReason:
+        description: "Reason why a node called for an election"
+        type: string
+        values:
+            kElectionTimeout: "electionTimeout"
+            kPriorityTakeover: "priorityTakeover"
+            kStepUpRequest: "stepUpRequest"
+            kStepUpRequestSkipDryRun: "stepUpRequestSkipDryRun"
+            kCatchupTakeover: "catchupTakeover"
+            kSingleNodePromptElection: "singleNodePromptElection"
+
 types:
     ElectionReasonCounter:
         bson_serialization_type: any
@@ -121,22 +133,60 @@ structs:
                               replSetAbortPrimaryCatchUp command"
                 type: long
                 default: 0
+            averageCatchUpOps:
+                description: "Average number of ops applied during catchup"
+                type: double
+                default: 0.0
 
     ElectionCandidateMetrics:
         description: "Stores metrics that are specific to the last election in which the node was a
                       candidate"
         strict: true
         fields:
+            lastElectionReason:
+                description: "Reason why the node called for the election"
+                type: StartElectionReason
             lastElectionDate:
-                description: "Time the node called the dry run election, or the actual election if
-                              it skipped dry run"
+                description: "Time the node called for the election"
                 type: date
+            termAtElection:
+                description: "New term at the time of election"
+                type: long
+            lastCommittedOpTimeAtElection:
+                description: "Last OpTime the node committed before calling the election"
+                type: optime
+            lastSeenOpTimeAtElection:
+                description: "Last OpTime the node saw before calling the election"
+                type: optime
+            numVotesNeeded:
+                description: "Number of votes the node needed to win the election"
+                type: int
+            priorityAtElection:
+                description: "Priority of the node at the time of the election"
+                type: double
+            electionTimeoutMillis:
+                description: "Timeout duration before a node initiates a new election"
+                type: long
+            priorPrimaryMemberId:
+                description: "MemberId of the prior primary, according to the node. Not set if
+                              there was no prior primary"
+                type: int
+                optional: true
             targetCatchupOpTime:
                 description: "The node's target opTime for catchup"
                 type: optime
                 optional: true
+            numCatchUpOps:
+                description: "Number of ops applied during catchup when the primary successfully
+                              catches up"
+                type: long
+                optional: true
             newTermStartDate:
                 description: "Time the new term oplog entry was written"
+                type: date
+                optional: true
+            wMajorityWriteAvailabilityDate:
+                description: "Time w:majority write concern is satisfied for new term oplog entry"
                 type: date
                 optional: true
 

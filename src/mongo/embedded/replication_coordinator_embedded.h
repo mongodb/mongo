@@ -233,9 +233,13 @@ public:
     repl::ReplSettings::IndexPrefetchConfig getIndexPrefetchConfig() const override;
     void setIndexPrefetchConfig(const repl::ReplSettings::IndexPrefetchConfig) override;
 
+    virtual void createWMajorityWriteAvailabilityDateWaiter(repl::OpTime opTime) override;
+
     Status stepUpIfEligible(bool skipDryRun) override;
 
     Status abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) override;
+
+    void incrementNumCatchUpOpsIfCatchingUp(int numOps) override;
 
     void signalDropPendingCollectionsRemovedFromStorage() final;
 

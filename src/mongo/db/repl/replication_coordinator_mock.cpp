@@ -462,6 +462,10 @@ size_t ReplicationCoordinatorMock::getNumUncommittedSnapshots() {
     return 0;
 }
 
+void ReplicationCoordinatorMock::createWMajorityWriteAvailabilityDateWaiter(OpTime opTime) {
+    return;
+}
+
 WriteConcernOptions ReplicationCoordinatorMock::populateUnsetWriteConcernOptionsSyncMode(
     WriteConcernOptions wc) {
     if (wc.syncMode == WriteConcernOptions::SyncMode::UNSET) {
@@ -491,6 +495,10 @@ void ReplicationCoordinatorMock::alwaysAllowWrites(bool allowWrites) {
 
 Status ReplicationCoordinatorMock::abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) {
     return Status::OK();
+}
+
+void ReplicationCoordinatorMock::incrementNumCatchUpOpsIfCatchingUp(int numOps) {
+    return;
 }
 
 void ReplicationCoordinatorMock::signalDropPendingCollectionsRemovedFromStorage() {}

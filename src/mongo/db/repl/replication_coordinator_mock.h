@@ -255,6 +255,8 @@ public:
 
     virtual size_t getNumUncommittedSnapshots() override;
 
+    virtual void createWMajorityWriteAvailabilityDateWaiter(OpTime opTime) override;
+
     virtual WriteConcernOptions populateUnsetWriteConcernOptionsSyncMode(
         WriteConcernOptions wc) override;
 
@@ -286,6 +288,8 @@ public:
     }
 
     virtual Status abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) override;
+
+    virtual void incrementNumCatchUpOpsIfCatchingUp(int numOps) override;
 
     void signalDropPendingCollectionsRemovedFromStorage() final;
 

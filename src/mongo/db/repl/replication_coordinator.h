@@ -814,6 +814,12 @@ public:
     virtual size_t getNumUncommittedSnapshots() = 0;
 
     /**
+     * Creates a CallbackWaiter that waits for w:majority write concern to be satisfied up to opTime
+     * before setting the 'wMajorityWriteAvailabilityDate' election candidate metric.
+     */
+    virtual void createWMajorityWriteAvailabilityDateWaiter(OpTime opTime) = 0;
+
+    /**
      * Returns a new WriteConcernOptions based on "wc" but with UNSET syncMode reset to JOURNAL or
      * NONE based on our rsConfig.
      */
@@ -840,6 +846,12 @@ public:
      * Abort catchup if the node is in catchup mode.
      */
     virtual Status abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) = 0;
+
+    /**
+     * Increment the counter for the number of ops applied during catchup if the node is in catchup
+     * mode.
+     */
+    virtual void incrementNumCatchUpOpsIfCatchingUp(int numOps) = 0;
 
     /**
      * Signals that drop pending collections have been removed from storage.

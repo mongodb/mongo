@@ -330,6 +330,10 @@ Status ReplicationCoordinatorEmbedded::processReplSetFresh(const ReplSetFreshArg
     UASSERT_NOT_IMPLEMENTED;
 }
 
+void ReplicationCoordinatorEmbedded::incrementNumCatchUpOpsIfCatchingUp(int numOps) {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 Status ReplicationCoordinatorEmbedded::processReplSetElect(const ReplSetElectArgs&,
                                                            BSONObjBuilder*) {
     UASSERT_NOT_IMPLEMENTED;
@@ -425,6 +429,10 @@ void ReplicationCoordinatorEmbedded::waitUntilSnapshotCommitted(OperationContext
 }
 
 size_t ReplicationCoordinatorEmbedded::getNumUncommittedSnapshots() {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
+void ReplicationCoordinatorEmbedded::createWMajorityWriteAvailabilityDateWaiter(OpTime opTime) {
     UASSERT_NOT_IMPLEMENTED;
 }
 

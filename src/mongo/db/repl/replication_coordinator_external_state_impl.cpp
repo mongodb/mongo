@@ -507,6 +507,9 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
 
     ReplicationMetrics::get(opCtx).setNewTermStartDate(newTermStartDate);
 
+    auto replCoord = ReplicationCoordinator::get(opCtx);
+    replCoord->createWMajorityWriteAvailabilityDateWaiter(opTimeToReturn);
+
     _shardingOnTransitionToPrimaryHook(opCtx);
     _dropAllTempCollections(opCtx);
 

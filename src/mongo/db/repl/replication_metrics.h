@@ -33,6 +33,7 @@
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/concurrency/with_lock.h"
 
 namespace mongo {
 namespace repl {
@@ -49,41 +50,51 @@ public:
     ~ReplicationMetrics();
 
     // Election metrics
-    void incrementNumElectionsCalledForReason(TopologyCoordinator::StartElectionReason reason);
-    void incrementNumElectionsSuccessfulForReason(TopologyCoordinator::StartElectionReason reason);
+    void incrementNumElectionsCalledForReason(StartElectionReasonEnum reason);
+    void incrementNumElectionsSuccessfulForReason(StartElectionReasonEnum reason);
     void incrementNumStepDownsCausedByHigherTerm();
     void incrementNumCatchUps();
     void incrementNumCatchUpsConcludedForReason(
         ReplicationCoordinator::PrimaryCatchUpConclusionReason reason);
 
-    int getNumStepUpCmdsCalled_forTesting();
-    int getNumPriorityTakeoversCalled_forTesting();
-    int getNumCatchUpTakeoversCalled_forTesting();
-    int getNumElectionTimeoutsCalled_forTesting();
-    int getNumFreezeTimeoutsCalled_forTesting();
-    int getNumStepUpCmdsSuccessful_forTesting();
-    int getNumPriorityTakeoversSuccessful_forTesting();
-    int getNumCatchUpTakeoversSuccessful_forTesting();
-    int getNumElectionTimeoutsSuccessful_forTesting();
-    int getNumFreezeTimeoutsSuccessful_forTesting();
-    int getNumStepDownsCausedByHigherTerm_forTesting();
-    int getNumCatchUps_forTesting();
-    int getNumCatchUpsSucceeded_forTesting();
-    int getNumCatchUpsAlreadyCaughtUp_forTesting();
-    int getNumCatchUpsSkipped_forTesting();
-    int getNumCatchUpsTimedOut_forTesting();
-    int getNumCatchUpsFailedWithError_forTesting();
-    int getNumCatchUpsFailedWithNewTerm_forTesting();
-    int getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_forTesting();
+    long getNumStepUpCmdsCalled_forTesting();
+    long getNumPriorityTakeoversCalled_forTesting();
+    long getNumCatchUpTakeoversCalled_forTesting();
+    long getNumElectionTimeoutsCalled_forTesting();
+    long getNumFreezeTimeoutsCalled_forTesting();
+    long getNumStepUpCmdsSuccessful_forTesting();
+    long getNumPriorityTakeoversSuccessful_forTesting();
+    long getNumCatchUpTakeoversSuccessful_forTesting();
+    long getNumElectionTimeoutsSuccessful_forTesting();
+    long getNumFreezeTimeoutsSuccessful_forTesting();
+    long getNumStepDownsCausedByHigherTerm_forTesting();
+    long getNumCatchUps_forTesting();
+    long getNumCatchUpsSucceeded_forTesting();
+    long getNumCatchUpsAlreadyCaughtUp_forTesting();
+    long getNumCatchUpsSkipped_forTesting();
+    long getNumCatchUpsTimedOut_forTesting();
+    long getNumCatchUpsFailedWithError_forTesting();
+    long getNumCatchUpsFailedWithNewTerm_forTesting();
+    long getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_forTesting();
 
     // Election candidate metrics
 
     // All the election candidate metrics that should be set when a node calls an election are set
     // in this one function, so that the 'electionCandidateMetrics' section of replSetStatus shows a
     // consistent state.
-    void setElectionCandidateMetrics(Date_t lastElectionDate);
+    void setElectionCandidateMetrics(const StartElectionReasonEnum reason,
+                                     const Date_t lastElectionDate,
+                                     const long long termAtElection,
+                                     const OpTime lastCommittedOpTime,
+                                     const OpTime lastSeenOpTime,
+                                     const int numVotesNeeded,
+                                     const double priorityAtElection,
+                                     const Milliseconds electionTimeoutMillis,
+                                     const boost::optional<int> priorPrimary);
     void setTargetCatchupOpTime(OpTime opTime);
+    void setNumCatchUpOps(int numCatchUpOps);
     void setNewTermStartDate(Date_t newTermStartDate);
+    void setWMajorityWriteAvailabilityDate(Date_t wMajorityWriteAvailabilityDate);
 
     boost::optional<OpTime> getTargetCatchupOpTime_forTesting();
 
@@ -94,12 +105,18 @@ public:
 private:
     class ElectionMetricsSSS;
 
+    void _updateAverageCatchUpOps(WithLock lk);
+
     mutable stdx::mutex _mutex;
     ElectionMetrics _electionMetrics;
     ElectionCandidateMetrics _electionCandidateMetrics;
     ElectionParticipantMetrics _electionParticipantMetrics;
 
     bool _nodeIsCandidateOrPrimary = false;
+
+    // This field is a double so that the division result in _updateAverageCatchUpOps will be a
+    // double without any casting.
+    double _totalNumCatchUpOps = 0.0;
 };
 
 }  // namespace repl

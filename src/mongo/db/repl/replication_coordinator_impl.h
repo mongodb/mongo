@@ -304,6 +304,8 @@ public:
 
     virtual size_t getNumUncommittedSnapshots() override;
 
+    virtual void createWMajorityWriteAvailabilityDateWaiter(OpTime opTime) override;
+
     virtual WriteConcernOptions populateUnsetWriteConcernOptionsSyncMode(
         WriteConcernOptions wc) override;
 
@@ -313,6 +315,8 @@ public:
     virtual Status stepUpIfEligible(bool skipDryRun) override;
 
     virtual Status abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) override;
+
+    virtual void incrementNumCatchUpOpsIfCatchingUp(int numOps) override;
 
     void signalDropPendingCollectionsRemovedFromStorage() final;
 
@@ -556,6 +560,8 @@ private:
         void abort_inlock(PrimaryCatchUpConclusionReason reason);
         // Heartbeat calls this function to update the target optime.
         void signalHeartbeatUpdate_inlock();
+        // Increment the counter for the number of ops applied during catchup.
+        void incrementNumCatchUpOps_inlock(int numOps);
 
     private:
         ReplicationCoordinatorImpl* _repl;  // Not owned.
@@ -564,9 +570,17 @@ private:
         // Handle to a Waiter that contains the current target optime to reach after which
         // we can exit catchup mode.
         std::unique_ptr<CallbackWaiter> _waiter;
+        // Counter for the number of ops applied during catchup.
+        int _numCatchUpOps;
     };
 
     void _resetMyLastOpTimes_inlock();
+
+    /**
+     * Returns a new WriteConcernOptions based on "wc" but with UNSET syncMode reset to JOURNAL or
+     * NONE based on our rsConfig.
+     */
+    WriteConcernOptions _populateUnsetWriteConcernOptionsSyncMode_inlock(WriteConcernOptions wc);
 
     /**
      * Returns the _writeConcernMajorityJournalDefault of our current _rsConfig.
@@ -827,8 +841,8 @@ private:
      *      _onVoteRequestComplete()
      */
     void _startElectSelf_inlock();
-    void _startElectSelfV1_inlock(TopologyCoordinator::StartElectionReason reason);
-    void _startElectSelfV1(TopologyCoordinator::StartElectionReason reason);
+    void _startElectSelfV1_inlock(StartElectionReasonEnum reason);
+    void _startElectSelfV1(StartElectionReasonEnum reason);
 
     /**
      * Callback called when the FreshnessChecker has completed; checks the results and
@@ -848,15 +862,13 @@ private:
      * "originalTerm" was the term during which the dry run began, if the term has since
      * changed, do not run for election.
      */
-    void _processDryRunResult(long long originalTerm,
-                              TopologyCoordinator::StartElectionReason reason);
+    void _processDryRunResult(long long originalTerm, StartElectionReasonEnum reason);
 
     /**
      * Begins executing a real election. This is called either a successful dry run, or when the
      * dry run was skipped (which may be specified for a ReplSetStepUp).
      */
-    void _startRealElection_inlock(long long originalTerm,
-                                   TopologyCoordinator::StartElectionReason reason);
+    void _startRealElection_inlock(long long originalTerm, StartElectionReasonEnum reason);
 
     /**
      * Writes the last vote in persistent storage after completing dry run successfully.
@@ -864,13 +876,12 @@ private:
      */
     void _writeLastVoteForMyElection(LastVote lastVote,
                                      const executor::TaskExecutor::CallbackArgs& cbData,
-                                     TopologyCoordinator::StartElectionReason reason);
+                                     StartElectionReasonEnum reason);
 
     /**
      * Starts VoteRequester to run the real election when last vote write has completed.
      */
-    void _startVoteRequester_inlock(long long newTerm,
-                                    TopologyCoordinator::StartElectionReason reason);
+    void _startVoteRequester_inlock(long long newTerm, StartElectionReasonEnum reason);
 
     /**
      * Callback called when the VoteRequester has completed; checks the results and
@@ -878,8 +889,7 @@ private:
      * "originalTerm" was the term during which the election began, if the term has since
      * changed, do not step up as primary.
      */
-    void _onVoteRequestComplete(long long originalTerm,
-                                TopologyCoordinator::StartElectionReason reason);
+    void _onVoteRequestComplete(long long originalTerm, StartElectionReasonEnum reason);
 
     /**
      * Callback called after a random delay, to prevent repeated election ties.
@@ -1069,7 +1079,7 @@ private:
     /**
      * Callback which starts an election if this node is electable and using protocolVersion 1.
      */
-    void _startElectSelfIfEligibleV1(TopologyCoordinator::StartElectionReason reason);
+    void _startElectSelfIfEligibleV1(StartElectionReasonEnum reason);
 
     /**
      * Resets the term of last vote to 0 to prevent any node from voting for term 0.
@@ -1196,6 +1206,9 @@ private:
     // list of information about clients waiting for a particular opTime.
     // Does *not* own the WaiterInfos.
     WaiterList _opTimeWaiterList;  // (M)
+
+    // Waiter waiting on w:majority write availability.
+    std::unique_ptr<CallbackWaiter> _wMajorityWriteAvailabilityWaiter;  // (M)
 
     // Set to true when we are in the process of shutting down replication.
     bool _inShutdown;  // (M)

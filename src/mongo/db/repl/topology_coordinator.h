@@ -35,8 +35,11 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/repl/last_vote.h"
+#include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
+#include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_metrics_gen.h"
 #include "mongo/db/repl/split_horizon.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/server_options.h"
@@ -677,19 +680,10 @@ public:
      */
     int getCurrentPrimaryIndex() const;
 
-    enum StartElectionReason {
-        kElectionTimeout,
-        kPriorityTakeover,
-        kStepUpRequest,
-        kStepUpRequestSkipDryRun,
-        kCatchupTakeover,
-        kSingleNodePromptElection
-    };
-
     /**
      * Transitions to the candidate role if the node is electable.
      */
-    Status becomeCandidateIfElectable(const Date_t now, StartElectionReason reason);
+    Status becomeCandidateIfElectable(const Date_t now, StartElectionReasonEnum reason);
 
     /**
      * Updates the storage engine read committed support in the TopologyCoordinator options after
@@ -701,6 +695,9 @@ public:
      * Reset the booleans to record the last heartbeat restart.
      */
     void restartHeartbeats();
+
+    // Scans through all members that are 'up' and returns the latest known optime.
+    OpTime latestKnownOpTime() const;
 
     /**
      * Scans through all members that are 'up' and return the latest known optime, if we have
@@ -832,7 +829,7 @@ private:
 
     // Returns reason why "self" member is unelectable
     UnelectableReasonMask _getMyUnelectableReason(const Date_t now,
-                                                  StartElectionReason reason) const;
+                                                  StartElectionReasonEnum reason) const;
 
     // Returns reason why memberIndex is unelectable
     UnelectableReasonMask _getUnelectableReason(int memberIndex) const;
@@ -842,9 +839,6 @@ private:
 
     // Return true if we are currently primary
     bool _iAmPrimary() const;
-
-    // Scans through all members that are 'up' and return the latest known optime.
-    OpTime _latestKnownOpTime() const;
 
     // Scans the electable set and returns the highest priority member index
     int _getHighestPriorityElectableIndex(Date_t now) const;

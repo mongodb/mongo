@@ -868,6 +868,7 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx) {
         }
         _replicationWaiterList.signalAll_inlock();
         _opTimeWaiterList.signalAll_inlock();
+        _wMajorityWriteAvailabilityWaiter.reset();
         _currentCommittedSnapshotCond.notify_all();
         _initialSyncer.swap(initialSyncerCopy);
     }
@@ -1873,6 +1874,7 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
 
     // Clear the node's election candidate metrics since it is no longer primary.
     ReplicationMetrics::get(opCtx).clearElectionCandidateMetrics();
+    _wMajorityWriteAvailabilityWaiter.reset();
 
     // Stepdown success!
     onExitGuard.Dismiss();
@@ -1933,8 +1935,7 @@ void ReplicationCoordinatorImpl::_handleTimePassing(
     // For election protocol v1, call _startElectSelfIfEligibleV1 to avoid race
     // against other elections caused by events like election timeout, replSetStepUp etc.
     if (isV1ElectionProtocol()) {
-        _startElectSelfIfEligibleV1(
-            TopologyCoordinator::StartElectionReason::kSingleNodePromptElection);
+        _startElectSelfIfEligibleV1(StartElectionReasonEnum::kSingleNodePromptElection);
         return;
     }
 
@@ -2304,8 +2305,7 @@ Status ReplicationCoordinatorImpl::processReplSetFreeze(int secs, BSONObjBuilder
         result.getValue()) {
         // For election protocol v1, call _startElectSelfIfEligibleV1 to avoid race
         // against other elections caused by events like election timeout, replSetStepUp etc.
-        _startElectSelfIfEligibleV1(
-            TopologyCoordinator::StartElectionReason::kSingleNodePromptElection);
+        _startElectSelfIfEligibleV1(StartElectionReasonEnum::kSingleNodePromptElection);
     }
 
     return Status::OK();
@@ -2696,6 +2696,7 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock(
 
         // Clear the node's election candidate metrics since it is no longer primary.
         ReplicationMetrics::get(getGlobalServiceContext()).clearElectionCandidateMetrics();
+        _wMajorityWriteAvailabilityWaiter.reset();
     }
 
     if (_memberState.secondary() && !newState.primary()) {
@@ -2798,7 +2799,7 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
         case kActionStartSingleNodeElection:
             // In protocol version 1, single node replset will run an election instead of directly
             // calling _postWonElectionUpdateMemberState_inlock as in protocol version 0.
-            _startElectSelfV1(TopologyCoordinator::StartElectionReason::kElectionTimeout);
+            _startElectSelfV1(StartElectionReasonEnum::kElectionTimeout);
             break;
         default:
             severe() << "Unknown post member state update action " << static_cast<int>(action);
@@ -2884,6 +2885,8 @@ void ReplicationCoordinatorImpl::CatchupState::start_inlock() {
         return;
     }
     _timeoutCbh = status.getValue();
+
+    _numCatchUpOps = 0;
 }
 
 void ReplicationCoordinatorImpl::CatchupState::abort_inlock(PrimaryCatchUpConclusionReason reason) {
@@ -2919,6 +2922,9 @@ void ReplicationCoordinatorImpl::CatchupState::signalHeartbeatUpdate_inlock() {
     if (*targetOpTime <= myLastApplied) {
         log() << "Caught up to the latest optime known via heartbeats after becoming primary. "
               << "Target optime: " << *targetOpTime << ". My Last Applied: " << myLastApplied;
+        // Report the number of ops applied during catchup in replSetGetStatus once the primary is
+        // caught up.
+        ReplicationMetrics::get(getGlobalServiceContext()).setNumCatchUpOps(_numCatchUpOps);
         abort_inlock(PrimaryCatchUpConclusionReason::kAlreadyCaughtUp);
         return;
     }
@@ -2946,11 +2952,18 @@ void ReplicationCoordinatorImpl::CatchupState::signalHeartbeatUpdate_inlock() {
         if (*targetOpTime <= myLastApplied) {
             log() << "Caught up to the latest known optime successfully after becoming primary. "
                   << "Target optime: " << *targetOpTime << ". My Last Applied: " << myLastApplied;
+            // Report the number of ops applied during catchup in replSetGetStatus once the primary
+            // is caught up.
+            ReplicationMetrics::get(getGlobalServiceContext()).setNumCatchUpOps(_numCatchUpOps);
             abort_inlock(PrimaryCatchUpConclusionReason::kSucceeded);
         }
     };
     _waiter = stdx::make_unique<CallbackWaiter>(*targetOpTime, targetOpTimeCB);
     _repl->_opTimeWaiterList.add_inlock(_waiter.get());
+}
+
+void ReplicationCoordinatorImpl::CatchupState::incrementNumCatchUpOps_inlock(int numOps) {
+    _numCatchUpOps += numOps;
 }
 
 Status ReplicationCoordinatorImpl::abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) {
@@ -2965,6 +2978,13 @@ Status ReplicationCoordinatorImpl::abortCatchupIfNeeded(PrimaryCatchUpConclusion
         return Status::OK();
     }
     return Status(ErrorCodes::IllegalOperation, "The node is not in catch-up mode.");
+}
+
+void ReplicationCoordinatorImpl::incrementNumCatchUpOpsIfCatchingUp(int numOps) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    if (_catchupState) {
+        _catchupState->incrementNumCatchUpOps_inlock(numOps);
+    }
 }
 
 void ReplicationCoordinatorImpl::signalDropPendingCollectionsRemovedFromStorage() {
@@ -3104,6 +3124,22 @@ void ReplicationCoordinatorImpl::_wakeReadyWaiters_inlock() {
     _replicationWaiterList.signalIf_inlock([this](Waiter* waiter) {
         return _doneWaitingForReplication_inlock(waiter->opTime, *waiter->writeConcern);
     });
+
+    if (_wMajorityWriteAvailabilityWaiter) {
+        WriteConcernOptions kMajorityWriteConcern(
+            WriteConcernOptions::kMajority,
+            WriteConcernOptions::SyncMode::UNSET,
+            // The timeout isn't used by _doneWaitingForReplication_inlock.
+            WriteConcernOptions::kNoTimeout);
+        kMajorityWriteConcern =
+            _populateUnsetWriteConcernOptionsSyncMode_inlock(kMajorityWriteConcern);
+
+        if (_doneWaitingForReplication_inlock(_wMajorityWriteAvailabilityWaiter->opTime,
+                                              kMajorityWriteConcern)) {
+            _wMajorityWriteAvailabilityWaiter->notify_inlock();
+            _wMajorityWriteAvailabilityWaiter.reset();
+        }
+    }
 }
 
 Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(const UpdatePositionArgs& updates,
@@ -3666,6 +3702,15 @@ size_t ReplicationCoordinatorImpl::getNumUncommittedSnapshots() {
     return _uncommittedSnapshotsSize.load();
 }
 
+void ReplicationCoordinatorImpl::createWMajorityWriteAvailabilityDateWaiter(OpTime opTime) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    auto opTimeCB = [this, opTime]() {
+        ReplicationMetrics::get(getServiceContext())
+            .setWMajorityWriteAvailabilityDate(_replExecutor->now());
+    };
+    _wMajorityWriteAvailabilityWaiter = std::make_unique<CallbackWaiter>(opTime, opTimeCB);
+}
+
 MONGO_FAIL_POINT_DEFINE(disableSnapshotting);
 
 bool ReplicationCoordinatorImpl::_updateCommittedSnapshot_inlock(
@@ -3765,11 +3810,16 @@ EventHandle ReplicationCoordinatorImpl::_makeEvent() {
 
 WriteConcernOptions ReplicationCoordinatorImpl::populateUnsetWriteConcernOptionsSyncMode(
     WriteConcernOptions wc) {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    return _populateUnsetWriteConcernOptionsSyncMode_inlock(wc);
+}
 
+WriteConcernOptions ReplicationCoordinatorImpl::_populateUnsetWriteConcernOptionsSyncMode_inlock(
+    WriteConcernOptions wc) {
     WriteConcernOptions writeConcern(wc);
     if (writeConcern.syncMode == WriteConcernOptions::SyncMode::UNSET) {
         if (writeConcern.wMode == WriteConcernOptions::kMajority &&
-            getWriteConcernMajorityShouldJournal()) {
+            getWriteConcernMajorityShouldJournal_inlock()) {
             writeConcern.syncMode = WriteConcernOptions::SyncMode::JOURNAL;
         } else {
             writeConcern.syncMode = WriteConcernOptions::SyncMode::NONE;
@@ -3794,8 +3844,8 @@ Status ReplicationCoordinatorImpl::stepUpIfEligible(bool skipDryRun) {
                       "Step-up command is only supported by Protocol Version 1");
     }
 
-    auto reason = skipDryRun ? TopologyCoordinator::StartElectionReason::kStepUpRequestSkipDryRun
-                             : TopologyCoordinator::StartElectionReason::kStepUpRequest;
+    auto reason = skipDryRun ? StartElectionReasonEnum::kStepUpRequestSkipDryRun
+                             : StartElectionReasonEnum::kStepUpRequest;
     _startElectSelfIfEligibleV1(reason);
 
     EventHandle finishEvent;

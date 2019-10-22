@@ -286,9 +286,9 @@ void ReplicationCoordinatorImpl::_recoverFromElectionTie(
     if (!status.isOK()) {
         LOG(2) << "ReplicationCoordinatorImpl::_recoverFromElectionTie -- " << status.reason();
     } else {
-        fassert(28817,
-                _topCoord->becomeCandidateIfElectable(
-                    now, TopologyCoordinator::StartElectionReason::kElectionTimeout));
+        fassert(
+            28817,
+            _topCoord->becomeCandidateIfElectable(now, StartElectionReasonEnum::kElectionTimeout));
         _startElectSelf_inlock();
     }
 }
