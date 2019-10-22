@@ -53,6 +53,24 @@ namespace {
 // The number of items we can scan before we must yield.
 static const int kScanLimit = 1000;
 static const size_t kNumHashBuckets = 1U << 16;
+
+/**
+ * Returns a key for the '_extraIndexEntries' and '_missingIndexEntries' maps. The key is a pair
+ * of index name and the index key represented in KeyString form.
+ * Using the index name is required as the index keys are passed in as KeyStrings which do not
+ * contain field names.
+ *
+ * If we had the following document: { a: 1, b: 1 } with two indexes on keys "a" and "b", then
+ * the KeyStrings for the index keys of the document would be identical as the field name in the
+ * KeyString is not present. The BSON representation of this would look like: { : 1 } for both.
+ * To distinguish these as different index keys, return a pair of index name and index key.
+ */
+std::pair<std::string, std::string> _generateKeyForMap(const IndexInfo& indexInfo,
+                                                       const KeyString& ks) {
+    return std::make_pair(indexInfo.descriptor->indexName(),
+                          std::string(ks.getBuffer(), ks.getSize()));
+}
+
 }  // namespace
 
 IndexInfo::IndexInfo(const IndexDescriptor* descriptor)
@@ -225,10 +243,10 @@ void IndexConsistency::addDocKey(const KeyString& ks,
             idKey = data["_id"];
         }
 
-        std::string key = std::string(ks.getBuffer(), ks.getSize());
         BSONObj info = _generateInfo(*indexInfo, recordId, indexKey, idKey);
 
-        // Cannot have duplicate KeyStrings during the document scan phase.
+        // Cannot have duplicate KeyStrings during the document scan phase for the same index.
+        IndexKey key = _generateKeyForMap(*indexInfo, ks);
         invariant(_missingIndexEntries.count(key) == 0);
         _missingIndexEntries.insert(std::make_pair(key, info));
     }
@@ -250,10 +268,8 @@ void IndexConsistency::addIndexKey(const KeyString& ks,
         // If there is a corresponding document key for the index entry key, we remove the key from
         // the '_missingIndexEntries' map. However if there was no document key for the index entry
         // key, we add the key to the '_extraIndexEntries' map.
-
-        std::string key = std::string(ks.getBuffer(), ks.getSize());
+        IndexKey key = _generateKeyForMap(*indexInfo, ks);
         BSONObj info = _generateInfo(*indexInfo, recordId, indexKey, boost::none);
-
         if (_missingIndexEntries.count(key) == 0) {
             // We may have multiple extra index entries for a given KeyString.
             auto search = _extraIndexEntries.find(key);
