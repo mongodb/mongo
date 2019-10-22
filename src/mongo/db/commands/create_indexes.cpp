@@ -563,7 +563,10 @@ bool runCreateIndexesForMobile(OperationContext* opCtx,
         // the collection lock.
         ns = collection->ns();
 
-        uassertStatusOK(indexer.drainBackgroundWrites(opCtx));
+        uassertStatusOK(
+            indexer.drainBackgroundWrites(opCtx,
+                                          RecoveryUnit::ReadSource::kUnset,
+                                          IndexBuildInterceptor::DrainYieldPolicy::kYield));
     }
 
     if (MONGO_unlikely(hangAfterIndexBuildFirstDrain.shouldFail())) {
@@ -584,7 +587,10 @@ bool runCreateIndexesForMobile(OperationContext* opCtx,
         // the collection lock.
         ns = collection->ns();
 
-        uassertStatusOK(indexer.drainBackgroundWrites(opCtx));
+        uassertStatusOK(
+            indexer.drainBackgroundWrites(opCtx,
+                                          RecoveryUnit::ReadSource::kUnset,
+                                          IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
     }
 
     if (MONGO_unlikely(hangAfterIndexBuildSecondDrain.shouldFail())) {
@@ -612,7 +618,10 @@ bool runCreateIndexesForMobile(OperationContext* opCtx,
     invariant(CollectionCatalog::get(opCtx).lookupCollectionByNamespace(ns));
 
     // Perform the third and final drain while holding the exclusive collection lock.
-    uassertStatusOK(indexer.drainBackgroundWrites(opCtx));
+    uassertStatusOK(
+        indexer.drainBackgroundWrites(opCtx,
+                                      RecoveryUnit::ReadSource::kUnset,
+                                      IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
     // This is required before completion.
     uassertStatusOK(indexer.checkConstraints(opCtx));

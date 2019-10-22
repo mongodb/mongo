@@ -42,7 +42,6 @@
 #include "mongo/db/catalog/multi_index_block_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/index/index_build_interceptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/op_observer.h"
@@ -676,8 +675,10 @@ Status MultiIndexBlock::dumpInsertsFromBulk(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status MultiIndexBlock::drainBackgroundWrites(OperationContext* opCtx,
-                                              RecoveryUnit::ReadSource readSource) {
+Status MultiIndexBlock::drainBackgroundWrites(
+    OperationContext* opCtx,
+    RecoveryUnit::ReadSource readSource,
+    IndexBuildInterceptor::DrainYieldPolicy drainYieldPolicy) {
     if (State::kAborted == _getState()) {
         return {ErrorCodes::IndexBuildAborted,
                 str::stream() << "Index build aborted: " << _abortReason

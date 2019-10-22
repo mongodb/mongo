@@ -2035,7 +2035,9 @@ public:
                       .getTimestamp(),
                   firstInsert.asTimestamp());
 
-        ASSERT_OK(indexer.drainBackgroundWrites(_opCtx));
+        ASSERT_OK(indexer.drainBackgroundWrites(_opCtx,
+                                                RecoveryUnit::ReadSource::kUnset,
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
         auto indexCatalog = autoColl.getCollection()->getIndexCatalog();
         const IndexCatalogEntry* buildingIndex = indexCatalog->getEntry(
@@ -2076,7 +2078,9 @@ public:
         const LogicalTime afterSecondInsert = _clock->reserveTicks(1);
         setReplCoordAppliedOpTime(repl::OpTime(afterSecondInsert.asTimestamp(), presentTerm));
 
-        ASSERT_OK(indexer.drainBackgroundWrites(_opCtx));
+        ASSERT_OK(indexer.drainBackgroundWrites(_opCtx,
+                                                RecoveryUnit::ReadSource::kUnset,
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
         {
             // At time of the second insert, there are un-drained writes.

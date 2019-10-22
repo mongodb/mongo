@@ -206,7 +206,7 @@ Status IndexBuildsManager::drainBackgroundWrites(
     IndexBuildInterceptor::DrainYieldPolicy drainYieldPolicy) {
     auto builder = _getBuilder(buildUUID);
 
-    return builder->drainBackgroundWrites(opCtx, readSource);
+    return builder->drainBackgroundWrites(opCtx, readSource, drainYieldPolicy);
 }
 
 Status IndexBuildsManager::finishBuildingPhase(const UUID& buildUUID) {

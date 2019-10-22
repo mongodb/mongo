@@ -274,7 +274,11 @@ Status CollectionBulkLoaderImpl::commit() {
                     });
             }
 
-            status = _idIndexBlock->drainBackgroundWrites(_opCtx.get());
+            status = _idIndexBlock->drainBackgroundWrites(
+                _opCtx.get(),
+                RecoveryUnit::ReadSource::kUnset,
+                _nss.isSystemDotViews() ? IndexBuildInterceptor::DrainYieldPolicy::kNoYield
+                                        : IndexBuildInterceptor::DrainYieldPolicy::kYield);
             if (!status.isOK()) {
                 return status;
             }

@@ -45,6 +45,7 @@
 #include "mongo/db/catalog/index_build_block.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_build_interceptor.h"
 #include "mongo/db/record_id.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/fail_point.h"
@@ -195,9 +196,9 @@ public:
      *
      * Must not be in a WriteUnitOfWork.
      */
-    Status drainBackgroundWrites(
-        OperationContext* opCtx,
-        RecoveryUnit::ReadSource readSource = RecoveryUnit::ReadSource::kUnset);
+    Status drainBackgroundWrites(OperationContext* opCtx,
+                                 RecoveryUnit::ReadSource readSource,
+                                 IndexBuildInterceptor::DrainYieldPolicy drainYieldPolicy);
 
     /**
      * Check any constraits that may have been temporarily violated during the index build for

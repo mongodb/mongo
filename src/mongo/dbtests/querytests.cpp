@@ -113,7 +113,10 @@ protected:
             wunit.commit();
         }
         uassertStatusOK(indexer.insertAllDocumentsInCollection(&_opCtx, _collection));
-        uassertStatusOK(indexer.drainBackgroundWrites(&_opCtx));
+        uassertStatusOK(
+            indexer.drainBackgroundWrites(&_opCtx,
+                                          RecoveryUnit::ReadSource::kUnset,
+                                          IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
         uassertStatusOK(indexer.checkConstraints(&_opCtx));
         {
             WriteUnitOfWork wunit(&_opCtx);
