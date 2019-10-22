@@ -1081,6 +1081,11 @@ if (configuredForNetworkRetry()) {
 
         return retVal;
     };
+
+    Mongo.prototype.logout = function() {
+        throw new Error(
+            "logout() isn't resilient to network errors. Please add requires_non_retryable_commands to your test");
+    };
 }
 
 if (configuredForTxnOverride()) {
