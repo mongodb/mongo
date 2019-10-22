@@ -69,6 +69,7 @@ struct IndexInfo {
 
 class IndexConsistency final {
     using ValidateResultsMap = std::map<std::string, ValidateResults>;
+    using IndexKey = std::pair<std::string, std::string>;
 
 public:
     using IndexInfoMap = std::map<std::string, IndexInfo>;
@@ -176,15 +177,15 @@ private:
 
     // Populated during the second phase of validation, this map contains the index entries that
     // were pointing at an invalid document key.
-    // The map contains a KeyString pointing at a set of BSON objects as there may be multiple
-    // extra index entries for the same KeyString.
-    std::map<std::string, SimpleBSONObjSet> _extraIndexEntries;
+    // The map contains a IndexKey pointing at a set of BSON objects as there may be multiple
+    // extra index entries for the same IndexKey.
+    std::map<IndexKey, SimpleBSONObjSet> _extraIndexEntries;
 
     // Populated during the second phase of validation, this map contains the index entries that
     // were missing while the document key was in place.
-    // The map contains a KeyString pointing to a BSON object as there can only be one missing index
-    // entry for a given KeyString.
-    std::map<std::string, BSONObj> _missingIndexEntries;
+    // The map contains a IndexKey pointing to a BSON object as there can only be one missing index
+    // entry for a given IndexKey for each index.
+    std::map<IndexKey, BSONObj> _missingIndexEntries;
 
     /**
      * Generates a key for the second phase of validation. The keys format is the following:

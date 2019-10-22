@@ -1374,6 +1374,135 @@ public:
     }
 };
 
+class ValidateDuplicateDocumentIndexKeySet : public ValidateBase {
+public:
+    ValidateDuplicateDocumentIndexKeySet() : ValidateBase(/*full=*/false, /*background=*/false) {}
+
+    void run() {
+        // Create a new collection.
+        lockDb(MODE_X);
+        Collection* coll;
+        {
+            WriteUnitOfWork wunit(&_opCtx);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
+            coll = _db->createCollection(&_opCtx, _nss);
+            wunit.commit();
+        }
+
+        // Create two identical indexes only differing by key pattern and name.
+        {
+            const auto indexName = "a";
+            const auto indexKey = BSON("a" << 1);
+            auto status = dbtests::createIndexFromSpec(
+                &_opCtx,
+                coll->ns().ns(),
+                BSON("name" << indexName << "key" << indexKey << "v"
+                            << static_cast<int>(kIndexVersion) << "background" << false));
+            ASSERT_OK(status);
+        }
+
+        {
+            const auto indexName = "b";
+            const auto indexKey = BSON("b" << 1);
+            auto status = dbtests::createIndexFromSpec(
+                &_opCtx,
+                coll->ns().ns(),
+                BSON("name" << indexName << "key" << indexKey << "v"
+                            << static_cast<int>(kIndexVersion) << "background" << false));
+            ASSERT_OK(status);
+        }
+
+        // Insert a document.
+        OpDebug* const nullOpDebug = nullptr;
+        RecordId rid = RecordId::min();
+        lockDb(MODE_X);
+        {
+            WriteUnitOfWork wunit(&_opCtx);
+            ASSERT_OK(
+                coll->insertDocument(&_opCtx,
+                                     InsertStatement(BSON("_id" << 1 << "a" << 1 << "b" << 1)),
+                                     nullOpDebug,
+                                     true));
+            rid = coll->getCursor(&_opCtx)->next()->id;
+            wunit.commit();
+        }
+        releaseDb();
+        ASSERT_TRUE(checkValid());
+
+        // Remove the index entry for index "a".
+        {
+            lockDb(MODE_X);
+
+            IndexCatalog* indexCatalog = coll->getIndexCatalog();
+            const std::string indexName = "a";
+            auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
+            auto iam =
+                const_cast<IndexAccessMethod*>(indexCatalog->getEntry(descriptor)->accessMethod());
+
+            WriteUnitOfWork wunit(&_opCtx);
+            int64_t numDeleted;
+            const BSONObj actualKey = BSON("a" << 1);
+            InsertDeleteOptions options;
+            options.logIfError = true;
+            options.dupsAllowed = true;
+
+            BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+            iam->getKeys(actualKey,
+                         IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
+                         &keys,
+                         nullptr,
+                         nullptr);
+            auto removeStatus = iam->removeKeys(
+                &_opCtx, {keys.begin(), keys.end()}, RecordId(1), options, &numDeleted);
+
+            ASSERT_EQUALS(numDeleted, 1);
+            ASSERT_OK(removeStatus);
+            wunit.commit();
+
+            releaseDb();
+        }
+
+        // Remove the index entry for index "b".
+        {
+            lockDb(MODE_X);
+
+            IndexCatalog* indexCatalog = coll->getIndexCatalog();
+            const std::string indexName = "b";
+            auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
+            auto iam =
+                const_cast<IndexAccessMethod*>(indexCatalog->getEntry(descriptor)->accessMethod());
+
+            WriteUnitOfWork wunit(&_opCtx);
+            int64_t numDeleted;
+            const BSONObj actualKey = BSON("b" << 1);
+            InsertDeleteOptions options;
+            options.logIfError = true;
+            options.dupsAllowed = true;
+
+            BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+            iam->getKeys(actualKey,
+                         IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
+                         &keys,
+                         nullptr,
+                         nullptr);
+            auto removeStatus = iam->removeKeys(
+                &_opCtx, {keys.begin(), keys.end()}, RecordId(1), options, &numDeleted);
+
+            ASSERT_EQUALS(numDeleted, 1);
+            ASSERT_OK(removeStatus);
+            wunit.commit();
+
+            releaseDb();
+        }
+
+        {
+            // Now we have two missing index entries with the keys { : 1 } since the KeyStrings
+            // aren't hydrated with their field names.
+            ASSERT_TRUE(!checkValid());
+        }
+    }
+};
+
 class ValidateTests : public Suite {
 public:
     ValidateTests() : Suite("validate_tests") {}
@@ -1416,6 +1545,8 @@ public:
         add<ValidateMissingAndExtraIndexEntryResults<false, false>>();
         add<ValidateMissingIndexEntryResults<false, false>>();
         add<ValidateExtraIndexEntryResults<false, false>>();
+
+        add<ValidateDuplicateDocumentIndexKeySet>();
     }
 } validateTests;
 }  // namespace ValidateTests
