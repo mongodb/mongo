@@ -50,6 +50,7 @@ assert.commandWorked(st.s1.adminCommand({shardcollection: "test.existing3", key:
 st.configRS.awaitLastOpCommitted();
 
 assert.commandWorked(st.s1.adminCommand({split: "test.existing3", middle: {_id: 5}}));
+st.configRS.awaitLastOpCommitted();
 assert.commandWorked(
     st.s0.adminCommand({moveChunk: "test.existing3", find: {_id: 1}, to: st.shard0.shardName}));
 
