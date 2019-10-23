@@ -325,6 +325,7 @@ error_codes:
 
     - {code: 290,name: TransactionExceededLifetimeLimitSeconds,categories: [ExceededTimeLimitError]}
     - {code: 291,name: NoQueryExecutionPlans}
+    - {code: 292,name: QueryExceededMemoryLimitNoDiskUseAllowed}
 
     # Error codes 4000-8999 are reserved.
 
