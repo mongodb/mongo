@@ -61,25 +61,23 @@ var $config = (function() {
 
     var transitions = {init: {mapReduce: 1}, mapReduce: {mapReduce: 1}};
 
-    function makeDoc(keyLimit, valueLimit) {
-        return {
-            _id: new ObjectId(),
-            key: Random.randInt(keyLimit),
-            value: Random.randInt(valueLimit)
-        };
-    }
-
     function setup(db, collName, cluster) {
         var bulk = db[collName].initializeUnorderedBulkOp();
         for (var i = 0; i < this.numDocs; ++i) {
             // TODO: this actually does assume that there are no unique indexes
-            var doc = makeDoc(this.numDocs / 100, this.numDocs / 10);
-            bulk.insert(doc);
+            bulk.insert({
+                _id: i,
+                key: Random.randInt(this.numDocs / 100),
+                value: Random.randInt(this.numDocs / 10)
+            });
         }
 
         var res = bulk.execute();
         assertAlways.commandWorked(res);
         assertAlways.eq(this.numDocs, res.nInserted);
+
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQueryUseAggMapReduce: true}));
     }
 
     return {

@@ -21,8 +21,7 @@ load('jstests/concurrency/fsm_workloads/map_reduce_replace.js');  // for $config
 var $config = extendWorkload($config, function($config, $super) {
     $config.states.remove = function remove(db, collName) {
         for (var i = 0; i < 20; ++i) {
-            var res = db[collName].remove({value: {$gte: Random.randInt(this.numDocs / 10)}},
-                                          {justOne: true});
+            var res = db[collName].remove({_id: Random.randInt(this.numDocs)}, {justOne: true});
             assertAlways.commandWorked(res);
             assertAlways.lte(0, res.nRemoved, tojson(res));
         }

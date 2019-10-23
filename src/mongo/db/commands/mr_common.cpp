@@ -68,7 +68,7 @@ using namespace std::string_literals;
 auto translateSort(boost::intrusive_ptr<ExpressionContext> expCtx,
                    const BSONObj& sort,
                    const boost::optional<std::int64_t>& limit) {
-    return DocumentSourceSort::create(expCtx, sort, limit.get_value_or(-1));
+    return DocumentSourceSort::create(expCtx, sort, limit.get_value_or(0));
 }
 
 auto translateMap(boost::intrusive_ptr<ExpressionContext> expCtx, std::string code) {

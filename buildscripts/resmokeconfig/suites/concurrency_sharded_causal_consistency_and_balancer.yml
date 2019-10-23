@@ -28,17 +28,6 @@ selector:
   - jstests/concurrency/fsm_workloads/agg_graph_lookup.js
   - jstests/concurrency/fsm_workloads/view_catalog_cycle_lookup.js
 
-  # Disabled due to SERVER-20057, 'Concurrent, sharded mapReduces can fail when temporary
-  # namespaces collide across mongos processes'
-  - jstests/concurrency/fsm_workloads/map_reduce_drop.js
-  - jstests/concurrency/fsm_workloads/map_reduce_inline.js
-  - jstests/concurrency/fsm_workloads/map_reduce_interrupt.js
-  - jstests/concurrency/fsm_workloads/map_reduce_merge.js
-  - jstests/concurrency/fsm_workloads/map_reduce_reduce.js
-  - jstests/concurrency/fsm_workloads/map_reduce_replace.js
-  - jstests/concurrency/fsm_workloads/map_reduce_replace_nonexistent.js
-  - jstests/concurrency/fsm_workloads/map_reduce_replace_remove.js
-
   # Disabled due to MongoDB restrictions and/or workload restrictions
 
   # These workloads sometimes trigger 'Could not lock auth data update lock'

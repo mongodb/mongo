@@ -98,7 +98,7 @@ TEST(MapReduceAggTest, testSortWithoutLimit) {
     auto iter = sources.begin();
     ASSERT(typeid(DocumentSourceSort) == typeid(**iter));
     auto& sort = dynamic_cast<DocumentSourceSort&>(**iter++);
-    ASSERT_EQ(-1ll, *sort.getLimit());
+    ASSERT(sort.getLimit() == boost::none);
     ASSERT(typeid(DocumentSourceSingleDocumentTransformation) == typeid(**iter++));
     ASSERT(typeid(DocumentSourceUnwind) == typeid(**iter++));
     ASSERT(typeid(DocumentSourceGroup) == typeid(**iter));

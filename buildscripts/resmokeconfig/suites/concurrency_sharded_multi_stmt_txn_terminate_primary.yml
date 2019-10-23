@@ -41,6 +41,7 @@ selector:
   - jstests/concurrency/fsm_workloads/map_reduce_replace.js
   - jstests/concurrency/fsm_workloads/map_reduce_replace_nonexistent.js
   - jstests/concurrency/fsm_workloads/map_reduce_replace_remove.js
+  - jstests/concurrency/fsm_workloads/map_reduce_with_chunk_migrations.js
 
   # Disabled due to MongoDB restrictions and/or workload restrictions
 

@@ -44,6 +44,10 @@ selector:
   - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
   - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
 
+  # This test is not compatible with the other mapReduce FSM tests since it requires the
+  # 'internalQueryUseAggMapReduce' knob to be false while the other tests explicitly set it to true.
+  - jstests/concurrency/fsm_workloads/map_reduce_reduce.js
+
   exclude_with_any_tags:
   - requires_sharding
 

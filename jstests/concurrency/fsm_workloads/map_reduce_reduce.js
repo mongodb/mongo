@@ -28,6 +28,12 @@ var $config = extendWorkload($config, function($config, $super) {
     }
 
     $config.states.init = function init(db, collName) {
+        // TODO SERVER-44150: Cannot run MR with output 'reduce' in agg since the 'whenMatched'
+        // pipeline will always run which can cause unexpected failures in the user-specified reduce
+        // function.
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQueryUseAggMapReduce: false}));
+
         $super.states.init.apply(this, arguments);
 
         this.outCollName = uniqueCollectionName(prefix, this.tid);
@@ -40,7 +46,6 @@ var $config = extendWorkload($config, function($config, $super) {
                      "output collection '" + fullName + "' should exist");
 
         var options = {finalize: this.finalizer, out: {reduce: this.outCollName}};
-
         var res = db[collName].mapReduce(this.mapper, this.reducer, options);
         assertAlways.commandWorked(res);
     };
