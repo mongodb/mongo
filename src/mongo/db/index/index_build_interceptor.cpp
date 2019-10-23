@@ -236,8 +236,11 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
         progress->hit(batchSize);
         _numApplied += batchSize;
 
-        // Lock yielding will only happen if we are holding intent locks.
-        _tryYield(opCtx);
+        // Lock yielding will be directed by the yield policy provided.
+        // We will typically yield locks during the draining phase if we are holding intent locks.
+        if (DrainYieldPolicy::kYield == drainYieldPolicy) {
+            _yield(opCtx);
+        }
 
         // Account for more writes coming in during a batch.
         progress->setTotalWhileRunning(_sideWritesCounter->loadRelaxed() - appliedAtStart);
@@ -329,19 +332,7 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
     return Status::OK();
 }
 
-void IndexBuildInterceptor::_tryYield(OperationContext* opCtx) {
-    // Never yield while holding locks that prevent writes to the collection: only yield while
-    // holding intent locks. This check considers all locks in the hierarchy that would cover this
-    // mode.
-    const NamespaceString nss(_indexCatalogEntry->ns());
-    if (opCtx->lockState()->isCollectionLockedForMode(nss, MODE_S)) {
-        return;
-    }
-    if (kDebugBuild) {
-        invariant(!opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
-        invariant(!opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_X));
-    }
-
+void IndexBuildInterceptor::_yield(OperationContext* opCtx) {
     // Releasing locks means a new snapshot should be acquired when restored.
     opCtx->recoveryUnit()->abandonSnapshot();
 

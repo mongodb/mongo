@@ -151,10 +151,9 @@ private:
                        int64_t* const keysDeleted);
 
     /**
-     * Yield lock manager locks, but only when holding intent locks. Does nothing otherwise. If this
-     * yields locks, it will also abandon the current storage engine snapshot.
+     * Yield lock manager locks and abandon the current storage engine snapshot.
      */
-    void _tryYield(OperationContext*);
+    void _yield(OperationContext* opCtx);
 
     // The entry for the index that is being built.
     IndexCatalogEntry* _indexCatalogEntry;
