@@ -825,43 +825,68 @@ void ReplicationCoordinatorImpl::_cancelCatchupTakeover_inlock() {
 }
 
 void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout_inlock() {
-    if (_handleElectionTimeoutCbh.isValid()) {
-        LOG(4) << "Canceling election timeout callback at " << _handleElectionTimeoutWhen;
+    // We log at level 5 except when:
+    // * This is the first time we're scheduling after becoming an electable secondary.
+    // * We are not going to reschedule the election timeout because we are shutting down or
+    //   no longer an electable secondary.
+    // * It has been at least a second since we last logged at level 4.
+    //
+    // In those instances we log at level 4.  This routine is called on every replication batch,
+    // which would produce many log lines per second, so this logging strategy provides a
+    // compromise which allows us to see the election timeout being rescheduled without spamming
+    // the logs.
+    int cancelAndRescheduleLogLevel = 5;
+    static auto logThrottleTime = _replExecutor->now();
+    const bool wasActive = _handleElectionTimeoutCbh.isValid();
+    auto now = _replExecutor->now();
+    const bool doNotReschedule = _inShutdown || !_memberState.secondary() || _selfIndex < 0 ||
+        !_rsConfig.getMemberAt(_selfIndex).isElectable();
+
+    if (doNotReschedule || !wasActive || (now - logThrottleTime) >= Seconds(1)) {
+        cancelAndRescheduleLogLevel = 4;
+        logThrottleTime = now;
+    }
+    if (wasActive) {
+        LOG_FOR_ELECTION(cancelAndRescheduleLogLevel)
+            << "Canceling election timeout callback at " << _handleElectionTimeoutWhen;
         _replExecutor->cancel(_handleElectionTimeoutCbh);
         _handleElectionTimeoutCbh = CallbackHandle();
         _handleElectionTimeoutWhen = Date_t();
     }
 
-    if (_inShutdown) {
+    if (doNotReschedule)
         return;
-    }
-
-    if (!_memberState.secondary()) {
-        return;
-    }
-
-    if (_selfIndex < 0) {
-        return;
-    }
-
-    if (!_rsConfig.getMemberAt(_selfIndex).isElectable()) {
-        return;
-    }
 
     Milliseconds randomOffset = _getRandomizedElectionOffset_inlock();
-    auto now = _replExecutor->now();
     auto when = now + _rsConfig.getElectionTimeoutPeriod() + randomOffset;
     invariant(when > now);
-    LOG_FOR_ELECTION(4) << "Scheduling election timeout callback at " << when;
+    if (wasActive) {
+        // The log level here is 4 once per second, otherwise 5.
+        LOG_FOR_ELECTION(cancelAndRescheduleLogLevel)
+            << "Rescheduling election timeout callback at " << when;
+    } else {
+        LOG_FOR_ELECTION(4) << "Scheduling election timeout callback at " << when;
+    }
     _handleElectionTimeoutWhen = when;
     _handleElectionTimeoutCbh =
-        _scheduleWorkAt(when, [=](const mongo::executor::TaskExecutor::CallbackArgs&) {
-            _startElectSelfIfEligibleV1(StartElectionReasonEnum::kElectionTimeout);
+        _scheduleWorkAt(when, [=](const mongo::executor::TaskExecutor::CallbackArgs& cbData) {
+            stdx::lock_guard<Latch> lk(_mutex);
+            if (_handleElectionTimeoutCbh == cbData.myHandle) {
+                // This lets _cancelAndRescheduleElectionTimeout_inlock know the callback
+                // has happened.
+                _handleElectionTimeoutCbh = CallbackHandle();
+            }
+            _startElectSelfIfEligibleV1(lk, StartElectionReasonEnum::kElectionTimeout);
         });
 }
 
 void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(StartElectionReasonEnum reason) {
     stdx::lock_guard<Latch> lock(_mutex);
+    _startElectSelfIfEligibleV1(lock, reason);
+}
+
+void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(WithLock,
+                                                             StartElectionReasonEnum reason) {
     // If it is not a single node replica set, no need to start an election after stepdown timeout.
     if (reason == StartElectionReasonEnum::kSingleNodePromptElection &&
         _rsConfig.getNumMembers() != 1) {

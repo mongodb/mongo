@@ -1246,6 +1246,7 @@ private:
      * Callback which starts an election if this node is electable and using protocolVersion 1.
      */
     void _startElectSelfIfEligibleV1(StartElectionReasonEnum reason);
+    void _startElectSelfIfEligibleV1(WithLock, StartElectionReasonEnum reason);
 
     /**
      * Schedules work to be run no sooner than 'when' and returns handle to callback.

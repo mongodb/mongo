@@ -5159,6 +5159,91 @@ TEST_F(ReplCoordTest,
     ASSERT_EQUALS(electionTimeoutWhen, replCoord->getElectionTimeout_forTest());
 }
 
+TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeoutLogging) {
+    // Log all the election messages.
+    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogComponent::kReplicationElection,
+                                                        logger::LogSeverity::Debug(5));
+    startCapturingLogMessages();
+    // heartbeatTimeoutSecs is made large so we can advance the clock without worrying about
+    // additional heartbeats.
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "settings" << BSON("heartbeatTimeoutSecs" << 60000)
+                            << "protocolVersion" << 1 << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 1))),
+                       HostAndPort("node1", 12345));
+
+    // Setting mode to secondary should schedule the election timeout.
+    ReplicationCoordinatorImpl* replCoord = getReplCoord();
+    ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+    ASSERT_EQ(1, countLogLinesContaining("Scheduling election timeout callback"));
+    ASSERT_EQ(0, countLogLinesContaining("Rescheduling election timeout callback"));
+    ASSERT_EQ(0, countLogLinesContaining("Canceling election timeout callback"));
+
+    // Scheduling again should produce the "rescheduled", not the "scheduled", message .
+    replCoord->cancelAndRescheduleElectionTimeout();
+    ASSERT_EQ(1, countLogLinesContaining("Scheduling election timeout callback"));
+    ASSERT_EQ(1, countLogLinesContaining("Rescheduling election timeout callback"));
+    ASSERT_EQ(1, countLogLinesContaining("Canceling election timeout callback"));
+
+    auto net = getNet();
+    net->enterNetwork();
+
+    // Black hole heartbeat request scheduled after transitioning to SECONDARY.
+    ASSERT_TRUE(net->hasReadyRequests());
+    auto noi = net->getNextReadyRequest();
+    const auto& request = noi->getRequest();
+    ASSERT_EQUALS(HostAndPort("node2", 12345), request.target);
+    ASSERT_EQUALS("replSetHeartbeat", request.cmdObj.firstElement().fieldNameStringData());
+    log() << "black holing " << noi->getRequest().cmdObj;
+    net->blackHole(noi);
+
+    // Advance simulator clock to some time after the first scheduled election.
+    auto electionTimeoutWhen = replCoord->getElectionTimeout_forTest();
+    log() << "Election initially scheduled at " << electionTimeoutWhen << " (simulator time)";
+    ASSERT_GREATER_THAN(electionTimeoutWhen, net->now());
+    auto until = electionTimeoutWhen + Milliseconds(1);
+    net->runUntil(until);
+    ASSERT_EQUALS(until, net->now());
+    net->exitNetwork();
+
+    // The election should have scheduled (not rescheduled) another timeout.
+    ASSERT_EQ(2, countLogLinesContaining("Scheduling election timeout callback"));
+    ASSERT_EQ(1, countLogLinesContaining("Rescheduling election timeout callback"));
+    ASSERT_EQ(1, countLogLinesContaining("Canceling election timeout callback"));
+
+    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogComponent::kReplicationElection,
+                                                        logger::LogSeverity::Debug(4));
+    net->enterNetwork();
+    until = electionTimeoutWhen + Milliseconds(500);
+    net->runUntil(until);
+    net->exitNetwork();
+    replCoord->cancelAndRescheduleElectionTimeout();
+
+    // We should not see this reschedule because it should be at log level 5.
+    ASSERT_EQ(2, countLogLinesContaining("Scheduling election timeout callback"));
+    ASSERT_EQ(1, countLogLinesContaining("Rescheduling election timeout callback"));
+    ASSERT_EQ(1, countLogLinesContaining("Canceling election timeout callback"));
+
+    net->enterNetwork();
+    until = electionTimeoutWhen + Milliseconds(1001);
+    net->runUntil(until);
+    net->exitNetwork();
+    replCoord->cancelAndRescheduleElectionTimeout();
+
+    stopCapturingLogMessages();
+    // We should see this reschedule at level 4 because it has been over 1 sec since we logged
+    // at level 4.
+    ASSERT_EQ(2, countLogLinesContaining("Scheduling election timeout callback"));
+    ASSERT_EQ(2, countLogLinesContaining("Rescheduling election timeout callback"));
+    ASSERT_EQ(2, countLogLinesContaining("Canceling election timeout callback"));
+}
+
 TEST_F(ReplCoordTest, AdvanceCommittedSnapshotToMostRecentSnapshotPriorToOpTimeWhenOpTimeChanges) {
     init("mySet");
 
