@@ -778,15 +778,7 @@ void SyncTail::_oplogApplication(ReplicationCoordinator* replCoord,
         if (MONGO_FAIL_POINT(rsSyncApplyStop)) {
             log() << "sync tail - rsSyncApplyStop fail point enabled. Blocking until fail point is "
                      "disabled.";
-            while (MONGO_FAIL_POINT(rsSyncApplyStop)) {
-                // Tests should not trigger clean shutdown while that failpoint is active. If we
-                // think we need this, we need to think hard about what the behavior should be.
-                if (inShutdown()) {
-                    severe() << "Turn off rsSyncApplyStop before attempting clean shutdown";
-                    fassertFailedNoTrace(40304);
-                }
-                sleepmillis(10);
-            }
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(&opCtx, rsSyncApplyStop);
         }
 
         // Get the current value of 'minValid'.
@@ -883,6 +875,12 @@ void SyncTail::_oplogApplication(ReplicationCoordinator* replCoord,
 }
 
 void SyncTail::shutdown() {
+    // Shutdown will hang if this failpoint is enabled.
+    if (MONGO_FAIL_POINT(rsSyncApplyStop)) {
+        severe() << "Turn off rsSyncApplyStop before attempting clean shutdown";
+        fassertFailedNoTrace(40304);
+    }
+
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     _inShutdown = true;
 }
