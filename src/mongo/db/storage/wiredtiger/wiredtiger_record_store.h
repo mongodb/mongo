@@ -250,6 +250,8 @@ public:
 
     void reclaimOplog(OperationContext* opCtx) override;
 
+    StatusWith<Timestamp> getLatestOplogTimestamp(OperationContext* opCtx) const override;
+
     /**
      * The `recoveryTimestamp` is when replication recovery would need to replay from for
      * recoverable rollback, or restart for durable engines. `reclaimOplog` will not

@@ -530,6 +530,18 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    /**
+     * If supported, this method returns the timestamp value for the latest storage engine committed
+     * oplog document. Note that this method will not include uncommitted writes on the input
+     * OperationContext. A new transaction is always created and destroyed to service this call.
+     *
+     * Unsupported RecordStores return the OplogOperationUnsupported error code.
+     */
+    virtual StatusWith<Timestamp> getLatestOplogTimestamp(OperationContext* opCtx) const {
+        return Status(ErrorCodes::OplogOperationUnsupported,
+                      "The current storage engine doesn't support an optimized implementation for "
+                      "getting the latest oplog timestamp.");
+    }
 
 protected:
     std::string _ns;
