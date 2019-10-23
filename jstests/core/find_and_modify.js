@@ -33,6 +33,32 @@ out = t.findAndModify(
     {query: {inprogress: false}, sort: {priority: -1}, update: {$set: {inprogress: true}}});
 assert.eq(out.priority, 9);
 
+// Use expressions in the 'fields' argument with 'new' false.
+out = t.findAndModify({
+    query: {inprogress: false},
+    sort: {priority: -1},
+    'new': false,
+    update: {$set: {inprogress: true}, $inc: {value: 1}},
+    fields: {priority: 1, inprogress: 1, computedField: {$add: ["$value", 2]}}
+});
+assert.eq(out.priority, 8);
+assert.eq(out.inprogress, false);
+// The projection should have been applied to the pre image of the update.
+assert.eq(out.computedField, 2);
+
+// Use expressions in the 'fields' argument with 'new' true.
+out = t.findAndModify({
+    query: {inprogress: false},
+    sort: {priority: -1},
+    update: {$set: {inprogress: true}, $inc: {value: 1}},
+    'new': true,
+    fields: {priority: 1, inprogress: 1, computedField: {$add: ["$value", 2]}}
+});
+assert.eq(out.priority, 7);
+assert.eq(out.inprogress, true);
+// The projection should have been applied to the update post image.
+assert.eq(out.computedField, 3);
+
 // remove lowest priority
 out = t.findAndModify({sort: {priority: 1}, remove: true});
 assert.eq(out.priority, 1);
@@ -121,15 +147,6 @@ cmdRes = db.runCommand({
     fields: {foo: {$pop: ["bar"]}},
 });
 assert.commandFailed(cmdRes);
-
-// Cannot use expressions in the projection part of findAndModify.
-cmdRes = db.runCommand({
-    findAndModify: "coll",
-    update: {a: 1},
-    fields: {b: {$ln: ['c']}},
-    upsert: true,
-});
-assert.commandFailedWithCode(cmdRes, ErrorCodes.BadValue);
 
 //
 // SERVER-17372

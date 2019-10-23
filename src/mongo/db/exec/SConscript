@@ -79,7 +79,6 @@ env.CppUnitTest(
         "document_value/value_comparator_test.cpp",
         "find_projection_executor_test.cpp",
         "projection_exec_agg_test.cpp",
-        "projection_exec_test.cpp",
         "projection_executor_test.cpp",
         "queued_data_stage_test.cpp",
         "sort_test.cpp",

@@ -32,6 +32,7 @@ selector:
 
   # TODO SERVER-31242: findAndModify no-op retry should respect the fields option.
   - jstests/core/crud_api.js
+  - jstests/core/find_and_modify.js
   - jstests/core/find_and_modify2.js
   - jstests/core/find_and_modify_pipeline_update.js
   - jstests/core/find_and_modify_server6865.js

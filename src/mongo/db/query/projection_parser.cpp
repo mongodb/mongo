@@ -337,10 +337,11 @@ void parseInclusion(ParseContext* ctx,
 
         StringData matchField = fullPathToParent ? fullPathToParent->front()
                                                  : str::before(elem.fieldNameStringData(), '.');
+        uassert(51050, "Projections with a positional operator require a matcher", ctx->query);
         uassert(31277,
                 str::stream() << "Positional projection '" << elem.fieldName() << "' does not "
                               << "match the query document.",
-                ctx->query && hasPositionalOperatorMatch(ctx->query, matchField));
+                hasPositionalOperatorMatch(ctx->query, matchField));
 
         // Check that the path does not end with ".$." which can be interpreted as the
         // positional projection.

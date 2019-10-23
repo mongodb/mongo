@@ -475,6 +475,8 @@ TEST_F(ProjectionASTTest, ParserErrorsOnPositionalProjectionNotMatchingQuery) {
     ASSERT_THROWS_CODE(parseWithFindFeaturesEnabled(fromjson("{'a.$': 1}"), fromjson("{b: 1}")),
                        DBException,
                        31277);
+    ASSERT_THROWS_CODE(
+        parseWithFindFeaturesEnabled(fromjson("{'a.$': 1}"), boost::none), DBException, 51050);
 }
 
 TEST_F(ProjectionASTTest, ParserErrorsOnSubfieldPrefixedByDbRefField) {

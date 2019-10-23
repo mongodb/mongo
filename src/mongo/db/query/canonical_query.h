@@ -31,12 +31,10 @@
 
 
 #include "mongo/base/status.h"
-#include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/parsed_projection.h"
 #include "mongo/db/query/projection.h"
 #include "mongo/db/query/query_request.h"
 

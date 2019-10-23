@@ -35,11 +35,12 @@
 #include "mongo/base/initializer.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
-#include "mongo/db/exec/projection_exec.h"
+#include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/parsed_projection.h"
+#include "mongo/db/query/projection.h"
+#include "mongo/db/query/projection_parser.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/update/update_driver.h"
 #include "mongo/util/assert_util.h"
@@ -139,21 +140,6 @@ struct ServiceContextDestructor {
 };
 
 using EmbeddedServiceContextPtr = std::unique_ptr<mongo::ServiceContext, ServiceContextDestructor>;
-
-ProjectionExec makeProjectionExecChecked(OperationContext* opCtx,
-                                         const BSONObj& spec,
-                                         const MatchExpression* queryExpression,
-                                         const CollatorInterface* collator) {
-    /**
-     * ParsedProjction::make performs necessary checks to ensure a projection spec is valid however
-     * we are not interested in the ParsedProjection object it produces.
-     */
-    ParsedProjection* dummy;
-    uassertStatusOK(ParsedProjection::make(opCtx, spec, queryExpression, &dummy));
-    delete dummy;
-    return ProjectionExec(opCtx, spec, queryExpression, collator);
-}
-
 }  // namespace
 }  // namespace mongo
 
@@ -192,27 +178,34 @@ struct stitch_support_v1_projection {
                                  const mongo::BSONObj& pattern,
                                  stitch_support_v1_matcher* matcher,
                                  stitch_support_v1_collator* collator)
-        : client(std::move(client)),
-          opCtx(this->client->makeOperationContext()),
-          projectionExec(mongo::makeProjectionExecChecked(
-              opCtx.get(),
-              pattern.getOwned(),
-              matcher ? matcher->matcher.getMatchExpression() : nullptr,
-              collator ? collator->collator.get() : nullptr)),
-          matcher(matcher) {
-        uassert(51050,
-                "Projections with a positional operator require a matcher",
-                matcher || !projectionExec.projectRequiresQueryExpression());
+        : client(std::move(client)), opCtx(this->client->makeOperationContext()), matcher(matcher) {
+
+        auto expCtx = mongo::make_intrusive<mongo::ExpressionContext>(
+            opCtx.get(), collator ? collator->collator.get() : nullptr);
+        const auto policies = mongo::ProjectionPolicies::findProjectionPolicies();
+        auto proj =
+            mongo::projection_ast::parse(expCtx,
+                                         pattern,
+                                         matcher ? matcher->matcher.getMatchExpression() : nullptr,
+                                         matcher ? *matcher->matcher.getQuery() : mongo::BSONObj(),
+                                         policies);
+
         uassert(51051,
                 "$textScore, $sortKey, $recordId and $geoNear are not allowed in this "
                 "context",
-                !projectionExec.hasMetaFields());
+                !proj.metadataDeps().any());
+
+        this->requiresMatch = proj.requiresMatchDetails();
+        this->projectionExec =
+            mongo::projection_executor::buildProjectionExecutor(expCtx, &proj, policies);
     }
 
     mongo::ServiceContext::UniqueClient client;
     mongo::ServiceContext::UniqueOperationContext opCtx;
-    mongo::ProjectionExec projectionExec;
+    std::unique_ptr<mongo::parsed_aggregation_projection::ParsedAggregationProjection>
+        projectionExec;
 
+    bool requiresMatch = false;
     stitch_support_v1_matcher* matcher;
 };
 
@@ -513,8 +506,8 @@ stitch_support_v1_projection_apply(stitch_support_v1_projection* const projectio
     return enterCXX(mongo::getStatusImpl(status), [&]() {
         mongo::BSONObj document(mongo::fromInterfaceType(documentBSON));
 
-        auto outputResult = projection->projectionExec.project(document);
-        auto outputObj = uassertStatusOK(outputResult);
+        auto outputObj =
+            projection->projectionExec->applyTransformation(mongo::Document{document}).toBson();
         auto outputSize = static_cast<size_t>(outputObj.objsize());
         auto output = new (std::nothrow) char[outputSize];
 
@@ -530,7 +523,7 @@ stitch_support_v1_projection_apply(stitch_support_v1_projection* const projectio
 bool MONGO_API_CALL
 stitch_support_v1_projection_requires_match(stitch_support_v1_projection* const projection) {
     return [projection]() noexcept {
-        return projection->projectionExec.projectRequiresQueryExpression();
+        return projection->requiresMatch;
     }
     ();
 }

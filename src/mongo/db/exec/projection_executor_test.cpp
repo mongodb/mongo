@@ -32,6 +32,7 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/projection_ast_util.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/unittest/unittest.h"
@@ -134,6 +135,9 @@ TEST_F(ProjectionExecutorTest, CanProjectFindPositional) {
     auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
     ASSERT_DOCUMENT_EQ(Document{fromjson("{a: {b: [3]}}")},
                        executor->applyTransformation(Document{fromjson("{a: {b: [1,2,3,4]}}")}));
+
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: {b: [4]}}")},
+                       executor->applyTransformation(Document{fromjson("{a: {b: [4, 3, 2]}}")}));
 }
 
 TEST_F(ProjectionExecutorTest, CanProjectFindElemMatchWithInclusion) {
@@ -142,6 +146,37 @@ TEST_F(ProjectionExecutorTest, CanProjectFindElemMatchWithInclusion) {
     ASSERT_DOCUMENT_EQ(
         Document{fromjson("{a: [{b: 3}]}")},
         executor->applyTransformation(Document{fromjson("{a: [{b: 1}, {b: 2}, {b: 3}]}")}));
+}
+
+TEST_F(ProjectionExecutorTest, CanProjectFindElemMatch) {
+
+    const BSONObj obj = fromjson("{a: [{b: 3, c: 1}, {b: 1, c: 2}, {b: 1, c: 3}]}");
+    {
+        auto proj = parseWithDefaultPolicies(fromjson("{a: {$elemMatch: {b: 1}}}"));
+        auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
+        ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [{b: 1, c: 2}]}")},
+                           executor->applyTransformation(Document{obj}));
+    }
+
+    {
+        auto proj = parseWithDefaultPolicies(fromjson("{a: {$elemMatch: {b: 1, c: 3}}}"));
+        auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
+        ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [{b: 1, c: 3}]}")},
+                           executor->applyTransformation(Document{obj}));
+    }
+}
+
+TEST_F(ProjectionExecutorTest, ElemMatchRespectsCollator) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    getExpCtx()->setCollator(&collator);
+
+    auto proj = parseWithDefaultPolicies(fromjson("{a: {$elemMatch: {$gte: 'abc'}}}"));
+    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
+
+
+    ASSERT_DOCUMENT_EQ(
+        Document{fromjson("{ a: [ \"zdd\" ] }")},
+        executor->applyTransformation(Document{fromjson("{a: ['zaa', 'zbb', 'zdd', 'zee']}")}));
 }
 
 TEST_F(ProjectionExecutorTest, CanProjectFindElemMatchWithExclusion) {
@@ -156,11 +191,27 @@ TEST_F(ProjectionExecutorTest, CanProjectFindSliceWithInclusion) {
     auto proj = parseWithFindFeaturesEnabled(fromjson("{'a.b': {$slice: [1,2]}, c: 1}"));
     auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
     ASSERT_DOCUMENT_EQ(
+        Document{fromjson("{a: {b: [1,2,3]}, c: 'abc'}")},
+        executor->applyTransformation(Document{fromjson("{a: {b: [1,2,3]}, c: 'abc'}")}));
+}
+
+TEST_F(ProjectionExecutorTest, CanProjectFindSliceSkipLimitWithInclusion) {
+    auto proj = parseWithFindFeaturesEnabled(fromjson("{'a.b': {$slice: [1,2]}, c: 1}"));
+    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
+    ASSERT_DOCUMENT_EQ(
         Document{fromjson("{a: {b: [2,3]}, c: 'abc'}")},
         executor->applyTransformation(Document{fromjson("{a: {b: [1,2,3,4]}, c: 'abc'}")}));
 }
 
-TEST_F(ProjectionExecutorTest, CanProjectFindSliceWithExclusion) {
+TEST_F(ProjectionExecutorTest, CanProjectFindSliceBasicWithExclusion) {
+    auto proj = parseWithFindFeaturesEnabled(fromjson("{'a.b': {$slice: 3}, c: 0}"));
+    auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
+    ASSERT_DOCUMENT_EQ(
+        Document{fromjson("{a: {b: [1,2,3]}}")},
+        executor->applyTransformation(Document{fromjson("{a: {b: [1,2,3,4]}, c: 'abc'}")}));
+}
+
+TEST_F(ProjectionExecutorTest, CanProjectFindSliceSkipLimitWithExclusion) {
     auto proj = parseWithFindFeaturesEnabled(fromjson("{'a.b': {$slice: [1,2]}, c: 0}"));
     auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
     ASSERT_DOCUMENT_EQ(

@@ -240,7 +240,6 @@ Status CanonicalQuery::init(OperationContext* opCtx,
 
     // Validate the projection if there is one.
     if (!_qr->getProj().isEmpty()) {
-        Status newParserStatus = Status::OK();
         try {
             _proj.emplace(projection_ast::parse(expCtx,
                                                 _qr->getProj(),
@@ -248,31 +247,7 @@ Status CanonicalQuery::init(OperationContext* opCtx,
                                                 _qr->getFilter(),
                                                 ProjectionPolicies::findProjectionPolicies()));
         } catch (const DBException& e) {
-            newParserStatus = e.toStatus();
-        }
-
-        ParsedProjection* pp = nullptr;
-        Status projStatus = ParsedProjection::make(opCtx, _qr->getProj(), _root.get(), &pp);
-
-        std::unique_ptr<ParsedProjection> projDeleter(pp);
-        pp = nullptr;
-
-        // The query system is in the process of migrating from one projection
-        // implementation/language to another. If there's a projection that the old parser rejects
-        // but the new parser accepts, then the client is attempting to use a feature only available
-        // as part of the new language, so we fail to parse.
-        if (newParserStatus.isOK() && !projStatus.isOK()) {
-            return projStatus.withContext(str::stream()
-                                          << "projection " << _qr->getProj()
-                                          << " is supported by new parser but not the old parser");
-        }
-
-        if (!projStatus.isOK()) {
-            return projStatus;
-        }
-
-        if (!newParserStatus.isOK()) {
-            return newParserStatus;
+            return e.toStatus();
         }
 
         _metadataDeps = _proj->metadataDeps();

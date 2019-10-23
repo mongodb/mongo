@@ -29,8 +29,6 @@
 
 #include <memory>
 
-#include "mongo/db/query/parsed_projection.h"
-
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_parser.h"

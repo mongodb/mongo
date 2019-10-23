@@ -659,20 +659,6 @@ StatusWith<unique_ptr<PlanStage>> applyProjection(OperationContext* opCtx,
                               cq->getQueryObj(),
                               ProjectionPolicies::findProjectionPolicies());
 
-    {
-        // The query system is in the process of migrating from one projection
-        // implementation/language to another. If there's a projection that the old parser rejects
-        // but the new parser accepts, then the client is attempting to use a feature only available
-        // as part of the new language, so we fail to parse.
-        // TODO SERVER-42423: Remove this.
-        ParsedProjection* rawParsedProj;
-        Status ppStatus = ParsedProjection::make(opCtx, projObj, cq->root(), &rawParsedProj);
-        if (!ppStatus.isOK()) {
-            return ppStatus;
-        }
-        std::unique_ptr<ParsedProjection> projDeleter(rawParsedProj);
-    }
-
     // ProjectionExec requires the MatchDetails from the query expression when the projection
     // uses the positional operator. Since the query may no longer match the newly-updated
     // document, we forbid this case.
