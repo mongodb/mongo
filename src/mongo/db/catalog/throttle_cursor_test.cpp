@@ -47,6 +47,7 @@ namespace {
 
 const NamespaceString kNss = NamespaceString("test.throttleCursor");
 const KeyString::Value kMinKeyString = KeyString::Value();
+const uint8_t kTickDelay = 200;
 
 class ThrottleCursorTest : public CatalogTestFixture {
 private:
@@ -60,7 +61,7 @@ public:
     int64_t getDifferenceInMillis(Date_t start, Date_t end);
     SortedDataInterfaceThrottleCursor getIdIndex(Collection* coll);
 
-    DataThrottle _dataThrottle;
+    std::unique_ptr<DataThrottle> _dataThrottle;
 };
 
 void ThrottleCursorTest::setUp() {
@@ -84,14 +85,11 @@ void ThrottleCursorTest::setUp() {
         wuow.commit();
     }
 
-    // Set a default tick rate of 200 milliseconds.
     std::unique_ptr<ClockSourceMock> clkSource =
-        std::make_unique<AutoAdvancingClockSourceMock>(Milliseconds(200));
-
-    // Set the initial time to be 1000 milliseconds.
-    clkSource->advance(Milliseconds(999));
+        std::make_unique<AutoAdvancingClockSourceMock>(Milliseconds(kTickDelay));
 
     operationContext()->getServiceContext()->setFastClockSource(std::move(clkSource));
+    _dataThrottle = std::make_unique<DataThrottle>(operationContext());
 }
 
 void ThrottleCursorTest::tearDown() {
@@ -115,7 +113,7 @@ SortedDataInterfaceThrottleCursor ThrottleCursorTest::getIdIndex(Collection* col
     const IndexCatalogEntry* idEntry = coll->getIndexCatalog()->getEntry(idDesc);
     const IndexAccessMethod* iam = idEntry->accessMethod();
 
-    return SortedDataInterfaceThrottleCursor(operationContext(), iam, &_dataThrottle);
+    return SortedDataInterfaceThrottleCursor(operationContext(), iam, _dataThrottle.get());
 }
 
 TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOff) {
@@ -127,7 +125,7 @@ TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOff) {
     FailPointEnableBlock failPoint("fixedCursorDataSizeOf512KBForDataThrottle");
 
     SeekableRecordThrottleCursor cursor =
-        SeekableRecordThrottleCursor(opCtx, coll->getRecordStore(), &_dataThrottle);
+        SeekableRecordThrottleCursor(opCtx, coll->getRecordStore(), _dataThrottle.get());
 
     // With the data throttle off, all operations should finish within a second.
     setMaxMbPerSec(0);
@@ -148,7 +146,7 @@ TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOff) {
     Date_t end = getTime();
 
     ASSERT_EQ(numRecords, 20);
-    ASSERT_TRUE(getDifferenceInMillis(start, end) <= 1000);
+    ASSERT_EQ(getDifferenceInMillis(start, end), kTickDelay * numRecords + kTickDelay);
 }
 
 TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOn) {
@@ -160,7 +158,7 @@ TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOn) {
     FailPointEnableBlock failPoint("fixedCursorDataSizeOf512KBForDataThrottle");
 
     SeekableRecordThrottleCursor cursor =
-        SeekableRecordThrottleCursor(opCtx, coll->getRecordStore(), &_dataThrottle);
+        SeekableRecordThrottleCursor(opCtx, coll->getRecordStore(), _dataThrottle.get());
 
     // Using a throttle with a limit of 1MB per second, all operations should take at least 5
     // seconds to finish. We have 10 records, each of which is 0.5MB courtesy of the fail point, so
@@ -227,7 +225,7 @@ TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOff) {
     Date_t end = getTime();
 
     ASSERT_EQ(numRecords, 10);
-    ASSERT_TRUE(getDifferenceInMillis(start, end) <= 1000);
+    ASSERT_EQ(getDifferenceInMillis(start, end), kTickDelay * numRecords + kTickDelay);
 }
 
 TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOn) {
@@ -290,13 +288,13 @@ TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOff) {
     FailPointEnableBlock failPoint("fixedCursorDataSizeOf512KBForDataThrottle");
 
     SeekableRecordThrottleCursor recordCursor =
-        SeekableRecordThrottleCursor(opCtx, coll->getRecordStore(), &_dataThrottle);
+        SeekableRecordThrottleCursor(opCtx, coll->getRecordStore(), _dataThrottle.get());
 
     SortedDataInterfaceThrottleCursor indexCursor = getIdIndex(coll);
 
     // With the data throttle off, all operations should finish within a second, regardless if
     // the 'maxValidateMBperSec' server parameter is set.
-    _dataThrottle.turnThrottlingOff();
+    _dataThrottle->turnThrottlingOff();
     setMaxMbPerSec(10);
     Date_t start = getTime();
 
@@ -320,7 +318,7 @@ TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOff) {
     Date_t end = getTime();
 
     ASSERT_EQ(numRecords, 30);
-    ASSERT_TRUE(getDifferenceInMillis(start, end) <= 1000);
+    ASSERT_EQ(getDifferenceInMillis(start, end), kTickDelay * numRecords + kTickDelay);
 }
 
 TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOn) {
@@ -332,7 +330,7 @@ TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOn) {
     FailPointEnableBlock failPoint("fixedCursorDataSizeOf512KBForDataThrottle");
 
     SeekableRecordThrottleCursor recordCursor =
-        SeekableRecordThrottleCursor(opCtx, coll->getRecordStore(), &_dataThrottle);
+        SeekableRecordThrottleCursor(opCtx, coll->getRecordStore(), _dataThrottle.get());
 
     SortedDataInterfaceThrottleCursor indexCursor = getIdIndex(coll);
 

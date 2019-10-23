@@ -107,7 +107,13 @@ private:
  */
 class DataThrottle {
 public:
-    DataThrottle() : _startMillis(0), _bytesProcessed(0), _shouldNotThrottle(false) {}
+    DataThrottle(OperationContext* opCtx)
+        : _startMillis(
+              opCtx->getServiceContext()->getFastClockSource()->now().toMillisSinceEpoch()),
+          _bytesProcessed(0),
+          _totalElapsedTimeSec(0),
+          _totalMBProcessed(0),
+          _shouldNotThrottle(false) {}
 
     /**
      * If throttling is not enabled by calling turnThrottlingOff(), or if
@@ -133,6 +139,9 @@ private:
     // Number of bytes processed in the current second being tracked by '_startMillis'. This will
     // contain the number of bytes processed between '_startMillis' and '_startMillis + 999'.
     uint64_t _bytesProcessed;
+
+    float _totalElapsedTimeSec;
+    float _totalMBProcessed;
 
     // Whether the throttle should be active.
     bool _shouldNotThrottle;

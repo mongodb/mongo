@@ -229,6 +229,10 @@ public:
     // Stores the duration of time spent blocked on prepare conflicts.
     Milliseconds prepareConflictDurationMillis{0};
 
+    // Stores the amount of the data processed by the throttle cursors in MB/sec.
+    boost::optional<float> dataThroughputLastSecond;
+    boost::optional<float> dataThroughputAverage;
+
     // Stores additive metrics.
     AdditiveMetrics additiveMetrics;
 

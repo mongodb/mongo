@@ -378,6 +378,7 @@ env.Library(
         'throttle_cursor.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/util/fail_point',
         'max_validate_mb_per_sec_idl',
     ],

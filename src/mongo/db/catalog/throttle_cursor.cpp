@@ -32,6 +32,7 @@
 #include "mongo/db/catalog/throttle_cursor.h"
 
 #include "mongo/db/catalog/max_validate_mb_per_sec_gen.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/operation_context.h"
 
@@ -120,21 +121,23 @@ boost::optional<KeyStringEntry> SortedDataInterfaceThrottleCursor::nextKeyString
 }
 
 void DataThrottle::awaitIfNeeded(OperationContext* opCtx, const int64_t dataSize) {
-    if (_shouldNotThrottle) {
-        return;
-    }
-
-    // No throttling should take place if 'gMaxValidateMBperSec' is zero.
-    uint64_t maxValidateBytesPerSec = gMaxValidateMBperSec.loadRelaxed() * 1024 * 1024;
-    if (maxValidateBytesPerSec == 0) {
-        return;
-    }
-
     int64_t currentMillis =
         opCtx->getServiceContext()->getFastClockSource()->now().toMillisSinceEpoch();
 
     // Reset the tracked information as the second has rolled over the starting point.
     if (currentMillis >= _startMillis + 1000) {
+        float elapsedTimeSec = static_cast<float>(currentMillis - _startMillis) / 1000;
+        float mbProcessed = static_cast<float>(_bytesProcessed + dataSize) / 1024 / 1024;
+
+        // Update how much data we've seen in the last second for CurOp.
+        CurOp::get(opCtx)->debug().dataThroughputLastSecond = mbProcessed / elapsedTimeSec;
+
+        _totalMBProcessed += mbProcessed;
+        _totalElapsedTimeSec += elapsedTimeSec;
+
+        // Update how much data we've seen throughout the lifetime of the DataThrottle for CurOp.
+        CurOp::get(opCtx)->debug().dataThroughputAverage = _totalMBProcessed / _totalElapsedTimeSec;
+
         _startMillis = currentMillis;
         _bytesProcessed = 0;
     }
@@ -142,6 +145,16 @@ void DataThrottle::awaitIfNeeded(OperationContext* opCtx, const int64_t dataSize
     _bytesProcessed += MONGO_unlikely(fixedCursorDataSizeOf512KBForDataThrottle.shouldFail())
         ? /*512KB*/ 1 * 1024 * 512
         : dataSize;
+
+    if (_shouldNotThrottle) {
+        return;
+    }
+
+    // No throttling should take place if 'gMaxValidateMBperSec' is zero.
+    uint64_t maxValidateBytesPerSec = gMaxValidateMBperSec.load() * 1024 * 1024;
+    if (maxValidateBytesPerSec == 0) {
+        return;
+    }
 
     if (_bytesProcessed < maxValidateBytesPerSec) {
         return;

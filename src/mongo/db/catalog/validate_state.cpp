@@ -55,7 +55,7 @@ ValidateState::ValidateState(OperationContext* opCtx,
                              const NamespaceString& nss,
                              bool background,
                              bool fullValidate)
-    : _nss(nss), _background(background), _fullValidate(fullValidate) {
+    : _nss(nss), _background(background), _fullValidate(fullValidate), _dataThrottle(opCtx) {
 
     // Subsequent re-locks will use the UUID when 'background' is true.
     if (_background) {
