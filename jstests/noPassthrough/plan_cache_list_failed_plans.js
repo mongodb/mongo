@@ -12,8 +12,8 @@ coll.drop();
 // Setup the database such that it will generate a failing plan and a succeeding plan.
 const numDocs = 32;
 const smallNumber = 10;
-assert.commandWorked(
-    testDB.adminCommand({setParameter: 1, internalQueryExecMaxBlockingSortBytes: smallNumber}));
+assert.commandWorked(testDB.adminCommand(
+    {setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: smallNumber}));
 for (let i = 0; i < numDocs * 2; ++i)
     assert.commandWorked(coll.insert({a: ((i >= (numDocs * 2) - smallNumber) ? 1 : 0), d: i}));
 

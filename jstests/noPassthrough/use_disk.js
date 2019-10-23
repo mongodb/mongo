@@ -43,7 +43,7 @@ assert(!profileObj.hasOwnProperty("usedDisk"), tojson(profileObj));
 assert.eq(profileObj.hasSortStage, true, tojson(profileObj));
 
 assert.commandWorked(
-    testDB.adminCommand({setParameter: 1, internalQueryExecMaxBlockingSortBytes: 10}));
+    testDB.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: 10}));
 assert.eq(
     8, coll.aggregate([{$match: {a: {$gte: 2}}}, {$sort: {a: 1}}], {allowDiskUse: true}).itcount());
 profileObj = getLatestProfilerEntry(testDB);
@@ -136,7 +136,7 @@ assert.eq(profileObj.usedDisk, true, tojson(profileObj));
 // Test that usedDisk is not set for a $lookup with a pipeline that does not use disk.
 //
 assert.commandWorked(testDB.adminCommand(
-    {setParameter: 1, internalQueryExecMaxBlockingSortBytes: 100 * 1024 * 1024}));
+    {setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: 100 * 1024 * 1024}));
 resetCollection();
 resetForeignCollection();
 coll.aggregate(

@@ -221,7 +221,7 @@ public:
     };
 
     uint64_t maxMemoryUsageBytes() const {
-        return internalQueryExecMaxBlockingSortBytes.load();
+        return internalQueryMaxBlockingSortMemoryUsageBytes.load();
     }
 
     static const char* ns() {

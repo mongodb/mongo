@@ -61,7 +61,7 @@ extern AtomicWord<bool> internalQueryForceIntersectionPlans;
 
 extern AtomicWord<bool> internalQueryPlannerEnableHashIntersection;
 
-extern AtomicWord<int> internalQueryExecMaxBlockingSortBytes;
+extern AtomicWord<int> internalQueryMaxBlockingSortMemoryUsageBytes;
 
 extern AtomicWord<int> internalQueryPlanEvaluationMaxResults;
 
@@ -189,17 +189,19 @@ class PlanRankingPreferNonFailed : public PlanRankingTestBase {
 public:
     PlanRankingPreferNonFailed()
         : PlanRankingTestBase(),
-          _internalQueryExecMaxBlockingSortBytes(internalQueryExecMaxBlockingSortBytes.load()),
+          _internalQueryMaxBlockingSortMemoryUsageBytes(
+              internalQueryMaxBlockingSortMemoryUsageBytes.load()),
           // We set the max results to decrease the amount of work that is done during the trial
           // period. We want it to do less work than there are docs to ensure that no plan reaches
           // EOF.
           _internalQueryPlanEvaluationMaxResults(internalQueryPlanEvaluationMaxResults.load()) {
-        internalQueryExecMaxBlockingSortBytes.store(10);
+        internalQueryMaxBlockingSortMemoryUsageBytes.store(10);
         internalQueryPlanEvaluationMaxResults.store(100);
     }
 
     ~PlanRankingPreferNonFailed() {
-        internalQueryExecMaxBlockingSortBytes.store(_internalQueryExecMaxBlockingSortBytes);
+        internalQueryMaxBlockingSortMemoryUsageBytes.store(
+            _internalQueryMaxBlockingSortMemoryUsageBytes);
         internalQueryPlanEvaluationMaxResults.store(_internalQueryPlanEvaluationMaxResults);
     }
 
@@ -253,9 +255,9 @@ public:
     }
 
 private:
-    // Holds the value of global "internalQueryExecMaxBlockingSortBytes" setParameter flag.
+    // Holds the value of global "internalQueryMaxBlockingSortMemoryUsageBytes" setParameter flag.
     // Restored at end of test invocation regardless of test result.
-    int _internalQueryExecMaxBlockingSortBytes;
+    int _internalQueryMaxBlockingSortMemoryUsageBytes;
     int _internalQueryPlanEvaluationMaxResults;
 };
 

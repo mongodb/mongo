@@ -105,7 +105,7 @@ public:
 
     /**
      * Convenience method for creating a $sort stage. If maxMemoryUsageBytes is boost::none,
-     * then it will actually use the value of internalQueryExecMaxBlockingSortBytes.
+     * then it will actually use the value of 'internalQueryMaxBlockingSortMemoryUsageBytes'.
      */
     static boost::intrusive_ptr<DocumentSourceSort> create(
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,

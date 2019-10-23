@@ -126,7 +126,7 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
                                                ws,
                                                SortPattern{sn->pattern, cq.getExpCtx()},
                                                sn->limit,
-                                               internalQueryExecMaxBlockingSortBytes.load(),
+                                               internalQueryMaxBlockingSortMemoryUsageBytes.load(),
                                                std::move(childStage));
         }
         case STAGE_SORT_KEY_GENERATOR: {

@@ -23,7 +23,7 @@ const kNumDocsExceedingMemLimit = 50;
 const kMemoryLimitExceededErrCode = 16819;
 
 const options = {
-    setParameter: "internalQueryExecMaxBlockingSortBytes=" + kMaxMemoryUsageBytes
+    setParameter: "internalQueryMaxBlockingSortMemoryUsageBytes=" + kMaxMemoryUsageBytes
 };
 const conn = MongoRunner.runMongod(options);
 assert.neq(null, conn, "mongod was unable to start up with options: " + tojson(options));

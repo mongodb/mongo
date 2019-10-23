@@ -202,12 +202,12 @@ server_parameters:
   #
   # Query execution
   #
-  internalQueryExecMaxBlockingSortBytes:
+  internalQueryMaxBlockingSortMemoryUsageBytes:
     description: "The maximum amount of memory a query (e.g. a find or aggregate command) is willing
     to use to execute a blocking sort, measured in bytes. If disk use is allowed, then it may be
     possible to sort more data, but this limit will still constrain the memory consumption."
     set_at: [ startup, runtime ]
-    cpp_varname: "internalQueryExecMaxBlockingSortBytes"
+    cpp_varname: "internalQueryMaxBlockingSortMemoryUsageBytes"
     cpp_vartype: AtomicWord<int>
     default: 
       expr: 100 * 1024 * 1024

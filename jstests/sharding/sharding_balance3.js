@@ -9,7 +9,8 @@ var s = new ShardingTest({
     other: {
         chunkSize: 1,
         enableBalancer: true,
-        shardOptions: {setParameter: {internalQueryExecMaxBlockingSortBytes: 32 * 1024 * 1024}}
+        shardOptions:
+            {setParameter: {internalQueryMaxBlockingSortMemoryUsageBytes: 32 * 1024 * 1024}}
     }
 });
 

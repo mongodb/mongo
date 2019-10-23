@@ -28,7 +28,7 @@ const expectedParamDefaults = {
     internalQueryPlannerEnableHashIntersection: false,
     internalQueryPlanOrChildrenIndependently: true,
     internalQueryMaxScansToExplode: 200,
-    internalQueryExecMaxBlockingSortBytes: 100 * 1024 * 1024,
+    internalQueryMaxBlockingSortMemoryUsageBytes: 100 * 1024 * 1024,
     internalQueryExecYieldIterations: 128,
     internalQueryExecYieldPeriodMS: 10,
     internalQueryFacetBufferSizeBytes: 100 * 1024 * 1024,
@@ -117,9 +117,9 @@ assertSetParameterSucceeds("internalQueryMaxScansToExplode", 11);
 assertSetParameterSucceeds("internalQueryMaxScansToExplode", 0);
 assertSetParameterFails("internalQueryMaxScansToExplode", -1);
 
-assertSetParameterSucceeds("internalQueryExecMaxBlockingSortBytes", 11);
-assertSetParameterSucceeds("internalQueryExecMaxBlockingSortBytes", 0);
-assertSetParameterFails("internalQueryExecMaxBlockingSortBytes", -1);
+assertSetParameterSucceeds("internalQueryMaxBlockingSortMemoryUsageBytes", 11);
+assertSetParameterSucceeds("internalQueryMaxBlockingSortMemoryUsageBytes", 0);
+assertSetParameterFails("internalQueryMaxBlockingSortMemoryUsageBytes", -1);
 
 assertSetParameterSucceeds("internalQueryExecYieldIterations", 10);
 assertSetParameterSucceeds("internalQueryExecYieldIterations", 0);

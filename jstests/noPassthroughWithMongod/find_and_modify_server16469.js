@@ -1,7 +1,7 @@
 // SERVER-16469: test that the findAndModify command will correctly sort a large amount of data
 // without hitting the internal sort memory limit (using a "top-K sort", where K=1).
 //
-// Note that this test sets the server parameter "internalQueryExecMaxBlockingSortBytes", and
+// Note that this test sets the server parameter "internalQueryMaxBlockingSortMemoryUsageBytes", and
 // restores the original value of the parameter before exiting.  As a result, this test cannot run
 // in the sharding passthrough (because mongos does not have this parameter), and cannot run in the
 // parallel suite (because the change of the parameter value would interfere with other tests).
@@ -10,12 +10,12 @@ var coll = db.find_and_modify_server16469;
 coll.drop();
 
 // Set the internal sort memory limit to 1MB.
-var result = db.adminCommand({getParameter: 1, internalQueryExecMaxBlockingSortBytes: 1});
+var result = db.adminCommand({getParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: 1});
 assert.commandWorked(result);
-var oldSortLimit = result.internalQueryExecMaxBlockingSortBytes;
+var oldSortLimit = result.internalQueryMaxBlockingSortMemoryUsageBytes;
 var newSortLimit = 1024 * 1024;
 assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQueryExecMaxBlockingSortBytes: newSortLimit}));
+    db.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: newSortLimit}));
 
 try {
     // Insert ~3MB of data.
@@ -41,6 +41,6 @@ try {
     assert.eq(result.value.b, 0);
 } finally {
     // Restore the orginal sort memory limit.
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryExecMaxBlockingSortBytes: oldSortLimit}));
+    assert.commandWorked(db.adminCommand(
+        {setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: oldSortLimit}));
 }
