@@ -125,7 +125,8 @@ const std::string& IndexBuildInterceptor::getConstraintViolationsTableIdent() co
 
 Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
                                                    const InsertDeleteOptions& options,
-                                                   RecoveryUnit::ReadSource readSource) {
+                                                   RecoveryUnit::ReadSource readSource,
+                                                   DrainYieldPolicy drainYieldPolicy) {
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
     // Reading at a timestamp during hybrid index builds is not supported.
     invariant(readSource == RecoveryUnit::ReadSource::kUnset);

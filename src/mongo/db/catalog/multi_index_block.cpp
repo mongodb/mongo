@@ -699,7 +699,8 @@ Status MultiIndexBlock::drainBackgroundWrites(
         if (!interceptor)
             continue;
 
-        auto status = interceptor->drainWritesIntoIndex(opCtx, _indexes[i].options, readSource);
+        auto status = interceptor->drainWritesIntoIndex(
+            opCtx, _indexes[i].options, readSource, drainYieldPolicy);
         if (!status.isOK()) {
             return status;
         }

@@ -117,7 +117,8 @@ public:
      */
     Status drainWritesIntoIndex(OperationContext* opCtx,
                                 const InsertDeleteOptions& options,
-                                RecoveryUnit::ReadSource readSource);
+                                RecoveryUnit::ReadSource readSource,
+                                DrainYieldPolicy drainYieldPolicy);
 
     /**
      * Returns 'true' if there are no visible records remaining to be applied from the side writes
