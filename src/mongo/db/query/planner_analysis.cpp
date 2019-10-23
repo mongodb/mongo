@@ -384,7 +384,6 @@ std::unique_ptr<ProjectionNode> analyzeProjection(const CanonicalQuery& query,
             }
         }
     }
-
     return std::make_unique<ProjectionNodeDefault>(
         addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot)),
         *query.root(),
@@ -756,7 +755,8 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
             }
         }
 
-        ShardingFilterNode* sfn = new ShardingFilterNode();
+        auto wantShardName = query.metadataDeps()[DocumentMetadataFields::kShardName];
+        ShardingFilterNode* sfn = new ShardingFilterNode(wantShardName);
         sfn->children.push_back(solnRoot.release());
         solnRoot.reset(sfn);
     }

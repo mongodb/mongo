@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/record_id.h"
+#include "mongo/s/shard_id.h"
 
 namespace mongo {
 /**
@@ -64,6 +65,7 @@ public:
         kSearchScore,
         kSortKey,
         kTextScore,
+        kShardName,
 
         // New fields must be added before the kNumFields sentinel.
         kNumFields
@@ -302,6 +304,24 @@ public:
         _holder->recordId = rid;
     }
 
+    bool hasShardName() const {
+        return _holder && _holder->metaFields.test(MetaType::kShardName);
+    }
+
+    ShardId getShardName() const {
+        invariant(hasShardName());
+        return _holder->shardName;
+    }
+
+    void setShardName(ShardId shardName) {
+        if (!_holder) {
+            _holder = std::make_unique<MetadataHolder>();
+        }
+
+        _holder->metaFields.set(MetaType::kShardName);
+        _holder->shardName = shardName;
+    }
+
     void serializeForSorter(BufBuilder& buf) const;
 
 private:
@@ -323,6 +343,7 @@ private:
         Value searchHighlights;
         BSONObj indexKey;
         RecordId recordId;
+        ShardId shardName;
     };
 
     // Null until the first setter is called, at which point a MetadataHolder struct is allocated.

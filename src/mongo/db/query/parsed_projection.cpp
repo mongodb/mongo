@@ -161,7 +161,8 @@ Status ParsedProjection::make(OperationContext* opCtx,
                     e2.valuestr() != QueryRequest::metaRecordId &&
                     e2.valuestr() != QueryRequest::metaGeoNearDistance &&
                     e2.valuestr() != QueryRequest::metaGeoNearPoint &&
-                    e2.valuestr() != QueryRequest::metaSortKey) {
+                    e2.valuestr() != QueryRequest::metaSortKey &&
+                    e2.valuestr() != QueryRequest::metaShardName) {
                     return Status(ErrorCodes::BadValue, "unsupported $meta operator: " + e2.str());
                 }
 

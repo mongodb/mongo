@@ -915,7 +915,7 @@ struct GeoNear2DSphereNode : public QuerySolutionNode {
  * through the pipeline.
  */
 struct ShardingFilterNode : public QuerySolutionNode {
-    ShardingFilterNode() {}
+    ShardingFilterNode(bool wantShardName): _wantShardName(wantShardName) {}
     virtual ~ShardingFilterNode() {}
 
     virtual StageType getType() const {
@@ -935,8 +935,14 @@ struct ShardingFilterNode : public QuerySolutionNode {
     const BSONObjSet& getSort() const {
         return children[0]->getSort();
     }
+    bool wantShardName() const {
+        return _wantShardName;
+    }
 
     QuerySolutionNode* clone() const;
+
+private:
+    bool _wantShardName;
 };
 
 /**

@@ -276,7 +276,8 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
 
             auto css = CollectionShardingState::get(opCtx, collection->ns());
             return std::make_unique<ShardFilterStage>(
-                opCtx, css->getOrphansFilter(opCtx, collection), ws, std::move(childStage));
+                opCtx, css->getOrphansFilter(opCtx, collection), ws, std::move(childStage),
+                fn->wantShardName());
         }
         case STAGE_DISTINCT_SCAN: {
             const DistinctNode* dn = static_cast<const DistinctNode*>(root);

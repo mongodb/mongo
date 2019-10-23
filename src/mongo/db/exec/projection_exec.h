@@ -63,6 +63,7 @@ public:
         META_RECORDID,
         META_SORT_KEY,
         META_TEXT_SCORE,
+        META_SHARD_NAME,
     };
 
     /**
@@ -109,6 +110,13 @@ public:
     }
 
     /**
+     * Indicates whether 'shardName' is going to be used in 'project()'.
+     */
+    bool needsShardName() const {
+        return _needsShardName;
+    }
+
+    /**
      * Returns false if there are no meta fields to project.
      */
     bool hasMetaFields() const {
@@ -124,7 +132,8 @@ public:
                                 Value geoNearPoint = Value{},
                                 const BSONObj& sortKey = BSONObj(),
                                 const boost::optional<const double> textScore = boost::none,
-                                const int64_t recordId = 0) const;
+                                const int64_t recordId = 0,
+                                const StringData& shardName = StringData("")) const;
 
     /**
      * Performs a projection given index 'KeyData' to directly retrieve results. This function
@@ -137,7 +146,8 @@ public:
         Value geoNearPoint = Value{},
         const BSONObj& sortKey = BSONObj(),
         const boost::optional<const double> textScore = boost::none,
-        const int64_t recordId = 0) const;
+        const int64_t recordId = 0,
+        const StringData& shardName = StringData("")) const;
 
     /**
      * Determines if calls to the project method require that this object was created with the full
@@ -157,7 +167,8 @@ private:
                     Value geoNearPoint,
                     const BSONObj& sortKey,
                     const boost::optional<const double> textScore,
-                    const int64_t recordId) const;
+                    const int64_t recordId,
+                    const StringData& shardName) const;
 
     //
     // Initialization
@@ -251,6 +262,7 @@ private:
     bool _needsGeoNearDistance = false;
     bool _needsGeoNearPoint = false;
     bool _needsTextScore = false;
+    bool _needsShardName = false;
 
     // The collator this projection should use to compare strings. Needed for projection operators
     // that perform matching (e.g. elemMatch projection). If null, the collation is a simple binary

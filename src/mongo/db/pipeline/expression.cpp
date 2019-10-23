@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/expression.h"
@@ -2550,6 +2549,7 @@ const std::string geoNearPointName = "geoNearPoint";
 const std::string recordIdName = "recordId";
 const std::string indexKeyName = "indexKey";
 const std::string sortKeyName = "sortKey";
+const std::string shardName = "shardName";
 
 using MetaType = DocumentMetadataFields::MetaType;
 const StringMap<DocumentMetadataFields::MetaType> kMetaNameToMetaType = {
@@ -2562,6 +2562,7 @@ const StringMap<DocumentMetadataFields::MetaType> kMetaNameToMetaType = {
     {searchScoreName, MetaType::kSearchScore},
     {sortKeyName, MetaType::kSortKey},
     {textScoreName, MetaType::kTextScore},
+    {shardName, MetaType::kShardName},
 };
 
 const stdx::unordered_map<DocumentMetadataFields::MetaType, StringData> kMetaTypeToMetaName = {
@@ -2574,6 +2575,7 @@ const stdx::unordered_map<DocumentMetadataFields::MetaType, StringData> kMetaTyp
     {MetaType::kSearchScore, searchScoreName},
     {MetaType::kSortKey, sortKeyName},
     {MetaType::kTextScore, textScoreName},
+    {MetaType::kShardName, shardName},
 };
 
 }  // namespace
@@ -2646,6 +2648,10 @@ Value ExpressionMeta::evaluate(const Document& root, Variables* variables) const
             return metadata.hasSortKey()
                 ? Value(DocumentMetadataFields::serializeSortKey(metadata.isSingleElementKey(),
                                                                  metadata.getSortKey()))
+                : Value();
+        case MetaType::kShardName:
+            return metadata.hasShardName()
+                ? Value(metadata.getShardName().toString())
                 : Value();
         default:
             MONGO_UNREACHABLE;

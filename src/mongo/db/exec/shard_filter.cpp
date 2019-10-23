@@ -38,6 +38,7 @@
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/log.h"
 
@@ -53,8 +54,10 @@ const char* ShardFilterStage::kStageType = "SHARDING_FILTER";
 ShardFilterStage::ShardFilterStage(OperationContext* opCtx,
                                    ScopedCollectionMetadata metadata,
                                    WorkingSet* ws,
-                                   std::unique_ptr<PlanStage> child)
-    : PlanStage(kStageType, opCtx), _ws(ws), _shardFilterer(std::move(metadata)) {
+                                   std::unique_ptr<PlanStage> child,
+                                   bool wantShardName)
+    : PlanStage(kStageType, opCtx), _ws(ws), _shardFilterer(std::move(metadata)),
+      _wantShardName(wantShardName) {
     _children.emplace_back(std::move(child));
 }
 
@@ -103,6 +106,13 @@ PlanStage::StageState ShardFilterStage::doWork(WorkingSetID* out) {
                 _ws->free(*out);
                 ++_specificStats.chunkSkips;
                 return PlanStage::NEED_TIME;
+            }
+
+            if(wantShardName()) {
+                auto sharding = ShardingState::get(this->getOpCtx());
+
+                // Populate the working set member with the shard name and return it.
+                member->metadata().setShardName(sharding->shardId().toString());
             }
         }
 

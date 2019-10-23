@@ -33,6 +33,8 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 
+#include "mongo/s/shard_id.h"
+
 namespace mongo {
 
 namespace {
@@ -173,6 +175,10 @@ void DocumentMetadataFields::serializeForSorter(BufBuilder& buf) const {
         buf.appendNum(static_cast<char>(MetaType::kIndexKey + 1));
         getIndexKey().appendSelfToBufBuilder(buf);
     }
+    if (hasShardName()) {
+        buf.appendNum(static_cast<char>(MetaType::kShardName + 1));
+        buf.appendStr(getShardName());
+    }
     buf.appendNum(static_cast<char>(0));
 }
 
@@ -201,6 +207,8 @@ void DocumentMetadataFields::deserializeForSorter(BufReader& buf, DocumentMetada
         } else if (marker == static_cast<char>(MetaType::kIndexKey) + 1) {
             out->setIndexKey(
                 BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings()));
+        } else if (marker == static_cast<char>(MetaType::kShardName) + 1) {
+            out->setShardName(ShardId(std::string(buf.readCStr())));
         } else {
             uasserted(28744, "Unrecognized marker, unable to deserialize buffer");
         }
