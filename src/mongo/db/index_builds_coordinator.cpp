@@ -853,12 +853,6 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
     invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
 
-    // Rebuilding system indexes during startup using the IndexBuildsCoordinator is done by all
-    // storage engines if they're missing. This includes the mobile storage engine which builds
-    // its indexes in the foreground.
-    invariant(_indexBuildsManager.isBackgroundBuilding(replState->buildUUID) ||
-              storageGlobalParams.engine == "mobile");
-
     // Index builds can safely ignore prepare conflicts and perform writes. On secondaries, prepare
     // operations wait for index builds to complete.
     opCtx->recoveryUnit()->abandonSnapshot();
