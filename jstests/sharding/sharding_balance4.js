@@ -6,6 +6,7 @@
  * @tags: [resource_intensive]
  */
 (function() {
+load('jstests/sharding/autosplit_include.js');
 
 var s = new ShardingTest({shards: 2, mongos: 1, other: {chunkSize: 1, enableAutoSplit: true}});
 
@@ -64,15 +65,19 @@ Random.setRandomSeed();
 
 // Initially update all documents from 1 to N, otherwise later checks can fail because no
 // document previously existed
-var bulk = db.foo.initializeUnorderedBulkOp();
 for (i = 0; i < N; i++) {
+    let bulk = db.foo.initializeUnorderedBulkOp();
     doUpdate(bulk, true, i);
+    assert.commandWorked(bulk.execute());
+    waitForOngoingChunkSplits(s);
 }
 
 for (i = 0; i < N * 9; i++) {
+    let bulk = db.foo.initializeUnorderedBulkOp();
     doUpdate(bulk, false);
+    assert.commandWorked(bulk.execute());
+    waitForOngoingChunkSplits(s);
 }
-assert.commandWorked(bulk.execute());
 
 for (var i = 0; i < 50; i++) {
     s.printChunks("test.foo");
