@@ -505,7 +505,7 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     const auto opTimeToReturn = fassert(28665, loadLastOpTime(opCtx));
     const auto newTermStartDate = fassert(31302, loadLastWallTime(opCtx));
 
-    ReplicationMetrics::get(opCtx).setNewTermStartDate(newTermStartDate);
+    ReplicationMetrics::get(opCtx).setCandidateNewTermStartDate(newTermStartDate);
 
     auto replCoord = ReplicationCoordinator::get(opCtx);
     replCoord->createWMajorityWriteAvailabilityDateWaiter(opTimeToReturn);

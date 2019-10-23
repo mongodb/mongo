@@ -2140,6 +2140,8 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
 
     BSONObj electionCandidateMetrics =
         ReplicationMetrics::get(getServiceContext()).getElectionCandidateMetricsBSON();
+    BSONObj electionParticipantMetrics =
+        ReplicationMetrics::get(getServiceContext()).getElectionParticipantMetricsBSON();
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     Status result(ErrorCodes::InternalError, "didn't set status in prepareStatusResponse");
@@ -2150,6 +2152,7 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
             _getCurrentCommittedSnapshotOpTime_inlock(),
             initialSyncProgress,
             electionCandidateMetrics,
+            electionParticipantMetrics,
             _storage->getLastStableCheckpointTimestamp(_service)},
         response,
         &result);
@@ -2842,6 +2845,9 @@ void ReplicationCoordinatorImpl::_onFollowerModeStateChange() {
 void ReplicationCoordinatorImpl::CatchupState::start_inlock() {
     log() << "Entering primary catch-up mode.";
 
+    // Reset the number of catchup operations performed before starting catchup.
+    _numCatchUpOps = 0;
+
     // No catchup in single node replica set.
     if (_repl->_rsConfig.getNumMembers() == 1) {
         abort_inlock(PrimaryCatchUpConclusionReason::kSkipped);
@@ -2885,8 +2891,6 @@ void ReplicationCoordinatorImpl::CatchupState::start_inlock() {
         return;
     }
     _timeoutCbh = status.getValue();
-
-    _numCatchUpOps = 0;
 }
 
 void ReplicationCoordinatorImpl::CatchupState::abort_inlock(PrimaryCatchUpConclusionReason reason) {
@@ -2962,7 +2966,7 @@ void ReplicationCoordinatorImpl::CatchupState::signalHeartbeatUpdate_inlock() {
     _repl->_opTimeWaiterList.add_inlock(_waiter.get());
 }
 
-void ReplicationCoordinatorImpl::CatchupState::incrementNumCatchUpOps_inlock(int numOps) {
+void ReplicationCoordinatorImpl::CatchupState::incrementNumCatchUpOps_inlock(long numOps) {
     _numCatchUpOps += numOps;
 }
 
@@ -2980,7 +2984,7 @@ Status ReplicationCoordinatorImpl::abortCatchupIfNeeded(PrimaryCatchUpConclusion
     return Status(ErrorCodes::IllegalOperation, "The node is not in catch-up mode.");
 }
 
-void ReplicationCoordinatorImpl::incrementNumCatchUpOpsIfCatchingUp(int numOps) {
+void ReplicationCoordinatorImpl::incrementNumCatchUpOpsIfCatchingUp(long numOps) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_catchupState) {
         _catchupState->incrementNumCatchUpOps_inlock(numOps);
@@ -3489,14 +3493,39 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
         _topCoord->processReplSetRequestVotes(args, response);
     }
 
-    if (!args.isADryRun() && response->getVoteGranted()) {
-        LastVote lastVote{args.getTerm(), args.getCandidateIndex()};
+    if (!args.isADryRun()) {
+        const int candidateIndex = args.getCandidateIndex();
+        LastVote lastVote{args.getTerm(), candidateIndex};
 
-        Status status = _externalState->storeLocalLastVoteDocument(opCtx, lastVote);
-        if (!status.isOK()) {
-            error() << "replSetRequestVotes failed to store LastVote document; " << status;
-            return status;
+        const bool votedForCandidate = response->getVoteGranted();
+
+        if (votedForCandidate) {
+            Status status = _externalState->storeLocalLastVoteDocument(opCtx, lastVote);
+            if (!status.isOK()) {
+                error() << "replSetRequestVotes failed to store LastVote document; " << status;
+                return status;
+            }
         }
+
+        // If the vote was not granted to the candidate, we still want to track metrics around the
+        // node's participation in the election.
+        const long long electionTerm = args.getTerm();
+        const Date_t lastVoteDate = _replExecutor->now();
+        const int electionCandidateMemberId = _rsConfig.getMemberAt(candidateIndex).getId();
+        const std::string voteReason = response->getReason();
+        const OpTime lastAppliedOpTime = _topCoord->getMyLastAppliedOpTime();
+        const OpTime maxAppliedOpTime = _topCoord->latestKnownOpTime();
+        const double priorityAtElection = _rsConfig.getMemberAt(_selfIndex).getPriority();
+
+        ReplicationMetrics::get(getServiceContext())
+            .setElectionParticipantMetrics(votedForCandidate,
+                                           electionTerm,
+                                           lastVoteDate,
+                                           electionCandidateMemberId,
+                                           voteReason,
+                                           lastAppliedOpTime,
+                                           maxAppliedOpTime,
+                                           priorityAtElection);
     }
     return Status::OK();
 }
@@ -3659,6 +3688,10 @@ EventHandle ReplicationCoordinatorImpl::_updateTerm_inlock(
     TopologyCoordinator::UpdateTermResult localUpdateTermResult = _topCoord->updateTerm(term, now);
     {
         if (localUpdateTermResult == TopologyCoordinator::UpdateTermResult::kUpdatedTerm) {
+            // When the node discovers a new term, the new term date metrics are now out-of-date, so
+            // we clear them.
+            ReplicationMetrics::get(getServiceContext()).clearParticipantNewTermDates();
+
             _termShadow.store(term);
             _cancelPriorityTakeover_inlock();
             _cancelAndRescheduleElectionTimeout_inlock();

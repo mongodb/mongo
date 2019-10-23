@@ -497,7 +497,7 @@ Status ReplicationCoordinatorMock::abortCatchupIfNeeded(PrimaryCatchUpConclusion
     return Status::OK();
 }
 
-void ReplicationCoordinatorMock::incrementNumCatchUpOpsIfCatchingUp(int numOps) {
+void ReplicationCoordinatorMock::incrementNumCatchUpOpsIfCatchingUp(long numOps) {
     return;
 }
 

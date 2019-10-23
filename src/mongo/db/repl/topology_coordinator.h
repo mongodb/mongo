@@ -328,6 +328,7 @@ public:
         const OpTime& readConcernMajorityOpTime;
         const BSONObj& initialSyncStatus;
         const BSONObj electionCandidateMetrics;
+        const BSONObj electionParticipantMetrics;
 
         // boost::none if the storage engine does not support recovering to a
         // timestamp. Timestamp::min() if a stable checkpoint is yet to be taken.

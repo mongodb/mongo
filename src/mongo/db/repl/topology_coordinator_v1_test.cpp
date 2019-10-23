@@ -1589,7 +1589,8 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     OpTime readConcernMajorityOpTime(Timestamp(4, 1), 20);
     Timestamp lastStableCheckpointTimestamp(2, 2);
     BSONObj initialSyncStatus = BSON("failedInitialSyncAttempts" << 1);
-    BSONObj electionCandidateMetrics = BSON("DummyElectionMetrics" << 1);
+    BSONObj electionCandidateMetrics = BSON("DummyElectionCandidateMetrics" << 1);
+    BSONObj electionParticipantMetrics = BSON("DummyElectionParticipantMetrics" << 1);
     std::string setName = "mySet";
 
     ReplSetHeartbeatResponse hb;
@@ -1647,6 +1648,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
             readConcernMajorityOpTime,
             initialSyncStatus,
             electionCandidateMetrics,
+            electionParticipantMetrics,
             lastStableCheckpointTimestamp},
         &statusBuilder,
         &resultStatus);
@@ -1748,6 +1750,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_EQUALS(2000, rsStatus["heartbeatIntervalMillis"].numberInt());
     ASSERT_BSONOBJ_EQ(initialSyncStatus, rsStatus["initialSyncStatus"].Obj());
     ASSERT_BSONOBJ_EQ(electionCandidateMetrics, rsStatus["electionCandidateMetrics"].Obj());
+    ASSERT_BSONOBJ_EQ(electionParticipantMetrics, rsStatus["electionParticipantMetrics"].Obj());
 
     // Test no lastStableCheckpointTimestamp field.
     BSONObjBuilder statusBuilder2;
@@ -1766,6 +1769,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_EQUALS(setName, rsStatus["set"].String());
     ASSERT_FALSE(rsStatus.hasField("lastStableCheckpointTimestamp"));
     ASSERT_FALSE(rsStatus.hasField("electionCandidateMetrics"));
+    ASSERT_FALSE(rsStatus.hasField("electionParticipantMetrics"));
 }
 
 TEST_F(TopoCoordTest, NodeReturnsInvalidReplicaSetConfigInResponseToGetStatusWhenAbsentFromConfig) {

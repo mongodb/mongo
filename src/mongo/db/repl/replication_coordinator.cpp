@@ -38,6 +38,8 @@
 namespace mongo {
 namespace repl {
 
+const StringData ReplicationCoordinator::newPrimaryMsgField = "msg"_sd;
+const StringData ReplicationCoordinator::newPrimaryMsg = "new primary"_sd;
 
 namespace {
 const auto getReplicationCoordinator =

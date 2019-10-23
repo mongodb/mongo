@@ -316,7 +316,7 @@ public:
 
     virtual Status abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) override;
 
-    virtual void incrementNumCatchUpOpsIfCatchingUp(int numOps) override;
+    virtual void incrementNumCatchUpOpsIfCatchingUp(long numOps) override;
 
     void signalDropPendingCollectionsRemovedFromStorage() final;
 
@@ -561,7 +561,7 @@ private:
         // Heartbeat calls this function to update the target optime.
         void signalHeartbeatUpdate_inlock();
         // Increment the counter for the number of ops applied during catchup.
-        void incrementNumCatchUpOps_inlock(int numOps);
+        void incrementNumCatchUpOps_inlock(long numOps);
 
     private:
         ReplicationCoordinatorImpl* _repl;  // Not owned.
@@ -571,7 +571,7 @@ private:
         // we can exit catchup mode.
         std::unique_ptr<CallbackWaiter> _waiter;
         // Counter for the number of ops applied during catchup.
-        int _numCatchUpOps;
+        long _numCatchUpOps = 0;
     };
 
     void _resetMyLastOpTimes_inlock();

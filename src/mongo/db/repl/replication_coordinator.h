@@ -851,7 +851,7 @@ public:
      * Increment the counter for the number of ops applied during catchup if the node is in catchup
      * mode.
      */
-    virtual void incrementNumCatchUpOpsIfCatchingUp(int numOps) = 0;
+    virtual void incrementNumCatchUpOpsIfCatchingUp(long numOps) = 0;
 
     /**
      * Signals that drop pending collections have been removed from storage.
@@ -863,6 +863,16 @@ public:
      * operation.
      */
     bool isOplogDisabledFor(OperationContext* opCtx, const NamespaceString& nss);
+
+    /**
+     * Field name of the newPrimaryMsg within the 'o' field in the new term oplog entry.
+     */
+    static const StringData newPrimaryMsgField;
+
+    /**
+     * Message string passed in the new term oplog entry after a primary has stepped up.
+     */
+    static const StringData newPrimaryMsg;
 
 protected:
     ReplicationCoordinator();

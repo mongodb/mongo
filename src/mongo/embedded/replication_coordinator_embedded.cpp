@@ -330,7 +330,7 @@ Status ReplicationCoordinatorEmbedded::processReplSetFresh(const ReplSetFreshArg
     UASSERT_NOT_IMPLEMENTED;
 }
 
-void ReplicationCoordinatorEmbedded::incrementNumCatchUpOpsIfCatchingUp(int numOps) {
+void ReplicationCoordinatorEmbedded::incrementNumCatchUpOpsIfCatchingUp(long numOps) {
     UASSERT_NOT_IMPLEMENTED;
 }
 

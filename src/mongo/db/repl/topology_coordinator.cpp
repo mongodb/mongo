@@ -66,6 +66,8 @@ namespace mongo {
 namespace repl {
 
 MONGO_FAIL_POINT_DEFINE(forceSyncSourceCandidate);
+MONGO_FAIL_POINT_DEFINE(voteNoInElection);
+MONGO_FAIL_POINT_DEFINE(voteYesInDryRunButNoInRealElection);
 
 const Seconds TopologyCoordinator::VoteLease::leaseTime = Seconds(30);
 
@@ -1985,6 +1987,7 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
     const OpTime lastOpDurable = getMyLastDurableOpTime();
     const BSONObj& initialSyncStatus = rsStatusArgs.initialSyncStatus;
     const BSONObj& electionCandidateMetrics = rsStatusArgs.electionCandidateMetrics;
+    const BSONObj& electionParticipantMetrics = rsStatusArgs.electionParticipantMetrics;
     const boost::optional<Timestamp>& lastStableCheckpointTimestamp =
         rsStatusArgs.lastStableCheckpointTimestamp;
 
@@ -2173,6 +2176,10 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
 
     if (!electionCandidateMetrics.isEmpty()) {
         response->append("electionCandidateMetrics", electionCandidateMetrics);
+    }
+
+    if (!electionParticipantMetrics.isEmpty()) {
+        response->append("electionParticipantMetrics", electionParticipantMetrics);
     }
 
     response->append("members", membersOut);
@@ -3332,6 +3339,29 @@ void TopologyCoordinator::summarizeAsHtml(ReplSetHtmlSummary* output) {
 void TopologyCoordinator::processReplSetRequestVotes(const ReplSetRequestVotesArgs& args,
                                                      ReplSetRequestVotesResponse* response) {
     response->setTerm(_term);
+
+    if (MONGO_unlikely(voteNoInElection.shouldFail())) {
+        log() << "failpoint voteNoInElection enabled";
+        response->setVoteGranted(false);
+        response->setReason(str::stream() << "forced to vote no during dry run election due to "
+                                             "failpoint voteNoInElection set");
+        return;
+    }
+
+    if (MONGO_unlikely(voteYesInDryRunButNoInRealElection.shouldFail())) {
+        log() << "failpoint voteYesInDryRunButNoInRealElection enabled";
+        if (args.isADryRun()) {
+            response->setVoteGranted(true);
+            response->setReason(str::stream() << "forced to vote yes in dry run due to failpoint "
+                                                 "voteYesInDryRunButNoInRealElection set");
+        } else {
+            response->setVoteGranted(false);
+            response->setReason(str::stream()
+                                << "forced to vote no in real election due to failpoint "
+                                   "voteYesInDryRunButNoInRealElection set");
+        }
+        return;
+    }
 
     if (args.getTerm() < _term) {
         response->setVoteGranted(false);

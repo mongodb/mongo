@@ -289,7 +289,7 @@ public:
 
     virtual Status abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) override;
 
-    virtual void incrementNumCatchUpOpsIfCatchingUp(int numOps) override;
+    virtual void incrementNumCatchUpOpsIfCatchingUp(long numOps) override;
 
     void signalDropPendingCollectionsRemovedFromStorage() final;
 

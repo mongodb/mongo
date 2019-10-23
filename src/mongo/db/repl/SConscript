@@ -658,6 +658,7 @@ env.Library(
         'oplogreader',
         'repl_coordinator_interface',
         'repl_settings',
+        'replication_metrics',
         'storage_interface',
     ],
     LIBDEPS_PRIVATE=[
