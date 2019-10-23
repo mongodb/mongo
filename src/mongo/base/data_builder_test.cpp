@@ -151,7 +151,7 @@ TEST(DataBuilder, Clear) {
 }
 
 TEST(DataBuilder, Move) {
-    DataBuilder db(1);
+    DataBuilder db(42);
 
     ASSERT_EQUALS(true, db.writeAndAdvance<uint16_t>(1).isOK());
 
@@ -160,7 +160,7 @@ TEST(DataBuilder, Move) {
     ConstDataRangeCursor cdrc = db2.getCursor();
 
     ASSERT_EQUALS(static_cast<uint16_t>(1), cdrc.readAndAdvance<uint16_t>());
-    ASSERT_EQUALS(2u, db2.capacity());
+    ASSERT_EQUALS(42u, db2.capacity());
     ASSERT_EQUALS(2u, db2.size());
 
     ASSERT_EQUALS(0u, db.capacity());
