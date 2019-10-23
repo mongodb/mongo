@@ -3,11 +3,9 @@
  * of initial sync.  Additionally, we will test that a background index build blocks this particular
  * situation until the index build is finished.
  *
- * TODO(SERVER-44042): Remove two_phase_index_builds_unsupported tag.
  * @tags: [
  *     uses_transactions,
  *     uses_prepare_transaction,
- *     two_phase_index_builds_unsupported,
  * ]
  */
 
@@ -91,13 +89,18 @@ jsTestLog("Resuming initial sync");
 assert.commandWorked(secondary.adminCommand(
     {configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}));
 
-// Wait for log message.
-assert.soon(
-    () =>
-        rawMongoProgramOutput().indexOf(
-            "blocking replication until index builds are finished on test.reconstruct_prepared_transactions_initial_sync_index_build, due to prepared transaction") >=
-        0,
-    "replication not hanging");
+const enableTwoPhaseIndexBuild =
+    assert.commandWorked(primary.adminCommand({getParameter: 1, enableTwoPhaseIndexBuild: 1}))
+        .enableTwoPhaseIndexBuild;
+if (!enableTwoPhaseIndexBuild) {
+    // Wait for log message.
+    assert.soon(
+        () =>
+            rawMongoProgramOutput().indexOf(
+                "blocking replication until index builds are finished on test.reconstruct_prepared_transactions_initial_sync_index_build, due to prepared transaction") >=
+            0,
+        "replication not hanging");
+}
 
 // Unblock index build.
 assert.commandWorked(
