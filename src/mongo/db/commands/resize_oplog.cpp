@@ -35,14 +35,13 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {
@@ -82,43 +81,35 @@ public:
              const std::string& dbname,
              const BSONObj& jsobj,
              BSONObjBuilder& result) {
-        const NamespaceString nss("local", "oplog.rs");
-        Lock::GlobalWrite global(opCtx);
-        auto databaseHolder = DatabaseHolder::get(opCtx);
-        auto database = databaseHolder->getDb(opCtx, nss.db());
-        if (!database) {
-            uasserted(ErrorCodes::NamespaceNotFound, "database local does not exist");
-        }
-        Collection* coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
-        if (!coll) {
-            uasserted(ErrorCodes::NamespaceNotFound, "oplog does not exist");
-        }
-        if (!coll->isCapped()) {
-            uasserted(ErrorCodes::IllegalOperation, "oplog isn't capped");
-        }
-        if (!jsobj["size"].isNumber()) {
-            uasserted(ErrorCodes::InvalidOptions, "invalid size field, size should be a number");
-        }
+        AutoGetCollection autoColl(opCtx, NamespaceString::kRsOplogNamespace, MODE_X);
+        Database* database = autoColl.getDb();
+        uassert(ErrorCodes::NamespaceNotFound, "database local does not exist", database);
+        Collection* coll = autoColl.getCollection();
+        uassert(ErrorCodes::NamespaceNotFound, "oplog does not exist", coll);
+        uassert(ErrorCodes::IllegalOperation, "oplog isn't capped", coll->isCapped());
+        uassert(ErrorCodes::InvalidOptions,
+                "invalid size field, size should be a number",
+                jsobj["size"].isNumber());
 
         long long sizeMb = jsobj["size"].numberLong();
-        if (sizeMb < 990L) {
-            uasserted(ErrorCodes::InvalidOptions, "oplog size should be 990MB at least");
-        }
+        uassert(ErrorCodes::InvalidOptions, "oplog size should be 990MB at least", sizeMb >= 990L);
 
         const long long kMB = 1024 * 1024;
         const long long kPB = kMB * 1024 * 1024 * 1024;
-        if (sizeMb > kPB / kMB) {
-            uasserted(ErrorCodes::InvalidOptions, "oplog size in MB cannot exceed maximum of 1PB");
-        }
+        uassert(ErrorCodes::InvalidOptions,
+                "oplog size in MB cannot exceed maximum of 1PB",
+                sizeMb <= kPB / kMB);
         long long size = sizeMb * kMB;
 
-        WriteUnitOfWork wunit(opCtx);
-        Status status = coll->getRecordStore()->updateCappedSize(opCtx, size);
-        uassertStatusOK(status);
-        DurableCatalog::get(opCtx)->updateCappedSize(opCtx, coll->ns(), size);
-        wunit.commit();
-        LOG(0) << "replSetResizeOplog success, currentSize:" << size;
-        return true;
+        return writeConflictRetry(opCtx, "replSetResizeOplog", coll->ns().ns(), [&] {
+            WriteUnitOfWork wunit(opCtx);
+            Status status = coll->getRecordStore()->updateCappedSize(opCtx, size);
+            uassertStatusOK(status);
+            DurableCatalog::get(opCtx)->updateCappedSize(opCtx, coll->ns(), size);
+            wunit.commit();
+            LOG(0) << "replSetResizeOplog success, currentSize:" << size;
+            return true;
+        });
     }
 
 } cmdReplSetResizeOplog;
