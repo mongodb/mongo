@@ -26,8 +26,8 @@
 # it in the license file.
 #
 
-# This file defines the IDL interface for the DeletionTask class which is used to serialize chunk
-# ranges for RangeDeletionService
+# This file defines the format of documents stored in config.rangeDeletions. Each document
+# represents a chunk range to be deleted by the CollectionRangeDeleter.
 
 global:
     cpp_namespace: "mongo"
@@ -46,15 +46,22 @@ types:
         deserializer: "mongo::ChunkRange::fromBSONThrowing"
 
 structs:
-    deletionTask:
+    rangeDeletionTask:
         description: "Represents a chunk range to be deleted by the range deleter."
         strict: false
         fields:
             nss:
                 type: namespacestring
                 description: "The namespace of the collection that the chunk belongs to."
+            collectionUuid:
+                type: namespacestring
+                description: "The UUID of the collection that the chunk belongs to."
             range:
                 type: chunkRangeType
                 description: "The range to be deleted. Needs to be optional since ChunkRange
                               doesn't have a default constructor."
+                optional: true
+            pending:
+                type: bool
+                description: "Flag that is present if the range is not yet ready for deletion"
                 optional: true
