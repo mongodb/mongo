@@ -78,9 +78,12 @@ public:
     }
 
     DataBuilder& operator=(DataBuilder&& other) {
+        size_t size = other.size();
         _buf = std::move(other._buf);
         _capacity = other._capacity;
-        _unwrittenSpaceCursor = {_buf.get(), _buf.get() + other.size()};
+        char* start = _buf.get() + size;
+        char* end = _buf.get() + _capacity;
+        _unwrittenSpaceCursor = {start, end};
 
         other._capacity = 0;
         other._unwrittenSpaceCursor = {nullptr, nullptr};
