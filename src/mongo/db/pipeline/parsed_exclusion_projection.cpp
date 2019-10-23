@@ -56,9 +56,6 @@ void ParsedExclusionProjection::parse(const BSONObj& spec, ExclusionNode* node, 
     for (auto elem : spec) {
         const auto fieldName = elem.fieldNameStringData();
 
-        // A $ should have been detected by ParsedAggregationProjection before we get here.
-        invariant(fieldName[0] != '$');
-
         // Track whether the projection spec specifies a desired behavior for the _id field.
         idSpecified = idSpecified || fieldName == "_id"_sd || fieldName.startsWith("_id."_sd);
 

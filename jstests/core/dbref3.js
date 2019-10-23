@@ -43,3 +43,17 @@ t.insert({sub: {$ref: "foo", $id: [{x: 1, y: 1}, {x: 2, y: 2}, {x: 3, y: 3}]}});
 var k = t.findOne({'sub.$id': {$elemMatch: {x: 2}}}, {_id: 0, 'sub.$id.$': 1});
 print('k = ' + tojson(k));
 assert.eq({sub: {$id: [{x: 2, y: 2}]}}, k);
+
+// Check that DBRef fields can be excluded
+assert.commandWorked(
+    t.insert({_id: 0, shouldExclude: 1, sub: {$ref: "foo", $id: 10, $db: "someDb"}}));
+assert.eq(t.find({shouldExclude: 1}, {"sub.$ref": 0}).toArray(),
+          [{_id: 0, shouldExclude: 1, sub: {$id: 10, $db: "someDb"}}]);
+assert.eq(t.find({shouldExclude: 1}, {"sub.$id": 0}).toArray(),
+          [{_id: 0, shouldExclude: 1, sub: {$ref: "foo", $db: "someDb"}}]);
+assert.eq(t.find({shouldExclude: 1}, {"sub.$id": 0, "sub.$ref": 0, "sub.$db": 0}).toArray(),
+          [{_id: 0, shouldExclude: 1, sub: {}}]);
+
+// It should be legal to exclude a DBRef field anywhere, even at the top layer.
+assert.eq(t.aggregate([{$match: {shouldExclude: 1}}, {$project: {"$id": 0, sub: 0}}]).toArray(),
+          [{_id: 0, shouldExclude: 1}]);
