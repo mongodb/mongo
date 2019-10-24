@@ -1355,6 +1355,15 @@ if link_model == "auto":
 if env.TargetOSIs('windows') and link_model not in ['object', 'static', 'dynamic-sdk']:
     env.FatalError("Windows builds must use the 'object', 'dynamic-sdk', or 'static' link models")
 
+
+# The mongodbtoolchain currently doesn't produce working binaries if
+# you combine a dynamic build with a non-system allocator, but the
+# failure mode is non-obvious. For now, prevent people from wandering
+# inadvertantly into this trap. Remove this constraint when
+# https://jira.mongodb.org/browse/SERVER-27675 is resolved.
+if (link_model == 'dynamic') and ('mongodbtoolchain' in env['CXX']) and (env['MONGO_ALLOCATOR'] != 'system'):
+    env.FatalError('Cannot combine the MongoDB toolchain, a dynamic build, and a non-system allocator. Choose two.')
+
 # The 'object' mode for libdeps is enabled by setting _LIBDEPS to $_LIBDEPS_OBJS. The other two
 # modes operate in library mode, enabled by setting _LIBDEPS to $_LIBDEPS_LIBS.
 env['_LIBDEPS'] = '$_LIBDEPS_OBJS' if link_model == "object" else '$_LIBDEPS_LIBS'
