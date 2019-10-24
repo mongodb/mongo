@@ -578,7 +578,7 @@ private:
 
     // The absolute value of constexpr `i` as a uint64_t, avoiding warnings.
     template <typename T>
-    constexpr std::uint64_t _makeCoefficientLow(T i) {
+    static constexpr std::uint64_t _makeCoefficientLow(T i) {
         if constexpr (std::is_signed_v<T>) {
             if (i < 0) {
                 std::make_unsigned_t<T> ui = i;
