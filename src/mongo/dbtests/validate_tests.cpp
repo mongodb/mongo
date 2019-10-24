@@ -1307,7 +1307,7 @@ public:
             options.logIfError = true;
             options.dupsAllowed = true;
 
-            ASSERT_OK(iam->remove(&_opCtx, actualKey, RecordId(1), options, &numDeleted));
+            ASSERT_OK(iam->remove(&_opCtx, actualKey, rid, options, &numDeleted));
 
             ASSERT_EQUALS(numDeleted, 1);
             wunit.commit();
@@ -1332,7 +1332,7 @@ public:
             options.logIfError = true;
             options.dupsAllowed = true;
 
-            ASSERT_OK(iam->remove(&_opCtx, actualKey, RecordId(1), options, &numDeleted));
+            ASSERT_OK(iam->remove(&_opCtx, actualKey, rid, options, &numDeleted));
             ASSERT_EQUALS(numDeleted, 1);
             wunit.commit();
 
