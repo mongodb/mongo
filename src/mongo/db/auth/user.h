@@ -82,6 +82,10 @@ public:
                 base64::validate(serverKey) && (storedKey.size() == kEncodedHashLength) &&
                 base64::validate(storedKey);
         }
+
+        bool empty() const {
+            return !iterationCount && salt.empty() && serverKey.empty() && storedKey.empty();
+        }
     };
     struct CredentialData {
         CredentialData() : scram_sha1(), scram_sha256(), isExternal(false) {}

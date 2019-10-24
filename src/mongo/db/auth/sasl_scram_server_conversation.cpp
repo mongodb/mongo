@@ -53,7 +53,6 @@
 
 namespace mongo {
 
-
 template <typename Policy>
 StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::stepImpl(
     OperationContext* opCtx, StringData inputData) {
@@ -210,10 +209,15 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
             return Status(ErrorCodes::AuthenticationFailed,
                           "It is not possible to authenticate as the __system user "
                           "on servers started without a --keyFile parameter");
+        } else if (scramCredentials.empty()) {
+            return {ErrorCodes::AuthenticationFailed,
+                    str::stream() << "Unable to use " << Policy::getName()
+                                  << " based authentication for user without any "
+                                  << Policy::getName() << " credentials registered"};
         } else {
-            return Status(ErrorCodes::AuthenticationFailed,
-                          "Unable to perform SCRAM authentication for a user with missing "
-                          "or invalid SCRAM credentials");
+            return {ErrorCodes::AuthenticationFailed,
+                    str::stream() << "Unable to validate " << Policy::getName()
+                                  << " authentication due to corrupted stored credentials"};
         }
     }
 
