@@ -125,7 +125,7 @@ public:
     std::vector<std::string> oplogEntries;
 
     bool onInsertsThrows = false;
-    bool onInsertsIsGlobalWriteLockExclusive = false;
+    bool onInsertsIsTargetDatabaseExclusivelyLocked = false;
 
     bool onRenameCollectionCalled = false;
     OptionalCollectionUUID onRenameCollectionDropTarget;
@@ -161,10 +161,9 @@ void OpObserverMock::onInserts(OperationContext* opCtx,
         uasserted(ErrorCodes::OperationFailed, "insert failed");
     }
 
-    // Check global lock state.
-    auto lockState = opCtx->lockState();
-    ASSERT_TRUE(lockState->isWriteLocked());
-    onInsertsIsGlobalWriteLockExclusive = lockState->isW();
+    ASSERT_TRUE(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
+    onInsertsIsTargetDatabaseExclusivelyLocked =
+        opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_X);
 
     _logOp(opCtx, nss, "inserts");
     OpObserverNoop::onInserts(opCtx, nss, uuid, begin, end, fromMigrate);
@@ -1089,28 +1088,28 @@ TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseDropsTemporaryCollect
     _checkOplogEntries(_opObserver->oplogEntries, {"create", "index", "drop"});
 }
 
-TEST_F(RenameCollectionTest,
-       RenameCollectionAcrossDatabaseDowngradesGlobalWriteLockToNonExclusive) {
+TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabasesWithoutLocks) {
     _createCollection(_opCtx.get(), _sourceNss);
     _insertDocument(_opCtx.get(), _sourceNss, BSON("_id" << 0));
     ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, {}));
-    ASSERT_FALSE(_opObserver->onInsertsIsGlobalWriteLockExclusive);
+    ASSERT_FALSE(_opObserver->onInsertsIsTargetDatabaseExclusivelyLocked);
 }
 
-TEST_F(RenameCollectionTest,
-       RenameCollectionAcrossDatabaseKeepsGlobalWriteLockExclusiveIfCallerHasGlobalWriteLock) {
+TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabasesWithLocks) {
     // This simulates the case when renameCollection is called using the applyOps command (different
     // from secondary oplog application).
     _createCollection(_opCtx.get(), _sourceNss);
     _insertDocument(_opCtx.get(), _sourceNss, BSON("_id" << 0));
-    Lock::GlobalWrite globalWrite(_opCtx.get());
+    Lock::DBLock sourceLk(_opCtx.get(), _sourceNss.db(), MODE_X);
+    Lock::DBLock targetLk(_opCtx.get(), _targetNssDifferentDb.db(), MODE_X);
     ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, {}));
-    ASSERT_TRUE(_opObserver->onInsertsIsGlobalWriteLockExclusive);
+    ASSERT_TRUE(_opObserver->onInsertsIsTargetDatabaseExclusivelyLocked);
 }
 
 TEST_F(RenameCollectionTest, CollectionPointerRemainsValidThroughRename) {
     _createCollection(_opCtx.get(), _sourceNss);
-    Lock::GlobalWrite globalWrite(_opCtx.get());
+    Lock::DBLock sourceLk(_opCtx.get(), _sourceNss.db(), MODE_X);
+    Lock::DBLock targetLk(_opCtx.get(), _targetNss.db(), MODE_X);
 
     // Get a pointer to the source collection, and ensure that it reports the expected namespace
     // string.
@@ -1147,7 +1146,8 @@ TEST_F(RenameCollectionTest, CatalogPointersRenameValidThroughRenameForApplyOps)
 
 TEST_F(RenameCollectionTest, CollectionCatalogMappingRemainsIntactThroughRename) {
     _createCollection(_opCtx.get(), _sourceNss);
-    Lock::GlobalWrite globalWrite(_opCtx.get());
+    Lock::DBLock sourceLk(_opCtx.get(), _sourceNss.db(), MODE_X);
+    Lock::DBLock targetLk(_opCtx.get(), _targetNss.db(), MODE_X);
     auto& catalog = CollectionCatalog::get(_opCtx.get());
     Collection* sourceColl = _getCollection_inlock(_opCtx.get(), _sourceNss);
     ASSERT(sourceColl);

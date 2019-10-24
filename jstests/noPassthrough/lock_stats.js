@@ -5,19 +5,33 @@
 (function() {
 'use strict';
 
-function testBlockTime(blockTimeMillis) {
-    assert.commandWorked(db.getSiblingDB('t1').createCollection('test'));
+const waitForCommand = function(waitingFor, opFilter) {
+    let opId = -1;
+    assert.soon(function() {
+        print(`Checking for ${waitingFor}`);
+        const curopRes = db.getSiblingDB("admin").currentOp();
+        assert.commandWorked(curopRes);
+        const foundOp = curopRes["inprog"].filter(opFilter);
 
+        if (foundOp.length == 1) {
+            opId = foundOp[0]["opid"];
+        }
+        return (foundOp.length == 1);
+    });
+    return opId;
+};
+
+function testBlockTime(blockTimeMillis) {
     // Lock the database, and in parallel start an operation that needs the lock, so it blocks.
     assert.commandWorked(db.fsyncLock());
     var startStats = db.serverStatus().locks.Global;
     var startTime = new Date();
     var minBlockedMillis = blockTimeMillis;
 
-    // This is just some command that requires a MODE_X global lock that conflicts.
-    let awaitRename = startParallelShell(() => {
-        assert.commandWorked(
-            db.adminCommand({renameCollection: 't1.test', to: 't2.test', dropTarget: true}));
+    let awaitSleepCmd = startParallelShell(() => {
+        assert.commandFailedWithCode(
+            db.adminCommand({sleep: 1, secs: 500, lock: "w", $comment: "Lock sleep"}),
+            ErrorCodes.Interrupted);
     }, conn.port);
 
     // Wait until we see somebody waiting to acquire the lock, defend against unset stats.
@@ -32,12 +46,17 @@ function testBlockTime(blockTimeMillis) {
         return stats.acquireWaitCount.W > startStats.acquireWaitCount.W;
     }));
 
+    const sleepID = waitForCommand(
+        "sleepCmd", op => (op["ns"] == "admin.$cmd" && op["command"]["$comment"] == "Lock sleep"));
+
     // Sleep for minBlockedMillis, so the acquirer would have to wait at least that long.
     sleep(minBlockedMillis);
     db.fsyncUnlock();
 
-    // Wait for the parallel shell to finish, so its stats will have been recorded.
-    awaitRename();
+    // Interrupt the sleep command.
+    assert.commandWorked(db.getSiblingDB("admin").killOp(sleepID));
+
+    awaitSleepCmd();
 
     // The fsync command from the shell cannot have possibly been blocked longer than this.
     var maxBlockedMillis = new Date() - startTime;
