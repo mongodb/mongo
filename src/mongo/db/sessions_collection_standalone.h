@@ -46,7 +46,7 @@ public:
     /**
      * Ensures that the sessions collection exists and has the proper indexes.
      */
-    Status setupSessionsCollection(OperationContext* opCtx) override;
+    void setupSessionsCollection(OperationContext* opCtx) override;
 
     /**
      * Checks if the sessions collection exists and has the proper indexes.

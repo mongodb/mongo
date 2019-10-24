@@ -106,9 +106,7 @@ public:
     explicit MockSessionsCollection(std::shared_ptr<MockSessionsCollectionImpl> impl)
         : _impl(std::move(impl)) {}
 
-    Status setupSessionsCollection(OperationContext* opCtx) override {
-        return Status::OK();
-    }
+    void setupSessionsCollection(OperationContext* opCtx) override {}
 
     Status checkSessionsCollectionExists(OperationContext* opCtx) override {
         return Status::OK();

@@ -48,7 +48,7 @@ public:
      * Ensures that the sessions collection exists, is sharded,
      * and has the proper indexes.
      */
-    Status setupSessionsCollection(OperationContext* opCtx) override;
+    void setupSessionsCollection(OperationContext* opCtx) override;
 
     /**
      * Checks if the sessions collection exists. Does not check if the index exists in the sharded

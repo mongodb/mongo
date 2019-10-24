@@ -124,7 +124,8 @@ void LogicalSessionCacheImpl::_periodicRefresh(Client* client) {
     try {
         _refresh(client);
     } catch (...) {
-        log() << "Failed to refresh session cache: " << exceptionToStatus();
+        log() << "Failed to refresh session cache: " << exceptionToStatus()
+              << ", will try again at the next refresh interval";
     }
 }
 
@@ -241,11 +242,12 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
 
     ON_BLOCK_EXIT([&opCtx] { clearShardingOperationFailedStatus(opCtx); });
 
-    auto setupStatus = _sessionsColl->setupSessionsCollection(opCtx);
+    try {
+        _sessionsColl->setupSessionsCollection(opCtx);
 
-    if (!setupStatus.isOK()) {
-        log() << "Sessions collection is not set up; "
-              << "waiting until next sessions refresh interval: " << setupStatus.reason();
+    } catch (DBException& ex) {
+        log() << "Failed to refresh session cache: " << ex.reason()
+              << ", will try again at the next refresh interval";
         return;
     }
 

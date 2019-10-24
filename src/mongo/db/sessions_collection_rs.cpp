@@ -47,6 +47,7 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -120,35 +121,37 @@ auto SessionsCollectionRS::_dispatch(const NamespaceString& ns,
     }
 }
 
-Status SessionsCollectionRS::setupSessionsCollection(OperationContext* opCtx) {
-    return _dispatch(
-        NamespaceString::kLogicalSessionsNamespace,
-        opCtx,
-        [&] {
-            auto existsStatus = checkSessionsCollectionExists(opCtx);
-            if (existsStatus.isOK()) {
+void SessionsCollectionRS::setupSessionsCollection(OperationContext* opCtx) {
+    uassertStatusOKWithContext(
+        _dispatch(
+            NamespaceString::kLogicalSessionsNamespace,
+            opCtx,
+            [&] {
+                auto existsStatus = checkSessionsCollectionExists(opCtx);
+                if (existsStatus.isOK()) {
+                    return Status::OK();
+                }
+
+                DBDirectClient client(opCtx);
+                BSONObj cmd;
+
+                if (existsStatus.code() == ErrorCodes::IndexOptionsConflict) {
+                    cmd = generateCollModCmd();
+                } else {
+                    // Creating the TTL index will auto-generate the collection.
+                    cmd = generateCreateIndexesCmd();
+                }
+
+                BSONObj info;
+                if (!client.runCommand(
+                        NamespaceString::kLogicalSessionsNamespace.db().toString(), cmd, info)) {
+                    return getStatusFromCommandResult(info);
+                }
+
                 return Status::OK();
-            }
-
-            DBDirectClient client(opCtx);
-            BSONObj cmd;
-
-            if (existsStatus.code() == ErrorCodes::IndexOptionsConflict) {
-                cmd = generateCollModCmd();
-            } else {
-                // Creating the TTL index will auto-generate the collection.
-                cmd = generateCreateIndexesCmd();
-            }
-
-            BSONObj info;
-            if (!client.runCommand(
-                    NamespaceString::kLogicalSessionsNamespace.db().toString(), cmd, info)) {
-                return getStatusFromCommandResult(info);
-            }
-
-            return Status::OK();
-        },
-        [&](DBClientBase*) { return checkSessionsCollectionExists(opCtx); });
+            },
+            [&](DBClientBase*) { return checkSessionsCollectionExists(opCtx); }),
+        str::stream() << "Failed to create " << NamespaceString::kLogicalSessionsNamespace);
 }
 
 Status SessionsCollectionRS::checkSessionsCollectionExists(OperationContext* opCtx) {

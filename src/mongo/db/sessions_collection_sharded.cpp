@@ -48,6 +48,7 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/cluster_write.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -134,8 +135,8 @@ std::vector<LogicalSessionRecord> SessionsCollectionSharded::_groupSessionRecord
     return sessionRecordsGroupedByShard;
 }
 
-Status SessionsCollectionSharded::setupSessionsCollection(OperationContext* opCtx) {
-    return checkSessionsCollectionExists(opCtx);
+void SessionsCollectionSharded::setupSessionsCollection(OperationContext* opCtx) {
+    uassertStatusOK(checkSessionsCollectionExists(opCtx));
 }
 
 Status SessionsCollectionSharded::checkSessionsCollectionExists(OperationContext* opCtx) {

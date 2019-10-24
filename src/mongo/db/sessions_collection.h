@@ -53,7 +53,7 @@ public:
     /**
      * Ensures that the sessions collection exists and has the proper indexes.
      */
-    virtual Status setupSessionsCollection(OperationContext* opCtx) = 0;
+    virtual void setupSessionsCollection(OperationContext* opCtx) = 0;
 
     /**
      * Checks if the sessions collection exists and has the proper indexes.

@@ -53,7 +53,7 @@ public:
      *
      * If there are no shards in this cluster, this method will do nothing.
      */
-    Status setupSessionsCollection(OperationContext* opCtx) override;
+    void setupSessionsCollection(OperationContext* opCtx) override;
 
     /**
      * Checks if the sessions collection exists.
@@ -61,8 +61,8 @@ public:
     Status checkSessionsCollectionExists(OperationContext* opCtx) override;
 
 private:
-    Status _shardCollectionIfNeeded(OperationContext* opCtx);
-    Status _generateIndexesIfNeeded(OperationContext* opCtx);
+    void _shardCollectionIfNeeded(OperationContext* opCtx);
+    void _generateIndexesIfNeeded(OperationContext* opCtx);
 
     Mutex _mutex = MONGO_MAKE_LATCH("SessionsCollectionConfigServer::_mutex");
 };

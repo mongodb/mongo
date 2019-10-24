@@ -45,10 +45,10 @@ BSONObj lsidQuery(const LogicalSessionId& lsid) {
 }
 }  // namespace
 
-Status SessionsCollectionStandalone::setupSessionsCollection(OperationContext* opCtx) {
+void SessionsCollectionStandalone::setupSessionsCollection(OperationContext* opCtx) {
     auto existsStatus = checkSessionsCollectionExists(opCtx);
     if (existsStatus.isOK()) {
-        return Status::OK();
+        return;
     }
 
     DBDirectClient client(opCtx);
@@ -62,10 +62,10 @@ Status SessionsCollectionStandalone::setupSessionsCollection(OperationContext* o
 
     BSONObj info;
     if (!client.runCommand(NamespaceString::kLogicalSessionsNamespace.db().toString(), cmd, info)) {
-        return getStatusFromCommandResult(info);
+        uassertStatusOKWithContext(getStatusFromCommandResult(info),
+                                   str::stream() << "Failed to create "
+                                                 << NamespaceString::kLogicalSessionsNamespace);
     }
-
-    return Status::OK();
 }
 
 Status SessionsCollectionStandalone::checkSessionsCollectionExists(OperationContext* opCtx) {
