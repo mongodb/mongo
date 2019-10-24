@@ -128,8 +128,11 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
             boost::optional<Session::TxnResources> txnResources;
             if (session && session->inActiveOrKilledMultiDocumentTransaction()) {
                 // Stash the current transaction so that writes to the profile collection are not
-                // done as part of the transaction.
-                txnResources = Session::TxnResources(opCtx);
+                // done as part of the transaction. We don't want to release the ticket so that
+                // we don't have to reacquire it within the ON_BLOCK_EXIT. This will be for a
+                // short period of time, so we're not holding onto extra resources for that much
+                // longer than we have to.
+                txnResources = Session::TxnResources(opCtx, true /* keepTicket */);
             }
             ON_BLOCK_EXIT([&] {
                 if (txnResources) {
@@ -510,7 +513,6 @@ WriteResult performInserts(OperationContext* opCtx,
                     durationCount<Microseconds>(curOp.elapsedTimeExcludingPauses()),
                     curOp.isCommand(),
                     curOp.getReadWriteType());
-
     });
 
     {
