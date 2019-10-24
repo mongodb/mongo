@@ -4012,7 +4012,7 @@ else:
             "jstests/",
             "src/mongo/",
         ],
-        action="$PYTHON ${{SOURCES[0]}} --dirmode lint ${{SOURCES[1:]}}",
+        action="$PYTHON ${SOURCES[0]} --dirmode lint ${SOURCES[1:]}",
     )
 
 lint_py = env.Command(
