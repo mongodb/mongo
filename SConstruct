@@ -128,6 +128,13 @@ add_option('legacy-tarball',
     help='Build a tarball matching the old MongoDB dist targets',
 )
 
+add_option('lint-scope',
+    choices=['all', 'changed'],
+    default='all',
+    type='choice',
+    help='Lint files in the current git diff instead of all files'
+)
+
 add_option('install-mode',
     choices=['legacy', 'hygienic'],
     default='legacy',
@@ -712,6 +719,10 @@ env_vars.Add('DESTDIR',
     help='Where hygienic builds will install files',
     default='$BUILD_ROOT/install')
 
+env_vars.Add('GITDIFFFLAGS',
+    help='Sets flags for git diff',
+    default='')
+
 # Note: This probably is only really meaningful when configured via a variables file. It will
 # also override whatever the SCons platform defaults would be.
 env_vars.Add('ENV',
@@ -820,7 +831,7 @@ different configurations, for instance:
 
     scons --sanitize=asan --ninja NINJA_SUFFIX=asan ninja-install-all-meta
     scons --sanitize=tsan --ninja NINJA_SUFFIX=tsan ninja-install-all-meta
-          
+
 Will generate the files (respectively):
 
     install-all-meta.build.ninja.asan
@@ -3941,26 +3952,79 @@ env.AddMethod(env_windows_resource_file, 'WindowsResourceFile')
 
 # --- lint ----
 
-def doLint( env , target , source ):
-    import buildscripts.eslint
-    if not buildscripts.eslint.lint(None, dirmode=True, glob=["jstests/", "src/mongo/"]):
-        raise Exception("ESLint errors")
+if get_option('lint-scope') == 'changed':
+    patch_file = env.Command(
+        target="$BUILD_DIR/current.git.patch",
+        source=[env.WhereIs("git")],
+        action="${SOURCES[0]} diff $GITDIFFFLAGS > $TARGET"
+    )
 
-    import buildscripts.clang_format
-    if not buildscripts.clang_format.lint_all(None):
-        raise Exception("clang-format lint errors")
+    env.AlwaysBuild(patch_file)
 
-    import buildscripts.pylinters
-    buildscripts.pylinters.lint_all(None, {}, [])
+    pylinters = env.Command(
+        target="#lint-pylinters",
+        source=[
+            "buildscripts/pylinters.py",
+            patch_file,
+        ],
+        action="$PYTHON ${SOURCES[0]} lint-patch ${SOURCES[1]}"
+    )
 
-run_lint = env.Command(
-    target="#run_lint",
+    clang_format = env.Command(
+        target="#lint-clang-format",
+        source=[
+            "buildscripts/clang_format.py",
+            patch_file,
+        ],
+        action="$PYTHON ${SOURCES[0]} lint-patch ${SOURCES[1]}"
+    )
+
+    eslint = env.Command(
+        target="#lint-eslint",
+        source=[
+            "buildscripts/eslint.py",
+            patch_file,
+        ],
+        action="$PYTHON ${SOURCES[0]} lint-patch ${SOURCES[1]}"
+    )
+
+else:
+    pylinters = env.Command(
+        target="#lint-pylinters",
+        source=[
+            "buildscripts/pylinters.py",
+        ],
+        action="$PYTHON ${SOURCES[0]} lint-all"
+    )
+
+    clang_format = env.Command(
+        target="#lint-clang-format",
+        source=[
+            "buildscripts/clang_format.py",
+        ],
+        action="$PYTHON ${SOURCES[0]} lint-all"
+    )
+
+    eslint = env.Command(
+        target="#lint-eslint",
+        source=[
+            "buildscripts/eslint.py",
+            "jstests/",
+            "src/mongo/",
+        ],
+        action="$PYTHON ${{SOURCES[0]}} --dirmode lint ${{SOURCES[1:]}}",
+    )
+
+lint_py = env.Command(
+    target="#lint-lint.py",
     source=["buildscripts/lint.py", "src/mongo"],
     action="$PYTHON ${SOURCES[0]} ${SOURCES[1]}",
 )
 
-env.Alias( "lint" , [ run_lint ] , [ doLint ] )
+env.Alias( "lint" , [ lint_py, eslint, clang_format, pylinters ] )
+env.Alias( "lint-fast" , [ eslint, clang_format, pylinters ] )
 env.AlwaysBuild( "lint" )
+env.AlwaysBuild( "lint-fast" )
 
 
 #  ----  INSTALL -------
@@ -4240,8 +4304,8 @@ if get_option('install-mode') == 'hygienic':
         env.Alias("archive-dist", "tar-dist")
         env.Alias("archive-dist-debug", "tar-dist-debug")
 
-# We don't want installing files to cause them to flow into the cache,	
-# since presumably we can re-install them from the origin if needed.	
+# We don't want installing files to cause them to flow into the cache,
+# since presumably we can re-install them from the origin if needed.
 env.NoCache(env.FindInstalledFiles())
 
 # Substitute environment variables in any build targets so that we can

@@ -1683,6 +1683,33 @@ functions:
             exit $(cat run_tests_infrastructure_failure)
           fi
 
+  "scons lint":
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          ${activate_virtualenv}
+          export MYPY="$(
+            if command -V cygpath 2>/dev/null; then
+                PATH+=":$(cypath "${workdir}")/venv_3/Scripts"
+            else
+                PATH+=":${workdir}/venv_3/bin"
+            fi
+            PATH+=':/opt/mongodbtoolchain/v3/bin'
+            which mypy
+          )"
+          echo "Found mypy executable at '$MYPY'"
+          export extra_flags=""
+          if [[ ${is_patch|false} == "true" ]]; then
+            extra_flags="--lint-scope=changed"
+          fi
+
+          ${compile_env|} python3 ./buildscripts/scons.py ${compile_flags|} $extra_flags --stack-size=1024 GITDIFFFLAGS="--cached" ${targets}
+
   "scons compile":
     command: shell.exec
     type: test
@@ -5007,8 +5034,7 @@ tasks:
         display_name: Benchmarks
 
 ## lint ##
-- name: lint
-  depends_on: []
+- name: lint_pylinters
   commands:
     - command: timeout.update
       params:
@@ -5019,26 +5045,54 @@ tasks:
     - func: "set task expansion macros"
     - func: "set up virtualenv"
     - func: "upload pip requirements"
-    - command: shell.exec
-      type: test
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
+    - func: "scons lint"
+      vars:
+        targets: lint-pylinters
 
-          ${activate_virtualenv}
-          export MYPY="$(
-            if command -V cygpath 2>/dev/null; then
-                PATH+=":$(cypath "${workdir}")/venv_3/Scripts"
-            else
-                PATH+=":${workdir}/venv_3/bin"
-            fi
-            PATH+=':/opt/mongodbtoolchain/v3/bin'
-            which mypy
-          )"
-          echo "Found mypy executable at '$MYPY'"
-          ${compile_env|} python3 ./buildscripts/scons.py ${compile_flags|} --stack-size=1024 lint
+- name: lint_clang_format
+  commands:
+    - command: timeout.update
+      params:
+        # 40 minutes
+        exec_timeout_secs: 2400
+    - command: manifest.load
+    - func: "git get project"
+    - func: "set task expansion macros"
+    - func: "set up virtualenv"
+    - func: "upload pip requirements"
+    - func: "scons lint"
+      vars:
+        targets: lint-clang-format
+
+- name: lint_eslint
+  commands:
+    - command: timeout.update
+      params:
+        # 40 minutes
+        exec_timeout_secs: 2400
+    - command: manifest.load
+    - func: "git get project"
+    - func: "set task expansion macros"
+    - func: "set up virtualenv"
+    - func: "upload pip requirements"
+    - func: "scons lint"
+      vars:
+        targets: lint-eslint
+
+- name: lint_cpplint
+  commands:
+    - command: timeout.update
+      params:
+        # 40 minutes
+        exec_timeout_secs: 2400
+    - command: manifest.load
+    - func: "git get project"
+    - func: "set task expansion macros"
+    - func: "set up virtualenv"
+    - func: "upload pip requirements"
+    - func: "scons lint"
+      vars:
+        targets: lint-lint.py
 
 - name: lint_yaml
   depends_on: []
@@ -10669,7 +10723,10 @@ buildvariants:
   - name: compile_benchmarks
     distros:
     - rhel62-large
-  - name: lint
+  - name: lint_pylinters
+  - name: lint_clang_format
+  - name: lint_eslint
+  - name: lint_cpplint
   - name: lint_fuzzer_sanity_patch
   - name: lint_yaml
   - name: burn_in_tests_gen
