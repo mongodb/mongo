@@ -292,15 +292,16 @@ CompareResult compareAllShardVersions(const CachedCollectionRoutingInfo& routing
 }
 
 CompareResult compareDbVersions(const CachedCollectionRoutingInfo& routingInfo,
-                                const boost::optional<DatabaseVersion>& remoteDbVersion) {
+                                const DatabaseVersion& remoteDbVersion) {
     DatabaseVersion cachedDbVersion = routingInfo.db().databaseVersion();
 
     // Db may have been dropped
-    if (!remoteDbVersion || (cachedDbVersion.getUuid() != remoteDbVersion->getUuid())) {
+    if (cachedDbVersion.getUuid() != remoteDbVersion.getUuid()) {
         return CompareResult_Unknown;
     }
 
-    if (cachedDbVersion.getLastMod() < remoteDbVersion->getLastMod()) {
+    // Db may have been moved
+    if (cachedDbVersion.getLastMod() < remoteDbVersion.getLastMod()) {
         return CompareResult_LT;
     }
 
@@ -711,19 +712,28 @@ void ChunkManagerTargeter::noteStaleDbResponse(const ShardEndpoint& endpoint,
 
     DatabaseVersion remoteDbVersion;
     if (!staleInfo.getVersionWanted()) {
-        // If we don't have a vWanted sent, assume the version is higher than our current version.
+        // If the vWanted is not set, assume the wanted version is higher than our current version.
         remoteDbVersion = _routingInfo->db().databaseVersion();
         remoteDbVersion = databaseVersion::makeIncremented(remoteDbVersion);
     } else {
         remoteDbVersion = *staleInfo.getVersionWanted();
     }
 
-    if (!_remoteDbVersion ||
-        (_remoteDbVersion->getUuid() == remoteDbVersion.getUuid() &&
-         _remoteDbVersion->getLastMod() < remoteDbVersion.getLastMod()) ||
-        (_remoteDbVersion->getUuid() != remoteDbVersion.getUuid())) {
-        _remoteDbVersion = remoteDbVersion;
+    // If databaseVersion was sent, only one shard should have been targeted. The shard should have
+    // stopped processing the batch after one write encountered StaleDbVersion, after which the
+    // shard should have simply copied that StaleDbVersion error as the error for the rest of the
+    // writes in the batch. So, all of the write errors that contain a StaleDbVersion error should
+    // contain the same vWanted version.
+    if (_remoteDbVersion) {
+        // Use uassert rather than invariant since this is asserting the contents of a network
+        // response.
+        uassert(
+            ErrorCodes::InternalError,
+            "Did not expect to get multiple StaleDbVersion errors with different vWanted versions",
+            databaseVersion::equal(*_remoteDbVersion, remoteDbVersion));
+        return;
     }
+    _remoteDbVersion = remoteDbVersion;
 }
 
 Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasChanged) {
@@ -805,10 +815,10 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasC
             lastManager, lastDbVersion, _routingInfo->cm(), _routingInfo->db().databaseVersion());
         return Status::OK();
     } else if (_remoteDbVersion) {
-        // If we got stale dbversions from remote shards, we may need to refresh
+        // If we got stale database versions from the remote shard, we may need to refresh
         // NOTE: Not sure yet if this can happen simultaneously with targeting issues
 
-        CompareResult result = compareDbVersions(*_routingInfo, _remoteDbVersion);
+        CompareResult result = compareDbVersions(*_routingInfo, *_remoteDbVersion);
 
         LOG(4) << "ChunkManagerTargeter database versions comparison result: " << (int)result;
 
