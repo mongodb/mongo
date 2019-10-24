@@ -51,21 +51,17 @@ BSONObj DepsTracker::toProjectionWithoutMetadata() const {
         return bb.obj();
     }
 
-    bool needId = false;
+    bool idSpecified = false;
     std::string last;
     for (const auto& field : fields) {
         if (str::startsWith(field, "_id") && (field.size() == 3 || field[3] == '.')) {
-            // _id and subfields are handled specially due in part to SERVER-7502
-            needId = true;
-            continue;
+            idSpecified = true;
         }
 
         if (!last.empty() && str::startsWith(field, last)) {
             // we are including a parent of *it so we don't need to include this field
-            // explicitly. In fact, due to SERVER-6527 if we included this field, the parent
-            // wouldn't be fully included.  This logic relies on on set iterators going in
-            // lexicographic order so that a string is always directly before of all fields it
-            // prefixes.
+            // explicitly. This logic relies on on set iterators going in lexicographic order so
+            // that a string is always directly before of all fields it prefixes.
             continue;
         }
 
@@ -79,10 +75,9 @@ BSONObj DepsTracker::toProjectionWithoutMetadata() const {
         bb.append(field, 1);
     }
 
-    if (needId)  // we are explicit either way
-        bb.append("_id", 1);
-    else
+    if (!idSpecified) {
         bb.append("_id", 0);
+    }
 
     return bb.obj();
 }

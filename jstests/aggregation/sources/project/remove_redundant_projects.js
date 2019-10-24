@@ -140,13 +140,15 @@ assertResultsMatch({
     removedProjectStage: {_id: 0, a: 1}
 });
 
-// Test that projections on _id with nested fields are not removed from pipeline. Due to
-// SERVER-7502, the dependency analysis does not generate a covered projection for nested
-// fields in _id and thus we cannot remove the stage.
+// Test that projections on _id with nested fields are removed from pipeline.
 indexSpec = {
     '_id.a': 1,
     a: 1
 };
-assertResultsMatch(
-    {pipeline: [{$project: {'_id.a': 1}}], expectProjectToCoalesce: false, index: indexSpec});
+assertResultsMatch({
+    pipeline: [{$match: {"_id.a": 1}}, {$project: {'_id.a': 1}}],
+    expectProjectToCoalesce: true,
+    index: indexSpec,
+    pipelineOptimizedAway: true,
+});
 }());

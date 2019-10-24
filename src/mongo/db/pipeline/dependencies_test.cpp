@@ -87,21 +87,21 @@ TEST(DependenciesToProjectionTest, ShouldIncludeIdIfNeeded) {
     const char* array[] = {"a", "_id"};
     DepsTracker deps;
     deps.fields = arrayToSet(array);
-    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSON("a" << 1 << "_id" << 1));
+    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSON("_id" << 1 << "a" << 1));
 }
 
-TEST(DependenciesToProjectionTest, ShouldIncludeEntireIdEvenIfOnlyASubFieldIsNeeded) {
-    const char* array[] = {"a", "_id.a"};  // still include whole _id (SERVER-7502)
+TEST(DependenciesToProjectionTest, ShouldNotIncludeEntireIdIfOnlyASubFieldIsNeeded) {
+    const char* array[] = {"a", "_id.a"};
     DepsTracker deps;
     deps.fields = arrayToSet(array);
-    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSON("a" << 1 << "_id" << 1));
+    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSON("_id.a" << 1 << "a" << 1));
 }
 
 TEST(DependenciesToProjectionTest, ShouldNotIncludeSubFieldOfIdIfIdIncluded) {
     const char* array[] = {"a", "_id", "_id.a"};  // handle both _id and subfield
     DepsTracker deps;
     deps.fields = arrayToSet(array);
-    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSON("a" << 1 << "_id" << 1));
+    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSON("_id" << 1 << "a" << 1));
 }
 
 TEST(DependenciesToProjectionTest, ShouldIncludeFieldPrefixedById) {
@@ -109,7 +109,15 @@ TEST(DependenciesToProjectionTest, ShouldIncludeFieldPrefixedById) {
     DepsTracker deps;
     deps.fields = arrayToSet(array);
     ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(),
-                      BSON("_id_a" << 1 << "a" << 1 << "_id" << 1));
+                      BSON("_id" << 1 << "_id_a" << 1 << "a" << 1));
+}
+
+TEST(DependenciesToProjectionTest, ShouldIncludeFieldPrefixedByIdWhenIdSubfieldIsIncluded) {
+    const char* array[] = {"a", "_id.a", "_id_a"};  // _id prefixed but non-subfield
+    DepsTracker deps;
+    deps.fields = arrayToSet(array);
+    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(),
+                      BSON("_id.a" << 1 << "_id_a" << 1 << "a" << 1));
 }
 
 TEST(DependenciesToProjectionTest, ShouldOutputEmptyObjectIfEntireDocumentNeeded) {
