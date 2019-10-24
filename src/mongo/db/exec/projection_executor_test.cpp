@@ -152,14 +152,14 @@ TEST_F(ProjectionExecutorTest, CanProjectFindElemMatch) {
 
     const BSONObj obj = fromjson("{a: [{b: 3, c: 1}, {b: 1, c: 2}, {b: 1, c: 3}]}");
     {
-        auto proj = parseWithDefaultPolicies(fromjson("{a: {$elemMatch: {b: 1}}}"));
+        auto proj = parseWithFindFeaturesEnabled(fromjson("{a: {$elemMatch: {b: 1}}}"));
         auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
         ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [{b: 1, c: 2}]}")},
                            executor->applyTransformation(Document{obj}));
     }
 
     {
-        auto proj = parseWithDefaultPolicies(fromjson("{a: {$elemMatch: {b: 1, c: 3}}}"));
+        auto proj = parseWithFindFeaturesEnabled(fromjson("{a: {$elemMatch: {b: 1, c: 3}}}"));
         auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
         ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [{b: 1, c: 3}]}")},
                            executor->applyTransformation(Document{obj}));
@@ -170,7 +170,7 @@ TEST_F(ProjectionExecutorTest, ElemMatchRespectsCollator) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     getExpCtx()->setCollator(&collator);
 
-    auto proj = parseWithDefaultPolicies(fromjson("{a: {$elemMatch: {$gte: 'abc'}}}"));
+    auto proj = parseWithFindFeaturesEnabled(fromjson("{a: {$elemMatch: {$gte: 'abc'}}}"));
     auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
 
 
@@ -191,7 +191,7 @@ TEST_F(ProjectionExecutorTest, CanProjectFindSliceWithInclusion) {
     auto proj = parseWithFindFeaturesEnabled(fromjson("{'a.b': {$slice: [1,2]}, c: 1}"));
     auto executor = buildProjectionExecutor(getExpCtx(), &proj, {});
     ASSERT_DOCUMENT_EQ(
-        Document{fromjson("{a: {b: [1,2,3]}, c: 'abc'}")},
+        Document{fromjson("{a: {b: [2,3]}, c: 'abc'}")},
         executor->applyTransformation(Document{fromjson("{a: {b: [1,2,3]}, c: 'abc'}")}));
 }
 
