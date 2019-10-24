@@ -47,7 +47,7 @@ void EphemeralForTestRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
     _setState(State::kInactiveInUnitOfWork);
 }
 
-void EphemeralForTestRecoveryUnit::commitUnitOfWork() {
+void EphemeralForTestRecoveryUnit::doCommitUnitOfWork() {
     invariant(_inUnitOfWork(), toString(_getState()));
     _setState(State::kCommitting);
 
@@ -70,7 +70,7 @@ void EphemeralForTestRecoveryUnit::commitUnitOfWork() {
     _setState(State::kInactive);
 }
 
-void EphemeralForTestRecoveryUnit::abortUnitOfWork() {
+void EphemeralForTestRecoveryUnit::doAbortUnitOfWork() {
     invariant(_inUnitOfWork(), toString(_getState()));
     _setState(State::kAborting);
 
@@ -100,7 +100,7 @@ bool EphemeralForTestRecoveryUnit::inActiveTxn() const {
     return _inUnitOfWork();
 }
 
-void EphemeralForTestRecoveryUnit::abandonSnapshot() {
+void EphemeralForTestRecoveryUnit::doAbandonSnapshot() {
     invariant(!_inUnitOfWork(), toString(_getState()));
 }
 

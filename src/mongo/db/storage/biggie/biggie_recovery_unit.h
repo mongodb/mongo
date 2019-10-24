@@ -46,18 +46,12 @@ public:
     ~RecoveryUnit();
 
     void beginUnitOfWork(OperationContext* opCtx) override final;
-    void commitUnitOfWork() override final;
-    void abortUnitOfWork() override final;
 
     bool inActiveTxn() const {
         return _inUnitOfWork();
     }
 
     virtual bool waitUntilDurable(OperationContext* opCtx) override;
-
-    virtual void abandonSnapshot() override;
-
-    virtual SnapshotId getSnapshotId() const override;
 
     virtual void setOrderedCommit(bool orderedCommit) override;
 
@@ -80,6 +74,12 @@ public:
     static RecoveryUnit* get(OperationContext* opCtx);
 
 private:
+    void doCommitUnitOfWork() override final;
+
+    void doAbortUnitOfWork() override final;
+
+    void doAbandonSnapshot() override final;
+
     void _abort();
 
     std::function<void()> _waitUntilDurableCallback;

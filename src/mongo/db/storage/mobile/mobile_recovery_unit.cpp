@@ -99,7 +99,7 @@ void MobileRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
     _txnOpen(opCtx, false);
 }
 
-void MobileRecoveryUnit::commitUnitOfWork() {
+void MobileRecoveryUnit::doCommitUnitOfWork() {
     invariant(_inUnitOfWork(), toString(_getState()));
 
     RECOVERY_UNIT_TRACE() << "Unit of work commited, marked inactive.";
@@ -107,7 +107,7 @@ void MobileRecoveryUnit::commitUnitOfWork() {
     _commit();
 }
 
-void MobileRecoveryUnit::abortUnitOfWork() {
+void MobileRecoveryUnit::doAbortUnitOfWork() {
     invariant(_inUnitOfWork(), toString(_getState()));
 
     RECOVERY_UNIT_TRACE() << "Unit of work aborted, marked inactive.";
@@ -149,7 +149,7 @@ bool MobileRecoveryUnit::waitUntilDurable(OperationContext* opCtx) {
     return true;
 }
 
-void MobileRecoveryUnit::abandonSnapshot() {
+void MobileRecoveryUnit::doAbandonSnapshot() {
     invariant(!_inUnitOfWork(), toString(_getState()));
     if (_isActive()) {
         // We can't be in a WriteUnitOfWork, so it is safe to rollback.

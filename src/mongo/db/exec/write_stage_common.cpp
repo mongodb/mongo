@@ -46,13 +46,8 @@ bool ensureStillMatches(const Collection* collection,
                         const CanonicalQuery* cq) {
     // If the snapshot changed, then we have to make sure we have the latest copy of the doc and
     // that it still matches.
-    //
-    // Storage engines that don't support document-level concurrency also do not track snapshot ids.
-    // Those storage engines always need to check whether the document still matches, as the
-    // document we are planning to delete may have already been deleted or updated during yield.
     WorkingSetMember* member = ws->get(id);
-    if (!supportsDocLocking() ||
-        opCtx->recoveryUnit()->getSnapshotId() != member->doc.snapshotId()) {
+    if (opCtx->recoveryUnit()->getSnapshotId() != member->doc.snapshotId()) {
         std::unique_ptr<SeekableRecordCursor> cursor(collection->getCursor(opCtx));
 
         if (!WorkingSetCommon::fetch(opCtx, ws, id, cursor)) {

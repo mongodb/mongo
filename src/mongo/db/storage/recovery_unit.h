@@ -132,7 +132,10 @@ public:
      *
      * Should be called through WriteUnitOfWork rather than directly.
      */
-    virtual void commitUnitOfWork() = 0;
+    void commitUnitOfWork() {
+        assignNextSnapshotId();
+        doCommitUnitOfWork();
+    }
 
     /**
      * Marks the end of a unit of work and rolls back all changes registered by calls to onRollback
@@ -141,7 +144,10 @@ public:
      *
      * Should be called through WriteUnitOfWork rather than directly.
      */
-    virtual void abortUnitOfWork() = 0;
+    void abortUnitOfWork() {
+        assignNextSnapshotId();
+        doAbortUnitOfWork();
+    }
 
     /**
      * Transitions the active unit of work to the "prepared" state. Must be called after
@@ -209,7 +215,10 @@ public:
      * If there is an open transaction, it is closed. On return no transaction is active. This
      * cannot be called inside of a WriteUnitOfWork, and should fail if it is.
      */
-    virtual void abandonSnapshot() = 0;
+    void abandonSnapshot() {
+        assignNextSnapshotId();
+        doAbandonSnapshot();
+    }
 
     /**
      * Informs the RecoveryUnit that a snapshot will be needed soon, if one was not already
@@ -264,7 +273,9 @@ public:
      *
      * This is unrelated to Timestamp which must be globally comparable.
      */
-    virtual SnapshotId getSnapshotId() const = 0;
+    SnapshotId getSnapshotId() const {
+        return SnapshotId{_mySnapshotId};
+    }
 
     /**
      * Sets a timestamp to assign to future writes in a transaction.
@@ -569,7 +580,7 @@ public:
     }
 
 protected:
-    RecoveryUnit() {}
+    RecoveryUnit();
 
     /**
      * Returns the current state.
@@ -609,9 +620,17 @@ protected:
     bool _mustBeTimestamped = false;
 
 private:
+    // Sets the snapshot associated with this RecoveryUnit to a new globally unique id number.
+    void assignNextSnapshotId();
+
+    virtual void doAbandonSnapshot() = 0;
+    virtual void doCommitUnitOfWork() = 0;
+    virtual void doAbortUnitOfWork() = 0;
+
     typedef std::vector<std::unique_ptr<Change>> Changes;
     Changes _changes;
     State _state = State::kInactive;
+    uint64_t _mySnapshotId;
 };
 
 }  // namespace mongo

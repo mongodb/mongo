@@ -2052,11 +2052,12 @@ TEST_F(DConcurrencyTestFixture, CompatibleFirstStress) {
 namespace {
 class RecoveryUnitMock : public RecoveryUnitNoop {
 public:
-    virtual void abandonSnapshot() {
+    bool activeTransaction = true;
+
+private:
+    void doAbandonSnapshot() override {
         activeTransaction = false;
     }
-
-    bool activeTransaction = true;
 };
 }  // namespace
 

@@ -68,6 +68,14 @@ private:
     uint64_t _id;
 };
 
+inline std::ostream& operator<<(std::ostream& stream, const SnapshotId& snapshotId) {
+    return stream << "SnapshotId(" << snapshotId.toNumber() << ")";
+}
+
+inline StringBuilder& operator<<(StringBuilder& stream, const SnapshotId& snapshotId) {
+    return stream << "SnapshotId(" << snapshotId.toNumber() << ")";
+}
+
 template <typename T>
 class Snapshotted {
 public:

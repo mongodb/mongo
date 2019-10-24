@@ -35,6 +35,21 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+namespace {
+// SnapshotIds need to be globally unique, as they are used in a WorkingSetMember to
+// determine if documents changed, but a different recovery unit may be used across a getMore,
+// so there is a chance the snapshot ID will be reused.
+AtomicWord<unsigned long long> nextSnapshotId{1};
+}  // namespace
+
+RecoveryUnit::RecoveryUnit() {
+    assignNextSnapshotId();
+}
+
+void RecoveryUnit::assignNextSnapshotId() {
+    _mySnapshotId = nextSnapshotId.fetchAndAdd(1);
+}
+
 void RecoveryUnit::registerChange(std::unique_ptr<Change> change) {
     invariant(_inUnitOfWork(), toString(_getState()));
     _changes.push_back(std::move(change));

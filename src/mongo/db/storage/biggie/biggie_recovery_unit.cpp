@@ -53,7 +53,7 @@ void RecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
     _setState(State::kInactiveInUnitOfWork);
 }
 
-void RecoveryUnit::commitUnitOfWork() {
+void RecoveryUnit::doCommitUnitOfWork() {
     invariant(_inUnitOfWork(), toString(_getState()));
 
     if (_dirty) {
@@ -86,7 +86,7 @@ void RecoveryUnit::commitUnitOfWork() {
     _setState(State::kInactive);
 }
 
-void RecoveryUnit::abortUnitOfWork() {
+void RecoveryUnit::doAbortUnitOfWork() {
     invariant(_inUnitOfWork(), toString(_getState()));
     _abort();
 }
@@ -96,14 +96,10 @@ bool RecoveryUnit::waitUntilDurable(OperationContext* opCtx) {
     return true;  // This is an in-memory storage engine.
 }
 
-void RecoveryUnit::abandonSnapshot() {
+void RecoveryUnit::doAbandonSnapshot() {
     invariant(!_inUnitOfWork(), toString(_getState()));
     _forked = false;
     _dirty = false;
-}
-
-SnapshotId RecoveryUnit::getSnapshotId() const {
-    return SnapshotId();
 }
 
 bool RecoveryUnit::forkIfNeeded() {

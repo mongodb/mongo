@@ -139,6 +139,38 @@ TEST_F(RecoveryUnitTestHarness, CheckInActiveTxnWithAbort) {
     ASSERT_FALSE(ru->inActiveTxn());
 }
 
+TEST_F(RecoveryUnitTestHarness, BeginningUnitOfWorkDoesNotIncrementSnapshotId) {
+    auto snapshotIdBefore = ru->getSnapshotId();
+    ru->beginUnitOfWork(opCtx.get());
+    ASSERT_EQ(snapshotIdBefore, ru->getSnapshotId());
+    ru->abortUnitOfWork();
+}
+
+TEST_F(RecoveryUnitTestHarness, NewlyAllocatedRecoveryUnitHasNewSnapshotId) {
+    auto newRu = harnessHelper->newRecoveryUnit();
+    ASSERT_NE(newRu->getSnapshotId(), ru->getSnapshotId());
+}
+
+TEST_F(RecoveryUnitTestHarness, AbandonSnapshotIncrementsSnapshotId) {
+    auto snapshotIdBefore = ru->getSnapshotId();
+    ru->abandonSnapshot();
+    ASSERT_NE(snapshotIdBefore, ru->getSnapshotId());
+}
+
+TEST_F(RecoveryUnitTestHarness, CommitUnitOfWorkIncrementsSnapshotId) {
+    auto snapshotIdBefore = ru->getSnapshotId();
+    ru->beginUnitOfWork(opCtx.get());
+    ru->commitUnitOfWork();
+    ASSERT_NE(snapshotIdBefore, ru->getSnapshotId());
+}
+
+TEST_F(RecoveryUnitTestHarness, AbortUnitOfWorkIncrementsSnapshotId) {
+    auto snapshotIdBefore = ru->getSnapshotId();
+    ru->beginUnitOfWork(opCtx.get());
+    ru->abortUnitOfWork();
+    ASSERT_NE(snapshotIdBefore, ru->getSnapshotId());
+}
+
 DEATH_TEST_F(RecoveryUnitTestHarness, RegisterChangeMustBeInUnitOfWork, "invariant") {
     int count = 0;
     opCtx->recoveryUnit()->registerChange(std::make_unique<TestChange>(&count));

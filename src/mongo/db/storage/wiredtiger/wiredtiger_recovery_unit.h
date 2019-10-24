@@ -104,22 +104,17 @@ public:
 
     void beginUnitOfWork(OperationContext* opCtx) override;
     void prepareUnitOfWork() override;
-    void commitUnitOfWork() override;
-    void abortUnitOfWork() override;
 
     bool waitUntilDurable(OperationContext* opCtx) override;
 
     bool waitUntilUnjournaledWritesDurable(OperationContext* opCtx,
                                            bool stableCheckpoint = true) override;
 
-    void abandonSnapshot() override;
     void preallocateSnapshot() override;
 
     Status obtainMajorityCommittedSnapshot() override;
 
     boost::optional<Timestamp> getPointInTimeReadTimestamp() override;
-
-    SnapshotId getSnapshotId() const override;
 
     Status setTimestamp(Timestamp timestamp) override;
 
@@ -205,6 +200,11 @@ public:
     static void appendGlobalStats(BSONObjBuilder& b);
 
 private:
+    void doCommitUnitOfWork() override;
+    void doAbortUnitOfWork() override;
+
+    void doAbandonSnapshot() override;
+
     void _abort();
     void _commit();
 
@@ -252,7 +252,6 @@ private:
     Timestamp _durableTimestamp;
     Timestamp _prepareTimestamp;
     boost::optional<Timestamp> _lastTimestampSet;
-    uint64_t _mySnapshotId;
     Timestamp _majorityCommittedSnapshot;
     Timestamp _readAtTimestamp;
     std::unique_ptr<Timer> _timer;

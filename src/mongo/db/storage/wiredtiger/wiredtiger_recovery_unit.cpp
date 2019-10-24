@@ -52,11 +52,6 @@ namespace {
 // because the recovery unit may not ever actually be in a prepared state.
 MONGO_FAIL_POINT_DEFINE(WTAlwaysNotifyPrepareConflictWaiters);
 
-// SnapshotIds need to be globally unique, as they are used in a WorkingSetMember to
-// determine if documents changed, but a different recovery unit may be used across a getMore,
-// so there is a chance the snapshot ID will be reused.
-AtomicWord<unsigned long long> nextSnapshotId{1};
-
 logger::LogSeverity kSlowTransactionSeverity = logger::LogSeverity::Debug(1);
 
 }  // namespace
@@ -164,9 +159,7 @@ WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerSessionCache* sc)
 
 WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerSessionCache* sc,
                                                WiredTigerOplogManager* oplogManager)
-    : _sessionCache(sc),
-      _oplogManager(oplogManager),
-      _mySnapshotId(nextSnapshotId.fetchAndAdd(1)) {}
+    : _sessionCache(sc), _oplogManager(oplogManager) {}
 
 WiredTigerRecoveryUnit::~WiredTigerRecoveryUnit() {
     invariant(!_inUnitOfWork(), toString(_getState()));
@@ -235,12 +228,12 @@ void WiredTigerRecoveryUnit::prepareUnitOfWork() {
     invariantWTOK(s->prepare_transaction(s, conf.c_str()));
 }
 
-void WiredTigerRecoveryUnit::commitUnitOfWork() {
+void WiredTigerRecoveryUnit::doCommitUnitOfWork() {
     invariant(_inUnitOfWork(), toString(_getState()));
     _commit();
 }
 
-void WiredTigerRecoveryUnit::abortUnitOfWork() {
+void WiredTigerRecoveryUnit::doAbortUnitOfWork() {
     invariant(_inUnitOfWork(), toString(_getState()));
     _abort();
 }
@@ -305,7 +298,7 @@ WiredTigerSession* WiredTigerRecoveryUnit::getSessionNoTxn() {
     return session;
 }
 
-void WiredTigerRecoveryUnit::abandonSnapshot() {
+void WiredTigerRecoveryUnit::doAbandonSnapshot() {
     invariant(!_inUnitOfWork(), toString(_getState()));
     if (_isActive()) {
         // Can't be in a WriteUnitOfWork, so safe to rollback
@@ -327,8 +320,9 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
         // `serverGlobalParams.slowMs` can be set to values <= 0. In those cases, give logging a
         // break.
         if (transactionTime >= std::max(1, serverGlobalParams.slowMS)) {
-            LOG(kSlowTransactionSeverity) << "Slow WT transaction. Lifetime of SnapshotId "
-                                          << _mySnapshotId << " was " << transactionTime << "ms";
+            LOG(kSlowTransactionSeverity)
+                << "Slow WT transaction. Lifetime of SnapshotId " << getSnapshotId().toNumber()
+                << " was " << transactionTime << "ms";
         }
     }
 
@@ -353,11 +347,11 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
         }
 
         wtRet = s->commit_transaction(s, conf.str().c_str());
-        LOG(3) << "WT commit_transaction for snapshot id " << _mySnapshotId;
+        LOG(3) << "WT commit_transaction for snapshot id " << getSnapshotId().toNumber();
     } else {
         wtRet = s->rollback_transaction(s, nullptr);
         invariant(!wtRet);
-        LOG(3) << "WT rollback_transaction for snapshot id " << _mySnapshotId;
+        LOG(3) << "WT rollback_transaction for snapshot id " << getSnapshotId().toNumber();
     }
 
     if (_isTimestamped) {
@@ -385,16 +379,10 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     _prepareTimestamp = Timestamp();
     _durableTimestamp = Timestamp();
     _roundUpPreparedTimestamps = RoundUpPreparedTimestamps::kNoRound;
-    _mySnapshotId = nextSnapshotId.fetchAndAdd(1);
     _isOplogReader = false;
     _oplogVisibleTs = boost::none;
     _orderedCommit = true;  // Default value is true; we assume all writes are ordered.
     _mustBeTimestamped = false;
-}
-
-SnapshotId WiredTigerRecoveryUnit::getSnapshotId() const {
-    // TODO: use actual wiredtiger txn id
-    return SnapshotId(_mySnapshotId);
 }
 
 Status WiredTigerRecoveryUnit::obtainMajorityCommittedSnapshot() {
@@ -538,7 +526,7 @@ void WiredTigerRecoveryUnit::_txnOpen() {
         }
     }
 
-    LOG(3) << "WT begin_transaction for snapshot id " << _mySnapshotId;
+    LOG(3) << "WT begin_transaction for snapshot id " << getSnapshotId().toNumber();
 }
 
 Timestamp WiredTigerRecoveryUnit::_beginTransactionAtAllDurableTimestamp(WT_SESSION* session) {

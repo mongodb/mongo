@@ -66,9 +66,9 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
     if (member->getState() == WorkingSetMember::RID_AND_IDX) {
         for (size_t i = 0; i < member->keyData.size(); i++) {
             auto&& memberKey = member->keyData[i];
-            // For storage engines that support document-level concurrency, if this key was obtained
-            // in the current snapshot, then move on to the next key.
-            if (supportsDocLocking() && memberKey.snapshotId == currentSnapshotId) {
+            // If this key was obtained in the current snapshot, then move on to the next key. There
+            // is no way for this key to be inconsistent with the document it points to.
+            if (memberKey.snapshotId == currentSnapshotId) {
                 continue;
             }
 

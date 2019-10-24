@@ -47,22 +47,14 @@ public:
     virtual ~EphemeralForTestRecoveryUnit();
 
     void beginUnitOfWork(OperationContext* opCtx) final;
-    void commitUnitOfWork() final;
-    void abortUnitOfWork() final;
 
     virtual bool waitUntilDurable(OperationContext* opCtx);
 
     bool inActiveTxn() const;
 
-    virtual void abandonSnapshot();
-
     Status obtainMajorityCommittedSnapshot() final;
 
     virtual void registerChange(std::unique_ptr<Change> change);
-
-    virtual SnapshotId getSnapshotId() const {
-        return SnapshotId();
-    }
 
     virtual void setOrderedCommit(bool orderedCommit) {}
 
@@ -89,6 +81,11 @@ public:
     }
 
 private:
+    void doCommitUnitOfWork() final;
+    void doAbortUnitOfWork() final;
+
+    void doAbandonSnapshot() final;
+
     typedef std::vector<std::shared_ptr<Change>> Changes;
 
     Changes _changes;

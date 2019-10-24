@@ -271,6 +271,7 @@ env.Library(
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/storage/storage_options",
         '$BUILD_DIR/mongo/util/fail_point',
+        'recovery_unit_base',
     ],
 )
 

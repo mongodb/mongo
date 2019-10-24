@@ -52,15 +52,7 @@ public:
     virtual ~MobileRecoveryUnit();
 
     void beginUnitOfWork(OperationContext* opCtx) override;
-    void commitUnitOfWork() override;
-    void abortUnitOfWork() override;
     bool waitUntilDurable(OperationContext* opCtx) override;
-
-    void abandonSnapshot() override;
-
-    SnapshotId getSnapshotId() const override {
-        return SnapshotId();
-    }
 
     MobileSession* getSession(OperationContext* opCtx, bool readOnly = true);
 
@@ -81,6 +73,11 @@ public:
     void setOrderedCommit(bool orderedCommit) override {}
 
 private:
+    void doCommitUnitOfWork() override;
+    void doAbortUnitOfWork() override;
+
+    void doAbandonSnapshot() override;
+
     void _abort();
     void _commit();
 
