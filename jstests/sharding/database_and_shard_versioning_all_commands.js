@@ -1,14 +1,11 @@
 /**
- * Specifies for each command whether it is expected to send a databaseVersion and shardVersion, and
- * verifies that the commands match the specification.
+ * Specifies for each command whether it is expected to send a databaseVersion, and verifies that
+ * the commands match the specification.
  */
 (function() {
 'use strict';
 
-load('jstests/libs/profiler.js');
 load('jstests/sharding/libs/last_stable_mongos_commands.js');
-
-const SHARD_VERSION_UNSHARDED = [Timestamp(0, 0), ObjectId("000000000000000000000000")];
 
 function assertMongosDatabaseVersion(conn, dbName, dbVersion) {
     let res = conn.adminCommand({getShardVersion: dbName});
@@ -20,32 +17,6 @@ function assertShardDatabaseVersion(shard, dbName, dbVersion) {
     let res = shard.adminCommand({getDatabaseVersion: dbName});
     assert.commandWorked(res);
     assert.eq(dbVersion, res.dbVersion);
-}
-
-function assertSentDatabaseVersion(testCase, commandProfile, dbName, dbVersion, primaryShard) {
-    assertShardDatabaseVersion(primaryShard, dbName, dbVersion);
-
-    // If the test case is marked as not tracked by the profiler, then we won't be able to
-    // verify the version was not sent here. Any test cases marked with this flag should be
-    // fixed in SERVER-33499.
-    if (!testCase.skipProfilerCheck) {
-        commandProfile["command.databaseVersion"] = dbVersion;
-        profilerHasSingleMatchingEntryOrThrow(
-            {profileDB: primaryShard.getDB(dbName), filter: commandProfile});
-    }
-}
-
-function assertDidNotSendDatabaseVersion(testCase, commandProfile, dbName, primaryShard) {
-    assertShardDatabaseVersion(primaryShard, dbName, {});
-
-    // If the test case is marked as not tracked by the profiler, then we won't be able to
-    // verify the version was not sent here. Any test cases marked with this flag should be
-    // fixed in SERVER-33499.
-    if (!testCase.skipProfilerCheck) {
-        commandProfile["command.databaseVersion"] = {$exists: false};
-        profilerHasSingleMatchingEntryOrThrow(
-            {profileDB: primaryShard.getDB(dbName), filter: commandProfile});
-    }
 }
 
 function containsDatabase(shard, dbName) {
@@ -98,33 +69,24 @@ function validateCommandTestCase(testCase) {
     // Check that required fields are present.
     assert(testCase.hasOwnProperty("sendsDbVersion"),
            "must specify 'sendsDbVersion' for test case " + tojson(testCase));
-    assert(testCase.hasOwnProperty("sendsShardVersion"),
-           "must specify 'sendsShardVersion' for test case " + tojson(testCase));
 
     // Check that all present fields are of the correct type.
     assert(typeof (testCase.command) === "function");
     assert(testCase.runsAgainstAdminDb ? typeof (testCase.runsAgainstAdminDb) === "boolean" : true);
-    assert(testCase.skipProfilerCheck ? typeof (testCase.skipProfilerCheck) === "boolean" : true);
     assert(typeof (testCase.sendsDbVersion) === "boolean");
-    assert(typeof (testCase.sendsShardVersion) === "boolean");
     assert(testCase.setUp ? typeof (testCase.setUp) === "function" : true,
            "setUp must be a function: " + tojson(testCase));
     assert(testCase.cleanUp ? typeof (testCase.cleanUp) === "function" : true,
            "cleanUp must be a function: " + tojson(testCase));
 }
 
-function runCommandTestCaseSendDbAndShardVersion(testCase, st, routingInfo, dbName, collName) {
+function runCommandTestCaseSendDbVersion(testCase, st, routingInfo, dbName, collName) {
     let command = testCase.command(dbName, collName);
     jsTest.log("testing command " + tojson(command));
 
     if (testCase.setUp) {
         testCase.setUp(st.s0, dbName, collName);
     }
-
-    routingInfo.primaryShard.getDB(dbName).setProfilingLevel(2);
-    let commandProfile = buildCommandProfile(command, false);
-    commandProfile["command.shardVersion"] =
-        testCase.sendsShardVersion ? SHARD_VERSION_UNSHARDED : {$exists: false};
 
     if (testCase.runsAgainstAdminDb) {
         assert.commandWorked(st.s0.adminCommand(command));
@@ -133,19 +95,14 @@ function runCommandTestCaseSendDbAndShardVersion(testCase, st, routingInfo, dbNa
     }
 
     if (testCase.sendsDbVersion) {
-        assertSentDatabaseVersion(
-            testCase, commandProfile, dbName, routingInfo.dbVersion, routingInfo.primaryShard);
+        assertShardDatabaseVersion(routingInfo.primaryShard, dbName, routingInfo.dbVersion);
     } else {
-        assertDidNotSendDatabaseVersion(testCase, commandProfile, dbName, routingInfo.primaryShard);
+        assertShardDatabaseVersion(routingInfo.primaryShard, dbName, {});
     }
 
     if (testCase.cleanUp) {
         testCase.cleanUp(st.s0, dbName, collName);
     }
-
-    // Clear the profiler collection in between testing each command.
-    routingInfo.primaryShard.getDB(dbName).setProfilingLevel(0);
-    assert(routingInfo.primaryShard.getDB(dbName).getCollection("system.profile").drop());
 
     // Ensure the primary shard's database entry is stale for the next command by changing the
     // primary shard (the recipient shard does not refresh until getting a request with the new
@@ -237,15 +194,12 @@ let testCases = {
     aggregate: {
         run: {
             sendsDbVersion: true,
-            sendsShardVersion: true,
             command: function(dbName, collName) {
                 return {aggregate: collName, pipeline: [{$match: {x: 1}}], cursor: {batchSize: 10}};
             }
         },
         explain: {
-            skipProfilerCheck: true,
             sendsDbVersion: true,
-            sendsShardVersion: true,
             command: function(dbName, collName) {
                 return {
                     explain:
@@ -265,7 +219,6 @@ let testCases = {
     collMod: {
         run: {
             sendsDbVersion: true,
-            sendsShardVersion: true,
             setUp: function(mongosConn, dbName, collName) {
                 // Expects the collection to exist, and doesn't implicitly create it.
                 assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
@@ -281,7 +234,6 @@ let testCases = {
     collStats: {
         run: {
             sendsDbVersion: true,
-            sendsShardVersion: true,
             setUp: function(mongosConn, dbName, collName) {
                 // Expects the collection to exist, and doesn't implicitly create it.
                 assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
@@ -303,7 +255,6 @@ let testCases = {
     convertToCapped: {
         run: {
             sendsDbVersion: true,
-            sendsShardVersion: true,
             setUp: function(mongosConn, dbName, collName) {
                 // Expects the collection to exist, and doesn't implicitly create it.
                 assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
@@ -319,15 +270,12 @@ let testCases = {
     count: {
         run: {
             sendsDbVersion: true,
-            sendsShardVersion: true,
             command: function(dbName, collName) {
                 return {count: collName, query: {x: 1}};
             }
         },
         explain: {
-            skipProfilerCheck: true,
             sendsDbVersion: true,
-            sendsShardVersion: true,
             command: function(dbName, collName) {
                 return {explain: {count: collName, query: {x: 1}}};
             }
@@ -336,8 +284,6 @@ let testCases = {
     create: {
         run: {
             sendsDbVersion: false,
-            // The collection doesn't exist yet, so no shardVersion is sent.
-            sendsShardVersion: false,
             command: function(dbName, collName) {
                 return {create: collName};
             },
@@ -348,9 +294,7 @@ let testCases = {
     },
     createIndexes: {
         run: {
-            skipProfilerCheck: true,
             sendsDbVersion: true,
-            sendsShardVersion: false,
             setUp: function(mongosConn, dbName, collName) {
                 // Expects the collection to exist, and doesn't implicitly create it.
                 assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
@@ -369,7 +313,6 @@ let testCases = {
     dataSize: {
         run: {
             sendsDbVersion: true,
-            sendsShardVersion: true,
             setUp: function(mongosConn, dbName, collName) {
                 // Expects the collection to exist, and doesn't implicitly create it.
                 assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
@@ -384,9 +327,8 @@ let testCases = {
     },
     dbStats: {
         run: {
-            sendsDbVersion: false,
             // dbStats is always broadcast to all shards
-            sendsShardVersion: false,
+            sendsDbVersion: false,
             command: function(dbName, collName) {
                 return {dbStats: 1, scale: 1};
             }
@@ -394,21 +336,13 @@ let testCases = {
     },
     delete: {
         run: {
-            skipProfilerCheck: true,
             sendsDbVersion: true,
-            // The profiler extracts the individual deletes from the 'deletes' array, and so loses
-            // the overall delete command's attached shardVersion, though one is sent.
-            sendsShardVersion: true,
             command: function(dbName, collName) {
                 return {delete: collName, deletes: [{q: {_id: 1}, limit: 1}]};
             }
         },
         explain: {
-            skipProfilerCheck: true,
             sendsDbVersion: true,
-            // The profiler extracts the individual deletes from the 'deletes' array, and so loses
-            // the overall delete command's attached shardVersion, though one is sent.
-            sendsShardVersion: true,
             command: function(dbName, collName) {
                 return {explain: {delete: collName, deletes: [{q: {_id: 1}, limit: 1}]}};
             }
@@ -417,15 +351,12 @@ let testCases = {
     distinct: {
         run: {
             sendsDbVersion: true,
-            sendsShardVersion: true,
             command: function(dbName, collName) {
                 return {distinct: collName, key: "x"};
             }
         },
         explain: {
-            skipProfilerCheck: true,
             sendsDbVersion: true,
-            sendsShardVersion: true,
             command: function(dbName, collName) {
                 return {explain: {distinct: collName, key: "x"}};
             }
@@ -433,9 +364,7 @@ let testCases = {
     },
     drop: {
         run: {
-            skipProfilerCheck: true,
             sendsDbVersion: false,
-            sendsShardVersion: false,
             setUp: function(mongosConn, dbName, collName) {
                 // Expects the collection to exist, and doesn't implicitly create it.
                 assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
@@ -452,7 +381,6 @@ let testCases = {
     dropIndexes: {
         run: {
             sendsDbVersion: true,
-            sendsShardVersion: true,
             setUp: function(mongosConn, dbName, collName) {
                 // Expects the collection to exist, and doesn't implicitly create it.
                 assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
@@ -475,7 +403,6 @@ let testCases = {
     filemd5: {
         run: {
             sendsDbVersion: true,
-            sendsShardVersion: true,
             command: function(dbName, collName) {
                 return {filemd5: ObjectId(), root: collName};
             }
@@ -484,15 +411,12 @@ let testCases = {
     find: {
         run: {
             sendsDbVersion: true,
-            sendsShardVersion: true,
             command: function(dbName, collName) {
                 return {find: collName, filter: {x: 1}};
             }
         },
         explain: {
-            skipProfilerCheck: true,
             sendsDbVersion: true,
-            sendsShardVersion: true,
             command: function(dbName, collName) {
                 return {explain: {find: collName, filter: {x: 1}}};
             }
@@ -501,15 +425,12 @@ let testCases = {
     findAndModify: {
         run: {
             sendsDbVersion: true,
-            sendsShardVersion: true,
             command: function(dbName, collName) {
                 return {findAndModify: collName, query: {_id: 0}, remove: true};
             }
         },
         explain: {
-            skipProfilerCheck: true,
             sendsDbVersion: true,
-            sendsShardVersion: true,
             setUp: function(mongosConn, dbName, collName) {
                 // Expects the collection to exist, and doesn't implicitly create it.
                 assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
@@ -538,7 +459,6 @@ let testCases = {
     insert: {
         run: {
             sendsDbVersion: true,
-            sendsShardVersion: true,
             command: function(dbName, collName) {
                 return {insert: collName, documents: [{_id: 1}]};
             },
@@ -558,9 +478,7 @@ let testCases = {
     killSessions: {skip: "always broadcast to all hosts in the cluster"},
     listCollections: {
         run: {
-            skipProfilerCheck: true,
             sendsDbVersion: true,
-            sendsShardVersion: true,
             command: function(dbName, collName) {
                 return {listCollections: 1};
             }
@@ -571,7 +489,6 @@ let testCases = {
     listIndexes: {
         run: {
             sendsDbVersion: true,
-            sendsShardVersion: false,
             setUp: function(mongosConn, dbName, collName) {
                 // Expects the collection to exist, and doesn't implicitly create it.
                 assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
@@ -590,9 +507,8 @@ let testCases = {
     logout: {skip: "not on a user database"},
     mapReduce: {
         run: {
+            // mapReduce uses connection versioning, which does not support database versioning.
             sendsDbVersion: false,
-            // mapReduce uses connection versioning rather than sending shardVersion in the command.
-            sendsShardVersion: false,
             setUp: function(mongosConn, dbName, collName) {
                 // Expects the collection to exist, and doesn't implicitly create it.
                 assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
@@ -624,7 +540,6 @@ let testCases = {
     planCacheClear: {
         run: {
             sendsDbVersion: true,
-            sendsShardVersion: true,
             command: function(dbName, collName) {
                 return {planCacheClear: collName};
             }
@@ -633,7 +548,6 @@ let testCases = {
     planCacheClearFilters: {
         run: {
             sendsDbVersion: true,
-            sendsShardVersion: true,
             command: function(dbName, collName) {
                 return {planCacheClearFilters: collName};
             }
@@ -642,7 +556,6 @@ let testCases = {
     planCacheListFilters: {
         run: {
             sendsDbVersion: true,
-            sendsShardVersion: true,
             command: function(dbName, collName) {
                 return {planCacheListFilters: collName};
             }
@@ -651,7 +564,6 @@ let testCases = {
     planCacheListPlans: {
         run: {
             sendsDbVersion: true,
-            sendsShardVersion: true,
             setUp: function(mongosConn, dbName, collName) {
                 // Expects the collection to exist, and doesn't implicitly create it.
                 assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
@@ -667,7 +579,6 @@ let testCases = {
     planCacheListQueryShapes: {
         run: {
             sendsDbVersion: true,
-            sendsShardVersion: true,
             command: function(dbName, collName) {
                 return {planCacheListQueryShapes: collName};
             }
@@ -676,7 +587,6 @@ let testCases = {
     planCacheSetFilter: {
         run: {
             sendsDbVersion: true,
-            sendsShardVersion: true,
             setUp: function(mongosConn, dbName, collName) {
                 // Expects the collection to exist, and doesn't implicitly create it.
                 assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
@@ -701,9 +611,7 @@ let testCases = {
     renameCollection: {
         run: {
             runsAgainstAdminDb: true,
-            skipProfilerCheck: true,
             sendsDbVersion: true,
-            sendsShardVersion: true,
             setUp: function(mongosConn, dbName, collName) {
                 // Expects the collection to exist, and doesn't implicitly create it.
                 assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
@@ -732,9 +640,7 @@ let testCases = {
     setDefaultRWConcern: {skip: "always targets the config server"},
     setIndexCommitQuorum: {
         run: {
-            skipProfilerCheck: true,
             sendsDbVersion: true,
-            sendsShardVersion: true,
             setUp: function(mongosConn, dbName, collName) {
                 // Expects the collection to exist, and doesn't implicitly create it.
                 assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
@@ -765,11 +671,7 @@ let testCases = {
     stopRecordingTraffic: {skip: "executes locally on mongos (not sent to any remote node)"},
     update: {
         run: {
-            skipProfilerCheck: true,
             sendsDbVersion: true,
-            // The profiler extracts the individual updates from the 'updates' array, and so loses
-            // the overall update command's attached shardVersion, though one is sent.
-            sendsShardVersion: true,
             command: function(dbName, collName) {
                 return {
                     update: collName,
@@ -778,11 +680,7 @@ let testCases = {
             }
         },
         explain: {
-            skipProfilerCheck: true,
             sendsDbVersion: true,
-            // The profiler extracts the individual updates from the 'updates' array, and so loses
-            // the overall update command's attached shardVersion, though one is sent.
-            sendsShardVersion: true,
             command: function(dbName, collName) {
                 return {
                     explain: {
@@ -799,9 +697,7 @@ let testCases = {
     usersInfo: {skip: "always targets the config server"},
     validate: {
         run: {
-            skipProfilerCheck: true,
             sendsDbVersion: true,
-            sendsShardVersion: true,
             setUp: function(mongosConn, dbName, collName) {
                 // Expects the collection to exist, and doesn't implicitly create it.
                 assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
@@ -830,7 +726,6 @@ const checkTestDbName = "checkVersions";
 let res = st.s0.adminCommand({listCommands: 1});
 assert.commandWorked(res);
 
-// Test that commands send or not databaseVersion and shardVersion.
 let primaryShard = st.shard0;
 let otherShard = st.shard1;
 assert.commandWorked(st.s0.adminCommand({enableSharding: sendTestDbName}));
@@ -863,8 +758,8 @@ let dbVersion =
     st.s0.getDB("config").getCollection("databases").findOne({_id: sendTestDbName}).version;
 let routingInfo = {primaryShard: primaryShard, dbVersion: dbVersion};
 
-// Use the profiler to check that the command was received with or without a databaseVersion and
-// shardVersion as expected by the 'testCase' for the command.
+// Check that the command was received with or without a databaseVersion as expected by the
+// 'testCase' for the command.
 for (let command of Object.keys(res.commands)) {
     let testCase = testCases[command];
     assert(testCase !== undefined, "coverage failure: must define a test case for " + command);
@@ -878,10 +773,10 @@ for (let command of Object.keys(res.commands)) {
         continue;
     }
 
-    runCommandTestCaseSendDbAndShardVersion(
+    runCommandTestCaseSendDbVersion(
         testCase.run, st, routingInfo, sendTestDbName, unshardedCollName);
     if (testCase.explain) {
-        runCommandTestCaseSendDbAndShardVersion(
+        runCommandTestCaseSendDbVersion(
             testCase.explain, st, routingInfo, sendTestDbName, unshardedCollName);
     }
 }

@@ -169,8 +169,8 @@ selector:
   - jstests/sharding/move_primary_clone_test.js
   - jstests/sharding/mongos_validate_writes.js
   - jstests/sharding/movePrimary1.js
-  # Checks for an exact number of matching entries in the profiler, which will fail if a command
-  # gets retried due to a stepdown.
+  # Asserts that the _flushDatabaseCacheUpdates at the end of _configsvrCreateDatabase is sent, but
+  # it may not be sent if the config server primary steps down just before sending it.
   - jstests/sharding/database_and_shard_versioning_all_commands.js
   # Calls removeShard/removeshard which is not idempotent and these tests expect it to be run an exact number of times
   - jstests/sharding/addshard5.js
