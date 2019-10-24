@@ -35,6 +35,7 @@
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 
 #include "mongo/db/client.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_context_group.h"
 #include "mongo/db/read_concern.h"
@@ -588,6 +589,12 @@ void ShardServerCatalogCacheLoader::_runSecondaryGetChunksSince(
     forcePrimaryCollectionRefreshAndWaitForReplication(opCtx, nss);
 
     // Read the local metadata.
+
+    // Disallow reading on an older snapshot because this relies on being able to read the
+    // side effects of writes during secondary replication after being signalled from the
+    // CollectionVersionLogOpHandler.
+    BlockSecondaryReadsDuringBatchApplication_DONT_USE secondaryReadsBlockBehindReplication(opCtx);
+
     auto swCollAndChunks =
         _getCompletePersistedMetadataForSecondarySinceVersion(opCtx, nss, catalogCacheSinceVersion);
     callbackFn(opCtx, std::move(swCollAndChunks));
