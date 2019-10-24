@@ -123,8 +123,10 @@ class ProgramRunner {
 public:
     /** @param args The program's arguments, including the program name.
      *  @param env Environment to run the program with, which will override any set by the local
-     *             environment */
-    ProgramRunner(const BSONObj& args, const BSONObj& env);
+     *             environment
+     * @param isMongo Indicator variable, true if runs as a mongo process.
+     */
+    ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMongo);
     /** Launch the program. */
     void start();
     /** Continuously read the program's output, generally from a special purpose thread. */
