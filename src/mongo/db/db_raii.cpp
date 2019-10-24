@@ -46,6 +46,12 @@ namespace {
 
 const boost::optional<int> kDoNotChangeProfilingLevel = boost::none;
 
+// TODO: SERVER-44105 remove
+// If set to false, secondary reads should wait behind the PBW lock.
+// Does nothing if gAllowSecondaryReadsDuringBatchApplication setting is false.
+const auto allowSecondaryReadsDuringBatchApplication_DONT_USE =
+    OperationContext::declareDecoration<boost::optional<bool>>();
+
 }  // namespace
 
 AutoStatsTracker::AutoStatsTracker(OperationContext* opCtx,
@@ -92,6 +98,7 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
     // Don't take the ParallelBatchWriterMode lock when the server parameter is set and our
     // storage engine supports snapshot reads.
     if (gAllowSecondaryReadsDuringBatchApplication.load() &&
+        allowSecondaryReadsDuringBatchApplication_DONT_USE(opCtx).value_or(true) &&
         opCtx->getServiceContext()->getStorageEngine()->supportsReadConcernSnapshot()) {
         _shouldNotConflictWithSecondaryBatchApplicationBlock.emplace(opCtx->lockState());
     }
@@ -384,6 +391,20 @@ LockMode getLockModeForQuery(OperationContext* opCtx, const boost::optional<Name
         return MODE_IX;
     }
     return MODE_IS;
+}
+
+BlockSecondaryReadsDuringBatchApplication_DONT_USE::
+    BlockSecondaryReadsDuringBatchApplication_DONT_USE(OperationContext* opCtx)
+    : _opCtx(opCtx) {
+    auto allowSecondaryReads = &allowSecondaryReadsDuringBatchApplication_DONT_USE(opCtx);
+    allowSecondaryReads->swap(_originalSettings);
+    *allowSecondaryReads = false;
+}
+
+BlockSecondaryReadsDuringBatchApplication_DONT_USE::
+    ~BlockSecondaryReadsDuringBatchApplication_DONT_USE() {
+    auto allowSecondaryReads = &allowSecondaryReadsDuringBatchApplication_DONT_USE(_opCtx);
+    allowSecondaryReads->swap(_originalSettings);
 }
 
 }  // namespace mongo

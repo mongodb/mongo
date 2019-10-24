@@ -259,4 +259,19 @@ private:
     PrepareConflictBehavior _originalValue;
 };
 
+/**
+ * TODO: SERVER-44105 remove
+ * RAII type for letting secondary reads to block behind the PBW lock.
+ * Note: Do not add additional usage. This is only temporary for ease of backport.
+ */
+struct BlockSecondaryReadsDuringBatchApplication_DONT_USE {
+public:
+    BlockSecondaryReadsDuringBatchApplication_DONT_USE(OperationContext* opCtx);
+    ~BlockSecondaryReadsDuringBatchApplication_DONT_USE();
+
+private:
+    OperationContext* _opCtx{nullptr};
+    boost::optional<bool> _originalSettings;
+};
+
 }  // namespace mongo
