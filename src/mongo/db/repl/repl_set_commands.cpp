@@ -46,6 +46,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/op_observer.h"
@@ -74,6 +75,8 @@ namespace repl {
 
 using std::string;
 using std::stringstream;
+
+static const std::string kReplSetReconfigNss = "local.replset.reconfig";
 
 class ReplExecutorSSM : public ServerStatusMetric {
 public:
@@ -394,17 +397,19 @@ public:
 
         if (status.isOK() && !parsedArgs.force) {
             const auto service = opCtx->getServiceContext();
-
             Lock::GlobalLock globalLock(opCtx, MODE_IX);
-            WriteUnitOfWork wuow(opCtx);
-            // Users must not be allowed to provide their own contents for the o2 field.
-            // o2 field of no-ops is supposed to be used internally.
-            service->getOpObserver()->onOpMessage(opCtx,
-                                                  BSON("msg"
-                                                       << "Reconfig set"
-                                                       << "version"
-                                                       << parsedArgs.newConfigObj["version"]));
-            wuow.commit();
+            writeConflictRetry(opCtx, "replSetReconfig", kReplSetReconfigNss, [&] {
+                WriteUnitOfWork wuow(opCtx);
+                // Users must not be allowed to provide their own contents for the o2 field.
+                // o2 field of no-ops is supposed to be used internally.
+
+                service->getOpObserver()->onOpMessage(opCtx,
+                                                      BSON("msg"
+                                                           << "Reconfig set"
+                                                           << "version"
+                                                           << parsedArgs.newConfigObj["version"]));
+                wuow.commit();
+            });
         }
 
         uassertStatusOK(status);
