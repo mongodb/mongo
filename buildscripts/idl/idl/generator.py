@@ -1947,13 +1947,11 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         if not cls.override_set:
             with self._block('Status %s::set(const BSONElement& newValueElement) {' % (cls.name),
                              '}'):
-                self._writer.write_line('std::string strval;')
-                with self._predicate('!newValueElement.coerce(&strval)'):
-                    value = '' if param.redact else '" << newValueElement << " '
-                    self._writer.write_line(
-                        'return {ErrorCodes::BadValue, str::stream() << "Invalid value ' + value +
-                        'for setParameter \'" << name() << "\'"};')
-                self._writer.write_line('return setFromString(strval);')
+                self._writer.write_line('auto swValue = coerceToString(newValueElement, %s);' %
+                                        ('true' if param.redact else 'false'))
+                with self._predicate('!swValue.isOK()'):
+                    self._writer.write_line('return swValue.getStatus();')
+                self._writer.write_line('return setFromString(swValue.getValue());')
             self.write_empty_line()
 
     def _gen_server_parameter_with_storage(self, param):

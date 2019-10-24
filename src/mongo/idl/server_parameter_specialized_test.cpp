@@ -211,6 +211,8 @@ TEST(SpecializedServerParameter, withAtomicValue) {
     auto* wv = getServerParameter<cls>("specializedWithAtomicValue");
     ASSERT_EQ(wv->_data.load(), cls::kDataDefault);
     ASSERT_APPENDED_INT(wv, cls::kDataDefault);
+    ASSERT_OK(wv->set(BSON("" << 99).firstElement()));
+    ASSERT_APPENDED_INT(wv, 99);
     ASSERT_OK(wv->setFromString("101"));
     ASSERT_APPENDED_INT(wv, 101);
     ASSERT_EQ(wv->_data.load(), 101);
