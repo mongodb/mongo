@@ -8,14 +8,19 @@
 const coll = db.id_partial_projection;
 coll.drop();
 
-assert.commandWorked(coll.insert({_id: {a: 1, b: 1}, otherField: 1}));
-assert.commandWorked(coll.insert({_id: 3, otherField: 2}));
+// Provide another field, 'sortKey' which we use to ensure the results come in the same order each
+// time.
+assert.commandWorked(coll.insert({_id: {a: 1, b: 1}, sortKey: 1}));
+assert.commandWorked(coll.insert({_id: 3, sortKey: 2}));
 
-assert.eq(coll.find({}, {"_id": 1}).toArray(), [{_id: {a: 1, b: 1}}, {_id: 3}]);
-assert.eq(coll.find({}, {"_id.a": 1}).toArray(), [{_id: {a: 1}}, {}]);
-assert.eq(coll.find({}, {"_id.b": 1}).toArray(), [{_id: {b: 1}}, {}]);
+function checkResults(projection, expectedResults) {
+    assert.eq(coll.find({}, projection).sort({sortKey: 1}).toArray(), expectedResults);
+}
 
-assert.eq(coll.find({}, {"_id.a": 0}).toArray(),
-          [{_id: {b: 1}, otherField: 1}, {_id: 3, otherField: 2}]);
-assert.eq(coll.find({}, {_id: 0}).toArray(), [{otherField: 1}, {otherField: 2}]);
+checkResults({_id: 1}, [{_id: {a: 1, b: 1}}, {_id: 3}]);
+checkResults({"_id.a": 1}, [{_id: {a: 1}}, {}]);
+checkResults({"_id.b": 1}, [{_id: {b: 1}}, {}]);
+
+checkResults({"_id.a": 0}, [{_id: {b: 1}, sortKey: 1}, {_id: 3, sortKey: 2}]);
+checkResults({_id: 0}, [{sortKey: 1}, {sortKey: 2}]);
 })();
