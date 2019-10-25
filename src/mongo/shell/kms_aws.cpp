@@ -42,6 +42,7 @@
 #include "mongo/shell/kms.h"
 #include "mongo/shell/kms_gen.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/kms_message_support.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sock.h"
@@ -52,56 +53,6 @@
 
 namespace mongo {
 namespace {
-
-/**
- * Free kms_request_t
- */
-struct kms_request_tFree {
-    void operator()(kms_request_t* p) noexcept {
-        if (p) {
-            ::kms_request_destroy(p);
-        }
-    }
-};
-
-using UniqueKmsRequest = std::unique_ptr<kms_request_t, kms_request_tFree>;
-
-/**
- * Free kms_response_parser_t
- */
-struct kms_response_parser_tFree {
-    void operator()(kms_response_parser_t* p) noexcept {
-        if (p) {
-            ::kms_response_parser_destroy(p);
-        }
-    }
-};
-
-using UniqueKmsResponseParser = std::unique_ptr<kms_response_parser_t, kms_response_parser_tFree>;
-
-/**
- * Free kms_response_t
- */
-struct kms_response_tFree {
-    void operator()(kms_response_t* p) noexcept {
-        if (p) {
-            ::kms_response_destroy(p);
-        }
-    }
-};
-
-using UniqueKmsResponse = std::unique_ptr<kms_response_t, kms_response_tFree>;
-
-/**
- * Free kms_char_buffer
- */
-struct kms_char_free {
-    void operator()(char* x) {
-        kms_request_free_string(x);
-    }
-};
-
-using UniqueKmsCharBuffer = std::unique_ptr<char, kms_char_free>;
 
 /**
  * Make a request to a AWS HTTP endpoint.
