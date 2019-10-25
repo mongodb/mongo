@@ -90,6 +90,15 @@ Status launchServiceWorkerThread(stdx::function<void()> task) {
             warning() << "Stack size set to " << (limits.rlim_cur / 1024) << "KB. We suggest 1MB";
         }
 
+        // Wrap the user-specified `task` so it runs with an installed `sigaltstack`.
+        task = [
+            sigAltStackController = std::make_shared<stdx::support::SigAltStackController>(),
+            f = std::move(task)
+        ] {
+            auto sigAltStackGuard = sigAltStackController->makeInstallGuard();
+            f();
+        };
+
         pthread_t thread;
         auto ctx = stdx::make_unique<stdx::function<void()>>(std::move(task));
         int failed = pthread_create(&thread, &attrs, runFunc, ctx.get());

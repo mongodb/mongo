@@ -1,0 +1,17 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env = env.Clone();
+
+# Not a CppUnitTest because it needs low-level control of thread creation and signals,
+# so it shouldn't use unittest_main and typical mongo startup routines.
+env.RegisterUnitTest(env.Program(
+    target='sigaltstack_location_test',
+    source=[
+        'sigaltstack_location_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ]
+)[0])
