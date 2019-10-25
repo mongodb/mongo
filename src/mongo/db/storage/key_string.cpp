@@ -45,6 +45,11 @@
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 
+#define keyStringAssert(msgid, msg, expr) \
+    uassert(msgid, str::stream() << "KeyString format error: " << msg, expr)
+#define keyStringAsserted(msgid, msg) \
+    uasserted(msgid, str::stream() << "KeyString format error: " << msg)
+
 namespace mongo {
 
 using std::string;
@@ -233,14 +238,6 @@ const uint8_t kGreater = 254;
 
 // some utility functions
 namespace {
-
-void keyStringAssert(const int msgid, const std::string msg, const bool expr) {
-    uassert(msgid, str::stream() << "KeyString format error: " << msg, expr);
-}
-
-void keyStringAsserted(const int msgid, const std::string msg) {
-    uasserted(msgid, str::stream() << "KeyString format error: " << msg);
-}
 
 void memcpy_flipBits(void* dst, const void* src, size_t bytes) {
     const char* input = static_cast<const char*>(src);
