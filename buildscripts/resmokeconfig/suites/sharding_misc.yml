@@ -65,7 +65,7 @@ selector:
   - jstests/sharding/addshard4.js
   - jstests/sharding/split_with_force.js
   - jstests/sharding/auto_rebalance_parallel_replica_sets.js
-  - jstests/sharding/database_and_shard_versioning_all_commands.js
+  - jstests/sharding/database_versioning_all_commands.js
   - jstests/sharding/find_and_modify_after_multi_write.js
   - jstests/sharding/query_after_multi_write.js
   - jstests/sharding/safe_secondary_reads_single_migration_suspend_range_deletion.js

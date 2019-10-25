@@ -31,7 +31,7 @@ selector:
   - jstests/sharding/clone_catalog_data.js
   - jstests/sharding/comment_field.js
   - jstests/sharding/covered_shard_key_indexes.js
-  - jstests/sharding/database_and_shard_versioning_all_commands.js
+  - jstests/sharding/database_versioning_all_commands.js
   - jstests/sharding/database_versioning_safe_secondary_reads.js
   - jstests/sharding/explain_agg_read_pref.js
   - jstests/sharding/explain_exec_stats_on_shards.js
