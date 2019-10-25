@@ -30,6 +30,9 @@
 #pragma once
 
 #include <chrono>
+#include <csignal>
+#include <cstddef>
+#include <cstdint>
 #include <ctime>
 #include <exception>
 #include <thread>
@@ -37,8 +40,86 @@
 
 #include "mongo/stdx/exception.h"
 
+#if defined(__linux__) || defined(__FreeBSD__)
+#define MONGO_HAS_SIGALTSTACK 1
+#else
+#define MONGO_HAS_SIGALTSTACK 0
+#endif
+
 namespace mongo {
 namespace stdx {
+namespace support {
+
+/**
+ * Manages an alternate stack for signal handlers.
+ * A dummy implementation is provided on platforms which do not support `sigaltstack`.
+ */
+class SigAltStackController {
+public:
+#if MONGO_HAS_SIGALTSTACK
+    /** Return an object that installs and uninstalls our `_stackStorage` as `sigaltstack`. */
+    auto makeInstallGuard() const {
+        struct Guard {
+            explicit Guard(const SigAltStackController& controller) : _controller(controller) {
+                _controller._install();
+            }
+
+            ~Guard() {
+                _controller._uninstall();
+            }
+
+            const SigAltStackController& _controller;
+        };
+        return Guard{*this};
+    }
+
+private:
+    void _install() const {
+        stack_t ss;
+        ss.ss_sp = _stackStorage.get();
+        ss.ss_flags = 0;
+        ss.ss_size = kStackSize;
+        if (sigaltstack(&ss, nullptr)) {
+            abort();
+        }
+    }
+
+    void _uninstall() const {
+        stack_t ss;
+        ss.ss_flags = SS_DISABLE;
+        if (sigaltstack(&ss, nullptr)) {
+            abort();
+        }
+    }
+
+    // Signal stack consumption was measured in mongo/util/stacktrace_test.
+    // 64 kiB is 4X our worst case, so that should be enough.
+    //   .                                    signal handler action
+    //   .  --use-libunwind : ----\       =============================
+    //   .  --dbg=on        : -\   \      minimal |  print  | backtrace
+    //   .                     =   =      ========|=========|==========
+    //   .                     N   N :      4,344 |   7,144 |     5,096
+    //   .                     Y   N :      4,424 |   7,528 |     5,160
+    //   .                     N   Y :      4,344 |  13,048 |     7,352
+    //   .                     Y   Y :      4,424 |  13,672 |     8,392
+    //   ( https://jira.mongodb.org/secure/attachment/233569/233569_stacktrace-writeup.txt )
+    static constexpr std::size_t kMongoMinSignalStackSize = std::size_t{64} << 10;
+
+    static constexpr std::size_t kStackSize =
+        std::max(kMongoMinSignalStackSize, std::size_t{MINSIGSTKSZ});
+    std::unique_ptr<std::byte[]> _stackStorage = std::make_unique<std::byte[]>(kStackSize);
+
+#else   // !MONGO_HAS_SIGALTSTACK
+    auto makeInstallGuard() const {
+        struct Guard {
+            ~Guard() {}  // needed to suppress 'unused variable' warnings.
+        };
+        return Guard{};
+    }
+#endif  // !MONGO_HAS_SIGALTSTACK
+};
+
+}  // namespace support
 
 /**
  * We're wrapping std::thread here, rather than aliasing it, because we'd like
@@ -48,6 +129,8 @@ namespace stdx {
  * retrying.  Therefore, all throwing does is remove context as to which part
  * of the system failed thread creation (as the exception itself is caught at
  * the top of the stack).
+ *
+ * We also want to allocate and install a `sigaltstack` to diagnose stack overflows.
  *
  * We're putting this in stdx, rather than having it as some kind of
  * mongo::Thread, because the signature and use of the type is otherwise
@@ -86,6 +169,7 @@ public:
     explicit thread(Function f, Args&&... args) noexcept
         : ::std::thread::thread(  // NOLINT
               [
+                  sigAltStackController = support::SigAltStackController(),
                   f = std::move(f),
                   pack = std::make_tuple(std::forward<Args>(args)...)
               ]() mutable noexcept {
@@ -96,6 +180,7 @@ public:
                   ::std::set_terminate(  // NOLINT
                       ::mongo::stdx::TerminateHandlerDetailsInterface::dispatch);
 #endif
+                  auto sigAltStackGuard = sigAltStackController.makeInstallGuard();
                   return std::apply(std::move(f), std::move(pack));
               }) {
     }
