@@ -370,9 +370,12 @@ public:
         return queryCollection(NamespaceString::kRsOplogNamespace, query);
     }
 
-    void assertMinValidDocumentAtTimestamp(Collection* coll,
+    void assertMinValidDocumentAtTimestamp(const NamespaceString& nss,
                                            const Timestamp& ts,
                                            const repl::MinValidDocument& expectedDoc) {
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
+        Collection* coll = autoColl.getCollection();
+
         OneOffRead oor(_opCtx, ts);
 
         auto doc =
@@ -1576,8 +1579,6 @@ public:
     void run() {
         NamespaceString nss(repl::ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace);
         reset(nss);
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-        auto minValidColl = autoColl.getCollection();
 
         repl::ReplicationConsistencyMarkersImpl consistencyMarkers(
             repl::StorageInterface::get(_opCtx));
@@ -1587,10 +1588,10 @@ public:
         expectedMinValid.setMinValidTerm(repl::OpTime::kUninitializedTerm);
         expectedMinValid.setMinValidTimestamp(nullTs);
 
-        assertMinValidDocumentAtTimestamp(minValidColl, nullTs, expectedMinValid);
-        assertMinValidDocumentAtTimestamp(minValidColl, pastTs, expectedMinValid);
-        assertMinValidDocumentAtTimestamp(minValidColl, presentTs, expectedMinValid);
-        assertMinValidDocumentAtTimestamp(minValidColl, futureTs, expectedMinValid);
+        assertMinValidDocumentAtTimestamp(nss, nullTs, expectedMinValid);
+        assertMinValidDocumentAtTimestamp(nss, pastTs, expectedMinValid);
+        assertMinValidDocumentAtTimestamp(nss, presentTs, expectedMinValid);
+        assertMinValidDocumentAtTimestamp(nss, futureTs, expectedMinValid);
     }
 };
 
@@ -1599,8 +1600,6 @@ public:
     void run() {
         NamespaceString nss(repl::ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace);
         reset(nss);
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-        auto minValidColl = autoColl.getCollection();
 
         repl::ReplicationConsistencyMarkersImpl consistencyMarkers(
             repl::StorageInterface::get(_opCtx));
@@ -1613,10 +1612,10 @@ public:
         expectedMinValidWithSetFlag.setMinValidTimestamp(nullTs);
         expectedMinValidWithSetFlag.setInitialSyncFlag(true);
 
-        assertMinValidDocumentAtTimestamp(minValidColl, nullTs, expectedMinValidWithSetFlag);
-        assertMinValidDocumentAtTimestamp(minValidColl, pastTs, expectedMinValidWithSetFlag);
-        assertMinValidDocumentAtTimestamp(minValidColl, presentTs, expectedMinValidWithSetFlag);
-        assertMinValidDocumentAtTimestamp(minValidColl, futureTs, expectedMinValidWithSetFlag);
+        assertMinValidDocumentAtTimestamp(nss, nullTs, expectedMinValidWithSetFlag);
+        assertMinValidDocumentAtTimestamp(nss, pastTs, expectedMinValidWithSetFlag);
+        assertMinValidDocumentAtTimestamp(nss, presentTs, expectedMinValidWithSetFlag);
+        assertMinValidDocumentAtTimestamp(nss, futureTs, expectedMinValidWithSetFlag);
 
         consistencyMarkers.clearInitialSyncFlag(_opCtx);
 
@@ -1625,10 +1624,10 @@ public:
         expectedMinValidWithUnsetFlag.setMinValidTimestamp(presentTs);
         expectedMinValidWithUnsetFlag.setAppliedThrough(repl::OpTime(presentTs, presentTerm));
 
-        assertMinValidDocumentAtTimestamp(minValidColl, nullTs, expectedMinValidWithUnsetFlag);
-        assertMinValidDocumentAtTimestamp(minValidColl, pastTs, expectedMinValidWithSetFlag);
-        assertMinValidDocumentAtTimestamp(minValidColl, presentTs, expectedMinValidWithUnsetFlag);
-        assertMinValidDocumentAtTimestamp(minValidColl, futureTs, expectedMinValidWithUnsetFlag);
+        assertMinValidDocumentAtTimestamp(nss, nullTs, expectedMinValidWithUnsetFlag);
+        assertMinValidDocumentAtTimestamp(nss, pastTs, expectedMinValidWithSetFlag);
+        assertMinValidDocumentAtTimestamp(nss, presentTs, expectedMinValidWithUnsetFlag);
+        assertMinValidDocumentAtTimestamp(nss, futureTs, expectedMinValidWithUnsetFlag);
     }
 };
 
@@ -1637,8 +1636,6 @@ public:
     void run() {
         NamespaceString nss(repl::ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace);
         reset(nss);
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-        auto minValidColl = autoColl.getCollection();
 
         repl::ReplicationConsistencyMarkersImpl consistencyMarkers(
             repl::StorageInterface::get(_opCtx));
@@ -1655,10 +1652,10 @@ public:
         expectedMinValidPresent.setMinValidTerm(presentTerm);
         expectedMinValidPresent.setMinValidTimestamp(presentTs);
 
-        assertMinValidDocumentAtTimestamp(minValidColl, nullTs, expectedMinValidPresent);
-        assertMinValidDocumentAtTimestamp(minValidColl, pastTs, expectedMinValidInit);
-        assertMinValidDocumentAtTimestamp(minValidColl, presentTs, expectedMinValidPresent);
-        assertMinValidDocumentAtTimestamp(minValidColl, futureTs, expectedMinValidPresent);
+        assertMinValidDocumentAtTimestamp(nss, nullTs, expectedMinValidPresent);
+        assertMinValidDocumentAtTimestamp(nss, pastTs, expectedMinValidInit);
+        assertMinValidDocumentAtTimestamp(nss, presentTs, expectedMinValidPresent);
+        assertMinValidDocumentAtTimestamp(nss, futureTs, expectedMinValidPresent);
 
         consistencyMarkers.setMinValidToAtLeast(_opCtx, repl::OpTime(futureTs, presentTerm));
 
@@ -1666,18 +1663,18 @@ public:
         expectedMinValidFuture.setMinValidTerm(presentTerm);
         expectedMinValidFuture.setMinValidTimestamp(futureTs);
 
-        assertMinValidDocumentAtTimestamp(minValidColl, nullTs, expectedMinValidFuture);
-        assertMinValidDocumentAtTimestamp(minValidColl, pastTs, expectedMinValidInit);
-        assertMinValidDocumentAtTimestamp(minValidColl, presentTs, expectedMinValidPresent);
-        assertMinValidDocumentAtTimestamp(minValidColl, futureTs, expectedMinValidFuture);
+        assertMinValidDocumentAtTimestamp(nss, nullTs, expectedMinValidFuture);
+        assertMinValidDocumentAtTimestamp(nss, pastTs, expectedMinValidInit);
+        assertMinValidDocumentAtTimestamp(nss, presentTs, expectedMinValidPresent);
+        assertMinValidDocumentAtTimestamp(nss, futureTs, expectedMinValidFuture);
 
         // Setting the timestamp to the past should be a noop.
         consistencyMarkers.setMinValidToAtLeast(_opCtx, repl::OpTime(pastTs, presentTerm));
 
-        assertMinValidDocumentAtTimestamp(minValidColl, nullTs, expectedMinValidFuture);
-        assertMinValidDocumentAtTimestamp(minValidColl, pastTs, expectedMinValidInit);
-        assertMinValidDocumentAtTimestamp(minValidColl, presentTs, expectedMinValidPresent);
-        assertMinValidDocumentAtTimestamp(minValidColl, futureTs, expectedMinValidFuture);
+        assertMinValidDocumentAtTimestamp(nss, nullTs, expectedMinValidFuture);
+        assertMinValidDocumentAtTimestamp(nss, pastTs, expectedMinValidInit);
+        assertMinValidDocumentAtTimestamp(nss, presentTs, expectedMinValidPresent);
+        assertMinValidDocumentAtTimestamp(nss, futureTs, expectedMinValidFuture);
     }
 };
 
@@ -1686,8 +1683,6 @@ public:
     void run() {
         NamespaceString nss(repl::ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace);
         reset(nss);
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-        auto minValidColl = autoColl.getCollection();
 
         repl::ReplicationConsistencyMarkersImpl consistencyMarkers(
             repl::StorageInterface::get(_opCtx));
@@ -1704,18 +1699,18 @@ public:
         expectedMinValidPresent.setMinValidTimestamp(nullTs);
         expectedMinValidPresent.setAppliedThrough(repl::OpTime(presentTs, presentTerm));
 
-        assertMinValidDocumentAtTimestamp(minValidColl, nullTs, expectedMinValidPresent);
-        assertMinValidDocumentAtTimestamp(minValidColl, pastTs, expectedMinValidInit);
-        assertMinValidDocumentAtTimestamp(minValidColl, presentTs, expectedMinValidPresent);
-        assertMinValidDocumentAtTimestamp(minValidColl, futureTs, expectedMinValidPresent);
+        assertMinValidDocumentAtTimestamp(nss, nullTs, expectedMinValidPresent);
+        assertMinValidDocumentAtTimestamp(nss, pastTs, expectedMinValidInit);
+        assertMinValidDocumentAtTimestamp(nss, presentTs, expectedMinValidPresent);
+        assertMinValidDocumentAtTimestamp(nss, futureTs, expectedMinValidPresent);
 
         // appliedThrough opTime can be unset.
         consistencyMarkers.clearAppliedThrough(_opCtx, futureTs);
 
-        assertMinValidDocumentAtTimestamp(minValidColl, nullTs, expectedMinValidInit);
-        assertMinValidDocumentAtTimestamp(minValidColl, pastTs, expectedMinValidInit);
-        assertMinValidDocumentAtTimestamp(minValidColl, presentTs, expectedMinValidPresent);
-        assertMinValidDocumentAtTimestamp(minValidColl, futureTs, expectedMinValidInit);
+        assertMinValidDocumentAtTimestamp(nss, nullTs, expectedMinValidInit);
+        assertMinValidDocumentAtTimestamp(nss, pastTs, expectedMinValidInit);
+        assertMinValidDocumentAtTimestamp(nss, presentTs, expectedMinValidPresent);
+        assertMinValidDocumentAtTimestamp(nss, futureTs, expectedMinValidInit);
     }
 };
 
