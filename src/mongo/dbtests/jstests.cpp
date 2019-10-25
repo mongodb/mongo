@@ -503,7 +503,7 @@ public:
                 "    } catch(e) {"
                 "         threw = true;"
                 "    }"
-                "    assert(threw);"
+                "    assert(threw);"  // NOLINT
                 "}";
             ASSERT_EQUALS(s->invoke(code, &invalidRegex, nullptr), 0);
         }

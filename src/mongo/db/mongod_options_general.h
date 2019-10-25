@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2019-present MongoDB, Inc.
  *

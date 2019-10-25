@@ -379,7 +379,7 @@ private:
     public:
         MozRuntime(const MozJSScriptEngine* engine);
 
-        std::thread _thread;
+        std::thread _thread;  // NOLINT
         std::unique_ptr<JSRuntime, std::function<void(JSRuntime*)>> _runtime;
         std::unique_ptr<JSContext, std::function<void(JSContext*)>> _context;
     };
@@ -420,7 +420,7 @@ private:
     unsigned int _opId;        // op id for this scope
     OperationContext* _opCtx;  // Op context for DbEval
     std::size_t _inOp;
-    std::atomic<bool> _pendingGC;
+    std::atomic<bool> _pendingGC;  // NOLINT
     ConnectState _connectState;
     Status _status;
     std::string _parentStack;

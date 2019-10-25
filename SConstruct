@@ -4026,8 +4026,8 @@ else:
 
 lint_py = env.Command(
     target="#lint-lint.py",
-    source=["buildscripts/lint.py", "src/mongo"],
-    action="$PYTHON ${SOURCES[0]} ${SOURCES[1]}",
+    source=["buildscripts/quickcpplint.py"],
+    action="$PYTHON ${SOURCES[0]} lint",
 )
 
 env.Alias( "lint" , [ lint_py, eslint, clang_format, pylinters ] )
