@@ -65,7 +65,7 @@
         // Get info about the failpoint that causes collection A's index rebuild to fail during a
         // database repair.
         const {failpoint, msg, mode, data} = constructFailpointInfo(collA);
-        const param = `failpoint.${failpoint}=${JSON.stringify({mode, data})})}`;
+        const param = `failpoint.${failpoint}=${tojson({mode, data})}`;
         const port = mongod.port;
 
         MongoRunner.stopMongod(mongod);
@@ -120,5 +120,4 @@
 
     // Test behavior when a database repair is activated through shell command db.repairDatabase().
     testRepairShell(dbName, dbpath);
-
 })();
