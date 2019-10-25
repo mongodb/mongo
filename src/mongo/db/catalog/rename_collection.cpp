@@ -446,9 +446,11 @@ Status renameBetweenDBs(OperationContext* opCtx,
                         const RenameCollectionOptions& options) {
     invariant(source.db() != target.db());
 
-    boost::optional<Lock::DBLock> sourceCollLock;
+    boost::optional<Lock::DBLock> sourceDbLock;
+    boost::optional<Lock::CollectionLock> sourceCollLock;
     if (!opCtx->lockState()->isCollectionLockedForMode(source, MODE_S)) {
-        sourceCollLock.emplace(opCtx, source.db(), MODE_S);
+        sourceDbLock.emplace(opCtx, source.db(), MODE_IS);
+        sourceCollLock.emplace(opCtx, source, MODE_S);
     }
 
     boost::optional<Lock::DBLock> targetDBLock;
@@ -704,6 +706,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
         }
     }
     sourceCollLock.reset();
+    sourceDbLock.reset();
 
     // Getting here means we successfully built the target copy. We now do the final
     // in-place rename and remove the source collection.
