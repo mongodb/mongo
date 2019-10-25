@@ -22,7 +22,7 @@
 (function() {
 'use strict';
 
-load("jstests/libs/check_log.js");
+load("jstests/libs/fail_point_util.js");
 
 const forceCheckpoint = () => {
     assert.commandWorked(db.fsyncLock());
@@ -67,8 +67,7 @@ assert(res.valid, "Validate cmd with {background:true} failed: " + tojson(res));
 
 // Set a failpoint in the background validation code to pause validation while holding a collection
 // lock.
-assert.commandWorked(
-    db.adminCommand({configureFailPoint: "pauseCollectionValidationWithLock", mode: "alwaysOn"}));
+let failPoint = configureFailPoint(db, "pauseCollectionValidationWithLock");
 
 // Start an asynchronous thread to run collection validation with {background:true}.
 let awaitValidateCommand = startParallelShell(function() {
@@ -82,7 +81,7 @@ let awaitValidateCommand = startParallelShell(function() {
 });
 
 // Wait for background validation command to start.
-checkLog.contains(db.getMongo(), "Failpoint 'pauseCollectionValidationWithLock' activated.");
+failPoint.wait();
 
 jsTest.log("Should start hanging now......");
 
@@ -96,8 +95,7 @@ assert.eq(1,
           "expected to find a single document, found: " + tojson(docRes.toArray()));
 
 // Clear the failpoint and make sure the validate command was successful.
-assert.commandWorked(
-    db.adminCommand({configureFailPoint: "pauseCollectionValidationWithLock", mode: "off"}));
+failPoint.off();
 awaitValidateCommand();
 
 /**

@@ -239,7 +239,7 @@ TEST_F(MongodbCAPITest, CreateIndex) {
     mongo::BSONObj inputObj = mongo::fromjson(
         R"raw_delimiter({
             createIndexes: 'items',
-            indexes: 
+            indexes:
             [
                 {
                     key: {
@@ -266,7 +266,7 @@ TEST_F(MongodbCAPITest, CreateBackgroundIndex) {
     mongo::BSONObj inputObj = mongo::fromjson(
         R"raw_delimiter({
             createIndexes: 'items',
-            indexes: 
+            indexes:
             [
                 {
                     key: {
@@ -292,7 +292,7 @@ TEST_F(MongodbCAPITest, CreateTTLIndex) {
     mongo::BSONObj inputObj = mongo::fromjson(
         R"raw_delimiter({
             createIndexes: 'items',
-            indexes: 
+            indexes:
             [
                 {
                     key: {
@@ -621,6 +621,7 @@ TEST_F(MongodbCAPITest, RunListCommands) {
                                           "trimMemory",
                                           "update",
                                           "validate",
+                                          "waitForFailPoint",
                                           "whatsmysni"};
 
     std::sort(whitelist.begin(), whitelist.end());

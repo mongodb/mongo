@@ -36,11 +36,14 @@
 #include <string>
 #include <vector>
 
+#include "mongo/db/client.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
+#include "mongo/util/tick_source_mock.h"
 #include "mongo/util/time_support.h"
 
 using mongo::BSONObj;
@@ -426,3 +429,33 @@ TEST(FailPoint, FailPointBlockIfBasicTest) {
     failPoint.executeIf([](auto&&) { ASSERT(!"shouldn't get here"); }, [](auto&&) { return true; });
 }
 }  // namespace mongo_test
+
+namespace mongo {
+
+TEST(FailPoint, WaitForFailPointTimeout) {
+    FailPoint failPoint;
+    failPoint.setMode(FailPoint::alwaysOn);
+
+    const auto service = ServiceContext::make();
+    const std::shared_ptr<ClockSourceMock> mockClock = std::make_shared<ClockSourceMock>();
+    service->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
+    service->setPreciseClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
+    service->setTickSource(std::make_unique<TickSourceMock<>>());
+
+    const auto client = service->makeClient("WaitForFailPointTest");
+    auto opCtx = client->makeOperationContext();
+    opCtx->setDeadlineAfterNowBy(Milliseconds{999}, ErrorCodes::ExceededTimeLimit);
+
+    stdx::thread waitForFailPoint([&] {
+        ASSERT_THROWS_CODE(failPoint.waitForTimesEntered(opCtx.get(), 1),
+                           AssertionException,
+                           ErrorCodes::ExceededTimeLimit);
+    });
+
+    mockClock->advance(Milliseconds{1000});
+    waitForFailPoint.join();
+
+    failPoint.setMode(FailPoint::off);
+}
+
+}  // namespace mongo

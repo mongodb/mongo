@@ -6,8 +6,9 @@
  */
 (function() {
 'use strict';
-load("jstests/libs/check_log.js");
+
 load('jstests/core/txns/libs/prepare_helpers.js');
+load("jstests/libs/fail_point_util.js");
 load('jstests/libs/parallel_shell_helpers.js');
 
 TestData.dbName = 'test';
@@ -36,11 +37,12 @@ TestData.otherDocFilter = {
  * field. This function is run in a separate thread and tests that oplog visibility blocks
  * certain reads and that prepare conflicts block other types of reads.
  */
-const readThreadFunc = function(readFunc, _collName) {
+const readThreadFunc = function(readFunc, _collName, timesEntered) {
     load("jstests/libs/check_log.js");
 
     // Do not start reads until we are blocked in 'prepareTransaction'.
-    checkLog.contains(db.getMongo(), "hangAfterReservingPrepareTimestamp fail point enabled");
+    assert.commandWorked(db.adminCommand(
+        {waitForFailPoint: "hangAfterReservingPrepareTimestamp", timesEntered: timesEntered}));
 
     // Create a 'readFuncObj' from the 'readFunc'.
     const readFuncObj = readFunc(_collName);
@@ -65,8 +67,7 @@ function runTest(prefix, readFunc) {
     testColl.drop({writeConcern: {w: "majority"}});
     assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: 'majority'}}));
 
-    assert.commandWorked(testDB.adminCommand(
-        {configureFailPoint: 'hangAfterReservingPrepareTimestamp', mode: 'alwaysOn'}));
+    let failPoint = configureFailPoint(testDB, "hangAfterReservingPrepareTimestamp");
 
     // Insert a document for the transaction.
     assert.commandWorked(testColl.insert(TestData.txnDoc));
@@ -89,7 +90,8 @@ function runTest(prefix, readFunc) {
     // Clear the log history to ensure we only see the most recent 'prepareTransaction'
     // failpoint log message.
     assert.commandWorked(db.adminCommand({clearLog: 'global'}));
-    const joinReadThread = startParallelShell(funWithArgs(readThreadFunc, readFunc, collName));
+    const joinReadThread = startParallelShell(
+        funWithArgs(readThreadFunc, readFunc, collName, failPoint.timesEntered + 1));
 
     jsTestLog("Preparing the transaction for " + prefix);
     const prepareTimestamp = PrepareHelpers.prepareTransaction(session);

@@ -3,8 +3,9 @@
 (function() {
 "use strict";
 
-load('jstests/libs/parallelTester.js');
 load("jstests/libs/check_log.js");
+load("jstests/libs/fail_point_util.js");
+load('jstests/libs/parallelTester.js');
 
 const dbName = "test";
 const collName = "kill_op_on_txn_expiry";
@@ -46,10 +47,8 @@ try {
     }));
 
     jsTestLog("Enabling fail point to block batch inserts");
-    assert.commandWorked(
-        testDB.adminCommand({configureFailPoint: "hangDuringBatchInsert", mode: "alwaysOn"}));
-    // Clear ramlog so checkLog can't find log messages from previous times this fail point was
-    // enabled.
+    let failPoint = configureFailPoint(testDB, "hangDuringBatchInsert");
+    // Clear ramlog so checkLog can't find log messages from the previous times this test was run.
     assert.commandWorked(testDB.adminCommand({clearLog: 'global'}));
 
     jsTestLog("Starting insert operation in parallel thread");
@@ -70,15 +69,14 @@ try {
     workerThread.start();
 
     jsTestLog("Wait for insert to be blocked");
-    checkLog.contains(db.getMongo(), "hangDuringBatchInsert fail point enabled");
+    failPoint.wait();
 
     jsTestLog("Wait for the transaction to expire");
     checkLog.contains(db.getMongo(), "Aborting transaction with txnNumber " + txnNumber);
 
     jsTestLog("Disabling fail point to enable insert to proceed and detect that the session " +
               "has been killed");
-    assert.commandWorked(
-        testDB.adminCommand({configureFailPoint: "hangDuringBatchInsert", mode: "off"}));
+    failPoint.off();
 
     workerThread.join();
     assert(!workerThread.hasFailed());

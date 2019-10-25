@@ -336,6 +336,7 @@ let testCases = {
             return {validate: collName};
         },
     },
+    waitForFailPoint: {skip: "executes locally on mongos (not sent to any remote node)"},
     whatsmyuri: {skip: "executes locally on mongos (not sent to any remote node)"},
 };
 

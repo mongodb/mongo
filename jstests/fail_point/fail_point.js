@@ -79,6 +79,16 @@ function runTest(adminDB) {
     res = adminDB.runCommand({getParameter: 1, "failpoint.dummy": 1});
     assert.commandWorked(res);
     expectFailPointState(res["failpoint.dummy"], 1, {x: 1});
+
+    // Test that the timeout for waitForFailPoint can be set via maxTimeMS.
+    var configureFailPointRes = adminDB.runCommand({configureFailPoint: 'dummy', mode: 'alwaysOn'});
+    assert.commandWorked(configureFailPointRes);
+    assert.commandFailedWithCode(adminDB.adminCommand({
+        waitForFailPoint: "dummy",
+        timesEntered: configureFailPointRes.count + 1,
+        maxTimeMS: 10
+    }),
+                                 ErrorCodes.MaxTimeMSExpired);
 }
 
 var conn = MongoRunner.runMongod();
