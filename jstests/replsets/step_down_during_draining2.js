@@ -14,7 +14,7 @@
 "use strict";
 
 load("jstests/replsets/rslib.js");
-load("jstests/libs/check_log.js");
+load("jstests/libs/fail_point_util.js");
 
 var replSet = new ReplSetTest({name: 'testSet', nodes: 3});
 var nodes = replSet.nodeList();
@@ -98,15 +98,14 @@ assert.commandFailedWithCode(
 
 // Prevent the current primary from stepping down
 jsTest.log("disallowing heartbeat stepdown " + secondary.host);
-assert.commandWorked(
-    secondary.adminCommand({configureFailPoint: "blockHeartbeatStepdown", mode: 'alwaysOn'}));
+var blockHeartbeatStepdownFailPoint = configureFailPoint(secondary, "blockHeartbeatStepdown");
 jsTestLog("Shut down the rest of the set so the primary-elect has to step down");
 replSet.stop(primary);
 disableFailPoint(replSet.nodes[2]);  // Fail point needs to be off when node is shut down.
 replSet.stop(2);
 
 jsTestLog("Waiting for secondary to begin stepping down while in drain mode");
-checkLog.contains(secondary, "stepDown - blockHeartbeatStepdown fail point enabled");
+blockHeartbeatStepdownFailPoint.wait();
 
 // Disable fail point to allow replication and allow secondary to finish drain mode while in the
 // process of stepping down.
@@ -135,8 +134,7 @@ assert.eq(ReplSetTest.State.PRIMARY, secondary.adminCommand({replSetGetStatus: 1
 assert(!secondary.adminCommand('ismaster').ismaster);
 
 jsTest.log("allowing heartbeat stepdown " + secondary.host);
-assert.commandWorked(
-    secondary.adminCommand({configureFailPoint: "blockHeartbeatStepdown", mode: 'off'}));
+blockHeartbeatStepdownFailPoint.off();
 
 jsTestLog("Checking that node successfully stepped down");
 replSet.waitForState(secondary, ReplSetTest.State.SECONDARY);

@@ -17,6 +17,7 @@
 'use strict';
 
 load("jstests/libs/check_log.js");
+load("jstests/libs/fail_point_util.js");
 
 const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
 rst.startSet();
@@ -30,14 +31,12 @@ const primary = rst.getPrimary();
 let upperDB = primary.getDB(dbNameUpper);
 assert.commandWorked(upperDB.createCollection("test"));
 
-assert.commandWorked(upperDB.adminCommand(
-    {configureFailPoint: 'dropDatabaseHangBeforeInMemoryDrop', mode: "alwaysOn"}));
+let failPoint = configureFailPoint(upperDB, 'dropDatabaseHangBeforeInMemoryDrop');
 let awaitDropUpper = startParallelShell(() => {
     db.getSiblingDB("A").dropDatabase();
 }, primary.port);
 
-checkLog.contains(primary, "dropDatabase - fail point dropDatabaseHangBeforeInMemoryDrop enabled.");
-
+failPoint.wait();
 let lowerDB = primary.getDB(dbNameLower);
 
 // The oplog entry to the secondaries to drop database "A" was sent, but the primary has not yet
@@ -45,8 +44,7 @@ let lowerDB = primary.getDB(dbNameLower);
 assert.commandFailedWithCode(lowerDB.createCollection("test"), ErrorCodes.DatabaseDifferCase);
 
 rst.awaitReplication();
-assert.commandWorked(
-    lowerDB.adminCommand({configureFailPoint: 'dropDatabaseHangBeforeInMemoryDrop', mode: "off"}));
+failPoint.off();
 
 checkLog.contains(primary, "dropDatabase " + dbNameUpper + " - finished");
 assert.commandWorked(lowerDB.createCollection("test"));

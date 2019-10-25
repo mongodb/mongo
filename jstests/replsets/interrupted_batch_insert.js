@@ -13,6 +13,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/fail_point_util.js");
 load('jstests/libs/parallelTester.js');
 load("jstests/replsets/rslib.js");
 
@@ -43,8 +44,7 @@ stopServerReplication(conns[2]);
 
 // Allow the primary to insert the first 5 batches of documents. After that, the fail point
 // activates, and the client thread hangs until the fail point gets turned off.
-assert.commandWorked(primary.getDB("db").adminCommand(
-    {configureFailPoint: "hangDuringBatchInsert", mode: {skip: 5}}));
+let failPoint = configureFailPoint(primary.getDB("db"), "hangDuringBatchInsert", {}, {skip: 5});
 
 // In a background thread, issue an insert command to the primary that will insert 10 batches of
 // documents.
@@ -62,7 +62,7 @@ worker.start();
 
 // Wait long enough to guarantee that all 5 batches of inserts have executed and the primary is
 // hung on the "hangDuringBatchInsert" fail point.
-checkLog.contains(primary, "hangDuringBatchInsert fail point enabled");
+failPoint.wait();
 
 // Make sure the insert command is, in fact, running in the background.
 assert.eq(primary.getDB("db").currentOp({"command.insert": name, active: true}).inprog.length, 1);
@@ -91,8 +91,7 @@ replTest.waitForState(primary, ReplSetTest.State.PRIMARY);
 assert.eq(replTest.nodes[0], replTest.getPrimary());
 
 // Allow the batch insert to continue.
-assert.commandWorked(
-    primary.getDB("db").adminCommand({configureFailPoint: "hangDuringBatchInsert", mode: "off"}));
+failPoint.off();
 
 // Wait until the insert command is done.
 assert.soon(

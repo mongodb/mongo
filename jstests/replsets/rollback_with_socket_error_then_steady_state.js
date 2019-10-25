@@ -7,6 +7,7 @@
 'use strict';
 
 load("jstests/libs/check_log.js");
+load("jstests/libs/fail_point_util.js");
 load("jstests/replsets/rslib.js");
 
 var collName = "test.coll";
@@ -71,8 +72,7 @@ jsTestLog("Do a write to node 1 on the [1,3,4] side of the partition.");
 assert.commandWorked(nodes[1].getCollection(collName).insert({a: counter++}));
 
 // Turn on failpoint on node 2 to pause rollback before doing anything.
-assert.commandWorked(
-    nodes[2].adminCommand({configureFailPoint: 'rollbackHangBeforeStart', mode: 'alwaysOn'}));
+let failPoint = configureFailPoint(nodes[2], 'rollbackHangBeforeStart');
 
 jsTestLog("Repartition to: [0] and [1,2,3,4].");
 nodes[2].disconnect(nodes[0]);
@@ -82,13 +82,13 @@ nodes[2].reconnect(nodes[4]);
 
 jsTestLog("Wait for node 2 to decide to go into ROLLBACK and start syncing from node 1.");
 // Since nodes 1 and 2 have now diverged, node 2 should go into rollback. The failpoint will
-// stop it from actually transitioning to rollback, so the checkLog bellow will ensure that we
+// stop it from actually transitioning to rollback, so the wait bellow will ensure that we
 // have decided to rollback, but haven't actually started yet.
 rst.awaitSyncSource(nodes[2], nodes[1]);
 
 jsTestLog("Wait for failpoint on node 2 to pause rollback before it starts");
 // Wait for fail point message to be logged.
-checkLog.contains(nodes[2], 'rollback - rollbackHangBeforeStart fail point enabled');
+failPoint.wait();
 
 jsTestLog("Repartition to: [1] and [0,2,3,4].");
 nodes[1].disconnect(nodes[3]);
@@ -101,8 +101,7 @@ nodes[4].reconnect(nodes[0]);
 nodes[4].reconnect(nodes[2]);
 
 // Turn off failpoint on node 2 to allow rollback against node 1 to fail with a network error.
-assert.adminCommandWorkedAllowingNetworkError(
-    nodes[2], {configureFailPoint: 'rollbackHangBeforeStart', mode: 'off'});
+failPoint.off();
 
 // Make node 0 ahead of node 2 again so node 2 will pick it as a sync source.
 

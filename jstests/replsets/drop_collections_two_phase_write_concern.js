@@ -6,7 +6,7 @@
 (function() {
 'use strict';
 
-load('jstests/libs/check_log.js');
+load("jstests/libs/fail_point_util.js");
 load('jstests/replsets/libs/two_phase_drops.js');  // For TwoPhaseDropCollectionTest.
 
 // Alias to logging function in two_phase_drops.js
@@ -59,8 +59,7 @@ const writeConcernForTimedOutOp = {
 assertTimeout(collForInserts.insert({_id: 1}, {writeConcern: writeConcernForTimedOutOp}));
 
 // Prevent drop collection reaper from making progress after resuming oplog application.
-assert.commandWorked(primary.adminCommand(
-    {configureFailPoint: 'dropPendingCollectionReaperHang', mode: 'alwaysOn'}));
+const failPoint = configureFailPoint(primary, 'dropPendingCollectionReaperHang');
 
 try {
     // Ensure that drop pending collection is not removed after resuming oplog application.
@@ -68,14 +67,13 @@ try {
     twoPhaseDropTest.resumeOplogApplication(twoPhaseDropTest.replTest.getSecondary());
 
     // Ensure that we've hit the failpoint before moving on.
-    checkLog.contains(primary, 'fail point dropPendingCollectionReaperHang enabled');
+    failPoint.wait();
 
     // While the drop pending collection reaper is blocked, an operation waiting on a majority
     // write concern should time out.
     assertTimeout(collForInserts.insert({_id: 2}, {writeConcern: writeConcernForTimedOutOp}));
 } finally {
-    assert.commandWorked(
-        primary.adminCommand({configureFailPoint: 'dropPendingCollectionReaperHang', mode: 'off'}));
+    failPoint.off();
 }
 
 // After the reaper is unblocked, an operation waiting on a majority write concern should run

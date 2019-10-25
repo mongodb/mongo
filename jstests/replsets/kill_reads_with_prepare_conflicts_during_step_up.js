@@ -10,6 +10,7 @@
 
 load("jstests/core/txns/libs/prepare_helpers.js");
 load("jstests/libs/check_log.js");
+load("jstests/libs/fail_point_util.js");
 
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
@@ -36,8 +37,7 @@ const sessionID = session.getSessionId();
 let sessionDB = session.getDatabase(dbName);
 const sessionColl = sessionDB.getCollection(collName);
 
-assert.commandWorked(
-    secondary.adminCommand({configureFailPoint: "WTPrintPrepareConflictLog", mode: "alwaysOn"}));
+let failPoint = configureFailPoint(secondary, "WTPrintPrepareConflictLog");
 
 // Insert a document that we will later modify in a transaction.
 assert.commandWorked(primaryColl.insert({_id: 1}));
@@ -94,7 +94,7 @@ const waitForSecondaryReadBlockedOnPrepareConflictThread = startParallelShell(()
 }, secondary.port);
 
 jsTestLog("Waiting for failpoint");
-checkLog.contains(secondary, "WTPrintPrepareConflictLog fail point enabled");
+failPoint.wait();
 
 // Once we've confirmed that the find command has hit a prepare conflict on the secondary, cause
 // that secondary to step up.

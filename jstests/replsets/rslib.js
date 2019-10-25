@@ -492,12 +492,15 @@ stopReplicationAndEnforceNewPrimaryToCatchUp = function(rst, node) {
 };
 
 /**
- * Sets the specified failpoint to 'alwaysOn' on the node.
+ * Sets the specified failpoint to 'alwaysOn' on the node and returns the number of
+ * times the fail point has been entered so far.
  */
 setFailPoint = function(node, failpoint, data = {}) {
     jsTestLog("Setting fail point " + failpoint);
-    assert.commandWorked(
-        node.adminCommand({configureFailPoint: failpoint, mode: "alwaysOn", data}));
+    let configureFailPointRes =
+        node.adminCommand({configureFailPoint: failpoint, mode: "alwaysOn", data: data});
+    assert.commandWorked(configureFailPointRes);
+    return configureFailPointRes.count;
 };
 
 /**

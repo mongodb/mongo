@@ -4,7 +4,8 @@
  */
 
 (function() {
-load("jstests/libs/check_log.js");
+
+load("jstests/libs/fail_point_util.js");
 
 rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -18,13 +19,10 @@ const nss = adminDbName + "." + versionCollName;
 
 // Hang initial sync before cloning the FCV document.
 let secondary = rst.add({rsConfig: {priority: 0}});
-assert.commandWorked(secondary.getDB('admin').runCommand({
-    configureFailPoint: 'initialSyncHangBeforeCollectionClone',
-    mode: 'alwaysOn',
-    data: {namespace: nss}
-}));
+let failPoint =
+    configureFailPoint(secondary, 'initialSyncHangBeforeCollectionClone', {namespace: nss});
 rst.reInitiate();
-checkLog.contains(secondary, "initialSyncHangBeforeCollectionClone fail point enabled.");
+failPoint.wait();
 
 jsTestLog("Restarting secondary in the early stages of initial sync.");
 rst.restart(secondary);

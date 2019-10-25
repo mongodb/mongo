@@ -8,7 +8,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/check_log.js");
+load("jstests/libs/fail_point_util.js");
 
 function assertWriteConcernTimeout(result) {
     assert.writeErrorWithCode(result, ErrorCodes.WriteConcernFailed);
@@ -32,11 +32,8 @@ TestData.collName = collName;
 testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
 assert.commandWorked(testDB.createCollection(collName, {writeConcern: {w: "majority"}}));
 
-assert.commandWorked(testDB.adminCommand({
-    configureFailPoint: "hangAfterCollectionInserts",
-    mode: "alwaysOn",
-    data: {collectionNS: testColl.getFullName(), first_id: "b"}
-}));
+const failPoint = configureFailPoint(
+    testDB, "hangAfterCollectionInserts", {collectionNS: testColl.getFullName(), first_id: "b"});
 
 jsTestLog(
     "Insert a document to hang before the insert completes to hold back the all durable timestamp.");
@@ -44,16 +41,14 @@ const joinHungWrite = startParallelShell(() => {
     assert.commandWorked(db.getSiblingDB(TestData.dbName)[TestData.collName].insert({_id: "b"}));
 }, primary.port);
 jsTestLog("Checking that the log contains fail point enabled.");
-checkLog.contains(testDB.getMongo(),
-                  "hangAfterCollectionInserts fail point enabled for " + testColl.getFullName());
+failPoint.wait();
 
 try {
     jsTest.log("Do a write with majority write concern that should time out.");
     assertWriteConcernTimeout(
         testColl.insert({_id: 0}, {writeConcern: {w: "majority", wtimeout: 2 * 1000}}));
 } finally {
-    assert.commandWorked(
-        primary.adminCommand({configureFailPoint: 'hangAfterCollectionInserts', mode: 'off'}));
+    failPoint.off();
 }
 
 joinHungWrite();

@@ -8,6 +8,7 @@
 "use strict";
 
 load("jstests/libs/check_log.js");
+load("jstests/libs/fail_point_util.js");
 
 const dbName = "kill_ttl_on_stepdown";
 
@@ -34,10 +35,8 @@ assert.soon(() => {
     return getNumTTLPasses() > 0;
 }, "TTLMonitor never did any passes.");
 
-assert.commandWorked(
-    primary.adminCommand({configureFailPoint: "hangTTLMonitorWithLock", mode: "alwaysOn"}));
-
-checkLog.contains(rst.getPrimary(), "Hanging due to hangTTLMonitorWithLock fail point");
+let failPoint = configureFailPoint(primary, "hangTTLMonitorWithLock");
+failPoint.wait();
 
 // See how many passes the TTLMonitor has done, before we stepdown the primary, killing it.
 let ttlPassesBeforeStepdown = getNumTTLPasses();
@@ -55,8 +54,7 @@ primary = rst.getPrimary();
 checkLog.contains(primary, "TTLMonitor was interrupted");
 
 // Disable the failpoint on the node that stepped down.
-assert.commandWorked(
-    primary.adminCommand({configureFailPoint: "hangTTLMonitorWithLock", mode: "off"}));
+failPoint.off();
 
 // Wait until the number TTLMonitor passes increases, informing us that the TTLMonitor thread
 // was not killed entirely and will continue to run after stepdown finishes.

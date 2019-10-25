@@ -7,6 +7,7 @@
 "use strict";
 load("jstests/replsets/rslib.js");  // For reconnect()
 load("jstests/libs/check_log.js");
+load("jstests/libs/fail_point_util.js");
 
 function getTxnTableEntry(db) {
     let txnTableEntries = db.getSiblingDB("config")["transactions"].find().toArray();
@@ -46,18 +47,14 @@ testDB.dropDatabase();
 assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
 // Prevent the priority: 0 node from fetching new ops so that it can vote for the new primary.
-assert.commandWorked(
-    replTest.nodes[2].adminCommand({configureFailPoint: 'stopReplProducer', mode: 'alwaysOn'}));
+const stopReplProducerFailPoint = configureFailPoint(replTest.nodes[2], 'stopReplProducer');
 
 jsTest.log("Stop secondary oplog replication before the last operation in the transaction.");
 // The stopReplProducerOnDocument failpoint ensures that secondary stops replicating before
 // applying the last operation in the transaction. This depends on the oplog fetcher batch size
 // being 1.
-assert.commandWorked(newPrimary.adminCommand({
-    configureFailPoint: "stopReplProducerOnDocument",
-    mode: "alwaysOn",
-    data: {document: {"applyOps.o._id": "last in txn"}}
-}));
+const stopReplProducerOnDocumentFailPoint = configureFailPoint(
+    newPrimary, "stopReplProducerOnDocument", {document: {"applyOps.o._id": "last in txn"}});
 
 jsTestLog("Starting transaction");
 const session = primary.startSession({causalConsistency: false});
@@ -80,7 +77,7 @@ assert.eq(txnTableEntry.state, "committed");
 const commitOpTime = getTxnTableEntry(testDB).lastWriteOpTime;
 
 jsTestLog("Wait for the new primary to block on fail point.");
-checkLog.contains(newPrimary, "stopReplProducerOnDocument fail point is enabled.");
+stopReplProducerOnDocumentFailPoint.wait();
 
 // Now the transaction should be in-progress on newPrimary.
 txnTableEntry = getTxnTableEntry(newTestDB);
@@ -98,14 +95,10 @@ jsTestLog("Wait for the new primary to stop replication after primary catch-up."
 checkLog.contains(newPrimary, "Stopping replication producer");
 
 jsTestLog("Enable replication on the new primary so that it can finish state transition");
-assert.commandWorked(newPrimary.adminCommand({
-    configureFailPoint: "stopReplProducerOnDocument",
-    mode: "off",
-}));
+stopReplProducerOnDocumentFailPoint.off();
 
 assert.eq(replTest.getPrimary(), newPrimary);
-assert.commandWorked(
-    replTest.nodes[2].adminCommand({configureFailPoint: 'stopReplProducer', mode: 'off'}));
+stopReplProducerFailPoint.off();
 replTest.awaitReplication();
 
 jsTestLog("The transaction has been aborted on the new primary.");

@@ -7,7 +7,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/check_log.js");
+load("jstests/libs/fail_point_util.js");
 load("jstests/libs/write_concern_util.js");  // for [stop|restart]ServerReplication.
 
 const dbName = "test";
@@ -80,13 +80,11 @@ jsTest.log("Node E syncs from a majority node and learns the new commit point in
 // The stopReplProducerOnDocument failpoint ensures that Node E stops replicating before
 // applying the document {msg: "new primary"}, which is the first document of term 3. This
 // depends on the oplog fetcher batch size being 1.
-assert.commandWorked(nodeE.adminCommand({
-    configureFailPoint: "stopReplProducerOnDocument",
-    mode: "alwaysOn",
-    data: {document: {msg: "new primary"}}
-}));
+const failPoint =
+    configureFailPoint(nodeE, "stopReplProducerOnDocument", {document: {msg: "new primary"}});
 nodeE.reconnect([nodeA, nodeC, nodeD]);
-checkLog.contains(nodeE, "stopReplProducerOnDocument fail point is enabled.");
+failPoint.wait();
+
 assert.soon(() => {
     return 1 === nodeE.getDB(dbName)[collName].find({term: 1}).itcount();
 });
@@ -96,8 +94,7 @@ jsTest.log("Node E switches its sync source to B and replicates the stale branch
 nodeE.disconnect([nodeA, nodeC, nodeD]);
 nodeB.reconnect(nodeE);
 rst.awaitSyncSource(nodeE, nodeB);
-assert.commandWorked(
-    nodeE.adminCommand({configureFailPoint: "stopReplProducerOnDocument", mode: "off"}));
+failPoint.off();
 assert.soon(() => {
     return 1 === nodeE.getDB(dbName)[collName].find({term: 2}).itcount();
 });

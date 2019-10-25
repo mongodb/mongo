@@ -5,7 +5,7 @@
 (function() {
 'use strict';
 
-load("jstests/libs/check_log.js");
+load("jstests/libs/fail_point_util.js");
 load("jstests/libs/write_concern_util.js");
 load("jstests/replsets/rslib.js");
 
@@ -63,8 +63,7 @@ assert.commandWorked(nodes[0].getDB(dbName).getCollection(collName).insert(
 // Stop the secondaries from replicating.
 stopServerReplication(secondaries);
 // Stop the primary from being able to complete stepping down.
-assert.commandWorked(
-    nodes[0].adminCommand({configureFailPoint: 'blockHeartbeatStepdown', mode: 'alwaysOn'}));
+var blockHeartbeatStepdownFailPoint = configureFailPoint(nodes[0], 'blockHeartbeatStepdown');
 
 jsTestLog("Do a write that won't ever reach a majority of nodes");
 assert.commandWorked(nodes[0].getDB(dbName).getCollection(collName).insert({a: 2}));
@@ -73,8 +72,7 @@ assert.commandWorked(nodes[0].getDB(dbName).getCollection(collName).insert({a: 2
 checkDocNotCommitted(nodes[0], {a: 2});
 
 // Prevent the primary from rolling back later on.
-assert.commandWorked(
-    nodes[0].adminCommand({configureFailPoint: 'rollbackHangBeforeStart', mode: 'alwaysOn'}));
+var rollbackHangBeforeStartFailPoint = configureFailPoint(nodes[0], 'rollbackHangBeforeStart');
 
 jsTest.log("Disconnect primary from all secondaries");
 nodes[0].disconnect(nodes[1]);
@@ -109,7 +107,7 @@ checkDocNotCommitted(nodes[0], {a: 2});
 jsTest.log("Allow the old primary to finish stepping down and become secondary");
 var res = null;
 try {
-    res = nodes[0].adminCommand({configureFailPoint: 'blockHeartbeatStepdown', mode: 'off'});
+    blockHeartbeatStepdownFailPoint.off();
 } catch (e) {
     // Expected - once we disable the fail point the stepdown will proceed and it's racy whether
     // the stepdown closes all connections before or after the configureFailPoint command
@@ -124,12 +122,11 @@ reconnect(nodes[0]);
 // At this point the former primary will attempt to go into rollback, but the
 // 'rollbackHangBeforeStart' will prevent it from doing so.
 checkDocNotCommitted(nodes[0], {a: 2});
-checkLog.contains(nodes[0], 'rollback - rollbackHangBeforeStart fail point enabled');
+rollbackHangBeforeStartFailPoint.wait();
 checkDocNotCommitted(nodes[0], {a: 2});
 
 jsTest.log("Allow the original primary to roll back its write and catch up to the new primary");
-assert.adminCommandWorkedAllowingNetworkError(
-    nodes[0], {configureFailPoint: 'rollbackHangBeforeStart', mode: 'off'});
+rollbackHangBeforeStartFailPoint.off();
 
 assert.soonNoExcept(function() {
     return null == nodes[0].getDB(dbName).getCollection(collName).findOne({a: 2});

@@ -4,7 +4,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/check_log.js");
+load("jstests/libs/fail_point_util.js");
 
 const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
 rst.startSet();
@@ -59,18 +59,17 @@ function getNotMasterLegacyUnackWritesCounter() {
 
 function runStepDownTest({description, failpoint, operation}) {
     jsTestLog("Enabling failpoint to block " + description + "s");
-    assert.commandWorked(
-        primaryAdmin.adminCommand({configureFailPoint: failpoint, mode: "alwaysOn"}));
+    let failPoint = configureFailPoint(primaryAdmin, failpoint);
 
     let failedLegacyUnackWritesBefore = getNotMasterLegacyUnackWritesCounter();
 
     jsTestLog("Trying legacy " + description + " on stepping-down primary");
     operation();
-    checkLog.contains(primary, failpoint + " fail point enabled");
+    failPoint.wait();
     jsTestLog("Within " + description + ": stepping down and disabling failpoint");
     assert.commandWorked(primaryAdmin.adminCommand({replSetStepDown: 60, force: true}));
     rst.waitForState(primary, ReplSetTest.State.SECONDARY);
-    assert.commandWorked(primaryAdmin.adminCommand({configureFailPoint: failpoint, mode: "off"}));
+    failPoint.off();
     res = assert.throws(() => primaryDb.adminCommand({ping: 1}));
     assert(isNetworkError(res));
     // We should automatically reconnect after the failed command.

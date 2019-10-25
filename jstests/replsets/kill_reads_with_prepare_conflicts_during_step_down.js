@@ -9,7 +9,7 @@
 "use strict";
 
 load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/check_log.js");
+load("jstests/libs/fail_point_util.js");
 
 // Start one of the nodes with priority: 0 to avoid elections.
 const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
@@ -32,8 +32,7 @@ const sessionID = session.getSessionId();
 let sessionDB = session.getDatabase(dbName);
 const sessionColl = sessionDB.getCollection(collName);
 
-assert.commandWorked(
-    primaryAdmin.adminCommand({configureFailPoint: "WTPrintPrepareConflictLog", mode: "alwaysOn"}));
+let failPoint = configureFailPoint(primaryAdmin, "WTPrintPrepareConflictLog");
 
 // Insert a document that we will later modify in a transaction.
 assert.commandWorked(primaryColl.insert({_id: 1}));
@@ -70,7 +69,7 @@ const readBlockedOnPrepareConflictThread = startParallelShell(() => {
 }, primary.port);
 
 jsTestLog("Waiting for failpoint");
-checkLog.contains(primary, "WTPrintPrepareConflictLog fail point enabled");
+failPoint.wait();
 
 // Once we have confirmed that the find command has hit a prepare conflict, we can perform
 // a step down.

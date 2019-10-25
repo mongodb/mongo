@@ -9,8 +9,8 @@
 "use strict";
 
 load('jstests/libs/change_stream_util.js');  // For ChangeStreamTest.
-load("jstests/libs/check_log.js");           // For checkLog.
-load("jstests/libs/parallelTester.js");      // for Thread.
+load("jstests/libs/fail_point_util.js");
+load("jstests/libs/parallelTester.js");  // for Thread.
 
 const name = "change_stream_speculative_majority_lastApplied_lag";
 const replTest = new ReplSetTest({
@@ -39,8 +39,7 @@ let startOperTime = res.operationTime;
 
 // Make the primary hang after it has completed a write but before it has advanced lastApplied
 // for that write.
-primaryDB.adminCommand(
-    {configureFailPoint: "hangBeforeLogOpAdvancesLastApplied", mode: "alwaysOn"});
+let failPoint = configureFailPoint(primaryDB, "hangBeforeLogOpAdvancesLastApplied");
 
 // Function which will be used by the background thread to perform an update on the specified
 // host, database, and collection.
@@ -59,7 +58,7 @@ primaryWrite.start();
 // should be visible. 'lastApplied', however, has not yet been advanced yet. We check both the
 // document state and the logs to make sure we hit the failpoint for the correct operation.
 assert.soon(() => (primaryColl.findOne({_id: 1}).v === 2));
-checkLog.contains(primary, 'hangBeforeLogOpAdvancesLastApplied fail point enabled.');
+failPoint.wait();
 
 // Open a change stream on the primary. The stream should only return the initial insert and the
 // first of the two update events, since the second update is not yet majority-committed.
@@ -98,7 +97,7 @@ cursor = cst.getNextBatch(cursor);
 assert.eq(cursor.nextBatch.length, 0);
 
 // Disable the failpoint to let the test complete.
-primaryDB.adminCommand({configureFailPoint: "hangBeforeLogOpAdvancesLastApplied", mode: "off"});
+failPoint.off();
 
 primaryWrite.join();
 replTest.stopSet();
