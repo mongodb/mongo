@@ -9,7 +9,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/check_log.js");
 load("jstests/core/txns/libs/prepare_helpers.js");
 
 // Set the number of initial sync attempts to 2 so that the test fails on unplanned failures.
@@ -63,7 +62,8 @@ secondary = replTest.start(
     true /* wait */);
 
 // Wait for failpoint to be reached so we know that collection cloning is paused.
-checkLog.contains(secondary, "initialSyncHangAfterDataCloning fail point enabled");
+assert.commandWorked(
+    secondary.adminCommand({waitForFailPoint: "initialSyncHangAfterDataCloning", timesEntered: 1}));
 
 jsTestLog("Running operations while collection cloning is paused");
 
@@ -82,7 +82,8 @@ assert.commandWorked(
     secondary.adminCommand({configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}));
 
 // Wait for this failpoint to be hit before turning it off and causing initial sync to fail.
-checkLog.contains(secondary, "failInitialSyncBeforeApplyingBatch fail point enabled");
+assert.commandWorked(secondary.adminCommand(
+    {waitForFailPoint: "failInitialSyncBeforeApplyingBatch", timesEntered: 1}));
 
 jsTestLog("Failing first initial sync attempt");
 

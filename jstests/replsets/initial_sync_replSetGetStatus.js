@@ -5,7 +5,8 @@
 
 (function() {
 "use strict";
-load("jstests/libs/check_log.js");
+
+load("jstests/libs/fail_point_util.js");
 
 var name = 'initial_sync_replSetGetStatus';
 var replSet = new ReplSetTest({
@@ -25,15 +26,12 @@ assert.commandWorked(coll.insert({a: 2}));
 var secondary = replSet.add();
 secondary.setSlaveOk();
 
-assert.commandWorked(secondary.getDB('admin').runCommand(
-    {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'alwaysOn'}));
-assert.commandWorked(secondary.getDB('admin').runCommand(
-    {configureFailPoint: 'initialSyncHangBeforeFinish', mode: 'alwaysOn'}));
+var failPointBeforeCopying = configureFailPoint(secondary, 'initialSyncHangBeforeCopyingDatabases');
+var failPointBeforeFinish = configureFailPoint(secondary, 'initialSyncHangBeforeFinish');
 replSet.reInitiate();
 
 // Wait for initial sync to pause before it copies the databases.
-checkLog.contains(secondary,
-                  'initial sync - initialSyncHangBeforeCopyingDatabases fail point enabled');
+failPointBeforeCopying.wait();
 
 // Test that replSetGetStatus returns the correct results while initial sync is in progress.
 var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
@@ -51,11 +49,10 @@ assert.commandWorked(coll.insert({a: 3}));
 assert.commandWorked(coll.insert({a: 4}));
 
 // Let initial sync continue working.
-assert.commandWorked(secondary.getDB('admin').runCommand(
-    {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'off'}));
+failPointBeforeCopying.off();
 
 // Wait for initial sync to pause right before it finishes.
-checkLog.contains(secondary, 'initial sync - initialSyncHangBeforeFinish fail point enabled');
+failPointBeforeFinish.wait();
 
 // Test that replSetGetStatus returns the correct results when initial sync is at the very end.
 res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
@@ -73,8 +70,7 @@ assert.eq(res.initialSyncStatus.databases.test["test.foo"].indexes, 1);
 assert.eq(res.initialSyncStatus.databases.test["test.foo"].fetchedBatches, 1);
 
 // Let initial sync finish and get into secondary state.
-assert.commandWorked(secondary.getDB('admin').runCommand(
-    {configureFailPoint: 'initialSyncHangBeforeFinish', mode: 'off'}));
+failPointBeforeFinish.off();
 replSet.awaitSecondaryNodes(60 * 1000);
 
 // Test that replSetGetStatus returns the correct results after initial sync is finished.

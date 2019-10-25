@@ -12,6 +12,7 @@
 (function() {
 "use strict";
 load("jstests/libs/check_log.js");
+load("jstests/libs/fail_point_util.js");
 
 var name = 'initial_sync_applier_error';
 var replSet = new ReplSetTest({
@@ -31,18 +32,15 @@ assert.commandWorked(coll.insert({_id: 0, content: "hi"}));
 var secondary = replSet.add({setParameter: "numInitialSyncAttempts=2"});
 secondary.setSlaveOk();
 
-assert.commandWorked(secondary.getDB('admin').runCommand(
-    {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'alwaysOn'}));
+let failPoint = configureFailPoint(secondary, 'initialSyncHangBeforeCopyingDatabases');
 replSet.reInitiate();
 
 // Wait for fail point message to be logged.
-checkLog.contains(secondary,
-                  'initial sync - initialSyncHangBeforeCopyingDatabases fail point enabled');
+failPoint.wait();
 
 var newCollName = name + '_2';
 assert.commandWorked(coll.renameCollection(newCollName, true));
-assert.commandWorked(secondary.getDB('admin').runCommand(
-    {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'off'}));
+failPoint.off();
 
 checkLog.contains(secondary, 'initial sync done');
 

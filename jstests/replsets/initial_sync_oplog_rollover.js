@@ -9,7 +9,8 @@
 
 (function() {
 "use strict";
-load("jstests/libs/check_log.js");
+
+load("jstests/libs/fail_point_util.js");
 
 var name = 'initial_sync_oplog_rollover';
 var replSet = new ReplSetTest({
@@ -42,12 +43,10 @@ var firstOplogEntry = getFirstOplogEntry(primary);
 var secondary = replSet.add();
 secondary.setSlaveOk();
 
-assert.commandWorked(secondary.getDB('admin').runCommand(
-    {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'alwaysOn'}));
+var failPoint = configureFailPoint(secondary, 'initialSyncHangBeforeCopyingDatabases');
 replSet.reInitiate();
 
-checkLog.contains(secondary,
-                  'initial sync - initialSyncHangBeforeCopyingDatabases fail point enabled');
+failPoint.wait();
 
 // Keep inserting large documents until they roll over the oplog.
 const largeStr = new Array(4 * 1024 * oplogSizeOnPrimary).join('aaaaaaaa');
@@ -57,8 +56,7 @@ while (bsonWoCompare(getFirstOplogEntry(primary), firstOplogEntry) === 0) {
     sleep(100);
 }
 
-assert.commandWorked(secondary.getDB('admin').runCommand(
-    {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'off'}));
+failPoint.off();
 
 replSet.awaitSecondaryNodes(200 * 1000);
 

@@ -44,8 +44,8 @@ function runInitialSync(cmd, initialFCV) {
     // Initial sync clones the 'admin' database first, which will set the fCV on the
     // secondary to initialFCV. We then block the secondary before issuing 'listCollections' on
     // the test database.
-    checkLog.contains(secondary,
-                      'initial sync - initialSyncHangBeforeListCollections fail point enabled');
+    assert.commandWorked(secondary.adminCommand(
+        {waitForFailPoint: "initialSyncHangBeforeListCollections", timesEntered: 1}));
 
     // Initial sync is stopped right before 'listCollections' on the test database. We now run
     // the test command to modify the fCV.

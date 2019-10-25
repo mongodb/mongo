@@ -7,6 +7,7 @@
 "use strict";
 
 load("jstests/libs/check_log.js");
+load("jstests/libs/fail_point_util.js");
 load("jstests/replsets/rslib.js");
 
 // Set up replica set. Disallow chaining so nodes always sync from primary.
@@ -40,19 +41,16 @@ assert.commandWorked(primaryColl.insert({_id: "a"}));
 assert.eq(primaryColl.find({_id: "a"}).itcount(), 1);
 
 jsTest.log("Create the uncommitted write.");
-assert.commandWorked(primaryDB.adminCommand({
-    configureFailPoint: "hangAfterCollectionInserts",
-    mode: "alwaysOn",
-    data: {collectionNS: primaryColl.getFullName(), first_id: "b"}
-}));
+const failPoint = configureFailPoint(primaryDB,
+                                     "hangAfterCollectionInserts",
+                                     {collectionNS: primaryColl.getFullName(), first_id: "b"});
 
 const db = primaryDB;
 const joinHungWrite = startParallelShell(() => {
     assert.commandWorked(
         db.getSiblingDB(TestData.testName)[TestData.collectionName].insert({_id: "b"}));
 }, primary.port);
-checkLog.contains(primaryDB.getMongo(),
-                  "hangAfterCollectionInserts fail point enabled for " + primaryColl.getFullName());
+failPoint.wait();
 
 jsTest.log("Create a write following the uncommitted write.");
 assert.commandWorked(primaryColl.insert({_id: "c"}));

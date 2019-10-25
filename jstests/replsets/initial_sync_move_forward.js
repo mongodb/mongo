@@ -14,6 +14,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/fail_point_util.js");
 load("jstests/libs/get_index_helpers.js");
 
 var rst = new ReplSetTest({name: "initial_sync_move_forward", nodes: 1});
@@ -43,22 +44,11 @@ secondary.setSlaveOk();
 var secondaryColl = secondary.getDB("test").coll;
 
 // Pause initial sync when the secondary has copied {_id: 0, x: 0} and {_id: 1, x: 1}.
-assert.commandWorked(secondary.adminCommand({
-    configureFailPoint: "initialSyncHangDuringCollectionClone",
-    data: {namespace: secondaryColl.getFullName(), numDocsToClone: 2},
-    mode: "alwaysOn"
-}));
+var failPoint = configureFailPoint(secondary,
+                                   "initialSyncHangDuringCollectionClone",
+                                   {namespace: secondaryColl.getFullName(), numDocsToClone: 2});
 rst.reInitiate();
-assert.soon(function() {
-    var logMessages = assert.commandWorked(secondary.adminCommand({getLog: "global"})).log;
-    for (var i = 0; i < logMessages.length; i++) {
-        if (logMessages[i].indexOf(
-                "initial sync - initialSyncHangDuringCollectionClone fail point enabled") != -1) {
-            return true;
-        }
-    }
-    return false;
-});
+failPoint.wait();
 
 // Delete {_id: count - 2} to make a hole. Grow {_id: 0} so that it moves into that hole. This
 // will cause the secondary to clone {_id: 0} again.
@@ -75,8 +65,7 @@ assert.commandWorked(masterColl.remove({_id: count - 1, x: count - 1}));
 assert.commandWorked(masterColl.insert({_id: count, x: 1, longString: longString}));
 
 // Resume initial sync.
-assert.commandWorked(secondary.adminCommand(
-    {configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}));
+failPoint.off();
 
 // Wait for initial sync to finish.
 rst.awaitSecondaryNodes();

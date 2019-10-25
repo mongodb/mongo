@@ -51,7 +51,9 @@ function setupTest({
     // Skip clearing initial sync progress after a successful initial sync attempt so that we
     // can check initialSyncStatus fields after initial sync is complete.
     secondaryStartupParams['failpoint.skipClearInitialSyncState'] = tojson({mode: 'alwaysOn'});
-    rst.start(secondary, {startClean: true, setParameter: secondaryStartupParams});
+    secondary = rst.start(secondary, {startClean: true, setParameter: secondaryStartupParams});
+    secondaryDB = secondary.getDB(dbName);
+    secondaryColl = secondaryDB[collName];
 
     // Wait until secondary reaches RS_STARTUP2 state.
     rst.waitForState(secondary, ReplSetTest.State.STARTUP_2);
@@ -141,7 +143,8 @@ setupTest({
 });
 
 jsTestLog("Waiting for collection cloning to complete.");
-checkLog.contains(secondary, "initialSyncHangAfterDataCloning fail point enabled");
+assert.commandWorked(
+    secondary.adminCommand({waitForFailPoint: "initialSyncHangAfterDataCloning", timesEntered: 1}));
 
 // Insert more data so that these are replicated to secondary node via oplog fetcher.
 jsTestLog("Inserting more data on primary.");

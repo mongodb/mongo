@@ -15,6 +15,7 @@
 "use strict";
 
 load("jstests/libs/check_log.js");
+load("jstests/libs/fail_point_util.js");
 load('jstests/replsets/rslib.js');
 
 /**
@@ -183,11 +184,11 @@ function InitialSyncTest(name = "InitialSyncTest", replSet, timeout) {
      * failpoint again.
      */
     function pauseBeforeSyncSourceCommand() {
-        assert.commandWorked(secondary.adminCommand(
-            {"configureFailPoint": 'initialSyncFuzzerSynchronizationPoint2', "mode": 'alwaysOn'}));
+        const secondSyncFailPoint =
+            configureFailPoint(secondary, 'initialSyncFuzzerSynchronizationPoint2');
         assert.commandWorked(secondary.adminCommand(
             {"configureFailPoint": 'initialSyncFuzzerSynchronizationPoint1', "mode": 'off'}));
-        checkLog.contains(secondary, "initialSyncFuzzerSynchronizationPoint2 fail point enabled");
+        secondSyncFailPoint.wait();
     }
 
     /**

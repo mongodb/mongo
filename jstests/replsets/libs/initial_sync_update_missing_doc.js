@@ -1,4 +1,7 @@
 "use strict";
+
+load("jstests/libs/fail_point_util.js");
+
 /**
  * Initial sync runs in several phases - the first 3 are as follows:
  * 1) fetches the last oplog entry (op_start1) on the source;
@@ -18,8 +21,7 @@ var reInitiateSetWithSecondary = function(replSet, secondaryConfig) {
 
     // Make the secondary hang after retrieving the last op on the sync source but before
     // copying databases.
-    assert.commandWorked(secondary.getDB('admin').runCommand(
-        {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'alwaysOn'}));
+    let failPoint = configureFailPoint(secondary, 'initialSyncHangBeforeCopyingDatabases');
 
     // Skip clearing initial sync progress after a successful initial sync attempt so that we
     // can check initialSyncStatus fields after initial sync is complete.
@@ -29,8 +31,7 @@ var reInitiateSetWithSecondary = function(replSet, secondaryConfig) {
     replSet.reInitiate();
 
     // Wait for fail point message to be logged.
-    checkLog.contains(secondary,
-                      'initial sync - initialSyncHangBeforeCopyingDatabases fail point enabled');
+    failPoint.wait();
 
     return secondary;
 };

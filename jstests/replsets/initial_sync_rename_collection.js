@@ -7,6 +7,7 @@
 (function() {
 'use strict';
 
+load("jstests/libs/fail_point_util.js");
 load('jstests/replsets/rslib.js');
 const basename = 'initial_sync_rename_collection';
 
@@ -43,8 +44,7 @@ const secondary = rst.add({setParameter: 'numInitialSyncAttempts=1'});
 
 // Add a fail point that causes the secondary's initial sync to hang before
 // copying databases.
-assert.commandWorked(secondary.adminCommand(
-    {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'alwaysOn'}));
+const failPoint = configureFailPoint(secondary, 'initialSyncHangBeforeCopyingDatabases');
 
 jsTestLog('Begin initial sync on secondary');
 let conf = rst.getPrimary().getDB('admin').runCommand({replSetGetConfig: 1}).config;
@@ -55,8 +55,7 @@ assert.eq(primary, rst.getPrimary(), 'Primary changed after reconfig');
 
 // Confirm that initial sync started on the secondary node.
 jsTestLog('Waiting for initial sync to start');
-checkLog.contains(secondary,
-                  'initial sync - initialSyncHangBeforeCopyingDatabases fail point enabled');
+failPoint.wait();
 
 // Start renaming collections while initial sync is hanging.
 jsTestLog('Rename collection ' + db0_name + '.' + collRenameWithinDB_name + ' to ' + db0_name +
@@ -72,8 +71,7 @@ assert.commandWorked(primary.adminCommand({
 }));
 
 // Disable fail point so that the secondary can finish its initial sync.
-assert.commandWorked(secondary.adminCommand(
-    {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'off'}));
+failPoint.off();
 
 jsTestLog('Wait for both nodes to be up-to-date');
 rst.awaitSecondaryNodes();

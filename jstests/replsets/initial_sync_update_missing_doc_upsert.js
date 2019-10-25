@@ -10,8 +10,8 @@
  */
 
 (function() {
+load("jstests/libs/fail_point_util.js");
 load("jstests/replsets/libs/initial_sync_update_missing_doc.js");
-load("jstests/libs/check_log.js");
 
 const replSet = new ReplSetTest({nodes: 1});
 
@@ -34,11 +34,10 @@ const secondary = reInitiateSetWithSecondary(replSet, secondaryConfig);
 
 jsTestLog("Allow initial sync to finish cloning collections");
 
-assert.commandWorked(secondary.getDB('admin').runCommand(
-    {configureFailPoint: 'initialSyncHangAfterDataCloning', mode: 'alwaysOn'}));
+let failPoint = configureFailPoint(secondary, 'initialSyncHangAfterDataCloning');
 assert.commandWorked(secondary.getDB('admin').runCommand(
     {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'off'}));
-checkLog.contains(secondary, "initialSyncHangAfterDataCloning fail point enabled");
+failPoint.wait();
 
 jsTestLog('Use both "update" and "applyOps" to upsert doc on primary');
 
@@ -94,8 +93,7 @@ for (let allowAtomic of [null, true, false]) {
 
 jsTestLog("Allow initial sync to finish fetching and replaying oplog");
 
-assert.commandWorked(secondary.getDB('admin').runCommand(
-    {configureFailPoint: 'initialSyncHangAfterDataCloning', mode: 'off'}));
+failPoint.off();
 
 finishAndValidate(replSet, collectionName, numDocuments);
 

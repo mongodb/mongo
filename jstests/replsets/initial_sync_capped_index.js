@@ -26,7 +26,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/check_log.js");
+load("jstests/libs/fail_point_util.js");
 load("jstests/replsets/rslib.js");  // for waitForState
 
 /**
@@ -84,17 +84,14 @@ var collectionClonerFailPoint = "initialSyncHangCollectionClonerAfterHandlingBat
 // Make the collection cloner pause after its initial 'find' response on the capped collection.
 var nss = dbName + "." + cappedCollName;
 jsTestLog("Enabling collection cloner fail point for " + nss);
-assert.commandWorked(secondary.adminCommand(
-    {configureFailPoint: collectionClonerFailPoint, mode: 'alwaysOn', data: {nss: nss}}));
+let failPoint = configureFailPoint(secondary, collectionClonerFailPoint, {nss: nss});
 
 // Let the SECONDARY begin initial sync.
 jsTestLog("Re-initiating replica set with new secondary.");
 replTest.reInitiate();
 
 jsTestLog("Waiting for the initial 'find' response of capped collection cloner to complete.");
-checkLog.contains(
-    secondary,
-    "initialSyncHangCollectionClonerAfterHandlingBatchResponse fail point enabled for " + nss);
+failPoint.wait();
 
 // Append documents to the capped collection so that the SECONDARY will clone these
 // additional documents.
@@ -105,8 +102,7 @@ for (var i = 0; i < docsToAppend; i++) {
 
 // Let the 'getMore' requests for the capped collection clone continue.
 jsTestLog("Disabling collection cloner fail point for " + nss);
-assert.commandWorked(secondary.adminCommand(
-    {configureFailPoint: collectionClonerFailPoint, mode: 'off', data: {nss: nss}}));
+failPoint.off();
 
 // Wait until initial sync completes.
 replTest.awaitReplication();

@@ -16,7 +16,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/check_log.js");
 load("jstests/core/txns/libs/prepare_helpers.js");
 
 const replTest = new ReplSetTest({nodes: 2});
@@ -109,8 +108,8 @@ secondary = replTest.start(
 jsTestLog("Secondary was restarted");
 
 // Wait for failpoint to be reached so we know that collection cloning is paused.
-checkLog.contains(secondary, "initialSyncHangDuringCollectionClone fail point enabled");
-
+assert.commandWorked(secondary.adminCommand(
+    {waitForFailPoint: "initialSyncHangDuringCollectionClone", timesEntered: 1}));
 jsTestLog("Running operations while collection cloning is paused");
 
 // Run some operations on the sync source while collection cloning is paused so that we know

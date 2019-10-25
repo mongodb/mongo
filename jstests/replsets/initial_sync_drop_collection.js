@@ -44,10 +44,13 @@ function setupTest({failPoint, secondaryStartupParams}) {
     // can check initialSyncStatus fields after initial sync is complete.
     secondaryStartupParams['failpoint.skipClearInitialSyncState'] = tojson({mode: 'alwaysOn'});
     secondaryStartupParams['numInitialSyncAttempts'] = 1;
-    replTest.restart(secondary, {startClean: true, setParameter: secondaryStartupParams});
+    secondary =
+        replTest.restart(secondary, {startClean: true, setParameter: secondaryStartupParams});
+    secondaryDB = secondary.getDB(dbName);
+    secondaryColl = secondaryDB[collName];
 
     jsTestLog("Waiting for secondary to reach failPoint " + failPoint);
-    checkLog.contains(secondary, failPoint + " fail point enabled for " + nss);
+    assert.commandWorked(secondary.adminCommand({waitForFailPoint: failPoint, timesEntered: 1}));
 
     // Restarting the secondary may have resulted in an election.  Wait until the system
     // stabilizes and reaches RS_STARTUP2 state.
