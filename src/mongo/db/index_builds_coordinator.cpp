@@ -889,11 +889,6 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
                                                  const IndexBuildOptions& indexBuildOptions) {
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
 
-    // TODO(SERVER-39484): Since 'replSetAndNotPrimary' is derived from the replication state at the
-    // start of the index build, this value is not resilient to member state changes like
-    // stepup/stepdown.
-    auto replSetAndNotPrimary = indexBuildOptions.replSetAndNotPrimary;
-
     // This Status stays unchanged unless we catch an exception in the following try-catch block.
     auto status = Status::OK();
     try {
@@ -906,7 +901,7 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
         boost::optional<Lock::CollectionLock> collLock;
         collLock.emplace(opCtx, dbAndUUID, MODE_X);
 
-        if (replSetAndNotPrimary) {
+        if (indexBuildOptions.replSetAndNotPrimaryAtStart) {
             // This index build can only be interrupted at shutdown. For the duration of the
             // OperationContext::runWithoutInterruptionExceptAtGlobalShutdown() invocation, any kill
             // status set by the killOp command will be ignored. After
@@ -949,7 +944,7 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
         // the next startup.
         // On primary and standalone nodes, the failed index build will not be replicated so it is
         // okay to propagate the shutdown error to the client.
-        if (replSetAndNotPrimary) {
+        if (indexBuildOptions.replSetAndNotPrimaryAtStart) {
             replState->stats.numIndexesAfter = replState->stats.numIndexesBefore;
             status = Status::OK();
         }
@@ -991,7 +986,7 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
 
             Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
 
-            if (!replSetAndNotPrimary) {
+            if (!indexBuildOptions.replSetAndNotPrimaryAtStart) {
                 auto replCoord = repl::ReplicationCoordinator::get(opCtx);
                 if (replCoord->getSettings().usingReplSets() &&
                     replCoord->canAcceptWritesFor(opCtx, nss)) {
@@ -1040,7 +1035,7 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
 
         // Failed index builds should abort secondary oplog application, except when the index build
         // was stopped due to processing an abortIndexBuild oplog entry.
-        if (replSetAndNotPrimary) {
+        if (indexBuildOptions.replSetAndNotPrimaryAtStart) {
             if (status == ErrorCodes::IndexBuildAborted) {
                 return;
             }
@@ -1143,7 +1138,7 @@ void IndexBuildsCoordinator::_buildIndex(
     }
 
     Timestamp commitIndexBuildTimestamp;
-    if (supportsTwoPhaseIndexBuild() && indexBuildOptions.replSetAndNotPrimary &&
+    if (supportsTwoPhaseIndexBuild() && indexBuildOptions.replSetAndNotPrimaryAtStart &&
         IndexBuildProtocol::kTwoPhase == replState->protocol) {
 
         log() << "Index build waiting for commit or abort before completing final phase: "
@@ -1232,6 +1227,7 @@ void IndexBuildsCoordinator::_buildIndex(
         if (supportsTwoPhaseIndexBuild()) {
             return;
         }
+
         opObserver->onCreateIndex(
             opCtx, collection->ns(), replState->collectionUUID, spec, fromMigrate);
     };

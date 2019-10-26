@@ -74,7 +74,7 @@ public:
      */
     struct IndexBuildOptions {
         boost::optional<CommitQuorumOptions> commitQuorum;
-        bool replSetAndNotPrimary = false;
+        bool replSetAndNotPrimaryAtStart = false;
     };
 
     /**

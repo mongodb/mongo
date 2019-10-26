@@ -188,7 +188,7 @@ Status startIndexBuild(OperationContext* opCtx,
 
     IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
     invariant(!indexBuildOptions.commitQuorum);
-    indexBuildOptions.replSetAndNotPrimary = true;
+    indexBuildOptions.replSetAndNotPrimaryAtStart = true;
 
     // We don't pass in a commit quorum here because secondary nodes don't have any knowledge of it.
     return IndexBuildsCoordinator::get(opCtx)
@@ -278,7 +278,7 @@ void createIndexForApplyOps(OperationContext* opCtx,
         // it.
         IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
         invariant(!indexBuildOptions.commitQuorum);
-        indexBuildOptions.replSetAndNotPrimary = true;
+        indexBuildOptions.replSetAndNotPrimaryAtStart = true;
 
         // This spawns a new thread and returns immediately.
         MONGO_COMPILER_VARIABLE_UNUSED auto fut = uassertStatusOK(
