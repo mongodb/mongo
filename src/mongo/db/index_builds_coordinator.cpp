@@ -94,6 +94,29 @@ void checkShardKeyRestrictions(OperationContext* opCtx,
 }
 
 /**
+ * Returns true if we should wait for a commitIndexBuild or abortIndexBuild oplog entry during oplog
+ * application.
+ */
+bool shouldWaitForCommitOrAbort(OperationContext* opCtx,
+                                const NamespaceString& nss,
+                                const ReplIndexBuildState& replState) {
+    if (IndexBuildProtocol::kTwoPhase != replState.protocol) {
+        return false;
+    }
+
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (!replCoord->getSettings().usingReplSets()) {
+        return false;
+    }
+
+    if (replCoord->canAcceptWritesFor(opCtx, nss)) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
  * Signal downstream secondary nodes to abort index build.
  */
 void onAbortIndexBuild(OperationContext* opCtx,
@@ -916,8 +939,11 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
             // deadlock could result if the index build was attempting to acquire a Collection S or
             // X lock while a prepared transaction held a Collection IX lock, and a step down was
             // waiting to acquire the RSTL in mode X.
-            const bool unlocked = opCtx->lockState()->unlockRSTLforPrepare();
-            invariant(unlocked);
+            // TODO(SERVER-44045): Revisit this logic for the non-two phase index build case.
+            if (!supportsTwoPhaseIndexBuild()) {
+                const bool unlocked = opCtx->lockState()->unlockRSTLforPrepare();
+                invariant(unlocked);
+            }
             opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&, this] {
                 _buildIndex(opCtx, dbAndUUID, replState, indexBuildOptions, &collLock);
             });
@@ -1120,6 +1146,9 @@ void IndexBuildsCoordinator::_buildIndex(
         hangAfterIndexBuildFirstDrain.pauseWhileSet();
     }
 
+    // Cache collection namespace for shouldWaitForCommitOrAbort().
+    NamespaceString nss;
+
     // Perform the second drain while stopping writes on the collection.
     {
         opCtx->recoveryUnit()->abandonSnapshot();
@@ -1130,6 +1159,8 @@ void IndexBuildsCoordinator::_buildIndex(
             replState->buildUUID,
             RecoveryUnit::ReadSource::kUnset,
             IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+
+        nss = *CollectionCatalog::get(opCtx).lookupNSSByUUID(replState->collectionUUID);
     }
 
     if (MONGO_unlikely(hangAfterIndexBuildSecondDrain.shouldFail())) {
@@ -1138,9 +1169,7 @@ void IndexBuildsCoordinator::_buildIndex(
     }
 
     Timestamp commitIndexBuildTimestamp;
-    if (supportsTwoPhaseIndexBuild() && indexBuildOptions.replSetAndNotPrimaryAtStart &&
-        IndexBuildProtocol::kTwoPhase == replState->protocol) {
-
+    if (shouldWaitForCommitOrAbort(opCtx, nss, *replState)) {
         log() << "Index build waiting for commit or abort before completing final phase: "
               << replState->buildUUID;
 
