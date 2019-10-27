@@ -12,7 +12,14 @@
  * 5) 'abortTransaction' cmd attempts to acquire the RSTL lock in MODE_IX but blocked
  *    behind the step down thread.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * TODO(SERVER-44190): Update this test to work with two phase index builds. Under two phase index
+ * builds, index builds are no longer aborted on stepdown.
+ *
+ * @tags: [
+ *     uses_transactions,
+ *     uses_prepare_transaction,
+ *     two_phase_index_builds_unsupported,
+ * ]
  */
 load("jstests/libs/check_log.js");
 load("jstests/replsets/rslib.js");

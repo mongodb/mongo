@@ -731,6 +731,15 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
         } catch (const ExceptionForCat<ErrorCategory::Interruption>& interruptionEx) {
             log() << "Index build interrupted: " << buildUUID << ": " << interruptionEx;
 
+            // If this node is no longer a primary, the index build will continue to run in the
+            // background and will complete when this node receives a commitIndexBuild oplog entry
+            // from the new primary.
+            if (indexBuildsCoord->supportsTwoPhaseIndexBuild() &&
+                ErrorCodes::InterruptedDueToReplStateChange == interruptionEx.code()) {
+                log() << "Index build continuing in background: " << buildUUID;
+                throw;
+            }
+
             // It is unclear whether the interruption originated from the current opCtx instance
             // for the createIndexes command or that the IndexBuildsCoordinator task was interrupted
             // independently of this command invocation. We'll defensively abort the index build
@@ -747,6 +756,13 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
         } catch (const ExceptionForCat<ErrorCategory::NotMasterError>& ex) {
             log() << "Index build interrupted due to change in replication state: " << buildUUID
                   << ": " << ex;
+
+            // The index build will continue to run in the background and will complete when this
+            // node receives a commitIndexBuild oplog entry from the new primary.
+            if (indexBuildsCoord->supportsTwoPhaseIndexBuild()) {
+                log() << "Index build continuing in background: " << buildUUID;
+                throw;
+            }
 
             indexBuildsCoord->abortIndexBuildByBuildUUID(
                 opCtx,

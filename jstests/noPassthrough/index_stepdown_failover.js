@@ -49,23 +49,31 @@ const newPrimaryDB = secondaryDB;
 const newPrimaryColl = secondaryColl;
 
 // Step down the primary.
-// Expect failed createIndex command invocation in parallel shell due to stepdown.
-// Before SERVER-44186, the index build will be aborted during stepdown.
+// Expect failed createIndex command invocation in parallel shell due to stepdown even though
+// the index build will continue in the background.
 assert.commandWorked(primary.adminCommand({replSetStepDown: 60, force: true}));
 const exitCode = createIdx({checkExitSuccess: false});
 assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build being terminated');
 checkLog.contains(primary, 'Index build interrupted: ');
 
 // Unblock the index build on the old primary during the collection scanning phase.
+// This index build will not complete because it has to wait for a commitIndexBuild oplog
+// entry.
 IndexBuildTest.resumeIndexBuilds(primary);
+checkLog.contains(primary,
+                  'Index build waiting for commit or abort before completing final phase: ');
 
 // Step up the new primary.
 rst.stepUp(newPrimary);
 
-// A new index should not be present on the old primary because the index build was aborted.
+// A new index should be present on the old primary after processing the commitIndexBuild oplog
+// entry from the new primary.
 IndexBuildTest.waitForIndexBuildToStop(testDB);
-IndexBuildTest.assertIndexes(coll, 1, ['_id_']);
+IndexBuildTest.assertIndexes(coll, 2, ['_id_', 'a_1']);
 
-TestData.skipCheckDBHashes = true;
+// Check that index was created on the new primary.
+IndexBuildTest.waitForIndexBuildToStop(newPrimaryDB);
+IndexBuildTest.assertIndexes(newPrimaryColl, 2, ['_id_', 'a_1']);
+
 rst.stopSet();
 })();
