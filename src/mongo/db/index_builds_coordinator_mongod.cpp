@@ -130,14 +130,6 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
     const auto deadline = opCtx->getDeadline();
     const auto timeoutError = opCtx->getTimeoutError();
 
-    // TODO: SERVER-39484 Because both 'writesAreReplicated' and
-    // 'shouldNotConflictWithSecondaryBatchApplication' depend on the current replication state,
-    // just passing the state here is not resilient to member state changes like stepup/stepdown.
-
-    // If the calling thread is replicating oplog writes (primary), this state should be passed to
-    // the builder.
-    const bool writesAreReplicated = opCtx->writesAreReplicated();
-
     // Task in thread pool should have similar CurOp representation to the caller so that it can be
     // identified as a createIndexes operation.
     LogicalOp logicalOp = LogicalOp::opInvalid;
@@ -155,7 +147,6 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
         indexBuildOptions,
         deadline,
         timeoutError,
-        writesAreReplicated,
         logicalOp,
         opDesc,
         replState
@@ -179,14 +170,6 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
         auto opCtx = Client::getCurrent()->makeOperationContext();
 
         opCtx->setDeadlineByDate(deadline, timeoutError);
-
-        // Two phase index builds have to adapt to replication state transitions and decide if it
-        // is ok to write to the oplog. Therefore, the caller's replicated writes setting should
-        // have no effect on the index build thread.
-        boost::optional<repl::UnreplicatedWritesBlock> unreplicatedWrites;
-        if (IndexBuildProtocol::kTwoPhase != replState->protocol && !writesAreReplicated) {
-            unreplicatedWrites.emplace(opCtx.get());
-        }
 
         // Index builds should never take the PBWM lock, even on a primary. This allows the index
         // to continue running after the node steps down to a secondary.

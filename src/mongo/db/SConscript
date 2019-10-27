@@ -765,6 +765,7 @@ env.Library(
         'db_raii',
         'index_build_entry_helpers',
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
+        '$BUILD_DIR/mongo/db/catalog/index_timestamp_helper',
     ],
 )
 

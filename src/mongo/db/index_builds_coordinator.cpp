@@ -37,6 +37,7 @@
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_build_entry_gen.h"
+#include "mongo/db/catalog/index_timestamp_helper.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -147,6 +148,12 @@ void onCommitIndexBuild(OperationContext* opCtx,
         // index builds are not in effect because the index build would be aborted (most likely due
         // to a stepdown) before we reach here.
         if (replSetAndNotPrimaryAtStart) {
+            // Get a timestamp to complete the index build in the absence of a commitIndexBuild
+            // oplog entry.
+            repl::UnreplicatedWritesBlock uwb(opCtx);
+            if (!IndexTimestampHelper::setGhostCommitTimestampForCatalogWrite(opCtx, nss)) {
+                log() << "Did not timestamp index commit write.";
+            }
             return;
         }
         opObserver->onCommitIndexBuild(opCtx, nss, collUUID, buildUUID, indexSpecs, fromMigrate);
