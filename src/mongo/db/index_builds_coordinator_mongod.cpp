@@ -180,8 +180,11 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
 
         opCtx->setDeadlineByDate(deadline, timeoutError);
 
+        // Two phase index builds have to adapt to replication state transitions and decide if it
+        // is ok to write to the oplog. Therefore, the caller's replicated writes setting should
+        // have no effect on the index build thread.
         boost::optional<repl::UnreplicatedWritesBlock> unreplicatedWrites;
-        if (!writesAreReplicated) {
+        if (IndexBuildProtocol::kTwoPhase != replState->protocol && !writesAreReplicated) {
             unreplicatedWrites.emplace(opCtx.get());
         }
 

@@ -117,6 +117,59 @@ bool shouldWaitForCommitOrAbort(OperationContext* opCtx,
 }
 
 /**
+ * Signal downstream secondary nodes to commit index build.
+ */
+void onCommitIndexBuild(OperationContext* opCtx,
+                        const NamespaceString& nss,
+                        const ReplIndexBuildState& replState,
+                        bool replSetAndNotPrimaryAtStart) {
+    if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+        return;
+    }
+
+    if (serverGlobalParams.featureCompatibility.getVersion() !=
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+        return;
+    }
+
+    const auto& buildUUID = replState.buildUUID;
+
+    invariant(opCtx->lockState()->isWriteLocked(),
+              str::stream() << "onCommitIndexBuild: " << buildUUID);
+
+    auto opObserver = opCtx->getServiceContext()->getOpObserver();
+    const auto& collUUID = replState.collectionUUID;
+    const auto& indexSpecs = replState.indexSpecs;
+    auto fromMigrate = false;
+
+    if (IndexBuildProtocol::kTwoPhase != replState.protocol) {
+        // Do not expect replication state to change during committing index build when two phase
+        // index builds are not in effect because the index build would be aborted (most likely due
+        // to a stepdown) before we reach here.
+        if (replSetAndNotPrimaryAtStart) {
+            return;
+        }
+        opObserver->onCommitIndexBuild(opCtx, nss, collUUID, buildUUID, indexSpecs, fromMigrate);
+        return;
+    }
+
+    // Since two phase index builds are allowed to survive replication state transitions, we should
+    // check if the node is currently a primary before attempting to write to the oplog.
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (!replCoord->getSettings().usingReplSets()) {
+        return;
+    }
+
+    if (!replCoord->canAcceptWritesFor(opCtx, nss)) {
+        invariant(!opCtx->recoveryUnit()->getCommitTimestamp().isNull(),
+                  str::stream() << "commitIndexBuild: " << buildUUID);
+        return;
+    }
+
+    opObserver->onCommitIndexBuild(opCtx, nss, collUUID, buildUUID, indexSpecs, fromMigrate);
+}
+
+/**
  * Signal downstream secondary nodes to abort index build.
  */
 void onAbortIndexBuild(OperationContext* opCtx,
@@ -1232,22 +1285,9 @@ void IndexBuildsCoordinator::_buildIndex(
 
     // Generate both createIndexes and commitIndexBuild oplog entries.
     // Secondaries currently interpret commitIndexBuild commands as noops.
-    auto opObserver = opCtx->getServiceContext()->getOpObserver();
-    auto fromMigrate = false;
     auto onCommitFn = [&] {
-        if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
-            return;
-        }
-        if (serverGlobalParams.featureCompatibility.getVersion() !=
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
-            return;
-        }
-        opObserver->onCommitIndexBuild(opCtx,
-                                       collection->ns(),
-                                       replState->collectionUUID,
-                                       replState->buildUUID,
-                                       replState->indexSpecs,
-                                       fromMigrate);
+        onCommitIndexBuild(
+            opCtx, collection->ns(), *replState, indexBuildOptions.replSetAndNotPrimaryAtStart);
     };
 
     auto onCreateEachFn = [&](const BSONObj& spec) {
@@ -1257,6 +1297,14 @@ void IndexBuildsCoordinator::_buildIndex(
             return;
         }
 
+        if (indexBuildOptions.replSetAndNotPrimaryAtStart) {
+            LOG(1) << "Skipping createIndexes oplog entry for index build: "
+                   << replState->buildUUID;
+            return;
+        }
+
+        auto opObserver = opCtx->getServiceContext()->getOpObserver();
+        auto fromMigrate = false;
         opObserver->onCreateIndex(
             opCtx, collection->ns(), replState->collectionUUID, spec, fromMigrate);
     };
