@@ -86,7 +86,7 @@ public:
      * Generates keys for hash access method.
      */
     static void getHashKeys(const BSONObj& obj,
-                            const std::string& hashedField,
+                            const BSONObj& keyPattern,
                             HashSeed seed,
                             int hashVersion,
                             bool isSparse,

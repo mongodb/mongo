@@ -48,7 +48,7 @@ void parseTwoDParams(const BSONObj& infoObj, TwoDIndexingParams* out);
 void parseHashParams(const BSONObj& infoObj,
                      HashSeed* seedOut,
                      int* versionOut,
-                     std::string* fieldOut);
+                     BSONObj* keyPattern);
 
 void parseHaystackParams(const BSONObj& infoObj,
                          std::string* geoFieldOut,

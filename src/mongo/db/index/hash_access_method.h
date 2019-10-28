@@ -61,16 +61,13 @@ private:
                    MultikeyPaths* multikeyPaths,
                    boost::optional<RecordId> id) const final;
 
-    // Only one of our fields is hashed.  This is the field name for it.
-    std::string _hashedField;
+    BSONObj _keyPattern;
 
     // _seed defaults to zero.
     HashSeed _seed;
 
     // _hashVersion defaults to zero.
     int _hashVersion;
-
-    BSONObj _missingKey;
 
     // Null if this index orders strings according to the simple binary compare. If non-null,
     // represents the collator used to generate index keys for indexed strings.

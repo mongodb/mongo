@@ -36,6 +36,7 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/unittest/unittest.h"
@@ -283,6 +284,47 @@ TEST(IndexKeyValidateTest, KeyElementNameWildcardFailsWhenValueIsPluginNameWithV
     ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
 }
 
-}  // namespace
+TEST(IndexKeyValidateTest, CompoundHashedIndexWithFCV44) {
+    ServerGlobalParams::FeatureCompatibility fcv;
+    fcv.setVersion(ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
 
+    // Validation fails when 'enableTestCommands' flag is not set.
+    auto status = index_key_validate::validateIndexSpec(
+        nullptr, fromjson("{key: {a : 'hashed', b: 1}, name: 'index'}"), fcv);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQ(status.getStatus().code(), 16763);
+
+    // Validation succeeds with hashed prefix in the index and 'enableTestCommands' flag enabled.
+    setTestCommandsEnabled(true);
+    ASSERT_OK(index_key_validate::validateIndexSpec(
+        nullptr, fromjson("{key: {a : 'hashed', b: 1}, name: 'index'}"), fcv));
+
+    // Validation succeeds with hashed non-prefix in the index.
+    ASSERT_OK(index_key_validate::validateIndexSpec(
+        nullptr, fromjson("{key: {b: 1, a : 'hashed', c: 1}, name: 'index'}"), fcv));
+}
+
+TEST(IndexKeyValidateTest, CompoundHashedIndexWithFCV42) {
+    ServerGlobalParams::FeatureCompatibility fcv;
+    fcv.setVersion(ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42);
+
+    // Validation succeeds with single field hashed index.
+    ASSERT_OK(index_key_validate::validateIndexSpec(
+        nullptr, fromjson("{key: {a : 'hashed'}, name: 'index'}"), fcv));
+
+    // Validation fails with compound hashed index.
+    auto status = index_key_validate::validateIndexSpec(
+        nullptr, fromjson("{key: {a : 'hashed', b: 1}, name: 'index'}"), fcv);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQ(status.getStatus().code(), 16763);
+
+    // validation fails even with 'enableTestCommands' flag enabled.
+    setTestCommandsEnabled(true);
+    status = index_key_validate::validateIndexSpec(
+        nullptr, fromjson("{key: {a : 'hashed', b: 1}, name: 'index'}"), fcv);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQ(status.getStatus().code(), 16763);
+}
+
+}  // namespace
 }  // namespace mongo

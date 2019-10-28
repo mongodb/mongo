@@ -41,16 +41,10 @@ HashAccessMethod::HashAccessMethod(IndexCatalogEntry* btreeState,
     : AbstractIndexAccessMethod(btreeState, std::move(btree)) {
     const IndexDescriptor* descriptor = btreeState->descriptor();
 
-    // We can change these if the single-field limitation is lifted later.
-    uassert(16763,
-            "Currently only single field hashed index supported.",
-            1 == descriptor->getNumFields());
-
     uassert(16764,
             "Currently hashed indexes cannot guarantee uniqueness. Use a regular index.",
             !descriptor->unique());
-
-    ExpressionParams::parseHashParams(descriptor->infoObj(), &_seed, &_hashVersion, &_hashedField);
+    ExpressionParams::parseHashParams(descriptor->infoObj(), &_seed, &_hashVersion, &_keyPattern);
 
     _collator = btreeState->getCollator();
 }
@@ -61,7 +55,7 @@ void HashAccessMethod::doGetKeys(const BSONObj& obj,
                                  MultikeyPaths* multikeyPaths,
                                  boost::optional<RecordId> id) const {
     ExpressionKeysPrivate::getHashKeys(obj,
-                                       _hashedField,
+                                       _keyPattern,
                                        _seed,
                                        _hashVersion,
                                        _descriptor->isSparse(),

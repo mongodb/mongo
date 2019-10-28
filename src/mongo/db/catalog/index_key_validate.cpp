@@ -40,6 +40,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/wildcard_key_generator.h"
@@ -304,6 +305,21 @@ StatusWith<BSONObj> validateIndexSpec(
                                 << "Values in the index key pattern cannot be empty strings"};
                 }
             }
+
+            // Allow compound hashed index only if FCV is 4.4.
+            const auto isFeatureDisabled =
+                (featureCompatibility.isVersionInitialized() &&
+                 featureCompatibility.getVersion() <
+                     ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) ||
+                !getTestCommandsEnabled();
+            if (isFeatureDisabled && (indexSpecElem.embeddedObject().nFields() > 1) &&
+                (IndexNames::findPluginName(indexSpecElem.embeddedObject()) ==
+                 IndexNames::HASHED)) {
+                return {ErrorCodes::Error(16763),
+                        "Compound hashed indexes can only be created with FCV 4.4 and with test "
+                        "commands enabled "};
+            }
+
             hasKeyPatternField = true;
         } else if (IndexDescriptor::kIndexNameFieldName == indexSpecElemFieldName) {
             if (indexSpecElem.type() != BSONType::String) {
@@ -374,8 +390,8 @@ StatusWith<BSONObj> validateIndexSpec(
             boost::intrusive_ptr<ExpressionContext> expCtx(
                 new ExpressionContext(opCtx, simpleCollator));
 
-            // Special match expression features (e.g. $jsonSchema, $expr, ...) are not allowed in
-            // a partialFilterExpression on index creation.
+            // Special match expression features (e.g. $jsonSchema, $expr, ...) are not allowed in a
+            // partialFilterExpression on index creation.
             auto statusWithMatcher =
                 MatchExpressionParser::parse(indexSpecElem.Obj(),
                                              std::move(expCtx),

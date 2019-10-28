@@ -57,7 +57,6 @@ namespace {
 using namespace mongo;
 
 namespace dps = ::mongo::dotted_path_support;
-
 //
 // Helper functions for getS2Keys
 //
@@ -374,7 +373,7 @@ void ExpressionKeysPrivate::getFTSKeys(const BSONObj& obj,
 
 // static
 void ExpressionKeysPrivate::getHashKeys(const BSONObj& obj,
-                                        const string& hashedField,
+                                        const BSONObj& keyPattern,
                                         HashSeed seed,
                                         int hashVersion,
                                         bool isSparse,
@@ -383,42 +382,49 @@ void ExpressionKeysPrivate::getHashKeys(const BSONObj& obj,
                                         KeyString::Version keyStringVersion,
                                         Ordering ordering,
                                         boost::optional<RecordId> id) {
-    const char* cstr = hashedField.c_str();
-    BSONElement fieldVal = dps::extractElementAtPathOrArrayAlongPath(obj, cstr);
+    static const BSONObj nullObj = BSON("" << BSONNULL);
+    auto hasFieldValue = false;
+    KeyString::HeapBuilder keyString(keyStringVersion, ordering);
+    for (auto&& indexEntry : keyPattern) {
+        auto indexPath = indexEntry.fieldNameStringData();
+        auto* cstr = indexPath.rawData();
+        auto fieldVal = dps::extractElementAtPathOrArrayAlongPath(obj, cstr);
 
-    // If we hit an array while traversing the path, 'cstr' will point to the path component
-    // immediately following the array, or the null termination byte if the final field in the path
-    // was an array.
-    uassert(
-        16766,
-        str::stream()
-            << "Error: hashed indexes do not currently support array values. Found array at path: "
-            << hashedField.substr(
-                   0, hashedField.size() - StringData(cstr).size() - !StringData(cstr).empty()),
-        fieldVal.type() != BSONType::Array);
+        // If we hit an array while traversing the path, 'cstr' will point to the path component
+        // immediately following the array, or the null termination byte if the final field in the
+        // path was an array.
+        uassert(16766,
+                str::stream() << "Error: hashed indexes do not currently support array values. "
+                                 "Found array at path: "
+                              << indexPath.substr(0,
+                                                  indexPath.size() - StringData(cstr).size() -
+                                                      !StringData(cstr).empty()),
+                fieldVal.type() != BSONType::Array);
 
-    // Convert strings to comparison keys.
-    BSONObj fieldValObj;
-    if (!fieldVal.eoo()) {
-        BSONObjBuilder bob;
-        CollationIndexKey::collationAwareIndexKeyAppend(fieldVal, collator, &bob);
-        fieldValObj = bob.obj();
-        fieldVal = fieldValObj.firstElement();
-        KeyString::HeapBuilder keyString(keyStringVersion, ordering);
-        keyString.appendNumberLong(makeSingleHashKey(fieldVal, seed, hashVersion));
-        if (id) {
-            keyString.appendRecordId(*id);
+        BSONObj fieldValObj;
+        if (fieldVal.eoo()) {
+            fieldVal = nullObj.firstElement();
+        } else {
+            BSONObjBuilder bob;
+            CollationIndexKey::collationAwareIndexKeyAppend(fieldVal, collator, &bob);
+            fieldValObj = bob.obj();
+            fieldVal = fieldValObj.firstElement();
+            hasFieldValue = true;
         }
-        keys->insert(keyString.release());
-    } else if (!isSparse) {
-        BSONObj nullObj = BSON("" << BSONNULL);
-        KeyString::HeapBuilder keyString(keyStringVersion, ordering);
-        keyString.appendNumberLong(makeSingleHashKey(nullObj.firstElement(), seed, hashVersion));
-        if (id) {
-            keyString.appendRecordId(*id);
+
+        if (indexEntry.isNumber()) {
+            keyString.appendBSONElement(fieldVal);
+        } else {
+            keyString.appendNumberLong(makeSingleHashKey(fieldVal, seed, hashVersion));
         }
-        keys->insert(keyString.release());
     }
+    if (isSparse && !hasFieldValue) {
+        return;
+    }
+    if (id) {
+        keyString.appendRecordId(*id);
+    }
+    keys->insert(keyString.release());
 }
 
 // static
