@@ -11256,6 +11256,37 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=rhel70 --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --use-libunwind
     has_packages: false
     mh_target: ""
+  # Override list of tasks to exclude package testing and publishing
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - rhel70
+  - name: compile_benchmarks
+    distros:
+    - rhel70
+  - name: .aggfuzzer
+  - name: audit
+  - name: auth_audit_gen
+  - name: auth_gen
+  - name: .benchmarks
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
+  - name: external_auth
+  - name: .jscore .common !.compat !.decimal !.sharding
+  - name: jsCore_txns_large_txns_format
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: replica_sets_auth_gen
+  - name: replica_sets_jscore_passthrough
+  - name: .replica_sets .multi_oplog
+  - name: sasl
+  - name: search_beta
+  - name: search_beta_auth
+  - name: search_beta_ssl
+  - name: sharding_auth_audit_gen
+  - name: sharding_auth_gen
+  - name: snmp
+  - name: .stitch
 
 - name: ubuntu1604-debug
   display_name: "* Ubuntu 16.04 DEBUG"
