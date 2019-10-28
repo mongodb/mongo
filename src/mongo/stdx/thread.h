@@ -75,7 +75,7 @@ public:
 
 private:
     void _install() const {
-        stack_t ss;
+        stack_t ss = {};
         ss.ss_sp = _stackStorage.get();
         ss.ss_flags = 0;
         ss.ss_size = kStackSize;
@@ -85,7 +85,7 @@ private:
     }
 
     void _uninstall() const {
-        stack_t ss;
+        stack_t ss = {};
         ss.ss_flags = SS_DISABLE;
         if (sigaltstack(&ss, nullptr)) {
             abort();
