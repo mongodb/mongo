@@ -421,6 +421,11 @@ Status initializeSharding(OperationContext* opCtx) {
         return status;
     }
 
+    status = preCacheMongosRoutingInfo(opCtx);
+    if (!status.isOK()) {
+        return status;
+    }
+
     Grid::get(opCtx)->setShardingInitialized();
 
     return Status::OK();

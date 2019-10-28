@@ -24,6 +24,7 @@ selector:
   - jstests/sharding/prepared_txn_metadata_refresh.js
   # Enable when 4.4 becomes last stable
   - jstests/sharding/banned_txn_databases_sharded.js
+  - jstests/sharding/mongos_precache_routing_info.js
   - jstests/sharding/bulk_insert.js
   - jstests/sharding/change_streams_establishment_finds_new_shards.js
   - jstests/sharding/change_streams_new_shard_new_database.js
