@@ -468,6 +468,46 @@ the local snapshot is beyond the specified OpTime. If read concern majority is s
 wait until the committed snapshot is beyond the specified OpTime. In 3.6 this feature will be
 extended to support a sharded cluster and use a **Lamport Clock** to provide **causal consistency**.
 
+# Concurrency Control
+
+## Parallel Batch Writer Mode
+
+The **Parallel Batch Writer Mode** lock (also known as the PBWM or the Peanut Butter Lock) is a
+global resource that helps manage the concurrency of running operations while a secondary is
+applying a batch of oplog entries. Since secondary oplog application applies batches in parallel,
+operations will not necessarily be applied in order, so a node will hold the PBWM while it is
+waiting for the entire batch to be applied. For secondaries, in order to read at a consistent state
+without needing the PBWM lock, a node will try to read at the `lastApplied` timestamp. Since
+`lastApplied` is set after a batch is completed, it is guaranteed to be at a batch boundary.
+However, during initial sync there could be changes from a background index build that occur after
+the `lastApplied` timestamp. Since there is no guarantee that `lastApplied` will be advanced again,
+if a node sees that there are pending changes ahead of `lastApplied`, it will acquire the PBWM to
+make sure that there isn't an in-progress batch when reading, and read without a timestamp to ensure
+all writes are visible, including those later than the `lastApplied`.
+
+## Replication State Transition Lock
+
+When a node goes through state transitions, it needs something to manage the concurrency of that
+state transition with other ongoing operations. For example, a node that is stepping down used to be
+able to accept writes, but shouldn't be able to do so until it becomes primary again. As a result,
+there is the **Replication State Transition Lock** (or RSTL), a global resource that manages the
+concurrency of state transitions.
+
+It is acquired in exclusive mode for the following replication state transitions: `PRIMARY` to
+`SECONDARY` (step down), `SECONDARY` to `PRIMARY` (step up), `SECONDARY` to `ROLLBACK` (rollback),
+`ROLLBACK` to `SECONDARY`, and `SECONDARY` to `RECOVERING`. Operations can hold it when they need to
+ensure that the node won't go through any of the above state transitions. Some examples of
+operations that do this are preparing a transaction, committing or aborting a prepared transaction,
+and checking/setting if the node can accept writes or serve reads.
+
+## Global Lock Acquisition Ordering
+
+Both the PBWM and RSTL are global resources that must be acquired before the global lock is
+acquired. The node must first acquire the PBWM in (intent
+shared)[https://docs.mongodb.com/manual/reference/glossary/#term-intent-lock] mode. Next, it must
+acquire the RSTL in intent exclusive mode. Only then can it acquire the global lock in its desired
+mode.
+
 # Elections
 
 ## Step Up
@@ -624,7 +664,7 @@ batch and fail with an `OplogStartMissing` error.
 
 During [rollback](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/rollback_impl.cpp#L176),
 nodes first transition to the `ROLLBACK` state and kill all user operations to ensure that we can
-successfully acquire the RSTL. (TODO SERVER-43789: link to RSTL section) Reads are prohibited while
+successfully acquire [the RSTL](#replication-state-transition-lock). Reads are prohibited while
 we are in the `ROLLBACK` state.
 
 We then wait for background index builds to complete before finding the `common point` between the
