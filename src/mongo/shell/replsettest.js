@@ -581,8 +581,6 @@ var ReplSetTest = function(opts) {
             self.startOptions = options;
         }
 
-        var nodes = [];
-
         if (jsTest.options().useRandomBinVersionsWithinReplicaSet &&
             self.seedRandomNumberGenerator) {
             // Set the random seed to the value passed in by TestData. The seed is undefined
@@ -591,11 +589,37 @@ var ReplSetTest = function(opts) {
             Random.setRandomSeed(jsTest.options().seed);
         }
 
-        for (var n = 0; n < this.ports.length; n++) {
-            nodes.push(this.start(n, options, restart));
+        // If the caller has explicitly specified 'waitForConnect:false', then we will start up all
+        // replica set nodes and return without waiting to connect to any of them.
+        const skipWaitingForAllConnections = (options && options.waitForConnect === false);
+
+        // If the caller has explicitly set 'waitForConnect', then we prefer that. Otherwise we
+        // default to not waiting for a connection. We merge the options object with a new field so
+        // as to not modify the original options object that was passed in.
+        options = options || {};
+        options = (options.waitForConnect === undefined)
+            ? Object.merge(options, {waitForConnect: false})
+            : options;
+
+        // Start up each node without waiting to connect. This allows startup of replica set nodes
+        // to proceed in parallel.
+        for (let n = 0; n < this.ports.length; n++) {
+            this.start(n, options, restart);
         }
 
-        this.nodes = nodes;
+        // Avoid waiting for connections to each node.
+        if (skipWaitingForAllConnections) {
+            print("ReplSetTest startSet skipping waiting for connections to all nodes.");
+            return this.nodes;
+        }
+
+        // Wait until we can establish a connection to each node before proceeding.
+        for (let n = 0; n < this.ports.length; n++) {
+            this._waitForInitialConnection(n);
+        }
+
+        print("ReplSetTest startSet, nodes: " + tojson(this.nodes));
+
         print("ReplSetTest startSet took " + (new Date() - startTime) + "ms for " +
               this.nodes.length + " nodes.");
         return this.nodes;
@@ -2342,6 +2366,54 @@ var ReplSetTest = function(opts) {
     };
 
     /**
+     * Waits for an initial connection to a given node. Should only be called after the node's
+     * process has already been started. Updates the corresponding entry in 'this.nodes' with the
+     * newly established connection object.
+     *
+     * @param {int} [n] the node id.
+     * @param {boolean} [waitForHealth] If true, wait for the health indicator of the replica set
+     *     node after waiting for a connection. Default: false.
+     * @returns a new Mongo connection object to the node.
+     */
+    this._waitForInitialConnection = function(n, waitForHealth) {
+        print("ReplSetTest waiting for an initial connection to node " + n);
+
+        // If we are using a bridge, then we want to get at the underlying mongod node object.
+        let node = _useBridge ? _unbridgedNodes[n] : this.nodes[n];
+        let pid = node.pid;
+        let port = node.port;
+        let conn = MongoRunner.awaitConnection(pid, port);
+        if (!conn) {
+            throw new Error("Failed to connect to node " + n);
+        }
+
+        // Attach the original node properties to the connection object.
+        Object.assign(conn, node);
+
+        // Save the new connection object. If we are using a bridge, then we need to connect to it.
+        if (_useBridge) {
+            this.nodes[n].connectToBridge();
+            this.nodes[n].nodeId = n;
+            _unbridgedNodes[n] = conn;
+        } else {
+            this.nodes[n] = conn;
+        }
+
+        print("ReplSetTest made initial connection to node: " + tojson(this.nodes[n]));
+
+        waitForHealth = waitForHealth || false;
+        if (waitForHealth) {
+            // Wait for node to start up.
+            _waitForHealth(this.nodes[n], Health.UP);
+        }
+
+        if (_causalConsistency) {
+            this.nodes[n].setCausalConsistency(true);
+        }
+        return this.nodes[n];
+    };
+
+    /**
      * Starts up a server.  Options are saved by default for subsequent starts.
      *
      *
@@ -2354,9 +2426,11 @@ var ReplSetTest = function(opts) {
      * @param {object} [options]
      * @param {boolean} [restart] If false, the data directory will be cleared
      *   before the server starts.  Default: false.
-     *
+     * @param {boolean} [waitForHealth] If true, wait for the health indicator of the replica set
+     *     node after waiting for a connection. Default: false.
      */
-    this.start = _nodeParamToSingleNode(_nodeParamToId(function(n, options, restart, wait) {
+    this.start = _nodeParamToSingleNode(_nodeParamToId(function(
+        n, options, restart, waitForHealth) {
         print("ReplSetTest n is : " + n);
 
         var defaults = {
@@ -2459,6 +2533,11 @@ var ReplSetTest = function(opts) {
             this.nodes[n] = new MongoBridge(bridgeOptions);
         }
 
+        // Save this property since it may be deleted inside 'runMongod'.
+        var waitForConnect = options.waitForConnect;
+
+        // Never wait for a connection inside runMongod. We will do so below if needed.
+        options.waitForConnect = false;
         var conn = MongoRunner.runMongod(options);
         if (!conn) {
             throw new Error("Failed to start node " + n);
@@ -2467,17 +2546,16 @@ var ReplSetTest = function(opts) {
         // Make sure to call _addPath, otherwise folders won't be cleaned.
         this._addPath(conn.dbpath);
 
+        // We don't want to persist 'waitForConnect' across node restarts.
+        delete conn.fullOptions.waitForConnect;
+
+        // Save the node object in the appropriate location.
         if (_useBridge) {
-            this.nodes[n].connectToBridge();
             _unbridgedNodes[n] = conn;
         } else {
             this.nodes[n] = conn;
+            this.nodes[n].nodeId = n;
         }
-
-        // Add replica set specific attributes.
-        this.nodes[n].nodeId = n;
-
-        printjson(this.nodes);
 
         // Clean up after noReplSet to ensure it doesn't effect future restarts.
         if (options.noReplSet) {
@@ -2485,24 +2563,12 @@ var ReplSetTest = function(opts) {
             delete this.nodes[n].fullOptions.noReplSet;
         }
 
-        wait = wait || false;
-        if (!wait.toFixed) {
-            if (wait)
-                wait = 0;
-            else
-                wait = -1;
+        // Wait for a connection to the node if necessary.
+        if (waitForConnect === false) {
+            print("ReplSetTest start skip waiting for a connection to node " + n);
+            return this.nodes[n];
         }
-
-        if (wait >= 0) {
-            // Wait for node to start up.
-            _waitForHealth(this.nodes[n], Health.UP, wait);
-        }
-
-        if (_causalConsistency) {
-            this.nodes[n].setCausalConsistency(true);
-        }
-
-        return this.nodes[n];
+        return this._waitForInitialConnection(n, waitForHealth);
     }));
 
     /**

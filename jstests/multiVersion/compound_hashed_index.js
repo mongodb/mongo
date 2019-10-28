@@ -134,7 +134,7 @@ try {
     restartReplSetNodes(rst, [secondaries[0]], nodeOptions42);
     assert(false, "Expected 'restartReplSetNodes' to throw");
 } catch (err) {
-    assert.eq(err.message, `Failed to start node ${rst.getNodeId(secondaries[0])}`);
+    assert.eq(err.message, `Failed to connect to node ${rst.getNodeId(secondaries[0])}`);
     // HashAccessMethod should throw this error when the index spec is validated during startup.
     assert(rawMongoProgramOutput().match("exception in initAndListen: Location16763"));
 }
