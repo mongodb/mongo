@@ -82,6 +82,15 @@ functions:
         set -o verbose
 
         ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C ${directory}  ${smp_command|} 2>&1
+  "make check all":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/build_posix"
+      script: |
+        set -o errexit
+        set -o verbose
+
+        ${test_env_vars|} ${make_command|make} VERBOSE=1 check ${smp_command|} 2>&1
   "upload artifact":
     - command: archive.targz_pack
       params:
@@ -113,7 +122,7 @@ post:
   - func: "cleanup"
 
 tasks:
-## Base compile task on posix flavours
+  # Base compile task on posix flavours
   - name: compile
     tags: ["pull_request"]
     commands:
@@ -126,8 +135,42 @@ tasks:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
-          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:disable_coredump=0 ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer CFLAGS="-fsanitize=address -ggdb"
+          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ CFLAGS="-fsanitize=address -fno-omit-frame-pointer -ggdb"
           posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic --disable-static
+
+  - name: compile-msan
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ CFLAGS="-fsanitize=memory -ggdb"
+          posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic --disable-static
+
+  - name: compile-ubsan
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ CFLAGS="-fsanitize=undefined -ggdb"
+          posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic
+
+  # production build with --disable-shared
+  - name: compile-production-disable-shared
+    tags: ["pull_request"]
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          posix_configure_flags: --enable-silent-rules --enable-strict --disable-shared
+
+  # production build with --disable-static
+  - name: compile-production-disable-static
+    tags: ["pull_request"]
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          posix_configure_flags: --enable-silent-rules --enable-strict --disable-static --enable-lz4 --enable-snappy --enable-zlib --enable-zstd --enable-python
 
   - name: make-check-test
     depends_on:
@@ -135,14 +178,37 @@ tasks:
     commands:
       - func: "fetch artifacts"
       - func: "compile wiredtiger"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix"
-          script: |
-            set -o errexit
-            set -o verbose
+      - func: "make check all"
 
-            ${test_env_vars|} ${make_command|make} VERBOSE=1 check ${smp_command|} 2>&1
+  - name: make-check-msan-test
+    depends_on:
+      - name: compile-msan
+    commands:
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: compile-msan
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ CFLAGS="-fsanitize=memory -ggdb"
+          posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic --disable-static
+      - func: "make check all"
+        vars:
+          test_env_vars: MSAN_OPTIONS=abort_on_error=1:disable_coredump=0 MSAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
+
+  - name: make-check-asan-test
+    depends_on:
+      - name: compile-asan
+    commands:
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: compile-asan
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ CFLAGS="-fsanitize=address -fno-omit-frame-pointer -ggdb"
+          posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic --disable-static
+      - func: "make check all"
+        vars:
+          test_env_vars: ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:disable_coredump=0 ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
 
   # Start of normal make check test tasks
 
@@ -178,8 +244,39 @@ tasks:
           dependent_task: compile-asan
       - func: "compile wiredtiger"
         vars:
-          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:disable_coredump=0 ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer CFLAGS="-fsanitize=address -ggdb"
+          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ CFLAGS="-fsanitize=address -ggdb"
           posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic --disable-static
+      - func: "make check directory"
+        vars:
+          test_env_vars: ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:disable_coredump=0 ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
+          directory: examples/c
+
+  - name: examples-c-production-disable-shared-test
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile-production-disable-shared
+    commands:
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: compile-production-disable-shared
+      - func: "compile wiredtiger"
+        vars:
+          posix_configure_flags: --enable-silent-rules --enable-strict --disable-shared
+      - func: "make check directory"
+        vars:
+          directory: examples/c
+
+  - name: examples-c-production-disable-static-test
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile-production-disable-static
+    commands:
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: compile-production-disable-static
+      - func: "compile wiredtiger"
+        vars:
+          posix_configure_flags: --enable-silent-rules --enable-strict --disable-static --enable-lz4 --enable-snappy --enable-zlib --enable-zstd --enable-python
       - func: "make check directory"
         vars:
           directory: examples/c
@@ -317,6 +414,23 @@ tasks:
           directory: bench/wtperf
 
   # End of normal make check test tasks
+
+  - name: ubsan-test
+    depends_on:
+      - name: compile-ubsan
+    commands:
+      - func: "fetch artifacts"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ CFLAGS="-fsanitize=undefined -ggdb"
+          posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix/examples/c"
+          script: |
+            set -o errexit
+            set -o verbose
+            UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1:abort_on_error=1:disable_coredump=0 ./ex_access
 
   # Start of csuite test tasks
 
@@ -888,7 +1002,8 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [c] -v 2 ${smp_command|} 2>&1
+            # Reserve this bucket only for compat tests, which take a long time to run
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py compat -v 2 ${smp_command|} 2>&1
 
   - name: unit-test-bucket02
     tags: ["pull_request", "unit_test"]
@@ -903,7 +1018,9 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [defg] -v 2 ${smp_command|} 2>&1
+            # Non-compat tests in the 'c' family
+            non_compat_tests=$(ls ../test/suite/test_c*.py | xargs -n1 basename | grep -v compat)
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py $non_compat_tests -v 2 ${smp_command|} 2>&1
 
   - name: unit-test-bucket03
     tags: ["pull_request", "unit_test"]
@@ -918,7 +1035,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [hijk] -v 2 ${smp_command|} 2>&1
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [defghijk] -v 2 ${smp_command|} 2>&1
 
   - name: unit-test-bucket04
     tags: ["pull_request", "unit_test"]
@@ -963,7 +1080,8 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [t] -v 2 ${smp_command|} 2>&1
+            # Reserve this bucket only for timestamp tests, which take a long time to run
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py timestamp -v 2 ${smp_command|} 2>&1
 
   - name: unit-test-bucket07
     tags: ["pull_request", "unit_test"]
@@ -978,6 +1096,9 @@ tasks:
             set -o errexit
             set -o verbose
 
+            # Non-timestamp tests in the 't' family
+            non_ts_tests=$(ls ../test/suite/test_t*.py | xargs -n1 basename | grep -v timestamp)
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py $non_ts_tests -v 2 ${smp_command|} 2>&1
             ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [uvwxyz] -v 2 ${smp_command|} 2>&1
 
   # End of Python unit test tasks
@@ -1236,6 +1357,33 @@ tasks:
             set -o verbose
             sh dist/s_clang-scan 2>&1
 
+  - name: configure-combinations
+    commands:
+      - func: "get project"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/evergreen"
+          script: |
+            set -o errexit
+            set -o verbose
+            ./configure_combinations.sh ${smp_command|} 2>&1
+  
+  - name: linux-directio
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "compile wiredtiger"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix/test/format"
+          script: |
+            set -o errexit
+            set -o verbose
+            for i in {1..3}; do
+              ./t -1 -C "direct_io=[data]" -c ../../../test/format/CONFIG.stress
+            done
+
 buildvariants:
 - name: ubuntu1804
   display_name: Ubuntu 18.04
@@ -1248,6 +1396,13 @@ buildvariants:
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
   tasks:
     - name: ".pull_request !.windows_only"
+    - name: compile-msan
+    - name: make-check-msan-test
+    - name: compile-ubsan
+    - name: ubsan-test
+    - name: linux-directio
+    - name: make-check-asan-test
+    - name: configure-combinations
 
 - name: ubuntu1804-python3
   display_name: Ubuntu 18.04 (Python3)
