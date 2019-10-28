@@ -114,6 +114,7 @@
 #include "mk_wcwidth.h"
 #include <errno.h>
 #include <fcntl.h>
+#include <memory>
 #include <sstream>
 #include <stdio.h>
 #include <string>
@@ -1754,7 +1755,7 @@ int InputBuffer::incrementalHistorySearch(PromptBase& pi, int startChar) {
     bool keepLooping = true;
     bool useSearchedLine = true;
     bool searchAgain = false;
-    UChar32* activeHistoryLine = nullptr;
+    std::unique_ptr<UChar32[]> activeHistoryLine;
     while (keepLooping) {
         c = linenoiseReadChar();
         c = cleanupCtrl(c);  // convert CTRL + <char> into normal ctrl
@@ -1881,9 +1882,9 @@ int InputBuffer::incrementalHistorySearch(PromptBase& pi, int startChar) {
         // if we are staying in search mode, search now
         if (keepLooping) {
             bufferSize = historyLineLength + 1;
-            activeHistoryLine = new UChar32[bufferSize];
+            activeHistoryLine = std::make_unique<UChar32[]>(bufferSize);
             copyString8to32(
-                activeHistoryLine, history[historyIndex], bufferSize, ucharCount, errorCode);
+                activeHistoryLine.get(), history[historyIndex], bufferSize, ucharCount, errorCode);
             if (dp.searchTextLen > 0) {
                 bool found = false;
                 int historySearchIndex = historyIndex;
@@ -1914,9 +1915,8 @@ int InputBuffer::incrementalHistorySearch(PromptBase& pi, int startChar) {
                         historySearchIndex += dp.direction;
                         bufferSize =
                             strlen(reinterpret_cast<char*>(history[historySearchIndex])) + 1;
-                        delete[] activeHistoryLine;
-                        activeHistoryLine = new UChar32[bufferSize];
-                        copyString8to32(activeHistoryLine,
+                        activeHistoryLine = std::make_unique<UChar32[]>(bufferSize);
+                        copyString8to32(activeHistoryLine.get(),
                                         history[historySearchIndex],
                                         bufferSize,
                                         ucharCount,
@@ -1929,15 +1929,12 @@ int InputBuffer::incrementalHistorySearch(PromptBase& pi, int startChar) {
                     }
                 };  // while
             }
-            if (activeHistoryLine) {
-                delete[] activeHistoryLine;
-            }
             bufferSize = historyLineLength + 1;
-            activeHistoryLine = new UChar32[bufferSize];
+            activeHistoryLine = std::make_unique<UChar32[]>(bufferSize);
             copyString8to32(
-                activeHistoryLine, history[historyIndex], bufferSize, ucharCount, errorCode);
+                activeHistoryLine.get(), history[historyIndex], bufferSize, ucharCount, errorCode);
             dynamicRefresh(dp,
-                           activeHistoryLine,
+                           activeHistoryLine.get(),
                            historyLineLength,
                            historyLinePosition);  // draw user's text with our prompt
         }
@@ -1959,12 +1956,9 @@ int InputBuffer::incrementalHistorySearch(PromptBase& pi, int startChar) {
     pb.promptPreviousLen = dp.promptChars;
     if (useSearchedLine && activeHistoryLine) {
         historyRecallMostRecent = true;
-        copyString32(buf32, activeHistoryLine, buflen + 1);
+        copyString32(buf32, activeHistoryLine.get(), buflen + 1);
         len = historyLineLength;
         pos = historyLinePosition;
-    }
-    if (activeHistoryLine) {
-        delete[] activeHistoryLine;
     }
     dynamicRefresh(pb, buf32, len, pos);  // redraw the original prompt with current input
     pi.promptPreviousInputLen = len;
