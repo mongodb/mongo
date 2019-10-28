@@ -193,36 +193,20 @@ bool Value::equal(const Value& otherVal) const {
 std::string Value::toString() const {
     StringBuilder sb;
     switch (_type) {
-        case StringVector:
-            if (!_stringVectorVal.empty()) {
-                // Convert all but the last element to avoid a trailing ","
-                for (StringVector_t::const_iterator iterator = _stringVectorVal.begin();
-                     iterator != _stringVectorVal.end() - 1;
-                     iterator++) {
-                    sb << *iterator << ",";
-                }
-
-                // Now add the last element with no delimiter
-                sb << _stringVectorVal.back();
+        case StringVector: {
+            StringData sep;
+            for (const auto& elem : _stringVectorVal) {
+                sb << sep << elem;
+                sep = ","_sd;
             }
-            break;
-        case StringMap:
-            if (!_stringMapVal.empty()) {
-                // Convert all but the last element to avoid a trailing ","
-                if (_stringMapVal.begin() != _stringMapVal.end()) {
-                    StringMap_t::const_iterator iterator;
-                    StringMap_t::const_iterator it_last;
-                    for (iterator = _stringMapVal.begin(), it_last = --_stringMapVal.end();
-                         iterator != it_last;
-                         ++iterator) {
-                        sb << iterator->first << ":" << iterator->second << ",";
-                    }
-                }
-
-                // Now add the last element with no delimiter
-                sb << _stringMapVal.end()->first << ":" << _stringMapVal.end()->second;
+        } break;
+        case StringMap: {
+            StringData sep;
+            for (const auto& elem : _stringMapVal) {
+                sb << sep << elem.first << ":" << elem.second;
+                sep = ","_sd;
             }
-            break;
+        } break;
         case Bool:
             sb << _boolVal;
             break;
