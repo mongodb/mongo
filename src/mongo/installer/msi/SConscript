@@ -165,7 +165,7 @@ env.Command(objects,
             ' -dFlavor=' + msi_flavor +
             r' -dProjectDir=buildscripts\packaging\msi\\'
             ' -dProjectName=MongoDB'
-            ' -dCompassDir=src\mongo\installer\compass'
+            ' -dCompassDir=' + buildDir + r'\mongo\installer\compass'
             ' -dTargetDir=' + buildDir + r'\msi'
             ' -dTargetExt=.msi'
             ' -dTargetFileName=${SERVER_ARCHIVE}'
@@ -204,7 +204,7 @@ env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/mongo.exe')
 env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/mongod.exe')
 env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/mongos.exe')
 env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/installer/msi/ca/mongoca.dll')
-env.Depends(pre_msi_cmd, '#src/mongo/installer/compass/Install-Compass.ps1')
+env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/installer/compass/Install-Compass.ps1')
 
 # Source Dependencies
 env.Depends(pre_msi_cmd, '#buildscripts/packaging/msi/mongod.yaml')

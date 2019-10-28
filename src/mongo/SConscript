@@ -866,9 +866,8 @@ compass_type = 'compass-community'
 if 'enterprise' in env['MONGO_MODULES']:
     compass_type = 'compass'
 
-compass_script = "install_compass"
+compass_script = "install_compass.in"
 if env.TargetOSIs('windows'):
-    # On windows the .in needs to be explicitly added to the file.
     compass_script = "Install-Compass.ps1.in"
 
 compass_python_interpreter = '/usr/bin/env python2'
@@ -876,7 +875,7 @@ if env.TargetOSIs('darwin'):
     compass_python_interpreter = '/usr/bin/env python'
 
 compass_installer = env.Substfile(
-  target="$BUILD_DIR/mongo/installer/compass/" + compass_script,
+  target="$BUILD_DIR/mongo/installer/compass/" + compass_script[:-3],
   source='installer/compass/' + compass_script,
   SUBST_DICT=[
     ('@compass_type@', compass_type),
