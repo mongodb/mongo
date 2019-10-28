@@ -358,6 +358,42 @@ TEST(StackTrace, WindowsFormat) {
         << "of trace: `" << trace << "`";
 }
 
+std::string traceString() {
+    std::ostringstream os;
+    printStackTrace(os);
+    return os.str();
+}
+
+/** Emit a stack trace before main() runs, for use in the EarlyTraceSanity test. */
+std::string earlyTrace = traceString();
+
+/**
+ * Verify that the JSON object emitted as part of a stack trace contains a "processInfo"
+ * field, and that it, in turn, contains the fields expected by mongosymb.py. Verify in
+ * particular that a stack trace emitted before main() and before the MONGO_INITIALIZERS
+ * have run will be valid according to mongosymb.py.
+ */
+TEST(StackTrace, EarlyTraceSanity) {
+    if (kIsWindows) {
+        return;
+    }
+
+    const std::string trace = traceString();
+    const std::string substrings[] = {
+        R"("processInfo":)",
+        R"("gitVersion":)",
+        R"("compiledModules":)",
+        R"("uname":)",
+        R"("somap":)",
+    };
+    for (const auto& sub : substrings) {
+        ASSERT_STRING_CONTAINS(earlyTrace, sub);
+    }
+    for (const auto& sub : substrings) {
+        ASSERT_STRING_CONTAINS(trace, sub);
+    }
+}
+
 class StringSink : public StackTraceSink {
 public:
     StringSink(std::string& s) : _s{s} {}

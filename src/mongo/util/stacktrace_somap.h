@@ -37,15 +37,17 @@ namespace mongo {
 class SharedObjectMapInfo {
 public:
     explicit SharedObjectMapInfo(BSONObj obj);
-    const BSONObj& obj() const {
-        return _obj;
-    }
+
+    const BSONObj& obj() const;
+
+    void setObj(BSONObj obj);
 
 private:
     BSONObj _obj;
 };
 
-// Available after the MONGO_INITIALIZER has run.
-SharedObjectMapInfo* globalSharedObjectMapInfo();
+// Can always be called, but more information is populated
+// after the MONGO_INITIALIZER has run.
+const SharedObjectMapInfo& globalSharedObjectMapInfo();
 
 }  // namespace mongo

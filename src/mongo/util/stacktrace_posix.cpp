@@ -253,10 +253,7 @@ void appendJsonProcessInfo(IterationIface& source,
                            const StackTraceOptions& options) {
     if (!options.withProcessInfo)
         return;
-    auto bsonSoMap = globalSharedObjectMapInfo();
-    if (!bsonSoMap)
-        return;
-    const BSONObj& bsonProcInfo = bsonSoMap->obj();
+    const BSONObj& bsonProcInfo = globalSharedObjectMapInfo().obj();
     CheapJson::Value jsonProcInfo = jsonRoot.appendKey("processInfo").appendObj();
     if (options.trimSoMap) {
         printJsonProcessInfoTrimmed(source, bsonProcInfo, jsonProcInfo);

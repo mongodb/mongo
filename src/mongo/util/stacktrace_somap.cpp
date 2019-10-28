@@ -306,32 +306,54 @@ void addOSComponentsToSoMap(BSONObjBuilder* soMap) {}
 
 #endif  // unknown OS
 
-SharedObjectMapInfo* _globalSharedObjectMapInfo = nullptr;
-
 /**
- * Builds the "soMapJson" string, which is a JSON encoding of various pieces of information
- * about a running process, including the map from load addresses to shared objects loaded at
- * those addresses.
+ * Used to build the "processInfo" field of the stacktrace JSON object. It's loaded with
+ * information about a running process, including the map from load addresses to shared
+ * objects loaded at those addresses.
  */
-MONGO_INITIALIZER(ExtractSOMap)(InitializerContext*) {
+BSONObj buildObj() {
     BSONObjBuilder soMap;
-
     auto&& vii = VersionInfoInterface::instance(VersionInfoInterface::NotEnabledAction::kFallback);
     soMap << "mongodbVersion" << vii.version();
     soMap << "gitVersion" << vii.gitVersion();
     soMap << "compiledModules" << vii.modules();
-
     addOSComponentsToSoMap(&soMap);
-    _globalSharedObjectMapInfo = new SharedObjectMapInfo(soMap.obj());
+    return soMap.obj();
+}
+
+SharedObjectMapInfo& mutableGlobalSharedObjectMapInfo() {
+    auto& p = *new SharedObjectMapInfo(buildObj());
+    return p;
+}
+
+MONGO_INITIALIZER(ExtractSOMap)(InitializerContext*) {
+    // Call buildObj() again now that there is better VersionInfo.
+    mutableGlobalSharedObjectMapInfo().setObj(buildObj());
     return Status::OK();
 }
+
+const bool dummyToForceEarlyInitializationOfSharedObjectMapInfo = [] {
+    mutableGlobalSharedObjectMapInfo();
+    return true;
+}();
 
 }  // namespace
 
 SharedObjectMapInfo::SharedObjectMapInfo(BSONObj obj) : _obj(std::move(obj)) {}
 
-SharedObjectMapInfo* globalSharedObjectMapInfo() {
-    return _globalSharedObjectMapInfo;
+const BSONObj& SharedObjectMapInfo::obj() const {
+    return _obj;
+}
+
+void SharedObjectMapInfo::setObj(BSONObj obj) {
+    _obj = std::move(obj);
+}
+
+const SharedObjectMapInfo& globalSharedObjectMapInfo() {
+    // This file internally has a non-const object, but only exposes a const reference
+    // to it to the public API. We do this to support stacktraces that might occur
+    // before the "ExtractSOMap" MONGO_INITIALIZER above.
+    return mutableGlobalSharedObjectMapInfo();
 }
 
 }  // namespace mongo
