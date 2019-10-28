@@ -373,7 +373,6 @@ variables:
   - enterprise-debian10-64
   - enterprise-linux-64-amazon-ami
   - enterprise-macos
-  - enterprise-macos-openssl
   - enterprise-rhel-62-64-bit
   - enterprise-rhel-62-64-bit-coverage
   - enterprise-rhel-62-64-bit-inmem
@@ -409,7 +408,6 @@ variables:
   - enterprise-windows-64-2k8-debug-unoptimized
   - enterprise-windows-64-2k8-inmem
   - enterprise-windows-64-2k8-nopush-template
-  - enterprise-windows-64-2k8-openssl
   - enterprise-windows-64-2k8-required
   - enterprise-windows-64-2k8-wtdevelop
   - ubuntu1804-debug-asan
@@ -9005,24 +9003,6 @@ buildvariants:
   - name: .jstestfuzz .common !.repl
   - name: sharding_jscore_passthrough
 
-- name: linux-64-lsm
-  stepback: false
-  display_name: Linux LSM
-  run_on:
-  - rhel62-small
-  batchtime: 1440 # 1 day
-  expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    test_flags: --wiredTigerEngineConfig=mmap=false --wiredTigerCollectionConfig=type=lsm --wiredTigerIndexConfig=type=lsm --excludeWithAnyTags=uses_transactions,does_not_support_wiredtiger_lsm
-    scons_cache_scope: shared
-    tooltags: ""
-    build_mongoreplay: true
-  tasks:
-  - name: compile_all_run_unittests_TG
-    distros:
-    - rhel62-large
-  - name: jsCore
-
 - name: ubuntu1804
   display_name: Ubuntu 18.04
   run_on:
@@ -9946,14 +9926,6 @@ buildvariants:
     - windows-64-vs2017-compile
   # Do not add more tasks to this list.
 
-- <<: *enterprise-windows-64-2k8-nopush-template
-  name: enterprise-windows-64-2k8-openssl
-  display_name: "~ Enterprise Windows 2008R2 OpenSSL"
-  batchtime: 1440 # 1 day
-  expansions:
-    <<: *enterprise-windows-64-2k8-nopush-expansions-template
-    compile_flags: --ssl --ssl-provider=openssl MONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=ws08r2
-
 - name: enterprise-windows-64-2k8-async
   display_name: "~ Enterprise Windows 2008R2 async"
   modules:
@@ -9961,7 +9933,7 @@ buildvariants:
   run_on:
   - windows-64-vs2017-test
   stepback: true
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   expansions:
     platform_decompress: unzip
     exe: ".exe"
@@ -10248,34 +10220,6 @@ buildvariants:
     distros:
     - rhel70-small
 
-- name: enterprise-macos-openssl
-  display_name: ~ Enterprise macOS OpenSSL
-  modules:
-  - enterprise
-  run_on:
-  - macos-1014
-  batchtime: 1440 # 1 day
-  expansions:
-    test_flags: --excludeWithAnyTags=requires_ssl_mongo_tools
-    tooltags: "ssl sasl gssapi"
-    compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
-    compile_flags: --ssl --ssl-provider=openssl -j$(sysctl -n hw.logicalcpu) --libc++ LIBPATH="$PWD/openssl_install_dir/lib" CPPPATH="$PWD/openssl_install_dir/include" --variables-files=etc/scons/xcode_macosx.vars
-    resmoke_jobs_max: 6
-    build_mongoreplay: true
-    build_openssl: true
-    openssl_config_flags: "-mmacosx-version-min=10.12"
-    openssl_make_flags: "-j$(sysctl -n hw.logicalcpu)"
-  tasks:
-  - name: compile_all_run_unittests_TG
-  - name: audit
-  - name: auth_audit_gen
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore
-  - name: .jscore .common !.compat !.decimal !.sharding
-  - name: .jstestfuzz .common
-  - name: replica_sets_auth_gen
-  - name: sasl
-
 
 ###########################################
 #          Mobile SDK buildvariants       #
@@ -10285,7 +10229,7 @@ buildvariants:
   display_name: "Embedded SDK - macOS"
   run_on:
   - macos-1014
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
@@ -10315,7 +10259,7 @@ buildvariants:
   display_name: "Embedded SDK - iOS"
   run_on:
   - macos-1014
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
@@ -10347,7 +10291,7 @@ buildvariants:
   display_name: "Embedded SDK - iOS Simulator"
   run_on:
   - macos-1014
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
@@ -10382,7 +10326,7 @@ buildvariants:
   display_name: "Embedded SDK - tvOS"
   run_on:
   - macos-1014
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   expansions:
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
     test_flags: --excludeWithAnyTags=uses_transactions
@@ -10414,7 +10358,7 @@ buildvariants:
   display_name: "Embedded SDK - tvOS Simulator"
   run_on:
   - macos-1014
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   expansions:
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
     test_flags: --excludeWithAnyTags=uses_transactions
@@ -10449,7 +10393,7 @@ buildvariants:
   display_name: "Embedded SDK - watchOS"
   run_on:
   - macos-1014
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   expansions:
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
     test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions,requires_http_client
@@ -10481,7 +10425,7 @@ buildvariants:
   display_name: "Embedded SDK - watchOS Simulator"
   run_on:
   - macos-1014
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   expansions:
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
     test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions,requires_http_client
@@ -10516,7 +10460,7 @@ buildvariants:
   display_name: "Embedded SDK - Apple Multiarch"
   run_on:
   - macos-1014
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   expansions:
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
     push_path: mobile
@@ -10556,7 +10500,7 @@ buildvariants:
   display_name: "Embedded SDK - Android arm32"
   run_on:
   - ubuntu1604-build
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions
     compile_env: JAVA_HOME=/opt/java/jdk8/
@@ -10597,7 +10541,7 @@ buildvariants:
   display_name: "Embedded SDK - Android arm64"
   run_on:
   - ubuntu1604-build
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions
     compile_env: JAVA_HOME=/opt/java/jdk8/
@@ -10638,7 +10582,7 @@ buildvariants:
   display_name: "Embedded SDK - Android x86_64"
   run_on:
   - ubuntu1604-build
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions
     compile_env: JAVA_HOME=/opt/java/jdk8/
@@ -10680,7 +10624,7 @@ buildvariants:
   display_name: "Embedded SDK - Android Multiarch Package"
   run_on:
   - ubuntu1604-build
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   expansions:
     compile_env: JAVA_HOME=/opt/java/jdk8/
     setup_android_toolchain: true
@@ -10695,7 +10639,7 @@ buildvariants:
   display_name: "Embedded SDK - Java Multiarch Package"
   run_on:
   - ubuntu1604-build
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   expansions:
     compile_env: JAVA_HOME=/opt/java/jdk8/
     setup_android_toolchain: true
@@ -10826,6 +10770,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel62-small
+  batchtime: 10080 # 7 days
   expansions:
     compile_flags: >-
       --ssl
@@ -10895,6 +10840,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel62-small
+  batchtime: 1440 # 1 day
   expansions: &enterprise-rhel-62-64-bit-majority-read-concern-off-expansions
     # Ban tests that run prepareTransaction or multi-shard transactions (which use
     # prepareTransaction). prepareTransaction is rejected on nodes with
@@ -10976,6 +10922,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel62-small
+  batchtime: 10080 # 7 days
   expansions: &enterprise-rhel-62-64-bit-flow-control-off
     test_flags: >-
       --flowControl=off
@@ -11211,6 +11158,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel80-build
+  batchtime: 1440 # 1 day
   expansions:
     push_path: linux
     push_bucket: downloads.10gen.com
@@ -12415,7 +12363,7 @@ buildvariants:
   display_name: RHEL 6.2 (mobile)
   run_on:
   - rhel62-small
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   expansions: &rhel-62-64-bit-mobile-expansions
     # Transactions are only supported on replica sets, and replication is not supported by the
     # mobile storage engine.
@@ -12467,7 +12415,7 @@ buildvariants:
   display_name: "Ubuntu 16.04 arm64 (mobile)"
   run_on:
   - ubuntu1604-arm64-large
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   expansions:
     test_flags: >-
       --storageEngine=mobile
@@ -12528,7 +12476,7 @@ buildvariants:
   display_name: macOS (mobile)
   run_on:
   - macos-1014
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   expansions:
     # Transactions are only supported on replica sets, and replication is not supported by the
     # mobile storage engine.
@@ -12862,6 +12810,7 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .updatefuzzer
+  - name: watchdog_wiredtiger
 
 - name: ubuntu1804-debug-aubsan-lite
   display_name: "! {A,UB}SAN Enterprise Ubuntu 18.04 DEBUG"
@@ -12883,12 +12832,8 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
   - name: compile_all_run_unittests_TG
-  - name: causally_consistent_jscore_txns_passthrough
   - name: jsCore
   - name: jsCore_txns
-  - name: jsCore_txns_large_txns_format
-  - name: .logical_session_cache .one_sec
-  - name: watchdog_wiredtiger
 
 - name: ubuntu1804-debug-aubsan-lite_fuzzer
   display_name: "{A,UB}SAN Enterprise Ubuntu 18.04 FUZZER"
