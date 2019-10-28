@@ -785,7 +785,14 @@ Status TransportLayerASIO::start() {
 
     if (_listenerOptions.isIngress()) {
         for (auto& acceptor : _acceptors) {
-            acceptor.second.listen(serverGlobalParams.listenBacklog);
+            asio::error_code ec;
+            acceptor.second.listen(serverGlobalParams.listenBacklog, ec);
+            if (ec) {
+                severe() << "Error listening for new connections on " << acceptor.first << ": "
+                         << ec.message();
+                fassertFailed(31339);
+            }
+
             _acceptConnection(acceptor.second);
             log() << "Listening on " << acceptor.first.getAddr();
         }
