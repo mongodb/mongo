@@ -8814,6 +8814,7 @@ task_groups:
 
 - name: embedded_sdk_build_and_test
   setup_group_can_fail_task: true
+  max_hosts: 1
   setup_group:
     - command: manifest.load
     - func: "git get project"
@@ -8848,6 +8849,7 @@ task_groups:
 - <<: *stitch_support_task_group_template
   name: stitch_support_lib_build_and_test
   tags: ["stitch"]
+  max_hosts: 1
   tasks:
     - "stitch_support_install_tests"
     - "stitch_support_run_tests"
