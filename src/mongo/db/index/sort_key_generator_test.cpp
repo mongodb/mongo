@@ -137,6 +137,38 @@ TEST(SortKeyGeneratorTest, SortKeyGenerationForArraysRespectsCompoundOrdering) {
     ASSERT_VALUE_EQ(sortKey, (Value{std::vector<Value>{Value{0}, Value{3}}}));
 }
 
+TEST(SortKeyGeneratorTest, SortKeyGenerationForMissingField) {
+    auto sortKeyGen = makeSortKeyGen(BSON("b" << 1), nullptr);
+    auto sortKey = sortKeyGen->computeSortKeyFromDocument(Document{{"a", Value{1}}});
+    ASSERT_VALUE_EQ(sortKey, Value{BSONNULL});
+}
+
+TEST(SortKeyGeneratorTest, SortKeyGenerationForMissingFieldInCompoundSortPattern) {
+    auto sortKeyGen = makeSortKeyGen(BSON("a" << 1 << "b" << 1), nullptr);
+    auto sortKey = sortKeyGen->computeSortKeyFromDocument(Document{{"b", Value{1}}});
+    ASSERT_VALUE_EQ(sortKey, (Value{std::vector<Value>{Value{BSONNULL}, Value{1}}}));
+}
+
+TEST(SortKeyGeneratorTest, SortKeyGenerationForMissingFieldInEmbeddedDocument) {
+    auto sortKeyGen = makeSortKeyGen(BSON("a.b" << 1), nullptr);
+    auto sortKey =
+        sortKeyGen->computeSortKeyFromDocument(Document{{"a", Value{Document{{"c", Value{1}}}}}});
+    ASSERT_VALUE_EQ(sortKey, Value{BSONNULL});
+}
+
+TEST(SortKeyGeneratorTest, SortKeyGenerationForMissingFieldInArrayElement) {
+    auto sortKeyGen = makeSortKeyGen(BSON("a.b" << 1), nullptr);
+    auto sortKey = sortKeyGen->computeSortKeyFromDocument(
+        Document{{"a", Value{std::vector<Value>{Value{Document{}}}}}});
+    ASSERT_VALUE_EQ(sortKey, Value{BSONNULL});
+}
+
+TEST(SortKeyGeneratorTest, SortKeyGenerationForInvalidPath) {
+    auto sortKeyGen = makeSortKeyGen(BSON("a.b" << 1), nullptr);
+    auto sortKey = sortKeyGen->computeSortKeyFromDocument(Document{{"a", Value{1}}});
+    ASSERT_VALUE_EQ(sortKey, Value{BSONNULL});
+}
+
 TEST(SortKeyGeneratorTest, SortPatternComponentWithStringUasserts) {
     ASSERT_THROWS_CODE_AND_WHAT(makeSortKeyGen(BSON("a"
                                                     << "foo"),
