@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGOD" "1" "Jul 25, 2019" "4.2" "mongodb-manual"
+.TH "MONGOD" "1" "Aug 16, 2019" "4.2" "mongodb-manual"
 .SH NAME
 mongod \- MongoDB Server
 .
@@ -382,6 +382,45 @@ asterisk in quotes to avoid filename pattern expansion).
 .INDENT 3.5
 \fB\-\-bind_ip\fP and \fB\-\-bind_ip_all\fP are mutually exclusive. That
 is, you can specify one or the other, but not both.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-clusterIpSourceWhitelist <string>
+New in version 3.6.
+
+.sp
+A list of IP addresses/CIDR (\fI\%Classless Inter\-Domain Routing\fP) ranges against which the
+\fI\%mongod\fP validates authentication requests from other members of
+the replica set and, if part of a sharded cluster, the \fBmongos\fP
+instances. The \fI\%mongod\fP verifies that the originating IP is
+either explicitly in the list or belongs to a CIDR range in the list. If the
+IP address is not present, the server does not authenticate the
+\fI\%mongod\fP or \fBmongos\fP\&.
+.sp
+\fI\%\-\-clusterIpSourceWhitelist\fP has no effect on a \fI\%mongod\fP started without
+authentication\&.
+.sp
+\fI\%\-\-clusterIpSourceWhitelist\fP accepts multiple comma\-separated IPv4/6 addresses or Classless
+Inter\-Domain Routing (\fI\%CIDR\fP) ranges:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-clusterIpSourceWhitelist 192.0.2.0/24,127.0.0.1,::1
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fBIMPORTANT:\fP
+.INDENT 7.0
+.INDENT 3.5
+Ensure \fI\%\-\-clusterIpSourceWhitelist\fP includes the IP address \fIor\fP CIDR ranges that include the
+IP address of each replica set member or \fBmongos\fP in the
+deployment to ensure healthy communication between cluster components.
 .UNINDENT
 .UNINDENT
 .UNINDENT
@@ -978,12 +1017,26 @@ _
 New in version 4.2.
 
 .sp
-Outputs the resolved YAML configuration document for the \fBmongod\fP
-to \fBstdout\fP and halts the \fBmongod\fP instance. For configuration
-options using externally\-sourced\-values, \fI\%\-\-outputConfig\fP returns the
-resolved value for those options. This may include any configured
-passwords or secrets previously obfuscated through the external
-source.
+Outputs the \fBmongod\fP instance\(aqs configuration options, formatted
+in YAML, to \fBstdout\fP and exits the \fBmongod\fP instance. For
+configuration options that uses externally\-sourced\-values,
+\fI\%\-\-outputConfig\fP returns the resolved value for those options.
+.sp
+\fBWARNING:\fP
+.INDENT 7.0
+.INDENT 3.5
+This may include any configured passwords or secrets previously
+obfuscated through the external source.
+.UNINDENT
+.UNINDENT
+.sp
+For usage examples, see:
+.INDENT 7.0
+.IP \(bu 2
+expansion\-directive\-output
+.IP \(bu 2
+/tutorial/convert\-command\-line\-options\-to\-yaml
+.UNINDENT
 .UNINDENT
 .SS Free Monitoring
 .sp
@@ -1504,8 +1557,35 @@ A relative LDAP query URL formatted conforming to \fI\%RFC4515\fP and \fI\%RFC45
 the LDAP groups to which the authenticated user belongs to. The query is
 relative to the host or hosts specified in \fI\%\-\-ldapServers\fP\&.
 .sp
-Use the \fB{USER}\fP placeholder in the URL to substitute the authenticated
-username, or the transformed username if a \fI\%username mapping\fP is specified.
+In the URL, you can use the following substituion tokens:
+.TS
+center;
+|l|l|.
+_
+T{
+Substitution Token
+T}	T{
+Description
+T}
+_
+T{
+\fB{USER}\fP
+T}	T{
+Substitutes the authenticated username, or the
+\fBtransformed\fP
+username if a \fI\%username mapping\fP is specified.
+T}
+_
+T{
+\fB{PROVIDED_USER}\fP
+T}	T{
+Substitutes the supplied username, i.e. before either
+authentication or \fBLDAP transformation\fP\&.
+.sp
+New in version 4.2.
+T}
+_
+.TE
 .sp
 When constructing the query URL, ensure that the order of LDAP parameters
 respects RFC4516:
@@ -1688,47 +1768,6 @@ in\-memory storage engine\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-nssize <value>
-\fIDefault\fP: 16
-.sp
-Specifies the default size for namespace files, which are files that end
-in \fB\&.ns\fP\&. Each collection and index counts as a namespace.
-.sp
-Use this setting to control size for newly created namespace files. This
-option has no impact on existing files. The maximum size for a namespace
-file is 2047 megabytes. The default value of 16 megabytes provides for
-approximately 24,000 namespaces.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-quota
-Enables a maximum limit for the number data files each database can
-have. When running with the \fI\%\-\-quota\fP option, MongoDB has a maximum of 8
-data files per database. Adjust the quota with
-\fI\%\-\-quotaFiles\fP\&.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-quotaFiles <number>
-\fIDefault\fP: 8
-.sp
-Modifies the limit on the number of data files per database. \fI\%\-\-quotaFiles\fP
-option requires that you set \fI\%\-\-quota\fP\&.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-smallfiles
-Sets MongoDB to use a smaller default file size. The \fI\%\-\-smallfiles\fP option
-reduces the initial size for data files and limits the maximum size to
-512 megabytes. \fI\%\-\-smallfiles\fP also reduces the size of each journal
-file from 1 gigabyte to 128 megabytes. Use \fI\%\-\-smallfiles\fP if you have a large
-number of databases that each holds a small quantity of data.
-.sp
-The \fI\%\-\-smallfiles\fP option can lead the \fBmongod\fP instance to create a large
-number of files, which can affect performance for larger databases.
-.UNINDENT
-.INDENT 0.0
-.TP
 .B \-\-syncdelay <value>
 \fIDefault\fP: 60
 .sp
@@ -1864,15 +1903,6 @@ WiredTiger storage engine.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-journalOptions <arguments>
-Provides functionality for testing. Not for general use, and will affect data
-file integrity in the case of abnormal system shutdown.
-.sp
-Not available for \fI\%mongod\fP instances that use the
-in\-memory storage engine\&.
-.UNINDENT
-.INDENT 0.0
-.TP
 .B \-\-journalCommitInterval <value>
 \fIDefault\fP: 100 or 30
 .sp
@@ -1898,10 +1928,8 @@ in\-memory storage engine\&.
 Defines the maximum size of the internal cache that WiredTiger will
 use for all data. The memory consumed by an index build (see
 \fBmaxIndexBuildMemoryUsageMegabytes\fP) is separate from the
-WiredTiger cache memory.
-.sp
-Starting in MongoDB 3.4, \fI\%\-\-wiredTigerCacheSizeGB\fP values can range from 0.25 GB  to
-10000 GB and can be a float.
+WiredTiger cache memory. Starting in MongoDB 3.4, the values can range
+from 0.25 GB  to 10000 GB and can be a float.
 .sp
 Starting in MongoDB 3.4, the default WiredTiger internal cache size is
 the larger of either:
@@ -1917,6 +1945,18 @@ cache will use 1.5GB of RAM (\fB0.5 * (4 GB \- 1 GB) = 1.5 GB\fP).
 Conversely, a system with a total of 1.25 GB of RAM will allocate 256
 MB to the WiredTiger cache because that is more than half of the
 total RAM minus one gigabyte (\fB0.5 * (1.25 GB \- 1 GB) = 128 MB < 256 MB\fP).
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+In some instances, such as when running in a container, the database
+can have memory constraints that are lower than the total system
+memory. In such instances, this memory limit, rather than the total
+system memory, is used as the maximum RAM available.
+.sp
+To see the memory limit, see \fBhostInfo.system.memLimitMB\fP\&.
+.UNINDENT
+.UNINDENT
 .sp
 Avoid increasing the WiredTiger internal cache size above its
 default value.
@@ -1950,9 +1990,10 @@ instances.
 .sp
 If you run \fI\%mongod\fP in a container (e.g. \fBlxc\fP,
 \fBcgroups\fP, Docker, etc.) that does \fInot\fP have access to all of the
-RAM available in a system, you must set \fI\%\-\-wiredTigerCacheSizeGB\fP to a value less
-than the amount of RAM available in the container. The exact amount
-depends on the other processes running in the container.
+RAM available in a system, you must set \fI\%\-\-wiredTigerCacheSizeGB\fP to a value
+less than the amount of RAM available in the container. The exact
+amount depends on the other processes running in the container. See
+\fBmemLimitMB\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -3946,6 +3987,25 @@ Starting in 4.0, on macOS or Windows, you can use a certificate
 from the operating system\(aqs secure store instead of a PEM key
 file. See \fI\%\-\-kmipClientCertificateSelector\fP\&. When using the secure store, you do not
 need to, but can, also specify the \fI\%\-\-kmipServerCAFile\fP\&.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-eseDatabaseKeyRollover
+New in version 4.2.
+
+.sp
+Roll over the encrypted storage engine database keys configured with
+\fBAES256\-GCM\fP cipher.
+.sp
+When \fI\%mongod\fP instance is started with this option, the
+instance rotates the keys and exits.
+.INDENT 7.0
+.INDENT 3.5
+.IP "Enterprise Feature"
+.sp
+Available in MongoDB Enterprise only.
 .UNINDENT
 .UNINDENT
 .UNINDENT

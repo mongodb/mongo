@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGODUMP" "1" "Jul 25, 2019" "4.2" "mongodb-manual"
+.TH "MONGODUMP" "1" "Aug 16, 2019" "4.2" "mongodb-manual"
 .SH NAME
 mongodump \- MongoDB Data Dump Utility
 .
@@ -35,6 +35,8 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .IP \(bu 2
 \fI\%Synopsis\fP
 .IP \(bu 2
+\fI\%Usage in Backup Strategy\fP
+.IP \(bu 2
 \fI\%Syntax\fP
 .IP \(bu 2
 \fI\%Behavior\fP
@@ -58,13 +60,14 @@ of  mongodump\&.
 \fI\%mongodump\fP is a utility for creating a binary export of the
 contents of a database. \fI\%mongodump\fP can export data from
 either \fBmongod\fP or \fBmongos\fP instances.
+.SH USAGE IN BACKUP STRATEGY
+.SS Standalones/Replica Sets
 .sp
-\fI\%mongodump\fP can be a part of a backup strategy with \fBmongorestore\fP for partial
-backups based on a query, syncing from production to staging or
-development environments, or changing the storage engine of a
-standalone. However, the use of \fI\%mongodump\fP and
-\fBmongorestore\fP as a backup strategy can be problematic for
-sharded clusters and replica sets.
+For standalone or a replica set, \fI\%mongodump\fP can be a part
+of a backup strategy with
+\fBmongorestore\fP for partial backups based on a query,
+syncing from production to staging or development environments, or
+changing the storage engine of a standalone.
 .sp
 For an overview of \fI\%mongodump\fP in conjunction with
 \fBmongorestore\fP part of a backup and recovery strategy, see:
@@ -72,9 +75,24 @@ For an overview of \fI\%mongodump\fP in conjunction with
 .IP \(bu 2
 /tutorial/backup\-and\-restore\-tools
 .IP \(bu 2
-/tutorial/backup\-sharded\-cluster\-with\-database\-dumps
-.IP \(bu 2
 /core/backups
+.UNINDENT
+.SS Sharded Cluster
+.sp
+Starting in MongoDB 4.2, \fI\%mongodump\fP and
+\fBmongorestore\fP \fBcannot\fP be part of a backup
+strategy for sharded clusters. These manual tools do not maintain
+the atomicity guarantees of transactions across shards.
+.sp
+To maintain the atomicity guarantees of transactions across shards,
+use the coordinated backup and restore services provided by:
+.INDENT 0.0
+.IP \(bu 2
+\fI\%MongoDB Atlas\fP,
+.IP \(bu 2
+\fI\%MongoDB Cloud Manager\fP, or
+.IP \(bu 2
+\fI\%MongoDB Ops Manager\fP\&.
 .UNINDENT
 .SH SYNTAX
 .sp
@@ -370,6 +388,23 @@ read\-only views\&. By default,
 create a binary export of the documents included in the view. To
 capture the documents in a view use \fI\%\-\-viewsAsCollections\fP\&.
 
+.SS Metadata Format
+.sp
+Starting in version 4.2, \fI\%mongodump\fP uses Extended
+JSON v2.0 (Canonical) format
+for the metadata files. To parse these files for restore, use
+\fBmongorestore\fP version 4.2+ that supports Extended
+JSON v2.0 (Canonical or Relaxed mode) format.
+.INDENT 0.0
+.INDENT 3.5
+.SS Tip
+.sp
+If general, use corresponding versions of \fI\%mongodump\fP
+and \fBmongorestore\fP\&. That is, to restore data files
+created with a specific version of \fI\%mongodump\fP, use the
+corresponding version of \fBmongorestore\fP\&.
+.UNINDENT
+.UNINDENT
 .SS Overwrite Files
 .sp
 \fI\%mongodump\fP overwrites output files if they exist in the
@@ -932,11 +967,28 @@ to the dump files.
 .INDENT 0.0
 .TP
 .B \-\-query <json>, \-q <json>
-Provides a JSON document as a query that optionally limits the
-documents included in the output of \fI\%mongodump\fP\&.
+Provides a JSON document as a query that optionally limits
+the documents included in the output of \fI\%mongodump\fP\&. To
+use the \fB\-\-query\fP option, you must also specify the
+\fI\%\-\-collection\fP option.
 .sp
 You must enclose the query document in single quotes (\fB\(aq{ ... }\(aq\fP) to ensure that it does
 not interact with your shell environment.
+.sp
+Starting in MongoDB 4.2, the query \fBmust\fP be in
+Extended JSON v2 format (either relaxed or canonical/strict
+mode), including enclosing the
+field names and operators in quotes.  For example:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongodump \-d test \-c records \-q \(aq{ "a": { "$gte": 3 }, "date": { "$lt": { "$date": "2016\-01\-01T00:00:00.000Z" } } }\(aq
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP

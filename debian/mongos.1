@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGOS" "1" "Jul 25, 2019" "4.2" "mongodb-manual"
+.TH "MONGOS" "1" "Aug 16, 2019" "4.2" "mongodb-manual"
 .SH NAME
 mongos \- MongoDB Sharded Cluster Query Router
 .
@@ -791,12 +791,26 @@ mongos \-\-timeZoneInfo timezonedb\-2017b/
 New in version 4.2.
 
 .sp
-Outputs the resolved YAML configuration document for the \fBmongos\fP
-to \fBstdout\fP and halts the \fBmongos\fP instance. For configuration
-options using externally\-sourced\-values, \fI\%\-\-outputConfig\fP returns the
-resolved value for those options. This may include any configured
-passwords or secrets previously obfuscated through the external
-source.
+Outputs the \fBmongos\fP instance\(aqs configuration options, formatted
+in YAML, to \fBstdout\fP and exits the \fBmongos\fP instance. For
+configuration options that uses externally\-sourced\-values,
+\fI\%\-\-outputConfig\fP returns the resolved value for those options.
+.sp
+\fBWARNING:\fP
+.INDENT 7.0
+.INDENT 3.5
+This may include any configured passwords or secrets previously
+obfuscated through the external source.
+.UNINDENT
+.UNINDENT
+.sp
+For usage examples, see:
+.INDENT 7.0
+.IP \(bu 2
+expansion\-directive\-output
+.IP \(bu 2
+/tutorial/convert\-command\-line\-options\-to\-yaml
+.UNINDENT
 .UNINDENT
 .SS Sharded Cluster Options
 .INDENT 0.0

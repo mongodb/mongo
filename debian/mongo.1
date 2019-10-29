@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGO" "1" "Jul 25, 2019" "4.2" "mongodb-manual"
+.TH "MONGO" "1" "Aug 16, 2019" "4.2" "mongodb-manual"
 .SH NAME
 mongo \- MongoDB Shell
 .
@@ -59,9 +59,18 @@ The \fI\%mongo\fP shell is part of the \fI\%MongoDB distributions\fP\&.
 \fBNOTE:\fP
 .INDENT 0.0
 .INDENT 3.5
+.INDENT 0.0
+.IP \(bu 2
+Starting in MongoDB 4.2, the \fI\%mongo\fP shell displays a
+warning message when connected to non\-genuine MongoDB instances as
+these instances may behave differently from the official MongoDB
+instances; e.g. missing or incomplete features, different feature
+behaviors, etc.
+.IP \(bu 2
 Starting in version 4.0, \fI\%mongo\fP disables support for TLS 1.0
 encryption on systems where TLS 1.1+ is available. For
 more details, see 4.0\-disable\-tls\&.
+.UNINDENT
 .UNINDENT
 .UNINDENT
 .SH SYNTAX
@@ -587,6 +596,15 @@ default name of \fBmongodb\fP\&.
 This option is available only in MongoDB Enterprise.
 .UNINDENT
 .SS TLS Options
+.sp
+\fBNOTE:\fP
+.INDENT 0.0
+.INDENT 3.5
+Starting in version 4.0, \fI\%mongo\fP disables support for TLS 1.0
+encryption on systems where TLS 1.1+ is available. For
+more details, see 4.0\-disable\-tls\&.
+.UNINDENT
+.UNINDENT
 .INDENT 0.0
 .INDENT 3.5
 .SS See
@@ -881,6 +899,15 @@ disabled TLS 1.0, specify \fBnone\fP to \fI\%\-\-tlsDisabledProtocols\fP\&.  See
 Starting in version 4.2, the SSL options are deprecated. Use the TLS
 counterparts instead. The SSL protocol is deprecated and MongoDB
 supports TLS 1.0 and later.
+.UNINDENT
+.UNINDENT
+.sp
+\fBNOTE:\fP
+.INDENT 0.0
+.INDENT 3.5
+Starting in version 4.0, \fI\%mongo\fP disables support for TLS 1.0
+encryption on systems where TLS 1.1+ is available. For
+more details, see 4.0\-disable\-tls\&.
 .UNINDENT
 .UNINDENT
 .INDENT 0.0
@@ -1650,6 +1677,13 @@ mongo script\-file.js \-u <user> \-p
 .fi
 .UNINDENT
 .UNINDENT
+.sp
+\fBSEE ALSO:\fP
+.INDENT 0.0
+.INDENT 3.5
+\fBisInteractive()\fP
+.UNINDENT
+.UNINDENT
 .SS Use \fI\%\-\-eval\fP to Print Query Results as JSON
 .sp
 To print return a query as JSON, from the system prompt using
@@ -1678,6 +1712,8 @@ the additional JavaScript required to generate this output.
 /reference/method
 .IP \(bu 2
 /mongo
+.IP \(bu 2
+\fBisInteractive()\fP
 .UNINDENT
 .UNINDENT
 .UNINDENT

@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGOFILES" "1" "Jul 25, 2019" "4.2" "mongodb-manual"
+.TH "MONGOFILES" "1" "Aug 16, 2019" "4.2" "mongodb-manual"
 .SH NAME
 mongofiles \- MongoDB GridFS Utility
 .
@@ -767,14 +767,25 @@ different location for the file on the local file system, use the
 .UNINDENT
 .INDENT 0.0
 .TP
-.B get_id "<ObjectId>"
+.B get_id "<_id>"
 New in version 3.2.0.
 
 .sp
-Copy the specified file from GridFS storage to the local file system.
+Copy the file, specified by its \fB<_id>\fP, from GridFS storage to the
+local file system.
 .sp
-Here \fB<ObjectId>\fP refers to the extended JSON \fB_id\fP of the
-object in GridFS. \fI\%mongofiles\fP writes the file to the local
+Here \fB<_id>\fP refers to the extended JSON \fB_id\fP of the
+object in GridFS:
+.INDENT 7.0
+.IP \(bu 2
+Starting in MongoDB 4.2, \fBget_id\fP can accept either ObjectId
+values or non\-ObjectId values for \fB<_id>\fP\&.
+.IP \(bu 2
+In MongoDB 4.0 and earlier, \fBget_id\fP only
+accepts \fB<ObjectId>\fP values.
+.UNINDENT
+.sp
+\fI\%mongofiles\fP writes the file to the local
 file system using the file\(aqs \fBfilename\fP in GridFS. To choose a
 different location for the file on the local file system, use the
 \fI\%\-\-local\fP option.
@@ -786,12 +797,19 @@ Delete the specified file from GridFS storage.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B delete_id "<ObjectId>"
+.B delete_id "<_id>"
 New in version 3.2.0.
 
 .sp
-Delete the specified file from GridFS storage. Specify the file using
-its \fB_id\fP\&.
+Delete the file, specified by its \fB<_id>\fP, from GridFS storage:
+.INDENT 7.0
+.IP \(bu 2
+Starting in MongoDB 4.2, \fBdelete_id\fP can accept
+either ObjectId values or non\-ObjectId values for \fB<_id>\fP\&.
+.IP \(bu 2
+In MongoDB 4.0 and earlier, \fBdelete_id\fP only
+accepts \fB<ObjectId>\fP values.
+.UNINDENT
 .UNINDENT
 .SH EXAMPLES
 .sp

@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGOEXPORT" "1" "Jul 25, 2019" "4.2" "mongodb-manual"
+.TH "MONGOEXPORT" "1" "Aug 16, 2019" "4.2" "mongodb-manual"
 .SH NAME
 mongoexport \- MongoDB Export Utility
 .
@@ -387,13 +387,20 @@ kind of functionality.
 .UNINDENT
 .UNINDENT
 .sp
-To preserve type information, \fI\%mongoexport\fP and \fBmongoimport\fP
-uses the strict mode representation
-for certain types.
+Starting in version 4.2, \fI\%mongoexport\fP:
+.INDENT 0.0
+.IP \(bu 2
+Outputs data in Extended JSON v2.0 (Relaxed mode) by default.
+.IP \(bu 2
+Outputs Extended JSON v2.0 (Canonical mode) if used with
+\fI\%\-\-jsonFormat\fP\&.
+.UNINDENT
+.sp
+Earlier versions used Extended JSON v1.0 (Canonical mode)\&.
 .sp
 For example, the following insert operation in the \fBmongo\fP
-shell uses the shell mode representation for the BSON types
-\fBdata_date\fP and \fBdata_numberlong\fP:
+shell uses the various shell helpers for the
+BSON types Date and 64\-bit integer:
 .INDENT 0.0
 .INDENT 3.5
 .sp
@@ -406,7 +413,7 @@ db.traffic.insert( { _id: 1, volume: NumberLong(\(aq2980000\(aq), date: new Date
 .UNINDENT
 .UNINDENT
 .sp
-The argument to \fBdata_numberlong\fP must be quoted to avoid potential
+The argument to 64\-bit integer must be quoted to avoid potential
 loss of accuracy.
 .sp
 Use \fI\%mongoexport\fP to export the data:
@@ -421,20 +428,57 @@ mongoexport \-\-db test \-\-collection traffic \-\-out traffic.json
 .UNINDENT
 .UNINDENT
 .sp
-The exported data is in strict mode representation to preserve type information:
+In version 4.2+, the exported data is in Extended JSON v2.0
+(Relaxed mode)\&.
 .INDENT 0.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-{ "_id" : 1, "volume" : { "$numberLong" : "2980000" }, "date" : { "$date" : "2014\-03\-13T13:47:42.483\-0400" } }
+{"_id":1.0,"volume":2980000,"date":{"$date":"2019\-08\-05T16:18:29.559Z"}}
 .ft P
 .fi
 .UNINDENT
 .UNINDENT
 .sp
-See /reference/mongodb\-extended\-json for a complete list of
-these types and the representations used.
+To output in Extended JSON v2.0 (Canonical
+mode), include the
+\fI\%\-\-jsonFormat=canonical\fP:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongoexport \-\-db test \-\-collection traffic \-\-jsonFormat=canonical \-\-out traffic.json
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+The exported data is in Extended JSON v2.0 (Canonical
+mode):
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+{"_id":{"$numberDouble":"1.0"},"volume":{"$numberLong":"2980000"},"date":{"$date":{"$numberLong":"1565363188675"}}}
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+In version 4.0 and earlier, the exported data is in Extended JSON v1.0 (Strict mode)
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+{"_id":1.0,"volume":{"$numberLong":"2980000"},"date":{"$date":"2019\-08\-05T16:18:29.559Z"}}
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
 .SS FIPS
 .sp
 Starting in version 4.2, MongoDB removes the \fB\-\-sslFIPSMode\fP
@@ -1017,11 +1061,15 @@ See \fI\%Use a File to Specify the Fields to Export in CSV Format\fP for sample 
 .TP
 .B \-\-query <JSON>, \-q <JSON>
 Provides a query as a JSON document (enclosed in quotes) to
-return matching documents in the export. Specify JSON in strict
-format\&.
+return matching documents in the export.
 .sp
 You must enclose the query document in single quotes (\fB\(aq{ ... }\(aq\fP) to ensure that it does
 not interact with your shell environment.
+.sp
+Starting in MongoDB 4.2, the query \fBmust\fP be in
+Extended JSON v2 format (either relaxed or canonical/strict
+mode), including enclosing the
+field names and operators in quotes:
 .sp
 For example, given a collection named \fBrecords\fP in the database
 \fBtest\fP with the following documents:
@@ -1041,17 +1089,18 @@ For example, given a collection named \fBrecords\fP in the database
 .UNINDENT
 .UNINDENT
 .sp
-The following \fI\%mongoexport\fP uses the \fI\%\-q\fP option to
-export only the documents with the field \fBa\fP greater than or equal to
-(\fB$gte\fP) to \fB3\fP and the field \fBdate\fP less than
-\fBISODate("2016\-01\-01T00:00:00Z")\fP (using the strict format
-for dates { "$date": "YYYY\-MM\-DDTHH:mm:ss.mmm<offset>"}):
+The following \fI\%mongoexport\fP uses the \fI\%\-q\fP option
+to export only the documents with the field \fBa\fP greater than or
+equal to (\fB$gte\fP) to \fB3\fP and the field \fBdate\fP less than
+\fBISODate("2016\-01\-01T00:00:00Z")\fP (using the extended JSON v2
+format (relaxed mode) for dates { "$date":
+"YYYY\-MM\-DDTHH:mm:ss.mmm<offset>"}):
 .INDENT 7.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-mongoexport \-d test \-c records \-q \(aq{ a: { $gte: 3 }, date: { $lt: { "$date": "2016\-01\-01T00:00:00.000Z" } } }\(aq \-\-out exportdir/myRecords.json
+mongoexport \-d test \-c records \-q \(aq{ "a": { "$gte": 3 }, "date": { "$lt": { "$date": "2016\-01\-01T00:00:00.000Z" } } }\(aq \-\-out exportdir/myRecords.json
 .ft P
 .fi
 .UNINDENT
@@ -1094,6 +1143,17 @@ declare the fields to export from the collection.
 Specifies a file to write the export to. If you do not specify a file
 name, the \fI\%mongoexport\fP writes data to standard output
 (e.g. \fBstdout\fP).
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-jsonFormat <canonical|relaxed>
+\fIDefault\fP: relaxed
+.sp
+Modifies the output to use either canonical or relaxed mode of the
+/reference/mongodb\-extended\-json format.
+.sp
+For differences between canonical and relaxed modes, see
+/reference/mongodb\-extended\-json\&.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -1463,7 +1523,7 @@ database using the "\fI\%\-\-db\fP" option.
 For instance, this command returns all documents in the \fBsales\fP
 database\(aqs \fBcontacts\fP collection that contain a field named \fBdept\fP
 equal to \fB"ABC"\fP and the field \fBdate\fP greater than or equal to
-ISODate("2018\-01\-01") (using the strict format for dates
+ISODate("2018\-01\-01") (using the canonical format for dates
 { "$date": "YYYY\-MM\-DDTHH:mm:ss.mmm<offset>"} )
 .INDENT 0.0
 .INDENT 3.5

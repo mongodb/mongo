@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "BSONDUMP" "1" "Jul 25, 2019" "4.2" "mongodb-manual"
+.TH "BSONDUMP" "1" "Aug 16, 2019" "4.2" "mongodb-manual"
 .SH NAME
 bsondump \- MongoDB BSON Utility
 .
@@ -62,6 +62,10 @@ Run \fI\%bsondump\fP from the system command line, not the \fBmongo\fP shell.
 BSON files, not a tool for data ingestion or other application use.
 .UNINDENT
 .UNINDENT
+.sp
+Starting in version 4.2, \fI\%bsondump\fP uses Extended
+JSON v2.0 (Canonical mode)
+to format its data.
 .SH OPTIONS
 .sp
 Changed in version 3.0.0: \fI\%bsondump\fP removed the \fB\-\-filter\fP, \fB\-\-dbpath\fP and the

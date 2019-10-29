@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGORESTORE" "1" "Jul 25, 2019" "4.2" "mongodb-manual"
+.TH "MONGORESTORE" "1" "Aug 16, 2019" "4.2" "mongodb-manual"
 .SH NAME
 mongorestore \- MongoDB Data Restoration Tool
 .
@@ -35,6 +35,8 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .IP \(bu 2
 \fI\%Synopsis\fP
 .IP \(bu 2
+\fI\%Usage in Backup Strategy\fP
+.IP \(bu 2
 \fI\%Syntax\fP
 .IP \(bu 2
 \fI\%Behavior\fP
@@ -59,9 +61,29 @@ The \fI\%mongorestore\fP program loads data from either a binary
 database dump created by \fBmongodump\fP or the standard input
 (starting in version 3.0.0) into a \fBmongod\fP or
 \fBmongos\fP instance.
+.SH USAGE IN BACKUP STRATEGY
+.SS Standalones/Replica Sets
 .sp
-For an overview of \fI\%mongorestore\fP usage, see
+For an overview of \fI\%mongorestore\fP usage as part of a
+backup and recovery strategy, see
 /tutorial/backup\-and\-restore\-tools\&.
+.SS Sharded Clusters
+.sp
+Starting in MongoDB 4.2, \fBmongodump\fP and
+\fI\%mongorestore\fP \fBcannot\fP be part of a backup
+strategy for sharded clusters. These manual tools do not maintain
+the atomicity guarantees of transactions across shards.
+.sp
+To maintain the atomicity guarantees of transactions across shards,
+use the coordinated backup and restore services provided by:
+.INDENT 0.0
+.IP \(bu 2
+\fI\%MongoDB Atlas\fP,
+.IP \(bu 2
+\fI\%MongoDB Cloud Manager\fP, or
+.IP \(bu 2
+\fI\%MongoDB Ops Manager\fP\&.
+.UNINDENT
 .SH SYNTAX
 .sp
 Run \fI\%mongorestore\fP from the system command line, not the \fBmongo\fP shell.
@@ -810,6 +832,15 @@ patterns.
 If source directory or file (i.e. the directory/file from which you
 are restoring the data) does not contain data files that match the
 namespace pattern, no data will be restored.
+.sp
+For collection names that contain non\-ascii characters,
+\fBmongodump\fP outputs the corresponding filenames with
+percent\-encoded names. However, to restore these collections, do not
+use the encoded names. Instead, use the namespace with the non\-ascii
+characters.
+.sp
+For example, if the dump directory contains
+\fBdump/test/caf%C3%A9s.bson\fP, specify \fB\-\-nsInclude "test.cafés"\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
