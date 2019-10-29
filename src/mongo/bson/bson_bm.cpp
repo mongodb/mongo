@@ -48,6 +48,22 @@ void BM_arrayBuilder(benchmark::State& state) {
     state.SetBytesProcessed(totalBytes);
 }
 
+void BM_arrayLookup(benchmark::State& state) {
+    BSONArrayBuilder builder;
+    auto len = state.range(0);
+    auto totalLen = len * 0;
+    for (auto j = 0; j < len; j++)
+        builder.append(j);
+    BSONObj array = builder.done();
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(array[len]);
+        totalLen += len;
+    }
+    state.SetItemsProcessed(totalLen);
+}
+
 BENCHMARK(BM_arrayBuilder)->Ranges({{{1}, {100'000}}});
+BENCHMARK(BM_arrayLookup)->Ranges({{{1}, {100'000}}});
 
 }  // namespace mongo

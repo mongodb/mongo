@@ -739,11 +739,11 @@ MONGO_COMPILER_NOINLINE void msgAssertedBadType [[noreturn]] (const char* data) 
 }
 }  // namespace
 
-int BSONElement::computeSize() const {
+int BSONElement::computeSize(int8_t type, const char* elem, int fieldNameSize) {
     enum SizeStyle : uint8_t {
         kFixed,         // Total size is a fixed amount + key length.
         kIntPlusFixed,  // Like Fixed, but also add in the int32 immediately following the key.
-        kRegEx,         // Handled specially.
+        kSpecial,       // Handled specially: RegEx, MinKey, MaxKey.
     };
     struct SizeInfo {
         uint8_t style : 2;
@@ -751,8 +751,8 @@ int BSONElement::computeSize() const {
     };
     MONGO_STATIC_ASSERT(sizeof(SizeInfo) == 1);
 
-    // This table should take 20 bytes. Align to next power of 2 to avoid splitting across cache
-    // lines unnecessarily.
+    // This table should take 32 bytes. Align to that size to avoid splitting across cache lines
+    // unnecessarily.
     static constexpr SizeInfo kSizeInfoTable alignas(32)[] = {
         {SizeStyle::kFixed, 1},          // EOO
         {SizeStyle::kFixed, 9},          // NumberDouble
@@ -765,7 +765,7 @@ int BSONElement::computeSize() const {
         {SizeStyle::kFixed, 2},          // Bool
         {SizeStyle::kFixed, 9},          // Date
         {SizeStyle::kFixed, 1},          // Null
-        {SizeStyle::kRegEx},             // Regex
+        {SizeStyle::kSpecial},           // Regex
         {SizeStyle::kIntPlusFixed, 17},  // DBRef
         {SizeStyle::kIntPlusFixed, 5},   // Code
         {SizeStyle::kIntPlusFixed, 5},   // Symbol
@@ -774,38 +774,47 @@ int BSONElement::computeSize() const {
         {SizeStyle::kFixed, 9},          // Timestamp
         {SizeStyle::kFixed, 9},          // Long
         {SizeStyle::kFixed, 17},         // Decimal
+        {SizeStyle::kSpecial},           // reserved 20
+        {SizeStyle::kSpecial},           // reserved 21
+        {SizeStyle::kSpecial},           // reserved 22
+        {SizeStyle::kSpecial},           // reserved 23
+        {SizeStyle::kSpecial},           // reserved 24
+        {SizeStyle::kSpecial},           // reserved 25
+        {SizeStyle::kSpecial},           // reserved 26
+        {SizeStyle::kSpecial},           // reserved 27
+        {SizeStyle::kSpecial},           // reserved 28
+        {SizeStyle::kSpecial},           // reserved 29
+        {SizeStyle::kSpecial},           // reserved 30
+        {SizeStyle::kSpecial},           // MinKey,  MaxKey
     };
-    MONGO_STATIC_ASSERT((sizeof(kSizeInfoTable) / sizeof(kSizeInfoTable[0])) == JSTypeMax + 1);
+    MONGO_STATIC_ASSERT(sizeof(kSizeInfoTable) == 32);
 
-    // This is the start of the runtime code for this function. Everything above happens at compile
-    // time. This function attempts to push complex handling of unlikely events out-of-line to
-    // ensure that the common cases never need to spill any registers (at least on x64 with
-    // gcc-5.4), which reduces the function call overhead.
-    int8_t type = *data;
-    if (MONGO_unlikely(type < 0 || type > JSTypeMax)) {
-        if (MONGO_unlikely(type != MinKey && type != MaxKey)) {
-            msgAssertedBadType(data);
-        }
-
-        // MinKey and MaxKey should be treated the same as Null
-        type = jstNULL;
+    // This function attempts to push complex handling of unlikely events out-of-line to ensure that
+    // the common cases never need to spill any registers, which reduces the function call overhead.
+    // Most invalid types have type != sizeInfoIndex and fall through to the cold path, as do RegEx,
+    // MinKey, MaxKey and the remaining invalid types mapping to SizeStyle::kSpecial.
+    int sizeInfoIndex = type % sizeof(kSizeInfoTable);
+    const auto sizeInfo = kSizeInfoTable[sizeInfoIndex];
+    if (MONGO_likely(type == sizeInfoIndex)) {
+        if (sizeInfo.style == SizeStyle::kFixed)
+            return sizeInfo.bytes + fieldNameSize;
+        if (MONGO_likely(sizeInfo.style == SizeStyle::kIntPlusFixed))
+            return sizeInfo.bytes + fieldNameSize +
+                ConstDataView(elem + fieldNameSize + 1).read<LittleEndian<int32_t>>();
     }
 
-    const auto sizeInfo = kSizeInfoTable[type];
-    if (sizeInfo.style == SizeStyle::kFixed)
-        return sizeInfo.bytes + fieldNameSize();
-    if (MONGO_likely(sizeInfo.style == SizeStyle::kIntPlusFixed))
-        return sizeInfo.bytes + fieldNameSize() + valuestrsize();
+    // The following code handles all special cases: MinKey, MaxKey, RegEx and invalid types.
+    if (type == MaxKey || type == MinKey)
+        return fieldNameSize + 1;
+    if (type != BSONType::RegEx)
+        msgAssertedBadType(elem);
 
-    return [this, type]() {
-        // Regex is two c-strings back-to-back.
-        invariant(type == BSONType::RegEx);
-        const char* p = value();
-        size_t len1 = strlen(p);
-        p = p + len1 + 1;
-        size_t len2 = strlen(p);
-        return (len1 + 1 + len2 + 1) + fieldNameSize() + 1;
-    }();
+    // RegEx is two c-strings back-to-back.
+    const char* p = elem + fieldNameSize + 1;
+    size_t len1 = strlen(p);
+    p = p + len1 + 1;
+    size_t len2 = strlen(p);
+    return (len1 + 1 + len2 + 1) + fieldNameSize + 1;
 }
 
 std::string BSONElement::toString(bool includeFieldName, bool full) const {

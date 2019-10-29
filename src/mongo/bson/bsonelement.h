@@ -687,13 +687,12 @@ public:
 
     // @param maxLen don't scan more than maxLen bytes
     explicit BSONElement(const char* d) : data(d) {
-        if (eoo()) {
-            fieldNameSize_ = 0;
-            totalSize = 1;
-        } else {
-            fieldNameSize_ = strlen(d + 1 /*skip type*/) + 1 /*include NUL byte*/;
-            totalSize = computeSize();
-        }
+        // While we should skip the type, and add 1 for the terminating null byte, just include
+        // the type byte in the strlen call: the extra byte cancels out. As an extra bonus, this
+        // also handles the EOO case, where the type byte is 0.
+        uint8_t type = *d;
+        fieldNameSize_ = strlen(d);
+        totalSize = computeSize(type, d, fieldNameSize_);
     }
 
     struct CachedSizeTag {};  // Opts in to next constructor.
@@ -714,7 +713,7 @@ public:
                 fieldNameSize_ = fieldNameSize;
             }
             if (totalSize == -1) {
-                this->totalSize = computeSize();
+                this->totalSize = computeSize(*d, d, fieldNameSize_);
             } else {
                 this->totalSize = totalSize;
             }
@@ -762,7 +761,7 @@ private:
     }
 
     // Only called from constructors.
-    int computeSize() const;
+    static int computeSize(int8_t type, const char* data, int fieldNameSize);
 };
 
 inline bool BSONElement::trueValue() const {
