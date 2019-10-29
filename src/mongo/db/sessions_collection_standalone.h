@@ -51,7 +51,7 @@ public:
     /**
      * Checks if the sessions collection exists and has the proper indexes.
      */
-    Status checkSessionsCollectionExists(OperationContext* opCtx) override;
+    void checkSessionsCollectionExists(OperationContext* opCtx) override;
 
     /**
      * Updates the last-use times on the given sessions to be greater than

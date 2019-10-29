@@ -58,7 +58,7 @@ public:
     /**
      * Checks if the sessions collection exists.
      */
-    Status checkSessionsCollectionExists(OperationContext* opCtx) override;
+    void checkSessionsCollectionExists(OperationContext* opCtx) override;
 
 private:
     void _shardCollectionIfNeeded(OperationContext* opCtx);

@@ -99,43 +99,36 @@ auto SessionsCollectionRS::_dispatch(const NamespaceString& ns,
         return std::forward<LocalCallback>(localCallback)();
     }
 
+    // There is a window here where we may transition from Primary to Secondary after we release
+    // the locks we take in _isStandaloneOrPrimary(). In this case, the callback we run below
+    // may throw a NotMaster error, or a stale read. However, this is preferable to running the
+    // callback while we hold locks, since that can lead to a deadlock.
+
+    auto conn = _makePrimaryConnection(opCtx);
+    DBClientBase* client = conn->get();
+    auto guard = makeGuard([&] { conn->done(); });
     try {
-        // There is a window here where we may transition from Primary to Secondary after we release
-        // the locks we take in _isStandaloneOrPrimary(). In this case, the callback we run below
-        // may throw a NotMaster error, or a stale read. However, this is preferable to running the
-        // callback while we hold locks, since that can lead to a deadlock.
-
-        auto conn = _makePrimaryConnection(opCtx);
-        DBClientBase* client = conn->get();
-
-        auto sosw = std::forward<RemoteCallback>(remoteCallback)(client);
-        if (!sosw.isOK()) {
-            conn->kill();
-            return sosw;
-        }
-
-        conn->done();
-        return sosw;
+        return std::forward<RemoteCallback>(remoteCallback)(client);
     } catch (...) {
-        return exceptionToStatus();
+        guard.dismiss();
+        conn->kill();
+        throw;
     }
 }
 
 void SessionsCollectionRS::setupSessionsCollection(OperationContext* opCtx) {
-    uassertStatusOKWithContext(
-        _dispatch(
-            NamespaceString::kLogicalSessionsNamespace,
-            opCtx,
-            [&] {
-                auto existsStatus = checkSessionsCollectionExists(opCtx);
-                if (existsStatus.isOK()) {
-                    return Status::OK();
-                }
+    _dispatch(
+        NamespaceString::kLogicalSessionsNamespace,
+        opCtx,
+        [&] {
+            try {
+                checkSessionsCollectionExists(opCtx);
+            } catch (const DBException& ex) {
 
                 DBDirectClient client(opCtx);
                 BSONObj cmd;
 
-                if (existsStatus.code() == ErrorCodes::IndexOptionsConflict) {
+                if (ex.code() == ErrorCodes::IndexOptionsConflict) {
                     cmd = generateCollModCmd();
                 } else {
                     // Creating the TTL index will auto-generate the collection.
@@ -145,41 +138,37 @@ void SessionsCollectionRS::setupSessionsCollection(OperationContext* opCtx) {
                 BSONObj info;
                 if (!client.runCommand(
                         NamespaceString::kLogicalSessionsNamespace.db().toString(), cmd, info)) {
-                    return getStatusFromCommandResult(info);
+                    uassertStatusOK(getStatusFromCommandResult(info));
                 }
-
-                return Status::OK();
-            },
-            [&](DBClientBase*) { return checkSessionsCollectionExists(opCtx); }),
-        str::stream() << "Failed to create " << NamespaceString::kLogicalSessionsNamespace);
+            }
+        },
+        [&](DBClientBase*) { checkSessionsCollectionExists(opCtx); });
 }
 
-Status SessionsCollectionRS::checkSessionsCollectionExists(OperationContext* opCtx) {
+void SessionsCollectionRS::checkSessionsCollectionExists(OperationContext* opCtx) {
     DBDirectClient client(opCtx);
 
     auto indexes = client.getIndexSpecs(NamespaceString::kLogicalSessionsNamespace);
 
-    if (indexes.size() == 0u) {
-        return Status{ErrorCodes::NamespaceNotFound, "config.system.sessions does not exist"};
-    }
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << NamespaceString::kLogicalSessionsNamespace << " does not exist",
+            indexes.size() != 0u);
 
     auto index = std::find_if(indexes.begin(), indexes.end(), [](const BSONObj& index) {
         return index.getField("name").String() == kSessionsTTLIndex;
     });
 
-    if (index == indexes.end()) {
-        return Status{ErrorCodes::IndexNotFound,
-                      "config.system.sessions does not have the required TTL index"};
-    }
+    uassert(ErrorCodes::IndexNotFound,
+            str::stream() << NamespaceString::kLogicalSessionsNamespace
+                          << " does not have the required TTL index",
+            index != indexes.end());
 
-    if (!index->hasField("expireAfterSeconds") ||
-        index->getField("expireAfterSeconds").Int() != (localLogicalSessionTimeoutMinutes * 60)) {
-        return Status{
-            ErrorCodes::IndexOptionsConflict,
-            "config.system.sessions currently has the incorrect timeout for the TTL index"};
-    }
-
-    return Status::OK();
+    uassert(ErrorCodes::IndexOptionsConflict,
+            str::stream() << NamespaceString::kLogicalSessionsNamespace
+                          << " currently has the incorrect timeout for the TTL index",
+            index->hasField("expireAfterSeconds") &&
+                index->getField("expireAfterSeconds").Int() ==
+                    (localLogicalSessionTimeoutMinutes * 60));
 }
 
 Status SessionsCollectionRS::refreshSessions(OperationContext* opCtx,

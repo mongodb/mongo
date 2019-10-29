@@ -57,7 +57,7 @@ public:
     /**
      * Checks if the sessions collection exists and has the proper indexes.
      */
-    Status checkSessionsCollectionExists(OperationContext* opCtx) override;
+    void checkSessionsCollectionExists(OperationContext* opCtx) override;
 
     /**
      * Updates the last-use times on the given sessions to be greater than
@@ -97,7 +97,8 @@ private:
         static_assert(std::is_same_v<LocalReturnType, RemoteReturnType>,
                       "LocalCallback and RemoteCallback must have the same return type");
 
-        using Type = RemoteReturnType;
+        using Type =
+            std::conditional_t<std::is_void<LocalReturnType>::value, void, LocalReturnType>;
     };
     template <typename LocalCallback, typename RemoteCallback>
     using CommonResultT = typename CommonResult<LocalCallback, RemoteCallback>::Type;

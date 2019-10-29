@@ -104,8 +104,8 @@ void SessionsCollectionConfigServer::setupSessionsCollection(OperationContext* o
     _generateIndexesIfNeeded(opCtx);
 }
 
-Status SessionsCollectionConfigServer::checkSessionsCollectionExists(OperationContext* opCtx) {
-    return _checkCacheForSessionsCollection(opCtx);
+void SessionsCollectionConfigServer::checkSessionsCollectionExists(OperationContext* opCtx) {
+    uassertStatusOK(_checkCacheForSessionsCollection(opCtx));
 }
 
 }  // namespace mongo

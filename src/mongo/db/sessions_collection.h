@@ -58,7 +58,7 @@ public:
     /**
      * Checks if the sessions collection exists and has the proper indexes.
      */
-    virtual Status checkSessionsCollectionExists(OperationContext* opCtx) = 0;
+    virtual void checkSessionsCollectionExists(OperationContext* opCtx) = 0;
 
     /**
      * Updates the last-use times on the given sessions to be greater than

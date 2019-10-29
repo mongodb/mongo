@@ -108,9 +108,7 @@ public:
 
     void setupSessionsCollection(OperationContext* opCtx) override {}
 
-    Status checkSessionsCollectionExists(OperationContext* opCtx) override {
-        return Status::OK();
-    }
+    void checkSessionsCollectionExists(OperationContext* opCtx) override {}
 
     Status refreshSessions(OperationContext* opCtx,
                            const LogicalSessionRecordSet& sessions) override {

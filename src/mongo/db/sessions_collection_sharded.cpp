@@ -136,11 +136,11 @@ std::vector<LogicalSessionRecord> SessionsCollectionSharded::_groupSessionRecord
 }
 
 void SessionsCollectionSharded::setupSessionsCollection(OperationContext* opCtx) {
-    uassertStatusOK(checkSessionsCollectionExists(opCtx));
+    checkSessionsCollectionExists(opCtx);
 }
 
-Status SessionsCollectionSharded::checkSessionsCollectionExists(OperationContext* opCtx) {
-    return _checkCacheForSessionsCollection(opCtx);
+void SessionsCollectionSharded::checkSessionsCollectionExists(OperationContext* opCtx) {
+    uassertStatusOK(_checkCacheForSessionsCollection(opCtx));
 }
 
 Status SessionsCollectionSharded::refreshSessions(OperationContext* opCtx,

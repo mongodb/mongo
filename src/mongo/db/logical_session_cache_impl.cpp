@@ -166,22 +166,20 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
 
     try {
         ON_BLOCK_EXIT([&opCtx] { clearShardingOperationFailedStatus(opCtx); });
-
-        auto existsStatus = _sessionsColl->checkSessionsCollectionExists(opCtx);
-        if (!existsStatus.isOK()) {
+        try {
+            _sessionsColl->checkSessionsCollectionExists(opCtx);
+        } catch (const DBException& ex) {
             StringData notSetUpWarning =
                 "Sessions collection is not set up; "
                 "waiting until next sessions reap interval";
-            if (existsStatus.code() != ErrorCodes::NamespaceNotFound ||
-                existsStatus.code() != ErrorCodes::NamespaceNotSharded) {
-                log() << notSetUpWarning << ": " << existsStatus.reason();
+            if (ex.code() != ErrorCodes::NamespaceNotFound ||
+                ex.code() != ErrorCodes::NamespaceNotSharded) {
+                log() << notSetUpWarning << ": " << ex.reason();
             } else {
                 log() << notSetUpWarning;
             }
-
             return Status::OK();
         }
-
         numReaped = _reapSessionsOlderThanFn(opCtx,
                                              *_sessionsColl,
                                              _service->now() -
@@ -244,7 +242,6 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
 
     try {
         _sessionsColl->setupSessionsCollection(opCtx);
-
     } catch (DBException& ex) {
         log() << "Failed to refresh session cache: " << ex.reason()
               << ", will try again at the next refresh interval";
