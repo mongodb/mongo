@@ -370,13 +370,15 @@ certs:
 - name: 'intermediate-ca.pem'
   description: CA issues by the primary root CA, which then issues its own server cert.
   Subject: {CN: 'Intermediate CA'}
+  extensions:
+    basicConstraints: {CA: true}
   Issuer: 'ca.pem'
 
 - name: 'server-intermediate-ca.pem'
   description: Server certificate signed by intermediate CA, including root CA in bundle.
   Subject: {CN: 'Server Via Intermediate'}
   Issuer: 'intermediate-ca.pem'
-  append_cert: 'ca.pem'
+  append_cert: 'intermediate-ca.pem'
 
 ###
 # Split Horizon
