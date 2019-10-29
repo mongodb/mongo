@@ -52,7 +52,7 @@
 namespace mongo {
 namespace {
 
-const class : public VersionInfoInterface {
+class FallbackVersionInfo : public VersionInfoInterface {
 public:
     int majorVersion() const noexcept final {
         return 0;
@@ -97,8 +97,7 @@ public:
     std::vector<BuildInfoTuple> buildInfo() const final {
         return {};
     }
-
-} kFallbackVersionInfo{};
+};
 
 const VersionInfoInterface* globalVersionInfo = nullptr;
 
@@ -109,10 +108,16 @@ void VersionInfoInterface::enable(const VersionInfoInterface* handler) {
 }
 
 const VersionInfoInterface& VersionInfoInterface::instance(NotEnabledAction action) noexcept {
-    if (globalVersionInfo)
+    if (globalVersionInfo) {
         return *globalVersionInfo;
-    if (action == NotEnabledAction::kFallback)
-        return kFallbackVersionInfo;
+    }
+
+    if (action == NotEnabledAction::kFallback) {
+        static const auto& fallbackVersionInfo = *new FallbackVersionInfo;
+
+        return fallbackVersionInfo;
+    }
+
     severe() << "Terminating because valid version info has not been configured";
     fassertFailed(40278);
 }
