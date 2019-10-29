@@ -813,30 +813,6 @@ functions:
       bucket: mciuploads
       local_file: src/mongo-debugsymbols.tgz
 
-  "extract debugsymbols": &extract_debugsymbols
-    command: shell.exec
-    params:
-      working_dir: src
-      script: |
-        set -o errexit
-        set -o verbose
-        # Debug symbols are not created for every variant
-        if [ ! -f mongo-debugsymbols.tgz ]; then
-          exit
-        fi
-        ${decompress} mongo-debugsymbols.tgz
-        files="mongo mongod mongos"
-        file_exts="debug dSYM pdb"
-        for file_ext in $file_exts
-        do
-            for file in $files
-            do
-                mv mongodb*/bin/$file.$file_ext . 2>/dev/null || true
-            done
-            rm -r mongodb*/bin/*.$file_ext 2>/dev/null || true
-        done
-        rm mongo-debugsymbols.tgz 2>/dev/null || true
-
   "fetch and build OpenSSL":
     command: shell.exec
     params:
@@ -1217,7 +1193,8 @@ functions:
             --json-artifact artifacts.json
         fi
 
-  ### Set expansion macros used in each task ###
+  ### Set expansion macros used in each task.
+  ### Note that this function will override task expansions set in update_bypass_expansions
   "set task expansion macros": &set_task_expansion_macros
     command: expansions.update
     params:
@@ -1364,6 +1341,7 @@ functions:
   - *fetch_artifacts
   - *update_bypass_expansions
   - *fetch_binaries
+  - *fetch_debugsymbols_archive
   - *extract_binaries
   - *set_task_expansion_macros
   - *set_up_virtualenv
@@ -1485,7 +1463,6 @@ functions:
         if [ ${task_path_suffix} ]; then
           path_value="$path_value:${task_path_suffix}"
         fi
-
 
         # The "resmoke_wrapper" expansion is used by the 'burn_in_tests' task to wrap the resmoke.py
         # invocation. It doesn't set any environment variables and should therefore come last in
@@ -3671,8 +3648,6 @@ post:
 
 # Timeout steps
 timeout:
-  - func: "fetch debugsymbols archive"
-  - func: "extract debugsymbols"
   - func: "get EC2 address"
   - func: "update EC2 address"
   - func: "run hang analyzer"

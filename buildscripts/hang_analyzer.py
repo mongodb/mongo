@@ -487,6 +487,61 @@ class JstackWindowsDumper(object):
         root_logger.warning("Debugger jstack not supported, skipping dumping of %d", pid)
 
 
+class DebugExtractor(object):
+    """Extracts `mongo-debugsymbols.tgz`."""
+
+    @staticmethod
+    def extract_debug_symbols(root_logger):
+        """
+        Extract debug symbols. Idempotent.
+
+        :param root_logger: logger to use
+        :return: None
+        """
+        path = os.path.join(os.getcwd(), 'mongo-debugsymbols.tgz')
+        root_logger.debug('Starting: Extract debug-symbols from %s.', path)
+        if not os.path.exists(path):
+            root_logger.info('Debug-symbols archive-file does not exist. '
+                             'Hang-Analyzer may not complete successfully, '
+                             'or debug-symbols may already be extracted.')
+            return
+        try:
+            DebugExtractor._exxtract_tar(path, root_logger)
+            root_logger.debug('Finished: Extract debug-symbols from %s.', path)
+        # We never want this to cause the whole task to fail.
+        # The rest of hang_analyzer.py will continue to work without the
+        # symbols it just won't be quite as helpful.
+        # pylint: disable=broad-except
+        except Exception as exception:
+            root_logger.warning('Error when extracting %s: %s', path, exception)
+
+    @staticmethod
+    def _exxtract_tar(path, root_logger):
+        import shutil
+        # The file name is always .tgz but it's "secretly" a zip file on Windows :(
+        compressed_format = 'zip' if _IS_WINDOWS else 'gztar'
+        shutil.unpack_archive(path, format=compressed_format)
+        for (src, dest) in DebugExtractor._extracted_files_to_copy():
+            if os.path.exists(dest):
+                root_logger.debug('Debug symbol %s already exists, not copying from %s.', dest, src)
+                continue
+            shutil.copy(src, dest)
+            root_logger.debug('Copied debug symbol %s.', dest)
+
+    @staticmethod
+    def _extracted_files_to_copy():
+        out = []
+        for ext in ['debug', 'dSYM', 'pdb']:
+            for file in ['mongo', 'mongod', 'mongos']:
+                # need to glob because it untar's to a directory that looks like
+                # mongodb-linux-x86_64-enterprise-rhel62-4.3.0-1823-gb9c13fa-patch-5daa05630ae60652f0890f76
+                haystack = os.path.join('mongodb*', 'bin', '{file}.{ext}'.format(
+                    file=file, ext=ext))
+                for needle in glob.glob(haystack):
+                    out.append((needle, os.path.join(os.getcwd(), os.path.basename(needle))))
+        return out
+
+
 def get_hang_analyzers():
     """Return hang analyzers."""
 
@@ -608,6 +663,8 @@ def main():  # pylint: disable=too-many-branches,too-many-locals,too-many-statem
         root_logger.warning("Cannot determine Unix Current Login")
     except AttributeError:
         root_logger.warning("Cannot determine Unix Current Login, not supported on Windows")
+
+    DebugExtractor.extract_debug_symbols(root_logger)
 
     interesting_processes = ["mongo", "mongod", "mongos", "_test", "dbtest", "python", "java"]
     go_processes = []
