@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGODUMP" "1" "Jul 25, 2019" "4.2" "mongodb-manual"
+.TH "MONGODUMP" "1" "Oct 29, 2019" "4.2" "mongodb-manual"
 .SH NAME
 mongodump \- MongoDB Data Dump Utility
 .
@@ -35,6 +35,10 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .IP \(bu 2
 \fI\%Synopsis\fP
 .IP \(bu 2
+\fI\%Availability\fP
+.IP \(bu 2
+\fI\%Usage in Backup Strategy\fP
+.IP \(bu 2
 \fI\%Syntax\fP
 .IP \(bu 2
 \fI\%Behavior\fP
@@ -55,16 +59,41 @@ of  mongodump\&.
 .UNINDENT
 .SH SYNOPSIS
 .sp
-\fI\%mongodump\fP is a utility for creating a binary export of the
-contents of a database. \fI\%mongodump\fP can export data from
-either \fBmongod\fP or \fBmongos\fP instances.
+\fI\%mongodump\fP is a utility for creating a binary export of
+the contents of a database. \fI\%mongodump\fP can export data
+from either \fBmongod\fP or \fBmongos\fP instances;
+i.e. can export data from standalone, replica set, and sharded cluster
+deployments.
+.SH AVAILABILITY
 .sp
-\fI\%mongodump\fP can be a part of a backup strategy with \fBmongorestore\fP for partial
-backups based on a query, syncing from production to staging or
-development environments, or changing the storage engine of a
-standalone. However, the use of \fI\%mongodump\fP and
-\fBmongorestore\fP as a backup strategy can be problematic for
-sharded clusters and replica sets.
+The \fI\%mongodump\fP tool is part of the MongoDB tools package. Consult the
+installation guide for your platform for
+instructions on how to install the tools package as part of your
+MongoDB installation.
+.sp
+The tools package is also available from the
+\fI\%MongoDB Download Center\fP,
+either as a separate \fBtools\fP download, or contained within the
+\fBTGZ\fP or \fBZIP\fP downloads, depending on platform. On Windows, the \fBMSI\fP installer includes all tools as part of the default installation.
+.INDENT 0.0
+.INDENT 3.5
+.SH TIP
+.sp
+If downloading the \fBTGZ\fP or \fBZIP\fP files from the Download
+Center, you may want to update your \fBPATH\fP environment
+variable to include the directory where you installed these tools.
+See the installation guide
+for your platform for more information.
+.UNINDENT
+.UNINDENT
+.SH USAGE IN BACKUP STRATEGY
+.SS Standalones/Replica Sets
+.sp
+For standalone or a replica set, \fI\%mongodump\fP can be a part
+of a backup strategy with
+\fBmongorestore\fP for partial backups based on a query,
+syncing from production to staging or development environments, or
+changing the storage engine of a standalone.
 .sp
 For an overview of \fI\%mongodump\fP in conjunction with
 \fBmongorestore\fP part of a backup and recovery strategy, see:
@@ -72,9 +101,25 @@ For an overview of \fI\%mongodump\fP in conjunction with
 .IP \(bu 2
 /tutorial/backup\-and\-restore\-tools
 .IP \(bu 2
-/tutorial/backup\-sharded\-cluster\-with\-database\-dumps
-.IP \(bu 2
 /core/backups
+.UNINDENT
+.SS Sharded Cluster
+.sp
+\fI\%mongodump\fP and \fBmongorestore\fP
+\fBcannot\fP be part of a backup strategy for 4.2+ sharded clusters
+that have sharded transactions in progress as these tools cannot
+guarantee a atomicity guarantees of data across the shards.
+.sp
+For 4.2+ sharded clusters with in\-progress sharded transactions, for
+coordinated backup and restore processes that maintain the atomicity
+guarantees of transactions across shards, see:
+.INDENT 0.0
+.IP \(bu 2
+\fI\%MongoDB Atlas\fP,
+.IP \(bu 2
+\fI\%MongoDB Cloud Manager\fP, or
+.IP \(bu 2
+\fI\%MongoDB Ops Manager\fP\&.
 .UNINDENT
 .SH SYNTAX
 .sp
@@ -114,7 +159,7 @@ Specify the hostname and port in the \fI\%\-\-uri connection string\fP:
 .sp
 .nf
 .ft C
-mongodump \-\-uri "mongodb://mongodb0.example.com:27017" [additional options]
+mongodump \-\-uri="mongodb://mongodb0.example.com:27017" [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -126,7 +171,7 @@ Specify the hostname and port in the \fI\%\-\-host\fP:
 .sp
 .nf
 .ft C
-mongodump \-\-host "mongodb0.example.com:27017"  [additional options]
+mongodump \-\-host="mongodb0.example.com:27017"  [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -138,7 +183,7 @@ Specify the hostname and port in the \fI\%\-\-host\fP and \fI\%\-\-port\fP:
 .sp
 .nf
 .ft C
-mongodump \-\-host "mongodb0.example.com" \-\-port 27017 [additional options]
+mongodump \-\-host="mongodb0.example.com" \-\-port=27017 [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -157,7 +202,7 @@ Specify the replica set name and members in the \fI\%\-\-uri connection string\f
 .sp
 .nf
 .ft C
-mongodump \-\-uri "mongodb://mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com:27017/?replicaSet=myReplicaSetName" [additional options]
+mongodump \-\-uri="mongodb://mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com:27017/?replicaSet=myReplicaSetName" [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -169,7 +214,7 @@ Specify the replica set name and members in the \fI\%\-\-host\fP:
 .sp
 .nf
 .ft C
-mongodump \-\-host "myReplicaSetName/mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com" [additional options]
+mongodump \-\-host="myReplicaSetName/mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com" [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -188,7 +233,7 @@ You can specify the read preference in the
 .sp
 .nf
 .ft C
-mongodump \-\-uri "mongodb://mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com:27017/?replicaSet=myReplicaSetName&readPreference=secondary" [additional options]
+mongodump \-\-uri="mongodb://mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com:27017/?replicaSet=myReplicaSetName&readPreference=secondary" [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -201,7 +246,7 @@ If specifying the read preference tags, include the
 .sp
 .nf
 .ft C
-mongodump \-\-uri "mongodb://mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com:27017/?replicaSet=myReplicaSetName&readPreference=secondary&readPreferenceTags=region:east" [additional options]
+mongodump \-\-uri="mongodb://mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com:27017/?replicaSet=myReplicaSetName&readPreference=secondary&readPreferenceTags=region:east" [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -215,7 +260,7 @@ option. The command\-line option takes a string if specifying only the read pref
 .sp
 .nf
 .ft C
-mongodump \-\-host "myReplicaSetName/mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com:27017" \-\-readPreference secondary [additional options]
+mongodump \-\-host="myReplicaSetName/mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com:27017" \-\-readPreference=secondary [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -231,7 +276,7 @@ maxStalenessSeconds:
 .sp
 .nf
 .ft C
-mongodump \-\-host "myReplicaSetName/mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com:27017" \-\-readPreference \(aq{mode: "secondary", tagSets: [ { "region": "east" } ]}\(aq [additional options]
+mongodump \-\-host="myReplicaSetName/mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com:27017" \-\-readPreference=\(aq{mode: "secondary", tagSets: [ { "region": "east" } ]}\(aq [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -251,7 +296,7 @@ Specify the hostname of the \fBmongos\fP instance in the
 .sp
 .nf
 .ft C
-mongodump \-\-uri "mongodb://mongos0.example.com:27017" [additional options]
+mongodump \-\-uri="mongodb://mongos0.example.com:27017" [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -263,7 +308,7 @@ Specify the hostname and port of the \fBmongos\fP instance in the \fI\%\-\-host\
 .sp
 .nf
 .ft C
-mongodump \-\-host "mongos0.example.com:27017" [additional options]
+mongodump \-\-host="mongos0.example.com:27017" [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -282,7 +327,7 @@ You can specify the read preference in the
 .sp
 .nf
 .ft C
-mongodump \-\-uri "mongodb://mongos0.example.com:27017/?readPreference=secondary" [additional options]
+mongodump \-\-uri="mongodb://mongos0.example.com:27017/?readPreference=secondary" [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -295,7 +340,7 @@ If specifying the read preference tags, include the
 .sp
 .nf
 .ft C
-mongodump \-\-uri "mongodb://mongos0.example.com:27017/?readPreference=secondary&readPreferenceTags=region:east" [additional options]
+mongodump \-\-uri="mongodb://mongos0.example.com:27017/?readPreference=secondary&readPreferenceTags=region:east" [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -309,7 +354,7 @@ option.  The command\-line option takes a string if specifying only the read pre
 .sp
 .nf
 .ft C
-mongodump \-\-host "mongos0.example.com:27017" \-\-readPreference secondary [additional options]
+mongodump \-\-host="mongos0.example.com:27017" \-\-readPreference=secondary [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -325,7 +370,7 @@ maxStalenessSeconds:
 .sp
 .nf
 .ft C
-mongodump \-\-host "mongos0.example.com:27017" \-\-readPreference \(aq{mode: "secondary", tagSets: [ { "region": "east" } ]}\(aq [additional options]
+mongodump \-\-host="mongos0.example.com:27017" \-\-readPreference=\(aq{mode: "secondary", tagSets: [ { "region": "east" } ]}\(aq [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -370,6 +415,23 @@ read\-only views\&. By default,
 create a binary export of the documents included in the view. To
 capture the documents in a view use \fI\%\-\-viewsAsCollections\fP\&.
 
+.SS Metadata Format
+.sp
+Starting in version 4.2, \fI\%mongodump\fP uses Extended
+JSON v2.0 (Canonical) format
+for the metadata files. To parse these files for restore, use
+\fBmongorestore\fP version 4.2+ that supports Extended
+JSON v2.0 (Canonical or Relaxed mode) format.
+.INDENT 0.0
+.INDENT 3.5
+.SS Tip
+.sp
+If general, use corresponding versions of \fI\%mongodump\fP
+and \fBmongorestore\fP\&. That is, to restore data files
+created with a specific version of \fI\%mongodump\fP, use the
+corresponding version of \fBmongorestore\fP\&.
+.UNINDENT
+.UNINDENT
 .SS Overwrite Files
 .sp
 \fI\%mongodump\fP overwrites output files if they exist in the
@@ -456,7 +518,7 @@ Returns the \fBmongodump\fP release number.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-uri <connectionString>
+.B \-\-uri=<connectionString>
 New in version 3.4.6.
 
 .sp
@@ -467,7 +529,7 @@ connection string (enclose in quotes) to connect to the MongoDB deployment.
 .sp
 .nf
 .ft C
-\-\-uri "mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]"
+\-\-uri="mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]"
 .ft P
 .fi
 .UNINDENT
@@ -515,7 +577,7 @@ connection string.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-host <hostname><:port>, \-h <hostname><:port>
+.B \-\-host=<hostname><:port>, \-h=<hostname><:port>
 \fIDefault\fP: localhost:27017
 .sp
 Specifies a resolvable hostname for the \fBmongod\fP to which to
@@ -530,7 +592,7 @@ the following:
 .sp
 .nf
 .ft C
-\-\-host <replSetName>/<hostname1><:port>,<hostname2><:port>,<...>
+\-\-host=<replSetName>/<hostname1><:port>,<hostname2><:port>,<...>
 .ft P
 .fi
 .UNINDENT
@@ -546,7 +608,7 @@ the host and port of only that member:
 .sp
 .nf
 .ft C
-\-\-host <hostname1><:port>
+\-\-host=<hostname1><:port>
 .ft P
 .fi
 .UNINDENT
@@ -566,7 +628,7 @@ You cannot specify both \fI\%\-\-host\fP and \fI\%\-\-uri\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-port <port>
+.B \-\-port=<port>
 \fIDefault\fP: 27017
 .sp
 Specifies the TCP port on which the MongoDB instance listens for
@@ -604,7 +666,7 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sslCAFile <filename>
+.B \-\-sslCAFile=<filename>
 New in version 2.6.
 
 .sp
@@ -645,7 +707,7 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sslPEMKeyFile <filename>
+.B \-\-sslPEMKeyFile=<filename>
 New in version 2.6.
 
 .sp
@@ -664,7 +726,7 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sslPEMKeyPassword <value>
+.B \-\-sslPEMKeyPassword=<value>
 New in version 2.6.
 
 .sp
@@ -683,7 +745,7 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sslCRLFile <filename>
+.B \-\-sslCRLFile=<filename>
 New in version 2.6.
 
 .sp
@@ -714,8 +776,6 @@ alias \fB\-\-tlsAllowInvalidateCertificates\fP or
 authentication, an invalid certificate is only sufficient to
 establish a TLS/SSL connection but is \fIinsufficient\fP for
 authentication.
-.sp
-# We created a separate blurb for tls in the ssl\-clients page.
 .sp
 \fBWARNING:\fP
 .INDENT 7.0
@@ -759,7 +819,7 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-username <username>, \-u <username>
+.B \-\-username=<username>, \-u=<username>
 Specifies a username with which to authenticate to a MongoDB database
 that uses authentication. Use in conjunction with the \fI\%\-\-password\fP and
 \fI\%\-\-authenticationDatabase\fP options.
@@ -773,7 +833,7 @@ You cannot specify both \fI\%\-\-username\fP and \fI\%\-\-uri\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-password <password>, \-p <password>
+.B \-\-password=<password>, \-p=<password>
 Specifies a password with which to authenticate to a MongoDB database
 that uses authentication. Use in conjunction with the \fI\%\-\-username\fP and
 \fI\%\-\-authenticationDatabase\fP options.
@@ -793,7 +853,7 @@ You cannot specify both \fI\%\-\-password\fP and \fI\%\-\-uri\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-authenticationDatabase <dbname>
+.B \-\-authenticationDatabase=<dbname>
 Specifies the authentication database where the specified \fI\%\-\-username\fP has been created.
 See user\-authentication\-database\&.
 .sp
@@ -813,7 +873,7 @@ credentials.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-authenticationMechanism <name>
+.B \-\-authenticationMechanism=<name>
 \fIDefault\fP: SCRAM\-SHA\-1
 .sp
 Specifies the authentication mechanism the \fBmongodump\fP instance uses to
@@ -910,7 +970,7 @@ This option is available only in MongoDB Enterprise.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-db <database>, \-d <database>
+.B \-\-db=<database>, \-d=<database>
 Specifies a database to backup. If you do not specify a database,
 \fI\%mongodump\fP copies all databases in this instance into the dump
 files.
@@ -924,23 +984,40 @@ You cannot specify both \fI\%\-\-db\fP and \fI\%\-\-uri\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-collection <collection>, \-c <collection>
+.B \-\-collection=<collection>, \-c=<collection>
 Specifies a collection to backup. If you do not specify a collection,
 this option copies all collections in the specified database or instance
 to the dump files.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-query <json>, \-q <json>
-Provides a JSON document as a query that optionally limits the
-documents included in the output of \fI\%mongodump\fP\&.
+.B \-\-query=<json>, \-q=<json>
+Provides a JSON document as a query that optionally limits
+the documents included in the output of \fI\%mongodump\fP\&. To
+use the \fB\-\-query\fP option, you must also specify the
+\fI\%\-\-collection\fP option.
 .sp
 You must enclose the query document in single quotes (\fB\(aq{ ... }\(aq\fP) to ensure that it does
 not interact with your shell environment.
+.sp
+Starting in MongoDB 4.2, the query \fBmust\fP be in
+Extended JSON v2 format (either relaxed or canonical/strict
+mode), including enclosing the
+field names and operators in quotes.  For example:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongodump \-d=test \-c=records \-q=\(aq{ "a": { "$gte": 3 }, "date": { "$lt": { "$date": "2016\-01\-01T00:00:00.000Z" } } }\(aq
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-queryFile <path>
+.B \-\-queryFile=<path>
 New in version 3.2.
 
 .sp
@@ -951,7 +1028,7 @@ are too large to fit in your terminal\(aqs buffer.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-readPreference <string|document>
+.B \-\-readPreference=<string|document>
 \fIDefault\fP: \fBprimary\fP
 .sp
 Specifies the read preference for
@@ -964,7 +1041,7 @@ A string if specifying only the read preference mode:
 .sp
 .nf
 .ft C
-\-\-readPreference secondary
+\-\-readPreference=secondary
 .ft P
 .fi
 .UNINDENT
@@ -978,7 +1055,7 @@ optional maxStalenessSeconds:
 .sp
 .nf
 .ft C
-\-\-readPreference \(aq{mode: "secondary", tagSets: [ { "region": "east" } ], maxStalenessSeconds: 120}\(aq
+\-\-readPreference=\(aq{mode: "secondary", tagSets: [ { "region": "east" } ], maxStalenessSeconds: 120}\(aq
 .ft P
 .fi
 .UNINDENT
@@ -1036,7 +1113,7 @@ output to the stream.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-out <path>, \-o <path>
+.B \-\-out=<path>, \-o=<path>
 Specifies the directory where \fI\%mongodump\fP will write
 BSON files for the dumped databases. By default,
 \fI\%mongodump\fP saves output files in a directory named
@@ -1054,22 +1131,45 @@ You cannot use the \fB\-\-archive\fP option with the
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-archive <file or null>
+.B \-\-archive=<file>
 New in version 3.2.
 
 .sp
-Writes the output to a single archive file or to the standard output
-(\fBstdout\fP).
+Writes the output to a specified archive file or, if the archive
+file is unspecified, writes to the standard output (\fBstdout\fP).
+.INDENT 7.0
+.IP \(bu 2
+To output the dump to an archive file, run
+\fI\%mongodump\fP with the \fI\%\-\-archive\fP option and the archive filename.
+.INDENT 2.0
+.INDENT 3.5
 .sp
-To output the dump to an archive file, run \fI\%mongodump\fP with the new
-\fB\-\-archive\fP option and the archive filename.
+.nf
+.ft C
+mongodump \-\-archive=<file>
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.IP \(bu 2
+To output the dump to the standard output stream in order to pipe
+to another process, run \fI\%mongodump\fP with the
+\fI\%\-\-archive\fP option but \fIomit\fP the
+filename.
+.INDENT 2.0
+.INDENT 3.5
 .sp
-To output the dump to the standard output stream in order to pipe to
-another process, run \fI\%mongodump\fP with the \fBarchive\fP option
-but \fIomit\fP the filename.
+.nf
+.ft C
+mongodump \-\-archive
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
 .sp
-You cannot use the \fB\-\-archive\fP option with the
-\fI\%\-\-out\fP option.
+You cannot use the \fI\%\-\-archive\fP option
+with the \fI\%\-\-out\fP option.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -1132,7 +1232,7 @@ and not just a specific database.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-excludeCollection string
+.B \-\-excludeCollection=<string>
 New in version 3.0.
 
 .sp
@@ -1141,7 +1241,7 @@ To exclude multiple collections, specify the \fI\%\-\-excludeCollection\fP multi
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-excludeCollectionsWithPrefix string
+.B \-\-excludeCollectionsWithPrefix=<string>
 New in version 3.0.
 
 .sp
@@ -1151,7 +1251,7 @@ times.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-numParallelCollections int, \-j int
+.B \-\-numParallelCollections=<int>, \-j=<int>
 \fIDefault\fP: 4
 .sp
 Number of collections \fBmongodump\fP should export
@@ -1177,7 +1277,7 @@ is recreated.
 .SS \fBmongodump\fP a Collection
 .sp
 The following operation creates a dump file that contains only the
-collection named \fBcollection\fP in the database named \fBtest\fP\&. In
+collection named \fBrecords\fP in the database named \fBtest\fP\&. In
 this case the database is running on the local interface on port
 \fB27017\fP:
 .INDENT 0.0
@@ -1185,7 +1285,7 @@ this case the database is running on the local interface on port
 .sp
 .nf
 .ft C
-mongodump  \-\-db test \-\-collection collection
+mongodump  \-\-db=test \-\-collection=records
 .ft P
 .fi
 .UNINDENT
@@ -1199,7 +1299,7 @@ except for \fBusers\fP and \fBsalaries\fP:
 .sp
 .nf
 .ft C
-mongodump  \-\-db test \-\-excludeCollection=users \-\-excludeCollection=salaries
+mongodump  \-\-db=test \-\-excludeCollection=users \-\-excludeCollection=salaries
 .ft P
 .fi
 .UNINDENT
@@ -1209,18 +1309,20 @@ mongodump  \-\-db test \-\-excludeCollection=users \-\-excludeCollection=salarie
 In the next example, \fI\%mongodump\fP creates a database dump
 located at \fB/opt/backup/mongodump\-2011\-10\-24\fP, from a database
 running on port \fB37017\fP on the host \fBmongodb1.example.net\fP and
-authenticating using the username \fBuser\fP and the password
-\fBpass\fP, as follows:
+authenticating using the username \fBuser\fP as follows:
 .INDENT 0.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-mongodump \-\-host mongodb1.example.net \-\-port 37017 \-\-username user \-\-password "pass" \-\-out /opt/backup/mongodump\-2011\-10\-24
+mongodump \-\-host=mongodb1.example.net \-\-port=37017 \-\-username=user \-\-authenticationDatabase=admin \-\-out=/opt/backup/mongodump\-2011\-10\-24
 .ft P
 .fi
 .UNINDENT
 .UNINDENT
+.sp
+If you do not include the \fI\%\-\-password\fP,
+\fBmongodump\fP prompts the user for the password.
 .SS Output to an Archive File
 .sp
 New in version 3.2.
@@ -1235,7 +1337,7 @@ of the \fBtest\fP database.
 .sp
 .nf
 .ft C
-mongodump \-\-archive=test.20150715.archive \-\-db test
+mongodump \-\-archive=test.20150715.archive \-\-db=test
 .ft P
 .fi
 .UNINDENT
@@ -1253,7 +1355,7 @@ option but \fIomit\fP the filename:
 .sp
 .nf
 .ft C
-mongodump \-\-archive \-\-db test \-\-port 27017 | mongorestore \-\-archive \-\-port 27018
+mongodump \-\-archive \-\-db=test \-\-port=27017 | mongorestore \-\-archive \-\-port=27018
 .ft P
 .fi
 .UNINDENT
@@ -1277,7 +1379,7 @@ the following operation outputs compressed files into the default
 .sp
 .nf
 .ft C
-mongodump \-\-gzip \-\-db test
+mongodump \-\-gzip \-\-db=test
 .ft P
 .fi
 .UNINDENT
@@ -1291,7 +1393,7 @@ option, specifying the name of the compressed file.
 .sp
 .nf
 .ft C
-mongodump \-\-archive=test.20150715.gz \-\-gzip \-\-db test
+mongodump \-\-archive=test.20150715.gz \-\-gzip \-\-db=test
 .ft P
 .fi
 .UNINDENT

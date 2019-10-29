@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGOS" "1" "Jul 25, 2019" "4.2" "mongodb-manual"
+.TH "MONGOS" "1" "Oct 29, 2019" "4.2" "mongodb-manual"
 .SH NAME
 mongos \- MongoDB Sharded Cluster Query Router
 .
@@ -524,11 +524,33 @@ _
 .INDENT 0.0
 .TP
 .B \-\-pidfilepath <path>
-Specifies a file location to hold the process ID of the \fBmongos\fP
-process where \fBmongos\fP will write its PID. This is useful for
-tracking the \fBmongos\fP process in combination with
-the \fI\%\-\-fork\fP option. Without a specified \fI\%\-\-pidfilepath\fP option, the
-process creates no PID file.
+Specifies a file location to store the process ID (PID) of the \fBmongos\fP
+process . The user running the the \fBmongod\fP or \fBmongos\fP
+process must be able to write to this path. If the \fI\%\-\-pidfilepath\fP option is not
+specified, the process does not create a PID file. This option is generally
+only useful in combination with the the \fI\%\-\-fork\fP option.
+.INDENT 7.0
+.INDENT 3.5
+.IP "Linux"
+.sp
+On Linux, PID file management is generally the responsibility of
+your distro\(aqs init system: usually a service file in the \fB/etc/init.d\fP
+directory, or a systemd unit file registered with \fBsystemctl\fP\&. Only
+use the \fI\%\-\-pidfilepath\fP option if you are not using one of these init
+systems. For more information, please see the respective
+Installation Guide for your operating system.
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.INDENT 3.5
+.IP "macOS"
+.sp
+On macOS, PID file management is generally handled by \fBbrew\fP\&. Only use
+the \fI\%\-\-pidfilepath\fP option if you are not using \fBbrew\fP on your macOS system.
+For more information, please see the respective
+Installation Guide for your operating system.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -622,6 +644,8 @@ background. By default \fBmongos\fP does not run as a daemon:
 typically you will run \fBmongos\fP as a daemon, either by using
 \fI\%\-\-fork\fP or by using a controlling process that handles the
 daemonization process (e.g. as with \fBupstart\fP and \fBsystemd\fP).
+.sp
+The \fI\%\-\-fork\fP option is not supported on Windows.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -791,12 +815,26 @@ mongos \-\-timeZoneInfo timezonedb\-2017b/
 New in version 4.2.
 
 .sp
-Outputs the resolved YAML configuration document for the \fBmongos\fP
-to \fBstdout\fP and halts the \fBmongos\fP instance. For configuration
-options using externally\-sourced\-values, \fI\%\-\-outputConfig\fP returns the
-resolved value for those options. This may include any configured
-passwords or secrets previously obfuscated through the external
-source.
+Outputs the \fBmongos\fP instance\(aqs configuration options, formatted
+in YAML, to \fBstdout\fP and exits the \fBmongos\fP instance. For
+configuration options that uses externally\-sourced\-values,
+\fI\%\-\-outputConfig\fP returns the resolved value for those options.
+.sp
+\fBWARNING:\fP
+.INDENT 7.0
+.INDENT 3.5
+This may include any configured passwords or secrets previously
+obfuscated through the external source.
+.UNINDENT
+.UNINDENT
+.sp
+For usage examples, see:
+.INDENT 7.0
+.IP \(bu 2
+expansion\-directive\-output
+.IP \(bu 2
+/tutorial/convert\-command\-line\-options\-to\-yaml
+.UNINDENT
 .UNINDENT
 .SS Sharded Cluster Options
 .INDENT 0.0
@@ -2153,14 +2191,14 @@ New in version 4.0.
 New in version 3.4: Available in MongoDB Enterprise only.
 
 .sp
-The LDAP server against which the \fBmongos\fP executes LDAP operations
-against to authenticate users or determine what actions a user is authorized
-to perform on a given database. If the LDAP server specified has any
-replicated instances, you may specify the host and port of each replicated
-server in a comma\-delimited list.
+The LDAP server against which the \fBmongos\fP authenticates users or
+determines what actions a user is authorized to perform on a given
+database. If the LDAP server specified has any replicated instances,
+you may specify the host and port of each replicated server in a
+comma\-delimited list.
 .sp
-If your LDAP infrastrucure partitions the LDAP directory over multiple LDAP
-servers, specify \fIone\fP LDAP server any of its replicated instances to
+If your LDAP infrastructure partitions the LDAP directory over multiple LDAP
+servers, specify \fIone\fP LDAP server or any of its replicated instances to
 \fI\%\-\-ldapServers\fP\&. MongoDB supports following LDAP referrals as defined in \fI\%RFC 4511
 4.1.10\fP\&. Do not use \fI\%\-\-ldapServers\fP
 for listing every LDAP server in your infrastructure.

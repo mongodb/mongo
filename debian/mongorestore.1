@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGORESTORE" "1" "Jul 25, 2019" "4.2" "mongodb-manual"
+.TH "MONGORESTORE" "1" "Oct 29, 2019" "4.2" "mongodb-manual"
 .SH NAME
 mongorestore \- MongoDB Data Restoration Tool
 .
@@ -35,6 +35,10 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .IP \(bu 2
 \fI\%Synopsis\fP
 .IP \(bu 2
+\fI\%Availability\fP
+.IP \(bu 2
+\fI\%Usage in Backup Strategy\fP
+.IP \(bu 2
 \fI\%Syntax\fP
 .IP \(bu 2
 \fI\%Behavior\fP
@@ -59,9 +63,52 @@ The \fI\%mongorestore\fP program loads data from either a binary
 database dump created by \fBmongodump\fP or the standard input
 (starting in version 3.0.0) into a \fBmongod\fP or
 \fBmongos\fP instance.
+.SH AVAILABILITY
 .sp
-For an overview of \fI\%mongorestore\fP usage, see
+The \fI\%mongorestore\fP tool is part of the MongoDB tools package. Consult the
+installation guide for your platform for
+instructions on how to install the tools package as part of your
+MongoDB installation.
+.sp
+The tools package is also available from the
+\fI\%MongoDB Download Center\fP,
+either as a separate \fBtools\fP download, or contained within the
+\fBTGZ\fP or \fBZIP\fP downloads, depending on platform. On Windows, the \fBMSI\fP installer includes all tools as part of the default installation.
+.INDENT 0.0
+.INDENT 3.5
+.SH TIP
+.sp
+If downloading the \fBTGZ\fP or \fBZIP\fP files from the Download
+Center, you may want to update your \fBPATH\fP environment
+variable to include the directory where you installed these tools.
+See the installation guide
+for your platform for more information.
+.UNINDENT
+.UNINDENT
+.SH USAGE IN BACKUP STRATEGY
+.SS Standalones/Replica Sets
+.sp
+For an overview of \fI\%mongorestore\fP usage as part of a
+backup and recovery strategy, see
 /tutorial/backup\-and\-restore\-tools\&.
+.SS Sharded Clusters
+.sp
+\fBmongodump\fP and \fI\%mongorestore\fP
+\fBcannot\fP be part of a backup strategy for 4.2+ sharded clusters
+that have sharded transactions in progress as these tools cannot
+guarantee a atomicity guarantees of data across the shards.
+.sp
+For 4.2+ sharded clusters with in\-progress sharded transactions, for
+coordinated backup and restore processes that maintain the atomicity
+guarantees of transactions across shards, see:
+.INDENT 0.0
+.IP \(bu 2
+\fI\%MongoDB Atlas\fP,
+.IP \(bu 2
+\fI\%MongoDB Cloud Manager\fP, or
+.IP \(bu 2
+\fI\%MongoDB Ops Manager\fP\&.
+.UNINDENT
 .SH SYNTAX
 .sp
 Run \fI\%mongorestore\fP from the system command line, not the \fBmongo\fP shell.
@@ -122,7 +169,7 @@ directory:
 .sp
 .nf
 .ft C
-mongorestore \-\-nsInclude test.purchaseorders dump/
+mongorestore \-\-nsInclude=test.purchaseorders dump/
 .ft P
 .fi
 .UNINDENT
@@ -137,7 +184,7 @@ corresponding data in the \fBdump/\fP directory:
 .sp
 .nf
 .ft C
-mongorestore \-\-nsInclude foo.bar dump/
+mongorestore \-\-nsInclude=foo.bar dump/
 .ft P
 .fi
 .UNINDENT
@@ -210,7 +257,7 @@ configured to use FIPS mode\&.
 .sp
 Starting in version 4.2, if you specify write concern in both the
 \fI\%\-\-writeConcern\fP option and the
-\fI\%\-\-uri connection string\fP option, the
+\fI\%\-\-uri\fP connection string option, the
 \fI\%\-\-writeConcern\fP value overrides
 the write concern specified in the URI string.
 .sp
@@ -218,9 +265,21 @@ In earlier versions, the two options are incompatible.
 .SH REQUIRED ACCESS
 .sp
 To restore data to a MongoDB deployment that has access control enabled, the \fBrestore\fP role provides
-access to restore any database if the backup data does not include
-\fBsystem.profile\fP collection data.
+the necessary privileges to restore data from backups \fIif\fP the data does
+not include \fBsystem.profile\fP
+collection data and you run \fI\%mongorestore\fP without the
+\fI\%\-\-oplogReplay\fP option.
 .sp
+If the backup data includes \fBsystem.profile\fP collection data or you run with
+\fI\%\-\-oplogReplay\fP, you need
+additional privileges:
+.TS
+center;
+|l|l|.
+_
+T{
+\fBsystem.profile\fP
+T}	T{
 If the backup data includes \fBsystem.profile\fP collection data and the target database
 does not contain the \fBsystem.profile\fP
 collection, \fI\%mongorestore\fP attempts to create the collection
@@ -230,14 +289,21 @@ documents. As such, the user requires additional privileges to perform
 actions on the \fBsystem.profile\fP
 collection for a database.
 .sp
-As of MongoDB 3.2.11, you can run \fI\%mongorestore\fP with
-\fI\%\-\-oplogReplay\fP if you have the
-\fBrestore\fP role. To replay the oplog on versions of MongoDB
-3.2.10 and earlier, you must create a
-user\-defined role that has
-\fBanyAction\fP on resource\-anyresource and grant only
-to users who must run \fI\%mongorestore\fP with
-\fI\%\-\-oplogReplay\fP\&.
+Both the built\-in roles \fBdbAdmin\fP and
+\fBdbAdminAnyDatabase\fP provide the additional privileges.
+T}
+_
+T{
+\fB\-\-oplogReplay\fP
+T}	T{
+To run with \fI\%\-\-oplogReplay\fP, create a user\-defined role that has \fBanyAction\fP on
+resource\-anyresource\&.
+.sp
+Grant only to users who must run \fI\%mongorestore\fP
+with \fI\%\-\-oplogReplay\fP\&.
+T}
+_
+.TE
 .SH OPTIONS
 .sp
 Changed in version 3.0.0: \fI\%mongorestore\fP removed the \fB\-\-filter\fP, \fB\-\-dbpath\fP, and the
@@ -284,7 +350,7 @@ Returns the \fBmongorestore\fP release number.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-uri <connectionString>
+.B \-\-uri=<connectionString>
 New in version 3.4.6.
 
 .sp
@@ -295,7 +361,7 @@ connection string (enclose in quotes) to connect to the MongoDB deployment.
 .sp
 .nf
 .ft C
-\-\-uri "mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]"
+\-\-uri="mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]"
 .ft P
 .fi
 .UNINDENT
@@ -343,7 +409,7 @@ connection string.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-host <hostname><:port>, \-h <hostname><:port>
+.B \-\-host=<hostname><:port>, \-h=<hostname><:port>
 \fIDefault\fP: localhost:27017
 .sp
 Specifies a resolvable hostname for the \fBmongod\fP to which to
@@ -358,7 +424,7 @@ the following:
 .sp
 .nf
 .ft C
-\-\-host <replSetName>/<hostname1><:port>,<hostname2><:port>,<...>
+\-\-host=<replSetName>/<hostname1><:port>,<hostname2><:port>,<...>
 .ft P
 .fi
 .UNINDENT
@@ -374,7 +440,7 @@ the host and port of only that member:
 .sp
 .nf
 .ft C
-\-\-host <hostname1><:port>
+\-\-host=<hostname1><:port>
 .ft P
 .fi
 .UNINDENT
@@ -394,7 +460,7 @@ You cannot specify both \fI\%\-\-host\fP and \fI\%\-\-uri\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-port <port>
+.B \-\-port=<port>
 \fIDefault\fP: 27017
 .sp
 Specifies the TCP port on which the MongoDB instance listens for
@@ -422,7 +488,7 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sslCAFile <filename>
+.B \-\-sslCAFile=<filename>
 New in version 2.6.
 
 .sp
@@ -463,7 +529,7 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sslPEMKeyFile <filename>
+.B \-\-sslPEMKeyFile=<filename>
 New in version 2.6.
 
 .sp
@@ -482,7 +548,7 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sslPEMKeyPassword <value>
+.B \-\-sslPEMKeyPassword=<value>
 New in version 2.6.
 
 .sp
@@ -501,7 +567,7 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sslCRLFile <filename>
+.B \-\-sslCRLFile=<filename>
 New in version 2.6.
 
 .sp
@@ -532,8 +598,6 @@ alias \fB\-\-tlsAllowInvalidateCertificates\fP or
 authentication, an invalid certificate is only sufficient to
 establish a TLS/SSL connection but is \fIinsufficient\fP for
 authentication.
-.sp
-# We created a separate blurb for tls in the ssl\-clients page.
 .sp
 \fBWARNING:\fP
 .INDENT 7.0
@@ -577,7 +641,7 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-username <username>, \-u <username>
+.B \-\-username=<username>, \-u=<username>
 Specifies a username with which to authenticate to a MongoDB database
 that uses authentication. Use in conjunction with the \fI\%\-\-password\fP and
 \fI\%\-\-authenticationDatabase\fP options.
@@ -591,7 +655,7 @@ You cannot specify both \fI\%\-\-username\fP and \fI\%\-\-uri\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-password <password>, \-p <password>
+.B \-\-password=<password>, \-p=<password>
 Specifies a password with which to authenticate to a MongoDB database
 that uses authentication. Use in conjunction with the \fI\%\-\-username\fP and
 \fI\%\-\-authenticationDatabase\fP options.
@@ -599,7 +663,7 @@ that uses authentication. Use in conjunction with the \fI\%\-\-username\fP and
 Changed in version 3.0.2: To prompt the user
 for the password, pass the \fI\%\-\-username\fP option without
 \fI\%\-\-password\fP or specify an empty string as the \fI\%\-\-password\fP value,
-as in \fB\-\-password ""\fP .
+as in \fB\-\-password=""\fP .
 
 .sp
 \fBNOTE:\fP
@@ -611,7 +675,7 @@ You cannot specify both \fI\%\-\-password\fP and \fI\%\-\-uri\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-authenticationDatabase <dbname>
+.B \-\-authenticationDatabase=<dbname>
 Specifies the authentication database where the specified \fI\%\-\-username\fP has been created.
 See user\-authentication\-database\&.
 .sp
@@ -624,7 +688,7 @@ You cannot specify both \fI\%\-\-authenticationDatabase\fP and \fI\%\-\-uri\fP\&
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-authenticationMechanism <name>
+.B \-\-authenticationMechanism=<name>
 \fIDefault\fP: SCRAM\-SHA\-1
 .sp
 Specifies the authentication mechanism the \fBmongorestore\fP instance uses to
@@ -699,7 +763,7 @@ You cannot specify both \fI\%\-\-authenticationMechanism\fP and \fI\%\-\-uri\fP\
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-gssapiServiceName
+.B \-\-gssapiServiceName=<serviceName>
 New in version 2.6.
 
 .sp
@@ -710,7 +774,7 @@ This option is available only in MongoDB Enterprise.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-gssapiHostName
+.B \-\-gssapiHostName=<hostname>
 New in version 2.6.
 
 .sp
@@ -721,7 +785,7 @@ This option is available only in MongoDB Enterprise.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-db <database>, \-d <database>
+.B \-\-db=<database>, \-d=<database>
 Specifies the destination database for \fBmongorestore\fP to restore data
 \fIinto\fP when restoring from a BSON file. If the database does not
 exist, \fBmongorestore\fP creates the database. For example, the following
@@ -731,7 +795,7 @@ restores the \fBsalaries\fP collection into the \fBreporting\fP database.
 .sp
 .nf
 .ft C
-mongorestore \-\-db reporting dump/test/salaries.bson
+mongorestore \-\-db=reporting dump/test/salaries.bson
 .ft P
 .fi
 .UNINDENT
@@ -754,7 +818,7 @@ You cannot specify both \fI\%\-\-db\fP and \fI\%\-\-uri\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-collection <collection>, \-c <collection>
+.B \-\-collection=<collection>, \-c=<collection>
 Specifies the name of the destination collection for \fBmongorestore\fP to
 restore data \fIinto\fP when restoring from a BSON file. If
 you do not specify \fI\%\-\-collection\fP, \fBmongorestore\fP takes
@@ -766,7 +830,7 @@ name.
 .sp
 .nf
 .ft C
-mongorestore \-\-db reporting \-\-collection employeesalaries dump/test/salaries.bson
+mongorestore \-\-db=reporting \-\-collection=employeesalaries dump/test/salaries.bson
 .ft P
 .fi
 .UNINDENT
@@ -779,7 +843,7 @@ Instead, to restore from an archive or a directory, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-nsExclude <namespace pattern>
+.B \-\-nsExclude=<namespace pattern>
 New in version 3.4.
 
 .sp
@@ -794,7 +858,7 @@ patterns.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-nsInclude <namespace pattern>
+.B \-\-nsInclude=<namespace pattern>
 New in version 3.4.
 
 .sp
@@ -810,10 +874,19 @@ patterns.
 If source directory or file (i.e. the directory/file from which you
 are restoring the data) does not contain data files that match the
 namespace pattern, no data will be restored.
+.sp
+For collection names that contain non\-ascii characters,
+\fBmongodump\fP outputs the corresponding filenames with
+percent\-encoded names. However, to restore these collections, do not
+use the encoded names. Instead, use the namespace with the non\-ascii
+characters.
+.sp
+For example, if the dump directory contains
+\fBdump/test/caf%C3%A9s.bson\fP, specify \fB\-\-nsInclude "test.cafés"\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-nsFrom <namespace pattern>
+.B \-\-nsFrom=<namespace pattern>
 New in version 3.4.
 
 .sp
@@ -843,7 +916,7 @@ sign\-delimited wild cards do \fBnot\fP need to be linear.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-nsTo <namespace pattern>
+.B \-\-nsTo=<namespace pattern>
 New in version 3.4.
 
 .sp
@@ -911,7 +984,7 @@ more detailed summary information.
 After restoring the database dump, replays the oplog entries
 from a bson file.
 When used in conjunction with \fBmongodump \-\-oplog\fP,
-\fB~bin.mongorestore \-\-oplogReplay\fP
+\fBmongorestore \-\-oplogReplay\fP
 restores the database to the point\-in\-time backup captured with the
 \fBmongodump \-\-oplog\fP command.
 .sp
@@ -983,7 +1056,7 @@ the following options to limit the data be restored:
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-oplogLimit <timestamp>
+.B \-\-oplogLimit=<timestamp>
 Prevents \fBmongorestore\fP from applying oplog entries
 with timestamp newer than or equal to \fB<timestamp>\fP\&. Specify
 \fB<timestamp>\fP values in the form of \fB<time_t>:<ordinal>\fP, where
@@ -996,7 +1069,7 @@ You must use \fI\%\-\-oplogLimit\fP in conjunction with the
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-oplogFile <path>
+.B \-\-oplogFile=<path>
 New in version 3.4.
 
 .sp
@@ -1035,7 +1108,7 @@ Restore user and role definitions for the given database. See
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-writeConcern <document>
+.B \-\-writeConcern=<document>
 \fIDefault\fP: majority
 .sp
 Specifies the write concern for each write operation that \fBmongorestore\fP
@@ -1047,7 +1120,7 @@ Specify the write concern as a document with w options:
 .sp
 .nf
 .ft C
-\-\-writeConcern "{w:\(aqmajority\(aq}"
+\-\-writeConcern="{w:\(aqmajority\(aq}"
 .ft P
 .fi
 .UNINDENT
@@ -1063,13 +1136,28 @@ the URI string.
 .B \-\-maintainInsertionOrder
 \fIDefault\fP: False
 .sp
-If specified, \fBmongorestore\fP inserts the documents in the order of
-their appearance in the input source, otherwise \fBmongorestore\fP may
-perform the insertions in an arbitrary order.
+If specified,
+.INDENT 7.0
+.IP \(bu 2
+Starting in version 4.2, \fBmongorestore\fP inserts the documents in the
+order of their appearance in the input source. That is, both the
+bulk write batch order and document order within the batches are
+maintained.
+.IP \(bu 2
+In earlier versions, only the batch order is maintained; document
+order within batches are not maintained.
+.UNINDENT
+.sp
+Starting in MongoDB 4.2,
+specifying \fI\%\-\-maintainInsertionOrder\fP also enables \fI\%\-\-stopOnError\fP and sets
+\fI\%numInsertionWorkersPerCollection\fP to 1.
+.sp
+If unspecified, \fBmongorestore\fP may perform the insertions in an
+arbitrary order.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-numParallelCollections int, \-j int
+.B \-\-numParallelCollections=<int>, \-j=<int>
 \fIDefault\fP: 4
 .sp
 Number of collections \fBmongorestore\fP should restore
@@ -1081,7 +1169,7 @@ maps to the \fI\%\-\-numInsertionWorkersPerCollection\fP option rather than
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-numInsertionWorkersPerCollection int
+.B \-\-numInsertionWorkersPerCollection=<int>
 \fIDefault\fP: 1
 .sp
 New in version 3.0.0.
@@ -1100,6 +1188,10 @@ New in version 3.0.
 .sp
 Forces \fBmongorestore\fP to halt the restore when it encounters an
 error.
+.sp
+Starting in version 4.2, \fI\%mongorestore\fP, by default,
+continues when it encounters duplicate key and document
+validation errors.  To ensure that the program stops on these errors, specify \fI\%\-\-stopOnError\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -1128,17 +1220,20 @@ both the \fI\%\-\-gzip\fP  and the \fI\-\-archive\fP options.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-archive <=file|null>
+.B \-\-archive=<file>
 New in version 3.2.
 
 .sp
-Restores from an archive file or from the standard input (\fBstdin\fP).
-.sp
-To restore from an archive file, run \fBmongorestore\fP with the \fB\-\-archive\fP
-option and the archive filename.
-.sp
-To restore from the standard input, run \fBmongorestore\fP with the
-\fB\-\-archive\fP option but \fIomit\fP the filename.
+Restores from the specified archive file or, if the file is
+unspecified, from the standard input (\fBstdin\fP):
+.INDENT 7.0
+.IP \(bu 2
+To restore from an archive file, run \fBmongorestore\fP with
+the \fB\-\-archive\fP option and the archive filename
+.IP \(bu 2
+To restore from the standard input, run \fBmongorestore\fP
+with the \fB\-\-archive\fP option but \fIomit\fP the filename.
+.UNINDENT
 .sp
 \fBNOTE:\fP
 .INDENT 7.0
@@ -1173,7 +1268,7 @@ option, which also specifies the dump directory, to \fBmongorestore\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-dir string
+.B \-\-dir=string
 Specifies the dump directory.
 .INDENT 7.0
 .IP \(bu 2
@@ -1197,7 +1292,7 @@ prompt for the password.
 .sp
 .nf
 .ft C
-mongorestore \-\-uri "mongodb://user@mongodb1.example.net:27017/?authSource=admin" /opt/backup/mongodump\-2011\-10\-24
+mongorestore \-\-uri="mongodb://user@mongodb1.example.net:27017/?authSource=admin" /opt/backup/mongodump\-2011\-10\-24
 .ft P
 .fi
 .UNINDENT
@@ -1211,7 +1306,7 @@ authentication database using \fI\%\-\-host\fP,
 .sp
 .nf
 .ft C
-mongorestore \-\-host mongodb1.example.net \-\-port 27017 \-\-username user \-\-authenticationDatabase=admin /opt/backup/mongodump\-2011\-10\-24
+mongorestore \-\-host=mongodb1.example.net \-\-port=27017 \-\-username=user \-\-authenticationDatabase=admin /opt/backup/mongodump\-2011\-10\-24
 .ft P
 .fi
 .UNINDENT
@@ -1232,7 +1327,7 @@ files located in the \fBdump/\fP directory.
 .sp
 .nf
 .ft C
-mongorestore \-\-nsInclude test.purchaseorders dump/
+mongorestore \-\-nsInclude=test.purchaseorders dump/
 .ft P
 .fi
 .UNINDENT
@@ -1263,8 +1358,8 @@ files for the specified namespace, no data will be restored:
 .sp
 .nf
 .ft C
-2019\-07\-08T14:39:57.121\-0400 preparing collections to restore from
-2019\-07\-08T14:39:57.121\-0400 0 document(s) restored successfully. 0 document(s) failed to restore.
+2019\-07\-08T14:39:57.121\-0400. preparing collections to restore from
+2019\-07\-08T14:39:57.121\-0400  0 document(s) restored successfully. 0 document(s) failed to restore.
 .ft P
 .fi
 .UNINDENT
@@ -1277,7 +1372,7 @@ Alternatively, you can restore a specific collection using the
 .sp
 .nf
 .ft C
-mongorestore \-\-db test \-\-collection purchaseorders dump/test/purchaseorders.bson
+mongorestore \-\-db=test \-\-collection=purchaseorders dump/test/purchaseorders.bson
 .ft P
 .fi
 .UNINDENT
@@ -1321,7 +1416,7 @@ on port \fB27017\fP\&.
 .sp
 .nf
 .ft C
-mongorestore \-\-nsInclude \(aqtransactions.*\(aq \-\-nsExclude \(aqtransactions.*_dev\(aq dump/
+mongorestore \-\-nsInclude=\(aqtransactions.*\(aq \-\-nsExclude=\(aqtransactions.*_dev\(aq dump/
 .ft P
 .fi
 .UNINDENT
@@ -1372,7 +1467,7 @@ collections in the \fB<customerName>\fP database.
 .sp
 .nf
 .ft C
-mongorestore \-\-nsInclude \(aqdata.*\(aq \-\-nsFrom \(aqdata.$prefix$_$customer$\(aq \-\-nsTo \(aq$customer$.$prefix$\(aq
+mongorestore \-\-nsInclude=\(aqdata.*\(aq \-\-nsFrom=\(aqdata.$prefix$_$customer$\(aq \-\-nsTo=\(aq$customer$.$prefix$\(aq
 .ft P
 .fi
 .UNINDENT
@@ -1405,7 +1500,7 @@ following operation restores the \fBtest\fP database from the file
 .sp
 .nf
 .ft C
-mongorestore \-\-archive=test.20150715.archive  \-\-nsInclude "test.*"
+mongorestore \-\-archive=test.20150715.archive  \-\-nsInclude="test.*"
 .ft P
 .fi
 .UNINDENT
@@ -1425,7 +1520,7 @@ directory:
 .sp
 .nf
 .ft C
-mongorestore \-\-gzip  \-\-nsInclude "test.*" dump/
+mongorestore \-\-gzip  \-\-nsInclude="test.*" dump/
 .ft P
 .fi
 .UNINDENT
@@ -1440,7 +1535,7 @@ database from the archive file \fBtest.20150715.gz\fP\&.
 .sp
 .nf
 .ft C
-mongorestore \-\-gzip \-\-archive=test.20150715.gz \-\-nsInclude "test.*"
+mongorestore \-\-gzip \-\-archive=test.20150715.gz \-\-nsInclude="test.*"
 .ft P
 .fi
 .UNINDENT
@@ -1458,7 +1553,7 @@ the filename. For example:
 .sp
 .nf
 .ft C
-mongodump \-\-archive \-\-db test \-\-port 27017 | mongorestore \-\-archive \-\-port 27018
+mongodump \-\-archive \-\-db=test \-\-port=27017 | mongorestore \-\-archive \-\-port=27018
 .ft P
 .fi
 .UNINDENT

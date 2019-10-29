@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGOEXPORT" "1" "Jul 25, 2019" "4.2" "mongodb-manual"
+.TH "MONGOEXPORT" "1" "Oct 29, 2019" "4.2" "mongodb-manual"
 .SH NAME
 mongoexport \- MongoDB Export Utility
 .
@@ -35,6 +35,8 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .IP \(bu 2
 \fI\%Synopsis\fP
 .IP \(bu 2
+\fI\%Availability\fP
+.IP \(bu 2
 \fI\%Syntax\fP
 .IP \(bu 2
 \fI\%Required Access\fP
@@ -67,6 +69,28 @@ Run \fI\%mongoexport\fP from the system command line, not the \fBmongo\fP shell.
 capability.
 .UNINDENT
 .UNINDENT
+.SH AVAILABILITY
+.sp
+The \fI\%mongoexport\fP tool is part of the MongoDB tools package. Consult the
+installation guide for your platform for
+instructions on how to install the tools package as part of your
+MongoDB installation.
+.sp
+The tools package is also available from the
+\fI\%MongoDB Download Center\fP,
+either as a separate \fBtools\fP download, or contained within the
+\fBTGZ\fP or \fBZIP\fP downloads, depending on platform. On Windows, the \fBMSI\fP installer includes all tools as part of the default installation.
+.INDENT 0.0
+.INDENT 3.5
+.SH TIP
+.sp
+If downloading the \fBTGZ\fP or \fBZIP\fP files from the Download
+Center, you may want to update your \fBPATH\fP environment
+variable to include the directory where you installed these tools.
+See the installation guide
+for your platform for more information.
+.UNINDENT
+.UNINDENT
 .SH SYNTAX
 .sp
 \fI\%mongoexport\fP must be run directly from the system command line.
@@ -75,7 +99,7 @@ capability.
 .sp
 .nf
 .ft C
-mongoexport \-\-collection <coll> [options]
+mongoexport \-\-collection=<coll> [options]
 .ft P
 .fi
 .UNINDENT
@@ -95,7 +119,7 @@ For example, to export the specified \fI\%collection\fP to the specified \fI\%ou
 .sp
 .nf
 .ft C
-mongoexport \-\-collection events \-\-db reporting \-\-out events.json
+mongoexport \-\-collection=events \-\-db=reporting \-\-out=events.json
 .ft P
 .fi
 .UNINDENT
@@ -110,7 +134,7 @@ Specify the hostname and port in the \fI\%\-\-uri connection string\fP:
 .sp
 .nf
 .ft C
-mongoexport \-\-uri "mongodb://mongodb0.example.com:27017/reporting"  \-\-collection events  \-\-out events.json [additional options]
+mongoexport \-\-uri="mongodb://mongodb0.example.com:27017/reporting"  \-\-collection=events  \-\-out=events.json [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -127,7 +151,7 @@ Specify the hostname and port in the \fI\%\-\-host\fP:
 .sp
 .nf
 .ft C
-mongoexport \-\-host "mongodb0.example.com:27017" \-\-collection events \-\-db reporting \-\-out events.json [additional options]
+mongoexport \-\-host="mongodb0.example.com:27017" \-\-collection=events \-\-db=reporting \-\-out=events.json [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -139,7 +163,7 @@ Specify the hostname and port in the \fI\%\-\-host\fP and \fI\%\-\-port\fP:
 .sp
 .nf
 .ft C
-mongoexport \-\-host "mongodb0.example.com" \-\-port 27017 \-\-collection events \-\-db reporting \-\-out events.json [additional options]
+mongoexport \-\-host="mongodb0.example.com" \-\-port=27017 \-\-collection=events \-\-db=reporting \-\-out=events.json [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -158,7 +182,7 @@ Specify the replica set name and members in the \fI\%\-\-uri connection string\f
 .sp
 .nf
 .ft C
-mongoexport \-\-uri "mongodb://mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com:27017/reporting?replicaSet=myReplicaSetName" \-\-collection events \-\-out events.json [additional options]
+mongoexport \-\-uri="mongodb://mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com:27017/reporting?replicaSet=myReplicaSetName" \-\-collection=events \-\-out=events.json [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -175,7 +199,7 @@ Specify the replica set name and members in the \fI\%\-\-host\fP:
 .sp
 .nf
 .ft C
-mongoexport \-\-host "myReplicaSetName/mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com" \-\-collection events \-\-db reporting \-\-out events.json [additional options]
+mongoexport \-\-host="myReplicaSetName/mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com" \-\-collection=events \-\-db=reporting \-\-out=events.json [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -194,7 +218,7 @@ You can specify the read preference in the
 .sp
 .nf
 .ft C
-mongoexport \-\-uri "mongodb://mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com:27017/reporting?replicaSet=myReplicaSetName&readPreference=secondary" \-\-collection events \-\-out events.json [additional options]
+mongoexport \-\-uri="mongodb://mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com:27017/reporting?replicaSet=myReplicaSetName&readPreference=secondary" \-\-collection=events \-\-out=events.json [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -207,7 +231,7 @@ If specifying the read preference tags, include the
 .sp
 .nf
 .ft C
-mongoexport \-\-uri "mongodb://mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com:27017/reporting?replicaSet=myReplicaSetName&readPreference=secondary&readPreferenceTags=region:east" \-\-collection events \-\-out events.json [additional options]
+mongoexport \-\-uri="mongodb://mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com:27017/reporting?replicaSet=myReplicaSetName&readPreference=secondary&readPreferenceTags=region:east" \-\-collection=events \-\-out=events.json [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -226,7 +250,7 @@ option. The command\-line option takes a string if specifying only the read pref
 .sp
 .nf
 .ft C
-mongoexport \-\-host "myReplicaSetName/mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com:27017" \-\-readPreference secondary \-\-collection events \-\-db reporting \-\-out events.json [additional options]
+mongoexport \-\-host="myReplicaSetName/mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com:27017" \-\-readPreference=secondary \-\-collection=events \-\-db=reporting \-\-out=events.json [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -242,7 +266,7 @@ maxStalenessSeconds:
 .sp
 .nf
 .ft C
-mongoexport \-\-host "myReplicaSetName/mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com:27017" \-\-readPreference \(aq{mode: "secondary", tagSets: [ { "region": "east" } ]}\(aq \-\-collection events \-\-db reporting \-\-out events.json [additional options]
+mongoexport \-\-host="myReplicaSetName/mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com:27017" \-\-readPreference=\(aq{mode: "secondary", tagSets: [ { "region": "east" } ]}\(aq \-\-collection=events \-\-db=reporting \-\-out=events.json [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -262,7 +286,7 @@ Specify the hostname of the \fBmongos\fP instance in the
 .sp
 .nf
 .ft C
-mongoexport \-\-uri "mongodb://mongos0.example.com:27017/reporting" \-\-collection events \-\-out events.json [additional options]
+mongoexport \-\-uri="mongodb://mongos0.example.com:27017/reporting" \-\-collection=events \-\-out=events.json [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -279,7 +303,7 @@ Specify the hostname and port of the \fBmongos\fP instance in the \fI\%\-\-host\
 .sp
 .nf
 .ft C
-mongoexport \-\-host "mongos0.example.com:27017" \-\-collection events \-\-db reporting \-\-out events.json[additional options]
+mongoexport \-\-host="mongos0.example.com:27017" \-\-collection=events \-\-db=reporting \-\-out=events.json[additional options]
 .ft P
 .fi
 .UNINDENT
@@ -298,7 +322,7 @@ You can specify the read preference in the
 .sp
 .nf
 .ft C
-mongoexport \-\-uri "mongodb://mongos0.example.com:27017/reporting?readPreference=secondary" \-\-collection events \-\-out events.json [additional options]
+mongoexport \-\-uri="mongodb://mongos0.example.com:27017/reporting?readPreference=secondary" \-\-collection=events \-\-out=events.json [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -311,7 +335,7 @@ If specifying the read preference tags, include the
 .sp
 .nf
 .ft C
-mongoexport \-\-uri "mongodb://mongos0.example.com:27017/reporting?readPreference=secondary&readPreferenceTags=region:east" \-\-collection events \-\-out events.json [additional options]
+mongoexport \-\-uri="mongodb://mongos0.example.com:27017/reporting?readPreference=secondary&readPreferenceTags=region:east" \-\-collection=events \-\-out=events.json [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -330,7 +354,7 @@ option.  The command\-line option takes a string if specifying only the read pre
 .sp
 .nf
 .ft C
-mongoexport \-\-host "mongos0.example.com:27017" \-\-readPreference secondary \-\-collection events \-\-db reporting \-\-out events.json [additional options]
+mongoexport \-\-host="mongos0.example.com:27017" \-\-readPreference=secondary \-\-collection=events \-\-db=reporting \-\-out=events.json [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -346,7 +370,7 @@ maxStalenessSeconds:
 .sp
 .nf
 .ft C
-mongoexport \-\-host "mongos0.example.com:27017" \-\-readPreference \(aq{mode: "secondary", tagSets: [ { "region": "east" } ]}\(aq \-\-collection events \-\-db reporting \-\-out events.json [additional options]
+mongoexport \-\-host="mongos0.example.com:27017" \-\-readPreference=\(aq{mode: "secondary", tagSets: [ { "region": "east" } ]}\(aq \-\-collection=events \-\-db=reporting \-\-out=events.json [additional options]
 .ft P
 .fi
 .UNINDENT
@@ -387,13 +411,20 @@ kind of functionality.
 .UNINDENT
 .UNINDENT
 .sp
-To preserve type information, \fI\%mongoexport\fP and \fBmongoimport\fP
-uses the strict mode representation
-for certain types.
+Starting in version 4.2, \fI\%mongoexport\fP:
+.INDENT 0.0
+.IP \(bu 2
+Outputs data in Extended JSON v2.0 (Relaxed mode) by default.
+.IP \(bu 2
+Outputs Extended JSON v2.0 (Canonical mode) if used with
+\fI\%\-\-jsonFormat\fP\&.
+.UNINDENT
+.sp
+Earlier versions used Extended JSON v1.0 (Canonical mode)\&.
 .sp
 For example, the following insert operation in the \fBmongo\fP
-shell uses the shell mode representation for the BSON types
-\fBdata_date\fP and \fBdata_numberlong\fP:
+shell uses the various shell helpers for the
+BSON types Date and 64\-bit integer:
 .INDENT 0.0
 .INDENT 3.5
 .sp
@@ -406,7 +437,7 @@ db.traffic.insert( { _id: 1, volume: NumberLong(\(aq2980000\(aq), date: new Date
 .UNINDENT
 .UNINDENT
 .sp
-The argument to \fBdata_numberlong\fP must be quoted to avoid potential
+The argument to 64\-bit integer must be quoted to avoid potential
 loss of accuracy.
 .sp
 Use \fI\%mongoexport\fP to export the data:
@@ -415,26 +446,63 @@ Use \fI\%mongoexport\fP to export the data:
 .sp
 .nf
 .ft C
-mongoexport \-\-db test \-\-collection traffic \-\-out traffic.json
+mongoexport \-\-db=test \-\-collection=traffic \-\-out=traffic.json
 .ft P
 .fi
 .UNINDENT
 .UNINDENT
 .sp
-The exported data is in strict mode representation to preserve type information:
+In version 4.2+, the exported data is in Extended JSON v2.0
+(Relaxed mode)\&.
 .INDENT 0.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-{ "_id" : 1, "volume" : { "$numberLong" : "2980000" }, "date" : { "$date" : "2014\-03\-13T13:47:42.483\-0400" } }
+{"_id":1.0,"volume":2980000,"date":{"$date":"2019\-08\-05T16:18:29.559Z"}}
 .ft P
 .fi
 .UNINDENT
 .UNINDENT
 .sp
-See /reference/mongodb\-extended\-json for a complete list of
-these types and the representations used.
+To output in Extended JSON v2.0 (Canonical
+mode), include the
+\fI\%\-\-jsonFormat=canonical\fP:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongoexport \-\-db=test \-\-collection=traffic \-\-jsonFormat=canonical \-\-out=traffic.json
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+The exported data is in Extended JSON v2.0 (Canonical
+mode):
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+{"_id":{"$numberDouble":"1.0"},"volume":{"$numberLong":"2980000"},"date":{"$date":{"$numberLong":"1565363188675"}}}
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+In version 4.0 and earlier, the exported data is in Extended JSON v1.0 (Strict mode)
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+{"_id":1.0,"volume":{"$numberLong":"2980000"},"date":{"$date":"2019\-08\-05T16:18:29.559Z"}}
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
 .SS FIPS
 .sp
 Starting in version 4.2, MongoDB removes the \fB\-\-sslFIPSMode\fP
@@ -509,7 +577,7 @@ Returns the \fBmongoexport\fP release number.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-uri <connectionString>
+.B \-\-uri=<connectionString>
 New in version 3.4.6.
 
 .sp
@@ -520,7 +588,7 @@ connection string (enclose in quotes) to connect to the MongoDB deployment.
 .sp
 .nf
 .ft C
-\-\-uri "mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]"
+\-\-uri="mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]"
 .ft P
 .fi
 .UNINDENT
@@ -568,7 +636,7 @@ connection string.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-host <hostname><:port>, \-h <hostname><:port>
+.B \-\-host=<hostname><:port>, \-h=<hostname><:port>
 \fIDefault\fP: localhost:27017
 .sp
 Specifies a resolvable hostname for the \fBmongod\fP to which to
@@ -583,7 +651,7 @@ the following:
 .sp
 .nf
 .ft C
-\-\-host <replSetName>/<hostname1><:port>,<hostname2><:port>,<...>
+\-\-host=<replSetName>/<hostname1><:port>,<hostname2><:port>,<...>
 .ft P
 .fi
 .UNINDENT
@@ -599,7 +667,7 @@ the host and port of only that member:
 .sp
 .nf
 .ft C
-\-\-host <hostname1><:port>
+\-\-host=<hostname1><:port>
 .ft P
 .fi
 .UNINDENT
@@ -619,7 +687,7 @@ You cannot specify both \fI\%\-\-host\fP and \fI\%\-\-uri\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-port <port>
+.B \-\-port=<port>
 \fIDefault\fP: 27017
 .sp
 Specifies the TCP port on which the MongoDB instance listens for
@@ -657,7 +725,7 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sslCAFile <filename>
+.B \-\-sslCAFile=<filename>
 New in version 2.6.
 
 .sp
@@ -698,7 +766,7 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sslPEMKeyFile <filename>
+.B \-\-sslPEMKeyFile=<filename>
 New in version 2.6.
 
 .sp
@@ -717,7 +785,7 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sslPEMKeyPassword <value>
+.B \-\-sslPEMKeyPassword=<value>
 New in version 2.6.
 
 .sp
@@ -736,7 +804,7 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sslCRLFile <filename>
+.B \-\-sslCRLFile=<filename>
 New in version 2.6.
 
 .sp
@@ -767,8 +835,6 @@ alias \fB\-\-tlsAllowInvalidateCertificates\fP or
 authentication, an invalid certificate is only sufficient to
 establish a TLS/SSL connection but is \fIinsufficient\fP for
 authentication.
-.sp
-# We created a separate blurb for tls in the ssl\-clients page.
 .sp
 \fBWARNING:\fP
 .INDENT 7.0
@@ -812,7 +878,7 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-username <username>, \-u <username>
+.B \-\-username=<username>, \-u=<username>
 Specifies a username with which to authenticate to a MongoDB database
 that uses authentication. Use in conjunction with the \fI\%\-\-password\fP and
 \fI\%\-\-authenticationDatabase\fP options.
@@ -826,7 +892,7 @@ You cannot specify both \fI\%\-\-username\fP and \fI\%\-\-uri\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-password <password>, \-p <password>
+.B \-\-password=<password>, \-p=<password>
 Specifies a password with which to authenticate to a MongoDB database
 that uses authentication. Use in conjunction with the \fI\%\-\-username\fP and
 \fI\%\-\-authenticationDatabase\fP options.
@@ -846,7 +912,7 @@ You cannot specify both \fI\%\-\-password\fP and \fI\%\-\-uri\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-authenticationDatabase <dbname>
+.B \-\-authenticationDatabase=<dbname>
 Specifies the authentication database where the specified \fI\%\-\-username\fP has been created.
 See user\-authentication\-database\&.
 .sp
@@ -862,7 +928,7 @@ assumes that the database specified to export holds the user\(aqs credentials.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-authenticationMechanism <name>
+.B \-\-authenticationMechanism=<name>
 \fIDefault\fP: SCRAM\-SHA\-1
 .sp
 Specifies the authentication mechanism the \fBmongoexport\fP instance uses to
@@ -937,7 +1003,7 @@ You cannot specify both \fI\%\-\-authenticationMechanism\fP and \fI\%\-\-uri\fP\
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-gssapiServiceName
+.B \-\-gssapiServiceName=<serviceName>
 New in version 2.6.
 
 .sp
@@ -948,7 +1014,7 @@ This option is available only in MongoDB Enterprise.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-gssapiHostName
+.B \-\-gssapiHostName=<hostname>
 New in version 2.6.
 
 .sp
@@ -959,7 +1025,7 @@ This option is available only in MongoDB Enterprise.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-db <database>, \-d <database>
+.B \-\-db=<database>, \-d=<database>
 Specifies the name of the database on which to run the \fBmongoexport\fP\&.
 .sp
 \fBNOTE:\fP
@@ -971,12 +1037,12 @@ You cannot specify both \fI\%\-\-db\fP and \fI\%\-\-uri\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-collection <collection>, \-c <collection>
+.B \-\-collection=<collection>, \-c=<collection>
 Specifies the collection to export.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-fields <field1[,field2]>, \-f <field1[,field2]>
+.B \-\-fields=<field1[,field2]>, \-f=<field1[,field2]>
 Specifies a field or fields to \fIinclude\fP in the export. Use a comma
 separated list of fields to specify multiple fields.
 .sp
@@ -999,7 +1065,7 @@ See: \fI\%Export Data in CSV Format using \-\-fields option\fP for sample usage.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-fieldFile <filename>
+.B \-\-fieldFile=<filename>
 An alternative to \fI\%\-\-fields\fP\&. The
 \fI\%\-\-fieldFile\fP option allows you to
 specify in a file the field or fields to \fIinclude\fP in the export and is
@@ -1015,13 +1081,17 @@ See \fI\%Use a File to Specify the Fields to Export in CSV Format\fP for sample 
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-query <JSON>, \-q <JSON>
+.B \-\-query=<JSON>, \-q=<JSON>
 Provides a query as a JSON document (enclosed in quotes) to
-return matching documents in the export. Specify JSON in strict
-format\&.
+return matching documents in the export.
 .sp
 You must enclose the query document in single quotes (\fB\(aq{ ... }\(aq\fP) to ensure that it does
 not interact with your shell environment.
+.sp
+Starting in MongoDB 4.2, the query \fBmust\fP be in
+Extended JSON v2 format (either relaxed or canonical/strict
+mode), including enclosing the
+field names and operators in quotes:
 .sp
 For example, given a collection named \fBrecords\fP in the database
 \fBtest\fP with the following documents:
@@ -1041,17 +1111,18 @@ For example, given a collection named \fBrecords\fP in the database
 .UNINDENT
 .UNINDENT
 .sp
-The following \fI\%mongoexport\fP uses the \fI\%\-q\fP option to
-export only the documents with the field \fBa\fP greater than or equal to
-(\fB$gte\fP) to \fB3\fP and the field \fBdate\fP less than
-\fBISODate("2016\-01\-01T00:00:00Z")\fP (using the strict format
-for dates { "$date": "YYYY\-MM\-DDTHH:mm:ss.mmm<offset>"}):
+The following \fI\%mongoexport\fP uses the \fI\%\-q\fP option
+to export only the documents with the field \fBa\fP greater than or
+equal to (\fB$gte\fP) to \fB3\fP and the field \fBdate\fP less than
+\fBISODate("2016\-01\-01T00:00:00Z")\fP (using the extended JSON v2
+format (relaxed mode) for dates { "$date":
+"YYYY\-MM\-DDTHH:mm:ss.mmm<offset>"}):
 .INDENT 7.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-mongoexport \-d test \-c records \-q \(aq{ a: { $gte: 3 }, date: { $lt: { "$date": "2016\-01\-01T00:00:00.000Z" } } }\(aq \-\-out exportdir/myRecords.json
+mongoexport \-d=test \-c=records \-q=\(aq{ "a": { "$gte": 3 }, "date": { "$lt": { "$date": "2016\-01\-01T00:00:00.000Z" } } }\(aq \-\-out=exportdir/myRecords.json
 .ft P
 .fi
 .UNINDENT
@@ -1075,7 +1146,7 @@ You can sort the results with the \fI\%\-\-sort\fP option to
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-type <string>
+.B \-\-type=<string>
 \fIDefault\fP: json
 .sp
 New in version 3.0.
@@ -1090,10 +1161,21 @@ declare the fields to export from the collection.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-out <file>, \-o <file>
+.B \-\-out=<file>, \-o=<file>
 Specifies a file to write the export to. If you do not specify a file
 name, the \fI\%mongoexport\fP writes data to standard output
 (e.g. \fBstdout\fP).
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-jsonFormat=<canonical|relaxed>
+\fIDefault\fP: relaxed
+.sp
+Modifies the output to use either canonical or relaxed mode of the
+/reference/mongodb\-extended\-json format.
+.sp
+For differences between canonical and relaxed modes, see
+/reference/mongodb\-extended\-json\&.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -1149,7 +1231,7 @@ inconsistencies, duplicates, or result in missed documents.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-readPreference <string|document>
+.B \-\-readPreference=<string|document>
 \fIDefault\fP: \fBprimary\fP
 .sp
 Specifies the read preference for
@@ -1162,7 +1244,7 @@ A string if specifying only the read preference mode:
 .sp
 .nf
 .ft C
-\-\-readPreference secondary
+\-\-readPreference=secondary
 .ft P
 .fi
 .UNINDENT
@@ -1176,7 +1258,7 @@ optional maxStalenessSeconds:
 .sp
 .nf
 .ft C
-\-\-readPreference \(aq{mode: "secondary", tagSets: [ { "region": "east" } ], maxStalenessSeconds: 120}\(aq
+\-\-readPreference=\(aq{mode: "secondary", tagSets: [ { "region": "east" } ], maxStalenessSeconds: 120}\(aq
 .ft P
 .fi
 .UNINDENT
@@ -1233,21 +1315,21 @@ and consideration.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-skip <number>
+.B \-\-skip=<number>
 Use \fI\%\-\-skip\fP to control where \fI\%mongoexport\fP begins
 exporting documents. See \fBskip()\fP for information about
 the underlying operation.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-limit <number>
+.B \-\-limit=<number>
 Specifies a maximum number of documents to include in the
 export. See \fBlimit()\fP for information about
 the underlying operation.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sort <JSON>
+.B \-\-sort=<JSON>
 Specifies an ordering for exported results. If an index does
 \fBnot\fP exist that can support the sort operation, the results must
 be \fIless than\fP 32 megabytes.
@@ -1259,9 +1341,9 @@ Use \fI\%\-\-sort\fP conjunction with \fI\%\-\-skip\fP and
 .sp
 .nf
 .ft C
-mongoexport \-d test \-c records \-\-sort \(aq{a: 1}\(aq \-\-limit 100 \-\-out export.0.json
-mongoexport \-d test \-c records \-\-sort \(aq{a: 1}\(aq \-\-limit 100 \-\-skip 100 \-\-out export.1.json
-mongoexport \-d test \-c records \-\-sort \(aq{a: 1}\(aq \-\-limit 100 \-\-skip 200 \-\-out export.2.json
+mongoexport \-d=test \-c=records \-\-sort=\(aq{a: 1}\(aq \-\-limit=100 \-\-out=export.0.json
+mongoexport \-d=test \-c=records \-\-sort=\(aq{a: 1}\(aq \-\-limit=100 \-\-skip=100 \-\-out=export.1.json
+mongoexport \-d=test \-c=records \-\-sort=\(aq{a: 1}\(aq \-\-limit=100 \-\-skip=200 \-\-out=export.2.json
 .ft P
 .fi
 .UNINDENT
@@ -1294,7 +1376,7 @@ to export.
 .sp
 .nf
 .ft C
-mongoexport \-\-db users \-\-collection contacts \-\-type=csv \-\-fields name,address \-\-out /opt/backups/contacts.csv
+mongoexport \-\-db=users \-\-collection=contacts \-\-type=csv \-\-fields=name,address \-\-out=/opt/backups/contacts.csv
 .ft P
 .fi
 .UNINDENT
@@ -1340,7 +1422,7 @@ the file:
 .sp
 .nf
 .ft C
-mongoexport \-\-db users \-\-collection contacts \-\-type=csv \-\-fieldFile fields.txt \-\-out /opt/backups/contacts.csv
+mongoexport \-\-db=users \-\-collection=contacts \-\-type=csv \-\-fieldFile=fields.txt \-\-out=/opt/backups/contacts.csv
 .ft P
 .fi
 .UNINDENT
@@ -1360,7 +1442,7 @@ of the field names as the first line:
 .sp
 .nf
 .ft C
-mongoexport \-\-db users \-\-collection contacts \-\-type csv \-\-fields name,address \-\-noHeaderLine \-\-out /opt/backups/contacts.csv
+mongoexport \-\-db=users \-\-collection=contacts \-\-type=csv \-\-fields=name,address \-\-noHeaderLine \-\-out=/opt/backups/contacts.csv
 .ft P
 .fi
 .UNINDENT
@@ -1388,7 +1470,7 @@ writes the export to the \fBcontacts.json\fP file in JSON format.
 .sp
 .nf
 .ft C
-mongoexport \-\-db sales \-\-collection contacts \-\-out contacts.json
+mongoexport \-\-db=sales \-\-collection=contacts \-\-out=contacts.json
 .ft P
 .fi
 .UNINDENT
@@ -1429,7 +1511,7 @@ have \fBmongoexport\fP prompt for the password:
 .sp
 .nf
 .ft C
-mongoexport \-\-host mongodb1.example.net \-\-port 27017 \-\-username someUser \-\-authenticationDatabase admin \-\-collection contacts \-\-db marketing \-\-out mdb1\-examplenet.json
+mongoexport \-\-host=mongodb1.example.net \-\-port=27017 \-\-username=someUser \-\-authenticationDatabase=admin \-\-collection=contacts \-\-db=marketing \-\-out=mdb1\-examplenet.json
 .ft P
 .fi
 .UNINDENT
@@ -1449,7 +1531,7 @@ for the password:
 .sp
 .nf
 .ft C
-mongoexport \-\-uri \(aqmongodb://someUser@mongodb0.example.com:27017/marketing?authsource=admin\(aq \-\-collection contacts \-\-out mdb1\-examplenet.json
+mongoexport \-\-uri=\(aqmongodb://someUser@mongodb0.example.com:27017/marketing?authsource=admin\(aq \-\-collection=contacts \-\-out=mdb1\-examplenet.json
 .ft P
 .fi
 .UNINDENT
@@ -1463,14 +1545,14 @@ database using the "\fI\%\-\-db\fP" option.
 For instance, this command returns all documents in the \fBsales\fP
 database\(aqs \fBcontacts\fP collection that contain a field named \fBdept\fP
 equal to \fB"ABC"\fP and the field \fBdate\fP greater than or equal to
-ISODate("2018\-01\-01") (using the strict format for dates
+ISODate("2018\-01\-01") (using the canonical format for dates
 { "$date": "YYYY\-MM\-DDTHH:mm:ss.mmm<offset>"} )
 .INDENT 0.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-mongoexport \-\-db sales \-\-collection contacts \-\-query \(aq{"dept": "ABC", date: { $gte: { "$date": "2018\-01\-01T00:00:00.000Z" } }}\(aq
+mongoexport \-\-db=sales \-\-collection=contacts \-\-query=\(aq{"dept": "ABC", date: { $gte: { "$date": "2018\-01\-01T00:00:00.000Z" } }}\(aq
 .ft P
 .fi
 .UNINDENT

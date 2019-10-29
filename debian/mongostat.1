@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGOSTAT" "1" "Jul 25, 2019" "4.2" "mongodb-manual"
+.TH "MONGOSTAT" "1" "Oct 29, 2019" "4.2" "mongodb-manual"
 .SH NAME
 mongostat \- MongoDB Use Statistics
 .
@@ -35,6 +35,8 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .IP \(bu 2
 \fI\%Synopsis\fP
 .IP \(bu 2
+\fI\%Availability\fP
+.IP \(bu 2
 \fI\%Required Access\fP
 .IP \(bu 2
 \fI\%Behavior\fP
@@ -65,6 +67,28 @@ UNIX/Linux file system utility \fBvmstat\fP, but provides data regarding
 \fBmongod\fP and \fBmongos\fP instances.
 .sp
 Run \fI\%mongostat\fP from the system command line, not the \fBmongo\fP shell.
+.SH AVAILABILITY
+.sp
+The \fI\%mongostat\fP tool is part of the MongoDB tools package. Consult the
+installation guide for your platform for
+instructions on how to install the tools package as part of your
+MongoDB installation.
+.sp
+The tools package is also available from the
+\fI\%MongoDB Download Center\fP,
+either as a separate \fBtools\fP download, or contained within the
+\fBTGZ\fP or \fBZIP\fP downloads, depending on platform. On Windows, the \fBMSI\fP installer includes all tools as part of the default installation.
+.INDENT 0.0
+.INDENT 3.5
+.SH TIP
+.sp
+If downloading the \fBTGZ\fP or \fBZIP\fP files from the Download
+Center, you may want to update your \fBPATH\fP environment
+variable to include the directory where you installed these tools.
+See the installation guide
+for your platform for more information.
+.UNINDENT
+.UNINDENT
 .SH REQUIRED ACCESS
 .sp
 In order to connect to a \fBmongod\fP that enforces authorization
@@ -108,7 +132,7 @@ Returns the \fBmongostat\fP release number.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-uri <connectionString>
+.B \-\-uri=<connectionString>
 New in version 3.4.6.
 
 .sp
@@ -119,7 +143,7 @@ connection string (enclose in quotes) to connect to the MongoDB deployment.
 .sp
 .nf
 .ft C
-\-\-uri "mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]"
+\-\-uri="mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]"
 .ft P
 .fi
 .UNINDENT
@@ -165,7 +189,7 @@ connection string.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-host <hostname><:port>, \-h <hostname><:port>
+.B \-\-host=<hostname><:port>, \-h=<hostname><:port>
 \fIDefault\fP: localhost:27017
 .sp
 Specifies a resolvable hostname for the \fBmongod\fP to which to
@@ -180,7 +204,7 @@ members to report on, as in the following (see also the
 .sp
 .nf
 .ft C
-\-\-host <hostname1><:port>,<hostname2><:port>,<...>
+\-\-host=<hostname1><:port>,<hostname2><:port>,<...>
 .ft P
 .fi
 .UNINDENT
@@ -200,7 +224,7 @@ You cannot specify both \fI\%\-\-host\fP and \fI\%\-\-uri\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-port <port>
+.B \-\-port=<port>
 \fIDefault\fP: 27017
 .sp
 Specifies the TCP port on which the MongoDB instance listens for
@@ -238,7 +262,7 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sslCAFile <filename>
+.B \-\-sslCAFile=<filename>
 New in version 2.6.
 
 .sp
@@ -279,7 +303,7 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sslPEMKeyFile <filename>
+.B \-\-sslPEMKeyFile=<filename>
 New in version 2.6.
 
 .sp
@@ -298,18 +322,20 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sslPEMKeyPassword <value>
+.B \-\-sslPEMKeyPassword=<value>
 New in version 2.6.
 
 .sp
 Specifies the password to de\-crypt the certificate\-key file (i.e.
-\fI\%\-\-sslPEMKeyFile\fP). Use the \fI\%\-\-sslPEMKeyPassword\fP option only if the
-certificate\-key file is encrypted. In all cases, the \fBmongostat\fP will
-redact the password from all logging and reporting output.
+\fI\%\-\-sslPEMKeyFile\fP). Use the
+\fI\%\-\-sslPEMKeyPassword\fP option
+only if the certificate\-key file is encrypted. In all cases, the
+\fBmongostat\fP will redact the password from all logging and
+reporting output.
 .sp
-If the private key in the PEM file is encrypted and you do not specify
-the \fI\%\-\-sslPEMKeyPassword\fP option, the \fBmongostat\fP will prompt for a passphrase. See
-ssl\-certificate\-password\&.
+If the private key in the PEM file is encrypted and you do not
+specify the \fI\%\-\-sslPEMKeyPassword\fP option, the \fBmongostat\fP will prompt
+for a passphrase. See ssl\-certificate\-password\&.
 .sp
 For more information about TLS/SSL and MongoDB, see
 /tutorial/configure\-ssl and
@@ -317,7 +343,7 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sslCRLFile <filename>
+.B \-\-sslCRLFile=<filename>
 New in version 2.6.
 
 .sp
@@ -348,8 +374,6 @@ alias \fB\-\-tlsAllowInvalidateCertificates\fP or
 authentication, an invalid certificate is only sufficient to
 establish a TLS/SSL connection but is \fIinsufficient\fP for
 authentication.
-.sp
-# We created a separate blurb for tls in the ssl\-clients page.
 .sp
 \fBWARNING:\fP
 .INDENT 7.0
@@ -393,9 +417,10 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-username <username>, \-u <username>
-Specifies a username with which to authenticate to a MongoDB database
-that uses authentication. Use in conjunction with the \fI\%\-\-password\fP and
+.B \-\-username=<username>, \-u=<username>
+Specifies a username with which to authenticate to a MongoDB
+database that uses authentication. Use in conjunction with the
+\fI\%\-\-password\fP and
 \fI\%\-\-authenticationDatabase\fP options.
 .sp
 \fBNOTE:\fP
@@ -407,15 +432,15 @@ You cannot specify both \fI\%\-\-username\fP and \fI\%\-\-uri\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-password <password>, \-p <password>
-Specifies a password with which to authenticate to a MongoDB database
-that uses authentication. Use in conjunction with the \fI\%\-\-username\fP and
+.B \-\-password=<password>, \-p=<password>
+Specifies a password with which to authenticate to a MongoDB
+database that uses authentication. Use in conjunction with the
+\fI\%\-\-username\fP and
 \fI\%\-\-authenticationDatabase\fP options.
 .sp
-Changed in version 3.0.2: To prompt the user
-for the password, pass the \fI\%\-\-username\fP option without
-\fI\%\-\-password\fP or specify an empty string as the \fI\%\-\-password\fP value,
-as in \fB\-\-password ""\fP .
+Changed in version 3.0.2: To prompt the user for the password, pass the \fI\%\-\-username\fP option without \fI\%\-\-password\fP or
+specify an empty string as the \fI\%\-\-password\fP value, as in
+\fB\-\-password=""\fP .
 
 .sp
 \fBNOTE:\fP
@@ -427,9 +452,10 @@ You cannot specify both \fI\%\-\-password\fP and \fI\%\-\-uri\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-authenticationDatabase <dbname>
-Specifies the authentication database where the specified \fI\%\-\-username\fP has been created.
-See user\-authentication\-database\&.
+.B \-\-authenticationDatabase=<dbname>
+Specifies the authentication database where the specified
+\fI\%\-\-username\fP has been created. See
+user\-authentication\-database\&.
 .sp
 \fBNOTE:\fP
 .INDENT 7.0
@@ -443,7 +469,7 @@ and \fBmongos\fP instances that use authentication\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-authenticationMechanism <name>
+.B \-\-authenticationMechanism=<name>
 \fIDefault\fP: SCRAM\-SHA\-1
 .sp
 Specifies the authentication mechanism the \fBmongostat\fP instance uses to
@@ -518,7 +544,7 @@ You cannot specify both \fI\%\-\-authenticationMechanism\fP and \fI\%\-\-uri\fP\
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-gssapiServiceName
+.B \-\-gssapiServiceName=<string>
 New in version 2.6.
 
 .sp
@@ -529,7 +555,7 @@ This option is available only in MongoDB Enterprise.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-gssapiHostName
+.B \-\-gssapiHostName=<string>
 New in version 2.6.
 
 .sp
@@ -540,7 +566,7 @@ This option is available only in MongoDB Enterprise.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-humanReadable boolean
+.B \-\-humanReadable=<boolean>
 \fIDefault\fP: True
 .sp
 New in version 3.4.
@@ -582,7 +608,7 @@ insert query update delete getmore command dirty used flushes      vsize       r
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-o <field list>
+.B \-o=<field list>
 New in version 3.4.
 
 .sp
@@ -600,7 +626,7 @@ as in:
 .sp
 .nf
 .ft C
-mongostat \-o \(aqhost=H,time=T,version=MongoDB Version\(aq
+mongostat \-o=\(aqhost=H,time=T,version=MongoDB Version\(aq
 .ft P
 .fi
 .UNINDENT
@@ -639,7 +665,7 @@ See \fI\%Specify mongostat Output Fields\fP for an example of
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-O <field list>
+.B \-O=<field list>
 New in version 3.4.
 
 .sp
@@ -657,14 +683,14 @@ as in:
 .sp
 .nf
 .ft C
-mongostat \-O host=H,time=T
+mongostat \-O=host=H,time=T
 .ft P
 .fi
 .UNINDENT
 .UNINDENT
 .sp
-\fBmongostat\fP supports specifying \fIeither\fP \fI\%\-O\fP or \fI\%\-o\fP:
-you cannot include both options.
+\fBmongostat\fP supports specifying \fIeither\fP \fI\%\-O\fP or \fI\%\-o\fP: you cannot include
+both options.
 .sp
 See \fI\%Add Fields to mongostat Output\fP for an example of
 \fI\%\-O\fP\&.
@@ -676,7 +702,7 @@ Disables the output of column or field names.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-rowcount <number>, \-n <number>
+.B \-\-rowcount=<number>, \-n=<number>
 Controls the number of rows to output. Use in conjunction with
 the \fBsleeptime\fP argument to control the duration of a
 \fI\%mongostat\fP operation.
@@ -959,10 +985,10 @@ behavior:
 .sp
 .nf
 .ft C
-mongostat \-\-rowcount 20 1
-mongostat \-\-rowcount 20
-mongostat \-n 20 1
-mongostat \-n 20
+mongostat \-\-rowcount=20 1
+mongostat \-\-rowcount=20
+mongostat \-n=20 1
+mongostat \-n=20
 .ft P
 .fi
 .UNINDENT
@@ -978,8 +1004,8 @@ invocations produce identical behavior:
 .sp
 .nf
 .ft C
-mongostat \-\-rowcount 0 300
-mongostat \-n 0 300
+mongostat \-\-rowcount=0 300
+mongostat \-n=0 300
 mongostat 300
 .ft P
 .fi
@@ -996,8 +1022,8 @@ behavior:
 .sp
 .nf
 .ft C
-mongostat \-\-rowcount 12 300
-mongostat \-n 12 300
+mongostat \-\-rowcount=12 300
+mongostat \-n=12 300
 .ft P
 .fi
 .UNINDENT
@@ -1018,7 +1044,7 @@ which will display as "network requests", to the default
 .sp
 .nf
 .ft C
-mongostat \-O \(aqhost,version,network.numRequests=network requests\(aq
+mongostat \-O=\(aqhost,version,network.numRequests=network requests\(aq
 .ft P
 .fi
 .UNINDENT
@@ -1052,7 +1078,7 @@ output. You can specify any \fBserverStatus\fP field as a
 .sp
 .nf
 .ft C
-mongostat \-o \(aqhost,time,metrics.document.inserted\(aq
+mongostat \-o=\(aqhost,time,metrics.document.inserted\(aq
 .ft P
 .fi
 .UNINDENT
@@ -1094,7 +1120,7 @@ to label \fBmetrics.document.inserted.rate()\fP as "inserted rate" and
 .sp
 .nf
 .ft C
-mongostat \-o \(aqhost,mem,bits,metrics.document.inserted.rate()=inserted rate,metrics.document.inserted=inserted\(aq \-\-rowcount 5
+mongostat \-o=\(aqhost,mem,bits,metrics.document.inserted.rate()=inserted rate,metrics.document.inserted=inserted\(aq \-\-rowcount=5
 .ft P
 .fi
 .UNINDENT
@@ -1134,7 +1160,7 @@ calls, while \fBinserted\fP is the value of
 .sp
 .nf
 .ft C
-mongostat \-o \(aqhost,mem.bits,metrics.document.inserted.diff()=inserted diff,metrics.document.inserted=inserted\(aq \-\-rowcount 5
+mongostat \-o=\(aqhost,mem.bits,metrics.document.inserted.diff()=inserted diff,metrics.document.inserted=inserted\(aq \-\-rowcount=5
 .ft P
 .fi
 .UNINDENT

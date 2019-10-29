@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGOFILES" "1" "Jul 25, 2019" "4.2" "mongodb-manual"
+.TH "MONGOFILES" "1" "Oct 29, 2019" "4.2" "mongodb-manual"
 .SH NAME
 mongofiles \- MongoDB GridFS Utility
 .
@@ -34,6 +34,8 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .INDENT 0.0
 .IP \(bu 2
 \fI\%Synopsis\fP
+.IP \(bu 2
+\fI\%Availability\fP
 .IP \(bu 2
 \fI\%Required Access\fP
 .IP \(bu 2
@@ -93,6 +95,28 @@ Run \fI\%mongofiles\fP from the system command line, not the \fBmongo\fP shell.
 For replica sets,
 \fI\%mongofiles\fP can only read from the set\(aqs
 primary\&.
+.UNINDENT
+.UNINDENT
+.SH AVAILABILITY
+.sp
+The \fI\%mongofiles\fP tool is part of the MongoDB tools package. Consult the
+installation guide for your platform for
+instructions on how to install the tools package as part of your
+MongoDB installation.
+.sp
+The tools package is also available from the
+\fI\%MongoDB Download Center\fP,
+either as a separate \fBtools\fP download, or contained within the
+\fBTGZ\fP or \fBZIP\fP downloads, depending on platform. On Windows, the \fBMSI\fP installer includes all tools as part of the default installation.
+.INDENT 0.0
+.INDENT 3.5
+.SH TIP
+.sp
+If downloading the \fBTGZ\fP or \fBZIP\fP files from the Download
+Center, you may want to update your \fBPATH\fP environment
+variable to include the directory where you installed these tools.
+See the installation guide
+for your platform for more information.
 .UNINDENT
 .UNINDENT
 .SH REQUIRED ACCESS
@@ -185,7 +209,7 @@ Returns the \fBmongofiles\fP release number.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-uri <connectionString>
+.B \-\-uri=<connectionString>
 New in version 3.4.6.
 
 .sp
@@ -196,7 +220,7 @@ connection string (enclose in quotes) to connect to the MongoDB deployment.
 .sp
 .nf
 .ft C
-\-\-uri "mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]"
+\-\-uri="mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]"
 .ft P
 .fi
 .UNINDENT
@@ -244,7 +268,7 @@ connection string.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-host <hostname><:port>
+.B \-\-host=<hostname><:port>
 Specifies a resolvable hostname for the \fBmongod\fP that holds
 your GridFS system. By default \fI\%mongofiles\fP attempts to connect
 to a MongoDB process running on the localhost port number \fB27017\fP\&.
@@ -261,7 +285,7 @@ You cannot specify both \fI\%\-\-host\fP and \fI\%\-\-uri\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-port <port>
+.B \-\-port=<port>
 \fIDefault\fP: 27017
 .sp
 Specifies the TCP port on which the MongoDB instance listens for
@@ -299,7 +323,7 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sslCAFile <filename>
+.B \-\-sslCAFile=<filename>
 New in version 2.6.
 
 .sp
@@ -340,7 +364,7 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sslPEMKeyFile <filename>
+.B \-\-sslPEMKeyFile=<filename>
 New in version 2.6.
 
 .sp
@@ -359,7 +383,7 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sslPEMKeyPassword <value>
+.B \-\-sslPEMKeyPassword=<value>
 New in version 2.6.
 
 .sp
@@ -378,7 +402,7 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sslCRLFile <filename>
+.B \-\-sslCRLFile=<filename>
 New in version 2.6.
 
 .sp
@@ -409,8 +433,6 @@ alias \fB\-\-tlsAllowInvalidateCertificates\fP or
 authentication, an invalid certificate is only sufficient to
 establish a TLS/SSL connection but is \fIinsufficient\fP for
 authentication.
-.sp
-# We created a separate blurb for tls in the ssl\-clients page.
 .sp
 \fBWARNING:\fP
 .INDENT 7.0
@@ -454,7 +476,7 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-username <username>, \-u <username>
+.B \-\-username=<username>, \-u=<username>
 Specifies a username with which to authenticate to a MongoDB database
 that uses authentication. Use in conjunction with the \fI\%\-\-password\fP and
 \fI\%\-\-authenticationDatabase\fP options.
@@ -468,7 +490,7 @@ You cannot specify both \fI\%\-\-username\fP and \fI\%\-\-uri\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-password <password>, \-p <password>
+.B \-\-password=<password>, \-p=<password>
 Specifies a password with which to authenticate to a MongoDB database
 that uses authentication. Use in conjunction with the \fI\%\-\-username\fP and
 \fI\%\-\-authenticationDatabase\fP options.
@@ -488,7 +510,7 @@ You cannot specify both \fI\%\-\-password\fP and \fI\%\-\-uri\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-authenticationDatabase <dbname>
+.B \-\-authenticationDatabase=<dbname>
 Specifies the authentication database where the specified \fI\%\-\-username\fP has been created.
 See user\-authentication\-database\&.
 .sp
@@ -501,7 +523,7 @@ You cannot specify both \fI\%\-\-authenticationDatabase\fP and \fI\%\-\-uri\fP\&
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-authenticationMechanism <name>
+.B \-\-authenticationMechanism=<name>
 \fIDefault\fP: SCRAM\-SHA\-1
 .sp
 Specifies the authentication mechanism the \fBmongofiles\fP instance uses to
@@ -576,7 +598,7 @@ You cannot specify both \fI\%\-\-authenticationMechanism\fP and \fI\%\-\-uri\fP\
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-gssapiServiceName
+.B \-\-gssapiServiceName=<serviceName>
 New in version 2.6.
 
 .sp
@@ -587,7 +609,7 @@ This option is available only in MongoDB Enterprise.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-gssapiHostName
+.B \-\-gssapiHostName=<hostname>
 New in version 2.6.
 
 .sp
@@ -598,7 +620,7 @@ This option is available only in MongoDB Enterprise.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-db <database>, \-d <database>
+.B \-\-db=<database>, \-d=<database>
 Specifies the name of the database on which to run the \fBmongofiles\fP\&.
 .sp
 \fBNOTE:\fP
@@ -610,7 +632,7 @@ You cannot specify both \fI\%\-\-db\fP and \fI\%\-\-uri\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-local <filename>, \-l <filename>
+.B \-\-local=<filename>, \-l=<filename>
 Specifies the local filesystem name of a file for get and put
 operations.
 .sp
@@ -622,7 +644,7 @@ default.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-type <MIME>
+.B \-\-type=<MIME>
 Provides the ability to specify a MIME type to describe the file
 inserted into GridFS storage. \fI\%mongofiles\fP omits this option in
 the default operation.
@@ -641,14 +663,14 @@ In the default operation, files will not be overwritten by a
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-prefix string
+.B \-\-prefix=<string>
 \fIDefault\fP: fs
 .sp
 GridFS prefix to use.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-writeConcern <document>
+.B \-\-writeConcern=<document>
 \fIDefault\fP: majority
 .sp
 Specifies the write concern for each write operation that \fBmongofiles\fP
@@ -660,7 +682,7 @@ Specify the write concern as a document with w options:
 .sp
 .nf
 .ft C
-\-\-writeConcern "{w:\(aqmajority\(aq}"
+\-\-writeConcern="{w:\(aqmajority\(aq}"
 .ft P
 .fi
 .UNINDENT
@@ -673,7 +695,7 @@ the URI string.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-readPreference <string|document>
+.B \-\-readPreference=<string|document>
 \fIDefault\fP: \fBprimary\fP
 .sp
 Specifies the read preference for
@@ -686,7 +708,7 @@ A string if specifying only the read preference mode:
 .sp
 .nf
 .ft C
-\-\-readPreference secondary
+\-\-readPreference=secondary
 .ft P
 .fi
 .UNINDENT
@@ -700,7 +722,7 @@ optional maxStalenessSeconds:
 .sp
 .nf
 .ft C
-\-\-readPreference \(aq{mode: "secondary", tagSets: [ { "region": "east" } ], maxStalenessSeconds: 120}\(aq
+\-\-readPreference=\(aq{mode: "secondary", tagSets: [ { "region": "east" } ], maxStalenessSeconds: 120}\(aq
 .ft P
 .fi
 .UNINDENT
@@ -767,14 +789,25 @@ different location for the file on the local file system, use the
 .UNINDENT
 .INDENT 0.0
 .TP
-.B get_id "<ObjectId>"
+.B get_id "<_id>"
 New in version 3.2.0.
 
 .sp
-Copy the specified file from GridFS storage to the local file system.
+Copy the file, specified by its \fB<_id>\fP, from GridFS storage to the
+local file system.
 .sp
-Here \fB<ObjectId>\fP refers to the extended JSON \fB_id\fP of the
-object in GridFS. \fI\%mongofiles\fP writes the file to the local
+Here \fB<_id>\fP refers to the extended JSON \fB_id\fP of the
+object in GridFS:
+.INDENT 7.0
+.IP \(bu 2
+Starting in MongoDB 4.2, \fBget_id\fP can accept either ObjectId
+values or non\-ObjectId values for \fB<_id>\fP\&.
+.IP \(bu 2
+In MongoDB 4.0 and earlier, \fBget_id\fP only
+accepts \fB<ObjectId>\fP values.
+.UNINDENT
+.sp
+\fI\%mongofiles\fP writes the file to the local
 file system using the file\(aqs \fBfilename\fP in GridFS. To choose a
 different location for the file on the local file system, use the
 \fI\%\-\-local\fP option.
@@ -786,12 +819,19 @@ Delete the specified file from GridFS storage.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B delete_id "<ObjectId>"
+.B delete_id "<_id>"
 New in version 3.2.0.
 
 .sp
-Delete the specified file from GridFS storage. Specify the file using
-its \fB_id\fP\&.
+Delete the file, specified by its \fB<_id>\fP, from GridFS storage:
+.INDENT 7.0
+.IP \(bu 2
+Starting in MongoDB 4.2, \fBdelete_id\fP can accept
+either ObjectId values or non\-ObjectId values for \fB<_id>\fP\&.
+.IP \(bu 2
+In MongoDB 4.0 and earlier, \fBdelete_id\fP only
+accepts \fB<ObjectId>\fP values.
+.UNINDENT
 .UNINDENT
 .SH EXAMPLES
 .sp
@@ -802,7 +842,7 @@ To return a list of all files in a GridFS collection in the
 .sp
 .nf
 .ft C
-mongofiles \-d records list
+mongofiles \-d=records list
 .ft P
 .fi
 .UNINDENT
@@ -817,9 +857,9 @@ hostname, and issue a command that resembles one of the following:
 .sp
 .nf
 .ft C
-mongofiles \-\-port 37017 \-d records list
-mongofiles \-\-host db1.example.net \-d records list
-mongofiles \-\-host db1.example.net \-\-port 37017 \-d records list
+mongofiles \-\-port=37017 \-d=records list
+mongofiles \-\-host=db1.example.net \-d=records list
+mongofiles \-\-host=db1.example.net \-\-port=37017 \-d=records list
 .ft P
 .fi
 .UNINDENT
@@ -835,7 +875,7 @@ the \fBrecords\fP database, you can use the following command:
 .sp
 .nf
 .ft C
-mongofiles \-d records put 32\-corinth.lp
+mongofiles \-d=records put 32\-corinth.lp
 .ft P
 .fi
 .UNINDENT
@@ -848,7 +888,7 @@ the \fBrecords\fP database, you can use the following command:
 .sp
 .nf
 .ft C
-mongofiles \-d records delete 32\-corinth.lp
+mongofiles \-d=records delete 32\-corinth.lp
 .ft P
 .fi
 .UNINDENT
@@ -862,7 +902,7 @@ following command:
 .sp
 .nf
 .ft C
-mongofiles \-d records search corinth
+mongofiles \-d=records search corinth
 .ft P
 .fi
 .UNINDENT
@@ -875,7 +915,7 @@ that begin with the string \fB32\fP, you can use the following command:
 .sp
 .nf
 .ft C
-mongofiles \-d records list 32
+mongofiles \-d=records list 32
 .ft P
 .fi
 .UNINDENT
@@ -888,7 +928,7 @@ database named \fB32\-corinth.lp\fP, you can use the following command:
 .sp
 .nf
 .ft C
-mongofiles \-d records get 32\-corinth.lp
+mongofiles \-d=records get 32\-corinth.lp
 .ft P
 .fi
 .UNINDENT
@@ -902,7 +942,7 @@ the following command:
 .sp
 .nf
 .ft C
-mongofiles \-d records get_id \(aqObjectId("56feac751f417d0357e7140f")\(aq
+mongofiles \-d=records get_id \(aqObjectId("56feac751f417d0357e7140f")\(aq
 .ft P
 .fi
 .UNINDENT

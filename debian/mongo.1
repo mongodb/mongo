@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGO" "1" "Jul 25, 2019" "4.2" "mongodb-manual"
+.TH "MONGO" "1" "Oct 29, 2019" "4.2" "mongodb-manual"
 .SH NAME
 mongo \- MongoDB Shell
 .
@@ -54,14 +54,41 @@ MongoDB, which provides a powerful interface for system
 administrators as well as a way for developers to test queries and
 operations directly with the database. \fI\%mongo\fP also provides
 a fully functional JavaScript environment for use with a MongoDB.
-The \fI\%mongo\fP shell is part of the \fI\%MongoDB distributions\fP\&.
+.sp
+The \fI\%mongo\fP shell is included as part of the MongoDB Server installation. MongoDB also provides the \fI\%mongo\fP
+shell as a standalone package. To download the standalone \fI\%mongo\fP
+shell package:
+.INDENT 0.0
+.IP 1. 3
+Open the \fI\%Download Center\fP\&. For the
+\fI\%mongo\fP Enterprise Shell, select the
+MongoDB Enterprise Server tab.
+.IP 2. 3
+Select your preferred Version and OS from the
+dropdowns.
+.IP 3. 3
+Select \fBShell\fP from the Package dropdown and click
+Download to start downloading the package.
+.sp
+If the \fBShell\fP option is unavailable for the selected OS and
+Version, contact MongoDB technical\-support for assistance.
+.UNINDENT
 .sp
 \fBNOTE:\fP
 .INDENT 0.0
 .INDENT 3.5
+.INDENT 0.0
+.IP \(bu 2
+Starting in MongoDB 4.2 (and 4.0.13), the \fI\%mongo\fP shell displays a
+warning message when connected to non\-genuine MongoDB instances as
+these instances may behave differently from the official MongoDB
+instances; e.g. missing or incomplete features, different feature
+behaviors, etc.
+.IP \(bu 2
 Starting in version 4.0, \fI\%mongo\fP disables support for TLS 1.0
 encryption on systems where TLS 1.1+ is available. For
 more details, see 4.0\-disable\-tls\&.
+.UNINDENT
 .UNINDENT
 .UNINDENT
 .SH SYNTAX
@@ -587,6 +614,15 @@ default name of \fBmongodb\fP\&.
 This option is available only in MongoDB Enterprise.
 .UNINDENT
 .SS TLS Options
+.sp
+\fBNOTE:\fP
+.INDENT 0.0
+.INDENT 3.5
+Starting in version 4.0, \fI\%mongo\fP disables support for TLS 1.0
+encryption on systems where TLS 1.1+ is available. For
+more details, see 4.0\-disable\-tls\&.
+.UNINDENT
+.UNINDENT
 .INDENT 0.0
 .INDENT 3.5
 .SS See
@@ -745,8 +781,6 @@ authentication.
 .UNINDENT
 .UNINDENT
 .sp
-# We created a separate blurb for tls in the ssl\-clients page.
-.sp
 \fBWARNING:\fP
 .INDENT 7.0
 .INDENT 3.5
@@ -881,6 +915,15 @@ disabled TLS 1.0, specify \fBnone\fP to \fI\%\-\-tlsDisabledProtocols\fP\&.  See
 Starting in version 4.2, the SSL options are deprecated. Use the TLS
 counterparts instead. The SSL protocol is deprecated and MongoDB
 supports TLS 1.0 and later.
+.UNINDENT
+.UNINDENT
+.sp
+\fBNOTE:\fP
+.INDENT 0.0
+.INDENT 3.5
+Starting in version 4.0, \fI\%mongo\fP disables support for TLS 1.0
+encryption on systems where TLS 1.1+ is available. For
+more details, see 4.0\-disable\-tls\&.
 .UNINDENT
 .UNINDENT
 .INDENT 0.0
@@ -1085,8 +1128,6 @@ authentication.
 .UNINDENT
 .UNINDENT
 .sp
-# We created a separate blurb for tls in the ssl\-clients page.
-.sp
 \fBWARNING:\fP
 .INDENT 7.0
 .INDENT 3.5
@@ -1170,6 +1211,98 @@ Enables retryable writes as the default for sessions in the
 \fI\%mongo\fP shell.
 .sp
 For more information on sessions, see sessions\&.
+.UNINDENT
+.SS Client\-Side Field Level Encryption Options
+.INDENT 0.0
+.TP
+.B \-\-awsAccessKeyId <string>
+An AWS \fI\%Access Key\fP
+associated to an IAM user with \fBList\fP and \fBRead\fP permissions for the
+AWS Key Management Service (KMS). The \fBmongo\fP shell uses the specified
+\fI\%\-\-awsAccessKeyId\fP to access the KMS.
+.sp
+\fI\%\-\-awsAccessKeyId\fP is required for enabling /core/security\-client\-side\-encryption
+for the \fBmongo\fP shell session. \fI\%\-\-awsAccessKeyId\fP requires \fIall\fP of the following
+command line options:
+.INDENT 7.0
+.IP \(bu 2
+\fI\%\-\-awsSecretAccessKey\fP
+.IP \(bu 2
+\fI\%\-\-keyVaultNamespace\fP
+.UNINDENT
+.sp
+If \fI\%\-\-awsAccessKeyId\fP is omitted, use the \fBMongo()\fP constructor within the shell
+session to enable client\-side field level encryption.
+.sp
+To mitigate the risk of leaking access keys into logs, consider specifying
+an environmental variable to \fI\%\-\-awsAccessKeyId\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-awsSecretAccessKey <string>
+An AWS \fI\%Secret Key\fP
+associated to the specified \fI\%\-\-awsAccessKeyId\fP\&.
+.sp
+\fI\%\-\-awsSecretAccessKey\fP is required for enabling /core/security\-client\-side\-encryption
+for the \fBmongo\fP shell session. \fI\%\-\-awsSecretAccessKey\fP requires \fIall\fP of the following
+command line options:
+.INDENT 7.0
+.IP \(bu 2
+\fI\%\-\-awsAccessKeyId\fP
+.IP \(bu 2
+\fI\%\-\-keyVaultNamespace\fP
+.UNINDENT
+.sp
+If \fI\%\-\-awsSecretAccessKey\fP and its supporting options are omitted, use \fBMongo()\fP
+within the shell session to enable client\-side field level encryption.
+.sp
+To mitigate the risk of leaking access keys into logs, consider specifying
+an environmental variable to \fI\%\-\-awsSecretAccessKey\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-awsSessionToken <string>
+An AWS \fI\%Session Token\fP
+associated to the specified \fI\%\-\-awsAccessKeyId\fP\&.
+.sp
+\fI\%\-\-awsSessionToken\fP is required for enabling /core/security\-client\-side\-encryption
+for the \fBmongo\fP shell session. \fI\%\-\-awsSessionToken\fP requires \fIall\fP of the following
+command line options:
+.INDENT 7.0
+.IP \(bu 2
+\fI\%\-\-awsAccessKeyId\fP
+.IP \(bu 2
+\fI\%\-\-awsSecretAccessKey\fP
+.IP \(bu 2
+\fI\%\-\-keyVaultNamespace\fP
+.UNINDENT
+.sp
+If \fI\%\-\-awsSessionToken\fP and its supporting options are omitted, use \fBMongo()\fP
+within the shell session to enable client\-side field level encryption.
+.sp
+To mitigate the risk of leaking access keys into logs, consider specifying
+an environmental variable to \fI\%\-\-awsSessionToken\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-keyVaultNamespace <string>
+The full namespace (\fB<database>.<collection>\fP) of the collection used as a
+key vault for /core/security\-client\-side\-encryption\&. \fI\%\-\-keyVaultNamespace\fP is
+required for enabling client\-side field level encryption. for the \fBmongo\fP
+shell session. \fBmongo\fP creates the specified namespace if it does not
+exist.
+.sp
+\fI\%\-\-keyVaultNamespace\fP requires \fIall\fP of the following command line options:
+.INDENT 7.0
+.IP \(bu 2
+\fI\%\-\-awsAccessKeyId\fP
+.IP \(bu 2
+\fI\%\-\-awsSecretAccessKey\fP
+.UNINDENT
+.sp
+If \fI\%\-\-keyVaultNamespace\fP and its supporting options are omitted, use the \fBMongo()\fP
+constructor within the shell session to enable client\-side field level
+encryption.
 .UNINDENT
 .SH FILES
 .INDENT 0.0
@@ -1650,10 +1783,23 @@ mongo script\-file.js \-u <user> \-p
 .fi
 .UNINDENT
 .UNINDENT
-.SS Use \fI\%\-\-eval\fP to Print Query Results as JSON
 .sp
-To print return a query as JSON, from the system prompt using
-the \fI\%\-\-eval\fP option, use the following form:
+\fBSEE ALSO:\fP
+.INDENT 0.0
+.INDENT 3.5
+\fBisInteractive()\fP
+.UNINDENT
+.UNINDENT
+.SS Use \fI\%\-\-eval\fP to Execute JavaScript Code
+.sp
+You may use the \fI\%\-\-eval\fP option to execute
+JavaScript directly from the command line.
+.sp
+For example, the following operation evaluates a JavaScript string
+which queries a collection and prints the results as JSON.
+.sp
+On Linux and macOS, you will need to use single quotes (e.g. \fB\(aq\fP)
+to enclose the JavaScript, using the following form:
 .INDENT 0.0
 .INDENT 3.5
 .sp
@@ -1665,8 +1811,18 @@ mongo \-\-eval \(aqdb.collection.find().forEach(printjson)\(aq
 .UNINDENT
 .UNINDENT
 .sp
-Use single quotes (e.g. \fB\(aq\fP) to enclose the JavaScript, as well as
-the additional JavaScript required to generate this output.
+On Windows, you will need to use double quotes (e.g. \fB"\fP)
+to enclose the JavaScript, using the following form:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongo \-\-eval "db.collection.find().forEach(printjson)"
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
 .sp
 \fBSEE ALSO:\fP
 .INDENT 0.0
@@ -1678,6 +1834,8 @@ the additional JavaScript required to generate this output.
 /reference/method
 .IP \(bu 2
 /mongo
+.IP \(bu 2
+\fBisInteractive()\fP
 .UNINDENT
 .UNINDENT
 .UNINDENT
