@@ -178,6 +178,12 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
             Value(static_cast<long long>(*opCtx->getTxnNumber()));
     }
 
+    // TODO (SERVER-43361): We set this flag to indicate to the shards that the mongos will be able
+    // to understand change stream sort keys in the new format. After branching for 4.5, there will
+    // only be one sort key format for changes streams, so there will be no need to set this flag
+    // anymore. This flag has no effect on pipelines without a change stream.
+    cmdForShards[AggregationRequest::kUse44SortKeys] = Value(true);
+
     return appendAllowImplicitCreate(cmdForShards.freeze().toBson(), false);
 }
 

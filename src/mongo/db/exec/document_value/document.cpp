@@ -383,35 +383,14 @@ void DocumentStorage::loadLazyMetadata() const {
             } else if (fieldName == Document::metaFieldSortKey) {
                 auto bsonSortKey = elem.Obj();
 
-                bool isSingleElementKey = false;
-
+                // If the sort key has exactly one field, we say it is a "single element key."
                 BSONObjIterator sortKeyIt(bsonSortKey);
                 uassert(31282, "Empty sort key in metadata", sortKeyIt.more());
-                auto firstElementName = sortKeyIt.next().fieldNameStringData();
+                bool isSingleElementKey = !(++sortKeyIt).more();
 
-                // If the sort key has exactly one field, we say it is a "single element key."
-                boost::optional<StringData> secondElementName;
-                if (!sortKeyIt.more()) {
-                    isSingleElementKey = true;
-                } else {
-                    secondElementName = sortKeyIt.next().fieldNameStringData();
-                }
-
-                // If the sort key looks like {_data: ...} or {_data: ..., _typeBits: ...}, we know
-                // that it came from a change stream, and we also treat it as a "single element
-                // key."
-                if (!sortKeyIt.more() && (firstElementName == ResumeToken::kDataFieldName) &&
-                    (!secondElementName || secondElementName == ResumeToken::kTypeBitsFieldName)) {
-                    // TODO (SERVER-43361): In 4.2 and earlier, the "sort key" for a change stream
-                    // document gets serialized differently than sort keys for normal pipeline
-                    // documents.
-                    isSingleElementKey = true;
-                    _metadataFields.setSortKey(Value(bsonSortKey), isSingleElementKey);
-                } else {
-                    _metadataFields.setSortKey(
-                        DocumentMetadataFields::deserializeSortKey(isSingleElementKey, bsonSortKey),
-                        isSingleElementKey);
-                }
+                _metadataFields.setSortKey(
+                    DocumentMetadataFields::deserializeSortKey(isSingleElementKey, bsonSortKey),
+                    isSingleElementKey);
             } else if (fieldName == Document::metaFieldGeoNearDistance) {
                 _metadataFields.setGeoNearDistance(elem.Double());
             } else if (fieldName == Document::metaFieldGeoNearPoint) {

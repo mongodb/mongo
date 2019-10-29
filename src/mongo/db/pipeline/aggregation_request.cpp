@@ -48,20 +48,6 @@
 
 namespace mongo {
 
-constexpr StringData AggregationRequest::kCommandName;
-constexpr StringData AggregationRequest::kCursorName;
-constexpr StringData AggregationRequest::kBatchSizeName;
-constexpr StringData AggregationRequest::kFromMongosName;
-constexpr StringData AggregationRequest::kNeedsMergeName;
-constexpr StringData AggregationRequest::kPipelineName;
-constexpr StringData AggregationRequest::kCollationName;
-constexpr StringData AggregationRequest::kExplainName;
-constexpr StringData AggregationRequest::kAllowDiskUseName;
-constexpr StringData AggregationRequest::kHintName;
-constexpr StringData AggregationRequest::kExchangeName;
-
-constexpr long long AggregationRequest::kDefaultBatchSize;
-
 StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
     const std::string& dbName,
     const BSONObj& cmdObj,
@@ -215,6 +201,18 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
             // 4.4 upgrade purposes, since a 4.2 mongoS will always send {mergeByPBRT:true} to the
             // shards. We do nothing with it because mergeByPBRT is the only mode available in 4.4.
             // Remove this final vestige of mergeByPBRT during the 4.5 development cycle.
+        } else if (fieldName == kUse44SortKeys) {
+            // TODO (SERVER-43361): After branching for 4.5, we will accept this option but ignore
+            // it, as we will be able to assume that any supported mongoS will be recent enough to
+            // understand the 4.4 sort key format. In the version that follows, we will be able to
+            // completely remove this option.
+            if (elem.type() != BSONType::Bool) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream() << kUse44SortKeys << " must be a boolean, not a "
+                                      << typeName(elem.type())};
+            }
+
+            request.setUse44SortKeys(elem.boolean());
         } else if (!isGenericArgument(fieldName)) {
             return {ErrorCodes::FailedToParse,
                     str::stream() << "unrecognized field '" << elem.fieldName() << "'"};
@@ -313,6 +311,7 @@ Document AggregationRequest::serializeToCommandObj() const {
          _writeConcern ? Value(_writeConcern->toBSON()) : Value()},
         // Only serialize runtime constants if any were specified.
         {kRuntimeConstants, _runtimeConstants ? Value(_runtimeConstants->toBSON()) : Value()},
+        {kUse44SortKeys, _use44SortKeys ? Value(true) : Value()},
     };
 }
 }  // namespace mongo

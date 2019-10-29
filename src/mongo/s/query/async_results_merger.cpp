@@ -192,7 +192,10 @@ BSONObj AsyncResultsMerger::getHighWaterMark() {
     stdx::lock_guard<Latch> lk(_mutex);
     auto minPromisedSortKey = _getMinPromisedSortKey(lk);
     if (!minPromisedSortKey.isEmpty() && !_ready(lk)) {
-        _highWaterMark = minPromisedSortKey;
+        // When 'minPromisedSortKey' contains the "high watermark" resume token, it's stored in
+        // sort-key format: {"": <high watermark>}. We copy the <high watermark> part of of the
+        // sort key, which looks like {_data: ..., _typeBits: ...}, and return that.
+        _highWaterMark = minPromisedSortKey.firstElement().Obj().getOwned();
     }
     return _highWaterMark;
 }
@@ -519,8 +522,10 @@ void AsyncResultsMerger::_updateRemoteMetadata(WithLock,
         invariant(!response.getPostBatchResumeToken()->isEmpty());
 
         // The most recent minimum sort key should never be smaller than the previous promised
-        // minimum sort key for this remote, if one exists.
-        auto newMinSortKey = *response.getPostBatchResumeToken();
+        // minimum sort key for this remote, if one exists. Note that the post-batch resume token is
+        // an object (with format {_data: ..., _typeBits: ...}) that we must wrap in a sort key so
+        // that it can compare correctly with sort keys from other streams.
+        auto newMinSortKey = BSON("" << *response.getPostBatchResumeToken());
         if (auto& oldMinSortKey = remote.promisedMinSortKey) {
             invariant(compareSortKeys(newMinSortKey, *oldMinSortKey, *_params.getSort()) >= 0);
             invariant(_promisedMinSortKeys.size() <= _remotes.size());

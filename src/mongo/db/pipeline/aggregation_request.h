@@ -63,6 +63,7 @@ public:
     static constexpr StringData kHintName = "hint"_sd;
     static constexpr StringData kExchangeName = "exchange"_sd;
     static constexpr StringData kRuntimeConstants = "runtimeConstants"_sd;
+    static constexpr StringData kUse44SortKeys = "use44SortKeys"_sd;
 
     static constexpr long long kDefaultBatchSize = 101;
 
@@ -216,6 +217,10 @@ public:
         return _runtimeConstants;
     }
 
+    bool getUse44SortKeys() const {
+        return _use44SortKeys;
+    }
+
     //
     // Setters for optional fields.
     //
@@ -280,6 +285,10 @@ public:
         _runtimeConstants = std::move(runtimeConstants);
     }
 
+    void setUse44SortKeys(bool use44SortKeys) {
+        _use44SortKeys = use44SortKeys;
+    }
+
 private:
     // Required fields.
     const NamespaceString _nss;
@@ -329,5 +338,9 @@ private:
     // A document containing runtime constants; i.e. values that do not change once computed (e.g.
     // $$NOW).
     boost::optional<RuntimeConstants> _runtimeConstants;
+
+    // All aggregation requests from mongos-4.4 set this flag, indicating that shard results should
+    // use the updated sort key format when returning change stream results.
+    bool _use44SortKeys = false;
 };
 }  // namespace mongo
