@@ -164,7 +164,7 @@ private:
     size_t _maxMemoryUsageBytes;
     std::unique_ptr<Variables> _variables;
     std::string _fileName;
-    unsigned int _nextSortedFileWriterOffset = 0;
+    std::streampos _nextSortedFileWriterOffset = 0;
     bool _ownsFileDeletion = true;  // unless a MergeIterator is made that takes over.
 
     std::vector<std::string> _idFieldNames;  // used when id is a document
