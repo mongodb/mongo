@@ -40,20 +40,16 @@ namespace mongo {
 namespace logv2 {
 namespace detail {
 void doLogImpl(LogSeverity const& severity,
-               LogOptions const& options,
                StringData stable_id,
+               LogOptions const& options,
                StringData message,
                AttributeArgumentSet const& attrs);
 
-void doLogRecordImpl(LogRecord&& debugRecord,
-                     LogDomain& domain,
-                     StringData message,
-                     AttributeArgumentSet const& attrs);
 
 template <typename S, typename... Args>
 void doLog(LogSeverity const& severity,
-           LogOptions const& options,
            StringData stable_id,
+           LogOptions const& options,
            S const& message,
            fmt::internal::named_arg<Args, char>&&... args) {
     AttributeArgumentSet attr_set;
@@ -61,21 +57,7 @@ void doLog(LogSeverity const& severity,
     attr_set._values = arg_store;
     (attr_set._names.push_back(::mongo::StringData(args.name.data(), args.name.size())), ...);
     auto msg = static_cast<fmt::string_view>(message);
-    doLogImpl(severity, options, stable_id, ::mongo::StringData(msg.data(), msg.size()), attr_set);
-}
-
-template <typename S, typename... Args>
-void doLogRecord(LogRecord&& record,
-                 LogDomain& domain,
-                 S const& message,
-                 fmt::internal::named_arg<Args, char>&&... args) {
-    AttributeArgumentSet attr_set;
-    auto arg_store = fmt::internal::make_args_checked(message, (args.value)...);
-    attr_set._values = arg_store;
-    (attr_set._names.push_back(::mongo::StringData(args.name.data(), args.name.size())), ...);
-    auto msg = static_cast<fmt::string_view>(message);
-    doLogRecordImpl(
-        std::move(record), domain, ::mongo::StringData(msg.data(), msg.size()), attr_set);
+    doLogImpl(severity, stable_id, options, ::mongo::StringData(msg.data(), msg.size()), attr_set);
 }
 
 }  // namespace detail

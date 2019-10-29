@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/logv2/log_component.h"
-#include "mongo/logv2/log_record.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_tag.h"
 
@@ -52,8 +51,6 @@ public:
     const Internal& internal() const {
         return *_internal;
     }
-
-    LogRecord openRecord(LogSeverity severity, LogComponent component, LogTag tags);
 
 private:
     std::unique_ptr<Internal> _internal;

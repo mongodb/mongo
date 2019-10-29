@@ -78,6 +78,9 @@ public:
             // We need to cast from the v1 logging severity to the equivalent v2 severity
             logv2::LogSeverity::cast(event.getSeverity().toInt()),
 
+            // stable id doesn't exist in logv1
+            StringData{},
+
             // Similarly, we need to transcode the options. They don't offer a cast
             // operator, so we need to do some metaprogramming on the types.
             logv2::LogOptions{logv2::LogComponent(static_cast<logv2::LogComponent::Value>(
@@ -85,9 +88,6 @@ public:
                                       static_cast<LogComponent::Value>(event.getComponent())))),
                               _domain,
                               logv2::LogTag{logTagValue}},
-
-            // stable id doesn't exist in logv1
-            StringData{},
 
             "{} {}",  // TODO remove this lv2 when it's no longer fun to have
             "engine"_attr = "lv2",

@@ -29,23 +29,12 @@
 
 #include "mongo/logv2/log_domain.h"
 #include "mongo/logv2/log_domain_internal.h"
-#include "mongo/logv2/log_record_impl.h"
 
 namespace mongo {
 namespace logv2 {
 LogDomain::LogDomain(std::unique_ptr<LogDomain::Internal> internalDomain)
     : _internal(std::move(internalDomain)) {}
 LogDomain::~LogDomain() = default;
-
-
-LogRecord LogDomain::openRecord(LogSeverity severity, LogComponent component, LogTag tags) {
-    std::unique_ptr<LogRecordImpl> record_impl;
-    auto record = internal().source().open_record(severity, component, tags, StringData{});
-    if (record) {
-        record_impl = std::make_unique<LogRecordImpl>(std::move(record));
-    }
-    return LogRecord(std::move(record_impl));
-}
 
 }  // namespace logv2
 }  // namespace mongo

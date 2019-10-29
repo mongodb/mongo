@@ -166,49 +166,35 @@ std::string createLongString() {
         std::string(1000, 'd') + std::string(1000, 'e');
 }
 
-static void BM_NoopLog(benchmark::State& state) {
+void BM_NoopLog(benchmark::State& state) {
     ScopedLogBench init(state);
 
     for (auto _ : state)
         MONGO_LOG(1) << "noop log";
 }
 
-static void BM_NoopLogV2Inline(benchmark::State& state) {
-    ScopedLogV2Bench init(state);
-
-    for (auto _ : state)
-        LOGV2_DEBUG_INLINE(1, "noop log");
-}
-
-static void BM_NoopLogV2PimplRecord(benchmark::State& state) {
+void BM_NoopLogV2(benchmark::State& state) {
     ScopedLogV2Bench init(state);
 
     for (auto _ : state)
         LOGV2_DEBUG(1, "noop log");
 }
 
-static void BM_NoopLogArg(benchmark::State& state) {
+void BM_NoopLogArg(benchmark::State& state) {
     ScopedLogBench init(state);
 
     for (auto _ : state)
         MONGO_LOG(1) << "noop log " << createLongString();
 }
 
-static void BM_NoopLogV2InlineArg(benchmark::State& state) {
-    ScopedLogV2Bench init(state);
-
-    for (auto _ : state)
-        LOGV2_DEBUG_INLINE(1, "noop log {}", "str"_attr = createLongString());
-}
-
-static void BM_NoopLogV2PimplRecordArg(benchmark::State& state) {
+void BM_NoopLogV2Arg(benchmark::State& state) {
     ScopedLogV2Bench init(state);
 
     for (auto _ : state)
         LOGV2_DEBUG(1, "noop log {}", "str"_attr = createLongString());
 }
 
-static void BM_EnabledLog(benchmark::State& state) {
+void BM_EnabledLog(benchmark::State& state) {
     ScopedLogBench init(state);
 
     for (auto _ : state)
@@ -216,14 +202,14 @@ static void BM_EnabledLog(benchmark::State& state) {
 }
 
 
-static void BM_EnabledLogV2(benchmark::State& state) {
+void BM_EnabledLogV2(benchmark::State& state) {
     ScopedLogV2Bench init(state);
 
     for (auto _ : state)
         LOGV2("enabled log");
 }
 
-static void BM_EnabledLogExpensiveArg(benchmark::State& state) {
+void BM_EnabledLogExpensiveArg(benchmark::State& state) {
     ScopedLogBench init(state);
 
     for (auto _ : state)
@@ -231,14 +217,14 @@ static void BM_EnabledLogExpensiveArg(benchmark::State& state) {
 }
 
 
-static void BM_EnabledLogV2ExpensiveArg(benchmark::State& state) {
+void BM_EnabledLogV2ExpensiveArg(benchmark::State& state) {
     ScopedLogV2Bench init(state);
 
     for (auto _ : state)
         LOGV2("enabled log {}", "str"_attr = createLongString());
 }
 
-static void BM_EnabledLogManySmallArg(benchmark::State& state) {
+void BM_EnabledLogManySmallArg(benchmark::State& state) {
     ScopedLogBench init(state);
 
     for (auto _ : state)
@@ -248,7 +234,7 @@ static void BM_EnabledLogManySmallArg(benchmark::State& state) {
 }
 
 
-static void BM_EnabledLogV2ManySmallArg(benchmark::State& state) {
+void BM_EnabledLogV2ManySmallArg(benchmark::State& state) {
     ScopedLogV2Bench init(state);
 
     for (auto _ : state) {
@@ -266,74 +252,26 @@ static void BM_EnabledLogV2ManySmallArg(benchmark::State& state) {
     }
 }
 
-BENCHMARK(BM_NoopLog)->Threads(1);
-BENCHMARK(BM_NoopLogV2Inline)->Threads(1);
-BENCHMARK(BM_NoopLogV2PimplRecord)->Threads(1);
+void ThreadCounts(benchmark::internal::Benchmark* b) {
+    int tc[] = {1, 2, 4, 8};
+    for (int t : tc)
+        b->Threads(t);
+}
 
-BENCHMARK(BM_NoopLog)->Threads(2);
-BENCHMARK(BM_NoopLogV2Inline)->Threads(2);
-BENCHMARK(BM_NoopLogV2PimplRecord)->Threads(2);
+BENCHMARK(BM_NoopLog)->Apply(ThreadCounts);
+BENCHMARK(BM_NoopLogV2)->Apply(ThreadCounts);
 
-BENCHMARK(BM_NoopLog)->Threads(4);
-BENCHMARK(BM_NoopLogV2Inline)->Threads(4);
-BENCHMARK(BM_NoopLogV2PimplRecord)->Threads(4);
+BENCHMARK(BM_NoopLogArg)->Apply(ThreadCounts);
+BENCHMARK(BM_NoopLogV2Arg)->Apply(ThreadCounts);
 
-BENCHMARK(BM_NoopLog)->Threads(8);
-BENCHMARK(BM_NoopLogV2Inline)->Threads(8);
-BENCHMARK(BM_NoopLogV2PimplRecord)->Threads(8);
+BENCHMARK(BM_EnabledLog)->Apply(ThreadCounts);
+BENCHMARK(BM_EnabledLogV2)->Apply(ThreadCounts);
 
-BENCHMARK(BM_NoopLogArg)->Threads(1);
-BENCHMARK(BM_NoopLogV2InlineArg)->Threads(1);
-BENCHMARK(BM_NoopLogV2PimplRecordArg)->Threads(1);
+BENCHMARK(BM_EnabledLogExpensiveArg)->Apply(ThreadCounts);
+BENCHMARK(BM_EnabledLogV2ExpensiveArg)->Apply(ThreadCounts);
 
-BENCHMARK(BM_NoopLogArg)->Threads(2);
-BENCHMARK(BM_NoopLogV2InlineArg)->Threads(2);
-BENCHMARK(BM_NoopLogV2PimplRecordArg)->Threads(2);
-
-BENCHMARK(BM_NoopLogArg)->Threads(4);
-BENCHMARK(BM_NoopLogV2InlineArg)->Threads(4);
-BENCHMARK(BM_NoopLogV2PimplRecordArg)->Threads(4);
-
-BENCHMARK(BM_NoopLogArg)->Threads(8);
-BENCHMARK(BM_NoopLogV2InlineArg)->Threads(8);
-BENCHMARK(BM_NoopLogV2PimplRecordArg)->Threads(8);
-
-BENCHMARK(BM_EnabledLog)->Threads(1);
-BENCHMARK(BM_EnabledLogV2)->Threads(1);
-
-BENCHMARK(BM_EnabledLog)->Threads(2);
-BENCHMARK(BM_EnabledLogV2)->Threads(2);
-
-BENCHMARK(BM_EnabledLog)->Threads(4);
-BENCHMARK(BM_EnabledLogV2)->Threads(4);
-
-BENCHMARK(BM_EnabledLog)->Threads(8);
-BENCHMARK(BM_EnabledLogV2)->Threads(8);
-
-BENCHMARK(BM_EnabledLogExpensiveArg)->Threads(1);
-BENCHMARK(BM_EnabledLogV2ExpensiveArg)->Threads(1);
-
-BENCHMARK(BM_EnabledLogExpensiveArg)->Threads(2);
-BENCHMARK(BM_EnabledLogV2ExpensiveArg)->Threads(2);
-
-BENCHMARK(BM_EnabledLogExpensiveArg)->Threads(4);
-BENCHMARK(BM_EnabledLogV2ExpensiveArg)->Threads(4);
-
-BENCHMARK(BM_EnabledLogExpensiveArg)->Threads(8);
-BENCHMARK(BM_EnabledLogV2ExpensiveArg)->Threads(8);
-
-BENCHMARK(BM_EnabledLogManySmallArg)->Threads(1);
-BENCHMARK(BM_EnabledLogV2ManySmallArg)->Threads(1);
-
-BENCHMARK(BM_EnabledLogManySmallArg)->Threads(2);
-BENCHMARK(BM_EnabledLogV2ManySmallArg)->Threads(2);
-
-BENCHMARK(BM_EnabledLogManySmallArg)->Threads(4);
-BENCHMARK(BM_EnabledLogV2ManySmallArg)->Threads(4);
-
-BENCHMARK(BM_EnabledLogManySmallArg)->Threads(8);
-BENCHMARK(BM_EnabledLogV2ManySmallArg)->Threads(8);
-
+BENCHMARK(BM_EnabledLogManySmallArg)->Apply(ThreadCounts);
+BENCHMARK(BM_EnabledLogV2ManySmallArg)->Apply(ThreadCounts);
 
 }  // namespace
 }  // namespace mongo

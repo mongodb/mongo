@@ -158,6 +158,9 @@ TEST_F(LogTestV2, Basic) {
     LOGV2("test");
     ASSERT(lines.back() == "test");
 
+    LOGV2_DEBUG(-2, "test debug");
+    ASSERT(lines.back() == "test debug");
+
     LOGV2("test {}", "name"_attr = 1);
     ASSERT(lines.back() == "test 1");
 

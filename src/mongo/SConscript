@@ -119,7 +119,6 @@ baseEnv.Library(
         'logv2/log_domain_global.cpp',
         'logv2/log_domain_internal.cpp',
         'logv2/log_manager.cpp',
-        'logv2/log_record.cpp',
         'logv2/log_severity.cpp',
         'logv2/log_tag.cpp',
         'logv2/ramlog.cpp',

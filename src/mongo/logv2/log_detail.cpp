@@ -36,7 +36,6 @@
 #include "mongo/logv2/log_domain.h"
 #include "mongo/logv2/log_domain_internal.h"
 #include "mongo/logv2/log_options.h"
-#include "mongo/logv2/log_record_impl.h"
 #include "mongo/logv2/log_source.h"
 
 namespace mongo {
@@ -44,8 +43,8 @@ namespace logv2 {
 namespace detail {
 
 void doLogImpl(LogSeverity const& severity,
-               LogOptions const& options,
                StringData stable_id,
+               LogOptions const& options,
                StringData message,
                AttributeArgumentSet const& attrs) {
     auto& source = options.domain().internal().source();
@@ -62,27 +61,6 @@ void doLogImpl(LogSeverity const& severity,
                 new boost::log::attributes::attribute_value_impl<AttributeArgumentSet>(attrs)));
 
         source.push_record(std::move(record));
-    }
-}
-
-void doLogRecordImpl(LogRecord&& record,
-                     LogDomain& domain,
-                     StringData message,
-                     AttributeArgumentSet const& attrs) {
-    auto& source = domain.internal().source();
-    auto rec = std::move(record.impl()->_record);
-    if (rec) {
-        rec.attribute_values().insert(
-            attributes::message(),
-            boost::log::attribute_value(
-                new boost::log::attributes::attribute_value_impl<StringData>(message)));
-
-        rec.attribute_values().insert(
-            attributes::attributes(),
-            boost::log::attribute_value(
-                new boost::log::attributes::attribute_value_impl<AttributeArgumentSet>(attrs)));
-
-        source.push_record(std::move(rec));
     }
 }
 
