@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
@@ -65,8 +66,8 @@ public:
     }
 
     virtual void externalSetup() = 0;
-    virtual void setLocalDB(const std::string& localDBName) {
-        _localDBName = localDBName;
+    virtual void setLocalDB(StringData localDBName) {
+        _localDBName = localDBName.toString();
     }
 
     virtual BSONObj getObject(const char* field) = 0;
@@ -209,7 +210,7 @@ class ScriptEngine : public KillOpListenerInterface {
     ScriptEngine& operator=(const ScriptEngine&) = delete;
 
 public:
-    ScriptEngine();
+    ScriptEngine(bool disableLoadStored);
     virtual ~ScriptEngine();
 
     virtual Scope* newScope() {
@@ -233,7 +234,12 @@ public:
     virtual int getJSHeapLimitMB() const = 0;
     virtual void setJSHeapLimitMB(int limit) = 0;
 
-    static void setup();
+    /**
+     * Calls the constructor for the Global ScriptEngine. 'disableLoadStored' causes future calls to
+     * the function Scope::loadStored(), which would otherwise load stored procedures, to be
+     * ignored.
+     */
+    static void setup(bool disableLoadStored = true);
     static void dropScopeCache();
 
     /** gets a scope from the pool or a new one if pool is empty
@@ -263,6 +269,7 @@ public:
     virtual void interruptAll() {}
 
     static std::string getInterpreterVersionString();
+    const bool _disableLoadStored;
 
 protected:
     virtual Scope* createScope() = 0;

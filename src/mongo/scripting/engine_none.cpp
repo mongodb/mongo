@@ -30,7 +30,7 @@
 #include "engine.h"
 
 namespace mongo {
-void ScriptEngine::setup() {
+void ScriptEngine::setup(bool disableLoadStored) {
     // noop
 }
 

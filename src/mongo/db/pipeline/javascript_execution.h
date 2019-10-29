@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/operation_context.h"
@@ -47,9 +48,10 @@ class JsExecution {
 public:
     /**
      * Create or get a pointer to a JsExecution instance, capable of invoking Javascript functions
-     * and reading the return value.
+     * and reading the return value. This will load all stored procedures from database unless
+     * 'disableLoadStored' is set on the global ScriptEngine.
      */
-    static JsExecution* get(OperationContext* opCtx, const BSONObj& scope);
+    static JsExecution* get(OperationContext* opCtx, const BSONObj& scope, StringData database);
 
     /**
      * Construct with a thread-local scope and initialize with the given scope variables.

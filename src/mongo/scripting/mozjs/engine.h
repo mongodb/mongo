@@ -48,7 +48,7 @@ class MozJSImplScope;
  */
 class MozJSScriptEngine final : public mongo::ScriptEngine {
 public:
-    MozJSScriptEngine();
+    MozJSScriptEngine(bool disableLoadStored);
     ~MozJSScriptEngine() override;
 
     mongo::Scope* createScope() override;

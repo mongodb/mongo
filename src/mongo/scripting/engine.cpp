@@ -68,7 +68,8 @@ static std::unique_ptr<ScriptEngine> globalScriptEngine;
 
 }  // namespace
 
-ScriptEngine::ScriptEngine() : _scopeInitCallback() {}
+ScriptEngine::ScriptEngine(bool disableLoadStored)
+    : _disableLoadStored(disableLoadStored), _scopeInitCallback() {}
 
 ScriptEngine::~ScriptEngine() {}
 
@@ -209,6 +210,8 @@ void Scope::validateObjectIdString(const string& str) {
 }
 
 void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
+    if (!getGlobalScriptEngine()->_disableLoadStored)
+        return;
     if (_localDBName.size() == 0) {
         if (ignoreNotConnected)
             return;
@@ -421,7 +424,7 @@ public:
     void init(const BSONObj* data) {
         _real->init(data);
     }
-    void setLocalDB(const string& dbName) {
+    void setLocalDB(StringData dbName) {
         _real->setLocalDB(dbName);
     }
     void loadStored(OperationContext* opCtx, bool ignoreNotConnected = false) {
