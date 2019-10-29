@@ -110,6 +110,9 @@ function runBypassDocumentValidationTest(validator) {
     assert.commandWorked(res);
     assert.eq(1, outputColl.count({value: 'mapReduce'}));
 
+    // TODO SERVER-42511 Test the mapReduce command reading from a different database with output in
+    // this database which has the document validation.
+
     // Test the insert command. Includes a test for a document with no _id (SERVER-20859).
     res = myDb.runCommand({insert: collName, documents: [{}], bypassDocumentValidation: false});
     assertFailsValidation(BulkWriteResult(res));

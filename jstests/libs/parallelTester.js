@@ -155,8 +155,7 @@ if (typeof _threadInject != "undefined") {
             "index_bigkeys_nofail.js",
             "index_bigkeys_validation.js",
 
-            "mr3.js",
-            "evald.js",
+            "mr_fail_invalid_js.js",
             "run_program1.js",
             "notablescan.js",
             "bench_test1.js",

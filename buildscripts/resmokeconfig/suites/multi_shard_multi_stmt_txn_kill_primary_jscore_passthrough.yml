@@ -31,7 +31,6 @@ selector:
   - jstests/core/index_id_options.js  # "local" database.
   - jstests/core/index9.js  # "local" database.
   - jstests/core/max_time_ms.js  # sleep, SERVER-2212.
-  - jstests/core/mr_replaceIntoDB.js  # MapReduceResult, SERVER-20495.
   - jstests/core/notablescan.js  # notablescan.
   - jstests/core/queryoptimizera.js  # "local" database.
   - jstests/core/rename*.js # renameCollection.
@@ -56,6 +55,7 @@ selector:
   - jstests/core/bad_index_plugin.js
   - jstests/core/create_indexes.js
   - jstests/core/list_indexes_non_existent_ns.js
+  - jstests/core/mr_preserve_indexes.js
   - jstests/core/rename6.js
   # The following tests fail because they expect no databases to be created. However a DB is created
   # automatically when we shard a collection.
@@ -84,10 +84,11 @@ selector:
   - jstests/core/index_multikey.js
   - jstests/core/optimized_match_explain.js
   - jstests/core/sort_array.js
-  # TODO: SERVER-16605 MapReduce into sharded collection with hashed index fails
+  # mapReduce requires sharded output collections to be sharded by {_id: 1}. {_id: "hashed"} is not
+  # supported.
   - jstests/core/mr_correctness.js
-  - jstests/core/mr3.js
-  - jstests/core/mr4.js
+  - jstests/core/mr_fail_invalid_js.js
+  - jstests/core/mr_scope.js
 
   ##
   ## Limitations with the way the runner file injects transactions.

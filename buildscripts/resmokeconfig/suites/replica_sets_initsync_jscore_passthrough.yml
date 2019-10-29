@@ -15,7 +15,6 @@ selector:
   - jstests/core/profile_list_indexes.js
   - jstests/core/recursion.js
   - jstests/core/system_profile.js
-  - jstests/core/temp_cleanup.js
   # operation_latency_histogram.js and geo_s2cursorlimitskip.js do not expect concurrent reads
   # against their test collections.
   - jstests/core/operation_latency_histogram.js

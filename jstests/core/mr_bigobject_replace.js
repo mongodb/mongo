@@ -14,6 +14,7 @@
  * "replace" action for the out collection.
  */
 (function() {
+"use strict";
 function mapper() {
     // Emit multiple values to ensure that the reducer gets called.
     emit(this._id, 1);
@@ -24,9 +25,9 @@ function createBigDocument() {
     // Returns a document of the form { _id: ObjectId(...), value: '...' } with the specified
     // 'targetSize' in bytes.
     function makeDocWithSize(targetSize) {
-        var doc = {_id: new ObjectId(), value: ''};
+        let doc = {_id: new ObjectId(), value: ''};
 
-        var size = Object.bsonsize(doc);
+        let size = Object.bsonsize(doc);
         assert.gte(targetSize, size);
 
         // Set 'value' as a string with enough characters to make the whole document 'size'
@@ -37,7 +38,7 @@ function createBigDocument() {
         return doc;
     }
 
-    var maxDocSize = 16 * 1024 * 1024;
+    let maxDocSize = 16 * 1024 * 1024;
     return makeDocWithSize(maxDocSize + 1).value;
 }
 
@@ -48,7 +49,7 @@ function runTest(testOptions) {
     // Insert a document so the mapper gets run.
     assert.commandWorked(db.input.insert({}));
 
-    var res = db.runCommand(Object.extend({
+    let res = db.runCommand(Object.extend({
         mapReduce: "input",
         map: mapper,
         out: {replace: "mr_bigobject_replace"},

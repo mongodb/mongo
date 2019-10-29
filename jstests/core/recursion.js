@@ -12,13 +12,13 @@
 
 db.recursion.drop();
 
-// Make sure the shell doesn't blow up
+// Make sure the shell doesn't blow up.
 function shellRecursion() {
     shellRecursion.apply();
 }
 assert.throws(shellRecursion);
 
-// Make sure mapReduce doesn't blow up
+// Make sure server side stack overflow doesn't blow up.
 function mapReduceRecursion() {
     db.recursion.mapReduce(
         function() {
@@ -30,6 +30,6 @@ function mapReduceRecursion() {
         {out: 'inline'});
 }
 
-db.recursion.insert({});
+assert.commandWorked(db.recursion.insert({}));
 assert.commandFailedWithCode(assert.throws(mapReduceRecursion), ErrorCodes.JSInterpreterFailure);
 }());

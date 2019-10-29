@@ -79,7 +79,6 @@ selector:
   - jstests/core/views/views_all_commands.js
   - jstests/core/or4.js
   - jstests/core/recursion.js
-  - jstests/core/temp_cleanup.js
   # An index drop does not necessarily cause cursors to be killed on the secondary.
   - jstests/core/ord.js
   # Parallel shell is not causally consistent
