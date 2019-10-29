@@ -7082,6 +7082,7 @@ task_groups:
   - compile_all
 - name: embedded_sdk_build_and_test
   setup_group_can_fail_task: true
+  max_hosts: 1
   setup_group:
     - command: manifest.load
     - func: "git get project"
