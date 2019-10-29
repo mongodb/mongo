@@ -44,3 +44,8 @@ out.drop();
 assert.commandWorked(t.mapReduce(m, r, {out: "mr_sort_out", sort: {x: 1}, limit: 2}));
 assert.eq([{_id: "a", value: 3}], out.find().toArray(), "A3");
 out.drop();
+
+// Verify that specifying a sort with no limit succeeds.
+assert.commandWorked(t.mapReduce(m, r, {out: "mr_sort_out", sort: {x: 1}}));
+assert.eq([{_id: "a", value: 55}], out.find().toArray());
+assert(out.drop());

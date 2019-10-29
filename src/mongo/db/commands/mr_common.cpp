@@ -65,10 +65,8 @@ Rarely nonAtomicDeprecationSampler;  // Used to occasionally log deprecation mes
 
 using namespace std::string_literals;
 
-auto translateSort(boost::intrusive_ptr<ExpressionContext> expCtx,
-                   const BSONObj& sort,
-                   const boost::optional<std::int64_t>& limit) {
-    return DocumentSourceSort::create(expCtx, sort, limit.get_value_or(0));
+auto translateSort(boost::intrusive_ptr<ExpressionContext> expCtx, const BSONObj& sort) {
+    return DocumentSourceSort::create(expCtx, sort);
 }
 
 auto translateMap(boost::intrusive_ptr<ExpressionContext> expCtx, std::string code) {
@@ -335,12 +333,13 @@ std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
 
     // TODO: It would be good to figure out what kind of errors this would produce in the Status.
     // It would be better not to produce something incomprehensible out of an internal translation.
-    return uassertStatusOK(Pipeline::create(
+    auto pipeline = uassertStatusOK(Pipeline::create(
         makeFlattenedList<boost::intrusive_ptr<DocumentSource>>(
             parsedMr.getQuery().map(
                 [&](auto&& query) { return DocumentSourceMatch::create(query, expCtx); }),
-            parsedMr.getSort().map(
-                [&](auto&& sort) { return translateSort(expCtx, sort, parsedMr.getLimit()); }),
+            parsedMr.getSort().map([&](auto&& sort) { return translateSort(expCtx, sort); }),
+            parsedMr.getLimit().map(
+                [&](auto&& limit) { return DocumentSourceLimit::create(expCtx, limit); }),
             translateMap(expCtx, parsedMr.getMap().getCode()),
             DocumentSourceUnwind::create(expCtx, "emits", false, boost::none),
             translateReduce(expCtx, parsedMr.getReduce().getCode()),
@@ -353,6 +352,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
                          std::move(outNss),
                          parsedMr.getReduce().getCode())),
         expCtx));
+    pipeline->optimizePipeline();
+    return pipeline;
 }
 
 }  // namespace mongo::map_reduce_common

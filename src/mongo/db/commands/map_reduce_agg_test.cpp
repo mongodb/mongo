@@ -98,7 +98,7 @@ TEST(MapReduceAggTest, testSortWithoutLimit) {
     auto iter = sources.begin();
     ASSERT(typeid(DocumentSourceSort) == typeid(**iter));
     auto& sort = dynamic_cast<DocumentSourceSort&>(**iter++);
-    ASSERT(sort.getLimit() == boost::none);
+    ASSERT(!sort.hasLimit());
     ASSERT(typeid(DocumentSourceSingleDocumentTransformation) == typeid(**iter++));
     ASSERT(typeid(DocumentSourceUnwind) == typeid(**iter++));
     ASSERT(typeid(DocumentSourceGroup) == typeid(**iter));
@@ -115,11 +115,34 @@ TEST(MapReduceAggTest, testSortWithLimit) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
     auto pipeline = map_reduce_common::translateFromMR(mr, expCtx);
     auto& sources = pipeline->getSources();
+
+    // Even though we specify a limit, there will only be 4 stages since the optimizer should
+    // merge $sort and $limit.
     ASSERT_EQ(4u, sources.size());
     auto iter = sources.begin();
     ASSERT(typeid(DocumentSourceSort) == typeid(**iter));
     auto& sort = dynamic_cast<DocumentSourceSort&>(**iter++);
-    ASSERT_EQ(23ll, *sort.getLimit());
+    ASSERT_EQ(23LL, *sort.getLimit());
+    ASSERT(typeid(DocumentSourceSingleDocumentTransformation) == typeid(**iter++));
+    ASSERT(typeid(DocumentSourceUnwind) == typeid(**iter++));
+    ASSERT(typeid(DocumentSourceGroup) == typeid(**iter));
+}
+
+TEST(MapReduceAggTest, testLimitNoSort) {
+    auto nss = NamespaceString{"db", "coll"};
+    auto mr = MapReduce{nss,
+                        MapReduceJavascriptCode{mapJavascript.toString()},
+                        MapReduceJavascriptCode{reduceJavascript.toString()},
+                        MapReduceOutOptions{boost::none, "", OutputType::InMemory, false}};
+    mr.setLimit(23);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
+    auto pipeline = map_reduce_common::translateFromMR(mr, expCtx);
+    auto& sources = pipeline->getSources();
+    ASSERT_EQ(4u, sources.size());
+    auto iter = sources.begin();
+    ASSERT(typeid(DocumentSourceLimit) == typeid(**iter));
+    auto& limit = dynamic_cast<DocumentSourceLimit&>(**iter++);
+    ASSERT_EQ(23LL, limit.getLimit());
     ASSERT(typeid(DocumentSourceSingleDocumentTransformation) == typeid(**iter++));
     ASSERT(typeid(DocumentSourceUnwind) == typeid(**iter++));
     ASSERT(typeid(DocumentSourceGroup) == typeid(**iter));
