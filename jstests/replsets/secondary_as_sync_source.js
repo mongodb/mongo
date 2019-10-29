@@ -3,21 +3,18 @@
  * source, which has an in-progress index build will also build the index as part of the initial
  * sync operation.
  *
- * TODO(SERVER-44043): Remove two_phase_index_builds_unsupported tag.
  * @tags: [
  *     requires_replication,
- *     two_phase_index_builds_unsupported,
  * ]
  */
 (function() {
 'use strict';
 
+load('jstests/noPassthrough/libs/index_build.js');
 load("jstests/replsets/rslib.js");
 
 const dbName = "test";
 const collName = "coll";
-
-const firstIndexName = "_first";
 
 function addTestDocuments(db) {
     let size = 100;
@@ -49,16 +46,34 @@ let secondaryDB = secondary.getDB(dbName);
 
 addTestDocuments(primaryDB);
 
-jsTest.log("Hanging index builds on the secondary node");
-assert.commandWorked(secondaryDB.adminCommand(
-    {configureFailPoint: "hangAfterStartingIndexBuild", mode: "alwaysOn"}));
+const enableTwoPhaseIndexBuild =
+    assert.commandWorked(primary.adminCommand({getParameter: 1, enableTwoPhaseIndexBuild: 1}))
+        .enableTwoPhaseIndexBuild;
 
-jsTest.log("Beginning index build: " + firstIndexName);
-assert.commandWorked(primaryDB.runCommand({
-    createIndexes: collName,
-    indexes: [{key: {i: 1}, name: firstIndexName, background: true}],
-    writeConcern: {w: 2}
-}));
+// Used to wait for two-phase builds to complete.
+let awaitIndex;
+
+if (!enableTwoPhaseIndexBuild) {
+    jsTest.log("Hanging index build on the secondary node");
+    IndexBuildTest.pauseIndexBuilds(secondary);
+
+    jsTest.log("Beginning index build");
+    assert.commandWorked(primaryDB.runCommand({
+        createIndexes: collName,
+        indexes: [{key: {i: 1}, name: "i_1"}],
+        writeConcern: {w: 2},
+    }));
+} else {
+    jsTest.log("Hanging index build on the primary node");
+    IndexBuildTest.pauseIndexBuilds(primary);
+
+    jsTest.log("Beginning index build");
+    const coll = primaryDB.getCollection(collName);
+    awaitIndex = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {i: 1});
+
+    jsTest.log("Waiting for index build to start on secondary");
+    IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
+}
 
 jsTest.log("Adding a new node to the replica set");
 let newNode = replSet.add({rsConfig: {votes: 0, priority: 0}});
@@ -71,10 +86,14 @@ replSet.reInitiate();
 // Wait for the new node to finish initial sync.
 waitForState(newNode, ReplSetTest.State.SECONDARY);
 
-// Let the 'secondary' finish its index build.
-jsTest.log("Removing index build hang on the secondary node to allow it to finish");
-assert.commandWorked(
-    secondaryDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "off"}));
+jsTest.log("Removing index build hang to allow it to finish");
+if (!enableTwoPhaseIndexBuild) {
+    // Let the 'secondary' finish its index build.
+    IndexBuildTest.resumeIndexBuilds(secondary);
+} else {
+    IndexBuildTest.resumeIndexBuilds(primary);
+    awaitIndex();
+}
 
 // Wait for the index builds to finish.
 replSet.waitForAllIndexBuildsToFinish(dbName, collName);
