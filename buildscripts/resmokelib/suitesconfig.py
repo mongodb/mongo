@@ -19,6 +19,18 @@ def get_named_suites():
     return names
 
 
+def get_named_suites_with_root_level_key_and_value(root_level_key, value):
+    """Return the suites that contain the given root_level_key with value equal to 'value'."""
+    all_suite_names = get_named_suites()
+    suites_to_return = []
+
+    for suite in all_suite_names:
+        suite_config = _get_suite_config(suite)
+        if root_level_key in suite_config.keys() and suite_config[root_level_key] == value:
+            suites_to_return.append(suite)
+    return suites_to_return
+
+
 def create_test_membership_map(fail_on_missing_selector=False, test_kind=None):
     """Return a dict keyed by test name containing all of the suites that will run that test.
 

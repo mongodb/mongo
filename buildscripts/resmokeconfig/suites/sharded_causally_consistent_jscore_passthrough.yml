@@ -1,4 +1,5 @@
 test_kind: js_test
+use_in_multiversion_burn_in_tests: true
 # This suite's blacklist is a sharded_collections_jscore_passthrough blacklist with some additions
 # from causally_consistent_jscore_passthrough blacklist.
 

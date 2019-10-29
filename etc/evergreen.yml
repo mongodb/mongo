@@ -5124,7 +5124,6 @@ tasks:
       script: |
         set -o errexit
         set -o verbose
-
         ${activate_virtualenv}
         # Capture a list of new and modified tests. The expansion macro burn_in_tests_build_variant
         # is used to for finding the associated tasks from a different build varaint than the
@@ -5133,7 +5132,6 @@ tasks:
         if [ -n "${burn_in_tests_build_variant|}" ]; then
           build_variant_opts="--build-variant=${burn_in_tests_build_variant} --run-build-variant=${build_variant}"
         fi
-
         burn_in_args="$burn_in_args --repeat-tests-min=2 --repeat-tests-max=1000 --repeat-tests-secs=600"
         # Evergreen executable is in $HOME.
         PATH=$PATH:$HOME $python buildscripts/burn_in_tests.py --project=${project} $build_variant_opts --distro=${distro_id} --generate-tasks-file=burn_in_tests_gen.json $burn_in_args --verbose
@@ -5143,6 +5141,7 @@ tasks:
       source_dir: src
       include:
         - burn_in_tests_gen.json
+
   - command: s3.put
     params:
       aws_key: ${aws_key}
@@ -5157,6 +5156,78 @@ tasks:
     params:
       files:
         - src/burn_in_tests_gen.json
+
+- name: burn_in_tests_multiversion_gen
+  commands:
+  - command: manifest.load
+  - func: "git get project"
+  - func: "set task expansion macros"
+  - func: "set up virtualenv"
+  - func: "upload pip requirements"
+  - func: "configure evergreen api credentials"
+  - command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      shell: bash
+      script: |
+        set -o errexit
+        set -o verbose
+
+        ${activate_virtualenv}
+        # Capture a list of new and modified tests. The expansion macro burn_in_tests_build_variant
+        # is used for finding the associated tasks from a different build variant than the
+        # burn_in_tests_multiversion_gen task executes on.
+        build_variant_opts="--build-variant=${build_variant}"
+        if [ -n "${burn_in_tests_build_variant|}" ]; then
+          build_variant_opts="--build-variant=${burn_in_tests_build_variant} --run-build-variant=${build_variant}"
+        fi
+
+        burn_in_args="$burn_in_args"
+        # Evergreen executable is in $HOME.
+        PATH=$PATH:$HOME $python buildscripts/burn_in_tests.py --task_id=${task_id} --project=${project} $build_variant_opts --distro=${distro_id} --generate-tasks-file=burn_in_tests_multiversion_gen.json $burn_in_args --use-multiversion --verbose
+
+  - command: archive.targz_pack
+    params:
+      target: src/burn_in_tests_multiversion_gen.tgz
+      source_dir: src
+      include:
+        - burn_in_tests_multiversion_gen.json
+
+  - command: archive.targz_pack
+    params:
+      target: generate_tasks_config.tgz
+      source_dir: src/generated_resmoke_config
+      include:
+        - "*"
+
+  - command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: generate_tasks_config.tgz
+      remote_file: ${project}/${build_variant}/${revision}/generate_tasks/burn_in_tests_multiversion_gen-${build_id}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: ${content_type|application/gzip}
+      optional: true
+      display_name: Generated Multiversion Resmoke.py Suite Config - Execution ${execution}
+
+  - command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/burn_in_tests_multiversion_gen.tgz
+      remote_file: ${project}/${build_variant}/${revision}/generate_tasks/burn_in_tests_multiversion_gen_config-${build_id}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: ${content_type|application/gzip}
+      display_name: Burn_in_tests Task Config - Execution ${execution}
+
+  - command: generate.tasks
+    params:
+      files:
+        - src/burn_in_tests_multiversion_gen.json
 
 - <<: *benchmark_template
   name: benchmarks_orphaned
@@ -7653,11 +7724,10 @@ tasks:
   commands:
   - func: "generate multiversion tasks"
     vars:
-      suite: replica_sets_jscore_passthrough
+      suite: sharded_causally_consistent_jscore_passthrough
       resmoke_args: --storageEngine=wiredTiger
       task_path_suffix: /data/multiversion
       fallback_num_sub_suites: 4
-      is_sharded: true
 
 - name: retryable_writes_jscore_passthrough_gen
   tags: ["retry"]
@@ -10673,6 +10743,7 @@ buildvariants:
   - name: lint_fuzzer_sanity_patch
   - name: lint_yaml
   - name: burn_in_tests_gen
+  - name: burn_in_tests_multiversion_gen
   - name: .aggfuzzer
   - name: .aggregation
   - name: audit

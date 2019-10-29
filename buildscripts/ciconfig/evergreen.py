@@ -83,6 +83,10 @@ class EvergreenProjectConfig(object):  # pylint: disable=too-many-instance-attri
         """Return the variant with the given name as a Variant instance."""
         return self._variants_by_name.get(variant_name)
 
+    def get_task_names_by_tag(self, tag):
+        """Return the list of tasks that have the given tag."""
+        return list(task.name for task in self.tasks if tag in task.tags)
+
 
 class Task(object):
     """Represent a task configuration as found in an Evergreen project configuration file."""
