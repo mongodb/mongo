@@ -322,7 +322,7 @@ BSONObj buildObj() {
 }
 
 SharedObjectMapInfo& mutableGlobalSharedObjectMapInfo() {
-    auto& p = *new SharedObjectMapInfo(buildObj());
+    static auto& p = *new SharedObjectMapInfo(buildObj());
     return p;
 }
 
