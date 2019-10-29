@@ -641,20 +641,61 @@ Finally, the node drops all temporary collections and logs “transition to prim
 
 ## Step Down
 
+### Conditional
+
+The `replSetStepDown` command is one way that a node relinquishes its position as primary. We
+consider this a conditional step down because it can fail if the following conditions are not met:
+* `force` is true and now > `waitUntil` deadline, which is the amount of time we will wait before
+stepping down (Note: If `force` is true, only this condition needs to be met)
+* The `lastApplied` OpTime of the primary must be replicated to a majority of the nodes
+* At least one of the up-to-date secondaries is also electable
+
 When a `replSetStepDown` command comes in, the node begins to check if it can step down. First, the
-node kills all user operations and they return an error to the user. Then the node loops trying to
-step down. It repeatedly checks if a majority of nodes are caught up and if one of those caught up
-nodes is electable or if the user requested it to force a stepdown. It then begins to step down.
+node attempts to acquire the RSTL. In order to do so, it must kill all conflicting user/system
+operations and abort all unprepared transactions.
 
-Stepdowns also occur if a primary sees a higher term than themselves or if a primary stops being
-able to transitively communicate with a majority of nodes. The primary does not need to be able to
-communicate directly with a majority of nodes. If primary A can’t communicate with node B, but A can
-communicate with C which can communicate with B, that is okay. If you consider the minimum spanning
-tree on the cluster where edges are connections from nodes to their sync source, then as long as the
-primary is connected to a majority of nodes, it will stay primary.
+Now, the node loops trying to step down. If force is `false`, it repeatedly checks if a majority of
+nodes have reached the `lastApplied` optime, meaning that they are caught up. It must also check
+that at least one of those nodes is electable. If force is `true`, it does not wait for these
+conditions and steps down immediately after it reaches the `waitUntil` deadline.
 
-Once the node begins to step down, it first sets its state to `follower` in the
-`TopologyCoordinator`. It then transitioning to SECONDARY in the `ReplicationCoordinator`.
+Upon a successful stepdown, it yields locks held by prepared transactions because we are now a
+secondary. Finally, we log stepdown metrics and update our member state to `SECONDARY`. (TODO
+SERVER-43781: link to prepare section of arch guide)
+
+### Unconditional
+
+Stepdowns can also occur for the following reasons:
+* If the primary learns of a higher term
+* Liveness timeout: If a primary stops being able to transitively communicate with a majority of
+nodes. The primary does not need to be able to communicate directly with a majority of nodes. If
+primary A can’t communicate with node B, but A can communicate with C which can communicate with B,
+that is okay. If you consider the minimum spanning tree on the cluster where edges are connections
+from nodes to their sync source, then as long as the primary is connected to a majority of nodes, it
+will stay primary.
+* Force reconfig via the `replSetReconfig` command
+* Force reconfig via heartbeat: If we learn of a newer config version through heartbeats, we will
+schedule a replica set config change.
+
+During unconditional stepdown, we do not check preconditions before attempting to step down. Similar
+to conditional stepdowns, we must kill any conflicting user/system operations before acquiring the
+RSTL and yield locks to prepared transactions following a successful stepdown.
+
+### Concurrent Stepdown Attempts
+
+It is possible to have concurrent conditional and unconditional stepdown attempts. In this case,
+the unconditional stepdown will supercede the conditional stepdown, which causes the conditional
+stepdown attempt to fail.
+
+Because concurrent unconditional stepdowns can cause conditional stepdowns to fail, we stop
+accepting writes once we confirm that we are allowed to step down. This way, if our stepdown
+attempt fails, we can release the RSTL and allow secondaries to catch up without new writes coming
+in.
+
+We try to prevent concurrent conditional stepdown attempts by setting `_leaderMode` to
+`kSteppingDown` in the `TopologyCoordinator`. By tracking the current stepdown state, we prevent
+another conditional stepdown attempt from occurring, but still allow unconditional attempts to
+supersede.
 
 # Rollback
 
