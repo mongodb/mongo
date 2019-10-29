@@ -333,10 +333,6 @@ take: no action, priority takeover, or reconfig,
 The `ReplicationCoordinator` then updates the `SlaveInfo` for the receiving node with its most
 recently acquired OpTimes.
 
-If the sending node is primary, this updates the commit point if the sending node sees that a
-majority of its nodes have reached a newer OpTime. Any threads blocking on a writeConcern are woken
-up to check if they now fulfill their requested writeConcern.
-
 The next heartbeat is scheduled and then the next action set by the `TopologyCoordinator` is
 executed.
 
@@ -344,6 +340,29 @@ If the action was a priority takeover, then the node ranks all of the priorities
 assigns itself a priority takeover timeout proportional to its rank. After that timeout expires the
 node will check if it's eligible to run for election and if so will begin an election. The timeout
 is simply: `(election timeout) * (priority rank + 1)`.
+
+### Commit Point Propogation
+
+The replication majority *commit point* refers to an OpTime such that all oplog entries with an
+OpTime earlier or equal to it have been replicated to a majority of nodes in the replica set. It is
+influenced by the `lastApplied` and the `lastDurable` OpTimes.
+
+The `lastApplied` is the OpTime of the latest applied oplog entry on a node. The `lastDurable` is
+the OpTime of the latest applied oplog entry that has been flushed to journal.
+
+On the primary, we advance the commit point by checking what the highest `lastApplied` or
+`lastDurable` is on a majority of the nodes. This OpTime must be greater than the current
+`commit point` for the primary to advance it. Any threads blocking on a writeConcern are woken up
+to check if they now fulfill their requested writeConcern.
+
+When `getWriteConcernMajorityShouldJournal` is set to true, the `_lastCommittedOpTime` is set to the
+`lastDurable` OpTime. This means that the server acknowledges a write operation after a majority has
+written to the on-disk journal. Otherwise, `_lastCommittedOpTime` is set using the `lastApplied`.
+
+Secondaries advance their commit point via heartbeats by checking if the commit point is in the
+same term as their `lastApplied` OpTime. This ensures that the secondary is on the same branch of
+history as the commit point. Additionally, they can update their commit point via the spanning tree
+by taking the minimum of the learned commit point and their `lastApplied`.
 
 ### Update Position Commands
 
