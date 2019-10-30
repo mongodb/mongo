@@ -347,7 +347,18 @@ void ExpressionKeysPrivate::getHashKeys(const BSONObj& obj,
                                         const CollatorInterface* collator,
                                         BSONObjSet* keys) {
     const char* cstr = hashedField.c_str();
-    BSONElement fieldVal = dps::extractElementAtPath(obj, cstr);
+    BSONElement fieldVal = dps::extractElementAtPathOrArrayAlongPath(obj, cstr);
+
+    // If we hit an array while traversing the path, 'cstr' will point to the path component
+    // immediately following the array, or the null termination byte if the final field in the path
+    // was an array.
+    uassert(
+        16766,
+        str::stream()
+            << "Error: hashed indexes do not currently support array values. Found array at path: "
+            << hashedField.substr(
+                   0, hashedField.size() - StringData(cstr).size() - !StringData(cstr).empty()),
+        fieldVal.type() != BSONType::Array);
 
     // Convert strings to comparison keys.
     BSONObj fieldValObj;
@@ -356,13 +367,6 @@ void ExpressionKeysPrivate::getHashKeys(const BSONObj& obj,
         CollationIndexKey::collationAwareIndexKeyAppend(fieldVal, collator, &bob);
         fieldValObj = bob.obj();
         fieldVal = fieldValObj.firstElement();
-    }
-
-    uassert(16766,
-            "Error: hashed indexes do not currently support array values",
-            fieldVal.type() != Array);
-
-    if (!fieldVal.eoo()) {
         BSONObj key = BSON("" << makeSingleHashKey(fieldVal, seed, hashVersion));
         keys->insert(key);
     } else if (!isSparse) {

@@ -92,3 +92,13 @@ var total = t.find().hint({"_id": 1}).toArray().length;
 var totala = t.find().hint(goodspec).toArray().length;
 assert.eq(total, totala, "non-sparse index has wrong total");
 assert.lt(totalb, totala, "sparse index should have smaller total");
+
+// Test that having arrays along the path of the index is not allowed.
+assert.commandWorked(t.createIndex({"field1.field2.0.field4": "hashed"}));
+assert.writeErrorWithCode(t.insert({field1: []}), 16766);
+assert.writeErrorWithCode(t.insert({field1: {field2: []}}), 16766);
+assert.writeErrorWithCode(t.insert({field1: {field2: {0: []}}}), 16766);
+assert.writeErrorWithCode(t.insert({field1: [{field2: {0: []}}]}), 16766);
+assert.writeErrorWithCode(t.insert({field1: {field2: {0: {field4: []}}}}), 16766);
+assert.writeOK(t.insert({field1: {field2: {0: {otherField: []}}}}));
+assert.writeOK(t.insert({field1: {field2: {0: {field4: 1}}}}));
