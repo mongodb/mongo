@@ -120,8 +120,6 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
             _value.setUndefined();
             return;
         case mongo::RegEx: {
-            // TODO parse into a custom type that can support any patterns and flags SERVER-9803
-
             JS::AutoValueArray<2> args(_context);
 
             ValueReader(_context, args[0]).fromStringData(elem.regex());
