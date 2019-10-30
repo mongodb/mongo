@@ -208,10 +208,6 @@ void cleanupTask(ServiceContext* serviceContext) {
             cursorManager->shutdown(opCtx);
         }
 
-        if (auto pool = Grid::get(opCtx)->getExecutorPool()) {
-            pool->shutdownAndJoin();
-        }
-
         if (auto catalog = Grid::get(opCtx)->catalogClient()) {
             catalog->shutDown(opCtx);
         }
