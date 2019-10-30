@@ -31,7 +31,11 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/core/null_deleter.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <boost/log/attributes/value_extraction.hpp>
+#include <boost/log/core.hpp>
+#include <boost/log/sinks.hpp>
 #include <cctype>
 #include <fstream>
 #include <iostream>
@@ -51,7 +55,15 @@
 #include "mongo/db/server_options.h"
 #include "mongo/logger/console_appender.h"
 #include "mongo/logger/logger.h"
+#include "mongo/logger/logv2_appender.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
+#include "mongo/logv2/attribute_argument_set.h"
+#include "mongo/logv2/attributes.h"
+#include "mongo/logv2/component_settings_filter.h"
+#include "mongo/logv2/console.h"
+#include "mongo/logv2/log_domain_global.h"
+#include "mongo/logv2/log_manager.h"
+#include "mongo/logv2/text_formatter.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/linenoise.h"
@@ -122,6 +134,7 @@ const auto kAuthParam = "authSource"s;
  */
 class ShellConsoleAppender final : public logger::ConsoleAppender<logger::MessageEventEphemeral> {
     using Base = logger::ConsoleAppender<logger::MessageEventEphemeral>;
+    friend class ShellBackend;
 
 public:
     using Base::Base;
@@ -160,6 +173,41 @@ private:
     // logging will happen once we return from disable().
     static inline Mutex mx = MONGO_MAKE_LATCH("ShellConsoleAppender::mx");
     static inline bool loggingEnabled = true;
+};
+
+/**
+ * Logv2 equivalent of ShellConsoleAppender above. Sharing the lock and LoggingDisabledScope.
+ */
+class ShellBackend final : public boost::log::sinks::text_ostream_backend {
+public:
+    void consume(boost::log::record_view const& rec, string_type const& formatted_message) {
+        auto lk = stdx::lock_guard(ShellConsoleAppender::mx);
+        if (!ShellConsoleAppender::loggingEnabled)
+            return;
+        boost::log::sinks::text_ostream_backend::consume(rec, formatted_message);
+    }
+};
+
+/**
+ * Formatter to provide specialized formatting for logs from javascript engine
+ */
+class ShellFormatter final : private logv2::TextFormatter {
+public:
+    void operator()(boost::log::record_view const& rec, boost::log::formatting_ostream& strm) {
+        using namespace logv2;
+        using boost::log::extract;
+
+        if (extract<LogTag>(attributes::tags(), rec).get().has(LogTag::kJavascript)) {
+            StringData message = extract<StringData>(attributes::message(), rec).get();
+            const auto& attrs = extract<AttributeArgumentSet>(attributes::attributes(), rec).get();
+
+            _buffer.clear();
+            fmt::internal::vformat_to(_buffer, to_string_view(message), attrs._values);
+            strm.write(_buffer.data(), _buffer.size());
+        } else {
+            logv2::TextFormatter::operator()(rec, strm);
+        }
+    }
 };
 
 }  // namespace
@@ -677,6 +725,12 @@ int _main(int argc, char* argv[], char** envp) {
     logger::globalLogManager()->getGlobalDomain()->attachAppender(
         std::make_unique<ShellConsoleAppender>(
             std::make_unique<logger::MessageEventDetailsEncoder>()));
+
+    auto& lv2Manager = logv2::LogManager::global();
+    logv2::LogDomainGlobal::ConfigurationOptions lv2Config;
+    lv2Config.makeDisabled();
+    uassertStatusOK(lv2Manager.getGlobalDomainInternal().configure(lv2Config));
+
     mongo::shell_utils::RecordMyLocation(argv[0]);
 
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
@@ -701,10 +755,34 @@ int _main(int argc, char* argv[], char** envp) {
     if (!mongo::serverGlobalParams.quiet.load())
         std::cout << mongoShellVersion(VersionInfoInterface::instance()) << std::endl;
 
-    logger::globalLogManager()
-        ->getNamedDomain("javascriptOutput")
-        ->attachAppender(std::make_unique<ShellConsoleAppender>(
-            std::make_unique<logger::MessageEventUnadornedEncoder>()));
+    if (!shellGlobalParams.logV2) {
+        logger::globalLogManager()
+            ->getNamedDomain("javascriptOutput")
+            ->attachAppender(std::make_unique<ShellConsoleAppender>(
+                std::make_unique<logger::MessageEventUnadornedEncoder>()));
+    } else {
+        logger::globalLogManager()->getGlobalDomain()->clearAppenders();
+        logger::globalLogManager()->getGlobalDomain()->attachAppender(
+            std::make_unique<logger::LogV2Appender<logger::MessageEventEphemeral>>(
+                &(lv2Manager.getGlobalDomain())));
+        logger::globalLogManager()
+            ->getNamedDomain("javascriptOutput")
+            ->attachAppender(std::make_unique<logger::LogV2Appender<logger::MessageEventEphemeral>>(
+                &lv2Manager.getGlobalDomain(), logv2::LogTag::kJavascript));
+
+        auto consoleSink = boost::make_shared<boost::log::sinks::synchronous_sink<ShellBackend>>();
+        consoleSink->set_filter(logv2::ComponentSettingsFilter(lv2Manager.getGlobalDomain(),
+                                                               lv2Manager.getGlobalSettings()));
+        consoleSink->set_formatter(ShellFormatter());
+
+        consoleSink->locked_backend()->add_stream(
+            boost::shared_ptr<std::ostream>(&logv2::Console::out(), boost::null_deleter()));
+
+        consoleSink->locked_backend()->auto_flush();
+
+        boost::log::core::get()->add_sink(std::move(consoleSink));
+    }
+
 
     // Get the URL passed to the shell
     std::string& cmdlineURI = shellGlobalParams.url;

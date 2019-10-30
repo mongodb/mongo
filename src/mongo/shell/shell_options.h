@@ -81,6 +81,8 @@ struct ShellGlobalParams {
     int jsHeapLimitMB = 0;
     bool nokillop = false;
     Seconds idleSessionTimeout = Seconds{0};
+
+    bool logV2 = false;
 };
 
 extern ShellGlobalParams shellGlobalParams;

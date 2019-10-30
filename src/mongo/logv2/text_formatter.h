@@ -89,7 +89,7 @@ public:
         strm.write(_buffer.data(), _buffer.size());
     }
 
-private:
+protected:
     fmt::memory_buffer _buffer;
 };
 

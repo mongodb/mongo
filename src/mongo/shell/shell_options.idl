@@ -208,3 +208,8 @@ configs:
     arg_vartype: Int
     default: 0
     validator: {gte: 0}
+
+  "logv2":
+    description: "logging gets directed to the logv2 backend"
+    arg_vartype: Switch
+    source: [ cli, ini ]

@@ -337,6 +337,10 @@ Status storeMongoShellOptions(const moe::Environment& params,
         }
     }
 
+    if (params.count("logv2")) {
+        shellGlobalParams.logV2 = true;
+    }
+
     return Status::OK();
 }
 
