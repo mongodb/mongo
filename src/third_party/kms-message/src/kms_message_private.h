@@ -17,9 +17,12 @@
 #ifndef KMS_MESSAGE_PRIVATE_H
 #define KMS_MESSAGE_PRIVATE_H
 
+#include <stdio.h>
+
 #include "kms_message/kms_message.h"
 #include "kms_request_str.h"
 #include "kms_kv_list.h"
+#include "kms_crypto.h"
 
 struct _kms_request_t {
    char error[512];
@@ -39,6 +42,7 @@ struct _kms_request_t {
    kms_kv_list_t *header_fields;
    /* turn off for tests only, not in public kms_request_opt_t API */
    bool auto_content_length;
+   _kms_crypto_t crypto;
 };
 
 struct _kms_response_t {
@@ -79,5 +83,11 @@ set_error (char *error, size_t size, const char *fmt, ...);
       obj->failed = true;                                       \
       set_error (obj->error, sizeof (obj->error), __VA_ARGS__); \
    } while (0)
+
+#define KMS_ASSERT(stmt) \
+if (!(stmt)) { \
+    fprintf (stderr, "%s failed\n", #stmt); \
+    abort (); \
+}
 
 #endif /* KMS_MESSAGE_PRIVATE_H */

@@ -20,6 +20,7 @@
 #include "kms_message_defines.h"
 
 #include <stdbool.h>
+#include <stdlib.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,6 +35,19 @@ kms_request_opt_destroy (kms_request_opt_t *request);
 KMS_MSG_EXPORT (void)
 kms_request_opt_set_connection_close (kms_request_opt_t *opt,
                                       bool connection_close);
+KMS_MSG_EXPORT (void)
+kms_request_opt_set_crypto_hooks (kms_request_opt_t *opt,
+                                  bool (*sha256) (void *ctx,
+                                                  const char *input,
+                                                  size_t len,
+                                                  unsigned char *hash_out),
+                                  bool (*sha256_hmac) (void *ctx,
+                                                       const char *key_input,
+                                                       size_t key_len,
+                                                       const char *input,
+                                                       size_t len,
+                                                       unsigned char *hash_out),
+                                  void *ctx);
 
 #ifdef __cplusplus
 } /* extern "C" */

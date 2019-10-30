@@ -62,6 +62,10 @@ kms_request_append_payload (kms_request_t *request,
                             size_t len);
 KMS_MSG_EXPORT (char *)
 kms_request_get_canonical (kms_request_t *request);
+
+KMS_MSG_EXPORT (const char *)
+kms_request_get_canonical_header (kms_request_t *request, const char *header);
+
 KMS_MSG_EXPORT (char *)
 kms_request_get_string_to_sign (kms_request_t *request);
 KMS_MSG_EXPORT (bool)
@@ -71,7 +75,7 @@ kms_request_get_signature (kms_request_t *request);
 KMS_MSG_EXPORT (char *)
 kms_request_get_signed (kms_request_t *request);
 KMS_MSG_EXPORT (void)
-kms_request_free_string (char* ptr);
+kms_request_free_string (char *ptr);
 
 #ifdef __cplusplus
 } /* extern "C" */

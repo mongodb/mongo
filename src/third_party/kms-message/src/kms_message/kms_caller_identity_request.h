@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-present MongoDB, Inc.
+ * Copyright 2019-present MongoDB, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef KMS_RESPONSE_H
-#define KMS_RESPONSE_H
+#ifndef KMS_CALLER_IDENTITY_REQUEST_H
+#define KMS_CALLER_IDENTITY_REQUEST_H
 
 #include "kms_message.h"
 
@@ -23,14 +23,12 @@
 extern "C" {
 #endif
 
-typedef struct _kms_response_t kms_response_t;
-
-KMS_MSG_EXPORT (const char *)
-kms_response_get_body (kms_response_t *reply, size_t *len);
-KMS_MSG_EXPORT (void) kms_response_destroy (kms_response_t *reply);
+KMS_MSG_EXPORT (kms_request_t *)
+kms_caller_identity_request_new (const kms_request_opt_t *opt);
 
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
 
-#endif /* KMS_RESPONSE_H */
+
+#endif /* KMS_CALLER_IDENTITY_REQUEST_H */

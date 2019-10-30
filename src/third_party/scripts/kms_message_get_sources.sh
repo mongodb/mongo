@@ -17,8 +17,8 @@ if grep -q Microsoft /proc/version; then
     GIT_EXE=git.exe
 fi
 
-NAME=kms-message
-REVISION=75e391a037d30941f8cad17568ea9bdd37962127
+NAME=libmongocrypt
+REVISION=59c8c17bbdfa1cf0fdec60cfdde73a437a868221
 
 if grep -q Microsoft /proc/version; then
     SRC_ROOT=$(wslpath -u $(powershell.exe -Command "Get-ChildItem Env:TEMP | Get-Content | Write-Host"))
@@ -35,12 +35,12 @@ CLONE_DEST=$SRC
 if grep -q Microsoft /proc/version; then
     CLONE_DEST=$(wslpath -m $SRC)
 fi
-DEST_DIR=$($GIT_EXE rev-parse --show-toplevel)/src/third_party/$NAME
+DEST_DIR=$($GIT_EXE rev-parse --show-toplevel)/src/third_party/kms-message
 
 echo "dest: $DEST_DIR"
 
 if [ ! -d $SRC ]; then
-    $GIT_EXE clone https://github.com/mongodb-labs/kms-message $CLONE_DEST
+    $GIT_EXE clone https://github.com/mongodb/libmongocrypt $CLONE_DEST
 
     pushd $SRC
     $GIT_EXE checkout $REVISION
@@ -58,10 +58,11 @@ README.rst
 test
 )
 
+SRC_DIR=${SRC}/kms-message
 for file in "${stuff_to_remove[@]}" ; do
-    rm -rf "$SRC/$file"
+    rm -rf "$SRC_DIR/$file"
 done
 
-cp -r $SRC/* $DEST_DIR
+cp -r $SRC_DIR/* $DEST_DIR
 
 

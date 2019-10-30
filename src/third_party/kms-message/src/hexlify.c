@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <assert.h>
+#include "kms_message_private.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,7 +47,7 @@ unhexlify (const char *hex_chars, size_t *len)
    pos = buf;
 
    while (*hex_chars) {
-      assert (1 == sscanf (hex_chars, "%2hhx", pos));
+      KMS_ASSERT (1 == sscanf (hex_chars, "%2hhx", pos));
       pos++;
       hex_chars += 2;
    }

@@ -1,7 +1,7 @@
 #include "kms_message/kms_response_parser.h"
 #include "kms_message_private.h"
 
-#include <assert.h>
+#include "kms_message_private.h"
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,7 +48,7 @@ kms_response_parser_wants_bytes (kms_response_parser_t *parser, int32_t max)
    case PARSING_HEADER:
       return max;
    case PARSING_BODY:
-      assert (parser->content_length != -1);
+      KMS_ASSERT (parser->content_length != -1);
       return parser->content_length -
              ((int) parser->raw_response->len - parser->start);
    }
@@ -119,6 +119,7 @@ _parse_line (kms_response_parser_t *parser, int end)
       }
 
       response->status = status;
+
       /* ignore the Reason-Phrase. */
       return PARSING_HEADER;
    } else if (parser->state == PARSING_HEADER) {
@@ -208,11 +209,21 @@ kms_response_parser_feed (kms_response_parser_t *parser,
             parser->start = curr + 1;
          }
          curr++;
+
+         if (parser->state == PARSING_BODY && parser->content_length <= 0) {
+            /* Ok, no Content-Length header, or explicitly 0, so empty body */
+            parser->response->body = kms_request_str_new ();
+            parser->state = PARSING_DONE;
+         }
          break;
       case PARSING_BODY:
          body_read = (int) raw->len - parser->start;
-         assert (parser->content_length != -1);
-         assert (body_read <= parser->content_length);
+
+         if (parser->content_length == -1 ||
+             body_read > parser->content_length) {
+            KMS_ERROR (parser, "Unexpected: exceeded content length");
+            return false;
+         }
 
          /* check if we have the entire body. */
          if (body_read == parser->content_length) {
@@ -224,11 +235,14 @@ kms_response_parser_feed (kms_response_parser_t *parser,
          curr = (int) raw->len;
          break;
       case PARSING_DONE:
-         /* return false if error. */
-         return true;
+         KMS_ERROR (parser, "Unexpected extra HTTP content");
+         return false;
       }
    }
 
+   if (parser->failed) {
+      return false;
+   }
    return true;
 }
 
@@ -243,6 +257,26 @@ kms_response_parser_get_response (kms_response_parser_t *parser)
    _parser_destroy (parser);
    _parser_init (parser);
    return response;
+}
+
+int
+kms_response_parser_status (kms_response_parser_t *parser)
+{
+   if (!parser || !(parser->response)) {
+      return 0;
+   }
+
+   return parser->response->status;
+}
+
+const char *
+kms_response_parser_error (kms_response_parser_t *parser)
+{
+   if (!parser) {
+      return NULL;
+   }
+
+   return parser->error;
 }
 
 void

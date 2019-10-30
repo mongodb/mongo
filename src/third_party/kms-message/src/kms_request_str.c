@@ -17,10 +17,10 @@
 #include "hexlify.h"
 #include "kms_crypto.h"
 #include "kms_message/kms_message.h"
+#include "kms_message_private.h"
 #include "kms_request_str.h"
 #include "kms_port.h"
 
-#include <assert.h>
 #include <stdio.h>
 #include <ctype.h>
 #include <stdbool.h>
@@ -46,36 +46,6 @@ tables_init ()
    kms_initialized = true;
 }
 
-static char *
-kms_strdupv_printf (const char *format, va_list args)
-{
-   va_list my_args;
-   char *buf;
-   ssize_t len = 32;
-   ssize_t n;
-
-   assert (format);
-
-   buf = malloc ((size_t) len);
-
-   while (true) {
-      va_copy (my_args, args);
-      n = vsnprintf (buf, len, format, my_args);
-      va_end (my_args);
-
-      if (n > -1 && n < len) {
-         return buf;
-      }
-
-      if (n > -1) {
-         len = n + 1;
-      } else {
-         len *= 2;
-      }
-
-      buf = realloc (buf, (size_t) len);
-   }
-}
 
 kms_request_str_t *
 kms_request_str_new (void)
@@ -109,7 +79,13 @@ kms_request_str_new_from_chars (const char *chars, ssize_t len)
 kms_request_str_t *
 kms_request_str_wrap (char *chars, ssize_t len)
 {
-   kms_request_str_t *s = malloc (sizeof (kms_request_str_t));
+   kms_request_str_t *s;
+
+   if (!chars) {
+      return NULL;
+   }
+
+   s = malloc (sizeof (kms_request_str_t));
 
    s->str = chars;
    s->len = len < 0 ? strlen (chars) : (size_t) len;
@@ -132,6 +108,9 @@ kms_request_str_destroy (kms_request_str_t *str)
 char *
 kms_request_str_detach (kms_request_str_t *str)
 {
+   if (!str) {
+      return NULL;
+   }
    char *r = str->str;
    free (str);
    return r;
@@ -268,7 +247,7 @@ kms_request_str_appendf (kms_request_str_t *str, const char *format, ...)
    size_t remaining;
    int n;
 
-   assert (format);
+   KMS_ASSERT (format);
 
    while (true) {
       remaining = str->size - str->len;
@@ -368,13 +347,14 @@ kms_request_str_append_stripped (kms_request_str_t *str,
 }
 
 bool
-kms_request_str_append_hashed (kms_request_str_t *str,
+kms_request_str_append_hashed (_kms_crypto_t *crypto,
+                               kms_request_str_t *str,
                                kms_request_str_t *appended)
 {
    uint8_t hash[32];
    char *hex_chars;
 
-   if (!kms_sha256 (appended->str, appended->len, hash)) {
+   if (!crypto->sha256 (crypto->ctx, appended->str, appended->len, hash)) {
       return false;
    }
 

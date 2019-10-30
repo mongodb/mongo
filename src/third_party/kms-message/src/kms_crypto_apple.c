@@ -31,7 +31,10 @@ kms_crypto_cleanup ()
 }
 
 bool
-kms_sha256 (const char *input, size_t len, unsigned char *hash_out)
+kms_sha256 (void *unused_ctx,
+            const char *input,
+            size_t len,
+            unsigned char *hash_out)
 {
    CC_SHA256_CTX ctx;
    CC_SHA256_Init (&ctx);
@@ -41,7 +44,8 @@ kms_sha256 (const char *input, size_t len, unsigned char *hash_out)
 }
 
 bool
-kms_sha256_hmac (const char *key_input,
+kms_sha256_hmac (void *unused_ctx,
+                 const char *key_input,
                  size_t key_len,
                  const char *input,
                  size_t len,

@@ -14,23 +14,37 @@
  * limitations under the License.
  */
 
-#ifndef KMS_RESPONSE_H
-#define KMS_RESPONSE_H
+#include "kms_crypto.h"
 
-#include "kms_message.h"
+int
+kms_crypto_init ()
+{
+   return 0;
+}
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+void
+kms_crypto_cleanup ()
+{
+}
 
-typedef struct _kms_response_t kms_response_t;
+bool
+kms_sha256 (void *unused_ctx,
+            const char *input,
+            size_t len,
+            unsigned char *hash_out)
+{
+   /* only gets called if hooks were mistakenly not set */
+   return false;
+}
 
-KMS_MSG_EXPORT (const char *)
-kms_response_get_body (kms_response_t *reply, size_t *len);
-KMS_MSG_EXPORT (void) kms_response_destroy (kms_response_t *reply);
-
-#ifdef __cplusplus
-} /* extern "C" */
-#endif
-
-#endif /* KMS_RESPONSE_H */
+bool
+kms_sha256_hmac (void *unused_ctx,
+                 const char *key_input,
+                 size_t key_len,
+                 const char *input,
+                 size_t len,
+                 unsigned char *hash_out)
+{
+   /* only gets called if hooks were mistakenly not set */
+   return false;
+}

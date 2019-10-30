@@ -18,6 +18,7 @@
 #define KMS_MESSAGE_KMS_REQUEST_STR_H
 
 #include "kms_message/kms_message.h"
+#include "kms_crypto.h"
 
 #include <stdarg.h>
 #include <stdbool.h>
@@ -78,7 +79,8 @@ KMS_MSG_EXPORT (void)
 kms_request_str_append_stripped (kms_request_str_t *str,
                                  kms_request_str_t *appended);
 KMS_MSG_EXPORT (bool)
-kms_request_str_append_hashed (kms_request_str_t *str,
+kms_request_str_append_hashed (_kms_crypto_t *crypto,
+                               kms_request_str_t *str,
                                kms_request_str_t *appended);
 KMS_MSG_EXPORT (bool)
 kms_request_str_append_hex (kms_request_str_t *str,

@@ -37,3 +37,23 @@ kms_request_opt_set_connection_close (kms_request_opt_t *opt,
 {
    opt->connection_close = connection_close;
 }
+
+
+void
+kms_request_opt_set_crypto_hooks (kms_request_opt_t *opt,
+                                  bool (*sha256) (void *ctx,
+                                                  const char *input,
+                                                  size_t len,
+                                                  unsigned char *hash_out),
+                                  bool (*sha256_hmac) (void *ctx,
+                                                       const char *key_input,
+                                                       size_t key_len,
+                                                       const char *input,
+                                                       size_t len,
+                                                       unsigned char *hash_out),
+                                  void *ctx)
+{
+   opt->crypto.sha256 = sha256;
+   opt->crypto.sha256_hmac = sha256_hmac;
+   opt->crypto.ctx = ctx;
+}

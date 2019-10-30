@@ -212,7 +212,7 @@ std::vector<uint8_t> AWSKMSService::encrypt(ConstDataRange cdr, StringData kmsKe
     AWSConnection connection(_sslManager.get());
     auto response = connection.makeOneRequest(_server, ConstDataRange(buffer.get(), buffer_len));
 
-    auto body = kms_response_get_body(response.get());
+    auto body = kms_response_get_body(response.get(), nullptr);
 
     BSONObj obj = fromjson(body);
 
@@ -265,7 +265,7 @@ SecureVector<uint8_t> AWSKMSService::decrypt(ConstDataRange cdr, BSONObj masterK
     AWSConnection connection(_sslManager.get());
     auto response = connection.makeOneRequest(_server, ConstDataRange(buffer.get(), buffer_len));
 
-    auto body = kms_response_get_body(response.get());
+    auto body = kms_response_get_body(response.get(), nullptr);
 
     BSONObj obj = fromjson(body);
 

@@ -40,6 +40,12 @@ kms_response_parser_feed (kms_response_parser_t *parser,
 KMS_MSG_EXPORT (kms_response_t *)
 kms_response_parser_get_response (kms_response_parser_t *parser);
 
+KMS_MSG_EXPORT (int)
+kms_response_parser_status (kms_response_parser_t *parser);
+
+KMS_MSG_EXPORT (const char *)
+kms_response_parser_error (kms_response_parser_t *parser);
+
 KMS_MSG_EXPORT (void)
 kms_response_parser_destroy (kms_response_parser_t *parser);
 
