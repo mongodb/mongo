@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,857 +29,364 @@
 
 #include "mongo/platform/basic.h"
 
-#include <list>
-#include <memory>
-#include <utility>
-
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/commands/list_collections_filter.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/repl/base_cloner_test_fixture.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/repl/cloner_test_fixture.h"
 #include "mongo/db/repl/database_cloner.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
-#include "mongo/unittest/task_executor_proxy.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/str.h"
-#include "mongo/util/uuid.h"
+#include "mongo/util/concurrency/thread_pool.h"
 
-namespace {
-
-using namespace mongo;
-using namespace mongo::repl;
-using namespace unittest;
-
-const std::string dbname("db");
+namespace mongo {
+namespace repl {
 
 struct CollectionCloneInfo {
     std::shared_ptr<CollectionMockStats> stats = std::make_shared<CollectionMockStats>();
     CollectionBulkLoaderMock* loader = nullptr;
-    Status status{ErrorCodes::NotYetInitialized, ""};
 };
 
-class DatabaseClonerTest : public BaseClonerTest {
+class DatabaseClonerTest : public ClonerTestFixture {
 public:
-    DatabaseClonerTest() {
-        _options1.uuid = UUID::gen();
-        _options2.uuid = UUID::gen();
-        _options3.uuid = UUID::gen();
-    }
-    void clear() override;
-    BaseCloner* getCloner() const override;
+    DatabaseClonerTest() {}
 
 protected:
-    auto makeCollectionWorkClosure() {
-        return [this](const Status& status, const NamespaceString& srcNss) {
-            _collections[srcNss].status = status;
+    void setUp() override {
+        ClonerTestFixture::setUp();
+        _storageInterface.createCollectionForBulkFn =
+            [this](const NamespaceString& nss,
+                   const CollectionOptions& options,
+                   const BSONObj& idIndexSpec,
+                   const std::vector<BSONObj>& secondaryIndexSpecs)
+            -> StatusWith<std::unique_ptr<CollectionBulkLoaderMock>> {
+            const auto collInfo = &_collections[nss];
+
+            auto localLoader = std::make_unique<CollectionBulkLoaderMock>(collInfo->stats);
+            auto status = localLoader->init(secondaryIndexSpecs);
+            if (!status.isOK())
+                return status;
+            collInfo->loader = localLoader.get();
+
+            return std::move(localLoader);
         };
     }
-    auto makeSetStatusClosure() {
-        return [this](const Status& status) { setStatus(status); };
+    std::unique_ptr<DatabaseCloner> makeDatabaseCloner() {
+        return std::make_unique<DatabaseCloner>(_dbName,
+                                                _sharedData.get(),
+                                                _source,
+                                                _mockClient.get(),
+                                                &_storageInterface,
+                                                _dbWorkThreadPool.get());
     }
 
-    void setUp() override;
-    void tearDown() override;
+    BSONObj createListCollectionsResponse(const std::vector<BSONObj>& collections) {
+        auto ns = _dbName + "$cmd.listCollections";
+        BSONObjBuilder bob;
+        {
+            BSONObjBuilder cursorBob(bob.subobjStart("cursor"));
+            cursorBob.append("id", CursorId(0));
+            cursorBob.append("ns", ns);
+            {
+                BSONArrayBuilder batchBob(cursorBob.subarrayStart("firstBatch"));
+                for (const auto& coll : collections) {
+                    batchBob.append(coll);
+                }
+            }
+        }
+        bob.append("ok", 1);
+        return bob.obj();
+    }
+
+    std::vector<std::pair<NamespaceString, CollectionOptions>> getCollectionsFromCloner(
+        DatabaseCloner* cloner) {
+        return cloner->_collections;
+    }
 
     std::map<NamespaceString, CollectionCloneInfo> _collections;
-    std::unique_ptr<DatabaseCloner> _databaseCloner;
-    CollectionOptions _options1;
-    CollectionOptions _options2;
-    CollectionOptions _options3;
-    DatabaseCloner::StartCollectionClonerFn _startCollectionCloner;
-    std::unique_ptr<MockRemoteDBServer> _mockServer;
+
+    static std::string _dbName;
 };
 
-void DatabaseClonerTest::setUp() {
-    BaseClonerTest::setUp();
-    _databaseCloner = std::make_unique<DatabaseCloner>(&getExecutor(),
-                                                       dbWorkThreadPool.get(),
-                                                       target,
-                                                       dbname,
-                                                       BSONObj(),
-                                                       DatabaseCloner::ListCollectionsPredicateFn(),
-                                                       storageInterface.get(),
-                                                       makeCollectionWorkClosure(),
-                                                       makeSetStatusClosure());
-    _databaseCloner->setScheduleDbWorkFn_forTest([this](executor::TaskExecutor::CallbackFn work) {
-        return getExecutor().scheduleWork(std::move(work));
-    });
-
-    _mockServer = std::make_unique<MockRemoteDBServer>(target.toString());
-    _mockServer->assignCollectionUuid("db.a", *_options1.uuid);
-    _mockServer->assignCollectionUuid("db.b", *_options2.uuid);
-    _mockServer->assignCollectionUuid("db.c", *_options3.uuid);
-    _startCollectionCloner = [this](CollectionCloner& cloner) {
-        cloner.setCreateClientFn_forTest([&cloner, this]() {
-            return std::unique_ptr<DBClientConnection>(
-                new MockDBClientConnection(_mockServer.get()));
-        });
-        return cloner.startup();
-    };
-    _databaseCloner->setStartCollectionClonerFn(_startCollectionCloner);
-
-    storageInterface->createCollectionForBulkFn =
-        [this](const NamespaceString& nss,
-               const CollectionOptions& options,
-               const BSONObj& idIndexSpec,
-               const std::vector<BSONObj>& secondaryIndexSpecs)
-        -> StatusWith<std::unique_ptr<CollectionBulkLoaderMock>> {
-        const auto collInfo = &_collections[nss];
-
-        auto localLoader = std::make_unique<CollectionBulkLoaderMock>(collInfo->stats);
-        auto status = localLoader->init(secondaryIndexSpecs);
-        if (!status.isOK())
-            return status;
-        collInfo->loader = localLoader.get();
-
-        return std::move(localLoader);
-    };
-}
-
-void DatabaseClonerTest::tearDown() {
-    BaseClonerTest::tearDown();
-    _databaseCloner.reset();
-    _collections.clear();
-}
-
-void DatabaseClonerTest::clear() {}
-
-BaseCloner* DatabaseClonerTest::getCloner() const {
-    return _databaseCloner.get();
-}
-
-TEST_F(DatabaseClonerTest, InvalidConstruction) {
-    executor::TaskExecutor& executor = getExecutor();
-
-    const BSONObj filter;
-    DatabaseCloner::ListCollectionsPredicateFn pred;
-    StorageInterface* si = storageInterface.get();
-    auto ccb = makeCollectionWorkClosure();
-    auto cb = [](const Status&) { FAIL("should not reach here"); };
-
-    // Null executor -- error from Fetcher, not _databaseCloner.
-    ASSERT_THROWS_CODE_AND_WHAT(
-        DatabaseCloner(nullptr, dbWorkThreadPool.get(), target, dbname, filter, pred, si, ccb, cb),
-        AssertionException,
-        ErrorCodes::BadValue,
-        "task executor cannot be null");
-
-    // Null db worker thread pool.
-    ASSERT_THROWS_CODE_AND_WHAT(
-        DatabaseCloner(&executor, nullptr, target, dbname, filter, pred, si, ccb, cb),
-        AssertionException,
-        ErrorCodes::BadValue,
-        "db worker thread pool cannot be null");
-
-    // Empty database name -- error from Fetcher, not _databaseCloner.
-    ASSERT_THROWS_CODE_AND_WHAT(
-        DatabaseCloner(&executor, dbWorkThreadPool.get(), target, "", filter, pred, si, ccb, cb),
-        AssertionException,
-        ErrorCodes::BadValue,
-        "database name in remote command request cannot be empty");
-
-    // Callback function cannot be null.
-    ASSERT_THROWS_CODE_AND_WHAT(
-        DatabaseCloner(
-            &executor, dbWorkThreadPool.get(), target, dbname, filter, pred, si, ccb, nullptr),
-        AssertionException,
-        ErrorCodes::BadValue,
-        "callback function cannot be null");
-
-    // Storage interface cannot be null.
-    ASSERT_THROWS_CODE_AND_WHAT(
-        DatabaseCloner(
-            &executor, dbWorkThreadPool.get(), target, dbname, filter, pred, nullptr, ccb, cb),
-        AssertionException,
-        ErrorCodes::BadValue,
-        "storage interface cannot be null");
-
-    // CollectionCallbackFn function cannot be null.
-    ASSERT_THROWS_CODE_AND_WHAT(
-        DatabaseCloner(
-            &executor, dbWorkThreadPool.get(), target, dbname, filter, pred, si, nullptr, cb),
-        AssertionException,
-        ErrorCodes::BadValue,
-        "collection callback function cannot be null");
-
-    // Completion callback cannot be null.
-    ASSERT_THROWS_CODE_AND_WHAT(
-        DatabaseCloner(
-            &executor, dbWorkThreadPool.get(), target, dbname, filter, pred, si, ccb, nullptr),
-        AssertionException,
-        ErrorCodes::BadValue,
-        "callback function cannot be null");
-}
-
-TEST_F(DatabaseClonerTest, ClonerLifeCycle) {
-    testLifeCycle();
-}
-
-TEST_F(DatabaseClonerTest, DatabaseClonerTransitionsToCompleteIfShutdownBeforeStartup) {
-    ASSERT_EQUALS(DatabaseCloner::State::kPreStart, _databaseCloner->getState_forTest());
-
-    _databaseCloner->shutdown();
-    ASSERT_EQUALS(DatabaseCloner::State::kComplete, _databaseCloner->getState_forTest());
-    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, _databaseCloner->startup());
-}
-
-class TaskExecutorWithFailureInScheduleRemoteCommand : public unittest::TaskExecutorProxy {
-public:
-    using ShouldFailRequestFn = std::function<bool(const executor::RemoteCommandRequest&)>;
-
-    TaskExecutorWithFailureInScheduleRemoteCommand(executor::TaskExecutor* executor,
-                                                   ShouldFailRequestFn shouldFailRequest)
-        : unittest::TaskExecutorProxy(executor), _shouldFailRequest(shouldFailRequest) {}
-
-    StatusWith<CallbackHandle> scheduleRemoteCommand(const executor::RemoteCommandRequest& request,
-                                                     const RemoteCommandCallbackFn& cb,
-                                                     const BatonHandle& baton = nullptr) override {
-        if (_shouldFailRequest(request)) {
-            return Status(ErrorCodes::OperationFailed, "failed to schedule remote command");
-        }
-        return getExecutor()->scheduleRemoteCommand(request, cb, baton);
-    }
-
-private:
-    ShouldFailRequestFn _shouldFailRequest;
-};
-
-TEST_F(DatabaseClonerTest,
-       DatabaseClonerReturnsScheduleErrorOnFailingToScheduleListCollectionsCommand) {
-    TaskExecutorWithFailureInScheduleRemoteCommand executorProxy(
-        &getExecutor(), [](const executor::RemoteCommandRequest& request) {
-            return request.cmdObj.firstElementFieldNameStringData() == "listCollections";
-        });
-
-    DatabaseCloner databaseCloner(&executorProxy,
-                                  dbWorkThreadPool.get(),
-                                  target,
-                                  dbname,
-                                  BSONObj(),
-                                  DatabaseCloner::ListCollectionsPredicateFn(),
-                                  storageInterface.get(),
-                                  [](const Status&, const NamespaceString&) {},
-                                  [](const Status&) {});
-    ASSERT_EQUALS(DatabaseCloner::State::kPreStart, databaseCloner.getState_forTest());
-
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, databaseCloner.startup());
-    ASSERT_EQUALS(DatabaseCloner::State::kComplete, databaseCloner.getState_forTest());
-}
-
-TEST_F(DatabaseClonerTest, FirstRemoteCommandWithoutFilter) {
-    ASSERT_EQUALS(DatabaseCloner::State::kPreStart, _databaseCloner->getState_forTest());
-
-    ASSERT_OK(_databaseCloner->startup());
-    ASSERT_EQUALS(DatabaseCloner::State::kRunning, _databaseCloner->getState_forTest());
-
-    auto net = getNet();
-    executor::NetworkInterfaceMock::InNetworkGuard guard(net);
-    ASSERT_TRUE(net->hasReadyRequests());
-    NetworkOperationIterator noi = net->getNextReadyRequest();
-    auto&& noiRequest = noi->getRequest();
-    ASSERT_EQUALS(nss.db().toString(), noiRequest.dbname);
-    ASSERT_EQUALS("listCollections", std::string(noiRequest.cmdObj.firstElementFieldName()));
-    ASSERT_EQUALS(1, noiRequest.cmdObj.firstElement().numberInt());
-    ASSERT_TRUE(noiRequest.cmdObj.hasField("filter"));
-    BSONElement filterElement = noiRequest.cmdObj.getField("filter");
-    ASSERT_TRUE(filterElement.isABSONObj());
-    ASSERT_BSONOBJ_EQ(ListCollectionsFilter::makeTypeCollectionFilter(), filterElement.Obj());
-    ASSERT_FALSE(net->hasReadyRequests());
-    ASSERT_TRUE(_databaseCloner->isActive());
-}
-
-TEST_F(DatabaseClonerTest, FirstRemoteCommandWithFilter) {
-    const BSONObj listCollectionsFilter = BSON("name"
-                                               << "coll");
-    _databaseCloner = std::make_unique<DatabaseCloner>(&getExecutor(),
-                                                       dbWorkThreadPool.get(),
-                                                       target,
-                                                       dbname,
-                                                       listCollectionsFilter,
-                                                       DatabaseCloner::ListCollectionsPredicateFn(),
-                                                       storageInterface.get(),
-                                                       makeCollectionWorkClosure(),
-                                                       makeSetStatusClosure());
-    ASSERT_EQUALS(DatabaseCloner::State::kPreStart, _databaseCloner->getState_forTest());
-
-    ASSERT_OK(_databaseCloner->startup());
-    ASSERT_EQUALS(DatabaseCloner::State::kRunning, _databaseCloner->getState_forTest());
-
-    auto net = getNet();
-    executor::NetworkInterfaceMock::InNetworkGuard guard(net);
-    ASSERT_TRUE(net->hasReadyRequests());
-    NetworkOperationIterator noi = net->getNextReadyRequest();
-    auto&& noiRequest = noi->getRequest();
-    ASSERT_EQUALS(nss.db().toString(), noiRequest.dbname);
-    ASSERT_EQUALS("listCollections", std::string(noiRequest.cmdObj.firstElementFieldName()));
-    ASSERT_EQUALS(1, noiRequest.cmdObj.firstElement().numberInt());
-    BSONElement filterElement = noiRequest.cmdObj.getField("filter");
-    ASSERT_TRUE(filterElement.isABSONObj());
-    ASSERT_BSONOBJ_EQ(ListCollectionsFilter::addTypeCollectionFilter(listCollectionsFilter),
-                      filterElement.Obj());
-    ASSERT_FALSE(net->hasReadyRequests());
-    ASSERT_TRUE(_databaseCloner->isActive());
-    ASSERT_EQUALS(DatabaseCloner::State::kRunning, _databaseCloner->getState_forTest());
-}
-
-TEST_F(DatabaseClonerTest, InvalidListCollectionsFilter) {
-    ASSERT_EQUALS(DatabaseCloner::State::kPreStart, _databaseCloner->getState_forTest());
-
-    ASSERT_OK(_databaseCloner->startup());
-    ASSERT_EQUALS(DatabaseCloner::State::kRunning, _databaseCloner->getState_forTest());
-
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(BSON("ok" << 0 << "errmsg"
-                                         << "unknown operator"
-                                         << "code" << ErrorCodes::BadValue));
-    }
-
-    ASSERT_EQUALS(ErrorCodes::BadValue, getStatus().code());
-    ASSERT_FALSE(_databaseCloner->isActive());
-    ASSERT_EQUALS(DatabaseCloner::State::kComplete, _databaseCloner->getState_forTest());
-}
+/* static */
+std::string DatabaseClonerTest::_dbName = "testDb";
 
 // A database may have no collections. Nothing to do for the database cloner.
 TEST_F(DatabaseClonerTest, ListCollectionsReturnedNoCollections) {
-    ASSERT_EQUALS(DatabaseCloner::State::kPreStart, _databaseCloner->getState_forTest());
+    _mockServer->setCommandReply("listCollections", createListCollectionsResponse({}));
+    auto cloner = makeDatabaseCloner();
 
-    ASSERT_OK(_databaseCloner->startup());
-    ASSERT_EQUALS(DatabaseCloner::State::kRunning, _databaseCloner->getState_forTest());
-
-    // Keep going even if initial batch is empty.
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createListCollectionsResponse(1, BSONArray()));
-    }
-
-    ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
-    ASSERT_TRUE(_databaseCloner->isActive());
-
-    // Final batch is also empty. Database cloner should stop and return a successful status.
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createListCollectionsResponse(0, BSONArray(), "nextBatch"));
-    }
-
-    ASSERT_OK(getStatus());
-    ASSERT_FALSE(_databaseCloner->isActive());
-    ASSERT_EQUALS(DatabaseCloner::State::kComplete, _databaseCloner->getState_forTest());
+    ASSERT_OK(cloner->run());
+    ASSERT_OK(_sharedData->initialSyncStatus);
+    ASSERT(getCollectionsFromCloner(cloner.get()).empty());
 }
 
-TEST_F(DatabaseClonerTest, ListCollectionsPredicate) {
-    DatabaseCloner::ListCollectionsPredicateFn pred = [](const BSONObj& info) {
-        return info["name"].String() != "b";
-    };
-    _databaseCloner = std::make_unique<DatabaseCloner>(&getExecutor(),
-                                                       dbWorkThreadPool.get(),
-                                                       target,
-                                                       dbname,
-                                                       BSONObj(),
-                                                       pred,
-                                                       storageInterface.get(),
-                                                       makeCollectionWorkClosure(),
-                                                       makeSetStatusClosure());
-    ASSERT_EQUALS(DatabaseCloner::State::kPreStart, _databaseCloner->getState_forTest());
-
-    ASSERT_OK(_databaseCloner->startup());
-    ASSERT_EQUALS(DatabaseCloner::State::kRunning, _databaseCloner->getState_forTest());
-
+TEST_F(DatabaseClonerTest, ListCollections) {
+    auto cloner = makeDatabaseCloner();
+    cloner->setStopAfterStage_forTest("listCollections");
+    auto uuid1 = UUID::gen();
+    auto uuid2 = UUID::gen();
     const std::vector<BSONObj> sourceInfos = {BSON("name"
                                                    << "a"
-                                                   << "options" << _options1.toBSON()),
-                                              BSON("name"
-                                                   << "b"
-                                                   << "options" << _options2.toBSON()),
-                                              BSON("name"
-                                                   << "c"
-                                                   << "options" << _options3.toBSON())};
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createListCollectionsResponse(
-            0, BSON_ARRAY(sourceInfos[0] << sourceInfos[1] << sourceInfos[2])));
-    }
+                                                   << "type"
+                                                   << "collection"
+                                                   << "options" << BSONObj() << "info"
+                                                   << BSON("readOnly" << false << "uuid" << uuid1)),
+                                              BSON(
+                                                  "name"
+                                                  << "b"
+                                                  << "type"
+                                                  << "collection"
+                                                  << "options" << BSONObj() << "info"
+                                                  << BSON("readOnly" << false << "uuid" << uuid2))};
+    _mockServer->setCommandReply("listCollections",
+                                 createListCollectionsResponse({sourceInfos[0], sourceInfos[1]}));
+    ASSERT_OK(cloner->run());
+    ASSERT_OK(_sharedData->initialSyncStatus);
+    auto collections = getCollectionsFromCloner(cloner.get());
 
-    ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
-    ASSERT_TRUE(_databaseCloner->isActive());
-    ASSERT_EQUALS(DatabaseCloner::State::kRunning, _databaseCloner->getState_forTest());
-
-    const std::vector<BSONObj>& collectionInfos = _databaseCloner->getCollectionInfos_forTest();
-    ASSERT_EQUALS(2U, collectionInfos.size());
-    ASSERT_BSONOBJ_EQ(sourceInfos[0], collectionInfos[0]);
-    ASSERT_BSONOBJ_EQ(sourceInfos[2], collectionInfos[1]);
+    ASSERT_EQUALS(2U, collections.size());
+    ASSERT_EQ(NamespaceString(_dbName, "a"), collections[0].first);
+    ASSERT_BSONOBJ_EQ(BSON("uuid" << uuid1), collections[0].second.toBSON());
+    ASSERT_EQ(NamespaceString(_dbName, "b"), collections[1].first);
+    ASSERT_BSONOBJ_EQ(BSON("uuid" << uuid2), collections[1].second.toBSON());
 }
 
-TEST_F(DatabaseClonerTest, ListCollectionsMultipleBatches) {
-    ASSERT_EQUALS(DatabaseCloner::State::kPreStart, _databaseCloner->getState_forTest());
-
-    ASSERT_OK(_databaseCloner->startup());
-    ASSERT_EQUALS(DatabaseCloner::State::kRunning, _databaseCloner->getState_forTest());
-
+// The listCollections command may return new fields in later versions; we do not want that
+// to cause upgrade/downgrade issues.
+TEST_F(DatabaseClonerTest, ListCollectionsAllowsExtraneousFields) {
+    auto cloner = makeDatabaseCloner();
+    cloner->setStopAfterStage_forTest("listCollections");
+    auto uuid1 = UUID::gen();
+    auto uuid2 = UUID::gen();
     const std::vector<BSONObj> sourceInfos = {BSON("name"
                                                    << "a"
-                                                   << "options" << _options1.toBSON()),
+                                                   << "type"
+                                                   << "collection"
+                                                   // The "flavor" field is not really found in
+                                                   // listCollections.
+                                                   << "flavor"
+                                                   << "raspberry"
+                                                   << "options" << BSONObj() << "info"
+                                                   << BSON("readOnly" << false << "uuid" << uuid1)),
                                               BSON("name"
                                                    << "b"
-                                                   << "options" << _options2.toBSON())};
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createListCollectionsResponse(1, BSON_ARRAY(sourceInfos[0])));
-    }
+                                                   << "type"
+                                                   << "collection"
+                                                   << "options" << BSONObj()
+                                                   << "info"
+                                                   // The "comet" field is not really found in
+                                                   // listCollections.
+                                                   << BSON("readOnly" << false << "uuid" << uuid2
+                                                                      << "comet"
+                                                                      << "2l_Borisov"))};
+    _mockServer->setCommandReply("listCollections",
+                                 createListCollectionsResponse({sourceInfos[0], sourceInfos[1]}));
+    ASSERT_OK(cloner->run());
+    ASSERT_OK(_sharedData->initialSyncStatus);
+    auto collections = getCollectionsFromCloner(cloner.get());
 
-    ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
-    ASSERT_TRUE(_databaseCloner->isActive());
-
-    {
-        const std::vector<BSONObj>& collectionInfos = _databaseCloner->getCollectionInfos_forTest();
-        ASSERT_EQUALS(1U, collectionInfos.size());
-        ASSERT_BSONOBJ_EQ(sourceInfos[0], collectionInfos[0]);
-    }
-
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(
-            createListCollectionsResponse(0, BSON_ARRAY(sourceInfos[1]), "nextBatch"));
-    }
-
-    ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
-    ASSERT_TRUE(_databaseCloner->isActive());
-
-    {
-        const std::vector<BSONObj>& collectionInfos = _databaseCloner->getCollectionInfos_forTest();
-        ASSERT_EQUALS(2U, collectionInfos.size());
-        ASSERT_BSONOBJ_EQ(sourceInfos[0], collectionInfos[0]);
-        ASSERT_BSONOBJ_EQ(sourceInfos[1], collectionInfos[1]);
-    }
-
-    ASSERT_EQUALS(DatabaseCloner::State::kRunning, _databaseCloner->getState_forTest());
+    ASSERT_EQUALS(2U, collections.size());
+    ASSERT_EQ(NamespaceString(_dbName, "a"), collections[0].first);
+    ASSERT_BSONOBJ_EQ(BSON("uuid" << uuid1), collections[0].second.toBSON());
+    ASSERT_EQ(NamespaceString(_dbName, "b"), collections[1].first);
+    ASSERT_BSONOBJ_EQ(BSON("uuid" << uuid2), collections[1].second.toBSON());
 }
 
-TEST_F(DatabaseClonerTest, CollectionInfoNameFieldMissing) {
-    ASSERT_EQUALS(DatabaseCloner::State::kPreStart, _databaseCloner->getState_forTest());
-
-    ASSERT_OK(_databaseCloner->startup());
-    ASSERT_EQUALS(DatabaseCloner::State::kRunning, _databaseCloner->getState_forTest());
-
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(
-            createListCollectionsResponse(0, BSON_ARRAY(BSON("options" << _options1.toBSON()))));
-    }
-
-    ASSERT_EQUALS(ErrorCodes::FailedToParse, getStatus().code());
-    ASSERT_STRING_CONTAINS(getStatus().reason(), "must contain 'name' field");
-    ASSERT_FALSE(_databaseCloner->isActive());
-    ASSERT_EQUALS(DatabaseCloner::State::kComplete, _databaseCloner->getState_forTest());
+TEST_F(DatabaseClonerTest, ListCollectionsFailsOnDuplicateNames) {
+    auto cloner = makeDatabaseCloner();
+    cloner->setStopAfterStage_forTest("listCollections");
+    auto uuid1 = UUID::gen();
+    auto uuid2 = UUID::gen();
+    const std::vector<BSONObj> sourceInfos = {BSON("name"
+                                                   << "a"
+                                                   << "type"
+                                                   << "collection"
+                                                   << "options" << BSONObj() << "info"
+                                                   << BSON("readOnly" << false << "uuid" << uuid1)),
+                                              BSON(
+                                                  "name"
+                                                  << "a"
+                                                  << "type"
+                                                  << "collection"
+                                                  << "options" << BSONObj() << "info"
+                                                  << BSON("readOnly" << false << "uuid" << uuid2))};
+    _mockServer->setCommandReply("listCollections",
+                                 createListCollectionsResponse({sourceInfos[0], sourceInfos[1]}));
+    auto status = cloner->run();
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(51005, status.code());
 }
 
-TEST_F(DatabaseClonerTest, CollectionInfoNameNotAString) {
-    ASSERT_EQUALS(DatabaseCloner::State::kPreStart, _databaseCloner->getState_forTest());
-
-    ASSERT_OK(_databaseCloner->startup());
-    ASSERT_EQUALS(DatabaseCloner::State::kRunning, _databaseCloner->getState_forTest());
-
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createListCollectionsResponse(
-            0, BSON_ARRAY(BSON("name" << 123 << "options" << _options1.toBSON()))));
-    }
-
-    ASSERT_EQUALS(ErrorCodes::TypeMismatch, getStatus().code());
-    ASSERT_STRING_CONTAINS(getStatus().reason(), "'name' field must be a string");
-    ASSERT_FALSE(_databaseCloner->isActive());
-    ASSERT_EQUALS(DatabaseCloner::State::kComplete, _databaseCloner->getState_forTest());
+TEST_F(DatabaseClonerTest, ListCollectionsFailsOnMissingNameField) {
+    auto cloner = makeDatabaseCloner();
+    cloner->setStopAfterStage_forTest("listCollections");
+    auto uuid1 = UUID::gen();
+    auto uuid2 = UUID::gen();
+    const std::vector<BSONObj> sourceInfos = {BSON("type"
+                                                   << "collection"
+                                                   << "options" << BSONObj() << "info"
+                                                   << BSON("readOnly" << false << "uuid" << uuid1)),
+                                              BSON(
+                                                  "name"
+                                                  << "b"
+                                                  << "type"
+                                                  << "collection"
+                                                  << "options" << BSONObj() << "info"
+                                                  << BSON("readOnly" << false << "uuid" << uuid2))};
+    _mockServer->setCommandReply("listCollections",
+                                 createListCollectionsResponse({sourceInfos[0], sourceInfos[1]}));
+    auto status = cloner->run();
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
 }
 
-TEST_F(DatabaseClonerTest, CollectionInfoNameEmpty) {
-    ASSERT_EQUALS(DatabaseCloner::State::kPreStart, _databaseCloner->getState_forTest());
-
-    ASSERT_OK(_databaseCloner->startup());
-    ASSERT_EQUALS(DatabaseCloner::State::kRunning, _databaseCloner->getState_forTest());
-
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(
-            createListCollectionsResponse(0,
-                                          BSON_ARRAY(BSON("name"
-                                                          << ""
-                                                          << "options" << _options1.toBSON()))));
-    }
-
-    ASSERT_EQUALS(ErrorCodes::BadValue, getStatus().code());
-    ASSERT_STRING_CONTAINS(getStatus().reason(), "invalid collection namespace: db.");
-    ASSERT_FALSE(_databaseCloner->isActive());
-    ASSERT_EQUALS(DatabaseCloner::State::kComplete, _databaseCloner->getState_forTest());
+TEST_F(DatabaseClonerTest, ListCollectionsFailsOnMissingOptions) {
+    auto cloner = makeDatabaseCloner();
+    cloner->setStopAfterStage_forTest("listCollections");
+    auto uuid1 = UUID::gen();
+    const std::vector<BSONObj> sourceInfos = {BSON("name"
+                                                   << "a"
+                                                   << "type"
+                                                   << "collection"),
+                                              BSON(
+                                                  "name"
+                                                  << "a"
+                                                  << "type"
+                                                  << "collection"
+                                                  << "options" << BSONObj() << "info"
+                                                  << BSON("readOnly" << false << "uuid" << uuid1))};
+    _mockServer->setCommandReply("listCollections",
+                                 createListCollectionsResponse({sourceInfos[0], sourceInfos[1]}));
+    auto status = cloner->run();
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
 }
 
-TEST_F(DatabaseClonerTest, CollectionInfoNameDuplicate) {
-    ASSERT_EQUALS(DatabaseCloner::State::kPreStart, _databaseCloner->getState_forTest());
-
-    ASSERT_OK(_databaseCloner->startup());
-    ASSERT_EQUALS(DatabaseCloner::State::kRunning, _databaseCloner->getState_forTest());
-
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(
-            createListCollectionsResponse(0,
-                                          BSON_ARRAY(BSON("name"
-                                                          << "a"
-                                                          << "options" << _options1.toBSON())
-                                                     << BSON("name"
-                                                             << "a"
-                                                             << "options" << _options2.toBSON()))));
-    }
-
-    ASSERT_EQUALS(51005, getStatus().code());
-    ASSERT_STRING_CONTAINS(getStatus().reason(), "duplicate collection name 'a'");
-    ASSERT_FALSE(_databaseCloner->isActive());
-    ASSERT_EQUALS(DatabaseCloner::State::kComplete, _databaseCloner->getState_forTest());
+TEST_F(DatabaseClonerTest, ListCollectionsFailsOnMissingUUID) {
+    auto cloner = makeDatabaseCloner();
+    cloner->setStopAfterStage_forTest("listCollections");
+    auto uuid1 = UUID::gen();
+    const std::vector<BSONObj> sourceInfos = {BSON("name"
+                                                   << "a"
+                                                   << "type"
+                                                   << "collection"
+                                                   << "options" << BSONObj() << "info"
+                                                   << BSON("readOnly" << false)),
+                                              BSON(
+                                                  "name"
+                                                  << "b"
+                                                  << "type"
+                                                  << "collection"
+                                                  << "options" << BSONObj() << "info"
+                                                  << BSON("readOnly" << false << "uuid" << uuid1))};
+    _mockServer->setCommandReply("listCollections",
+                                 createListCollectionsResponse({sourceInfos[0], sourceInfos[1]}));
+    auto status = cloner->run();
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
 }
 
-TEST_F(DatabaseClonerTest, CollectionInfoOptionsFieldMissing) {
-    ASSERT_EQUALS(DatabaseCloner::State::kPreStart, _databaseCloner->getState_forTest());
-
-    ASSERT_OK(_databaseCloner->startup());
-    ASSERT_EQUALS(DatabaseCloner::State::kRunning, _databaseCloner->getState_forTest());
-
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createListCollectionsResponse(0,
-                                                             BSON_ARRAY(BSON("name"
-                                                                             << "a"))));
-    }
-
-    ASSERT_EQUALS(ErrorCodes::FailedToParse, getStatus().code());
-    ASSERT_STRING_CONTAINS(getStatus().reason(), "must contain 'options' field");
-    ASSERT_FALSE(_databaseCloner->isActive());
-    ASSERT_EQUALS(DatabaseCloner::State::kComplete, _databaseCloner->getState_forTest());
-}
-
-TEST_F(DatabaseClonerTest, CollectionInfoOptionsNotAnObject) {
-    ASSERT_EQUALS(DatabaseCloner::State::kPreStart, _databaseCloner->getState_forTest());
-
-    ASSERT_OK(_databaseCloner->startup());
-    ASSERT_EQUALS(DatabaseCloner::State::kRunning, _databaseCloner->getState_forTest());
-
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(
-            createListCollectionsResponse(0,
-                                          BSON_ARRAY(BSON("name"
-                                                          << "a"
-                                                          << "options" << 123))));
-    }
-
-    ASSERT_EQUALS(ErrorCodes::TypeMismatch, getStatus().code());
-    ASSERT_STRING_CONTAINS(getStatus().reason(), "'options' field must be an object");
-    ASSERT_FALSE(_databaseCloner->isActive());
-    ASSERT_EQUALS(DatabaseCloner::State::kComplete, _databaseCloner->getState_forTest());
-}
-
-TEST_F(DatabaseClonerTest, InvalidCollectionOptions) {
-    ASSERT_EQUALS(DatabaseCloner::State::kPreStart, _databaseCloner->getState_forTest());
-
-    ASSERT_OK(_databaseCloner->startup());
-    ASSERT_EQUALS(DatabaseCloner::State::kRunning, _databaseCloner->getState_forTest());
-
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createListCollectionsResponse(
-            0,
-            BSON_ARRAY(BSON("name"
+TEST_F(DatabaseClonerTest, ListCollectionsFailsOnInvalidCollectionOptions) {
+    auto cloner = makeDatabaseCloner();
+    cloner->setStopAfterStage_forTest("listCollections");
+    auto uuid1 = UUID::gen();
+    auto uuid2 = UUID::gen();
+    const std::vector<BSONObj>
+        sourceInfos = {BSON("name"
                             << "a"
-                            << "options" << BSON("storageEngine" << 1)))));
-    }
-
-    ASSERT_EQUALS(ErrorCodes::BadValue, getStatus().code());
-    ASSERT_FALSE(_databaseCloner->isActive());
-    ASSERT_EQUALS(DatabaseCloner::State::kComplete, _databaseCloner->getState_forTest());
-}
-
-TEST_F(DatabaseClonerTest, InvalidMissingUUID) {
-    ASSERT_EQUALS(DatabaseCloner::State::kPreStart, _databaseCloner->getState_forTest());
-
-    ASSERT_OK(_databaseCloner->startup());
-    ASSERT_EQUALS(DatabaseCloner::State::kRunning, _databaseCloner->getState_forTest());
-
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(
-            createListCollectionsResponse(0,
-                                          BSON_ARRAY(BSON("name"
-                                                          << "a"
-                                                          << "options" << BSONObj()))));
-    }
-
-    ASSERT_EQUALS(50953, getStatus().code());
-    ASSERT_FALSE(_databaseCloner->isActive());
-    ASSERT_EQUALS(DatabaseCloner::State::kComplete, _databaseCloner->getState_forTest());
-}
-
-TEST_F(DatabaseClonerTest, DatabaseClonerResendsListCollectionsRequestOnRetriableError) {
-    ASSERT_EQUALS(DatabaseCloner::State::kPreStart, _databaseCloner->getState_forTest());
-
-    ASSERT_OK(_databaseCloner->startup());
-    ASSERT_EQUALS(DatabaseCloner::State::kRunning, _databaseCloner->getState_forTest());
-
-    auto net = getNet();
-    executor::NetworkInterfaceMock::InNetworkGuard guard(net);
-
-    // Respond to first listCollections request with a retriable error.
-    assertRemoteCommandNameEquals(
-        "listCollections", net->scheduleErrorResponse(Status(ErrorCodes::HostUnreachable, "")));
-    net->runReadyNetworkOperations();
-
-    // DatabaseCloner stays active because it resends the listCollections request.
-    ASSERT_TRUE(_databaseCloner->isActive());
-    ASSERT_EQUALS(DatabaseCloner::State::kRunning, _databaseCloner->getState_forTest());
-
-    // DatabaseCloner should resend listCollections request.
-    auto noi = net->getNextReadyRequest();
-    assertRemoteCommandNameEquals("listCollections", noi->getRequest());
-    net->blackHole(noi);
-}
-
-TEST_F(DatabaseClonerTest, ListCollectionsReturnsEmptyCollectionName) {
-    _databaseCloner = std::make_unique<DatabaseCloner>(&getExecutor(),
-                                                       dbWorkThreadPool.get(),
-                                                       target,
-                                                       dbname,
-                                                       BSONObj(),
-                                                       DatabaseCloner::ListCollectionsPredicateFn(),
-                                                       storageInterface.get(),
-                                                       makeCollectionWorkClosure(),
-                                                       makeSetStatusClosure());
-    ASSERT_EQUALS(DatabaseCloner::State::kPreStart, _databaseCloner->getState_forTest());
-
-    ASSERT_OK(_databaseCloner->startup());
-    ASSERT_EQUALS(DatabaseCloner::State::kRunning, _databaseCloner->getState_forTest());
-
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(
-            createListCollectionsResponse(0,
-                                          BSON_ARRAY(BSON("name"
-                                                          << ""
-                                                          << "options" << BSONObj()))));
-    }
-
-    ASSERT_EQUALS(ErrorCodes::BadValue, getStatus().code());
-    ASSERT_STRING_CONTAINS(getStatus().reason(), "invalid collection namespace: db.");
-    ASSERT_FALSE(_databaseCloner->isActive());
-    ASSERT_EQUALS(DatabaseCloner::State::kComplete, _databaseCloner->getState_forTest());
-}
-
-TEST_F(DatabaseClonerTest, StartFirstCollectionClonerFailed) {
-    ASSERT_EQUALS(DatabaseCloner::State::kPreStart, _databaseCloner->getState_forTest());
-
-    ASSERT_OK(_databaseCloner->startup());
-    ASSERT_EQUALS(DatabaseCloner::State::kRunning, _databaseCloner->getState_forTest());
-
-    _databaseCloner->setStartCollectionClonerFn([](CollectionCloner& cloner) {
-        return Status(ErrorCodes::OperationFailed,
-                      "StartFirstCollectionClonerFailed injected failure.");
-    });
-
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(
-            createListCollectionsResponse(0,
-                                          BSON_ARRAY(BSON("name"
-                                                          << "a"
-                                                          << "options" << _options1.toBSON()))));
-    }
-
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, getStatus().code());
-    ASSERT_FALSE(_databaseCloner->isActive());
-    ASSERT_EQUALS(DatabaseCloner::State::kComplete, _databaseCloner->getState_forTest());
-}
-
-TEST_F(DatabaseClonerTest, StartSecondCollectionClonerFailed) {
-    ASSERT_EQUALS(DatabaseCloner::State::kPreStart, _databaseCloner->getState_forTest());
-
-    ASSERT_OK(_databaseCloner->startup());
-    ASSERT_EQUALS(DatabaseCloner::State::kRunning, _databaseCloner->getState_forTest());
-
-    const Status errStatus{ErrorCodes::OperationFailed,
-                           "StartSecondCollectionClonerFailed injected failure."};
-
-    _databaseCloner->setStartCollectionClonerFn(
-        [errStatus, this](CollectionCloner& cloner) -> Status {
-            if (cloner.getSourceNamespace().coll() == "b") {
-                return errStatus;
-            }
-            return _startCollectionCloner(cloner);
-        });
-
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(
-            createListCollectionsResponse(0,
-                                          BSON_ARRAY(BSON("name"
-                                                          << "a"
-                                                          << "options" << _options1.toBSON())
-                                                     << BSON("name"
-                                                             << "b"
-                                                             << "options" << _options2.toBSON()))));
-
-        processNetworkResponse(createCountResponse(0));
-        processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
-    }
-    _databaseCloner->join();
-    ASSERT_FALSE(_databaseCloner->isActive());
-    ASSERT_EQUALS(errStatus, getStatus());
-    ASSERT_EQUALS(DatabaseCloner::State::kComplete, _databaseCloner->getState_forTest());
-}
-
-TEST_F(DatabaseClonerTest, ShutdownCancelsCollectionCloning) {
-    ASSERT_EQUALS(DatabaseCloner::State::kPreStart, _databaseCloner->getState_forTest());
-
-    ASSERT_OK(_databaseCloner->startup());
-    ASSERT_EQUALS(DatabaseCloner::State::kRunning, _databaseCloner->getState_forTest());
-
-    auto net = getNet();
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
-
-        assertRemoteCommandNameEquals("listCollections",
-                                      net->scheduleSuccessfulResponse(createListCollectionsResponse(
-                                          0,
-                                          BSON_ARRAY(BSON("name"
-                                                          << "a"
-                                                          << "options" << _options1.toBSON())))));
-        net->runReadyNetworkOperations();
-
-        // CollectionCloner sends collection count request on startup.
-        // Blackhole count request to leave collection cloner active.
-        auto noi = net->getNextReadyRequest();
-        assertRemoteCommandNameEquals("count", noi->getRequest());
-        ASSERT_EQUALS(*_options1.uuid, UUID::parse(noi->getRequest().cmdObj.firstElement()));
-        net->blackHole(noi);
-    }
-
-    _databaseCloner->shutdown();
-    ASSERT_EQUALS(DatabaseCloner::State::kShuttingDown, _databaseCloner->getState_forTest());
-
-    // Deliver cancellation event to cloners.
-    executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
-
-    _databaseCloner->join();
-    ASSERT_FALSE(_databaseCloner->isActive());
-    ASSERT_EQUALS(DatabaseCloner::State::kComplete, _databaseCloner->getState_forTest());
-
-    // We do not need to attempt a subsequent collection clone to be notified of an error.
-    ASSERT_EQUALS(ErrorCodes::InitialSyncFailure, getStatus());
+                            << "type"
+                            << "collection"
+                            << "options" << BSONObj() << "info"
+                            << BSON("readOnly" << false << "uuid" << uuid1)),
+                       BSON("name"
+                            << "b"
+                            << "type"
+                            << "collection"
+                            // "storageEngine" is not an integer collection option.
+                            << "options" << BSON("storageEngine" << 1) << "info"
+                            << BSON("readOnly" << false << "uuid" << uuid2))};
+    _mockServer->setCommandReply("listCollections",
+                                 createListCollectionsResponse({sourceInfos[0], sourceInfos[1]}));
+    auto status = cloner->run();
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
 }
 
 TEST_F(DatabaseClonerTest, FirstCollectionListIndexesFailed) {
-    ASSERT_EQUALS(DatabaseCloner::State::kPreStart, _databaseCloner->getState_forTest());
-
-    ASSERT_OK(_databaseCloner->startup());
-    ASSERT_EQUALS(DatabaseCloner::State::kRunning, _databaseCloner->getState_forTest());
-
+    auto uuid1 = UUID::gen();
+    auto uuid2 = UUID::gen();
+    const BSONObj idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
+                                         << "_id_");
     const std::vector<BSONObj> sourceInfos = {BSON("name"
                                                    << "a"
-                                                   << "options" << _options1.toBSON()),
-                                              BSON("name"
-                                                   << "b"
-                                                   << "options" << _options2.toBSON())};
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(
-            createListCollectionsResponse(0, BSON_ARRAY(sourceInfos[0] << sourceInfos[1])));
-    }
-    ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
-    ASSERT_TRUE(_databaseCloner->isActive());
+                                                   << "type"
+                                                   << "collection"
+                                                   << "options" << BSONObj() << "info"
+                                                   << BSON("readOnly" << false << "uuid" << uuid1)),
+                                              BSON(
+                                                  "name"
+                                                  << "b"
+                                                  << "type"
+                                                  << "collection"
+                                                  << "options" << BSONObj() << "info"
+                                                  << BSON("readOnly" << false << "uuid" << uuid2))};
+    _mockServer->setCommandReply("listCollections",
+                                 createListCollectionsResponse({sourceInfos[0], sourceInfos[1]}));
+    _mockServer->setCommandReply("count", {createCountResponse(0), createCountResponse(0)});
+    _mockServer->setCommandReply("listIndexes",
+                                 {BSON("ok" << 0 << "errmsg"
+                                            << "fake message"
+                                            << "code" << ErrorCodes::CursorNotFound),
+                                  createCursorResponse(_dbName + ".b", BSON_ARRAY(idIndexSpec))});
+    auto cloner = makeDatabaseCloner();
+    auto status = cloner->run();
+    ASSERT_NOT_OK(status);
 
-    // Collection cloners are run serially for now.
-    // This affects the order of the network responses.
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(0));
-        processNetworkResponse(BSON("ok" << 0 << "errmsg"
-                                         << "fake message"
-                                         << "code" << ErrorCodes::CursorNotFound));
-
-        processNetworkResponse(createCountResponse(0));
-        processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
-    }
-    _databaseCloner->join();
-    ASSERT_EQ(getStatus().code(), ErrorCodes::InitialSyncFailure);
-    ASSERT_FALSE(_databaseCloner->isActive());
-    ASSERT_EQUALS(DatabaseCloner::State::kComplete, _databaseCloner->getState_forTest());
-
-    ASSERT_EQUALS(1U, _collections.size());
-
-    // We have attempted, and failed, to clone the first collection.
-    auto collInfo = _collections[NamespaceString{"db.a"}];
-    ASSERT_EQUALS(ErrorCodes::CursorNotFound, collInfo.status.code());
-    auto stats = *collInfo.stats;
-    stats.insertCount = 0;
-    stats.commitCalled = false;
-
-    // We have not attempted to clone the second collection.
-    collInfo = _collections[NamespaceString{"db.b"}];
-    ASSERT_EQUALS(ErrorCodes::NotYetInitialized, collInfo.status.code());
-    stats = *collInfo.stats;
-    stats.insertCount = 0;
-    stats.commitCalled = true;
+    ASSERT_EQ(status.code(), ErrorCodes::InitialSyncFailure);
+    ASSERT_EQUALS(0u, _collections.size());
 }
 
 TEST_F(DatabaseClonerTest, CreateCollections) {
-    ASSERT_EQUALS(DatabaseCloner::State::kPreStart, _databaseCloner->getState_forTest());
-
-    ASSERT_OK(_databaseCloner->startup());
-    ASSERT_EQUALS(DatabaseCloner::State::kRunning, _databaseCloner->getState_forTest());
-
+    auto uuid1 = UUID::gen();
+    auto uuid2 = UUID::gen();
+    const BSONObj idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
+                                         << "_id_");
     const std::vector<BSONObj> sourceInfos = {BSON("name"
                                                    << "a"
-                                                   << "options" << _options1.toBSON()),
-                                              BSON("name"
-                                                   << "b"
-                                                   << "options" << _options2.toBSON())};
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(
-            createListCollectionsResponse(0, BSON_ARRAY(sourceInfos[0] << sourceInfos[1])));
-    }
-    ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
-    ASSERT_TRUE(_databaseCloner->isActive());
-
-    // Collection cloners are run serially for now.
-    // This affects the order of the network responses.
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(0));
-        processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
-    }
-    ASSERT_TRUE(_databaseCloner->isActive());
-
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(0));
-        processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
-    }
-
-    _databaseCloner->join();
-    ASSERT_OK(getStatus());
-    ASSERT_FALSE(_databaseCloner->isActive());
-    ASSERT_EQUALS(DatabaseCloner::State::kComplete, _databaseCloner->getState_forTest());
+                                                   << "type"
+                                                   << "collection"
+                                                   << "options" << BSONObj() << "info"
+                                                   << BSON("readOnly" << false << "uuid" << uuid1)),
+                                              BSON(
+                                                  "name"
+                                                  << "b"
+                                                  << "type"
+                                                  << "collection"
+                                                  << "options" << BSONObj() << "info"
+                                                  << BSON("readOnly" << false << "uuid" << uuid2))};
+    _mockServer->setCommandReply("listCollections",
+                                 createListCollectionsResponse({sourceInfos[0], sourceInfos[1]}));
+    _mockServer->setCommandReply("count", {createCountResponse(0), createCountResponse(0)});
+    _mockServer->setCommandReply("listIndexes",
+                                 {createCursorResponse(_dbName + ".a", BSON_ARRAY(idIndexSpec)),
+                                  createCursorResponse(_dbName + ".b", BSON_ARRAY(idIndexSpec))});
+    auto cloner = makeDatabaseCloner();
+    auto status = cloner->run();
+    ASSERT_OK(status);
 
     ASSERT_EQUALS(2U, _collections.size());
 
-    auto collInfo = _collections[NamespaceString{"db.a"}];
-    ASSERT_OK(collInfo.status);
+    auto collInfo = _collections[NamespaceString{_dbName, "a"}];
     auto stats = *collInfo.stats;
-    stats.insertCount = 0;
-    stats.commitCalled = true;
+    ASSERT_EQUALS(0, stats.insertCount);
+    ASSERT(stats.commitCalled);
 
-    collInfo = _collections[NamespaceString{"db.b"}];
-    ASSERT_OK(collInfo.status);
+    collInfo = _collections[NamespaceString{_dbName, "b"}];
     stats = *collInfo.stats;
-    stats.insertCount = 0;
-    stats.commitCalled = true;
+    ASSERT_EQUALS(0, stats.insertCount);
+    ASSERT(stats.commitCalled);
 }
 
-}  // namespace
+}  // namespace repl
+}  // namespace mongo

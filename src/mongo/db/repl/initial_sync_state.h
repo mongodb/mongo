@@ -37,7 +37,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/databases_cloner.h"
+#include "mongo/db/repl/all_database_cloner.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -48,10 +48,12 @@ namespace repl {
  * Holder of state for initial sync (InitialSyncer).
  */
 struct InitialSyncState {
-    InitialSyncState(std::unique_ptr<DatabasesCloner> cloner) : dbsCloner(std::move(cloner)){};
+    InitialSyncState(std::unique_ptr<AllDatabaseCloner> cloner)
+        : allDatabaseCloner(std::move(cloner)){};
 
-    std::unique_ptr<DatabasesCloner>
-        dbsCloner;                     // Cloner for all databases included in initial sync.
+    std::unique_ptr<AllDatabaseCloner>
+        allDatabaseCloner;                 // Cloner for all databases included in initial sync.
+    Future<void> allDatabaseClonerFuture;  // Future for holding result of AllDatabaseCloner
     Timestamp beginApplyingTimestamp;  // Timestamp from the latest entry in oplog when started. It
                                        // is also the timestamp after which we will start applying
                                        // operations during initial sync.

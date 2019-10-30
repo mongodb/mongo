@@ -324,8 +324,11 @@ long long DBClientBase::count(
     auto dbName = (nsOrUuid.uuid() ? nsOrUuid.dbname() : (*nsOrUuid.nss()).db().toString());
     BSONObj cmd = _countCmd(nsOrUuid, query, options, limit, skip);
     BSONObj res;
-    if (!runCommand(dbName, cmd, res, options))
-        uasserted(11010, string("count fails:") + res.toString());
+    if (!runCommand(dbName, cmd, res, options)) {
+        auto status = getStatusFromCommandResult(res);
+        uassertStatusOK(status.withContext("count fails:"));
+    }
+    uassert(ErrorCodes::NoSuchKey, "Missing 'n' field for count command.", res.hasField("n"));
     return res["n"].numberLong();
 }
 
@@ -865,12 +868,15 @@ list<BSONObj> DBClientBase::getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
 
         return specs;
     }
-    int code = res["code"].numberInt();
+    Status status = getStatusFromCommandResult(res);
 
-    if (code == ErrorCodes::NamespaceNotFound) {
+    // "NamespaceNotFound" is an error for UUID but returns an empty list for NamespaceString; this
+    // matches the behavior for other commands such as 'find' and 'count'.
+    if (nsOrUuid.nss() && status.code() == ErrorCodes::NamespaceNotFound) {
         return specs;
     }
-    uasserted(18631, str::stream() << "listIndexes failed: " << res);
+    uassertStatusOK(status.withContext(str::stream() << "listIndexes failed: " << res));
+    MONGO_UNREACHABLE;
 }
 
 

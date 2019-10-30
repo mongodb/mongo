@@ -44,8 +44,6 @@ namespace mongo {
 class ThreadPoolInterface;
 
 namespace executor {
-extern FailPoint initialSyncFuzzerSynchronizationPoint1;
-extern FailPoint initialSyncFuzzerSynchronizationPoint2;
 
 struct ConnectionPoolStats;
 class NetworkInterface;

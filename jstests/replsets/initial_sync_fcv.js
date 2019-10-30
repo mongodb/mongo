@@ -30,11 +30,14 @@ function runInitialSync(cmd, initialFCV) {
 
     jsTestLog('Testing setting fCV with ' + tojson(cmd));
 
-    const failPointOptions = tojson({mode: 'alwaysOn', data: {database: dbName}});
+    const failPointOptions = tojson({
+        mode: 'alwaysOn',
+        data: {cloner: "DatabaseCloner", stage: "listCollections", database: dbName}
+    });
     rst.restart(1, {
         startClean: true,
         setParameter: {
-            'failpoint.initialSyncHangBeforeListCollections': failPointOptions,
+            'failpoint.hangBeforeClonerStage': failPointOptions,
             'failpoint.skipClearInitialSyncState': tojson({mode: 'alwaysOn'}),
             numInitialSyncAttempts: 2
         }
@@ -44,8 +47,8 @@ function runInitialSync(cmd, initialFCV) {
     // Initial sync clones the 'admin' database first, which will set the fCV on the
     // secondary to initialFCV. We then block the secondary before issuing 'listCollections' on
     // the test database.
-    assert.commandWorked(secondary.adminCommand(
-        {waitForFailPoint: "initialSyncHangBeforeListCollections", timesEntered: 1}));
+    assert.commandWorked(
+        secondary.adminCommand({waitForFailPoint: "hangBeforeClonerStage", timesEntered: 1}));
 
     // Initial sync is stopped right before 'listCollections' on the test database. We now run
     // the test command to modify the fCV.
@@ -53,8 +56,8 @@ function runInitialSync(cmd, initialFCV) {
 
     // Let initial sync finish, making sure that it fails due to the feature compatibility
     // version change.
-    assert.commandWorked(secondary.adminCommand(
-        {configureFailPoint: 'initialSyncHangBeforeListCollections', mode: 'off'}));
+    assert.commandWorked(
+        secondary.adminCommand({configureFailPoint: 'hangBeforeClonerStage', mode: 'off'}));
     checkLog.contains(secondary, 'Applying operation on feature compatibility version document');
 
     jsTestLog('Wait for both nodes to be up-to-date');

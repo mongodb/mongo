@@ -655,7 +655,6 @@ env.Library(
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/db/repl/replication_metrics',
-        'collection_cloner',
         'initial_syncer',
         'data_replicator_external_state_initial_sync',
         'repl_coordinator_interface',
@@ -924,70 +923,29 @@ env.Library(
 )
 
 env.Library(
-    target='base_cloner_test_fixture',
+    target='initial_sync_cloners',
     source=[
-        'base_cloner_test_fixture.cpp',
-    ],
-    LIBDEPS=[
-        'replmocks',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
-        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
-    ],
-)
-
-env.Library(
-    target='collection_cloner',
-    source=[
+        'all_database_cloner.cpp',
+        'base_cloner.cpp',
         'collection_cloner.cpp',
+        'database_cloner.cpp',
+        env.Idlc('database_cloner.idl')[0]
     ],
-    LIBDEPS=[
+    LIBDEPS = [
         'task_runner',
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/client/fetcher',
-        '$BUILD_DIR/mongo/client/remote_command_retry_scheduler',
-        '$BUILD_DIR/mongo/db/catalog/collection_options',
-        '$BUILD_DIR/mongo/db/catalog/document_validation',
-        '$BUILD_DIR/mongo/executor/task_executor_interface',
-        '$BUILD_DIR/mongo/rpc/command_status',
-        '$BUILD_DIR/mongo/s/query/async_results_merger',
-        '$BUILD_DIR/mongo/util/progress_meter',
-    ],
+        '$BUILD_DIR/mongo/client/clientdriver_network',
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        '$BUILD_DIR/mongo/util/net/network',
+    ],        
     LIBDEPS_PRIVATE=[
         'repl_server_parameters',
         'replication_auth',
-    ],
-)
-
-env.Library(
-    target='database_cloner',
-    source=[
-        'database_cloner.cpp',
-    ],
-    LIBDEPS=[
-        'collection_cloner',
-        '$BUILD_DIR/mongo/executor/task_executor_interface',
-    ],
-    LIBDEPS_PRIVATE=[
-        'repl_server_parameters',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/commands/list_collections_filter',
-    ],
-)
-
-env.Library(
-    target='databases_cloner',
-    source=[
-        'databases_cloner.cpp',
-        env.Idlc('databases_cloner.idl')[0],
-    ],
-    LIBDEPS=[
-        'database_cloner',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/dbtests/mocklib',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
-    ],
+        '$BUILD_DIR/mongo/util/progress_meter',
+    ]
 )
 
 env.Library(
@@ -1079,9 +1037,8 @@ env.Library(
         '$BUILD_DIR/mongo/client/fetcher',
         '$BUILD_DIR/mongo/db/transaction',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
-        'collection_cloner',
-        'database_cloner',
-        'databases_cloner',
+        '$BUILD_DIR/mongo/client/clientdriver_network',
+        'initial_sync_cloners',
         'multiapplier',
         'oplog',
         'oplog_application_interface',
@@ -1284,6 +1241,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/db/transaction',
+        '$BUILD_DIR/mongo/dbtests/mocklib',
         '$BUILD_DIR/mongo/executor/network_interface_factory',
         '$BUILD_DIR/mongo/executor/network_interface_mock',
         '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
@@ -1359,21 +1317,19 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='db_repl_cloners_test',
     source=[
-        'collection_cloner_test.cpp',
+        'all_database_cloner_test.cpp',
+        'cloner_test_fixture.cpp',
         'database_cloner_test.cpp',
-        'databases_cloner_test.cpp',
-    ],
+        'collection_cloner_test.cpp'
+        ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
-        '$BUILD_DIR/mongo/db/commands/list_collections_filter',
+        '$BUILD_DIR/mongo/db/auth/authmocks',  # Required for service context test fixture
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/dbtests/mocklib',
-        '$BUILD_DIR/mongo/unittest/task_executor_proxy',
-        'base_cloner_test_fixture',
-        'collection_cloner',
-        'database_cloner',
-        'databases_cloner',
-    ],
+        'replmocks',
+        'initial_sync_cloners'
+        ],
 )
 
 env.Library(

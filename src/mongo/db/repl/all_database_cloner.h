@@ -32,79 +32,74 @@
 #include <vector>
 
 #include "mongo/db/repl/base_cloner.h"
-#include "mongo/db/repl/collection_cloner.h"
+#include "mongo/db/repl/database_cloner.h"
 
 namespace mongo {
 namespace repl {
 
-class DatabaseCloner final : public BaseCloner {
+class AllDatabaseCloner final : public BaseCloner {
 public:
     struct Stats {
-        std::string dbname;
-        Date_t start;
-        Date_t end;
-        size_t collections{0};
-        size_t clonedCollections{0};
-        std::vector<CollectionCloner::Stats> collectionStats;
+        size_t databasesCloned{0};
+        size_t databaseCount{0};
+        std::vector<DatabaseCloner::Stats> databaseStats;
 
         std::string toString() const;
         BSONObj toBSON() const;
         void append(BSONObjBuilder* builder) const;
     };
 
-    DatabaseCloner(const std::string& dbName,
-                   InitialSyncSharedData* sharedData,
-                   const HostAndPort& source,
-                   DBClientConnection* client,
-                   StorageInterface* storageInterface,
-                   ThreadPool* dbPool,
-                   ClockSource* clock = SystemClockSource::get());
+    AllDatabaseCloner(InitialSyncSharedData* sharedData,
+                      const HostAndPort& source,
+                      DBClientConnection* client,
+                      StorageInterface* storageInterface,
+                      ThreadPool* dbPool,
+                      ClockSource* clock = SystemClockSource::get());
 
-    virtual ~DatabaseCloner() = default;
+    virtual ~AllDatabaseCloner() = default;
 
     Stats getStats() const;
 
     std::string toString() const;
 
-    static CollectionOptions parseCollectionOptions(const BSONObj& element);
-
 protected:
     ClonerStages getStages() final;
 
-    bool isMyFailPoint(const BSONObj& data) const final;
-
 private:
-    friend class DatabaseClonerTest;
+    friend class AllDatabaseClonerTest;
 
     /**
-     * Stage function that retrieves collection information from the sync source.
+     * Stage function that retrieves database information from the sync source.
      */
-    AfterStageBehavior listCollectionsStage();
+    AfterStageBehavior listDatabasesStage();
+
+    // The pre-stage for this class connects to the sync source.
+    void preStage() final;
 
     /**
-     * The postStage creates and runs the individual CollectionCloners on each database found on
+     *
+     * The postStage creates and runs the individual DatabaseCloners on each database found on
      * the sync source.
      */
     void postStage() final;
 
     std::string describeForFuzzer(BaseClonerStage* stage) const final {
-        return _dbName + " db: { " + stage->getName() + ": 1 } ";
+        return "admin db: { " + stage->getName() + ": 1 }";
     }
 
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
     //
     // (R)  Read-only in concurrent operation; no synchronization required.
-    // (S)  Self-synchronizing; access according to class's own rules.
+    // (S)  Self-synchronizing; access according to classes own rules.
     // (M)  Reads and writes guarded by _mutex (defined in base class).
     // (X)  Access only allowed from the main flow of control called from run() or constructor.
     // (MX) Write access with mutex from main flow of control, read access with mutex from other
     //      threads, read access allowed from main flow without mutex.
-    const std::string _dbName;                                                // (R)
-    ClonerStage<DatabaseCloner> _listCollectionsStage;                        // (R)
-    std::vector<std::pair<NamespaceString, CollectionOptions>> _collections;  // (X)
-    std::unique_ptr<CollectionCloner> _currentCollectionCloner;               // (MX)
-    Stats _stats;                                                             // (MX)
+    ClonerStage<AllDatabaseCloner> _listDatabasesStage;      // (R)
+    std::vector<std::string> _databases;                     // (X)
+    std::unique_ptr<DatabaseCloner> _currentDatabaseCloner;  // (MX)
+    Stats _stats;                                            // (MX)
 };
 
 }  // namespace repl

@@ -43,6 +43,7 @@
 namespace mongo {
 
 namespace repl {
+class CollectionInfo;
 class OplogEntryBase;
 class DurableReplOperation;
 }  // namespace repl
@@ -76,6 +77,7 @@ class UUID {
     friend class LogicalSessionIdToClient;
     friend class LogicalSessionFromClient;
     friend class ResolvedKeyId;
+    friend class repl::CollectionInfo;
     friend class repl::OplogEntryBase;
     friend class repl::DurableReplOperation;
     friend class ResumeTokenInternal;

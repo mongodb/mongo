@@ -3,6 +3,11 @@
 (function() {
 "use strict";
 
+// TODO(SERVER-43277): This test is disabled while we work on the Resumable Initial Sync
+// project
+/* eslint-disable no-unreachable */
+return;
+
 // Skip db hash check because secondary cannot complete initial sync.
 TestData.skipCheckDBHashes = true;
 

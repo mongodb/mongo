@@ -64,7 +64,11 @@ function ResyncWithFailpoint(failpointName, failpointData) {
     jsTestLog('Check consistency and shut down replica-set');
     rst.checkReplicatedDataHashes();
 }
-ResyncWithFailpoint('initialSyncHangBeforeCollectionClone', {namespace: primaryColl.getFullName()});
-ResyncWithFailpoint('initialSyncHangAfterListCollections', {database: primaryDB.getName()});
+ResyncWithFailpoint(
+    'hangBeforeClonerStage',
+    {cloner: 'CollectionCloner', stage: 'count', namespace: primaryColl.getFullName()});
+ResyncWithFailpoint(
+    'hangAfterClonerStage',
+    {cloner: 'DatabaseCloner', stage: 'listCollections', database: primaryDB.getName()});
 rst.stopSet();
 })();

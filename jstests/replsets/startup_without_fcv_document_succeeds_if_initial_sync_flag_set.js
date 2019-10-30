@@ -19,8 +19,9 @@ const nss = adminDbName + "." + versionCollName;
 
 // Hang initial sync before cloning the FCV document.
 let secondary = rst.add({rsConfig: {priority: 0}});
-let failPoint =
-    configureFailPoint(secondary, 'initialSyncHangBeforeCollectionClone', {namespace: nss});
+let failPoint = configureFailPoint(secondary,
+                                   'hangBeforeClonerStage',
+                                   {cloner: 'CollectionCloner', stage: 'count', namespace: nss});
 rst.reInitiate();
 failPoint.wait();
 

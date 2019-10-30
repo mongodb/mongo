@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,43 +27,43 @@
  *    it in the license file.
  */
 
-
 #pragma once
 
-#include <string>
-#include <vector>
-
-#include "mongo/base/status.h"
-#include "mongo/bson/bsonobj.h"
+#include "mongo/db/repl/base_cloner.h"
+#include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/dbtests/mock/mock_dbclient_connection.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
-
-class Collection;
-class OperationContext;
-
 namespace repl {
 
-/**
- * Used on a local Collection to create and bulk build indexes.
- */
-class CollectionBulkLoader {
+class ClonerTestFixture : public unittest::Test, public ScopedGlobalServiceContextForTest {
 public:
-    virtual ~CollectionBulkLoader() = default;
+    ClonerTestFixture() : _storageInterface{} {}
 
-    virtual Status init(const std::vector<BSONObj>& indexSpecs) = 0;
-    /**
-     * Inserts the documents into the collection record store, and indexes them with the
-     * MultiIndexBlock on the side.
-     */
-    virtual Status insertDocuments(const std::vector<BSONObj>::const_iterator begin,
-                                   const std::vector<BSONObj>::const_iterator end) = 0;
-    /**
-     * Called when inserts are done and indexes can be committed.
-     */
-    virtual Status commit() = 0;
+    static BSONObj createCountResponse(int documentCount);
 
-    virtual std::string toString() const = 0;
-    virtual BSONObj toBSON() const = 0;
+    // Since the DBClient handles the cursor iterating, we assume that works for the purposes of the
+    // cloner unit test and just use a single batch for all mock responses.
+    static BSONObj createCursorResponse(const std::string& nss, const BSONArray& docs);
+
+protected:
+    void setUp() override;
+
+    void tearDown() override;
+
+    StorageInterfaceMock _storageInterface;
+    HostAndPort _source;
+    std::unique_ptr<ThreadPool> _dbWorkThreadPool;
+    std::unique_ptr<MockRemoteDBServer> _mockServer;
+    std::unique_ptr<DBClientConnection> _mockClient;
+    std::unique_ptr<InitialSyncSharedData> _sharedData;
+
+private:
+    static constexpr int kInitialRollbackId = 1;
 };
 
 }  // namespace repl

@@ -48,7 +48,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/databases_cloner.h"
+#include "mongo/db/repl/all_database_cloner.h"
 #include "mongo/db/repl/initial_sync_state.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog_buffer.h"
@@ -108,6 +108,10 @@ MONGO_FAIL_POINT_DEFINE(failInitialSyncBeforeApplyingBatch);
 
 // Failpoint which fasserts if applying a batch fails.
 MONGO_FAIL_POINT_DEFINE(initialSyncFassertIfApplyingBatchFails);
+
+// Failpoints for synchronization, shared with cloners.
+extern FailPoint initialSyncFuzzerSynchronizationPoint1;
+extern FailPoint initialSyncFuzzerSynchronizationPoint2;
 
 namespace {
 using namespace executor;
@@ -175,10 +179,12 @@ InitialSyncer::InitialSyncer(
       _opts(opts),
       _dataReplicatorExternalState(std::move(dataReplicatorExternalState)),
       _exec(_dataReplicatorExternalState->getTaskExecutor()),
+      _clonerExec(_exec),
       _writerPool(writerPool),
       _storage(storage),
       _replicationProcess(replicationProcess),
-      _onCompletion(onCompletion) {
+      _onCompletion(onCompletion),
+      _createClientFn([] { return std::make_unique<DBClientConnection>(); }) {
     uassert(ErrorCodes::BadValue, "task executor cannot be null", _exec);
     uassert(ErrorCodes::BadValue, "invalid storage interface", _storage);
     uassert(ErrorCodes::BadValue, "invalid replication process", _replicationProcess);
@@ -278,8 +284,8 @@ void InitialSyncer::_cancelRemainingWork_inlock() {
                 Status{ErrorCodes::CallbackCanceled, "Initial sync attempt canceled"};
         }
     }
-    if (_initialSyncState) {
-        _shutdownComponent_inlock(_initialSyncState->dbsCloner);
+    if (_client) {
+        _client->shutdownAndDisallowReconnect();
     }
     _shutdownComponent_inlock(_applier);
     _shutdownComponent_inlock(_fCVFetcher);
@@ -364,9 +370,9 @@ BSONObj InitialSyncer::_getInitialSyncProgress_inlock() const {
         BSONObjBuilder bob;
         _appendInitialSyncProgressMinimal_inlock(&bob);
         if (_initialSyncState) {
-            if (_initialSyncState->dbsCloner) {
+            if (_initialSyncState->allDatabaseCloner) {
                 BSONObjBuilder dbsBuilder(bob.subobjStart("databases"));
-                _initialSyncState->dbsCloner->getStats().append(&dbsBuilder);
+                _initialSyncState->allDatabaseCloner->getStats().append(&dbsBuilder);
                 dbsBuilder.doneFast();
             }
         }
@@ -379,15 +385,17 @@ BSONObj InitialSyncer::_getInitialSyncProgress_inlock() const {
     return bob.obj();
 }
 
-void InitialSyncer::setScheduleDbWorkFn_forTest(const DatabaseCloner::ScheduleDbWorkFn& work) {
+void InitialSyncer::setCreateClientFn_forTest(const CreateClientFn& createClientFn) {
     LockGuard lk(_mutex);
-    _scheduleDbWorkFn = work;
+    _createClientFn = createClientFn;
 }
 
-void InitialSyncer::setStartCollectionClonerFn(
-    const StartCollectionClonerFn& startCollectionCloner) {
-    LockGuard lk(_mutex);
-    _startCollectionClonerFn = startCollectionCloner;
+void InitialSyncer::setClonerExecutor_forTest(executor::TaskExecutor* clonerExec) {
+    _clonerExec = clonerExec;
+}
+
+void InitialSyncer::waitForCloner_forTest() {
+    _initialSyncState->allDatabaseClonerFuture.wait();
 }
 
 void InitialSyncer::_setUp_inlock(OperationContext* opCtx, std::uint32_t initialSyncMaxAttempts) {
@@ -861,20 +869,9 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
     // - oplog fetcher
     // - data cloning and applier
     _sharedData = std::make_unique<InitialSyncSharedData>(version, _rollbackChecker->getBaseRBID());
-    auto listDatabasesFilter = [](BSONObj dbInfo) {
-        std::string name;
-        auto status = mongo::bsonExtractStringField(dbInfo, "name", &name);
-        if (!status.isOK()) {
-            error() << "listDatabases filter failed to parse database name from " << redact(dbInfo)
-                    << ": " << redact(status);
-            return false;
-        }
-        return (name != "local");
-    };
-    _initialSyncState = std::make_unique<InitialSyncState>(std::make_unique<DatabasesCloner>(
-        _storage, _exec, _writerPool, _syncSource, listDatabasesFilter, [=](const Status& status) {
-            _databasesClonerCallback(status, onCompletionGuard);
-        }));
+    _client = _createClientFn();
+    _initialSyncState = std::make_unique<InitialSyncState>(std::make_unique<AllDatabaseCloner>(
+        _sharedData.get(), _syncSource, _client.get(), _storage, _writerPool));
 
     // Create oplog applier.
     auto consistencyMarkers = _replicationProcess->getConsistencyMarkers();
@@ -949,7 +946,7 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
     status = _startupComponent_inlock(_oplogFetcher);
     if (!status.isOK()) {
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
-        _initialSyncState->dbsCloner.reset();
+        _initialSyncState->allDatabaseCloner.reset();
         return;
     }
 
@@ -967,22 +964,25 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
         lock.lock();
     }
 
-    if (_scheduleDbWorkFn) {
-        // '_scheduleDbWorkFn' is passed through (DatabasesCloner->DatabaseCloner->CollectionCloner)
-        // to the CollectionCloner so that CollectionCloner's default TaskRunner can be disabled to
-        // facilitate testing.
-        _initialSyncState->dbsCloner->setScheduleDbWorkFn_forTest(_scheduleDbWorkFn);
-    }
-    if (_startCollectionClonerFn) {
-        _initialSyncState->dbsCloner->setStartCollectionClonerFn(_startCollectionClonerFn);
-    }
+    LOG(2) << "Starting AllDatabaseCloner: " << _initialSyncState->allDatabaseCloner->toString();
 
-    LOG(2) << "Starting DatabasesCloner: " << _initialSyncState->dbsCloner->toString();
+    _initialSyncState->allDatabaseClonerFuture =
+        _initialSyncState->allDatabaseCloner->runOnExecutor(_clonerExec)
+            .onCompletion([this, onCompletionGuard](Status status) {
+                // The completion guard must run on the main executor.  This only makes a difference
+                // for unit tests, but we always schedule it that way to avoid special casing test
+                // code.
+                auto exec_status = _exec->scheduleWork(
+                    [this, status, onCompletionGuard](executor::TaskExecutor::CallbackArgs args) {
+                        _allDatabaseClonerCallback(status, onCompletionGuard);
+                    });
+                if (!exec_status.isOK()) {
+                    stdx::unique_lock<Latch> lock(_mutex);
+                    onCompletionGuard->setResultAndCancelRemainingWork_inlock(
+                        lock, exec_status.getStatus());
+                }
+            });
 
-    // _startupComponent_inlock() is shutdown-aware. Additionally, if the component fails to
-    // startup, _startupComponent_inlock() resets the unique_ptr to the component (in this case,
-    // DatabasesCloner).
-    status = _startupComponent_inlock(_initialSyncState->dbsCloner);
     if (!status.isOK()) {
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
         return;
@@ -1022,10 +1022,13 @@ void InitialSyncer::_oplogFetcherCallback(const Status& oplogFetcherFinishStatus
     onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
 }
 
-void InitialSyncer::_databasesClonerCallback(const Status& databaseClonerFinishStatus,
-                                             std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
+void InitialSyncer::_allDatabaseClonerCallback(
+    const Status& databaseClonerFinishStatus,
+    std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
     log() << "Finished cloning data: " << redact(databaseClonerFinishStatus)
           << ". Beginning oplog replay.";
+    _client->shutdownAndDisallowReconnect();
+    _client.reset();
 
     if (MONGO_unlikely(initialSyncHangAfterDataCloning.shouldFail())) {
         // This could have been done with a scheduleWorkAt but this is used only by JS tests where
