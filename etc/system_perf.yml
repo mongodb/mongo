@@ -326,8 +326,22 @@ functions:
     - command: shell.exec
       params:
         working_dir: work
+        silent: true
         script: |
-          ../src/dsi/dsi/run-dsi detect-changes
+          set -o errexit
+
+          # Create the Evergreen API credentials
+          cat > .evergreen.yml <<END_OF_CREDS
+          api_server_host: https://evergreen.mongodb.com/api
+          api_key: "${evergreen_api_key}"
+          user: "${evergreen_api_user}"
+          END_OF_CREDS
+
+    - command: shell.exec
+      params:
+        working_dir: work
+        script: |
+          ../src/dsi/dsi/run-dsi detect-changes --evergreen-api-config .evergreen.yml
     - command: shell.exec
       type: test
       params:
@@ -343,7 +357,7 @@ functions:
       params:
         working_dir: work
         script: |
-          ../src/dsi/dsi/run-dsi detect-outliers
+          ../src/dsi/dsi/run-dsi detect-outliers --evergreen-api-config .evergreen.yml
     - command: shell.exec
       type: setup
       params:
