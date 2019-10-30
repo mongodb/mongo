@@ -1,13 +1,11 @@
 /**
  * Tests that initial sync successfully applies a prepare oplog entry during oplog application phase
- * of initial sync.  Additionally, we will test that a background index build blocks this particular
- * situation until the index build is finished.
+ * of initial sync.  Additionally, we will test that a background index build interleaves without
+ * hanging.
  *
- * TODO(SERVER-44042): Remove two_phase_index_builds_unsupported tag.
  * @tags: [
  *     uses_transactions,
  *     uses_prepare_transaction,
- *     two_phase_index_builds_unsupported,
  * ]
  */
 
@@ -15,6 +13,7 @@
 "use strict";
 
 load("jstests/core/txns/libs/prepare_helpers.js");
+load('jstests/noPassthrough/libs/index_build.js');
 
 const replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
@@ -66,11 +65,28 @@ jsTestLog("Running operations while collection cloning is paused");
 // Perform writes while collection cloning is paused so that we know they must be applied during
 // the oplog application stage of initial sync.
 assert.commandWorked(testColl.insert({_id: 1, a: 1}));
-assert.commandWorked(testColl.createIndex({a: 1}));
-// Make the index build hang on the secondary so that initial sync gets to the prepared-txn
-// reconstruct stage with the index build still running.
-assert.commandWorked(
-    secondary.adminCommand({configureFailPoint: 'hangAfterStartingIndexBuild', mode: "alwaysOn"}));
+
+const enableTwoPhaseIndexBuild =
+    assert.commandWorked(primary.adminCommand({getParameter: 1, enableTwoPhaseIndexBuild: 1}))
+        .enableTwoPhaseIndexBuild;
+if (!enableTwoPhaseIndexBuild) {
+    // Make the index build hang on the secondary so that initial sync gets to the prepared-txn
+    // reconstruct stage with the index build still running.
+    jsTest.log("Hanging index build on the secondary node");
+    IndexBuildTest.pauseIndexBuilds(secondary);
+
+    jsTest.log("Beginning index build");
+    assert.commandWorked(testColl.createIndex({a: 1}));
+} else {
+    // Make the index build hang on the primary so that only a startIndexBuild oplog entry is
+    // replicated and initial sync gets to the prepared-txn reconstruct stage with the index build
+    // still running.
+    jsTest.log("Hanging index build on the primary node");
+    IndexBuildTest.pauseIndexBuilds(primary);
+
+    jsTest.log("Beginning index build");
+    IndexBuildTest.startIndexBuild(primary, testColl.getFullName(), {a: 1});
+}
 
 let session = primary.startSession();
 let sessionDB = session.getDatabase(dbName);
@@ -91,17 +107,22 @@ jsTestLog("Resuming initial sync");
 assert.commandWorked(secondary.adminCommand(
     {configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}));
 
-// Wait for log message.
-assert.soon(
-    () =>
-        rawMongoProgramOutput().indexOf(
-            "blocking replication until index builds are finished on test.reconstruct_prepared_transactions_initial_sync_index_build, due to prepared transaction") >=
-        0,
-    "replication not hanging");
-
 // Unblock index build.
-assert.commandWorked(
-    secondary.adminCommand({configureFailPoint: 'hangAfterStartingIndexBuild', mode: "off"}));
+if (!enableTwoPhaseIndexBuild) {
+    // Wait for log message.
+    assert.soon(
+        () => rawMongoProgramOutput().indexOf(
+                  "blocking replication until index builds are finished on " +
+                  "test.reconstruct_prepared_transactions_initial_sync_index_build, due to " +
+                  "prepared transaction") >= 0,
+        "replication not hanging");
+
+    // Let the secondary finish its index build.
+    IndexBuildTest.resumeIndexBuilds(secondary);
+} else {
+    // Let the primary finish its index build and replicate a commit to the secondary.
+    IndexBuildTest.resumeIndexBuilds(primary);
+}
 
 // Wait for the secondary to complete initial sync.
 replTest.awaitSecondaryNodes();
