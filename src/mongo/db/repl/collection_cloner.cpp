@@ -183,11 +183,11 @@ BaseCloner::AfterStageBehavior CollectionCloner::queryStage() {
 
 void CollectionCloner::handleNextBatch(DBClientCursorBatchIterator& iter) {
     {
-        stdx::lock_guard<Latch> lk(getSharedData()->mutex);
-        if (!getSharedData()->initialSyncStatus.isOK()) {
+        stdx::lock_guard<InitialSyncSharedData> lk(*getSharedData());
+        if (!getSharedData()->getInitialSyncStatus(lk).isOK()) {
             std::string message = str::stream()
                 << "Collection cloning cancelled due to initial sync failure: "
-                << getSharedData()->initialSyncStatus.toString();
+                << getSharedData()->getInitialSyncStatus(lk).toString();
             log() << message;
             uasserted(ErrorCodes::CallbackCanceled, message);
         }

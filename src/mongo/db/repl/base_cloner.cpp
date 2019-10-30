@@ -88,12 +88,12 @@ Status BaseCloner::run() {
             return _status;
         }
     }
-    stdx::lock_guard<Latch> lk(_sharedData->mutex);
-    if (!_sharedData->initialSyncStatus.isOK()) {
+    stdx::lock_guard<InitialSyncSharedData> lk(*_sharedData);
+    if (!_sharedData->getInitialSyncStatus(lk).isOK()) {
         log() << "Failing data clone because initial sync failed outside data clone: "
-              << _sharedData->initialSyncStatus;
+              << _sharedData->getInitialSyncStatus(lk);
     }
-    return _sharedData->initialSyncStatus;
+    return _sharedData->getInitialSyncStatus(lk);
 }
 
 bool BaseCloner::isMyFailPoint(const BSONObj& data) const {
@@ -205,8 +205,8 @@ BaseCloner::AfterStageBehavior BaseCloner::runStages() {
     AfterStageBehavior afterStageBehavior = kContinueNormally;
     for (auto* stage : getStages()) {
         {
-            stdx::lock_guard<Latch> lk(_sharedData->mutex);
-            if (!_sharedData->initialSyncStatus.isOK())
+            stdx::lock_guard<InitialSyncSharedData> lk(*_sharedData);
+            if (!_sharedData->getInitialSyncStatus(lk).isOK())
                 return kSkipRemainingStages;
         }
         afterStageBehavior = runStage(stage);
@@ -222,15 +222,13 @@ void BaseCloner::setInitialSyncFailedStatus(Status status) {
         stdx::lock_guard<Latch> lk(_mutex);
         _status = status;
     }
-    stdx::lock_guard<Latch> lk(_sharedData->mutex);
-    if (_sharedData->initialSyncStatus.isOK()) {
-        _sharedData->initialSyncStatus = status;
-    }
+    stdx::lock_guard<InitialSyncSharedData> lk(*_sharedData);
+    _sharedData->setInitialSyncStatusIfOK(lk, status);
 }
 
 bool BaseCloner::mustExit() {
-    stdx::lock_guard<Latch> lk(_sharedData->mutex);
-    return !_sharedData->initialSyncStatus.isOK();
+    stdx::lock_guard<InitialSyncSharedData> lk(*_sharedData);
+    return !_sharedData->getInitialSyncStatus(lk).isOK();
 }
 
 }  // namespace repl

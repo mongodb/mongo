@@ -933,6 +933,7 @@ env.Library(
     ],
     LIBDEPS = [
         'task_runner',
+        'initial_sync_shared_data',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/clientdriver_network',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
@@ -1029,6 +1030,16 @@ env.Library(
 )
 
 env.Library(
+    target='initial_sync_shared_data',
+    source=[
+        'initial_sync_shared_data.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ]
+)
+
+env.Library(
     target='initial_syncer',
     source=[
         'initial_syncer.cpp',
@@ -1039,6 +1050,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/client/clientdriver_network',
         'initial_sync_cloners',
+        'initial_sync_shared_data',
         'multiapplier',
         'oplog',
         'oplog_application_interface',
@@ -1320,16 +1332,19 @@ env.CppUnitTest(
         'all_database_cloner_test.cpp',
         'cloner_test_fixture.cpp',
         'database_cloner_test.cpp',
-        'collection_cloner_test.cpp'
-        ],
+        'collection_cloner_test.cpp',
+        'initial_sync_shared_data_test.cpp'
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',  # Required for service context test fixture
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/dbtests/mocklib',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
         'replmocks',
-        'initial_sync_cloners'
-        ],
+        'initial_sync_cloners',
+        'initial_sync_shared_data'
+    ],
 )
 
 env.Library(

@@ -31,30 +31,128 @@
 
 #include <mutex>
 
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/server_options.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/util/clock_source.h"
 
 namespace mongo {
-struct InitialSyncSharedData {
-    InitialSyncSharedData(ServerGlobalParams::FeatureCompatibility::Version inFCV, int inRollbackId)
-        : FCV(inFCV), rollBackId(inRollbackId) {}
+namespace repl {
+class InitialSyncSharedData {
+public:
+    InitialSyncSharedData(ServerGlobalParams::FeatureCompatibility::Version FCV, int rollBackId)
+        : _FCV(FCV), _rollBackId(rollBackId) {}
 
+    ServerGlobalParams::FeatureCompatibility::Version getFCV() const {
+        return _FCV;
+    }
+
+    int getRollBackId() const {
+        return _rollBackId;
+    }
+
+    /**
+     * In all cases below, the lock must be a lock on this object itself for access to be valid.
+     */
+
+    Status getInitialSyncStatus(WithLock lk) {
+        return _initialSyncStatus;
+    }
+
+    void setInitialSyncStatus(WithLock lk, Status newStatus) {
+        _initialSyncStatus = newStatus;
+    }
+
+    /**
+     * Sets the initialSyncStatus to the new status if and only if the old status is "OK".
+     */
+    void setInitialSyncStatusIfOK(WithLock lk, Status newStatus) {
+        if (_initialSyncStatus.isOK())
+            _initialSyncStatus = newStatus;
+    }
+
+    int getRetryingOperationsCount(WithLock lk) {
+        return _retryingOperationsCount;
+    }
+
+    int totalRetries(WithLock lk) {
+        return _totalRetries;
+    }
+
+    /**
+     * Increment the number of retrying operations, set syncSourceUnreachableSince if this is the
+     * only retrying operation. This should be used when an operation starts retrying.
+     *
+     * Returns the new number of retrying operations.
+     */
+    int incrementRetryingOperations(WithLock lk, ClockSource* clock);
+
+    /**
+     * Decrement the number of retrying operations.  If now zero, clear syncSourceUnreachableSince
+     * and update _totalTimeUnreachable.
+     * Returns the new number of retrying operations.
+     */
+    int decrementRetryingOperations(WithLock lk, ClockSource* clock);
+
+    void incrementTotalRetries(WithLock lk) {
+        _totalRetries++;
+    }
+
+    /**
+     * Returns the total time the sync source has been unreachable, including any current outage.
+     */
+    Milliseconds getTotalTimeUnreachable(WithLock lk, ClockSource* clock);
+
+    /**
+     * Returns the total time the sync source has been unreachable in the current outage.
+     * Returns Milliseconds::min() if there is no current outage.
+     */
+    Milliseconds getCurrentOutageDuration(WithLock lk, ClockSource* clock);
+
+    /**
+     * BasicLockable C++ methods; they merely delegate to the mutex.
+     * The presence of these methods means we can use stdx::unique_lock<InitialSyncSharedData> and
+     * stdx::lock_guard<InitialSyncSharedData>.
+     */
+    void lock() {
+        _mutex.lock();
+    }
+
+    void unlock() {
+        _mutex.unlock();
+    }
+
+private:
     // The const members above the mutex may be accessed without the mutex.
 
     // Sync source FCV at start of initial sync.
-    const ServerGlobalParams::FeatureCompatibility::Version FCV;
+    const ServerGlobalParams::FeatureCompatibility::Version _FCV;
 
     // Rollback ID at start of initial sync
-    const int rollBackId;
+    const int _rollBackId;
 
     // This mutex controls access to all members below it.
-    mutable Mutex mutex = MONGO_MAKE_LATCH("InitialSyncSharedData::mutex"_sd);
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("InitialSyncSharedData::_mutex"_sd);
 
     // Status of the entire initial sync.  All initial sync tasks should exit if this becomes
     // non-OK.
-    Status initialSyncStatus = Status::OK();
+    Status _initialSyncStatus = Status::OK();
+
+    // Number of operations currently being retried due to a transient error.
+    int _retryingOperationsCount = 0;
+
+    // Number of total retry attempts for all operations.  Does not include initial attempts,
+    // so should normally be 0.
+    int _totalRetries = 0;
+
+    // If any operation is currently retrying, the earliest time at which any operation detected
+    // a transient network error.  Otherwise is Date_t().
+    Date_t _syncSourceUnreachableSince;
+
+    // The total time across all outages in this initial sync attempt, but excluding any current
+    // outage, that we were retrying because we were unable to reach the sync source.
+    Milliseconds _totalTimeUnreachable;
 };
+}  // namespace repl
 }  // namespace mongo

@@ -117,7 +117,7 @@ TEST_F(DatabaseClonerTest, ListCollectionsReturnedNoCollections) {
     auto cloner = makeDatabaseCloner();
 
     ASSERT_OK(cloner->run());
-    ASSERT_OK(_sharedData->initialSyncStatus);
+    ASSERT_OK(_sharedData->getInitialSyncStatus(WithLock::withoutLock()));
     ASSERT(getCollectionsFromCloner(cloner.get()).empty());
 }
 
@@ -142,7 +142,7 @@ TEST_F(DatabaseClonerTest, ListCollections) {
     _mockServer->setCommandReply("listCollections",
                                  createListCollectionsResponse({sourceInfos[0], sourceInfos[1]}));
     ASSERT_OK(cloner->run());
-    ASSERT_OK(_sharedData->initialSyncStatus);
+    ASSERT_OK(_sharedData->getInitialSyncStatus(WithLock::withoutLock()));
     auto collections = getCollectionsFromCloner(cloner.get());
 
     ASSERT_EQUALS(2U, collections.size());
@@ -183,7 +183,7 @@ TEST_F(DatabaseClonerTest, ListCollectionsAllowsExtraneousFields) {
     _mockServer->setCommandReply("listCollections",
                                  createListCollectionsResponse({sourceInfos[0], sourceInfos[1]}));
     ASSERT_OK(cloner->run());
-    ASSERT_OK(_sharedData->initialSyncStatus);
+    ASSERT_OK(_sharedData->getInitialSyncStatus(WithLock::withoutLock()));
     auto collections = getCollectionsFromCloner(cloner.get());
 
     ASSERT_EQUALS(2U, collections.size());
