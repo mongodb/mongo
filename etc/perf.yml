@@ -167,9 +167,22 @@ functions:
     - command: shell.exec
       params:
         working_dir: src
+        silent: true
+        script: |
+          set -o errexit
+
+          # Create the Evergreen API credentials
+          cat > .evergreen.yml <<END_OF_CREDS
+          api_server_host: https://evergreen.mongodb.com/api
+          api_key: "${evergreen_api_key}"
+          user: "${evergreen_api_user}"
+          END_OF_CREDS
+    - command: shell.exec
+      params:
+        working_dir: src
         script: |
           set -v
-          ./dsi/run-dsi detect-changes
+          ./dsi/run-dsi detect-changes --evergreen-api-config .evergreen.yml
     - command: json.get_history
       params:
         task: ${task_name}
