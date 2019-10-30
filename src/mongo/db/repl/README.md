@@ -57,13 +57,13 @@ satisfy write concerns.
 
 A secondary keeps its data synchronized with its sync source by fetching oplog entries from its sync
 source. This is done via the
-[`OplogFetcher`](https://github.com/mongodb/mongo/blob/r3.4.2/src/mongo/db/repl/oplog_fetcher.h).
+[`OplogFetcher`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/oplog_fetcher.h).
 
 The `OplogFetcher` first sends a `find` command to the sync source's oplog, and then follows with a
 series of `getMore`s on the cursor.
 
 The `OplogFetcher` makes use of the
-[`Fetcher`](https://github.com/mongodb/mongo/blob/r3.4.2/src/mongo/client/fetcher.h) for this task,
+[`Fetcher`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/client/fetcher.h) for this task,
 which is a generic class used for fetching data from a collection on a remote node. A `Fetcher` is
 given a `find` command and then follows that command with `getMore` requests. The `Fetcher` also
 takes in a callback function that is called with the results of every batch.
@@ -92,7 +92,7 @@ the `Fetcher` with a new `find` command each time it receives an error for a max
 If it expires its retries then the `OplogFetcher` shuts down with an error status.
 
 The `OplogFetcher` is owned by the
-[`BackgroundSync`](https://github.com/mongodb/mongo/blob/r3.4.2/src/mongo/db/repl/bgsync.h) thread.
+[`BackgroundSync`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/bgsync.h) thread.
 The `BackgroundSync` thread runs continuously while a node is in SECONDARY state. `BackgroundSync`
 sits in a loop, where each iteration it first chooses a sync source with the `SyncSourceResolver`
 and then starts up the `OplogFetcher`. When the `OplogFetcher` terminates, `BackgroundSync` restarts
@@ -111,12 +111,12 @@ state replication; there is a similar collection-backed buffer used for initial 
 Whenever a node starts initial sync, creates a new `BackgroundSync` (when it stops being primary),
 or errors on its current `OplogFetcher`, it must get a new sync source. Sync source selection is
 done by the
-[`SyncSourceResolver`](https://github.com/mongodb/mongo/blob/r3.4.2/src/mongo/db/repl/sync_source_resolver.h).
+[`SyncSourceResolver`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/sync_source_resolver.h).
 
 The `SyncSourceResolver` delegates the duty of choosing a "sync source candidate" to the
-[**`ReplicationCoordinator`**](https://github.com/mongodb/mongo/blob/r3.4.2/src/mongo/db/repl/replication_coordinator.h),
+[**`ReplicationCoordinator`**](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/replication_coordinator.h),
 which in turn asks the
-[**`TopologyCoordinator`**](https://github.com/mongodb/mongo/blob/r3.4.2/src/mongo/db/repl/topology_coordinator.h)
+[**`TopologyCoordinator`**](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/topology_coordinator.h)
 to choose a new sync source.
 
 #### Choosing a sync source candidate
@@ -134,10 +134,10 @@ Otherwise, it iterates through all of the nodes and sees which one is the best.
 * First the secondary checks the `TopologyCoordinator`'s cached view of the replica set for the
   latest OpTime known to be on the primary. Secondaries do not sync from nodes whose newest oplog
   entry is more than
-  [`maxSyncSourceLagSecs`](https://github.com/mongodb/mongo/blob/r3.4.2/src/mongo/db/repl/topology_coordinator_impl.cpp#L227-L240)
+  [`maxSyncSourceLagSecs`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/topology_coordinator.cpp#L302-L315)
   seconds behind the primary's newest oplog entry.
 * Secondaries then loop through each node and choose the closest node that satisfies [various
-  criteria](https://github.com/mongodb/mongo/blob/r3.4.2/src/mongo/db/repl/topology_coordinator_impl.cpp#L162-L363).
+  criteria](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/topology_coordinator.cpp#L200-L438).
   “Closest” here is determined by the lowest ping time to each node.
 * If no node satisfies the necessary criteria, then the `BackgroundSync` waits 1 second and restarts
   the sync source selection process.
@@ -166,13 +166,11 @@ Otherwise, the secondary found a sync source! At that point `BackgroundSync` sta
 
 ### Oplog Entry Application
 
-A separate thread,
-[`RSDataSync`](https://github.com/mongodb/mongo/blob/r3.4.2/src/mongo/db/repl/rs_sync.h) is used for
-pulling oplog entries off of the oplog buffer and applying them. `RSDataSync` constructs a
-[`SyncTail`](https://github.com/mongodb/mongo/blob/r3.4.2/src/mongo/db/repl/sync_tail.h) in a loop
-which is used to actually apply the operations. The `SyncTail` instance does some oplog application,
-and terminates when there is a state change where we need to pause oplog application. After it
-terminates, `RSDataSync` loops back and decides if it should make a new `SyncTail` and continue.
+A separate thread, `RSDataSync` is used for pulling oplog entries off of the oplog buffer and
+applying them. `RSDataSync` constructs a `SyncTail` in a loop which is used to actually apply the
+operations. The `SyncTail` instance does some oplog application, and terminates when there is a state
+change where we need to pause oplog application. After it terminates, `RSDataSync` loops back and
+decides if it should make a new `SyncTail` and continue.
 
 `SyncTail` creates multiple threads that apply buffered oplog entries in parallel. Operations are
 pulled off of the oplog buffer in batches to be applied. Nodes keep track of their “last applied
@@ -188,7 +186,7 @@ The `ReplicationCoordinator` is the public api that replication presents to the 
 base. It is in charge of coordinating the interaction of replication with the rest of the system.
 
 The `ReplicationCoordinator` communicates with the storage layer and other nodes through the
-[`ReplicationCoordinatorExternalState`](https://github.com/mongodb/mongo/blob/r3.4.2/src/mongo/db/repl/replication_coordinator_external_state.h).
+[`ReplicationCoordinatorExternalState`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/replication_coordinator_external_state.h).
 The external state also manages and owns all of the replication threads.
 
 The `TopologyCoordinator` is in charge of maintaining state about the topology of the cluster. It is
@@ -204,7 +202,7 @@ Each node has a copy of the **`ReplicaSetConfig`** in the `ReplicationCoordinato
 nodes in the replica set. This config lets each node talk to every other node.
 
 Each node uses the internal client, the legacy c++ driver code in the
-[`src/mongo/client`](https://github.com/mongodb/mongo/tree/r3.4.2/src/mongo/client) directory, to
+[`src/mongo/client`](https://github.com/mongodb/mongo/tree/r4.2.0/src/mongo/client) directory, to
 talk to each other node. Nodes talk to each other by sending a mixture of external and internal
 commands over the same incoming port as user commands. All commands take the same code path as
 normal user commands. For security, nodes use the keyfile to authenticate to each other. You need to
@@ -368,7 +366,7 @@ by taking the minimum of the learned commit point and their `lastApplied`.
 
 The last way that replica set nodes regularly communicate with each other is through
 `replSetUpdatePosition` commands. The `ReplicationCoordinatorExternalState` creates a
-[**`SyncSourceFeedback`**](https://github.com/mongodb/mongo/blob/r3.4.2/src/mongo/db/repl/sync_source_feedback.h)
+[**`SyncSourceFeedback`**](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/sync_source_feedback.h)
 object at startup that is responsible for sending `replSetUpdatePosition` commands.
 
 The `SyncSourceFeedback` starts a loop. In each iteration it first waits on a condition variable
@@ -377,7 +375,7 @@ replicated more operations and become more up-to-date. It checks that it is not 
 STARTUP state before moving on.
 
 It then gets the node's sync source and creates a
-[**`Reporter`**](https://github.com/mongodb/mongo/blob/r3.4.2/src/mongo/db/repl/reporter.h) that
+[**`Reporter`**](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/reporter.h) that
 actually sends the `replSetUpdatePosition` command to the sync source. This command keeps getting
 sent every `keepAliveInterval` milliseconds (`(electionTimeout / 2)`) to maintain liveness
 information about the nodes in the replica set.
@@ -522,8 +520,8 @@ and checking/setting if the node can accept writes or serve reads.
 ## Global Lock Acquisition Ordering
 
 Both the PBWM and RSTL are global resources that must be acquired before the global lock is
-acquired. The node must first acquire the PBWM in (intent
-shared)[https://docs.mongodb.com/manual/reference/glossary/#term-intent-lock] mode. Next, it must
+acquired. The node must first acquire the PBWM in [intent
+shared](https://docs.mongodb.com/manual/reference/glossary/#term-intent-lock) mode. Next, it must
 acquire the RSTL in intent exclusive mode. Only then can it acquire the global lock in its desired
 mode.
 
@@ -660,8 +658,8 @@ that at least one of those nodes is electable. If force is `true`, it does not w
 conditions and steps down immediately after it reaches the `waitUntil` deadline.
 
 Upon a successful stepdown, it yields locks held by prepared transactions because we are now a
-secondary. Finally, we log stepdown metrics and update our member state to `SECONDARY`. (TODO
-SERVER-43781: link to prepare section of arch guide)
+secondary. Finally, we log stepdown metrics and update our member state to `SECONDARY`.
+<!-- TODO SERVER-43781: Link to process for reconstructing prepared transactions -->
 
 ### Unconditional
 
@@ -764,9 +762,9 @@ run through the oplog recovery process, which truncates the oplog after the `com
 truncate point) and applies all oplog entries through the end of the sync source's oplog.
 
 The last thing we do before exiting the data modification section is reconstruct prepared
-transactions. (TODO SERVER-43783: add link to prepared transactions recovery process). We must also
-restore their in-memory state to what it was prior to the rollback in order to fulfill the
-durability guarantees of prepared transactions.
+transactions. We must also restore their in-memory state to what it was prior to the rollback in
+order to fulfill the durability guarantees of prepared transactions.
+<!-- TODO SERVER-43783: Link to process for reconstructing prepared transactions -->
 
 At this point, the last applied and durable OpTimes still point to the divergent branch of history,
 so we must update them to be at the top of the oplog, which should be the `common point`.
