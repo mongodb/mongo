@@ -288,7 +288,12 @@ func configureClient(opts options.ToolOptions) (*mongo.Client, error) {
 	clientopt.SetReplicaSet(opts.ReplicaSetName)
 
 	clientopt.SetAppName(opts.AppName)
-	clientopt.SetDirect(opts.Direct)
+	if opts.Direct {
+		clientopt.SetDirect(true)
+		t := true
+		clientopt.AuthenticateToAnything = &t
+	}
+
 	if opts.ReadPreference != nil {
 		clientopt.SetReadPreference(opts.ReadPreference)
 	}
@@ -297,6 +302,10 @@ func configureClient(opts options.ToolOptions) (*mongo.Client, error) {
 	} else {
 		// If no write concern was specified, default to majority
 		clientopt.SetWriteConcern(writeconcern.New(writeconcern.WMajority()))
+	}
+
+	if opts.Compressors != "" && opts.Compressors != "none" {
+		clientopt.SetCompressors(strings.Split(opts.Compressors, ","))
 	}
 
 	if opts.Auth != nil && opts.Auth.IsSet() {
