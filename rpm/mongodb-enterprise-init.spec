@@ -275,6 +275,8 @@ fi
 %{_mandir}/man1/mongoexport.1*
 %{_mandir}/man1/mongofiles.1*
 %{_mandir}/man1/mongoimport.1*
+%{_mandir}/man1/mongoldap.1*
+%{_mandir}/man1/mongoreplay.1*
 %{_mandir}/man1/mongorestore.1*
 %{_mandir}/man1/mongotop.1*
 %{_mandir}/man1/mongostat.1*
