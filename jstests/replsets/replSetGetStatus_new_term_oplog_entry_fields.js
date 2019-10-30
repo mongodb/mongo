@@ -48,7 +48,7 @@
             tojson(res.electionCandidateMetrics));
 
     restartReplSetReplication(rst);
-    rst.awaitReplication();
+    rst.awaitLastOpCommitted();
 
     // Check that the 'electionCandidateMetrics' section of the replSetGetStatus response has the
     // 'wMajorityWriteAvailabilityDate' field once the new term oplog entry is in the committed
