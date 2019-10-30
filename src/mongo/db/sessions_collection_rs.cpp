@@ -171,50 +171,48 @@ void SessionsCollectionRS::checkSessionsCollectionExists(OperationContext* opCtx
                     (localLogicalSessionTimeoutMinutes * 60));
 }
 
-Status SessionsCollectionRS::refreshSessions(OperationContext* opCtx,
-                                             const LogicalSessionRecordSet& sessions) {
+void SessionsCollectionRS::refreshSessions(OperationContext* opCtx,
+                                           const LogicalSessionRecordSet& sessions) {
     const std::vector<LogicalSessionRecord> sessionsVector(sessions.begin(), sessions.end());
 
-    return _dispatch(NamespaceString::kLogicalSessionsNamespace,
-                     opCtx,
-                     [&] {
-                         DBDirectClient client(opCtx);
-                         return doRefresh(NamespaceString::kLogicalSessionsNamespace,
-                                          sessionsVector,
-                                          makeSendFnForBatchWrite(
-                                              NamespaceString::kLogicalSessionsNamespace, &client));
-                     },
-                     [&](DBClientBase* client) {
-                         return doRefresh(NamespaceString::kLogicalSessionsNamespace,
-                                          sessionsVector,
-                                          makeSendFnForBatchWrite(
-                                              NamespaceString::kLogicalSessionsNamespace, client));
-                     });
+    _dispatch(
+        NamespaceString::kLogicalSessionsNamespace,
+        opCtx,
+        [&] {
+            DBDirectClient client(opCtx);
+            doRefresh(NamespaceString::kLogicalSessionsNamespace,
+                      sessionsVector,
+                      makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, &client));
+        },
+        [&](DBClientBase* client) {
+            doRefresh(NamespaceString::kLogicalSessionsNamespace,
+                      sessionsVector,
+                      makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, client));
+        });
 }
 
-Status SessionsCollectionRS::removeRecords(OperationContext* opCtx,
-                                           const LogicalSessionIdSet& sessions) {
+void SessionsCollectionRS::removeRecords(OperationContext* opCtx,
+                                         const LogicalSessionIdSet& sessions) {
     const std::vector<LogicalSessionId> sessionsVector(sessions.begin(), sessions.end());
 
-    return _dispatch(NamespaceString::kLogicalSessionsNamespace,
-                     opCtx,
-                     [&] {
-                         DBDirectClient client(opCtx);
-                         return doRemove(NamespaceString::kLogicalSessionsNamespace,
-                                         sessionsVector,
-                                         makeSendFnForBatchWrite(
-                                             NamespaceString::kLogicalSessionsNamespace, &client));
-                     },
-                     [&](DBClientBase* client) {
-                         return doRemove(NamespaceString::kLogicalSessionsNamespace,
-                                         sessionsVector,
-                                         makeSendFnForBatchWrite(
-                                             NamespaceString::kLogicalSessionsNamespace, client));
-                     });
+    _dispatch(
+        NamespaceString::kLogicalSessionsNamespace,
+        opCtx,
+        [&] {
+            DBDirectClient client(opCtx);
+            doRemove(NamespaceString::kLogicalSessionsNamespace,
+                     sessionsVector,
+                     makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, &client));
+        },
+        [&](DBClientBase* client) {
+            doRemove(NamespaceString::kLogicalSessionsNamespace,
+                     sessionsVector,
+                     makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, client));
+        });
 }
 
-StatusWith<LogicalSessionIdSet> SessionsCollectionRS::findRemovedSessions(
-    OperationContext* opCtx, const LogicalSessionIdSet& sessions) {
+LogicalSessionIdSet SessionsCollectionRS::findRemovedSessions(OperationContext* opCtx,
+                                                              const LogicalSessionIdSet& sessions) {
     const std::vector<LogicalSessionId> sessionsVector(sessions.begin(), sessions.end());
 
     return _dispatch(

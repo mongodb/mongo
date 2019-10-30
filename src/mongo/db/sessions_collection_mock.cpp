@@ -35,8 +35,8 @@
 namespace mongo {
 
 MockSessionsCollectionImpl::MockSessionsCollectionImpl()
-    : _refresh([=](const LogicalSessionRecordSet& sessions) { return _refreshSessions(sessions); }),
-      _remove([=](const LogicalSessionIdSet& sessions) { return _removeRecords(sessions); }) {}
+    : _refresh([=](const LogicalSessionRecordSet& sessions) { _refreshSessions(sessions); }),
+      _remove([=](const LogicalSessionIdSet& sessions) { _removeRecords(sessions); }) {}
 
 void MockSessionsCollectionImpl::setRefreshHook(RefreshHook hook) {
     _refresh = std::move(hook);
@@ -47,16 +47,16 @@ void MockSessionsCollectionImpl::setRemoveHook(RemoveHook hook) {
 }
 
 void MockSessionsCollectionImpl::clearHooks() {
-    _refresh = [=](const LogicalSessionRecordSet& sessions) { return _refreshSessions(sessions); };
-    _remove = [=](const LogicalSessionIdSet& sessions) { return _removeRecords(sessions); };
+    _refresh = [=](const LogicalSessionRecordSet& sessions) { _refreshSessions(sessions); };
+    _remove = [=](const LogicalSessionIdSet& sessions) { _removeRecords(sessions); };
 }
 
-Status MockSessionsCollectionImpl::refreshSessions(const LogicalSessionRecordSet& sessions) {
-    return _refresh(sessions);
+void MockSessionsCollectionImpl::refreshSessions(const LogicalSessionRecordSet& sessions) {
+    _refresh(sessions);
 }
 
-Status MockSessionsCollectionImpl::removeRecords(const LogicalSessionIdSet& sessions) {
-    return _remove(std::move(sessions));
+void MockSessionsCollectionImpl::removeRecords(const LogicalSessionIdSet& sessions) {
+    _remove(std::move(sessions));
 }
 
 void MockSessionsCollectionImpl::add(LogicalSessionRecord record) {
@@ -83,25 +83,22 @@ const MockSessionsCollectionImpl::SessionMap& MockSessionsCollectionImpl::sessio
     return _sessions;
 }
 
-Status MockSessionsCollectionImpl::_refreshSessions(const LogicalSessionRecordSet& sessions) {
+void MockSessionsCollectionImpl::_refreshSessions(const LogicalSessionRecordSet& sessions) {
     for (auto& record : sessions) {
         if (!has(record.getId())) {
             _sessions.insert({record.getId(), record});
         }
     }
-    return Status::OK();
 }
 
-Status MockSessionsCollectionImpl::_removeRecords(const LogicalSessionIdSet& sessions) {
+void MockSessionsCollectionImpl::_removeRecords(const LogicalSessionIdSet& sessions) {
     stdx::unique_lock<Latch> lk(_mutex);
     for (auto& lsid : sessions) {
         _sessions.erase(lsid);
     }
-
-    return Status::OK();
 }
 
-StatusWith<LogicalSessionIdSet> MockSessionsCollectionImpl::findRemovedSessions(
+LogicalSessionIdSet MockSessionsCollectionImpl::findRemovedSessions(
     OperationContext* opCtx, const LogicalSessionIdSet& sessions) {
     LogicalSessionIdSet lsids;
     stdx::unique_lock<Latch> lk(_mutex);

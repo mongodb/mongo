@@ -60,8 +60,8 @@ public:
 
     MockSessionsCollectionImpl();
 
-    using RefreshHook = std::function<Status(const LogicalSessionRecordSet&)>;
-    using RemoveHook = std::function<Status(const LogicalSessionIdSet&)>;
+    using RefreshHook = std::function<void(const LogicalSessionRecordSet&)>;
+    using RemoveHook = std::function<void(const LogicalSessionIdSet&)>;
 
     // Set custom hooks to override default behavior
     void setRefreshHook(RefreshHook hook);
@@ -71,8 +71,8 @@ public:
     void clearHooks();
 
     // Forwarding methods from the MockSessionsCollection
-    Status refreshSessions(const LogicalSessionRecordSet& sessions);
-    Status removeRecords(const LogicalSessionIdSet& sessions);
+    void refreshSessions(const LogicalSessionRecordSet& sessions);
+    void removeRecords(const LogicalSessionIdSet& sessions);
 
     // Test-side methods that operate on the _sessions map
     void add(LogicalSessionRecord record);
@@ -81,13 +81,13 @@ public:
     void clearSessions();
     const SessionMap& sessions() const;
 
-    StatusWith<LogicalSessionIdSet> findRemovedSessions(OperationContext* opCtx,
-                                                        const LogicalSessionIdSet& sessions);
+    LogicalSessionIdSet findRemovedSessions(OperationContext* opCtx,
+                                            const LogicalSessionIdSet& sessions);
 
 private:
     // Default implementations, may be overridden with custom hooks.
-    Status _refreshSessions(const LogicalSessionRecordSet& sessions);
-    Status _removeRecords(const LogicalSessionIdSet& sessions);
+    void _refreshSessions(const LogicalSessionRecordSet& sessions);
+    void _removeRecords(const LogicalSessionIdSet& sessions);
 
     Mutex _mutex = MONGO_MAKE_LATCH("MockSessionsCollectionImpl::_mutex");
     SessionMap _sessions;
@@ -110,17 +110,17 @@ public:
 
     void checkSessionsCollectionExists(OperationContext* opCtx) override {}
 
-    Status refreshSessions(OperationContext* opCtx,
-                           const LogicalSessionRecordSet& sessions) override {
-        return _impl->refreshSessions(sessions);
+    void refreshSessions(OperationContext* opCtx,
+                         const LogicalSessionRecordSet& sessions) override {
+        _impl->refreshSessions(sessions);
     }
 
-    Status removeRecords(OperationContext* opCtx, const LogicalSessionIdSet& sessions) override {
-        return _impl->removeRecords(sessions);
+    void removeRecords(OperationContext* opCtx, const LogicalSessionIdSet& sessions) override {
+        _impl->removeRecords(sessions);
     }
 
-    StatusWith<LogicalSessionIdSet> findRemovedSessions(
-        OperationContext* opCtx, const LogicalSessionIdSet& sessions) override {
+    LogicalSessionIdSet findRemovedSessions(OperationContext* opCtx,
+                                            const LogicalSessionIdSet& sessions) override {
         return _impl->findRemovedSessions(opCtx, sessions);
     }
 

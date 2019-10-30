@@ -95,25 +95,25 @@ void SessionsCollectionStandalone::checkSessionsCollectionExists(OperationContex
                     (localLogicalSessionTimeoutMinutes * 60));
 }
 
-Status SessionsCollectionStandalone::refreshSessions(OperationContext* opCtx,
-                                                     const LogicalSessionRecordSet& sessions) {
+void SessionsCollectionStandalone::refreshSessions(OperationContext* opCtx,
+                                                   const LogicalSessionRecordSet& sessions) {
     const std::vector<LogicalSessionRecord> sessionsVector(sessions.begin(), sessions.end());
     DBDirectClient client(opCtx);
-    return doRefresh(NamespaceString::kLogicalSessionsNamespace,
-                     sessionsVector,
-                     makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, &client));
+    doRefresh(NamespaceString::kLogicalSessionsNamespace,
+              sessionsVector,
+              makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, &client));
 }
 
-Status SessionsCollectionStandalone::removeRecords(OperationContext* opCtx,
-                                                   const LogicalSessionIdSet& sessions) {
+void SessionsCollectionStandalone::removeRecords(OperationContext* opCtx,
+                                                 const LogicalSessionIdSet& sessions) {
     const std::vector<LogicalSessionId> sessionsVector(sessions.begin(), sessions.end());
     DBDirectClient client(opCtx);
-    return doRemove(NamespaceString::kLogicalSessionsNamespace,
-                    sessionsVector,
-                    makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, &client));
+    doRemove(NamespaceString::kLogicalSessionsNamespace,
+             sessionsVector,
+             makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, &client));
 }
 
-StatusWith<LogicalSessionIdSet> SessionsCollectionStandalone::findRemovedSessions(
+LogicalSessionIdSet SessionsCollectionStandalone::findRemovedSessions(
     OperationContext* opCtx, const LogicalSessionIdSet& sessions) {
     const std::vector<LogicalSessionId> sessionsVector(sessions.begin(), sessions.end());
     DBDirectClient client(opCtx);

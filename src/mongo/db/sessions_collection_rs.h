@@ -65,15 +65,14 @@ public:
      *
      * If a step-down happens on this node as this method is running, it may fail.
      */
-    Status refreshSessions(OperationContext* opCtx,
-                           const LogicalSessionRecordSet& sessions) override;
+    void refreshSessions(OperationContext* opCtx, const LogicalSessionRecordSet& sessions) override;
 
     /**
      * Removes the authoritative records for the specified sessions.
      *
      * If a step-down happens on this node as this method is running, it may fail.
      */
-    Status removeRecords(OperationContext* opCtx, const LogicalSessionIdSet& sessions) override;
+    void removeRecords(OperationContext* opCtx, const LogicalSessionIdSet& sessions) override;
 
     /**
      * Returns the subset of sessions from the given set that do not have entries
@@ -82,8 +81,8 @@ public:
      * If a step-down happens on this node as this method is running, it may
      * return stale results.
      */
-    StatusWith<LogicalSessionIdSet> findRemovedSessions(
-        OperationContext* opCtx, const LogicalSessionIdSet& sessions) override;
+    LogicalSessionIdSet findRemovedSessions(OperationContext* opCtx,
+                                            const LogicalSessionIdSet& sessions) override;
 
 private:
     auto _makePrimaryConnection(OperationContext* opCtx);

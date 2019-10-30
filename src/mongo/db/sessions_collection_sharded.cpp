@@ -143,8 +143,8 @@ void SessionsCollectionSharded::checkSessionsCollectionExists(OperationContext* 
     uassertStatusOK(_checkCacheForSessionsCollection(opCtx));
 }
 
-Status SessionsCollectionSharded::refreshSessions(OperationContext* opCtx,
-                                                  const LogicalSessionRecordSet& sessions) {
+void SessionsCollectionSharded::refreshSessions(OperationContext* opCtx,
+                                                const LogicalSessionRecordSet& sessions) {
     auto send = [&](BSONObj toSend) {
         auto opMsg =
             OpMsgRequest::fromDBAndBody(NamespaceString::kLogicalSessionsNamespace.db(), toSend);
@@ -157,13 +157,13 @@ Status SessionsCollectionSharded::refreshSessions(OperationContext* opCtx,
         return response.toStatus();
     };
 
-    return doRefresh(NamespaceString::kLogicalSessionsNamespace,
-                     _groupSessionRecordsByOwningShard(opCtx, sessions),
-                     send);
+    doRefresh(NamespaceString::kLogicalSessionsNamespace,
+              _groupSessionRecordsByOwningShard(opCtx, sessions),
+              send);
 }
 
-Status SessionsCollectionSharded::removeRecords(OperationContext* opCtx,
-                                                const LogicalSessionIdSet& sessions) {
+void SessionsCollectionSharded::removeRecords(OperationContext* opCtx,
+                                              const LogicalSessionIdSet& sessions) {
     auto send = [&](BSONObj toSend) {
         auto opMsg =
             OpMsgRequest::fromDBAndBody(NamespaceString::kLogicalSessionsNamespace.db(), toSend);
@@ -176,41 +176,31 @@ Status SessionsCollectionSharded::removeRecords(OperationContext* opCtx,
         return response.toStatus();
     };
 
-    return doRemove(NamespaceString::kLogicalSessionsNamespace,
-                    _groupSessionIdsByOwningShard(opCtx, sessions),
-                    send);
+    doRemove(NamespaceString::kLogicalSessionsNamespace,
+             _groupSessionIdsByOwningShard(opCtx, sessions),
+             send);
 }
 
-StatusWith<LogicalSessionIdSet> SessionsCollectionSharded::findRemovedSessions(
+LogicalSessionIdSet SessionsCollectionSharded::findRemovedSessions(
     OperationContext* opCtx, const LogicalSessionIdSet& sessions) {
 
-    auto send = [&](BSONObj toSend) -> StatusWith<BSONObj> {
-        auto qr = QueryRequest::makeFromFindCommand(
-            NamespaceString::kLogicalSessionsNamespace, toSend, false);
-        if (!qr.isOK()) {
-            return qr.getStatus();
-        }
+    auto send = [&](BSONObj toSend) -> BSONObj {
+        auto qr = uassertStatusOK(QueryRequest::makeFromFindCommand(
+            NamespaceString::kLogicalSessionsNamespace, toSend, false));
 
         const boost::intrusive_ptr<ExpressionContext> expCtx;
-        auto cq = CanonicalQuery::canonicalize(opCtx,
-                                               std::move(qr.getValue()),
-                                               expCtx,
-                                               ExtensionsCallbackNoop(),
-                                               MatchExpressionParser::kBanAllSpecialFeatures);
-        if (!cq.isOK()) {
-            return cq.getStatus();
-        }
+        auto cq = uassertStatusOK(
+            CanonicalQuery::canonicalize(opCtx,
+                                         std::move(qr),
+                                         expCtx,
+                                         ExtensionsCallbackNoop(),
+                                         MatchExpressionParser::kBanAllSpecialFeatures));
 
         // Do the work to generate the first batch of results. This blocks waiting to get responses
         // from the shard(s).
         std::vector<BSONObj> batch;
         CursorId cursorId;
-        try {
-            cursorId = ClusterFind::runQuery(
-                opCtx, *cq.getValue(), ReadPreferenceSetting::get(opCtx), &batch);
-        } catch (const DBException& ex) {
-            return ex.toStatus();
-        }
+        cursorId = ClusterFind::runQuery(opCtx, *cq, ReadPreferenceSetting::get(opCtx), &batch);
 
         rpc::OpMsgReplyBuilder replyBuilder;
         CursorResponseBuilder::Options options;

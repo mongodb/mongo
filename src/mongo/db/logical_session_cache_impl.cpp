@@ -296,7 +296,7 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
     }
 
     // Refresh the active sessions in the sessions collection.
-    uassertStatusOK(_sessionsColl->refreshSessions(opCtx, activeSessionRecords));
+    _sessionsColl->refreshSessions(opCtx, activeSessionRecords);
     activeSessionsBackSwapper.dismiss();
     {
         stdx::lock_guard<Latch> lk(_mutex);
@@ -304,7 +304,7 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
     }
 
     // Remove the ending sessions from the sessions collection.
-    uassertStatusOK(_sessionsColl->removeRecords(opCtx, explicitlyEndingSessions));
+    _sessionsColl->removeRecords(opCtx, explicitlyEndingSessions);
     explicitlyEndingBackSwaper.dismiss();
     {
         stdx::lock_guard<Latch> lk(_mutex);
@@ -331,14 +331,13 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
     }
 
     // think about pruning ending and active out of openCursorSessions
-    auto statusAndRemovedSessions = _sessionsColl->findRemovedSessions(opCtx, openCursorSessions);
+    try {
+        auto removedSessions = _sessionsColl->findRemovedSessions(opCtx, openCursorSessions);
 
-    if (statusAndRemovedSessions.isOK()) {
-        auto removedSessions = statusAndRemovedSessions.getValue();
         for (const auto& lsid : removedSessions) {
             patterns.emplace(makeKillAllSessionsByPattern(opCtx, lsid));
         }
-    } else {
+    } catch (...) {
         // Ignore errors.
     }
 

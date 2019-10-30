@@ -54,7 +54,7 @@ int RouterSessionCatalog::reapSessionsOlderThan(OperationContext* opCtx,
         });
 
     // From the passed-in sessions, find the ones which are actually expired/removed
-    auto expiredSessionIds = uassertStatusOK(sessionsCollection.findRemovedSessions(opCtx, lsids));
+    auto expiredSessionIds = sessionsCollection.findRemovedSessions(opCtx, lsids);
 
     // Remove the session ids from the in-memory catalog
     int numReaped = 0;

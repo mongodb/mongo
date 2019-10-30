@@ -60,16 +60,15 @@ public:
      * Updates the last-use times on the given sessions to be greater than
      * or equal to the current time.
      */
-    Status refreshSessions(OperationContext* opCtx,
-                           const LogicalSessionRecordSet& sessions) override;
+    void refreshSessions(OperationContext* opCtx, const LogicalSessionRecordSet& sessions) override;
 
     /**
      * Removes the authoritative records for the specified sessions.
      */
-    Status removeRecords(OperationContext* opCtx, const LogicalSessionIdSet& sessions) override;
+    void removeRecords(OperationContext* opCtx, const LogicalSessionIdSet& sessions) override;
 
-    StatusWith<LogicalSessionIdSet> findRemovedSessions(
-        OperationContext* opCtx, const LogicalSessionIdSet& sessions) override;
+    LogicalSessionIdSet findRemovedSessions(OperationContext* opCtx,
+                                            const LogicalSessionIdSet& sessions) override;
 
 protected:
     Status _checkCacheForSessionsCollection(OperationContext* opCtx);
