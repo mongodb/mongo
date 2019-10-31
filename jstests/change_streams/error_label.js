@@ -22,7 +22,7 @@ const err = assert.throws(function() {
     // observable to the change stream in sharded configurations.
     assert.soon(function() {
         return changeStream.hasNext();
-    });
+    }, undefined, undefined, undefined, {runHangAnalyzer: false});
 });
 
 // The hasNext() sends a getMore command, which should generate a ChangeStreamFatalError reply

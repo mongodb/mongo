@@ -47,9 +47,12 @@ checkLog = (function() {
      * the provided 'msg' is found in the logs, or it times out. Throws an exception on timeout.
      */
     let contains = function(conn, msg, timeout = 5 * 60 * 1000) {
+        // Don't run the hang analyzer because we don't expect contains() to always succeed.
         assert.soon(function() {
             return checkContainsOnce(conn, msg);
-        }, 'Could not find log entries containing the following message: ' + msg, timeout, 300);
+        }, 'Could not find log entries containing the following message: ' + msg, timeout, 300, {
+            runHangAnalyzer: false
+        });
     };
 
     /*

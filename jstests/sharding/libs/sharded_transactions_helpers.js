@@ -96,10 +96,16 @@ function assertNoSuchTransactionOnConn(conn, lsid, txnNumber) {
 }
 
 function waitForFailpoint(hitFailpointStr, numTimes, timeout) {
-    assert.soon(function() {
-        const re = new RegExp(hitFailpointStr, 'g' /* find all occurrences */);
-        return (rawMongoProgramOutput().match(re) || []).length == numTimes;
-    }, 'Failed to find "' + hitFailpointStr + '" logged ' + numTimes + ' times', timeout);
+    // Don't run the hang analyzer because we don't expect waitForFailpoint() to always succeed.
+    assert.soon(
+        function() {
+            const re = new RegExp(hitFailpointStr, 'g' /* find all occurrences */);
+            return (rawMongoProgramOutput().match(re) || []).length == numTimes;
+        },
+        'Failed to find "' + hitFailpointStr + '" logged ' + numTimes + ' times',
+        timeout,
+        undefined,
+        {runHangAnalyzer: false});
 }
 
 // Enables the transaction router to retry on stale version (db or shard version) and snapshot
