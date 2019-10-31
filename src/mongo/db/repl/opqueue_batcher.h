@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/db/repl/initial_syncer.h"
-#include "mongo/db/repl/oplog_applier_impl.h"
 
 namespace mongo {
 namespace repl {
@@ -134,6 +133,17 @@ public:
      */
     OpQueue getNextBatch(Seconds maxWaitTime);
 
+    /**
+     * Starts up a thread to continuously pull from the oplog buffer into the OpQueueBatcher's oplog
+     * queue.
+     */
+    void startup();
+
+    /**
+     * Shuts down the thread that pulls from the oplog buffer to the oplog queue.
+     */
+    void shutdown();
+
 private:
     /**
      * If slaveDelay is enabled, this function calculates the most recent timestamp of any oplog
@@ -152,10 +162,7 @@ private:
     stdx::condition_variable _cv;
     OpQueue _ops;
 
-    // This only exists so the destructor invariants rather than deadlocking.
-    bool _isDead = false;
-
-    stdx::thread _thread;  // Must be last so all other members are initialized before starting.
+    std::unique_ptr<stdx::thread> _thread;
 };
 
 

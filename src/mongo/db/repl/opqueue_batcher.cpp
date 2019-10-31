@@ -44,11 +44,9 @@ OpQueueBatcher::OpQueueBatcher(OplogApplier* oplogApplier,
       _storageInterface(storageInterface),
       _oplogBuffer(oplogBuffer),
       _getNextApplierBatchFn(getNextApplierBatchFn),
-      _ops(0),
-      _thread([this] { run(); }) {}
+      _ops(0) {}
 OpQueueBatcher::~OpQueueBatcher() {
-    invariant(_isDead);
-    _thread.join();
+    invariant(!_thread);
 }
 
 
@@ -73,6 +71,17 @@ OpQueue OpQueueBatcher::getNextBatch(Seconds maxWaitTime) {
     _ops = OpQueue(0);
     _cv.notify_all();
     return ops;
+}
+
+void OpQueueBatcher::startup() {
+    _thread = std::make_unique<stdx::thread>([this] { run(); });
+}
+
+void OpQueueBatcher::shutdown() {
+    if (_thread) {
+        _thread->join();
+        _thread.reset();
+    }
 }
 
 /**
@@ -171,7 +180,6 @@ void OpQueueBatcher::run() {
         _ops = std::move(ops);
         _cv.notify_all();
         if (_ops.mustShutdown()) {
-            _isDead = true;
             return;
         }
     }

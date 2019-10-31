@@ -120,6 +120,8 @@ private:
     // we will apply all operations that were fetched.
     OpTime _beginApplyingOpTime = OpTime();
 
+    std::unique_ptr<OpQueueBatcher> _opQueueBatcher;
+
     void fillWriterVectors(OperationContext* opCtx,
                            MultiApplier::Operations* ops,
                            std::vector<MultiApplier::OperationPtrs>* writerVectors,
