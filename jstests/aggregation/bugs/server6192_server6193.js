@@ -7,31 +7,25 @@
 // This test makes assumptions about how the explain output will be formatted, so cannot be
 // transformed to be put inside a $facet stage.
 // @tags: [do_not_wrap_aggregations_in_facets,assumes_unsharded_collection]
+(function() {
+"use strict";
 
-var t = db.jstests_aggregation_server6192;
+load("jstests/libs/analyze_plan.js");  // For 'getPlanStage'.
+
+const t = db.jstests_aggregation_server6192;
 t.drop();
-t.save({x: true});
+assert.commandWorked(t.insert({x: true}));
 
 function assertOptimized(pipeline, v) {
-    var explained = t.runCommand("aggregate", {pipeline: pipeline, explain: true});
-
-    printjson({input: pipeline, output: explained});
-
-    assert("stages" in explained);
-    assert("$project" in explained.stages[1]);
-    var projectStage = explained.stages[1]["$project"];
-    assert.eq(projectStage.a["$const"], v, "ensure short-circuiting worked");
+    const explained = t.runCommand("aggregate", {pipeline: pipeline, explain: true});
+    const projectStage = getPlanStage(explained, "PROJECTION_DEFAULT");
+    assert.eq(projectStage.transformBy.a["$const"], v, "ensure short-circuiting worked", explained);
 }
 
 function assertNotOptimized(pipeline) {
-    var explained = t.runCommand("aggregate", {pipeline: pipeline, explain: true});
-
-    printjson({input: pipeline, output: explained});
-
-    assert("stages" in explained);
-    assert("$project" in explained.stages[1]);
-    var projectStage = explained.stages[1]["$project"];
-    assert(!("$const" in projectStage.a), "ensure no short-circuiting");
+    const explained = t.runCommand("aggregate", {pipeline: pipeline, explain: true});
+    const projectStage = getPlanStage(explained, "PROJECTION_DEFAULT");
+    assert(!("$const" in projectStage.transformBy.a), "ensure no short-circuiting");
 }
 
 // short-circuiting for $and
@@ -59,3 +53,4 @@ assertNotOptimized([{$project: {a: {$and: ['$x', '$x']}}}]);
 assertNotOptimized([{$project: {a: {$or: ['$x', '$x']}}}]);
 assertNotOptimized([{$project: {a: {$and: ['$x']}}}]);
 assertNotOptimized([{$project: {a: {$or: ['$x']}}}]);
+}());

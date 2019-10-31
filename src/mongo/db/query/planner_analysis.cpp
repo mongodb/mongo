@@ -794,10 +794,6 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
                 : std::vector<FieldPath>{});
     } else if (query.getProj()) {
         solnRoot = analyzeProjection(query, std::move(solnRoot), hasSortStage);
-        // If we don't have a covered project, and we're not allowed to put an uncovered one in,
-        // bail out.
-        if (solnRoot->fetched() && params.options & QueryPlannerParams::NO_UNCOVERED_PROJECTIONS)
-            return nullptr;
     } else {
         // Even if there's no projection, the client may want sort key metadata.
         solnRoot = addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot));

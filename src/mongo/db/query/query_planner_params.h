@@ -78,23 +78,19 @@ struct QueryPlannerParams {
         // sometimes to be interpreted as batchSize, then this should be turned on.
         SPLIT_LIMITED_SORT = 1 << 5,
 
-        // Set this if you don't want any plans with a non-covered projection stage. All projections
-        // must be provided/covered by an index.
-        NO_UNCOVERED_PROJECTIONS = 1 << 6,
-
         // Set this to generate covered whole IXSCAN plans.
-        GENERATE_COVERED_IXSCANS = 1 << 7,
+        GENERATE_COVERED_IXSCANS = 1 << 6,
 
         // Set this to track the most recent timestamp seen by this cursor while scanning the oplog.
-        TRACK_LATEST_OPLOG_TS = 1 << 8,
+        TRACK_LATEST_OPLOG_TS = 1 << 7,
 
         // Set this so that collection scans on the oplog wait for visibility before reading.
-        OPLOG_SCAN_WAIT_FOR_VISIBLE = 1 << 9,
+        OPLOG_SCAN_WAIT_FOR_VISIBLE = 1 << 8,
 
         // Set this so that getExecutorDistinct() will only use a plan that _guarantees_ it will
         // return exactly one document per value of the distinct field. See the comments above the
         // declaration of getExecutorDistinct() for more detail.
-        STRICT_DISTINCT_ONLY = 1 << 10,
+        STRICT_DISTINCT_ONLY = 1 << 9,
     };
 
     // See Options enum above.

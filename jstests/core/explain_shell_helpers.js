@@ -212,7 +212,7 @@ assert("queryPlanner" in explain.stages[0].$cursor);
 
 explain = t.explain().aggregate({$project: {a: 3}}, {$group: {_id: null}});
 assert.commandWorked(explain);
-assert.eq(3, explain.stages.length);
+assert.eq(2, explain.stages.length);
 assert("queryPlanner" in explain.stages[0].$cursor);
 
 // Options already provided.

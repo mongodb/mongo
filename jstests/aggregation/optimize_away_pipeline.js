@@ -41,19 +41,12 @@ function assertPipelineUsesAggregation({
 } = {}) {
     const explainOutput = coll.explain().aggregate(pipeline, pipelineOptions);
 
-    assert(isAggregationPlan(explainOutput),
-           "Expected pipeline " + tojsononeline(pipeline) +
-               " to use an aggregation framework in the explain output: " + tojson(explainOutput));
-    assert(!isQueryPlan(explainOutput),
-           "Expected pipeline " + tojsononeline(pipeline) +
-               " *not* to use a query layer at the root level in the explain output: " +
-               tojson(explainOutput));
+    assert(isAggregationPlan(explainOutput), explainOutput);
+    assert(!isQueryPlan(explainOutput), explainOutput);
 
     if (optimizedAwayStages) {
         for (let stage of optimizedAwayStages) {
-            assert(!aggPlanHasStage(explainOutput, stage),
-                   "Expected pipeline " + tojsononeline(pipeline) + " to *not* include a " + stage +
-                       " stage in the explain output: " + tojson(explainOutput));
+            assert(!aggPlanHasStage(explainOutput, stage), explainOutput);
         }
     }
 
@@ -64,18 +57,12 @@ function assertPipelineUsesAggregation({
         cursor = getAggPlanStage(explainOutput, "$geoNearCursor").$geoNearCursor;
     }
 
-    assert(cursor,
-           "Expected pipeline " + tojsononeline(pipeline) + " to include a $cursor " +
-               " stage in the explain output: " + tojson(explainOutput));
-    assert(cursor.queryPlanner.optimizedPipeline === undefined,
-           "Expected pipeline " + tojsononeline(pipeline) + " to *not* include an " +
-               "'optimizedPipeline' field in the explain output: " + tojson(explainOutput));
+    assert(cursor, explainOutput);
+    assert(cursor.queryPlanner.optimizedPipeline === undefined, explainOutput);
 
     if (expectedStages) {
         for (let expectedStage of expectedStages) {
-            assert(aggPlanHasStage(explainOutput, expectedStage),
-                   "Expected pipeline " + tojsononeline(pipeline) + " to include a " +
-                       expectedStage + " stage in the explain output: " + tojson(explainOutput));
+            assert(aggPlanHasStage(explainOutput, expectedStage), explainOutput);
         }
     }
 
@@ -103,32 +90,20 @@ function assertPipelineDoesNotUseAggregation({
 } = {}) {
     const explainOutput = coll.explain().aggregate(pipeline, pipelineOptions);
 
-    assert(!isAggregationPlan(explainOutput),
-           "Expected pipeline " + tojsononeline(pipeline) +
-               " *not* to use an aggregation framework in the explain output: " +
-               tojson(explainOutput));
-    assert(isQueryPlan(explainOutput),
-           "Expected pipeline " + tojsononeline(pipeline) +
-               " to use a query layer at the root level in the explain output: " +
-               tojson(explainOutput));
+    assert(!isAggregationPlan(explainOutput), explainOutput);
+    assert(isQueryPlan(explainOutput), explainOutput);
     if (explainOutput.hasOwnProperty("shards")) {
         Object.keys(explainOutput.shards)
             .forEach((shard) =>
                          assert(explainOutput.shards[shard].queryPlanner.optimizedPipeline === true,
-                                "Expected pipeline " + tojsononeline(pipeline) + " to include an " +
-                                    "'optimizedPipeline' field in the explain output: " +
-                                    tojson(explainOutput)));
+                                explainOutput));
     } else {
-        assert(explainOutput.queryPlanner.optimizedPipeline === true,
-               "Expected pipeline " + tojsononeline(pipeline) + " to include an " +
-                   "'optimizedPipeline' field in the explain output: " + tojson(explainOutput));
+        assert(explainOutput.queryPlanner.optimizedPipeline === true, explainOutput);
     }
 
     if (expectedStages) {
         for (let expectedStage of expectedStages) {
-            assert(planHasStage(db, explainOutput, expectedStage),
-                   "Expected pipeline " + tojsononeline(pipeline) + " to include a " +
-                       expectedStage + " stage in the explain output: " + tojson(explainOutput));
+            assert(planHasStage(db, explainOutput, expectedStage), explainOutput);
         }
     }
 
@@ -200,44 +175,45 @@ assertPipelineDoesNotUseAggregation({
 });
 assert.commandWorked(coll.dropIndexes());
 
-// Pipelines which cannot be optimized away.
-
-// TODO SERVER-40254: Uncovered queries.
 assert.commandWorked(coll.insert({_id: 4, x: 40, a: {b: "ab1"}}));
-assertPipelineUsesAggregation({
+assertPipelineDoesNotUseAggregation({
     pipeline: [{$project: {x: 1, _id: 0}}],
-    expectedStages: ["COLLSCAN"],
+    expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE"],
     expectedResult: [{x: 10}, {x: 20}, {x: 30}, {x: 40}]
 });
-assertPipelineUsesAggregation({
+assertPipelineDoesNotUseAggregation({
     pipeline: [{$match: {x: 20}}, {$project: {x: 1, _id: 0}}],
-    expectedStages: ["COLLSCAN"],
+    expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE"],
     expectedResult: [{x: 20}]
 });
-assertPipelineUsesAggregation({
+assertPipelineDoesNotUseAggregation({
     pipeline: [{$project: {x: 1, "a.b": 1, _id: 0}}],
-    expectedStages: ["COLLSCAN"],
+    expectedStages: ["COLLSCAN", "PROJECTION_DEFAULT"],
     expectedResult: [{x: 10}, {x: 20}, {x: 30}, {x: 40, a: {b: "ab1"}}]
 });
-assertPipelineUsesAggregation({
+assertPipelineDoesNotUseAggregation({
     pipeline: [{$match: {x: 40}}, {$project: {"a.b": 1, _id: 0}}],
-    expectedStages: ["COLLSCAN"],
+    expectedStages: ["COLLSCAN", "PROJECTION_DEFAULT"],
     expectedResult: [{a: {b: "ab1"}}]
 });
+// We can collapse a $project stage if it has a complex pipeline expression.
+assertPipelineDoesNotUseAggregation({
+    pipeline: [{$project: {x: {$substr: ["$y", 0, 1]}, _id: 0}}],
+    expectedStages: ["COLLSCAN", "PROJECTION_DEFAULT"]
+});
+assertPipelineDoesNotUseAggregation({
+    pipeline: [{$match: {x: 20}}, {$project: {x: {$substr: ["$y", 0, 1]}, _id: 0}}],
+    expectedStages: ["COLLSCAN", "PROJECTION_DEFAULT"]
+});
 assert.commandWorked(coll.deleteOne({_id: 4}));
+
+// Pipelines which cannot be optimized away.
 
 // TODO SERVER-40909: $skip stage is not supported yet.
 assertPipelineUsesAggregation({
     pipeline: [{$match: {x: {$gte: 20}}}, {$skip: 1}],
     expectedStages: ["COLLSCAN"],
     expectedResult: [{_id: 3, x: 30}]
-});
-// We cannot collapse a $project stage if it has a complex pipeline expression.
-assertPipelineUsesAggregation(
-    {pipeline: [{$project: {x: {$substr: ["$y", 0, 1]}, _id: 0}}], expectedStages: ["COLLSCAN"]});
-assertPipelineUsesAggregation({
-    pipeline: [{$match: {x: 20}}, {$project: {x: {$substr: ["$y", 0, 1]}, _id: 0}}],
-    expectedStages: ["COLLSCAN"]
 });
 // We cannot optimize away a pipeline if there are stages which have no equivalent in the
 // find command.
@@ -304,13 +280,12 @@ assertPipelineDoesNotUseAggregation({
     expectedResult: [{x: 20}],
 });
 
-// $match, $project, and $limit cannot be optimized away when the projection is not covered. But the
-// $limit can be pushed down into the query layer.
-assertPipelineUsesAggregation({
+// $match, $project, and $limit can be optimized away.
+assertPipelineDoesNotUseAggregation({
     pipeline: [{$match: {x: {$gte: 20}}}, {$project: {_id: 0, x: 1, y: 1}}, {$limit: 1}],
-    expectedStages: ["IXSCAN", "FETCH", "LIMIT"],
+    expectedStages: ["IXSCAN", "FETCH", "LIMIT", "PROJECTION_SIMPLE"],
     expectedResult: [{x: 20}],
-    optimizedAwayStages: ["$limit"],
+    optimizedAwayStages: ["$limit", "$project"],
 });
 
 // $match, $project, $limit, $sort cannot be optimized away because the $limit comes before the
@@ -454,13 +429,11 @@ assertPipelineDoesNotUseAggregation({
     expectedResult: [{_id: 3, x: 30}],
 });
 
-// If there is a $project that can't result in a covered plan, however, then the pipeline cannot be
-// optimized away. But the $sort should still get pushed down into the PlanStage layer.
-assertPipelineUsesAggregation({
+// $match, $sort, $project, $limit can be optimized away.
+assertPipelineDoesNotUseAggregation({
     pipeline:
         [{$match: {x: {$gte: 20}}}, {$sort: {x: -1}}, {$project: {_id: 0, x: 1}}, {$limit: 2}],
-    expectedStages: ["COLLSCAN", "SORT"],
-    optimizedAwayStages: ["$match", "$sort", "$limit"],
+    expectedStages: ["COLLSCAN", "SORT", "PROJECTION_SIMPLE"],
     expectedResult: [{x: 30}, {x: 20}],
 });
 
@@ -478,6 +451,61 @@ assertPipelineDoesNotUseAggregation({
     expectedResult: [],
 });
 assert.commandWorked(coll.dropIndexes());
+
+// Test that even if we don't have a projection stage at the front of the pipeline but there is a
+// finite dependency set, a projection representing this dependency set is pushed down.
+pipeline = [{$group: {_id: "$a", b: {$sum: "$b"}}}];
+assertPipelineUsesAggregation({
+    pipeline: pipeline,
+    expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE"],
+});
+explain = coll.explain().aggregate(pipeline);
+let projStage = getAggPlanStage(explain, "PROJECTION_SIMPLE");
+assert.neq(null, projStage, explain);
+assert.eq({a: 1, b: 1, _id: 0}, projStage.transformBy, explain);
+
+// Similar as above, but with $addFields stage at the front of the pipeline.
+pipeline = [{$addFields: {z: "abc"}}, {$group: {_id: "$a", b: {$sum: "$b"}}}];
+assertPipelineUsesAggregation({
+    pipeline: pipeline,
+    expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE"],
+});
+explain = coll.explain().aggregate(pipeline);
+projStage = getAggPlanStage(explain, "PROJECTION_SIMPLE");
+assert.neq(null, projStage, explain);
+assert.eq({a: 1, b: 1, _id: 0}, projStage.transformBy, explain);
+
+// We generate a projection stage from dependency analysis, even if the pipeline begins with an
+// exclusion projection.
+pipeline = [{$project: {c: 0}}, {$group: {_id: "$a", b: {$sum: "$b"}}}];
+assertPipelineUsesAggregation({
+    pipeline: pipeline,
+    expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE", "$project"],
+});
+explain = coll.explain().aggregate(pipeline);
+projStage = getAggPlanStage(explain, "PROJECTION_SIMPLE");
+assert.neq(null, projStage, explain);
+assert.eq({a: 1, b: 1, _id: 0}, projStage.transformBy, explain);
+
+// Similar as above, but with a field 'a' presented both in the finite dependency set, and in the
+// exclusion projection at the front of the pipeline.
+pipeline = [{$project: {a: 0}}, {$group: {_id: "$a", b: {$sum: "$b"}}}];
+assertPipelineUsesAggregation({
+    pipeline: pipeline,
+    expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE", "$project"],
+});
+explain = coll.explain().aggregate(pipeline);
+projStage = getAggPlanStage(explain, "PROJECTION_SIMPLE");
+assert.neq(null, projStage, explain);
+assert.eq({a: 1, b: 1, _id: 0}, projStage.transformBy, explain);
+
+// Test that an exclusion projection at the front of the pipeline is not pushed down, if there no
+// finite dependency set.
+pipeline = [{$project: {x: 0}}];
+assertPipelineUsesAggregation({pipeline: pipeline, expectedStages: ["COLLSCAN"]});
+explain = coll.explain().aggregate(pipeline);
+assert(!planHasStage(db, explain, "PROJECTION_SIMPLE"), explain);
+assert(!planHasStage(db, explain, "PROJECTION_DEFAULT"), explain);
 
 // getMore cases.
 

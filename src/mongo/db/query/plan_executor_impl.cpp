@@ -364,6 +364,9 @@ void PlanExecutorImpl::detachFromOperationContext() {
     invariant(_currentState == kSaved);
     _opCtx = nullptr;
     _root->detachFromOperationContext();
+    if (_expCtx) {
+        _expCtx->opCtx = nullptr;
+    }
     _currentState = kDetached;
     _everDetachedFromOperationContext = true;
 }
@@ -377,6 +380,9 @@ void PlanExecutorImpl::reattachToOperationContext(OperationContext* opCtx) {
 
     _opCtx = opCtx;
     _root->reattachToOperationContext(opCtx);
+    if (_expCtx) {
+        _expCtx->opCtx = opCtx;
+    }
     _currentState = kSaved;
 }
 

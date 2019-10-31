@@ -41,10 +41,10 @@ function assertResultsMatch({
         let result;
 
         if (pipelineOptimizedAway) {
-            assert(isQueryPlan(explain));
+            assert(isQueryPlan(explain), explain);
             result = explain.queryPlanner.winningPlan;
         } else {
-            assert(isAggregationPlan(explain));
+            assert(isAggregationPlan(explain), explain);
             result = explain.stages[0].$cursor.queryPlanner.winningPlan;
         }
 
@@ -52,13 +52,14 @@ function assertResultsMatch({
         assert.eq(expectProjectToCoalesce,
                   planHasStage(db, result, "PROJECTION_DEFAULT") ||
                       planHasStage(db, result, "PROJECTION_COVERED") ||
-                      planHasStage(db, result, "PROJECTION_SIMPLE"));
+                      planHasStage(db, result, "PROJECTION_SIMPLE"),
+                  explain);
 
         if (!pipelineOptimizedAway) {
             // Check that $project was removed from pipeline and pushed to the query system.
             explain.stages.forEach(function(stage) {
                 if (stage.hasOwnProperty("$project"))
-                    assert.neq(removedProjectStage, stage["$project"]);
+                    assert.neq(removedProjectStage, stage["$project"], explain);
             });
         }
     }
@@ -75,7 +76,6 @@ function assertResultsMatch({
 assertResultsMatch({
     pipeline: [{$project: {_id: 0, a: 1}}],
     expectProjectToCoalesce: true,
-    removedProjectStage: {_id: 0, a: 1},
     pipelineOptimizedAway: true
 });
 assertResultsMatch({
@@ -86,7 +86,6 @@ assertResultsMatch({
 assertResultsMatch({
     pipeline: [{$sort: {a: -1}}, {$project: {_id: 0, a: 1}}],
     expectProjectToCoalesce: true,
-    removedProjectStage: {_id: 0, a: 1},
     pipelineOptimizedAway: true
 });
 assertResultsMatch({
@@ -101,32 +100,48 @@ assertResultsMatch({
 assertResultsMatch({
     pipeline: [{$project: {_id: 0, c: {d: 1}}}],
     expectProjectToCoalesce: true,
-    removedProjectStage: {_id: 0, c: {d: 1}},
     pipelineOptimizedAway: true
 });
 
-// Test that projections with renamed fields are not removed from the pipeline, however an
-// inclusion projection is still pushed to the query system.
-assertResultsMatch({pipeline: [{$project: {_id: 0, f: "$a"}}], expectProjectToCoalesce: true});
-assertResultsMatch(
-    {pipeline: [{$project: {_id: 0, a: 1, f: "$a"}}], expectProjectToCoalesce: true});
-
-// Test that uncovered projections include the $project stage in the pipeline.
-assertResultsMatch(
-    {pipeline: [{$sort: {a: 1}}, {$project: {_id: 1, b: 1}}], expectProjectToCoalesce: false});
+// Test that projections with renamed fields are removed from the pipeline.
 assertResultsMatch({
-    pipeline: [{$sort: {a: 1}}, {$group: {_id: "$_id", arr: {$push: "$a"}}}, {$project: {arr: 1}}],
-    expectProjectToCoalesce: false
+    pipeline: [{$project: {_id: 0, f: "$a"}}],
+    expectProjectToCoalesce: true,
+    pipelineOptimizedAway: true
+});
+assertResultsMatch({
+    pipeline: [{$project: {_id: 0, a: 1, f: "$a"}}],
+    expectProjectToCoalesce: true,
+    pipelineOptimizedAway: true
 });
 
-// Test that projections with computed fields are kept in the pipeline.
-assertResultsMatch(
-    {pipeline: [{$project: {computedField: {$sum: "$a"}}}], expectProjectToCoalesce: false});
-assertResultsMatch({pipeline: [{$project: {a: ["$a", "$b"]}}], expectProjectToCoalesce: false});
+// Test that uncovered projections are removed from the pipeline.
+assertResultsMatch({
+    pipeline: [{$sort: {a: 1}}, {$project: {_id: 1, b: 1}}],
+    expectProjectToCoalesce: true,
+    pipelineOptimizedAway: true
+});
+assertResultsMatch({
+    pipeline: [{$sort: {a: 1}}, {$group: {_id: "$_id", arr: {$push: "$a"}}}, {$project: {arr: 1}}],
+    expectProjectToCoalesce: true
+});
+
+// Test that projections with computed fields are removed from the pipeline.
+assertResultsMatch({
+    pipeline: [{$project: {computedField: {$sum: "$a"}}}],
+    expectProjectToCoalesce: true,
+    pipelineOptimizedAway: true
+});
+assertResultsMatch({
+    pipeline: [{$project: {a: ["$a", "$b"]}}],
+    expectProjectToCoalesce: true,
+    pipelineOptimizedAway: true
+});
 assertResultsMatch({
     pipeline:
         [{$project: {e: {$filter: {input: "$e", as: "item", cond: {"$eq": ["$$item", "elem0"]}}}}}],
-    expectProjectToCoalesce: false
+    expectProjectToCoalesce: true,
+    pipelineOptimizedAway: true
 });
 
 // Test that only the first projection is removed from the pipeline.
@@ -150,5 +165,6 @@ assertResultsMatch({
     expectProjectToCoalesce: true,
     index: indexSpec,
     pipelineOptimizedAway: true,
+    removedProjectStage: {'_id.a': 1},
 });
 }());

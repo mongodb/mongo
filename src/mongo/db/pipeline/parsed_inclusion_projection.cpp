@@ -215,31 +215,5 @@ void ParsedInclusionProjection::parseSubObject(const BSONObj& subObj,
         }
     }
 }
-
-bool ParsedInclusionProjection::isEquivalentToDependencySet(const BSONObj& deps) const {
-    std::set<std::string> preservedPaths;
-    _root->reportProjectedPaths(&preservedPaths);
-    size_t numDependencies = 0;
-    for (auto&& dependency : deps) {
-        if (!dependency.trueValue()) {
-            // This is not an included field, so move on.
-            continue;
-        }
-
-        if (preservedPaths.find(dependency.fieldNameStringData().toString()) ==
-            preservedPaths.end()) {
-            return false;
-        }
-        ++numDependencies;
-    }
-
-    if (numDependencies != preservedPaths.size()) {
-        return false;
-    }
-
-    // If the inclusion has any computed fields or renamed fields, then it's not a subset.
-    return !_root->subtreeContainsComputedFields();
-}
-
 }  // namespace parsed_aggregation_projection
 }  // namespace mongo

@@ -174,13 +174,6 @@ public:
      */
     Document applyProjection(const Document& inputDoc) const final;
 
-    /*
-     * Given 'deps', a BSONObj describing a the dependency set for a pipeline, returns true if this
-     * is an inclusion projection with no computed paths which includes the exact same set of fields
-     * as 'deps'.
-     */
-    bool isEquivalentToDependencySet(const BSONObj& deps) const;
-
 private:
     /**
      * Attempts to parse 'objSpec' as an expression like {$add: [...]}. Adds a computed field to

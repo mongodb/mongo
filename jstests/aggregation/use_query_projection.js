@@ -19,31 +19,20 @@ for (let i = 0; i < 100; ++i) {
 }
 assert.commandWorked(bulk.execute());
 
-function assertQueryCoversProjection({pipeline = [], pipelineOptimizedAway = true} = {}) {
-    const explainOutput = coll.explain().aggregate(pipeline);
+function assertQueryCoversProjection(
+    {pipeline = [], pipelineOptimizedAway = true, options = {}} = {}) {
+    const explainOutput = coll.explain().aggregate(pipeline, options);
 
     if (pipelineOptimizedAway) {
         assert(isQueryPlan(explainOutput), explainOutput);
-        assert(
-            !planHasStage(db, explainOutput, "FETCH"),
-            "Expected pipeline " + tojsononeline(pipeline) +
-                " *not* to include a FETCH stage in the explain output: " + tojson(explainOutput));
-        assert(planHasStage(db, explainOutput, "IXSCAN"),
-               "Expected pipeline " + tojsononeline(pipeline) +
-                   " to include an index scan in the explain output: " + tojson(explainOutput));
+        assert(!planHasStage(db, explainOutput, "FETCH"), explainOutput);
+        assert(planHasStage(db, explainOutput, "IXSCAN"), explainOutput);
     } else {
         assert(isAggregationPlan(explainOutput), explainOutput);
-        assert(
-            !aggPlanHasStage(explainOutput, "FETCH"),
-            "Expected pipeline " + tojsononeline(pipeline) +
-                " *not* to include a FETCH stage in the explain output: " + tojson(explainOutput));
-        assert(aggPlanHasStage(explainOutput, "IXSCAN"),
-               "Expected pipeline " + tojsononeline(pipeline) +
-                   " to include an index scan in the explain output: " + tojson(explainOutput));
+        assert(!aggPlanHasStage(explainOutput, "FETCH"), explainOutput);
+        assert(aggPlanHasStage(explainOutput, "IXSCAN"), explainOutput);
     }
-    assert(!hasRejectedPlans(explainOutput),
-           "Expected pipeline " + tojsononeline(pipeline) +
-               " not to have any rejected plans in the explain output: " + tojson(explainOutput));
+    assert(!hasRejectedPlans(explainOutput), explainOutput);
     return explainOutput;
 }
 
@@ -51,27 +40,15 @@ function assertQueryDoesNotCoverProjection({pipeline = [], pipelineOptimizedAway
     const explainOutput = coll.explain().aggregate(pipeline);
 
     if (pipelineOptimizedAway) {
-        assert(isQueryPlan(explainOutput));
+        assert(isQueryPlan(explainOutput), explainOutput);
         assert(planHasStage(db, explainOutput, "FETCH") || aggPlanHasStage("COLLSCAN"),
-               "Expected pipeline " + tojsononeline(pipeline) +
-                   " to include a FETCH or COLLSCAN stage in the explain output: " +
-                   tojson(explainOutput));
-        assert(
-            !hasRejectedPlans(explainOutput),
-            "Expected pipeline " + tojsononeline(pipeline) +
-                " not to have any rejected plans in the explain output: " + tojson(explainOutput));
+               explainOutput);
     } else {
-        assert(isAggregationPlan(explainOutput));
+        assert(isAggregationPlan(explainOutput), explainOutput);
         assert(aggPlanHasStage(explainOutput, "FETCH") || aggPlanHasStage("COLLSCAN"),
-               "Expected pipeline " + tojsononeline(pipeline) +
-                   " to include a FETCH or COLLSCAN stage in the explain output: " +
-                   tojson(explainOutput));
-        assert(
-            !hasRejectedPlans(explainOutput),
-            "Expected pipeline " + tojsononeline(pipeline) +
-                " not to have any rejected plans in the explain output: " + tojson(explainOutput));
+               explainOutput);
     }
-
+    assert(!hasRejectedPlans(explainOutput), explainOutput);
     return explainOutput;
 }
 
@@ -85,12 +62,13 @@ assertQueryCoversProjection(
     {pipeline: [{$match: {x: "string"}}, {$project: {_id: 0, x: 1, a: 1}}]});
 assertQueryCoversProjection(
     {pipeline: [{$match: {x: "string"}}, {$project: {_id: 1, x: 1, a: 1}}]});
-assertQueryCoversProjection(
-    {pipeline: [{$match: {_id: 0, x: "string"}}, {$project: {_id: 1, x: 1, a: 1}}]});
+assertQueryCoversProjection({
+    pipeline: [{$match: {_id: 0, x: "string"}}, {$project: {_id: 1, x: 1, a: 1}}],
+    options: {hint: {x: 1, a: -1, _id: 1}}
+});
 
 // Test that a pipeline requiring a field that is not in the index cannot use a covered plan.
-assertQueryDoesNotCoverProjection(
-    {pipeline: [{$match: {x: "string"}}, {$project: {notThere: 1}}], pipelineOptimizedAway: false});
+assertQueryDoesNotCoverProjection({pipeline: [{$match: {x: "string"}}, {$project: {notThere: 1}}]});
 
 // Test that a covered plan is the only plan considered, even if another plan would be equally
 // selective. Add an equally selective index, then rely on assertQueryCoversProjection() to
@@ -102,17 +80,14 @@ assertQueryCoversProjection({
         {$sort: {x: 1, a: 1}},  // Note: not indexable, but doesn't add any additional dependencies.
         {$project: {_id: 1, x: 1, a: 1}},
     ],
+    options: {hint: {x: 1, a: -1, _id: 1}}
 });
 
 // Test that a multikey index will prevent a covered plan.
 assert.commandWorked(coll.dropIndex({x: 1}));  // Make sure there is only one plan considered.
 assert.commandWorked(coll.insert({x: ["an", "array!"]}));
-assertQueryDoesNotCoverProjection({
-    pipeline: [{$match: {x: "string"}}, {$project: {_id: 1, x: 1}}],
-    pipelineOptimizedAway: false
-});
-assertQueryDoesNotCoverProjection({
-    pipeline: [{$match: {x: "string"}}, {$project: {_id: 1, x: 1, a: 1}}],
-    pipelineOptimizedAway: false
-});
+assertQueryDoesNotCoverProjection(
+    {pipeline: [{$match: {x: "string"}}, {$project: {_id: 1, x: 1}}]});
+assertQueryDoesNotCoverProjection(
+    {pipeline: [{$match: {x: "string"}}, {$project: {_id: 1, x: 1, a: 1}}]});
 }());

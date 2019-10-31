@@ -21,7 +21,7 @@ const pipelinesWithNewFeatures = [
     // TODO SERVER-43168: enable once indexKey and recordId $meta works correctly with pipelines.
     // [{$project: {x: {$meta: "indexKey"}}}],
     // [{$project: {x: {$meta: "recordId"}}}],
-    [{$project: {x: {$meta: "sortKey"}}}],
+    [{$sort: {a: 1}}, {$project: {x: {$meta: "sortKey"}}}],
     [
         {$geoNear: {near: {type: "Point", coordinates: [0, 0]}, distanceField: "loc"}},
         {$project: {m: {$meta: "geoNearPoint"}}}

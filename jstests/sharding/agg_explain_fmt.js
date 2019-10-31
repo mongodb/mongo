@@ -1,4 +1,4 @@
-// This test ensuexplain an explain of an aggregate through mongos has the intended format.
+// This test ensures that explain of an aggregate through mongos has the intended format.
 (function() {
 "use strict";
 
@@ -14,7 +14,7 @@ assert.commandWorked(coll.insert(Array.from({length: 10}, (_, i) => ({_id: i - 5
 // normal explain with 'stages'.
 let explain = coll.explain().aggregate([{$project: {a: 1}}]);
 assert(!explain.hasOwnProperty("splitPipeline"), explain);
-assert(explain.hasOwnProperty("stages"), explain);
+assert(planHasStage(mongosDB, explain, "PROJECTION_SIMPLE"), explain);
 
 // Now shard the collection by _id and move a chunk to each shard.
 st.shardColl(coll, {_id: 1}, {_id: 0}, {_id: 0});

@@ -117,9 +117,6 @@ string optionString(size_t options) {
             case QueryPlannerParams::SPLIT_LIMITED_SORT:
                 ss << "SPLIT_LIMITED_SORT ";
                 break;
-            case QueryPlannerParams::NO_UNCOVERED_PROJECTIONS:
-                ss << "NO_UNCOVERED_PROJECTIONS ";
-                break;
             case QueryPlannerParams::GENERATE_COVERED_IXSCANS:
                 ss << "GENERATE_COVERED_IXSCANS ";
                 break;
@@ -849,9 +846,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     // $** index is hinted, we do not want this behavior.
     if (!hintedIndex.isEmpty() && relevantIndices.size() == 1) {
         if (0 == out.size() && relevantIndices.front().type != IndexType::INDEX_WILDCARD) {
-            // Push hinted index solution to output list if found. It is possible to end up without
-            // a solution in the case where a filtering QueryPlannerParams argument, such as
-            // NO_UNCOVERED_PROJECTIONS, leads to its exclusion.
+            // Push hinted index solution to output list if found.
             auto soln = buildWholeIXSoln(relevantIndices.front(), query, params);
             if (soln) {
                 LOG(5) << "Planner: outputting soln that uses hinted index as scan.";
@@ -966,10 +961,8 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
             }
 
             QueryPlannerParams paramsForCoveredIxScan;
-            paramsForCoveredIxScan.options =
-                params.options | QueryPlannerParams::NO_UNCOVERED_PROJECTIONS;
             auto soln = buildWholeIXSoln(index, query, paramsForCoveredIxScan);
-            if (soln) {
+            if (soln && !soln->root->fetched()) {
                 LOG(5) << "Planner: outputting soln that uses index to provide projection.";
                 PlanCacheIndexTree* indexTree = new PlanCacheIndexTree();
                 indexTree->setIndexEntry(index);

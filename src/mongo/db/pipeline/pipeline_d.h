@@ -166,19 +166,13 @@ private:
                                    Pipeline* pipeline);
 
     /**
-     * Creates a PlanExecutor to be used in the initial cursor source. If the query system can use
-     * an index to provide a more efficient sort or projection, the sort and/or projection will be
-     * incorporated into the PlanExecutor.
+     * Creates a PlanExecutor to be used in the initial cursor source. This function will try to
+     * push down the $sort, $project, $match and $limit stages into the PlanStage layer whenever
+     * possible. In this case, these stages will be incorporated into the PlanExecutor.
      *
      * Set 'rewrittenGroupStage' when the pipeline uses $match+$sort+$group stages that are
      * compatible with a DISTINCT_SCAN plan that visits the first document in each group
      * (SERVER-9507).
-     *
-     * This function computes the dependencies of 'pipeline' and attempts to push the dependency set
-     * down to the query layer as a projection. If the dependency set indeed results in a projection
-     * being pushed down to the query layer, this projection is returned in 'projectionObj'. If no
-     * such projection can be pushed down, then 'projectionObj' is set to the empty BSONObj. This
-     * can happen if the query system cannot provide a covered projection.
      *
      * Sets the 'hasNoRequirements' out-parameter based on whether the dependency set is both finite
      * and empty. In this case, the query has count semantics.
@@ -195,7 +189,6 @@ private:
         boost::optional<long long> limit,
         const AggregationRequest* aggRequest,
         const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
-        BSONObj* projectionObj,
         bool* hasNoRequirements);
 
     /**
