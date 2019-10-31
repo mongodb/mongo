@@ -113,8 +113,6 @@ struct OpenSSLDeleter {
 class SSLConnectionInterface {
 public:
     virtual ~SSLConnectionInterface();
-
-    virtual std::string getSNIServerName() const = 0;
 };
 
 class SSLConfiguration {
@@ -259,10 +257,11 @@ public:
      * certificates are not allowed, a non-OK status will be returned. If validation is successful,
      * the `subjectName` will contain  the certificate's subject name, and any roles acquired by
      * X509 authorization will be returned in `roles`.
-     * Further, the SNI Name will be captured into the `sniName` value, when available.
+     * Further, the SNI Name will be captured into the `sni` value, when available.
      */
     virtual StatusWith<SSLPeerInfo> parseAndValidatePeerCertificate(
         SSLConnectionType ssl,
+        boost::optional<std::string> sni,
         const std::string& remoteHost,
         const HostAndPort& hostForLogging) = 0;
 };

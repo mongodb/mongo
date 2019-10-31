@@ -1064,27 +1064,6 @@ std::string explainTrustFailure(::SecTrustRef trust, ::SecTrustResultType result
     return ret("No trust failure reason available");
 }
 
-boost::optional<std::string> getRawSNIServerName(::SSLContextRef _ssl) {
-    size_t len = 0;
-    auto status = ::SSLCopyRequestedPeerNameLength(_ssl, &len);
-    if (status != ::errSecSuccess) {
-        return boost::none;
-    }
-    std::string ret;
-    ret.resize(len);
-    status = ::SSLCopyRequestedPeerName(_ssl, &ret[0], &len);
-    if (status != ::errSecSuccess) {
-        return boost::none;
-    }
-    // ::SSLCopyRequestedPeerName includes space for a null byte at the end of the string it writes.
-    // We do not want to include this null byte in the advertised SNI name
-    while (!ret.empty() && ret.back() == '\0') {
-        ret.pop_back();
-    }
-
-    return ret;
-}
-
 }  // namespace
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1132,10 +1111,6 @@ public:
         } while ((status == ::errSSLServerAuthCompleted) ||
                  (status == ::errSSLClientAuthCompleted));
         uassertOSStatusOK(status, ErrorCodes::SSLHandshakeFailed);
-    }
-
-    std::string getSNIServerName() const final {
-        return getRawSNIServerName(get()).value_or("");
     }
 
     ::SSLContextRef get() const {
@@ -1223,6 +1198,7 @@ public:
 
     StatusWith<SSLPeerInfo> parseAndValidatePeerCertificate(
         ::SSLContextRef conn,
+        boost::optional<std::string> sniName,
         const std::string& remoteHost,
         const HostAndPort& hostForLogging) final;
 
@@ -1417,7 +1393,8 @@ SSLPeerInfo SSLManagerApple::parseAndValidatePeerCertificateDeprecated(
     const HostAndPort& hostForLogging) {
     auto ssl = checked_cast<const SSLConnectionApple*>(conn)->get();
 
-    auto swPeerSubjectName = parseAndValidatePeerCertificate(ssl, remoteHost, hostForLogging);
+    auto swPeerSubjectName =
+        parseAndValidatePeerCertificate(ssl, boost::none, remoteHost, hostForLogging);
     // We can't use uassertStatusOK here because we need to throw a NetworkException.
     if (!swPeerSubjectName.isOK()) {
         throwSocketError(SocketErrorKind::CONNECT_ERROR, swPeerSubjectName.getStatus().reason());
@@ -1444,9 +1421,10 @@ StatusWith<TLSVersion> mapTLSVersion(SSLContextRef ssl) {
 
 
 StatusWith<SSLPeerInfo> SSLManagerApple::parseAndValidatePeerCertificate(
-    ::SSLContextRef ssl, const std::string& remoteHost, const HostAndPort& hostForLogging) {
-    auto sniName = getRawSNIServerName(ssl);
-
+    ::SSLContextRef ssl,
+    boost::optional<std::string> sniName,
+    const std::string& remoteHost,
+    const HostAndPort& hostForLogging) {
     // Record TLS version stats
     auto tlsVersionStatus = mapTLSVersion(ssl);
     if (!tlsVersionStatus.isOK()) {
@@ -1593,7 +1571,6 @@ StatusWith<SSLPeerInfo> SSLManagerApple::parseAndValidatePeerCertificate(
         if (!swPeerCertificateRoles.isOK()) {
             return swPeerCertificateRoles.getStatus();
         }
-
         return SSLPeerInfo(peerSubjectName, sniName, std::move(swPeerCertificateRoles.getValue()));
     }
 

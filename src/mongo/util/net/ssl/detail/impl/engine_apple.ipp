@@ -315,6 +315,38 @@ asio::mutable_buffer engine::get_output(const asio::mutable_buffer& data) {
     return (requested == *data_len) ? ::errSecSuccess : ::errSSLWouldBlock;
 }
 
+boost::optional<std::string> engine::get_sni() {
+    if (_sni) {
+        return _sni;
+    }
+
+    size_t len = 0;
+    auto status = ::SSLCopyRequestedPeerNameLength(_ssl.get(), &len);
+    if (status != ::errSecSuccess) {
+        _sni = boost::none;
+        return _sni;
+    }
+
+    std::string sni;
+    sni.resize(len + 1);
+    status = ::SSLCopyRequestedPeerName(_ssl.get(), sni.data(), &len);
+    if (status != ::errSecSuccess) {
+        _sni = boost::none;
+        return _sni;
+    }
+
+    sni.resize(len);
+
+    // ::SSLCopyRequestedPeerName includes space for a null byte at the end of the string it writes.
+    // We do not want to include this null byte in the advertised SNI name
+    while (!sni.empty() && sni.back() == '\0') {
+        sni.pop_back();
+    }
+
+    _sni = sni;
+    return _sni;
+}
+
 engine::want engine::read(const asio::mutable_buffer& data,
                           asio::error_code& ec,
                           std::size_t& bytes_transferred) {

@@ -247,7 +247,7 @@ protected:
 
             SSLPeerInfo::forSession(shared_from_this()) =
                 uassertStatusOK(getSSLManager()->parseAndValidatePeerCertificate(
-                    _sslSocket->native_handle(), target.host(), target));
+                    _sslSocket->native_handle(), _sslSocket->get_sni(), target.host(), target));
         });
     }
 
@@ -625,7 +625,7 @@ private:
 
                 if (sslPeerInfo.subjectName.empty()) {
                     sslPeerInfo = uassertStatusOK(getSSLManager()->parseAndValidatePeerCertificate(
-                        _sslSocket->native_handle(), "", _remote));
+                        _sslSocket->native_handle(), _sslSocket->get_sni(), "", _remote));
                 }
                 return true;
             });

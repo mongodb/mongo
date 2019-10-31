@@ -61,6 +61,8 @@ public:
         return _ssl.get();
     }
 
+    ASIO_DECL boost::optional<std::string> get_sni();
+
     ASIO_DECL want handshake(stream_base::handshake_type type, asio::error_code& ec);
 
     ASIO_DECL want shutdown(asio::error_code& ec);
@@ -89,6 +91,9 @@ private:
 
     // TLS SNI server name
     std::string _remoteHostName;
+
+    // TLS SNI name received from remote side
+    boost::optional<std::string> _sni;
 
     apple::CFUniquePtr<native_handle_type> _ssl;
     apple::CFUniquePtr<::CFArrayRef> _certs;

@@ -261,12 +261,6 @@ SSLPeerInfo Socket::doSSLHandshake(const char* firstBytes, int len) {
         _sslConnection.get(), "", HostAndPort());
 }
 
-std::string Socket::getSNIServerName() const {
-    if (!_sslConnection)
-        return "";
-
-    return _sslConnection->getSNIServerName();
-}
 #endif
 
 bool Socket::connect(SockAddr& remote) {

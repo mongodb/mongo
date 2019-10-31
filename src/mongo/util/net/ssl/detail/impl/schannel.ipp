@@ -35,6 +35,7 @@
 #include <memory>
 
 #include "asio/detail/assert.hpp"
+#include "mongo/base/init.h"
 #include "mongo/util/assert_util.h"
 
 namespace asio {
@@ -321,6 +322,27 @@ ssl_want SSLHandshakeManager::doServerHandshake(asio::error_code& ec,
         }
 
         return ssl_want::want_nothing;
+    }
+
+    if (!_sni_set) {
+        DWORD client_hello_size = _pInBuffer->size();
+        DWORD sni_size = client_hello_size + 1;
+        PBYTE sni_ptr = nullptr;
+
+        SECURITY_STATUS status =
+            _sslGetServerIdentityFn(_pInBuffer->data(), client_hello_size, &sni_ptr, &sni_size, 0);
+        if (status != SEC_E_OK) {
+            ec = asio::error_code(status, asio::error::get_ssl_category());
+        } else if (sni_ptr == nullptr) {
+            _sni = boost::none;
+            _sni_set = true;
+        } else {
+            std::vector<BYTE> sni(sni_size);
+            std::memcpy(sni.data(), sni_ptr, sni_size);
+            sni.push_back('\0');
+            _sni = sni;
+            _sni_set = true;
+        }
     }
 
     // ASC_RET_EXTENDED_ERROR is not support on Windows 7/Windows 2008 R2.
@@ -776,6 +798,16 @@ ssl_want SSLWriteManager::encryptMessage(const void* pMessage,
     bytes_transferred = messageLength;
 
     return ssl_want::want_output;
+}
+
+
+MONGO_INITIALIZER(InitializeSchannelGetServerIdentityFn)(mongo::InitializerContext*) {
+    auto sc = std::move(mongo::SharedLibrary::create("Schannel.dll").getValue());
+
+    SSLHandshakeManager::setSslGetServerIdentityFn(
+        sc->getFunctionAs<SslGetServerIdentityFn>("SslGetServerIdentity").getValue());
+
+    return mongo::Status::OK();
 }
 
 }  // namespace detail

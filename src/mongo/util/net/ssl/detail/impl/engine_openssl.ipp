@@ -61,6 +61,21 @@ SSL* engine::native_handle() {
     return ssl_;
 }
 
+boost::optional<std::string> engine::get_sni() {
+    if (_sni) {
+        return _sni;
+    }
+
+    auto name = SSL_get_servername(ssl_, TLSEXT_NAMETYPE_host_name);
+    if (!name) {
+        _sni = boost::none;
+        return _sni;
+    }
+
+    _sni = std::string(name);
+    return _sni;
+}
+
 engine::want engine::handshake(stream_base::handshake_type type, asio::error_code& ec) {
     return perform((type == asio::ssl::stream_base::client) ? &engine::do_connect
                                                             : &engine::do_accept,

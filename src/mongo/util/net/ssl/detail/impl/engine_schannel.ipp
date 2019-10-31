@@ -34,6 +34,7 @@
 
 #include "asio/detail/throw_error.hpp"
 #include "asio/error.hpp"
+#include "mongo/platform/shared_library.h"
 #include "mongo/util/net/ssl/detail/engine.hpp"
 #include "mongo/util/net/ssl/error.hpp"
 #include "mongo/util/text.h"
@@ -66,6 +67,10 @@ engine::~engine() {
 
 PCtxtHandle engine::native_handle() {
     return &_hcxt;
+}
+
+boost::optional<std::string> engine::get_sni() const {
+    return _handshakeManager.getSNI();
 }
 
 engine::want ssl_want_to_engine(ssl_want want) {

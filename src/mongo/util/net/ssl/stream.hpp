@@ -166,6 +166,11 @@ public:
         return core_.engine_.native_handle();
     }
 
+    /// Gets the sni from the client hello.
+    boost::optional<std::string> get_sni() {
+        return core_.engine_.get_sni();
+    }
+
     /// Get a reference to the next layer.
     /**
      * This function returns a reference to the next layer in a stack of stream

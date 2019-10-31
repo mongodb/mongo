@@ -103,6 +103,9 @@ public:
     // error code object, suitable for passing to a completion handler.
     ASIO_DECL const asio::error_code& map_error_code(asio::error_code& ec) const;
 
+    // Returns the SNI from the handshake manager.
+    boost::optional<std::string> get_sni() const;
+
 private:
     // Disallow copying and assignment.
     engine(const engine&);

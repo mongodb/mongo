@@ -275,14 +275,6 @@ void DH_get0_pqg(const DH* dh, const BIGNUM** p, const BIGNUM** q, const BIGNUM*
 }
 #endif
 
-boost::optional<std::string> getRawSNIServerName(const SSL* const ssl) {
-    const char* name = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
-    if (!name) {
-        return boost::none;
-    }
-    return std::string(name);
-}
-
 class SSLConnectionOpenSSL : public SSLConnectionInterface {
 public:
     SSL* ssl;
@@ -293,10 +285,6 @@ public:
     SSLConnectionOpenSSL(SSL_CTX* ctx, Socket* sock, const char* initialBytes, int len);
 
     ~SSLConnectionOpenSSL();
-
-    std::string getSNIServerName() const final {
-        return getRawSNIServerName(ssl).value_or("");
-    }
 };
 
 ////////////////////////////////////////////////////////////////
@@ -329,7 +317,10 @@ public:
                                                           const HostAndPort& hostForLogging) final;
 
     StatusWith<SSLPeerInfo> parseAndValidatePeerCertificate(
-        SSL* conn, const std::string& remoteHost, const HostAndPort& hostForLogging) final;
+        SSL* conn,
+        boost::optional<std::string> sni,
+        const std::string& remoteHost,
+        const HostAndPort& hostForLogging) final;
 
     const SSLConfiguration& getSSLConfiguration() const final {
         return _sslConfiguration;
@@ -1372,9 +1363,10 @@ StatusWith<TLSVersion> mapTLSVersion(SSL* conn) {
 }
 
 StatusWith<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
-    SSL* conn, const std::string& remoteHost, const HostAndPort& hostForLogging) {
-    auto sniName = getRawSNIServerName(conn);
-
+    SSL* conn,
+    boost::optional<std::string> sni,
+    const std::string& remoteHost,
+    const HostAndPort& hostForLogging) {
     auto tlsVersionStatus = mapTLSVersion(conn);
     if (!tlsVersionStatus.isOK()) {
         return tlsVersionStatus.getStatus();
@@ -1383,7 +1375,7 @@ StatusWith<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
     recordTLSVersion(tlsVersionStatus.getValue(), hostForLogging);
 
     if (!_sslConfiguration.hasCA && isSSLServer)
-        return SSLPeerInfo(std::move(sniName));
+        return SSLPeerInfo(sni);
 
     X509* peerCert = SSL_get_peer_certificate(conn);
 
@@ -1393,7 +1385,7 @@ StatusWith<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
             if (!_suppressNoCertificateWarning) {
                 warning() << "no SSL certificate provided by peer";
             }
-            return SSLPeerInfo(std::move(sniName));
+            return SSLPeerInfo(sni);
         } else {
             auto msg = "no SSL certificate provided by peer; connection rejected";
             error() << msg;
@@ -1408,7 +1400,7 @@ StatusWith<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
         if (_allowInvalidCertificates) {
             warning() << "SSL peer certificate validation failed: "
                       << X509_verify_cert_error_string(result);
-            return SSLPeerInfo(std::move(sniName));
+            return SSLPeerInfo(sni);
         } else {
             str::stream msg;
             msg << "SSL peer certificate validation failed: "
@@ -1449,7 +1441,7 @@ StatusWith<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
             warning() << "Client connecting with server's own TLS certificate";
         }
 
-        return SSLPeerInfo(peerSubject, sniName, std::move(swPeerCertificateRoles.getValue()));
+        return SSLPeerInfo(peerSubject, sni, std::move(swPeerCertificateRoles.getValue()));
     }
 
     // If this is an SSL client context (on a MongoDB server or client)
@@ -1562,7 +1554,8 @@ SSLPeerInfo SSLManagerOpenSSL::parseAndValidatePeerCertificateDeprecated(
     const HostAndPort& hostForLogging) {
     const SSLConnectionOpenSSL* conn = checked_cast<const SSLConnectionOpenSSL*>(connInterface);
 
-    auto swPeerSubjectName = parseAndValidatePeerCertificate(conn->ssl, remoteHost, hostForLogging);
+    auto swPeerSubjectName =
+        parseAndValidatePeerCertificate(conn->ssl, boost::none, remoteHost, hostForLogging);
     // We can't use uassertStatusOK here because we need to throw a NetworkException.
     if (!swPeerSubjectName.isOK()) {
         throwSocketError(SocketErrorKind::CONNECT_ERROR, swPeerSubjectName.getStatus().reason());
