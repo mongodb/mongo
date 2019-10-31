@@ -3,6 +3,7 @@
  */
 
 var configureFailPoint;
+var kDefaultWaitForFailPointTimeout;
 
 (function() {
 "use strict";
@@ -10,6 +11,8 @@ var configureFailPoint;
 if (configureFailPoint) {
     return;  // Protect against this file being double-loaded.
 }
+
+kDefaultWaitForFailPointTimeout = 5 * 60 * 1000;
 
 configureFailPoint = function(conn, failPointName, data = {}, failPointMode = "alwaysOn") {
     return {
@@ -20,7 +23,7 @@ configureFailPoint = function(conn, failPointName, data = {}, failPointMode = "a
                               {configureFailPoint: failPointName, mode: failPointMode, data: data}))
                           .count,
         wait:
-            function(additionalTimes = 1, maxTimeMS = 5 * 60 * 1000) {
+            function(additionalTimes = 1, maxTimeMS = kDefaultWaitForFailPointTimeout) {
                 // Can only be called once because this function does not keep track of the
                 // number of times the fail point is entered between the time it returns
                 // and the next time it gets called.

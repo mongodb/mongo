@@ -14,6 +14,7 @@
 
 (function() {
 "use strict";
+load("jstests/libs/fail_point_util.js");
 load("jstests/core/txns/libs/prepare_helpers.js");
 
 const replTest = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0, votes: 0}}]});
@@ -50,8 +51,11 @@ secondary = replTest.restart(secondary, {
 });
 
 // Wait for fail point message to be logged so that we know that initial sync is paused.
-assert.commandWorked(secondary.adminCommand(
-    {waitForFailPoint: "initialSyncHangBeforeCopyingDatabases", timesEntered: 1}));
+assert.commandWorked(secondary.adminCommand({
+    waitForFailPoint: "initialSyncHangBeforeCopyingDatabases",
+    timesEntered: 1,
+    maxTimeMS: kDefaultWaitForFailPointTimeout
+}));
 
 jsTestLog("Initial sync paused");
 

@@ -45,3 +45,7 @@ commands:
                 type: safeInt64
                 description: "The number of times the fail point has been entered."
                 optional: false
+            maxTimeMS:
+                type: safeInt64
+                description: "The wait timeout in milliseconds."
+                optional: false

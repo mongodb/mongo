@@ -12,6 +12,7 @@ return;
 TestData.skipCheckDBHashes = true;
 
 load("jstests/libs/check_log.js");
+load("jstests/libs/fail_point_util.js");
 load('jstests/replsets/libs/two_phase_drops.js');
 load("jstests/libs/uuid_util.js");
 
@@ -55,7 +56,11 @@ function setupTest({failPoint, secondaryStartupParams}) {
     secondaryColl = secondaryDB[collName];
 
     jsTestLog("Waiting for secondary to reach failPoint " + failPoint);
-    assert.commandWorked(secondary.adminCommand({waitForFailPoint: failPoint, timesEntered: 1}));
+    assert.commandWorked(secondary.adminCommand({
+        waitForFailPoint: failPoint,
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout
+    }));
 
     // Restarting the secondary may have resulted in an election.  Wait until the system
     // stabilizes and reaches RS_STARTUP2 state.

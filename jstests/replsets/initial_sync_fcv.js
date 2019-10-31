@@ -8,6 +8,7 @@
 'use strict';
 
 load('jstests/libs/check_log.js');
+load("jstests/libs/fail_point_util.js");
 
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
@@ -47,8 +48,11 @@ function runInitialSync(cmd, initialFCV) {
     // Initial sync clones the 'admin' database first, which will set the fCV on the
     // secondary to initialFCV. We then block the secondary before issuing 'listCollections' on
     // the test database.
-    assert.commandWorked(
-        secondary.adminCommand({waitForFailPoint: "hangBeforeClonerStage", timesEntered: 1}));
+    assert.commandWorked(secondary.adminCommand({
+        waitForFailPoint: "hangBeforeClonerStage",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout
+    }));
 
     // Initial sync is stopped right before 'listCollections' on the test database. We now run
     // the test command to modify the fCV.
