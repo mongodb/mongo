@@ -17,6 +17,7 @@ selector:
   - jstests/core/mr_undef.js
   - jstests/core/mr_use_this_object.js
   - jstests/core/mr_scope.js
+  - jstests/core/profile_mapreduce.js
 executor:
   archive:
     hooks:

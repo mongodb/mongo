@@ -806,18 +806,14 @@ void PipelineD::getPlanSummaryStats(const Pipeline* pipeline, PlanSummaryStats* 
         *statsOut = docSourceCursor->getPlanSummaryStats();
     }
 
-    bool hasSortStage{false};
-    bool usedDisk{false};
     for (auto&& source : pipeline->_sources) {
         if (dynamic_cast<DocumentSourceSort*>(source.get()))
-            hasSortStage = true;
+            statsOut->hasSortStage = true;
 
-        usedDisk = usedDisk || source->usedDisk();
-        if (usedDisk && hasSortStage)
+        statsOut->usedDisk = statsOut->usedDisk || source->usedDisk();
+        if (statsOut->usedDisk && statsOut->hasSortStage)
             break;
     }
-    statsOut->hasSortStage = hasSortStage;
-    statsOut->usedDisk = usedDisk;
 }
 
 }  // namespace mongo

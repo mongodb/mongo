@@ -14,26 +14,25 @@
 // For getLatestProfilerEntry and getProfilerProtocolStringForCommand
 load("jstests/libs/profiler.js");
 
-var testDB = db.getSiblingDB("profile_mapreduce");
+const testDB = db.getSiblingDB("profile_mapreduce");
 assert.commandWorked(testDB.dropDatabase());
-var conn = testDB.getMongo();
-var coll = testDB.getCollection("test");
+const conn = testDB.getMongo();
+const coll = testDB.getCollection("test");
 
 testDB.setProfilingLevel(2);
 
-var mapFunction = function() {
+const mapFunction = function() {
     emit(this.a, this.b);
 };
 
-var reduceFunction = function(a, b) {
+const reduceFunction = function(a, b) {
     return Array.sum(b);
 };
 
 //
 // Confirm metrics for mapReduce with query.
 //
-coll.drop();
-for (var i = 0; i < 3; i++) {
+for (let i = 0; i < 3; i++) {
     assert.commandWorked(coll.insert({a: i, b: i}));
 }
 assert.commandWorked(coll.createIndex({a: 1}));
@@ -42,14 +41,13 @@ coll.mapReduce(mapFunction,
                reduceFunction,
                {query: {a: {$gte: 0}}, out: {inline: 1}, collation: {locale: "fr"}});
 
-var profileObj = getLatestProfilerEntry(testDB);
+let profileObj = getLatestProfilerEntry(testDB);
 
 assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
 assert.eq(profileObj.op, "command", tojson(profileObj));
 assert.eq(profileObj.keysExamined, 3, tojson(profileObj));
 assert.eq(profileObj.docsExamined, 3, tojson(profileObj));
 assert.eq(profileObj.planSummary, "IXSCAN { a: 1 }", tojson(profileObj));
-assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
 assert.eq(profileObj.protocol, getProfilerProtocolStringForCommand(conn), tojson(profileObj));
 assert.eq(coll.getName(), profileObj.command.mapreduce, tojson(profileObj));
 assert.eq({locale: "fr"}, profileObj.command.collation, tojson(profileObj));
@@ -62,8 +60,8 @@ assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 //
 // Confirm metrics for mapReduce with sort stage.
 //
-coll.drop();
-for (var i = 0; i < 5; i++) {
+assert(coll.drop());
+for (let i = 0; i < 5; i++) {
     assert.commandWorked(coll.insert({a: i, b: i}));
 }
 
@@ -76,8 +74,8 @@ assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 //
 // Confirm namespace field is correct when output is a collection.
 //
-coll.drop();
-for (var i = 0; i < 3; i++) {
+assert(coll.drop());
+for (let i = 0; i < 3; i++) {
     assert.commandWorked(coll.insert({a: i, b: i}));
 }
 
@@ -90,10 +88,10 @@ assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
 //
 // Confirm "fromMultiPlanner" metric.
 //
-coll.drop();
+assert(coll.drop());
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({b: 1}));
-for (i = 0; i < 5; ++i) {
+for (let i = 0; i < 5; ++i) {
     assert.commandWorked(coll.insert({a: i, b: i}));
 }
 
