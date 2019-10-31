@@ -184,7 +184,6 @@ function RollbackTest(name = "RollbackTest", replSet) {
      * be replicated to all nodes and should not be rolled back.
      */
     this.transitionToSteadyStateOperations = function() {
-
         // Ensure the secondary is connected. It may already have been connected from a previous
         // stage.
         log(`Ensuring the secondary ${curSecondary.host} is connected to the other nodes`);
@@ -208,7 +207,6 @@ function RollbackTest(name = "RollbackTest", replSet) {
                            `RBID is too large. current RBID: ${rbid}, last RBID: ${lastRBID}`);
 
                 return rbid === lastRBID + 1;
-
             }, "Timed out waiting for RBID to increment on " + curSecondary.host);
         } else {
             log(`Skipping RBID check on ${curSecondary.host} because shutdowns ` +
@@ -369,6 +367,11 @@ function RollbackTest(name = "RollbackTest", replSet) {
         } else if (signal === SIGKILL) {
             opts = {allowedExitCode: MongoRunner.EXIT_SIGKILL};
         }
+
+        // We may attempt to restart a node while it is in rollback or recovery, in which case
+        // the validation checks will fail. We will still validate collections during the
+        // RollbackTest's full consistency checks, so we do not lose much validation coverage.
+        opts.skipValidation = true;
 
         log(`Stopping node ${hostName} with signal ${signal}`);
         rst.stop(nodeId, signal, opts, {forRestart: true});
