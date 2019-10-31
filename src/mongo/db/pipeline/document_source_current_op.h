@@ -41,6 +41,7 @@ public:
     using SessionMode = MongoProcessInterface::CurrentOpSessionsMode;
     using UserMode = MongoProcessInterface::CurrentOpUserMode;
     using CursorMode = MongoProcessInterface::CurrentOpCursorMode;
+    using BacktraceMode = MongoProcessInterface::CurrentOpBacktraceMode;
 
     static constexpr StringData kStageName = "$currentOp"_sd;
 
@@ -98,7 +99,8 @@ public:
         UserMode includeOpsFromAllUsers = UserMode::kExcludeOthers,
         LocalOpsMode showLocalOpsOnMongoS = LocalOpsMode::kRemoteShardOps,
         TruncationMode truncateOps = TruncationMode::kNoTruncation,
-        CursorMode idleCursors = CursorMode::kExcludeCursors);
+        CursorMode idleCursors = CursorMode::kExcludeCursors,
+        BacktraceMode backtrace = BacktraceMode::kExcludeBacktrace);
 
     GetNextResult getNext() final;
 
@@ -136,14 +138,16 @@ private:
                             UserMode includeOpsFromAllUsers,
                             LocalOpsMode showLocalOpsOnMongoS,
                             TruncationMode truncateOps,
-                            CursorMode idleCursors)
+                            CursorMode idleCursors,
+                            BacktraceMode backtrace)
         : DocumentSource(pExpCtx),
           _includeIdleConnections(includeIdleConnections),
           _includeIdleSessions(includeIdleSessions),
           _includeOpsFromAllUsers(includeOpsFromAllUsers),
           _showLocalOpsOnMongoS(showLocalOpsOnMongoS),
           _truncateOps(truncateOps),
-          _idleCursors(idleCursors) {}
+          _idleCursors(idleCursors),
+          _backtrace(backtrace) {}
 
     ConnMode _includeIdleConnections = ConnMode::kExcludeIdle;
     SessionMode _includeIdleSessions = SessionMode::kIncludeIdle;
@@ -151,6 +155,7 @@ private:
     LocalOpsMode _showLocalOpsOnMongoS = LocalOpsMode::kRemoteShardOps;
     TruncationMode _truncateOps = TruncationMode::kNoTruncation;
     CursorMode _idleCursors = CursorMode::kExcludeCursors;
+    BacktraceMode _backtrace = BacktraceMode::kExcludeBacktrace;
 
     std::string _shardName;
 

@@ -46,6 +46,7 @@
 #include "mongo/transport/session.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/interruptible.h"
+#include "mongo/util/lockable_adapter.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
@@ -352,9 +353,7 @@ public:
     Microseconds getRemainingMaxTimeMicros() const;
 
     StatusWith<stdx::cv_status> waitForConditionOrInterruptNoAssertUntil(
-        stdx::condition_variable& cv,
-        stdx::unique_lock<stdx::mutex>& m,
-        Date_t deadline) noexcept override;
+        stdx::condition_variable& cv, BasicLockableAdapter m, Date_t deadline) noexcept override;
 
     bool isIgnoringInterrupts() const;
 

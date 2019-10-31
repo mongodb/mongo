@@ -536,11 +536,17 @@ bool MongoInterfaceStandalone::fieldsHaveSupportingUniqueIndex(
 }
 
 BSONObj MongoInterfaceStandalone::_reportCurrentOpForClient(
-    OperationContext* opCtx, Client* client, CurrentOpTruncateMode truncateOps) const {
+    OperationContext* opCtx,
+    Client* client,
+    CurrentOpTruncateMode truncateOps,
+    CurrentOpBacktraceMode backtraceMode) const {
     BSONObjBuilder builder;
 
-    CurOp::reportCurrentOpForClient(
-        opCtx, client, (truncateOps == CurrentOpTruncateMode::kTruncateOps), &builder);
+    CurOp::reportCurrentOpForClient(opCtx,
+                                    client,
+                                    (truncateOps == CurrentOpTruncateMode::kTruncateOps),
+                                    (backtraceMode == CurrentOpBacktraceMode::kIncludeBacktrace),
+                                    &builder);
 
     OperationContext* clientOpCtx = client->getOperationContext();
 

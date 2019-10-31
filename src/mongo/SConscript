@@ -103,6 +103,7 @@ env.Library(
         'logger/rotatable_file_manager.cpp',
         'logger/rotatable_file_writer.cpp',
         'platform/decimal128.cpp',
+        'platform/mutex.cpp',
         'platform/posix_fadvise.cpp',
         'platform/process_id.cpp',
         'platform/random.cpp',

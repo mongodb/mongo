@@ -36,6 +36,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/diagnostic_info.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/time_support.h"
 
@@ -275,6 +276,7 @@ public:
     static void reportCurrentOpForClient(OperationContext* opCtx,
                                          Client* client,
                                          bool truncateOps,
+                                         bool backtraceMode,
                                          BSONObjBuilder* infoBuilder);
 
     /**

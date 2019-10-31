@@ -235,8 +235,10 @@ CurOp* CurOp::get(const OperationContext& opCtx) {
 void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
                                      Client* client,
                                      bool truncateOps,
+                                     bool backtraceMode,
                                      BSONObjBuilder* infoBuilder) {
     invariant(client);
+
     OperationContext* clientOpCtx = client->getOperationContext();
 
     infoBuilder->append("type", "op");
@@ -300,6 +302,22 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
         }
 
         CurOp::get(clientOpCtx)->reportState(infoBuilder, truncateOps);
+    }
+
+    if (auto diagnostic = DiagnosticInfo::get(*client)) {
+        BSONObjBuilder waitingForLatchBuilder(infoBuilder->subobjStart("waitingForLatch"));
+        waitingForLatchBuilder.append("timestamp", diagnostic->getTimestamp());
+        waitingForLatchBuilder.append("captureName", diagnostic->getCaptureName());
+        if (backtraceMode) {
+            BSONArrayBuilder backtraceBuilder(waitingForLatchBuilder.subarrayStart("backtrace"));
+            /** This branch becomes useful again with SERVER-44091
+            for (const auto& frame : diagnostic->makeStackTrace().frames) {
+                BSONObjBuilder backtraceObj(backtraceBuilder.subobjStart());
+                backtraceObj.append("addr", integerToHex(frame.instructionOffset));
+                backtraceObj.append("path", frame.objectPath);
+            }
+            */
+        }
     }
 }
 

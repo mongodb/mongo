@@ -305,7 +305,8 @@ public:
         // If we don't have a timeout, or we have a timeout that's unexpired, run poll.
         if (!deadline || (*deadline > now)) {
             if (deadline && !clkSource->tracksSystemClock()) {
-                invariant(clkSource->setAlarm(*deadline, [this] { notify(); }));
+                invariant(clkSource->setAlarm(*deadline,
+                                              [this, anchor = shared_from_this()] { notify(); }));
 
                 deadline.reset();
             }
