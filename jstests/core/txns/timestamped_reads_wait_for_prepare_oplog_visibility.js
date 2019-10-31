@@ -39,10 +39,14 @@ TestData.otherDocFilter = {
  */
 const readThreadFunc = function(readFunc, _collName, timesEntered) {
     load("jstests/libs/check_log.js");
+    load("jstests/libs/fail_point_util.js");
 
     // Do not start reads until we are blocked in 'prepareTransaction'.
-    assert.commandWorked(db.adminCommand(
-        {waitForFailPoint: "hangAfterReservingPrepareTimestamp", timesEntered: timesEntered}));
+    assert.commandWorked(db.adminCommand({
+        waitForFailPoint: "hangAfterReservingPrepareTimestamp",
+        timesEntered: timesEntered,
+        maxTimeMS: kDefaultWaitForFailPointTimeout
+    }));
 
     // Create a 'readFuncObj' from the 'readFunc'.
     const readFuncObj = readFunc(_collName);

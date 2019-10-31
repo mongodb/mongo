@@ -7,7 +7,7 @@
 (function() {
 'use strict';
 
-load('jstests/libs/check_log.js');
+load("jstests/libs/fail_point_util.js");
 
 const basename = 'initial_sync_rename_collection';
 
@@ -44,7 +44,11 @@ function ResyncWithFailpoint(failpointName, failpointData) {
     const secondaryColl = secondaryDB[primaryColl.getName()];
 
     rst.reInitiate();
-    checkLog.contains(secondary, 'initial sync - ' + failpointName + ' fail point enabled');
+    assert.commandWorked(secondary.adminCommand({
+        waitForFailPoint: failpointName,
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout
+    }));
 
     jsTestLog('Remove collection on the primary and insert a new document, recreating it.');
     assert(primaryColl.drop());

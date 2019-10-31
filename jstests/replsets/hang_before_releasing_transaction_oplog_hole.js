@@ -8,7 +8,7 @@
 
 (function() {
 'use strict';
-load("jstests/libs/check_log.js");
+load("jstests/libs/fail_point_util.js");
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -50,7 +50,11 @@ function transactionFn() {
 const joinTransaction = startParallelShell(transactionFn, rst.ports[0]);
 
 jsTestLog("Waiting to hang with the oplog hole held open.");
-checkLog.contains(node, "hangBeforeReleasingTransactionOplogHole fail point enabled");
+assert.commandWorked(testDB.adminCommand({
+    waitForFailPoint: 'hangBeforeReleasingTransactionOplogHole',
+    timesEntered: 1,
+    maxTimeMS: kDefaultWaitForFailPointTimeout
+}));
 
 jsTestLog("Waiting for 'commitTransaction' to advance lastApplied.");
 sleep(5 * 1000);
