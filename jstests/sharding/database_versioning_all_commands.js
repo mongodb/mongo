@@ -7,6 +7,14 @@
 
 load('jstests/sharding/libs/last_stable_mongos_commands.js');
 
+function getNewDbName(dbName) {
+    if (!getNewDbName.counter) {
+        getNewDbName.counter = 0;
+    }
+    getNewDbName.counter++;
+    return "db" + getNewDbName.counter;
+}
+
 function assertMongosDatabaseVersion(conn, dbName, dbVersion) {
     let res = conn.adminCommand({getShardVersion: dbName});
     assert.commandWorked(res);
@@ -17,17 +25,6 @@ function assertShardDatabaseVersion(shard, dbName, dbVersion) {
     let res = shard.adminCommand({getDatabaseVersion: dbName});
     assert.commandWorked(res);
     assert.eq(dbVersion, res.dbVersion);
-}
-
-function containsDatabase(shard, dbName) {
-    let res = shard.adminCommand({listDatabases: 1});
-    assert.commandWorked(res);
-    for (let database of res.databases) {
-        if (database["name"] == dbName) {
-            return true;
-        }
-    }
-    return false;
 }
 
 function containsCollection(shard, dbName, collName) {
@@ -80,14 +77,42 @@ function validateCommandTestCase(testCase) {
            "cleanUp must be a function: " + tojson(testCase));
 }
 
-function runCommandTestCaseSendDbVersion(testCase, st, routingInfo, dbName, collName) {
-    let command = testCase.command(dbName, collName);
-    jsTest.log("testing command " + tojson(command));
+function testCommandAfterMovePrimary(testCase, st, dbName, collName) {
+    const command = testCase.command(dbName, collName);
+
+    const primaryShardBefore = st.getPrimaryShard(dbName);
+    const primaryShardAfter = st.getOther(primaryShardBefore);
+    const dbVersionBefore =
+        st.s0.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
+
+    jsTest.log("testing command " + tojson(command) + " after movePrimary; primary shard before: " +
+               primaryShardBefore + ", database version before: " + tojson(dbVersionBefore) +
+               ", primary shard after: " + primaryShardAfter);
 
     if (testCase.setUp) {
         testCase.setUp(st.s0, dbName, collName);
     }
 
+    // Ensure all nodes know the dbVersion before the movePrimary.
+    assert.commandWorked(st.s0.adminCommand({flushRouterConfig: 1}));
+    assertMongosDatabaseVersion(st.s0, dbName, dbVersionBefore);
+    assert.commandWorked(primaryShardBefore.adminCommand({_flushDatabaseCacheUpdates: dbName}));
+    assertShardDatabaseVersion(primaryShardBefore, dbName, dbVersionBefore);
+    assert.commandWorked(primaryShardAfter.adminCommand({_flushDatabaseCacheUpdates: dbName}));
+    assertShardDatabaseVersion(primaryShardAfter, dbName, dbVersionBefore);
+
+    // Run movePrimary through the second mongos.
+    assert.commandWorked(st.s1.adminCommand({movePrimary: dbName, to: primaryShardAfter.name}));
+    const dbVersionAfter =
+        st.s1.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
+
+    // The only change after the movePrimary should be that the old primary shard should have
+    // cleared its dbVersion.
+    assertMongosDatabaseVersion(st.s0, dbName, dbVersionBefore);
+    assertShardDatabaseVersion(primaryShardBefore, dbName, {});
+    assertShardDatabaseVersion(primaryShardAfter, dbName, dbVersionBefore);
+
+    // Run the test case's command.
     if (testCase.runsAgainstAdminDb) {
         assert.commandWorked(st.s0.adminCommand(command));
     } else {
@@ -95,87 +120,103 @@ function runCommandTestCaseSendDbVersion(testCase, st, routingInfo, dbName, coll
     }
 
     if (testCase.sendsDbVersion) {
-        assertShardDatabaseVersion(routingInfo.primaryShard, dbName, routingInfo.dbVersion);
+        // If the command participates in database versioning, all nodes should now know the new
+        // dbVersion:
+        // 1. The mongos should have sent the stale dbVersion to the old primary shard
+        // 2. The old primary shard should have returned StaleDbVersion and refreshed
+        // 3. Which should have caused the mongos to refresh and retry against the new primary shard
+        // 4. The new primary shard should have returned StaleDbVersion and refreshed
+        // 5. Which should have caused the mongos to refresh and retry again, this time succeeding.
+        assertMongosDatabaseVersion(st.s0, dbName, dbVersionAfter);
+        assertShardDatabaseVersion(primaryShardBefore, dbName, dbVersionAfter);
+        assertShardDatabaseVersion(primaryShardBefore, dbName, dbVersionAfter);
     } else {
-        assertShardDatabaseVersion(routingInfo.primaryShard, dbName, {});
+        // If the command does not participate in database versioning, none of the nodes' view of
+        // the dbVersion should have changed:
+        // 1. The mongos should have targeted the old primary shard but not attached a dbVersion
+        // 2. The old primary shard should have returned an ok response
+        assertMongosDatabaseVersion(st.s0, dbName, dbVersionBefore);
+        assertShardDatabaseVersion(primaryShardBefore, dbName, {});
+        assertShardDatabaseVersion(primaryShardAfter, dbName, dbVersionBefore);
     }
 
     if (testCase.cleanUp) {
         testCase.cleanUp(st.s0, dbName, collName);
     }
-
-    // Ensure the primary shard's database entry is stale for the next command by changing the
-    // primary shard (the recipient shard does not refresh until getting a request with the new
-    // version).
-    let fromShard = st.getPrimaryShard(dbName);
-    let toShard = st.getOther(fromShard);
-
-    routingInfo.primaryShard = toShard;
-    const prevDbVersion = routingInfo.dbVersion;
-
-    assert.commandWorked(st.s0.adminCommand({movePrimary: dbName, to: toShard.name}));
-    routingInfo.dbVersion =
-        st.s0.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
-
-    // The dbVersion should have changed due to the movePrimary operation.
-    assert.eq(routingInfo.dbVersion.lastMod, prevDbVersion.lastMod + 1);
-
-    // The fromShard should have cleared its in-memory database info but still have the database.
-    assertShardDatabaseVersion(fromShard, dbName, {});
-    assert(containsDatabase(fromShard, dbName));
 }
 
-function runCommandTestCaseCheckDbVersion(testCase, st, dbName, collName) {
-    let command = testCase.command(dbName, collName);
-    if (!testCase.sendsDbVersion) {
-        return;
-    }
-    jsTest.log("testing command " + tojson(command));
+function testCommandAfterDropRecreateDatabase(testCase, st) {
+    const dbName = getNewDbName();
+    const collName = "foo";
+    const command = testCase.command(dbName, collName);
 
-    // Create and drop the database to create a stale entry for the database in the first mongos's
-    // cache, and manually insert an entry for the database in config.databases for a different
-    // shard.
+    // Create the database by creating a collection in it.
     assert.commandWorked(st.s0.getDB(dbName).createCollection(collName));
-    let prevDbVersion =
+    let dbVersionBefore =
         st.s0.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
-    let prevPrimaryShard = st.getPrimaryShard(dbName);
-    let currPrimaryShard = st.getOther(prevPrimaryShard);
+    let primaryShardBefore = st.getPrimaryShard(dbName);
+    let primaryShardAfter = st.getOther(primaryShardBefore);
 
-    assertMongosDatabaseVersion(st.s0, dbName, prevDbVersion);
-    assertShardDatabaseVersion(prevPrimaryShard, dbName, prevDbVersion);
-    assertShardDatabaseVersion(currPrimaryShard, dbName, {});
+    jsTest.log("testing command " + tojson(command) +
+               " after drop/recreate database; primary shard before: " + primaryShardBefore +
+               ", database version before: " + tojson(dbVersionBefore) +
+               ", primary shard after: " + primaryShardAfter);
 
+    // Ensure the router and primary shard know the dbVersion before the drop/recreate database.
+    assertMongosDatabaseVersion(st.s0, dbName, dbVersionBefore);
+    assertShardDatabaseVersion(primaryShardBefore, dbName, dbVersionBefore);
+    assertShardDatabaseVersion(primaryShardAfter, dbName, {});
+
+    // Drop and recreate the database through the second mongos. Insert the entry for the new
+    // database explicitly to ensure it is assigned the other shard as the primary shard.
     assert.commandWorked(st.s1.getDB(dbName).dropDatabase());
-    assertMongosDatabaseVersion(st.s0, dbName, prevDbVersion);
-    assertShardDatabaseVersion(prevPrimaryShard, dbName, {});
-    assertShardDatabaseVersion(currPrimaryShard, dbName, {});
-
     let currDbVersion = {uuid: UUID(), lastMod: NumberInt(1)};
-    assert.commandWorked(st.s0.getDB("config").getCollection("databases").insert({
+    assert.commandWorked(st.s1.getDB("config").getCollection("databases").insert({
         _id: dbName,
         partitioned: false,
-        primary: currPrimaryShard.shardName,
+        primary: primaryShardAfter.shardName,
         version: currDbVersion
     }));
+    const dbVersionAfter =
+        st.s1.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
 
-    // Set up and check that the shards still do not have the database version.
     if (testCase.setUp) {
         testCase.setUp(st.s0, dbName, collName);
     }
-    assertMongosDatabaseVersion(st.s0, dbName, prevDbVersion);
-    assertShardDatabaseVersion(prevPrimaryShard, dbName, {});
-    assertShardDatabaseVersion(currPrimaryShard, dbName, {});
 
-    // Run the command and check that the shards have the correct database version
-    // after the command returns.
+    // The only change after the drop/recreate database should be that the old primary shard should
+    // have cleared its dbVersion.
+    assertMongosDatabaseVersion(st.s0, dbName, dbVersionBefore);
+    assertShardDatabaseVersion(primaryShardBefore, dbName, {});
+    assertShardDatabaseVersion(primaryShardAfter, dbName, {});
+
+    // Run the test case's command.
     if (testCase.runsAgainstAdminDb) {
         assert.commandWorked(st.s0.adminCommand(command));
     } else {
         assert.commandWorked(st.s0.getDB(dbName).runCommand(command));
     }
-    assertMongosDatabaseVersion(st.s0, dbName, currDbVersion);
-    assertShardDatabaseVersion(prevPrimaryShard, dbName, currDbVersion);
-    assertShardDatabaseVersion(currPrimaryShard, dbName, currDbVersion);
+
+    if (testCase.sendsDbVersion) {
+        // If the command participates in database versioning, all nodes should now know the new
+        // dbVersion:
+        // 1. The mongos should have sent the stale dbVersion to the old primary shard
+        // 2. The old primary shard should have returned StaleDbVersion and refreshed
+        // 3. Which should have caused the mongos to refresh and retry against the new primary shard
+        // 4. The new primary shard should have returned StaleDbVersion and refreshed
+        // 5. Which should have caused the mongos to refresh and retry again, this time succeeding.
+        assertMongosDatabaseVersion(st.s0, dbName, dbVersionAfter);
+        assertShardDatabaseVersion(primaryShardBefore, dbName, dbVersionAfter);
+        assertShardDatabaseVersion(primaryShardBefore, dbName, dbVersionAfter);
+    } else {
+        // If the command does not participate in database versioning, none of the nodes' view of
+        // the dbVersion should have changed:
+        // 1. The mongos should have targeted the old primary shard but not attached a dbVersion
+        // 2. The old primary shard should have returned an ok response
+        assertMongosDatabaseVersion(st.s0, dbName, dbVersionBefore);
+        assertShardDatabaseVersion(primaryShardBefore, dbName, {});
+        assertShardDatabaseVersion(primaryShardAfter, dbName, {});
+    }
 
     // Clean up.
     if (testCase.cleanUp) {
@@ -505,32 +546,7 @@ let testCases = {
     logApplicationMessage: {skip: "not on a user database", conditional: true},
     logRotate: {skip: "executes locally on mongos (not sent to any remote node)"},
     logout: {skip: "not on a user database"},
-    mapReduce: {
-        run: {
-            // mapReduce uses connection versioning, which does not support database versioning.
-            sendsDbVersion: false,
-            setUp: function(mongosConn, dbName, collName) {
-                // Expects the collection to exist, and doesn't implicitly create it.
-                assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
-            },
-            command: function(dbName, collName) {
-                return {
-                    mapReduce: collName,
-                    map: function() {
-                        emit(this.x, 1);
-                    },
-                    reduce: function(key, values) {
-                        return Array.sum(values);
-                    },
-                    out: {inline: 1}
-                };
-            },
-            cleanUp: function(mongosConn, dbName, collName) {
-                assert(mongosConn.getDB(dbName).getCollection(collName).drop());
-                assert(mongosConn.getDB(dbName).getCollection(collName + "_renamed").drop());
-            }
-        }
-    },
+    mapReduce: {skip: "TODO (SERVER-41953)"},
     mergeChunks: {skip: "does not forward command to primary shard"},
     moveChunk: {skip: "does not forward command to primary shard"},
     movePrimary: {skip: "reads primary shard from sharding catalog with readConcern: local"},
@@ -719,102 +735,123 @@ commandsRemovedFromMongosIn44.forEach(function(cmd) {
 });
 
 const st = new ShardingTest({shards: 2, mongos: 2});
-const unshardedCollName = "foo";
-const shardedCollName = "bar";
-const sendTestDbName = "sendVersions";
-const checkTestDbName = "checkVersions";
 
-let res = st.s0.adminCommand({listCommands: 1});
-assert.commandWorked(res);
+const listCommandsRes = st.s0.adminCommand({listCommands: 1});
+assert.commandWorked(listCommandsRes);
 
-let primaryShard = st.shard0;
-let otherShard = st.shard1;
-assert.commandWorked(st.s0.adminCommand({enableSharding: sendTestDbName}));
-st.ensurePrimaryShard(sendTestDbName, primaryShard.shardName);
+(() => {
+    // Validate test cases for all commands.
 
-// Create a sharded collection that does not get moved during movePrimary.
-let shardedCollNs = sendTestDbName + "." + shardedCollName;
-
-assert.commandWorked(st.s0.adminCommand({addShardToZone: st.shard0.shardName, zone: 'x < 0'}));
-assert.commandWorked(st.s0.adminCommand({addShardToZone: st.shard1.shardName, zone: 'x >= 0'}));
-
-assert.commandWorked(st.s0.adminCommand(
-    {updateZoneKeyRange: shardedCollNs, min: {x: MinKey}, max: {x: 0}, zone: 'x < 0'}));
-assert.commandWorked(st.s0.adminCommand(
-    {updateZoneKeyRange: shardedCollNs, min: {x: 0}, max: {x: MaxKey}, zone: 'x >= 0'}));
-
-assert.commandWorked(
-    st.s0.getDB('admin').admin.runCommand({shardCollection: shardedCollNs, key: {"x": 1}}));
-assert.commandWorked(st.s0.getDB(sendTestDbName).createCollection(shardedCollName));
-
-// Check that the shards has the unsharded collections.
-assert(containsCollection(primaryShard, sendTestDbName, shardedCollName));
-assert(containsCollection(otherShard, sendTestDbName, shardedCollName));
-
-// Drop the database to create an entry for the database in the sharding catalog.
-assert.commandWorked(st.s0.getDB(sendTestDbName).runCommand({drop: unshardedCollName}));
-assert(containsDatabase(primaryShard, sendTestDbName));
-
-let dbVersion =
-    st.s0.getDB("config").getCollection("databases").findOne({_id: sendTestDbName}).version;
-let routingInfo = {primaryShard: primaryShard, dbVersion: dbVersion};
-
-// Check that the command was received with or without a databaseVersion as expected by the
-// 'testCase' for the command.
-for (let command of Object.keys(res.commands)) {
-    let testCase = testCases[command];
-    assert(testCase !== undefined, "coverage failure: must define a test case for " + command);
-    if (!testCases[command].validated) {
+    // Ensure there is a test case for every mongos command, and that the test cases are well
+    // formed.
+    for (let command of Object.keys(listCommandsRes.commands)) {
+        let testCase = testCases[command];
+        assert(testCase !== undefined, "coverage failure: must define a test case for " + command);
         validateTestCase(testCase);
         testCases[command].validated = true;
     }
 
-    if (testCase.skip) {
-        print("skipping " + command + ": " + testCase.skip);
-        continue;
+    // After iterating through all the existing commands, ensure there were no additional test cases
+    // that did not correspond to any mongos command.
+    for (let key of Object.keys(testCases)) {
+        // We have defined real test cases for commands added in 4.4 so that the test cases are
+        // exercised in the regular suites, but because these test cases can't run in the last
+        // stable suite, we skip processing them here to avoid failing the below assertion.
+        // We have defined "skip" test cases for commands removed in 4.4 so the test case is defined
+        // in last stable suites (in which these commands still exist on the mongos), but these test
+        // cases won't be run in regular suites, so we skip processing them below as well.
+        if (commandsAddedToMongosIn44.includes(key) ||
+            commandsRemovedFromMongosIn44.includes(key)) {
+            continue;
+        }
+        assert(testCases[key].validated || testCases[key].conditional,
+               "you defined a test case for a command '" + key +
+                   "' that does not exist on mongos: " + tojson(testCases[key]));
     }
+})();
 
-    runCommandTestCaseSendDbVersion(
-        testCase.run, st, routingInfo, sendTestDbName, unshardedCollName);
-    if (testCase.explain) {
-        runCommandTestCaseSendDbVersion(
-            testCase.explain, st, routingInfo, sendTestDbName, unshardedCollName);
-    }
-}
+(() => {
+    // Test that commands that send databaseVersion are subjected to the databaseVersion check when
+    // the primary shard for the database has moved and the database no longer exists on the old
+    // primary shard (because the database only contained unsharded collections; this is in
+    // anticipation of SERVER-43925).
 
-// Test that commands that send databaseVersion are subjected to the databaseVersion check even if
-// the database does not exist on targeted shard
-for (let command of Object.keys(res.commands)) {
-    let testCase = testCases[command];
-    if (testCase.skip) {
-        print("skipping " + command + ": " + testCase.skip);
-        continue;
-    }
+    const dbName = getNewDbName();
+    const collName = "foo";
 
-    let dbName = checkTestDbName + "-" + command;
-    runCommandTestCaseCheckDbVersion(testCase.run, st, dbName, unshardedCollName);
-    if (testCase.explain) {
-        dbName = checkTestDbName + "-explain-" + command;
-        runCommandTestCaseCheckDbVersion(testCase.explain, st, dbName, unshardedCollName);
-    }
-}
+    // Create the database by creating a collection in it.
+    assert.commandWorked(st.s0.getDB(dbName).createCollection(collName));
 
-// After iterating through all the existing commands, ensure there were no additional test cases
-// that did not correspond to any mongos command.
-for (let key of Object.keys(testCases)) {
-    // We have defined real test cases for commands added in 4.4 so that the test cases are
-    // exercised in the regular suites, but because these test cases can't run in the last stable
-    // suite, we skip processing them here to avoid failing the below assertion. We have defined
-    // "skip" test cases for commands removed in 4.4 so the test case is defined in last stable
-    // suites (in which these commands still exist on the mongos), but these test cases won't be
-    // run in regular suites, so we skip processing them below as well.
-    if (commandsAddedToMongosIn44.includes(key) || commandsRemovedFromMongosIn44.includes(key)) {
-        continue;
+    for (let command of Object.keys(listCommandsRes.commands)) {
+        let testCase = testCases[command];
+        if (testCase.skip) {
+            print("skipping " + command + ": " + testCase.skip);
+            continue;
+        }
+
+        testCommandAfterMovePrimary(testCase.run, st, dbName, collName);
+        if (testCase.explain) {
+            testCommandAfterMovePrimary(testCase.explain, st, dbName, collName);
+        }
     }
-    assert(testCases[key].validated || testCases[key].conditional,
-           "you defined a test case for a command '" + key +
-               "' that does not exist on mongos: " + tojson(testCases[key]));
-}
+})();
+
+(() => {
+    // Test that commands that send databaseVersion are subjected to the databaseVersion check when
+    // the primary shard for the database has moved, but the database still exists on the old
+    // primary shard (because the old primary shard owns chunks for sharded collections in the
+    // database).
+
+    const dbName = getNewDbName();
+    const collName = "foo";
+    const shardedCollName = "pinnedShardedCollWithChunksOnBothShards";
+
+    // Create a sharded collection with data on both shards so that the database does not get
+    // dropped on the old primary shard after movePrimary.
+    let shardedCollNs = dbName + "." + shardedCollName;
+    assert.commandWorked(st.s0.adminCommand({enableSharding: dbName}));
+    assert.commandWorked(st.s0.adminCommand({addShardToZone: st.shard0.shardName, zone: 'x < 0'}));
+    assert.commandWorked(st.s0.adminCommand({addShardToZone: st.shard1.shardName, zone: 'x >= 0'}));
+    assert.commandWorked(st.s0.adminCommand(
+        {updateZoneKeyRange: shardedCollNs, min: {x: MinKey}, max: {x: 0}, zone: 'x < 0'}));
+    assert.commandWorked(st.s0.adminCommand(
+        {updateZoneKeyRange: shardedCollNs, min: {x: 0}, max: {x: MaxKey}, zone: 'x >= 0'}));
+    assert.commandWorked(
+        st.s0.getDB('admin').admin.runCommand({shardCollection: shardedCollNs, key: {"x": 1}}));
+    assert(containsCollection(st.shard0, dbName, shardedCollName));
+    assert(containsCollection(st.shard1, dbName, shardedCollName));
+
+    for (let command of Object.keys(listCommandsRes.commands)) {
+        let testCase = testCases[command];
+        if (testCase.skip) {
+            print("skipping " + command + ": " + testCase.skip);
+            continue;
+        }
+
+        testCommandAfterMovePrimary(testCase.run, st, dbName, collName);
+        if (testCase.explain) {
+            testCommandAfterMovePrimary(testCase.explain, st, dbName, collName);
+        }
+    }
+})();
+
+(() => {
+    // Test that commands that send databaseVersion are subjected to the databaseVersion check when
+    // the database has been dropped and recreated with a different primary shard.
+
+    for (let command of Object.keys(listCommandsRes.commands)) {
+        let testCase = testCases[command];
+        if (testCase.skip) {
+            print("skipping " + command + ": " + testCase.skip);
+            continue;
+        }
+
+        testCommandAfterDropRecreateDatabase(testCase.run, st);
+        if (testCase.explain) {
+            testCommandAfterDropRecreateDatabase(testCase.explain, st);
+        }
+    }
+})();
 
 st.stop();
 })();
