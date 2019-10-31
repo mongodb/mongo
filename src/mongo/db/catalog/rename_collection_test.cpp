@@ -79,6 +79,28 @@ public:
                        BSONObj indexDoc,
                        bool fromMigrate) override;
 
+    void onStartIndexBuild(OperationContext* opCtx,
+                           const NamespaceString& nss,
+                           CollectionUUID collUUID,
+                           const UUID& indexBuildUUID,
+                           const std::vector<BSONObj>& indexes,
+                           bool fromMigrate) override;
+
+    void onCommitIndexBuild(OperationContext* opCtx,
+                            const NamespaceString& nss,
+                            CollectionUUID collUUID,
+                            const UUID& indexBuildUUID,
+                            const std::vector<BSONObj>& indexes,
+                            bool fromMigrate) override;
+
+    void onAbortIndexBuild(OperationContext* opCtx,
+                           const NamespaceString& nss,
+                           CollectionUUID collUUID,
+                           const UUID& indexBuildUUID,
+                           const std::vector<BSONObj>& indexes,
+                           const Status& cause,
+                           bool fromMigrate) override;
+
     void onInserts(OperationContext* opCtx,
                    const NamespaceString& nss,
                    OptionalCollectionUUID uuid,
@@ -149,6 +171,38 @@ void OpObserverMock::onCreateIndex(OperationContext* opCtx,
                                    bool fromMigrate) {
     _logOp(opCtx, nss, "index");
     OpObserverNoop::onCreateIndex(opCtx, nss, uuid, indexDoc, fromMigrate);
+}
+
+void OpObserverMock::onStartIndexBuild(OperationContext* opCtx,
+                                       const NamespaceString& nss,
+                                       CollectionUUID collUUID,
+                                       const UUID& indexBuildUUID,
+                                       const std::vector<BSONObj>& indexes,
+                                       bool fromMigrate) {
+    _logOp(opCtx, nss, "startIndex");
+    OpObserverNoop::onStartIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexes, fromMigrate);
+}
+
+void OpObserverMock::onCommitIndexBuild(OperationContext* opCtx,
+                                        const NamespaceString& nss,
+                                        CollectionUUID collUUID,
+                                        const UUID& indexBuildUUID,
+                                        const std::vector<BSONObj>& indexes,
+                                        bool fromMigrate) {
+    _logOp(opCtx, nss, "commitIndex");
+    OpObserverNoop::onCommitIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexes, fromMigrate);
+}
+
+void OpObserverMock::onAbortIndexBuild(OperationContext* opCtx,
+                                       const NamespaceString& nss,
+                                       CollectionUUID collUUID,
+                                       const UUID& indexBuildUUID,
+                                       const std::vector<BSONObj>& indexes,
+                                       const Status& cause,
+                                       bool fromMigrate) {
+    _logOp(opCtx, nss, "abortIndex");
+    OpObserverNoop::onAbortIndexBuild(
+        opCtx, nss, collUUID, indexBuildUUID, indexes, cause, fromMigrate);
 }
 
 void OpObserverMock::onInserts(OperationContext* opCtx,
@@ -1009,48 +1063,52 @@ void _testRenameCollectionAcrossDatabaseOplogEntries(
 
 TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseOplogEntries) {
     bool forApplyOps = false;
-    _testRenameCollectionAcrossDatabaseOplogEntries(
-        _opCtx.get(),
-        _sourceNss,
-        _targetNssDifferentDb,
-        &_opObserver->oplogEntries,
-        forApplyOps,
-        {"create", "index", "inserts", "rename", "drop"});
+    std::vector<std::string> expectedOplogEntries = {
+        "create", "startIndex", "index", "commitIndex", "inserts", "rename", "drop"};
+    _testRenameCollectionAcrossDatabaseOplogEntries(_opCtx.get(),
+                                                    _sourceNss,
+                                                    _targetNssDifferentDb,
+                                                    &_opObserver->oplogEntries,
+                                                    forApplyOps,
+                                                    expectedOplogEntries);
 }
 
 TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsAcrossDatabaseOplogEntries) {
     bool forApplyOps = true;
-    _testRenameCollectionAcrossDatabaseOplogEntries(
-        _opCtx.get(),
-        _sourceNss,
-        _targetNssDifferentDb,
-        &_opObserver->oplogEntries,
-        forApplyOps,
-        {"create", "index", "inserts", "rename", "drop"});
+    std::vector<std::string> expectedOplogEntries = {
+        "create", "startIndex", "index", "commitIndex", "inserts", "rename", "drop"};
+    _testRenameCollectionAcrossDatabaseOplogEntries(_opCtx.get(),
+                                                    _sourceNss,
+                                                    _targetNssDifferentDb,
+                                                    &_opObserver->oplogEntries,
+                                                    forApplyOps,
+                                                    expectedOplogEntries);
 }
 
 TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseOplogEntriesDropTarget) {
     _createCollection(_opCtx.get(), _targetNssDifferentDb);
     bool forApplyOps = false;
-    _testRenameCollectionAcrossDatabaseOplogEntries(
-        _opCtx.get(),
-        _sourceNss,
-        _targetNssDifferentDb,
-        &_opObserver->oplogEntries,
-        forApplyOps,
-        {"create", "index", "inserts", "rename", "drop"});
+    std::vector<std::string> expectedOplogEntries = {
+        "create", "startIndex", "index", "commitIndex", "inserts", "rename", "drop"};
+    _testRenameCollectionAcrossDatabaseOplogEntries(_opCtx.get(),
+                                                    _sourceNss,
+                                                    _targetNssDifferentDb,
+                                                    &_opObserver->oplogEntries,
+                                                    forApplyOps,
+                                                    expectedOplogEntries);
 }
 
 TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsAcrossDatabaseOplogEntriesDropTarget) {
     _createCollection(_opCtx.get(), _targetNssDifferentDb);
     bool forApplyOps = true;
-    _testRenameCollectionAcrossDatabaseOplogEntries(
-        _opCtx.get(),
-        _sourceNss,
-        _targetNssDifferentDb,
-        &_opObserver->oplogEntries,
-        forApplyOps,
-        {"create", "index", "inserts", "rename", "drop"});
+    std::vector<std::string> expectedOplogEntries = {
+        "create", "startIndex", "index", "commitIndex", "inserts", "rename", "drop"};
+    _testRenameCollectionAcrossDatabaseOplogEntries(_opCtx.get(),
+                                                    _sourceNss,
+                                                    _targetNssDifferentDb,
+                                                    &_opObserver->oplogEntries,
+                                                    forApplyOps,
+                                                    expectedOplogEntries);
 }
 
 TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseOplogEntriesWritesNotReplicated) {
@@ -1085,7 +1143,9 @@ TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseDropsTemporaryCollect
     ASSERT_THROWS_CODE(renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, {}),
                        AssertionException,
                        ErrorCodes::OperationFailed);
-    _checkOplogEntries(_opObserver->oplogEntries, {"create", "index", "drop"});
+    std::vector<std::string> expectedOplogEntries = {
+        "create", "startIndex", "index", "commitIndex", "drop"};
+    _checkOplogEntries(_opObserver->oplogEntries, expectedOplogEntries);
 }
 
 TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabasesWithoutLocks) {
