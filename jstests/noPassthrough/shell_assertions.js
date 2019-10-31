@@ -308,7 +308,7 @@
         assert.throws(() => {
             assert.soon(() => {
                 return false;
-            }, 'assert message', kSmallTimeoutMS, kSmallRetryIntervalMS);
+            }, 'assert message', kSmallTimeoutMS, kSmallRetryIntervalMS, {runHangAnalyzer: false});
         });
     });
 
@@ -342,7 +342,7 @@
         assert.throws(() => {
             assert.soonNoExcept(() => {
                 throw new Error('failed');
-            }, 'assert message', kSmallTimeoutMS, kSmallRetryIntervalMS);
+            }, 'assert message', kSmallTimeoutMS, kSmallRetryIntervalMS, {runHangAnalyzer: false});
         });
     });
 
@@ -363,7 +363,9 @@
         assert.throws(() => {
             assert.retry(() => {
                 return false;
-            }, 'assert message', kDefaultRetryAttempts, kSmallRetryIntervalMS);
+            }, 'assert message', kDefaultRetryAttempts, kSmallRetryIntervalMS, {
+                runHangAnalyzer: false
+            });
         });
     });
 
@@ -387,7 +389,9 @@
         assert.throws(() => {
             assert.retryNoExcept(() => {
                 throw new Error('failed');
-            }, 'assert message', kDefaultRetryAttempts, kSmallRetryIntervalMS);
+            }, 'assert message', kDefaultRetryAttempts, kSmallRetryIntervalMS, {
+                runHangAnalyzer: false
+            });
         });
     });
 
@@ -405,7 +409,7 @@
         assert.throws(() => {
             assert.time(() => {
                 return true;
-            }, 'assert message', -5 * 60 * 1000);
+            }, 'assert message', -5 * 60 * 1000, {runHangAnalyzer: false});
         });
     });
 

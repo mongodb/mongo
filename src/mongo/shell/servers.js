@@ -114,6 +114,10 @@ function pathJoin(...parts) {
  *     child processes started by `MongoRunner.runMongo*()` etc.
  */
 function runHangAnalyzer(pids) {
+    if (typeof TestData === 'undefined') {
+        print("Skipping runHangAnalyzer: no TestData (not running from resmoke)");
+        return;
+    }
     if (typeof pids === 'undefined') {
         pids = getPids();
     }

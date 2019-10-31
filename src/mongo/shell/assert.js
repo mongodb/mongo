@@ -311,7 +311,7 @@ assert = (function() {
      * or more than 'timeout' milliseconds have elapsed. Throws an exception with
      * message 'msg' after timing out.
      */
-    assert.soon = function(func, msg, timeout, interval) {
+    assert.soon = function(func, msg, timeout, interval, {runHangAnalyzer = true} = {}) {
         _validateAssertionMessage(msg);
 
         var msgPrefix = "assert.soon failed: " + func;
@@ -337,9 +337,20 @@ assert = (function() {
 
             diff = (new Date()).getTime() - start.getTime();
             if (diff > timeout) {
-                doassert(_buildAssertionMessage(msg, msgPrefix));
+                msg = _buildAssertionMessage(msg, msgPrefix);
+                if (runHangAnalyzer) {
+                    msg = msg +
+                        "The hang analyzer is automatically called in assert.soon functions. " +
+                        "If you are *expecting* assert.soon to possibly fail, call assert.soon " +
+                        "with {runHangAnalyzer: false} as the fifth argument " +
+                        "(you can fill unused arguments with `undefined`).";
+                    print(msg + " Running hang analyzer from assert.soon.");
+                    MongoRunner.runHangAnalyzer(msg);
+                }
+                doassert(msg);
+            } else {
+                sleep(interval);
             }
-            sleep(interval);
         }
     };
 
@@ -361,7 +372,7 @@ assert = (function() {
      * message 'msg' after all attempts are used up. If no 'intervalMS' argument is passed,
      * it defaults to 0.
      */
-    assert.retry = function(func, msg, num_attempts, intervalMS) {
+    assert.retry = function(func, msg, num_attempts, intervalMS, {runHangAnalyzer = true} = {}) {
         var intervalMS = intervalMS || 0;
         var attempts_made = 0;
         while (attempts_made < num_attempts) {
@@ -374,6 +385,15 @@ assert = (function() {
             }
         }
         // Used up all attempts
+        msg = _buildAssertionMessage(msg, msgPrefix);
+        if (runHangAnalyzer) {
+            msg = msg + "The hang analyzer is automatically called in assert.retry functions. " +
+                "If you are *expecting* assert.soon to possibly fail, call assert.retry " +
+                "with {runHangAnalyzer: false} as the fifth argument " +
+                "(you can fill unused arguments with `undefined`).";
+            print(msg + " Running hang analyzer from assert.retry.");
+            MongoRunner.runHangAnalyzer(msg);
+        }
         doassert(msg);
     };
 
@@ -412,7 +432,7 @@ assert = (function() {
         return res;
     };
 
-    assert.time = function(f, msg, timeout /*ms*/) {
+    assert.time = function(f, msg, timeout /*ms*/, {runHangAnalyzer = true} = {}) {
         _validateAssertionMessage(msg);
 
         var start = new Date();
@@ -427,7 +447,16 @@ assert = (function() {
         if (diff > timeout) {
             const msgPrefix =
                 "assert.time failed timeout " + timeout + "ms took " + diff + "ms : " + f + ", msg";
-            doassert(_buildAssertionMessage(msg, msgPrefix));
+            msg = _buildAssertionMessage(msg, msgPrefix);
+            if (runHangAnalyzer) {
+                msg = msg + "The hang analyzer is automatically called in assert.time functions. " +
+                    "If you are *expecting* assert.soon to possibly fail, call assert.time " +
+                    "with {runHangAnalyzer: false} as the fourth argument " +
+                    "(you can fill unused arguments with `undefined`).";
+                print(msg + " Running hang analyzer from assert.time.");
+                MongoRunner.runHangAnalyzer(msg);
+            }
+            doassert(msg);
         }
         return res;
     };
