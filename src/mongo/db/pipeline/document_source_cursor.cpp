@@ -161,14 +161,7 @@ void DocumentSourceCursor::_updateOplogTimestamp() {
 
 void DocumentSourceCursor::recordPlanSummaryStats() {
     invariant(_exec);
-    // Aggregation handles in-memory sort outside of the query sub-system. Given that we need to
-    // preserve the existing value of hasSortStage rather than overwrite with the underlying
-    // PlanExecutor's value.
-    auto hasSortStage = _planSummaryStats.hasSortStage;
-
     Explain::getSummaryStats(*_exec, &_planSummaryStats);
-
-    _planSummaryStats.hasSortStage = hasSortStage;
 }
 
 Value DocumentSourceCursor::serialize(boost::optional<ExplainOptions::Verbosity> verbosity) const {
