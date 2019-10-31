@@ -67,7 +67,7 @@ __wt_spin_trylock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
     WT_UNUSED(session);
 
-    return (__atomic_test_and_set(&t->lock, __ATOMIC_ACQUIRE) ? 0 : EBUSY);
+    return (!__atomic_test_and_set(&t->lock, __ATOMIC_ACQUIRE) ? 0 : EBUSY);
 }
 
 /*

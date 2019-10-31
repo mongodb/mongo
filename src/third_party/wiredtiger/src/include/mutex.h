@@ -99,7 +99,8 @@ struct __wt_rwlock { /* Read/write lock */
 struct __wt_spinlock {
 #if SPINLOCK_TYPE == SPINLOCK_GCC
     WT_CACHE_LINE_PAD_BEGIN
-    volatile int lock;
+    volatile bool lock;
+    uint8_t unused[7];
 #elif SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX || \
   SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_ADAPTIVE || SPINLOCK_TYPE == SPINLOCK_MSVC
     wt_mutex_t lock;
