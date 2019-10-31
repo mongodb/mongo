@@ -77,6 +77,8 @@ const NamespaceString NamespaceString::kSystemReplSetNamespace(NamespaceString::
                                                                "system.replset");
 const NamespaceString NamespaceString::kIndexBuildEntryNamespace(NamespaceString::kConfigDb,
                                                                  "system.indexBuilds");
+const NamespaceString NamespaceString::kRangeDeletionNamespace(NamespaceString::kConfigDb,
+                                                               "rangeDeletions");
 
 bool NamespaceString::isListCollectionsCursorNS() const {
     return coll() == listCollectionsCursorCol;

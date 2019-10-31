@@ -101,6 +101,9 @@ public:
     // Namespace for index build entries.
     static const NamespaceString kIndexBuildEntryNamespace;
 
+    // Namespace for pending range deletions.
+    static const NamespaceString kRangeDeletionNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */

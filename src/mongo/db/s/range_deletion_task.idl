@@ -45,6 +45,14 @@ types:
         serializer: "mongo::ChunkRange::toBSON"
         deserializer: "mongo::ChunkRange::fromBSONThrowing"
 
+enums:
+  CleanWhen:
+    description: "When to cleanup ranges."
+    type: string
+    values:
+      kNow: "now"
+      kDelayed: "delayed"
+
 structs:
     rangeDeletionTask:
         description: "Represents a chunk range to be deleted by the range deleter."
@@ -65,3 +73,6 @@ structs:
                 type: bool
                 description: "Flag that is present if the range is not yet ready for deletion"
                 optional: true
+            whenToClean:
+                type: CleanWhen
+                description: "Enumeration that defines when to cleanup the range."
