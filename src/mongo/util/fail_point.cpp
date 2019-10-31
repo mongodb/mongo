@@ -83,7 +83,7 @@ void FailPoint::shouldFailCloseBlock() {
     _fpInfo.subtractAndFetch(1);
 }
 
-void FailPoint::setMode(Mode mode, ValType val, const BSONObj& extra) {
+int64_t FailPoint::setMode(Mode mode, ValType val, const BSONObj& extra) {
     /**
      * Outline:
      *
@@ -110,6 +110,20 @@ void FailPoint::setMode(Mode mode, ValType val, const BSONObj& extra) {
     if (_mode != off) {
         enableFailPoint();
     }
+
+    return _timesEntered.load();
+}
+
+void FailPoint::waitForTimesEntered(int64_t timesEntered) {
+    while (_timesEntered.load() < timesEntered) {
+        sleepmillis(100);
+    };
+}
+
+void FailPoint::waitForTimesEntered(OperationContext* opCtx, int64_t timesEntered) {
+    while (_timesEntered.load() < timesEntered) {
+        opCtx->sleepFor(Milliseconds(100));
+    }
 }
 
 const BSONObj& FailPoint::getData() const {
@@ -124,7 +138,7 @@ void FailPoint::disableFailPoint() {
     _fpInfo.fetchAndBitAnd(~ACTIVE_BIT);
 }
 
-FailPoint::RetCode FailPoint::slowShouldFailOpenBlock(
+FailPoint::RetCode FailPoint::slowShouldFailOpenBlockImpl(
     stdx::function<bool(const BSONObj&)> cb) noexcept {
     ValType localFpInfo = _fpInfo.addAndFetch(1);
 
@@ -165,6 +179,15 @@ FailPoint::RetCode FailPoint::slowShouldFailOpenBlock(
             error() << "FailPoint Mode not supported: " << static_cast<int>(_mode);
             fassertFailed(16444);
     }
+}
+
+FailPoint::RetCode FailPoint::slowShouldFailOpenBlock(
+    stdx::function<bool(const BSONObj&)> cb) noexcept {
+    auto ret = slowShouldFailOpenBlockImpl(cb);
+    if (ret == slowOn) {
+        _timesEntered.addAndFetch(1);
+    }
+    return ret;
 }
 
 StatusWith<std::tuple<FailPoint::Mode, FailPoint::ValType, BSONObj>> FailPoint::parseBSON(
@@ -263,6 +286,7 @@ BSONObj FailPoint::toBSON() const {
     stdx::lock_guard<stdx::mutex> scoped(_modMutex);
     builder.append("mode", _mode);
     builder.append("data", _data);
+    builder.append("timesEntered", _timesEntered.load());
 
     return builder.obj();
 }

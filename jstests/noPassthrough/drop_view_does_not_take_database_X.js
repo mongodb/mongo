@@ -6,7 +6,8 @@
 
 (function() {
 "use strict";
-load("jstests/libs/check_log.js");
+
+load("jstests/libs/fail_point_util.js");
 
 const conn = MongoRunner.runMongod({});
 const db = conn.getDB("test");
@@ -14,19 +15,17 @@ const db = conn.getDB("test");
 assert.commandWorked(db.runCommand({insert: "a", documents: [{x: 1}]}));
 assert.commandWorked(db.createView("view", "a", []));
 
-assert.commandWorked(
-    db.adminCommand({configureFailPoint: "hangDuringDropCollection", mode: "alwaysOn"}));
+const failPoint = configureFailPoint(db, "hangDuringDropCollection");
 
 // This only holds a database IX lock.
 const awaitDrop =
     startParallelShell(() => assert(db.getSiblingDB("test")["view"].drop()), conn.port);
-checkLog.contains(conn, "hangDuringDropCollection fail point enabled");
+failPoint.wait();
 
 // This takes a database IX lock and should not be blocked.
 assert.commandWorked(db.runCommand({insert: "a", documents: [{y: 1}]}));
 
-assert.commandWorked(
-    db.adminCommand({configureFailPoint: "hangDuringDropCollection", mode: "off"}));
+failPoint.off();
 
 awaitDrop();
 MongoRunner.stopMongod(conn);

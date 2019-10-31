@@ -42,9 +42,10 @@ FailPointRegistry* getGlobalFailPointRegistry();
 
 /**
  * Set a fail point in the global registry to a given value via BSON
+ * @return the number of times the fail point has been entered so far.
  * @throw DBException If no failpoint called failPointName exists.
  */
-void setGlobalFailPoint(const std::string& failPointName, const BSONObj& cmdObj);
+int64_t setGlobalFailPoint(const std::string& failPointName, const BSONObj& cmdObj);
 
 /**
  * Convenience macro for defining a fail point. Must be used at namespace scope.

@@ -238,7 +238,7 @@ TEST_F(MongodbCAPITest, CreateIndex) {
     mongo::BSONObj inputObj = mongo::fromjson(
         R"raw_delimiter({
             createIndexes: 'items',
-            indexes: 
+            indexes:
             [
                 {
                     key: {
@@ -265,7 +265,7 @@ TEST_F(MongodbCAPITest, CreateBackgroundIndex) {
     mongo::BSONObj inputObj = mongo::fromjson(
         R"raw_delimiter({
             createIndexes: 'items',
-            indexes: 
+            indexes:
             [
                 {
                     key: {
@@ -291,7 +291,7 @@ TEST_F(MongodbCAPITest, CreateTTLIndex) {
     mongo::BSONObj inputObj = mongo::fromjson(
         R"raw_delimiter({
             createIndexes: 'items',
-            indexes: 
+            indexes:
             [
                 {
                     key: {
@@ -560,7 +560,6 @@ TEST_F(MongodbCAPITest, InsertAndUpdate) {
 
 TEST_F(MongodbCAPITest, RunListCommands) {
     auto client = createClient();
-
     std::vector<std::string> whitelist = {
         "_hashBSONElement",
         "aggregate",
@@ -623,6 +622,7 @@ TEST_F(MongodbCAPITest, RunListCommands) {
         "twoPhaseCreateIndexes",
         "update",
         "validate",
+        "waitForFailPoint",
     };
     std::sort(whitelist.begin(), whitelist.end());
 

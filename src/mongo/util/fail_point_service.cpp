@@ -62,7 +62,7 @@ FailPointRegistry* getGlobalFailPointRegistry() {
     return _fpRegistry.get();
 }
 
-void setGlobalFailPoint(const std::string& failPointName, const BSONObj& cmdObj) {
+int64_t setGlobalFailPoint(const std::string& failPointName, const BSONObj& cmdObj) {
     FailPointRegistry* registry = getGlobalFailPointRegistry();
     FailPoint* failPoint = registry->getFailPoint(failPointName);
 
@@ -74,8 +74,9 @@ void setGlobalFailPoint(const std::string& failPointName, const BSONObj& cmdObj)
     BSONObj data;
     std::tie(mode, val, data) = uassertStatusOK(FailPoint::parseBSON(cmdObj));
 
-    failPoint->setMode(mode, val, data);
+    auto timesEntered = failPoint->setMode(mode, val, data);
     warning() << "failpoint: " << failPointName << " set to: " << failPoint->toBSON();
+    return timesEntered;
 }
 
 FailPointEnableBlock::FailPointEnableBlock(const std::string& failPointName)

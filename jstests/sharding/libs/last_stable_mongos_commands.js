@@ -22,4 +22,5 @@ const commandsAddedToMongosIn42 = [
     'setIndexCommitQuorum',
     'startRecordingTraffic',
     'stopRecordingTraffic',
+    'waitForFailPoint',
 ];

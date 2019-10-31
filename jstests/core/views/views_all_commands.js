@@ -528,6 +528,7 @@ let viewsCommandTests = {
     voteCommitIndexBuild: {skip: isUnrelated},
     voteCommitTransaction: {skip: isUnrelated},
     voteAbortTransaction: {skip: isUnrelated},
+    waitForFailPoint: {skip: isUnrelated},
     whatsmyuri: {skip: isUnrelated}
 };
 

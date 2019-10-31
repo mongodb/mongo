@@ -155,8 +155,24 @@ public:
      * @param extra arbitrary BSON object that can be stored to this fail point
      *     that can be referenced afterwards with #getData. Defaults to an empty
      *     document.
+     *
+     * @returns the number of times the fail point has been entered so far.
      */
-    void setMode(Mode mode, ValType val = 0, const BSONObj& extra = BSONObj());
+    int64_t setMode(Mode mode, ValType val = 0, const BSONObj& extra = BSONObj());
+
+    /**
+     * Waits until the fail point has been entered the desired number of times.
+     *
+     * @param timesEntered the number of times the fail point has been entered.
+     */
+    void waitForTimesEntered(int64_t timesEntered);
+
+    /**
+     * Like `waitForTimesEntered`, but interruptible via the `opCtx->sleepFor` mechanism.  See
+     * `mongo::Interruptible::sleepFor` (Interruptible is a base class of
+     * OperationContext).
+     */
+    void waitForTimesEntered(OperationContext* opCtx, int64_t timesEntered);
 
     /**
      * @returns a BSON object showing the current mode and data stored.
@@ -171,6 +187,9 @@ private:
     // 31: tells whether this fail point is active.
     // 0~30: unsigned ref counter for active dynamic instances.
     AtomicWord<unsigned> _fpInfo{0};
+
+    // Total number of times the fail point has been entered.
+    AtomicWord<int64_t> _timesEntered{0};
 
     // Invariant: These should be read only if ACTIVE_BIT of _fpInfo is set.
     Mode _mode{off};
@@ -196,7 +215,15 @@ private:
      * If a callable is passed, and returns false, this will return userIgnored and avoid altering
      * the mode in any way.  The argument is the fail point payload.
      */
-    RetCode slowShouldFailOpenBlock(stdx::function<bool(const BSONObj&)> cb) noexcept;
+    RetCode slowShouldFailOpenBlockImpl(std::function<bool(const BSONObj&)> cb) noexcept;
+
+    /**
+     * slow path for #shouldFailOpenBlock
+     *
+     * Calls slowShouldFailOpenBlockImpl. If it returns slowOn, increments the number of times
+     * the fail point has been entered before returning the RetCode.
+     */
+    RetCode slowShouldFailOpenBlock(std::function<bool(const BSONObj&)> cb) noexcept;
 
     /**
      * @return the stored BSONObj in this fail point. Note that this cannot be safely

@@ -307,6 +307,7 @@ let testCases = {
     usersInfo: {skip: "primary only"},
     validate: {skip: "does not return user data"},
     waitForOngoingChunkSplits: {skip: "does not return user data"},
+    waitForFailPoint: {skip: "does not return user data"},
     whatsmyuri: {skip: "does not return user data"}
 };
 
