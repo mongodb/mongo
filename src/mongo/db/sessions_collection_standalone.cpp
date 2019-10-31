@@ -99,27 +99,28 @@ void SessionsCollectionStandalone::refreshSessions(OperationContext* opCtx,
                                                    const LogicalSessionRecordSet& sessions) {
     const std::vector<LogicalSessionRecord> sessionsVector(sessions.begin(), sessions.end());
     DBDirectClient client(opCtx);
-    doRefresh(NamespaceString::kLogicalSessionsNamespace,
-              sessionsVector,
-              makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, &client));
+    _doRefresh(NamespaceString::kLogicalSessionsNamespace,
+               sessionsVector,
+               makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, &client));
 }
 
 void SessionsCollectionStandalone::removeRecords(OperationContext* opCtx,
                                                  const LogicalSessionIdSet& sessions) {
     const std::vector<LogicalSessionId> sessionsVector(sessions.begin(), sessions.end());
     DBDirectClient client(opCtx);
-    doRemove(NamespaceString::kLogicalSessionsNamespace,
-             sessionsVector,
-             makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, &client));
+    _doRemove(NamespaceString::kLogicalSessionsNamespace,
+              sessionsVector,
+              makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, &client));
 }
 
 LogicalSessionIdSet SessionsCollectionStandalone::findRemovedSessions(
     OperationContext* opCtx, const LogicalSessionIdSet& sessions) {
     const std::vector<LogicalSessionId> sessionsVector(sessions.begin(), sessions.end());
     DBDirectClient client(opCtx);
-    return doFindRemoved(NamespaceString::kLogicalSessionsNamespace,
-                         sessionsVector,
-                         makeFindFnForCommand(NamespaceString::kLogicalSessionsNamespace, &client));
+    return _doFindRemoved(
+        NamespaceString::kLogicalSessionsNamespace,
+        sessionsVector,
+        makeFindFnForCommand(NamespaceString::kLogicalSessionsNamespace, &client));
 }
 
 }  // namespace mongo

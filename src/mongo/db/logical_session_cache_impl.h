@@ -71,9 +71,9 @@ public:
 
     Status vivify(OperationContext* opCtx, const LogicalSessionId& lsid) override;
 
-    Status refreshNow(Client* client) override;
+    Status refreshNow(OperationContext* opCtx) override;
 
-    Status reapNow(Client* client) override;
+    void reapNow(OperationContext* opCtx) override;
 
     size_t size() override;
 
@@ -100,10 +100,7 @@ private:
      */
     bool _isDead(const LogicalSessionRecord& record, Date_t now) const;
 
-    /**
-     *
-     */
-    Status _addToCache(WithLock, LogicalSessionRecord record);
+    Status _addToCacheIfNotFull(WithLock, LogicalSessionRecord record);
 
     const std::unique_ptr<ServiceLiaison> _service;
     const std::shared_ptr<SessionsCollection> _sessionsColl;

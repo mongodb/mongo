@@ -45,8 +45,9 @@ class OperationContext;
 class SessionsCollectionSharded : public SessionsCollection {
 public:
     /**
-     * Ensures that the sessions collection exists, is sharded,
-     * and has the proper indexes.
+     * Only ensures that the sessions collection exists, is sharded and has the proper indexes, but
+     * doesn't do any configuration on its own. This is left to the config server's implementation
+     * in SessionsCollectionConfigServer.
      */
     void setupSessionsCollection(OperationContext* opCtx) override;
 
@@ -54,25 +55,16 @@ public:
      * Checks if the sessions collection exists. Does not check if the index exists in the sharded
      * version of this function.
      */
-    virtual void checkSessionsCollectionExists(OperationContext* opCtx) override;
+    void checkSessionsCollectionExists(OperationContext* opCtx) final;
 
-    /**
-     * Updates the last-use times on the given sessions to be greater than
-     * or equal to the current time.
-     */
     void refreshSessions(OperationContext* opCtx, const LogicalSessionRecordSet& sessions) override;
 
-    /**
-     * Removes the authoritative records for the specified sessions.
-     */
     void removeRecords(OperationContext* opCtx, const LogicalSessionIdSet& sessions) override;
 
     LogicalSessionIdSet findRemovedSessions(OperationContext* opCtx,
                                             const LogicalSessionIdSet& sessions) override;
 
-protected:
-    Status _checkCacheForSessionsCollection(OperationContext* opCtx);
-
+private:
     /**
      * These two methods use the sharding routing metadata to do a best effort attempt at grouping
      * the specified set of sessions by the shards, which have the records for these sessions. This

@@ -175,20 +175,21 @@ void SessionsCollectionRS::refreshSessions(OperationContext* opCtx,
                                            const LogicalSessionRecordSet& sessions) {
     const std::vector<LogicalSessionRecord> sessionsVector(sessions.begin(), sessions.end());
 
-    _dispatch(
-        NamespaceString::kLogicalSessionsNamespace,
-        opCtx,
-        [&] {
-            DBDirectClient client(opCtx);
-            doRefresh(NamespaceString::kLogicalSessionsNamespace,
+    _dispatch(NamespaceString::kLogicalSessionsNamespace,
+              opCtx,
+              [&] {
+                  DBDirectClient client(opCtx);
+                  _doRefresh(
+                      NamespaceString::kLogicalSessionsNamespace,
                       sessionsVector,
                       makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, &client));
-        },
-        [&](DBClientBase* client) {
-            doRefresh(NamespaceString::kLogicalSessionsNamespace,
+              },
+              [&](DBClientBase* client) {
+                  _doRefresh(
+                      NamespaceString::kLogicalSessionsNamespace,
                       sessionsVector,
                       makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, client));
-        });
+              });
 }
 
 void SessionsCollectionRS::removeRecords(OperationContext* opCtx,
@@ -200,14 +201,14 @@ void SessionsCollectionRS::removeRecords(OperationContext* opCtx,
         opCtx,
         [&] {
             DBDirectClient client(opCtx);
-            doRemove(NamespaceString::kLogicalSessionsNamespace,
-                     sessionsVector,
-                     makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, &client));
+            _doRemove(NamespaceString::kLogicalSessionsNamespace,
+                      sessionsVector,
+                      makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, &client));
         },
         [&](DBClientBase* client) {
-            doRemove(NamespaceString::kLogicalSessionsNamespace,
-                     sessionsVector,
-                     makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, client));
+            _doRemove(NamespaceString::kLogicalSessionsNamespace,
+                      sessionsVector,
+                      makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, client));
         });
 }
 
@@ -220,13 +221,13 @@ LogicalSessionIdSet SessionsCollectionRS::findRemovedSessions(OperationContext* 
         opCtx,
         [&] {
             DBDirectClient client(opCtx);
-            return doFindRemoved(
+            return _doFindRemoved(
                 NamespaceString::kLogicalSessionsNamespace,
                 sessionsVector,
                 makeFindFnForCommand(NamespaceString::kLogicalSessionsNamespace, &client));
         },
         [&](DBClientBase* client) {
-            return doFindRemoved(
+            return _doFindRemoved(
                 NamespaceString::kLogicalSessionsNamespace,
                 sessionsVector,
                 makeFindFnForCommand(NamespaceString::kLogicalSessionsNamespace, client));

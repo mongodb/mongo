@@ -60,27 +60,6 @@ BSONObj lsidQuery(const LogicalSessionId& lsid) {
 
 }  // namespace
 
-Status SessionsCollectionSharded::_checkCacheForSessionsCollection(OperationContext* opCtx) {
-    // If the sharding state is not yet initialized, fail.
-    if (!Grid::get(opCtx)->isShardingInitialized()) {
-        return {ErrorCodes::ShardingStateNotInitialized, "sharding state is not yet initialized"};
-    }
-
-    // If the collection doesn't exist, fail. Only the config servers generate it.
-    auto res = Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
-        opCtx, NamespaceString::kLogicalSessionsNamespace);
-    if (!res.isOK()) {
-        return res.getStatus();
-    }
-
-    auto routingInfo = res.getValue();
-    if (routingInfo.cm()) {
-        return Status::OK();
-    }
-
-    return {ErrorCodes::NamespaceNotFound, "config.system.sessions does not exist"};
-}
-
 std::vector<LogicalSessionId> SessionsCollectionSharded::_groupSessionIdsByOwningShard(
     OperationContext* opCtx, const LogicalSessionIdSet& sessions) {
     auto routingInfo = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
@@ -140,7 +119,17 @@ void SessionsCollectionSharded::setupSessionsCollection(OperationContext* opCtx)
 }
 
 void SessionsCollectionSharded::checkSessionsCollectionExists(OperationContext* opCtx) {
-    uassertStatusOK(_checkCacheForSessionsCollection(opCtx));
+    uassert(ErrorCodes::ShardingStateNotInitialized,
+            "sharding state is not yet initialized",
+            Grid::get(opCtx)->isShardingInitialized());
+
+    // If the collection doesn't exist, fail. Only the config servers generate it.
+    const auto routingInfo = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
+            opCtx, NamespaceString::kLogicalSessionsNamespace));
+
+    uassert(
+        ErrorCodes::NamespaceNotFound, "config.system.sessions does not exist", routingInfo.cm());
 }
 
 void SessionsCollectionSharded::refreshSessions(OperationContext* opCtx,
@@ -157,9 +146,9 @@ void SessionsCollectionSharded::refreshSessions(OperationContext* opCtx,
         return response.toStatus();
     };
 
-    doRefresh(NamespaceString::kLogicalSessionsNamespace,
-              _groupSessionRecordsByOwningShard(opCtx, sessions),
-              send);
+    _doRefresh(NamespaceString::kLogicalSessionsNamespace,
+               _groupSessionRecordsByOwningShard(opCtx, sessions),
+               send);
 }
 
 void SessionsCollectionSharded::removeRecords(OperationContext* opCtx,
@@ -176,9 +165,9 @@ void SessionsCollectionSharded::removeRecords(OperationContext* opCtx,
         return response.toStatus();
     };
 
-    doRemove(NamespaceString::kLogicalSessionsNamespace,
-             _groupSessionIdsByOwningShard(opCtx, sessions),
-             send);
+    _doRemove(NamespaceString::kLogicalSessionsNamespace,
+              _groupSessionIdsByOwningShard(opCtx, sessions),
+              send);
 }
 
 LogicalSessionIdSet SessionsCollectionSharded::findRemovedSessions(
@@ -214,9 +203,9 @@ LogicalSessionIdSet SessionsCollectionSharded::findRemovedSessions(
         return replyBuilder.releaseBody();
     };
 
-    return doFindRemoved(NamespaceString::kLogicalSessionsNamespace,
-                         _groupSessionIdsByOwningShard(opCtx, sessions),
-                         send);
+    return _doFindRemoved(NamespaceString::kLogicalSessionsNamespace,
+                          _groupSessionIdsByOwningShard(opCtx, sessions),
+                          send);
 }
 
 }  // namespace mongo

@@ -51,7 +51,8 @@ public:
     virtual ~SessionsCollection();
 
     /**
-     * Ensures that the sessions collection exists and has the proper indexes.
+     * Ensures that the sessions collection exists and has the proper indexes. Implementations of
+     * this method must support multiple concurrent invocations.
      */
     virtual void setupSessionsCollection(OperationContext* opCtx) = 0;
 
@@ -61,8 +62,8 @@ public:
     virtual void checkSessionsCollectionExists(OperationContext* opCtx) = 0;
 
     /**
-     * Updates the last-use times on the given sessions to be greater than
-     * or equal to the given time. Throws an exception if a networking issue occurred.
+     * Updates the last-use times on the given sessions to be greater than or equal to the given
+     * time. Throws an exception if a networking issue occurred.
      */
     virtual void refreshSessions(OperationContext* opCtx,
                                  const LogicalSessionRecordSet& sessions) = 0;
@@ -70,15 +71,15 @@ public:
     /**
      * Removes the authoritative records for the specified sessions.
      *
-     * Implementations should perform authentication checks to ensure that
-     * session records may only be removed if their owner is logged in.
+     * Implementations should perform authentication checks to ensure that session records may only
+     * be removed if their owner is logged in.
      *
      * Throws an exception if the removal fails, for example from a network error.
      */
     virtual void removeRecords(OperationContext* opCtx, const LogicalSessionIdSet& sessions) = 0;
 
     /**
-     * Checks a set of lsids and returns the set that no longer exists
+     * Checks a set of lsids and returns the set that no longer exists.
      *
      * Throws an exception if the fetch cannot occur, for example from a network error.
      */
@@ -98,9 +99,6 @@ public:
 protected:
     SessionsCollection();
 
-    /**
-     * Makes a send function for the given client.
-     */
     using SendBatchFn = std::function<void(BSONObj batch)>;
     static SendBatchFn makeSendFnForCommand(const NamespaceString& ns, DBClientBase* client);
     static SendBatchFn makeSendFnForBatchWrite(const NamespaceString& ns, DBClientBase* client);
@@ -111,25 +109,25 @@ protected:
     /**
      * Formats and sends batches of refreshes for the given set of sessions.
      */
-    void doRefresh(const NamespaceString& ns,
-                   const std::vector<LogicalSessionRecord>& sessions,
-                   SendBatchFn send);
+    void _doRefresh(const NamespaceString& ns,
+                    const std::vector<LogicalSessionRecord>& sessions,
+                    SendBatchFn send);
 
     /**
      * Formats and sends batches of deletes for the given set of sessions.
      */
-    void doRemove(const NamespaceString& ns,
-                  const std::vector<LogicalSessionId>& sessions,
-                  SendBatchFn send);
+    void _doRemove(const NamespaceString& ns,
+                   const std::vector<LogicalSessionId>& sessions,
+                   SendBatchFn send);
 
     /**
      * Returns those lsids from the input 'sessions' array which are not present in the sessions
      * collection (essentially performs an inner join of 'sessions' against the sessions
      * collection).
      */
-    LogicalSessionIdSet doFindRemoved(const NamespaceString& ns,
-                                      const std::vector<LogicalSessionId>& sessions,
-                                      FindBatchFn send);
+    LogicalSessionIdSet _doFindRemoved(const NamespaceString& ns,
+                                       const std::vector<LogicalSessionId>& sessions,
+                                       FindBatchFn send);
 };
 
 }  // namespace mongo

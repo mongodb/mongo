@@ -33,10 +33,6 @@
 
 namespace mongo {
 
-class Client;
-class OperationContext;
-class ServiceContext;
-
 /**
  * A noop logical session cache for use in tests
  */
@@ -52,13 +48,11 @@ public:
         return Status::OK();
     }
 
-    Status refreshNow(Client* client) override {
+    Status refreshNow(OperationContext* opCtx) override {
         return Status::OK();
     }
 
-    Status reapNow(Client* client) override {
-        return Status::OK();
-    }
+    void reapNow(OperationContext* opCtx) override {}
 
     size_t size() override {
         return 0;

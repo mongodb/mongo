@@ -47,13 +47,13 @@
 
 namespace mongo {
 
-// Returns an error if the collection didn't exist and we couldn't
-// shard it into existence, either.
 void SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext* opCtx) {
     // First, check if the collection is already sharded.
-    auto res = _checkCacheForSessionsCollection(opCtx);
-    if (res.isOK()) {
+    try {
+        checkSessionsCollectionExists(opCtx);
         return;
+    } catch (const DBException&) {
+        // If the sessions collection doesn't exist, create it
     }
 
     // If we don't have any shards, we can't set up this collection yet.
@@ -83,7 +83,6 @@ void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* 
             opCtx,
             NamespaceString::kLogicalSessionsNamespace,
             SessionsCollection::generateCreateIndexesCmd());
-
     } catch (DBException& ex) {
         ex.addContext(str::stream()
                       << "Failed to generate TTL index for "
@@ -102,10 +101,6 @@ void SessionsCollectionConfigServer::setupSessionsCollection(OperationContext* o
 
     _shardCollectionIfNeeded(opCtx);
     _generateIndexesIfNeeded(opCtx);
-}
-
-void SessionsCollectionConfigServer::checkSessionsCollectionExists(OperationContext* opCtx) {
-    uassertStatusOK(_checkCacheForSessionsCollection(opCtx));
 }
 
 }  // namespace mongo

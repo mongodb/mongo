@@ -40,10 +40,6 @@
 
 namespace mongo {
 
-class Client;
-class OperationContext;
-class ServiceContext;
-
 /**
  * The interface for the logical session cache
  */
@@ -87,12 +83,12 @@ public:
      * Refreshes the cache synchronously. This flushes all pending refreshes and inserts to the
      * sessions collection.
      */
-    virtual Status refreshNow(Client* client) = 0;
+    virtual Status refreshNow(OperationContext* opCtx) = 0;
 
     /**
      * Reaps transaction records synchronously.
      */
-    virtual Status reapNow(Client* client) = 0;
+    virtual void reapNow(OperationContext* opCtx) = 0;
 
     /**
      * Returns the number of session records currently in the cache.

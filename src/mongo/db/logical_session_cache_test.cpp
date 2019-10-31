@@ -77,6 +77,7 @@ public:
         Client::releaseCurrent();
         Client::initThread(getThreadName());
         _opCtx = makeOperationContext();
+
         auto mockService = std::make_unique<MockServiceLiaison>(_service);
         auto mockSessions = std::make_unique<MockSessionsCollection>(_sessions);
         _cache = std::make_unique<LogicalSessionCacheImpl>(
@@ -103,14 +104,6 @@ public:
 
     std::shared_ptr<MockSessionsCollectionImpl> sessions() {
         return _sessions;
-    }
-
-    void setOpCtx() {
-        _opCtx = getClient()->makeOperationContext();
-    }
-
-    void clearOpCtx() {
-        _opCtx.reset();
     }
 
     OperationContext* opCtx() {
@@ -168,8 +161,7 @@ TEST_F(LogicalSessionCacheTest, StartSession) {
     ASSERT(!sessions()->has(lsid));
 
     // Do refresh, cached records should get flushed to collection.
-    clearOpCtx();
-    ASSERT(cache()->refreshNow(getClient()).isOK());
+    ASSERT(cache()->refreshNow(opCtx()).isOK());
     ASSERT(sessions()->has(lsid));
 
     // Try to start the same session again, should succeed.
@@ -200,7 +192,7 @@ TEST_F(LogicalSessionCacheTest, BasicSessionExpiration) {
     service()->fastForward(Milliseconds(kSessionTimeout.count() + 5));
 
     // Check that it is no longer in the cache
-    ASSERT_OK(cache()->refreshNow(getClient()));
+    ASSERT_OK(cache()->refreshNow(opCtx()));
     ASSERT_EQ(0UL, cache()->size());
 }
 
@@ -219,9 +211,8 @@ TEST_F(LogicalSessionCacheTest, ManySignedLsidsInCacheRefresh) {
     });
 
     // Force a refresh
-    clearOpCtx();
     service()->fastForward(kForceRefresh);
-    ASSERT(cache()->refreshNow(getClient()).isOK());
+    ASSERT_OK(cache()->refreshNow(opCtx()));
 }
 
 //
@@ -337,9 +328,8 @@ TEST_F(LogicalSessionCacheTest, RefreshMatrixSessionState) {
     }
 
     // Force a refresh
-    clearOpCtx();
     service()->fastForward(kForceRefresh);
-    ASSERT(cache()->refreshNow(getClient()).isOK());
+    ASSERT_OK(cache()->refreshNow(opCtx()));
 
     for (int i = 0; i < 32; i++) {
         std::stringstream failText;

@@ -30,7 +30,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/init.h"
-#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/logical_session_cache.h"
@@ -70,12 +69,9 @@ public:
              const std::string& db,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        auto cache = LogicalSessionCache::get(opCtx);
-        auto client = opCtx->getClient();
+        const auto cache = LogicalSessionCache::get(opCtx);
 
-        auto res = cache->reapNow(client);
-        uassertStatusOK(res);
-
+        cache->reapNow(opCtx);
         return true;
     }
 };

@@ -195,9 +195,9 @@ SessionsCollection::FindBatchFn SessionsCollection::makeFindFnForCommand(const N
     return send;
 }
 
-void SessionsCollection::doRefresh(const NamespaceString& ns,
-                                   const std::vector<LogicalSessionRecord>& sessions,
-                                   SendBatchFn send) {
+void SessionsCollection::_doRefresh(const NamespaceString& ns,
+                                    const std::vector<LogicalSessionRecord>& sessions,
+                                    SendBatchFn send) {
     auto init = [ns](BSONObjBuilder* batch) {
         batch->append("update", ns.coll());
         batch->append("ordered", false);
@@ -213,9 +213,9 @@ void SessionsCollection::doRefresh(const NamespaceString& ns,
     runBulkCmd("updates", init, add, send, sessions);
 }
 
-void SessionsCollection::doRemove(const NamespaceString& ns,
-                                  const std::vector<LogicalSessionId>& sessions,
-                                  SendBatchFn send) {
+void SessionsCollection::_doRemove(const NamespaceString& ns,
+                                   const std::vector<LogicalSessionId>& sessions,
+                                   SendBatchFn send) {
     auto init = [ns](BSONObjBuilder* batch) {
         batch->append("delete", ns.coll());
         batch->append("ordered", false);
@@ -229,9 +229,8 @@ void SessionsCollection::doRemove(const NamespaceString& ns,
     runBulkCmd("deletes", init, add, send, sessions);
 }
 
-LogicalSessionIdSet SessionsCollection::doFindRemoved(const NamespaceString& ns,
-                                                      const std::vector<LogicalSessionId>& sessions,
-                                                      FindBatchFn send) {
+LogicalSessionIdSet SessionsCollection::_doFindRemoved(
+    const NamespaceString& ns, const std::vector<LogicalSessionId>& sessions, FindBatchFn send) {
     auto makeT = [] { return std::vector<LogicalSessionId>{}; };
 
     auto add = [](std::vector<LogicalSessionId>& batch, const LogicalSessionId& record) {

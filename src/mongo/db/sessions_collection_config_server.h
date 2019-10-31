@@ -46,24 +46,22 @@ class OperationContext;
 class SessionsCollectionConfigServer : public SessionsCollectionSharded {
 public:
     /**
-     * Ensures that the sessions collection has been set up for this cluster,
-     * sharded, and with the proper indexes.
+     * Ensures that the sessions collection has been set up for this cluster, sharded, and with the
+     * proper indexes.
      *
-     * This method may safely be called multiple times.
+     * This method may safely be called multiple times and if called concurrently the calls will get
+     * serialised using the mutex below.
      *
      * If there are no shards in this cluster, this method will do nothing.
      */
     void setupSessionsCollection(OperationContext* opCtx) override;
 
-    /**
-     * Checks if the sessions collection exists.
-     */
-    void checkSessionsCollectionExists(OperationContext* opCtx) override;
-
 private:
     void _shardCollectionIfNeeded(OperationContext* opCtx);
     void _generateIndexesIfNeeded(OperationContext* opCtx);
 
+    // Serialises concurrent calls to setupSessionsCollection so that only one thread performs the
+    // sharded operations
     Mutex _mutex = MONGO_MAKE_LATCH("SessionsCollectionConfigServer::_mutex");
 };
 

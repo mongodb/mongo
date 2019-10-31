@@ -29,21 +29,18 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/query/cluster_cursor_manager.h"
-
 #include <memory>
 #include <vector>
 
-#include "mongo/db/logical_session_cache.h"
 #include "mongo/db/logical_session_cache_noop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/s/query/cluster_client_cursor_mock.h"
+#include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
-
 namespace {
 
 using unittest::assertGet;
@@ -111,7 +108,6 @@ protected:
     }
 
     void killCursorFromDifferentOpCtx(const NamespaceString& nss, CursorId cursorId) {
-
         // Set up another client to kill the cursor.
         auto killCursorClient = getServiceContext()->makeClient("killCursorClient");
         auto killCursorOpCtx = killCursorClient->makeOperationContext();
