@@ -18,7 +18,7 @@ TestData.skipCheckDBHashes = true;
 (function() {
 'use strict';
 
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
+load("jstests/libs/fail_point_util.js");
 load('jstests/libs/write_concern_util.js');
 
 const rs0_opts = {
@@ -104,15 +104,12 @@ assert.commandWorked(testDB.runCommand({
 jsTest.log("Turn on hangBeforeWritingDecision failpoint");
 // Make the commit coordination hang before writing the decision, and send commitTransaction.
 // The transaction on the participant will remain in prepare.
-assert.commandWorked(coordinatorPrimaryConn.adminCommand({
-    configureFailPoint: "hangBeforeWritingDecision",
-    mode: "alwaysOn",
-}));
+let failPoint = configureFailPoint(coordinatorPrimaryConn, "hangBeforeWritingDecision");
 
 // Run commit through mongos in a parallel shell. This should timeout since we have set the
 // failpoint.
 runCommitThroughMongosInParallelShellExpectTimeOut();
-waitForFailpoint("Hit hangBeforeWritingDecision failpoint", 1 /* numTimes */);
+failPoint.wait();
 
 jsTest.log("Stopping coordinator shard");
 // Stop the mongods on the coordinator shard using the SIGTERM signal. We must skip validation

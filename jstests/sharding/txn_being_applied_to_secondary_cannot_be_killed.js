@@ -8,7 +8,7 @@
 (function() {
 'use strict';
 
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
+load("jstests/libs/fail_point_util.js");
 
 const dbName = "test";
 const collName = "foo";
@@ -65,10 +65,7 @@ assert.commandWorked(session.getDatabase(dbName).runCommand({
 // operations in the transaction but before preparing the TransactionParticipant.
 const applyOpsHangBeforePreparingTransaction = "applyOpsHangBeforePreparingTransaction";
 const firstSecondary = st.rs0.getSecondary();
-assert.commandWorked(firstSecondary.adminCommand({
-    configureFailPoint: applyOpsHangBeforePreparingTransaction,
-    mode: "alwaysOn",
-}));
+let failPoint = configureFailPoint(firstSecondary, applyOpsHangBeforePreparingTransaction);
 
 // Commit the transaction, which will execute two-phase commit.
 assert.commandWorked(session.commitTransaction_forTesting());
@@ -84,7 +81,7 @@ assert.soon(function() {
 });
 
 jsTest.log("Waiting for secondary to apply the prepare oplog entry.");
-waitForFailpoint("Hit " + applyOpsHangBeforePreparingTransaction + " failpoint", 1);
+failPoint.wait();
 
 // Wait for the periodic transaction abort job to run while oplog
 // application is hanging. The job should run every 10 seconds due to the
@@ -98,10 +95,7 @@ jsTest.log("Turning off " + applyOpsHangBeforePreparingTransaction + " failpoint
 // Allow oplog application to continue by turning off the failpoint. The
 // transaction should prepare successfully and should not have been aborted
 // by the transaction abort job.
-assert.commandWorked(firstSecondary.adminCommand({
-    configureFailPoint: applyOpsHangBeforePreparingTransaction,
-    mode: "off",
-}));
+failPoint.off();
 
 jsTest.log("Turned off " + applyOpsHangBeforePreparingTransaction + " failpoint.");
 

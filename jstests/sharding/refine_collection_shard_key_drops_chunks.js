@@ -5,7 +5,7 @@
 
 (function() {
 'use strict';
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
+load('jstests/libs/fail_point_util.js');
 
 const st = new ShardingTest({shards: 1});
 const mongos = st.s0;
@@ -51,22 +51,19 @@ assert.eq({a: MaxKey, b: MaxKey}, chunkArr[2].max);
 
 // Enable failpoint 'hangPersistCollectionAndChangedChunksAfterDropChunks' and flush the routing
 // table cache.
-assert.commandWorked(shard.adminCommand({
-    configureFailPoint: 'hangPersistCollectionAndChangedChunksAfterDropChunks',
-    mode: 'alwaysOn'
-}));
+let hangAfterDropChunksFailPoint =
+    configureFailPoint(shard, 'hangPersistCollectionAndChangedChunksAfterDropChunks');
 
 assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: kNsName, key: newKeyDoc}));
 
 // Verify that all chunks belonging to 'db.foo' have been deleted.
-waitForFailpoint('Hit hangPersistCollectionAndChangedChunksAfterDropChunks', 1);
+hangAfterDropChunksFailPoint.wait();
 chunkArr = shard.getCollection(kConfigCacheChunks).find({}).sort({min: 1}).toArray();
 assert.eq(0, chunkArr.length);
 
 // Disable failpoint 'hangPersistCollectionAndChangedChunksAfterDropChunks' and continue
 // flushing the routing table cache.
-assert.commandWorked(shard.adminCommand(
-    {configureFailPoint: 'hangPersistCollectionAndChangedChunksAfterDropChunks', mode: 'off'}));
+hangAfterDropChunksFailPoint.off();
 
 // Verify that 'config.cache.chunks.db.foo' is as expected after refineCollectionShardKey. NOTE: We
 // use assert.soon here because refineCollectionShardKey doesn't block for each shard to refresh.

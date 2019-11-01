@@ -11,7 +11,7 @@
 (function() {
 "use strict";
 
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
+load("jstests/libs/fail_point_util.js");
 load("jstests/libs/write_concern_util.js");
 
 // The test modifies config.transactions, which must be done outside of a session.
@@ -496,8 +496,7 @@ const recoveryToken = startNewMultiShardWriteTransaction();
 // Ensure the coordinator will hang after putting the participants into prepare but
 // before sending the decision to the participants.
 clearRawMongoProgramOutput();
-assert.commandWorked(st.rs0.getPrimary().adminCommand(
-    {configureFailPoint: "hangBeforeWritingDecision", mode: "alwaysOn"}));
+let failPoint = configureFailPoint(st.rs0.getPrimary(), "hangBeforeWritingDecision");
 
 assert.commandFailedWithCode(st.s0.adminCommand({
     commitTransaction: 1,
@@ -509,7 +508,7 @@ assert.commandFailedWithCode(st.s0.adminCommand({
 }),
                              ErrorCodes.MaxTimeMSExpired);
 
-waitForFailpoint("Hit hangBeforeWritingDecision failpoint", 1);
+failPoint.wait();
 
 // Trying to recover the decision should block because the recovery shard's participant
 // is in prepare.
@@ -525,8 +524,7 @@ assert.commandFailedWithCode(st.s1.adminCommand({
                              ErrorCodes.MaxTimeMSExpired);
 
 // Allow the transaction to complete.
-assert.commandWorked(st.rs0.getPrimary().adminCommand(
-    {configureFailPoint: "hangBeforeWritingDecision", mode: "off"}));
+failPoint.off();
 
 // Trying to recover the decision should now return that the transaction committed.
 assert.commandWorked(sendCommitViaRecoveryMongos(lsid, txnNumber, recoveryToken));

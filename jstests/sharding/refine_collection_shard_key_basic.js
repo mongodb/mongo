@@ -8,6 +8,7 @@
 
 (function() {
 'use strict';
+load('jstests/libs/fail_point_util.js');
 load('jstests/sharding/libs/sharded_transactions_helpers.js');
 
 const st = new ShardingTest({mongos: 2, shards: 2, rs: {nodes: 3}});
@@ -311,43 +312,41 @@ enableShardingAndShardColl({_id: 1});
 
 // Configure failpoint 'hangRefineCollectionShardKeyAfterRefresh' on staleMongos and run
 // refineCollectionShardKey against this mongos in a parallel thread.
-assert.commandWorked(staleMongos.adminCommand(
-    {configureFailPoint: 'hangRefineCollectionShardKeyAfterRefresh', mode: 'alwaysOn'}));
+let hangAfterRefreshFailPoint =
+    configureFailPoint(staleMongos, 'hangRefineCollectionShardKeyAfterRefresh');
 const awaitShellToTriggerNamespaceNotSharded = startParallelShell(() => {
     assert.commandFailedWithCode(
         db.adminCommand({refineCollectionShardKey: 'db.foo', key: {_id: 1, aKey: 1}}),
         ErrorCodes.NamespaceNotSharded);
 }, staleMongos.port);
-waitForFailpoint('Hit hangRefineCollectionShardKeyAfterRefresh', 1);
+hangAfterRefreshFailPoint.wait();
 
 // Drop and re-create namespace 'db.foo' without staleMongos refreshing its metadata.
 dropAndRecreateColl({aKey: 1});
 
 // Should fail because namespace 'db.foo' is not sharded. NOTE: This NamespaceNotSharded error
 // is thrown in ConfigsvrRefineCollectionShardKeyCommand.
-assert.commandWorked(staleMongos.adminCommand(
-    {configureFailPoint: 'hangRefineCollectionShardKeyAfterRefresh', mode: 'off'}));
+hangAfterRefreshFailPoint.off();
 awaitShellToTriggerNamespaceNotSharded();
 
 assert.commandWorked(mongos.adminCommand({shardCollection: kNsName, key: {_id: 1}}));
 
 // Configure failpoint 'hangRefineCollectionShardKeyAfterRefresh' on staleMongos and run
 // refineCollectionShardKey against this mongos in a parallel thread.
-assert.commandWorked(staleMongos.adminCommand(
-    {configureFailPoint: 'hangRefineCollectionShardKeyAfterRefresh', mode: 'alwaysOn'}));
+hangAfterRefreshFailPoint =
+    configureFailPoint(staleMongos, 'hangRefineCollectionShardKeyAfterRefresh');
 const awaitShellToTriggerStaleEpoch = startParallelShell(() => {
     assert.commandFailedWithCode(
         db.adminCommand({refineCollectionShardKey: 'db.foo', key: {_id: 1, aKey: 1}}),
         ErrorCodes.StaleEpoch);
 }, staleMongos.port);
-waitForFailpoint('Hit hangRefineCollectionShardKeyAfterRefresh', 2);
+hangAfterRefreshFailPoint.wait(2);
 
 // Drop and re-shard namespace 'db.foo' without staleMongos refreshing its metadata.
 dropAndReshardColl({_id: 1});
 
 // Should fail because staleMongos has a stale epoch.
-assert.commandWorked(staleMongos.adminCommand(
-    {configureFailPoint: 'hangRefineCollectionShardKeyAfterRefresh', mode: 'off'}));
+hangAfterRefreshFailPoint.off();
 awaitShellToTriggerStaleEpoch();
 
 assert.commandWorked(mongos.getDB(kDbName).dropDatabase());

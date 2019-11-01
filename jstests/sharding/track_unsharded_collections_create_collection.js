@@ -9,23 +9,23 @@ TestData.skipCheckingCatalogCacheConsistencyWithShardingCatalog = true;
 (function() {
 'use strict';
 
+load("jstests/libs/fail_point_util.js");
 load("jstests/sharding/libs/track_unsharded_collections_helpers.js");
-load("jstests/sharding/libs/sharded_transactions_helpers.js");  // for waitForFailpoint
 
 function runExplicitCollectionCreationWithConfigStepdownAtFailpoint(failpointName, collName) {
     st.configRS.awaitNodesAgreeOnPrimary();
     const configPrimary = st.configRS.getPrimary();
 
     clearRawMongoProgramOutput();
-    setFailpoint(failpointName, configPrimary);
+    let failPoint = configureFailPoint(configPrimary, failpointName);
 
     const explicitCreateCode =
         `assert.commandWorked(db.getSiblingDB("${dbName}").runCommand({create: "${collName}"}));`;
     const awaitResult = startParallelShell(explicitCreateCode, st.s.port);
-    waitForFailpoint("Hit " + failpointName, 1);
+    failPoint.wait();
 
     assert.commandWorked(configPrimary.adminCommand({replSetStepDown: 1, force: true}));
-    unsetFailpoint(failpointName, configPrimary);
+    failPoint.off();
 
     awaitResult();
 }
@@ -35,15 +35,15 @@ function runImplicitCollectionCreationWithConfigStepdownAtFailpoint(failpointNam
     const configPrimary = st.configRS.getPrimary();
 
     clearRawMongoProgramOutput();
-    setFailpoint(failpointName, configPrimary);
+    let failPoint = configureFailPoint(configPrimary, failpointName);
 
     const implicitCreateCode = `assert.commandWorked(db.getSiblingDB("${
         dbName}").runCommand({insert: "${collName}", documents: [{_id: 1}]}));`;
     const awaitResult = startParallelShell(implicitCreateCode, st.s.port);
-    waitForFailpoint("Hit " + failpointName, 1);
+    failPoint.wait();
 
     assert.commandWorked(configPrimary.adminCommand({replSetStepDown: 1, force: true}));
-    unsetFailpoint(failpointName, configPrimary);
+    failPoint.off();
 
     awaitResult();
 }
@@ -167,7 +167,7 @@ assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 (() => {
     const [collName, ns] = getNewNs(dbName);
     jsTest.log(
-        `Check creating an unsharded collection that's already sharded with default sharding 
+        `Check creating an unsharded collection that's already sharded with default sharding
         options; ns: ${ns}`);
 
     // Create a sharded collection that has the default unsharded collection sharding options.

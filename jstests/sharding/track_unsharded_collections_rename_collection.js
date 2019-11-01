@@ -8,8 +8,8 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 (function() {
 'use strict';
 
+load("jstests/libs/fail_point_util.js");
 load("jstests/sharding/libs/track_unsharded_collections_helpers.js");
-load("jstests/sharding/libs/sharded_transactions_helpers.js");  // for waitForFailpoint
 
 function runCollectionRenameWithConfigStepdownAtFailpointInShard(
     failpointName, fromColl, toColl, fromNs, toNs, node) {
@@ -17,15 +17,15 @@ function runCollectionRenameWithConfigStepdownAtFailpointInShard(
     const configPrimary = st.configRS.getPrimary();
 
     clearRawMongoProgramOutput();
-    setFailpoint(failpointName, node);
+    let failPoint = configureFailPoint(node, failpointName);
 
     const renameCode = `assert.commandWorked(db.getSiblingDB("${
         dbName}").adminCommand({renameCollection: "${fromNs}", to: "${toNs}"}));`;
     const awaitResult = startParallelShell(renameCode, st.s.port);
-    waitForFailpoint("Hit " + failpointName, 1);
+    failPoint.wait();
     assert.commandWorked(configPrimary.adminCommand({replSetStepDown: 1, force: true}));
-    waitForFailpoint("Hit " + failpointName, 2);
-    unsetFailpoint(failpointName, node);
+    failPoint.wait(2);
+    failPoint.off();
 
     awaitResult();
 }
@@ -37,13 +37,14 @@ function runCollectionRenameWithConfigStepdownAtFailpointInPrimaryConfigsvr(
 
     clearRawMongoProgramOutput();
     setFailpoint(failpointName, configPrimary);
+    let failPoint = configureFailPoint(configPrimary, failpointName);
 
     const renameCode = `assert.commandWorked(db.getSiblingDB("${
         dbName}").adminCommand({renameCollection: "${fromNs}", to: "${toNs}"}));`;
     const awaitResult = startParallelShell(renameCode, st.s.port);
-    waitForFailpoint("Hit " + failpointName, 1);
+    failPoint.wait();
     assert.commandWorked(configPrimary.adminCommand({replSetStepDown: 1, force: true}));
-    unsetFailpoint(failpointName, configPrimary);
+    failPoint.off();
 
     awaitResult();
 }

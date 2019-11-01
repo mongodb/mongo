@@ -5,7 +5,7 @@
 
 (function() {
 'use strict';
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
+load('jstests/libs/fail_point_util.js');
 
 const st = new ShardingTest({shards: 1});
 const mongos = st.s0;
@@ -77,13 +77,14 @@ assert.eq({a: MaxKey, b: MaxKey}, oldTagsArr[1].max);
 
 // Enable failpoint 'hangRefineCollectionShardKeyBeforeCommit' and run refineCollectionShardKey in a
 // parallel shell.
-assert.commandWorked(st.configRS.getPrimary().adminCommand(
-    {configureFailPoint: 'hangRefineCollectionShardKeyBeforeCommit', mode: 'alwaysOn'}));
+let hangBeforeCommitFailPoint =
+    configureFailPoint(st.configRS.getPrimary(), 'hangRefineCollectionShardKeyBeforeCommit');
+
 let awaitShellToRefineCollectionShardKey = startParallelShell(() => {
     assert.commandWorked(
         db.adminCommand({refineCollectionShardKey: 'db.foo', key: {a: 1, b: 1, c: 1, d: 1}}));
 }, mongos.port);
-waitForFailpoint('Hit hangRefineCollectionShardKeyBeforeCommit', 1);
+hangBeforeCommitFailPoint.wait();
 
 // Verify that 'config.collections' has not been updated since we haven't committed the transaction.
 let newCollArr = mongos.getCollection(kConfigCollections).find({_id: kNsName}).toArray();
@@ -98,8 +99,7 @@ let newTagsArr = mongos.getCollection(kConfigTags).find({ns: kNsName}).sort({min
 assert.sameMembers(oldTagsArr, newTagsArr);
 
 // Disable failpoint 'hangRefineCollectionShardKeyBeforeCommit' and await parallel shell.
-assert.commandWorked(st.configRS.getPrimary().adminCommand(
-    {configureFailPoint: 'hangRefineCollectionShardKeyBeforeCommit', mode: 'off'}));
+hangBeforeCommitFailPoint.off();
 awaitShellToRefineCollectionShardKey();
 
 // Verify that 'config.collections' is as expected after refineCollectionShardKey.
@@ -140,22 +140,21 @@ assert.eq(oldKeyDoc, oldCollArr[0].key);
 
 // Enable failpoint 'hangRefineCollectionShardKeyBeforeUpdatingChunks' and run
 // refineCollectionShardKey in a parallel shell.
-assert.commandWorked(st.configRS.getPrimary().adminCommand(
-    {configureFailPoint: 'hangRefineCollectionShardKeyBeforeUpdatingChunks', mode: 'alwaysOn'}));
+let hangBeforeUpdatingChunksFailPoint = configureFailPoint(
+    st.configRS.getPrimary(), 'hangRefineCollectionShardKeyBeforeUpdatingChunks');
 awaitShellToRefineCollectionShardKey = startParallelShell(() => {
     assert.commandFailedWithCode(
         db.adminCommand({refineCollectionShardKey: 'db.foo', key: {a: 1, b: 1, c: 1, d: 1}}),
         ErrorCodes.WriteConflict);
 }, mongos.port);
-waitForFailpoint('Hit hangRefineCollectionShardKeyBeforeUpdatingChunks', 1);
+hangBeforeUpdatingChunksFailPoint.wait();
 
 // Manually write to 'config.chunks' to force refineCollectionShardKey to throw a WriteConflict
 // exception.
 assert.writeOK(mongos.getCollection(kConfigChunks).update({ns: kNsName}, {jumbo: true}));
 
 // Disable failpoint 'hangRefineCollectionShardKeyBeforeUpdatingChunks' and await parallel shell.
-assert.commandWorked(st.configRS.getPrimary().adminCommand(
-    {configureFailPoint: 'hangRefineCollectionShardKeyBeforeUpdatingChunks', mode: 'off'}));
+hangBeforeUpdatingChunksFailPoint.off();
 awaitShellToRefineCollectionShardKey();
 
 // Verify that 'config.collections' is as expected after refineCollectionShardKey.

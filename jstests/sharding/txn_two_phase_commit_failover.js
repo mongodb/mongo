@@ -13,6 +13,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 (function() {
 'use strict';
 
+load("jstests/libs/fail_point_util.js");
 load('jstests/sharding/libs/sharded_transactions_helpers.js');
 
 const dbName = "test";
@@ -131,10 +132,9 @@ const runTest = function(sameNodeStepsUpAfterFailover) {
             }));
         }
 
-        assert.commandWorked(coordPrimary.adminCommand({
-            configureFailPoint: failpointData.failpoint,
-            mode: {skip: (failpointData.skip ? failpointData.skip : 0)},
-        }));
+        let failPoint = configureFailPoint(coordPrimary, failpointData.failpoint, {}, {
+            skip: (failpointData.skip ? failpointData.skip : 0)
+        });
 
         // Run commitTransaction through a parallel shell.
         let awaitResult;
@@ -152,15 +152,12 @@ const runTest = function(sameNodeStepsUpAfterFailover) {
             numTimesShouldBeHit++;
         }
 
-        waitForFailpoint("Hit " + failpointData.failpoint + " failpoint", numTimesShouldBeHit);
+        failPoint.wait(numTimesShouldBeHit);
 
         // Induce the coordinator primary to step down.
         assert.commandWorked(
             coordPrimary.adminCommand({replSetStepDown: stepDownSecs, force: true}));
-        assert.commandWorked(coordPrimary.adminCommand({
-            configureFailPoint: failpointData.failpoint,
-            mode: "off",
-        }));
+        failPoint.off();
 
         // The router should retry commitTransaction against the new primary.
         awaitResult();
