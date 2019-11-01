@@ -76,7 +76,8 @@ assert.commandWorked(testDB.createCollection(smallCollName));
 let smallColl = testDB.getCollection(smallCollName);
 
 // The 'top' command should fail because the response would be too big to return.
-assert.commandFailedWithCode(largeColl.getDB().adminCommand('top'), 13548);
+assert.commandFailedWithCode(largeColl.getDB().adminCommand('top'),
+                             [13548, ErrorCodes.BSONObjectTooLarge]);
 
 // Adding indexes to the large collection should fail but not crash the server.
 assert.commandFailedWithCode(largeColl.createIndex({x: 1}), ErrorCodes.BSONObjectTooLarge);
