@@ -101,7 +101,12 @@ assert.commandFailedWithCode(sessionDB.runCommand({
                              ErrorCodes.PreparedTransactionInProgress);
 
 jsTestLog("Committing the first transaction");
-
+// Wait for the prepared transaction oplog entry to be majority committed before committing the
+// transaction. This is needed after restarting the node in a single-node replica set because the
+// lastCommitted is not set until it flushes its first oplog entry after the restart. We need to
+// wait for the lastCommitted OpTime to be past the prepareTimestamp before committing the prepared
+// transaction.
+PrepareHelpers.awaitMajorityCommitted(replTest, prepareTimestamp);
 // Make sure we can successfully commit the first transaction after recovery.
 let commitTimestamp = Timestamp(prepareTimestamp.getTime(), prepareTimestamp.getInc() + 1);
 assert.commandWorked(sessionDB.adminCommand({
