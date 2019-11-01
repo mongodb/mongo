@@ -94,6 +94,10 @@ public:
         return _databaseName;
     }
 
+    const bool isSharded() const {
+        return _sharded;
+    }
+
 private:
     boost::optional<std::string> _databaseName;
     std::string _collectionName;

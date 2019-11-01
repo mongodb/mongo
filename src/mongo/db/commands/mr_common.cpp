@@ -331,6 +331,14 @@ std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
                 shardKey == std::set<FieldPath>{FieldPath("_id"s)});
     }
 
+    // If sharded option is set to true and the replace action is specified, verify that this isn't
+    // running on mongos.
+    if (outType == OutputType::Replace && parsedMr.getOutOptions().isSharded()) {
+        uassert(31327,
+                "Cannot replace output collection when specifying sharded: true",
+                !expCtx->inMongos);
+    }
+
     // TODO: It would be good to figure out what kind of errors this would produce in the Status.
     // It would be better not to produce something incomprehensible out of an internal translation.
     auto pipeline = uassertStatusOK(Pipeline::create(
