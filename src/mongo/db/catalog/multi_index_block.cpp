@@ -877,6 +877,11 @@ bool MultiIndexBlock::isBackgroundBuilding() const {
     return _method == IndexBuildMethod::kBackground || _method == IndexBuildMethod::kHybrid;
 }
 
+void MultiIndexBlock::setIndexBuildMethod(IndexBuildMethod indexBuildMethod) {
+    invariant(_getState() == State::kUninitialized);
+    _method = indexBuildMethod;
+}
+
 MultiIndexBlock::State MultiIndexBlock::getState_forTest() const {
     return _getState();
 }
