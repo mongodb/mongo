@@ -120,6 +120,7 @@ void makeUpdateRequest(OperationContext* opCtx,
     requestOut->setRuntimeConstants(
         args.getRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx)));
     requestOut->setSort(args.getSort());
+    requestOut->setHint(args.getHint());
     requestOut->setCollation(args.getCollation());
     requestOut->setArrayFilters(args.getArrayFilters());
     requestOut->setUpsert(args.isUpsert());

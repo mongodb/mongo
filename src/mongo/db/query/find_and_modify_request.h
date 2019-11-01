@@ -102,6 +102,7 @@ public:
     BSONObj getFields() const;
     const boost::optional<write_ops::UpdateModification>& getUpdate() const;
     BSONObj getSort() const;
+    BSONObj getHint() const;
     BSONObj getCollation() const;
     const std::vector<BSONObj>& getArrayFilters() const;
     bool shouldReturnNew() const;
@@ -154,6 +155,11 @@ public:
     void setSort(BSONObj sort);
 
     /**
+     * Sets a hint on the query, which will force the planner to use the specified index.
+     */
+    void setHint(BSONObj hint);
+
+    /**
      * Sets the collation for the query, which is used for all string comparisons.
      */
     void setCollation(BSONObj collation);
@@ -200,6 +206,7 @@ private:
     bool _isUpsert{false};
     boost::optional<BSONObj> _fieldProjection;
     boost::optional<BSONObj> _sort;
+    boost::optional<BSONObj> _hint;
     boost::optional<BSONObj> _collation;
     boost::optional<std::vector<BSONObj>> _arrayFilters;
     boost::optional<RuntimeConstants> _runtimeConstants;

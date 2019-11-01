@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/command_generic_argument.h"
+#include "mongo/db/query/hint_parser.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/idl/idl_parser.h"
 
@@ -43,6 +44,7 @@ namespace mongo {
 namespace {
 const char kQueryField[] = "query";
 const char kSortField[] = "sort";
+const char kHintField[] = "hint";
 const char kCollationField[] = "collation";
 const char kArrayFiltersField[] = "arrayFilters";
 const char kRuntimeConstantsField[] = "runtimeConstants";
@@ -111,6 +113,10 @@ BSONObj FindAndModifyRequest::toBSON(const BSONObj& commandPassthroughFields) co
         builder.append(kSortField, _sort.get());
     }
 
+    if (_hint) {
+        builder.append(kHintField, _hint.get());
+    }
+
     if (_collation) {
         builder.append(kCollationField, _collation.get());
     }
@@ -153,6 +159,7 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
     BSONObj fields;
     BSONObj updateObj;
     BSONObj sort;
+    BSONObj hint;
     boost::optional<write_ops::UpdateModification> update;
 
     BSONObj collation;
@@ -161,6 +168,7 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
     bool isRemove = false;
     bool bypassDocumentValidation = false;
     bool arrayFiltersSet = false;
+    bool hintSet = false;
     std::vector<BSONObj> arrayFilters;
     boost::optional<RuntimeConstants> runtimeConstants;
     bool writeConcernOptionsSet = false;
@@ -185,6 +193,9 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
                             << sortElement.type()};
             }
             sort = sortElement.embeddedObject();
+        } else if (field == kHintField) {
+            hint = parseHint(cmdObj[kHintField]);
+            hintSet = true;
         } else if (field == kRemoveField) {
             isRemove = cmdObj[kRemoveField].trueValue();
         } else if (field == kUpdateField) {
@@ -275,6 +286,10 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
                     " 'remove' always returns the deleted document"};
         }
 
+        if (hintSet) {
+            return {ErrorCodes::FailedToParse, "Cannot specify a hint with remove=true"};
+        }
+
         if (arrayFiltersSet) {
             return {ErrorCodes::FailedToParse, "Cannot specify arrayFilters and remove=true"};
         }
@@ -288,6 +303,7 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
     FindAndModifyRequest request(std::move(fullNs), query, std::move(update));
     request.setFieldProjection(fields);
     request.setSort(sort);
+    request.setHint(hint);
     request.setCollation(collation);
     request.setBypassDocumentValidation(bypassDocumentValidation);
     if (arrayFiltersSet) {
@@ -314,6 +330,10 @@ void FindAndModifyRequest::setFieldProjection(BSONObj fields) {
 
 void FindAndModifyRequest::setSort(BSONObj sort) {
     _sort = sort.getOwned();
+}
+
+void FindAndModifyRequest::setHint(BSONObj hint) {
+    _hint = hint.getOwned();
 }
 
 void FindAndModifyRequest::setCollation(BSONObj collation) {
@@ -370,6 +390,10 @@ const boost::optional<write_ops::UpdateModification>& FindAndModifyRequest::getU
 
 BSONObj FindAndModifyRequest::getSort() const {
     return _sort.value_or(BSONObj());
+}
+
+BSONObj FindAndModifyRequest::getHint() const {
+    return _hint.value_or(BSONObj());
 }
 
 BSONObj FindAndModifyRequest::getCollation() const {

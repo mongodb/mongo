@@ -169,6 +169,24 @@ TEST(FindAndModifyRequest, UpdateWithSort) {
     ASSERT_BSONOBJ_EQ(expectedObj, request.toBSON({}));
 }
 
+TEST(FindAndModifyRequest, UpdateWithHint) {
+    const BSONObj query(BSON("x" << 1));
+    const BSONObj update(BSON("y" << 1));
+    const BSONObj hint(BSON("z" << -1));
+
+    auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
+    request.setHint(hint);
+
+    BSONObj expectedObj(fromjson(R"json({
+            findAndModify: 'user',
+            query: { x: 1 },
+            update: { y: 1 },
+            hint: { z: -1 }
+        })json"));
+
+    ASSERT_BSONOBJ_EQ(expectedObj, request.toBSON({}));
+}
+
 TEST(FindAndModifyRequest, UpdateWithCollation) {
     const BSONObj query(BSON("x" << 1));
     const BSONObj update(BSON("y" << 1));
@@ -248,6 +266,7 @@ TEST(FindAndModifyRequest, UpdateWithFullSpec) {
     const BSONObj query(BSON("x" << 1));
     const BSONObj update(BSON("y" << 1));
     const BSONObj sort(BSON("z" << -1));
+    const BSONObj hint(BSON("z" << -1));
     const BSONObj collation(BSON("locale"
                                  << "en_US"));
     const std::vector<BSONObj> arrayFilters{BSON("i" << 0)};
@@ -259,6 +278,7 @@ TEST(FindAndModifyRequest, UpdateWithFullSpec) {
     request.setFieldProjection(field);
     request.setShouldReturnNew(true);
     request.setSort(sort);
+    request.setHint(hint);
     request.setCollation(collation);
     request.setArrayFilters(arrayFilters);
     request.setRuntimeConstants(rtc);
@@ -273,6 +293,7 @@ TEST(FindAndModifyRequest, UpdateWithFullSpec) {
             upsert: true,
             fields: { x: 1, y: 1 },
             sort: { z: -1 },
+            hint: { z: -1 },
             collation: { locale: 'en_US' },
             arrayFilters: [ { i: 0 } ],
             runtimeConstants: {
@@ -421,6 +442,7 @@ TEST(FindAndModifyRequest, ParseWithUpdateOnlyRequiredFields) {
     ASSERT_EQ(false, request.isRemove());
     ASSERT_BSONOBJ_EQ(BSONObj(), request.getFields());
     ASSERT_BSONOBJ_EQ(BSONObj(), request.getSort());
+    ASSERT_BSONOBJ_EQ(BSONObj(), request.getHint());
     ASSERT_BSONOBJ_EQ(BSONObj(), request.getCollation());
     ASSERT_EQ(0u, request.getArrayFilters().size());
     ASSERT_EQ(false, request.shouldReturnNew());
@@ -433,6 +455,7 @@ TEST(FindAndModifyRequest, ParseWithUpdateFullSpec) {
             upsert: true,
             fields: { x: 1, y: 1 },
             sort: { z: -1 },
+            hint: { z: -1 },
             collation: {locale: 'en_US' },
             arrayFilters: [ { i: 0 } ],
             new: true
@@ -451,12 +474,41 @@ TEST(FindAndModifyRequest, ParseWithUpdateFullSpec) {
     ASSERT_EQ(false, request.isRemove());
     ASSERT_BSONOBJ_EQ(BSON("x" << 1 << "y" << 1), request.getFields());
     ASSERT_BSONOBJ_EQ(BSON("z" << -1), request.getSort());
+    ASSERT_BSONOBJ_EQ(BSON("z" << -1), request.getHint());
     ASSERT_BSONOBJ_EQ(BSON("locale"
                            << "en_US"),
                       request.getCollation());
     ASSERT_EQ(1u, request.getArrayFilters().size());
     ASSERT_BSONOBJ_EQ(BSON("i" << 0), request.getArrayFilters()[0]);
     ASSERT_EQ(true, request.shouldReturnNew());
+}
+
+TEST(FindAndModifyRequest, ParseWithUpdateAndStringHint) {
+    BSONObj cmdObj(fromjson(R"json({
+            query: { x: 1 },
+            update: { y: 1 },
+            hint: 'z_1'
+        })json"));
+
+    auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
+    ASSERT_OK(parseStatus.getStatus());
+
+    auto request = parseStatus.getValue();
+    ASSERT_EQ(NamespaceString("a.b"), request.getNamespaceString());
+    ASSERT_BSONOBJ_EQ(BSON("x" << 1), request.getQuery());
+    ASSERT(request.getUpdate());
+    ASSERT(request.getUpdate()->type() == write_ops::UpdateModification::Type::kClassic);
+    ASSERT_BSONOBJ_EQ(BSON("y" << 1), request.getUpdate()->getUpdateClassic());
+    ASSERT_BSONOBJ_EQ(BSON("$hint"
+                           << "z_1"),
+                      request.getHint());
+    ASSERT_EQ(false, request.isUpsert());
+    ASSERT_EQ(false, request.isRemove());
+    ASSERT_BSONOBJ_EQ(BSONObj(), request.getFields());
+    ASSERT_BSONOBJ_EQ(BSONObj(), request.getSort());
+    ASSERT_BSONOBJ_EQ(BSONObj(), request.getCollation());
+    ASSERT_EQ(0u, request.getArrayFilters().size());
+    ASSERT_EQ(false, request.shouldReturnNew());
 }
 
 TEST(FindAndModifyRequest, ParseWithRemoveOnlyRequiredFields) {
@@ -565,6 +617,24 @@ TEST(FindAndModifyRequest, ParseWithRemoveAndArrayFilters) {
     ASSERT_NOT_OK(parseStatus.getStatus());
 }
 
+TEST(FindAndModifyRequest, ParseWithRemoveAndHint) {
+    const BSONObj query(BSON("x" << 1));
+    const BSONObj hint(BSON("z" << -1));
+
+    auto request = FindAndModifyRequest::makeRemove(NamespaceString("test.user"), query);
+    request.setHint(hint);
+
+    BSONObj cmdObj(fromjson(R"json({
+            findAndModify: 'user',
+            query: { x: 1 },
+            remove: true,
+            hint: { z: -1 }
+        })json"));
+
+    auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
+    ASSERT_NOT_OK(parseStatus.getStatus());
+}
+
 TEST(FindAndModifyRequest, ParseWithCollationTypeMismatch) {
     BSONObj cmdObj(fromjson(R"json({
             query: { x: 1 },
@@ -625,6 +695,7 @@ TEST(FindAndModifyRequest, ParsesAndSerializesPipelineUpdate) {
       update: [{$replaceWith: {y: 1}}],
       fields: {},
       sort: {},
+      hint: {},
       collation: {}
     })json"));
     ASSERT_OK(FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), serialized).getStatus());
@@ -670,6 +741,17 @@ TEST(FindAndModifyRequest, InvalidSortParameter) {
 
     auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
     ASSERT_EQ(31174, parseStatus.getStatus().code());
+}
+
+TEST(FindAndModifyRequest, InvalidHintParameter) {
+    BSONObj cmdObj(fromjson(R"json({
+            findAndModify: 'user',
+            hint: 1
+        })json"));
+
+    ASSERT_THROWS_CODE(FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
 }
 
 TEST(FindAndModifyRequest, InvalidFieldParameter) {

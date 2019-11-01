@@ -773,6 +773,7 @@ DBCollection.prototype.findOneAndDelete = function(filter, options) {
  * @param {object} [options.projection=null] Limits the fields to return for all matching documents.
  * @param {object} [options.sort=null] Determines which document the operation modifies if the query
  *selects multiple documents.
+ * @param {object|string} [options.hint=null] Force a particular index to be used for the query.
  * @param {number} [options.maxTimeMS=null] The maximum amount of time to allow the query to run.
  * @param {boolean} [options.upsert=false] Upsert the document if it does not exist.
  * @param {boolean} [options.returnNewDocument=false] When true, returns the updated document rather
@@ -812,6 +813,10 @@ DBCollection.prototype.findOneAndReplace = function(filter, replacement, options
         cmd.collation = opts.collation;
     }
 
+    if (opts.hint) {
+        cmd.hint = opts.hint;
+    }
+
     // Set flags
     cmd.upsert = (typeof opts.upsert == 'boolean') ? opts.upsert : false;
     cmd.new = (typeof opts.returnNewDocument == 'boolean') ? opts.returnNewDocument : false;
@@ -839,6 +844,7 @@ DBCollection.prototype.findOneAndReplace = function(filter, replacement, options
  * @param {object} [options.projection=null] Limits the fields to return for all matching documents.
  * @param {object} [options.sort=null] Determines which document the operation modifies if the query
  *selects multiple documents.
+ * @param {object|string} [options.hint=null] Force a particular index to be used for the query.
  * @param {number} [options.maxTimeMS=null] The maximum amount of time to allow the query to run.
  * @param {boolean} [options.upsert=false] Upsert the document if it does not exist.
  * @param {boolean} [options.returnNewDocument=false] When true, returns the updated document rather
@@ -882,6 +888,10 @@ DBCollection.prototype.findOneAndUpdate = function(filter, update, options) {
 
     if (opts.arrayFilters) {
         cmd.arrayFilters = opts.arrayFilters;
+    }
+
+    if (opts.hint) {
+        cmd.hint = opts.hint;
     }
 
     // Set flags
