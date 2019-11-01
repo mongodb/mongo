@@ -38,11 +38,16 @@
 #include <string>
 #include <vector>
 
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/map_reduce_gen.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
 #include "mongo/db/op_observer_noop.h"
 #include "mongo/db/op_observer_registry.h"
@@ -277,6 +282,17 @@ TEST(ConfigTest, CollationNotAnObjectFailsToParse) {
 class MapReduceOpObserver : public OpObserverNoop {
 public:
     /**
+     * This function is called whenever mapReduce copies indexes from an existing output collection
+     * to a temporary collection.
+     */
+    void onStartIndexBuild(OperationContext* opCtx,
+                           const NamespaceString& nss,
+                           CollectionUUID collUUID,
+                           const UUID& indexBuildUUID,
+                           const std::vector<BSONObj>& indexes,
+                           bool fromMigrate) override;
+
+    /**
      * This function is called whenever mapReduce inserts documents into a temporary output
      * collection.
      */
@@ -307,11 +323,27 @@ public:
     // while mapReduce inserts its results into the temporary output collection.
     std::function<void()> onInsertsFn = [] {};
 
+    // Holds indexes copied from existing output collection to the temporary collections.
+    std::vector<BSONObj> indexesCreated;
+
     // Holds namespaces of temporary collections created by mapReduce.
     std::vector<NamespaceString> tempNamespaces;
 
     const repl::OpTime dropOpTime = {Timestamp(Seconds(100), 1U), 1LL};
 };
+
+/**
+ * This function is called whenever mapReduce copies indexes from an existing output collection
+ * to a temporary collection.
+ */
+void MapReduceOpObserver::onStartIndexBuild(OperationContext* opCtx,
+                                            const NamespaceString& nss,
+                                            CollectionUUID collUUID,
+                                            const UUID& indexBuildUUID,
+                                            const std::vector<BSONObj>& indexes,
+                                            bool fromMigrate) {
+    indexesCreated = indexes;
+}
 
 void MapReduceOpObserver::onInserts(OperationContext* opCtx,
                                     const NamespaceString& nss,
@@ -518,6 +550,54 @@ TEST_F(MapReduceCommandTest, PrimaryStepDownPreventsTemporaryCollectionDrops) {
         ASSERT_OK(_storage.getCollectionCount(_opCtx.get(), tempNss).getStatus())
             << "missing mapReduce temporary collection: " << tempNss;
     }
+}
+
+TEST_F(MapReduceCommandTest, ReplacingExistingOutputCollectionPreservesIndexes) {
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    ASSERT_OK(_storage.createCollection(_opCtx.get(), outputNss, options));
+
+    // Create an index in the existing output collection. This should be present in the recreated
+    // output collection.
+    auto indexSpec = BSON("v" << 2 << "key" << BSON("a" << 1) << "name"
+                              << "a_1");
+    {
+        AutoGetCollection autoColl(_opCtx.get(), outputNss, MODE_IX);
+        auto coll = autoColl.getCollection();
+        ASSERT(coll);
+        auto indexCatalog = coll->getIndexCatalog();
+        writeConflictRetry(
+            _opCtx.get(), "ReplacingExistingOutputCollectionPreservesIndexes", outputNss.ns(), [&] {
+                WriteUnitOfWork wuow(_opCtx.get());
+                ASSERT_OK(indexCatalog->createIndexOnEmptyCollection(_opCtx.get(), indexSpec));
+                wuow.commit();
+            });
+    }
+
+    auto sourceDoc = BSON("_id" << 0);
+    ASSERT_OK(_storage.insertDocument(_opCtx.get(), inputNss, {sourceDoc, Timestamp(0)}, 1LL));
+
+    auto mapCode = "function() { emit(this._id, this._id); }"_sd;
+    auto reduceCode = "function(k, v) { return Array.sum(v); }"_sd;
+    ASSERT_OK(_runCommand(mapCode, reduceCode));
+
+    // MapReduce should filter existing indexes in the temporary collection, such as
+    // the _id index.
+    ASSERT_EQUALS(2U, _opObserver->indexesCreated.size())
+        << BSON("indexesCreated" << _opObserver->indexesCreated);
+    if (IndexDescriptor::isIdIndexPattern(_opObserver->indexesCreated[0]["key"].Obj())) {
+        ASSERT_BSONOBJ_EQ(indexSpec, _opObserver->indexesCreated[1]);
+    } else {
+        ASSERT(IndexDescriptor::isIdIndexPattern(_opObserver->indexesCreated[1]["key"].Obj()))
+            << BSON("indexesCreated" << _opObserver->indexesCreated);
+        ASSERT_BSONOBJ_EQ(indexSpec, _opObserver->indexesCreated[0]);
+    }
+
+    ASSERT_NOT_EQUALS(*options.uuid,
+                      *CollectionCatalog::get(_opCtx.get()).lookupUUIDByNSS(outputNss))
+        << "Output collection " << outputNss << " was not replaced";
+
+    _assertTemporaryCollectionsAreDropped();
 }
 
 }  // namespace
