@@ -117,6 +117,12 @@ if env.ToolchainIs('msvc'):
     # the current source character set (codepage 65001).
     loglib_env.AppendUnique(CCFLAGS=['/wd4828'])
 
+    # permissions.cpp includes windows.h directly, causing issues with boost winapi (error C2116 and C2733)
+    loglib_env.AppendUnique(
+    CPPDEFINES=[
+        'BOOST_USE_WINDOWS_H',
+    ])
+
 loglib_env.Library(
     target='boost_log', 
     source=[
