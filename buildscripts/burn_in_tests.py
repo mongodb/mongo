@@ -443,7 +443,7 @@ def _set_resmoke_cmd(repeat_config: RepeatConfig, resmoke_args: [str]) -> [str]:
     return new_args
 
 
-def _parse_avg_test_runtime(test: str, task_avg_test_runtime_stats: TestStats) -> Optional[float]:
+def _parse_avg_test_runtime(test: str, task_avg_test_runtime_stats: [TestStats]) -> Optional[float]:
     """
     Parse list of teststats to find runtime for particular test.
 
@@ -492,7 +492,7 @@ def _calculate_exec_timeout(repeat_config: RepeatConfig, avg_test_runtime: float
 
 
 def _generate_timeouts(repeat_config: RepeatConfig, test: str,
-                       task_avg_test_runtime_stats: TestStats) -> TimeoutInfo:
+                       task_avg_test_runtime_stats: [TestStats]) -> TimeoutInfo:
     """
     Add timeout.update command to list of commands for a burn in execution task.
 

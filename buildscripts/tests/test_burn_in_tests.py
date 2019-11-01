@@ -18,7 +18,6 @@ from shrub.config import Configuration
 
 import buildscripts.burn_in_tests as under_test
 import buildscripts.util.teststats as teststats_utils
-import buildscripts.ciconfig.evergreen as evg
 import buildscripts.resmokelib.parser as _parser
 from buildscripts.resmokelib.suitesconfig import get_named_suites_with_root_level_key_and_value
 import buildscripts.evergreen_gen_multiversion_tests as gen_multiversion
@@ -59,30 +58,6 @@ def create_multiversion_tests_by_task_mock(n_tasks, n_tests):
 
 _DATE = datetime.datetime(2018, 7, 15)
 RESMOKELIB = "buildscripts.resmokelib"
-
-GENERATE_RESMOKE_TASKS_BASENAME = "this_is_a_gen_task"
-GENERATE_RESMOKE_TASKS_NAME = GENERATE_RESMOKE_TASKS_BASENAME + "_gen"
-GET_GENERATE_RESMOKE_TASKS_NAME = lambda _: GENERATE_RESMOKE_TASKS_NAME
-GENERATE_RESMOKE_TASKS_COMMAND = {
-    "func": "generate resmoke tasks",
-    "vars": {"suite": "suite3", "resmoke_args": "--shellWriteMode=commands"}
-}
-
-GENERATE_RESMOKE_TASKS_COMMAND2 = {
-    "func": "generate resmoke tasks", "vars": {"resmoke_args": "--shellWriteMode=commands"}
-}
-
-MULTIVERSION_PATH = "/data/multiversion"
-GENERATE_RESMOKE_TASKS_MULTIVERSION_COMMAND = {
-    "func": "generate resmoke tasks",
-    "vars": {"resmoke_args": "--shellWriteMode=commands", "use_multiversion": MULTIVERSION_PATH}
-}
-
-RUN_TESTS_MULTIVERSION_COMMAND = {
-    "func": "run tests",
-    "vars": {"resmoke_args": "--shellWriteMode=commands", "task_path_suffix": MULTIVERSION_PATH}
-}
-
 NUM_REPL_MIXED_VERSION_CONFIGS = len(gen_multiversion.REPL_MIXED_VERSION_CONFIGS)
 NUM_SHARDED_MIXED_VERSION_CONFIGS = len(gen_multiversion.SHARDED_MIXED_VERSION_CONFIGS)
 
@@ -92,82 +67,6 @@ NS = "buildscripts.burn_in_tests"
 def ns(relative_name):  # pylint: disable=invalid-name
     """Return a full name from a name relative to the test module"s name space."""
     return NS + "." + relative_name
-
-
-def tasks_mock(  #pylint: disable=too-many-arguments
-        tasks, generate_resmoke_tasks_command=None, get_vars_task_name=None, run_tests_command=None,
-        multiversion_path=None, multiversion_setup_command=None):
-    task_list = Mock()
-    task_list.tasks = []
-    for idx, task in enumerate(tasks):
-        task_list.tasks.append(Mock())
-        task_list.tasks[idx].is_generate_resmoke_task = generate_resmoke_tasks_command is not None
-        task_list.tasks[idx].is_run_tests_task = run_tests_command is not None
-        task_list.tasks[idx].is_multiversion_task = multiversion_path is not None
-        task_list.tasks[idx].generate_resmoke_tasks_command = generate_resmoke_tasks_command
-        task_list.tasks[idx].run_tests_command = run_tests_command
-        task_list.tasks[idx].get_vars_task_name = get_vars_task_name
-        task_list.tasks[idx].name = task["name"]
-        resmoke_args = task.get("combined_resmoke_args")
-        task_list.tasks[idx].combined_resmoke_args = resmoke_args
-        task_list.tasks[idx].resmoke_suite = evg.ResmokeArgs.get_arg(
-            resmoke_args, "suites") if resmoke_args else None
-        task_list.tasks[idx].multiversion_path = multiversion_path
-        task_list.tasks[idx].multiversion_setup_command = multiversion_setup_command
-        if task["name"].endswith("_gen"):
-            task_list.tasks[idx].generated_task_name = task["name"][:-4]
-
-    return task_list
-
-
-VARIANTS = {
-    "variantall":
-        tasks_mock([{"name": "task1", "combined_resmoke_args": "--suites=suite1 var1arg1"},
-                    {"name": "task2", "combined_resmoke_args": "--suites=suite1 var1arg2"},
-                    {"name": "task3", "combined_resmoke_args": "--suites=suite1 var1arg3"}]),
-    "variant1":
-        tasks_mock([{"name": "task1", "combined_resmoke_args": "--suites=suite1 var1arg1"},
-                    {"name": "task2"}]),
-    "variant2":
-        tasks_mock([{"name": "task2", "combined_resmoke_args": "var2arg1"},
-                    {"name": "task3", "combined_resmoke_args": "--suites=suite3 var2arg3"}]),
-    "variant3":
-        tasks_mock([{"name": "task2", "combined_resmoke_args": "var3arg1"}]),
-    "variant4":
-        tasks_mock([]),
-    "variant_multiversion":
-        tasks_mock(
-            [{"name": "multiversion_task", "combined_resmoke_args": "--suites=suite3 vararg"}],
-            run_tests_command=RUN_TESTS_MULTIVERSION_COMMAND,
-            multiversion_setup_command=RUN_TESTS_MULTIVERSION_COMMAND,
-            multiversion_path=MULTIVERSION_PATH),
-    "variant_generate_tasks":
-        tasks_mock([{
-            "name": GENERATE_RESMOKE_TASKS_NAME, "combined_resmoke_args": "--suites=suite3 vararg"
-        }], generate_resmoke_tasks_command=GENERATE_RESMOKE_TASKS_COMMAND,
-                   get_vars_task_name=GET_GENERATE_RESMOKE_TASKS_NAME),
-    "variant_generate_tasks_no_suite":
-        tasks_mock([{
-            "name": GENERATE_RESMOKE_TASKS_NAME, "combined_resmoke_args": "--suites=suite3 vararg"
-        }], generate_resmoke_tasks_command=GENERATE_RESMOKE_TASKS_COMMAND2,
-                   get_vars_task_name=GET_GENERATE_RESMOKE_TASKS_NAME),
-    "variant_generate_tasks_diff_names":
-        tasks_mock([{
-            "name": "gen_task_name_different_from_vars_task_name",
-            "combined_resmoke_args": "--suites=suite3 vararg"
-        }], generate_resmoke_tasks_command=GENERATE_RESMOKE_TASKS_COMMAND,
-                   get_vars_task_name=GET_GENERATE_RESMOKE_TASKS_NAME),
-    "variant_generate_tasks_multiversion":
-        tasks_mock([{
-            "name": GENERATE_RESMOKE_TASKS_NAME, "combined_resmoke_args": "--suites=suite3 vararg"
-        }], generate_resmoke_tasks_command=GENERATE_RESMOKE_TASKS_MULTIVERSION_COMMAND,
-                   get_vars_task_name=GET_GENERATE_RESMOKE_TASKS_NAME,
-                   multiversion_path=MULTIVERSION_PATH),
-}
-
-EVERGREEN_CONF = Mock()
-EVERGREEN_CONF.get_variant = VARIANTS.get
-EVERGREEN_CONF.variant_names = VARIANTS.keys()
 
 
 class TestRepeatConfig(unittest.TestCase):
@@ -521,7 +420,7 @@ TESTS_BY_TASK = {
         "resmoke_args": "--suites=suite4",
         "tests": ["jstests/multi1.js"],
         "use_multiversion": "/data/multi"},
-} # yapf: disable
+}  # yapf: disable
 
 
 class TestCreateGenerateTasksConfig(unittest.TestCase):
@@ -736,7 +635,7 @@ class TestCreateGenerateTasksFile(unittest.TestCase):
                     ]
                 }
             ]
-        } # yapf: disable
+        }  # yapf: disable
 
         gen_tasks_config_mock.return_value = evg_config
 
@@ -1085,7 +984,7 @@ class TestCreateTaskList(unittest.TestCase):
         suite_dict = {}
 
         with self.assertRaises(ValueError):
-            under_test.create_task_list(EVERGREEN_CONF, variant, suite_dict, [])
+            under_test.create_task_list(evg_conf_mock, variant, suite_dict, [])
 
 
 class TestFindChangedTests(unittest.TestCase):
