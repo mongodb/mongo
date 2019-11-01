@@ -198,6 +198,39 @@ TEST(OrOp, MatchesSingleClause) {
     ASSERT(!orOp.matchesBSON(BSON("a" << BSON_ARRAY(4 << 5)), nullptr));
 }
 
+TEST(OrOp, MatchesTwoClauses) {
+    auto clauseObj1 = fromjson("{i: 5}");
+    auto clauseObj2 = fromjson("{'i.a': 6}");
+    std::unique_ptr<ComparisonMatchExpression> clause1(
+        new EqualityMatchExpression("i", clauseObj1["i"]));
+    std::unique_ptr<ComparisonMatchExpression> clause2(
+        new EqualityMatchExpression("i.a", clauseObj2["i.a"]));
+
+    OrMatchExpression filter;
+    filter.add(clause1.release());
+    filter.add(clause2.release());
+
+    auto aClause1 = fromjson("{a: 5}");
+    auto iClause1 = fromjson("{i: 5}");
+    ASSERT_TRUE(filter.matchesBSONElement(aClause1["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iClause1));
+
+    auto aClause2 = fromjson("{a: {a: 6}}");
+    auto iClause2 = fromjson("{i: {a: 6}}");
+    ASSERT_TRUE(filter.matchesBSONElement(aClause2["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iClause2));
+
+    auto aNoMatch1 = fromjson("{a: 6}");
+    auto iNoMatch1 = fromjson("{i: 6}");
+    ASSERT_FALSE(filter.matchesBSONElement(aNoMatch1["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iNoMatch1));
+
+    auto aNoMatch2 = fromjson("{a: {a: 5}}");
+    auto iNoMatch2 = fromjson("{i: {a: 5}}");
+    ASSERT_FALSE(filter.matchesBSONElement(aNoMatch2["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iNoMatch2));
+}
+
 TEST(OrOp, MatchesThreeClauses) {
     BSONObj baseOperand1 = BSON("$gt" << 10);
     BSONObj baseOperand2 = BSON("$lt" << 0);

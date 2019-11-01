@@ -1861,4 +1861,272 @@ TEST(BitTestMatchExpression, DoesNotMatchBinaryWithBitMask) {
     ASSERT(banyc.matchesSingleElement(match1["a"]));
     ASSERT(banyc.matchesSingleElement(match2["a"]));
 }
+
+TEST(LeafMatchExpressionTest, Equal1) {
+    BSONObj temp = BSON("x" << 5);
+    EqualityMatchExpression e("x", temp["x"]);
+
+    ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 5 }")));
+    ASSERT_TRUE(e.matchesBSON(fromjson("{ x : [5] }")));
+    ASSERT_TRUE(e.matchesBSON(fromjson("{ x : [1,5] }")));
+    ASSERT_TRUE(e.matchesBSON(fromjson("{ x : [1,5,2] }")));
+    ASSERT_TRUE(e.matchesBSON(fromjson("{ x : [5,2] }")));
+
+    ASSERT_FALSE(e.matchesBSON(fromjson("{ x : null }")));
+    ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 6 }")));
+    ASSERT_FALSE(e.matchesBSON(fromjson("{ x : [4,2] }")));
+    ASSERT_FALSE(e.matchesBSON(fromjson("{ x : [[5]] }")));
+}
+
+TEST(LeafMatchExpressionTest, Comp1) {
+    BSONObj temp = BSON("x" << 5);
+
+    {
+        LTEMatchExpression e("x", temp["x"]);
+        ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 5 }")));
+        ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 4 }")));
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 6 }")));
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 'eliot' }")));
+    }
+
+    {
+        LTMatchExpression e("x", temp["x"]);
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 5 }")));
+        ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 4 }")));
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 6 }")));
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 'eliot' }")));
+    }
+
+    {
+        GTEMatchExpression e("x", temp["x"]);
+        ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 5 }")));
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 4 }")));
+        ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 6 }")));
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 'eliot' }")));
+    }
+
+    {
+        GTMatchExpression e("x", temp["x"]);
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 5 }")));
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 4 }")));
+        ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 6 }")));
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 'eliot' }")));
+    }
+}
+
+TEST(MatchesBSONElement, ScalarEquality) {
+    auto filterObj = fromjson("{i: 5}");
+    EqualityMatchExpression filter("i", filterObj["i"]);
+
+    auto aFive = fromjson("{a: 5}");
+    auto iFive = fromjson("{i: 5}");
+    ASSERT_TRUE(filter.matchesBSONElement(aFive["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iFive));
+
+    auto aSix = fromjson("{a: 6}");
+    auto iSix = fromjson("{i: 6}");
+    ASSERT_FALSE(filter.matchesBSONElement(aSix["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iSix));
+
+    auto aArrMatch1 = fromjson("{a: [5, 6]}");
+    auto iArrMatch1 = fromjson("{i: [5, 6]}");
+    ASSERT_TRUE(filter.matchesBSONElement(aArrMatch1["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iArrMatch1));
+
+    auto aArrMatch2 = fromjson("{a: [6, 5]}");
+    auto iArrMatch2 = fromjson("{i: [6, 5]}");
+    ASSERT_TRUE(filter.matchesBSONElement(aArrMatch2["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iArrMatch2));
+
+    auto aArrNoMatch = fromjson("{a: [6, 6]}");
+    auto iArrNoMatch = fromjson("{i: [6, 6]}");
+    ASSERT_FALSE(filter.matchesBSONElement(aArrNoMatch["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iArrNoMatch));
+
+    auto aObj = fromjson("{a: {i: 5}}");
+    auto iObj = fromjson("{i: {i: 5}}");
+    ASSERT_FALSE(filter.matchesBSONElement(aObj["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObj));
+
+    auto aObjArr = fromjson("{a: [{i: 5}]}");
+    auto iObjArr = fromjson("{i: [{i: 5}]}");
+    ASSERT_FALSE(filter.matchesBSONElement(aObjArr["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObjArr));
+}
+
+TEST(MatchesBSONElement, DottedPathEquality) {
+    auto filterObj = fromjson("{'i.a': 5}");
+    EqualityMatchExpression filter("i.a", filterObj["i.a"]);
+
+    auto aFive = fromjson("{a: 5}");
+    auto iFive = fromjson("{i: 5}");
+    ASSERT_FALSE(filter.matchesBSONElement(aFive["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iFive));
+
+    auto aArr = fromjson("{a: [5]}");
+    auto iArr = fromjson("{i: [5]}");
+    ASSERT_FALSE(filter.matchesBSONElement(aArr["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iArr));
+
+    auto aObjMatch = fromjson("{a: {a: 5, b: 6}}");
+    auto iObjMatch = fromjson("{i: {a: 5, b: 6}}");
+    ASSERT_TRUE(filter.matchesBSONElement(aObjMatch["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iObjMatch));
+
+    auto aObjNoMatch1 = fromjson("{a: {a: 6}}");
+    auto iObjNoMatch1 = fromjson("{i: {a: 6}}");
+    ASSERT_FALSE(filter.matchesBSONElement(aObjNoMatch1["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObjNoMatch1));
+
+    auto aObjNoMatch2 = fromjson("{a: {b: 5}}");
+    auto iObjNoMatch2 = fromjson("{i: {b: 5}}");
+    ASSERT_FALSE(filter.matchesBSONElement(aObjNoMatch2["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObjNoMatch2));
+
+    auto aObjArrMatch1 = fromjson("{a: [{a: 5}, {a: 6}]}");
+    auto iObjArrMatch1 = fromjson("{i: [{a: 5}, {a: 6}]}");
+    ASSERT_TRUE(filter.matchesBSONElement(aObjArrMatch1["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iObjArrMatch1));
+
+    auto aObjArrMatch2 = fromjson("{a: [{a: 6}, {a: 5}]}");
+    auto iObjArrMatch2 = fromjson("{i: [{a: 6}, {a: 5}]}");
+    ASSERT_TRUE(filter.matchesBSONElement(aObjArrMatch2["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iObjArrMatch2));
+
+    auto aObjArrNoMatch1 = fromjson("{a: [{a: 6}, {a: 6}]}");
+    auto iObjArrNoMatch1 = fromjson("{i: [{a: 6}, {a: 6}]}");
+    ASSERT_FALSE(filter.matchesBSONElement(aObjArrNoMatch1["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObjArrNoMatch1));
+
+    auto aObjArrNoMatch2 = fromjson("{a: [{b: 5}, {b: 5}]}");
+    auto iObjArrNoMatch2 = fromjson("{i: [{b: 5}, {b: 5}]}");
+    ASSERT_FALSE(filter.matchesBSONElement(aObjArrNoMatch2["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObjArrNoMatch2));
+}
+
+TEST(MatchesBSONElement, ArrayIndexEquality) {
+    auto filterObj = fromjson("{'i.1': 5}");
+    EqualityMatchExpression filter("i.1", filterObj["i.1"]);
+
+    auto aFive = fromjson("{a: 5}");
+    auto iFive = fromjson("{i: 5}");
+    ASSERT_FALSE(filter.matchesBSONElement(aFive["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iFive));
+
+    auto aArrMatch = fromjson("{a: [6, 5]}");
+    auto iArrMatch = fromjson("{i: [6, 5]}");
+    ASSERT_TRUE(filter.matchesBSONElement(aArrMatch["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iArrMatch));
+
+    auto aArrNoMatch = fromjson("{a: [5, 6]}");
+    auto iArrNoMatch = fromjson("{i: [5, 6]}");
+    ASSERT_FALSE(filter.matchesBSONElement(aArrNoMatch["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iArrNoMatch));
+
+    auto aObjMatch = fromjson("{a: {'1': 5}}");
+    auto iObjMatch = fromjson("{i: {'1': 5}}");
+    ASSERT_TRUE(filter.matchesBSONElement(aObjMatch["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iObjMatch));
+
+    auto aObjNoMatch = fromjson("{a: {i: 5}}");
+    auto iObjNoMatch = fromjson("{i: {i: 5}}");
+    ASSERT_FALSE(filter.matchesBSONElement(aObjNoMatch["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObjNoMatch));
+
+    auto aObjArrMatch = fromjson("{a: [{'1': 5}]}");
+    auto iObjArrMatch = fromjson("{i: [{'1': 5}]}");
+    ASSERT_TRUE(filter.matchesBSONElement(aObjArrMatch["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iObjArrMatch));
+
+    auto aObjArrNoMatch = fromjson("{a: [{i: 6}, {i: 5}]}");
+    auto iObjArrNoMatch = fromjson("{i: [{i: 6}, {i: 5}]}");
+    ASSERT_FALSE(filter.matchesBSONElement(aObjArrNoMatch["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObjArrNoMatch));
+
+    auto aArrArr = fromjson("{a: [[6, 5], [6, 5]]}");
+    auto iArrArr = fromjson("{i: [[6, 5], [6, 5]]}");
+    ASSERT_FALSE(filter.matchesBSONElement(aArrArr["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iArrArr));
+}
+
+TEST(MatchesBSONElement, ObjectEquality) {
+    auto filterObj = fromjson("{i: {a: 5}}");
+    EqualityMatchExpression filter("i", filterObj["i"]);
+
+    auto aFive = fromjson("{a: 5}");
+    auto iFive = fromjson("{i: 5}");
+    ASSERT_FALSE(filter.matchesBSONElement(aFive["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iFive));
+
+    auto aArr = fromjson("{a: [5]}");
+    auto iArr = fromjson("{i: [5]}");
+    ASSERT_FALSE(filter.matchesBSONElement(aArr["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iArr));
+
+    auto aObjMatch = fromjson("{a: {a: 5}}");
+    auto iObjMatch = fromjson("{i: {a: 5}}");
+    ASSERT_TRUE(filter.matchesBSONElement(aObjMatch["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iObjMatch));
+
+    auto aObjNoMatch1 = fromjson("{a: {a: 5, b: 6}}");
+    auto iObjNoMatch1 = fromjson("{i: {a: 5, b: 6}}");
+    ASSERT_FALSE(filter.matchesBSONElement(aObjNoMatch1["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObjNoMatch1));
+
+    auto aObjNoMatch2 = fromjson("{a: {a: 6}}");
+    auto iObjNoMatch2 = fromjson("{i: {a: 6}}");
+    ASSERT_FALSE(filter.matchesBSONElement(aObjNoMatch2["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObjNoMatch2));
+
+    auto aObjNoMatch3 = fromjson("{a: {b: 5}}");
+    auto iObjNoMatch3 = fromjson("{i: {b: 5}}");
+    ASSERT_FALSE(filter.matchesBSONElement(aObjNoMatch3["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObjNoMatch3));
+
+    auto aObjArrMatch1 = fromjson("{a: [{a: 5}, {a: 6}]}");
+    auto iObjArrMatch1 = fromjson("{i: [{a: 5}, {a: 6}]}");
+    ASSERT_TRUE(filter.matchesBSONElement(aObjArrMatch1["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iObjArrMatch1));
+
+    auto aObjArrMatch2 = fromjson("{a: [{a: 6}, {a: 5}]}");
+    auto iObjArrMatch2 = fromjson("{i: [{a: 6}, {a: 5}]}");
+    ASSERT_TRUE(filter.matchesBSONElement(aObjArrMatch2["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iObjArrMatch2));
+
+    auto aObjArrNoMatch = fromjson("{a: [{a: 6}, {a: 6}]}");
+    auto iObjArrNoMatch = fromjson("{i: [{a: 6}, {a: 6}]}");
+    ASSERT_FALSE(filter.matchesBSONElement(aObjArrNoMatch["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObjArrNoMatch));
+}
+
+TEST(MatchesBSONElement, ArrayEquality) {
+    auto filterObj = fromjson("{i: [5]}");
+    EqualityMatchExpression filter("i", filterObj["i"]);
+
+    auto aFive = fromjson("{a: 5}");
+    auto iFive = fromjson("{i: 5}");
+    ASSERT_FALSE(filter.matchesBSONElement(aFive["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iFive));
+
+    auto aArrMatch = fromjson("{a: [5]}");
+    auto iArrMatch = fromjson("{i: [5]}");
+    ASSERT_TRUE(filter.matchesBSONElement(aArrMatch["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iArrMatch));
+
+    auto aArrNoMatch = fromjson("{a: [5, 6]}");
+    auto iArrNoMatch = fromjson("{i: [5, 6]}");
+    ASSERT_FALSE(filter.matchesBSONElement(aArrNoMatch["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iArrNoMatch));
+
+    auto aObj = fromjson("{a: {i: [5]}}");
+    auto iObj = fromjson("{i: {i: [5]}}");
+    ASSERT_FALSE(filter.matchesBSONElement(aObj["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObj));
+
+    auto aObjArr = fromjson("{a: [{i: [5]}]}");
+    auto iObjArr = fromjson("{i: [{i: [5]}]}");
+    ASSERT_FALSE(filter.matchesBSONElement(aObjArr["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObjArr));
+}
+
 }  // namespace mongo
