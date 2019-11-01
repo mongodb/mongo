@@ -2118,9 +2118,22 @@ var ReplSetTest = function(opts) {
                                    (hasSecondaryIndexes &&
                                     primaryCollStats.nindexes !== secondaryCollStats.nindexes) ||
                                    primaryCollStats.ns !== secondaryCollStats.ns) {
+                            // Provide hint on where to look within stats.
+                            let reasons = [];
+                            if (primaryCollStats.capped !== secondaryCollStats.capped) {
+                                reasons.push('capped');
+                            }
+                            if (hasSecondaryIndexes &&
+                                primaryCollStats.nindexes !== secondaryCollStats.nindexes) {
+                                reasons.push('indexes');
+                            }
+                            if (primaryCollStats.ns !== secondaryCollStats.ns) {
+                                reasons.push('ns');
+                            }
                             print(msgPrefix +
                                   ', the primary and secondary have different stats for the ' +
-                                  'collection ' + dbName + '.' + collName);
+                                  'collection ' + dbName + '.' + collName + ': ' +
+                                  reasons.join(', '));
                             DataConsistencyChecker.dumpCollectionDiff(this,
                                                                       collectionPrinted,
                                                                       primaryCollInfos,
